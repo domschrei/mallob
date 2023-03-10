@@ -71,11 +71,11 @@ struct ProducedBinaryClause {
     }
 };
 
-struct ProducedLargeClause {
+struct __attribute__ ((packed)) ProducedLargeClause {
     
-    uint16_t size;
     // This member is marked mutable in order to allow extraction of a clause from a hash table.
     mutable int* data = nullptr;
+    uint16_t size;
 
     ProducedLargeClause() = default;
     ProducedLargeClause(const Mallob::Clause& cls) {

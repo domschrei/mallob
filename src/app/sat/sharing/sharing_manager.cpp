@@ -53,7 +53,7 @@ SharingManager::SharingManager(
 
 	auto callback = getCallback();
 	
-	assert(!solvers.empty());
+	if (solvers.empty()) return;
 	_num_original_clauses = solvers[0]->getSolverSetup().numOriginalClauses;
 	int maxNumGlobalSolvers = solvers[0]->getSolverSetup().maxNumSolvers;
 

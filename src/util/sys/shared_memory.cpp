@@ -32,18 +32,20 @@ namespace SharedMemory {
         return ::access(shmemFile.c_str(), F_OK) != -1;
     }
 
-    void* access(const std::string& specifier, size_t size) {
+    void* access(const std::string& specifier, size_t size, AccessMode accessMode) {
 
         std::string shmemFile = "/dev/shm/" + specifier;
         if (::access(shmemFile.c_str(), F_OK) == -1) return nullptr;
 
-        int memFd = shm_open(specifier.c_str(), O_RDWR, 0);
+        auto oflag = accessMode == READONLY ? O_RDONLY : O_RDWR;
+        int memFd = shm_open(specifier.c_str(), oflag, 0);
         if (memFd == -1) {
             perror("Can't open file");
             return nullptr;
         }
 
-        void *buffer = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, memFd, 0);
+        auto prot = accessMode == READONLY ? PROT_READ : (PROT_READ | PROT_WRITE);
+        void *buffer = mmap(NULL, size, prot, MAP_SHARED, memFd, 0);
         if (buffer == NULL) {
             perror("Can't mmap");
             return nullptr;

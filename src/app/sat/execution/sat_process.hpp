@@ -77,8 +77,8 @@ public:
         // Import first revision
         _desired_revision = _config.firstrev;
         {
-            int* fPtr = (int*) accessMemory(_shmem_id + ".formulae.0", sizeof(int) * _hsm->fSize);
-            int* aPtr = (int*) accessMemory(_shmem_id + ".assumptions.0", sizeof(int) * _hsm->aSize);
+            const int* fPtr = (const int*) accessMemory(_shmem_id + ".formulae.0", sizeof(int) * _hsm->fSize, SharedMemory::READONLY);
+            const int* aPtr = (const int*) accessMemory(_shmem_id + ".assumptions.0", sizeof(int) * _hsm->aSize, SharedMemory::READONLY);
             _engine.appendRevision(0, _hsm->fSize, fPtr, _hsm->aSize, aPtr, 
                 /*finalRevisionForNow=*/_desired_revision == 0);
             updateChecksum(fPtr, _hsm->fSize);
@@ -267,8 +267,8 @@ public:
     }
     
 private:
-    void* accessMemory(const std::string& shmemId, size_t size) {
-        void* ptr = SharedMemory::access(shmemId, size);
+    void* accessMemory(const std::string& shmemId, size_t size, SharedMemory::AccessMode accessMode = SharedMemory::ARBITRARY) {
+        void* ptr = SharedMemory::access(shmemId, size, accessMode);
         if (ptr == nullptr) {
             LOGGER(_log, V0_CRIT, "[ERROR] Could not access shmem %s\n", shmemId.c_str());  
             Process::doExit(0);  
@@ -276,7 +276,7 @@ private:
         return ptr;
     }
 
-    void updateChecksum(int* ptr, size_t size) {
+    void updateChecksum(const int* ptr, size_t size) {
         if (_checksum == nullptr) return;
         for (size_t i = 0; i < size; i++) _checksum->combine(ptr[i]);
     }
@@ -301,8 +301,8 @@ private:
         size_t* fSizePtr = (size_t*) accessMemory(_shmem_id + ".fsize." + std::to_string(revision), sizeof(size_t));
         size_t* aSizePtr = (size_t*) accessMemory(_shmem_id + ".asize." + std::to_string(revision), sizeof(size_t));
         LOGGER(_log, V4_VVER, "Read rev. %i/%i : %i lits, %i assumptions\n", revision, _desired_revision, *fSizePtr, *aSizePtr);
-        int* fPtr = (int*) accessMemory(_shmem_id + ".formulae." + std::to_string(revision), sizeof(int) * (*fSizePtr));
-        int* aPtr = (int*) accessMemory(_shmem_id + ".assumptions." + std::to_string(revision), sizeof(int) * (*aSizePtr));
+        const int* fPtr = (const int*) accessMemory(_shmem_id + ".formulae." + std::to_string(revision), sizeof(int) * (*fSizePtr), SharedMemory::READONLY);
+        const int* aPtr = (const int*) accessMemory(_shmem_id + ".assumptions." + std::to_string(revision), sizeof(int) * (*aSizePtr), SharedMemory::READONLY);
         
         if (checksum != nullptr) {
             // Append accessed data to local checksum

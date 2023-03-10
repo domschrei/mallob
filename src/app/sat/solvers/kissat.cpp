@@ -1,5 +1,6 @@
 
 #include "app/sat/sharing/buffer/priority_clause_buffer.hpp"
+#include "util/logger.hpp"
 extern "C" {
 #include "kissat/src/kissat.h"
 }
