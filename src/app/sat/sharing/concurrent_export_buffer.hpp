@@ -5,6 +5,7 @@
 
 #include "app/sat/data/produced_clause_candidate.hpp"
 #include "app/sat/sharing/buffer/priority_clause_buffer.hpp"
+#include "app/sat/solvers/portfolio_solver_interface.hpp"
 #include "util/logger.hpp"
 #include "util/sys/threading.hpp"
 #include "filter/concurrent_produced_clause_filter.hpp"
@@ -19,6 +20,7 @@ private:
         ConcurrentProducedClauseFilter filter;
         Mutex mtxBacklog;
         std::list<ProducedClauseCandidate> backlog;
+        float lastBacklogWarn {0};
 
         Slot(PriorityClauseBuffer& pcb, int epochHorizon, bool reshareImprovedLbd, int clauseLength) :
             clauseLength(clauseLength), filter(pcb, epochHorizon, reshareImprovedLbd) {}
@@ -26,6 +28,7 @@ private:
 
     std::vector<std::unique_ptr<Slot>> _slots;
     PriorityClauseBuffer& _pcb;
+    std::vector<std::shared_ptr<PortfolioSolverInterface>>& _solvers;
     std::vector<SolverStatistics*>& _solver_stats;
 
     ClauseHistogram _hist_failed_filter;
@@ -34,8 +37,9 @@ private:
 
 public:
     ConcurrentExportBuffer(PriorityClauseBuffer& pcb, int epochHorizon, bool reshareImprovedLbd,
+            std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
             std::vector<SolverStatistics*>& solverStats, int maxClauseLength) : 
-        _pcb(pcb), _solver_stats(solverStats),
+        _pcb(pcb), _solvers(solvers), _solver_stats(solverStats),
         _hist_failed_filter(maxClauseLength), 
         _hist_admitted_to_db(maxClauseLength), 
         _hist_dropped_before_db(maxClauseLength) {
@@ -55,7 +59,7 @@ public:
         auto& backlog = slot.backlog;
 
         // Can I expect to quickly obtain the map's internal locks?
-        if (filter.tryGetExclusiveLock()) {
+        if (filter.tryAcquireLock()) {
             // -- yes!
 
             // Insert clause directly
@@ -63,18 +67,30 @@ public:
 
             // Reduce backlog size
             std::list<ProducedClauseCandidate> extracted;
+            size_t backlogSize;
             {
                 auto lock = mtxBacklog.getLock();
                 auto endIt = backlog.begin();
                 std::advance(endIt, std::min(32UL, backlog.size()));
                 extracted.splice(extracted.end(), backlog, backlog.begin(), endIt);
+                backlogSize = backlog.size();
             }
             while (!extracted.empty()) {
                 processClause(extracted.front(), filter);
                 extracted.pop_front();
             }
 
-            filter.returnExclusiveLock();
+            filter.releaseLock();
+
+            // Print a warning periodically if the backlog is very large
+            if (backlogSize >= (1<<16)) {
+                auto time = Timer::elapsedSeconds();
+                if (time - slot.lastBacklogWarn >= 1.0) {
+                    LOGGER(_solvers[producerId]->getLogger(), V1_WARN, "[WARN] Export backlog for clauses of len %i had size %lu\n", 
+                        size, backlogSize);
+                    slot.lastBacklogWarn = time;
+                }
+            }
 
         } else {
             // -- no: Insert into backlog
@@ -97,10 +113,10 @@ public:
                 if (slotLocked[i]) continue;
                 if (nbLocked+1 == _slots.size()) {
                     // Last slot: acquire lock directly
-                    _slots[i]->filter.acquireExclusiveLock();
+                    _slots[i]->filter.acquireLock();
                     nbLocked++;
                     slotLocked[i] = true;
-                } else if (_slots[i]->filter.tryGetExclusiveLock()) {
+                } else if (_slots[i]->filter.tryAcquireLock()) {
                     nbLocked++;
                     slotLocked[i] = true;
                 }
@@ -108,7 +124,7 @@ public:
         }
     }
     void unlockAllFilters() {
-        for (auto& slot : _slots) slot->filter.returnExclusiveLock();
+        for (auto& slot : _slots) slot->filter.releaseLock();
     }
 
     void updateEpoch(int epoch) {

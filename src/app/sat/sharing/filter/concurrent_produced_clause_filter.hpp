@@ -63,11 +63,11 @@ struct AnyProducedClauseEquals {
 // subset of solvers should receive the clauses (because they did not export it themselves).
 class ConcurrentProducedClauseFilter {
 
-using ProducedMap = libcuckoo::cuckoohash_map<AnyProducedClause, ClauseInfo, AnyProducedClauseHasher, AnyProducedClauseEquals>;
+using ProducedMap = tsl::robin_map<AnyProducedClause, ClauseInfo, AnyProducedClauseHasher, AnyProducedClauseEquals>;
 
 private:
     PriorityClauseBuffer& _pcb;
-    std::shared_mutex _mtx_map;
+    Mutex _mtx_map;
     ProducedMap _map;
 
     const int _epoch_horizon;
@@ -94,47 +94,43 @@ public:
     enum ExportResult {ADMITTED, FILTERED, DROPPED};
     ExportResult tryRegisterAndInsert(ProducedClauseCandidate&& c) {
 
-        ClauseInfo defaultInfo(c);
-        defaultInfo.lastSharedEpoch = _epoch.load(std::memory_order_relaxed);
         AnyProducedClause apc = getAnyProducedClause(c);
         int* data = getLiteralData(apc);
 
         ExportResult result;
-        _map.uprase_fn(apc, [&](ClauseInfo& info, libcuckoo::UpsertContext ctx) {
 
-            bool contained = ctx == libcuckoo::UpsertContext::ALREADY_EXISTED;
-            if (contained) {
-                // entry existed before: check if this clause should be filtered
-                int oldLbd = info.minProducedLbd;
-                // No resharing upon improved LBD, or LBD not improved?
-                // => Filter clause.
-                if (!_reshare_improved_lbd || (oldLbd > 0 && c.lbd >= oldLbd)) {
-                    // add new producer, return.
-                    updateClauseInfo(c, info, /*updateLbd=*/false);
-                    result = FILTERED;
-                    return false;
-                }
-                // Clause can be accepted (again) due to improved LBD score
+        auto it = _map.find(apc);
+        bool contained = it != _map.end();
+        bool filtered = false;
+
+        if (contained) {
+            auto& info = it->second;
+            // entry existed before: check if this clause should be filtered
+            int oldLbd = info.minProducedLbd;
+            // No resharing upon improved LBD, or LBD not improved?
+            // => Filter clause.
+            if (!_reshare_improved_lbd || (oldLbd > 0 && c.lbd >= oldLbd)) {
+                // add new producer, return.
+                updateClauseInfo(c, apc, it, /*updateLbd=*/false);
+                result = FILTERED;
+                filtered = true;
             }
+            // Clause can be accepted (again) due to improved LBD score
+        }
 
+        if (!filtered) {
             // Try to insert to sharing database
             if (_pcb.addClause(data, c.size, c.lbd)) {
                 // Success!
                 result = ADMITTED;
-                if (!contained) return false; // nothing to do, info was newly constructed 
-                updateClauseInfo(c, info, /*updateLbd=*/true);
+                updateClauseInfo(c, apc, it, /*updateLbd=*/true);
             } else {
                 // No space left in database: update meta data, drop clause
                 result = DROPPED;
-                if (!contained) return true; // delete the newly constructed entry again
                 // (Do not update LBD value because the clause was not exported)
-                updateClauseInfo(c, info, /*updateLbd=*/false);
+                if (contained) updateClauseInfo(c, apc, it, /*updateLbd=*/false);
             }
-
-            return false; // do not delete
-        }, defaultInfo);
-
-        //LOG(V2_INFO, "FILTER_SIZE %lu/%lu\n", _map.size(), _map.capacity());
+        }
 
         if (result == ADMITTED && _deletion_list_size.load(std::memory_order_relaxed) >= 2) {
             // Remove up to two clauses which are marked for deletion from the filter
@@ -174,17 +170,15 @@ public:
 
         // Remove all old clauses
         int nbRemoved = 0;
-        auto lockedMap = _map.lock_table();
-        for (auto it = lockedMap.begin(); it != lockedMap.end();) {
+        for (auto it = _map.begin(); it != _map.end();) {
             auto& [apc, info] = *it;
             if (epoch - info.lastSharedEpoch > _epoch_horizon) {
-                it = lockedMap.erase(it);
+                it = _map.erase(it);
                 nbRemoved++;
             } else ++it;
         }
         //LOG(V2_INFO, "SWEEPED OVER FILTER horizon=%i epoch=%i removed=%i\n",
         //    _epoch_horizon, epoch, nbRemoved);
-        lockedMap.unlock();
 
         // Allow inserting threads to successfully tryGetSharedLock() again
         _mtx_map.unlock();
@@ -212,20 +206,13 @@ public:
         return _map.size();
     }
 
-    bool tryGetSharedLock() {
-        return _mtx_map.try_lock_shared();
+    bool tryAcquireLock() {
+        return _mtx_map.tryLock();
     }
-    void returnSharedLock() {
-        _mtx_map.unlock_shared();
-    }
-
-    bool tryGetExclusiveLock() {
-        return _mtx_map.try_lock();
-    }
-    void acquireExclusiveLock() {
+    void acquireLock() {
         _mtx_map.lock();
     }
-    void returnExclusiveLock() {
+    void releaseLock() {
         _mtx_map.unlock();
     }
 
@@ -285,7 +272,15 @@ private:
         }
     }
 
-    void updateClauseInfo(const ProducedClauseCandidate& c, ClauseInfo& info, bool updateLbd) {
+    ClauseInfo getDefaultClauseInfo(const ProducedClauseCandidate& c) {
+        ClauseInfo defaultInfo(c);
+        defaultInfo.lastSharedEpoch = _epoch.load(std::memory_order_relaxed);
+        return defaultInfo;
+    }
+
+    void updateClauseInfo(const ProducedClauseCandidate& c, const AnyProducedClause& apc, ProducedMap::iterator& it, bool updateLbd) {
+
+        ClauseInfo info = it == _map.end() ? getDefaultClauseInfo(c) : it->second;
         assert(c.lbd > 0);
         if (updateLbd) {
             if (info.minProducedLbd == 0 || info.minProducedLbd > c.lbd) {
@@ -300,43 +295,41 @@ private:
         // Add producing solver as a producer
         assert(c.producerId < MALLOB_MAX_N_APPTHREADS_PER_PROCESS);
         info.producers |= (1 << c.producerId);
+        _map.insert_or_assign(it, apc, std::move(info));
     }
 
     inline bool admitSharing(const AnyProducedClause& apc, int lbd, int epoch) {
-        
-        bool admit = true;
-        _map.update_fn(apc, [&](ClauseInfo& info) {
 
-            if (info.minSharedLbd > 0) {
-                // Clause was shared before
-                if (_epoch_horizon < 0 || epoch - info.lastSharedEpoch <= _epoch_horizon) {
-                    // Clause was shared at some recent point in time
-                    if (!_reshare_improved_lbd) {
-                        // Never reshare recent clauses, even with improved LBD
-                        admit = false;
-                        return;
-                    }
-                    if (info.minSharedLbd <= lbd) {
-                        // Clause was shared with this LBD or better: filter
-                        admit = false; 
-                        return;
-                    }
+        auto it = _map.find(apc);
+        if (it == _map.end()) return true;
+
+        ClauseInfo info = it->second;
+
+        if (info.minSharedLbd > 0) {
+            // Clause was shared before
+            if (_epoch_horizon < 0 || epoch - info.lastSharedEpoch <= _epoch_horizon) {
+                // Clause was shared at some recent point in time
+                if (!_reshare_improved_lbd) {
+                    // Never reshare recent clauses, even with improved LBD
+                    return false;
+                }
+                if (info.minSharedLbd <= lbd) {
+                    // Clause was shared with this LBD or better: filter
+                    return false;
                 }
             }
+        }
 
-            // Admit for sharing, update meta data to reflect sharing
-            info.minSharedLbd = lbd;
-            info.lastSharedEpoch = epoch;
-            admit = true;
-        });
-
-        return admit;
+        // Admit for sharing, update meta data to reflect sharing
+        info.minSharedLbd = lbd;
+        info.lastSharedEpoch = epoch;
+        _map.insert_or_assign(it, apc, std::move(info));
+        return true;
     }
 
     inline cls_producers_bitset getProducers(const AnyProducedClause& apc, int epoch) {
-        ClauseInfo returnedInfo;
-        bool found = _map.find(apc, returnedInfo);
-        if (!found) return 0;
-        return returnedInfo.producers;
+        auto it = _map.find(apc);
+        if (it == _map.end()) return 0;
+        return it->second.producers;
     }
 };

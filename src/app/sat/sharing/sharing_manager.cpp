@@ -40,7 +40,8 @@ SharingManager::SharingManager(
 		setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
 		return setup;
 	}()),
-	_export_buffer(_pcb, params.clauseFilterClearInterval(), params.reshareImprovedLbd(), _solver_stats, params.strictClauseLengthLimit()),
+	_export_buffer(_pcb, params.clauseFilterClearInterval(), params.reshareImprovedLbd(),
+		_solvers, _solver_stats, params.strictClauseLengthLimit()),
 	_hist_produced(params.strictClauseLengthLimit()), 
 	_hist_returned_to_db(params.strictClauseLengthLimit()) {
 
@@ -240,8 +241,15 @@ int SharingManager::filterSharing(int* begin, int buflen, int* filterOut) {
 		_id_alignment->contributeFirstClauseIdOfEpoch(filterOut);
 	}
 
+	int filterSizeBeingLocked = -1;
 	while (clause.begin != nullptr) {
 		++nbTotal;
+
+		if (filterSizeBeingLocked != clause.size) {
+			if (filterSizeBeingLocked != -1) _export_buffer.getFilter(filterSizeBeingLocked).releaseLock();
+			filterSizeBeingLocked = clause.size;
+			_export_buffer.getFilter(filterSizeBeingLocked).acquireLock();
+		}
 
 		if (shift == bitsPerElem) {
 			++filterPos;
@@ -259,6 +267,7 @@ int SharingManager::filterSharing(int* begin, int buflen, int* filterOut) {
 		++shift;
 		clause = reader.getNextIncomingClause();
 	}
+	if (filterSizeBeingLocked != -1) _export_buffer.getFilter(filterSizeBeingLocked).releaseLock();
 
 	_logger.log(V4_VVER, "filtered %i/%i\n", nbFiltered, nbTotal);
 	return filterPos+1;
@@ -301,9 +310,9 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	while (clause.begin != nullptr) {
 
 		if (filterSizeBeingLocked != clause.size) {
-			if (filterSizeBeingLocked != -1) _export_buffer.getFilter(filterSizeBeingLocked).returnExclusiveLock();
+			if (filterSizeBeingLocked != -1) _export_buffer.getFilter(filterSizeBeingLocked).releaseLock();
 			filterSizeBeingLocked = clause.size;
-			_export_buffer.getFilter(filterSizeBeingLocked).acquireExclusiveLock();
+			_export_buffer.getFilter(filterSizeBeingLocked).acquireLock();
 		}
 
 		hist.increment(clause.size);
@@ -317,7 +326,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 
 		clause = reader.getNextIncomingClause();
 	}
-	if (filterSizeBeingLocked != -1) _export_buffer.getFilter(filterSizeBeingLocked).returnExclusiveLock();
+	if (filterSizeBeingLocked != -1) _export_buffer.getFilter(filterSizeBeingLocked).releaseLock();
 	
 	for (auto& slv : importingSolvers) {
 		BufferReader reader = _pcb.getBufferReader(begin, buflen);
