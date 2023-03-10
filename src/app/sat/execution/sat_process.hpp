@@ -41,6 +41,9 @@ private:
     int _desired_revision;
     Checksum* _checksum;
 
+    std::vector<std::vector<int>> _read_formulae;
+    std::vector<std::vector<int>> _read_assumptions;
+
 public:
     SatProcess(const Parameters& params, const SatProcessConfig& config, Logger& log) 
         : _params(params), _config(config), _log(log), _engine(_params, _config, _log) {
@@ -76,13 +79,7 @@ public:
 
         // Import first revision
         _desired_revision = _config.firstrev;
-        {
-            const int* fPtr = (const int*) accessMemory(_shmem_id + ".formulae.0", sizeof(int) * _hsm->fSize, SharedMemory::READONLY);
-            const int* aPtr = (const int*) accessMemory(_shmem_id + ".assumptions.0", sizeof(int) * _hsm->aSize, SharedMemory::READONLY);
-            _engine.appendRevision(0, _hsm->fSize, fPtr, _hsm->aSize, aPtr, 
-                /*finalRevisionForNow=*/_desired_revision == 0);
-            updateChecksum(fPtr, _hsm->fSize);
-        }
+        readFormulaAndAssumptionsFromSharedMem(0);
         _last_imported_revision = 0;
         // Import subsequent revisions
         importRevisions();
@@ -267,6 +264,50 @@ public:
     }
     
 private:
+
+    void readFormulaAndAssumptionsFromSharedMem(int revision) {
+
+        float time = Timer::elapsedSeconds();
+
+        size_t fSize, aSize;
+        if (revision == 0) {
+            fSize = _hsm->fSize;
+            aSize = _hsm->aSize;
+        } else {
+            size_t* fSizePtr = (size_t*) accessMemory(_shmem_id + ".fsize." + std::to_string(revision), sizeof(size_t));
+            size_t* aSizePtr = (size_t*) accessMemory(_shmem_id + ".asize." + std::to_string(revision), sizeof(size_t));
+            fSize = *fSizePtr;
+            aSize = *aSizePtr;
+        }
+
+        const int* fPtr = (const int*) accessMemory(_shmem_id + ".formulae." + std::to_string(revision),
+            sizeof(int) * fSize, SharedMemory::READONLY);
+        const int* aPtr = (const int*) accessMemory(_shmem_id + ".assumptions." + std::to_string(revision),
+            sizeof(int) * aSize, SharedMemory::READONLY);
+
+        _read_formulae.emplace_back(fPtr, fPtr+fSize);
+        _read_assumptions.emplace_back(aPtr, aPtr+aSize);
+
+        _engine.appendRevision(revision, fSize, _read_formulae.back().data(), 
+            aSize, _read_assumptions.back().data(), revision == _desired_revision);
+
+        updateChecksum(_read_formulae.back().data(), fSize);
+        if (revision > 0) {
+            // Access checksum from outside
+            Checksum* chk = (Checksum*) accessMemory(_shmem_id + ".checksum." + std::to_string(revision), sizeof(Checksum));
+            if (chk->count() > 0) {
+                // Check checksum
+                if (_checksum->get() != chk->get()) {
+                    LOGGER(_log, V0_CRIT, "[ERROR] Checksum fail at rev. %i. Incoming count: %ld ; local count: %ld\n", revision, chk->count(), _checksum->count());
+                    abort();
+                }
+            }
+        }
+
+        time = Timer::elapsedSeconds() - time;
+        LOGGER(_log, V3_VERB, "Read formula rev. %i (size:%lu,%lu) from shared memory in %.4fs\n", revision, fSize, aSize, time);
+    }
+
     void* accessMemory(const std::string& shmemId, size_t size, SharedMemory::AccessMode accessMode = SharedMemory::ARBITRARY) {
         void* ptr = SharedMemory::access(shmemId, size, accessMode);
         if (ptr == nullptr) {
@@ -288,38 +329,13 @@ private:
             if (_hsm->doStartNextRevision && !_hsm->didStartNextRevision) {
                 _desired_revision = _hsm->desiredRevision;
                 _last_imported_revision++;
-                importRevision(_last_imported_revision, _checksum);
+                readFormulaAndAssumptionsFromSharedMem(_last_imported_revision);
                 _hsm->didStartNextRevision = true;
                 _hsm->hasSolution = false;
             } else doSleep();
             if (!_hsm->doStartNextRevision) _hsm->didStartNextRevision = false;
         }
         if (!_hsm->doStartNextRevision) _hsm->didStartNextRevision = false;
-    }
-
-    void importRevision(int revision, Checksum* checksum) {
-        size_t* fSizePtr = (size_t*) accessMemory(_shmem_id + ".fsize." + std::to_string(revision), sizeof(size_t));
-        size_t* aSizePtr = (size_t*) accessMemory(_shmem_id + ".asize." + std::to_string(revision), sizeof(size_t));
-        LOGGER(_log, V4_VVER, "Read rev. %i/%i : %i lits, %i assumptions\n", revision, _desired_revision, *fSizePtr, *aSizePtr);
-        const int* fPtr = (const int*) accessMemory(_shmem_id + ".formulae." + std::to_string(revision), sizeof(int) * (*fSizePtr), SharedMemory::READONLY);
-        const int* aPtr = (const int*) accessMemory(_shmem_id + ".assumptions." + std::to_string(revision), sizeof(int) * (*aSizePtr), SharedMemory::READONLY);
-        
-        if (checksum != nullptr) {
-            // Append accessed data to local checksum
-            updateChecksum(fPtr, *fSizePtr);
-            // Access checksum from outside
-            Checksum* chk = (Checksum*) accessMemory(_shmem_id + ".checksum." + std::to_string(revision), sizeof(Checksum));
-            if (chk->count() > 0) {
-                // Check checksum
-                if (checksum->get() != chk->get()) {
-                    LOGGER(_log, V0_CRIT, "[ERROR] Checksum fail at rev. %i. Incoming count: %ld ; local count: %ld\n", revision, chk->count(), checksum->count());
-                    abort();
-                }
-            }
-        }
-
-        _engine.appendRevision(revision, *fSizePtr, fPtr, *aSizePtr, aPtr, 
-            /*finalRevisionForNow=*/revision == _desired_revision);
     }
 
     void doSleep() {
