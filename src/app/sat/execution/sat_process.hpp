@@ -285,13 +285,21 @@ private:
         const int* aPtr = (const int*) accessMemory(_shmem_id + ".assumptions." + std::to_string(revision),
             sizeof(int) * aSize, SharedMemory::READONLY);
 
-        _read_formulae.emplace_back(fPtr, fPtr+fSize);
-        _read_assumptions.emplace_back(aPtr, aPtr+aSize);
+        if (_params.copyFormulaeFromSharedMem()) {
+            // Copy formula and assumptions to your own local memory
+            _read_formulae.emplace_back(fPtr, fPtr+fSize);
+            _read_assumptions.emplace_back(aPtr, aPtr+aSize);
 
-        _engine.appendRevision(revision, fSize, _read_formulae.back().data(), 
-            aSize, _read_assumptions.back().data(), revision == _desired_revision);
+            // Reference the according positions in local memory when forwarding the data
+            _engine.appendRevision(revision, fSize, _read_formulae.back().data(),
+                aSize, _read_assumptions.back().data(), revision == _desired_revision);
+            updateChecksum(_read_formulae.back().data(), fSize);
+        } else {
+            // Let the solvers read from shared memory directly
+            _engine.appendRevision(revision, fSize, fPtr, aSize, aPtr, revision == _desired_revision);
+            updateChecksum(fPtr, fSize);
+        }
 
-        updateChecksum(_read_formulae.back().data(), fSize);
         if (revision > 0) {
             // Access checksum from outside
             Checksum* chk = (Checksum*) accessMemory(_shmem_id + ".checksum." + std::to_string(revision), sizeof(Checksum));

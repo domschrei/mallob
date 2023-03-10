@@ -13,6 +13,8 @@ OPTION_GROUP(grpAppSat, "app/sat", "SAT solving options")
     "If formula is larger than threshold, reduce #threads per PE until #threads=1 or until limit is met \"on average\"")
  OPT_STRING(satEngineConfig,                "sec", "sat-engine-config",                  "",                      
     "Supply config for SAT engine subprocess [internal option, do not use]")
+ OPT_BOOL(copyFormulaeFromSharedMem,        "cpshm", "",                                           false,
+    "Copy each formula + assumptions from shared memory to local memory before launching solvers")
 
 OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration")
  OPT_INT(bufferedImportedClsGenerations,    "bicg", "buffered-imported-cls-generations", 4,        1,   LARGE_INT, 
