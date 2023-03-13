@@ -56,14 +56,22 @@ public:
         _hist_discarded_cls = &hist;
     }
 
+    // Reduces global budget by clause.size
+    // AND/OR
+    // reduces stored clauses in another slot and may store remainder in global budget
     bool insert(const Mallob::Clause& clause, ClauseSlot* maxNeighbor) {
+        assert(clause.size == _clause_length);
 
-        if (tryFetchBudget(1, maxNeighbor, false) == 0) 
+        int fetchedBudget = tryFetchBudget(1, maxNeighbor, false);
+        //LOG(V2_INFO, "(%i,%i) FETCHED_BUDGET=%i\n", _clause_length, _common_lbd_or_zero, fetchedBudget);
+        if (fetchedBudget == 0)
             return false;
         // Budget fetched successfully!
+        assert(fetchedBudget == clause.size || log_return_false("[ERROR] (%i,%i) Expected %i freed lits, got %i\n",
+            _clause_length, _common_lbd_or_zero, clause.size, fetchedBudget));
 
         auto lock = _mtx.getLock();
-        pushClauseToBack(clause);
+        pushClauseToBack(clause); // absorbs budget, increases # stored clauses
         return true;
     }
 
@@ -135,7 +143,7 @@ public:
         assert(nbFreedLits >= 0);
         assert(nbFreedLits % _clause_length == 0);
         //LOG(V2_INFO, "  %i/%i lits freed\n", nbFreedLits, nbStoredLits);
-        storeBudget(nbFreedLits);
+        storeBudget(nbFreedLits); // return budget freed from flushed clauses to global budget
         int dataIdx = _data_size - _effective_clause_length;
         while (nbFreedLits >= _clause_length) {
             // Clause freed - read, append to buffer, pop
@@ -168,13 +176,18 @@ public:
         int nbDesiredCls = (int) std::ceil(nbDesiredLits / (double)_clause_length);
         while (nbClauses > 0 &&
             !_nb_stored_clauses.compare_exchange_strong(nbClauses, std::max(0, nbClauses-nbDesiredCls), std::memory_order_relaxed)) {}
+        //LOG(V2_INFO, "(%i,%i) UPDATE_STOREDCLS %i ~> %i\n",
+        //    _clause_length, _common_lbd_or_zero, nbClauses, std::max(0, nbClauses-nbDesiredCls));
         
         int nbFreedLits = std::min(nbClauses, nbDesiredCls)*_clause_length;
         if (!freePartially && nbFreedLits < nbDesiredLits) {
-            storeBudget(nbFreedLits);
+            if (nbFreedLits > 0) storeBudget(nbFreedLits);
             return 0;
         }
-        if (nbFreedLits > nbDesiredLits) storeBudget(nbFreedLits);
+        if (nbFreedLits > nbDesiredLits) {
+            storeBudget(nbFreedLits-nbDesiredLits);
+            nbFreedLits = nbDesiredLits;
+        }
         return nbFreedLits;
     }
 
@@ -244,7 +257,9 @@ private:
     }
 
     void pushClauseToBack(const Mallob::Clause& clause) {
-        _nb_stored_clauses.fetch_add(1);
+        int nbStoredClsBefore = _nb_stored_clauses.fetch_add(1);
+        //LOG(V2_INFO, "(%i,%i) UPDATE_STOREDCLS %i ~> %i\n",
+        //    _clause_length, _common_lbd_or_zero, nbStoredClsBefore, nbStoredClsBefore+1);
         if (_data.size() < _data_size + _effective_clause_length) {
             _data.resize(std::max(
                 (int) (_data_size+_effective_clause_length),
@@ -300,7 +315,9 @@ private:
             // Try fetch budget from other slots
             ClauseSlot* neighbor = maxNeighbor;
             while (neighbor != this && budget < nbDesiredLits) {
-                budget += neighbor->tryFreeStoredLiterals(nbDesiredLits-budget, true);
+                assert(_clause_length < neighbor->_clause_length);
+                auto stolen = neighbor->tryFreeStoredLiterals(nbDesiredLits-budget, true);
+                budget += stolen;
                 neighbor = neighbor->getLeftNeighbor();
             }
             // Still insufficient?
@@ -316,7 +333,7 @@ private:
         if (budget > nbDesiredLits) {
             storeBudget(budget-nbDesiredLits);
         }
-        return budget;
+        return nbDesiredLits;
     }
 
     int fetchBudget(int numDesired) {
@@ -326,13 +343,16 @@ private:
             if (_global_budget.compare_exchange_strong(globalBudget, globalBudget-amountToFetch, 
                 std::memory_order_relaxed)) {
                 // success
+                //LOG(V2_INFO, "FETCH_BUDGET %i\n", amountToFetch);
                 return amountToFetch;
             }
         }
+        //LOG(V2_INFO, "FETCH_BUDGET 0\n");
         return 0;
     }
 
     void storeBudget(int amount) {
+        //LOG(V2_INFO, "STORE_BUDGET %i\n", amount);
         _global_budget.fetch_add(amount, std::memory_order_relaxed);
     }
 

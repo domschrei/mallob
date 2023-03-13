@@ -190,6 +190,11 @@ public:
         return (_total_literal_limit - _free_budget.load(std::memory_order_relaxed))
             + (UNIT_SLOT_MAX_BUDGET - _unit_slot_budget.load(std::memory_order_relaxed));
     }
+    std::string getCurrentlyUsedLiteralsReport() const {
+        std::string out;
+        for (auto& slot : _slots) out += std::to_string(slot->getNbStoredLiterals()) + " ";
+        return out;
+    }
     int getNumLiterals(int clauseLength, int lbd) const {
         auto [slotIdx, mode] = getSlotIdxAndMode(clauseLength, lbd);
         return _slots[slotIdx]->getNbStoredLiterals();
@@ -200,7 +205,13 @@ public:
     }
 
     bool checkTotalLiterals() {
-        // TODO
+        int nbLiterals = 0;
+        for (auto& slot : _slots) nbLiterals += slot->getNbStoredLiterals();
+        int nbAdvertisedLiterals = getCurrentlyUsedLiterals();
+        if (nbLiterals != nbAdvertisedLiterals) {
+            LOG(V0_CRIT, "[ERROR] %i literals advertised, %i present\n", nbAdvertisedLiterals, nbLiterals);
+            return false;
+        }
         return true;
     }
 

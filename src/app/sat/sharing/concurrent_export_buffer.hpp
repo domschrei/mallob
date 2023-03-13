@@ -140,8 +140,10 @@ public:
         for (auto& slot : _slots) {
             didCollectGarbage |= slot->filter.collectGarbage(logger, slot->clauseLength);
         }
-        if (didCollectGarbage)
-            LOGGER(logger, V4_VVER, "pcb size=%ld\n", _pcb.getCurrentlyUsedLiterals());
+        if (didCollectGarbage) {
+            LOGGER(logger, V4_VVER, "pcb size=%ld %s\n", _pcb.getCurrentlyUsedLiterals(),
+                _pcb.getCurrentlyUsedLiteralsReport().c_str());
+        }
     }
 
     ClauseHistogram& getFailedFilterHistogram() {return _hist_failed_filter;}
