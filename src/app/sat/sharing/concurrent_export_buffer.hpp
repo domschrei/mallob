@@ -136,7 +136,12 @@ public:
     }
 
     void collectGarbage(const Logger& logger) {
-        for (auto& slot : _slots) slot->filter.collectGarbage(logger, slot->clauseLength);
+        bool didCollectGarbage = false;
+        for (auto& slot : _slots) {
+            didCollectGarbage |= slot->filter.collectGarbage(logger, slot->clauseLength);
+        }
+        if (didCollectGarbage)
+            LOGGER(logger, V4_VVER, "pcb size=%ld\n", _pcb.getCurrentlyUsedLiterals());
     }
 
     ClauseHistogram& getFailedFilterHistogram() {return _hist_failed_filter;}

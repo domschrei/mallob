@@ -155,13 +155,13 @@ public:
         return result;
     }
 
-    void collectGarbage(const Logger& logger, int clauseLength) {
+    bool collectGarbage(const Logger& logger, int clauseLength) {
 
         // Garbage collector for old clauses in the map
-        if (_epoch_horizon < 0) return;
+        if (_epoch_horizon < 0) return false;
 
         int epoch = _epoch.load(std::memory_order_relaxed);
-        if (epoch - _last_gc_epoch < _epoch_horizon) return;
+        if (epoch - _last_gc_epoch < _epoch_horizon) return false;
         _last_gc_epoch = epoch;
 
         auto time = Timer::elapsedSeconds();
@@ -187,6 +187,7 @@ public:
 
         // Allow inserting threads to successfully tryGetSharedLock() again
         _mtx_map.unlock();
+        return true;
     }
 
     void updateEpoch(int epoch) {
