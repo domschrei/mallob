@@ -68,12 +68,20 @@ public:
             // Reduce backlog size
             std::list<ProducedClauseCandidate> extracted;
             size_t backlogSize;
+            bool warnSize = false;
             {
                 auto lock = mtxBacklog.getLock();
                 auto endIt = backlog.begin();
                 std::advance(endIt, std::min(32UL, backlog.size()));
                 extracted.splice(extracted.end(), backlog, backlog.begin(), endIt);
                 backlogSize = backlog.size();
+                if (backlogSize >= (1<<16)) {
+                    auto time = Timer::elapsedSeconds();
+                    if (time - slot.lastBacklogWarn >= 1.0) {
+                        warnSize = true;
+                        slot.lastBacklogWarn = time;
+                    }
+                }
             }
             while (!extracted.empty()) {
                 processClause(extracted.front(), filter);
@@ -83,13 +91,9 @@ public:
             filter.releaseLock();
 
             // Print a warning periodically if the backlog is very large
-            if (backlogSize >= (1<<16)) {
-                auto time = Timer::elapsedSeconds();
-                if (time - slot.lastBacklogWarn >= 1.0) {
-                    LOGGER(_solvers[producerId]->getLogger(), V1_WARN, "[WARN] Export backlog for clauses of len %i had size %lu\n", 
-                        size, backlogSize);
-                    slot.lastBacklogWarn = time;
-                }
+            if (warnSize) {
+                LOGGER(_solvers[producerId]->getLogger(), V1_WARN, "[WARN] Export backlog for clauses of len %i had size %lu\n",
+                    size, backlogSize);
             }
 
         } else {
@@ -131,8 +135,8 @@ public:
         for (auto& slot : _slots) slot->filter.updateEpoch(epoch);
     }
 
-    void collectGarbage() {
-        for (auto& slot : _slots) slot->filter.collectGarbage();
+    void collectGarbage(const Logger& logger) {
+        for (auto& slot : _slots) slot->filter.collectGarbage(logger, slot->clauseLength);
     }
 
     ClauseHistogram& getFailedFilterHistogram() {return _hist_failed_filter;}

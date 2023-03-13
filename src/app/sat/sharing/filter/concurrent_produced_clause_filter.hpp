@@ -155,7 +155,7 @@ public:
         return result;
     }
 
-    void collectGarbage() {
+    void collectGarbage(const Logger& logger, int clauseLength) {
 
         // Garbage collector for old clauses in the map
         if (_epoch_horizon < 0) return;
@@ -164,12 +164,15 @@ public:
         if (epoch - _last_gc_epoch < _epoch_horizon) return;
         _last_gc_epoch = epoch;
 
+        auto time = Timer::elapsedSeconds();
+
         // Signal that the sweep operation is ongoing
         // to inserting threads calling tryGetSharedLock()
         _mtx_map.lock();
 
         // Remove all old clauses
-        int nbRemoved = 0;
+        size_t nbRemoved = 0;
+        size_t mapSize = _map.size();
         for (auto it = _map.begin(); it != _map.end();) {
             auto& [apc, info] = *it;
             if (epoch - info.lastSharedEpoch > _epoch_horizon) {
@@ -177,8 +180,10 @@ public:
                 nbRemoved++;
             } else ++it;
         }
-        //LOG(V2_INFO, "SWEEPED OVER FILTER horizon=%i epoch=%i removed=%i\n",
-        //    _epoch_horizon, epoch, nbRemoved);
+
+        time = Timer::elapsedSeconds() - time;
+        LOGGER(logger, V4_VVER, "filter-gc clslen=%i epoch=%i removed=%lu/%lu time=%.4f\n",
+            clauseLength, epoch, nbRemoved, mapSize, time);
 
         // Allow inserting threads to successfully tryGetSharedLock() again
         _mtx_map.unlock();

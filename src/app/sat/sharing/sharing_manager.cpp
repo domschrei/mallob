@@ -385,7 +385,7 @@ void SharingManager::digestHistoricClauses(int epochBegin, int epochEnd, int *be
 
 void SharingManager::collectGarbageInFilter() {
 	if (!_gc_pending) return;
-	_export_buffer.collectGarbage();
+	_export_buffer.collectGarbage(_logger);
 	_gc_pending = false;
 }
 
