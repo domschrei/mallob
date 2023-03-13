@@ -27,7 +27,7 @@ void MyMpi::init() {
 }
 
 size_t MyMpi::getBinaryTreeBufferLimit(int numWorkers, int baseSize, float discountFactor, BufferQueryMode mode) {
-    float limit = baseSize * std::pow(discountFactor, std::log2(numWorkers+1));
+    float limit = baseSize * std::pow(discountFactor, std::log2(numWorkers+1)-1);
     if (mode == SELF) {
         return std::ceil(limit);
     } else {

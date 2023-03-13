@@ -80,11 +80,11 @@ public:
         if (_stage == PRODUCING_CLAUSES && _job->hasPreparedSharing()) {
 
             // Produce contribution to all-reduction of clauses
-            LOG(V4_VVER, "%s CS produced cls\n", _job->toStr());
             _allreduce_clauses.produce([&]() {
                 Checksum checksum;
                 int successfulSolverId;
                 auto clauses = _job->getPreparedClauses(checksum, successfulSolverId);
+                LOG(V4_VVER, "%s CS produced cls size=%lu\n", _job->toStr(), clauses.size());
                 clauses.push_back(1); // # aggregated workers
                 clauses.push_back(successfulSolverId); // successful solver ID (or -1)
                 return clauses;
