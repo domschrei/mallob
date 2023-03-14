@@ -11,8 +11,21 @@
 #include <fstream>
 
 #include "sat_reader.hpp"
+#include "util/params.hpp"
 #include "util/sys/terminator.hpp"
 #include "util/sys/timer.hpp"
+
+void handleUnsat(const Parameters& _params) {
+	LOG_OMIT_PREFIX(V0_CRIT, "s UNSATISFIABLE\n");
+	if (_params.certifiedUnsat()) {
+		// Output Mallob file with result code
+		std::ofstream resultFile(".mallob_result");
+		std::string resultCodeStr = std::to_string(20);
+		if (resultFile.is_open()) resultFile.write(resultCodeStr.c_str(), resultCodeStr.size());
+		// Create empty proof file
+		std::ofstream ofs(_params.proofOutputFile());
+	}
+}
 
 bool SatReader::read(JobDescription& desc) {
 
@@ -53,11 +66,7 @@ bool SatReader::read(JobDescription& desc) {
 				return false;
 			} else if (returnCode == 20) {
 				LOG(V2_INFO, "external call to CaDiCaL found result UNSAT\n");
-				LOG_OMIT_PREFIX(V0_CRIT, "s UNSATISFIABLE\n");
-				if (_params.certifiedUnsat()) {
-					// Create empty proof file
-					std::ofstream ofs(_params.proofOutputFile());
-				}
+				handleUnsat(_params);
 				return false;
 			} else assert(returnCode == 0 || log_return_false("Unexpected return code %i\n", returnCode));
 
@@ -167,11 +176,7 @@ bool SatReader::read(JobDescription& desc) {
 	if (namedpipe != -1) close(namedpipe);
 
 	if (_contains_empty_clause) {
-		LOG_OMIT_PREFIX(V0_CRIT, "s UNSATISFIABLE\n");
-		if (_params.certifiedUnsat()) {
-			// Create empty proof file
-			std::ofstream ofs(_params.proofOutputFile());
-		}
+		handleUnsat(_params);
 		return false;
 	}
 

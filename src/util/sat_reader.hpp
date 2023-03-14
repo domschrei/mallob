@@ -31,7 +31,7 @@ private:
 	int _num = 0;
 	int _max_var = 0;
     int _num_read_clauses = 0;
-    bool _last_added_lit_was_zero {false};
+    bool _last_added_lit_was_zero {true};
     bool _contains_empty_clause {false};
 
     // Content mode: RAW
