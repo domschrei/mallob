@@ -53,11 +53,15 @@ bool SatReader::read(JobDescription& desc) {
 			if (returnCode == 10) {
 				LOG(V2_INFO, "external call to CaDiCaL found result SAT\n");
 				LOG_OMIT_PREFIX(V0_CRIT, "s SATISFIABLE\n");
-				Terminator::broadcastExitSignal();
+				return false;
 			} else if (returnCode == 20) {
 				LOG(V2_INFO, "external call to CaDiCaL found result UNSAT\n");
 				LOG_OMIT_PREFIX(V0_CRIT, "s UNSATISFIABLE\n");
-				Terminator::broadcastExitSignal();
+				if (_params.certifiedUnsat()) {
+					// Create empty proof file
+					std::ofstream ofs(_params.proofOutputFile());
+				}
+				return false;
 			} else assert(returnCode == 0 || log_return_false("Unexpected return code %i\n", returnCode));
 
 			_filename = newFilename;
@@ -164,6 +168,15 @@ bool SatReader::read(JobDescription& desc) {
 
 	if (pipe != nullptr) pclose(pipe);
 	if (namedpipe != -1) close(namedpipe);
+
+	if (_contains_empty_clause) {
+		LOG_OMIT_PREFIX(V0_CRIT, "s UNSATISFIABLE\n");
+		if (_params.certifiedUnsat()) {
+			// Create empty proof file
+			std::ofstream ofs(_params.proofOutputFile());
+		}
+		return false;
+	}
 
 	return isValidInput();
 }

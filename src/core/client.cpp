@@ -313,6 +313,9 @@ void Client::advance() {
     if (_num_failed_jobs.load(std::memory_order_relaxed) > 0 && _failed_job_lock.tryLock()) {
         for (auto& jobname : _failed_job_queue) {
             LOG(V1_WARN, "[WARN] Rejecting submission %s - reason: Error while parsing description.\n", jobname.c_str());
+            if (_params.monoFilename.isSet()) {
+                Terminator::broadcastExitSignal();
+            }
         }
         _failed_job_queue.clear();
         _failed_job_lock.unlock();
