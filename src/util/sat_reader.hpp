@@ -31,6 +31,8 @@ private:
 	int _num = 0;
 	int _max_var = 0;
     int _num_read_clauses = 0;
+    bool _last_added_lit_was_zero {false};
+    bool _contains_empty_clause {false};
 
     // Content mode: RAW
     bool _traversing_clauses = true;
@@ -90,6 +92,8 @@ public:
                 assert(_num == 0);
                 if (!_assumption) {
                     desc.addLiteral(0);
+                    if (_last_added_lit_was_zero) _contains_empty_clause = true;
+                    _last_added_lit_was_zero = true;
                     _num_read_clauses++;
                 }
                 _began_num = false;
@@ -109,7 +113,11 @@ public:
                 if (!_assumption) {
                     int lit = _sign * _num;
                     desc.addLiteral(lit);
-                    if (lit == 0) _num_read_clauses++;
+                    if (lit == 0) {
+                        if (_last_added_lit_was_zero) _contains_empty_clause = true;
+                        _num_read_clauses++;
+                    }
+                    _last_added_lit_was_zero = lit == 0;
                 } else if (_num != 0) {
                     desc.addAssumption(_sign * _num);
                 }

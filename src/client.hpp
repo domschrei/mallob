@@ -93,6 +93,8 @@ private:
 
     PeriodicEvent<100> _periodic_check_done_jobs;
 
+    bool _unsuccessful_job_read {false};
+
 public:
     Client(MPI_Comm comm, Parameters& params)
         : _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 

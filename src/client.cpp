@@ -102,6 +102,7 @@ void Client::readIncomingJobs() {
                 }
                 if (!success) {
                     LOGGER(log, V1_WARN, "[T] [WARN] Unsuccessful read - skipping #%i\n", id);
+                    _unsuccessful_job_read = true;
                 } else {
                     time = Timer::elapsedSeconds() - time;
                     LOGGER(log, V3_VERB, "[T] Initialized job #%i %s in %.3fs: %ld lits w/ separators, %ld assumptions\n", 
@@ -262,6 +263,10 @@ void Client::advance() {
             } else ++it;
         }
         _jobs_to_interrupt_lock.unlock();
+    }
+
+    if (_unsuccessful_job_read &&_params.monoFilename.isSet()) {
+        Terminator::broadcastExitSignal();
     }
 
     // Process arrival times chronologically; if at least one "happened", notify reader
