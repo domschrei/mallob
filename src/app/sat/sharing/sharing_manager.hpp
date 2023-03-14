@@ -76,6 +76,7 @@ protected:
 	int _global_solver_id_with_result {-1};
 
 	std::unique_ptr<ClauseIdAlignment> _id_alignment;
+	bool _sharing_op_ongoing {false};
 
 public:
 	SharingManager(std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
@@ -110,6 +111,10 @@ public:
 	void writeClauseEpochs(const std::string& filename) {
 		if (!_id_alignment) return;
 		_id_alignment->writeClauseEpochs(filename);
+	}
+
+	bool isSharingOperationOngoing() const {
+		return _sharing_op_ongoing;
 	}
 
 private:

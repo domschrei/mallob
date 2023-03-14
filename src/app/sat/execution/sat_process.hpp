@@ -146,7 +146,7 @@ public:
             if (!_hsm->doDumpStats) _hsm->didDumpStats = false;
 
             // Check if clauses should be exported
-            if (_hsm->doExport && !_hsm->didExport) {
+            if (_hsm->doExport && !_hsm->didExport && _engine.isReadyToPrepareSharing()) {
                 LOGGER(_log, V5_DEBG, "DO export clauses\n");
                 // Collect local clauses, put into shared memory
                 _hsm->exportChecksum = Checksum();

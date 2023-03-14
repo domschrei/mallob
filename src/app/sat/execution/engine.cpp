@@ -2,6 +2,8 @@
 #include "engine.hpp"
 
 #include "../sharing/sharing_manager.hpp"
+#include "app/sat/data/clause.hpp"
+#include "app/sat/data/clause_metadata.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "data/app_configuration.hpp"
@@ -317,6 +319,12 @@ int SatEngine::solveLoop() {
 		return _result.result;
 	}
     return -1; // no result yet
+}
+
+bool SatEngine::isReadyToPrepareSharing() const {
+	// If certified UNSAT is enabled, no sharing operation can be ongoing
+	// (otherwise, this op must be finished first, for clause ID consistency)
+	return !ClauseMetadata::enabled() || !_sharing_manager->isSharingOperationOngoing();
 }
 
 int SatEngine::prepareSharing(int* begin, int maxSize, int& successfulSolverId) {

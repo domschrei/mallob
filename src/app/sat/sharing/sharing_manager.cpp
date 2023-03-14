@@ -123,12 +123,12 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 	if (clauseSize == 1 && clause.lbd != 1) {
 		_logger.log(V1_WARN, "Observed unit LBD of %i\n", clause.lbd);
 	}
-	if (clauseSize > 1) {
+	if (clauseSize-ClauseMetadata::numBytes() > 1) {
 		_observed_nonunit_lbd_of_zero |= clause.lbd == 0;
 		_observed_nonunit_lbd_of_one |= clause.lbd == 1;
 		_observed_nonunit_lbd_of_two |= clause.lbd == 2;
-		_observed_nonunit_lbd_of_length_minus_one |= clause.lbd == clause.size-1;
-		_observed_nonunit_lbd_of_length |= clause.lbd == clause.size;
+		_observed_nonunit_lbd_of_length_minus_one |= clause.lbd == clause.size-ClauseMetadata::numBytes()-1;
+		_observed_nonunit_lbd_of_length |= clause.lbd == clause.size-ClauseMetadata::numBytes();
 	}
 
 	if (clauseSize == 1) assert(clause.lbd == 1);
@@ -165,6 +165,8 @@ int SharingManager::prepareSharing(int* begin, int totalLiteralLimit, int& succe
 			LOGGER(_logger, V4_VVER, "Emit successful solver ID %i\n", successfulSolverId);
 		}
 	}
+
+	_sharing_op_ongoing = true;
 
 	// Flushing the priority clause buffer results in owning locks
 	// for an extended period, which may block solver threads.
@@ -341,6 +343,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 
 	// Signal next garbage collection
 	_gc_pending = true;
+	_sharing_op_ongoing = false;
 }
 
 void SharingManager::applyFilterToBuffer(int* begin, int& buflen, const int* filter) {
