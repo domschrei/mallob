@@ -47,8 +47,7 @@ public:
         }
 
         _next_clause.resize(clause.size+1);
-        // In CaDiCaL, LBD scores are represented from 1 to len-1. => Decrement LBD.
-        _next_clause[0] = clause.lbd-1;
+        _next_clause[0] = clause.lbd; //-1;
         for (size_t i = 0; i < clause.size; i++) {
             _next_clause[i+1] = clause.begin[i];
         }
