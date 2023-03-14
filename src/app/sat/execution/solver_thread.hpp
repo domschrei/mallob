@@ -1,7 +1,6 @@
 
 #pragma once
 
-#include <random>
 #include <sys/types.h>
 #include <unistd.h>
 #include <utility>
@@ -30,9 +29,6 @@ private:
     PortfolioSolverInterface& _solver;
     Logger& _logger;
     std::thread _thread;
-
-    std::mt19937 _rng;
-    std::uniform_real_distribution<float> _dist;
 
     std::vector<std::pair<size_t, const int*>> _pending_formulae;
     std::vector<std::pair<size_t, const int*>> _pending_assumptions;

@@ -4,7 +4,6 @@
 #include <string>
 
 #include "util/logger.hpp"
-#include "util/random.hpp"
 
 struct SolverSetup {
 
