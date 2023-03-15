@@ -4,6 +4,7 @@
 #include <chrono>
 #include <random>
 
+#include "app/sat/sharing/buffer/priority_clause_buffer.hpp"
 #include "glucose.hpp"
 #include "util/distribution.hpp"
 
@@ -229,6 +230,17 @@ void MGlucose::writeStatistics(SolverStatistics& stats) {
 	stats.producedClauses = numProduced;
 }
 
+void MGlucose::cleanUp() {
+	// Best effort cleanup of the probably most space-hogging structures
+	watches.clear(true);
+	watchesBin.clear(true);
+	unaryWatches.clear(true);
+	clauses.clear(true);
+	learnts.clear(true);
+	permanentLearnts.clear(true);
+	occurs.clear(true);
+}
+
 MGlucose::~MGlucose() {
 	resetMaps();
 }
@@ -350,7 +362,7 @@ void MGlucose::parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysi
 bool MGlucose::parallelImportClauses() {
 
 	Mallob::Clause importedClause;
-	while (fetchLearnedClause(importedClause, AdaptiveClauseDatabase::NONUNITS)) {
+	while (fetchLearnedClause(importedClause, PriorityClauseBuffer::NONUNITS)) {
 		assert(importedClause.size > 1);
 
 		// Assemble Glucose-style clause

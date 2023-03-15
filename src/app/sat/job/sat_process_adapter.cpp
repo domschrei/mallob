@@ -365,6 +365,7 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
     if (_hsm->didDigestHistoricClauses) _hsm->doDigestHistoricClauses = false;
     if (_hsm->didStartNextRevision)     _hsm->doStartNextRevision     = false;
     if (_hsm->didDumpStats)             _hsm->doDumpStats             = false;
+    if (_hsm->didReduceThreadCount)     _hsm->doReduceThreadCount     = false;
     if (_hsm->didDigestImport) {
         _hsm->doDigestImportWithFilter = false;
         _hsm->doDigestImportWithoutFilter = false;
@@ -460,6 +461,11 @@ void* SatProcessAdapter::createSharedMemoryBlock(std::string shmemSubId, size_t 
 
 void SatProcessAdapter::crash() {
     _hsm->doCrash = true;
+}
+
+void SatProcessAdapter::reduceThreadCount() {
+    if (!_hsm->doReduceThreadCount && !_hsm->didReduceThreadCount)
+        _hsm->doReduceThreadCount = true;
 }
 
 SatProcessAdapter::~SatProcessAdapter() {

@@ -153,6 +153,13 @@ bool Kissat::shouldTerminate() {
     return interrupted;
 }
 
+void Kissat::cleanUp() {
+    if (solver) {
+        kissat_release(solver);
+        solver = nullptr;
+    }
+}
+
 std::vector<int> Kissat::getSolution() {
 	std::vector<int> result = {0};
 
@@ -216,6 +223,7 @@ int Kissat::getSplittingVariable() {
 }
 
 void Kissat::writeStatistics(SolverStatistics& stats) {
+    if (!solver) return;
     kissat_statistics kstats = kissat_get_statistics(solver);
     stats.conflicts = kstats.conflicts;
     stats.decisions = kstats.decisions;
@@ -228,6 +236,6 @@ void Kissat::writeStatistics(SolverStatistics& stats) {
 }
 
 Kissat::~Kissat() {
-	kissat_release(solver);
+	cleanUp();
 }
 

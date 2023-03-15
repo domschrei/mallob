@@ -90,6 +90,8 @@ public:
 	bool supportsIncrementalSat() override {return true;}
 	bool exportsConditionalClauses() override {return false;}
 
+	void cleanUp() override;
+
 private:
 	void updateMaxVar(int lit);
     

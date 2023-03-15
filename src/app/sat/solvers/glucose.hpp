@@ -77,6 +77,8 @@ public:
 	bool supportsIncrementalSat() override {return true;}
 	bool exportsConditionalClauses() override {return true;}
 
+	void cleanUp() override;
+
 private:
 	Glucose::Lit encodeLit(int lit);
 	int decodeLit(Glucose::Lit lit);

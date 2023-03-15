@@ -37,6 +37,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	LOGGER(_logger, V4_VVER, "SAT engine for %s\n", config.getJobStr().c_str());
 	//params.printParams();
 	_num_solvers = config.threads;
+	_num_active_solvers = _num_solvers;
 	int numOrigSolvers = params.numThreadsPerProcess();
 	_job_id = config.jobid;
 	
@@ -367,6 +368,21 @@ void SatEngine::digestHistoricClauses(int epochBegin, int epochEnd, int* begin, 
 void SatEngine::syncDeterministicSolvingAndCheckForLocalWinner() {
 	if (_block_result) {
 		_block_result = !_sharing_manager->syncDeterministicSolvingAndCheckForWinningSolver();
+	}
+}
+
+void SatEngine::reduceActiveThreadCount() {
+	if (_num_active_solvers <= 1) return;
+
+	// Reduce thread count by 15% (but at least one thread)
+	size_t nbThreadsToTerminate = std::max(1UL, (size_t)std::round(0.15*_num_active_solvers));
+
+	for (int termIdx = 0; termIdx < nbThreadsToTerminate; termIdx++) {
+		size_t i = _num_active_solvers-1;
+		LOGGER(_logger, V3_VERB, "Terminating %lu-th solver to reduce thread count\n", i);
+		_sharing_manager->stopClauseImport(i);
+		_solver_threads[i]->setTerminate(true);
+		_num_active_solvers--;
 	}
 }
 

@@ -91,7 +91,7 @@ public:
             filter.releaseLock();
 
             // Print a warning periodically if the backlog is very large
-            if (warnSize) {
+            if (warnSize && _solvers[producerId]) {
                 LOGGER(_solvers[producerId]->getLogger(), V1_WARN, "[WARN] Export backlog for clauses of len %i had size %lu\n",
                     size, backlogSize);
             }

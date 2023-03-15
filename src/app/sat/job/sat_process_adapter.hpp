@@ -115,6 +115,7 @@ public:
     bool isFullyInitialized();
     void appendRevisions(const std::vector<RevisionData>& revisions, int desiredRevision);
     void crash();
+    void reduceThreadCount();
 
     void setSolvingState(SolvingStates::SolvingState state);
 

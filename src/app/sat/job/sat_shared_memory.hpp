@@ -28,6 +28,7 @@ struct SatSharedMemory {
     bool doStartNextRevision {false};
     bool doTerminate {false};
     bool doCrash {false};
+    bool doReduceThreadCount {false};
 
     // Responses child->parent
     bool didExport {false};
@@ -38,6 +39,7 @@ struct SatSharedMemory {
     bool didDumpStats {false};
     bool didStartNextRevision {false};
     bool didTerminate {false};
+    bool didReduceThreadCount {false};
 
     // State alerts child->parent
     bool isInitialized {false};

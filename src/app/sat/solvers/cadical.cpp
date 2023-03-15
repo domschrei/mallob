@@ -231,9 +231,14 @@ int Cadical::getSplittingVariable() {
 }
 
 void Cadical::writeStatistics(SolverStatistics& stats) {
+	if (!solver) return;
 	CaDiCaL::Solver::Statistics s = solver->get_stats();
 	stats.conflicts = s.conflicts;
 	stats.decisions = s.decisions;
 	stats.propagations = s.propagations;
 	stats.restarts = s.restarts;
+}
+
+void Cadical::cleanUp() {
+	solver.reset();
 }

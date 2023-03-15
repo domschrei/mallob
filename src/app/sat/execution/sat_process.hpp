@@ -221,6 +221,14 @@ public:
                 raise(SIGUSR2);
             }
 
+            // Reduce active thread count (to reduce memory usage)
+            if (_hsm->doReduceThreadCount && !_hsm->didReduceThreadCount) {
+                LOGGER(_log, V3_VERB, "Reducing thread count\n");
+                _engine.reduceActiveThreadCount();
+                _hsm->didReduceThreadCount = true;
+            }
+            if (!_hsm->doReduceThreadCount) _hsm->didReduceThreadCount = false;
+
             // Do not check solved state if the current 
             // revision has already been solved
             if (lastSolvedRevision == _last_imported_revision) continue;

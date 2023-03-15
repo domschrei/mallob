@@ -336,6 +336,7 @@ int Lingeling::getSplittingVariable() {
 }
 
 void Lingeling::writeStatistics(SolverStatistics& stats) {
+	if (!solver) return;
 	stats.conflicts = lglgetconfs(solver);
 	stats.decisions = lglgetdecs(solver);
 	stats.propagations = lglgetprops(solver);
@@ -343,6 +344,13 @@ void Lingeling::writeStatistics(SolverStatistics& stats) {
 	stats.producedClauses = numProduced;
 }
 
+void Lingeling::cleanUp() {
+	if (solver) {
+		lglrelease(solver);
+		solver = nullptr;
+	}
+}
+
 Lingeling::~Lingeling() {
-	lglrelease(solver);
+	cleanUp();
 }

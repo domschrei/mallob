@@ -25,6 +25,7 @@ private:
 	int _job_id;
 	
 	size_t _num_solvers;
+	size_t _num_active_solvers;
 	
 	std::unique_ptr<SharingManager> _sharing_manager;
 	std::vector<std::shared_ptr<PortfolioSolverInterface>> _solver_interfaces;
@@ -73,6 +74,8 @@ public:
 
 	void setWinningSolverId(int globalId);
 	void syncDeterministicSolvingAndCheckForLocalWinner();
+
+	void reduceActiveThreadCount();
 
     void setPaused();
     void unsetPaused();

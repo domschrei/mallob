@@ -165,7 +165,7 @@ public:
         i = 0;
         while (i < processInfo.size() && machineMinFreeMem/machineMinTotalMem < 0.125) {
             auto info = processInfo[i];
-            if (info.utility <= 0) break;
+            if (info.utility < 0) break;
             machineMinFreeMem += 0.5 * info.usedMem;
             if (info.procIdx == MyMpi::rank(_comm)) {
                 LOG(V3_VERB, "Enable memory panic (idx=%lu,usedmem=%.3f,util=%.4f)\n", 

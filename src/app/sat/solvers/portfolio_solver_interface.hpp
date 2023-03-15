@@ -84,6 +84,8 @@ public:
 	virtual bool supportsIncrementalSat() = 0;
 	virtual bool exportsConditionalClauses() = 0;
 
+	virtual void cleanUp() = 0;
+
 protected:
 	// Interrupt the SAT solving, solving cannot continue until interrupt is unset.
 	virtual void setSolverInterrupt() = 0;
@@ -158,7 +160,6 @@ public:
 	void suspend();
 	void resume();
 	void setTerminate();
-
 
 	// Add a learned clause to the formula
 	// The learned clauses might be added later or possibly never

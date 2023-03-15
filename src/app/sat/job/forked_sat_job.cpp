@@ -196,8 +196,14 @@ void ForkedSatJob::appl_memoryPanic() {
     int nbThreads = getNumThreads();
     if (nbThreads > 0 && _solver->getStartedNumThreads() == nbThreads) 
         setNumThreads(nbThreads-1);
-    LOG(V1_WARN, "[WARN] %s : memory panic triggered - restarting solver with %i threads\n", toStr(), getNumThreads());
-    _solver->crash();
+
+    // Gently ask the solver process to reduce its number of solvers
+    LOG(V1_WARN, "[WARN] %s : memory panic triggered - reducing thread count\n", toStr());
+    _solver->reduceThreadCount();
+
+    // Straight up crash the solver process, restart with reduced # solvers
+    //LOG(V1_WARN, "[WARN] %s : memory panic triggered - restarting solver with %i threads\n", toStr(), getNumThreads());
+    //_solver->crash();
 }
 
 void ForkedSatJob::appl_communicate() {

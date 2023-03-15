@@ -66,6 +66,9 @@ void* SolverThread::run() {
         runOnce();
     }
 
+    // Clean up solver
+    if (_cleanup_within_thread) _solver_ptr->cleanUp();
+
     LOGGER(_logger, V4_VVER, "exiting\n");
     return NULL;
 }

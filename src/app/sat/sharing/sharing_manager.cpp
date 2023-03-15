@@ -286,6 +286,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	std::vector<ImportingSolver> importingSolvers;
 	for (size_t i = 0; i < _solvers.size(); i++) {
 		auto& solver = _solvers[i];
+		if (!solver || !_solver_stats[i]) continue; // solver was cleaned up
 		if (!solver->isClauseSharingEnabled()) continue;
 		if (solver->getCurrentRevision() != _current_revision) continue;
 		importingSolvers.emplace_back(solver.get(), _solver_stats[i], _id_alignment.get());
