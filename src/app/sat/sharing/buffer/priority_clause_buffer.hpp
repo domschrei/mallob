@@ -175,12 +175,13 @@ public:
         }
         if (mode != UNITS) {
             _max_admissible_slot_idx.store(_slots.size()-1, std::memory_order_relaxed);
-            bool updateMaxAdmissibleIndex = true;
+            int nbLitsContained = getCurrentlyUsedNonunitLiterals();
+            bool updateMaxAdmissibleIndex = nbLitsContained >= 0.9*_total_literal_limit;
             int nbLitsEncountered = 0;
             for (int i = 1; i < _slots.size(); i++) {
                 if (updateMaxAdmissibleIndex) {
                     nbLitsEncountered += _slots[i]->getNbStoredLiterals();
-                    if (nbLitsEncountered >= 0.95 * _total_literal_limit) {
+                    if (nbLitsEncountered >= 0.975 * nbLitsContained) {
                         _max_admissible_slot_idx.store(i, std::memory_order_relaxed);
                         //LOG(V2_INFO, "LIMIT pcb adm. slot to %i\n", i);
                         updateMaxAdmissibleIndex = false;
@@ -206,8 +207,11 @@ public:
     }
 
     int getCurrentlyUsedLiterals() const {
-        return (_total_literal_limit - _free_budget.load(std::memory_order_relaxed))
+        return getCurrentlyUsedNonunitLiterals()
             + (UNIT_SLOT_MAX_BUDGET - _unit_slot_budget.load(std::memory_order_relaxed));
+    }
+    int getCurrentlyUsedNonunitLiterals() const {
+        return (_total_literal_limit - _free_budget.load(std::memory_order_relaxed));
     }
     std::string getCurrentlyUsedLiteralsReport() const {
         std::string out;
@@ -242,6 +246,12 @@ public:
 
     void clearClauseDeletionCallback() {
         _has_cb_clause_deleted = false;
+    }
+
+    int getMaxAdmissibleClauseLength() const {
+        int slotIdx = _max_admissible_slot_idx.load(std::memory_order_relaxed);
+        assert(slotIdx >= 0 && slotIdx < _slots.size());
+        return _slots[slotIdx]->getClauseLength();
     }
 
 private:

@@ -53,6 +53,11 @@ public:
 
         ProducedClauseCandidate pcc(begin, size, lbd, producerId, epoch);
 
+        if (size > _pcb.getMaxAdmissibleClauseLength()) {
+            handleResult(producerId, ConcurrentProducedClauseFilter::DROPPED, size);
+            return;
+        }
+
         auto& slot = getSlot(size);
         auto& filter = slot.filter;
         auto& mtxBacklog = slot.mtxBacklog;
@@ -63,7 +68,7 @@ public:
             // -- yes!
 
             // Insert clause directly
-            processClause(pcc, filter);
+            processClause(pcc, filter, true);
 
             // Reduce backlog size
             std::list<ProducedClauseCandidate> extracted;
@@ -153,9 +158,13 @@ public:
 private:
     Slot& getSlot(int clauseLength) {return *_slots.at(clauseLength-1);}
 
-    void processClause(ProducedClauseCandidate& pcc, ConcurrentProducedClauseFilter& filter) {
+    void processClause(ProducedClauseCandidate& pcc, ConcurrentProducedClauseFilter& filter, bool checkedForAdmissibleClauseLength = false) {
         int clauseLength = pcc.size;
         int producerId = pcc.producerId;
+        if (!checkedForAdmissibleClauseLength && clauseLength > _pcb.getMaxAdmissibleClauseLength()) {
+            handleResult(producerId, ConcurrentProducedClauseFilter::DROPPED, clauseLength);
+            return;
+        }
         auto result = filter.tryRegisterAndInsert(std::move(pcc));
         handleResult(producerId, result, clauseLength);
     }
