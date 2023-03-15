@@ -26,7 +26,8 @@ private:
     std::atomic_int _free_budget {0};
     const int UNIT_SLOT_MAX_BUDGET {std::numeric_limits<int>::max() - 1024};
     std::atomic_int _unit_slot_budget {UNIT_SLOT_MAX_BUDGET};
-    std::atomic_int _max_admissible_cls_size {std::numeric_limits<int>::max()};
+
+    std::atomic_int _max_admissible_slot_idx;
 
     enum ClauseSlotMode {SAME_SUM_OF_SIZE_AND_LBD, SAME_SIZE, SAME_SIZE_AND_LBD};
     robin_hood::unordered_flat_map<std::pair<int, int>, std::pair<int, ClauseSlotMode>, IntPairHasher> _size_lbd_to_slot_idx_mode;
@@ -113,13 +114,16 @@ public:
 
         // Store initial literal budget
         _free_budget.store(_total_literal_limit, std::memory_order_relaxed);
+        _max_admissible_slot_idx.store(_slots.size()-1, std::memory_order_relaxed);
     }
     ~PriorityClauseBuffer() {}
 
     bool addClause(const Clause& c) {
         ++_op_count;
         auto [slotIdx, mode] = getSlotIdxAndMode(c.size, c.lbd);
-        return _slots[slotIdx]->insert(c, _slots.back().get());
+        int maxSlotIdx = _max_admissible_slot_idx.load(std::memory_order_relaxed);
+        if (slotIdx > maxSlotIdx) return false;
+        return _slots[slotIdx]->insert(c, _slots[maxSlotIdx].get());
     }
 
     bool addClause(int* cBegin, int cSize, int cLbd) {
@@ -129,9 +133,11 @@ public:
     void addClauses(BufferReader& inputBuffer, ClauseHistogram* hist) {
         ++_op_count;
         auto& clause = inputBuffer.getNextIncomingClause(); // prepare first clause in reader
-        for (auto& slot : _slots) {
+        int maxSlotIdx = _max_admissible_slot_idx.load(std::memory_order_relaxed);
+        for (int slotIdx = 0; slotIdx < _slots.size(); slotIdx++) {
+            auto& slot = _slots[slotIdx];
             if (!slot->fitsThisSlot(clause)) continue;
-            int nbInsertedCls = slot->insert(inputBuffer, _slots.back().get());
+            int nbInsertedCls = slotIdx > maxSlotIdx ? 0 : slot->insert(inputBuffer, _slots[maxSlotIdx].get());
             //LOG(V2_INFO, "DBG -- (%i,?) : %i clauses inserted\n", slot->getClauseLength(), nbInsertedCls);
             if (hist) hist->increase(slot->getClauseLength(), nbInsertedCls);
         }
@@ -163,12 +169,25 @@ public:
         
         ++_op_count;
         BufferBuilder builder(sizeLimit, _max_clause_length, _slots_for_sum_of_length_and_lbd);
-        if (mode == ANY) {
-            for (auto& slot : _slots) slot->flushAndShrink(builder, clauseDataConverter);
+
+        if (mode != NONUNITS) {
+            _slots[0]->flushAndShrink(builder, clauseDataConverter);
         }
-        if (mode == UNITS) {
-            auto [unitSlotIdx, _] = getSlotIdxAndMode(1, 1);
-            _slots[unitSlotIdx]->flushAndShrink(builder, clauseDataConverter);
+        if (mode != UNITS) {
+            _max_admissible_slot_idx.store(_slots.size()-1, std::memory_order_relaxed);
+            bool updateMaxAdmissibleIndex = true;
+            int nbLitsEncountered = 0;
+            for (int i = 1; i < _slots.size(); i++) {
+                if (updateMaxAdmissibleIndex) {
+                    nbLitsEncountered += _slots[i]->getNbStoredLiterals();
+                    if (nbLitsEncountered >= 0.95 * _total_literal_limit) {
+                        _max_admissible_slot_idx.store(i, std::memory_order_relaxed);
+                        //LOG(V2_INFO, "LIMIT pcb adm. slot to %i\n", i);
+                        updateMaxAdmissibleIndex = false;
+                    }
+                }
+                _slots[i]->flushAndShrink(builder, clauseDataConverter);
+            }
         }
         numExportedClauses = builder.getNumAddedClauses();
         return builder.extractBuffer();
