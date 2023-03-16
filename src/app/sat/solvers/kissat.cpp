@@ -51,18 +51,31 @@ void Kissat::diversify(int seed) {
     // Set random seed
     kissat_set_option(solver, "seed", seed);
 
+    // Eliminated variables obstruct the import of many shared clauses (40-90%!).
+    // They are caused by BVE ("eliminate"), autarky reasoning and equivalent literal substitution.
+    // Since these are important inprocessing techniques, we cycle through all combinations
+    // of enabling/disabling them.
+    if (getDiversificationIndex() % 2 >= 1)
+        kissat_set_option(solver, "eliminate", 0);
+    if (getDiversificationIndex() % 4 >= 2)
+        kissat_set_option(solver, "autarky", 0);
+    if (getDiversificationIndex() % 8 >= 4)
+        kissat_set_option(solver, "substitute", 0);
+    // TODO
+    // Conjecture based on individual test runs: eliminate and substitute are both important to disable.
+    // Disabling autarky may be less important, so perhaps disable it less frequently.
+
     // Base portfolio of different configurations
     switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
-    case 0: kissat_set_option(solver, "eliminate", 0); break;
-    case 1: kissat_set_option(solver, "delay", 10); break;
-    case 2: kissat_set_option(solver, "restartint", 100); break;
-    case 3: kissat_set_option(solver, "walkinitially", 1); break;
-    case 4: kissat_set_option(solver, "restartint", 1000); break;
-    case 5: kissat_set_option(solver, "sweep", 0); break;
-    case 6: kissat_set_configuration(solver, "unsat"); break;
-    case 7: kissat_set_configuration(solver, "sat"); break;
-    case 8: kissat_set_option(solver, "probe", 0); break;
-    case 9: kissat_set_option(solver, "tier1", 3); kissat_set_option(solver, "tier2", 8); break;
+    case 0: kissat_set_option(solver, "delay", 10); break;
+    case 1: kissat_set_option(solver, "restartint", 100); break;
+    case 2: kissat_set_option(solver, "walkinitially", 1); break;
+    case 3: kissat_set_option(solver, "restartint", 1000); break;
+    case 4: kissat_set_option(solver, "sweep", 0); break;
+    case 5: kissat_set_configuration(solver, "unsat"); break;
+    case 6: kissat_set_configuration(solver, "sat"); break;
+    case 7: kissat_set_option(solver, "probe", 0); break;
+    case 8: kissat_set_option(solver, "tier1", 3); kissat_set_option(solver, "tier2", 8); break;
     }
 
     // Randomize ("jitter") certain options around their default value
