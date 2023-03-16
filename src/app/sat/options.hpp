@@ -35,16 +35,16 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "Min. number of cbbs-sized chunks for buffering incoming clauses for import per solver")
  OPT_INT(numChunksForExport,                "nce", "export-chunks",                      10,       1,   LARGE_INT,
     "Number of cbbs-sized chunks for buffering produced clauses for export")
- OPT_INT(qualityClauseLengthLimit,          "qcll", "quality-clause-length-limit",       8,        0,   LARGE_INT,      
+ OPT_INT(qualityClauseLengthLimit,          "qcll", "quality-clause-length-limit",       8,        0,   255,
     "Clauses up to this length are considered \"high quality\"")
- OPT_INT(qualityLbdLimit,                   "qlbdl", "quality-lbd-limit",                2,        0,   LARGE_INT,      
+ OPT_INT(qualityLbdLimit,                   "qlbdl", "quality-lbd-limit",                2,        0,   255,
     "Clauses with an LBD score up to this value are considered \"high quality\"")
  OPT_BOOL(reshareImprovedLbd,               "ril", "reshare-improved-lbd",               false,
     "Reshare clauses (regardless of their last sharing epoch) if their LBD improved")
  OPT_BOOL(resetLbdBeforeImport,             "rlbd", "reset-lbd-before-import",           true, "Reset each clause's LBD to its length before importing it")
- OPT_INT(strictClauseLengthLimit,           "scll", "strict-clause-length-limit",        16,       0,   LARGE_INT,
+ OPT_INT(strictClauseLengthLimit,           "scll", "strict-clause-length-limit",        16,       0,   255,
     "Only clauses up to this length will be shared")
- OPT_INT(strictLbdLimit,                    "slbdl", "strict-lbd-limit",                 16,       0,   LARGE_INT,
+ OPT_INT(strictLbdLimit,                    "slbdl", "strict-lbd-limit",                 16,       0,   255,
     "Only clauses with an LBD score up to this value will be shared")
  OPT_BOOL(skipClauseSharingDiagonally,    "scsd", "skip-clause-sharing-diagonally",    true,                    "In the ith diversification round, disable clause sharing for the (i%%numDivs)th solver")
  OPT_FLOAT(maxSharingCompensationFactor,    "mscf", "max-sharing-compensation-factor",   5,        1,   LARGE_INT,

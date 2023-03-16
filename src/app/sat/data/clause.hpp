@@ -11,12 +11,12 @@
 
 namespace Mallob {
     
-    struct Clause {
-        int* begin = nullptr; 
-        int size = 0; 
-        int lbd = 0;
+    struct __attribute__ ((packed)) Clause {
+        int* begin = nullptr;
+        int size : 16;
+        int lbd : 16;
 
-        Clause() = default;
+        Clause() : size(0), lbd(0) {}
         Clause(int* begin, int size, int lbd) : begin(begin), size(size), lbd(lbd) {}
 
         Clause copy() const {
