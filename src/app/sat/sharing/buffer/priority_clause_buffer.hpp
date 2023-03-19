@@ -178,16 +178,20 @@ public:
             int nbLitsContained = getCurrentlyUsedNonunitLiterals();
             bool updateMaxAdmissibleIndex = nbLitsContained >= 0.9*_total_literal_limit;
             int nbLitsEncountered = 0;
+            ClauseSlot::FlushMode flushMode {ClauseSlot::FLUSH_FITTING};
             for (int i = 1; i < _slots.size(); i++) {
-                if (updateMaxAdmissibleIndex) {
-                    nbLitsEncountered += _slots[i]->getNbStoredLiterals();
-                    if (nbLitsEncountered >= 0.975 * nbLitsContained) {
-                        _max_admissible_slot_idx.store(i, std::memory_order_relaxed);
-                        //LOG(V2_INFO, "LIMIT pcb adm. slot to %i\n", i);
-                        updateMaxAdmissibleIndex = false;
-                    }
+                // Get number of a priori stored literals, flush slot
+                nbLitsEncountered += _slots[i]->getNbStoredLiterals();
+                _slots[i]->flushAndShrink(builder, clauseDataConverter, flushMode);
+                // Enough literals encountered to make the cut for updating max. admissible slot?
+                if (updateMaxAdmissibleIndex && nbLitsEncountered >= 0.95 * nbLitsContained) {
+                    //LOG(V2_INFO, "LIMIT pcb adm. slot to %i\n", i);
+                    // Update maximum admissible slot index
+                    _max_admissible_slot_idx.store(i, std::memory_order_relaxed);
+                    updateMaxAdmissibleIndex = false;
+                    // Clear all clauses from all subsequent slots
+                    flushMode = ClauseSlot::FLUSH_OR_DISCARD_ALL;
                 }
-                _slots[i]->flushAndShrink(builder, clauseDataConverter);
             }
         }
         numExportedClauses = builder.getNumAddedClauses();

@@ -125,7 +125,9 @@ public:
         return pop(clause, true);
     }
 
-    void flushAndShrink(BufferBuilder& buf, std::function<void(int*)> clauseDataConverter) {
+    enum FlushMode {FLUSH_FITTING, FLUSH_OR_DISCARD_ALL};
+    void flushAndShrink(BufferBuilder& buf, std::function<void(int*)> clauseDataConverter,
+        FlushMode flushMode = FLUSH_FITTING) {
 
         // Acquire lock
         auto lock = _mtx.getLock();
@@ -162,6 +164,11 @@ public:
             assert(success);
         }
         
+        if (flushMode == FLUSH_OR_DISCARD_ALL) {
+            // Mark any remaining clauses to be discarded
+            tryFreeStoredLiterals(_clause_length * _nb_stored_clauses.load(std::memory_order_relaxed),
+                true);
+        }
         discardFreedClauses();
 
         // Shrink vector to fit actual data
