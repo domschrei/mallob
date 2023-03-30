@@ -5,19 +5,22 @@
 #include <memory>
 #include <list>
 
-#include "app/sat/sharing/buffer/priority_clause_buffer.hpp"
 #include "app/sat/sharing/clause_id_alignment.hpp"
-#include "app/sat/sharing/concurrent_export_buffer.hpp"
-#include "buffer/adaptive_clause_database.hpp"
+#include "app/sat/sharing/generic_export_manager.hpp"
 #include "../solvers/portfolio_solver_interface.hpp"
+#include "app/sat/sharing/store/generic_clause_store.hpp"
 #include "util/params.hpp"
-#include "filter/concurrent_produced_clause_filter.hpp"
 #include "../data/sharing_statistics.hpp"
 #include "util/tsl/robin_map.h"
 #include "util/tsl/robin_set.h"
 #include "buffer/deterministic_clause_synchronizer.hpp"
 
 #define CLAUSE_LEN_HIST_LENGTH 256
+
+#define MALLOB_RESET_LBD_NEVER 0
+#define MALLOB_RESET_LBD_AT_IMPORT 1
+#define MALLOB_RESET_LBD_AT_EXPORT 2
+#define MALLOB_RESET_LBD_AT_PRODUCE 3
 
 class SharingManager {
 
@@ -39,15 +42,15 @@ protected:
 		std::vector<uint32_t> producersPerClause;
 	};
 	std::list<DeferredClauseList> _future_clauses;
-	size_t _max_deferred_lits_per_solver;
-	
+
 	// global parameters
 	const Parameters& _params;
 	const Logger& _logger;
 	int _job_index;
 
-	PriorityClauseBuffer _pcb;
-	ConcurrentExportBuffer _export_buffer;
+	std::unique_ptr<GenericClauseStore> _clause_store;
+	std::unique_ptr<GenericClauseFilter> _clause_filter;
+	std::unique_ptr<GenericExportManager> _export_buffer;
 	bool _gc_pending {false};
 	
 	int _last_num_cls_to_import = 0;
@@ -121,17 +124,17 @@ private:
 
 	void applyFilterToBuffer(int* begin, int& buflen, const int* filter);
 
-	void onProduceClause(int solverId, int solverRevision, const Clause& clause, int condVarOrZero, bool recursiveCall = false);
+	void onProduceClause(int solverId, int solverRevision, const Mallob::Clause& clause, int condVarOrZero, bool recursiveCall = false);
 
 	ExtLearnedClauseCallback getCallback() {
-		return [this](const Clause& c, int solverId, int solverRevision, int condVarOrZero) {
+		return [this](const Mallob::Clause& c, int solverId, int solverRevision, int condVarOrZero) {
 			onProduceClause(solverId, solverRevision, c, condVarOrZero);
 		};
 	};
 
-	void tryReinsertDeferredClauses(int solverId, std::list<Clause>& clauses, SolverStatistics* stats);
+	void tryReinsertDeferredClauses(int solverId, std::list<Mallob::Clause>& clauses, SolverStatistics* stats);
 	void digestDeferredFutureClauses();
 
-	void importClausesToSolver(int solverId, const std::vector<Clause>& clauses, const std::vector<uint32_t>& producersPerClause);
+	void importClausesToSolver(int solverId, const std::vector<Mallob::Clause>& clauses, const std::vector<uint32_t>& producersPerClause);
 
 };

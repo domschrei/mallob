@@ -5,7 +5,7 @@
 #include "comm/msgtags.h"
 #include "util/logger.hpp"
 #include "comm/mympi.hpp"
-#include "../sharing/filter/clause_filter.hpp"
+#include "app/sat/data/clause_comparison.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "clause_sharing_session.hpp"
 #include "base_sat_job.hpp"

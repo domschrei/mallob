@@ -10,11 +10,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-bool ClauseFilter::registerClause(const std::vector<int>& cls) {
+bool BloomClauseFilter::registerClause(const std::vector<int>& cls) {
 	return registerClause(cls.data(), cls.size());
 }
 
-bool ClauseFilter::registerClause(const int* begin, int size) {
+bool BloomClauseFilter::registerClause(const int* begin, int size) {
 
 	// Block clauses above maximum length
 	if (_max_clause_length > 0 && size > _max_clause_length) return false;
@@ -36,15 +36,15 @@ bool ClauseFilter::registerClause(const int* begin, int size) {
 	return admitted;
 }
 
-void ClauseFilter::clear() {
+void BloomClauseFilter::clear() {
 	_bitset.reset();
 }
 
-void ClauseFilter::setClear() {
+void BloomClauseFilter::setClear() {
 	_clear.store(true, std::memory_order_relaxed);
 }
 
-void ClauseFilter::clearHalf() {
+void BloomClauseFilter::clearHalf() {
 
 	// The probability to delete a single bit is set to 0.1591 (or 1591/10000).
 	// => P(clause is deleted) = P(one of four bits is removed) = 1 - (1-pDelete)^4 = 0.5.

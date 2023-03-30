@@ -231,16 +231,17 @@ void SolverThread::diversifyInitially() {
 }
 
 void SolverThread::diversifyAfterReading() {
-	if (_solver.getGlobalId() >= _solver.getNumOriginalDiversifications()) {
-        int solversCount = _local_solvers_count;
-        int totalSolvers = solversCount * _portfolio_size;
-        int vars = _solver.getVariablesCount();
+    if (!_params.diversifyPhases()) return;
+    if (_solver.getGlobalId() < _solver.getNumOriginalDiversifications()) return;
 
-        for (int var = 1; var <= vars; var++) {
-            float numSolversRand = _rng.randomInRange(0, totalSolvers);
-            if (numSolversRand < 1) {
-                _solver.setPhase(var, numSolversRand < 0.5);
-            }
+    int solversCount = _local_solvers_count;
+    int totalSolvers = solversCount * _portfolio_size;
+    int vars = _solver.getVariablesCount();
+
+    for (int var = 1; var <= vars; var++) {
+        float numSolversRand = _rng.randomInRange(0, totalSolvers);
+        if (numSolversRand < 1) {
+            _solver.setPhase(var, numSolversRand < 0.5);
         }
     }
 }

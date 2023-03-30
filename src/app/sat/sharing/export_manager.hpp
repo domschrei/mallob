@@ -6,10 +6,9 @@
 #include "app/sat/data/produced_clause_candidate.hpp"
 #include "util/sys/threading.hpp"
 #include "filter/produced_clause_filter.hpp"
-#include "buffer/adaptive_clause_database.hpp"
 #include "../data/solver_statistics.hpp"
 
-class ExportBuffer {
+class ExportManager {
 
 private:
     Mutex _backlog_mutex;
@@ -24,7 +23,7 @@ private:
 	ClauseHistogram _hist_dropped_before_db;
 
 public:
-    ExportBuffer(ProducedClauseFilter& filter, AdaptiveClauseDatabase& cdb, 
+    ExportManager(ProducedClauseFilter& filter, AdaptiveClauseDatabase& cdb, 
             std::vector<SolverStatistics*>& solverStats, int maxClauseLength) : 
         _filter(filter), _cdb(cdb), _solver_stats(solverStats),
         _hist_failed_filter(maxClauseLength), 

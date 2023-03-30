@@ -7,7 +7,7 @@
 
 #include "buffer_builder.hpp"
 #include "buffer_reader.hpp"
-#include "../filter/clause_filter.hpp" 
+#include "app/sat/data/clause_comparison.hpp"
 #include "util/random.hpp"
 
 class BufferMerger {

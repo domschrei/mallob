@@ -10,11 +10,12 @@
 
 #include "../../data/produced_clause.hpp"
 #include "bucket_label.hpp"
-#include "buffer_reader.hpp"
-#include "buffer_merger.hpp"
+#include "../buffer/buffer_reader.hpp"
+#include "../buffer/buffer_merger.hpp"
 #include "util/logger.hpp"
 #include "util/periodic_event.hpp"
 #include "../../data/solver_statistics.hpp"
+#include "util/sys/threading.hpp"
 
 /*
 Buffering structure for clauses which sorts and prioritizes clauses 

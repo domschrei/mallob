@@ -7,7 +7,7 @@
 #include "../../data/produced_clause.hpp"
 #include "../../data/produced_clause_candidate.hpp"
 #include "util/sys/threading.hpp"
-#include "../buffer/adaptive_clause_database.hpp"
+#include "../store/adaptive_clause_database.hpp"
 #include "util/params.hpp"
 #include "produced_clause_filter_commons.hpp"
 

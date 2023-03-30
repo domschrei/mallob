@@ -11,7 +11,6 @@
 #include <string.h>
 #include <cmath>
 
-#include "app/sat/sharing/buffer/priority_clause_buffer.hpp"
 #include "lingeling.hpp"
 #include "util/sys/timer.hpp"
 #include "util/distribution.hpp"
@@ -151,7 +150,7 @@ void Lingeling::diversify(int seed) {
 			break;
 	}
 
-	if (rank >= getNumOriginalDiversifications()) {
+	if (rank >= getNumOriginalDiversifications() && _setup.diversifyNoise) {
 		std::mt19937 rng(seed);
         Distribution distribution(rng);
 
@@ -269,7 +268,7 @@ void Lingeling::doConsume(int** clause, int* glue) {
 	*clause = nullptr;
 
 	Mallob::Clause c;
-	bool success = fetchLearnedClause(c, PriorityClauseBuffer::NONUNITS);
+	bool success = fetchLearnedClause(c, GenericClauseStore::NONUNITS);
 	if (!success) return;
 
 	// Assemble a zero-terminated array of all the literals

@@ -1,5 +1,4 @@
 
-#include "app/sat/sharing/buffer/priority_clause_buffer.hpp"
 #include "util/logger.hpp"
 extern "C" {
 #include "kissat/src/kissat.h"
@@ -61,9 +60,20 @@ void Kissat::diversify(int seed) {
         kissat_set_option(solver, "autarky", 0);
     if (getDiversificationIndex() % 8 >= 4)
         kissat_set_option(solver, "substitute", 0);
-    // TODO
-    // Conjecture based on individual test runs: eliminate and substitute are both important to disable.
-    // Disabling autarky may be less important, so perhaps disable it less frequently.
+    // ALTERNATIVE:
+    /*
+    if (getDiversificationIndex() % 2 == 1) {
+        // Every second configuration, a subset of elim/aut/sub is disabled.
+        // (111, 110, 101, 100, 011, 010, 001)
+        int divIdx = (getDiversificationIndex() / 2) % 7;
+        if (getDiversificationIndex() % 2 <= 1)
+            kissat_set_option(solver, "eliminate", 0);
+        if (getDiversificationIndex() % 4 <= 2)
+            kissat_set_option(solver, "autarky", 0);
+        if (getDiversificationIndex() % 8 <= 4)
+            kissat_set_option(solver, "substitute", 0);
+    }
+    */
 
     // Base portfolio of different configurations
     switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
@@ -79,7 +89,7 @@ void Kissat::diversify(int seed) {
     }
 
     // Randomize ("jitter") certain options around their default value
-    if (getDiversificationIndex() >= getNumOriginalDiversifications()) {
+    if (getDiversificationIndex() >= getNumOriginalDiversifications() && _setup.diversifyNoise) {
         std::mt19937 rng(seed);
         Distribution distribution(rng);
 
@@ -209,8 +219,8 @@ void Kissat::produceClause(int size, int lbd) {
 }
 
 void Kissat::consumeClause(int** clause, int* size, int* lbd) {
-    Clause c;
-    bool success = fetchLearnedClause(c, PriorityClauseBuffer::ANY);
+    Mallob::Clause c;
+    bool success = fetchLearnedClause(c, GenericClauseStore::ANY);
     if (success) {
         assert(c.begin != nullptr);
         assert(c.size >= 1);

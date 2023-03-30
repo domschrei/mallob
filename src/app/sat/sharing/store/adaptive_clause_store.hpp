@@ -7,18 +7,17 @@
 #include <memory>
 #include <numeric>
 
-
 #include "../../data/produced_clause.hpp"
 #include "app/sat/data/clause_histogram.hpp"
+#include "app/sat/sharing/buffer/buffer_merger.hpp"
+#include "app/sat/sharing/store/generic_clause_store.hpp"
 #include "bucket_label.hpp"
-#include "buffer_reader.hpp"
-#include "buffer_merger.hpp"
 #include "util/logger.hpp"
 #include "util/periodic_event.hpp"
 #include "../../data/solver_statistics.hpp"
 #include "clause_slot.hpp"
 
-class PriorityClauseBuffer {
+class AdaptiveClauseStore : public GenericClauseStore {
 
 private:
     int _total_literal_limit;
@@ -39,14 +38,9 @@ private:
     bool _use_checksum;
     BucketLabel _bucket_iterator;
 
-    ClauseHistogram _hist_deleted_in_slots;
-
-    bool _has_cb_clause_deleted {false};
-    std::function<void(Mallob::Clause&)> _cb_clause_deleted;
-
-    unsigned long _op_count {1};
-    unsigned long _cached_op_count {0};
-    int _cached_pop_slot {0};
+    std::atomic_ulong _opcount {1};
+    unsigned long _last_pop_opcount {0};
+    int _last_pop_idx {0};
 
 public:
     struct Setup {
@@ -55,9 +49,11 @@ public:
         int maxLbdPartitionedSize = 2;
         bool useChecksums = false;
         bool slotsForSumOfLengthAndLbd = false;
+        bool resetLbdAtExport = false;
     };
 
-    PriorityClauseBuffer(Setup setup) :
+    AdaptiveClauseStore(Setup setup) :
+        GenericClauseStore(setup.maxClauseLength, setup.resetLbdAtExport),
         _total_literal_limit(setup.numLiterals),
         _max_lbd_partitioned_size(setup.maxLbdPartitionedSize),
         _max_clause_length(setup.maxClauseLength),
@@ -65,8 +61,7 @@ public:
         _use_checksum(setup.useChecksums),
         _bucket_iterator(setup.slotsForSumOfLengthAndLbd ? 
             BucketLabel::MINIMIZE_SUM_OF_SIZE_AND_LBD : BucketLabel::MINIMIZE_SIZE, 
-            setup.maxLbdPartitionedSize),
-        _hist_deleted_in_slots(setup.maxClauseLength) {
+            setup.maxLbdPartitionedSize) {
 
         // Choose max. sum such that the largest legal clauses will be admitted iff they have LBD 2. 
         int maxSumOfLengthAndLbd = setup.maxClauseLength+2;
@@ -116,10 +111,10 @@ public:
         _free_budget.store(_total_literal_limit, std::memory_order_relaxed);
         _max_admissible_slot_idx.store(_slots.size()-1, std::memory_order_relaxed);
     }
-    ~PriorityClauseBuffer() {}
+    ~AdaptiveClauseStore() {}
 
-    bool addClause(const Clause& c) {
-        ++_op_count;
+    bool addClause(const Mallob::Clause& c) override {
+        _opcount.fetch_add(1, std::memory_order_relaxed);
         auto [slotIdx, mode] = getSlotIdxAndMode(c.size, c.lbd);
         int maxSlotIdx = _max_admissible_slot_idx.load(std::memory_order_relaxed);
         if (slotIdx > maxSlotIdx) return false;
@@ -130,8 +125,8 @@ public:
         return addClause(Mallob::Clause(cBegin, cSize, cLbd));
     }
 
-    void addClauses(BufferReader& inputBuffer, ClauseHistogram* hist) {
-        ++_op_count;
+    void addClauses(BufferReader& inputBuffer, ClauseHistogram* hist) override {
+        _opcount.fetch_add(1, std::memory_order_relaxed);
         auto& clause = inputBuffer.getNextIncomingClause(); // prepare first clause in reader
         int maxSlotIdx = _max_admissible_slot_idx.load(std::memory_order_relaxed);
         for (int slotIdx = 0; slotIdx < _slots.size(); slotIdx++) {
@@ -143,31 +138,48 @@ public:
         }
     }
     
-    enum ExportMode {UNITS, NONUNITS, ANY};
     bool popClauseWeak(ExportMode mode, Mallob::Clause& clause) {
         int slotIdx = mode == NONUNITS ? 1 : 0;
-        if (_op_count == _cached_op_count) {
-            // No changes since last operation! Can use cached slot index.
-            slotIdx = std::max(slotIdx, _cached_pop_slot);
-        }
-        ++_op_count;
-        for (; slotIdx < _slots.size(); slotIdx++) {
-            if (mode == UNITS && slotIdx > 0) return false;
-            if (_slots[slotIdx]->popWeak(clause)) {
-                // Remember this slot for the next pop operation
-                _cached_op_count = _op_count;
-                _cached_pop_slot = slotIdx;
-                return true;
+        auto prevOpcount = _opcount.fetch_add(1, std::memory_order_relaxed);
+        if (mode != UNITS) {
+            if (prevOpcount == _last_pop_opcount) {
+                // No changes since last pop operation! Can use cached slot index.
+                slotIdx = std::max(slotIdx, _last_pop_idx);
             }
+            // Update last pop opcount
+            _last_pop_opcount = prevOpcount+1;
+        }
+        if (prevOpcount % 131072 == 0) {
+            // Perform a flush over all slots to shrink slots and discard old clauses
+            BufferBuilder dummyBuilder = getBufferBuilder(nullptr, 0);
+            for (auto& slot : _slots) slot->flushAndShrink(dummyBuilder);
+            assert(dummyBuilder.getNumAddedClauses() == 0);
+        }
+        // Cycle once over all slots, beginning with the cached slot index,
+        // until success. Remember if a spurious fail occurred somewhere.
+        bool spuriousFails = false;
+        for (size_t i = 0; i < _slots.size(); i++, slotIdx = (slotIdx+1)%_slots.size()) {
+            if (mode == UNITS && slotIdx != 0) break;
+            if (mode == NONUNITS && slotIdx == 0) continue;
+            auto result = _slots[slotIdx]->popWeak(clause);
+            if (result == ClauseSlot::SUCCESS) {
+                // Remember this slot for the next pop operation except for UNITS only.
+                // There must not have been any spurious fails (otherwise some good slots
+                // might have been skipped) except if the new pop index is actually better
+                // than the old one.
+                if (mode != UNITS && (slotIdx < _last_pop_idx || !spuriousFails))
+                    _last_pop_idx = slotIdx;
+                return true;
+            } else if (result == ClauseSlot::SPURIOUS_FAIL) spuriousFails = true;
         }
         return false;
     }
 
-    std::vector<int> exportBuffer(int sizeLimit, int& numExportedClauses, 
+    std::vector<int> exportBuffer(int sizeLimit, int& numExportedClauses,
             ExportMode mode = ANY, bool sortClauses = true, 
-            std::function<void(int*)> clauseDataConverter = [](int*){}) {
+            std::function<void(int*)> clauseDataConverter = [](int*){}) override {
         
-        ++_op_count;
+        _opcount.fetch_add(1, std::memory_order_relaxed);
         BufferBuilder builder(sizeLimit, _max_clause_length, _slots_for_sum_of_length_and_lbd);
 
         if (mode != NONUNITS) {
@@ -182,7 +194,7 @@ public:
             for (int i = 1; i < _slots.size(); i++) {
                 // Get number of a priori stored literals, flush slot
                 nbLitsEncountered += _slots[i]->getNbStoredLiterals();
-                _slots[i]->flushAndShrink(builder, clauseDataConverter, flushMode);
+                _slots[i]->flushAndShrink(builder, clauseDataConverter, flushMode, _reset_lbd_at_export);
                 // Enough literals encountered to make the cut for updating max. admissible slot?
                 if (updateMaxAdmissibleIndex && nbLitsEncountered >= 0.95 * nbLitsContained) {
                     //LOG(V2_INFO, "LIMIT pcb adm. slot to %i\n", i);
@@ -198,7 +210,7 @@ public:
         return builder.extractBuffer();
     }
 
-    BufferReader getBufferReader(int* begin, size_t size, bool useChecksums = false) const {
+    BufferReader getBufferReader(int* begin, size_t size, bool useChecksums = false) const override {
         return BufferReader(begin, size, _max_clause_length, _slots_for_sum_of_length_and_lbd, useChecksums);
     }
 
@@ -206,18 +218,18 @@ public:
         return BufferMerger(sizeLimit, _max_clause_length, _slots_for_sum_of_length_and_lbd, _use_checksum);
     }
 
-    BufferBuilder getBufferBuilder(std::vector<int>* out) const {
-        return BufferBuilder(-1, _max_clause_length, _slots_for_sum_of_length_and_lbd, out);
+    BufferBuilder getBufferBuilder(std::vector<int>* out, int totalLiteralLimit = -1) const {
+        return BufferBuilder(totalLiteralLimit, _max_clause_length, _slots_for_sum_of_length_and_lbd, out);
     }
 
-    int getCurrentlyUsedLiterals() const {
+    int getCurrentlyUsedLiterals() const override {
         return getCurrentlyUsedNonunitLiterals()
             + (UNIT_SLOT_MAX_BUDGET - _unit_slot_budget.load(std::memory_order_relaxed));
     }
     int getCurrentlyUsedNonunitLiterals() const {
         return (_total_literal_limit - _free_budget.load(std::memory_order_relaxed));
     }
-    std::string getCurrentlyUsedLiteralsReport() const {
+    std::string getCurrentlyUsedLiteralsReport() const override {
         std::string out;
         for (auto& slot : _slots) out += std::to_string(slot->getNbStoredLiterals()) + " ";
         return out;
@@ -225,10 +237,6 @@ public:
     int getNumLiterals(int clauseLength, int lbd) const {
         auto [slotIdx, mode] = getSlotIdxAndMode(clauseLength, lbd);
         return _slots[slotIdx]->getNbStoredLiterals();
-    }
-
-    ClauseHistogram& getDeletedClausesHistogram() {
-        return _hist_deleted_in_slots;
     }
 
     bool checkTotalLiterals() {
@@ -242,17 +250,19 @@ public:
         return true;
     }
 
-    void setClauseDeletionCallback(std::function<void(Mallob::Clause&)> cb) {
-        _has_cb_clause_deleted = true;
-        _cb_clause_deleted = cb;
-        for (auto& slot : _slots) slot->setDiscardedClausesNotification(_cb_clause_deleted, _hist_deleted_in_slots);
+    void setClauseDeletionCallback(int clauseLength, std::function<void(Mallob::Clause&)> cb) override {
+        // Iterate over all distinct slots with the specified clause length
+        int lastSlotIdx = -1;
+        for (int lbd = std::min(clauseLength, 2); lbd <= clauseLength; lbd++) {
+            int slotIdx = getSlotIdxAndMode(clauseLength, lbd).first;
+            if (slotIdx != lastSlotIdx) {
+                lastSlotIdx = slotIdx;
+                _slots[slotIdx]->setDiscardedClausesNotification(cb, _hist_deleted_in_slots);
+            }
+        }
     }
 
-    void clearClauseDeletionCallback() {
-        _has_cb_clause_deleted = false;
-    }
-
-    int getMaxAdmissibleClauseLength() const {
+    int getMaxAdmissibleClauseLength() const override {
         int slotIdx = _max_admissible_slot_idx.load(std::memory_order_relaxed);
         assert(slotIdx >= 0 && slotIdx < _slots.size());
         return _slots[slotIdx]->getClauseLength();

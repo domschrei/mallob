@@ -7,7 +7,7 @@
 #include "app/sat/data/clause.hpp"
 #include "util/params.hpp"
 #include "util/hashing.hpp"
-#include "../sharing/buffer/adaptive_clause_database.hpp"
+#include "../sharing/store/adaptive_clause_database.hpp"
 #include "data/job_transfer.hpp"
 #include "app/job.hpp"
 #include "comm/job_tree_all_reduction.hpp"

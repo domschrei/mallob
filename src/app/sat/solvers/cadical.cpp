@@ -10,7 +10,6 @@
 #include <chrono>
 #include <filesystem>
 
-#include "app/sat/sharing/buffer/priority_clause_buffer.hpp"
 #include "cadical.hpp"
 #include "util/logger.hpp"
 #include "util/distribution.hpp"
@@ -20,7 +19,7 @@ Cadical::Cadical(const SolverSetup& setup)
 	  solver(new CaDiCaL::Solver), terminator(*setup.logger), 
 	  learner(_setup), learnSource(_setup, [this]() {
 		  Mallob::Clause c;
-		  fetchLearnedClause(c, PriorityClauseBuffer::ANY);
+		  fetchLearnedClause(c, GenericClauseStore::ANY);
 		  return c;
 	  }) {
 	
@@ -56,7 +55,7 @@ void Cadical::diversify(int seed) {
 	setClauseSharing(getNumOriginalDiversifications());
 
 	// Randomize ("jitter") certain options around their default value
-    if (getDiversificationIndex() >= getNumOriginalDiversifications()) {
+    if (getDiversificationIndex() >= getNumOriginalDiversifications() && _setup.diversifyNoise) {
         std::mt19937 rng(seed);
         Distribution distribution(rng);
 

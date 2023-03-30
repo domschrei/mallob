@@ -127,12 +127,14 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.qualityLbdLimit = params.qualityLbdLimit();
 	setup.clauseBaseBufferSize = params.clauseBufferBaseSize();
 	setup.anticipatedLitsToImportPerCycle = config.maxBroadcastedLitsPerCycle;
-	setup.resetLbdBeforeImport = params.resetLbdBeforeImport();
+	setup.resetLbdBeforeImport = params.resetLbd() == MALLOB_RESET_LBD_AT_IMPORT;
 	setup.hasPseudoincrementalSolvers = setup.isJobIncremental && hasPseudoincrementalSolvers;
 	setup.solverRevision = 0;
 	setup.minNumChunksPerSolver = params.minNumChunksForImportPerSolver();
 	setup.numBufferedClsGenerations = params.bufferedImportedClsGenerations();
 	setup.skipClauseSharingDiagonally = params.skipClauseSharingDiagonally();
+	setup.diversifyNoise = params.diversifyNoise();
+	setup.adaptiveImportManager = params.adaptiveImportManager();
 	setup.certifiedUnsat = params.certifiedUnsat();
 	setup.maxNumSolvers = config.mpisize * params.numThreadsPerProcess();
 	setup.numOriginalClauses = numClauses;

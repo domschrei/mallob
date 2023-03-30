@@ -14,7 +14,7 @@
 #include "util/random.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
-#include "app/sat/sharing/buffer/adaptive_clause_database.hpp"
+#include "app/sat/sharing/store/adaptive_clause_database.hpp"
 #include "app/sat/sharing/buffer/buffer_merger.hpp"
 #include "app/sat/sharing/buffer/buffer_reducer.hpp"
 #include "util/sys/terminator.hpp"

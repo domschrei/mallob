@@ -22,6 +22,7 @@ struct SolverSetup {
 	int numOriginalClauses;
 	int minNumChunksPerSolver;
 	int numBufferedClsGenerations;
+	bool diversifyNoise;
 
 	// SAT Solving settings
 
@@ -38,6 +39,7 @@ struct SolverSetup {
 	size_t anticipatedLitsToImportPerCycle;
 	bool resetLbdBeforeImport {false};
 
+	bool adaptiveImportManager;
 	bool skipClauseSharingDiagonally;
 	bool certifiedUnsat;
 	int maxNumSolvers;

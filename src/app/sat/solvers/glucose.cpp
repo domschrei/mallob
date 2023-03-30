@@ -4,7 +4,6 @@
 #include <chrono>
 #include <random>
 
-#include "app/sat/sharing/buffer/priority_clause_buffer.hpp"
 #include "glucose.hpp"
 #include "util/distribution.hpp"
 
@@ -126,7 +125,7 @@ void MGlucose::diversify(int seed) {
 		break;
 	}
 
-	if (rank >= getNumOriginalDiversifications()) {
+	if (rank >= getNumOriginalDiversifications() && _setup.diversifyNoise) {
 		std::mt19937 rng(seed);
         Distribution distribution(rng);
 
@@ -362,7 +361,7 @@ void MGlucose::parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysi
 bool MGlucose::parallelImportClauses() {
 
 	Mallob::Clause importedClause;
-	while (fetchLearnedClause(importedClause, PriorityClauseBuffer::NONUNITS)) {
+	while (fetchLearnedClause(importedClause, GenericClauseStore::NONUNITS)) {
 		assert(importedClause.size > 1);
 
 		// Assemble Glucose-style clause

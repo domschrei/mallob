@@ -1,14 +1,14 @@
 
 #include <algorithm>
 
-#include "app/sat/sharing/import_buffer.hpp"
+#include "app/sat/sharing/adaptive_import_manager.hpp"
 
 #include "util/sys/process.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "util/random.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
-#include "app/sat/sharing/buffer/priority_clause_buffer.hpp"
+#include "app/sat/sharing/store/adaptive_clause_store.hpp"
 #include "app/sat/sharing/buffer/buffer_merger.hpp"
 #include "app/sat/sharing/buffer/buffer_reducer.hpp"
 #include "util/sys/terminator.hpp"
@@ -51,7 +51,7 @@ void testImport() {
     SolverStatistics stats;
     stats.histProduced = new ClauseHistogram(20);
     stats.histDigested = new ClauseHistogram(20);
-    ImportBuffer importBuffer(setup, stats);
+    AdaptiveImportManager importBuffer(setup, stats);
 
     // Generate some number of clauses
     std::vector<Mallob::Clause> clauses;
@@ -118,7 +118,7 @@ void testImport() {
         }
         // Retrieval of non-unit clauses
         {
-            auto clause = importBuffer.get(PriorityClauseBuffer::NONUNITS);
+            auto clause = importBuffer.get(AdaptiveClauseStore::NONUNITS);
             int nbRetrievedNonunits = 0;
             while (!importBuffer.empty() || clause.begin != nullptr) {
                 if (clause.begin != nullptr) {
@@ -129,7 +129,7 @@ void testImport() {
                     nbRetrievedNonunits++;
                 }
                 //LOG(V2_INFO, "%lu lits remaining; pop result: %s\n", importBuffer.size(), clause.begin==nullptr ? "(null)" : clause.toStr().c_str());
-                clause = importBuffer.get(PriorityClauseBuffer::NONUNITS);
+                clause = importBuffer.get(AdaptiveClauseStore::NONUNITS);
             }
             LOG(V2_INFO, "Retrieved %i non-units\n", nbRetrievedNonunits);
         }

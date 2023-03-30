@@ -3,7 +3,6 @@
 
 #include <vector>
 
-#include "app/sat/sharing/buffer/adaptive_clause_database.hpp"
 #include "app/sat/sharing/buffer/buffer_reducer.hpp"
 #include "util/params.hpp"
 

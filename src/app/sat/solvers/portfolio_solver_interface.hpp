@@ -7,12 +7,12 @@
 #include <functional>
 #include <atomic>
 
+#include "app/sat/sharing/store/generic_clause_store.hpp"
+#include "util/sys/threading.hpp"
 #include "../data/clause.hpp"
-#include "app/sat/sharing/buffer/adaptive_clause_database.hpp"
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
-#include "app/sat/sharing/buffer/priority_clause_buffer.hpp"
 #include "util/logger.hpp"
-#include "../sharing/import_buffer.hpp"
+#include "../sharing/generic_import_manager.hpp"
 #include "../data/solver_statistics.hpp"
 #include "../execution/solver_setup.hpp"
 
@@ -166,11 +166,11 @@ public:
 	void addLearnedClause(const Mallob::Clause& c);
 	void addLearnedClauses(BufferReader& reader) {
 		if (_clause_sharing_disabled) return;
-		_import_buffer.performImport(reader);
+		_import_manager->performImport(reader);
 	}
 
 	// Within the solver, fetch a clause that was previously added as a learned clause.
-	bool fetchLearnedClause(Mallob::Clause& clauseOut, PriorityClauseBuffer::ExportMode mode = PriorityClauseBuffer::ANY);
+	bool fetchLearnedClause(Mallob::Clause& clauseOut, GenericClauseStore::ExportMode mode = GenericClauseStore::ANY);
 	std::vector<int> fetchLearnedUnitClauses();
 
 	std::function<void(int)> _cb_result_found;
@@ -191,7 +191,7 @@ private:
 	std::atomic_bool _terminated = false;
 
 	SolverStatistics _stats;
-	ImportBuffer _import_buffer;
+	std::unique_ptr<GenericImportManager> _import_manager;
 };
 
 // Returns the elapsed time (seconds) since the currently registered solver's start time.

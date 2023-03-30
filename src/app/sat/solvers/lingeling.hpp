@@ -6,8 +6,6 @@
 #include "portfolio_solver_interface.hpp"
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
-#include "../sharing/buffer/adaptive_clause_database.hpp"
-#include "../sharing/import_buffer.hpp"
 
 struct LGL;
 
@@ -35,7 +33,7 @@ private:
 	// importing a learnt clause
 	std::vector<int> zeroTerminatedClause;
 	// exporting a clause
-	Clause producedClause;
+	Mallob::Clause producedClause;
 
 	unsigned long numProduced = 0;
     

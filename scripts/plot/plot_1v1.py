@@ -26,7 +26,6 @@ runtime_maps = []
 labels = []
 xlabel = None
 ylabel = None
-max_id = -1
 min_val = lim
 heading = ""
 outfile = None
@@ -69,7 +68,7 @@ for arg in files:
     domains_seen = set()
     for line in open(arg, 'r').readlines():
         words = line.rstrip().split(" ")
-        id = int(words[0])
+        id = words[0]
         dom = words[1]
         val = float(words[2])
         if dom not in runtime_map_pairs_by_domain:
@@ -80,7 +79,6 @@ for arg in files:
         id_runtime_map = runtime_map_pairs_by_domain[dom][-1]
         if val <= lim:
             id_runtime_map[id] = val
-            max_id = max(max_id, id)
             if val > 0:
                 min_val = min(min_val, val)
 
@@ -108,7 +106,8 @@ for dom in runtime_map_pairs_by_domain:
     
     X = []
     Y = []
-    for i in range(max_id+1):
+    keys = [i for i in runtime_maps[0]] + [i for i in runtime_maps[1]]
+    for i in keys:
         
         if i not in runtime_maps[0] and i not in runtime_maps[1]:
             continue
@@ -147,8 +146,8 @@ else:
     plt.ylabel(labels[1] + ' / s')
 plt.ylim(min_val, border_hi)
 plt.xlim(min_val, border_hi)
-plt.xscale("log")
-plt.yscale("log")
+#plt.xscale("log")
+#plt.yscale("log")
 plt.grid(color='#dddddd', linestyle='-', linewidth=1)
 plt.legend()
 plt.tight_layout()

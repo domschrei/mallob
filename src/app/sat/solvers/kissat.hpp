@@ -14,7 +14,7 @@ private:
 
     LearnedClauseCallback callback;
     int learntClauseBuffer[100];
-	Clause learntClause;
+	Mallob::Clause learntClause;
     std::vector<int> producedClause;
 
     bool interrupted = false;

@@ -6,7 +6,6 @@ using namespace Mallob;
 
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
-#include "../sharing/import_buffer.hpp"
 
 #ifndef INCREMENTAL
 #define INCREMENTAL 1

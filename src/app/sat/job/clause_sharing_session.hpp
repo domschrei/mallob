@@ -1,12 +1,13 @@
 
 #pragma once
 
+#include "app/sat/sharing/filter/generic_clause_filter.hpp"
 #include "comm/msgtags.h"
 #include "data/job_transfer.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
 #include "base_sat_job.hpp"
-#include "app/sat/sharing/buffer/adaptive_clause_database.hpp"
+#include "app/sat/sharing/store/adaptive_clause_database.hpp"
 #include "comm/job_tree_all_reduction.hpp"
 #include "historic_clause_storage.hpp"
 #include "app/sat/sharing/filter/in_place_clause_filtering.hpp"
@@ -34,7 +35,7 @@ private:
     int _num_admitted_clauses;
 
     JobTreeAllReduction _allreduce_clauses;
-    JobTreeAllReduction _allreduce_filter;
+    std::optional<JobTreeAllReduction> _allreduce_filter;
 
     SplitMix64Rng _rng;
 
@@ -52,18 +53,21 @@ public:
             [&](std::list<std::vector<int>>& elems) {
                 return mergeClauseBuffersDuringAggregation(elems);
             }
-        ),
-        _allreduce_filter(
-            job->getJobTree(), 
-            // Base message
-            JobMessage(_job->getId(), _job->getContextId(), _job->getRevision(), epoch, MSG_ALLREDUCE_FILTER),
-            // Neutral element
-            std::vector<int>(ClauseMetadata::numBytes(), 0),
-            // Aggregator for local + incoming elements
-            [&](std::list<std::vector<int>>& elems) {
-                return mergeFiltersDuringAggregation(elems);
-            }
         ), _rng(_params.seed()+69) {
+
+        if (_params.clauseFilterMode() == MALLOB_CLAUSE_FILTER_EXACT_DISTRIBUTED) {
+            _allreduce_filter.emplace(
+                job->getJobTree(), 
+                // Base message
+                JobMessage(_job->getId(), _job->getContextId(), _job->getRevision(), epoch, MSG_ALLREDUCE_FILTER),
+                // Neutral element
+                std::vector<int>(ClauseMetadata::numBytes(), 0),
+                // Aggregator for local + incoming elements
+                [&](std::list<std::vector<int>>& elems) {
+                    return mergeFiltersDuringAggregation(elems);
+                }
+            );
+        }
 
         LOG(V4_VVER, "%s CS OPEN e=%i\n", _job->toStr(), _epoch);
         _job->setSharingCompensationFactorAndUpdateExportLimit(compensationFactor);
@@ -72,7 +76,7 @@ public:
 
     void pruneChild(int rank) {
         _allreduce_clauses.pruneChild(rank);
-        _allreduce_filter.pruneChild(rank);
+        if (_allreduce_filter) _allreduce_filter->pruneChild(rank);
     }
 
     void advanceSharing() {
@@ -95,8 +99,6 @@ public:
 
         if (_stage == AGGREGATING_CLAUSES && _allreduce_clauses.advance().hasResult()) {
 
-            LOG(V4_VVER, "%s CS filter\n", _job->toStr());
-
             // Some clauses may have been left behind during merge
             if (_excess_clauses_from_merge.size() > sizeof(size_t)/sizeof(int)) {
                 // Add them as produced clauses to your local solver
@@ -109,24 +111,33 @@ public:
             int winningSolverId = _broadcast_clause_buffer.back();
             assert(winningSolverId >= -1 || log_return_false("Winning solver ID = %i\n", winningSolverId));
 
-            // Initiate production of local filter element for 2nd all-reduction 
-            _job->filterSharing(_epoch, _broadcast_clause_buffer);
-            _stage = PRODUCING_FILTER;
+            if (_allreduce_filter) {
+                // Initiate production of local filter element for 2nd all-reduction 
+                LOG(V4_VVER, "%s CS filter\n", _job->toStr());
+                _job->filterSharing(_epoch, _broadcast_clause_buffer);
+                _stage = PRODUCING_FILTER;
+            } else {
+                // No distributed filtering: Sharing is done!
+                LOG(V4_VVER, "%s CS digest w/o filter\n", _job->toStr());
+                _job->digestSharingWithoutFilter(_broadcast_clause_buffer);
+                if (_cls_history) _cls_history->importSharing(_epoch, std::move(_broadcast_clause_buffer));
+                _stage = DONE;
+            }
         }
 
         if (_stage == PRODUCING_FILTER && _job->hasFilteredSharing(_epoch)) {
 
             LOG(V4_VVER, "%s CS produced filter\n", _job->toStr());
-            _allreduce_filter.produce([&]() {return _job->getLocalFilter(_epoch);});
+            _allreduce_filter->produce([&]() {return _job->getLocalFilter(_epoch);});
             _stage = AGGREGATING_FILTER;
         }
 
-        if (_stage == AGGREGATING_FILTER && _allreduce_filter.advance().hasResult()) {
+        if (_stage == AGGREGATING_FILTER && _allreduce_filter->advance().hasResult()) {
 
-            LOG(V4_VVER, "%s CS apply filter\n", _job->toStr());
+            LOG(V4_VVER, "%s CS digest w/ filter\n", _job->toStr());
 
             // Extract and digest result
-            auto filter = _allreduce_filter.extractResult();
+            auto filter = _allreduce_filter->extractResult();
             _job->applyFilter(_epoch, filter);
             if (_cls_history) {
                 applyGlobalFilter(filter, _broadcast_clause_buffer);
@@ -149,8 +160,8 @@ public:
     }
     bool advanceFilterAggregation(int source, int mpiTag, JobMessage& msg) {
         bool success = false;
-        if (msg.tag == MSG_ALLREDUCE_FILTER && _allreduce_filter.isValid()) {
-            success = _allreduce_filter.receive(source, mpiTag, msg);
+        if (msg.tag == MSG_ALLREDUCE_FILTER && _allreduce_filter->isValid()) {
+            success = _allreduce_filter->receive(source, mpiTag, msg);
             advanceSharing();
         }
         return success;
@@ -161,7 +172,8 @@ public:
     }
 
     bool isDestructible() {
-        return _allreduce_clauses.isDestructible() && _allreduce_filter.isDestructible();
+        return _allreduce_clauses.isDestructible() && 
+            (!_allreduce_filter || _allreduce_filter->isDestructible());
     }
 
     ~ClauseSharingSession() {
@@ -169,7 +181,7 @@ public:
         // If not done producing, will send empty clause buffer upwards
         _allreduce_clauses.cancel();
         // If not done producing, will send empty filter upwards
-        _allreduce_filter.cancel();
+        if (_allreduce_filter) _allreduce_filter->cancel();
     }
 
 private:

@@ -3,6 +3,10 @@
 
 #include "app/sat/data/produced_clause_candidate.hpp"
 
+#ifndef MALLOB_MAX_N_APPTHREADS_PER_PROCESS
+#define MALLOB_MAX_N_APPTHREADS_PER_PROCESS 32
+#endif
+
 #if MALLOB_MAX_N_APPTHREADS_PER_PROCESS <= 8
 typedef uint8_t cls_producers_bitset;
 #elif MALLOB_MAX_N_APPTHREADS_PER_PROCESS <= 16

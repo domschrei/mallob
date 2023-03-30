@@ -53,6 +53,7 @@ public:
 
     void setDiscardedClausesNotification(std::function<void(Mallob::Clause&)> callback, ClauseHistogram& hist) {
         _cb_discard_cls = callback;
+        assert(!_hist_discarded_cls);
         _hist_discarded_cls = &hist;
     }
 
@@ -121,13 +122,14 @@ public:
         return pop(clause, false);
     }
 
-    bool popWeak(Mallob::Clause& clause) {
+    enum PopWeakResult {SUCCESS, FAIL, SPURIOUS_FAIL};
+    PopWeakResult popWeak(Mallob::Clause& clause) {
         return pop(clause, true);
     }
 
     enum FlushMode {FLUSH_FITTING, FLUSH_OR_DISCARD_ALL};
-    void flushAndShrink(BufferBuilder& buf, std::function<void(int*)> clauseDataConverter,
-        FlushMode flushMode = FLUSH_FITTING) {
+    void flushAndShrink(BufferBuilder& buf, std::function<void(int*)> clauseDataConverter = [](int*){},
+        FlushMode flushMode = FLUSH_FITTING, bool resetLbd = false) {
 
         // Acquire lock
         auto lock = _mtx.getLock();
@@ -152,6 +154,7 @@ public:
             readClause(dataIdx, _tmp_clause);
             clauseDataConverter(_tmp_clause.begin);
             flushedClauses.push_back(_tmp_clause);
+            if (resetLbd) flushedClauses.back().lbd = _tmp_clause.size;
             nbFreedLits -= _clause_length;
             dataIdx -= _effective_clause_length;
         }
@@ -233,19 +236,19 @@ private:
         }
     }
 
-    bool pop(Mallob::Clause& clause, bool giveUpOnLock) {
+    PopWeakResult pop(Mallob::Clause& clause, bool giveUpOnLock) {
 
         // Is this slot empty? (Redundant check, but can avoid locking)
-        if (_nb_stored_clauses.load(std::memory_order_relaxed) == 0) return false;
+        if (_nb_stored_clauses.load(std::memory_order_relaxed) == 0) return FAIL;
 
         // Acquire lock
-        if (giveUpOnLock && !_mtx.tryLock()) return false;
+        if (giveUpOnLock && !_mtx.tryLock()) return SPURIOUS_FAIL;
         if (!giveUpOnLock) _mtx.lock();
 
         // Try to reduce the used budget by one clause.
         if (tryFreeStoredLiterals(_clause_length, false) == 0) {
             _mtx.unlock();
-            return false;
+            return FAIL;
         }
         
         // Success! At least one clause is here and can be popped.
@@ -260,7 +263,7 @@ private:
         discardFreedClauses();
 
         _mtx.unlock();
-        return true;
+        return SUCCESS;
     }
 
     void pushClauseToBack(const Mallob::Clause& clause) {
@@ -322,7 +325,9 @@ private:
             // Try fetch budget from other slots
             ClauseSlot* neighbor = maxNeighbor;
             while (neighbor != this && budget < nbDesiredLits) {
-                assert(_clause_length < neighbor->_clause_length);
+                assert(_clause_length < neighbor->_clause_length || 
+                    (_clause_length == neighbor->_clause_length 
+                        && _common_lbd_or_zero < neighbor->_common_lbd_or_zero));
                 auto stolen = neighbor->tryFreeStoredLiterals(nbDesiredLits-budget, true);
                 budget += stolen;
                 neighbor = neighbor->getLeftNeighbor();

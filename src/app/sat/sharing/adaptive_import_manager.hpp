@@ -4,71 +4,61 @@
 #include <vector>
 #include <list>
 
+#include "app/sat/data/clause_histogram.hpp"
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
-#include "buffer/priority_clause_buffer.hpp"
+#include "app/sat/sharing/generic_import_manager.hpp"
+#include "store/adaptive_clause_store.hpp"
 #include "../execution/solver_setup.hpp"
 #include "util/logger.hpp"
 
-class ImportBuffer {
+class AdaptiveImportManager : public GenericImportManager {
 
 private:
-    SolverStatistics& _stats;
-    PriorityClauseBuffer _pcb;
-    int _max_clause_length;
-    bool _reset_lbd;
+    AdaptiveClauseStore _pcb;
 
     std::vector<int> _plain_units_out;
     std::vector<int> _clause_out_data;
     Mallob::Clause _clause_out;
 
 public:
-    ImportBuffer(const SolverSetup& setup, SolverStatistics& stats) : _stats(stats), 
+    AdaptiveImportManager(const SolverSetup& setup, SolverStatistics& stats) :
+        GenericImportManager(setup, stats), 
         _pcb([&]() {
-            PriorityClauseBuffer::Setup pcbSetup;
+            AdaptiveClauseStore::Setup pcbSetup;
             pcbSetup.maxClauseLength = setup.strictClauseLengthLimit;
             pcbSetup.maxLbdPartitionedSize = 2;
-            pcbSetup.numLiterals = setup.clauseBaseBufferSize * std::max(
-                setup.minNumChunksPerSolver, 
-                (int) (
-                    ((float) setup.numBufferedClsGenerations) * 
-                    setup.anticipatedLitsToImportPerCycle / setup.clauseBaseBufferSize
-                )
-            );
+            pcbSetup.numLiterals = getLiteralBudget(setup);
             pcbSetup.slotsForSumOfLengthAndLbd = false;
             pcbSetup.useChecksums = false;
             return pcbSetup;
-        }()), _max_clause_length(setup.strictClauseLengthLimit),
-        _reset_lbd(setup.resetLbdBeforeImport),
+        }()),
         _clause_out_data(setup.strictClauseLengthLimit),
-        _clause_out(_clause_out_data.data(), 0, 0) {}
+        _clause_out(_clause_out_data.data(), 0, 0) {
 
-    void performImport(BufferReader& reader) {
-        //LOG(V2_INFO, "DBG perform import of size %i\n", reader.getRemainingSize());
-        _pcb.addClauses(reader, nullptr);
-        //LOG(V2_INFO, "DBG %lu lits in import buffer\n", size());
+        for (int clslen = 1; clslen <= setup.strictClauseLengthLimit; clslen++) {
+            _pcb.setClauseDeletionCallback(clslen, [&](Mallob::Clause& cls) {
+                _stats.receivedClausesDropped++;
+            });
+        }
     }
 
-    void add(const Mallob::Clause& c) {
+    void performImport(BufferReader& reader) override {
+        //LOG(V2_INFO, "DBG perform import of size %i\n", reader.getRemainingSize());
+        _pcb.addClauses(reader, nullptr);
+        LOG(V2_INFO, "%lu lits in import buffer: %s dropped:%i\n", size(), _pcb.getCurrentlyUsedLiteralsReport().c_str(), _stats.receivedClausesDropped);
+        LOG(V2_INFO, "clenhist imp_disc %s\n", _pcb.getDeletedClausesHistogram().getReport().c_str());
+    }
+
+    void addSingleClause(const Mallob::Clause& c) override {
         if (ClauseMetadata::enabled()) {
             // Perform safety checks
             assert(c.size >= 3);
-            // Heavy safety checks with false positives!
-            /*
-            unsigned long id; memcpy(&id, c.begin, sizeof(unsigned long));
-            assert(id < std::numeric_limits<unsigned long>::max()/2
-                    || log_return_false("Clause ID \"%lu\" found, which could be an error\n", id));
-            for (size_t i = MALLOB_CLAUSE_METADATA_SIZE; i < c.size; i++)
-                assert(std::abs(c.begin[i]) < 10000000 
-                    || log_return_false("Literal \"%i\" found, error thrown for safety - "
-                    "delete this assertion if your formula has >=10'000'000 variables\n", 
-                    c.begin[i]));
-            */
         }
         bool success = _pcb.addClause(c);
         if (!success) _stats.receivedClausesDropped++;
     }
 
-    const std::vector<int>& getUnitsBuffer() {
+    const std::vector<int>& getUnitsBuffer() override {
 
         if (_pcb.getNumLiterals(1, 1) == 0) {
             _plain_units_out.clear();
@@ -77,7 +67,7 @@ public:
 
         int numUnits = 0;
         std::vector<int> buf;
-        buf = _pcb.exportBuffer(-1, numUnits, PriorityClauseBuffer::UNITS, /*sortClauses=*/false);
+        buf = _pcb.exportBuffer(-1, numUnits, AdaptiveClauseStore::UNITS, /*sortClauses=*/false);
 
         _plain_units_out = std::vector<int>(buf.data()+(buf.size()-numUnits), buf.data()+buf.size());
         assert(_plain_units_out.size() == numUnits);
@@ -87,7 +77,7 @@ public:
         return _plain_units_out;
     }
 
-    Mallob::Clause& get(PriorityClauseBuffer::ExportMode mode) {
+    Mallob::Clause& get(AdaptiveClauseStore::ExportMode mode) override {
 
         if (_pcb.getCurrentlyUsedLiterals() == 0) {
             _clause_out.begin = nullptr;
@@ -109,17 +99,13 @@ public:
         return _clause_out;
     }
 
-    bool empty() const {
-        return size() == 0;
-    }
-
-    size_t size() const {
+    size_t size() const override {
         int litsInUse = _pcb.getCurrentlyUsedLiterals();
         assert(litsInUse >= 0);
         return litsInUse;
     }
 
-    ~ImportBuffer() {
+    ~AdaptiveImportManager() {
         if (_clause_out.begin != nullptr) free(_clause_out.begin);
     }
 };

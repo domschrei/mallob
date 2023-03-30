@@ -2,7 +2,9 @@
 #include <map>
 #include <chrono>
 #include <atomic>
-#include "app/sat/sharing/buffer/priority_clause_buffer.hpp"
+#include "app/sat/sharing/adaptive_import_manager.hpp"
+#include "app/sat/sharing/ring_buffer_import_manager.hpp"
+#include "app/sat/sharing/store/generic_clause_store.hpp"
 #include "util/assert.hpp"
 
 #include "util/sys/threading.hpp"
@@ -41,7 +43,13 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 		  _setup(setup), _job_name(setup.jobname), 
 		  _global_id(setup.globalId), _local_id(setup.localId), 
 		  _diversification_index(setup.diversificationIndex),
-		  _import_buffer(setup, _stats) {
+		  _import_manager([&]() -> GenericImportManager* {
+			if (setup.adaptiveImportManager) {
+				return new AdaptiveImportManager(setup, _stats);
+			} else {
+				return new RingBufferImportManager(setup, _stats);
+			}
+		  }()) {
 	updateTimer(_job_name);
 	_global_name = "<h-" + _job_name + "_S" + std::to_string(_global_id) + ">";
 	_stats.histProduced = new ClauseHistogram(setup.strictClauseLengthLimit);
@@ -81,16 +89,16 @@ void PortfolioSolverInterface::setExtLearnedClauseCallback(const ExtLearnedClaus
 
 void PortfolioSolverInterface::addLearnedClause(const Mallob::Clause& c) {
 	if (_clause_sharing_disabled) return;
-	_import_buffer.add(c);
+	_import_manager->addSingleClause(c);
 }
 
-bool PortfolioSolverInterface::fetchLearnedClause(Mallob::Clause& clauseOut, PriorityClauseBuffer::ExportMode mode) {
+bool PortfolioSolverInterface::fetchLearnedClause(Mallob::Clause& clauseOut, GenericClauseStore::ExportMode mode) {
 	if (_clause_sharing_disabled) return false;
-	clauseOut = _import_buffer.get(mode);
+	clauseOut = _import_manager->get(mode);
 	return clauseOut.begin != nullptr && clauseOut.size >= 1;
 }
 
 std::vector<int> PortfolioSolverInterface::fetchLearnedUnitClauses() {
 	if (_clause_sharing_disabled) return std::vector<int>();
-	return _import_buffer.getUnitsBuffer();
+	return _import_manager->getUnitsBuffer();
 }

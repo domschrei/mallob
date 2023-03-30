@@ -39,9 +39,14 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "Clauses up to this length are considered \"high quality\"")
  OPT_INT(qualityLbdLimit,                   "qlbdl", "quality-lbd-limit",                2,        0,   255,
     "Clauses with an LBD score up to this value are considered \"high quality\"")
+ OPT_INT(clauseFilterMode,                  "cfm", "clause-filter-mode",                 3,        0,   3, 
+    "0 = no filtering, 1 = bloom filters, 2 = exact filters, 3 = exact filters with distributed filtering in a 2nd all-reduction")
+ OPT_INT(clauseStoreMode,                   "csm", "clause-store-mode",                  2,        0,   2, 
+    "0 = static by length, 1 = static by LBD, 2 = adaptive by length + -mlbdps option")
+ OPT_INT(resetLbd,                          "rlbd", "reset-lbd-at-import",                1,        0,   3,
+    "Reset each clause's LBD to its length 0=never; 1=at import; 2=at export; 3=at production")
  OPT_BOOL(reshareImprovedLbd,               "ril", "reshare-improved-lbd",               false,
     "Reshare clauses (regardless of their last sharing epoch) if their LBD improved")
- OPT_BOOL(resetLbdBeforeImport,             "rlbd", "reset-lbd-before-import",           true, "Reset each clause's LBD to its length before importing it")
  OPT_INT(strictClauseLengthLimit,           "scll", "strict-clause-length-limit",        16,       0,   255,
     "Only clauses up to this length will be shared")
  OPT_INT(strictLbdLimit,                    "slbdl", "strict-lbd-limit",                 16,       0,   255,
@@ -49,12 +54,16 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
  OPT_BOOL(skipClauseSharingDiagonally,    "scsd", "skip-clause-sharing-diagonally",    true,                    "In the ith diversification round, disable clause sharing for the (i%%numDivs)th solver")
  OPT_FLOAT(maxSharingCompensationFactor,    "mscf", "max-sharing-compensation-factor",   5,        1,   LARGE_INT,
     "Max. relative increase in size of clause sharing buffers in case of many clauses being filtered")
+ OPT_BOOL(backlogExportManager,             "bem", "backlog-export-manager",             true, "Use sequentialized export manager with backlogs instead of simple HordeSat-style export")
+ OPT_BOOL(adaptiveImportManager,            "aim", "adaptive-import-manager",            true, "Use adaptive clause store for each solver's import buffer instead of lock-free ring buffers")
 
 OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversification options")
  OPT_FLOAT(inputShuffleProbability,         "isp", "input-shuffle-probability",          1,        0,   1,
     "Probability for a solver (never the 1st one of a kind) to shuffle the order of clauses in the input to some degree")
- OPT_BOOL(phaseDiversification,             "phasediv", "",                              true,
-    "Diversify solvers based on phase in addition to native diversification")
+ OPT_BOOL(diversifyPhases,                  "div-phases", "",                            true,
+    "Diversify solvers based on random sparse variable phases in addition to native diversification")
+ OPT_BOOL(diversifyNoise,                   "div-noise",  "",                            true,
+    "Diversify solvers by adding Gaussian noise on top of numeric parameters")
  OPT_STRING(satSolverSequence,              "satsolver",  "",                            "C",
     "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")
 

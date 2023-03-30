@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "../data/clause.hpp"
-#include "../sharing/filter/clause_filter.hpp"
+#include "app/sat/data/clause_comparison.hpp"
 #include "app/job_tree.hpp"
 
 class DistributedClauseFilter {

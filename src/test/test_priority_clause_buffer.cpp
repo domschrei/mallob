@@ -1,14 +1,12 @@
 
 #include <algorithm>
 
-#include "app/sat/sharing/import_buffer.hpp"
-
 #include "util/sys/process.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "util/random.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
-#include "app/sat/sharing/buffer/priority_clause_buffer.hpp"
+#include "app/sat/sharing/store/adaptive_clause_store.hpp"
 #include "app/sat/sharing/buffer/buffer_merger.hpp"
 #include "app/sat/sharing/buffer/buffer_reducer.hpp"
 #include "util/sys/terminator.hpp"
@@ -39,12 +37,12 @@ int getProducer(const Mallob::Clause& clause, int nbProducers) {
 }
 
 void testBasic() {
-    PriorityClauseBuffer::Setup setup;
+    AdaptiveClauseStore::Setup setup;
     setup.maxClauseLength = 20;
     setup.slotsForSumOfLengthAndLbd = false;
     setup.maxLbdPartitionedSize = 2;
     setup.numLiterals = 10;
-    PriorityClauseBuffer pcb(setup);
+    AdaptiveClauseStore acs(setup);
 
     Mallob::Clause c;
     int nbExportedCls;
@@ -54,41 +52,41 @@ void testBasic() {
         for (int size = 10; size >= 2; size--) {
             c = generateClause(size, size);
             LOG(V2_INFO, "INSERT %s\n", c.toStr().c_str());
-            bool success = pcb.addClause(c);
+            bool success = acs.addClause(c);
             assert(success);
-            assert(pcb.checkTotalLiterals());
+            assert(acs.checkTotalLiterals());
         }
         
-        assert(pcb.getNumLiterals(2, 2) == 2);
-        assert(pcb.getNumLiterals(3, 2) == 3);
-        assert(pcb.getNumLiterals(4, 2) == 4);
-        assert(pcb.getNumLiterals(5, 2) == 0);
-        assert(pcb.getCurrentlyUsedLiterals() == 9);
+        assert(acs.getNumLiterals(2, 2) == 2);
+        assert(acs.getNumLiterals(3, 2) == 3);
+        assert(acs.getNumLiterals(4, 2) == 4);
+        assert(acs.getNumLiterals(5, 2) == 0);
+        assert(acs.getCurrentlyUsedLiterals() == 9);
 
-        pcb.exportBuffer(999, nbExportedCls);
+        acs.exportBuffer(999, nbExportedCls);
         assert(nbExportedCls == 3);
-        assert(pcb.checkTotalLiterals());
-        assert(pcb.getCurrentlyUsedLiterals() == 0);
+        assert(acs.checkTotalLiterals());
+        assert(acs.getCurrentlyUsedLiterals() == 0);
 
         for (int size = 1; size <= 10; size++) {
             c = generateClause(size, size);
             LOG(V2_INFO, "INSERT %s\n", c.toStr().c_str());
-            bool success = pcb.addClause(c);
+            bool success = acs.addClause(c);
             assert(success == (size <= 4));
-            assert(pcb.checkTotalLiterals());
+            assert(acs.checkTotalLiterals());
         }
 
-        assert(pcb.getNumLiterals(1, 1) == 1);
-        assert(pcb.getNumLiterals(2, 2) == 2);
-        assert(pcb.getNumLiterals(3, 2) == 3);
-        assert(pcb.getNumLiterals(4, 2) == 4);
-        assert(pcb.getNumLiterals(5, 2) == 0);
-        assert(pcb.getCurrentlyUsedLiterals() == 10);
+        assert(acs.getNumLiterals(1, 1) == 1);
+        assert(acs.getNumLiterals(2, 2) == 2);
+        assert(acs.getNumLiterals(3, 2) == 3);
+        assert(acs.getNumLiterals(4, 2) == 4);
+        assert(acs.getNumLiterals(5, 2) == 0);
+        assert(acs.getCurrentlyUsedLiterals() == 10);
 
-        pcb.exportBuffer(999, nbExportedCls);
+        acs.exportBuffer(999, nbExportedCls);
         assert(nbExportedCls == 4);
-        assert(pcb.checkTotalLiterals());
-        assert(pcb.getCurrentlyUsedLiterals() == 0);
+        assert(acs.checkTotalLiterals());
+        assert(acs.getCurrentlyUsedLiterals() == 0);
     }
 }
 
