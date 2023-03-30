@@ -45,8 +45,8 @@ public:
     void performImport(BufferReader& reader) override {
         //LOG(V2_INFO, "DBG perform import of size %i\n", reader.getRemainingSize());
         _pcb.addClauses(reader, nullptr);
-        LOG(V2_INFO, "%lu lits in import buffer: %s dropped:%i\n", size(), _pcb.getCurrentlyUsedLiteralsReport().c_str(), _stats.receivedClausesDropped);
-        LOG(V2_INFO, "clenhist imp_disc %s\n", _pcb.getDeletedClausesHistogram().getReport().c_str());
+        LOG(V5_DEBG, "%lu lits in import buffer: %s dropped:%i\n", size(), _pcb.getCurrentlyUsedLiteralsReport().c_str(), _stats.receivedClausesDropped);
+        LOG(V5_DEBG, "clenhist imp_disc %s\n", _pcb.getDeletedClausesHistogram().getReport().c_str());
     }
 
     void addSingleClause(const Mallob::Clause& c) override {
