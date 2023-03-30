@@ -60,6 +60,8 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
 OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversification options")
  OPT_FLOAT(inputShuffleProbability,         "isp", "input-shuffle-probability",          1,        0,   1,
     "Probability for a solver (never the 1st one of a kind) to shuffle the order of clauses in the input to some degree")
+ OPT_INT(diversifyElimination,              "div-elim", "",                              0,        0,   3,
+    "0=normal diversification, 1/2/3=disable some/most/all variable elimination")
  OPT_BOOL(diversifyPhases,                  "div-phases", "",                            true,
     "Diversify solvers based on random sparse variable phases in addition to native diversification")
  OPT_BOOL(diversifyNoise,                   "div-noise",  "",                            true,

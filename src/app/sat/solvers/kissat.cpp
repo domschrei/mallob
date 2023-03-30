@@ -52,28 +52,31 @@ void Kissat::diversify(int seed) {
 
     // Eliminated variables obstruct the import of many shared clauses (40-90%!).
     // They are caused by BVE ("eliminate"), autarky reasoning and equivalent literal substitution.
-    // Since these are important inprocessing techniques, we cycle through all combinations
-    // of enabling/disabling them.
-    if (getDiversificationIndex() % 2 >= 1)
+    if (_setup.eliminationSetting == SolverSetup::DISABLE_ALL) {
         kissat_set_option(solver, "eliminate", 0);
-    if (getDiversificationIndex() % 4 >= 2)
         kissat_set_option(solver, "autarky", 0);
-    if (getDiversificationIndex() % 8 >= 4)
         kissat_set_option(solver, "substitute", 0);
-    // ALTERNATIVE:
-    /*
-    if (getDiversificationIndex() % 2 == 1) {
-        // Every second configuration, a subset of elim/aut/sub is disabled.
-        // (111, 110, 101, 100, 011, 010, 001)
-        int divIdx = (getDiversificationIndex() / 2) % 7;
-        if (getDiversificationIndex() % 2 <= 1)
+    }
+    // Since these are important inprocessing techniques, we may want to cycle through all combinations
+    // of enabling/disabling them.
+    if (_setup.eliminationSetting == SolverSetup::DISABLE_MOST) {
+        if (getDiversificationIndex() % 2 >= 1)
             kissat_set_option(solver, "eliminate", 0);
-        if (getDiversificationIndex() % 4 <= 2)
+        if (getDiversificationIndex() % 4 >= 2)
             kissat_set_option(solver, "autarky", 0);
-        if (getDiversificationIndex() % 8 <= 4)
+        if (getDiversificationIndex() % 8 >= 4)
             kissat_set_option(solver, "substitute", 0);
     }
-    */
+    if (_setup.eliminationSetting == SolverSetup::DISABLE_SOME && getDiversificationIndex() % 2 == 1) {
+        // Every second configuration, a subset of elim/aut/sub is disabled.
+        int divIdx = (getDiversificationIndex() / 2) % 7;
+        if (divIdx % 2 == 0)
+            kissat_set_option(solver, "eliminate", 0);
+        if (divIdx % 4 < 2)
+            kissat_set_option(solver, "autarky", 0);
+        if (divIdx < 4)
+            kissat_set_option(solver, "substitute", 0);
+    }
 
     // Base portfolio of different configurations
     switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
@@ -118,7 +121,7 @@ void Kissat::diversify(int seed) {
 }
 
 int Kissat::getNumOriginalDiversifications() {
-	return 10;
+	return 9;
 }
 
 void Kissat::setPhase(const int var, const bool phase) {

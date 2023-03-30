@@ -134,6 +134,20 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.numBufferedClsGenerations = params.bufferedImportedClsGenerations();
 	setup.skipClauseSharingDiagonally = params.skipClauseSharingDiagonally();
 	setup.diversifyNoise = params.diversifyNoise();
+	switch (_params.diversifyElimination()) {
+	case 0:
+		setup.eliminationSetting = SolverSetup::ALLOW_ALL;
+		break;
+	case 1:
+		setup.eliminationSetting = SolverSetup::DISABLE_SOME;
+		break;
+	case 2:
+		setup.eliminationSetting = SolverSetup::DISABLE_MOST;
+		break;
+	case 3:
+		setup.eliminationSetting = SolverSetup::DISABLE_ALL;
+		break;
+	}
 	setup.adaptiveImportManager = params.adaptiveImportManager();
 	setup.certifiedUnsat = params.certifiedUnsat();
 	setup.maxNumSolvers = config.mpisize * params.numThreadsPerProcess();

@@ -23,6 +23,9 @@ struct SolverSetup {
 	int minNumChunksPerSolver;
 	int numBufferedClsGenerations;
 	bool diversifyNoise;
+	enum EliminationSetting {
+		ALLOW_ALL, DISABLE_SOME, DISABLE_MOST, DISABLE_ALL
+	} eliminationSetting;
 
 	// SAT Solving settings
 
