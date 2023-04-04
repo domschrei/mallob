@@ -78,8 +78,15 @@ void Kissat::diversify(int seed) {
             kissat_set_option(solver, "substitute", 0);
     }
 
+    int divIdx = getDiversificationIndex() % getNumOriginalDiversifications();
+    // move div. index 9 to pos. 0 to restore original configuration for ALLOW_ALL
+    if (_setup.eliminationSetting == SolverSetup::ALLOW_ALL) {
+        if (divIdx == 9) divIdx = 0;
+        else divIdx++;
+    }
+
     // Base portfolio of different configurations
-    switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
+    switch (divIdx) {
     case 0: kissat_set_option(solver, "delay", 10); break;
     case 1: kissat_set_option(solver, "restartint", 100); break;
     case 2: kissat_set_option(solver, "walkinitially", 1); break;
@@ -89,6 +96,8 @@ void Kissat::diversify(int seed) {
     case 6: kissat_set_configuration(solver, "sat"); break;
     case 7: kissat_set_option(solver, "probe", 0); break;
     case 8: kissat_set_option(solver, "tier1", 3); kissat_set_option(solver, "tier2", 8); break;
+    // only if elimination options are unrestricted
+    case 9: kissat_set_option(solver, "eliminate", 0); break;
     }
 
     // Randomize ("jitter") certain options around their default value
@@ -121,6 +130,8 @@ void Kissat::diversify(int seed) {
 }
 
 int Kissat::getNumOriginalDiversifications() {
+    if (_setup.eliminationSetting == SolverSetup::ALLOW_ALL)
+        return 10;
 	return 9;
 }
 
