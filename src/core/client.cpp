@@ -363,15 +363,26 @@ void Client::advance() {
         }
     }
 
-    int jobLimit = _params.numJobs();
-    if (jobLimit > 0 && (int)_sys_state.getGlobal()[SYSSTATE_PROCESSED_JOBS] >= jobLimit) {
-        LOG(V2_INFO, "Job limit reached.\n");
-        // Job limit reached - exit
-        Terminator::setTerminating();
-        // Send MSG_EXIT to worker of rank 0, which will broadcast it
-        MyMpi::isend(0, MSG_DO_EXIT, IntVec({0}));
-        // Stop instance reader immediately
-        _instance_reader.stopWithoutWaiting();
+    // Any "done job" processings still pending?
+    if (_done_job_futures.empty()) {
+        // -- no: check if job limit has been reached
+        int jobLimit = _params.numJobs();
+        if (jobLimit > 0 && (int)_sys_state.getGlobal()[SYSSTATE_PROCESSED_JOBS] >= jobLimit) {
+            LOG(V2_INFO, "Job limit reached.\n");
+            // Job limit reached - exit
+            Terminator::setTerminating();
+            // Send MSG_EXIT to worker of rank 0, which will broadcast it
+            MyMpi::isend(0, MSG_DO_EXIT, IntVec({0}));
+            // Stop instance reader immediately
+            _instance_reader.stopWithoutWaiting();
+        }
+    } else {
+        // processings pending - try to join done tasks
+        while (!_done_job_futures_finished.empty() && _done_job_futures_finished.front()) {
+            _done_job_futures.front().get();
+            _done_job_futures.pop_front();
+            _done_job_futures_finished.pop_front();
+        }
     }
 }
 
@@ -544,14 +555,18 @@ void Client::handleSendJobResult(MessageHandle& handle) {
 
     if (_json_interface) {
         JobResult* resultPtr = new JobResult(std::move(jobResult));
+        _done_job_futures_finished.push_back(false);
+        bool* futFinished = &_done_job_futures_finished.back();
         auto fut = ProcessWideThreadPool::get().addTask(
             [interface = _json_interface.get(), 
             result = resultPtr, 
             stats = desc.getStatistics(),
+            futFinished,
             applicationId = desc.getApplicationId()]() mutable {
             
             interface->handleJobDone(std::move(*result), stats, applicationId);
             delete result;
+            *futFinished = true;
         });
         _done_job_futures.push_back(std::move(fut));
     }

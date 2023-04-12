@@ -40,6 +40,8 @@ private:
     std::vector<nlohmann::json> _jsons_to_delete;
 
     std::ofstream _ofs_results;
+    int _nb_introduced_jobs {0};
+    int _nb_concluded_jobs {0};
 
 public:
     JobStreamer(const Parameters& params, APIConnector& api, int internalRank) : 
@@ -99,8 +101,6 @@ public:
             std::string baseJobName = _json_template["name"];
             Logger logger = Logger::getMainInstance().copy("Streamer", ".streamer");
 
-            int numIntroducedJobs = 0;
-
             while (_bg_worker.continueRunning()) {
 
                 // Wait until there is work
@@ -114,7 +114,7 @@ public:
                 while (_num_active_jobs < _params.activeJobsPerClient()) {
                     
                     // Already submitted enough jobs?
-                    if (_params.maxJobsPerStreamer() != 0 && numIntroducedJobs == _params.maxJobsPerStreamer())
+                    if (_params.maxJobsPerStreamer() != 0 && _nb_introduced_jobs == _params.maxJobsPerStreamer())
                         break;
 
                     // Prepare JSON
@@ -155,7 +155,7 @@ public:
                         _delete_cond_var.notify();
                     });
                     logger.flush();
-                    numIntroducedJobs++;
+                    _nb_introduced_jobs++;
                 }
             }
         });
@@ -188,8 +188,10 @@ public:
                     if (writeResultsToFile) {
                         jsonToDelete["result"].erase("solution"); // potentially expensive call!
                         _ofs_results << jsonToDelete << std::endl;
+                        _ofs_results.flush();
                     }
                     // JSON destructor is called here
+                    _nb_concluded_jobs++;
                 }
             }
         });
@@ -204,5 +206,7 @@ public:
         _delete_cond_var.notify();
         _bg_worker.stop();
         _bg_deleter.stop();
+        LOG(V2_INFO, "Streamer concluded %i/%i introduced jobs\n",
+            _nb_concluded_jobs, _nb_introduced_jobs);
     }
 };

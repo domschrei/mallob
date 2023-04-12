@@ -81,6 +81,7 @@ private:
     Mutex _done_job_lock; 
 
     std::list<std::future<void>> _done_job_futures;
+    std::list<bool> _done_job_futures_finished;
 
     std::atomic_int _num_jobs_to_interrupt = 0;
     robin_hood::unordered_set<int> _jobs_to_interrupt;
