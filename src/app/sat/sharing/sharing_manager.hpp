@@ -55,6 +55,7 @@ protected:
 	
 	int _last_num_cls_to_import = 0;
 	int _last_num_admitted_cls_to_import = 0;
+	int _allocated_sharing_buffer_size {-1};
 
 	ClauseHistogram _hist_produced;
 	ClauseHistogram _hist_returned_to_db;
@@ -87,6 +88,7 @@ public:
 			int jobIndex);
 	~SharingManager();
 
+	void setAllocatedSharingBufferSize(int allocatedSize) {_allocated_sharing_buffer_size = allocatedSize;}
 	void addSharingEpoch(int epoch) {_digested_epochs.insert(epoch);}
     int prepareSharing(int* begin, int totalLiteralLimit, int& successfulSolverId);
 	int filterSharing(int* begin, int buflen, int* filterOut);

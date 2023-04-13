@@ -225,6 +225,14 @@ int SharingManager::prepareSharing(int* begin, int totalLiteralLimit, int& succe
 
 	_clause_filter->releaseAllLocks();
 
+	if (_allocated_sharing_buffer_size >= 0 && buffer.size() > _allocated_sharing_buffer_size) {
+		LOGGER(_logger, V1_WARN, "[WARN] prepared buffer len=%i exceeds allocated size %i! Truncating ...\n",
+			(int)buffer.size(), _allocated_sharing_buffer_size);
+		// Truncating should be fine, even if a clause is cut in half,
+		// since BufferReader implementation always checks for bounds.
+		buffer.resize(_allocated_sharing_buffer_size);
+	}
+
 	//assert(buffer.size() <= maxSize);
 	memcpy(begin, buffer.data(), buffer.size()*sizeof(int));
 

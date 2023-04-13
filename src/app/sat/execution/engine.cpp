@@ -338,6 +338,10 @@ int SatEngine::solveLoop() {
     return -1; // no result yet
 }
 
+void SatEngine::setAllocatedSharingBufferSize(int allocatedSize) {
+	_sharing_manager->setAllocatedSharingBufferSize(allocatedSize);
+}
+
 bool SatEngine::isReadyToPrepareSharing() const {
 	// If certified UNSAT is enabled, no sharing operation can be ongoing
 	// (otherwise, this op must be finished first, for clause ID consistency)

@@ -90,6 +90,7 @@ public:
         _last_imported_revision = 0;
         // Import subsequent revisions
         importRevisions();
+        _engine.setAllocatedSharingBufferSize(_hsm->exportBufferAllocatedSize);
         
         // Start solver threads
         _engine.solve();
@@ -158,6 +159,7 @@ public:
                 // Collect local clauses, put into shared memory
                 _hsm->exportChecksum = Checksum();
                 _hsm->successfulSolverId = -1;
+                assert(_hsm->exportBufferMaxSize >= 0 && _hsm->exportBufferMaxSize < 1048576);
                 _hsm->exportBufferTrueSize = _engine.prepareSharing(_export_buffer, _hsm->exportBufferMaxSize, _hsm->successfulSolverId);
                 if (_hsm->exportBufferTrueSize != -1) {
                     auto [admitted, total] = _engine.getLastAdmittedClauseShare();

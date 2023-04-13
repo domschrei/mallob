@@ -62,6 +62,7 @@ public:
     int solveLoop();
 	JobResult& getResult() {return _result;}
 
+	void setAllocatedSharingBufferSize(int allocatedSize);
 	bool isReadyToPrepareSharing() const;
     int prepareSharing(int* begin, int maxSize, int& successfulSolverId);
 	int filterSharing(int* begin, int size, int* filterOut);
