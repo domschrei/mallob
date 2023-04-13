@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <fstream>
 #include <iostream>
 #include <stdlib.h>
 #include <unistd.h>
@@ -54,6 +55,12 @@ public:
         _hsm = (SatSharedMemory*) accessMemory(_shmem_id, sizeof(SatSharedMemory));
         
         _checksum = params.useChecksums() ? new Checksum() : nullptr;
+
+        // Adjust OOM killer score to make this process the first to be killed
+        // (always better than touching an MPI process, which would crash everything)
+        std::ofstream oomOfs("/proc/self/oom_score_adj");
+        oomOfs << "1000";
+        oomOfs.close();
     }
 
     void run() {
