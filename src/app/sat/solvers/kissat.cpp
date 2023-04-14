@@ -25,7 +25,8 @@ int terminate_callback(void* state) {
 
 
 Kissat::Kissat(const SolverSetup& setup)
-	: PortfolioSolverInterface(setup), solver(kissat_init()) {
+	: PortfolioSolverInterface(setup), solver(kissat_init()),
+        learntClauseBuffer(_setup.strictClauseLengthLimit+3) {
 
     kissat_set_terminate(solver, this, &terminate_callback);
     glueLimit = _setup.strictLbdLimit;
@@ -218,7 +219,7 @@ std::set<int> Kissat::getFailedAssumptions() {
 
 void Kissat::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
 	this->callback = callback;
-    kissat_set_clause_export_callback(solver, this, learntClauseBuffer, _setup.strictClauseLengthLimit, &produce_clause);
+    kissat_set_clause_export_callback(solver, this, learntClauseBuffer.data(), _setup.strictClauseLengthLimit, &produce_clause);
     kissat_set_clause_import_callback(solver, this, &consume_clause);
 }
 
@@ -228,7 +229,7 @@ void Kissat::produceClause(int size, int lbd) {
     // In Kissat, LBD scores are represented from 1 to len-1. => Increment LBD.
     learntClause.lbd = learntClause.size == 1 ? 1 : lbd+1; 
     if (learntClause.lbd > _setup.strictLbdLimit) return;
-    learntClause.begin = learntClauseBuffer;
+    learntClause.begin = learntClauseBuffer.data();
     callback(learntClause, _setup.localId);
 }
 

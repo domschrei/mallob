@@ -13,7 +13,7 @@ private:
     int numVars = 0;
 
     LearnedClauseCallback callback;
-    int learntClauseBuffer[100];
+    std::vector<int> learntClauseBuffer;
 	Mallob::Clause learntClause;
     std::vector<int> producedClause;
 

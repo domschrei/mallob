@@ -125,6 +125,7 @@ private:
 		//for (size_t i = 0; i < size; i++) lits += std::to_string(begin[i]) + ",";
 		//lits = lits.substr(0, lits.size()-1);
 
+		assert(producerId >= 0 && producerId < _bitsets.size());
 		auto& bitset = _bitsets.at(producerId);
 
 		if (bitset.test(h1) && bitset.test(h2) && bitset.test(h3) && bitset.test(h4)) {
