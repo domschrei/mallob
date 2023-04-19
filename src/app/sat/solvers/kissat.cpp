@@ -92,7 +92,6 @@ void Kissat::diversify(int seed) {
     case 7: kissat_set_configuration(solver, "sat"); break;
     case 8: kissat_set_option(solver, "probe", 0); break;
     case 9: kissat_set_option(solver, "tier1", 3); kissat_set_option(solver, "tier2", 8); break;
-    // only if elimination options are unrestricted
 
     // new options to try
     case 10: kissat_set_option(solver, "failedcont", 50); kissat_set_option(solver, "failedrounds", 10); break;
@@ -100,8 +99,7 @@ void Kissat::diversify(int seed) {
     case 12: kissat_set_option(solver, "modeconflicts", 1e5); kissat_set_option(solver, "modeticks", 1e9); break;
     case 13: kissat_set_option(solver, "reducefraction", 90); break;
     case 14: kissat_set_option(solver, "vivifyeffort", 1000); break;
-    case 15: kissat_set_option(solver, "vivifykeep", 1); break;
-    case 16: kissat_set_option(solver, "xorsclslim", 8); break;
+    case 15: kissat_set_option(solver, "xorsclslim", 8); break;
     }
 
     // Randomize ("jitter") certain options around their default value
@@ -134,7 +132,7 @@ void Kissat::diversify(int seed) {
 }
 
 int Kissat::getNumOriginalDiversifications() {
-    return 17;
+    return 16;
 }
 
 void Kissat::setPhase(const int var, const bool phase) {
