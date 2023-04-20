@@ -293,6 +293,10 @@ public:
     int64_t decisions;    // number of decisions in 'decide'
     int64_t propagations; // total # propagations
     int64_t restarts;     // total # restarts
+    // monitoring of internally imported / discarded clauses
+    unsigned long imported;
+    unsigned long discarded;
+    unsigned long r_wit,r_el,r_fx;
   };
   Statistics get_stats ();
 

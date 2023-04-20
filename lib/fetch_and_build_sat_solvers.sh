@@ -110,7 +110,7 @@ if echo $solvers|grep -q "k" && [ ! -f kissat/libkissat.a ]; then
     unzip kissat-isc22.zip
     mv kissat-*/ kissat
     cd kissat
-    ./configure --quiet
+    ./configure --quiet --no-proofs
     make
     cp build/libkissat.a .
     cd ..

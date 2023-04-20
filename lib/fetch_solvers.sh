@@ -6,7 +6,7 @@ if echo $solvers|grep -q "m"; then wget -nc https://dominikschreiber.de/mergesat
 if echo $solvers|grep -q "g"; then wget -nc https://www.labri.fr/perso/lsimon/downloads/softwares/glucose-syrup-4.1.tgz ; fi
 if echo $solvers|grep -q "y"; then wget -nc http://fmv.jku.at/yalsat/yalsat-03v.zip ; fi
 if echo $solvers|grep -q "l" && [ ! -d lingeling ]; then wget -nc https://dominikschreiber.de/share/lingeling-isc22.zip ; fi
-if echo $solvers|grep -q "c" && [ ! -d cadical ]; then git clone git@github.com:domschrei/cadical.git && cd cadical && git checkout 20a9484 && cd .. ; fi
+if echo $solvers|grep -q "c" && [ ! -d cadical ]; then git clone git@github.com:domschrei/cadical.git && cd cadical && git checkout eb842f9dd4986b492dbe7fe51cc3da717e3f24df && cd .. ; fi
 if echo $solvers|grep -q "p" && [ ! -d lrat-cadical ]; then 
     git clone https://github.com/domschrei/cadical.git lrat-cadical
     cd lrat-cadical

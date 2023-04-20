@@ -236,6 +236,10 @@ void Cadical::writeStatistics(SolverStatistics& stats) {
 	stats.decisions = s.decisions;
 	stats.propagations = s.propagations;
 	stats.restarts = s.restarts;
+	stats.imported = s.imported;
+	stats.discarded = s.discarded;
+	LOGGER(_logger, V4_VVER, "disc_reasons r_ed:%ld,r_fx:%ld,r_wit:%ld\n",
+        s.r_el, s.r_fx, s.r_wit);
 }
 
 void Cadical::cleanUp() {
