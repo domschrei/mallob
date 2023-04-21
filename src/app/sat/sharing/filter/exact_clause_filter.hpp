@@ -326,8 +326,11 @@ private:
         if (it == slot._map.end()) return 0;
         ClauseInfo info = it->second;
         info.lastSharedEpoch = epoch;
-        auto producers = info.producers;
-        info.producers = 0; // reset producers
+        // return no producers if all registered producers are from a long time ago
+        auto producers =
+            (_epoch_horizon >= 0 && epoch - info.lastProducedEpoch > _epoch_horizon) ?
+            0 : info.producers;
+        info.producers = 0; // reset producers in any case
         slot._map.insert_or_assign(it, apc, std::move(info));
         return producers;
     }
