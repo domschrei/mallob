@@ -67,32 +67,19 @@ using ProducedMap = tsl::robin_map<AnyProducedClause, ClauseInfo, AnyProducedCla
 
 private:
     const int _epoch_horizon;
-    const bool _reshare_improved_lbd;
 
     struct Slot {
         Mutex _mtx_map;
         ProducedMap _map;
-
-        Mutex _mtx_deletion_list;
-        std::atomic_int _deletion_list_size {0};
-        std::list<Mallob::Clause> _deletion_list;
-
-        Slot(GenericClauseStore& clauseStore, int clauseLength) : _map(32'768) {
-            
-            clauseStore.setClauseDeletionCallback(clauseLength, [&](Mallob::Clause& clause) {
-                auto lock = _mtx_deletion_list.getLock();
-                _deletion_list_size.fetch_add(1, std::memory_order_relaxed);
-                _deletion_list.push_back(std::move(clause));
-            });
-        }
+        Slot(GenericClauseStore& clauseStore, int clauseLength) : _map(32'768) {}
     };
     std::vector<std::unique_ptr<Slot>> _slots;
     
     int _last_gc_epoch {0};
 
 public:
-    ExactClauseFilter(GenericClauseStore& clauseStore, int epochHorizon, bool reshareImprovedLbd, int maxClauseLength) :
-        GenericClauseFilter(clauseStore), _epoch_horizon(epochHorizon), _reshare_improved_lbd(reshareImprovedLbd),
+    ExactClauseFilter(GenericClauseStore& clauseStore, int epochHorizon, int maxClauseLength) :
+        GenericClauseFilter(clauseStore), _epoch_horizon(epochHorizon),
         _slots(maxClauseLength) {
 
         for (size_t i = 0; i < _slots.size(); i++) {
@@ -110,57 +97,25 @@ public:
 
         auto& slot = getSlot(c.size);
         auto it = slot._map.find(apc);
-        bool contained = it != slot._map.end();
-        bool filtered = false;
 
-        if (contained) {
+        if (it != slot._map.end()) {
+            // entry existed before: filter clause.
             auto& info = it->second;
-            // entry existed before: check if this clause should be filtered
-            int oldLbd = info.minProducedLbd;
-            // No resharing upon improved LBD, or LBD not improved?
-            // => Filter clause.
-            if (!_reshare_improved_lbd || (oldLbd > 0 && c.lbd >= oldLbd)) {
-                // add new producer, return.
-                updateClauseInfo(c, apc, it, /*updateLbd=*/false);
-                result = FILTERED;
-                filtered = true;
-            }
-            // Clause can be accepted (again) due to improved LBD score
-        }
-
-        if (!filtered) {
+            // add new producer, return.
+            updateClauseInfo(c, apc, it);
+            result = FILTERED;
+        } else {
+            // entry does not exist yet
             // Try to insert to sharing database
             cls.begin = data; cls.size = c.size; cls.lbd = c.lbd;
             if (_clause_store.addClause(cls)) {
                 // Success!
                 result = ADMITTED;
-                updateClauseInfo(c, apc, it, /*updateLbd=*/true);
+                updateClauseInfo(c, apc, it);
             } else {
-                // No space left in database: update meta data, drop clause
+                // No space left in database: drop clause
                 result = DROPPED;
-                // (Do not update LBD value because the clause was not exported)
-                if (contained) updateClauseInfo(c, apc, it, /*updateLbd=*/false);
             }
-        }
-
-        if (result == ADMITTED && slot._deletion_list_size.load(std::memory_order_relaxed) >= 2) {
-            // Remove up to two clauses which are marked for deletion from the filter
-            Mallob::Clause c1, c2;
-            {
-                auto lock = slot._mtx_deletion_list.getLock();
-                if (!slot._deletion_list.empty()) {
-                    c1 = std::move(slot._deletion_list.front());
-                    slot._deletion_list.pop_front();
-                    slot._deletion_list_size.fetch_sub(1, std::memory_order_relaxed);
-                }
-                if (!slot._deletion_list.empty()) {
-                    c2 = std::move(slot._deletion_list.front());
-                    slot._deletion_list.pop_front();
-                    slot._deletion_list_size.fetch_sub(1, std::memory_order_relaxed);
-                }
-            }
-            if (c1.begin != nullptr) erase(c1);
-            if (c2.begin != nullptr) erase(c2);
         }
 
         return result;
@@ -188,7 +143,8 @@ public:
             size_t mapSize = slot._map.size();
             for (auto it = slot._map.begin(); it != slot._map.end();) {
                 auto& [apc, info] = *it;
-                if (epoch - info.lastSharedEpoch > _epoch_horizon) {
+                if (epoch - info.lastSharedEpoch > _epoch_horizon
+                    && epoch - info.lastProducedEpoch > _epoch_horizon) {
                     it = slot._map.erase(it);
                     nbRemoved++;
                 } else ++it;
@@ -264,6 +220,10 @@ public:
         for (size_t i = 0; i < _slots.size(); i++) releaseLock(i+1);
     }
 
+    void erase(ProducedClauseCandidate& c) {
+        getSlot(c.size)._map.erase(getAnyProducedClause(c));
+    }
+
 private:
     Slot& getSlot(int clauseLength) const {
         assert(clauseLength-1 >= 0 && clauseLength-1 < _slots.size()
@@ -271,9 +231,6 @@ private:
         return *_slots.at(clauseLength-1);
     }
 
-    void erase(ProducedClauseCandidate& c) {
-        getSlot(c.size)._map.erase(getAnyProducedClause(c));
-    }
     void erase(Mallob::Clause& c) {
         auto apc = getAnyProducedClause(c);
         getSlot(c.size)._map.erase(apc);
@@ -327,28 +284,17 @@ private:
     }
 
     ClauseInfo getDefaultClauseInfo(const ProducedClauseCandidate& c) {
-        ClauseInfo defaultInfo(c);
-        defaultInfo.lastSharedEpoch = _epoch.load(std::memory_order_relaxed);
-        return defaultInfo;
+        return ClauseInfo(c);
     }
 
-    void updateClauseInfo(const ProducedClauseCandidate& c, const AnyProducedClause& apc, ProducedMap::iterator& it, bool updateLbd) {
+    void updateClauseInfo(const ProducedClauseCandidate& c, const AnyProducedClause& apc, ProducedMap::iterator& it) {
 
         auto& slot = getSlot(c.size);
         ClauseInfo info = it == slot._map.end() ? getDefaultClauseInfo(c) : it->second;
-        assert(c.lbd > 0);
-        if (updateLbd) {
-            if (info.minProducedLbd == 0 || info.minProducedLbd > c.lbd) {
-                // Improved (or first) LBD
-                info.minProducedLbd = ClauseInfo::truncateLbd(c.lbd);
-            }
-        }
-        if (info.minSharedLbd == 0) {
-            // clause was not shared before: we abuse the field for the epoch where it was last produced
-            info.lastSharedEpoch = c.epoch;
-        }
-        // Add producing solver as a producer
         assert(c.producerId < MALLOB_MAX_N_APPTHREADS_PER_PROCESS);
+        // Update the epoch where it was last produced 
+        if (c.epoch > info.lastProducedEpoch) info.lastProducedEpoch = c.epoch;
+        // Add producing solver as a producer
         info.producers |= (1 << c.producerId);
         slot._map.insert_or_assign(it, apc, std::move(info));
     }
@@ -361,18 +307,11 @@ private:
 
         const ClauseInfo& info = it->second;
 
-        if (info.minSharedLbd > 0) {
+        if (info.wasSharedBefore()) {
             // Clause was shared before
             if (_epoch_horizon < 0 || epoch - info.lastSharedEpoch <= _epoch_horizon) {
-                // Clause was shared at some recent point in time
-                if (!_reshare_improved_lbd) {
-                    // Never reshare recent clauses, even with improved LBD
-                    return false;
-                }
-                if (info.minSharedLbd <= lbd) {
-                    // Clause was shared with this LBD or better: filter
-                    return false;
-                }
+                // Clause was shared at some recent point in time: do not reshare
+                return false;
             }
         }
 
@@ -381,11 +320,11 @@ private:
     }
 
     inline cls_producers_bitset confirmSharingAndGetProducers(const AnyProducedClause& apc, int size, int lbd, int epoch) {
+
         auto& slot = getSlot(size);
         auto it = slot._map.find(apc);
         if (it == slot._map.end()) return 0;
         ClauseInfo info = it->second;
-        info.minSharedLbd = ClauseInfo::truncateLbd(lbd);
         info.lastSharedEpoch = epoch;
         auto producers = info.producers;
         info.producers = 0; // reset producers

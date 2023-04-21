@@ -11,6 +11,34 @@
 #include "util/params.hpp"
 #include "produced_clause_filter_commons.hpp"
 
+// Packed struct to get in all meta data for a produced clause.
+struct __attribute__ ((packed)) ClauseInfoWithLbd {
+
+    // Best LBD so far this clause was PRODUCED (+inserted into buffer) with
+    uint32_t minProducedLbd:5;
+    // Best LBD so far this clause was SHARED to all solvers with
+    uint32_t minSharedLbd:5;
+    // Epoch of last modification (production, or sharing:=true)
+    uint32_t lastSharedEpoch:22;
+
+    // Bitset of which local solver(s) exported the clause
+    cls_producers_bitset producers:MALLOB_MAX_N_APPTHREADS_PER_PROCESS;
+
+    ClauseInfoWithLbd() {
+        minProducedLbd = 0;
+        minSharedLbd = 0;
+        producers = 0;
+        lastSharedEpoch = 0;
+    }
+    ClauseInfoWithLbd(const ProducedClauseCandidate& c) {
+        minProducedLbd = c.lbd;
+        minSharedLbd = 0;
+        assert(c.producerId < MALLOB_MAX_N_APPTHREADS_PER_PROCESS);
+        producers = 1 << c.producerId;
+        lastSharedEpoch = 0;
+    }
+};
+
 // Exact data structure which remembers clauses which were successfully exported by a solver.
 // For each incoming clause, the structure can then be used to decide (a) if the clause should 
 // be discarded ("filtered") because it was shared before (or too recently) and (b) which
@@ -20,7 +48,7 @@
 class ProducedClauseFilter {
 
 template <typename T>
-using ProducedMap = tsl::robin_map<T, ClauseInfo, ProducedClauseHasher<T>, ProducedClauseEqualsCommutative<T>>;
+using ProducedMap = tsl::robin_map<T, ClauseInfoWithLbd, ProducedClauseHasher<T>, ProducedClauseEqualsCommutative<T>>;
 
 private:
     ProducedMap<ProducedUnitClause> _map_units;
@@ -32,7 +60,7 @@ private:
     const int _epoch_horizon;
     const bool _reshare_improved_lbd;
 
-    ClauseInfo _empty_clause_info;
+    ClauseInfoWithLbd _empty_clause_info;
 
 public:
     ProducedClauseFilter(int epochHorizon, bool reshareImprovedLbd) : 
@@ -159,11 +187,11 @@ private:
 
         // Inserted: do register and set epoch to current epoch
         if (contained) updateClauseInfo(c, it.value(), /*updateLbd=*/true);
-        else map.insert({std::move(pc), ClauseInfo(c)});
+        else map.insert({std::move(pc), ClauseInfoWithLbd(c)});
         return ADMITTED;
     }
 
-    void updateClauseInfo(const ProducedClauseCandidate& c, ClauseInfo& info, bool updateLbd) {
+    void updateClauseInfo(const ProducedClauseCandidate& c, ClauseInfoWithLbd& info, bool updateLbd) {
         assert(c.lbd > 0);
         if (updateLbd) {
             if (info.minProducedLbd == 0 || info.minProducedLbd > c.lbd) {
@@ -183,7 +211,7 @@ private:
         if (it == map.end()) return true; // No entry? -> Admit trivially
         
         // There is a present entry for this clause
-        ClauseInfo& info = it.value();
+        ClauseInfoWithLbd& info = it.value();
         if (info.minSharedLbd > 0) {
             // Clause was shared before
             if (epoch - info.lastSharedEpoch <= _epoch_horizon) {
@@ -209,7 +237,7 @@ private:
     inline cls_producers_bitset getProducers(const T& pc, ProducedMap<T>& map, int epoch) {
         auto it = map.find(pc);
         if (it == map.end()) return 0;
-        ClauseInfo& info = it.value();
+        ClauseInfoWithLbd& info = it.value();
         return info.producers;
     }
 };

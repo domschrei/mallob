@@ -66,7 +66,7 @@ SharingManager::SharingManager(
 		case MALLOB_CLAUSE_FILTER_EXACT:
 		case MALLOB_CLAUSE_FILTER_EXACT_DISTRIBUTED:
 		default:
-			return new ExactClauseFilter(*_clause_store, _params.clauseFilterClearInterval(), _params.reshareImprovedLbd(), _params.strictClauseLengthLimit());
+			return new ExactClauseFilter(*_clause_store, _params.clauseFilterClearInterval(), _params.strictClauseLengthLimit());
 		}
 	}()),
 	_export_buffer([&]() -> GenericExportManager* {

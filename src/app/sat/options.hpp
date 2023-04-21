@@ -45,8 +45,6 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "0 = static by length, 1 = static by LBD, 2 = adaptive by length + -mlbdps option")
  OPT_INT(resetLbd,                          "rlbd", "reset-lbd-at-import",                1,        0,   3,
     "Reset each clause's LBD to its length 0=never; 1=at import; 2=at export; 3=at production")
- OPT_BOOL(reshareImprovedLbd,               "ril", "reshare-improved-lbd",               false,
-    "Reshare clauses (regardless of their last sharing epoch) if their LBD improved")
  OPT_INT(strictClauseLengthLimit,           "scll", "strict-clause-length-limit",        16,       0,   255,
     "Only clauses up to this length will be shared")
  OPT_INT(strictLbdLimit,                    "slbdl", "strict-lbd-limit",                 16,       0,   255,
