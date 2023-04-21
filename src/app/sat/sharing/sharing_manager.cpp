@@ -369,7 +369,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 
 		hist.increment(clause.size);
 		// bitset of producing solvers
-		auto producers = _clause_filter->getProducers(clause, _internal_epoch);
+		auto producers = _clause_filter->confirmSharingAndGetProducers(clause, _internal_epoch);
 
 		// Decide for each solver whether it should receive the clause
 		for (size_t i = 0; i < importingSolvers.size(); i++) {

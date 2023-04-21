@@ -207,9 +207,9 @@ public:
         return true;
     }
 
-    cls_producers_bitset getProducers(Mallob::Clause& c, int epoch) override {
+    cls_producers_bitset confirmSharingAndGetProducers(Mallob::Clause& c, int epoch) override {
         auto apc = getAnyProducedClause(c);
-        auto producers = getProducers(apc, c.size, epoch);
+        auto producers = confirmSharingAndGetProducers(apc, c.size, c.lbd, epoch);
         if (apc.index() == 2) std::get<2>(apc).data = nullptr;
         return producers;
     }
@@ -340,7 +340,7 @@ private:
         if (updateLbd) {
             if (info.minProducedLbd == 0 || info.minProducedLbd > c.lbd) {
                 // Improved (or first) LBD
-                info.minProducedLbd = c.lbd;
+                info.minProducedLbd = ClauseInfo::truncateLbd(c.lbd);
             }
         }
         if (info.minSharedLbd == 0) {
@@ -359,7 +359,7 @@ private:
         auto it = slot._map.find(apc);
         if (it == slot._map.end()) return true;
 
-        ClauseInfo info = it->second;
+        const ClauseInfo& info = it->second;
 
         if (info.minSharedLbd > 0) {
             // Clause was shared before
@@ -376,17 +376,20 @@ private:
             }
         }
 
-        // Admit for sharing, update meta data to reflect sharing
-        info.minSharedLbd = lbd;
-        info.lastSharedEpoch = epoch;
-        slot._map.insert_or_assign(it, apc, std::move(info));
+        // Admit for sharing
         return true;
     }
 
-    inline cls_producers_bitset getProducers(const AnyProducedClause& apc, int size, int epoch) {
+    inline cls_producers_bitset confirmSharingAndGetProducers(const AnyProducedClause& apc, int size, int lbd, int epoch) {
         auto& slot = getSlot(size);
         auto it = slot._map.find(apc);
         if (it == slot._map.end()) return 0;
-        return it->second.producers;
+        ClauseInfo info = it->second;
+        info.minSharedLbd = ClauseInfo::truncateLbd(lbd);
+        info.lastSharedEpoch = epoch;
+        auto producers = info.producers;
+        info.producers = 0; // reset producers
+        slot._map.insert_or_assign(it, apc, std::move(info));
+        return producers;
     }
 };

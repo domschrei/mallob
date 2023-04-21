@@ -20,7 +20,7 @@ public:
 		} else return DROPPED;
 	}
 
-    cls_producers_bitset getProducers(Mallob::Clause& c, int epoch) override {
+    cls_producers_bitset confirmSharingAndGetProducers(Mallob::Clause& c, int epoch) override {
 		cls_producers_bitset result = 0;
 		return result;
 	}

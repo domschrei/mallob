@@ -70,7 +70,7 @@ public:
 		return registerClause(Mallob::Clause(c.begin, c.size, c.lbd), c.producerId);
 	}
 
-    cls_producers_bitset getProducers(Mallob::Clause& c, int epoch) override {
+    cls_producers_bitset confirmSharingAndGetProducers(Mallob::Clause& c, int epoch) override {
 		cls_producers_bitset result = 0;
 		for (int i = 0; i < _bitsets.size(); i++) {
 			if (!admitClause(c, i)) result |= (1 << i);
