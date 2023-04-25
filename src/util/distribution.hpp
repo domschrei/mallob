@@ -8,7 +8,7 @@ struct Distribution {
     enum Type {CONSTANT, UNIFORM, EXPONENTIAL, NORMAL} type;
     std::vector<double> params;
     std::mt19937& _rng;
-    void* _distribution;
+    void* _distribution {nullptr};
 
     Distribution(std::mt19937& rng) : _rng(rng) {}
     ~Distribution() {

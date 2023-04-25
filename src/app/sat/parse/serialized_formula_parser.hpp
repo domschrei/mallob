@@ -35,7 +35,6 @@ private:
     bool _has_true_chksum {false};
     int _true_chksum {1337};
 
-    bool _read_from_outofplace_clause {false};
     std::vector<int> _current_clause;
     int _current_clause_idx {0};
     int _current_clause_size {0};
@@ -118,7 +117,6 @@ public:
         _shuffled = true;
         _literal_ptr = nullptr;
         _next_cls_literal_ptr = nullptr;
-        _read_from_outofplace_clause = shuffleNextClause();
     }
 
     bool getNextLiteral(int& lit) {
@@ -141,7 +139,7 @@ public:
             ++_clause_index;
         }
 
-        if (!_read_from_outofplace_clause) {
+        if (!_shuffled) {
             // Set literal to destination of the current pointer
             lit = *_literal_ptr;
         } else {
@@ -151,8 +149,8 @@ public:
                 const int* litPtr = _literal_ptr;
                 assert(*litPtr != 0);
                 while (*litPtr != 0) {
-                    if (size >= _current_clause_capacity) {
-                        _current_clause_capacity = 2*(size+1)+2;
+                    if (size+1 >= _current_clause_capacity) {
+                        _current_clause_capacity = 2*(size+1);
                         _current_clause.resize(_current_clause_capacity);
                     }
                     _current_clause[size] = *litPtr;
@@ -173,6 +171,7 @@ public:
 
             lit = _current_clause[_current_clause_idx];
             _current_clause_idx++;
+            assert((lit == 0) == (*_literal_ptr == 0) || log_return_false("[ERROR] %i (%i/%i) vs. %i\n", lit, _current_clause_idx, _current_clause_size, *_literal_ptr));
         }
 
         // Advance literal pointer
@@ -185,9 +184,6 @@ public:
         if (lit == 0) {
             _chksum ^= _cls_chksum;
             _cls_chksum = SERIALIZED_FORMULA_PARSER_BASE_CLS_CHKSUM;
-            if (_shuffled) {
-                _read_from_outofplace_clause = shuffleNextClause();
-            }
         } else {
             _cls_chksum ^= lit;
         }
@@ -204,11 +200,5 @@ public:
             LOGGER(_logger, V0_CRIT, "[ERROR] Checksum fail: expected %i, got %i\n", _true_chksum, _chksum);
             abort();
         }
-    }
-
-    bool shuffleNextClause() {
-        //return false;
-        return true;
-        //return _rng.randomInRange(0, 1) < _literal_shuffle_probability;
     }
 };
