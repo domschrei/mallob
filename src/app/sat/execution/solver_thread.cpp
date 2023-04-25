@@ -85,7 +85,7 @@ bool SolverThread::readFormula() {
         // Shuffle next input
         if (_imported_lits_curr_revision == 0) {
             // ... not for the first solver
-            bool shuffle = _solver.getDiversificationIndex() >= 1;
+            bool shuffle = _solver.getGlobalId() >= 10;
             float random = 0.0001f * (rand() % 10000); // random number in [0,1)
             assert(random >= 0); assert(random <= 1);
             // ... only if random throw hits user-defined probability
@@ -188,7 +188,8 @@ bool SolverThread::readFormula() {
             
             // No formula left to read?
             if (_active_revision == _latest_revision) {
-                LOGGER(_logger, V4_VVER, "Reading done @ rev. %i\n", (int)_active_revision);                
+                LOGGER(_logger, V4_VVER, "Reading done @ rev. %i (%lu lits)\n", (int)_active_revision,
+                    _imported_lits_curr_revision);
                 return true;
             }
             _active_revision++;

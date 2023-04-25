@@ -4,6 +4,7 @@
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "util/random.hpp"
+#include <string>
 
 #define SERIALIZED_FORMULA_PARSER_BASE_CLS_CHKSUM 17
 
@@ -17,6 +18,7 @@ private:
     const size_t _num_cls;
 
     bool _shuffled {false};
+    SplitMix64Rng _rng;
 
     std::vector<const int*> _clause_refs;
     std::vector<int> _permuted_clause_indices;
@@ -25,7 +27,7 @@ private:
     int _permuted_clause_index {0};
 
     const int* _literal_ptr {nullptr};
-    const int* _next_literal_ptr {nullptr};
+    const int* _next_cls_literal_ptr {nullptr};
 
     int _chksum {1337};
     int _cls_chksum {SERIALIZED_FORMULA_PARSER_BASE_CLS_CHKSUM};
@@ -33,10 +35,18 @@ private:
     bool _has_true_chksum {false};
     int _true_chksum {1337};
 
+    bool _read_from_outofplace_clause {false};
+    std::vector<int> _current_clause;
+    int _current_clause_idx {0};
+    int _current_clause_size {0};
+    int _current_clause_capacity {0};
+
+    float _literal_shuffle_probability {0.01};
+
 public:
     SerializedFormulaParser(Logger& logger, size_t size, const int* literals, size_t numClauses=0) : 
         _logger(logger), _size(size), _payload(literals), _num_cls(numClauses),
-        _literal_ptr(_size==0 ? nullptr : _payload), _next_literal_ptr(_payload+_size) {}
+        _literal_ptr(_size==0 ? nullptr : _payload), _next_cls_literal_ptr(_payload+_size) {}
 
     void shuffle(int seed) {
         
@@ -45,8 +55,8 @@ public:
         const int numBlocks = 128;
 
         // Initialize RNG
-        SplitMix64Rng rng(seed);
-        auto rngLambda = [&]() {return ((double)rng()) / rng.max();};
+        _rng = SplitMix64Rng(seed);
+        auto rngLambda = [&]() {return ((double)_rng()) / _rng.max();};
         
         // Build vector of clauses (size + pointer to data)
         size_t clauseStart = 0; // 1st clause always begins at position 0
@@ -86,7 +96,7 @@ public:
         // as blocks of clauses.
         _permuted_clause_indices.resize(_clause_refs.size());
         for (size_t i = 0; i < _clause_refs.size(); i++) _permuted_clause_indices[i] = i;
-        ::random_shuffle(_permuted_clause_indices.data(), _permuted_clause_indices.size(), rng);
+        ::random_shuffle(_permuted_clause_indices.data(), _permuted_clause_indices.size(), _rng);
 
         // Create a little report string which shows some of the reordered indices
         std::string report;
@@ -107,7 +117,8 @@ public:
         
         _shuffled = true;
         _literal_ptr = nullptr;
-        _next_literal_ptr = nullptr;
+        _next_cls_literal_ptr = nullptr;
+        _read_from_outofplace_clause = shuffleNextClause();
     }
 
     bool getNextLiteral(int& lit) {
@@ -123,26 +134,60 @@ public:
             _permuted_clause_index = _permuted_clause_indices[_clause_index];
             // Set pointers to the current clause and its end
             _literal_ptr = _clause_refs[_permuted_clause_index];
-            _next_literal_ptr = _permuted_clause_index+1 == _clause_refs.size() ? 
+            _next_cls_literal_ptr = _permuted_clause_index+1 == _clause_refs.size() ?
                 _payload+_size
                 : _clause_refs[_permuted_clause_index+1];
             // Advance clause counter
             ++_clause_index;
         }
 
-        // Set literal to destination of the current pointer
-        lit = *_literal_ptr;
+        if (!_read_from_outofplace_clause) {
+            // Set literal to destination of the current pointer
+            lit = *_literal_ptr;
+        } else {
+            if (_current_clause_idx == _current_clause_size) {
+                // Shuffle next clause
+                int size = 0;
+                const int* litPtr = _literal_ptr;
+                assert(*litPtr != 0);
+                while (*litPtr != 0) {
+                    if (size >= _current_clause_capacity) {
+                        _current_clause_capacity = 2*(size+1)+2;
+                        _current_clause.resize(_current_clause_capacity);
+                    }
+                    _current_clause[size] = *litPtr;
+                    ++litPtr;
+                    ++size;
+                }
+                ::random_shuffle(_current_clause.data(), size, _rng);
+                _current_clause[size] = 0;
+                ++size;
+
+                _current_clause_idx = 0;
+                _current_clause_size = size;
+
+                //std::string clsstr;
+                //for (int lit : _current_clause) clsstr += std::to_string(lit) + " ";
+                //LOG(V2_INFO, "SHUFCLS %s\n", clsstr.c_str());
+            }
+
+            lit = _current_clause[_current_clause_idx];
+            _current_clause_idx++;
+        }
 
         // Advance literal pointer
         ++_literal_ptr;
-        if (_literal_ptr == _next_literal_ptr) {
-            // Clause fully read -- pick next clause next time
+        if (_literal_ptr == _next_cls_literal_ptr) {
+            // Clause block fully read -- pick next clause block next time
             _literal_ptr = nullptr;
         }
 
         if (lit == 0) {
             _chksum ^= _cls_chksum;
             _cls_chksum = SERIALIZED_FORMULA_PARSER_BASE_CLS_CHKSUM;
+            if (_shuffled) {
+                _read_from_outofplace_clause = shuffleNextClause();
+            }
         } else {
             _cls_chksum ^= lit;
         }
@@ -159,5 +204,11 @@ public:
             LOGGER(_logger, V0_CRIT, "[ERROR] Checksum fail: expected %i, got %i\n", _true_chksum, _chksum);
             abort();
         }
+    }
+
+    bool shuffleNextClause() {
+        //return false;
+        return true;
+        //return _rng.randomInRange(0, 1) < _literal_shuffle_probability;
     }
 };
