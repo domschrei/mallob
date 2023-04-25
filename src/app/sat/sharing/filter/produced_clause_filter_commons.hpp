@@ -49,4 +49,13 @@ struct __attribute__ ((packed)) ClauseInfo {
     bool wasSharedBefore() const {
         return lastSharedEpoch != MALLOB_EPOCH_NEVER_SHARED;
     }
+
+    bool isAdmissibleForInsertion(int epoch, int epochHorizon) const {
+        return epochHorizon >= 0 && epoch - lastProducedEpoch > epochHorizon;
+    }
+
+    bool isAdmissibleForSharing(int epoch, int epochHorizon) const {
+        if (!wasSharedBefore()) return true;
+        return epochHorizon >= 0 && epoch - lastSharedEpoch > epochHorizon;
+    }
 };

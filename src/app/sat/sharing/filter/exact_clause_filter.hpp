@@ -97,23 +97,29 @@ public:
 
         auto& slot = getSlot(c.size);
         auto it = slot._map.find(apc);
+        bool contained = it != slot._map.end();
+        bool filtered = false;
 
-        if (it != slot._map.end()) {
-            // entry existed before: filter clause.
+        if (contained) {
+            // entry existed before: check if the clause should be filtered.
             auto& info = it->second;
-            // add new producer, return.
-            updateClauseInfo(c, apc, it);
-            result = FILTERED;
-        } else {
-            // entry does not exist yet
-            // Try to insert to sharing database
+            if (!info.isAdmissibleForInsertion(c.epoch, _epoch_horizon)) {
+                // filtered! add new producer, return.
+                updateClauseInfo(c, apc, it, false);
+                result = FILTERED;
+                filtered = true;
+            }
+        }
+        if (!filtered) {
+            // Try to insert clause to clause store
             cls.begin = data; cls.size = c.size; cls.lbd = c.lbd;
             if (_clause_store.addClause(cls)) {
                 // Success!
+                updateClauseInfo(c, apc, it, true); // create if nonexistent
                 result = ADMITTED;
-                updateClauseInfo(c, apc, it);
             } else {
                 // No space left in database: drop clause
+                if (contained) updateClauseInfo(c, apc, it, false); // update if existent
                 result = DROPPED;
             }
         }
@@ -287,13 +293,14 @@ private:
         return ClauseInfo(c);
     }
 
-    void updateClauseInfo(const ProducedClauseCandidate& c, const AnyProducedClause& apc, ProducedMap::iterator& it) {
+    void updateClauseInfo(const ProducedClauseCandidate& c, const AnyProducedClause& apc, ProducedMap::iterator& it,
+            bool updateProducedEpoch) {
 
         auto& slot = getSlot(c.size);
         ClauseInfo info = it == slot._map.end() ? getDefaultClauseInfo(c) : it->second;
         assert(c.producerId < MALLOB_MAX_N_APPTHREADS_PER_PROCESS);
         // Update the epoch where it was last produced 
-        if (c.epoch > info.lastProducedEpoch) info.lastProducedEpoch = c.epoch;
+        if (updateProducedEpoch && c.epoch > info.lastProducedEpoch) info.lastProducedEpoch = c.epoch;
         // Add producing solver as a producer
         info.producers |= (1 << c.producerId);
         slot._map.insert_or_assign(it, apc, std::move(info));
@@ -307,12 +314,9 @@ private:
 
         const ClauseInfo& info = it->second;
 
-        if (info.wasSharedBefore()) {
-            // Clause was shared before
-            if (_epoch_horizon < 0 || epoch - info.lastSharedEpoch <= _epoch_horizon) {
-                // Clause was shared at some recent point in time: do not reshare
-                return false;
-            }
+        if (!info.isAdmissibleForSharing(epoch, _epoch_horizon)) {
+            // Clause was shared at some recent point in time: do not reshare
+            return false;
         }
 
         // Admit for sharing
