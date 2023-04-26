@@ -162,9 +162,6 @@ public:
                 assert(_hsm->exportBufferMaxSize >= 0 && _hsm->exportBufferMaxSize < 1048576);
                 _hsm->exportBufferTrueSize = _engine.prepareSharing(_export_buffer, _hsm->exportBufferMaxSize, _hsm->successfulSolverId);
                 if (_hsm->exportBufferTrueSize != -1) {
-                    auto [admitted, total] = _engine.getLastAdmittedClauseShare();
-                    _hsm->lastNumAdmittedClausesToImport = admitted;
-                    _hsm->lastNumClausesToImport = total;
                     assert(_hsm->exportBufferTrueSize <= _hsm->exportBufferAllocatedSize);
                     _hsm->didExport = true;
                 }
@@ -197,6 +194,9 @@ public:
                 }
                 _engine.addSharingEpoch(_hsm->importEpoch);
                 _engine.syncDeterministicSolvingAndCheckForLocalWinner();
+                auto [admitted, total] = _engine.getLastAdmittedClauseShare();
+                _hsm->lastNumAdmittedClausesToImport = admitted;
+                _hsm->lastNumClausesToImport = total;
                 _hsm->didDigestImport = true;
             }
             if (!_hsm->doDigestImportWithFilter && !_hsm->doDigestImportWithoutFilter) 

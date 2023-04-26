@@ -210,7 +210,6 @@ std::vector<int> SatProcessAdapter::getCollectedClauses(int& successfulSolverId)
     if (!_initialized || !hasCollectedClauses()) return std::vector<int>();
     assert(_hsm->exportBufferTrueSize <= _hsm->exportBufferAllocatedSize);
     std::vector<int> clauses(_export_buffer, _export_buffer+_hsm->exportBufferTrueSize);
-    _last_admitted_clause_share = std::pair<int, int>(_hsm->lastNumAdmittedClausesToImport, _hsm->lastNumClausesToImport);
     successfulSolverId = _hsm->successfulSolverId;
     _hsm->doExport = false;
     return clauses;
@@ -369,6 +368,7 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
     if (_hsm->didDigestImport) {
         _hsm->doDigestImportWithFilter = false;
         _hsm->doDigestImportWithoutFilter = false;
+        _last_admitted_clause_share = std::pair<int, int>(_hsm->lastNumAdmittedClausesToImport, _hsm->lastNumClausesToImport);
     }
 
     if (!_hsm->doStartNextRevision 
