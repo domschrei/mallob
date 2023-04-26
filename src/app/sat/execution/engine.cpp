@@ -394,8 +394,8 @@ void SatEngine::syncDeterministicSolvingAndCheckForLocalWinner() {
 void SatEngine::reduceActiveThreadCount() {
 	if (_num_active_solvers <= 1) return;
 
-	// Reduce thread count by 15% (but at least one thread)
-	size_t nbThreadsToTerminate = std::max(1UL, (size_t)std::round(0.15*_num_active_solvers));
+	// Reduce thread count by 10% (but at least one thread)
+	size_t nbThreadsToTerminate = std::max(1UL, (size_t)std::round(0.1*_num_active_solvers));
 
 	for (int termIdx = 0; termIdx < nbThreadsToTerminate; termIdx++) {
 		size_t i = _num_active_solvers-1;
