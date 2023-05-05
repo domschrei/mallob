@@ -19,30 +19,31 @@ fi
 
 bash fetch_solvers.sh $solvers
 
+# MergeSAT
 if echo $solvers|grep -q "m" && [ ! -f mergesat/libmergesat.a ]; then
     echo "Building MergeSAT"
 
-    tar xzvf mergesat-patched.tar.gz
     cd mergesat
     make all -j $(nproc)
     cp build/release/lib/libmergesat.a .
     cd ..
 fi
 
+# Glucose
 if echo $solvers|grep -q "g" && [ ! -f glucose/libglucose.a ]; then
     echo "Building Glucose ..."
     
-    tar xzvf glucose-syrup-4.1.tgz
-    rm ._glucose-syrup-4.1
-    mv glucose-syrup-4.1 glucose
-    # Patch bug in solver
-    patch glucose/core/Solver.cc < Glucose_Solver.cc.patch
-    # Add INCREMENTAL definition to compile flags
-    sed -i 's/ -D __STDC_FORMAT_MACROS/ -D __STDC_FORMAT_MACROS -D INCREMENTAL/g' glucose/mtl/template.mk
-    # Fix typo in a preprocessor definition
-    sed -i 's/INCREMNENTAL/INCREMENTAL/g' glucose/core/SolverTypes.h
-    if $disable_fpu; then
-        sed -i 's/#if defined(__linux__)/#if 0/g' glucose/simp/Main.cc
+    if [ ! -f glucose/.PATCHED ]; then
+        # Patch bug in solver
+        patch glucose/core/Solver.cc < Glucose_Solver.cc.patch
+        # Add INCREMENTAL definition to compile flags
+        sed -i 's/ -D __STDC_FORMAT_MACROS/ -D __STDC_FORMAT_MACROS -D INCREMENTAL/g' glucose/mtl/template.mk
+        # Fix typo in a preprocessor definition
+        sed -i 's/INCREMNENTAL/INCREMENTAL/g' glucose/core/SolverTypes.h
+        if $disable_fpu; then
+            sed -i 's/#if defined(__linux__)/#if 0/g' glucose/simp/Main.cc
+        fi
+        touch glucose/.PATCHED
     fi
     
     cd glucose/simp
@@ -51,11 +52,10 @@ if echo $solvers|grep -q "g" && [ ! -f glucose/libglucose.a ]; then
     cd ../..
 fi
 
+# YalSAT
 if echo $solvers|grep -q "y" && [ ! -f yalsat/libyals.a ]; then
     echo "Building YalSAT ..."
 
-    unzip yalsat-03v.zip
-    mv yalsat-03v yalsat
     cd yalsat
     for f in *.c *.h ; do
         sed -i 's/exit ([01])/abort()/g' $f
@@ -68,13 +68,10 @@ if echo $solvers|grep -q "y" && [ ! -f yalsat/libyals.a ]; then
     cd ..
 fi
 
+# Lingeling
 if echo $solvers|grep -q "l" && [ ! -f lingeling/liblgl.a ]; then
     echo "Building lingeling ..."
 
-    #tar xzvf lingeling-bcj-78ebb86-180517.tar.gz
-    #mv lingeling-bcj-78ebb86-180517 lingeling
-    unzip lingeling-isc22.zip
-    mv lingeling-*/ lingeling
     cd lingeling
     for f in *.c *.h ; do
         sed -i 's/exit ([01])/abort()/g' $f
@@ -84,6 +81,18 @@ if echo $solvers|grep -q "l" && [ ! -f lingeling/liblgl.a ]; then
     cd ..
 fi
 
+# Kissat
+if echo $solvers|grep -q "k" && [ ! -f kissat/libkissat.a ]; then
+    echo "Building Kissat ..."
+
+    cd kissat
+    ./configure --quiet --no-proofs
+    make
+    cp build/libkissat.a .
+    cd ..
+fi
+
+# Normal (non-LRAT) CaDiCaL
 if echo $solvers|grep -q "c" && [ ! -f cadical/libcadical.a ]; then
     echo "Building CaDiCaL (no LRAT support) ..."
 
@@ -94,6 +103,7 @@ if echo $solvers|grep -q "c" && [ ! -f cadical/libcadical.a ]; then
     cd ..
 fi
 
+# LRAT-logging CaDiCaL
 if echo $solvers|grep -q "p" && [ ! -f lrat-cadical/libcadical.a ]; then
     echo "Building CaDiCaL with LRAT support ..."
 
@@ -101,17 +111,5 @@ if echo $solvers|grep -q "p" && [ ! -f lrat-cadical/libcadical.a ]; then
     ./configure
     make
     cp build/libcadical.a .
-    cd ..
-fi
-
-if echo $solvers|grep -q "k" && [ ! -f kissat/libkissat.a ]; then
-    echo "Building kissat ..."
-
-    unzip kissat-isc22.zip
-    mv kissat-*/ kissat
-    cd kissat
-    ./configure --quiet --no-proofs
-    make
-    cp build/libkissat.a .
     cd ..
 fi

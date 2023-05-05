@@ -2,15 +2,82 @@
 
 solvers=$1
 
-if echo $solvers|grep -q "m"; then wget -nc https://dominikschreiber.de/mergesat-patched.tar.gz ; fi
-if echo $solvers|grep -q "g"; then wget -nc https://www.labri.fr/perso/lsimon/downloads/softwares/glucose-syrup-4.1.tgz ; fi
-if echo $solvers|grep -q "y"; then wget -nc http://fmv.jku.at/yalsat/yalsat-03v.zip ; fi
-if echo $solvers|grep -q "l" && [ ! -d lingeling ]; then wget -nc https://dominikschreiber.de/share/lingeling-isc22.zip ; fi
-if echo $solvers|grep -q "c" && [ ! -d cadical ]; then git clone git@github.com:domschrei/cadical.git && cd cadical && git checkout d91b3cecd718719c1d955f28c0f0da1cdc9e27bd && cd .. ; fi
-if echo $solvers|grep -q "p" && [ ! -d lrat-cadical ]; then 
-    git clone https://github.com/domschrei/cadical.git lrat-cadical
-    cd lrat-cadical
-    git checkout certified-integrated
-    cd ..
+# MergeSAT
+if echo $solvers|grep -q "m"; then
+    if [ ! -d mergesat ]; then
+        if [ ! -f mergesat-patched.tar.gz ]; then
+            wget -nc https://dominikschreiber.de/mergesat-patched.tar.gz
+        fi
+        tar xzvf mergesat-patched.tar.gz
+    fi
 fi
-if echo $solvers|grep -q "k" && [ ! -d kissat ]; then wget -nc https://github.com/domschrei/kissat/archive/refs/heads/master.zip && mv master.zip kissat-isc22.zip ; fi
+
+# Glucose
+if echo $solvers|grep -q "g"; then
+    if [ ! -d glucose ]; then
+        if [ ! -f glucose-syrup-4.1.tgz ]; then
+            wget -nc https://www.labri.fr/perso/lsimon/downloads/softwares/glucose-syrup-4.1.tgz
+        fi
+        tar xzvf glucose-syrup-4.1.tgz
+        rm ._glucose-syrup-4.1
+        mv glucose-syrup-4.1 glucose
+    fi
+fi
+
+# YalSAT
+if echo $solvers|grep -q "y"; then
+    if [ ! -d yalsat ]; then
+        if [ ! -f yalsat-03v.zip ]; then
+            wget -nc http://fmv.jku.at/yalsat/yalsat-03v.zip
+        fi
+        unzip yalsat-03v.zip
+        mv yalsat-03v yalsat
+    fi
+fi
+
+# Lingeling
+if echo $solvers|grep -q "l"; then
+    if [ ! -d lingeling ]; then
+        if [ ! -f lingeling-isc22.zip ]; then
+            wget -nc https://dominikschreiber.de/share/lingeling-isc22.zip
+        fi
+        unzip lingeling-isc22.zip
+        mv lingeling-*/ lingeling
+    fi
+fi
+
+# Kissat
+if echo $solvers|grep -q "k"; then
+    if [ ! -d kissat ]; then
+        if [ ! -f kissat.zip ]; then
+            branchorcommit="moreexport"
+            wget -nc https://github.com/domschrei/kissat/archive/refs/heads/${branchorcommit}.zip -O kissat.zip
+        fi
+        unzip kissat.zip
+        mv kissat-* kissat
+    fi
+fi
+
+# Normal (non-LRAT) CaDiCaL
+if echo $solvers|grep -q "c"; then
+    if [ ! -d cadical ]; then
+        if [ ! -f cadical.zip ]; then
+            branchorcommit="moreexport"
+            wget -nc https://github.com/domschrei/cadical/archive/refs/heads/${branchorcommit}.zip -O cadical.zip
+        fi
+        unzip cadical.zip
+        mv cadical-* cadical
+    fi
+fi
+
+# LRAT-logging CaDiCaL
+if echo $solvers|grep -q "p"; then
+    if [ ! -d lrat-cadical ]; then
+        if [ ! -f lrat-cadical.zip ]; then
+            branchorcommit="certified-integrated"
+            wget -nc https://github.com/domschrei/cadical/archive/refs/heads/${branchorcommit}.zip -O lrat-cadical.zip
+        fi
+        unzip lrat-cadical.zip
+        mv cadical-* lrat-cadical
+    fi
+fi
