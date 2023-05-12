@@ -50,8 +50,9 @@ fi
 if echo $solvers|grep -q "k"; then
     if [ ! -d kissat ]; then
         if [ ! -f kissat.zip ]; then
+            # for fixing a branch instead of a commit, prepend "refs/heads/"
             branchorcommit="9af526d3502f5d2c65140b64d52c806f10ab7d5c"
-            wget -nc https://github.com/domschrei/kissat/archive/refs/heads/${branchorcommit}.zip -O kissat.zip
+            wget -nc https://github.com/domschrei/kissat/archive/${branchorcommit}.zip -O kissat.zip
         fi
         unzip kissat.zip
         mv kissat-* kissat
@@ -62,8 +63,9 @@ fi
 if echo $solvers|grep -q "c"; then
     if [ ! -d cadical ]; then
         if [ ! -f cadical.zip ]; then
+            # for fixing a branch instead of a commit, prepend "refs/heads/"
             branchorcommit="d91b3cecd718719c1d955f28c0f0da1cdc9e27bd"
-            wget -nc https://github.com/domschrei/cadical/archive/refs/heads/${branchorcommit}.zip -O cadical.zip
+            wget -nc https://github.com/domschrei/cadical/archive/${branchorcommit}.zip -O cadical.zip
         fi
         unzip cadical.zip
         mv cadical-* cadical
@@ -74,8 +76,8 @@ fi
 if echo $solvers|grep -q "p"; then
     if [ ! -d lrat-cadical ]; then
         if [ ! -f lrat-cadical.zip ]; then
-            branchorcommit="certified-integrated"
-            wget -nc https://github.com/domschrei/cadical/archive/refs/heads/${branchorcommit}.zip -O lrat-cadical.zip
+            branchorcommit="refs/heads/certified-integrated"
+            wget -nc https://github.com/domschrei/cadical/archive/${branchorcommit}.zip -O lrat-cadical.zip
         fi
         unzip lrat-cadical.zip
         mv cadical-* lrat-cadical
