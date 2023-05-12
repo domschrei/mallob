@@ -50,7 +50,7 @@ fi
 if echo $solvers|grep -q "k"; then
     if [ ! -d kissat ]; then
         if [ ! -f kissat.zip ]; then
-            branchorcommit="moreexport"
+            branchorcommit="9af526d3502f5d2c65140b64d52c806f10ab7d5c"
             wget -nc https://github.com/domschrei/kissat/archive/refs/heads/${branchorcommit}.zip -O kissat.zip
         fi
         unzip kissat.zip
@@ -62,7 +62,7 @@ fi
 if echo $solvers|grep -q "c"; then
     if [ ! -d cadical ]; then
         if [ ! -f cadical.zip ]; then
-            branchorcommit="moreexport"
+            branchorcommit="d91b3cecd718719c1d955f28c0f0da1cdc9e27bd"
             wget -nc https://github.com/domschrei/cadical/archive/refs/heads/${branchorcommit}.zip -O cadical.zip
         fi
         unzip cadical.zip

@@ -167,6 +167,8 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 		_observed_nonunit_lbd_of_length |= clause.lbd == clause.size-ClauseMetadata::numBytes();
 	}
 
+	//log(V4_VVER, "EXPORT %s\n", clause.toStr().c_str());
+
 	if (clauseSize == 1) assert(clause.lbd == 1);
 	else {
 		assert(clause.lbd >= 1 || LOG_RETURN_FALSE("[ERROR] len=%i lbd=%i!\n", clause.size, clause.lbd));
