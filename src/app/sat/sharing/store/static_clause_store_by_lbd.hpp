@@ -102,18 +102,21 @@ public:
                 b->size -= clause.size + 1;
             }
 
-
             if (nbRemainingLits < clause.size) break;
         }
-        addClauseLock.unlock();
 
         // Sort all flushed clauses by length -> lbd -> lexicographically
         std::sort(clauses.begin(), clauses.end());
+        Mallob::Clause lastClause;
         for (auto& c : clauses) {
+            assert(lastClause.begin == nullptr || lastClause == c || lastClause < c
+                || log_return_false("[ERROR] %s > %s\n", lastClause.toStr().c_str(), c.toStr().c_str()));
+            lastClause = c;
             bool success = builder.append(c);
             assert(success);
         }
 
+        addClauseLock.unlock();
         nbExportedClauses = builder.getNumAddedClauses();
         return builder.extractBuffer();
     }

@@ -52,6 +52,12 @@ namespace Mallob {
             }
             return false;
         }
+        bool operator==(const Clause& other) const {
+            return !(*this < other) && !(other < *this);
+        }
+        bool operator!=(const Clause& other) const {
+            return !(*this == other);
+        }
     };
 
     inline size_t commutativeHash(const int* begin, int size, int which = 3) {

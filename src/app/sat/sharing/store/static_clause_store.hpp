@@ -79,13 +79,14 @@ public:
 
         // Read clauses bucket by bucket (most important clauses first)
         int nbRemainingLits = limit;
+        std::vector<Mallob::Clause> clauses;
         for (Bucket* b : buckets) {
 
-            std::vector<Mallob::Clause> clauses;
             Mallob::Clause clause;
             clause.size = b->clauseLength;
             clause.lbd = _reset_lbd_at_export ? clause.size : b->lbd;
 
+            if (nbRemainingLits < clause.size) break;
             if (clause.size == 0 || clause.lbd == 0) continue;
             if (clause.size == 1 && mode == NONUNITS) continue;
             if (clause.size > 1 && mode == UNITS) break;
@@ -100,16 +101,20 @@ public:
             }
             if (clauses.empty()) continue;
 
-            std::sort(clauses.begin(), clauses.end());
-            for (auto& c : clauses) {
-                bool success = builder.append(c);
-                assert(success);
-            }
-
             if (nbRemainingLits < clause.size) break;
         }
-        addClauseLock.unlock();
 
+        std::sort(clauses.begin(), clauses.end());
+        Mallob::Clause lastClause;
+        for (auto& c : clauses) {
+            assert(lastClause.begin == nullptr || lastClause == c || lastClause < c
+                || log_return_false("[ERROR] %s > %s\n", lastClause.toStr().c_str(), c.toStr().c_str()));
+            lastClause = c;
+            bool success = builder.append(c);
+            assert(success);
+        }
+
+        addClauseLock.unlock();
         nbExportedClauses = builder.getNumAddedClauses();
         return builder.extractBuffer();
     }
