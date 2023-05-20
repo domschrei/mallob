@@ -12,11 +12,13 @@ protected:
     SolverStatistics& _stats;
     int _max_clause_length;
     bool _reset_lbd;
+    bool _increment_lbd;
 
 public:
     GenericImportManager(const SolverSetup& setup, SolverStatistics& stats) : _stats(stats), 
         _max_clause_length(setup.strictClauseLengthLimit),
-        _reset_lbd(setup.resetLbdBeforeImport) {}
+        _reset_lbd(setup.resetLbdBeforeImport),
+        _increment_lbd(setup.incrementLbdBeforeImport) {}
     virtual ~GenericImportManager() {};
 
     virtual void addSingleClause(const Mallob::Clause& c) = 0;

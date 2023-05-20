@@ -89,6 +89,8 @@ public:
             _stats.receivedClausesDigested++;
             _stats.histDigested->increment(_clause_out.size);
             if (_reset_lbd) _clause_out.lbd = _clause_out.size;
+            if (_increment_lbd && _clause_out.lbd < _clause_out.size)
+                _clause_out.lbd++;
             assert(_clause_out.size > 0);
             assert(_clause_out.lbd > 0);
             //assert(_clause_out.begin[0] != 0);

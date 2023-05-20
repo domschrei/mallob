@@ -41,6 +41,8 @@ public:
             success = _units.produce(c.begin, 1, false);
         } else {
             int lbd = _reset_lbd ? c.size : c.lbd;
+            if (_increment_lbd && lbd < c.size)
+                lbd++;
             success = _clauses.produceInTwoChunks(&lbd, 1, c.begin, c.size, true);
         }
         if (!success) _stats.receivedClausesDropped++;
