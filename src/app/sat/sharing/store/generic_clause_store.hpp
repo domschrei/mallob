@@ -7,6 +7,7 @@
 #include "app/sat/data/clause_histogram.hpp"
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
 
+#define MALLOB_CLAUSE_STORE_STATIC_BY_LENGTH_MIXED_LBD -1
 #define MALLOB_CLAUSE_STORE_STATIC_BY_LENGTH 0
 #define MALLOB_CLAUSE_STORE_STATIC_BY_LBD 1
 #define MALLOB_CLAUSE_STORE_ADAPTIVE 2

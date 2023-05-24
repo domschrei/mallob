@@ -12,7 +12,9 @@
 #include <unistd.h>
 
 #include "app/sat/sharing/filter/generic_clause_filter.hpp"
+#include "app/sat/sharing/store/generic_clause_store.hpp"
 #include "app/sat/sharing/store/static_clause_store_by_lbd.hpp"
+#include "app/sat/sharing/store/static_clause_store_mixed_lbd.hpp"
 #include "sharing_manager.hpp"
 #include "app/sat/sharing/store/static_clause_store.hpp"
 #include "app/sat/sharing/store/adaptive_clause_store.hpp"
@@ -40,6 +42,9 @@ SharingManager::SharingManager(
 	_clause_store([&]() -> GenericClauseStore* {
 		bool resetLbdAtExport = _params.resetLbd() == MALLOB_RESET_LBD_AT_EXPORT;
 		switch(_params.clauseStoreMode()) {
+		case MALLOB_CLAUSE_STORE_STATIC_BY_LENGTH_MIXED_LBD:
+			return new StaticClauseStoreMixedLbd(_params.strictClauseLengthLimit(),
+				resetLbdAtExport);
 		case MALLOB_CLAUSE_STORE_STATIC_BY_LENGTH:
 			return new StaticClauseStore(_params.strictClauseLengthLimit(),
 				resetLbdAtExport);
@@ -62,7 +67,8 @@ SharingManager::SharingManager(
 		case MALLOB_CLAUSE_FILTER_NONE:
 			return new NoopClauseFilter(*_clause_store);
 		case MALLOB_CLAUSE_FILTER_BLOOM:
-			return new BloomClauseFilter(*_clause_store, _solvers.size(), _params.strictClauseLengthLimit());
+			return new BloomClauseFilter(*_clause_store, _solvers.size(),
+				_params.strictClauseLengthLimit(), _params.backlogExportManager());
 		case MALLOB_CLAUSE_FILTER_EXACT:
 		case MALLOB_CLAUSE_FILTER_EXACT_DISTRIBUTED:
 		default:

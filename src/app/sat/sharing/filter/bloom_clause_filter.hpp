@@ -61,9 +61,18 @@ private:
 
 	size_t _nb_inserted {0};
 
+	const bool _locking;
+	std::vector<std::unique_ptr<Mutex>> _locks;
+
 public:
-	BloomClauseFilter(GenericClauseStore& clauseStore, int nbSolvers, int maxClauseLen) : 
-		GenericClauseFilter(clauseStore), _bitsets(nbSolvers), _max_clause_length(maxClauseLen) {}
+	BloomClauseFilter(GenericClauseStore& clauseStore, int nbSolvers, int maxClauseLen, bool locking) :
+		GenericClauseFilter(clauseStore), _bitsets(nbSolvers), _max_clause_length(maxClauseLen), _locking(locking) {
+
+		if (_locking) {
+			_locks.resize(maxClauseLen+1);
+			for (size_t i = 0; i < _locks.size(); i++) _locks[i].reset(new Mutex());
+		}
+	}
 	virtual ~BloomClauseFilter() {}
 
 	ExportResult tryRegisterAndInsert(ProducedClauseCandidate&& c) override {
@@ -85,6 +94,44 @@ public:
 	size_t size(int clauseLength) const override {
 		if (clauseLength == 0) return _nb_inserted;
 		return 0;
+	}
+
+	virtual bool tryAcquireLock(int clauseLength = 0) override {
+		if (!_locking) return true;
+		return _locks[clauseLength]->tryLock();
+	}
+	virtual void acquireLock(int clauseLength = 0) override {
+		if (!_locking) return;
+		_locks[clauseLength]->lock();
+	}
+	virtual void releaseLock(int clauseLength = 0) override {
+		if (!_locking) return;
+		_locks[clauseLength]->unlock();
+	}
+	virtual void acquireAllLocks() override {
+		if (!_locking) return;
+		std::vector<bool> slotLocked(_locks.size(), false);
+		int nbLocked = 0;
+		// Repeatedly cycle over the slots, acquiring locks where possible,
+		// until all locks are held
+		while (nbLocked < _locks.size()) {
+			for (size_t i = 0; i < _locks.size(); i++) {
+				if (slotLocked[i]) continue;
+				if (nbLocked+1 == _locks.size()) {
+					// Last slot: acquire lock directly
+					acquireLock(i);
+					nbLocked++;
+					slotLocked[i] = true;
+				} else if (tryAcquireLock(i)) {
+					nbLocked++;
+					slotLocked[i] = true;
+				}
+			}
+		}
+	}
+	virtual void releaseAllLocks() override {
+		if (!_locking) return;
+		for (auto& lock : _locks) lock->unlock();
 	}
 
 private:
