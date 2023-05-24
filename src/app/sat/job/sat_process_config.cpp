@@ -15,7 +15,7 @@ SatProcessConfig::SatProcessConfig(const Parameters& params, const Job& job, int
     incremental = job.getDescription().isIncremental();
     firstrev = job.getDesiredRevision();
     threads = job.getNumThreads();
-    maxBroadcastedLitsPerCycle = (1+params.maxSharingCompensationFactor()) *
+    maxBroadcastedLitsPerCycle = params.maxSharingCompensationFactor() *
     MyMpi::getBinaryTreeBufferLimit(job.getGlobalNumWorkers(), params.clauseBufferBaseSize(), params.clauseBufferDiscountFactor(), MyMpi::ALL);
     this->recoveryIndex = recoveryIndex;
 }
