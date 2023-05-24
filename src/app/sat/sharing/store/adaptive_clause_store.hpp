@@ -38,9 +38,9 @@ private:
     bool _use_checksum;
     BucketLabel _bucket_iterator;
 
-    std::atomic_ulong _opcount {1};
-    unsigned long _last_pop_opcount {0};
-    int _last_pop_idx {0};
+    int _next_pop_idx {0};
+    bool _reset_pop_idx {false};
+    unsigned long _pop_op_count {1};
 
 public:
     struct Setup {
@@ -114,11 +114,12 @@ public:
     ~AdaptiveClauseStore() {}
 
     bool addClause(const Mallob::Clause& c) override {
-        _opcount.fetch_add(1, std::memory_order_relaxed);
         auto [slotIdx, mode] = getSlotIdxAndMode(c.size, c.lbd);
         int maxSlotIdx = _max_admissible_slot_idx.load(std::memory_order_relaxed);
         if (slotIdx > maxSlotIdx) return false;
-        return _slots[slotIdx]->insert(c, _slots[maxSlotIdx].get());
+        auto result = _slots[slotIdx]->insert(c, _slots[maxSlotIdx].get());
+        _reset_pop_idx = true;
+        return result;
     }
 
     bool addClause(int* cBegin, int cSize, int cLbd) {
@@ -126,7 +127,6 @@ public:
     }
 
     void addClauses(BufferReader& inputBuffer, ClauseHistogram* hist) override {
-        _opcount.fetch_add(1, std::memory_order_relaxed);
         auto& clause = inputBuffer.getNextIncomingClause(); // prepare first clause in reader
         int maxSlotIdx = _max_admissible_slot_idx.load(std::memory_order_relaxed);
         for (int slotIdx = 0; slotIdx < _slots.size(); slotIdx++) {
@@ -135,42 +135,58 @@ public:
             int nbInsertedCls = slotIdx > maxSlotIdx ? 0 : slot->insert(inputBuffer, _slots[maxSlotIdx].get());
             //LOG(V2_INFO, "DBG -- (%i,?) : %i clauses inserted\n", slot->getClauseLength(), nbInsertedCls);
             if (hist) hist->increase(slot->getClauseLength(), nbInsertedCls);
+            if (nbInsertedCls > 0) _reset_pop_idx = true;
         }
     }
     
     bool popClauseWeak(ExportMode mode, Mallob::Clause& clause) {
+
+        // Check if any clauses for the desired export mode are available
+        auto sizeNonunit = getCurrentlyUsedNonunitLiterals();
+        auto sizeUnit = getCurrentlyUsedUnitLiterals();
+        if (mode == NONUNITS && sizeNonunit == 0) return false;
+        if (mode == UNITS && sizeUnit == 0) return false;
+        if (mode == ANY && sizeUnit+sizeNonunit == 0) return false;
+
+        // Find slot index to begin at
+        //LOG(V4_VVER, "POP NONEMPTY\n");
         int slotIdx = mode == NONUNITS ? 1 : 0;
-        auto prevOpcount = _opcount.fetch_add(1, std::memory_order_relaxed);
         if (mode != UNITS) {
-            if (prevOpcount == _last_pop_opcount) {
-                // No changes since last pop operation! Can use cached slot index.
-                slotIdx = std::max(slotIdx, _last_pop_idx);
+            if (_reset_pop_idx) {
+                //LOG(V4_VVER, "RESET POP IDX %i\n", _next_pop_idx);
+                _next_pop_idx = 0;
+                _reset_pop_idx = false;
             }
-            // Update last pop opcount
-            _last_pop_opcount = prevOpcount+1;
+            slotIdx = std::max(slotIdx, _next_pop_idx);
         }
-        if (prevOpcount % 131072 == 0) {
+        if (_pop_op_count % 131072 == 0) {
             // Perform a flush over all slots to shrink slots and discard old clauses
             BufferBuilder dummyBuilder = getBufferBuilder(nullptr, 0);
             for (auto& slot : _slots) slot->flushAndShrink(dummyBuilder);
             assert(dummyBuilder.getNumAddedClauses() == 0);
         }
-        // Cycle once over all slots, beginning with the cached slot index,
+        // Cycle once over all slots, beginning with the (cached) slot index,
         // until success. Remember if a spurious fail occurred somewhere.
         bool spuriousFails = false;
-        for (size_t i = 0; i < _slots.size(); i++, slotIdx = (slotIdx+1)%_slots.size()) {
+        for (; slotIdx < _slots.size(); slotIdx++) {
             if (mode == UNITS && slotIdx != 0) break;
             if (mode == NONUNITS && slotIdx == 0) continue;
             auto result = _slots[slotIdx]->popWeak(clause);
             if (result == ClauseSlot::SUCCESS) {
-                // Remember this slot for the next pop operation except for UNITS only.
-                // There must not have been any spurious fails (otherwise some good slots
-                // might have been skipped) except if the new pop index is actually better
-                // than the old one.
-                if (mode != UNITS && (slotIdx < _last_pop_idx || !spuriousFails))
-                    _last_pop_idx = slotIdx;
+                // Remember this slot for the next pop operation.
+                // There must not have been any spurious fails 
+                // (otherwise nonempty slots might have been skipped).
+                if (!spuriousFails) {
+                    //if (_next_pop_idx != slotIdx) LOG(V4_VVER, "POP SLOT IDX %i ~> %i\n", _next_pop_idx, slotIdx);
+                    _next_pop_idx = slotIdx;
+                }
+                _pop_op_count++;
                 return true;
-            } else if (result == ClauseSlot::SPURIOUS_FAIL) spuriousFails = true;
+            } else if (result == ClauseSlot::SPURIOUS_FAIL) {
+                //if (_next_pop_idx != slotIdx) LOG(V4_VVER, "POP SLOT IDX %i ~> %i\n", _next_pop_idx, slotIdx);
+                _next_pop_idx = slotIdx;
+                spuriousFails = true;
+            }
         }
         return false;
     }
@@ -178,8 +194,7 @@ public:
     std::vector<int> exportBuffer(int sizeLimit, int& numExportedClauses,
             ExportMode mode = ANY, bool sortClauses = true, 
             std::function<void(int*)> clauseDataConverter = [](int*){}) override {
-        
-        _opcount.fetch_add(1, std::memory_order_relaxed);
+
         BufferBuilder builder(sizeLimit, _max_clause_length, _slots_for_sum_of_length_and_lbd);
 
         if (mode != NONUNITS) {
@@ -223,11 +238,13 @@ public:
     }
 
     int getCurrentlyUsedLiterals() const override {
-        return getCurrentlyUsedNonunitLiterals()
-            + (UNIT_SLOT_MAX_BUDGET - _unit_slot_budget.load(std::memory_order_relaxed));
+        return getCurrentlyUsedNonunitLiterals() + getCurrentlyUsedUnitLiterals();
     }
     int getCurrentlyUsedNonunitLiterals() const {
         return (_total_literal_limit - _free_budget.load(std::memory_order_relaxed));
+    }
+    int getCurrentlyUsedUnitLiterals() const {
+        return (UNIT_SLOT_MAX_BUDGET - _unit_slot_budget.load(std::memory_order_relaxed));
     }
     std::string getCurrentlyUsedLiteralsReport() const override {
         std::string out;
