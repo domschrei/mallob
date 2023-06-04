@@ -84,7 +84,7 @@ private:
         int epochEnd;
     };
     std::list<BufferTask> _pending_tasks;
-    std::pair<int, int> _last_admitted_clause_share;
+    int _last_admitted_nb_lits {0};
     robin_hood::unordered_flat_set<int> _epochs_to_filter;
     int _epoch_of_export_buffer {-1};
 
@@ -124,7 +124,7 @@ public:
     void collectClauses(int maxSize);
     bool hasCollectedClauses();
     std::vector<int> getCollectedClauses(int& successfulSolverId);
-    std::pair<int, int> getLastAdmittedClauseShare();
+    int getLastAdmittedNumLits();
 
     void filterClauses(int epoch, const std::vector<int>& clauses);
     bool hasFilteredClauses(int epoch);

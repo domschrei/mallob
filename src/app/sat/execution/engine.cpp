@@ -470,11 +470,12 @@ void SatEngine::terminateSolvers() {
 	dumpStats(/*final=*/true);
 }
 
-std::pair<int, int> SatEngine::getLastAdmittedClauseShare() {
-	return std::pair<int, int>(
+SatEngine::LastAdmittedStats SatEngine::getLastAdmittedClauseShare() {
+	return LastAdmittedStats {
 		_sharing_manager->getLastNumAdmittedClausesToImport(), 
-		_sharing_manager->getLastNumClausesToImport()
-	);
+		_sharing_manager->getLastNumClausesToImport(),
+		_sharing_manager->getLastNumAdmittedLitsToImport()
+	};
 }
 
 void SatEngine::writeClauseEpochs() {

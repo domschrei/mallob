@@ -214,8 +214,8 @@ std::vector<int> SatProcessAdapter::getCollectedClauses(int& successfulSolverId)
     _hsm->doExport = false;
     return clauses;
 }
-std::pair<int, int> SatProcessAdapter::getLastAdmittedClauseShare() {
-    return _last_admitted_clause_share;
+int SatProcessAdapter::getLastAdmittedNumLits() {
+    return _last_admitted_nb_lits;
 }
 
 bool SatProcessAdapter::process(BufferTask& task) {
@@ -368,7 +368,7 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
     if (_hsm->didDigestImport) {
         _hsm->doDigestImportWithFilter = false;
         _hsm->doDigestImportWithoutFilter = false;
-        _last_admitted_clause_share = std::pair<int, int>(_hsm->lastNumAdmittedClausesToImport, _hsm->lastNumClausesToImport);
+        _last_admitted_nb_lits = _hsm->lastAdmittedStats.nbAdmittedLits;
     }
 
     if (!_hsm->doStartNextRevision 

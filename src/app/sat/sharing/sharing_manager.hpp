@@ -55,6 +55,7 @@ protected:
 	
 	int _last_num_cls_to_import = 0;
 	int _last_num_admitted_cls_to_import = 0;
+	int _last_num_admitted_lits_to_import = 0;
 	int _allocated_sharing_buffer_size {-1};
 
 	ClauseHistogram _hist_produced;
@@ -109,6 +110,7 @@ public:
 	void continueClauseImport(int solverId);
 	int getLastNumClausesToImport() const {return _last_num_cls_to_import;}
 	int getLastNumAdmittedClausesToImport() const {return _last_num_admitted_cls_to_import;}
+	int getLastNumAdmittedLitsToImport() const {return _last_num_admitted_lits_to_import;}
 
 	int getGlobalStartOfSuccessEpoch() {
 		return !_id_alignment ? 0 : _id_alignment->getGlobalStartOfSuccessEpoch();

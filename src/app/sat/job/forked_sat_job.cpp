@@ -255,9 +255,9 @@ std::vector<int> ForkedSatJob::getPreparedClauses(Checksum& checksum, int& succe
     successfulSolverId = -1;
     return _solver->getCollectedClauses(successfulSolverId);
 }
-std::pair<int, int> ForkedSatJob::getLastAdmittedClauseShare() {
-    if (!_initialized) return std::pair<int, int>();
-    return _solver->getLastAdmittedClauseShare();
+int ForkedSatJob::getLastAdmittedNumLits() {
+    if (!_initialized) return 0;
+    return _solver->getLastAdmittedNumLits();
 }
 
 void ForkedSatJob::filterSharing(int epoch, std::vector<int>& clauses) {

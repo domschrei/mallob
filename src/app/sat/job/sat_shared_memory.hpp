@@ -4,6 +4,7 @@
 #include <sys/types.h>
 
 #include "../solvers/portfolio_solver_interface.hpp"
+#include "app/sat/execution/engine.hpp"
 #include "data/checksum.hpp"
 #include "sat_process_config.hpp"
 
@@ -66,7 +67,6 @@ struct SatSharedMemory {
     int exportBufferTrueSize {0};
     Checksum exportChecksum;
     int filterSize;
-    int lastNumClausesToImport;
-    int lastNumAdmittedClausesToImport;
+    SatEngine::LastAdmittedStats lastAdmittedStats;
     int successfulSolverId {-1};
 };

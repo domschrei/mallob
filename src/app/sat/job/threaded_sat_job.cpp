@@ -182,8 +182,8 @@ std::vector<int> ThreadedSatJob::getPreparedClauses(Checksum& checksum, int& suc
     successfulSolverId = _successful_solver_id;
     return out;
 }
-std::pair<int, int> ThreadedSatJob::getLastAdmittedClauseShare() {
-    return _solver->getLastAdmittedClauseShare();
+int ThreadedSatJob::getLastAdmittedNumLits() {
+    return _solver->getLastAdmittedClauseShare().nbAdmittedLits;
 }
 
 void ThreadedSatJob::filterSharing(int epoch, std::vector<int>& clauses) {

@@ -71,7 +71,13 @@ public:
 	void digestSharingWithoutFilter(int* begin, int size);
 	void returnClauses(int* begin, int size);
 	void digestHistoricClauses(int epochBegin, int epochEnd, int* begin, int size);
-	std::pair<int, int> getLastAdmittedClauseShare();
+
+	struct LastAdmittedStats {
+		int nbAdmittedCls;
+		int nbTotalCls;
+		int nbAdmittedLits;
+	};
+	LastAdmittedStats getLastAdmittedClauseShare();
 
 	void setWinningSolverId(int globalId);
 	void syncDeterministicSolvingAndCheckForLocalWinner();

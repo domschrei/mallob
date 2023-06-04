@@ -32,7 +32,12 @@ public:
             ClauseMetadata::enableClauseIds();
         }
     }
-    virtual ~BaseSatJob() {}
+    virtual ~BaseSatJob() {
+        if (_next_expected_volume != -1.f) {
+            LOG(V3_VERB, "%s CS total expected=%lu exchanged=%lu ratio=%.3f\n", toStr(), 
+                _total_expected, _total_exchanged, _total_expected/(float)_total_exchanged);
+        }
+    }
 
     // Methods common to all BaseSatJob instances
 
@@ -41,7 +46,7 @@ public:
     virtual void prepareSharing() = 0;
     virtual bool hasPreparedSharing() = 0;
     virtual std::vector<int> getPreparedClauses(Checksum& checksum, int& successfulSolverId) = 0;
-    virtual std::pair<int, int> getLastAdmittedClauseShare() = 0;
+    virtual int getLastAdmittedNumLits() = 0;
 
     virtual void filterSharing(int epoch, std::vector<int>& clauses) = 0;
     virtual bool hasFilteredSharing(int epoch) = 0;
@@ -89,7 +94,14 @@ protected:
 
 private:
     float _compensation_factor = 1.0f;
-    const float _compensation_decay {0.6};
+
+    float _accumulated_expected = 0;
+    float _accumulated_exchanged = 0;
+    float _next_expected_volume = -1.f;
+
+    // stats
+    size_t _total_expected {0};
+    size_t _total_exchanged {0};
 
     bool _done_solving = false;
 
@@ -101,17 +113,29 @@ public:
 
     float updateSharingCompensationFactor() {
 
-        auto [nbAdmitted, nbBroadcast] = getLastAdmittedClauseShare();
-        float admittedRatio = nbBroadcast == 0 ? 1 : ((float)nbAdmitted) / nbBroadcast;
-        admittedRatio = std::max(0.01f, admittedRatio);
-        float newCompensationFactor = std::max(1.f, std::min(
-            (float)_params.maxSharingCompensationFactor(), 1.f/admittedRatio
-        ));
-        _compensation_factor = _compensation_decay * _compensation_factor 
-            + (1-_compensation_decay) * newCompensationFactor;
+        auto defaultBuflim = MyMpi::getBinaryTreeBufferLimit(getVolume(),
+            _params.clauseBufferBaseSize(), _params.clauseBufferDiscountFactor(),
+            MyMpi::BufferQueryMode::ALL);
+
+        int nbAdmittedLits = getLastAdmittedNumLits();
+
+        if (_next_expected_volume == -1.f) {
+            // initialize expected next sharing volume
+            _next_expected_volume = defaultBuflim;
+        } else {
+            // update internal state
+            _accumulated_expected = 0.9 * _accumulated_expected + defaultBuflim;
+            _accumulated_exchanged = 0.9 * _accumulated_exchanged + nbAdmittedLits;
+            _next_expected_volume = 0.6 * _next_expected_volume + 0.4 * (nbAdmittedLits / _compensation_factor);
+            _total_expected += defaultBuflim;
+            _total_exchanged += nbAdmittedLits;
+        }
+
+        _compensation_factor = (_accumulated_expected - _accumulated_exchanged + defaultBuflim) / _next_expected_volume;
+        _compensation_factor = std::max(0.1f, std::min((float)_params.maxSharingCompensationFactor(), _compensation_factor));
 
         LOG(V3_VERB, "%s CS last sharing: %i/%i globally passed ~> c=%.3f\n", toStr(), 
-            nbAdmitted, nbBroadcast, _compensation_factor);
+            nbAdmittedLits, defaultBuflim, _compensation_factor);
 
         return _compensation_factor;
     }

@@ -194,9 +194,7 @@ public:
                 }
                 _engine.addSharingEpoch(_hsm->importEpoch);
                 _engine.syncDeterministicSolvingAndCheckForLocalWinner();
-                auto [admitted, total] = _engine.getLastAdmittedClauseShare();
-                _hsm->lastNumAdmittedClausesToImport = admitted;
-                _hsm->lastNumClausesToImport = total;
+                _hsm->lastAdmittedStats = _engine.getLastAdmittedClauseShare();
                 _hsm->didDigestImport = true;
             }
             if (!_hsm->doDigestImportWithFilter && !_hsm->doDigestImportWithoutFilter) 

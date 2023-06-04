@@ -349,6 +349,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 
 	_last_num_cls_to_import = 0;
 	_last_num_admitted_cls_to_import = 0;
+	_last_num_admitted_lits_to_import = 0;
 
 	if (importingSolvers.empty()) {
 		_logger.log(verb, "no local solvers accepting clauses - ignoring sharing\n");
@@ -376,6 +377,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 		}
 
 		hist.increment(clause.size);
+		_last_num_admitted_lits_to_import += clause.size;
 		// bitset of producing solvers
 		auto producers = _clause_filter->confirmSharingAndGetProducers(clause, _internal_epoch);
 
