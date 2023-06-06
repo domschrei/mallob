@@ -12,25 +12,21 @@
 #include "app/sat/sharing/store/generic_clause_store.hpp"
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
-
-#define BUCKET_SIZE 1000
+#include "static_clause_store_commons.hpp"
 
 class StaticClauseStoreByLbd : public GenericClauseStore {
 
 private:
-    struct Bucket {
-        int data[BUCKET_SIZE];
-        unsigned int size {0};
-        int lbd {0};
-    };
 	Mutex addClauseLock;
 
 	// Structures for EXPORTING
 	std::vector<Bucket*> buckets;
 
+    const int _bucket_size;
+
 public:
-    StaticClauseStoreByLbd(int maxClauseLength, bool resetLbdAtExport) :
-        GenericClauseStore(maxClauseLength, resetLbdAtExport) {}
+    StaticClauseStoreByLbd(int maxClauseLength, bool resetLbdAtExport, int bucketSize) :
+        GenericClauseStore(maxClauseLength, resetLbdAtExport), _bucket_size(bucketSize) {}
 
     bool addClause(const Mallob::Clause& clause) override {
         if (!addClauseLock.tryLock()) return false;
@@ -39,13 +35,13 @@ public:
         assert(bucketIdx >= 0);
 
         while (bucketIdx >= buckets.size()) {
-            Bucket* b = new Bucket();
+            Bucket* b = new Bucket(_bucket_size);
             buckets.push_back(b);
         }
         Bucket* b = buckets[bucketIdx];
         b->lbd = clause.lbd;
         unsigned int top = b->size;
-        if (top + clause.size + 1 <= BUCKET_SIZE) {
+        if (top + clause.size + 1 <= _bucket_size) {
             // copy the clause (clause size at the end)
             for (unsigned int i = 0; i < clause.size; i++) {
                 b->data[top+i] = clause.begin[i];
