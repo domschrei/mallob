@@ -119,19 +119,25 @@ public:
 
         int nbAdmittedLits = getLastAdmittedNumLits();
 
-        if (_next_expected_volume == -1.f) {
-            // initialize expected next sharing volume
-            _next_expected_volume = defaultBuflim;
+        if (_params.compensateUnusedSharingVolume()) {
+
+            if (_next_expected_volume == -1.f) {
+                // initialize expected next sharing volume
+                _next_expected_volume = defaultBuflim;
+            } else {
+                // update internal state
+                _accumulated_expected = std::max(1.f, 0.9f * _accumulated_expected + defaultBuflim);
+                _accumulated_exchanged = 0.9 * _accumulated_exchanged + nbAdmittedLits;
+                _next_expected_volume = 0.6 * _next_expected_volume + 0.4 * (nbAdmittedLits / _compensation_factor);
+                _total_expected += defaultBuflim;
+                _total_exchanged += nbAdmittedLits;
+            }
+
+            _compensation_factor = (_accumulated_expected - _accumulated_exchanged + defaultBuflim) / _next_expected_volume;
         } else {
-            // update internal state
-            _accumulated_expected = 0.9 * _accumulated_expected + defaultBuflim;
-            _accumulated_exchanged = 0.9 * _accumulated_exchanged + nbAdmittedLits;
-            _next_expected_volume = 0.6 * _next_expected_volume + 0.4 * (nbAdmittedLits / _compensation_factor);
-            _total_expected += defaultBuflim;
-            _total_exchanged += nbAdmittedLits;
+            _compensation_factor = 1;
         }
 
-        _compensation_factor = (_accumulated_expected - _accumulated_exchanged + defaultBuflim) / _next_expected_volume;
         _compensation_factor = std::max(0.1f, std::min((float)_params.maxSharingCompensationFactor(), _compensation_factor));
 
         LOG(V3_VERB, "%s CS last sharing: %i/%i globally passed ~> c=%.3f\n", toStr(), 
