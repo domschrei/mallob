@@ -98,8 +98,8 @@ void SatProcessAdapter::doInitialize() {
     // Allocate import and export buffers
     _hsm->exportBufferAllocatedSize = 2 * _params.maxSharingCompensationFactor() * _params.clauseBufferBaseSize() + 1024;
     _hsm->importBufferMaxSize = 2 * _params.maxSharingCompensationFactor() * MyMpi::getBinaryTreeBufferLimit(
-        _hsm->config.mpisize, _params.clauseBufferBaseSize(), _params.clauseBufferDiscountFactor(), 
-        MyMpi::ALL
+        _hsm->config.mpisize, _params.clauseBufferBaseSize(), _params.clauseBufferLimitParam(),
+        MyMpi::BufferQueryMode(_params.clauseBufferLimitMode())
     ) + 1024;
     _export_buffer = (int*) createSharedMemoryBlock("clauseexport", 
             sizeof(int)*_hsm->exportBufferAllocatedSize, nullptr);

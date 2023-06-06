@@ -1,5 +1,6 @@
 
 #include <chrono>
+#include <cmath>
 #include <unistd.h>
 #include <ctime>
 #include <algorithm>
@@ -26,13 +27,17 @@ void MyMpi::init() {
     }
 }
 
-size_t MyMpi::getBinaryTreeBufferLimit(int numWorkers, int baseSize, float discountFactor, BufferQueryMode mode) {
-    float limit = baseSize * std::pow(discountFactor, std::log2(numWorkers+1)-1);
-    if (mode == SELF) {
-        return std::ceil(limit);
-    } else {
+size_t MyMpi::getBinaryTreeBufferLimit(int numWorkers, int baseSize, float functionParam, BufferQueryMode mode) {
+    if (mode == LEVEL) {
+        float limit = baseSize * std::pow(functionParam, std::log2(numWorkers+1)-1);
         return std::ceil(numWorkers * limit);
     }
+    if (mode == LIMITED) {
+        float upperBound = functionParam;
+        auto buflim = upperBound - (upperBound - baseSize) * std::exp((baseSize / (baseSize - upperBound)) * (numWorkers-1));
+        return std::ceil(buflim);
+    }
+    return 0;
 }
 
 void MyMpi::setOptions(const Parameters& params) {

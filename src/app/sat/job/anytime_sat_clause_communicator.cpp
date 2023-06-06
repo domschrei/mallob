@@ -28,8 +28,6 @@ void advanceCollective(BaseSatJob* job, JobMessage& msg, int broadcastTag) {
 
 AnytimeSatClauseCommunicator::AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job) : 
     _params(params), _job(job), 
-    _clause_buf_base_size(_params.clauseBufferBaseSize()), 
-    _clause_buf_discount_factor(_params.clauseBufferDiscountFactor()),
     _cdb([&]() {
         AdaptiveClauseDatabase::Setup setup;
         setup.maxClauseLength = _params.strictClauseLengthLimit();
@@ -44,7 +42,7 @@ AnytimeSatClauseCommunicator::AnytimeSatClauseCommunicator(const Parameters& par
             setup.maxClauseLength = _params.strictClauseLengthLimit();
             setup.maxLbdPartitionedSize = _params.maxLbdPartitioningSize();
             setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
-            setup.numLiterals = _job->getBufferLimit(MyMpi::size(MPI_COMM_WORLD), MyMpi::ALL);
+            setup.numLiterals = _job->getBufferLimit(MyMpi::size(MPI_COMM_WORLD), false);
             return setup;
         }(), _job)
     ),

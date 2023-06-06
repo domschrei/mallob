@@ -208,7 +208,7 @@ private:
             numAggregated += elem.back();
             elem.pop_back();
         }
-        auto merger = _cdb.getBufferMerger(_job->getBufferLimit(numAggregated, MyMpi::ALL));
+        auto merger = _cdb.getBufferMerger(_job->getBufferLimit(numAggregated, false));
         for (auto& elem : elems) {
             merger.add(_cdb.getBufferReader(elem.data(), elem.size()));
         }

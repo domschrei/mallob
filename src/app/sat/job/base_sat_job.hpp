@@ -114,8 +114,8 @@ public:
     float updateSharingCompensationFactor() {
 
         auto defaultBuflim = MyMpi::getBinaryTreeBufferLimit(getVolume(),
-            _params.clauseBufferBaseSize(), _params.clauseBufferDiscountFactor(),
-            MyMpi::BufferQueryMode::ALL);
+            _params.clauseBufferBaseSize(), _params.clauseBufferLimitParam(),
+            MyMpi::BufferQueryMode(_params.clauseBufferLimitMode()));
 
         int nbAdmittedLits = getLastAdmittedNumLits();
 
@@ -147,13 +147,14 @@ public:
     }
     void setSharingCompensationFactorAndUpdateExportLimit(float factor) {
         _compensation_factor = factor;
-        _clsbuf_export_limit = getBufferLimit(1, MyMpi::SELF);
+        _clsbuf_export_limit = getBufferLimit(1, true);
     }
 
-    size_t getBufferLimit(int numAggregatedNodes, MyMpi::BufferQueryMode mode) {
-        if (mode == MyMpi::SELF) return _compensation_factor * _params.clauseBufferBaseSize();
-        return _compensation_factor * MyMpi::getBinaryTreeBufferLimit(numAggregatedNodes, 
-            _params.clauseBufferBaseSize(), _params.clauseBufferDiscountFactor(), mode);
+    size_t getBufferLimit(int numAggregatedNodes, bool selfOnly) {
+        if (selfOnly) return _compensation_factor * _params.clauseBufferBaseSize();
+        return _compensation_factor * MyMpi::getBinaryTreeBufferLimit(numAggregatedNodes,
+            _params.clauseBufferBaseSize(), _params.clauseBufferLimitParam(),
+            MyMpi::BufferQueryMode(_params.clauseBufferLimitMode()));
     }
 
     void deferMessage(int source, int mpiTag, JobMessage& msg) {

@@ -24,9 +24,6 @@ private:
     BaseSatJob* _job = NULL;
     bool _suspended = false;
 
-    const int _clause_buf_base_size;
-    const float _clause_buf_discount_factor;
-
     AdaptiveClauseDatabase _cdb;
     std::unique_ptr<HistoricClauseStorage> _cls_history;
 
