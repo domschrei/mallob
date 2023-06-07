@@ -5,6 +5,7 @@
 #include "buffer_merger.hpp"
 #include "util/logger.hpp"
 #include "util/random.hpp"
+#include "util/tsl/robin_set.h"
 
 BufferMerger::BufferMerger(int sizeLimit, int maxClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum) : 
     _size_limit(sizeLimit), _max_clause_length(maxClauseLength), 
@@ -63,6 +64,8 @@ std::vector<int> BufferMerger::merge(std::vector<int>* excessClauses, SplitMix64
 
     // For checking duplicates
     Clause lastSeenClause;
+    tsl::robin_set<Mallob::Clause, Mallob::NonCommutativeClauseHasher, Mallob::SortedClauseExactEquals> acceptedClausesSet;
+    int currentClauseLengthOfSet = 0;
 
     // Merge rounds
     while (!_merger.empty()) {
@@ -71,9 +74,18 @@ std::vector<int> BufferMerger::merge(std::vector<int>* excessClauses, SplitMix64
         auto& [clause, readerId] = _merger.front();
         
         // Duplicate?
-        if (lastSeenClause.begin == nullptr || compare(lastSeenClause, *clause)) {
+        if (currentClauseLengthOfSet == clause->size && acceptedClausesSet.contains(*clause)) {
+            // Duplicate! Either lastSeenClause == clause or the clause was seen before with another LBD.
+        } else {
             // -- not a duplicate
             lastSeenClause = *clause;
+            // insert to set which is needed for filtering out identical clauses with different LBDs 
+            if (currentClauseLengthOfSet < lastSeenClause.size) {
+                // new clause length reached: can safely discard smaller accepted clauses
+                acceptedClausesSet.clear();
+                currentClauseLengthOfSet = lastSeenClause.size;
+            }
+            acceptedClausesSet.insert(lastSeenClause);
 
             // Try to append to current builder
             bool success = currentBuilder->append(lastSeenClause);
@@ -83,11 +95,6 @@ std::vector<int> BufferMerger::merge(std::vector<int>* excessClauses, SplitMix64
                 success = currentBuilder->append(lastSeenClause);
                 if (success) excessFirstCounterPosition = currentBuilder->getCurrentCounterPosition();
             }
-        } else {
-            // Duplicate!
-            assert(!compare(*clause, lastSeenClause) || 
-                log_return_false("ERROR: Clauses unordered - %s <-> %s\n", 
-                clause->toStr().c_str(), lastSeenClause.toStr().c_str()));
         }
 
         // Refill merger
