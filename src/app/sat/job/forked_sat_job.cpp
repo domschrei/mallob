@@ -253,6 +253,7 @@ bool ForkedSatJob::hasPreparedSharing() {
 }
 std::vector<int> ForkedSatJob::getPreparedClauses(Checksum& checksum, int& successfulSolverId, int& numLits) {
     successfulSolverId = -1;
+    numLits = 0;
     return _solver->getCollectedClauses(successfulSolverId, numLits);
 }
 int ForkedSatJob::getLastAdmittedNumLits() {
