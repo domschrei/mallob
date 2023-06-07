@@ -12,6 +12,7 @@
 #include "historic_clause_storage.hpp"
 #include "app/sat/sharing/filter/in_place_clause_filtering.hpp"
 #include "util/random.hpp"
+#include "inplace_sharing_aggregation.hpp"
 
 class ClauseSharingSession {
 
@@ -31,6 +32,7 @@ private:
 
     std::vector<int> _excess_clauses_from_merge;
     std::vector<int> _broadcast_clause_buffer;
+    int _local_export_limit;
     int _num_broadcast_clauses;
     int _num_admitted_clauses;
 
@@ -48,7 +50,7 @@ public:
             // Base message 
             JobMessage(_job->getId(), _job->getContextId(), _job->getRevision(), epoch, MSG_ALLREDUCE_CLAUSES),
             // Neutral element
-            {1, -1}, // two integers: number of aggregated job tree nodes, winning solver ID
+            InplaceClauseAggregation::neutralElem(),
             // Aggregator for local + incoming elements
             [&](std::list<std::vector<int>>& elems) {
                 return mergeClauseBuffersDuringAggregation(elems);
@@ -70,7 +72,7 @@ public:
         }
 
         LOG(V4_VVER, "%s CS OPEN e=%i\n", _job->toStr(), _epoch);
-        _job->setSharingCompensationFactorAndUpdateExportLimit(compensationFactor);
+        _local_export_limit = _job->setSharingCompensationFactorAndUpdateExportLimit(compensationFactor);
         if (!_job->hasPreparedSharing()) _job->prepareSharing();
     }
 
@@ -87,10 +89,10 @@ public:
             _allreduce_clauses.produce([&]() {
                 Checksum checksum;
                 int successfulSolverId;
-                auto clauses = _job->getPreparedClauses(checksum, successfulSolverId);
-                LOG(V4_VVER, "%s CS produced cls size=%lu\n", _job->toStr(), clauses.size());
-                clauses.push_back(1); // # aggregated workers
-                clauses.push_back(successfulSolverId); // successful solver ID (or -1)
+                int numLits;
+                auto clauses = _job->getPreparedClauses(checksum, successfulSolverId, numLits);
+                LOG(V4_VVER, "%s CS produced cls size=%lu lits=%i/%i\n", _job->toStr(), clauses.size(), numLits, _local_export_limit);
+                InplaceClauseAggregation::prepareRawBuffer(clauses, numLits, 1, successfulSolverId);
                 return clauses;
             });
 
@@ -108,8 +110,10 @@ public:
 
             // Fetch initial clause buffer (result of all-reduction of clauses)
             _broadcast_clause_buffer = _allreduce_clauses.extractResult();
-            int winningSolverId = _broadcast_clause_buffer.back();
+            auto aggregation = InplaceClauseAggregation(_broadcast_clause_buffer);
+            int winningSolverId = aggregation.successfulSolver();
             assert(winningSolverId >= -1 || log_return_false("Winning solver ID = %i\n", winningSolverId));
+            _job->setNumInputLitsOfLastSharing(aggregation.numInputLiterals());
 
             if (_allreduce_filter) {
                 // Initiate production of local filter element for 2nd all-reduction 
@@ -120,7 +124,10 @@ public:
                 // No distributed filtering: Sharing is done!
                 LOG(V4_VVER, "%s CS digest w/o filter\n", _job->toStr());
                 _job->digestSharingWithoutFilter(_broadcast_clause_buffer);
-                if (_cls_history) _cls_history->importSharing(_epoch, std::move(_broadcast_clause_buffer));
+                if (_cls_history) {
+                    InplaceClauseAggregation(_broadcast_clause_buffer).stripToRawBuffer();
+                    _cls_history->importSharing(_epoch, std::move(_broadcast_clause_buffer));
+                }
                 _stage = DONE;
             }
         }
@@ -140,6 +147,7 @@ public:
             auto filter = _allreduce_filter->extractResult();
             _job->applyFilter(_epoch, filter);
             if (_cls_history) {
+                InplaceClauseAggregation(_broadcast_clause_buffer).stripToRawBuffer();
                 applyGlobalFilter(filter, _broadcast_clause_buffer);
                 // Add clause batch to history
                 _cls_history->importSharing(_epoch, std::move(_broadcast_clause_buffer));
@@ -197,26 +205,28 @@ private:
     
     std::vector<int> mergeClauseBuffersDuringAggregation(std::list<std::vector<int>>& elems) {
         int numAggregated = 0;
+        int numInputLits = 0;
         int successfulSolverId = -1;
         for (auto& elem : elems) {
-            assert(elem.size() >= 2 || log_return_false("[ERROR] Clause buffer has size %ld!\n", elem.size()));
-            assert(elem.back() >= -1 || log_return_false("[ERROR] Invalid successful solver ID %i\n", elem.back()));
-            if (elem.back() != -1 && (successfulSolverId == -1 || successfulSolverId > elem.back())) {
-                successfulSolverId = elem.back();
+            assert(elem.size() >= 3 || log_return_false("[ERROR] Clause buffer has size %ld!\n", elem.size()));
+            auto agg = InplaceClauseAggregation(elem);
+            if (agg.successfulSolver() != -1 && (successfulSolverId == -1 || successfulSolverId > agg.successfulSolver())) {
+                successfulSolverId = agg.successfulSolver();
             }
-            elem.pop_back();
-            numAggregated += elem.back();
-            elem.pop_back();
+            numAggregated += agg.numAggregatedNodes();
+            numInputLits += agg.numInputLiterals();
+            agg.stripToRawBuffer();
         }
-        auto merger = _cdb.getBufferMerger(_job->getBufferLimit(numAggregated, false));
+        int buflim = _job->getBufferLimit(numAggregated, false);
+        numInputLits = std::min(numInputLits, buflim);
+        auto merger = _cdb.getBufferMerger(buflim);
         for (auto& elem : elems) {
             merger.add(_cdb.getBufferReader(elem.data(), elem.size()));
         }
         std::vector<int> merged = merger.mergePreservingExcessWithRandomTieBreaking(_excess_clauses_from_merge, _rng);
-        LOG(V4_VVER, "%s : merged %i contribs ~> len=%i\n", 
-            _job->toStr(), numAggregated, merged.size());
-        merged.push_back(numAggregated);
-        merged.push_back(successfulSolverId);
+        LOG(V4_VVER, "%s : merged %i contribs (inp=%i) ~> len=%i\n",
+            _job->toStr(), numAggregated, numInputLits, merged.size());
+        InplaceClauseAggregation::prepareRawBuffer(merged, numInputLits, numAggregated, successfulSolverId);
         return merged;
     }
 

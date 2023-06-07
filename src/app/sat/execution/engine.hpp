@@ -64,7 +64,7 @@ public:
 
 	void setAllocatedSharingBufferSize(int allocatedSize);
 	bool isReadyToPrepareSharing() const;
-    int prepareSharing(int* begin, int maxSize, int& successfulSolverId);
+    int prepareSharing(int* begin, int maxSize, int& successfulSolverId, int& numLits);
 	int filterSharing(int* begin, int size, int* filterOut);
 	void addSharingEpoch(int epoch);
 	void digestSharingWithFilter(int* begin, int size, const int* filter);

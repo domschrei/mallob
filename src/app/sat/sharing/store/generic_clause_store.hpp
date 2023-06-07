@@ -29,7 +29,7 @@ public:
     virtual void addClauses(BufferReader& inputReader, ClauseHistogram* hist) = 0;
 
     enum ExportMode {UNITS, NONUNITS, ANY};
-    virtual std::vector<int> exportBuffer(int size, int& nbExportedClauses, 
+    virtual std::vector<int> exportBuffer(int size, int& nbExportedClauses, int& nbExportedLits,
         ExportMode mode = ANY, bool sortClauses = true,
         std::function<void(int*)> clauseDataConverter = [](int*){}) = 0;
 

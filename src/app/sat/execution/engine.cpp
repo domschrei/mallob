@@ -349,10 +349,10 @@ bool SatEngine::isReadyToPrepareSharing() const {
 	return !ClauseMetadata::enabled() || !_sharing_manager->isSharingOperationOngoing();
 }
 
-int SatEngine::prepareSharing(int* begin, int maxSize, int& successfulSolverId) {
+int SatEngine::prepareSharing(int* begin, int maxSize, int& successfulSolverId, int& numLits) {
 	if (isCleanedUp()) return sizeof(size_t) / sizeof(int); // checksum, nothing else
 	LOGGER(_logger, V5_DEBG, "collecting clauses on this node\n");
-	int size = _sharing_manager->prepareSharing(begin, maxSize, successfulSolverId);
+	int size = _sharing_manager->prepareSharing(begin, maxSize, successfulSolverId, numLits);
 	return size;
 }
 

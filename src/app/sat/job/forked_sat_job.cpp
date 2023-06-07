@@ -251,9 +251,9 @@ bool ForkedSatJob::hasPreparedSharing() {
     if (!hasCollected) prepareSharing();
     return hasCollected;
 }
-std::vector<int> ForkedSatJob::getPreparedClauses(Checksum& checksum, int& successfulSolverId) {
+std::vector<int> ForkedSatJob::getPreparedClauses(Checksum& checksum, int& successfulSolverId, int& numLits) {
     successfulSolverId = -1;
-    return _solver->getCollectedClauses(successfulSolverId);
+    return _solver->getCollectedClauses(successfulSolverId, numLits);
 }
 int ForkedSatJob::getLastAdmittedNumLits() {
     if (!_initialized) return 0;

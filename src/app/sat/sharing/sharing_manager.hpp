@@ -91,7 +91,7 @@ public:
 
 	void setAllocatedSharingBufferSize(int allocatedSize) {_allocated_sharing_buffer_size = allocatedSize;}
 	void addSharingEpoch(int epoch) {_digested_epochs.insert(epoch);}
-    int prepareSharing(int* begin, int totalLiteralLimit, int& successfulSolverId);
+    int prepareSharing(int* begin, int totalLiteralLimit, int& successfulSolverId, int& numLits);
 	int filterSharing(int* begin, int buflen, int* filterOut);
 	void digestSharingWithFilter(int* begin, int buflen, const int* filter);
     void digestSharingWithoutFilter(int* begin, int buflen);

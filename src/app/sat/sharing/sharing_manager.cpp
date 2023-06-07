@@ -203,7 +203,7 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 	if (tldClauseVec) delete tldClauseVec;
 }
 
-int SharingManager::prepareSharing(int* begin, int totalLiteralLimit, int& successfulSolverId) {
+int SharingManager::prepareSharing(int* begin, int totalLiteralLimit, int& successfulSolverId, int& numLits) {
 
 	if (_det_sync) {
 		if (!_det_sync->areAllSolversSyncReady()) return -1;
@@ -225,7 +225,7 @@ int SharingManager::prepareSharing(int* begin, int totalLiteralLimit, int& succe
 	LOGGER(_logger, V4_VVER, "acquired all clause locks after %.6fs\n", time);
 
 	int numExportedClauses = 0;
-	auto buffer = _clause_store->exportBuffer(totalLiteralLimit, numExportedClauses, 
+	auto buffer = _clause_store->exportBuffer(totalLiteralLimit, numExportedClauses, numLits,
 			GenericClauseStore::ANY, /*sortClauses=*/true, [&](int* data) {
 
 		// Shift clause ID from a local solver according to the solver's offset

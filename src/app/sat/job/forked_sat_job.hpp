@@ -67,7 +67,7 @@ public:
 
     void prepareSharing() override;
     bool hasPreparedSharing() override;
-    std::vector<int> getPreparedClauses(Checksum& checksum, int& successfulSolverId) override;
+    std::vector<int> getPreparedClauses(Checksum& checksum, int& successfulSolverId, int& numLits) override;
     int getLastAdmittedNumLits() override;
 
     virtual void filterSharing(int epoch, std::vector<int>& clauses) override;

@@ -64,7 +64,8 @@ public:
         }
     }
 
-    std::vector<int> exportBuffer(int limit, int& nbExportedClauses, ExportMode mode = ANY, bool sortClauses = true,
+    std::vector<int> exportBuffer(int limit, int& nbExportedClauses, int& nbExportedLits,
+            ExportMode mode = ANY, bool sortClauses = true,
             std::function<void(int*)> clauseDataConverter = [](int*){}) override {
 
         BufferBuilder builder(limit, _max_clause_length, false);
@@ -99,6 +100,7 @@ public:
             if (nbRemainingLits < clause.size) break;
         }
 
+        nbExportedLits = 0;
         std::sort(clauses.begin(), clauses.end());
         Mallob::Clause lastClause;
         for (auto& c : clauses) {
@@ -107,6 +109,7 @@ public:
             lastClause = c;
             bool success = builder.append(c);
             assert(success);
+            nbExportedLits += c.size;
         }
 
         addClauseLock.unlock();

@@ -1,5 +1,7 @@
 
 #include "app/sat/execution/solving_state.hpp"
+#include "app/sat/job/inplace_sharing_aggregation.hpp"
+#include "app/sat/sharing/filter/in_place_clause_filtering.hpp"
 #include "util/assert.hpp"
 #include <atomic>
 #include <sys/types.h>
@@ -206,11 +208,12 @@ void SatProcessAdapter::collectClauses(int maxSize) {
 bool SatProcessAdapter::hasCollectedClauses() {
     return !_initialized || (_hsm->doExport && _hsm->didExport);
 }
-std::vector<int> SatProcessAdapter::getCollectedClauses(int& successfulSolverId) {
+std::vector<int> SatProcessAdapter::getCollectedClauses(int& successfulSolverId, int& numLits) {
     if (!_initialized || !hasCollectedClauses()) return std::vector<int>();
     assert(_hsm->exportBufferTrueSize <= _hsm->exportBufferAllocatedSize);
     std::vector<int> clauses(_export_buffer, _export_buffer+_hsm->exportBufferTrueSize);
     successfulSolverId = _hsm->successfulSolverId;
+    numLits = _hsm->numCollectedLits;
     _hsm->doExport = false;
     return clauses;
 }
@@ -228,12 +231,13 @@ bool SatProcessAdapter::process(BufferTask& task) {
 
     auto& buffer = task.payload;
     if (task.type == BufferTask::FILTER_CLAUSES) {
-        _hsm->importBufferSize = buffer.size();
+        InplaceClauseAggregation agg(buffer);
+        _hsm->importBufferSize = buffer.size() - InplaceClauseAggregation::numMetadataInts();
         _hsm->importBufferRevision = _desired_revision;
         _epoch_of_export_buffer = task.epoch;
         assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
-        memcpy(_import_buffer, buffer.data(), buffer.size()*sizeof(int));
-        _hsm->winningSolverId = buffer.back();
+        memcpy(_import_buffer, buffer.data(), _hsm->importBufferSize*sizeof(int));
+        _hsm->winningSolverId = agg.successfulSolver();
         assert(_hsm->winningSolverId >= -1);
         _hsm->doFilterImport = true;
         _epochs_to_filter.erase(task.epoch);
@@ -252,11 +256,11 @@ bool SatProcessAdapter::process(BufferTask& task) {
         _hsm->doReturnClauses = true;
 
     } else if (task.type == BufferTask::DIGEST_CLAUSES_WITHOUT_FILTER) {
-        _hsm->importBufferSize = buffer.size();
+        _hsm->importBufferSize = buffer.size() - InplaceClauseAggregation::numMetadataInts();
         _hsm->importBufferRevision = _desired_revision;
         _hsm->importEpoch = task.epoch;
         assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
-        memcpy(_import_buffer, buffer.data(), buffer.size()*sizeof(int));
+        memcpy(_import_buffer, buffer.data(), _hsm->importBufferSize*sizeof(int));
         _hsm->doDigestImportWithoutFilter = true;
 
     } else if (task.type == BufferTask::DIGEST_HISTORIC_CLAUSES) {

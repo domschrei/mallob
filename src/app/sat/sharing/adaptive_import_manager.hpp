@@ -66,8 +66,10 @@ public:
         }
 
         int numUnits = 0;
+        int numLits = 0;
         std::vector<int> buf;
-        buf = _pcb.exportBuffer(-1, numUnits, AdaptiveClauseStore::UNITS, /*sortClauses=*/false);
+        buf = _pcb.exportBuffer(-1, numUnits, numLits, AdaptiveClauseStore::UNITS, /*sortClauses=*/false);
+        assert(numUnits == numLits);
 
         _plain_units_out = std::vector<int>(buf.data()+(buf.size()-numUnits), buf.data()+buf.size());
         assert(_plain_units_out.size() == numUnits);

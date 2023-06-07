@@ -169,17 +169,18 @@ void ThreadedSatJob::prepareSharing() {
     _clause_buffer.resize(2*_clsbuf_export_limit+100);
     _clause_checksum = Checksum();
     int actualSize = _solver->prepareSharing(_clause_buffer.data(), _clsbuf_export_limit, 
-        _successful_solver_id);
+        _successful_solver_id, _num_collected_lits);
     _clause_buffer.resize(actualSize);
 }
 bool ThreadedSatJob::hasPreparedSharing() {
     return !_clause_buffer.empty();
 }
-std::vector<int> ThreadedSatJob::getPreparedClauses(Checksum& checksum, int& successfulSolverId) {
+std::vector<int> ThreadedSatJob::getPreparedClauses(Checksum& checksum, int& successfulSolverId, int& numLits) {
     std::vector<int> out = std::move(_clause_buffer);
     _clause_buffer.clear();
     checksum = _clause_checksum;
     successfulSolverId = _successful_solver_id;
+    numLits = _num_collected_lits;
     return out;
 }
 int ThreadedSatJob::getLastAdmittedNumLits() {

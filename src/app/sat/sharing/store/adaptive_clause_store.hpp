@@ -191,7 +191,7 @@ public:
         return false;
     }
 
-    std::vector<int> exportBuffer(int sizeLimit, int& numExportedClauses,
+    std::vector<int> exportBuffer(int sizeLimit, int& numExportedClauses, int& numExportedLits,
             ExportMode mode = ANY, bool sortClauses = true, 
             std::function<void(int*)> clauseDataConverter = [](int*){}) override {
 
@@ -222,6 +222,7 @@ public:
             }
         }
         numExportedClauses = builder.getNumAddedClauses();
+        numExportedLits = builder.getNumAddedLits();
         return builder.extractBuffer();
     }
 

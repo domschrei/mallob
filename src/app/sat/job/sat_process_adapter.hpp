@@ -123,7 +123,7 @@ public:
 
     void collectClauses(int maxSize);
     bool hasCollectedClauses();
-    std::vector<int> getCollectedClauses(int& successfulSolverId);
+    std::vector<int> getCollectedClauses(int& successfulSolverId, int& numLits);
     int getLastAdmittedNumLits();
 
     void filterClauses(int epoch, const std::vector<int>& clauses);

@@ -160,7 +160,7 @@ public:
                 _hsm->exportChecksum = Checksum();
                 _hsm->successfulSolverId = -1;
                 assert(_hsm->exportBufferMaxSize >= 0 && _hsm->exportBufferMaxSize < 1048576);
-                _hsm->exportBufferTrueSize = _engine.prepareSharing(_export_buffer, _hsm->exportBufferMaxSize, _hsm->successfulSolverId);
+                _hsm->exportBufferTrueSize = _engine.prepareSharing(_export_buffer, _hsm->exportBufferMaxSize, _hsm->successfulSolverId, _hsm->numCollectedLits);
                 if (_hsm->exportBufferTrueSize != -1) {
                     assert(_hsm->exportBufferTrueSize <= _hsm->exportBufferAllocatedSize);
                     _hsm->didExport = true;

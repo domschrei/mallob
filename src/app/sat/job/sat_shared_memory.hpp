@@ -62,6 +62,7 @@ struct SatSharedMemory {
     int historicEpochBegin;
     int historicEpochEnd;
     int winningSolverId {-1};
+    int numCollectedLits {0};
     
     // Clause buffers: child->parent
     int exportBufferTrueSize {0};

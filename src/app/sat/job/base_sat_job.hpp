@@ -5,6 +5,7 @@
 #include "app/job.hpp"
 #include "data/checksum.hpp"
 #include "app/sat/data/clause_metadata.hpp"
+#include "util/logger.hpp"
 
 class AnytimeSatClauseCommunicator; // fwd decl
 
@@ -45,7 +46,7 @@ public:
     
     virtual void prepareSharing() = 0;
     virtual bool hasPreparedSharing() = 0;
-    virtual std::vector<int> getPreparedClauses(Checksum& checksum, int& successfulSolverId) = 0;
+    virtual std::vector<int> getPreparedClauses(Checksum& checksum, int& successfulSolverId, int& numLits) = 0;
     virtual int getLastAdmittedNumLits() = 0;
 
     virtual void filterSharing(int epoch, std::vector<int>& clauses) = 0;
@@ -95,6 +96,8 @@ protected:
 private:
     float _compensation_factor = 1.0f;
 
+    int _last_num_input_lits {0};
+    float _avg_incoming = 0;
     float _accumulated_expected = 0;
     float _accumulated_exchanged = 0;
     float _next_expected_volume = -1.f;
@@ -113,41 +116,50 @@ public:
 
     float updateSharingCompensationFactor() {
 
+        int nbAdmittedLits = getLastAdmittedNumLits();
         auto defaultBuflim = MyMpi::getBinaryTreeBufferLimit(getVolume(),
             _params.clauseBufferBaseSize(), _params.clauseBufferLimitParam(),
             MyMpi::BufferQueryMode(_params.clauseBufferLimitMode()));
-
-        int nbAdmittedLits = getLastAdmittedNumLits();
+        float priorCompensationFactor = _compensation_factor;
 
         if (_params.compensateUnusedSharingVolume()) {
 
             if (_next_expected_volume == -1.f) {
                 // initialize expected next sharing volume
-                _next_expected_volume = defaultBuflim;
+                _next_expected_volume = _last_num_input_lits;
             } else {
                 // update internal state
-                _accumulated_expected = std::max(1.f, 0.9f * _accumulated_expected + defaultBuflim);
-                _accumulated_exchanged = 0.9 * _accumulated_exchanged + nbAdmittedLits;
+                _accumulated_exchanged = 0.6f * _accumulated_exchanged + 0.4f * nbAdmittedLits;
+                _accumulated_expected = std::max(1.f, 0.6f * _accumulated_expected + 0.4f * _last_num_input_lits);
+                _avg_incoming = 0.6 * _avg_incoming + 0.4 * (_last_num_input_lits / _compensation_factor);
                 _next_expected_volume = 0.6 * _next_expected_volume + 0.4 * (nbAdmittedLits / _compensation_factor);
-                _total_expected += defaultBuflim;
+                _total_expected += _last_num_input_lits;
                 _total_exchanged += nbAdmittedLits;
             }
+            LOG(V4_VVER, "%s CS avginc=%.1f accexp=%.1f accexch=%.1f nextexp=%.1f totexp=%lu totexch=%lu\n",
+                toStr(), _avg_incoming, _accumulated_expected, _accumulated_exchanged, _next_expected_volume, _total_expected, _total_exchanged);
 
-            _compensation_factor = (_accumulated_expected - _accumulated_exchanged + defaultBuflim) / _next_expected_volume;
+            _compensation_factor = _next_expected_volume <= 0 ? 1.0 :
+                (_accumulated_expected - _accumulated_exchanged + _avg_incoming) / _next_expected_volume;
         } else {
             _compensation_factor = 1;
         }
 
         _compensation_factor = std::max(0.1f, std::min((float)_params.maxSharingCompensationFactor(), _compensation_factor));
 
-        LOG(V3_VERB, "%s CS last sharing: %i/%i globally passed ~> c=%.3f\n", toStr(), 
-            nbAdmittedLits, defaultBuflim, _compensation_factor);
+        LOG(V3_VERB, "%s CS last sharing: %i/%i/%i globally passed ~> c=%.3f\n", toStr(),
+            nbAdmittedLits, _last_num_input_lits, (int)std::ceil(priorCompensationFactor*defaultBuflim),
+            _compensation_factor);
 
         return _compensation_factor;
     }
-    void setSharingCompensationFactorAndUpdateExportLimit(float factor) {
+    int setSharingCompensationFactorAndUpdateExportLimit(float factor) {
         _compensation_factor = factor;
         _clsbuf_export_limit = getBufferLimit(1, true);
+        return _clsbuf_export_limit;
+    }
+    void setNumInputLitsOfLastSharing(int numInputLits) {
+        _last_num_input_lits = numInputLits;
     }
 
     size_t getBufferLimit(int numAggregatedNodes, bool selfOnly) {

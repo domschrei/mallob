@@ -45,7 +45,7 @@ void testBasic() {
     AdaptiveClauseStore acs(setup);
 
     Mallob::Clause c;
-    int nbExportedCls;
+    int nbExportedCls, nbExportedLits;
 
     for (int rep = 0; rep <= 10; rep++) {
 
@@ -63,7 +63,7 @@ void testBasic() {
         assert(acs.getNumLiterals(5, 2) == 0);
         assert(acs.getCurrentlyUsedLiterals() == 9);
 
-        acs.exportBuffer(999, nbExportedCls);
+        acs.exportBuffer(999, nbExportedCls, nbExportedLits);
         assert(nbExportedCls == 3);
         assert(acs.checkTotalLiterals());
         assert(acs.getCurrentlyUsedLiterals() == 0);
@@ -83,7 +83,7 @@ void testBasic() {
         assert(acs.getNumLiterals(5, 2) == 0);
         assert(acs.getCurrentlyUsedLiterals() == 10);
 
-        acs.exportBuffer(999, nbExportedCls);
+        acs.exportBuffer(999, nbExportedCls, nbExportedLits);
         assert(nbExportedCls == 4);
         assert(acs.checkTotalLiterals());
         assert(acs.getCurrentlyUsedLiterals() == 0);
