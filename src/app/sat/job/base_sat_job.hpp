@@ -34,9 +34,9 @@ public:
         }
     }
     virtual ~BaseSatJob() {
-        if (_next_expected_volume != -1.f) {
+        if (_estimate_shared_lits != -1.f) {
             LOG(V3_VERB, "%s CS total expected=%lu exchanged=%lu ratio=%.3f\n", toStr(), 
-                _total_expected, _total_exchanged, _total_expected/(float)_total_exchanged);
+                _total_desired, _total_shared, _total_desired/(float)_total_shared);
         }
     }
 
@@ -97,14 +97,14 @@ private:
     float _compensation_factor = 1.0f;
 
     int _last_num_input_lits {0};
-    float _avg_incoming = 0;
-    float _accumulated_expected = 0;
-    float _accumulated_exchanged = 0;
-    float _next_expected_volume = -1.f;
+    float _estimate_incoming_lits = 0;
+    float _accumulated_desired_lits = 0;
+    float _accumulated_shared_lits = 0;
+    float _estimate_shared_lits = -1.f;
 
     // stats
-    size_t _total_expected {0};
-    size_t _total_exchanged {0};
+    size_t _total_desired {0};
+    size_t _total_shared {0};
 
     bool _done_solving = false;
 
@@ -124,23 +124,24 @@ public:
 
         if (_params.compensateUnusedSharingVolume()) {
 
-            if (_next_expected_volume == -1.f) {
+            if (_estimate_shared_lits == -1.f) {
                 // initialize expected next sharing volume
-                _next_expected_volume = _last_num_input_lits;
+                _estimate_shared_lits = _last_num_input_lits;
             } else {
                 // update internal state
-                _accumulated_exchanged = 0.6f * _accumulated_exchanged + 0.4f * nbAdmittedLits;
-                _accumulated_expected = std::max(1.f, 0.6f * _accumulated_expected + 0.4f * _last_num_input_lits);
-                _avg_incoming = 0.6 * _avg_incoming + 0.4 * (_last_num_input_lits / _compensation_factor);
-                _next_expected_volume = 0.6 * _next_expected_volume + 0.4 * (nbAdmittedLits / _compensation_factor);
-                _total_expected += _last_num_input_lits;
-                _total_exchanged += nbAdmittedLits;
+                _accumulated_shared_lits = 0.9f * _accumulated_shared_lits + nbAdmittedLits;
+                _accumulated_desired_lits = std::max(1.f, 0.9f * _accumulated_desired_lits + _last_num_input_lits);
+                _estimate_incoming_lits = 0.6 * _estimate_incoming_lits + 0.4 * (_last_num_input_lits / _compensation_factor);
+                _estimate_shared_lits = 0.6 * _estimate_shared_lits + 0.4 * (nbAdmittedLits / _compensation_factor);
+                // just for stats
+                _total_desired += _last_num_input_lits;
+                _total_shared += nbAdmittedLits;
             }
-            LOG(V4_VVER, "%s CS avginc=%.1f accexp=%.1f accexch=%.1f nextexp=%.1f totexp=%lu totexch=%lu\n",
-                toStr(), _avg_incoming, _accumulated_expected, _accumulated_exchanged, _next_expected_volume, _total_expected, _total_exchanged);
+            LOG(V4_VVER, "%s CS estinc=%.1f estshr=%.1f accdes=%.1f accshr=%.1f totdes=%lu totshr=%lu\n",
+                toStr(), _estimate_incoming_lits, _estimate_shared_lits, _accumulated_desired_lits, _accumulated_shared_lits, _total_desired, _total_shared);
 
-            _compensation_factor = _next_expected_volume <= 0 ? 1.0 :
-                (_accumulated_expected - _accumulated_exchanged + _avg_incoming) / _next_expected_volume;
+            _compensation_factor = _estimate_shared_lits <= 0 ? 1.0 :
+                (_accumulated_desired_lits - _accumulated_shared_lits + _estimate_incoming_lits) / _estimate_shared_lits;
         } else {
             _compensation_factor = 1;
         }
