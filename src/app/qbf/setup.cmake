@@ -35,3 +35,7 @@ set(BASE_SOURCES ${BASE_SOURCES} ${SAT_SOURCES} CACHE INTERNAL "")
 # Add unit tests
 new_test(qbf_reader)
 #...
+
+add_executable(qbf_bloqqer
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/app/qbf/execution/bloqqer.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/app/qbf/execution/blqrcfg.c)
