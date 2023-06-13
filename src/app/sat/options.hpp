@@ -69,6 +69,8 @@ OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversificati
     "Diversify solvers based on random sparse variable phases in addition to native diversification")
  OPT_BOOL(diversifyNoise,                   "div-noise",  "",                            true,
     "Diversify solvers by adding Gaussian noise on top of numeric parameters")
+ OPT_BOOL(diversifySeeds,                   "div-seeds", "",                             true,
+    "Diversify solvers with different random seeds")
  OPT_STRING(satSolverSequence,              "satsolver",  "",                            "C",
     "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")
 
