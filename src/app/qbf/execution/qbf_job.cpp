@@ -6,8 +6,8 @@ QbfJob::QbfJob(const Parameters& params, const JobSetup& setup, AppMessageTable&
         ".qbfjob." + std::to_string(getId())
     )) {
 
-  // Just initializes this job context -- job description is NOT present yet!
-  LOG(V3_VERB, "QBF Initialized job #%i\n", getId());
+    // Just initializes this job context -- job description is NOT present yet!
+    LOG(V3_VERB, "QBF Initialized job #%i\n", getId());
 }
 
 QbfJob::~QbfJob() {
@@ -44,12 +44,12 @@ void QbfJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {}
 void QbfJob::appl_dumpStats() {}
 
 bool QbfJob::appl_isDestructible() {
-  return _bg_worker_done;
+    return _bg_worker_done;
 }
 void QbfJob::appl_memoryPanic() {}
 
 int QbfJob::getDemand() const {
-  return 1; // for a default QBF job, we only want a single worker!
+    return 1; // for a default QBF job, we only want a single worker!
 }
 
 // Separate thread: We can do long tasks here,
