@@ -79,6 +79,11 @@ public:
 
     inline void process(char c, JobDescription& desc) {
 
+        // When processing QBF, the prefix is encoded as sequence of
+        // integers, each either > 0 (existential) or < 0 (universal).
+        // The quantifier prefix is separated from the CNF formula by a
+        // 0, like a clause in SAT.
+
         if (_comment && c != '\n') return;
 
         signed char uc = *((signed char*) &c);
