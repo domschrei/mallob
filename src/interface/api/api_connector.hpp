@@ -40,4 +40,8 @@ public:
     If the request could not be processed properly, an empty JSON is returned.
     */
     std::promise<nlohmann::json> processAsync(nlohmann::json& input);
+
+    void storePreloadedRevision(const std::string& user, const std::string& name, int rev, std::vector<int>&& payload) {
+        _interface.getPreloadedRevisionStore().storePayload(user+"."+name+".json", rev, std::move(payload));
+    }
 };

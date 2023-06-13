@@ -73,17 +73,20 @@ void Parameters::init(int argc, char** argv) {
 
 void Parameters::expand() {
     if (monoFilename.isSet()) {
-        // Single instance solving
-        hopsUntilCollectiveAssignment.set(-1); // no collective assignments
-        numClients.set(1); // 1 client
-        useFilesystemInterface.set(false); // no fs interface
-        useIPCSocketInterface.set(false); // no socket interface
-        numWorkers.set(-1); // all workers
-        growthPeriod.set(0); // instantaneous growth of job demand
-        loadFactor.set(1); // full load factor
-        maxDemand.set(0); // no limit of max. demand
-        balancingPeriod.set(0.01); // low balancing delay to immediately get full demand
-        numJobs.set(1); // one job to process
+
+        if (!monoSubjobs()) {
+            // Single instance solving
+            hopsUntilCollectiveAssignment.set(-1); // no collective assignments
+            if (numClients() != -1) numClients.set(1); // 1 client
+            useFilesystemInterface.set(false); // no fs interface
+            useIPCSocketInterface.set(false); // no socket interface
+            numWorkers.set(-1); // all workers
+            growthPeriod.set(0); // instantaneous growth of job demand
+            loadFactor.set(1); // full load factor
+            maxDemand.set(0); // no limit of max. demand
+            balancingPeriod.set(0.01); // low balancing delay to immediately get full demand
+            numJobs.set(1); // one job to process
+        }
         
         // Disable detection of unresponsive nodes since printing a huge model
         // may lead to such timeouts. 

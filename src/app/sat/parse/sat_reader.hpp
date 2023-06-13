@@ -15,7 +15,7 @@
 
 class SatReader {
 
-private:
+protected:
     const Parameters& _params;
     std::string _filename;
     bool _raw_content_mode;
@@ -42,9 +42,10 @@ private:
 public:
     SatReader(const Parameters& params, const std::string& filename) : 
         _params(params), _filename(filename) {}
+
     bool read(JobDescription& desc);
 
-    inline void processInt(int x, JobDescription& desc) {
+    inline virtual void processInt(int x, JobDescription& desc) {
         
         //std::cout << x << std::endl;
 
@@ -77,7 +78,7 @@ public:
         _empty_clause = _traversing_assumptions || (x == 0);
     }
 
-    inline void process(char c, JobDescription& desc) {
+    inline virtual void process(char c, JobDescription& desc) {
 
         if (_comment && c != '\n') return;
 

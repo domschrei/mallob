@@ -13,6 +13,7 @@ struct JobMetadata {
     std::string jobName;
     std::unique_ptr<JobDescription> description;
     std::vector<std::string> files;
+    bool hasPreloadedRevisions {false};
     std::vector<int> dependencies;
     bool done = false;
     bool interrupt = false;
@@ -23,7 +24,8 @@ struct JobMetadata {
     JobMetadata(JobMetadata&& other) :
         jobName(std::move(other.jobName)),
         description(std::move(other.description)), 
-        files(std::move(other.files)), 
+        files(std::move(other.files)),
+        hasPreloadedRevisions(other.hasPreloadedRevisions),
         dependencies(std::move(other.dependencies)),
         done(other.done), interrupt(other.interrupt) {}
     

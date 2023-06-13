@@ -273,8 +273,8 @@ int main(int argc, char *argv[]) {
         return rank < params.numWorkers();
     };
     auto isClient = [&](int rank) {
-        if (params.monoFilename.isSet()) return rank == 0;
         if (params.numClients() == -1) return true;
+        if (params.monoFilename.isSet()) return rank == 0;
         return rank >= numNodes - params.numClients();
     };
 

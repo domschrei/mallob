@@ -57,4 +57,10 @@ void deserialize(const std::string& packed) {
     }
 }
 
+int getIntOrDefault(std::string key, int defaultVal) {
+    auto it = map.find(key);
+    if (it == map.end()) return defaultVal;
+    return atoi(it->second.c_str());
+}
+
 };

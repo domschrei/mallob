@@ -33,5 +33,5 @@ set(BASE_SOURCES ${BASE_SOURCES} ${SAT_SOURCES} CACHE INTERNAL "")
 #target_link_libraries(mallob_sat_process mallob_commons)
 
 # Add unit tests
-#new_test(qbf_reader)
+new_test(qbf_reader)
 #...

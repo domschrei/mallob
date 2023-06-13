@@ -38,6 +38,8 @@ and reporting results back over this interface. There is at most one Client inst
 class Client {
 
 private:
+    static APIConnector* _any_client_api;
+
     MPI_Comm _comm;
     int _world_rank;
     Parameters& _params;
@@ -118,6 +120,8 @@ public:
     std::string getFilesystemInterfacePath();
     std::string getSocketPath();
     APIConnector& getAPI();
+
+    static APIConnector* getAnyAPIOrNull() {return _any_client_api;}
 
 private:
     void readIncomingJobs();

@@ -27,6 +27,7 @@
 #include "interface/filesystem/inotify_filesystem_connector.hpp"
 #include "interface/api/api_connector.hpp"
 
+APIConnector* Client::_any_client_api {nullptr};
 
 // Executed by a separate worker thread
 void Client::readIncomingJobs() {
@@ -128,7 +129,7 @@ void Client::readIncomingJobs() {
                 // Read job
                 int id = foundJob.description->getId();
                 float time = Timer::elapsedSeconds();
-                bool success = false;
+                bool success = foundJob.hasPreloadedRevisions;
                 auto filesList = foundJob.getFilesList();
                 foundJob.description->beginInitialization(foundJob.description->getRevision());
                 if (foundJob.hasFiles()) {
@@ -241,6 +242,7 @@ void Client::init() {
         _interface_connectors.push_back(new SocketConnector(_params, *_json_interface, path));
     }
     _api_connector = new APIConnector(*_json_interface, _params, Logger::getMainInstance().copy("I-API", ".i.api"));
+    if (!_any_client_api) _any_client_api = _api_connector;
     _interface_connectors.push_back(_api_connector);
     LOG(V2_INFO, "Set up API at %s\n", "src/interface/api/api_connector.hpp");
 
@@ -512,7 +514,9 @@ void Client::handleSendJobResult(MessageHandle& handle) {
 
     // Output response time and solution header
     LOG(V2_INFO, "RESPONSE_TIME #%i %.6f rev. %i\n", jobId, Timer::elapsedSeconds()-desc.getArrival(), revision);
-    LOG(V2_INFO, "SOLUTION #%i %s rev. %i\n", jobId, resultCode == RESULT_SAT ? "SAT" : "UNSAT", revision);
+    LOG(V2_INFO, "SOLUTION #%i %s rev. %i\n", jobId,
+        resultCode == RESULT_SAT ? "SAT" : resultCode == RESULT_UNSAT ? "UNSAT" : "UNKNOWN",
+        revision);
 
     // Disable all watchdogs to avoid crashes while printing a huge model
     Watchdog::disableGlobally();

@@ -4,6 +4,7 @@
 #include <functional>
 #include <atomic>
 
+#include "interface/api/preloaded_revision_store.hpp"
 #include "util/logger.hpp"
 #include "util/hashing.hpp"
 #include "data/job_description.hpp"
@@ -39,6 +40,7 @@ public:
 private:
     const Parameters& _params;
     Logger _logger;
+    PreloadedRevisionStore _preloaded_revision_store;
 
     Mutex _job_map_mutex;
     JobIdAllocator _job_id_allocator;
@@ -58,6 +60,10 @@ public:
         _job_id_allocator(std::move(jobIdAllocator)),
         _job_callback(jobCallback) {}
     ~JsonInterface() {}
+
+    PreloadedRevisionStore& getPreloadedRevisionStore() {
+        return _preloaded_revision_store;
+    }
 
     // User-side events
     enum Result {ACCEPT, ACCEPT_CONCLUDE, DISCARD};

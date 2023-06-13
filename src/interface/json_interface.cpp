@@ -192,6 +192,7 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
         auto& jConfig = json["configuration"];
         for (auto it = jConfig.begin(); it != jConfig.end(); ++it) {
             config.map[it.key()] = it.value();
+            LOGGER(_logger, V4_VVER, "Job #%i : app config field %s=%s\n", id, it.key().c_str(), it.value().get<std::string>().c_str());
         }
     }
     // legacy support for "content-mode" field at the JSON's top level
@@ -223,6 +224,16 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
     JobMetadata metadata;
     metadata.jobName = jobName;
     metadata.description = std::unique_ptr<JobDescription>(job);
+    if (json.contains("preloaded_revisions")) {
+        for (int rev : json["preloaded_revisions"].get<std::vector<int>>()) {
+            auto payload = _preloaded_revision_store.withdrawPayload(jobName, rev);
+            LOGGER(_logger, V3_VERB, "appending preloaded payload of size %lu to %s rev. %i\n", payload.size(), jobName.c_str(), rev);
+            job->beginInitialization(rev);
+            job->reserveSize(payload.size());
+            job->setPreloadedLiterals(std::move(payload));
+            metadata.hasPreloadedRevisions = true;
+        }
+    }
     metadata.files = std::move(files);
     metadata.dependencies = std::move(idDependencies);
     _job_callback(std::move(metadata));
