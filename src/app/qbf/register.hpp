@@ -10,7 +10,7 @@ void register_mallob_app_qbf() {
 
     app_registry::registerApplication("QBF",
         // Job reader
-        [](const Parameters& params, const std::vector<std::string>& files, JobDescription& desc) {
+        [](const Parameters& params, const std::vector<std::string>& files, JobDescription& desc) -> bool {
             return QbfReader(params, files.front()).read(desc);
         },
         // Job creator

@@ -1,9 +1,11 @@
 
 # QBF-specific sources
-set(SAT_SOURCES )
+set(QBF_SOURCES
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/app/qbf/execution/qbf_job.cpp
+)
 
 # Add SAT-specific sources to main Mallob executable
-set(BASE_SOURCES ${BASE_SOURCES} ${SAT_SOURCES} CACHE INTERNAL "")
+set(BASE_SOURCES ${BASE_SOURCES} ${QBF_SOURCES} CACHE INTERNAL "")
 
 # Include external libraries, e.g.:
 #link_directories(lib/lingeling lib/yalsat lib/kissat)
