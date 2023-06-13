@@ -12,10 +12,6 @@
 #include "util/str_util.hpp"
 #include "util/sys/background_worker.hpp"
 
-/*
-Minimally compiling example "application" for a Mallob job. 
-Edit and extend for your application. 
-*/
 class QbfJob : public Job {
 
 private:
@@ -29,28 +25,27 @@ private:
     JobResult _internal_result;
 
 public:
-  QbfJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table);
+    QbfJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table);
     void appl_start() override;
     void appl_suspend() override;
     void appl_resume() override;
-  void appl_terminate() override;
-  int appl_solved() override;
-  JobResult&& appl_getResult() override ;
-  void appl_communicate() override;
-  void appl_communicate(int source, int mpiTag, JobMessage& msg) override;
-  void appl_dumpStats() override;
-  bool appl_isDestructible() override;
-  void appl_memoryPanic() override;
-  virtual ~QbfJob();
+    void appl_terminate() override;
+    int appl_solved() override;
+    JobResult&& appl_getResult() override ;
+    void appl_communicate() override;
+    void appl_communicate(int source, int mpiTag, JobMessage& msg) override;
+    void appl_dumpStats() override;
+    bool appl_isDestructible() override;
+    void appl_memoryPanic() override;
+    virtual ~QbfJob();
 
-  virtual int getDemand() const override;
+    virtual int getDemand() const override;
 
 private:
     void run();
 
-  void markDone();
+    void markDone();
 
     enum ChildJobApp {QBF, SAT};
-  nlohmann::json getJobSubmissionJson(ChildJobApp app, const AppConfiguration& appConfig);
-
+    nlohmann::json getJobSubmissionJson(ChildJobApp app, const AppConfiguration& appConfig);
 };
