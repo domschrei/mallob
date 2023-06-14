@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include "app/job.hpp"
+#include "app/qbf/execution/qbf_context.hpp"
 #include "comm/msg_queue/message_subscription.hpp"
 #include "comm/msgtags.h"
 #include "core/client.hpp"
@@ -44,8 +45,17 @@ public:
 private:
     void run();
 
-    void markDone();
+    std::pair<size_t, const int*> getFormulaWithQuantifications();
+    size_t getNumQuantifications(size_t fSize, const int* fData);
+
+    QbfContext fetchQbfContextFromAppConfig();
+    static QbfContext fetchQbfContextFromPermanentCache(int id);
+    void storeQbfContext(const QbfContext& ctx);
+    void installMessageListener(QbfContext& submitCtx);
 
     enum ChildJobApp {QBF, SAT};
+    void spawnChildJob(QbfContext& ctx, ChildJobApp app, std::vector<int>&& formula);
+    void markDone();
+
     nlohmann::json getJobSubmissionJson(ChildJobApp app, const AppConfiguration& appConfig);
 };

@@ -1,4 +1,6 @@
 #include "qbf_job.hpp"
+#include "data/app_configuration.hpp"
+#include "qbf_context.hpp"
 
 QbfJob::QbfJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table) 
     : Job(params, setup, table), _job_log(Logger::getMainInstance().copy(
@@ -61,139 +63,120 @@ int QbfJob::getDemand() const {
 void QbfJob::run() {
 
     // Fetch our formula
-    size_t fSize = getDescription().getFormulaPayloadSize(0);
-    LOGGER(_job_log, V3_VERB, "QBF Formula size: %lu\n", fSize);
-    const int* fPayload = getDescription().getFormulaPayload(0);
-
-    // Extract all quantifications
-    std::vector<int> quantifications;
-    for (size_t i = 0; i < fSize && fPayload[i] != 0; ++i) {
-        quantifications.push_back(fPayload[i]);
-    }
-    LOGGER(_job_log, V3_VERB, "QBF Quantifier list: %s\n", StrUtil::vecToStr(quantifications).c_str());
+    auto [fSize, fData] = getFormulaWithQuantifications();
+    auto nbQuantifications = getNumQuantifications(fSize, fData);
+    LOGGER(_job_log, V3_VERB, "QBF fsize=%lu qsize=%lu\n", fSize, nbQuantifications);
 
     // Extract meta data for this particular job node
     // from the AppConfig which is part of the job description
-    AppConfiguration appConfig = getDescription().getAppConfiguration();
-    int depth = appConfig.getIntOrDefault("depth", 0);
-    int parentRank = appConfig.getIntOrDefault("parent", -1);
-    LOGGER(_job_log, V3_VERB, "QBF I am on depth %i; parent [%i]\n", depth, parentRank);
-    bool isLogicalRoot = parentRank == -1; // actual root of the QBF solving effort?
+    QbfContext ctx = fetchQbfContextFromAppConfig();
+
+    // Decide what to do with the formula and how many children to spawn.
+    ctx.nbDoneChildren = 0;
+    ctx.nbTotalChildren = 1;
+    const int* childFormulaData = fData+1; // remove one quantification
+    bool isSatJob = childFormulaData[0] == 0; // List of quantifications ended!
+    std::vector<int> payloadChild1(isSatJob ? childFormulaData+1 : childFormulaData, fData+fSize);
+
+    // Store QbfContext in your job's app config (to be forwarded to children!)
+    // and in the permanent cache of this process that exceeds this job's life time.
+    storeQbfContext(ctx);
+
+    // Install a callback for incoming messages of the tag MSG_QBF_NOTIFICATION_UPWARDS.
+    // CAUTION: Callback may be executed AFTER the life time of this job instance!
+    installMessageListener(ctx);
+
+    // Spawn child job(s).
+    // The job will be a QBF job if any quantifications are left in the formula
+    // and will be a SAT job otherwise. 
+    spawnChildJob(ctx, isSatJob?SAT:QBF, std::move(payloadChild1));
+
+    // Non-root jobs should be cleaned up immediately again.
+    if (!ctx.isRootNode) markDone();
+}
+
+void QbfJob::installMessageListener(QbfContext& submitCtx) {
+
+    // Callback to be executed when a notification message arrives from a child
+    // DANGER: This job instance may not be present any longer!
+    auto cb = [&, submitCtx](MessageHandle& h) {
+
+        // Extract payload of the incoming message
+        IntVec data = Serializable::get<IntVec>(h.getRecvData());
+        if (data[0] != submitCtx.depth+1) return; // check that you are indeed the addressee!
+
+        LOG(V3_VERB, "QBF #%i (local:#%i) notification of depth %i\n",
+            submitCtx.rootJobId, submitCtx.nodeJobId, submitCtx.depth+1);
+
+        QbfContext currCtx = fetchQbfContextFromPermanentCache(submitCtx.nodeJobId);
+
+        // TODO Logically apply the result you received!
+        currCtx.nbDoneChildren++; // now another child is done
+
+        LOG(V3_VERB, "QBF #%i %i/%i done\n", currCtx.nodeJobId, currCtx.nbDoneChildren, currCtx.nbTotalChildren);
+
+        // TODO more generic evaluation function on how to react
+        if (currCtx.nbDoneChildren == currCtx.nbTotalChildren) {
+            // All children done!
+            LOG(V3_VERB, "QBF #%i done - cleaning cache\n", currCtx.nodeJobId);
+            PermanentCache::getMainInstance().erase(currCtx.nodeJobId);
+            if (currCtx.isRootNode) {
+                // Job is completely done (and, in this case, still present!)
+                markDone();
+            } else {
+                // Propagate notification upwards
+                // TODO Send actual data about the result upwards!
+                MyMpi::isend(currCtx.parentRank, MSG_QBF_NOTIFICATION_UPWARDS, IntVec({currCtx.depth}));
+            }
+        } else {
+            // Commit updated done children count
+            storeQbfContext(currCtx);
+        }
+    };
+
+    // Store the message subscription in the permanent cache of this process.
+    // It will be erased once some notification from all children has arrived.
+    PermanentCache::getMainInstance().putMsgSubscription(submitCtx.nodeJobId,
+        MessageSubscription(MSG_QBF_NOTIFICATION_UPWARDS, cb));
+}
+
+void QbfJob::spawnChildJob(QbfContext& ctx, ChildJobApp app, std::vector<int>&& formula) {
+
+    // Create an app configuration object for the child
+    // and write it into the job submission JSON
+    QbfContext childCtx = ctx.deriveChildContext(getMyMpiRank());
+    AppConfiguration config(getDescription().getAppConfiguration());
+    childCtx.writeToAppConfig(config);
+    auto json = getJobSubmissionJson(app, config);
 
     // Access the API used to introduce a job from this job
     auto api = Client::getAnyAPIOrNull();
     assert(api || log_return_false("[ERROR] Could not access job submission API! Does this process have a client role?\n"));
 
-    // Access the app config and store it permanently,
-    // i.e., exceeding the life time of this job object.
-    appConfig.map["done_children"] = "0"; // count num. done children later
-    PermanentCache& cache = PermanentCache::getMainInstance();
-    cache.putData(getId(), appConfig.serialize());
-
-    // Derive a new app config for the child job(s).
-    int childDepth = depth+1;
-    appConfig.map["depth"] = std::to_string(childDepth);
-    appConfig.map["parent"] = std::to_string(getMyMpiRank()); // my own rank
-
-    // Construct a JSON for the child job.
-    nlohmann::json json;
-    std::vector<int> payloadForChild;
-    bool spawnSatJob = quantifications.empty();
-    if (spawnSatJob) {
-        // Quantifier-free, pure SAT problem!
-        json = getJobSubmissionJson(ChildJobApp::SAT, appConfig);
-        // remove the leading "0" from the payload which terminated the quantifications
-        auto fStart = fPayload + (fPayload[0]==0 ? 1 : 0);
-        payloadForChild = std::vector<int>(fStart, fPayload+fSize);
-    } else {
-        // Incorrect dummy simplification for now: just remove one quantifier
-        json = getJobSubmissionJson(ChildJobApp::QBF, appConfig);
-        payloadForChild = std::vector<int>(fPayload+1, fPayload+fSize);
-    }
-
     // Internally store the payload for the child (so that it will get
     // transferred as soon as a 1st worker for the job was found)
-    api->storePreloadedRevision(json["user"], json["name"], 0, std::move(payloadForChild));
-
-    // How many children do I spawn (and have to wait for later)?
-    int nbTotalChildren = 1;
-
-    // Install a callback for incoming messages of the tag MSG_QBF_NOTIFICATION_UPWARDS.
-    // CAUTION: Callback may be executed AFTER the life time of this job instance!
-
-    auto cb = [&, id=getId(), isLogicalRoot, nbTotalChildren, depth, parentRank](MessageHandle& h) {
-
-        // Extract payload of the incoming message
-        IntVec data = Serializable::get<IntVec>(h.getRecvData());
-        if (data[0] != depth+1) return; // check that you are indeed the addressee!
-
-        LOG(V3_VERB, "QBF #%i notification of depth %i\n", id, depth+1);
-
-        // Fetch permanent cache entry (app config) for this job node
-        PermanentCache& cache = PermanentCache::getMainInstance();
-        AppConfiguration appConfig;
-        appConfig.deserialize(cache.getData(id));
-
-        // TODO Logically apply the result you received!
-
-        // How many children were done before?
-        int nbDoneChildren = appConfig.getIntOrDefault("done_children", 0);
-        nbDoneChildren++; // now one more is done
-
-        LOG(V3_VERB, "QBF #%i %i/%i done\n", id, nbDoneChildren, nbTotalChildren);
-
-        if (nbDoneChildren == nbTotalChildren) {
-            // All children done!
-            LOG(V3_VERB, "QBF #%i done - cleaning cache\n", id);
-            cache.erase(id);
-            if (isLogicalRoot) {
-                // Job is completely done
-                markDone();
-            } else {
-                // Propagate notification upwards
-                // TODO Send actual data about the result upwards!
-                MyMpi::isend(parentRank, MSG_QBF_NOTIFICATION_UPWARDS, IntVec({depth}));
-            }
-        } else {
-            // Commit updated done children count
-            appConfig.map["done_children"] = nbDoneChildren;
-            cache.putData(id, appConfig.serialize());
-        }
-    };
-
-    cache.putMsgSubscription(getId(), MessageSubscription(MSG_QBF_NOTIFICATION_UPWARDS, cb));
+    api->storePreloadedRevision(json["user"], json["name"], 0, std::move(formula));
 
     // Submit child job.
-    // CAUTION: Callback may be executed AFTER the life time of this job instance!
-    api->submit(json, [
-            &,
-            id=getId(),
-            isLogicalRoot,
-            spawnSatJob,
-            parentRank,
-            depth
-        ](nlohmann::json& response) {
+    // DANGER: Callback may be executed AFTER the life time of this job instance!
+    api->submit(json, [&, app, ctx](nlohmann::json& response) {
 
-        LOGGER(_job_log, V3_VERB, "QBF Child job done\n");
+        LOG(V3_VERB, "QBF Child job done\n");
 
         // Only need to react to the callback if it was a SAT job.
-        if (spawnSatJob) {
-            // SAT job was done
+        if (app == SAT) {
+            // SAT job was done.
             // TODO extract proper result
-
-            if (isLogicalRoot) {
+            if (ctx.isRootNode) {
                 // Root? => This job is actually still alive. Conclude it!
-                markDone();
+                markDone(); // TODO fwd result
             } else {
                 // Propagate notification upwards
-                // TODO Send actual data about the result upwards!
-                MyMpi::isend(parentRank, MSG_QBF_NOTIFICATION_UPWARDS, IntVec({depth}));
+                // TODO fwd result
+                MyMpi::isend(ctx.parentRank, MSG_QBF_NOTIFICATION_UPWARDS, IntVec({ctx.depth}));
             }
         }
     });
-
-    // Non-root jobs should be cleaned up immediately again.
-    if (!isLogicalRoot) markDone();
 }
 
 void QbfJob::markDone() {
@@ -202,6 +185,49 @@ void QbfJob::markDone() {
     _internal_result.result = 0;
     _internal_result.setSolutionToSerialize(nullptr, 0);
     _bg_worker_done = true;
+}
+
+std::pair<size_t, const int*> QbfJob::getFormulaWithQuantifications() {
+    return {
+        getDescription().getFormulaPayloadSize(0),
+        getDescription().getFormulaPayload(0)
+    };
+}
+
+size_t QbfJob::getNumQuantifications(size_t fSize, const int* fData) {
+    size_t size = 0;
+    while (size < fSize && fData[size] != 0) ++size;
+    return size;
+}
+
+QbfContext QbfJob::fetchQbfContextFromAppConfig() {
+
+    // Extract meta data for this particular job node
+    // from the AppConfig which is part of the job description
+    AppConfiguration appConfig = getDescription().getAppConfiguration();
+    QbfContext ctx(getId(), appConfig);
+    LOGGER(_job_log, V3_VERB, "QBF #%i depth=%i parent [%i]\n", ctx.nodeJobId, ctx.depth, ctx.parentRank);
+    return ctx;
+}
+
+QbfContext QbfJob::fetchQbfContextFromPermanentCache(int id) {
+
+    // Fetch permanent cache entry (app config) for this job node
+    PermanentCache& cache = PermanentCache::getMainInstance();
+    AppConfiguration appConfig;
+    appConfig.deserialize(cache.getData(id));
+    return QbfContext(id, appConfig);
+}
+
+void QbfJob::storeQbfContext(const QbfContext& ctx) {
+
+    // update AppConfig
+    AppConfiguration appConfig = getDescription().getAppConfiguration();
+    ctx.writeToAppConfig(appConfig);
+
+    // Store the AppConfiguration instance permanently,
+    // i.e., exceeding the life time of this job object.
+    PermanentCache::getMainInstance().putData(getId(), appConfig.serialize());
 }
 
 nlohmann::json QbfJob::getJobSubmissionJson(ChildJobApp app, const AppConfiguration& appConfig) {
