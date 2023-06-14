@@ -30,6 +30,7 @@ public:
     }
     std::string getData(int key) {
         auto lock = _mtx_map.getLock();
+        if (!_data_map.count(key)) return "";
         return _data_map.at(key);
     }
 

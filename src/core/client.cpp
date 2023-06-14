@@ -197,6 +197,9 @@ void Client::handleNewJob(JobMetadata&& data) {
 
     // Introduce new job into "incoming" queue
     data.description->setClientRank(_world_rank);
+    if (data.jobName == "admin.mono-job.json") {
+        setMonoJobId(data.description->getId());
+    }
     {
         auto lock = _arrival_times_lock.getLock();
         _arrival_times.insert(data.description->getArrival());
@@ -521,10 +524,11 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     // Disable all watchdogs to avoid crashes while printing a huge model
     Watchdog::disableGlobally();
 
+    bool isMonoJob = jobId == _mono_job_id;
     std::string resultString = "s " + std::string(resultCode == RESULT_SAT ? "SATISFIABLE" 
                         : resultCode == RESULT_UNSAT ? "UNSATISFIABLE" : "UNKNOWN") + "\n";
     std::vector<std::string> modelStrings;
-    if ((_params.solutionToFile.isSet() || (_params.monoFilename.isSet() && !_params.omitSolution())) 
+    if ((_params.solutionToFile.isSet() || (isMonoJob && !_params.omitSolution())) 
             && resultCode == RESULT_SAT) {
         auto json = app_registry::getJobSolutionFormatter(desc.getApplicationId())(jobResult);
         if (json.is_array()) {
@@ -544,7 +548,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
             for (auto& modelString : modelStrings) file << modelString;
             file.close();
         }
-    } else if (_params.monoFilename.isSet()) {
+    } else if (isMonoJob) {
         LOG_OMIT_PREFIX(V0_CRIT, resultString.c_str());
         if (!_params.omitSolution()) {
             for (auto& modelString : modelStrings)

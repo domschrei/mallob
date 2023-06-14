@@ -105,6 +105,8 @@ private:
 
     PeriodicEvent<100> _periodic_check_done_jobs;
 
+    int _mono_job_id {-1};
+
 public:
     Client(MPI_Comm comm, Parameters& params)
         : _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 
@@ -115,6 +117,7 @@ public:
 
     // Callback from JobFileAdapter when a new job's meta data were read
     void handleNewJob(JobMetadata&& data);
+    void setMonoJobId(int jobId) {_mono_job_id = jobId;}
 
     int getInternalRank();
     std::string getFilesystemInterfacePath();

@@ -1,6 +1,7 @@
 #include "qbf_job.hpp"
 #include "data/app_configuration.hpp"
 #include "qbf_context.hpp"
+#include "app/sat/job/sat_constants.h"
 
 QbfJob::QbfJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table) 
     : Job(params, setup, table), _job_log(Logger::getMainInstance().copy(
@@ -72,11 +73,7 @@ void QbfJob::run() {
     QbfContext ctx = fetchQbfContextFromAppConfig();
 
     // Decide what to do with the formula and how many children to spawn.
-    ctx.nbDoneChildren = 0;
-    ctx.nbTotalChildren = 1;
-    const int* childFormulaData = fData+1; // remove one quantification
-    bool isSatJob = childFormulaData[0] == 0; // List of quantifications ended!
-    std::vector<int> payloadChild1(isSatJob ? childFormulaData+1 : childFormulaData, fData+fSize);
+    auto [childApp, payloads] = applySplittingStrategy(ctx);
 
     // Store QbfContext in your job's app config (to be forwarded to children!)
     // and in the permanent cache of this process that exceeds this job's life time.
@@ -88,8 +85,10 @@ void QbfJob::run() {
 
     // Spawn child job(s).
     // The job will be a QBF job if any quantifications are left in the formula
-    // and will be a SAT job otherwise. 
-    spawnChildJob(ctx, isSatJob?SAT:QBF, std::move(payloadChild1));
+    // and will be a SAT job otherwise.
+    for (auto& payloadChild : payloads) {
+        spawnChildJob(ctx, childApp, std::move(payloadChild));
+    }
 
     // Non-root jobs should be cleaned up immediately again.
     if (!ctx.isRootNode) markDone();
@@ -113,25 +112,21 @@ void QbfJob::installMessageListener(QbfContext& submitCtx) {
             submitCtx.rootJobId, submitCtx.nodeJobId, submitCtx.depth+1, incomingMsg.resultCode);
 
         QbfContext currCtx = fetchQbfContextFromPermanentCache(submitCtx.nodeJobId);
+        if (currCtx.nodeJobId == -1) return; // context not present any more!
 
-        // TODO Logically apply the result you received!
-        currCtx.nbDoneChildren++; // now another child is done
-        // TODO set result code correctly according to all children's responses!
-        int myResultCode = incomingMsg.resultCode;
+        int result = currCtx.handleNotification(incomingMsg);
 
         LOG(V3_VERB, "QBF #%i %i/%i done\n", currCtx.nodeJobId, currCtx.nbDoneChildren, currCtx.nbTotalChildren);
 
-        // TODO more generic evaluation function on how to react
-        if (currCtx.nbDoneChildren == currCtx.nbTotalChildren) {
-            // All children done!
+        if (result != 0) {
             LOG(V3_VERB, "QBF #%i done - cleaning cache\n", currCtx.nodeJobId);
             PermanentCache::getMainInstance().erase(currCtx.nodeJobId);
             if (currCtx.isRootNode) {
                 // Job is completely done (and, in this case, still present!)
-                markDone(myResultCode);
+                markDone(result);
             } else {
                 // Propagate notification upwards
-                QbfNotification outMsg(currCtx.rootJobId, currCtx.depth, myResultCode);
+                QbfNotification outMsg(currCtx.rootJobId, currCtx.depth, result);
                 MyMpi::isend(currCtx.parentRank, MSG_QBF_NOTIFICATION_UPWARDS, outMsg);
             }
         } else {
@@ -144,6 +139,58 @@ void QbfJob::installMessageListener(QbfContext& submitCtx) {
     // It will be erased once some notification from all children has arrived.
     PermanentCache::getMainInstance().putMsgSubscription(submitCtx.nodeJobId,
         MessageSubscription(MSG_QBF_NOTIFICATION_UPWARDS, cb));
+}
+
+std::pair<QbfJob::ChildJobApp, std::vector<std::vector<int>>> QbfJob::applySplittingStrategy(QbfContext& ctx) {
+
+    // Assemble formula for each child to spawn
+    std::vector<std::vector<int>> payloads;
+    bool childJobsArePureSat;
+
+    {
+        // Basic splitting
+        auto [fSize, fData] = getFormulaWithQuantifications();
+        const int* childDataBegin = fData+1;
+        const int* childDataEnd = fData+fSize;
+        int quantification = fData[0];
+        childJobsArePureSat = quantification == 0;
+
+        if (childJobsArePureSat) {
+
+            // No quantifications left: Pure SAT!
+            payloads.emplace_back(childDataBegin, childDataEnd);
+
+        } else {
+
+            // Branch over the first quantification
+            int quantifiedVar = std::abs(quantification);
+            if (quantification > 0) {
+                // existential quantification
+                ctx.nodeType = QbfContext::OR;
+            } else {
+                // universal quantification
+                ctx.nodeType = QbfContext::AND;
+            }
+            {
+                std::vector<int> childTruePayload(childDataBegin, childDataEnd);
+                childTruePayload.push_back(quantifiedVar);
+                childTruePayload.push_back(0);
+                payloads.push_back(std::move(childTruePayload));
+            }
+            {
+                std::vector<int> childFalsePayload(childDataBegin, childDataEnd);
+                childFalsePayload.push_back(-quantifiedVar);
+                childFalsePayload.push_back(0);
+                payloads.push_back(std::move(childFalsePayload));
+            }
+        }
+    }
+
+    // Update QBF context
+    ctx.nbDoneChildren = 0;
+    ctx.nbTotalChildren = payloads.size();
+
+    return {childJobsArePureSat?SAT:QBF, std::move(payloads)};
 }
 
 void QbfJob::spawnChildJob(QbfContext& ctx, ChildJobApp app, std::vector<int>&& formula) {
@@ -165,7 +212,7 @@ void QbfJob::spawnChildJob(QbfContext& ctx, ChildJobApp app, std::vector<int>&& 
 
     // Submit child job.
     // DANGER: Callback may be executed AFTER the life time of this job instance!
-    api->submit(json, [&, app, ctx](nlohmann::json& response) {
+    api->submit(json, [&, app, ctx](nlohmann::json& response) mutable {
 
         LOG(V3_VERB, "QBF Child job done\n");
 
@@ -174,13 +221,17 @@ void QbfJob::spawnChildJob(QbfContext& ctx, ChildJobApp app, std::vector<int>&& 
             // SAT job was done.
             int resultCode = response["result"]["resultcode"].get<int>();
             LOG(V3_VERB, "QBF SAT child job returned result code %i\n", resultCode);
-            if (ctx.isRootNode) {
-                // Root? => This job is actually still alive. Conclude it!
-                markDone(resultCode);
-            } else {
-                // Propagate notification upwards
-                QbfNotification outMsg(ctx.rootJobId, ctx.depth, resultCode);
-                MyMpi::isend(ctx.parentRank, MSG_QBF_NOTIFICATION_UPWARDS, outMsg);
+            QbfNotification outMsg(ctx.rootJobId, ctx.depth, resultCode);
+            int result = ctx.handleNotification(outMsg);
+            if (result != 0) {
+                if (ctx.isRootNode) {
+                    // Root? => This job is actually still alive. Conclude it!
+                    markDone(result);
+                } else {
+                    // Propagate notification upwards
+                    QbfNotification outMsg(ctx.rootJobId, ctx.depth, result);
+                    MyMpi::isend(ctx.parentRank, MSG_QBF_NOTIFICATION_UPWARDS, outMsg);
+                }
             }
         }
     });
@@ -222,7 +273,9 @@ QbfContext QbfJob::fetchQbfContextFromPermanentCache(int id) {
     // Fetch permanent cache entry (app config) for this job node
     PermanentCache& cache = PermanentCache::getMainInstance();
     AppConfiguration appConfig;
-    appConfig.deserialize(cache.getData(id));
+    auto packedCtx = cache.getData(id);
+    if (packedCtx.empty()) return QbfContext(-1, appConfig);
+    appConfig.deserialize(packedCtx);
     return QbfContext(id, appConfig);
 }
 
