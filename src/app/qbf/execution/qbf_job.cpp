@@ -102,16 +102,22 @@ void QbfJob::installMessageListener(QbfContext& submitCtx) {
     auto cb = [&, submitCtx](MessageHandle& h) {
 
         // Extract payload of the incoming message
-        IntVec data = Serializable::get<IntVec>(h.getRecvData());
-        if (data[0] != submitCtx.depth+1) return; // check that you are indeed the addressee!
+        QbfNotification incomingMsg = Serializable::get<QbfNotification>(h.getRecvData());
+        // check that you are indeed the addressee!
+        if (incomingMsg.rootJobId != submitCtx.rootJobId
+                || incomingMsg.depth != submitCtx.depth+1) {
+            return;
+        }
 
-        LOG(V3_VERB, "QBF #%i (local:#%i) notification of depth %i\n",
-            submitCtx.rootJobId, submitCtx.nodeJobId, submitCtx.depth+1);
+        LOG(V3_VERB, "QBF #%i (local:#%i) notification of depth %i: result code %i\n",
+            submitCtx.rootJobId, submitCtx.nodeJobId, submitCtx.depth+1, incomingMsg.resultCode);
 
         QbfContext currCtx = fetchQbfContextFromPermanentCache(submitCtx.nodeJobId);
 
         // TODO Logically apply the result you received!
         currCtx.nbDoneChildren++; // now another child is done
+        // TODO set result code correctly according to all children's responses!
+        int myResultCode = incomingMsg.resultCode;
 
         LOG(V3_VERB, "QBF #%i %i/%i done\n", currCtx.nodeJobId, currCtx.nbDoneChildren, currCtx.nbTotalChildren);
 
@@ -122,11 +128,11 @@ void QbfJob::installMessageListener(QbfContext& submitCtx) {
             PermanentCache::getMainInstance().erase(currCtx.nodeJobId);
             if (currCtx.isRootNode) {
                 // Job is completely done (and, in this case, still present!)
-                markDone();
+                markDone(myResultCode);
             } else {
                 // Propagate notification upwards
-                // TODO Send actual data about the result upwards!
-                MyMpi::isend(currCtx.parentRank, MSG_QBF_NOTIFICATION_UPWARDS, IntVec({currCtx.depth}));
+                QbfNotification outMsg(currCtx.rootJobId, currCtx.depth, myResultCode);
+                MyMpi::isend(currCtx.parentRank, MSG_QBF_NOTIFICATION_UPWARDS, outMsg);
             }
         } else {
             // Commit updated done children count
@@ -166,23 +172,24 @@ void QbfJob::spawnChildJob(QbfContext& ctx, ChildJobApp app, std::vector<int>&& 
         // Only need to react to the callback if it was a SAT job.
         if (app == SAT) {
             // SAT job was done.
-            // TODO extract proper result
+            int resultCode = response["result"]["resultcode"].get<int>();
+            LOG(V3_VERB, "QBF SAT child job returned result code %i\n", resultCode);
             if (ctx.isRootNode) {
                 // Root? => This job is actually still alive. Conclude it!
-                markDone(); // TODO fwd result
+                markDone(resultCode);
             } else {
                 // Propagate notification upwards
-                // TODO fwd result
-                MyMpi::isend(ctx.parentRank, MSG_QBF_NOTIFICATION_UPWARDS, IntVec({ctx.depth}));
+                QbfNotification outMsg(ctx.rootJobId, ctx.depth, resultCode);
+                MyMpi::isend(ctx.parentRank, MSG_QBF_NOTIFICATION_UPWARDS, outMsg);
             }
         }
     });
 }
 
-void QbfJob::markDone() {
+void QbfJob::markDone(int resultCode) {
     _internal_result.id = getId();
     _internal_result.revision = 0;
-    _internal_result.result = 0;
+    _internal_result.result = resultCode;
     _internal_result.setSolutionToSerialize(nullptr, 0);
     _bg_worker_done = true;
 }

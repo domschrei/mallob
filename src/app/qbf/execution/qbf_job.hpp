@@ -9,6 +9,7 @@
 #include "core/client.hpp"
 #include "data/app_configuration.hpp"
 #include "data/permanent_cache.hpp"
+#include "data/serializable.hpp"
 #include "util/logger.hpp"
 #include "util/str_util.hpp"
 #include "util/sys/background_worker.hpp"
@@ -43,6 +44,29 @@ public:
     virtual int getDemand() const override;
 
 private:
+    struct QbfNotification : public Serializable {
+        int rootJobId;
+        int depth;
+        int resultCode;
+
+        QbfNotification() {}
+        QbfNotification(int rootJobId, int depth, int resultCode) :
+            rootJobId(rootJobId),
+            depth(depth),
+            resultCode(resultCode) {}
+
+        virtual std::vector<uint8_t> serialize() const override {
+            return IntVec({rootJobId, depth, resultCode}).serialize();
+        }
+        virtual QbfNotification& deserialize(const std::vector<uint8_t>& packed) override {
+            IntVec vec = Serializable::get<IntVec>(packed);
+            rootJobId = vec[0];
+            depth = vec[1];
+            resultCode = vec[2];
+            return *this;
+        }
+    };
+
     void run();
 
     std::pair<size_t, const int*> getFormulaWithQuantifications();
@@ -55,7 +79,7 @@ private:
 
     enum ChildJobApp {QBF, SAT};
     void spawnChildJob(QbfContext& ctx, ChildJobApp app, std::vector<int>&& formula);
-    void markDone();
+    void markDone(int resultCode = 0);
 
     nlohmann::json getJobSubmissionJson(ChildJobApp app, const AppConfiguration& appConfig);
 };
