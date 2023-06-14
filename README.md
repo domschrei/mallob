@@ -82,6 +82,8 @@ This will locally run a suite of automated tests which cover the basic functiona
 To include Glucose in the tests, prepend the above command with "GLUCOSE=1".
 Running the tests takes a few minutes and in the end "All tests done." should be output.
 
+QBF: mpirun -np 4 build/mallob -c=-1 -v=4 -mono-app=QBF -mono-subjobs=1 -mono=instances/qbf/r3unsat_300.qdimacs
+
 <hr/>
 
 # Usage
