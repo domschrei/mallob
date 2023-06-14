@@ -9,7 +9,6 @@
 #include "core/client.hpp"
 #include "data/app_configuration.hpp"
 #include "data/permanent_cache.hpp"
-#include "util/logger.hpp"
 #include "util/str_util.hpp"
 #include "util/sys/background_worker.hpp"
 
@@ -54,8 +53,17 @@ private:
     void installMessageListener(QbfContext& submitCtx);
 
     enum ChildJobApp {QBF, SAT};
-    std::pair<ChildJobApp, std::vector<std::vector<int>>> applySplittingStrategy(QbfContext& ctx);
-    void spawnChildJob(QbfContext& ctx, ChildJobApp app, std::vector<int>&& formula);
+
+    struct Payload {
+      std::vector<int> formula;
+      unsigned int quantifierDepth = 0;
+
+      Payload(std::vector<int> &&formula, unsigned int quantifierDepth = 0)
+        : formula(std::move(formula)), quantifierDepth(quantifierDepth) {}
+    };
+  
+    std::pair<ChildJobApp, std::vector<Payload>> applySplittingStrategy(QbfContext& ctx);
+    void spawnChildJob(QbfContext& ctx, ChildJobApp app, Payload&& formula);
     void markDone(int resultCode = 0);
 
     nlohmann::json getJobSubmissionJson(ChildJobApp app, const AppConfiguration& appConfig);

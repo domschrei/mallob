@@ -1,13 +1,13 @@
 #pragma once
 
+#include "util/logger.hpp"
+
 #include <string>
 #include <vector>
 
 class BloqqerCaller {
 public:
-  using PCNF = std::vector<int>;
-  
-  BloqqerCaller();
+  BloqqerCaller(Logger &logger);
   ~BloqqerCaller();
 
   struct FIFO {
@@ -27,6 +27,7 @@ public:
      Bloqqer may also give return code 10 or 20, saying the formula is
      trivially SAT or UNSAT.
    */
-  int process(PCNF &inOut, int jobId, int litToTry = 0, int maxCost = 10000);
+  int process(unsigned long size, const int *data, int jobId, int litToTry = 0, int maxCost = 10000);
 private:
+  Logger &_log;
 };

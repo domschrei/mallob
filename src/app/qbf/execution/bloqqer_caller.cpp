@@ -15,20 +15,22 @@ BloqqerCaller::FIFO::~FIFO() {
   close(fd);
 }
 
-BloqqerCaller::BloqqerCaller() {
+BloqqerCaller::BloqqerCaller(Logger &logger) : _log(logger) {
 
 }
 BloqqerCaller::~BloqqerCaller() {
 
 }
 
-int BloqqerCaller::process(PCNF &inOut, int jobId, int litToTry, int maxCost) {
+int BloqqerCaller::process(unsigned long size, const int *data, int jobId, int litToTry, int maxCost) {
   pid_t pid = getpid();
   std::string fifoPath = std::to_string(pid) + "." + std::to_string(jobId);
   std::string command = "qbf_bloqqer "
     + fifoPath
     + " --maxexpvarcost=" + std::to_string(maxCost)
     + " --expvar=" + std::to_string(litToTry);
+
+  LOGGER(_log, V3_VERB, "Calling qbf_bloqqer with command %s\n", command.c_str());
 
   FIFO fifo{fifoPath, 0600};
   FILE* bloqqer = popen(command.c_str(), "r");

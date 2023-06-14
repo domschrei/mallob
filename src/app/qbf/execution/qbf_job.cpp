@@ -2,6 +2,7 @@
 #include "data/app_configuration.hpp"
 #include "qbf_context.hpp"
 #include "app/sat/job/sat_constants.h"
+#include "bloqqer_caller.hpp"
 
 QbfJob::QbfJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table) 
     : Job(params, setup, table), _job_log(Logger::getMainInstance().copy(
@@ -141,10 +142,10 @@ void QbfJob::installMessageListener(QbfContext& submitCtx) {
         MessageSubscription(MSG_QBF_NOTIFICATION_UPWARDS, cb));
 }
 
-std::pair<QbfJob::ChildJobApp, std::vector<std::vector<int>>> QbfJob::applySplittingStrategy(QbfContext& ctx) {
+std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Payload>> QbfJob::applySplittingStrategy(QbfContext& ctx) {
 
     // Assemble formula for each child to spawn
-    std::vector<std::vector<int>> payloads;
+    std::vector<Payload> payloads;
     bool childJobsArePureSat;
 
     {
@@ -155,10 +156,12 @@ std::pair<QbfJob::ChildJobApp, std::vector<std::vector<int>>> QbfJob::applySplit
         int quantification = fData[0];
         childJobsArePureSat = quantification == 0;
 
+        BloqqerCaller bc(_job_log);
+
         if (childJobsArePureSat) {
 
             // No quantifications left: Pure SAT!
-            payloads.emplace_back(childDataBegin, childDataEnd);
+            payloads.emplace_back(Payload{std::vector<int>(childDataBegin, childDataEnd)});
 
         } else {
 
@@ -172,16 +175,16 @@ std::pair<QbfJob::ChildJobApp, std::vector<std::vector<int>>> QbfJob::applySplit
                 ctx.nodeType = QbfContext::AND;
             }
             {
-                std::vector<int> childTruePayload(childDataBegin, childDataEnd);
-                childTruePayload.push_back(quantifiedVar);
-                childTruePayload.push_back(0);
-                payloads.push_back(std::move(childTruePayload));
+                std::vector<int> childTruePayloadF(childDataBegin, childDataEnd);
+                childTruePayloadF.push_back(quantifiedVar);
+                childTruePayloadF.push_back(0);
+                payloads.push_back(Payload{std::move(childTruePayloadF)});
             }
             {
-                std::vector<int> childFalsePayload(childDataBegin, childDataEnd);
-                childFalsePayload.push_back(-quantifiedVar);
-                childFalsePayload.push_back(0);
-                payloads.push_back(std::move(childFalsePayload));
+                std::vector<int> childFalsePayloadF(childDataBegin, childDataEnd);
+                childFalsePayloadF.push_back(-quantifiedVar);
+                childFalsePayloadF.push_back(0);
+                payloads.push_back(Payload{std::move(childFalsePayloadF)});
             }
         }
     }
@@ -193,7 +196,7 @@ std::pair<QbfJob::ChildJobApp, std::vector<std::vector<int>>> QbfJob::applySplit
     return {childJobsArePureSat?SAT:QBF, std::move(payloads)};
 }
 
-void QbfJob::spawnChildJob(QbfContext& ctx, ChildJobApp app, std::vector<int>&& formula) {
+void QbfJob::spawnChildJob(QbfContext& ctx, ChildJobApp app, Payload&& formula) {
 
     // Create an app configuration object for the child
     // and write it into the job submission JSON
@@ -208,7 +211,7 @@ void QbfJob::spawnChildJob(QbfContext& ctx, ChildJobApp app, std::vector<int>&& 
 
     // Internally store the payload for the child (so that it will get
     // transferred as soon as a 1st worker for the job was found)
-    api->storePreloadedRevision(json["user"], json["name"], 0, std::move(formula));
+    api->storePreloadedRevision(json["user"], json["name"], 0, std::move(formula.formula));
 
     // Submit child job.
     // DANGER: Callback may be executed AFTER the life time of this job instance!
