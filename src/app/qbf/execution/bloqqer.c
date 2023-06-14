@@ -178,7 +178,7 @@ static int blkmax1size, blkmax2size;
 static int elimoccs, elimsize, excess;
 
 static int expand_variable;
-static int gather_expansion_cost;
+static int maxexpvarcost;
 
 #define IM INT_MAX
 
@@ -225,7 +225,7 @@ static Opt opts[] = {
 {000,"htesize",1024,2,IM,"hte max clause size",&htesize},
 
 // NEW ADDITIONS:
-{000,"expvarcost",0,0,IM,"only gather cost of expanding one variable",&gather_expansion_cost},
+{000,"maxexpvarcost",10000,0,IM,"maximum cost of expanding the variable",&maxexpvarcost},
 {000,"expvar",0,0,IM,"expand one variable",&expand_variable},
 
 {000,0},
@@ -3276,36 +3276,33 @@ int main (int argc, char ** argv) {
   if (ipclose) pclose (ifile);
   flush_vars ();
 
-  if(gather_expansion_cost == 0) {
-    if(expand_variable) {
-      apply_expansion_config();
-      flush(1);
-      int cost = expand_cost(expand_variable, IM);
-      expand(expand_variable, cost);
-    }
-    for (;;) {
-      flush (1);
-      split ();
-      if (empty_clause || !num_clauses) break;
-      if (eqres (1)) flush (0);
-      if (empty_clause || !num_clauses) break;
-      elim ();
-      if (verbose) log_pruned_scopes ();
-      if (empty_clause || !num_clauses) break;
-      if (propositional ()) break;
-      if (!try_expand ()) break;
-    }
-  } else if(gather_expansion_cost) {
+  if(expand_variable) {
     apply_expansion_config();
-    flush (1);
-    // Gather cost of expanding the given universal variable and print to STDOUT.
-    int cost = expand_cost(gather_expansion_cost, IM);
-    printf("%d\n", cost);
-    output = 0;
+    flush(1);
+    int cost = expand_cost(expand_variable, IM);
+    if(cost < maxexpvarcost) {
+      expand(expand_variable, cost);
+      res = 1;
+    } else {
+      res = 2;
+    }
   }
+
+  for (;;) {
+    flush (1);
+    split ();
+    if (empty_clause || !num_clauses) break;
+    if (eqres (1)) flush (0);
+    if (empty_clause || !num_clauses) break;
+    elim ();
+    if (verbose) log_pruned_scopes ();
+    if (empty_clause || !num_clauses) break;
+    if (propositional ()) break;
+    if (!try_expand ()) break;
+  }
+  
   if (empty_clause) { res = 20; msg ("definitely UNSATISFIABLE"); }
   else if (!num_clauses) { res = 10; msg ("definitely SATISFIABLE"); }
-  else { res = 0; msg ("unknown status"); }
   split ();
   if (keep) remaining = num_vars; else map_vars ();
   if (oname && strcmp (oname, "-")) {
