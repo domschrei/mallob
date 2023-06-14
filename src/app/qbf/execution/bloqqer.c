@@ -193,7 +193,7 @@ static Opt opts[] = {
 {'d',"defaults",0,0,1,"print command line option default values",&defaults},
 {'e',"embedded",0,0,1,"as '-d' but in embedded format",&embedded},
 {'r',"range",0,0,1,"print comand line option value ranges",&range},
-{'k',"keep",0,0,1,"keep original variable indices",&keep},
+{'k',"keep",1,0,1,"keep original variable indices",&keep},
 {'f',"force",0,0,1,"force reading if clause number incorrect",&force},
 {'q',"quantify-all",1,0,1,"quantify all variables in output",&quantifyall},
 {000,"split",512,3,IM,"split long clauses of at least this length",&splitlim},
@@ -219,7 +219,7 @@ static Opt opts[] = {
 {000,"blkmax2size",16,0,IM,"outer max blocked clause size",&blkmax2size},
 {000,"elimoccs",32,0,IM,"max eliminated variable occs",&elimoccs},
 {000,"elimsize",32,0,IM,"max eliminated clauses size",&elimsize},
-{000,"bound",IM,-1,IM,"bound for all bw/fw/block/elim limits",&bound},
+{000,"bound",1024,-1,IM,"bound for all bw/fw/block/elim limits",&bound},
 {000,"htesteps",64,0,IM,"hte steps bound",&htesteps},
 {000,"hteoccs",32,0,IM,"hte max occurrences size",&hteoccs},
 {000,"htesize",1024,2,IM,"hte max clause size",&htesize},
@@ -230,6 +230,11 @@ static Opt opts[] = {
 
 {000,0},
 };
+
+static void apply_expansion_config() {
+  bound = IM;
+  //axcess = IM;
+}
 
 static const char * iname, * oname;
 static FILE * ifile, * ofile;
@@ -3273,6 +3278,7 @@ int main (int argc, char ** argv) {
 
   if(gather_expansion_cost == 0) {
     if(expand_variable) {
+      apply_expansion_config();
       flush(1);
       int cost = expand_cost(expand_variable, IM);
       expand(expand_variable, cost);
@@ -3290,6 +3296,7 @@ int main (int argc, char ** argv) {
       if (!try_expand ()) break;
     }
   } else if(gather_expansion_cost) {
+    apply_expansion_config();
     flush (1);
     // Gather cost of expanding the given universal variable and print to STDOUT.
     int cost = expand_cost(gather_expansion_cost, IM);
