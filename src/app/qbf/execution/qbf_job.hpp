@@ -18,8 +18,12 @@ class QbfJob : public Job {
 private:
     Logger _job_log;
 
+    bool _initialized {false};
+    bool _sent_ready_msg_to_parent {false};
     bool _bg_worker_done {false};
     BackgroundWorker _bg_worker;
+
+    Mutex _mtx_app_config;
 
     int _internal_job_counter {1};
 
@@ -48,15 +52,14 @@ private:
     std::pair<size_t, const int*> getFormulaWithQuantifications();
     size_t getNumQuantifications(size_t fSize, const int* fData);
 
-    QbfContext fetchQbfContextFromAppConfig();
-    static QbfContext fetchQbfContextFromPermanentCache(int id);
-    void storeQbfContext(const QbfContext& ctx);
+    QbfContext buildQbfContextFromAppConfig();
     void installMessageListener(QbfContext& submitCtx);
 
     enum ChildJobApp {QBF, SAT};
     std::pair<ChildJobApp, std::vector<std::vector<int>>> applySplittingStrategy(QbfContext& ctx);
-    void spawnChildJob(QbfContext& ctx, ChildJobApp app, std::vector<int>&& formula);
+    void spawnChildJob(QbfContext& ctx, ChildJobApp app, int childIdx, std::vector<int>&& formula);
     void markDone(int resultCode = 0);
 
+    AppConfiguration getAppConfig();
     nlohmann::json getJobSubmissionJson(ChildJobApp app, const AppConfiguration& appConfig);
 };
