@@ -13,9 +13,8 @@
 #include "util/sys/timer.hpp"
 
 static void test_write() {
-    Logger logger = Logger::getMainInstance().copy("<BloqqerCaller>", ".bloqqercaller");
     
-    BloqqerCaller bq(logger);
+    BloqqerCaller bq;
     const char* filename = "test_bloqqer_caller.qdimacs";
     FILE* tgt = fopen(filename, "w");
     std::vector<int> formula = {1, -2, -3, 4, -5, 0, 2, 3, 0, 1, 5, 0};
@@ -44,8 +43,7 @@ static void test_read() {
     FILE* f = fopen("instances/qbf/microtest01.qdimacs", "r");
     assert(f);
 
-    Logger logger = Logger::getMainInstance().copy("<BloqqerCaller>", ".bloqqercaller");
-    BloqqerCaller bq(logger);
+    BloqqerCaller bq;
     // Dummy data, has to be cleared by readQDIMACS!
     std::vector<int> tgt = { 1, 2, 3};
     bq.readQDIMACS(f, tgt);
@@ -69,8 +67,7 @@ static void test_read_keep_prefix() {
     FILE* f = fopen("instances/qbf/microtest01.qdimacs", "r");
     assert(f);
 
-    Logger logger = Logger::getMainInstance().copy("<BloqqerCaller>", ".bloqqercaller");
-    BloqqerCaller bq(logger);
+    BloqqerCaller bq;
 
     std::vector<int> tgt = { 1, 2, 3, 4, 5, 0 };
 
@@ -94,8 +91,7 @@ static void test_read_keep_prefix() {
 static void test_bloqqer_interact() {
     std::vector<int> trivial_unsat = {-1, -2, 0, -1, -2, 0, 1, -2, 0, -1, 2, 0, 1, 2, 0 };
 
-    Logger logger = Logger::getMainInstance().copy("<BloqqerCaller>", ".bloqqercaller");
-    BloqqerCaller bq(logger);
+    BloqqerCaller bq;
     int res = bq.process(trivial_unsat, 2, 1, 1);
 
     assert(res == 20);

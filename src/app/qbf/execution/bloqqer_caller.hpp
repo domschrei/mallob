@@ -1,13 +1,11 @@
 #pragma once
 
-#include "util/logger.hpp"
-
 #include <string>
 #include <vector>
 
 class BloqqerCaller {
 public:
-  BloqqerCaller(Logger &logger);
+  BloqqerCaller();
   ~BloqqerCaller();
 
   struct FIFO {
@@ -34,6 +32,5 @@ public:
 
   void kill();
 private:
-  Logger &_log;
   volatile pid_t _pid = 0;
 };

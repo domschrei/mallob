@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include "app/job.hpp"
 #include "app/qbf/execution/qbf_context.hpp"
-#include "app/qbf/execution/bloqqer_caller.hpp"
 #include "comm/msg_queue/message_handle.hpp"
 #include "comm/msg_queue/message_subscription.hpp"
 #include "comm/msgtags.h"
@@ -32,8 +31,6 @@ private:
 
     Mutex _mtx_msg_queue;
     std::list<MessageHandle> _msg_queue;
-
-    BloqqerCaller _bloqqerCaller;
 
 public:
     QbfJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table);
@@ -63,7 +60,7 @@ private:
 
     enum ChildJobApp {QBF, SAT};
     using Payload = std::vector<int>;
-    std::pair<ChildJobApp, std::vector<Payload>> applySplittingStrategy(QbfContext& ctx);
+    std::optional<std::pair<ChildJobApp, std::vector<Payload>>> applySplittingStrategy();
     void spawnChildJob(QbfContext& ctx, ChildJobApp app, int childIdx, Payload&& formula);
 
     void markDone(int resultCode = 0);

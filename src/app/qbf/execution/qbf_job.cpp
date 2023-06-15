@@ -15,7 +15,7 @@ QbfJob::QbfJob(const Parameters& params, const JobSetup& setup, AppMessageTable&
     : Job(params, setup, table), _job_log(Logger::getMainInstance().copy(
         "<" + std::string(toStr()) + ">",
         ".qbfjob." + std::to_string(getId())
-                                                                         )), _bloqqerCaller(_job_log){
+                                                                         )) {
 
     // Just initializes this job context -- job description is NOT present yet!
     LOG(V3_VERB, "QBF Initialized job #%i\n", getId());
@@ -83,38 +83,54 @@ int QbfJob::getDemand() const {
 // We should also quickly stop when appl_terminate is called,
 // which means that we should check _bg_worker.continueRunning()
 // frequently.
+// We should also try to not block the context object without
+// requirement.
 void QbfJob::run() {
 
     // Extract meta data for this particular job node
     // from the AppConfig which is part of the job description
     QbfContextStore::create(getId(), buildQbfContextFromAppConfig());
-    auto ctx = QbfContextStore::acquire(getId());
 
-    // Install a callback for incoming messages of the tag MSG_QBF_NOTIFICATION_UPWARDS.
-    // CAUTION: Callback may be executed AFTER the life time of this job instance!
-    installMessageListeners(*ctx);
+    {
+        auto ctx = QbfContextStore::acquire(getId());
+        // Install a callback for incoming messages of the tag MSG_QBF_NOTIFICATION_UPWARDS.
+        // CAUTION: Callback may be executed AFTER the life time of this job instance!
+        installMessageListeners(*ctx);
 
-    // Allow the main thread to send a "ready" notification to this job's parent.
-    _initialized = true;
+        // Allow the main thread to send a "ready" notification to this job's parent.
+        _initialized = true;
+    }
 
     // Decide what to do with the formula and how many children to spawn.
-    auto [childApp, payloads] = applySplittingStrategy(*ctx);
+    {
+      auto ctx = QbfContextStore::acquire(getId());
 
-    if (ctx->cancelled) {
+      if (ctx->cancelled) {
         markDone();
         return;
+      }
     }
 
-    // Spawn child job(s).
-    // The job will be a QBF job if any quantifications are left in the formula
-    // and will be a SAT job otherwise.
-    for (int childIdx = 0; childIdx < payloads.size(); childIdx++) {
+    auto maybeSplit = applySplittingStrategy();
+    if(!maybeSplit) {
+      // TODO: Nothing to split left! We are done already.
+      return;
+    }
+    auto [childApp, payloads] = *maybeSplit;
+
+    {
+      auto ctx = QbfContextStore::acquire(getId());
+      // Spawn child job(s).
+      // The job will be a QBF job if any quantifications are left in the formula
+      // and will be a SAT job otherwise.
+      for (int childIdx = 0; childIdx < payloads.size(); childIdx++) {
         auto& payloadChild = payloads[childIdx];
         spawnChildJob(*ctx, childApp, childIdx, std::move(payloadChild));
-    }
+      }
 
-    // Non-root jobs should be cleaned up immediately again.
-    if (!ctx->isRootNode) markDone();
+      // Non-root jobs should be cleaned up immediately again.
+      if (!ctx->isRootNode) markDone();
+    }
 }
 
 void QbfJob::installMessageListeners(QbfContext& submitCtx) {
@@ -135,11 +151,105 @@ void QbfJob::installMessageListeners(QbfContext& submitCtx) {
     PermanentCache::getMainInstance().putMsgSubscription(submitCtx.nodeJobId, std::move(subCancel));
 }
 
-std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Payload>> QbfJob::applySplittingStrategy(QbfContext& ctx) {
+std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Payload>>> QbfJob::applySplittingStrategy() {
 
     // Assemble formula for each child to spawn
     std::vector<Payload> payloads;
     bool childJobsArePureSat;
+
+    int vars = 0;
+    int depth = 0;
+    int id = 0;
+
+    {
+      auto ctx = QbfContextStore::acquire(getId());
+      depth = ctx->depth;
+      vars = getDescription().getNumVars();
+      id = ctx->nodeJobId;
+    }
+
+    assert(vars >= 0);
+    auto [fSize, fData] = getFormulaWithQuantifications();
+    std::vector<int> formula(fData, fData + fSize);
+
+    auto matrix_begin = std::find(formula.begin(), formula.end(), 0);
+    ++matrix_begin;
+    auto is_in_matrix = [&matrix_begin, &formula](int var) -> bool {
+      return std::find_if(matrix_begin, formula.end(),
+                          [var](int l) {return abs(l) == var;}) == formula.end();
+    };
+    while(!is_in_matrix(formula[depth])) {
+      LOGGER(_job_log, V3_VERB, "Increasing depth from %d to %d because literal %d was not in matrix.", depth, (depth+1), formula[depth]);
+      ++depth;
+    }
+
+    // Keeps the prefix and modifies the matrix. Variable indices stay
+    // the same.
+    BloqqerCaller *bloqqerCaller = nullptr;
+    {
+      auto ctx = QbfContextStore::acquire(getId());
+      ctx->bloqqerCaller = std::make_unique<BloqqerCaller>();
+      bloqqerCaller = ctx->bloqqerCaller.get();
+    }
+    int res = bloqqerCaller->process(formula,
+                                     vars,
+                                     id,
+                                     formula[depth]);
+
+    switch(res) {
+    case 1:
+      // Bloqqer could expand the variable.
+      [[fallthrough]];
+    case 2:
+      // Bloqqer could not expand the variable, or the variable was
+      // existential. Anyway, use the new formula to split.
+      if(formula[depth] < 0) {
+        // Flip quantifier! But we need to remember that we had a universal at this space.
+        // We are in an AND-node.
+        // TODO: Put this into context.
+        formula[depth] = -formula[depth];
+        {
+          auto ctx = QbfContextStore::acquire(getId());
+          ctx->nodeType = QbfContext::AND;
+        }
+      }
+      break;
+    case 3:
+      // Job was cancelled through a kill that propagated a SIGINT
+      // through the bloqqer sub-process.
+      // TODO: Do we have to do anything else here?
+      markDone();
+      return {};
+    case 10:
+      // SAT result directly through Bloqqer
+      // TODO: Assign SAT to the Job.
+      return {};
+    case 20:
+      // UNSAT result directly through Bloqqer
+      // TODO: Assign UNSAT to the Job.
+      return {};
+    }
+
+    auto ctx_ = QbfContextStore::acquire(getId());
+    auto &ctx = *ctx_;
+
+    auto universal_quantifiers_in_formula = [&formula, &matrix_begin]() {
+      auto it = std::find_if(formula.begin(), matrix_begin, [](int q) {
+        return q < 0;
+      });
+
+      // our "end"
+      return it != matrix_begin;
+    };
+
+    if (ctx.cancelled) {
+      markDone();
+      return {};
+    }
+
+
+    // Eventually use "Trivial Truth", i.e. delete all Foralls and
+    // check if the Formula is true.
 
     {
         // Basic splitting
@@ -148,17 +258,6 @@ std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Payload>> QbfJob::applySplitt
         const int* childDataEnd = fData+fSize;
         int quantification = fData[0];
         childJobsArePureSat = quantification == 0;
-
-        /*
-        Payload f(fData, fData+fSize);
-
-        // It is best to run bloqqer directly here and then apply
-        // stuff to it afterwards. This runs bloqqer in parallel.
-
-        int vars = getAppConfig().getIntOrDefault("__NV", -1);
-        assert(vars >= 0);
-        int bloqqerRes = _bloqqerCaller.process(f, getId(), vars, f[ctx.depth], 10000);
-        */
 
         if (childJobsArePureSat) {
 
@@ -195,7 +294,7 @@ std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Payload>> QbfJob::applySplitt
         }
     }
 
-    return {childJobsArePureSat?SAT:QBF, std::move(payloads)};
+    return std::make_pair(childJobsArePureSat?SAT:QBF, std::move(payloads));
 }
 
 void QbfJob::spawnChildJob(QbfContext& ctx, ChildJobApp app, int childIdx, Payload&& formula) {
@@ -315,6 +414,8 @@ void QbfJob::onJobCancelled(MessageHandle& h, const QbfContext& submitCtx) {
         auto currCtx = QbfContextStore::acquire(submitCtx.nodeJobId);
         LOG(V3_VERB, "QBF #%i (local:#%i) cancelled\n", submitCtx.rootJobId, submitCtx.nodeJobId);
         currCtx->cancelled = true;
+        if(currCtx->bloqqerCaller)
+          currCtx->bloqqerCaller->kill();
         destruct = currCtx->isDestructible();
     }
     if (destruct) QbfContextStore::erase(submitCtx.nodeJobId);

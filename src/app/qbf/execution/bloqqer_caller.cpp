@@ -21,7 +21,7 @@ BloqqerCaller::FIFO::~FIFO() {
   fclose(fifo);
 }
 
-BloqqerCaller::BloqqerCaller(Logger &logger) : _log(logger) {
+BloqqerCaller::BloqqerCaller() {
 
 }
 BloqqerCaller::~BloqqerCaller() {
@@ -81,8 +81,6 @@ int BloqqerCaller::process(std::vector<int> &f, int vars, int jobId, int litToTr
     + " --maxexpvarcost=" + std::to_string(maxCost)
     + " --expvar=" + std::to_string(litToTry);
 
-  LOGGER(_log, V3_VERB, "Calling qbf_bloqqer with command %s\n", command.c_str());
-
   auto [bloqqer, bloqqer_pid] = popen2(command.c_str(), "r");
   _pid = bloqqer_pid;
 
@@ -90,7 +88,7 @@ int BloqqerCaller::process(std::vector<int> &f, int vars, int jobId, int litToTr
     FIFO fifo{fifoPath, 0600, "w"};
     writeQDIMACS(f, fifo.fifo, vars);
     fifo.~FIFO();
-    readQDIMACS(bloqqer, f);
+    readQDIMACS(bloqqer, f, true);
     fclose(bloqqer);
   }
   int wstatus = 0;

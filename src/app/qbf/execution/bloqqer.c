@@ -3229,7 +3229,7 @@ static void sigint_handler(int signal) {
 int main (int argc, char ** argv) {
   signal(SIGINT, &sigint_handler);
   const char * perr;
-  int i, res;
+  int i, res = 0;
   init_opts ();
   for (i = 1; i < argc; i++) if (!strcmp (argv[i], "-v")) verbose = 1;
   msg ("Bloqqer QBF Preprocessor");
@@ -3281,7 +3281,7 @@ int main (int argc, char ** argv) {
   if (ipclose) pclose (ifile);
   flush_vars ();
 
-  if(expand_variable) {
+  if(expand_variable && universal(expand_variable)) {
     apply_expansion_config();
     flush(1);
     // This if is required, as otherwise trivial formulas could not be
@@ -3295,6 +3295,8 @@ int main (int argc, char ** argv) {
         res = 2;
       }
     }
+  } else {
+    res = 2;
   }
 
   for (;;) {

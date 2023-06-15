@@ -2,6 +2,7 @@
 #pragma once
 
 #include "app/qbf/execution/qbf_notification.hpp"
+#include "app/qbf/execution/bloqqer_caller.hpp"
 #include "app/sat/job/sat_constants.h"
 #include "comm/msgtags.h"
 #include "comm/mympi.hpp"
@@ -16,6 +17,8 @@ struct QbfContext {
     int parentRank;
     int childIdx;
     bool isRootNode;
+
+    std::unique_ptr<BloqqerCaller> bloqqerCaller;
 
     bool cancelled {false};
 
@@ -37,6 +40,17 @@ struct QbfContext {
         childIdx = source.getIntOrDefault("child_idx", -1);
         isRootNode = rootJobId == nodeJobId;
     }
+
+  QbfContext(const QbfContext &o) : rootJobId(o.rootJobId),
+                                    nodeJobId(o.nodeJobId),
+                                    depth(o.depth),
+                                    parentRank(o.parentRank),
+                                    childIdx(o.childIdx),
+                                    isRootNode(o.isRootNode),
+                                    cancelled(o.cancelled),
+                                    nodeType(o.nodeType),
+                                    children(o.children),
+                                    nbDoneChildren(o.nbDoneChildren) {}
 
     QbfContext deriveChildContext(int childIdx, int myRank) const {
         QbfContext childCtx(*this);
