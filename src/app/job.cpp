@@ -1,6 +1,8 @@
 
 #include <cmath>
 #include <limits>
+#include "app/qbf/execution/qbf_ready_msg.hpp"
+#include "comm/msgtags.h"
 #include "util/assert.hpp"
 
 #include "app/job.hpp"
@@ -84,6 +86,22 @@ void Job::start() {
     _state = ACTIVE;
     LOG(V4_VVER, "%s : new job node starting\n", toStr());
     appl_start();
+
+    auto& appConfig = getDescription().getAppConfiguration();
+    int reportToParent = appConfig.getIntOrDefault("report_to_parent", 0);
+    if (reportToParent) {
+        int parentRank = appConfig.getIntOrDefault("parent_rank", -1);
+        int childIdx = appConfig.getIntOrDefault("child_idx", -1);
+        LOG(V3_VERB, "Reporting ready sub-job #%i (childidx=%i) to parent job [%i]\n", getId(), childIdx, parentRank);
+        MyMpi::isend(parentRank, MSG_NOTIFY_JOB_READY,
+            SubjobReadyMsg(
+                appConfig.getIntOrDefault("root_job_id", -1),
+                appConfig.getIntOrDefault("depth", -1),
+                childIdx,
+                getId()
+            )
+        );
+    }
 }
 
 void Job::suspend() {

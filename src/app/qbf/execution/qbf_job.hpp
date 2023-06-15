@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include "app/job.hpp"
 #include "app/qbf/execution/qbf_context.hpp"
+#include "comm/msg_queue/message_handle.hpp"
 #include "comm/msg_queue/message_subscription.hpp"
 #include "comm/msgtags.h"
 #include "core/client.hpp"
@@ -17,12 +18,19 @@ class QbfJob : public Job {
 private:
     Logger _job_log;
 
+    bool _initialized {false};
+    bool _sent_ready_msg_to_parent {false};
     bool _bg_worker_done {false};
     BackgroundWorker _bg_worker;
+
+    Mutex _mtx_app_config;
 
     int _internal_job_counter {1};
 
     JobResult _internal_result;
+
+    Mutex _mtx_msg_queue;
+    std::list<MessageHandle> _msg_queue;
 
 public:
     QbfJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table);
@@ -47,18 +55,23 @@ private:
     std::pair<size_t, const int*> getFormulaWithQuantifications();
     size_t getNumQuantifications(size_t fSize, const int* fData);
 
-    QbfContext fetchQbfContextFromAppConfig();
-    static QbfContext fetchQbfContextFromPermanentCache(int id);
-    void storeQbfContext(const QbfContext& ctx);
-    void installMessageListener(QbfContext& submitCtx);
+    QbfContext buildQbfContextFromAppConfig();
+    void installMessageListeners(QbfContext& submitCtx);
 
     enum ChildJobApp {QBF, SAT};
-
     using Payload = std::vector<int>;
-  
     std::pair<ChildJobApp, std::vector<Payload>> applySplittingStrategy(QbfContext& ctx);
-    void spawnChildJob(QbfContext& ctx, ChildJobApp app, Payload&& formula);
+    void spawnChildJob(QbfContext& ctx, ChildJobApp app, int childIdx, Payload&& formula);
+
     void markDone(int resultCode = 0);
 
+    AppConfiguration getAppConfig();
     nlohmann::json getJobSubmissionJson(ChildJobApp app, const AppConfiguration& appConfig);
+
+    static void onJobReadyNotification(MessageHandle& h, const QbfContext& submitCtx);
+    static void onJobCancelled(MessageHandle& h, const QbfContext& submitCtx);
+    void onResultNotification(MessageHandle& h, const QbfContext& submitCtx);
+    void onSatJobDone(const nlohmann::json& response, QbfContext& ctx);
+
+    void handleSubjobDone(int nodeJobId, QbfNotification& msg);
 };
