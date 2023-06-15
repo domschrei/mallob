@@ -184,7 +184,8 @@ bool BloqqerCaller::readQDIMACS(FILE* src, std::vector<int> &tgt, bool keepPrefi
   }
 
   // Spacer between prefix and matrix.
-  tgt.emplace_back(0);
+  if(!keepPrefix)
+    tgt.emplace_back(0);
 
   int v;
   while(fscanf(src, "%d", &v) == 1) {

@@ -65,6 +65,32 @@ static void test_read() {
     assert(are_equal);
 }
 
+static void test_read_keep_prefix() {
+    FILE* f = fopen("instances/qbf/microtest01.qdimacs", "r");
+    assert(f);
+
+    Logger logger = Logger::getMainInstance().copy("<BloqqerCaller>", ".bloqqercaller");
+    BloqqerCaller bq(logger);
+
+    std::vector<int> tgt = { 1, 2, 3, 4, 5, 0 };
+
+    bq.readQDIMACS(f, tgt, true);
+
+    std::vector<int> expected_tgt = {1, 2, 3, 4, 5, 0, 1, 2, 0};
+
+    bool are_equal = std::equal(tgt.begin(), tgt.end(),
+                                expected_tgt.begin(), expected_tgt.end());
+
+    if(!are_equal) {
+      std::cout << "Read: ";
+      for(int i : tgt) std::cout << i << " ";
+      std::cout << std::endl << "Expected: ";
+      for(int i : expected_tgt) std::cout << i << " ";
+      std::cout << std::endl;
+    }
+    assert(are_equal);
+}
+
 static void test_bloqqer_interact() {
     std::vector<int> trivial_unsat = {-1, -2, 0, -1, -2, 0, 1, -2, 0, -1, 2, 0, 1, 2, 0 };
 
@@ -82,5 +108,6 @@ int main(int argc, char* argv[]) {
 
     test_write();
     test_read();
+    test_read_keep_prefix();
     test_bloqqer_interact();
 }
