@@ -1,7 +1,9 @@
 #include "bloqqer_caller.hpp"
+#include "util/logger.hpp"
 
 #include <cstdlib>
 #include <algorithm>
+#include <cstring>
 #include <stdexcept>
 #include <stdio.h>
 #include <signal.h>
@@ -11,15 +13,6 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
-
-BloqqerCaller::FIFO::FIFO(std::string path, mode_t mode, const char* mode_) {
-  int res = mkfifo(path.c_str(), mode);
-  if(res != 0) throw std::runtime_error("Could not open fifo " + path);
-  fifo = fopen(path.c_str(), mode_);
-}
-BloqqerCaller::FIFO::~FIFO() {
-  fclose(fifo);
-}
 
 BloqqerCaller::BloqqerCaller() {
 
@@ -85,9 +78,19 @@ int BloqqerCaller::process(std::vector<int> &f, int vars, int jobId, int litToTr
   _pid = bloqqer_pid;
 
   if(bloqqer) {
-    FIFO fifo{fifoPath, 0600, "w"};
-    writeQDIMACS(f, fifo.fifo, vars);
-    fifo.~FIFO();
+    int res = mkfifo(fifoPath.c_str(), 0600);
+    if (res != 0) {
+      LOG(V0_CRIT, "[ERROR] Could not make FIFO, res=%i errno=%s\n", res,
+          strerror(errno));
+      abort();
+    }
+    FILE* fifo = fopen(fifoPath.c_str(), "w");
+    if (fifo == NULL) {
+      LOG(V0_CRIT, "[ERROR] Could not open FIFO, errno=%i\n", errno);
+      abort();
+    }
+    writeQDIMACS(f, fifo, vars);
+    fclose(fifo);
     readQDIMACS(bloqqer, f, true);
     fclose(bloqqer);
   }

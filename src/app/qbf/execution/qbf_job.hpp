@@ -59,9 +59,16 @@ private:
     void installMessageListeners(QbfContext& submitCtx);
 
     enum ChildJobApp {QBF, SAT};
-    using Payload = std::vector<int>;
-    std::optional<std::pair<ChildJobApp, std::vector<Payload>>> applySplittingStrategy();
-    void spawnChildJob(QbfContext& ctx, ChildJobApp app, int childIdx, Payload&& formula);
+    using Formula = std::vector<int>;
+
+    std::optional<std::pair<ChildJobApp, std::vector<Formula>>> applySplittingStrategy();
+    std::optional<std::pair<ChildJobApp, std::vector<Formula>>> applyTrivialSplittingStrategy();
+    std::optional<std::pair<ChildJobApp, std::vector<Formula>>> applyIterativeDeepeningSplittingStrategy();
+
+    std::vector<Formula> prepareSatChildJobs(QbfContext& ctx, const int* begin, const int* end);
+    std::vector<Formula> prepareQbfChildJobs(QbfContext& ctx, const int* begin, const int* end, int varToSplitOn);
+
+    void spawnChildJob(QbfContext& ctx, ChildJobApp app, int childIdx, Formula&& formula);
 
     void markDone(int resultCode = 0);
 

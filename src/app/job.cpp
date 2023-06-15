@@ -89,7 +89,7 @@ void Job::start() {
 
     auto& appConfig = getDescription().getAppConfiguration();
     int reportToParent = appConfig.getIntOrDefault("report_to_parent", 0);
-    if (reportToParent) {
+    if (getJobTree().isRoot() && reportToParent) {
         int parentRank = appConfig.getIntOrDefault("parent_rank", -1);
         int childIdx = appConfig.getIntOrDefault("child_idx", -1);
         LOG(V3_VERB, "Reporting ready sub-job #%i (childidx=%i) to parent job [%i]\n", getId(), childIdx, parentRank);

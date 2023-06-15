@@ -8,12 +8,6 @@ public:
   BloqqerCaller();
   ~BloqqerCaller();
 
-  struct FIFO {
-    FIFO(std::string path, mode_t mode, const char* mode_);
-    ~FIFO();
-    FILE* fifo;
-  };
-
   /* Regular process when calling Bloqqer:
 
      First call: Check if PCNF can be expanded, i.e. costs are below a
