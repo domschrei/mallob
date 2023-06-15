@@ -6,6 +6,7 @@
 #include "comm/msgtags.h"
 #include "comm/mympi.hpp"
 #include "data/app_configuration.hpp"
+#include "util/logger.hpp"
 
 struct QbfContext {
 
@@ -74,16 +75,20 @@ struct QbfContext {
         auto& child = children[msg.childIdx];
         if (child.state == ChildInfo::CANCELLED)
             return RESULT_UNKNOWN;
+        if (nbDoneChildren == children.size()) return RESULT_UNKNOWN;
         child.state = ChildInfo::DONE;
         int resultCode = msg.resultCode;
         nbDoneChildren++;
+        LOG(V3_VERB, "QBF #%i %i/%i done\n", nodeJobId, nbDoneChildren, children.size());
         if (nbDoneChildren == children.size()) {
             return resultCode;
         }
         if (nodeType == AND && resultCode == RESULT_UNSAT) {
+            nbDoneChildren = children.size();
             return RESULT_UNSAT;
         }
         if (nodeType == OR && resultCode == RESULT_SAT) {
+            nbDoneChildren = children.size();
             return RESULT_SAT;
         }
         return RESULT_UNKNOWN;
@@ -105,20 +110,11 @@ struct QbfContext {
     }
 
     bool isDestructible() {
-        cancelActiveChildren();
-        for (auto child : children) {
+        cancelActiveChildren(); // only if "cancelled" is set to true
+        for (auto& child : children) {
             if (child.state == ChildInfo::INTRODUCED || child.state == ChildInfo::READY)
                 return false;
         }
         return true;
-    }
-
-private:
-    int findChildIdx(int rank) {
-        int childIdx = 0;
-        while (childIdx < children.size() && children[childIdx].rank != rank) {
-            childIdx++;
-        }
-        return childIdx < children.size() ? childIdx : -1;
     }
 };

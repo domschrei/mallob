@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include "app/job.hpp"
 #include "app/qbf/execution/qbf_context.hpp"
+#include "comm/msg_queue/message_handle.hpp"
 #include "comm/msg_queue/message_subscription.hpp"
 #include "comm/msgtags.h"
 #include "core/client.hpp"
@@ -29,6 +30,9 @@ private:
 
     JobResult _internal_result;
 
+    Mutex _mtx_msg_queue;
+    std::list<MessageHandle> _msg_queue;
+
 public:
     QbfJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table);
     void appl_start() override;
@@ -53,7 +57,7 @@ private:
     size_t getNumQuantifications(size_t fSize, const int* fData);
 
     QbfContext buildQbfContextFromAppConfig();
-    void installMessageListener(QbfContext& submitCtx);
+    void installMessageListeners(QbfContext& submitCtx);
 
     enum ChildJobApp {QBF, SAT};
     std::pair<ChildJobApp, std::vector<std::vector<int>>> applySplittingStrategy(QbfContext& ctx);
@@ -62,4 +66,11 @@ private:
 
     AppConfiguration getAppConfig();
     nlohmann::json getJobSubmissionJson(ChildJobApp app, const AppConfiguration& appConfig);
+
+    static void onJobReadyNotification(MessageHandle& h, const QbfContext& submitCtx);
+    static void onJobCancelled(MessageHandle& h, const QbfContext& submitCtx);
+    void onResultNotification(MessageHandle& h, const QbfContext& submitCtx);
+    void onSatJobDone(const nlohmann::json& response, QbfContext& ctx);
+
+    void handleSubjobDone(int nodeJobId, QbfNotification& msg);
 };
