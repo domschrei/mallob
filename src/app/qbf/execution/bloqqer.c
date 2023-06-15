@@ -3222,7 +3222,12 @@ static void stats (void) {
   msg ("%.3f seconds, %.1f MB", seconds (), max_bytes /(double)(1<<20));
 }
 
+static void sigint_handler(int signal) {
+  exit(3);
+}
+
 int main (int argc, char ** argv) {
+  signal(SIGINT, &sigint_handler);
   const char * perr;
   int i, res;
   init_opts ();
