@@ -3279,12 +3279,16 @@ int main (int argc, char ** argv) {
   if(expand_variable) {
     apply_expansion_config();
     flush(1);
-    int cost = expand_cost(expand_variable, IM);
-    if(cost < maxexpvarcost) {
-      expand(expand_variable, cost);
-      res = 1;
-    } else {
-      res = 2;
+    // This if is required, as otherwise trivial formulas could not be
+    // expanded!
+    if(!empty_clause && num_clauses) {
+      int cost = expand_cost(expand_variable, IM);
+      if(cost < maxexpvarcost) {
+        expand(expand_variable, cost);
+        res = 1;
+      } else {
+        res = 2;
+      }
     }
   }
 

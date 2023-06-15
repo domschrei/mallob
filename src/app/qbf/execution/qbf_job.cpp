@@ -156,12 +156,21 @@ std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Payload>> QbfJob::applySplitt
         int quantification = fData[0];
         childJobsArePureSat = quantification == 0;
 
+        Payload f(fData, fData+fSize);
+
+        // It is best to run bloqqer directly here and then apply
+        // stuff to it afterwards. This runs bloqqer in parallel.
+
+        int vars = getDescription().getNumVars();
+        assert(vars >= 0);
+        LOGGER(_job_log, V3_VERB, "QBF Apply Splitting Strategy");
         BloqqerCaller bc(_job_log);
+        int bloqqerRes = bc.process(f, getId(), vars, f[ctx.depth], 10000);
 
         if (childJobsArePureSat) {
 
             // No quantifications left: Pure SAT!
-            payloads.emplace_back(Payload{std::vector<int>(childDataBegin, childDataEnd)});
+            payloads.emplace_back(Payload(childDataBegin, childDataEnd));
 
         } else {
 
@@ -175,16 +184,16 @@ std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Payload>> QbfJob::applySplitt
                 ctx.nodeType = QbfContext::AND;
             }
             {
-                std::vector<int> childTruePayloadF(childDataBegin, childDataEnd);
-                childTruePayloadF.push_back(quantifiedVar);
-                childTruePayloadF.push_back(0);
-                payloads.push_back(Payload{std::move(childTruePayloadF)});
+                std::vector<int> childTruePayload(childDataBegin, childDataEnd);
+                childTruePayload.push_back(quantifiedVar);
+                childTruePayload.push_back(0);
+                payloads.push_back(std::move(childTruePayload));
             }
             {
-                std::vector<int> childFalsePayloadF(childDataBegin, childDataEnd);
-                childFalsePayloadF.push_back(-quantifiedVar);
-                childFalsePayloadF.push_back(0);
-                payloads.push_back(Payload{std::move(childFalsePayloadF)});
+                std::vector<int> childFalsePayload(childDataBegin, childDataEnd);
+                childFalsePayload.push_back(-quantifiedVar);
+                childFalsePayload.push_back(0);
+                payloads.push_back(std::move(childFalsePayload));
             }
         }
     }
@@ -211,7 +220,7 @@ void QbfJob::spawnChildJob(QbfContext& ctx, ChildJobApp app, Payload&& formula) 
 
     // Internally store the payload for the child (so that it will get
     // transferred as soon as a 1st worker for the job was found)
-    api->storePreloadedRevision(json["user"], json["name"], 0, std::move(formula.formula));
+    api->storePreloadedRevision(json["user"], json["name"], 0, std::move(formula));
 
     // Submit child job.
     // DANGER: Callback may be executed AFTER the life time of this job instance!

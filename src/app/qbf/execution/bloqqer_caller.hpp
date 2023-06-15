@@ -11,9 +11,9 @@ public:
   ~BloqqerCaller();
 
   struct FIFO {
-    FIFO(std::string path, mode_t mode);
+    FIFO(std::string path, mode_t mode, const char* mode_);
     ~FIFO();
-    int fd;
+    FILE* fifo;
   };
 
   /* Regular process when calling Bloqqer:
@@ -27,7 +27,11 @@ public:
      Bloqqer may also give return code 10 or 20, saying the formula is
      trivially SAT or UNSAT.
    */
-  int process(unsigned long size, const int *data, int jobId, int litToTry = 0, int maxCost = 10000);
+  int process(std::vector<int> &f, int vars, int jobId, int litToTry = 0, int maxCost = 10000);
+
+  void writeQDIMACS(const std::vector<int> &src, FILE* tgt, int vars);
+  void readQDIMACS(FILE* src, std::vector<int> &tgt);
+  
 private:
   Logger &_log;
 };

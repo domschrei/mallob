@@ -54,13 +54,7 @@ private:
 
     enum ChildJobApp {QBF, SAT};
 
-    struct Payload {
-      std::vector<int> formula;
-      unsigned int quantifierDepth = 0;
-
-      Payload(std::vector<int> &&formula, unsigned int quantifierDepth = 0)
-        : formula(std::move(formula)), quantifierDepth(quantifierDepth) {}
-    };
+    using Payload = std::vector<int>;
   
     std::pair<ChildJobApp, std::vector<Payload>> applySplittingStrategy(QbfContext& ctx);
     void spawnChildJob(QbfContext& ctx, ChildJobApp app, Payload&& formula);

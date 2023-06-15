@@ -161,6 +161,7 @@ bool SatReader::read(JobDescription& desc) {
 		}
 	}
 
+    desc.setNumVars(_max_var);
 	std::string numClausesStr = std::to_string(_num_read_clauses);
 	assert(numClausesStr.size() < NC_DEFAULT_VAL.size());
 	while (numClausesStr.size() < NC_DEFAULT_VAL.size())
