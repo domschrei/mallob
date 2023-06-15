@@ -53,9 +53,11 @@ void QbfJob::appl_communicate() {
         // so that it knows your address
         auto ctx = QbfContextStore::acquire(getId());
         int parentRank = ctx->parentRank;
-        if (parentRank != -1)
+        if (parentRank != -1) {
+            LOG(V3_VERB, "Reporting ready QBF sub-job #%i (childidx=%i) to parent job [%i]\n", getId(), ctx->childIdx, parentRank);
             MyMpi::isend(parentRank, MSG_NOTIFY_JOB_READY,
                 SubjobReadyMsg(ctx->rootJobId, ctx->depth, ctx->childIdx, ctx->nodeJobId));
+        }
         _sent_ready_msg_to_parent = true;
     }
 }
@@ -273,6 +275,7 @@ void QbfJob::onJobReadyNotification(MessageHandle& h, const QbfContext& submitCt
     if (msg.rootJobId != submitCtx.rootJobId || msg.depth != submitCtx.depth+1) return;
 
     if (!QbfContextStore::has(submitCtx.nodeJobId)) return; // context not present any more!
+    LOG(V3_VERB, "QBF #%i Received ready msg from childidx %i <= [%i]\n", submitCtx.nodeJobId, msg.childIdx, h.source);
     bool destruct;
     {
         auto currCtx = QbfContextStore::acquire(submitCtx.nodeJobId);
@@ -293,11 +296,14 @@ void QbfJob::onJobCancelled(MessageHandle& h, const QbfContext& submitCtx) {
     }
 
     if (!QbfContextStore::has(submitCtx.nodeJobId)) return; // context not present any more!
-    auto currCtx = QbfContextStore::acquire(submitCtx.nodeJobId);
-
-    LOG(V3_VERB, "QBF #%i (local:#%i) cancelled\n", submitCtx.rootJobId, submitCtx.nodeJobId);
-    currCtx->cancelled = true;
-    currCtx->cancelActiveChildren();
+    bool destruct;
+    {
+        auto currCtx = QbfContextStore::acquire(submitCtx.nodeJobId);
+        LOG(V3_VERB, "QBF #%i (local:#%i) cancelled\n", submitCtx.rootJobId, submitCtx.nodeJobId);
+        currCtx->cancelled = true;
+        destruct = currCtx->isDestructible();
+    }
+    if (destruct) QbfContextStore::erase(submitCtx.nodeJobId);
 }
 
 void QbfJob::onResultNotification(MessageHandle& h, const QbfContext& submitCtx) {
@@ -347,6 +353,7 @@ void QbfJob::handleSubjobDone(int nodeJobId, QbfNotification& msg) {
                 QbfNotification outMsg(ctx->rootJobId, ctx->depth, ctx->childIdx, resultCode);
                 MyMpi::isend(ctx->parentRank, MSG_QBF_NOTIFICATION_UPWARDS, outMsg);
             }
+            ctx->cancelled = true;
             destruct = ctx->isDestructible();
         }
     }

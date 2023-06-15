@@ -65,7 +65,9 @@ public:
     static void erase(int id) {
         LOG(V3_VERB, "QBF ERASE_CTX %i\n", id);
         auto lock = _mtx_map.getLock();
-        _map[id].first->getLock(); // just "touch" the lock once to make sure no one owns it
+        // just "touch" the lock once to make sure no one owns it any more
+        _map[id].first->lock();
+        _map[id].first->unlock();
         _map.erase(id);
     }
 };

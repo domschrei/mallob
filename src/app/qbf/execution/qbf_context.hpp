@@ -111,9 +111,12 @@ struct QbfContext {
 
     bool isDestructible() {
         cancelActiveChildren(); // only if "cancelled" is set to true
-        for (auto& child : children) {
-            if (child.state == ChildInfo::INTRODUCED || child.state == ChildInfo::READY)
+        for (int childIdx = 0; childIdx < children.size(); childIdx++) {
+            auto& child = children[childIdx];
+            if (child.state == ChildInfo::INTRODUCED || child.state == ChildInfo::READY) {
+                LOG(V3_VERB, "QBF #%i waiting for childidx %i ...\n", nodeJobId, childIdx);
                 return false;
+            }
         }
         return true;
     }
