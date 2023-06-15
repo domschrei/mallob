@@ -178,7 +178,7 @@ static int blkmax1size, blkmax2size;
 static int elimoccs, elimsize, excess;
 
 static int expand_variable;
-static int gather_expansion_cost;
+static int maxexpvarcost;
 
 #define IM INT_MAX
 
@@ -193,7 +193,7 @@ static Opt opts[] = {
 {'d',"defaults",0,0,1,"print command line option default values",&defaults},
 {'e',"embedded",0,0,1,"as '-d' but in embedded format",&embedded},
 {'r',"range",0,0,1,"print comand line option value ranges",&range},
-{'k',"keep",0,0,1,"keep original variable indices",&keep},
+{'k',"keep",1,0,1,"keep original variable indices",&keep},
 {'f',"force",0,0,1,"force reading if clause number incorrect",&force},
 {'q',"quantify-all",1,0,1,"quantify all variables in output",&quantifyall},
 {000,"split",512,3,IM,"split long clauses of at least this length",&splitlim},
@@ -219,17 +219,22 @@ static Opt opts[] = {
 {000,"blkmax2size",16,0,IM,"outer max blocked clause size",&blkmax2size},
 {000,"elimoccs",32,0,IM,"max eliminated variable occs",&elimoccs},
 {000,"elimsize",32,0,IM,"max eliminated clauses size",&elimsize},
-{000,"bound",IM,-1,IM,"bound for all bw/fw/block/elim limits",&bound},
+{000,"bound",1024,-1,IM,"bound for all bw/fw/block/elim limits",&bound},
 {000,"htesteps",64,0,IM,"hte steps bound",&htesteps},
 {000,"hteoccs",32,0,IM,"hte max occurrences size",&hteoccs},
 {000,"htesize",1024,2,IM,"hte max clause size",&htesize},
 
 // NEW ADDITIONS:
-{000,"expvarcost",0,0,IM,"only gather cost of expanding one variable",&gather_expansion_cost},
+{000,"maxexpvarcost",10000,0,IM,"maximum cost of expanding the variable",&maxexpvarcost},
 {000,"expvar",0,0,IM,"expand one variable",&expand_variable},
 
 {000,0},
 };
+
+static void apply_expansion_config() {
+  bound = IM;
+  //axcess = IM;
+}
 
 static const char * iname, * oname;
 static FILE * ifile, * ofile;
@@ -3271,34 +3276,37 @@ int main (int argc, char ** argv) {
   if (ipclose) pclose (ifile);
   flush_vars ();
 
-  if(gather_expansion_cost == 0) {
-    if(expand_variable) {
-      flush(1);
+  if(expand_variable) {
+    apply_expansion_config();
+    flush(1);
+    // This if is required, as otherwise trivial formulas could not be
+    // expanded!
+    if(!empty_clause && num_clauses) {
       int cost = expand_cost(expand_variable, IM);
-      expand(expand_variable, cost);
+      if(cost < maxexpvarcost) {
+        expand(expand_variable, cost);
+        res = 1;
+      } else {
+        res = 2;
+      }
     }
-    for (;;) {
-      flush (1);
-      split ();
-      if (empty_clause || !num_clauses) break;
-      if (eqres (1)) flush (0);
-      if (empty_clause || !num_clauses) break;
-      elim ();
-      if (verbose) log_pruned_scopes ();
-      if (empty_clause || !num_clauses) break;
-      if (propositional ()) break;
-      if (!try_expand ()) break;
-    }
-  } else if(gather_expansion_cost) {
-    flush (1);
-    // Gather cost of expanding the given universal variable and print to STDOUT.
-    int cost = expand_cost(gather_expansion_cost, IM);
-    printf("%d\n", cost);
-    output = 0;
   }
+
+  for (;;) {
+    flush (1);
+    split ();
+    if (empty_clause || !num_clauses) break;
+    if (eqres (1)) flush (0);
+    if (empty_clause || !num_clauses) break;
+    elim ();
+    if (verbose) log_pruned_scopes ();
+    if (empty_clause || !num_clauses) break;
+    if (propositional ()) break;
+    if (!try_expand ()) break;
+  }
+  
   if (empty_clause) { res = 20; msg ("definitely UNSATISFIABLE"); }
   else if (!num_clauses) { res = 10; msg ("definitely SATISFIABLE"); }
-  else { res = 0; msg ("unknown status"); }
   split ();
   if (keep) remaining = num_vars; else map_vars ();
   if (oname && strcmp (oname, "-")) {

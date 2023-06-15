@@ -8,6 +8,7 @@
 #include "qbf_context.hpp"
 #include "app/sat/job/sat_constants.h"
 #include "util/logger.hpp"
+#include "bloqqer_caller.hpp"
 
 QbfJob::QbfJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table) 
     : Job(params, setup, table), _job_log(Logger::getMainInstance().copy(
@@ -133,10 +134,10 @@ void QbfJob::installMessageListeners(QbfContext& submitCtx) {
     PermanentCache::getMainInstance().putMsgSubscription(submitCtx.nodeJobId, std::move(subCancel));
 }
 
-std::pair<QbfJob::ChildJobApp, std::vector<std::vector<int>>> QbfJob::applySplittingStrategy(QbfContext& ctx) {
+std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Payload>> QbfJob::applySplittingStrategy(QbfContext& ctx) {
 
     // Assemble formula for each child to spawn
-    std::vector<std::vector<int>> payloads;
+    std::vector<Payload> payloads;
     bool childJobsArePureSat;
 
     {
@@ -146,6 +147,17 @@ std::pair<QbfJob::ChildJobApp, std::vector<std::vector<int>>> QbfJob::applySplit
         const int* childDataEnd = fData+fSize;
         int quantification = fData[0];
         childJobsArePureSat = quantification == 0;
+
+        Payload f(fData, fData+fSize);
+
+        // It is best to run bloqqer directly here and then apply
+        // stuff to it afterwards. This runs bloqqer in parallel.
+
+        int vars = getDescription().getNumVars();
+        assert(vars >= 0);
+        LOGGER(_job_log, V3_VERB, "QBF Apply Splitting Strategy");
+        BloqqerCaller bc(_job_log);
+        int bloqqerRes = bc.process(f, getId(), vars, f[ctx.depth], 10000);
 
         if (childJobsArePureSat) {
 
@@ -184,7 +196,7 @@ std::pair<QbfJob::ChildJobApp, std::vector<std::vector<int>>> QbfJob::applySplit
     return {childJobsArePureSat?SAT:QBF, std::move(payloads)};
 }
 
-void QbfJob::spawnChildJob(QbfContext& ctx, ChildJobApp app, int childIdx, std::vector<int>&& formula) {
+void QbfJob::spawnChildJob(QbfContext& ctx, ChildJobApp app, int childIdx, Payload&& formula) {
 
     // Create an app configuration object for the child
     // and write it into the job submission JSON

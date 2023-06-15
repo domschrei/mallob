@@ -15,6 +15,8 @@ public:
     QbfReader(const Parameters& params, const std::string& filename) :
         SatReader(params, filename) {}
 
+    int getMaxVar() const { return _max_var; }
+
     inline void process(char c, JobDescription& desc) override {
 
         LOG(V6_DEBGV, "PROCESS %c\n", c);

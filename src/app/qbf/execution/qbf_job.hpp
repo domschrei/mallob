@@ -10,7 +10,6 @@
 #include "core/client.hpp"
 #include "data/app_configuration.hpp"
 #include "data/permanent_cache.hpp"
-#include "util/logger.hpp"
 #include "util/str_util.hpp"
 #include "util/sys/background_worker.hpp"
 
@@ -60,8 +59,10 @@ private:
     void installMessageListeners(QbfContext& submitCtx);
 
     enum ChildJobApp {QBF, SAT};
-    std::pair<ChildJobApp, std::vector<std::vector<int>>> applySplittingStrategy(QbfContext& ctx);
-    void spawnChildJob(QbfContext& ctx, ChildJobApp app, int childIdx, std::vector<int>&& formula);
+    using Payload = std::vector<int>;
+    std::pair<ChildJobApp, std::vector<Payload>> applySplittingStrategy(QbfContext& ctx);
+    void spawnChildJob(QbfContext& ctx, ChildJobApp app, int childIdx, Payload&& formula);
+
     void markDone(int resultCode = 0);
 
     AppConfiguration getAppConfig();

@@ -1,8 +1,9 @@
 
 # QBF-specific sources
 set(QBF_SOURCES
-${CMAKE_CURRENT_SOURCE_DIR}/src/app/qbf/execution/qbf_job.cpp
-${CMAKE_CURRENT_SOURCE_DIR}/src/app/qbf/execution/qbf_context_store.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/app/qbf/execution/qbf_job.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/app/qbf/execution/qbf_context_store.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/app/qbf/execution/bloqqer_caller.cpp
 )
 
 # Add SAT-specific sources to main Mallob executable

@@ -184,7 +184,7 @@ public:
     int getMetadataSize() const;
     
     size_t getFullNonincrementalTransferSize() const {return _data_per_revision[0]->size();}
-    int getNumVars() {return _num_vars;}
+    int getNumVars() const {return _num_vars;}
 
     void setRootRank(int rootRank) {_root_rank = rootRank;}
     void setRevision(int revision) {_revision = revision;}
