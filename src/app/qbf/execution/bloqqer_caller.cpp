@@ -4,8 +4,10 @@
 #include <algorithm>
 #include <stdexcept>
 #include <stdio.h>
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -26,6 +28,51 @@ BloqqerCaller::~BloqqerCaller() {
 
 }
 
+#include	<stdio.h>
+#include	<signal.h>
+
+#define	READ	0
+#define	WRITE	1
+
+std::pair<FILE*, pid_t> popen2(const char* command, const char *mode) {
+  int	pfp[2], pid;
+  FILE	*fp;
+  int	parent_end, child_end;
+
+  if ( *mode == 'r' ){
+    parent_end = READ;
+    child_end = WRITE ;
+  } else if ( *mode == 'w' ){
+    parent_end = WRITE;
+    child_end = READ ;
+  } else return {NULL, 0} ;
+
+  if ( pipe(pfp) == -1 )
+    return {NULL, 0};
+  if ( (pid = fork()) == -1 ){
+    close(pfp[0]);
+    close(pfp[1]);
+    return {NULL, 0};
+  }
+
+  if ( pid > 0 ){	
+    if (close( pfp[child_end] ) == -1 )
+      return {NULL, 0};
+    return {fdopen( pfp[parent_end] , mode), pid};
+  }
+
+  if ( close(pfp[parent_end]) == -1 )
+    exit(1);
+
+  if ( dup2(pfp[child_end], child_end) == -1 )
+    exit(1);
+
+  if ( close(pfp[child_end]) == -1 )
+    exit(1);
+  execl( "/bin/sh", "sh", "-c", command, NULL );
+  exit(1);
+}
+
 int BloqqerCaller::process(std::vector<int> &f, int vars, int jobId, int litToTry, int maxCost) {
   pid_t pid = getpid();
   std::string fifoPath = std::to_string(pid) + "." + std::to_string(jobId);
@@ -36,16 +83,21 @@ int BloqqerCaller::process(std::vector<int> &f, int vars, int jobId, int litToTr
 
   LOGGER(_log, V3_VERB, "Calling qbf_bloqqer with command %s\n", command.c_str());
 
-  FILE* bloqqer = popen(command.c_str(), "r");
+  auto [bloqqer, bloqqer_pid] = popen2(command.c_str(), "r");
+  _pid = bloqqer_pid;
 
-  FIFO fifo{fifoPath, 0600, "w"};
-  writeQDIMACS(f, fifo.fifo, vars);
-  fifo.~FIFO();
-  readQDIMACS(bloqqer, f);
+  if(bloqqer) {
+    FIFO fifo{fifoPath, 0600, "w"};
+    writeQDIMACS(f, fifo.fifo, vars);
+    fifo.~FIFO();
+    readQDIMACS(bloqqer, f);
+    fclose(bloqqer);
+  }
+  int wstatus = 0;
+  waitpid(_pid, &wstatus, 0);
+  _pid = 0;
 
-  int res = pclose(bloqqer);
-
-  return WEXITSTATUS(res);
+  return WEXITSTATUS(wstatus);
 }
 
 void BloqqerCaller::writeQDIMACS(const std::vector<int> &src, FILE* tgt, int vars) {
@@ -86,13 +138,19 @@ void BloqqerCaller::writeQDIMACS(const std::vector<int> &src, FILE* tgt, int var
     }
   }
 }
-void BloqqerCaller::readQDIMACS(FILE* src, std::vector<int> &tgt) {
-  tgt.clear();
+bool BloqqerCaller::readQDIMACS(FILE* src, std::vector<int> &tgt, bool keepPrefix) {
+  if(keepPrefix) {
+    auto prefixEnd = std::find(tgt.begin(), tgt.end(), 0);
+    ++prefixEnd;
+    tgt.erase(prefixEnd, tgt.end());
+  } else {
+    tgt.clear();
+  }
 
   int vars, clauses;
   int read_items = fscanf(src, "p cnf %d %d\n", &vars, &clauses);
 
-  if(read_items != 2) throw std::runtime_error("Did not read correct prefix from bloqqer!");
+  if(read_items != 2) return false;
 
   tgt.reserve(vars + clauses * 5);
 
@@ -113,21 +171,31 @@ void BloqqerCaller::readQDIMACS(FILE* src, std::vector<int> &tgt) {
 
     // Remove the space following the quantifier symbol
     char c = fgetc(src);
-    if(c != ' ') throw std::runtime_error("Did not encounter a space after e or a!");
+    if(c != ' ') return false;
 
     int v = 0;
     while(fscanf(src, "%d", &v) == 1 && v != 0) {
-      tgt.emplace_back(v * sign);
+      if(!keepPrefix) {
+        tgt.emplace_back(v * sign);
+      }
     }
     c = fgetc(src);
-    if(c != '\n') throw std::runtime_error("Did not encounter a new line after quantifier end delimiter 0!");
+    if(c != '\n') return false;
   }
 
   // Spacer between prefix and matrix.
-  tgt.emplace_back(0);
+  if(!keepPrefix)
+    tgt.emplace_back(0);
 
   int v;
   while(fscanf(src, "%d", &v) == 1) {
     tgt.emplace_back(v);
   }
+
+  return true;
+}
+
+void BloqqerCaller::kill() {
+  pid_t p = _pid;
+  ::kill(p, SIGINT);
 }

@@ -15,7 +15,7 @@ QbfJob::QbfJob(const Parameters& params, const JobSetup& setup, AppMessageTable&
     : Job(params, setup, table), _job_log(Logger::getMainInstance().copy(
         "<" + std::string(toStr()) + ">",
         ".qbfjob." + std::to_string(getId())
-    )) {
+                                                                         )), _bloqqerCaller(_job_log){
 
     // Just initializes this job context -- job description is NOT present yet!
     LOG(V3_VERB, "QBF Initialized job #%i\n", getId());
@@ -157,9 +157,7 @@ std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Payload>> QbfJob::applySplitt
 
         int vars = getAppConfig().getIntOrDefault("__NV", -1);
         assert(vars >= 0);
-        LOGGER(_job_log, V3_VERB, "QBF Apply Splitting Strategy");
-        BloqqerCaller bc(_job_log);
-        int bloqqerRes = bc.process(f, getId(), vars, f[ctx.depth], 10000);
+        int bloqqerRes = _bloqqerCaller.process(f, getId(), vars, f[ctx.depth], 10000);
         */
 
         if (childJobsArePureSat) {
