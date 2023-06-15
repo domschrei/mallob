@@ -9,6 +9,7 @@
 #include "app/sat/job/sat_constants.h"
 #include "util/logger.hpp"
 #include "bloqqer_caller.hpp"
+#include "util/str_util.hpp"
 
 QbfJob::QbfJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table) 
     : Job(params, setup, table), _job_log(Logger::getMainInstance().copy(
@@ -148,20 +149,23 @@ std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Payload>> QbfJob::applySplitt
         int quantification = fData[0];
         childJobsArePureSat = quantification == 0;
 
+        /*
         Payload f(fData, fData+fSize);
 
         // It is best to run bloqqer directly here and then apply
         // stuff to it afterwards. This runs bloqqer in parallel.
 
-        int vars = getDescription().getNumVars();
+        int vars = getAppConfig().getIntOrDefault("__NV", -1);
         assert(vars >= 0);
         LOGGER(_job_log, V3_VERB, "QBF Apply Splitting Strategy");
         BloqqerCaller bc(_job_log);
         int bloqqerRes = bc.process(f, getId(), vars, f[ctx.depth], 10000);
+        */
 
         if (childJobsArePureSat) {
 
             // No quantifications left: Pure SAT!
+            //LOG(V3_VERB, "d=%i PAYLOAD: %s\n", ctx.depth, StrUtil::vecToStr(std::vector<int>(childDataBegin, childDataEnd)).c_str());
             payloads.emplace_back(childDataBegin, childDataEnd);
             ctx.appendChild(false, -1, -1);
 
@@ -355,7 +359,7 @@ void QbfJob::handleSubjobDone(int nodeJobId, QbfNotification& msg) {
     {
         auto ctx = QbfContextStore::acquire(nodeJobId);
         int resultCode = ctx->handleNotification(msg);
-        if (resultCode != 0) {
+        if (resultCode >= 0) {
             LOG(V3_VERB, "QBF #%i childidx %i forwarding my result %i\n", ctx->nodeJobId, ctx->childIdx, resultCode);
             if (ctx->isRootNode) {
                 // Root? => This job is actually still alive. Conclude it!
@@ -366,8 +370,8 @@ void QbfJob::handleSubjobDone(int nodeJobId, QbfNotification& msg) {
                 MyMpi::isend(ctx->parentRank, MSG_QBF_NOTIFICATION_UPWARDS, outMsg);
             }
             ctx->cancelled = true;
-            destruct = ctx->isDestructible();
         }
+        destruct = ctx->isDestructible();
     }
     if (destruct) {
         QbfContextStore::erase(nodeJobId);

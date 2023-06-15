@@ -93,20 +93,9 @@ size_t JobDescription::getTransferSize(int revision) const {
     return getRevisionData(revision)->size();
 }
 
-
-
 int JobDescription::getMetadataSize() const {
-    return 6*sizeof(int)
-           +3*sizeof(float)
-           +2*sizeof(size_t)
-           +sizeof(Checksum)
-           +sizeof(int)
-           +sizeof(bool)
-           +sizeof(int)
-           + sizeof(int)+_app_config.getSerializedSize();
+    return 10'000; // TODO FIXME variable size according to AppConfig!
 }
-
-
 
 int JobDescription::readRevisionIndex(const std::vector<uint8_t>& serialized) {
     assert(serialized.size() >= 3*sizeof(int)+2*sizeof(size_t));

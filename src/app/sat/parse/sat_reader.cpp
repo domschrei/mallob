@@ -11,6 +11,7 @@
 #include <fstream>
 
 #include "sat_reader.hpp"
+#include "util/logger.hpp"
 #include "util/params.hpp"
 #include "util/sys/terminator.hpp"
 #include "util/sys/timer.hpp"
@@ -47,6 +48,7 @@ bool SatReader::read(JobDescription& desc) {
 	
 	const std::string NC_DEFAULT_VAL = "BMMMKKK111";
 	desc.setAppConfigurationEntry("__NC", NC_DEFAULT_VAL);
+	desc.setAppConfigurationEntry("__NV", NC_DEFAULT_VAL);
 	desc.beginInitialization(desc.getRevision());
 
 	if (pipe == nullptr && namedpipe == -1) {
@@ -161,12 +163,9 @@ bool SatReader::read(JobDescription& desc) {
 		}
 	}
 
-    desc.setNumVars(_max_var);
-	std::string numClausesStr = std::to_string(_num_read_clauses);
-	assert(numClausesStr.size() < NC_DEFAULT_VAL.size());
-	while (numClausesStr.size() < NC_DEFAULT_VAL.size())
-		numClausesStr += ".";
-	desc.setAppConfigurationEntry("__NC", numClausesStr);
+	desc.setNumVars(_max_var);
+	desc.setAppConfigurationEntry("__NC", std::to_string(_num_read_clauses));
+	desc.setAppConfigurationEntry("__NV", std::to_string(_max_var));
 
 	{
 		std::ofstream ofs(".preprocessed-header.pipe", std::ofstream::app);

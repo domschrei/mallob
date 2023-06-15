@@ -175,6 +175,7 @@ public:
     float getCpuLimit() const {return _cpu_limit;}
     int getMaxDemand() const {return _max_demand;}
     int getApplicationId() const {return _application_id;}
+    AppConfiguration& getAppConfiguration() {return _app_config;}
     const AppConfiguration& getAppConfiguration() const {return _app_config;}
     
     float getArrival() const {return _arrival;}

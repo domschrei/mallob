@@ -65,21 +65,24 @@ struct QbfContext {
 
     void markChildAsReady(int childIdx, int rank, int jobId) {
         auto& child = children[childIdx];
+        if (child.state == ChildInfo::DONE || child.state == ChildInfo::CANCELLED)
+            return;
         child.state = ChildInfo::READY;
         child.rank = rank;
         child.jobId = jobId;
     }
 
-    // SAT-like return values: 0=UNKNOWN, 10=SAT, 20=UNSAT
+    // -1 for no result / not done (yet).
+    // Otherwise, SAT-like return values: 0=UNKNOWN, 10=SAT, 20=UNSAT
     int handleNotification(QbfNotification& msg) {
         auto& child = children[msg.childIdx];
         if (child.state == ChildInfo::CANCELLED)
-            return RESULT_UNKNOWN;
-        if (nbDoneChildren == children.size()) return RESULT_UNKNOWN;
+            return -1;
         child.state = ChildInfo::DONE;
-        int resultCode = msg.resultCode;
+        if (nbDoneChildren == children.size()) return -1;
         nbDoneChildren++;
-        LOG(V3_VERB, "QBF #%i %i/%i done\n", nodeJobId, nbDoneChildren, children.size());
+        int resultCode = msg.resultCode;
+        LOG(V3_VERB, "QBF #%i %i/%i done, result=%i\n", nodeJobId, nbDoneChildren, children.size(), resultCode);
         if (nbDoneChildren == children.size()) {
             return resultCode;
         }
@@ -91,7 +94,7 @@ struct QbfContext {
             nbDoneChildren = children.size();
             return RESULT_SAT;
         }
-        return RESULT_UNKNOWN;
+        return -1;
     }
 
     void cancelActiveChildren() {
