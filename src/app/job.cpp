@@ -96,6 +96,7 @@ void Job::start() {
         MyMpi::isend(parentRank, MSG_NOTIFY_JOB_READY,
             SubjobReadyMsg(
                 appConfig.getIntOrDefault("root_job_id", -1),
+                appConfig.getIntOrDefault("parent_job_id", -1),
                 appConfig.getIntOrDefault("depth", -1),
                 childIdx,
                 getId()

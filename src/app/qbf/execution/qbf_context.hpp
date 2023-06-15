@@ -13,6 +13,7 @@ struct QbfContext {
 
     int rootJobId;
     int nodeJobId;
+    int parentJobId;
     int depth;
     int parentRank;
     int childIdx;
@@ -35,13 +36,15 @@ struct QbfContext {
     QbfContext(int nodeJobId, const AppConfiguration& source) {
         rootJobId = source.getIntOrDefault("root_job_id", nodeJobId);
         this->nodeJobId = nodeJobId;
+        parentJobId = source.getIntOrDefault("parent_job_id", -1);
         depth = source.getIntOrDefault("depth", 0);
         parentRank = source.getIntOrDefault("parent_rank", -1);
         childIdx = source.getIntOrDefault("child_idx", -1);
         isRootNode = rootJobId == nodeJobId;
     }
 
-  QbfContext(const QbfContext &o) : rootJobId(o.rootJobId),
+    QbfContext(const QbfContext &o) : rootJobId(o.rootJobId),
+                                    parentJobId(o.parentJobId),
                                     nodeJobId(o.nodeJobId),
                                     depth(o.depth),
                                     parentRank(o.parentRank),
@@ -56,6 +59,7 @@ struct QbfContext {
         QbfContext childCtx(*this);
         childCtx.depth++;
         childCtx.parentRank = myRank;
+        childCtx.parentJobId = nodeJobId;
         childCtx.childIdx = childIdx;
         return childCtx;
     }
@@ -64,6 +68,7 @@ struct QbfContext {
         dest.setInt("root_job_id", rootJobId);
         dest.setInt("depth", depth);
         dest.setInt("parent_rank", parentRank);
+        dest.setInt("parent_job_id", parentJobId);
         dest.setInt("child_idx", childIdx);
         dest.setInt("report_to_parent", qbf?0:1);
     }

@@ -26,7 +26,7 @@ private:
     Mutex _mtx_app_config;
 
     int _internal_job_counter {1};
-    int _splitting_result_code {0};
+    int _internal_result_code {0};
 
     JobResult _internal_result;
 
@@ -71,15 +71,19 @@ private:
 
     void spawnChildJob(QbfContext& ctx, ChildJobApp app, int childIdx, Formula&& formula);
 
-    void markDone(int resultCode = 0);
+    void reportJobDone(QbfContext& ctx, int resultCode);
+    void markDone(QbfContext& ctx, int resultCode = -1);
+    void eraseContextAndConclude(int nodeJobId);
 
     AppConfiguration getAppConfig();
     nlohmann::json getJobSubmissionJson(ChildJobApp app, const AppConfiguration& appConfig);
 
-    static void onJobReadyNotification(MessageHandle& h, const QbfContext& submitCtx);
-    static void onJobCancelled(MessageHandle& h, const QbfContext& submitCtx);
+    void onJobReadyNotification(MessageHandle& h, const QbfContext& submitCtx);
+    void onJobCancelled(MessageHandle& h, const QbfContext& submitCtx);
     void onResultNotification(MessageHandle& h, const QbfContext& submitCtx);
     void onSatJobDone(const nlohmann::json& response, QbfContext& ctx);
 
     void handleSubjobDone(int nodeJobId, QbfNotification& msg);
+
+    static size_t findIdxOfFirstZero(const int* data, size_t size);
 };
