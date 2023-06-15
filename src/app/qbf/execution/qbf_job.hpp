@@ -26,6 +26,7 @@ private:
     Mutex _mtx_app_config;
 
     int _internal_job_counter {1};
+    int _splitting_result_code {0};
 
     JobResult _internal_result;
 

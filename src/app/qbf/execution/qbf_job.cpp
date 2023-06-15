@@ -102,35 +102,44 @@ void QbfJob::run() {
         _initialized = true;
     }
 
-    // Decide what to do with the formula and how many children to spawn.
     {
-      auto ctx = QbfContextStore::acquire(getId());
-
-      if (ctx->cancelled) {
-        markDone();
-        return;
-      }
+        auto ctx = QbfContextStore::acquire(getId());
+        if (ctx->cancelled) {
+            markDone();
+            return;
+        }
     }
 
+    // Apply our splitting strategy (may be expensive).
     auto maybeSplit = applySplittingStrategy();
-    if(!maybeSplit) {
-      // TODO: Nothing to split left! We are done already.
-      return;
+
+    {
+        auto ctx = QbfContextStore::acquire(getId());
+        if (ctx->cancelled) {
+            markDone();
+            return;
+        }
+    }
+
+    if (!maybeSplit) {
+        // Nothing to split left! We are done already.
+        markDone(_splitting_result_code);
+        return;
     }
     auto [childApp, payloads] = *maybeSplit;
 
     {
-      auto ctx = QbfContextStore::acquire(getId());
-      // Spawn child job(s).
-      // The job will be a QBF job if any quantifications are left in the formula
-      // and will be a SAT job otherwise.
-      for (int childIdx = 0; childIdx < payloads.size(); childIdx++) {
-        auto& payloadChild = payloads[childIdx];
-        spawnChildJob(*ctx, childApp, childIdx, std::move(payloadChild));
-      }
+        auto ctx = QbfContextStore::acquire(getId());
+        // Spawn child job(s).
+        // The job will be a QBF job if any quantifications are left in the formula
+        // and will be a SAT job otherwise.
+        for (int childIdx = 0; childIdx < payloads.size(); childIdx++) {
+            auto& payloadChild = payloads[childIdx];
+            spawnChildJob(*ctx, childApp, childIdx, std::move(payloadChild));
+        }
 
-      // Non-root jobs should be cleaned up immediately again.
-      if (!ctx->isRootNode) markDone();
+        // Non-root jobs should be cleaned up immediately again.
+        if (!ctx->isRootNode) markDone();
     }
 }
 
@@ -275,16 +284,16 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Formula>>> QbfJ
         case 3:
             // Job was cancelled through a kill that propagated a SIGINT
             // through the bloqqer sub-process.
-            // TODO: Do we have to do anything else here?
-            markDone();
             return {};
         case 10:
             // SAT result directly through Bloqqer
             // TODO: Assign SAT to the Job.
+            _splitting_result_code = 10;
             return {};
         case 20:
             // UNSAT result directly through Bloqqer
             // TODO: Assign UNSAT to the Job.
+            _splitting_result_code = 20;
             return {};
         }
 
