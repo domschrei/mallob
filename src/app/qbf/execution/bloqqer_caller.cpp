@@ -68,7 +68,7 @@ std::pair<FILE*, pid_t> popen2(const char* command, const char *mode) {
 
 int BloqqerCaller::process(std::vector<int> &f, int vars, int jobId, int litToTry, int maxCost) {
   pid_t pid = getpid();
-  std::string fifoPath = std::to_string(pid) + "." + std::to_string(jobId);
+  std::string fifoPath = "/tmp/mallob.bloqqer." + std::to_string(pid) + "." + std::to_string(jobId);
   std::string command = "build/qbf_bloqqer "
     + fifoPath
     + " --maxexpvarcost=" + std::to_string(maxCost)
@@ -80,13 +80,13 @@ int BloqqerCaller::process(std::vector<int> &f, int vars, int jobId, int litToTr
   if(bloqqer) {
     int res = mkfifo(fifoPath.c_str(), 0600);
     if (res != 0) {
-      LOG(V0_CRIT, "[ERROR] Could not make FIFO, res=%i errno=%s\n", res,
+      LOG(V0_CRIT, "[ERROR] Could not make FIFO, res=%i err=%s\n", res,
           strerror(errno));
       abort();
     }
     FILE* fifo = fopen(fifoPath.c_str(), "w");
     if (fifo == NULL) {
-      LOG(V0_CRIT, "[ERROR] Could not open FIFO, errno=%i\n", errno);
+      LOG(V0_CRIT, "[ERROR] Could not open FIFO, err=%s\n", strerror(errno));
       abort();
     }
     writeQDIMACS(f, fifo, vars);
