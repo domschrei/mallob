@@ -15,9 +15,10 @@ private:
 public:
     class ExclusiveWrapper {
     private:
-        Mutex* _mtx;
-        QbfContext* _ctx;
+        Mutex* _mtx {nullptr};
+        QbfContext* _ctx {nullptr};
     public:
+        ExclusiveWrapper() {}
         ExclusiveWrapper(Mutex& mtx, QbfContext& ctx) : _mtx(&mtx), _ctx(&ctx) {
             _mtx->lock();
         }
@@ -37,6 +38,9 @@ public:
         ~ExclusiveWrapper() {
             if (_mtx != nullptr) _mtx->unlock();
         }
+        operator bool() {
+            return _mtx != nullptr;
+        }
         QbfContext& operator*() {
             return *_ctx;
         }
@@ -52,13 +56,14 @@ public:
         _map[id] = {std::unique_ptr<Mutex>(new Mutex()), std::unique_ptr<QbfContext>(new QbfContext(baseCtx))};
     }
 
-    static bool has(int id) {
+    // Try to acquire the QbfContext of the specified ID.
+    // If this context does not exist, returns an empty object
+    // (evaluate it as a bool to check).
+    // On success, the context can be accessed via operator->
+    // as well as operator*.
+    static ExclusiveWrapper tryAcquire(int id) {
         auto lock = _mtx_map.getLock();
-        return _map.count(id);
-    }
-
-    static ExclusiveWrapper acquire(int id) {
-        auto lock = _mtx_map.getLock();
+        if (!_map.count(id)) return {};
         return ExclusiveWrapper(*_map[id].first, *_map[id].second);
     }
 

@@ -54,7 +54,8 @@ void QbfJob::appl_communicate() {
     if (_initialized && !_sent_ready_msg_to_parent) {
         // Send a "ready" notification to your parent
         // so that it knows your address
-        auto ctx = QbfContextStore::acquire(getId());
+        auto ctx = QbfContextStore::tryAcquire(getId());
+        if (!ctx) return;
         int parentRank = ctx->parentRank;
         if (parentRank != -1) {
             LOG(V3_VERB, "Reporting ready QBF sub-job #%i (childidx=%i) to parent job [%i]\n", getId(), ctx->childIdx, parentRank);
@@ -93,7 +94,8 @@ void QbfJob::run() {
     QbfContextStore::create(getId(), buildQbfContextFromAppConfig());
 
     {
-        auto ctx = QbfContextStore::acquire(getId());
+        auto ctx = QbfContextStore::tryAcquire(getId());
+        assert(ctx);
         LOGGER(_job_log, V3_VERB, "QBF #%i - parent #%i\n", getId(), ctx->parentJobId);
         // Install a callback for incoming messages of the tag MSG_QBF_NOTIFICATION_UPWARDS.
         // CAUTION: Callback may be executed AFTER the life time of this job instance!
@@ -104,7 +106,8 @@ void QbfJob::run() {
     }
 
     {
-        auto ctx = QbfContextStore::acquire(getId());
+        auto ctx = QbfContextStore::tryAcquire(getId());
+        assert(ctx);
         if (ctx->cancelled) {
             markDone(*ctx, true);
             return;
@@ -116,7 +119,8 @@ void QbfJob::run() {
 
     bool cleanup = false;
     {
-        auto ctx = QbfContextStore::acquire(getId());
+        auto ctx = QbfContextStore::tryAcquire(getId());
+        assert(ctx);
         if (ctx->cancelled) {
             markDone(*ctx, true);
             return;
@@ -137,7 +141,8 @@ void QbfJob::run() {
     auto [childApp, payloads] = *maybeSplit;
 
     {
-        auto ctx = QbfContextStore::acquire(getId());
+        auto ctx = QbfContextStore::tryAcquire(getId());
+        assert(ctx);
         // Spawn child job(s).
         // The job will be a QBF job if any quantifications are left in the formula
         // and will be a SAT job otherwise.
@@ -188,7 +193,8 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Formula>>> QbfJ
     const int* childDataEnd = fData+fSize;
     int quantification = fData[0];
     bool childJobsArePureSat = quantification == 0;
-    auto ctx_ = QbfContextStore::acquire(getId());
+    auto ctx_ = QbfContextStore::tryAcquire(getId());
+    assert(ctx_);
     auto &ctx = *ctx_;
 
     if (childJobsArePureSat) {
@@ -225,7 +231,8 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Formula>>> QbfJ
     int id = 0;
 
     {
-      auto ctx = QbfContextStore::acquire(getId());
+      auto ctx = QbfContextStore::tryAcquire(getId());
+      assert(ctx);
       depth = ctx->depth;
       vars = getAppConfig().getIntOrDefault("__NV", -1);
       id = ctx->nodeJobId;
@@ -253,7 +260,8 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Formula>>> QbfJ
     // the same.
     BloqqerCaller *bloqqerCaller = nullptr;
     {
-      auto ctx = QbfContextStore::acquire(getId());
+      auto ctx = QbfContextStore::tryAcquire(getId());
+      assert(ctx);
       ctx->bloqqerCaller = std::make_unique<BloqqerCaller>();
       bloqqerCaller = ctx->bloqqerCaller.get();
     }
@@ -263,7 +271,8 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Formula>>> QbfJ
         res = bloqqerCaller->process(formula,
                                         vars,
                                         id,
-                                        formula[depth]);
+                                        formula[depth],
+                                        _params.expansionCostThreshold());
 
         LOGGER(_job_log, V3_VERB, "#%i bloqqer returned with result %i\n", id, res);
 
@@ -278,7 +287,8 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Formula>>> QbfJ
         case 2: {
             // Bloqqer could not expand the variable, or the variable was
             // existential. Anyway, use the new formula to split.
-            auto ctx = QbfContextStore::acquire(getId());
+            auto ctx = QbfContextStore::tryAcquire(getId());
+            assert(ctx);
             if (formula[depth] < 0) {
                 // Flip quantifier! But we need to remember that we had a universal at this space.
                 // We are in an AND-node.
@@ -305,12 +315,14 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Formula>>> QbfJ
             return {};
         }
 
-        auto ctx = QbfContextStore::acquire(getId());
+        auto ctx = QbfContextStore::tryAcquire(getId());
+        assert(ctx);
         if (ctx->cancelled) break;
 
     } while (res == 1 && formula[depth] != 0);
 
-    auto ctx_ = QbfContextStore::acquire(getId());
+    auto ctx_ = QbfContextStore::tryAcquire(getId());
+    assert(ctx_);
     auto &ctx = *ctx_;
 
     if (ctx.cancelled) {
@@ -420,7 +432,8 @@ void QbfJob::markDone(QbfContext& ctx, bool jobAlive, int resultCode) {
 
 void QbfJob::eraseContextAndConclude(int nodeJobId) {
     {
-        auto ctx = QbfContextStore::acquire(nodeJobId);
+        auto ctx = QbfContextStore::tryAcquire(nodeJobId);
+        assert(ctx);
         if (ctx->isRootNode) reportJobDone(*ctx, _internal_result_code);
     }
     QbfContextStore::erase(nodeJobId);
@@ -477,11 +490,11 @@ void QbfJob::onJobReadyNotification(MessageHandle& h, const QbfContext& submitCt
     if (msg.rootJobId != submitCtx.rootJobId || msg.depth != submitCtx.depth+1
         || msg.parentJobId != submitCtx.nodeJobId) return;
 
-    if (!QbfContextStore::has(submitCtx.nodeJobId)) return; // context not present any more!
-    LOG(V3_VERB, "QBF #%i Received ready msg from childidx %i <= [%i]\n", submitCtx.nodeJobId, msg.childIdx, h.source);
     bool destruct;
     {
-        auto currCtx = QbfContextStore::acquire(submitCtx.nodeJobId);
+        auto currCtx = QbfContextStore::tryAcquire(submitCtx.nodeJobId);
+        if (!currCtx) return; // context not present any more!
+        LOG(V3_VERB, "QBF #%i Received ready msg from childidx %i <= [%i]\n", submitCtx.nodeJobId, msg.childIdx, h.source);
         currCtx->markChildAsReady(msg.childIdx, h.source, msg.childJobId);
         destruct = currCtx->isDestructible();
     }
@@ -499,10 +512,10 @@ void QbfJob::onJobCancelled(MessageHandle& h, const QbfContext& submitCtx) {
         return;
     }
 
-    if (!QbfContextStore::has(submitCtx.nodeJobId)) return; // context not present any more!
     bool destruct;
     {
-        auto currCtx = QbfContextStore::acquire(submitCtx.nodeJobId);
+        auto currCtx = QbfContextStore::tryAcquire(submitCtx.nodeJobId);
+        if (!currCtx) return; // context not present any more!
         LOG(V3_VERB, "QBF #%i (local:#%i) cancelled\n", submitCtx.rootJobId, submitCtx.nodeJobId);
         currCtx->cancelled = true;
         if(currCtx->bloqqerCaller)
@@ -527,7 +540,6 @@ void QbfJob::onResultNotification(MessageHandle& h, const QbfContext& submitCtx)
         submitCtx.rootJobId, submitCtx.nodeJobId, submitCtx.depth+1,
         incomingMsg.childIdx, incomingMsg.resultCode);
 
-    if (!QbfContextStore::has(submitCtx.nodeJobId)) return; // context not present any more!
     handleSubjobDone(submitCtx.nodeJobId, incomingMsg);
 }
 
@@ -538,7 +550,8 @@ void QbfJob::onSatJobDone(const nlohmann::json& response, QbfContext& ctx) {
     LOG(V3_VERB, "QBF SAT child job done, result code %i\n", resultCode);
     QbfNotification outMsg;
     {
-        auto wrappedCtx = QbfContextStore::acquire(ctx.nodeJobId);
+        auto wrappedCtx = QbfContextStore::tryAcquire(ctx.nodeJobId);
+        assert(wrappedCtx);
         outMsg = QbfNotification(ctx.rootJobId, ctx.parentJobId, ctx.depth, 0, resultCode);
     }
     handleSubjobDone(ctx.nodeJobId, outMsg);
@@ -548,7 +561,8 @@ void QbfJob::handleSubjobDone(int nodeJobId, QbfNotification& msg) {
 
     bool destruct {false};
     {
-        auto ctx = QbfContextStore::acquire(nodeJobId);
+        auto ctx = QbfContextStore::tryAcquire(nodeJobId);
+        if (!ctx) return; // context not present any more!
         int resultCode = ctx->handleNotification(msg);
         if (resultCode >= 0) {
             LOG(V3_VERB, "QBF #%i childidx %i forwarding my result %i to #%i [%i]\n", ctx->nodeJobId, ctx->childIdx, resultCode, ctx->parentJobId, ctx->parentRank);

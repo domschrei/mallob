@@ -2,6 +2,7 @@
 #pragma once
 
 #include "optionslist.hpp"
+#include <climits>
 
 // Application-specific program options for QBF solving.
 // memberName                               short option name, long option name          default   min  max
@@ -12,4 +13,6 @@
 // Example:
 OPTION_GROUP(grpAppQbf, "app/qbf", "QBF solving options")
   OPT_INT(qbfSplitStrategy,"qss", "qbf-split-strategy",               0, 0,   1,    
-  "Splitting strategy for QBF solving. 0: trivial splitting; 1: bloqqer-based iterative deepening expansion")
+    "Splitting strategy for QBF solving. 0: trivial splitting; 1: bloqqer-based iterative deepening expansion")
+  OPT_INT(expansionCostThreshold, "ect", "expansion-cost-threshold", 10'000, 0, INT_MAX,
+    "Maximum expansion cost at which bloqqer expands a formula")
