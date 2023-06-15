@@ -30,8 +30,10 @@ public:
   int process(std::vector<int> &f, int vars, int jobId, int litToTry = 0, int maxCost = 10000);
 
   void writeQDIMACS(const std::vector<int> &src, FILE* tgt, int vars);
-  void readQDIMACS(FILE* src, std::vector<int> &tgt);
-  
+  bool readQDIMACS(FILE* src, std::vector<int> &tgt, bool keepPrefix = false);
+
+  void kill();
 private:
   Logger &_log;
+  volatile pid_t _pid = 0;
 };
