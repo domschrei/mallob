@@ -72,7 +72,7 @@ private:
     void spawnChildJob(QbfContext& ctx, ChildJobApp app, int childIdx, Formula&& formula);
 
     void reportJobDone(QbfContext& ctx, int resultCode);
-    void markDone(QbfContext& ctx, int resultCode = -1);
+    void markDone(QbfContext& ctx, bool jobAlive, int resultCode = -1);
     void eraseContextAndConclude(int nodeJobId);
 
     AppConfiguration getAppConfig();

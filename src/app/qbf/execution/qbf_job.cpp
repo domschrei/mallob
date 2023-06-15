@@ -94,7 +94,7 @@ void QbfJob::run() {
 
     {
         auto ctx = QbfContextStore::acquire(getId());
-        LOGGER(_job_log, V3_VERB, "QBF #%i - parent of #%i\n", getId(), ctx->parentJobId);
+        LOGGER(_job_log, V3_VERB, "QBF #%i - parent #%i\n", getId(), ctx->parentJobId);
         // Install a callback for incoming messages of the tag MSG_QBF_NOTIFICATION_UPWARDS.
         // CAUTION: Callback may be executed AFTER the life time of this job instance!
         installMessageListeners(*ctx);
@@ -106,7 +106,7 @@ void QbfJob::run() {
     {
         auto ctx = QbfContextStore::acquire(getId());
         if (ctx->cancelled) {
-            markDone(*ctx);
+            markDone(*ctx, true);
             return;
         }
     }
@@ -118,12 +118,12 @@ void QbfJob::run() {
     {
         auto ctx = QbfContextStore::acquire(getId());
         if (ctx->cancelled) {
-            markDone(*ctx);
+            markDone(*ctx, true);
             return;
         }
         if (!maybeSplit) {
             // Nothing to split left! We are done already.
-            markDone(*ctx, _internal_result_code);
+            markDone(*ctx, true, _internal_result_code);
             // In case this is the root node, we need to clean up and report the result
             // directly here.
             cleanup = ctx->isRootNode;
@@ -147,7 +147,7 @@ void QbfJob::run() {
         }
 
         // Non-root jobs should be cleaned up immediately again.
-        if (!ctx->isRootNode) markDone(*ctx);
+        if (!ctx->isRootNode) markDone(*ctx, true);
     }
 }
 
@@ -314,7 +314,7 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Formula>>> QbfJ
     auto &ctx = *ctx_;
 
     if (ctx.cancelled) {
-        markDone(ctx);
+        markDone(ctx, true);
         return {};
     }
 
@@ -407,13 +407,13 @@ void QbfJob::reportJobDone(QbfContext& ctx, int resultCode) {
     _bg_worker_done = true;
 }
 
-void QbfJob::markDone(QbfContext& ctx, int resultCode) {
+void QbfJob::markDone(QbfContext& ctx, bool jobAlive, int resultCode) {
     _internal_result_code = resultCode;
     if (ctx.isRootNode) return;
-    reportJobDone(ctx, resultCode);
+    if (jobAlive) reportJobDone(ctx, resultCode);
     if (resultCode < 0) return;
     // Propagate notification upwards
-    QbfNotification outMsg(ctx.rootJobId, ctx.depth, ctx.childIdx, resultCode);
+    QbfNotification outMsg(ctx.rootJobId, ctx.parentJobId, ctx.depth, ctx.childIdx, resultCode);
     MyMpi::isend(ctx.parentRank, MSG_QBF_NOTIFICATION_UPWARDS, outMsg);
     ctx.cancelled = true;
 }
@@ -494,6 +494,7 @@ void QbfJob::onJobCancelled(MessageHandle& h, const QbfContext& submitCtx) {
     QbfNotification incomingMsg = Serializable::get<QbfNotification>(h.getRecvData());
     // check that you are indeed the addressee!
     if (incomingMsg.rootJobId != submitCtx.rootJobId
+            || incomingMsg.parentJobId != submitCtx.nodeJobId
             || incomingMsg.depth != submitCtx.depth) {
         return;
     }
@@ -517,6 +518,7 @@ void QbfJob::onResultNotification(MessageHandle& h, const QbfContext& submitCtx)
     QbfNotification incomingMsg = Serializable::get<QbfNotification>(h.getRecvData());
     // check that you are indeed the addressee!
     if (incomingMsg.rootJobId != submitCtx.rootJobId
+            || incomingMsg.parentJobId != submitCtx.nodeJobId
             || incomingMsg.depth != submitCtx.depth+1) {
         return;
     }
@@ -537,7 +539,7 @@ void QbfJob::onSatJobDone(const nlohmann::json& response, QbfContext& ctx) {
     QbfNotification outMsg;
     {
         auto wrappedCtx = QbfContextStore::acquire(ctx.nodeJobId);
-        outMsg = QbfNotification(ctx.rootJobId, ctx.depth, 0, resultCode);
+        outMsg = QbfNotification(ctx.rootJobId, ctx.parentJobId, ctx.depth, 0, resultCode);
     }
     handleSubjobDone(ctx.nodeJobId, outMsg);
 }
@@ -549,8 +551,8 @@ void QbfJob::handleSubjobDone(int nodeJobId, QbfNotification& msg) {
         auto ctx = QbfContextStore::acquire(nodeJobId);
         int resultCode = ctx->handleNotification(msg);
         if (resultCode >= 0) {
-            LOG(V3_VERB, "QBF #%i childidx %i forwarding my result %i\n", ctx->nodeJobId, ctx->childIdx, resultCode);
-            markDone(*ctx, resultCode);
+            LOG(V3_VERB, "QBF #%i childidx %i forwarding my result %i to #%i [%i]\n", ctx->nodeJobId, ctx->childIdx, resultCode, ctx->parentJobId, ctx->parentRank);
+            markDone(*ctx, false, resultCode);
         }
         destruct = ctx->isDestructible();
     }
