@@ -124,30 +124,32 @@ void Lingeling::diversify(int seed) {
 
 	// This portfolio is based on Plingeling (mix of ayv and bcj)
 	lglsetopt(solver, "classify", 0);
-    switch (rank % numDiversifications) {
-		case 0: lglsetopt (solver, "gluescale", 5); break; // from 3 (value "ld" moved)
-		case 1: 
-			lglsetopt (solver, "plain", 1);
-			lglsetopt (solver, "decompose", 1);
-			break;
-		case 2:
-			lglsetopt (solver, "plain", rank % (2*numDiversifications) < numDiversifications);
-			lglsetopt (solver, "locs", -1);
-			lglsetopt (solver, "locsrtc", 1);
-			lglsetopt (solver, "locswait", 0);
-			lglsetopt (solver, "locsclim", (1<<24));
-			break;
-		case 3: lglsetopt (solver, "restartint", 100); break;
-		case 4: lglsetopt (solver, "sweeprtc", 1); break;
-		case 5: lglsetopt (solver, "restartint", 1000); break;
-		case 6: lglsetopt (solver, "scincinc", 50); break;
-		case 7: lglsetopt (solver, "restartint", 4); break;
-		case 8: lglsetopt (solver, "phase", 1); break;
-		case 9: lglsetopt (solver, "phase", -1); break;
-		case 10: 
-			lglsetopt (solver, "block", 0); 
-			lglsetopt (solver, "cce", 0); 
-			break;
+	if (_setup.diversifyNative) {
+		switch (rank % numDiversifications) {
+			case 0: lglsetopt (solver, "gluescale", 5); break; // from 3 (value "ld" moved)
+			case 1: 
+				lglsetopt (solver, "plain", 1);
+				lglsetopt (solver, "decompose", 1);
+				break;
+			case 2:
+				lglsetopt (solver, "plain", rank % (2*numDiversifications) < numDiversifications);
+				lglsetopt (solver, "locs", -1);
+				lglsetopt (solver, "locsrtc", 1);
+				lglsetopt (solver, "locswait", 0);
+				lglsetopt (solver, "locsclim", (1<<24));
+				break;
+			case 3: lglsetopt (solver, "restartint", 100); break;
+			case 4: lglsetopt (solver, "sweeprtc", 1); break;
+			case 5: lglsetopt (solver, "restartint", 1000); break;
+			case 6: lglsetopt (solver, "scincinc", 50); break;
+			case 7: lglsetopt (solver, "restartint", 4); break;
+			case 8: lglsetopt (solver, "phase", 1); break;
+			case 9: lglsetopt (solver, "phase", -1); break;
+			case 10: 
+				lglsetopt (solver, "block", 0); 
+				lglsetopt (solver, "cce", 0); 
+				break;
+		}
 	}
 
 	if (rank >= getNumOriginalDiversifications() && _setup.diversifyNoise) {

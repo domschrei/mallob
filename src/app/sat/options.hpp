@@ -59,14 +59,19 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
  OPT_BOOL(backlogExportManager,             "bem", "backlog-export-manager",             true, "Use sequentialized export manager with backlogs instead of simple HordeSat-style export")
  OPT_BOOL(adaptiveImportManager,            "aim", "adaptive-import-manager",            true, "Use adaptive clause store for each solver's import buffer instead of lock-free ring buffers")
  OPT_BOOL(incrementLbd,                     "ilbd", "increment-lbd-at-import",           false, "Increment LBD value of each clause before import")
+ OPT_BOOL(noImport,                         "no-import", "",                             false, "Turn off solvers importing clauses (for comparison purposes)")
 
 OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversification options")
  OPT_FLOAT(inputShuffleProbability,         "isp", "input-shuffle-probability",          1,        0,   1,
     "Probability for a solver (never the 1st one of a kind) to shuffle the order of clauses in the input to some degree")
  OPT_INT(diversifyElimination,              "div-elim", "",                              0,        0,   3,
     "0=normal diversification, 1/2/3=disable some/most/all variable elimination")
+ OPT_BOOL(diversifyFanOut,                  "div-fanout", "",                            false,
+    "Diversify some solvers based on making X random variable decisions every Y conflicts")
  OPT_BOOL(diversifyPhases,                  "div-phases", "",                            true,
     "Diversify solvers based on random sparse variable phases in addition to native diversification")
+ OPT_BOOL(diversifyNative,                 "div-native",  "",                            true,
+    "Diversify solvers by cycling through sequence of solver-specific configurations")
  OPT_BOOL(diversifyNoise,                   "div-noise",  "",                            true,
     "Diversify solvers by adding Gaussian noise on top of numeric parameters")
  OPT_BOOL(diversifySeeds,                   "div-seeds", "",                             true,

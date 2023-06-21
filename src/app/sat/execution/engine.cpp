@@ -135,6 +135,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.numBufferedClsGenerations = params.bufferedImportedClsGenerations();
 	setup.skipClauseSharingDiagonally = params.skipClauseSharingDiagonally();
 	setup.diversifyNoise = params.diversifyNoise();
+	setup.diversifyNative = params.diversifyNative();
+	setup.diversifyFanOut = params.diversifyFanOut();
 	switch (_params.diversifyElimination()) {
 	case 0:
 		setup.eliminationSetting = SolverSetup::ALLOW_ALL;

@@ -79,6 +79,10 @@ void Cadical::diversify(int seed) {
         LOGGER(_logger, V3_VERB, "Sampled restartint=%i decay=%i\n", restartFrequency, decay);
     }
 
+	if (getDiversificationIndex() >= getNumOriginalDiversifications() && _setup.diversifyFanOut) {
+		okay = solver->set("fanout", 1); assert(okay);
+	}
+
 	// In certified UNSAT mode?
 	if (getSolverSetup().certifiedUnsat) {
 
@@ -102,31 +106,35 @@ void Cadical::diversify(int seed) {
 		}
 		
 		// Simple LRAT-safe portfolio (5/10 solvers are diversified)
-		switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
-		case 1: okay = solver->set("shuffle", 1) && solver->set("shufflerandom", 1); break;
-		case 3: okay = solver->set("phase", 0); break;
-		case 5: okay = solver->set("walk", 0); break;
-		case 7: okay = solver->set("restartint", 100); break;
-		case 9: okay = solver->set("inprocessing", 0); break;
+		if (_setup.diversifyNative) {
+			switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
+			case 1: okay = solver->set("shuffle", 1) && solver->set("shufflerandom", 1); break;
+			case 3: okay = solver->set("phase", 0); break;
+			case 5: okay = solver->set("walk", 0); break;
+			case 7: okay = solver->set("restartint", 100); break;
+			case 9: okay = solver->set("inprocessing", 0); break;
+			}
+			assert(okay);
 		}
-		assert(okay);
 		return;
 	}
 
-	switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
-	// Greedy 10-portfolio according to tests of the above configurations on SAT2020 instances
-	case 0: okay = solver->set("phase", 0); break;
-	case 1: okay = solver->configure("sat"); break;
-	case 2: okay = solver->set("elim", 0); break;
-	case 3: okay = solver->configure("unsat"); break;
-	case 4: okay = solver->set("condition", 1); break;
-	case 5: okay = solver->set("walk", 0); break;
-	case 6: okay = solver->set("restartint", 100); break;
-	case 7: okay = solver->set("cover", 1); break;
-	case 8: okay = solver->set("shuffle", 1) && solver->set("shufflerandom", 1); break;
-	case 9: okay = solver->set("inprocessing", 0); break;
+	if (_setup.diversifyNative) {
+		switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
+		// Greedy 10-portfolio according to tests of the above configurations on SAT2020 instances
+		case 0: okay = solver->set("phase", 0); break;
+		case 1: okay = solver->configure("sat"); break;
+		case 2: okay = solver->set("elim", 0); break;
+		case 3: okay = solver->configure("unsat"); break;
+		case 4: okay = solver->set("condition", 1); break;
+		case 5: okay = solver->set("walk", 0); break;
+		case 6: okay = solver->set("restartint", 100); break;
+		case 7: okay = solver->set("cover", 1); break;
+		case 8: okay = solver->set("shuffle", 1) && solver->set("shufflerandom", 1); break;
+		case 9: okay = solver->set("inprocessing", 0); break;
+		}
+		assert(okay);
 	}
-	assert(okay);
 }
 
 int Cadical::getNumOriginalDiversifications() {

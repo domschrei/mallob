@@ -246,7 +246,7 @@ int SharingManager::prepareSharing(int* begin, int totalLiteralLimit, int& succe
 	memcpy(begin, buffer.data(), buffer.size()*sizeof(int));
 
 	LOGGER(_logger, V5_DEBG, "prepared %i clauses, size %i (%i in DB, limit %i)\n", numExportedClauses, buffer.size(), 
-		_pcb.getCurrentlyUsedLiterals(), totalLiteralLimit);
+		_clause_store->getCurrentlyUsedLiterals(), totalLiteralLimit);
 	_stats.exportedClauses += numExportedClauses;
 	_internal_epoch++;
 	_clause_filter->updateEpoch(_internal_epoch);
@@ -390,11 +390,13 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 		clause = reader.getNextIncomingClause();
 	}
 	if (filterSizeBeingLocked != -1) _clause_filter->releaseLock(filterSizeBeingLocked);
-	
-	for (auto& slv : importingSolvers) {
-		BufferReader reader = _clause_store->getBufferReader(begin, buflen);
-		reader.setFilterBitset(slv.filter);
-		slv.solver->addLearnedClauses(reader);
+
+	if (!_params.noImport()) {
+		for (auto& slv : importingSolvers) {
+			BufferReader reader = _clause_store->getBufferReader(begin, buflen);
+			reader.setFilterBitset(slv.filter);
+			slv.solver->addLearnedClauses(reader);
+		}
 	}
 	
 	// Process-wide stats
