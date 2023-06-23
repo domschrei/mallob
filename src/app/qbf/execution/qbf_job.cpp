@@ -138,6 +138,11 @@ void QbfJob::run() {
         return;
     }
 
+    // No splitting was carried out, but we must not try to resolve
+    // our std::optional!
+    if (!maybeSplit) {
+      return;
+    }
     auto& [childApp, payloads] = *maybeSplit;
 
     {
