@@ -98,15 +98,24 @@ int BloqqerCaller::process(std::vector<int> &f, int vars, int jobId, int litToTr
   waitpid(_pid, &wstatus, 0);
   _pid = 0;
 
-  return WEXITSTATUS(wstatus);
+  int exitcode = WEXITSTATUS(wstatus);
+  return exitcode;
 }
+
+#if __has_cpp_attribute(unlikely)
+#define UNLIKELY [[unlikely]]
+#else
+#define UNLIKELY
+#endif
+
+#define CHECK(PRINT) if(PRINT < 0) UNLIKELY return
 
 void BloqqerCaller::writeQDIMACS(const std::vector<int> &src, FILE* tgt, int vars) {
   // There's one more 0 because of the prefix delimited to the matrix
   // by a 0. This has to be removed when counting the zeroes in the
   // vector.
   int clauses = std::count(src.begin(), src.end(), 0) - 1;
-  fprintf(tgt, "p cnf %d %d\n", vars, clauses);
+  CHECK(fprintf(tgt, "p cnf %d %d\n", vars, clauses));
 
   size_t i = 0;
 
@@ -114,31 +123,35 @@ void BloqqerCaller::writeQDIMACS(const std::vector<int> &src, FILE* tgt, int var
   int last = 0;
   for(; src[i] != 0; ++i) {
     if(src[i] < 0 && last < 0) {
-      fprintf(tgt, "%d ", -src[i]);
+      CHECK(fprintf(tgt, "%d ", -src[i]));
     } else if(src[i] > 0 && last > 0) {
-      fprintf(tgt, "%d ", src[i]);
+      CHECK(fprintf(tgt, "%d ", src[i]));
     } else if(src[i] < 0 && last > 0) {
-      fprintf(tgt, "0\na %d ", -src[i]);
+      CHECK(fprintf(tgt, "0\na %d ", -src[i]));
     } else if(src[i] > 0 && last < 0) {
-      fprintf(tgt, "0\ne %d ", src[i]);
+      CHECK(fprintf(tgt, "0\ne %d ", src[i]));
     } else if(src[i] < 0 && last == 0) {
-      fprintf(tgt, "a %d ", -src[i]);
+      CHECK(fprintf(tgt, "a %d ", -src[i]));
     } else if(src[i] > 0 && last == 0) {
-      fprintf(tgt, "e %d ", src[i]);
+      CHECK(fprintf(tgt, "e %d ", src[i]));
     }
     last = src[i];
   }
-  fprintf(tgt, "0\n");
+  CHECK(fprintf(tgt, "0\n"));
 
   // Matrix
   for(i = i + 1; i < src.size(); ++i) {
     if(src[i] == 0) {
-      fprintf(tgt, "0\n");
+      CHECK(fprintf(tgt, "0\n"));
     } else {
-      fprintf(tgt, "%d ", src[i]);
+      CHECK(fprintf(tgt, "%d ", src[i]));
     }
   }
 }
+
+#undef UNLIKELY
+#undef CHECK
+
 bool BloqqerCaller::readQDIMACS(FILE* src, std::vector<int> &tgt, bool keepPrefix) {
   if(keepPrefix) {
     auto prefixEnd = std::find(tgt.begin(), tgt.end(), 0);

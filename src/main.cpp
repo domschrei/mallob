@@ -6,6 +6,8 @@
 #include <algorithm> 
 #include <string>
 
+#include <signal.h>
+
 #include "comm/mympi.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
@@ -171,6 +173,8 @@ void longStartupWarnMsg(int rank, const char* msg) {
 }
 
 int main(int argc, char *argv[]) {
+
+    signal(SIGPIPE, SIG_IGN);
     
     MyMpi::init();
     Timer::init();
