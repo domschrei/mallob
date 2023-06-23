@@ -62,14 +62,14 @@ private:
     enum ChildJobApp {QBF, SAT};
     using Formula = std::vector<int>;
 
-    std::optional<std::pair<ChildJobApp, std::vector<Formula>>> applySplittingStrategy();
-    std::optional<std::pair<ChildJobApp, std::vector<Formula>>> applyTrivialSplittingStrategy();
-    std::optional<std::pair<ChildJobApp, std::vector<Formula>>> applyIterativeDeepeningSplittingStrategy();
+    std::optional<std::pair<ChildJobApp, std::vector<std::pair<int, Formula>>>> applySplittingStrategy();
+    std::optional<std::pair<ChildJobApp, std::vector<std::pair<int, Formula>>>> applyTrivialSplittingStrategy();
+    std::optional<std::pair<ChildJobApp, std::vector<std::pair<int, Formula>>>> applyIterativeDeepeningSplittingStrategy();
 
-    std::vector<Formula> prepareSatChildJobs(QbfContext& ctx, const int* begin, const int* end);
-    std::vector<Formula> prepareQbfChildJobs(QbfContext& ctx, const int* begin, const int* end, int varToSplitOn);
+    std::vector<std::pair<int, Formula>> prepareSatChildJobs(QbfContext& ctx, const int* begin, const int* end, int vars);
+    std::vector<std::pair<int, Formula>> prepareQbfChildJobs(QbfContext& ctx, const int* begin, const int* end, int varToSplitOn, int vars);
 
-    void spawnChildJob(QbfContext& ctx, ChildJobApp app, int childIdx, Formula&& formula);
+    void spawnChildJob(QbfContext& ctx, ChildJobApp app, int childIdx, Formula&& formula, int vars);
 
     void reportJobDone(QbfContext& ctx, int resultCode);
     void markDone(QbfContext& ctx, bool jobAlive, int resultCode = -1);

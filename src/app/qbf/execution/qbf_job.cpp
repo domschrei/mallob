@@ -138,7 +138,7 @@ void QbfJob::run() {
         return;
     }
 
-    auto [childApp, payloads] = *maybeSplit;
+    auto& [childApp, payloads] = *maybeSplit;
 
     {
         auto ctx = QbfContextStore::tryAcquire(getId());
@@ -147,8 +147,8 @@ void QbfJob::run() {
         // The job will be a QBF job if any quantifications are left in the formula
         // and will be a SAT job otherwise.
         for (int childIdx = 0; childIdx < payloads.size(); childIdx++) {
-            auto& payloadChild = payloads[childIdx];
-            spawnChildJob(*ctx, childApp, childIdx, std::move(payloadChild));
+            auto& [vars, payloadChild] = payloads[childIdx];
+            spawnChildJob(*ctx, childApp, childIdx, std::move(payloadChild), vars);
         }
 
         // Non-root jobs should be cleaned up immediately again.
@@ -174,7 +174,7 @@ void QbfJob::installMessageListeners(QbfContext& submitCtx) {
     PermanentCache::getMainInstance().putMsgSubscription(submitCtx.nodeJobId, std::move(subCancel));
 }
 
-std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Formula>>> QbfJob::applySplittingStrategy() {
+std::optional<std::pair<QbfJob::ChildJobApp, std::vector<std::pair<int, QbfJob::Formula>>>> QbfJob::applySplittingStrategy() {
     switch (_params.qbfSplitStrategy()) {
     case QBF_SPLIT_TRIVIAL:
         return applyTrivialSplittingStrategy();
@@ -184,9 +184,9 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Formula>>> QbfJ
     }
 }
 
-std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Formula>>> QbfJob::applyTrivialSplittingStrategy() {
+std::optional<std::pair<QbfJob::ChildJobApp, std::vector<std::pair<int, QbfJob::Formula>>>> QbfJob::applyTrivialSplittingStrategy() {
 
-    std::vector<Formula> payloads;
+    std::vector<std::pair<int, Formula>> payloads;
     // Basic splitting
     auto [fSize, fData] = getFormulaWithQuantifications();
     const int* childDataBegin = fData+1;
@@ -197,11 +197,14 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Formula>>> QbfJ
     assert(ctx_);
     auto &ctx = *ctx_;
 
+    int vars = getAppConfig().getIntOrDefault("__NV", -1);
+    assert(vars > -1);
+
     if (childJobsArePureSat) {
 
         // No quantifications left: Pure SAT!
         ctx.nodeType = QbfContext::AND;
-        payloads = prepareSatChildJobs(ctx, childDataBegin, childDataEnd);
+        payloads = prepareSatChildJobs(ctx, childDataBegin, childDataEnd, vars);
 
     } else {
 
@@ -214,13 +217,13 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Formula>>> QbfJ
             // universal quantification
             ctx.nodeType = QbfContext::AND;
         }
-        payloads = prepareQbfChildJobs(ctx, childDataBegin, childDataEnd, quantifiedVar);
+        payloads = prepareQbfChildJobs(ctx, childDataBegin, childDataEnd, quantifiedVar, vars);
     }
 
     return std::make_pair(childJobsArePureSat?SAT:QBF, std::move(payloads));
 }
 
-std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Formula>>> QbfJob::applyIterativeDeepeningSplittingStrategy() {
+std::optional<std::pair<QbfJob::ChildJobApp, std::vector<std::pair<int, QbfJob::Formula>>>> QbfJob::applyIterativeDeepeningSplittingStrategy() {
 
     // Assemble formula for each child to spawn
     std::vector<Formula> payloads;
@@ -228,13 +231,16 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Formula>>> QbfJ
 
     int depth = 0;
     int id = 0;
+    int vars = 0;
 
     {
       auto ctx = QbfContextStore::tryAcquire(getId());
       assert(ctx);
       depth = ctx->depth;
       id = ctx->nodeJobId;
+      vars = getAppConfig().getIntOrDefault("__NV", -1);
     }
+    assert(vars > -1);
 
     auto [fSize, fData] = getFormulaWithQuantifications();
     Formula formula(fData, fData + fSize);
@@ -266,7 +272,7 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Formula>>> QbfJ
     int res = -1;
     do {
         res = bloqqerCaller->process(formula,
-                                     bloqqerCaller->computeNumberOfVars(formula),
+                                     vars,
                                      id,
                                      formula[depth],
                                      _params.expansionCostThreshold());
@@ -279,12 +285,14 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Formula>>> QbfJ
             // This means that this quantification was universal.
             assert(formula[depth] < 0);
             formula[depth] = -formula[depth];
+            vars = bloqqerCaller->getVars();
             depth++;
             break;
         case 2: {
             // Bloqqer could not expand the variable, or the variable was
             // existential. Anyway, use the new formula to split.
             auto ctx = QbfContextStore::tryAcquire(getId());
+            vars = bloqqerCaller->getVars();
             assert(ctx);
             if (formula[depth] < 0) {
                 // Flip quantifier! But we need to remember that we had a universal at this space.
@@ -341,48 +349,49 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Formula>>> QbfJ
         LOGGER(_job_log, V3_VERB, "QBF #%i spawning two QBF children\n", getId());
         int quantification = formula[depth];
         assert(quantification > 0);
-        return std::make_pair(QBF, prepareQbfChildJobs(ctx, formula.data(), formula.data()+formula.size(), quantification));
+        return std::make_pair(QBF, prepareQbfChildJobs(ctx, formula.data(), formula.data()+formula.size(), quantification, vars));
     } else {
         // Spawn a single SAT job.
         LOGGER(_job_log, V3_VERB, "QBF #%i spawning one SAT child\n", getId());
         ctx.nodeType = QbfContext::AND;
         // payload begins at matrix_begin
-        return std::make_pair(SAT, prepareSatChildJobs(ctx, formula.data()+matrixBeginIdx, formula.data()+formula.size()));
+        return std::make_pair(SAT, prepareSatChildJobs(ctx, formula.data()+matrixBeginIdx, formula.data()+formula.size(), vars));
     }
 }
 
-std::vector<QbfJob::Formula> QbfJob::prepareSatChildJobs(QbfContext& ctx, const int* begin, const int* end) {
+std::vector<std::pair<int, QbfJob::Formula>> QbfJob::prepareSatChildJobs(QbfContext& ctx, const int* begin, const int* end, int vars) {
     ctx.appendChild(false, -1, -1);
-    return std::vector<Formula> {Formula(begin, end)};
+    return std::vector<std::pair<int, Formula>> {std::make_pair(vars, Formula(begin, end))};
 }
 
-std::vector<QbfJob::Formula> QbfJob::prepareQbfChildJobs(QbfContext& ctx, const int* begin, const int* end, int varToSplitOn) {
+std::vector<std::pair<int, QbfJob::Formula>> QbfJob::prepareQbfChildJobs(QbfContext& ctx, const int* begin, const int* end, int varToSplitOn, int vars) {
 
-    std::vector<Formula> payloads;
+    std::vector<std::pair<int, Formula>> payloads;
     {
         Formula childTruePayload(begin, end);
         childTruePayload.push_back(varToSplitOn);
         childTruePayload.push_back(0);
-        payloads.push_back(std::move(childTruePayload));
+        payloads.emplace_back(vars, std::move(childTruePayload));
         ctx.appendChild(true, -1, -1);
     }
     {
         Formula childFalsePayload(begin, end);
         childFalsePayload.push_back(-varToSplitOn);
         childFalsePayload.push_back(0);
-        payloads.push_back(std::move(childFalsePayload));
+        payloads.emplace_back(vars, std::move(childFalsePayload));
         ctx.appendChild(true, -1, -1);
     }
     return payloads;
 }
 
-void QbfJob::spawnChildJob(QbfContext& ctx, ChildJobApp app, int childIdx, Formula&& formula) {
+void QbfJob::spawnChildJob(QbfContext& ctx, ChildJobApp app, int childIdx, Formula&& formula, int vars) {
 
     // Create an app configuration object for the child
     // and write it into the job submission JSON
     QbfContext childCtx = ctx.deriveChildContext(childIdx, getMyMpiRank());
     AppConfiguration config(getAppConfig());
     childCtx.writeToAppConfig(app==QBF, config);
+    config.setInt("__NV", vars);
     auto json = getJobSubmissionJson(app, config);
 
     // Access the API used to introduce a job from this job

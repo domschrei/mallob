@@ -2,6 +2,7 @@
 #include "util/logger.hpp"
 
 #include <cstdlib>
+#include <cassert>
 #include <algorithm>
 #include <cstring>
 #include <stdexcept>
@@ -175,6 +176,9 @@ bool BloqqerCaller::readQDIMACS(FILE* src, std::vector<int> &tgt, bool keepPrefi
   int read_items = fscanf(src, "p cnf %d %d\n", &_vars, &_clauses);
 
   if(read_items != 2) return false;
+
+  if(_vars == 0)
+    return true;
 
   tgt.reserve(_vars + _clauses * 5);
 
