@@ -226,7 +226,6 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Formula>>> QbfJ
     std::vector<Formula> payloads;
     bool childJobsArePureSat;
 
-    int vars = 0;
     int depth = 0;
     int id = 0;
 
@@ -234,11 +233,9 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Formula>>> QbfJ
       auto ctx = QbfContextStore::tryAcquire(getId());
       assert(ctx);
       depth = ctx->depth;
-      vars = getAppConfig().getIntOrDefault("__NV", -1);
       id = ctx->nodeJobId;
     }
 
-    assert(vars >= 0);
     auto [fSize, fData] = getFormulaWithQuantifications();
     Formula formula(fData, fData + fSize);
 
@@ -269,10 +266,10 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::Formula>>> QbfJ
     int res = -1;
     do {
         res = bloqqerCaller->process(formula,
-                                        vars,
-                                        id,
-                                        formula[depth],
-                                        _params.expansionCostThreshold());
+                                     bloqqerCaller->computeNumberOfVars(formula),
+                                     id,
+                                     formula[depth],
+                                     _params.expansionCostThreshold());
 
         LOGGER(_job_log, V3_VERB, "#%i bloqqer returned with result %i\n", id, res);
 

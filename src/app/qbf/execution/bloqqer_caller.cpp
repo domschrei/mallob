@@ -102,6 +102,17 @@ int BloqqerCaller::process(std::vector<int> &f, int vars, int jobId, int litToTr
   return exitcode;
 }
 
+int BloqqerCaller::computeNumberOfVars(const std::vector<int> &f) const {
+  int max = 0;
+  for(int e : f) {
+    int e_abs = abs(e);
+    if(e_abs > max) {
+      max = e_abs;
+    }
+  }
+  return max;
+}
+
 #if __has_cpp_attribute(unlikely)
 #define UNLIKELY [[unlikely]]
 #else
@@ -161,12 +172,11 @@ bool BloqqerCaller::readQDIMACS(FILE* src, std::vector<int> &tgt, bool keepPrefi
     tgt.clear();
   }
 
-  int vars, clauses;
-  int read_items = fscanf(src, "p cnf %d %d\n", &vars, &clauses);
+  int read_items = fscanf(src, "p cnf %d %d\n", &_vars, &_clauses);
 
   if(read_items != 2) return false;
 
-  tgt.reserve(vars + clauses * 5);
+  tgt.reserve(_vars + _clauses * 5);
 
   // Prefix
 
