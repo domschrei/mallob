@@ -72,7 +72,14 @@ public:
 
         // Parse job description files
         if (_params.jobDescriptionTemplate.isSet()) {
-            std::ifstream i(_params.jobDescriptionTemplate());
+            std::string descriptionTemplateFile = _params.jobDescriptionTemplate();
+            // check if client-specific description template file exists
+            std::string clientSpecificDescTemplateFile = descriptionTemplateFile + "." + std::to_string(_internal_rank);
+            if (FileUtils::isRegularFile(clientSpecificDescTemplateFile)) {
+                LOG(V3_VERB, "Using client-specific description template file %s\n", clientSpecificDescTemplateFile.c_str());
+                descriptionTemplateFile = clientSpecificDescTemplateFile;
+            }
+            std::ifstream i(descriptionTemplateFile);
             std::string line;
             while (std::getline(i, line)) {
                 if (line.empty()) break;
