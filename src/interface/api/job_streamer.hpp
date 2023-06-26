@@ -27,6 +27,7 @@ private:
     int _job_counter = 1;
     int _job_description_index = 0;
     std::vector<std::vector<std::string>> _job_descriptions;
+    bool _has_client_specific_job_descriptions;
 
     BackgroundWorker _bg_worker;
     std::atomic_int _num_active_jobs = 0;
@@ -78,6 +79,7 @@ public:
             if (FileUtils::isRegularFile(clientSpecificDescTemplateFile)) {
                 LOG(V3_VERB, "Using client-specific description template file %s\n", clientSpecificDescTemplateFile.c_str());
                 descriptionTemplateFile = clientSpecificDescTemplateFile;
+                _has_client_specific_job_descriptions = true;
             }
             std::ifstream i(descriptionTemplateFile);
             std::string line;
@@ -173,7 +175,8 @@ public:
             bool writeResultsToFile = false;
             if (_params.streamerResultOutput.isSet()) {
                 writeResultsToFile = true;
-                _ofs_results.open(_params.streamerResultOutput());
+                _ofs_results.open(_params.streamerResultOutput() 
+                    + (_has_client_specific_job_descriptions ? "." + std::to_string(_internal_rank) : ""));
             }
 
             while (_bg_deleter.continueRunning() || _num_jsons_to_delete.load(std::memory_order_relaxed) > 0) {
