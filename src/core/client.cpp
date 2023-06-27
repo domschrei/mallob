@@ -353,21 +353,28 @@ void Client::advance() {
     // Advance an all-reduction of the current system state
     if (_sys_state.aggregate(time)) {
         const std::vector<float>& result = _sys_state.getGlobal();
-        int processed = (int)result[SYSSTATE_PROCESSED_JOBS];
         if (MyMpi::rank(_comm) == 0) {
-            LOG(V2_INFO, "sysstate entered=%i parsed=%i scheduled=%i processed=%i\n", 
+            LOG(V2_INFO, "sysstate entered=%i parsed=%i scheduled=%i processed=%i successful=%i\n",
                 (int)result[SYSSTATE_ENTERED_JOBS], 
                 (int)result[SYSSTATE_PARSED_JOBS], 
-                (int)result[SYSSTATE_SCHEDULED_JOBS], 
-                processed);
+                (int)result[SYSSTATE_SCHEDULED_JOBS],
+                (int)result[SYSSTATE_PROCESSED_JOBS],
+                (int)result[SYSSTATE_SUCCESSFUL_JOBS]);
         }
     }
 
     // Any "done job" processings still pending?
     if (_done_job_futures.empty()) {
         // -- no: check if job limit has been reached
+
+        bool jobLimitReached = false;
         int jobLimit = _params.numJobs();
-        if (jobLimit > 0 && (int)_sys_state.getGlobal()[SYSSTATE_PROCESSED_JOBS] >= jobLimit) {
+        if (jobLimit > 0) jobLimitReached |= (int)_sys_state.getGlobal()[SYSSTATE_PROCESSED_JOBS] >= jobLimit;
+        int successfulJobLimit = _params.numSuccessfulJobs();
+        if (successfulJobLimit > 0)
+            jobLimitReached |= (int)_sys_state.getGlobal()[SYSSTATE_SUCCESSFUL_JOBS] >= successfulJobLimit;
+
+        if (jobLimitReached) {
             LOG(V2_INFO, "Job limit reached.\n");
             // Job limit reached - exit
             Terminator::setTerminating();
@@ -513,6 +520,11 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     // Output response time and solution header
     LOG(V2_INFO, "RESPONSE_TIME #%i %.6f rev. %i\n", jobId, Timer::elapsedSeconds()-desc.getArrival(), revision);
     LOG(V2_INFO, "SOLUTION #%i %s rev. %i\n", jobId, resultCode == RESULT_SAT ? "SAT" : "UNSAT", revision);
+
+    // Increment # successful jobs if result is not "unknown"
+    if (resultCode != 0) {
+        _sys_state.addLocal(SYSSTATE_SUCCESSFUL_JOBS, 1);
+    }
 
     // Disable all watchdogs to avoid crashes while printing a huge model
     Watchdog::disableGlobally();
