@@ -36,7 +36,8 @@ OPTION_GROUP(grpGeneral, "general", "General")
  OPT_INT(numClients,                      "c", "clients",                              1,    -1, LARGE_INT,     "Number of client PEs to initialize (counting backwards from last rank). -1: all PEs are clients")
  OPT_INT(numWorkers,                      "w", "workers",                              -1,   -1, LARGE_INT,     "Number of worker PEs to initialize (beginning from rank #0), -1: all PEs are workers")
  OPT_BOOL(preCleanup,                     "pre-cleanup", "",                           false,                   "Clean up shmem/proof/trace/extmem files before starting off")
- OPT_STRING(clientApplication,            "client-app", "",                            "", "Have client i run the specified external program path + \".\" + i (or, if nonexistent, just the path as is)")
+ OPT_STRING(clientApplication,            "client-app", "",                            "", "Have clients run specified external program path + \".\" + i for increasing i (or, if nonexistent, just the path as is)")
+ OPT_INT(clientAppThreads,                "client-app-threads", "",                    1,    1, LARGE_INT,      "Max. number of applications to run per client")
 
 ///////////////////////////////////////////////////////////////////////
 

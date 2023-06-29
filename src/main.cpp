@@ -136,15 +136,19 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
         streamer = new JobStreamer(params, client->getAPI(), client->getInternalRank());
     }
 
-    // If a client application is provided, run this application in a separate thread
-    BackgroundWorker clientAppWorker;
+    // If a client application is provided, run this application in (a) separate thread(s)
+    std::list<BackgroundWorker> clientAppWorkers;
     if (params.clientApplication.isSet() && isClient) {
         int internalClientRank = MyMpi::rank(commClients);
-        clientAppWorker.run([&, internalClientRank]() {
-            RankSpecificFileFetcher fetcher(internalClientRank);
-            std::string appPath = fetcher.get(params.clientApplication());
-            int systemRetVal = system(appPath.c_str());
-        });
+        int nbThreads = params.clientAppThreads();
+        for (size_t i = internalClientRank*nbThreads; i < (internalClientRank+1)*nbThreads; ++i) {
+            clientAppWorkers.emplace_back();
+            clientAppWorkers.back().run([&, i]() {
+                RankSpecificFileFetcher fetcher(i);
+                std::string appPath = fetcher.get(params.clientApplication());
+                int systemRetVal = system(appPath.c_str());
+            });
+        }
     }
 
     // Main loop

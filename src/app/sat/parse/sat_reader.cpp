@@ -30,7 +30,7 @@ void handleUnsat(const Parameters& _params) {
 bool SatReader::read(JobDescription& desc) {
 
 	_raw_content_mode = desc.getAppConfiguration().map.count("content-mode")
-		&& desc.getAppConfiguration().map.at("content-mode") == "RAW";
+		&& desc.getAppConfiguration().map.at("content-mode") == "raw";
 
 	FILE* pipe = nullptr;
 	int namedpipe = -1;
