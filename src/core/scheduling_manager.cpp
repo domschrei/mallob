@@ -604,7 +604,7 @@ void SchedulingManager::handleJobInterruption(MessageHandle& handle) {
 
     LOG(V3_VERB, "Acknowledge #%i aborting\n", jobId);
     auto& job = get(jobId);    
-    if (job.getJobTree().isRoot()) {
+    if (job.getJobTree().isRoot() && !job.isIncremental()) {
         // Forward information on aborted job to client
         MyMpi::isend(job.getJobTree().getParentNodeRank(), 
             MSG_NOTIFY_CLIENT_JOB_ABORTING, handle.moveRecvData());

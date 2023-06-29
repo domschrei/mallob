@@ -8,6 +8,10 @@
 #define MALLOB_MAX_N_APPTHREADS_PER_PROCESS 32
 #endif
 
+#define MALLOB_PIPE_SOLUTIONS_NONE 0
+#define MALLOB_PIPE_SOLUTIONS_LARGE 1
+#define MALLOB_PIPE_SOLUTIONS_ALL 2
+
 // All declared options will be stored in this member of the Parameters class.
 OptMap _global_map;
 GroupedOptionsList _grouped_list;
@@ -32,6 +36,7 @@ OPTION_GROUP(grpGeneral, "general", "General")
  OPT_INT(numClients,                      "c", "clients",                              1,    -1, LARGE_INT,     "Number of client PEs to initialize (counting backwards from last rank). -1: all PEs are clients")
  OPT_INT(numWorkers,                      "w", "workers",                              -1,   -1, LARGE_INT,     "Number of worker PEs to initialize (beginning from rank #0), -1: all PEs are workers")
  OPT_BOOL(preCleanup,                     "pre-cleanup", "",                           false,                   "Clean up shmem/proof/trace/extmem files before starting off")
+ OPT_STRING(clientApplication,            "client-app", "",                            "", "Have client i run the specified external program path + \".\" + i (or, if nonexistent, just the path as is)")
 
 ///////////////////////////////////////////////////////////////////////
 
@@ -56,7 +61,7 @@ OPTION_GROUP(grpOutput, "output", "Output")
  OPT_BOOL(immediateFileFlush,             "iff", "immediate-file-flush",               false,                   "Flush log files after each line instead of buffering")
  OPT_STRING(logDirectory,                 "log", "log-directory",                      "",                      "Directory to save logs in") //[[AUTOCOMPLETE_DIRECTORY]]
  OPT_BOOL(omitSolution,                   "os", "omit-solution",                       false,                   "Do not output solution in mono mode of operation")
- OPT_BOOL(pipeLargeSolutions,             "pls", "pipe-large-solutions",               false,                   "Provide large solutions over a named pipe instead of directly writing them into the response JSON")
+ OPT_INT(pipeSolutions,                   "ps", "pipe-solutions",                      MALLOB_PIPE_SOLUTIONS_NONE, MALLOB_PIPE_SOLUTIONS_NONE, MALLOB_PIPE_SOLUTIONS_ALL,                   "Provide [0=no,1=large,2=all] solutions over a named pipe instead of directly writing them into the response JSON")
  OPT_BOOL(quiet,                          "q", "quiet",                                false,                   "Do not log to stdout besides critical information")
  OPT_STRING(solutionToFile,               "s2f", "solution-to-file",                   "",                      "Write solutions to file with provided base name + job ID")
  OPT_INT(verbosity,                       "v", "verbosity",                            2,    0, 6,              "Logging verbosity: 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB 5=DEBG")

@@ -7,6 +7,7 @@
 #include <string>
 
 #include "comm/mympi.hpp"
+#include "interface/api/rank_specific_file_fetcher.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
 #include "util/random.hpp"
@@ -133,6 +134,17 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     JobStreamer* streamer = nullptr;
     if (params.jobTemplate.isSet() && isClient) {
         streamer = new JobStreamer(params, client->getAPI(), client->getInternalRank());
+    }
+
+    // If a client application is provided, run this application in a separate thread
+    BackgroundWorker clientAppWorker;
+    if (params.clientApplication.isSet() && isClient) {
+        int internalClientRank = MyMpi::rank(commClients);
+        clientAppWorker.run([&, internalClientRank]() {
+            RankSpecificFileFetcher fetcher(internalClientRank);
+            std::string appPath = fetcher.get(params.clientApplication());
+            int systemRetVal = system(appPath.c_str());
+        });
     }
 
     // Main loop

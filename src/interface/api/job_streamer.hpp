@@ -5,6 +5,7 @@
 #include <fstream>
 #include <ios>
 
+#include "interface/api/rank_specific_file_fetcher.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
 #include "interface/json_interface.hpp"
@@ -22,12 +23,12 @@ private:
     int _internal_rank;
     nlohmann::json _json_template;
     bool _valid = false;
+    RankSpecificFileFetcher _rank_specific_file_fetcher;
     ClientTemplate _client_template;
 
     int _job_counter = 1;
     int _job_description_index = 0;
     std::vector<std::vector<std::string>> _job_descriptions;
-    bool _has_client_specific_templates;
 
     BackgroundWorker _bg_worker;
     std::atomic_int _num_active_jobs = 0;
@@ -46,11 +47,13 @@ private:
 
 public:
     JobStreamer(const Parameters& params, APIConnector& api, int internalRank) : 
-            _params(params), _api(api), _internal_rank(internalRank), 
-            _client_template(_params.seed()+_internal_rank, getTemplateFile(_params.clientTemplate())) {
+            _params(params), _api(api), _internal_rank(internalRank),
+            _rank_specific_file_fetcher(internalRank),
+            _client_template(_params.seed()+_internal_rank,
+            _rank_specific_file_fetcher.get(_params.clientTemplate())) {
 
         // Attempt to parse JSON from file
-        std::string jsonTemplateFile = getTemplateFile(_params.jobTemplate());
+        std::string jsonTemplateFile = _rank_specific_file_fetcher.get(_params.jobTemplate());
         if (jsonTemplateFile.empty()) return;
         try {
             std::ifstream i(jsonTemplateFile);
@@ -63,7 +66,7 @@ public:
 
         // Parse job description files
         if (_params.jobDescriptionTemplate.isSet()) {
-            std::string descriptionTemplateFile = getTemplateFile(_params.jobDescriptionTemplate());
+            std::string descriptionTemplateFile = _rank_specific_file_fetcher.get(_params.jobDescriptionTemplate());
             std::ifstream i(descriptionTemplateFile);
             std::string line;
             while (std::getline(i, line)) {
@@ -159,7 +162,8 @@ public:
             if (_params.streamerResultOutput.isSet()) {
                 writeResultsToFile = true;
                 _ofs_results.open(_params.streamerResultOutput() 
-                    + (_has_client_specific_templates ? "." + std::to_string(_internal_rank) : ""));
+                    + (_rank_specific_file_fetcher.hasRankSpecificTemplate() ?
+                        "." + std::to_string(_internal_rank) : ""));
             }
 
             while (_bg_deleter.continueRunning() || _num_jsons_to_delete.load(std::memory_order_relaxed) > 0) {
@@ -188,22 +192,6 @@ public:
                 }
             }
         });
-    }
-
-    std::string getTemplateFile(const std::string& path) {
-        std::string templateFile = path;
-        // Check if a client-specific template file is present
-        std::string clientSpecificFile = templateFile + "." + std::to_string(_internal_rank);
-        if (FileUtils::isRegularFile(clientSpecificFile)) {
-            _has_client_specific_templates = true;
-            return clientSpecificFile;
-        }
-        // Is template file itself valid?
-        if (!FileUtils::isRegularFile(templateFile)) {
-            LOG(V1_WARN, "Template file %s does not exist\n", templateFile.c_str());        
-            return "";
-        }
-        return templateFile;
     }
 
     ~JobStreamer() {
