@@ -1,5 +1,6 @@
 #include "bloqqer_caller.hpp"
 #include "util/logger.hpp"
+#include "util/sys/fileutils.hpp"
 
 #include <cstdlib>
 #include <cassert>
@@ -99,6 +100,8 @@ int BloqqerCaller::process(std::vector<int> &f, int vars, int jobId, int litToTr
   int wstatus = 0;
   waitpid(_pid, &wstatus, 0);
   _pid = 0;
+
+  FileUtils::rm(fifoPath);
 
   int exitcode = WEXITSTATUS(wstatus);
   return exitcode;
