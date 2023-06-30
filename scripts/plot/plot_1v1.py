@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
- 
-import matplotlib.pyplot as plt
+
 import math
 import sys
 
@@ -29,6 +28,11 @@ ylabel = None
 min_val = lim
 heading = ""
 outfile = None
+logscale = False
+domainlabels = None
+domainmarkers = None
+domaincolors = None
+tickslist = None
 
 for arg in sys.argv[1:]:
     if arg.startswith("-l="):
@@ -52,15 +56,50 @@ for arg in sys.argv[1:]:
         ylabel = arg[8:]
     elif arg.startswith("-T="):
         lim = float(arg[3:])
-        out = lim * 1.35
-        border_hi = lim * 1.8
+        #out = lim * 1.35
+        #border_hi = lim * 1.8
         min_val = lim
     elif arg.startswith("-y2="):
         y2 = float(arg[4:])
     elif arg.startswith("-o="):
         outfile = arg[3:]
+    elif arg.startswith("-logscale"):
+        logscale = True
+    elif arg.startswith("-domainlabels="):
+        domainlabels = arg[len("-domainlabels="):].split(",")
+    elif arg.startswith("-domainmarkers="):
+        domainmarkers = arg[len("-domainmarkers="):].split(",")
+    elif arg.startswith("-domaincolors="):
+        domaincolors = arg[len("-domaincolors="):].split(",")
+    elif arg.startswith("-ticks="):
+        tickslist = arg[len("-ticks="):].split(",")
+    elif arg.startswith("-markersize="):
+        msize = float(arg[len("-markersize="):])
     else:
         files += [arg]
+
+import matplotlib
+if outfile:
+    matplotlib.use('pdf')
+matplotlib.rcParams['hatch.linewidth'] = 0.5  # previous pdf hatch linewidth
+import matplotlib.pyplot as plt
+from matplotlib import rc
+
+sansfont = False
+timesfont = False
+
+rc('text', usetex=True)
+if sansfont:
+    matplotlib.rcParams['text.latex.preamble'] = [r'\usepackage[cm]{sfmath}']
+    matplotlib.rcParams['font.family'] = 'sans-serif'
+    matplotlib.rcParams['font.sans-serif'] = 'cm'
+    #\renewcommand\familydefault{\sfdefault} 
+else:
+    rc('font', family='serif')
+    if timesfont:
+        rc('font', serif=['Times'])
+
+out = math.exp((math.log(lim) + math.log(border_hi)) / 2)
 
 runtime_map_pairs_by_domain = dict()
 
@@ -88,19 +127,36 @@ for dom in runtime_map_pairs_by_domain:
         exit(1)
 
 margin = lim - out
-plt.figure(figsize=(pltxsize,pltysize))
-plt.plot([border_lo, border_hi], [border_lo, border_hi], 'black', alpha=0.3, linestyle="--", label="y=x")
-plt.plot([border_lo, border_hi], [10*border_lo, 10*border_hi], 'gray', alpha=0.3, linestyle="--", label="y=10x")
+
+fig, ax = plt.subplots(1, 1, figsize=(pltxsize, pltysize))
+ax.set_box_aspect(1)
+
+if tickslist:
+    ax.set_xticklabels(tickslist)
+    ax.set_xticks([float(x) for x in tickslist])
+    ax.set_yticklabels(tickslist)
+    ax.set_yticks([float(x) for x in tickslist])
+    plt.minorticks_off()
+
+plt.grid(color='#dddddd', linestyle='-', linewidth=1)
+
+plt.plot([border_lo, lim], [border_lo, lim], 'black', alpha=0.3, linestyle="--", label="y=x")
+#plt.plot([border_lo, border_hi], [10*border_lo, 10*border_hi], 'gray', alpha=0.3, linestyle="--", label="y=10x")
 if y2:
     plt.plot([1/y2*border_lo, 1/y2*border_hi], [border_lo, border_hi], 'black', alpha=0.3, linestyle="-.", label="y="+str(y2)+"x")
-plt.plot([border_lo, lim], [lim, lim], 'blue', alpha=0.3)
-plt.plot([lim, lim], [border_lo, lim], 'red', alpha=0.3)
 
+plt.plot([border_lo, lim], [lim, lim], 'black', alpha=1)
+plt.plot([lim, lim], [border_lo, lim], 'black', alpha=1)
+plt.fill_between([border_lo, lim], [lim, lim], [border_hi, border_hi], alpha=0.3, color='gray', zorder=0) #color='blue', label=str(timeouts_y) + " timeouts of LEFT")
+plt.fill_between([lim, border_hi], [border_lo, border_lo], [lim, lim], alpha=0.3, color='gray', zorder=0) #, label=str(timeouts_x) + " timeouts of BOTTOM")
 
 timeouts_x = 0
 timeouts_y = 0
 marker_idx = 0
 color_idx = 0
+label_idx = 0
+
+
 for dom in runtime_map_pairs_by_domain:
     runtime_maps = runtime_map_pairs_by_domain[dom]
     
@@ -127,12 +183,13 @@ for dom in runtime_map_pairs_by_domain:
             Y += [runtime_maps[1][i]]
             print(str(i) + " : X " + str(runtime_maps[0][i]) + ", Y " + str(runtime_maps[1][i]))
 
-    plt.plot(X, Y, markers[marker_idx], color=colors[color_idx], markersize=msize, label=dom)
+    plt.plot(X, Y, domainmarkers[marker_idx] if domainmarkers else markers[marker_idx],
+             color=domaincolors[color_idx] if domaincolors else colors[color_idx], 
+             label=domainlabels[label_idx] if domainlabels else dom,
+             alpha=1, markersize=msize, markeredgecolor='None')
     marker_idx = (marker_idx+1) % len(markers)
     color_idx = (color_idx+1) % len(markers)
-
-plt.fill_between([border_lo, lim], [lim, lim], [border_hi, border_hi], alpha=0.2, color='blue', label=str(timeouts_y) + " timeouts of LEFT")
-plt.fill_between([lim, border_hi], [border_lo, border_lo], [lim, lim], alpha=0.2, color='red', label=str(timeouts_x) + " timeouts of BOTTOM")
+    label_idx += 1
 
 if heading:
     plt.title(heading)
@@ -144,12 +201,15 @@ if ylabel:
     plt.ylabel(ylabel)
 else:    
     plt.ylabel(labels[1] + ' / s')
+
 plt.ylim(min_val, border_hi)
 plt.xlim(min_val, border_hi)
-#plt.xscale("log")
-#plt.yscale("log")
-plt.grid(color='#dddddd', linestyle='-', linewidth=1)
+if logscale:
+    plt.xscale("log")
+    plt.yscale("log")
+
 plt.legend()
+
 plt.tight_layout()
 if outfile:
     plt.savefig(outfile)

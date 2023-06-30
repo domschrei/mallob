@@ -51,6 +51,7 @@ JobResult&& QbfJob::appl_getResult() {
 }
 
 void QbfJob::appl_communicate() {
+
     if (_initialized && !_sent_ready_msg_to_parent) {
         // Send a "ready" notification to your parent
         // so that it knows your address
@@ -64,6 +65,15 @@ void QbfJob::appl_communicate() {
         }
         _sent_ready_msg_to_parent = true;
     }
+
+    // Send messages from outgoing messages queue (if possible)
+    if (!_mtx_out_msg_queue.tryLock()) return;
+    while (!_out_msg_queue.empty()) {
+        auto outMsg = _out_msg_queue.front();
+        MyMpi::isend(outMsg.rank, outMsg.tag, std::move(outMsg.data));
+        _out_msg_queue.pop_front();
+    }
+    _mtx_out_msg_queue.unlock();
 }
 
 void QbfJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {}
@@ -431,13 +441,22 @@ void QbfJob::reportJobDone(QbfContext& ctx, int resultCode) {
 }
 
 void QbfJob::markDone(QbfContext& ctx, bool jobAlive, int resultCode) {
-    _internal_result_code = resultCode;
+    if (jobAlive && resultCode != 0) _internal_result_code = resultCode;
     if (ctx.isRootNode) return;
     if (jobAlive) reportJobDone(ctx, resultCode);
     if (resultCode < 0) return;
     // Propagate notification upwards
-    QbfNotification outMsg(ctx.rootJobId, ctx.parentJobId, ctx.depth, ctx.childIdx, resultCode);
-    MyMpi::isend(ctx.parentRank, MSG_QBF_NOTIFICATION_UPWARDS, outMsg);
+    QbfNotification noti(ctx.rootJobId, ctx.parentJobId, ctx.depth, ctx.childIdx, resultCode);
+    OutMessage outMsg {ctx.parentRank, MSG_QBF_NOTIFICATION_UPWARDS, noti.serialize()};
+    if (jobAlive) {
+        // Job still alive: May not be in the main thread! => Send via message queue.
+        auto lock = _mtx_out_msg_queue.getLock();
+        _out_msg_queue.push_back(std::move(outMsg));
+    } else {
+        // Job no longer alive: Cannot use message queue but running in main thread.
+        // Can send the message normally.
+        MyMpi::isend(outMsg.rank, outMsg.tag, std::move(outMsg.data));
+    }
     ctx.cancelled = true;
 }
 

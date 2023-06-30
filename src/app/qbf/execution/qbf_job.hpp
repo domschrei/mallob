@@ -29,9 +29,13 @@ private:
     int _internal_result_code {0};
 
     JobResult _internal_result;
-
-    Mutex _mtx_msg_queue;
-    std::list<MessageHandle> _msg_queue;
+    Mutex _mtx_out_msg_queue;
+    struct OutMessage {
+        int rank;
+        int tag;
+        std::vector<uint8_t> data;
+    };
+    std::list<OutMessage> _out_msg_queue;
 
 public:
     QbfJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table);
