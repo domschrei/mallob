@@ -62,6 +62,7 @@ private:
 
     QbfContext buildQbfContextFromAppConfig();
     void installMessageListeners(QbfContext& submitCtx);
+    void processOutMessageQueue();
 
     enum ChildJobApp {QBF, SAT};
     using Formula = std::vector<int>;

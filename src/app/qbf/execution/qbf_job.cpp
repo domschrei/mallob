@@ -68,11 +68,7 @@ void QbfJob::appl_communicate() {
 
     // Send messages from outgoing messages queue (if possible)
     if (!_mtx_out_msg_queue.tryLock()) return;
-    while (!_out_msg_queue.empty()) {
-        auto outMsg = _out_msg_queue.front();
-        MyMpi::isend(outMsg.rank, outMsg.tag, std::move(outMsg.data));
-        _out_msg_queue.pop_front();
-    }
+    processOutMessageQueue();
     _mtx_out_msg_queue.unlock();
 }
 
@@ -81,7 +77,10 @@ void QbfJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {}
 void QbfJob::appl_dumpStats() {}
 
 bool QbfJob::appl_isDestructible() {
-    return _bg_worker_done;
+    if (!_bg_worker_done) return false;
+    auto lock = _mtx_out_msg_queue.getLock();
+    processOutMessageQueue();
+    return _out_msg_queue.empty();
 }
 void QbfJob::appl_memoryPanic() {}
 
@@ -138,9 +137,8 @@ void QbfJob::run() {
         if (!maybeSplit) {
             // Nothing to split left! We are done already.
             markDone(*ctx, true, _internal_result_code);
-            // In case this is the root node, we need to clean up and report the result
-            // directly here.
-            cleanup = ctx->isRootNode;
+            // Clean up and report the result directly here.
+            cleanup = true;
         }
     }
     if (cleanup) {
@@ -148,11 +146,6 @@ void QbfJob::run() {
         return;
     }
 
-    // No splitting was carried out, but we must not try to resolve
-    // our std::optional!
-    if (!maybeSplit) {
-      return;
-    }
     auto& [childApp, payloads] = *maybeSplit;
 
     {
@@ -187,6 +180,14 @@ void QbfJob::installMessageListeners(QbfContext& submitCtx) {
     PermanentCache::getMainInstance().putMsgSubscription(submitCtx.nodeJobId, std::move(subReady));
     PermanentCache::getMainInstance().putMsgSubscription(submitCtx.nodeJobId, std::move(subResults));
     PermanentCache::getMainInstance().putMsgSubscription(submitCtx.nodeJobId, std::move(subCancel));
+}
+
+void QbfJob::processOutMessageQueue() {
+    while (!_out_msg_queue.empty()) {
+        auto outMsg = _out_msg_queue.front();
+        MyMpi::isend(outMsg.rank, outMsg.tag, std::move(outMsg.data));
+        _out_msg_queue.pop_front();
+    }
 }
 
 std::optional<std::pair<QbfJob::ChildJobApp, std::vector<std::pair<int, QbfJob::Formula>>>> QbfJob::applySplittingStrategy() {
