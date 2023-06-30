@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <stdexcept>
 #include <string>
 #include <map>
 #include <sstream>
@@ -60,7 +61,13 @@ void deserialize(const std::string& packed) {
 int getIntOrDefault(const std::string& key, int defaultVal) const {
     auto it = map.find(key);
     if (it == map.end()) return defaultVal;
-    return atoi(it->second.c_str());
+    int res {-1};
+    try {
+        res = atoi(it->second.c_str());
+    } catch (...) {
+        abort();
+    }
+    return res;
 }
 
 void setInt(const std::string& key, int val) {

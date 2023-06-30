@@ -3,6 +3,7 @@
 
 #include <sstream>
 #include <iostream>
+#include <stdexcept>
 
 #include "util/params.hpp"
 
@@ -28,17 +29,21 @@ struct SatProcessConfig {
     SatProcessConfig(const std::string& packed) {
         std::stringstream s_stream(packed);
         std::string substr;
-        getline(s_stream, substr, ','); starttimeSecs = atol(substr.c_str());
-        getline(s_stream, substr, ','); starttimeNsecs = atol(substr.c_str());
-        getline(s_stream, substr, ','); apprank = atoi(substr.c_str());
-        getline(s_stream, substr, ','); mpirank = atoi(substr.c_str());
-        getline(s_stream, substr, ','); mpisize = atoi(substr.c_str());
-        getline(s_stream, substr, ','); jobid = atoi(substr.c_str());
-        getline(s_stream, substr, ','); incremental = substr == "1";
-        getline(s_stream, substr, ','); firstrev = atoi(substr.c_str());
-        getline(s_stream, substr, ','); threads = atoi(substr.c_str());
-        getline(s_stream, substr, ','); maxBroadcastedLitsPerCycle = atoi(substr.c_str());
-        getline(s_stream, substr, ','); recoveryIndex = atoi(substr.c_str());
+        try {
+            getline(s_stream, substr, ','); starttimeSecs = atol(substr.c_str());
+            getline(s_stream, substr, ','); starttimeNsecs = atol(substr.c_str());
+            getline(s_stream, substr, ','); apprank = atoi(substr.c_str());
+            getline(s_stream, substr, ','); mpirank = atoi(substr.c_str());
+            getline(s_stream, substr, ','); mpisize = atoi(substr.c_str());
+            getline(s_stream, substr, ','); jobid = atoi(substr.c_str());
+            getline(s_stream, substr, ','); incremental = substr == "1";
+            getline(s_stream, substr, ','); firstrev = atoi(substr.c_str());
+            getline(s_stream, substr, ','); threads = atoi(substr.c_str());
+            getline(s_stream, substr, ','); maxBroadcastedLitsPerCycle = atoi(substr.c_str());
+            getline(s_stream, substr, ','); recoveryIndex = atoi(substr.c_str());
+        } catch (...) {
+            abort();
+        }
     }
 
     std::string getSharedMemId(pid_t pid) const;
