@@ -581,7 +581,7 @@ void QbfJob::onSatJobDone(const nlohmann::json& response, QbfContext& ctx) {
     QbfNotification outMsg;
     {
         auto wrappedCtx = QbfContextStore::tryAcquire(ctx.nodeJobId);
-        assert(wrappedCtx);
+        if (!wrappedCtx) return; // context not present any more - must've been cancelled in the mean time
         outMsg = QbfNotification(ctx.rootJobId, ctx.parentJobId, ctx.depth, 0, resultCode);
     }
     handleSubjobDone(ctx.nodeJobId, outMsg);
