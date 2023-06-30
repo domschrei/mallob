@@ -75,16 +75,17 @@ int BloqqerCaller::process(std::vector<int> &f, int vars, int jobId, int litToTr
     + " --maxexpvarcost=" + std::to_string(maxCost)
     + " --expvar=" + std::to_string(litToTry);
 
+  int res = mkfifo(fifoPath.c_str(), 0600);
+  if (res != 0) {
+    LOG(V0_CRIT, "[ERROR] Could not make FIFO, res=%i err=%s\n", res,
+        strerror(errno));
+    abort();
+  }
+
   auto [bloqqer, bloqqer_pid] = popen2(command.c_str(), "r");
   _pid = bloqqer_pid;
 
   if(bloqqer) {
-    int res = mkfifo(fifoPath.c_str(), 0600);
-    if (res != 0) {
-      LOG(V0_CRIT, "[ERROR] Could not make FIFO, res=%i err=%s\n", res,
-          strerror(errno));
-      abort();
-    }
     FILE* fifo = fopen(fifoPath.c_str(), "w");
     if (fifo == NULL) {
       LOG(V0_CRIT, "[ERROR] Could not open FIFO, err=%s\n", strerror(errno));
