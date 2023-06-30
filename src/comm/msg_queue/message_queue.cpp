@@ -53,8 +53,8 @@ MessageQueue::~MessageQueue() {
 }
 
 MessageQueue::CallbackRef MessageQueue::registerCallback(int tag, const MsgCallback& cb) {
-    if (_callbacks.count(tag)) {
-        LOG(V1_WARN, "[WARN] More than one callback for tag %i!\n", tag);
+    if (_callbacks.count(tag) && (_callbacks[tag].size() == 1)) {
+        LOG(V1_WARN, "[WARN] More than one callback for tag %i\n", tag);
     }
     _callbacks[tag].push_back(cb);
     auto it = _callbacks[tag].end();

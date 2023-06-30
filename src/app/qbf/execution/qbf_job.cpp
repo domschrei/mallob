@@ -270,7 +270,7 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<std::pair<int, QbfJob::
                         }) != formula.end();
     };
     while (!is_in_matrix(formula[depth])) {
-      LOGGER(_job_log, V3_VERB, "Increasing depth from %d to %d because literal %d was not in matrix.", depth, (depth+1), formula[depth]);
+      LOGGER(_job_log, V3_VERB, "Increasing depth from %d to %d because literal %d was not in matrix\n", depth, (depth+1), formula[depth]);
       ++depth;
     }
 
@@ -595,7 +595,8 @@ void QbfJob::handleSubjobDone(int nodeJobId, QbfNotification& msg) {
         if (!ctx) return; // context not present any more!
         int resultCode = ctx->handleNotification(msg);
         if (resultCode >= 0) {
-            LOG(V3_VERB, "QBF #%i childidx %i forwarding my result %i to #%i [%i]\n", ctx->nodeJobId, ctx->childIdx, resultCode, ctx->parentJobId, ctx->parentRank);
+            LOG(V3_VERB, "QBF #%i childidx %i depth %i forwarding my result %i to #%i [%i]\n",
+                ctx->nodeJobId, ctx->childIdx, ctx->depth, resultCode, ctx->parentJobId, ctx->parentRank);
             markDone(*ctx, false, resultCode);
         }
         destruct = ctx->isDestructible();
