@@ -61,7 +61,7 @@ void QbfJob::appl_communicate() {
         if (parentRank != -1) {
             LOG(V3_VERB, "Reporting ready QBF sub-job #%i (childidx=%i) to parent job [%i]\n", getId(), ctx->childIdx, parentRank);
             MyMpi::isend(parentRank, MSG_NOTIFY_JOB_READY,
-                SubjobReadyMsg(ctx->rootJobId, ctx->parentJobId, ctx->depth, ctx->childIdx, ctx->nodeJobId));
+                SubjobReadyMsg(ctx->rootJobId, ctx->parentJobId, ctx->childIdx, ctx->nodeJobId));
         }
         _sent_ready_msg_to_parent = true;
     }
@@ -105,7 +105,7 @@ void QbfJob::run() {
     {
         auto ctx = QbfContextStore::tryAcquire(getId());
         assert(ctx);
-        LOGGER(_job_log, V3_VERB, "QBF #%i - parent #%i\n", getId(), ctx->parentJobId);
+        LOGGER(_job_log, V3_VERB, "QBF #%i - parent #%i depth %i\n", getId(), ctx->parentJobId, ctx->depth);
         // Install a callback for incoming messages of the tag MSG_QBF_NOTIFICATION_UPWARDS.
         // CAUTION: Callback may be executed AFTER the life time of this job instance!
         installMessageListeners(*ctx);
@@ -155,8 +155,8 @@ void QbfJob::run() {
         // The job will be a QBF job if any quantifications are left in the formula
         // and will be a SAT job otherwise.
         for (int childIdx = 0; childIdx < payloads.size(); childIdx++) {
-            auto& [vars, payloadChild] = payloads[childIdx];
-            spawnChildJob(*ctx, childApp, childIdx, std::move(payloadChild), vars);
+            auto& payload = payloads[childIdx];
+            spawnChildJob(*ctx, childApp, childIdx, std::move(payload));
         }
 
         // Non-root jobs should be cleaned up immediately again.
@@ -190,7 +190,7 @@ void QbfJob::processOutMessageQueue() {
     }
 }
 
-std::optional<std::pair<QbfJob::ChildJobApp, std::vector<std::pair<int, QbfJob::Formula>>>> QbfJob::applySplittingStrategy() {
+std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>> QbfJob::applySplittingStrategy() {
     switch (_params.qbfSplitStrategy()) {
     case QBF_SPLIT_TRIVIAL:
         return applyTrivialSplittingStrategy();
@@ -200,9 +200,9 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<std::pair<int, QbfJob::
     }
 }
 
-std::optional<std::pair<QbfJob::ChildJobApp, std::vector<std::pair<int, QbfJob::Formula>>>> QbfJob::applyTrivialSplittingStrategy() {
+std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>> QbfJob::applyTrivialSplittingStrategy() {
 
-    std::vector<std::pair<int, Formula>> payloads;
+    std::vector<ChildPayload> payloads;
     // Basic splitting
     auto [fSize, fData] = getFormulaWithQuantifications();
     const int* childDataBegin = fData+1;
@@ -220,7 +220,7 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<std::pair<int, QbfJob::
 
         // No quantifications left: Pure SAT!
         ctx.nodeType = QbfContext::AND;
-        payloads = prepareSatChildJobs(ctx, childDataBegin, childDataEnd, vars);
+        payloads = prepareSatChildJobs(ctx, childDataBegin, childDataEnd, vars, ctx.depth+1);
 
     } else {
 
@@ -233,13 +233,13 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<std::pair<int, QbfJob::
             // universal quantification
             ctx.nodeType = QbfContext::AND;
         }
-        payloads = prepareQbfChildJobs(ctx, childDataBegin, childDataEnd, quantifiedVar, vars);
+        payloads = prepareQbfChildJobs(ctx, childDataBegin, childDataEnd, quantifiedVar, vars, ctx.depth+1);
     }
 
     return std::make_pair(childJobsArePureSat?SAT:QBF, std::move(payloads));
 }
 
-std::optional<std::pair<QbfJob::ChildJobApp, std::vector<std::pair<int, QbfJob::Formula>>>> QbfJob::applyIterativeDeepeningSplittingStrategy() {
+std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>> QbfJob::applyIterativeDeepeningSplittingStrategy() {
 
     // Assemble formula for each child to spawn
     std::vector<Formula> payloads;
@@ -365,49 +365,49 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<std::pair<int, QbfJob::
         LOGGER(_job_log, V3_VERB, "QBF #%i spawning two QBF children\n", getId());
         int quantification = formula[depth];
         assert(quantification > 0);
-        return std::make_pair(QBF, prepareQbfChildJobs(ctx, formula.data(), formula.data()+formula.size(), quantification, vars));
+        return std::make_pair(QBF, prepareQbfChildJobs(ctx, formula.data(), formula.data()+formula.size(), quantification, vars, depth+1));
     } else {
         // Spawn a single SAT job.
         LOGGER(_job_log, V3_VERB, "QBF #%i spawning one SAT child\n", getId());
         ctx.nodeType = QbfContext::AND;
         // payload begins at matrix_begin
-        return std::make_pair(SAT, prepareSatChildJobs(ctx, formula.data()+matrixBeginIdx, formula.data()+formula.size(), vars));
+        return std::make_pair(SAT, prepareSatChildJobs(ctx, formula.data()+matrixBeginIdx, formula.data()+formula.size(), vars, depth+1));
     }
 }
 
-std::vector<std::pair<int, QbfJob::Formula>> QbfJob::prepareSatChildJobs(QbfContext& ctx, const int* begin, const int* end, int vars) {
+std::vector<QbfJob::ChildPayload> QbfJob::prepareSatChildJobs(QbfContext& ctx, const int* begin, const int* end, int vars, int depth) {
     ctx.appendChild(false, -1, -1);
-    return std::vector<std::pair<int, Formula>> {std::make_pair(vars, Formula(begin, end))};
+    return std::vector<ChildPayload> {{vars, depth, Formula(begin, end)}};
 }
 
-std::vector<std::pair<int, QbfJob::Formula>> QbfJob::prepareQbfChildJobs(QbfContext& ctx, const int* begin, const int* end, int varToSplitOn, int vars) {
+std::vector<QbfJob::ChildPayload> QbfJob::prepareQbfChildJobs(QbfContext& ctx, const int* begin, const int* end, int varToSplitOn, int vars, int depth) {
 
-    std::vector<std::pair<int, Formula>> payloads;
+    std::vector<QbfJob::ChildPayload> payloads;
     {
         Formula childTruePayload(begin, end);
         childTruePayload.push_back(varToSplitOn);
         childTruePayload.push_back(0);
-        payloads.emplace_back(vars, std::move(childTruePayload));
+        payloads.push_back({vars, depth, std::move(childTruePayload)});
         ctx.appendChild(true, -1, -1);
     }
     {
         Formula childFalsePayload(begin, end);
         childFalsePayload.push_back(-varToSplitOn);
         childFalsePayload.push_back(0);
-        payloads.emplace_back(vars, std::move(childFalsePayload));
+        payloads.push_back({vars, depth, std::move(childFalsePayload)});
         ctx.appendChild(true, -1, -1);
     }
     return payloads;
 }
 
-void QbfJob::spawnChildJob(QbfContext& ctx, ChildJobApp app, int childIdx, Formula&& formula, int vars) {
+void QbfJob::spawnChildJob(QbfContext& ctx, ChildJobApp app, int childIdx, ChildPayload&& childPayload) {
 
     // Create an app configuration object for the child
     // and write it into the job submission JSON
-    QbfContext childCtx = ctx.deriveChildContext(childIdx, getMyMpiRank());
+    QbfContext childCtx = ctx.deriveChildContext(childIdx, childPayload.depth, getMyMpiRank());
     AppConfiguration config(getAppConfig());
     childCtx.writeToAppConfig(app==QBF, config);
-    config.setInt("__NV", vars);
+    config.setInt("__NV", childPayload.nbVars);
     auto json = getJobSubmissionJson(app, config);
 
     // Access the API used to introduce a job from this job
@@ -416,7 +416,7 @@ void QbfJob::spawnChildJob(QbfContext& ctx, ChildJobApp app, int childIdx, Formu
 
     // Internally store the payload for the child (so that it will get
     // transferred as soon as a 1st worker for the job was found)
-    api->storePreloadedRevision(json["user"], json["name"], 0, std::move(formula));
+    api->storePreloadedRevision(json["user"], json["name"], 0, std::move(childPayload.formula));
 
     LOGGER(_job_log, V3_VERB, "QBF SPAWNING CHILD\n");
 
@@ -518,8 +518,8 @@ nlohmann::json QbfJob::getJobSubmissionJson(ChildJobApp app, const AppConfigurat
 void QbfJob::onJobReadyNotification(MessageHandle& h, const QbfContext& submitCtx) {
 
     SubjobReadyMsg msg = Serializable::get<SubjobReadyMsg>(h.getRecvData());
-    if (msg.rootJobId != submitCtx.rootJobId || msg.depth != submitCtx.depth+1
-        || msg.parentJobId != submitCtx.nodeJobId) return;
+    if (msg.rootJobId != submitCtx.rootJobId || msg.parentJobId != submitCtx.nodeJobId)
+        return;
 
     bool destruct;
     {
@@ -538,8 +538,8 @@ void QbfJob::onJobCancelled(MessageHandle& h, const QbfContext& submitCtx) {
     QbfNotification incomingMsg = Serializable::get<QbfNotification>(h.getRecvData());
     // check that you are indeed the addressee!
     if (incomingMsg.rootJobId != submitCtx.rootJobId
-            || incomingMsg.parentJobId != submitCtx.nodeJobId
-            || incomingMsg.depth != submitCtx.depth) {
+            || incomingMsg.parentJobId != submitCtx.parentJobId
+            || incomingMsg.childIdx != submitCtx.childIdx) {
         return;
     }
 
@@ -562,13 +562,12 @@ void QbfJob::onResultNotification(MessageHandle& h, const QbfContext& submitCtx)
     QbfNotification incomingMsg = Serializable::get<QbfNotification>(h.getRecvData());
     // check that you are indeed the addressee!
     if (incomingMsg.rootJobId != submitCtx.rootJobId
-            || incomingMsg.parentJobId != submitCtx.nodeJobId
-            || incomingMsg.depth != submitCtx.depth+1) {
+            || incomingMsg.parentJobId != submitCtx.nodeJobId) {
         return;
     }
 
-    LOG(V3_VERB, "QBF #%i (local:#%i) notification of depth %i childidx %i: result code %i\n",
-        submitCtx.rootJobId, submitCtx.nodeJobId, submitCtx.depth+1,
+    LOG(V3_VERB, "QBF #%i (local:#%i) notification depth %i->%i childidx %i: result code %i\n",
+        submitCtx.rootJobId, submitCtx.nodeJobId, incomingMsg.depth, submitCtx.depth,
         incomingMsg.childIdx, incomingMsg.resultCode);
 
     handleSubjobDone(submitCtx.nodeJobId, incomingMsg);
@@ -598,7 +597,7 @@ void QbfJob::handleSubjobDone(int nodeJobId, QbfNotification& msg) {
         if (resultCode >= 0) {
             LOG(V3_VERB, "QBF #%i childidx %i depth %i forwarding my result %i to #%i [%i]\n",
                 ctx->nodeJobId, ctx->childIdx, ctx->depth, resultCode, ctx->parentJobId, ctx->parentRank);
-            markDone(*ctx, false, resultCode);
+            markDone(*ctx, ctx->isRootNode, resultCode);
         }
         destruct = ctx->isDestructible();
     }

@@ -55,9 +55,9 @@ struct QbfContext {
                                     children(o.children),
                                     nbDoneChildren(o.nbDoneChildren) {}
 
-    QbfContext deriveChildContext(int childIdx, int myRank) const {
+    QbfContext deriveChildContext(int childIdx, int depth, int myRank) const {
         QbfContext childCtx(*this);
-        childCtx.depth++;
+        childCtx.depth = depth;
         childCtx.parentRank = myRank;
         childCtx.parentJobId = nodeJobId;
         childCtx.childIdx = childIdx;
@@ -118,11 +118,13 @@ struct QbfContext {
 
     void cancelActiveChildren() {
         if (!cancelled) return;
-        for (auto child : children) {
+        for (int childIdx = 0; childIdx < children.size(); childIdx++) {
+            auto& child = children[childIdx];
             if (child.state != ChildInfo::READY) continue;
             if (child.qbfJob) {
                 // For QBF jobs
-                MyMpi::isend(child.rank, MSG_QBF_CANCEL_CHILDREN, IntVec({rootJobId, depth+1}));
+                QbfNotification noti(rootJobId, nodeJobId, depth, childIdx, 0);
+                MyMpi::isend(child.rank, MSG_QBF_CANCEL_CHILDREN, noti);
             } else {
                 // For SAT jobs
                 MyMpi::isend(child.rank, MSG_NOTIFY_JOB_ABORTING, IntVec({child.jobId}));
