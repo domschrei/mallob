@@ -47,6 +47,7 @@ bool SatReader::read(JobDescription& desc) {
 	
 	const std::string NC_DEFAULT_VAL = "BMMMKKK111";
 	desc.setAppConfigurationEntry("__NC", NC_DEFAULT_VAL);
+	desc.setAppConfigurationEntry("__NV", NC_DEFAULT_VAL);
 	desc.beginInitialization(desc.getRevision());
 
 	if (pipe == nullptr && namedpipe == -1) {
@@ -161,11 +162,18 @@ bool SatReader::read(JobDescription& desc) {
 		}
 	}
 
-	std::string numClausesStr = std::to_string(_num_read_clauses);
-	assert(numClausesStr.size() < NC_DEFAULT_VAL.size());
-	while (numClausesStr.size() < NC_DEFAULT_VAL.size())
-		numClausesStr += ".";
-	desc.setAppConfigurationEntry("__NC", numClausesStr);
+	// Store # variables and # clauses in app config
+	std::vector<std::pair<int, std::string>> fields {
+		{_num_read_clauses, "__NC"},
+		{_max_var, "__NV"}
+	};
+	for (auto [nbRead, dest] : fields) {
+		std::string nbStr = std::to_string(nbRead);
+		assert(nbStr.size() < NC_DEFAULT_VAL.size());
+		while (nbStr.size() < NC_DEFAULT_VAL.size())
+			nbStr += ".";
+		desc.setAppConfigurationEntry(dest, nbStr);
+	}
 
 	{
 		std::ofstream ofs(".preprocessed-header.pipe", std::ofstream::app);

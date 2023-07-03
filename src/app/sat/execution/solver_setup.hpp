@@ -19,12 +19,16 @@ struct SolverSetup {
 	bool hasPseudoincrementalSolvers;
 	char solverType;
 	int solverRevision;
+
 	int numOriginalClauses;
+	int numVars;
+
 	int minNumChunksPerSolver;
 	int numBufferedClsGenerations;
 	bool diversifyNoise;
 	bool diversifyNative;
 	bool diversifyFanOut;
+	bool diversifyInitShuffle;
 	enum EliminationSetting {
 		ALLOW_ALL, DISABLE_SOME, DISABLE_MOST, DISABLE_ALL
 	} eliminationSetting;

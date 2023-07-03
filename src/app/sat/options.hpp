@@ -23,7 +23,7 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "Clause buffer base size in literals per process")
  OPT_INT(clauseBufferLimitMode,             "cblm", "clause-buffer-limit-mode",          1,        0,   1,
     "Mode for computing clause buffer limit w.r.t. worker count (0: unlimited growth based on levels of binary tree, 1: limited growth based on exponential function")
- OPT_FLOAT(clauseBufferLimitParam,          "cblp", "clause-buffer-limit-param",         0.9,      0,   MAX_INT,
+ OPT_FLOAT(clauseBufferLimitParam,          "cblp", "clause-buffer-limit-param",         100'000,  0,   MAX_INT,
     "Clause buffer discount factor: reduce buffer size per PE by <factor> each depth")
  OPT_FLOAT(clauseFilterClearInterval,       "cfci", "clause-filter-clear-interval",      20,       -1,  LARGE_INT,     
     "Set clear interval of clauses in solver filters (-1: never clear, 0: always clear")
@@ -68,6 +68,7 @@ OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversificati
     "0=normal diversification, 1/2/3=disable some/most/all variable elimination")
  OPT_BOOL(diversifyFanOut,                  "div-fanout", "",                            false,
     "Diversify some solvers based on making X random variable decisions every Y conflicts")
+ OPT_BOOL(diversifyInitShuffle,             "div-init-shuffle", "",                      false, "Shuffle order in which variables are activated (->scored) initially")
  OPT_BOOL(diversifyPhases,                  "div-phases", "",                            true,
     "Diversify solvers based on random sparse variable phases in addition to native diversification")
  OPT_BOOL(diversifyNative,                 "div-native",  "",                            true,
