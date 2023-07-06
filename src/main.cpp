@@ -145,8 +145,10 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
             clientAppWorkers.emplace_back();
             clientAppWorkers.back().run([&, i]() {
                 RankSpecificFileFetcher fetcher(i);
-                std::string appPath = fetcher.get(params.clientApplication());
-                int systemRetVal = system(appPath.c_str());
+                assert(params.logDirectory.isSet());
+                std::string appCmd = fetcher.get(params.clientApplication())
+                    + " 2>&1 > " + params.logDirectory() + "/clientapp." + std::to_string(i);
+                int systemRetVal = system(appCmd.c_str());
             });
         }
     }
