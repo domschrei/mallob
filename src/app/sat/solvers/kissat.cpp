@@ -1,4 +1,5 @@
 
+#include "util/sys/timer.hpp"
 #include "util/tsl/robin_set.h"
 
 #include "util/logger.hpp"
@@ -136,6 +137,7 @@ void Kissat::diversify(int seed) {
     // This is done by generating a pseudo-random permutation from 0 to #vars-1
     // and then activating the variables in this order.
     if (_setup.diversifyInitShuffle) {
+        float time = Timer::elapsedSeconds();
         kissat_set_option(solver, "manualvaractivation", 1);
         AdjustablePermutation perm(getSolverSetup().numVars, seed);
         // With heavy assertions enabled, actually track that all variables
@@ -154,6 +156,8 @@ void Kissat::diversify(int seed) {
         LOGGER(_logger, V3_VERB, "Checking activated vars\n");
         assert(activatedVars.size() == getSolverSetup().numVars);
 #endif
+        time = Timer::elapsedSeconds() - time;
+        LOGGER(_logger, V3_VERB, "Init var shuffle took %.3fs\n", time);
     }
 
     seedSet = true;
