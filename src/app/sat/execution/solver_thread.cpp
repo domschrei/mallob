@@ -89,7 +89,8 @@ bool SolverThread::readFormula() {
             float random = 0.0001f * (rand() % 10000); // random number in [0,1)
             assert(random >= 0); assert(random <= 1);
             // ... only if random throw hits user-defined probability
-            shuffle = shuffle && random <= _params.inputShuffleProbability();
+            shuffle = shuffle && _params.inputShuffleProbability() > 0
+                && random <= _params.inputShuffleProbability();
 
             if (shuffle) {
                 LOGGER(_logger, V4_VVER, "Shuffling input rev. %i\n", (int)_active_revision);
