@@ -97,7 +97,7 @@ bool SolverThread::readFormula() {
                 {
                     auto lock = _state_mutex.getLock();
                     assert(_active_revision < (int)_pending_formulae.size());
-                    fParser = &_pending_formulae[_active_revision];
+                    fParser = _pending_formulae[_active_revision].get();
                 }
                 fParser->shuffle(_solver.getGlobalId());
             }
@@ -107,7 +107,7 @@ bool SolverThread::readFormula() {
         {
             auto lock = _state_mutex.getLock();
             assert(_active_revision < (int)_pending_formulae.size());
-            fParser = &_pending_formulae[_active_revision];
+            fParser = _pending_formulae[_active_revision].get();
             aSize = _pending_assumptions[_active_revision].first;
             aLits = _pending_assumptions[_active_revision].second;
         }
@@ -202,8 +202,12 @@ bool SolverThread::readFormula() {
 void SolverThread::appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits) {
     {
         auto lock = _state_mutex.getLock();
-        _pending_formulae.emplace_back(_logger, fSize, fLits, 
-            revision == 0 ? _solver.getSolverSetup().numOriginalClauses : 0);
+        _pending_formulae.emplace_back(
+            new SerializedFormulaParser(
+                _logger, fSize, fLits,
+                revision == 0 ? _solver.getSolverSetup().numOriginalClauses : 0
+            )
+        );
         LOGGER(_logger, V4_VVER, "Received %i literals\n", fSize);
         _pending_assumptions.emplace_back(aSize, aLits);
         LOGGER(_logger, V4_VVER, "Received %i assumptions\n", aSize);
