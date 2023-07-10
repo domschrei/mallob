@@ -284,6 +284,9 @@ int main(int argc, char *argv[]) {
         for (auto file : FileUtils::glob("/dev/shm/edu.kit.iti.mallob.*")) {
             doRemove(file);
         }
+        for (auto file : FileUtils::glob("/tmp/mallob.apipath.*")) {
+            doRemove(file);
+        }
     }
 
     auto isWorker = [&](int rank) {

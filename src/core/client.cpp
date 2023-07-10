@@ -227,6 +227,11 @@ void Client::init() {
     // Set up various interfaces as bridges between the outside and the JSON interface
     if (_params.useFilesystemInterface()) {
         std::string path = getFilesystemInterfacePath();
+        {
+            // Write the available job submission path to an availability tmp file
+            std::ofstream ofs("/tmp/mallob.apipath." + std::to_string(Proc::getPid()));
+            ofs << path << std::endl;
+        }
         LOG(V2_INFO, "Set up filesystem interface at %s\n", path.c_str());
         auto logger = Logger::getMainInstance().copy("I-FS", ".i-fs");
         auto conn = _params.inotify() ? 
@@ -637,6 +642,8 @@ Client::~Client() {
     _incoming_job_cond_var.notify();
     _instance_reader.stop();
     _json_interface.reset();
+
+    FileUtils::rm("/tmp/mallob.apipath." + std::to_string(Proc::getPid()));
 
     LOG(V4_VVER, "Leaving client destructor\n");
 }
