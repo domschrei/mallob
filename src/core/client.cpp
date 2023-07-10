@@ -6,6 +6,7 @@
 #include <thread>
 #include <unistd.h>
 #include <list>
+#include <filesystem>
 
 #include "client.hpp"
 #include "util/sys/timer.hpp"
@@ -230,7 +231,7 @@ void Client::init() {
         {
             // Write the available job submission path to an availability tmp file
             std::ofstream ofs("/tmp/mallob.apipath." + std::to_string(Proc::getPid()));
-            ofs << path << std::endl;
+            ofs << std::filesystem::current_path().string() + "/" + path;
         }
         LOG(V2_INFO, "Set up filesystem interface at %s\n", path.c_str());
         auto logger = Logger::getMainInstance().copy("I-FS", ".i-fs");
