@@ -243,7 +243,7 @@ void SatEngine::appendRevision(int revision, size_t fSize, const int* fLits, siz
 	LOGGER(_logger, V4_VVER, "Import rev. %i: %i lits, %i assumptions\n", revision, fSize, aSize);
 	assert(_revision+1 == revision);
 	_revision_data.push_back(RevisionData{fSize, fLits, aSize, aLits});
-	_sharing_manager->setRevision(revision);
+	_sharing_manager->setImportedRevision(revision);
 	
 	for (size_t i = 0; i < _num_solvers; i++) {
 		if (revision == 0) {
@@ -361,9 +361,9 @@ bool SatEngine::isReadyToPrepareSharing() const {
 	return !ClauseMetadata::enabled() || !_sharing_manager->isSharingOperationOngoing();
 }
 
-void SatEngine::updateTargetRevision(int revision) {
+void SatEngine::setClauseBufferRevision(int revision) {
 	if (isCleanedUp()) return;
-	_sharing_manager->setRevision(revision);
+	_sharing_manager->setImportedRevision(revision);
 }
 
 int SatEngine::prepareSharing(int* begin, int maxSize, int& successfulSolverId, int& numLits) {

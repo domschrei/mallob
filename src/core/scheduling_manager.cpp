@@ -151,7 +151,7 @@ void SchedulingManager::execute(Job& job, int source) {
         job.start();
     } else {
         // Restart job
-        job.resume(req.revision);
+        job.resume();
     }
 
     int demand = job.getDemand();
@@ -1115,7 +1115,7 @@ void SchedulingManager::resume(Job& job, const JobRequest& req, int source) {
     setLoad(1, req.jobId);
     LOG_ADD_SRC(V3_VERB, "RESUME %s", source, 
                 Job::toStr(req.jobId, req.requestedNodeIndex).c_str());
-    job.resume(req.revision);
+    job.resume();
 
     int demand = job.getDemand();
     _balancer.onActivate(job, demand);

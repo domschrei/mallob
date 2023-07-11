@@ -161,7 +161,7 @@ void KMeansJob::appl_suspend() {
     _base_msg.payload.assign(1, _my_index);
     getJobTree().sendToParent(_base_msg);
 }
-void KMeansJob::appl_resume(int revision) {
+void KMeansJob::appl_resume() {
     LOG(V5_DEBG, "KMDBG myIndex: %i i got RESUMED :D iter: %i\n", _my_index, _iterations_done);
 
     reset();

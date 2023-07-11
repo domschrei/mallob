@@ -233,7 +233,7 @@ bool SatProcessAdapter::process(BufferTask& task) {
     if (task.type == BufferTask::FILTER_CLAUSES) {
         InplaceClauseAggregation agg(buffer);
         _hsm->importBufferSize = buffer.size() - InplaceClauseAggregation::numMetadataInts();
-        _hsm->importBufferRevision = _desired_revision;
+        _hsm->importBufferRevision = _clause_buffer_revision;
         _epoch_of_export_buffer = task.epoch;
         assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
         memcpy(_import_buffer, buffer.data(), _hsm->importBufferSize*sizeof(int));
@@ -246,7 +246,6 @@ bool SatProcessAdapter::process(BufferTask& task) {
         if (_epoch_of_export_buffer == task.epoch) {
             memcpy(_filter_buffer, buffer.data(), buffer.size()*sizeof(int));
             _hsm->importEpoch = task.epoch;
-            _hsm->clauseBufferRevision = _desired_revision;
             _hsm->doDigestImportWithFilter = true;
         } // else: discard this filter since the clauses are not present in any buffer
 
@@ -258,9 +257,8 @@ bool SatProcessAdapter::process(BufferTask& task) {
 
     } else if (task.type == BufferTask::DIGEST_CLAUSES_WITHOUT_FILTER) {
         _hsm->importBufferSize = buffer.size() - InplaceClauseAggregation::numMetadataInts();
-        _hsm->importBufferRevision = _desired_revision;
+        _hsm->importBufferRevision = _clause_buffer_revision;
         _hsm->importEpoch = task.epoch;
-        _hsm->clauseBufferRevision = _desired_revision;
         assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
         memcpy(_import_buffer, buffer.data(), _hsm->importBufferSize*sizeof(int));
         _hsm->doDigestImportWithoutFilter = true;
@@ -269,7 +267,7 @@ bool SatProcessAdapter::process(BufferTask& task) {
         _hsm->historicEpochBegin = task.epoch;
         _hsm->historicEpochEnd = task.epochEnd;
         _hsm->importBufferSize = buffer.size();
-        _hsm->clauseBufferRevision = _desired_revision;
+        _hsm->importBufferRevision = _clause_buffer_revision;
         assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
         memcpy(_import_buffer, buffer.data(), buffer.size()*sizeof(int));
         _hsm->doDigestHistoricClauses = true;

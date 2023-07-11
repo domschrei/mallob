@@ -55,7 +55,7 @@ public:
 	~SatEngine();
 
 	void solve();
-	void updateTargetRevision(int revision);
+	void setClauseBufferRevision(int revision);
     void appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits, 
 		bool lastRevisionForNow = true);
 

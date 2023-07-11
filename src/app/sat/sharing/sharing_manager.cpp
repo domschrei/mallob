@@ -394,7 +394,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 		for (auto& slv : importingSolvers) {
 			BufferReader reader = _clause_store->getBufferReader(begin, buflen);
 			reader.setFilterBitset(slv.filter);
-			slv.solver->addLearnedClauses(reader, _current_revision);
+			slv.solver->addLearnedClauses(reader, _imported_revision);
 		}
 	}
 	

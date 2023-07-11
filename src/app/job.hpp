@@ -73,7 +73,7 @@ public:
     /*
     Resume a suspended job.
     */
-    virtual void appl_resume(int revision = -1) = 0;
+    virtual void appl_resume() = 0;
     /*
     Terminate a job which is irrecoverably marked for deletion: This method
     can concurrently trigger a cleanup of any resources needed for solving the job.
@@ -215,7 +215,7 @@ public:
     // Suspend the execution of all internal solvers. They can be resumed at any time.
     void suspend();
     // Resume all internal solvers given that they were suspended.
-    void resume(int revision = -1);
+    void resume();
 
     // Initiate a communication with other nodes in the associated job tree.
     void communicate(); // outgoing

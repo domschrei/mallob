@@ -94,6 +94,7 @@ private:
     std::atomic_int _written_revision = 0;
     int _published_revision = 0;
     int _desired_revision = -1;
+    int _clause_buffer_revision = -1;
 
     std::atomic_int _num_revisions_to_write = 0;
     std::list<RevisionData> _revisions_to_write;
@@ -118,7 +119,7 @@ public:
     void reduceThreadCount();
 
     void setSolvingState(SolvingStates::SolvingState state);
-    void updateTargetRevision(int revision) {_desired_revision = std::max(_desired_revision, revision);}
+    void setClauseBufferRevision(int revision) {_clause_buffer_revision = std::max(_clause_buffer_revision, revision);}
 
     int getStartedNumThreads() const {return _config.threads;}
 

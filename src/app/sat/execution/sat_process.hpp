@@ -187,7 +187,7 @@ public:
                 LOGGER(_log, V5_DEBG, "DO import clauses\n");
                 // Write imported clauses from shared memory into vector
                 assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
-                _engine.updateTargetRevision(_hsm->clauseBufferRevision);
+                _engine.setClauseBufferRevision(_hsm->importBufferRevision);
                 if (_hsm->doDigestImportWithFilter) {
                     _engine.digestSharingWithFilter(_import_buffer, _hsm->importBufferSize, _filter_buffer);
                 } else {
@@ -211,7 +211,7 @@ public:
 
             if (_hsm->doDigestHistoricClauses && !_hsm->didDigestHistoricClauses) {
                 LOGGER(_log, V5_DEBG, "DO digest historic clauses\n");
-                _engine.updateTargetRevision(_hsm->clauseBufferRevision);
+                _engine.setClauseBufferRevision(_hsm->importBufferRevision);
                 _engine.digestHistoricClauses(_hsm->historicEpochBegin, _hsm->historicEpochEnd, 
                     _import_buffer, _hsm->importBufferSize);
                 _hsm->didDigestHistoricClauses = true;

@@ -66,7 +66,7 @@ protected:
 
 	int _num_original_clauses;
 
-	int _current_revision = -1;
+	int _imported_revision = -1;
 
 	bool _observed_nonunit_lbd_of_zero = false;
 	bool _observed_nonunit_lbd_of_one = false;
@@ -104,7 +104,7 @@ public:
 
 	SharingStatistics getStatistics();
 
-	void setRevision(int revision) {_current_revision = std::max(_current_revision, revision);}
+	void setImportedRevision(int revision) {_imported_revision = std::max(_imported_revision, revision);}
 	void stopClauseImport(int solverId);
 
 	void continueClauseImport(int solverId);

@@ -48,6 +48,7 @@ public:
     virtual bool hasPreparedSharing() = 0;
     virtual std::vector<int> getPreparedClauses(Checksum& checksum, int& successfulSolverId, int& numLits) = 0;
     virtual int getLastAdmittedNumLits() = 0;
+    virtual void setClauseBufferRevision(int revision) = 0;
 
     virtual void filterSharing(int epoch, std::vector<int>& clauses) = 0;
     virtual bool hasFilteredSharing(int epoch) = 0;
@@ -62,7 +63,7 @@ public:
 
     virtual void appl_start() override = 0;
     virtual void appl_suspend() override = 0;
-    virtual void appl_resume(int revision) override = 0;
+    virtual void appl_resume() override = 0;
     virtual void appl_terminate() override = 0;
 
     virtual int appl_solved() override = 0;

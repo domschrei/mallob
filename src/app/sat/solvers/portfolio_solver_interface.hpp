@@ -167,7 +167,7 @@ public:
 	void addLearnedClause(const Mallob::Clause& c);
 	void addLearnedClauses(BufferReader& reader, int revision) {
 		if (_clause_sharing_disabled) return;
-		_import_manager->updateGlobalRevision(revision);
+		_import_manager->setImportedRevision(revision);
 		_import_manager->performImport(reader);
 	}
 

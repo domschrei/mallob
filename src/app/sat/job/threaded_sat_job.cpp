@@ -51,9 +51,8 @@ void ThreadedSatJob::appl_suspend() {
     _clause_comm->communicate();
 }
 
-void ThreadedSatJob::appl_resume(int revision) {
+void ThreadedSatJob::appl_resume() {
     if (!_initialized) return;
-    getSolver()->updateTargetRevision(revision);
     getSolver()->unsetPaused();
 }
 
@@ -186,6 +185,9 @@ std::vector<int> ThreadedSatJob::getPreparedClauses(Checksum& checksum, int& suc
 }
 int ThreadedSatJob::getLastAdmittedNumLits() {
     return _solver->getLastAdmittedClauseShare().nbAdmittedLits;
+}
+void ThreadedSatJob::setClauseBufferRevision(int revision) {
+    _solver->setClauseBufferRevision(revision);
 }
 
 void ThreadedSatJob::filterSharing(int epoch, std::vector<int>& clauses) {
