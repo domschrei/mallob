@@ -19,6 +19,8 @@ private:
 
     std::list<MessageSubscription> _subscriptions;
 
+    std::pair<int, int> _key_of_deferred_root_to_resume {-1, -1};
+
 public:
     ReactivationScheduler(Parameters& params, JobRegistry& jobRegistry, EmitDirectedJobRequestCallback emitJobReq) : 
             _params(params), _job_registry(jobRegistry), _cb_emit_job_request(emitJobReq) {
@@ -44,12 +46,28 @@ public:
                 if (update.epoch < 0) update.epoch = 0;
                 _schedulers.at(key).initializeScheduling(update, job.getJobTree().getParentNodeRank());
             } else {
-                _schedulers.at(key).beginResumptionAsRoot();
+                if (_schedulers.at(key).canBeginResumptionAsRoot()) {
+                    _schedulers.at(key).beginResumptionAsRoot();
+                } else {
+                    _key_of_deferred_root_to_resume = key;
+                }
             }
         } else {
             assert(_schedulers.at(key).canCommit());
             _schedulers.at(key).resetRole();
         }
+    }
+
+    bool checkResumeDeferredRoot(int jobId) {
+        if (_key_of_deferred_root_to_resume.first != jobId)
+            return true;
+        if (!_schedulers.count(_key_of_deferred_root_to_resume)) return true;
+        if (!_schedulers.at(_key_of_deferred_root_to_resume).canBeginResumptionAsRoot()) {
+            return false;
+        }
+        _schedulers.at(_key_of_deferred_root_to_resume).beginResumptionAsRoot();
+        _key_of_deferred_root_to_resume = {-1, -1};
+        return true;
     }
 
     void suspendReactivator(Job& job) {

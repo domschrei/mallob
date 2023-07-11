@@ -39,6 +39,7 @@ private:
 
     JobDescriptionInterface _desc_interface;
     ReactivationScheduler _reactivation_scheduler;
+    std::pair<int, int> _id_and_source_of_deferred_root_to_reactivate {-1, -1};
     ResultStore _result_store;
 
     std::list<MessageSubscription> _subscriptions;
@@ -82,6 +83,7 @@ private:
     void handleJobResultFound(MessageHandle& handle);
     void handleJobReleasedFromWaitingForReactivation(MessageHandle& handle);
 
+    void handleJobAfterArrivedJobDescription(int jobId, int source);
     void leaveJobTree(Job& job, bool notifyParent);
     void initiateVolumeUpdate(Job& job);
     void updateVolume(int jobId, int volume, int balancingEpoch, float eventLatency);

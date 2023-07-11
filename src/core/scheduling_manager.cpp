@@ -233,6 +233,16 @@ void SchedulingManager::checkActiveJob() {
 }
 
 void SchedulingManager::checkSuspendedJobs() {
+
+    // Try to resume deferred root nodes in the process of suspending their tree
+    auto [deferredRootId, source] = _id_and_source_of_deferred_root_to_reactivate;
+    if (deferredRootId >= 0) {
+        if (_reactivation_scheduler.checkResumeDeferredRoot(deferredRootId)) {
+            handleJobAfterArrivedJobDescription(deferredRootId, source);
+            _id_and_source_of_deferred_root_to_reactivate = {-1, -1};
+        }
+    }
+
     for (auto& [id, job] : _job_registry.getJobMap()) {
         if (job->getState() == SUSPENDED) job->communicate();
     }
@@ -514,6 +524,17 @@ void SchedulingManager::handleIncomingJobDescription(MessageHandle& handle) {
     // Append revision description to job
     int jobId;
     if (!_desc_interface.handleIncomingJobDescription(handle, jobId)) return;
+    if (_reactivation_scheduler.checkResumeDeferredRoot(jobId)) {
+        handleJobAfterArrivedJobDescription(jobId, handle.source);
+    } else {
+        // This root node cannot be resumed yet
+        // since its suspension protocol is not done yet!
+        // Remember the id and source to resume later.
+        _id_and_source_of_deferred_root_to_reactivate = {jobId, handle.source};
+    }
+}
+
+void SchedulingManager::handleJobAfterArrivedJobDescription(int jobId, int source) {
 
     // If job has not started yet, execute it now
     Job& job = get(jobId);
@@ -522,12 +543,12 @@ void SchedulingManager::handleIncomingJobDescription(MessageHandle& handle) {
             const auto& req = _job_registry.getCommitment(jobId);
             job.setDesiredRevision(req.revision);
         }
-        execute(job, handle.source);
+        execute(job, source);
         initiateVolumeUpdate(job);
     }
     
     if (job.getState() == ACTIVE)
-        _desc_interface.queryNextRevisionIfNeeded(job, handle.source);
+        _desc_interface.queryNextRevisionIfNeeded(job, source);
 }
 
 void SchedulingManager::handleQueryForExplicitVolumeUpdate(MessageHandle& handle) {
