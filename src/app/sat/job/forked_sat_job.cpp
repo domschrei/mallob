@@ -89,8 +89,10 @@ void ForkedSatJob::appl_suspend() {
     _clause_comm->communicate();
 }
 
-void ForkedSatJob::appl_resume() {
+void ForkedSatJob::appl_resume(int revision) {
     if (!_initialized) return;
+    if (revision > getDesiredRevision())
+        _solver->updateTargetRevision(revision);
     _solver->setSolvingState(SolvingStates::ACTIVE);
     _clause_comm->communicate();
 }

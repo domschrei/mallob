@@ -104,7 +104,7 @@ public:
 
 	SharingStatistics getStatistics();
 
-	void setRevision(int revision) {_current_revision = revision;}
+	void setRevision(int revision) {_current_revision = std::max(_current_revision, revision);}
 	void stopClauseImport(int solverId);
 
 	void continueClauseImport(int solverId);

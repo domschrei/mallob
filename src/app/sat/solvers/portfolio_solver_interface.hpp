@@ -141,8 +141,9 @@ public:
 	void setCurrentCondVarOrZero(int condVarOrZero) {_current_cond_var_or_zero = condVarOrZero;}
 	void setExtLearnedClauseCallback(const ExtLearnedClauseCallback& callback);
 
-	void setCurrentRevision(int revision) {_current_revision = revision;}
-	int getCurrentRevision() const {return _current_revision;}
+	void setCurrentRevision(int revision) {
+		if (_import_manager) _import_manager->updateSolverRevision(revision);
+	}
 
 	Logger& getLogger() {return _logger;}
 	
@@ -164,8 +165,9 @@ public:
 	// Add a learned clause to the formula
 	// The learned clauses might be added later or possibly never
 	void addLearnedClause(const Mallob::Clause& c);
-	void addLearnedClauses(BufferReader& reader) {
+	void addLearnedClauses(BufferReader& reader, int revision) {
 		if (_clause_sharing_disabled) return;
+		_import_manager->updateGlobalRevision(revision);
 		_import_manager->performImport(reader);
 	}
 
@@ -187,7 +189,6 @@ private:
 	int _diversification_index;
 	bool _clause_sharing_disabled = false;
 	std::atomic_int _current_cond_var_or_zero = 0;
-	std::atomic_int _current_revision = 0;
 	std::atomic_bool _terminated = false;
 
 	SolverStatistics _stats;

@@ -118,6 +118,7 @@ public:
     void reduceThreadCount();
 
     void setSolvingState(SolvingStates::SolvingState state);
+    void updateTargetRevision(int revision) {_desired_revision = std::max(_desired_revision, revision);}
 
     int getStartedNumThreads() const {return _config.threads;}
 

@@ -51,8 +51,9 @@ void ThreadedSatJob::appl_suspend() {
     _clause_comm->communicate();
 }
 
-void ThreadedSatJob::appl_resume() {
+void ThreadedSatJob::appl_resume(int revision) {
     if (!_initialized) return;
+    getSolver()->updateTargetRevision(revision);
     getSolver()->unsetPaused();
 }
 

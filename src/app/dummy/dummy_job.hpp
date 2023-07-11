@@ -18,7 +18,7 @@ public:
         : Job(params, setup, table) {}
     void appl_start() override {}
     void appl_suspend() override {}
-    void appl_resume() override {}
+    void appl_resume(int revision) override {}
     void appl_terminate() override {}
     int appl_solved() override {return -1;}
     JobResult&& appl_getResult() override {return std::move(_result);}

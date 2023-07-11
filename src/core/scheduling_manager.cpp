@@ -140,7 +140,7 @@ RequestMatcher* SchedulingManager::createRequestMatcher() {
 void SchedulingManager::execute(Job& job, int source) {
 
     // Remove commitment
-    uncommit(job, /*leaving=*/false);
+    auto req = uncommit(job, /*leaving=*/false);
 
     // Execute job
     int jobId = job.getId();
@@ -151,7 +151,7 @@ void SchedulingManager::execute(Job& job, int source) {
         job.start();
     } else {
         // Restart job
-        job.resume();
+        job.resume(req.revision);
     }
 
     int demand = job.getDemand();
@@ -986,8 +986,8 @@ void SchedulingManager::commit(Job& job, JobRequest& req) {
     }
 }
 
-void SchedulingManager::uncommit(Job& job, bool leaving) {
-    if (!job.hasCommitment()) return;
+JobRequest SchedulingManager::uncommit(Job& job, bool leaving) {
+    if (!job.hasCommitment()) return JobRequest();
     LOG(V3_VERB, "UNCOMMIT %s\n", job.toStr());
     
     auto optReq = job.uncommit();
@@ -1002,6 +1002,7 @@ void SchedulingManager::uncommit(Job& job, bool leaving) {
         job.getRequestToMultiply(/*left=*/true).reset();
         job.getRequestToMultiply(/*left=*/false).reset();
     }
+    return optReq.value();
 }
 
 SchedulingManager::AdoptionResult SchedulingManager::tryAdopt(JobRequest& req, JobRequestMode mode, int sender) {
@@ -1093,7 +1094,7 @@ void SchedulingManager::resume(Job& job, const JobRequest& req, int source) {
     setLoad(1, req.jobId);
     LOG_ADD_SRC(V3_VERB, "RESUME %s", source, 
                 Job::toStr(req.jobId, req.requestedNodeIndex).c_str());
-    job.resume();
+    job.resume(req.revision);
 
     int demand = job.getDemand();
     _balancer.onActivate(job, demand);

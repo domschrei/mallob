@@ -88,7 +88,7 @@ private:
     void propagateVolumeUpdate(Job& job, int volume, int balancingEpoch);
 
     void commit(Job& job, JobRequest& req);
-    void uncommit(Job& job, bool leaving);
+    JobRequest uncommit(Job& job, bool leaving);
     void execute(Job& job, int source);
     void resume(Job& job, const JobRequest& req, int source);
     void suspend(Job& job);

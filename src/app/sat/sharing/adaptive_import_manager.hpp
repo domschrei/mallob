@@ -65,6 +65,12 @@ public:
             return _plain_units_out;
         }
 
+        auto lock = _mtx_revision.getLock();
+        if (!canImport()) {
+            _plain_units_out.clear();
+            return _plain_units_out;
+        }
+
         int numUnits = 0;
         int numLits = 0;
         std::vector<int> buf;
@@ -82,6 +88,12 @@ public:
     Mallob::Clause& get(AdaptiveClauseStore::ExportMode mode) override {
 
         if (_pcb.getCurrentlyUsedLiterals() == 0) {
+            _clause_out.begin = nullptr;
+            return _clause_out;
+        }
+
+        auto lock = _mtx_revision.getLock();
+        if (!canImport()) {
             _clause_out.begin = nullptr;
             return _clause_out;
         }

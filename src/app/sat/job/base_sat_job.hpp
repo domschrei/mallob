@@ -62,7 +62,7 @@ public:
 
     virtual void appl_start() override = 0;
     virtual void appl_suspend() override = 0;
-    virtual void appl_resume() override = 0;
+    virtual void appl_resume(int revision) override = 0;
     virtual void appl_terminate() override = 0;
 
     virtual int appl_solved() override = 0;

@@ -164,7 +164,7 @@ void SatProcessAdapter::appendRevisions(const std::vector<RevisionData>& revisio
     {
         auto lock = _revisions_mutex.getLock();
         _revisions_to_write.insert(_revisions_to_write.end(), revisions.begin(), revisions.end());
-        _desired_revision = desiredRevision;
+        _desired_revision = std::max(_desired_revision, desiredRevision);
         _num_revisions_to_write += revisions.size();
     }
     doWriteRevisions();
@@ -246,6 +246,7 @@ bool SatProcessAdapter::process(BufferTask& task) {
         if (_epoch_of_export_buffer == task.epoch) {
             memcpy(_filter_buffer, buffer.data(), buffer.size()*sizeof(int));
             _hsm->importEpoch = task.epoch;
+            _hsm->clauseBufferRevision = _desired_revision;
             _hsm->doDigestImportWithFilter = true;
         } // else: discard this filter since the clauses are not present in any buffer
 
@@ -259,6 +260,7 @@ bool SatProcessAdapter::process(BufferTask& task) {
         _hsm->importBufferSize = buffer.size() - InplaceClauseAggregation::numMetadataInts();
         _hsm->importBufferRevision = _desired_revision;
         _hsm->importEpoch = task.epoch;
+        _hsm->clauseBufferRevision = _desired_revision;
         assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
         memcpy(_import_buffer, buffer.data(), _hsm->importBufferSize*sizeof(int));
         _hsm->doDigestImportWithoutFilter = true;
@@ -267,6 +269,7 @@ bool SatProcessAdapter::process(BufferTask& task) {
         _hsm->historicEpochBegin = task.epoch;
         _hsm->historicEpochEnd = task.epochEnd;
         _hsm->importBufferSize = buffer.size();
+        _hsm->clauseBufferRevision = _desired_revision;
         assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
         memcpy(_import_buffer, buffer.data(), buffer.size()*sizeof(int));
         _hsm->doDigestHistoricClauses = true;

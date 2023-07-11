@@ -98,11 +98,11 @@ void Job::suspend() {
     updateVolumeAndUsedCpu(getVolume());
 }
 
-void Job::resume() {
+void Job::resume(int revision) {
     assertState(SUSPENDED);
     _volume = std::max(1, _volume);
     _state = ACTIVE;
-    appl_resume();
+    appl_resume(revision);
     LOG(V4_VVER, "%s : resumed solving threads\n", toStr());
     _time_of_last_limit_check = Timer::elapsedSecondsCached();
 }

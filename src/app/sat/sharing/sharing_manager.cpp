@@ -344,7 +344,6 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 		auto& solver = _solvers[i];
 		if (!solver || !_solver_stats[i]) continue; // solver was cleaned up
 		if (!solver->isClauseSharingEnabled()) continue;
-		if (solver->getCurrentRevision() != _current_revision) continue;
 		importingSolvers.emplace_back(solver.get(), _solver_stats[i], _id_alignment.get());
 	}
 
@@ -395,7 +394,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 		for (auto& slv : importingSolvers) {
 			BufferReader reader = _clause_store->getBufferReader(begin, buflen);
 			reader.setFilterBitset(slv.filter);
-			slv.solver->addLearnedClauses(reader);
+			slv.solver->addLearnedClauses(reader, _current_revision);
 		}
 	}
 	
