@@ -287,6 +287,11 @@ int main(int argc, char *argv[]) {
         for (auto file : FileUtils::glob("/tmp/mallob.apipath.*")) {
             doRemove(file);
         }
+
+        // Wait for all processes to have cleaned up before proceeding
+        // (creating new files which shouldn't be cleaned up!)
+        MPI_Barrier(MPI_COMM_WORLD);
+        LOG(V4_VVER, "Passed cleanup barrier\n");
     }
 
     auto isWorker = [&](int rank) {
