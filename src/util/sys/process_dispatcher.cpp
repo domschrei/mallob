@@ -21,13 +21,17 @@ void ProcessDispatcher::dispatch() {
     // Read command from tmp file
     pid_t myPid = Proc::getPid();
     std::string commandOutfile = "/tmp/mallob_subproc_cmd_" + std::to_string(myPid);
-    std::ifstream ifs(commandOutfile);
-    while (!ifs.is_open()) {
-        usleep(100);
-        ifs = std::ifstream(commandOutfile);
+    std::string command;
+    {
+        std::ifstream ifs(commandOutfile);
+        while (!ifs.is_open()) {
+            usleep(100);
+            ifs = std::ifstream(commandOutfile);
+        }
+        command = std::string(std::istreambuf_iterator<char>(ifs),
+            std::istreambuf_iterator<char>());
     }
-    std::string command((std::istreambuf_iterator<char>(ifs)),
-                    (std::istreambuf_iterator<char>()));
+    FileUtils::rm(commandOutfile); // clean up immediately
 
     // Assemble arguments list
     int numArgs = 0;
