@@ -242,7 +242,7 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Stat
 
     bool useSolutionFile = (_params.pipeSolutions() == MALLOB_PIPE_SOLUTIONS_ALL && result.getSolutionSize() > 0)
         || (_params.pipeSolutions() == MALLOB_PIPE_SOLUTIONS_LARGE && result.getSolutionSize() > 65536);
-    auto solutionFile = TmpDir::get() + "/mallob-job-result."
+    auto solutionFile = _output_dir + "/mallob-job-result."
         + std::to_string(result.id) + "." 
         + std::to_string(result.revision) + ".pipe";
 

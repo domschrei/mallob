@@ -237,6 +237,9 @@ void Client::init() {
             else ofs << std::filesystem::current_path().string() + "/" + path;
         }
         LOG(V2_INFO, "Set up filesystem interface at %s\n", path.c_str());
+        // Tell JSON interface to output non-JSON result files to the interface path, too
+        _json_interface->setOutputDirectory(path);
+
         auto logger = Logger::getMainInstance().copy("I-FS", ".i-fs");
         auto conn = _params.inotify() ? 
             (Connector*) new InotifyFilesystemConnector(*_json_interface, _params, std::move(logger), path)

@@ -14,6 +14,7 @@
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
 #include "api/job_id_allocator.hpp"
+#include "util/sys/tmpdir.hpp"
 
 class Parameters; // fwd declaration
 
@@ -39,6 +40,7 @@ public:
 private:
     const Parameters& _params;
     Logger _logger;
+    std::string _output_dir;
 
     Mutex _job_map_mutex;
     JobIdAllocator _job_id_allocator;
@@ -54,10 +56,15 @@ public:
             std::function<void(JobMetadata&&)> jobCallback, JobIdAllocator&& jobIdAllocator) : 
         _params(params),
         _logger(std::move(logger)),
+        _output_dir(TmpDir::get()),
         _job_map_mutex(),
         _job_id_allocator(std::move(jobIdAllocator)),
         _job_callback(jobCallback) {}
     ~JsonInterface() {}
+
+    void setOutputDirectory(const std::string& outputDir) {
+        _output_dir = outputDir;
+    }
 
     // User-side events
     enum Result {ACCEPT, ACCEPT_CONCLUDE, DISCARD};
