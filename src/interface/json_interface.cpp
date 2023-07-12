@@ -13,6 +13,7 @@
 #include "app/sat/job/sat_constants.h"
 #include "util/sys/thread_pool.hpp"
 #include "app/app_registry.hpp"
+#include "util/sys/tmpdir.hpp"
 
 JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson, 
     std::function<void(nlohmann::json&)> feedback) {
@@ -241,7 +242,7 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Stat
 
     bool useSolutionFile = (_params.pipeSolutions() == MALLOB_PIPE_SOLUTIONS_ALL && result.getSolutionSize() > 0)
         || (_params.pipeSolutions() == MALLOB_PIPE_SOLUTIONS_LARGE && result.getSolutionSize() > 65536);
-    auto solutionFile = "/tmp/mallob-job-result." 
+    auto solutionFile = TmpDir::get() + "/mallob-job-result."
         + std::to_string(result.id) + "." 
         + std::to_string(result.revision) + ".pipe";
 

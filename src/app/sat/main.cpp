@@ -17,6 +17,7 @@
 #include "data/checksum.hpp"
 #include "execution/sat_process.hpp"
 #include "util/sys/fileutils.hpp"
+#include "util/sys/tmpdir.hpp"
 
 #ifndef MALLOB_VERSION
 #define MALLOB_VERSION "(dbg)"
@@ -62,7 +63,7 @@ int main(int argc, char *argv[]) {
     LOG(V3_VERB, "Mallob SAT engine %s pid=%lu\n", MALLOB_VERSION, pid);
     
     // Clean up subprocess command tmp file
-    FileUtils::rm("/tmp/mallob_subproc_cmd_" + std::to_string(pid));
+    FileUtils::rm(TmpDir::get() + "/mallob_subproc_cmd_" + std::to_string(pid));
     
     try {
         // Launch program

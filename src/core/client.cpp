@@ -21,6 +21,7 @@
 #include "util/sys/thread_pool.hpp"
 #include "util/sys/atomics.hpp"
 #include "app/app_registry.hpp"
+#include "util/sys/tmpdir.hpp"
 #include "util/sys/watchdog.hpp"
 
 #include "interface/socket/socket_connector.hpp"
@@ -230,7 +231,7 @@ void Client::init() {
         std::string path = getFilesystemInterfacePath();
         {
             // Write the available job submission path to an availability tmp file
-            std::ofstream ofs("/tmp/mallob.apipath." + std::to_string(Proc::getPid()));
+            std::ofstream ofs(TmpDir::get() + "/mallob.apipath." + std::to_string(Proc::getPid()));
             // Differentiate absolute vs. relative path
             if (path[0] == '/') ofs << path;
             else ofs << std::filesystem::current_path().string() + "/" + path;
@@ -274,7 +275,7 @@ std::string Client::getFilesystemInterfacePath() {
 }
 
 std::string Client::getSocketPath() {
-    return "/tmp/mallob_" + std::to_string(Proc::getPid()) + "." + std::to_string(getInternalRank()) + ".sk";
+    return TmpDir::get() + "/mallob_" + std::to_string(Proc::getPid()) + "." + std::to_string(getInternalRank()) + ".sk";
 } 
 
 APIConnector& Client::getAPI() {
@@ -646,7 +647,7 @@ Client::~Client() {
     _instance_reader.stop();
     _json_interface.reset();
 
-    FileUtils::rm("/tmp/mallob.apipath." + std::to_string(Proc::getPid()));
+    FileUtils::rm(TmpDir::get() + "/mallob.apipath." + std::to_string(Proc::getPid()));
 
     LOG(V4_VVER, "Leaving client destructor\n");
 }

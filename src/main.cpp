@@ -23,6 +23,7 @@
 #include "comm/host_comm.hpp"
 #include "data/job_transfer.hpp"
 #include "comm/msg_queue/message_subscription.hpp"
+#include "util/sys/tmpdir.hpp"
 
 #include "app/.register_includes.h"
 
@@ -286,7 +287,7 @@ int main(int argc, char *argv[]) {
         for (auto file : FileUtils::glob("/dev/shm/edu.kit.iti.mallob.*")) {
             doRemove(file);
         }
-        for (auto file : FileUtils::glob("/tmp/mallob.apipath.*")) {
+        for (auto file : FileUtils::glob(TmpDir::get() + "/mallob.apipath.*")) {
             doRemove(file);
         }
 

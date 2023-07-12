@@ -1,6 +1,7 @@
 
 #include "process_dispatcher.hpp"
 
+#include <cstdlib>
 #include <sys/types.h>
 #include <stdlib.h>
 #include <fstream>
@@ -15,12 +16,13 @@
 #include "comm/mympi.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "util/sys/fileutils.hpp"
+#include "util/sys/tmpdir.hpp"
 
 void ProcessDispatcher::dispatch() {
 
     // Read command from tmp file
     pid_t myPid = Proc::getPid();
-    std::string commandOutfile = "/tmp/mallob_subproc_cmd_" + std::to_string(myPid);
+    std::string commandOutfile = TmpDir::get() + "/mallob_subproc_cmd_" + std::to_string(myPid);
     std::string command;
     {
         std::ifstream ifs(commandOutfile);

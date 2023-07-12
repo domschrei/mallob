@@ -5,6 +5,7 @@
 #include "util/params.hpp"
 #include "util/sys/process.hpp"
 #include "util/assert.hpp"
+#include "util/sys/tmpdir.hpp"
 #include <ctime>
 #include <string>
 #include <fstream>
@@ -16,7 +17,7 @@ where an MPI process is the parent, this is done in a quite awkward manner to be
 absolutely safe: The forked process does not touch any non-constant memory and
 immediately executes a generic, parameter-free "dispatcher" executable.
 The parent process then communicates the actual command and args to execute to
-the dispatcher via a /tmp file qualified by the dispatcher's PID.
+the dispatcher via a tmp file qualified by the dispatcher's PID.
 Obviously this results in additional overhead, so spawning a subprocess via this
 interface should be done sparingly.
 */
@@ -55,7 +56,7 @@ public:
         std::string command = _params.getSubprocCommandAsString(executable.c_str());
         
         // Write command to tmp file (to be read by child process)
-        std::string commandOutfile = "/tmp/mallob_subproc_cmd_" + std::to_string(res) + "~";
+        std::string commandOutfile = TmpDir::get() + "/mallob_subproc_cmd_" + std::to_string(res) + "~";
         {
             std::ofstream ofs(commandOutfile);
             ofs << command << " " << std::endl;

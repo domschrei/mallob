@@ -14,6 +14,7 @@
 #include "util/sys/fileutils.hpp"
 #include "comm/sysstate.hpp"
 #include "util/sys/proc.hpp"
+#include "util/sys/tmpdir.hpp"
 
 class HostComm {
 
@@ -23,6 +24,7 @@ private:
     MPI_Comm _comm;
 
     std::string _base_filename;
+    std::string _hash_string;
 
     SysState<4>* _sysstate = nullptr;
     const int SYSSTATE_PROCESS_USED_MEMORY = 0;
@@ -51,9 +53,9 @@ public:
         auto paramsHash = robin_hood::hash<std::string>()(_params.getParamsAsString());
         std::stringstream hashStream;
         hashStream << std::hex << paramsHash;
-        std::string hashString(hashStream.str());
+        _hash_string = std::string(hashStream.str());
         // Create empty file
-        _base_filename = "/tmp/mallob.colleaguerecognition." + hashString + "."; 
+        _base_filename = TmpDir::get() + "/mallob.colleaguerecognition." + _hash_string + ".";
         std::ofstream output(_base_filename + std::to_string(MyMpi::rank(_parent_comm)));
     }
 
@@ -71,11 +73,11 @@ public:
             auto files = FileUtils::glob(_base_filename + "*");
             int nbWorkersThisMachine = files.size();
             static constexpr ctll::fixed_string REGEX_COLLEAGUE_RECOGNITION = 
-                ctll::fixed_string{ "(/tmp/mallob\\.colleaguerecognition\\.[0-9a-f]+\\.)([0-9\\.]+)" };
+                ctll::fixed_string{ "/mallob\\.colleaguerecognition\\.([0-9a-f]+)\\.([0-9\\.]+)" };
             int minRank = MyMpi::size(MPI_COMM_WORLD);
             for (auto& file : files) {
-                auto match = ctre::match<REGEX_COLLEAGUE_RECOGNITION>(file);
-                if (match.get<1>().to_string() == _base_filename) {
+                auto match = ctre::search<REGEX_COLLEAGUE_RECOGNITION>(file);
+                if (match.get<1>().to_string() == _hash_string) {
                     int rank = std::stoi(match.get<2>().to_string());
                     minRank = std::min(minRank, rank);
                 }
