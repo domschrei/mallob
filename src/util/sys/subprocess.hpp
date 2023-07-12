@@ -6,9 +6,11 @@
 #include "util/sys/process.hpp"
 #include "util/assert.hpp"
 #include "util/sys/tmpdir.hpp"
+#include <cstdlib>
 #include <ctime>
 #include <string>
 #include <fstream>
+#include <sys/stat.h>
 #include <unistd.h>
 
 /*
@@ -33,14 +35,15 @@ public:
     }
 
     pid_t start() {
+
         // FORK: Create a child process
         pid_t res = Process::createChild();
         if (res == 0) {
             // [child process]
             // Danger zone: Do not touch any memory.
-            execl(MALLOB_SUBPROC_DISPATCH_PATH"mallob_process_dispatcher", 
+            execle(MALLOB_SUBPROC_DISPATCH_PATH"mallob_process_dispatcher",
                 MALLOB_SUBPROC_DISPATCH_PATH"mallob_process_dispatcher", 
-                (char*) 0);
+                (char*) 0, environ);
             
             // If this is reached, something went very wrong with execvp
             LOG(V0_CRIT, "[ERROR] execl returned errno %i\n", (int)errno);
@@ -56,12 +59,12 @@ public:
         std::string command = _params.getSubprocCommandAsString(executable.c_str());
         
         // Write command to tmp file (to be read by child process)
-        std::string commandOutfile = TmpDir::get() + "/mallob_subproc_cmd_" + std::to_string(res) + "~";
+        std::string commandOutfile = TmpDir::get() + "/mallob_subproc_cmd_" + std::to_string(res);
+        mkfifo(commandOutfile.c_str(), 0666);
         {
             std::ofstream ofs(commandOutfile);
             ofs << command << " " << std::endl;
         }
-        std::rename(commandOutfile.c_str(), commandOutfile.substr(0, commandOutfile.size()-1).c_str()); // remove tilde
         return res;
     }
 

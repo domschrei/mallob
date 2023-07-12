@@ -35,6 +35,7 @@ int main(int argc, char *argv[]) {
     Timer::init(t);
 
     int rankOfParent = config.mpirank;
+    TmpDir::init(rankOfParent);
 
     Random::init(config.mpisize, rankOfParent);
 
@@ -61,10 +62,7 @@ int main(int argc, char *argv[]) {
     
     pid_t pid = Proc::getPid();
     LOG(V3_VERB, "Mallob SAT engine %s pid=%lu\n", MALLOB_VERSION, pid);
-    
-    // Clean up subprocess command tmp file
-    FileUtils::rm(TmpDir::get() + "/mallob_subproc_cmd_" + std::to_string(pid));
-    
+
     try {
         // Launch program
         SatProcess p(params, config, Logger::getMainInstance());

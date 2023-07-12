@@ -20,9 +20,12 @@
 
 void ProcessDispatcher::dispatch() {
 
+    const char* tmpdirCStr = std::getenv("MALLOB_TMP_DIR");
+    std::string tmpdir = tmpdirCStr ? tmpdirCStr : "/tmp";
+
     // Read command from tmp file
     pid_t myPid = Proc::getPid();
-    std::string commandOutfile = TmpDir::get() + "/mallob_subproc_cmd_" + std::to_string(myPid);
+    std::string commandOutfile = tmpdir + "/mallob_subproc_cmd_" + std::to_string(myPid);
     std::string command;
     {
         std::ifstream ifs(commandOutfile);
