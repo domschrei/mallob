@@ -231,7 +231,9 @@ void Client::init() {
         {
             // Write the available job submission path to an availability tmp file
             std::ofstream ofs("/tmp/mallob.apipath." + std::to_string(Proc::getPid()));
-            ofs << std::filesystem::current_path().string() + "/" + path;
+            // Differentiate absolute vs. relative path
+            if (path[0] == '/') ofs << path;
+            else ofs << std::filesystem::current_path().string() + "/" + path;
         }
         LOG(V2_INFO, "Set up filesystem interface at %s\n", path.c_str());
         auto logger = Logger::getMainInstance().copy("I-FS", ".i-fs");
@@ -268,7 +270,7 @@ int Client::getInternalRank() {
 }
 
 std::string Client::getFilesystemInterfacePath() {
-    return ".api/jobs." + std::to_string(getInternalRank()) + "/";
+    return _params.apiDirectory() + "/jobs." + std::to_string(getInternalRank()) + "/";
 }
 
 std::string Client::getSocketPath() {

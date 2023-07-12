@@ -44,14 +44,15 @@ OPTION_GROUP(grpGeneral, "general", "General")
 OPTION_GROUP(grpInterface, "interface", "Interface")
  OPT_INT(activeJobsPerClient,             "ajpc", "active-jobs-per-client",            0,         0, LARGE_INT, "Make each client have up to this many active jobs at any given time")
  OPT_STRING(clientTemplate,               "client-template", "",                       "",                      "JSON template file which each client uses to decide on job parameters (with -job-template option)") //[[AUTOCOMPLETE_FILE]]
- OPT_INT(firstApiIndex,                   "fapii", "first-api-index",                  0,    0, LARGE_INT,      "1st API index: with c clients, uses .api/jobs.{<index>..<index>+c-1}/ as directories")
+ OPT_STRING(apiDirectory,                 "apidir", "api-dir",                         ".api",                  "Directory for filesystem API")
+ OPT_INT(firstApiIndex,                   "fapii", "first-api-index",                  0,    0, LARGE_INT,      "1st API index: with c clients, uses [-apidir]/jobs.{<index>..<index>+c-1}/ as directories")
  OPT_BOOL(inotify,                        "inotify", "",                               true,                    "Use inotify for filesystem interface (otherwise, use naive directory polling)")
  OPT_STRING(jobDescriptionTemplate,       "job-desc-template", "",                     "",                      "Plain text file, one file path per line, to use as job descriptions (with -job-template option)") //[[AUTOCOMPLETE_FILE]]
  OPT_STRING(jobTemplate,                  "job-template", "",                          "",                      "JSON template file which each client uses to instantiate jobs indeterminately") //[[AUTOCOMPLETE_FILE]]
  OPT_INT(loadedJobsPerClient,             "ljpc", "loaded-jobs-per-client",            32,   0, LARGE_INT,      "Limit for how many job descriptions each client is allowed to have loaded at the same time")
  OPT_INT(maxJobsPerStreamer,              "mjps", "max-jobs-per-streamer",             0,    0, LARGE_INT,      "Maximum number of jobs to introduce per streamer")
  OPT_BOOL(shuffleJobDescriptions,         "sjd", "shuffle-job-descriptions",           false,                   "Shuffle job descriptions given via -job-desc-template option")
- OPT_BOOL(useFilesystemInterface,         "interface-fs", "",                          true,                    "Use filesystem interface (.api/{in,out}/*.json)")
+ OPT_BOOL(useFilesystemInterface,         "interface-fs", "",                          true,                    "Use filesystem interface ([-apidir]/jobs.*/{in,out}/*.json)")
  OPT_BOOL(useIPCSocketInterface,          "interface-ipc", "",                         false,                   "Use IPC socket interface (.mallob.<pid>.sk)")
  OPT_STRING(streamerResultOutput,         "sro", "streamer-result-output",             "",                      "Path for streamer to write result metadata to")
 
