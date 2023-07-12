@@ -98,9 +98,10 @@ private:
         const auto& descPtr = job.getSerializedDescription(revision);
         assert(descPtr->size() == job.getDescription().getTransferSize(revision) 
             || LOG_RETURN_FALSE("%i != %i\n", descPtr->size(), job.getDescription().getTransferSize(revision)));
+        LOG_ADD_DEST(V4_VVER, "Sending job desc. of %s rev. %i, size %lu", dest,
+                job.toStr(), revision, descPtr->size());
         int sendId = MyMpi::isend(dest, MSG_SEND_JOB_DESCRIPTION, descPtr);
-        LOG_ADD_DEST(V4_VVER, "Sent job desc. of %s rev. %i, size %lu, id=%i", dest, 
-                job.toStr(), revision, descPtr->size(), sendId);
+        LOG_ADD_DEST(V4_VVER, "Sent id=%i", dest, sendId);
         job.getJobTree().addSendHandle(dest, sendId);
         _send_id_to_job_id[sendId] = job.getId();
     }

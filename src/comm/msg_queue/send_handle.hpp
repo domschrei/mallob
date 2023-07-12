@@ -35,6 +35,7 @@ struct SendHandle {
         sentBatches = 0;
         totalNumBatches = data.size() <= sizePerBatch+3*sizeof(int) ? 1 
             : std::ceil(data.size() / (float)sizePerBatch);
+        assert(totalNumBatches > 0);
     }
 
     bool valid() {return id != -1;}
@@ -122,6 +123,7 @@ struct SendHandle {
         memcpy(tempStorage.data(), data.data()+begin, end-begin);
         // Copy meta data at insertion point
         memcpy(tempStorage.data()+(end-begin), &id, sizeof(int));
+        assert(totalNumBatches > 0);
         memcpy(tempStorage.data()+(end-begin)+sizeof(int), &sentBatches, sizeof(int));
         memcpy(tempStorage.data()+(end-begin)+2*sizeof(int), &totalNumBatches, sizeof(int));
 
