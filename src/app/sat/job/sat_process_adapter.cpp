@@ -14,6 +14,7 @@
 #include "../execution/engine.hpp"
 #include "util/sys/shared_memory.hpp"
 #include "util/sys/proc.hpp"
+#include "util/sys/subprocess.hpp"
 #include "util/sys/timer.hpp"
 #include "util/sys/process.hpp"
 #include "util/logger.hpp"
@@ -118,33 +119,9 @@ void SatProcessAdapter::doInitialize() {
 
     if (_terminate) return;
 
-    // FORK: Create a child process
-    pid_t res = Process::createChild();
-    if (res == 0) {
-        // [child process]
-        execl(MALLOB_SUBPROC_DISPATCH_PATH"mallob_process_dispatcher", 
-              MALLOB_SUBPROC_DISPATCH_PATH"mallob_process_dispatcher", 
-              (char*) 0);
-        
-        // If this is reached, something went wrong with execvp
-        LOG(V0_CRIT, "[ERROR] execl returned errno %i\n", (int)errno);
-        abort();
-    }
-
-    // Assemble SAT subprocess command
-    std::string executable = MALLOB_SUBPROC_DISPATCH_PATH"mallob_sat_process";
-    //char* const* argv = _params.asCArgs(executable.c_str());
-    std::string command = _params.getSubprocCommandAsString(executable.c_str());
-    
-    // Write command to tmp file
-    std::string commandOutfile = "/tmp/mallob_subproc_cmd_" + std::to_string(res) + "~";
-    std::ofstream ofs(commandOutfile);
-    ofs << command << " " << std::endl;
-    ofs.close();
-    std::rename(commandOutfile.c_str(), commandOutfile.substr(0, commandOutfile.size()-1).c_str()); // remove tilde
-
-    //int i = 0;
-    //delete[] ((const char**) argv);
+    // Create SAT solving child process
+    Subprocess subproc(_params, "mallob_sat_process");
+    pid_t res = subproc.start();
 
     {
         auto lock = _state_mutex.getLock();

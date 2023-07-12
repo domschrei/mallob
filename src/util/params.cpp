@@ -150,7 +150,7 @@ std::string Parameters::getParamsAsString() const {
     return out;
 }
 
-std::string Parameters::getSubprocCommandAsString(const char* execName) {
+std::string Parameters::getSubprocCommandAsString(const char* execName) const {
 
     std::string out;
 

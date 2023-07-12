@@ -8,6 +8,7 @@
 
 #include "comm/mympi.hpp"
 #include "interface/api/rank_specific_file_fetcher.hpp"
+#include "util/sys/subprocess.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
 #include "util/random.hpp"
@@ -146,9 +147,10 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
             clientAppWorkers.back().run([&, i]() {
                 RankSpecificFileFetcher fetcher(i);
                 assert(params.logDirectory.isSet());
-                std::string appCmd = fetcher.get(params.clientApplication())
-                    + " 2>&1 > " + params.logDirectory() + "/clientapp." + std::to_string(i);
-                int systemRetVal = system(appCmd.c_str());
+                std::string appCmd = fetcher.get(params.clientApplication());
+                //+ " 2>&1 > " + params.logDirectory() + "/clientapp." + std::to_string(i);
+                Subprocess subproc(params, appCmd);
+                pid_t res = subproc.start();
             });
         }
     }
