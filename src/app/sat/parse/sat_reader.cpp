@@ -14,6 +14,7 @@
 #include "util/params.hpp"
 #include "util/sys/terminator.hpp"
 #include "util/sys/timer.hpp"
+#include "util/sys/tmpdir.hpp"
 
 void handleUnsat(const Parameters& _params) {
 	LOG_OMIT_PREFIX(V0_CRIT, "s UNSATISFIABLE\n");
@@ -175,9 +176,9 @@ bool SatReader::read(JobDescription& desc) {
 		desc.setAppConfigurationEntry(dest, nbStr);
 	}
 
-	{
-		std::ofstream ofs(".preprocessed-header.pipe", std::ofstream::app);
-		std::string out = "p cnf 0 " + std::to_string(_num_read_clauses) + "\n";
+	if (_params.satPreprocessor.isSet()) {
+		std::ofstream ofs(TmpDir::get() + "/preprocessed-header.pipe", std::ofstream::app);
+		std::string out = "p cnf " + std::to_string(_max_var) + " " + std::to_string(_num_read_clauses) + "\n";
 		if (ofs.is_open()) ofs.write(out.c_str(), out.size());
 	}
 
