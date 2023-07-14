@@ -7,6 +7,7 @@
 #include <atomic>
 
 #include "comm/mympi.hpp"
+#include "data/job_transfer.hpp"
 #include "util/params.hpp"
 #include "data/job_description.hpp"
 #include "util/sys/threading.hpp"
@@ -124,6 +125,8 @@ private:
     void readIncomingJobs();
     
     void handleOfferAdoption(MessageHandle& handle);
+    void sendJobDescription(JobRequest& req, int destRank);
+
     void handleJobDone(MessageHandle& handle);
     void handleAbort(MessageHandle& handle);
     void handleSendJobResult(MessageHandle& handle);

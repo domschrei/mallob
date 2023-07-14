@@ -1,6 +1,8 @@
 
 #include "scheduling_manager.hpp"
 
+#include "comm/msg_queue/message_handle.hpp"
+#include "comm/msgtags.h"
 #include "data/job_state.h"
 #include "data/job_transfer.hpp"
 #include "util/assert.hpp"
@@ -104,7 +106,9 @@ SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm,
     _subscriptions.emplace_back(MSG_JOB_TREE_BROADCAST, 
         [&](auto& h) {handleApplicationMessage(h);});
     _subscriptions.emplace_back(MSG_SEND_JOB_DESCRIPTION, 
-        [&](auto& h) {handleIncomingJobDescription(h);});
+        [&](auto& h) {handleIncomingJobDescription(h, false);});
+    _subscriptions.emplace_back(MSG_DEPLOY_NEW_REVISION,
+        [&](auto& h) {handleIncomingJobDescription(h, true);});
     _subscriptions.emplace_back(MSG_NOTIFY_ASSIGNMENT_UPDATE, 
         [&](auto& h) {_req_matcher->handle(h);});
     _subscriptions.emplace_back(MSG_SCHED_RELEASE_FROM_WAITING, 
@@ -519,11 +523,18 @@ void SchedulingManager::handleAnswerToAdoptionOffer(MessageHandle& handle) {
     }
 }
 
-void SchedulingManager::handleIncomingJobDescription(MessageHandle& handle) {
+void SchedulingManager::handleIncomingJobDescription(MessageHandle& handle, bool deployNewRevision) {
 
     // Append revision description to job
     int jobId;
     if (!_desc_interface.handleIncomingJobDescription(handle, jobId)) return;
+    if (deployNewRevision) {
+        Job& job = get(jobId);
+        if (!job.getJobTree().isRoot()) return;
+        assert(job.getRevision() > 0);
+        auto req = _req_mgr.getIncrementalRootJobRequest(jobId, job.getRevision());
+        commit(job, req);
+    }
     if (_reactivation_scheduler.checkResumeDeferredRoot(jobId)) {
         handleJobAfterArrivedJobDescription(jobId, handle.source);
     } else {
@@ -1005,6 +1016,12 @@ void SchedulingManager::commit(Job& job, JobRequest& req) {
     if (_params.reactivationScheduling()) {
         _reactivation_scheduler.initializeReactivator(req, job);
     }
+
+    // For root nodes of incremental jobs, remember the job request
+    // to later instantiate it when a new revision is deployed
+    if (job.getJobTree().isRoot() && req.revision == 0 && job.isIncremental()) {
+        _req_mgr.putIncrementalRootJobTemplate(req);
+    }
 }
 
 JobRequest SchedulingManager::uncommit(Job& job, bool leaving) {
@@ -1076,7 +1093,7 @@ SchedulingManager::AdoptionResult SchedulingManager::tryAdopt(JobRequest& req, J
 
     // Request for a root node:
     // Possibly adopt the job while dismissing the active job
-    if (req.requestedNodeIndex == 0 && !_params.reactivationScheduling()) {
+    if (req.requestedNodeIndex == 0 && req.revision == 0 && !_params.reactivationScheduling()) {
 
         // Adoption only works if this node does not yet compute for that job
         if (!has(req.jobId) || get(req.jobId).getState() != ACTIVE) {

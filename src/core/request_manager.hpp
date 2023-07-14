@@ -25,6 +25,7 @@ private:
     std::list<std::tuple<float, int, JobRequest>> _deferred_requests;
     std::map<int, std::list<MessageHandle>> _future_request_msgs;
     robin_hood::unordered_map<int, std::list<JobRequest>> _root_requests;
+    robin_hood::unordered_map<int, JobRequest> _incremental_root_job_templates;
 
     // Request to re-activate a local dormant root
     std::optional<JobRequest> _pending_root_reactivate_request;
@@ -268,6 +269,17 @@ public:
 
     void addMultiplicityToRequest(JobRequest& req, int jobVolume) {
         req.multiplicity = getCurrentDesiredRequestMultiplicity(jobVolume, req.requestedNodeIndex);
+    }
+
+    void putIncrementalRootJobTemplate(const JobRequest& r) {
+        _incremental_root_job_templates[r.jobId] = r;
+    }
+
+    JobRequest getIncrementalRootJobRequest(int jobId, int revision) {
+        JobRequest r = _incremental_root_job_templates.at(jobId);
+        assert(r.jobId == jobId);
+        r.revision = revision;
+        return r;
     }
 
 private:

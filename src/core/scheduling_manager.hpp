@@ -3,6 +3,7 @@
 
 #include <list>
 
+#include "comm/msg_queue/message_handle.hpp"
 #include "util/hashing.hpp"
 #include "app/job.hpp"
 #include "data/job_transfer.hpp"
@@ -71,7 +72,7 @@ private:
     void handleAdoptionOffer(MessageHandle& handle);
     void handleRejectionOfDirectedRequest(MessageHandle& handle);
     void handleAnswerToAdoptionOffer(MessageHandle& handle);
-    void handleIncomingJobDescription(MessageHandle& handle);
+    void handleIncomingJobDescription(MessageHandle& handle, bool deployNewRevision);
     void handleQueryForExplicitVolumeUpdate(MessageHandle& handle);
     void handleExplicitVolumeUpdate(MessageHandle& handle);
     void handleLeavingChild(MessageHandle& handle);

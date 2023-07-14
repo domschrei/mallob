@@ -9,6 +9,8 @@
 #include <filesystem>
 
 #include "client.hpp"
+#include "comm/msg_queue/message_handle.hpp"
+#include "comm/msgtags.h"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
 #include "util/permutation.hpp"
@@ -473,32 +475,44 @@ void Client::introduceNextJob() {
     req.timeOfBirth = job.getArrival();
 
     LOG_ADD_DEST(V2_INFO, "Introducing job #%i rev. %i : %s", nodeRank, jobId, req.revision, req.toStr().c_str());
-    MyMpi::isend(nodeRank, MSG_REQUEST_NODE, req);
+    if (job.isIncremental() && req.revision > 0) {
+        sendJobDescription(req, nodeRank);
+    } else {
+        MyMpi::isend(nodeRank, MSG_REQUEST_NODE, req);
+    }
 }
 
 void Client::handleOfferAdoption(MessageHandle& handle) {
     JobRequest req = Serializable::get<JobRequest>(handle.getRecvData());
+    sendJobDescription(req, handle.source);
+}
+
+void Client::sendJobDescription(JobRequest& req, int destRank) {
+
     float schedulingTime = Timer::elapsedSeconds() - req.timeOfBirth;
-    LOG(V3_VERB, "Scheduling %s on [%i] (latency: %.5fs)\n", req.toStr().c_str(), handle.source, schedulingTime);
-    
+    LOG(V3_VERB, "Scheduling %s on [%i] (latency: %.5fs)\n", req.toStr().c_str(), destRank, schedulingTime);
+
     JobDescription& desc = *_active_jobs[req.jobId];
     desc.getStatistics().schedulingTime = schedulingTime;
     desc.getStatistics().timeOfScheduling = Timer::elapsedSeconds();
     assert(desc.getId() == req.jobId || LOG_RETURN_FALSE("%i != %i\n", desc.getId(), req.jobId));
 
     // Send job description
-    LOG_ADD_DEST(V4_VVER, "Sending job desc. of #%i rev. %i of size %lu", handle.source, desc.getId(), 
+    LOG_ADD_DEST(V4_VVER, "Sending job desc. of #%i rev. %i of size %lu", destRank, desc.getId(),
         desc.getRevision(), desc.getTransferSize(desc.getRevision()));
-    
+
+    int tag = desc.isIncremental() && req.revision>0 ?
+        MSG_DEPLOY_NEW_REVISION : MSG_SEND_JOB_DESCRIPTION;
+
     auto data = desc.getSerialization(desc.getRevision());
     desc.clearPayload(desc.getRevision());
-    int msgId = MyMpi::isend(handle.source, MSG_SEND_JOB_DESCRIPTION, data);
+    int msgId = MyMpi::isend(destRank, tag, data);
     LOG_ADD_DEST(V4_VVER, "Sent job desc. of #%i of size %lu", 
-        handle.source, req.jobId, data->size());
+        destRank, req.jobId, data->size());
     //LOG(V4_VVER, "%p : use count %i\n", data.get(), data.use_count());
     
     // Remember transaction
-    _root_nodes[req.jobId] = handle.source;
+    _root_nodes[req.jobId] = destRank;
 
     // waiting instance reader might be able to continue now
     {
