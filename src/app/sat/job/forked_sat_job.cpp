@@ -92,6 +92,7 @@ void ForkedSatJob::appl_suspend() {
 void ForkedSatJob::appl_resume() {
     if (!_initialized) return;
     _solver->setSolvingState(SolvingStates::ACTIVE);
+    loadIncrements();
     _clause_comm->communicate();
 }
 

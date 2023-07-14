@@ -100,6 +100,7 @@ private:
     std::list<RevisionData> _revisions_to_write;
     Mutex _revisions_mutex;
     Mutex _state_mutex;
+    unsigned long _sum_of_revision_sizes {0};
 
     bool _solution_in_preparation = false;
     int _solution_revision_in_preparation = -1;

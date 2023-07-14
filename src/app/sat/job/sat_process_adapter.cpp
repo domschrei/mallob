@@ -97,6 +97,7 @@ void SatProcessAdapter::doInitialize() {
     _hsm->aSize = _a_size;
     _hsm->desiredRevision = _config.firstrev;
     _hsm->config = _config;
+    _sum_of_revision_sizes += _f_size;
 
     // Allocate import and export buffers
     _hsm->exportBufferAllocatedSize = 2 * _params.maxSharingCompensationFactor() * _params.clauseBufferBaseSize() + 1024;
@@ -143,6 +144,7 @@ void SatProcessAdapter::appendRevisions(const std::vector<RevisionData>& revisio
         _revisions_to_write.insert(_revisions_to_write.end(), revisions.begin(), revisions.end());
         _desired_revision = std::max(_desired_revision, desiredRevision);
         _num_revisions_to_write += revisions.size();
+        for (auto& data : revisions) _sum_of_revision_sizes += data.fSize;
     }
     doWriteRevisions();
 }
@@ -378,6 +380,12 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
             // Begin preparation of solution
             _solution_revision_in_preparation = _desired_revision;
             _solution_in_preparation = true;
+            if (_sum_of_revision_sizes <= 500'000) {
+                // Small job: Extract solution immediately in this thread.
+                doPrepareSolution();
+                return FOUND_RESULT;
+            }
+            // Large job: Extract solution concurrently
             _solution_prepare_future = ProcessWideThreadPool::get().addTask([&]() {
                 doPrepareSolution();
             });
