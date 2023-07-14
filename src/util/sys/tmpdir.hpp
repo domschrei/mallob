@@ -20,7 +20,7 @@ public:
                 _tmpdir = rankSpecificDir;
             }
         }
-        if (_tmpdir != tmpdirFromEnv)
+        if (!tmpdirFromEnv || _tmpdir != tmpdirFromEnv)
             setenv("MALLOB_TMP_DIR", _tmpdir.c_str(), 1);
     }
     static std::string get() {
