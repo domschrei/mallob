@@ -53,6 +53,12 @@ void Worker::advance() {
         checkStats();
     }
 
+    // Check switch between having an active job and being idle
+    if (_job_registry.hasActiveJob() != _job_active) {
+        _job_active = _job_registry.hasActiveJob();
+        if (_job_active) _periodic_job_check.resetToInitPeriod();
+    }
+
     // Advance load balancing operations
     if (_periodic_balance_check.ready(time)) {
         _watchdog.setActivity(Watchdog::BALANCING);
