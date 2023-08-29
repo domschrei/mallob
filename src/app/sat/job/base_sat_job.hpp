@@ -131,7 +131,10 @@ public:
             } else {
                 // update internal state
                 _accumulated_shared_lits = 0.9f * _accumulated_shared_lits + nbAdmittedLits;
-                _accumulated_desired_lits = std::max(1.f, 0.9f * _accumulated_desired_lits + _last_num_input_lits);
+                _accumulated_desired_lits = std::max(1.f, 0.9f * _accumulated_desired_lits
+                    // as target sharing volume, we want the base, default buffer limit
+                    // but only as far as the number of input literals can actually fill it
+                    + std::min(_last_num_input_lits, (int)defaultBuflim));
                 _estimate_incoming_lits = 0.6 * _estimate_incoming_lits + 0.4 * (_last_num_input_lits / _compensation_factor);
                 _estimate_shared_lits = 0.6 * _estimate_shared_lits + 0.4 * (nbAdmittedLits / _compensation_factor);
                 // just for stats
