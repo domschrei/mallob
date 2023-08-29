@@ -1,4 +1,5 @@
 [![status](https://joss.theoj.org/papers/700e9010c4080ffe8ae4df21cf1cc899/status.svg)](https://joss.theoj.org/papers/700e9010c4080ffe8ae4df21cf1cc899)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6890240.svg)](https://doi.org/10.5281/zenodo.6890240)
 
 # Introduction
 
@@ -7,7 +8,7 @@ Malleability means that the CPU resources allotted to a job may vary _during its
 Mallob was tested on configurations with up to 6144 cores as described in our publications: [SAT 2021](https://dominikschreiber.de/papers/2021-sat-scalable.pdf), [Euro-Par 2022](https://publikationen.bibliothek.kit.edu/1000149349/149124221).
 
 Most notably, Mallob features an engine for distributed SAT solving.
-According to the [International SAT Competitions](https://satcompetition.github.io/) 2020-2022, the premier competitive events for state-of-the-art SAT solving, Mallob is consistently the strongest SAT solving system for massively parallel and distributed systems (800 physical cores) and also a highly competitive system for moderately parallel SAT solving (32 physical cores).
+According to the [International SAT Competitions](https://satcompetition.github.io/) 2020-2023, the premier competitive events for state-of-the-art SAT solving, Mallob is consistently the strongest SAT solving system for massively parallel and distributed systems (1600 hardware threads spread across 100 machines) and also a highly competitive system for moderately parallel SAT solving (64 hardware threads).
 This version of Mallob also features the generation of UNSAT proofs due to a cooperation with researchers from Amazon Web Services (see [docs/certified-unsat.md](docs/certified-unsat.md)).
 
 Furthermore, Mallob features an engine for K-Means clustering, authored by [Michael Dörr](https://github.com/MichaelDoerr) in the scope of his Bachelor thesis.
@@ -56,13 +57,16 @@ You can use the following Mallob-specific build options:
 
 ## Docker
 
-We also provide a minimalistic Dockerfile using an Ubuntu 20.04 setup.
-Run `docker build .` in the base directory after setting up Docker on your machine.
-The final line of the output is the ID to run the container, e.g. by running `docker run -i -t <id> bash` and then executing Mallob interactively inside with the options of your choosing.
+We also provide a Dockerfile using an Ubuntu 20.04 setup.
+
+```
+cd docker/leader
+docker build -t mallob:leader ../.. -f ./Dockerfile
+```
 
 ## Bash Autocompletion
 
-Mallob now features bash auto-completion by pressing TAB. To enable this, execute this command from Mallob's base directory:
+Mallob features bash auto-completion by pressing TAB. To enable this, execute this command from Mallob's base directory:
 
   source scripts/run/autocomplete.sh
 
@@ -269,7 +273,7 @@ Within our codebase we make thankful use of the following liberally licensed pro
 * [Compile Time Regular Expressions](https://github.com/hanickadot/compile-time-regular-expressions) by Hana Dusíková, for matching particular user inputs
 * [robin_hood hashing](https://github.com/martinus/robin-hood-hashing) by Martin Ankerl, for efficient unordered maps and sets
 
-If you make use of Mallob in an academic setting, please cite the following two conference papers. If you can (or want to) cite only one of them, then please cite the SAT'21 paper when focusing on our SAT engine and the Euro-Par'22 paper when focusing on the scheduling aspects of our system.
+If you make use of Mallob in an academic setting, please cite the following conference papers. If you can (or want to) cite only one of them, then please cite the SAT'21 paper when focusing on our SAT engine and the Euro-Par'22 paper when focusing on the scheduling aspects of our system.
 ```
 @inproceedings{schreiber2021scalable,
   title={Scalable SAT Solving in the Cloud},
@@ -309,6 +313,12 @@ If you want to specifically cite Mallob in the scope of an International SAT Com
   title={Mallob in the {SAT} Competition 2022},
   author={Schreiber, Dominik},
   journal={SAT Competition 2022},
+  pages={46--47}
+}
+@article{schreiber2023mallob,
+  title={Mallob\{32,64,1600\} in the {SAT} Competition 2023},
+  author={Schreiber, Dominik},
+  journal={SAT Competition 2023},
   pages={46--47}
 }
 ```
