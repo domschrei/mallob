@@ -119,6 +119,10 @@ SharingManager::SharingManager(
 			onProduceClause(call.solverId, call.solverRevision, call.clause, call.condVarOrZero, true);
 		}));
 	}
+
+	if (_job_index == 0 && _params.clauseLog.isSet()) {
+		_clause_logger.reset(new ClauseLogger(_params.clauseLog()));
+	}
 }
 
 void SharingManager::onProduceClause(int solverId, int solverRevision, const Clause& clause, int condVarOrZero, bool recursiveCall) {
@@ -370,6 +374,8 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	auto clause = reader.getNextIncomingClause();
 	while (clause.begin != nullptr) {
 
+		if (_clause_logger) _clause_logger->append(clause);
+
 		if (filterSizeBeingLocked != clause.size) {
 			if (filterSizeBeingLocked != -1) _clause_filter->releaseLock(filterSizeBeingLocked);
 			filterSizeBeingLocked = clause.size;
@@ -406,6 +412,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	// Signal next garbage collection
 	_gc_pending = true;
 	_sharing_op_ongoing = false;
+	if (_clause_logger) _clause_logger->publish();
 }
 
 void SharingManager::applyFilterToBuffer(int* begin, int& buflen, const int* filter) {

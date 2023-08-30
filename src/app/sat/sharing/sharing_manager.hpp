@@ -6,6 +6,7 @@
 #include <list>
 
 #include "app/sat/sharing/clause_id_alignment.hpp"
+#include "app/sat/sharing/clause_logger.hpp"
 #include "app/sat/sharing/generic_export_manager.hpp"
 #include "../solvers/portfolio_solver_interface.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
@@ -82,6 +83,8 @@ protected:
 
 	std::unique_ptr<ClauseIdAlignment> _id_alignment;
 	bool _sharing_op_ongoing {false};
+
+	std::unique_ptr<ClauseLogger> _clause_logger;
 
 public:
 	SharingManager(std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,

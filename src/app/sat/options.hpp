@@ -15,6 +15,8 @@ OPTION_GROUP(grpAppSat, "app/sat", "SAT solving options")
     "Supply config for SAT engine subprocess [internal option, do not use]")
  OPT_BOOL(copyFormulaeFromSharedMem,        "cpshm", "",                                           false,
     "Copy each formula + assumptions from shared memory to local memory before launching solvers")
+ OPT_STRING(clauseLog,                      "clause-log", "",                            "",
+    "Log successfully shared clauses to the provided path")
 
 OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration")
  OPT_INT(bufferedImportedClsGenerations,    "bicg", "buffered-imported-cls-generations", 4,        1,   LARGE_INT, 
