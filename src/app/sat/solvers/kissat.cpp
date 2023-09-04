@@ -155,7 +155,7 @@ void Kissat::diversify(int seed) {
     #endif
             for (size_t i = 0; i < getSolverSetup().numVars; i++) {
                 int var = perm.get(i, false)+1;
-                kissat_activate_variable(solver, var);
+                //kissat_activate_variable(solver, var);
     #if MALLOB_ASSERT == 2
                 activatedVars.insert(var);
     #endif
