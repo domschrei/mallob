@@ -9,7 +9,7 @@ Mallob was tested on configurations with up to 6144 cores as described in our pu
 
 Most notably, Mallob features an engine for distributed SAT solving.
 According to the [International SAT Competitions](https://satcompetition.github.io/) 2020-2023, the premier competitive events for state-of-the-art SAT solving, Mallob is consistently the strongest SAT solving system for massively parallel and distributed systems (1600 hardware threads spread across 100 machines) and also a highly competitive system for moderately parallel SAT solving (64 hardware threads).
-This version of Mallob also features the generation of UNSAT proofs due to a cooperation with researchers from Amazon Web Services (see [docs/certified-unsat.md](docs/certified-unsat.md)).
+Note that this version of Mallob also features a module to generate proofs of unsatisfiability due to a cooperation with external researchers from Amazon Web Services (see [docs/certified-unsat.md](docs/certified-unsat.md)).
 
 Furthermore, Mallob features an engine for K-Means clustering, authored by [Michael Dörr](https://github.com/MichaelDoerr) in the scope of his Bachelor thesis.
 
