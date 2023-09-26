@@ -8,6 +8,10 @@
 #define MALLOB_MAX_N_APPTHREADS_PER_PROCESS 32
 #endif
 
+#define MALLOB_PIPE_SOLUTIONS_NONE 0
+#define MALLOB_PIPE_SOLUTIONS_LARGE 1
+#define MALLOB_PIPE_SOLUTIONS_ALL 2
+
 // All declared options will be stored in this member of the Parameters class.
 OptMap _global_map;
 GroupedOptionsList _grouped_list;
@@ -26,26 +30,30 @@ OPTION_GROUP(grpGeneral, "general", "General")
  OPT_STRING(monoApplication,              "mono-app", "mono-application",              "SAT",                   "Application assumed for mono mode")
  OPT_BOOL(monoSubjobs,                    "mono-subjobs", "",                          false,                   "Support mono application spawn new jobs recursively")
  OPT_INT(numJobs,                         "J", "jobs",                                 0,    0, LARGE_INT,      "Exit as soon as this number of jobs has been processed (set to 1 if -mono is used)")
+ OPT_INT(numSuccessfulJobs,               "SJ", "successful-jobs",                     0,    0, LARGE_INT,      "Exit as soon as this number of jobs has been processed SUCCESSFULLY (i.e., not cancelled / aborted)")
  OPT_INT(seed,                            "seed", "",                                  0,    0, MAX_INT,        "Random seed")
  OPT_FLOAT(timeLimit,                     "T", "time-limit",                           0,    0, LARGE_INT,      "Run entire system for at most this many seconds")
  OPT_BOOL(warmup,                         "warmup", "",                                false,                   "Do one explicit All-To-All warmup among all nodes in the beginning")
  OPT_INT(numClients,                      "c", "clients",                              1,    -1, LARGE_INT,     "Number of client PEs to initialize (counting backwards from last rank). -1: all PEs are clients")
  OPT_INT(numWorkers,                      "w", "workers",                              -1,   -1, LARGE_INT,     "Number of worker PEs to initialize (beginning from rank #0), -1: all PEs are workers")
  OPT_BOOL(preCleanup,                     "pre-cleanup", "",                           false,                   "Clean up shmem/proof/trace/extmem files before starting off")
+ OPT_STRING(clientApplication,            "client-app", "",                            "", "Have clients run specified external program path + \".\" + i for increasing i (or, if nonexistent, just the path as is)")
+ OPT_INT(clientAppThreads,                "client-app-threads", "",                    1,    1, LARGE_INT,      "Max. number of applications to run per client")
 
 ///////////////////////////////////////////////////////////////////////
 
 OPTION_GROUP(grpInterface, "interface", "Interface")
  OPT_INT(activeJobsPerClient,             "ajpc", "active-jobs-per-client",            0,         0, LARGE_INT, "Make each client have up to this many active jobs at any given time")
  OPT_STRING(clientTemplate,               "client-template", "",                       "",                      "JSON template file which each client uses to decide on job parameters (with -job-template option)") //[[AUTOCOMPLETE_FILE]]
- OPT_INT(firstApiIndex,                   "fapii", "first-api-index",                  0,    0, LARGE_INT,      "1st API index: with c clients, uses .api/jobs.{<index>..<index>+c-1}/ as directories")
+ OPT_STRING(apiDirectory,                 "apidir", "api-dir",                         ".api",                  "Directory for filesystem API")
+ OPT_INT(firstApiIndex,                   "fapii", "first-api-index",                  0,    0, LARGE_INT,      "1st API index: with c clients, uses [-apidir]/jobs.{<index>..<index>+c-1}/ as directories")
  OPT_BOOL(inotify,                        "inotify", "",                               true,                    "Use inotify for filesystem interface (otherwise, use naive directory polling)")
  OPT_STRING(jobDescriptionTemplate,       "job-desc-template", "",                     "",                      "Plain text file, one file path per line, to use as job descriptions (with -job-template option)") //[[AUTOCOMPLETE_FILE]]
  OPT_STRING(jobTemplate,                  "job-template", "",                          "",                      "JSON template file which each client uses to instantiate jobs indeterminately") //[[AUTOCOMPLETE_FILE]]
  OPT_INT(loadedJobsPerClient,             "ljpc", "loaded-jobs-per-client",            32,   0, LARGE_INT,      "Limit for how many job descriptions each client is allowed to have loaded at the same time")
  OPT_INT(maxJobsPerStreamer,              "mjps", "max-jobs-per-streamer",             0,    0, LARGE_INT,      "Maximum number of jobs to introduce per streamer")
  OPT_BOOL(shuffleJobDescriptions,         "sjd", "shuffle-job-descriptions",           false,                   "Shuffle job descriptions given via -job-desc-template option")
- OPT_BOOL(useFilesystemInterface,         "interface-fs", "",                          true,                    "Use filesystem interface (.api/{in,out}/*.json)")
+ OPT_BOOL(useFilesystemInterface,         "interface-fs", "",                          true,                    "Use filesystem interface ([-apidir]/jobs.*/{in,out}/*.json)")
  OPT_BOOL(useIPCSocketInterface,          "interface-ipc", "",                         false,                   "Use IPC socket interface (.mallob.<pid>.sk)")
  OPT_STRING(streamerResultOutput,         "sro", "streamer-result-output",             "",                      "Path for streamer to write result metadata to")
 
@@ -56,7 +64,7 @@ OPTION_GROUP(grpOutput, "output", "Output")
  OPT_BOOL(immediateFileFlush,             "iff", "immediate-file-flush",               false,                   "Flush log files after each line instead of buffering")
  OPT_STRING(logDirectory,                 "log", "log-directory",                      "",                      "Directory to save logs in") //[[AUTOCOMPLETE_DIRECTORY]]
  OPT_BOOL(omitSolution,                   "os", "omit-solution",                       false,                   "Do not output solution in mono mode of operation")
- OPT_BOOL(pipeLargeSolutions,             "pls", "pipe-large-solutions",               false,                   "Provide large solutions over a named pipe instead of directly writing them into the response JSON")
+ OPT_INT(pipeSolutions,                   "ps", "pipe-solutions",                      MALLOB_PIPE_SOLUTIONS_NONE, MALLOB_PIPE_SOLUTIONS_NONE, MALLOB_PIPE_SOLUTIONS_ALL,                   "Provide [0=no,1=large,2=all] solutions over a named pipe instead of directly writing them into the response JSON")
  OPT_BOOL(quiet,                          "q", "quiet",                                false,                   "Do not log to stdout besides critical information")
  OPT_STRING(solutionToFile,               "s2f", "solution-to-file",                   "",                      "Write solutions to file with provided base name + job ID")
  OPT_INT(verbosity,                       "v", "verbosity",                            2,    0, 6,              "Logging verbosity: 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB 5=DEBG")

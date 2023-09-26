@@ -6,6 +6,7 @@
 #include <list>
 
 #include "app/sat/sharing/clause_id_alignment.hpp"
+#include "app/sat/sharing/clause_logger.hpp"
 #include "app/sat/sharing/generic_export_manager.hpp"
 #include "../solvers/portfolio_solver_interface.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
@@ -66,7 +67,7 @@ protected:
 
 	int _num_original_clauses;
 
-	int _current_revision = -1;
+	int _imported_revision = -1;
 
 	bool _observed_nonunit_lbd_of_zero = false;
 	bool _observed_nonunit_lbd_of_one = false;
@@ -82,6 +83,8 @@ protected:
 
 	std::unique_ptr<ClauseIdAlignment> _id_alignment;
 	bool _sharing_op_ongoing {false};
+
+	std::unique_ptr<ClauseLogger> _clause_logger;
 
 public:
 	SharingManager(std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
@@ -104,7 +107,7 @@ public:
 
 	SharingStatistics getStatistics();
 
-	void setRevision(int revision) {_current_revision = revision;}
+	void setImportedRevision(int revision) {_imported_revision = std::max(_imported_revision, revision);}
 	void stopClauseImport(int solverId);
 
 	void continueClauseImport(int solverId);

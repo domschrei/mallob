@@ -1,6 +1,11 @@
 
 #pragma once
 
+#include "data/job_transfer.hpp"
+#include "scheduling/job_scheduling_update.hpp"
+#include "util/logger.hpp"
+#include "comm/mympi.hpp"
+
 class ChildInterface {
 
 private:

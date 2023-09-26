@@ -3,6 +3,7 @@
 
 #include <list>
 
+#include "comm/msg_queue/message_handle.hpp"
 #include "util/hashing.hpp"
 #include "app/job.hpp"
 #include "data/job_transfer.hpp"
@@ -39,6 +40,7 @@ private:
 
     JobDescriptionInterface _desc_interface;
     ReactivationScheduler _reactivation_scheduler;
+    std::pair<int, int> _id_and_source_of_deferred_root_to_reactivate {-1, -1};
     ResultStore _result_store;
 
     std::list<MessageSubscription> _subscriptions;
@@ -70,7 +72,7 @@ private:
     void handleAdoptionOffer(MessageHandle& handle);
     void handleRejectionOfDirectedRequest(MessageHandle& handle);
     void handleAnswerToAdoptionOffer(MessageHandle& handle);
-    void handleIncomingJobDescription(MessageHandle& handle);
+    void handleIncomingJobDescription(MessageHandle& handle, bool deployNewRevision);
     void handleQueryForExplicitVolumeUpdate(MessageHandle& handle);
     void handleExplicitVolumeUpdate(MessageHandle& handle);
     void handleLeavingChild(MessageHandle& handle);
@@ -82,13 +84,14 @@ private:
     void handleJobResultFound(MessageHandle& handle);
     void handleJobReleasedFromWaitingForReactivation(MessageHandle& handle);
 
+    void handleJobAfterArrivedJobDescription(int jobId, int source);
     void leaveJobTree(Job& job, bool notifyParent);
     void initiateVolumeUpdate(Job& job);
     void updateVolume(int jobId, int volume, int balancingEpoch, float eventLatency);
     void propagateVolumeUpdate(Job& job, int volume, int balancingEpoch);
 
     void commit(Job& job, JobRequest& req);
-    void uncommit(Job& job, bool leaving);
+    JobRequest uncommit(Job& job, bool leaving);
     void execute(Job& job, int source);
     void resume(Job& job, const JobRequest& req, int source);
     void suspend(Job& job);

@@ -9,11 +9,15 @@ set(CMAKE_CXX_STANDARD 17)
 # Build-specific compile options
 
 set(BASE_LIBS "")
-set(MY_DEBUG_OPTIONS "")
+set(MY_DEBUG_OPTIONS "-rdynamic -g -ggdb")
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
-    add_definitions(-DMALLOB_VERSION=\"dbg\" -DMALLOB_ASSERT=1)
-    set(MY_DEBUG_OPTIONS "-rdynamic -g -ggdb") 
+    add_definitions(-DMALLOB_VERSION=\"dbg\")
+    if(MALLOB_ASSERT_HEAVY)
+        add_definitions(-DMALLOB_ASSERT=2)
+    else()
+        add_definitions(-DMALLOB_ASSERT=1)
+    endif()
 else()
     add_definitions(-DMALLOB_VERSION=\"rls\")
     set(MY_DEBUG_OPTIONS "-rdynamic -g -ggdb")
@@ -65,7 +69,7 @@ set(BASE_INCLUDES ${MPI_CXX_INCLUDE_PATH} src lib CACHE INTERNAL "")
 
 # Base source files
 
-set(BASE_SOURCES ${BASE_SOURCES} src/app/job.cpp src/app/app_registry.cpp src/app/app_message_subscription.cpp src/balancing/event_driven_balancer.cpp src/balancing/request_matcher.cpp src/balancing/routing_tree_request_matcher.cpp src/comm/msg_queue/message_queue.cpp src/comm/mpi_base.cpp src/comm/mympi.cpp src/comm/sysstate_unresponsive_crash.cpp src/core/scheduling_manager.cpp src/data/job_description.cpp src/data/job_result.cpp src/data/job_transfer.cpp src/data/permanent_cache.cpp src/interface/json_interface.cpp src/interface/api/api_connector.cpp src/scheduling/job_scheduling_update.cpp src/util/logger.cpp src/util/option.cpp src/util/params.cpp src/util/permutation.cpp src/util/random.cpp src/util/sys/atomics.cpp src/util/sys/fileutils.cpp src/util/sys/process.cpp src/util/sys/proc.cpp src/util/sys/process_dispatcher.cpp src/util/sys/shared_memory.cpp src/util/sys/terminator.cpp src/util/sys/threading.cpp src/util/sys/thread_pool.cpp src/util/sys/timer.cpp src/util/sys/watchdog.cpp src/util/ringbuf/ringbuf.c CACHE INTERNAL "")
+set(BASE_SOURCES ${BASE_SOURCES} src/app/job.cpp src/app/app_registry.cpp src/app/app_message_subscription.cpp src/balancing/event_driven_balancer.cpp src/balancing/request_matcher.cpp src/balancing/routing_tree_request_matcher.cpp src/comm/msg_queue/message_queue.cpp src/comm/mpi_base.cpp src/comm/mympi.cpp src/comm/sysstate_unresponsive_crash.cpp src/core/scheduling_manager.cpp src/data/job_description.cpp src/data/job_result.cpp src/data/job_transfer.cpp src/data/permanent_cache.cpp src/interface/json_interface.cpp src/interface/api/api_connector.cpp src/scheduling/job_scheduling_update.cpp src/util/logger.cpp src/util/option.cpp src/util/params.cpp src/util/permutation.cpp src/util/random.cpp src/util/sys/atomics.cpp src/util/sys/fileutils.cpp src/util/sys/process.cpp src/util/sys/proc.cpp src/util/sys/process_dispatcher.cpp src/util/sys/shared_memory.cpp src/util/sys/tmpdir.cpp src/util/sys/terminator.cpp src/util/sys/threading.cpp src/util/sys/thread_pool.cpp src/util/sys/timer.cpp src/util/sys/watchdog.cpp src/util/ringbuf/ringbuf.c CACHE INTERNAL "")
 
 # Use to debug
 #message("mallob_commons sources pre application registration: ${BASE_SOURCES}")

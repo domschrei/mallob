@@ -1,6 +1,6 @@
 #!/bin/bash
 
-for i in $(ps -ALf |grep build/mallob |awk '{print $4}'); do 
+for i in $(ps -ALf |grep mallob_sat_process |awk '{print $4}'); do 
     output=$(gdb --q --n --ex bt --batch --pid $i 2>&1)
 #    if echo "$output"|grep -q "doWorkerNodeProgram"; then
         #if ! echo "$output"|grep -q "__GI___clock_nanosleep"; then

@@ -22,7 +22,7 @@ public:
 	void printUsage() const;
 	std::string getParamsAsString() const;
 	
-	std::string getSubprocCommandAsString(const char* execName);
+	std::string getSubprocCommandAsString(const char* execName) const;
 	std::list<std::string>& getArgList(const char* execName);
 	char* const* asCArgs(const char* execName);
 

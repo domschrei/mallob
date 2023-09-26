@@ -1,5 +1,10 @@
 
+#include "util/random.hpp"
+#include "util/sys/timer.hpp"
+#include "util/tsl/robin_set.h"
+
 #include "util/logger.hpp"
+#include "util/permutation.hpp"
 extern "C" {
 #include "kissat/src/kissat.h"
 }
@@ -79,23 +84,25 @@ void Kissat::diversify(int seed) {
             kissat_set_option(solver, "substitute", 0);
     }
 
-    // Base portfolio of different configurations
-    switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
-    case 0: kissat_set_option(solver, "eliminate", 0); break;
-    case 1: kissat_set_option(solver, "delay", 10); break;
-    case 2: kissat_set_option(solver, "restartint", 100); break;
-    case 3: kissat_set_option(solver, "walkinitially", 1); break;
-    case 4: kissat_set_option(solver, "restartint", 1000); break;
-    case 5: kissat_set_option(solver, "sweep", 0); break;
-    case 6: kissat_set_configuration(solver, "unsat"); break;
-    case 7: kissat_set_configuration(solver, "sat"); break;
-    case 8: kissat_set_option(solver, "probe", 0); break;
-    case 9: kissat_set_option(solver, "failedcont", 50); kissat_set_option(solver, "failedrounds", 10); break;
-    case 10: kissat_set_option(solver, "minimizedepth", 1e4); break;
-    case 11: kissat_set_option(solver, "modeconflicts", 1e5); kissat_set_option(solver, "modeticks", 1e9); break;
-    case 12: kissat_set_option(solver, "reducefraction", 90); break;
-    case 13: kissat_set_option(solver, "vivifyeffort", 1000); break;
-    case 14: kissat_set_option(solver, "xorsclslim", 8); break;
+    if (_setup.diversifyNative) {
+        // Base portfolio of different configurations
+        switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
+        case 0: kissat_set_option(solver, "eliminate", 0); break;
+        case 1: kissat_set_option(solver, "delay", 10); break;
+        case 2: kissat_set_option(solver, "restartint", 100); break;
+        case 3: kissat_set_option(solver, "walkinitially", 1); break;
+        case 4: kissat_set_option(solver, "restartint", 1000); break;
+        case 5: kissat_set_option(solver, "sweep", 0); break;
+        case 6: kissat_set_configuration(solver, "unsat"); break;
+        case 7: kissat_set_configuration(solver, "sat"); break;
+        case 8: kissat_set_option(solver, "probe", 0); break;
+        case 9: kissat_set_option(solver, "failedcont", 50); kissat_set_option(solver, "failedrounds", 10); break;
+        case 10: kissat_set_option(solver, "minimizedepth", 1e4); break;
+        case 11: kissat_set_option(solver, "modeconflicts", 1e5); kissat_set_option(solver, "modeticks", 1e9); break;
+        case 12: kissat_set_option(solver, "reducefraction", 90); break;
+        case 13: kissat_set_option(solver, "vivifyeffort", 1000); break;
+        case 14: kissat_set_option(solver, "xorsclslim", 8); break;
+        }
     }
 
     // Randomize ("jitter") certain options around their default value
@@ -122,6 +129,45 @@ void Kissat::diversify(int seed) {
         
         LOGGER(_logger, V3_VERB, "Sampled restartint=%i decay=%i\n", restartFrequency, decay);
     }
+
+    if (getDiversificationIndex() >= getNumOriginalDiversifications() && _setup.diversifyFanOut) {
+		kissat_set_option(solver, "fanout", 1);
+	}
+
+    // Diversify the order in which the variables are activated.
+    // This is done by generating a pseudo-random permutation from 0 to #vars-1
+    // and then activating the variables in this order.
+    if (getDiversificationIndex() >= getNumOriginalDiversifications() && _setup.diversifyInitShuffle) {
+        SplitMix64Rng rng(seed);
+        float k = 0.1;
+        float shufProbability = 1 - 0.8 * std::exp(-k * (int) (getDiversificationIndex() / getNumOriginalDiversifications() - 1));
+        auto r = rng.randomInRange(0, 1);
+        LOGGER(_logger, V3_VERB, "Init var shuffle decision: %.4f < %.4f\n", r, shufProbability);
+        if (r < shufProbability) {
+            // Shuffle!
+            float time = Timer::elapsedSeconds();
+            kissat_set_option(solver, "manualvaractivation", 1);
+            AdjustablePermutation perm(getSolverSetup().numVars, seed);
+            // With heavy assertions enabled, actually track that all variables
+            // have been activated in the end.
+    #if MALLOB_ASSERT == 2
+            tsl::robin_set<int> activatedVars;
+    #endif
+            for (size_t i = 0; i < getSolverSetup().numVars; i++) {
+                int var = perm.get(i, false)+1;
+                //kissat_activate_variable(solver, var);
+    #if MALLOB_ASSERT == 2
+                activatedVars.insert(var);
+    #endif
+            }
+    #if MALLOB_ASSERT == 2
+            LOGGER(_logger, V3_VERB, "Checking activated vars\n");
+            assert(activatedVars.size() == getSolverSetup().numVars);
+    #endif
+            time = Timer::elapsedSeconds() - time;
+            LOGGER(_logger, V3_VERB, "Init var shuffle took %.3fs\n", time);
+        }
+        }
 
     seedSet = true;
     setClauseSharing(getNumOriginalDiversifications());

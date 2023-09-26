@@ -64,18 +64,25 @@ public:
 
             // Callback for receiving a result for the request at hand
             auto cb = [&](nlohmann::json& result) {
-                // Get qualified job name
+                // Find path for .api file with qualified job name
                 std::string user = result["user"].get<std::string>();
                 std::string name = result["name"].get<std::string>();
                 std::string jobName = user + "." + name + ".json";
-                // Write JSON to "out" directory
-                auto intermediateOutput = _base_path + "/~" + jobName;
-                auto finalOutput = _base_path + "/out/" + jobName;
+                std::string outFilepath = _base_path + "/~" + jobName;
+                std::string finalOutFilepath = _base_path + "/out/" + jobName;
+                if (result.contains("piped-response") && result["piped-response"].get<bool>()) {
+                    // Do not write response to a separate file first;
+                    // directly write into the final output.
+                    outFilepath = finalOutFilepath;
+                    finalOutFilepath.clear();
+                }
+                // Write JSON to destination
                 {
-                    std::ofstream o(intermediateOutput);
+                    std::ofstream o(outFilepath);
                     o << std::setw(4) << result << std::endl;
                 }
-                std::rename(intermediateOutput.c_str(), finalOutput.c_str());
+                if (!finalOutFilepath.empty())
+                    std::rename(outFilepath.c_str(), finalOutFilepath.c_str());
             };
 
             // Handle JSON file

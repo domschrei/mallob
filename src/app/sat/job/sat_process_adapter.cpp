@@ -14,6 +14,7 @@
 #include "../execution/engine.hpp"
 #include "util/sys/shared_memory.hpp"
 #include "util/sys/proc.hpp"
+#include "util/sys/subprocess.hpp"
 #include "util/sys/timer.hpp"
 #include "util/sys/process.hpp"
 #include "util/logger.hpp"
@@ -96,6 +97,7 @@ void SatProcessAdapter::doInitialize() {
     _hsm->aSize = _a_size;
     _hsm->desiredRevision = _config.firstrev;
     _hsm->config = _config;
+    _sum_of_revision_sizes += _f_size;
 
     // Allocate import and export buffers
     _hsm->exportBufferAllocatedSize = 2 * _params.maxSharingCompensationFactor() * _params.clauseBufferBaseSize() + 1024;
@@ -118,33 +120,9 @@ void SatProcessAdapter::doInitialize() {
 
     if (_terminate) return;
 
-    // FORK: Create a child process
-    pid_t res = Process::createChild();
-    if (res == 0) {
-        // [child process]
-        execl(MALLOB_SUBPROC_DISPATCH_PATH"mallob_process_dispatcher", 
-              MALLOB_SUBPROC_DISPATCH_PATH"mallob_process_dispatcher", 
-              (char*) 0);
-        
-        // If this is reached, something went wrong with execvp
-        LOG(V0_CRIT, "[ERROR] execl returned errno %i\n", (int)errno);
-        abort();
-    }
-
-    // Assemble SAT subprocess command
-    std::string executable = MALLOB_SUBPROC_DISPATCH_PATH"mallob_sat_process";
-    //char* const* argv = _params.asCArgs(executable.c_str());
-    std::string command = _params.getSubprocCommandAsString(executable.c_str());
-    
-    // Write command to tmp file
-    std::string commandOutfile = "/tmp/mallob_subproc_cmd_" + std::to_string(res) + "~";
-    std::ofstream ofs(commandOutfile);
-    ofs << command << " " << std::endl;
-    ofs.close();
-    std::rename(commandOutfile.c_str(), commandOutfile.substr(0, commandOutfile.size()-1).c_str()); // remove tilde
-
-    //int i = 0;
-    //delete[] ((const char**) argv);
+    // Create SAT solving child process
+    Subprocess subproc(_params, "mallob_sat_process");
+    pid_t res = subproc.start();
 
     {
         auto lock = _state_mutex.getLock();
@@ -164,8 +142,9 @@ void SatProcessAdapter::appendRevisions(const std::vector<RevisionData>& revisio
     {
         auto lock = _revisions_mutex.getLock();
         _revisions_to_write.insert(_revisions_to_write.end(), revisions.begin(), revisions.end());
-        _desired_revision = desiredRevision;
+        _desired_revision = std::max(_desired_revision, desiredRevision);
         _num_revisions_to_write += revisions.size();
+        for (auto& data : revisions) _sum_of_revision_sizes += data.fSize;
     }
     doWriteRevisions();
 }
@@ -233,7 +212,7 @@ bool SatProcessAdapter::process(BufferTask& task) {
     if (task.type == BufferTask::FILTER_CLAUSES) {
         InplaceClauseAggregation agg(buffer);
         _hsm->importBufferSize = buffer.size() - InplaceClauseAggregation::numMetadataInts();
-        _hsm->importBufferRevision = _desired_revision;
+        _hsm->importBufferRevision = _clause_buffer_revision;
         _epoch_of_export_buffer = task.epoch;
         assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
         memcpy(_import_buffer, buffer.data(), _hsm->importBufferSize*sizeof(int));
@@ -257,7 +236,7 @@ bool SatProcessAdapter::process(BufferTask& task) {
 
     } else if (task.type == BufferTask::DIGEST_CLAUSES_WITHOUT_FILTER) {
         _hsm->importBufferSize = buffer.size() - InplaceClauseAggregation::numMetadataInts();
-        _hsm->importBufferRevision = _desired_revision;
+        _hsm->importBufferRevision = _clause_buffer_revision;
         _hsm->importEpoch = task.epoch;
         assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
         memcpy(_import_buffer, buffer.data(), _hsm->importBufferSize*sizeof(int));
@@ -267,6 +246,7 @@ bool SatProcessAdapter::process(BufferTask& task) {
         _hsm->historicEpochBegin = task.epoch;
         _hsm->historicEpochEnd = task.epochEnd;
         _hsm->importBufferSize = buffer.size();
+        _hsm->importBufferRevision = _clause_buffer_revision;
         assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
         memcpy(_import_buffer, buffer.data(), buffer.size()*sizeof(int));
         _hsm->doDigestHistoricClauses = true;
@@ -400,6 +380,12 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
             // Begin preparation of solution
             _solution_revision_in_preparation = _desired_revision;
             _solution_in_preparation = true;
+            if (_sum_of_revision_sizes <= 500'000) {
+                // Small job: Extract solution immediately in this thread.
+                doPrepareSolution();
+                return FOUND_RESULT;
+            }
+            // Large job: Extract solution concurrently
             _solution_prepare_future = ProcessWideThreadPool::get().addTask([&]() {
                 doPrepareSolution();
             });

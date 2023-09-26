@@ -124,7 +124,7 @@ public:
 
         bool accept = msg.jobId == _base_msg.jobId 
                     && msg.epoch == _base_msg.epoch 
-                    && msg.revision == _base_msg.revision 
+                    //&& msg.revision == _base_msg.revision 
                     && msg.tag == _base_msg.tag;
         if (!accept) return false;
 

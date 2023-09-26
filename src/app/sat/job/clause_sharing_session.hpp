@@ -92,7 +92,8 @@ public:
                 int numLits;
                 auto clauses = _job->getPreparedClauses(checksum, successfulSolverId, numLits);
                 LOG(V4_VVER, "%s CS produced cls size=%lu lits=%i/%i\n", _job->toStr(), clauses.size(), numLits, _local_export_limit);
-                InplaceClauseAggregation::prepareRawBuffer(clauses, numLits, 1, successfulSolverId);
+                InplaceClauseAggregation::prepareRawBuffer(clauses,
+                    _job->getDesiredRevision(), numLits, 1, successfulSolverId);
                 return clauses;
             });
 
@@ -114,6 +115,7 @@ public:
             int winningSolverId = aggregation.successfulSolver();
             assert(winningSolverId >= -1 || log_return_false("Winning solver ID = %i\n", winningSolverId));
             _job->setNumInputLitsOfLastSharing(aggregation.numInputLiterals());
+            _job->setClauseBufferRevision(aggregation.maxRevision());
 
             if (_allreduce_filter) {
                 // Initiate production of local filter element for 2nd all-reduction 
@@ -204,17 +206,19 @@ private:
     }
     
     std::vector<int> mergeClauseBuffersDuringAggregation(std::list<std::vector<int>>& elems) {
+        int maxRevision = -1;
         int numAggregated = 0;
         int numInputLits = 0;
         int successfulSolverId = -1;
         for (auto& elem : elems) {
-            assert(elem.size() >= 3 || log_return_false("[ERROR] Clause buffer has size %ld!\n", elem.size()));
+            assert(elem.size() >= 4 || log_return_false("[ERROR] Clause buffer has size %ld!\n", elem.size()));
             auto agg = InplaceClauseAggregation(elem);
             if (agg.successfulSolver() != -1 && (successfulSolverId == -1 || successfulSolverId > agg.successfulSolver())) {
                 successfulSolverId = agg.successfulSolver();
             }
             numAggregated += agg.numAggregatedNodes();
             numInputLits += agg.numInputLiterals();
+            maxRevision = std::max(maxRevision, agg.maxRevision());
             agg.stripToRawBuffer();
         }
         int buflim = _job->getBufferLimit(numAggregated, false);
@@ -224,9 +228,10 @@ private:
             merger.add(_cdb.getBufferReader(elem.data(), elem.size()));
         }
         std::vector<int> merged = merger.mergePreservingExcessWithRandomTieBreaking(_excess_clauses_from_merge, _rng);
-        LOG(V4_VVER, "%s : merged %i contribs (inp=%i) ~> len=%i\n",
-            _job->toStr(), numAggregated, numInputLits, merged.size());
-        InplaceClauseAggregation::prepareRawBuffer(merged, numInputLits, numAggregated, successfulSolverId);
+        LOG(V4_VVER, "%s : merged %i contribs rev=%i (inp=%i) ~> len=%i\n",
+            _job->toStr(), numAggregated, maxRevision, numInputLits, merged.size());
+        InplaceClauseAggregation::prepareRawBuffer(merged,
+            maxRevision, numInputLits, numAggregated, successfulSolverId);
         return merged;
     }
 

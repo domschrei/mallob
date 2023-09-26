@@ -9,6 +9,8 @@
 #include <signal.h>
 
 #include "comm/mympi.hpp"
+#include "interface/api/rank_specific_file_fetcher.hpp"
+#include "util/sys/subprocess.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
 #include "util/random.hpp"
@@ -23,6 +25,7 @@
 #include "comm/host_comm.hpp"
 #include "data/job_transfer.hpp"
 #include "comm/msg_queue/message_subscription.hpp"
+#include "util/sys/tmpdir.hpp"
 
 #include "app/.register_includes.h"
 
@@ -137,6 +140,24 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
         streamer = new JobStreamer(params, client->getAPI(), client->getInternalRank());
     }
 
+    // If a client application is provided, run this application in (a) separate thread(s)
+    std::list<BackgroundWorker> clientAppWorkers;
+    if (params.clientApplication.isSet() && isClient) {
+        int internalClientRank = MyMpi::rank(commClients);
+        int nbThreads = params.clientAppThreads();
+        for (size_t i = internalClientRank*nbThreads; i < (internalClientRank+1)*nbThreads; ++i) {
+            clientAppWorkers.emplace_back();
+            clientAppWorkers.back().run([&, i]() {
+                RankSpecificFileFetcher fetcher(i);
+                assert(params.logDirectory.isSet());
+                std::string appCmd = fetcher.get(params.clientApplication());
+                //+ " 2>&1 > " + params.logDirectory() + "/clientapp." + std::to_string(i);
+                Subprocess subproc(params, appCmd);
+                pid_t res = subproc.start();
+            });
+        }
+    }
+
     // Main loop
     while (true) {
 
@@ -193,6 +214,7 @@ int main(int argc, char *argv[]) {
 
     // Initialize bookkeeping of child processes and signals
     Process::init(rank, params.traceDirectory());
+    TmpDir::init(rank);
 
     longStartupWarnMsg(rank, "Init'd process");
 
@@ -270,6 +292,14 @@ int main(int argc, char *argv[]) {
         for (auto file : FileUtils::glob("/dev/shm/edu.kit.iti.mallob.*")) {
             doRemove(file);
         }
+        for (auto file : FileUtils::glob(TmpDir::get() + "/mallob.apipath.*")) {
+            doRemove(file);
+        }
+
+        // Wait for all processes to have cleaned up before proceeding
+        // (creating new files which shouldn't be cleaned up!)
+        MPI_Barrier(MPI_COMM_WORLD);
+        LOG(V4_VVER, "Passed cleanup barrier\n");
     }
 
     auto isWorker = [&](int rank) {

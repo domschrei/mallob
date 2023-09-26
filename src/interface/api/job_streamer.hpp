@@ -5,6 +5,7 @@
 #include <fstream>
 #include <ios>
 
+#include "interface/api/rank_specific_file_fetcher.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
 #include "interface/json_interface.hpp"
@@ -22,6 +23,7 @@ private:
     int _internal_rank;
     nlohmann::json _json_template;
     bool _valid = false;
+    RankSpecificFileFetcher _rank_specific_file_fetcher;
     ClientTemplate _client_template;
 
     int _job_counter = 1;
@@ -45,22 +47,14 @@ private:
 
 public:
     JobStreamer(const Parameters& params, APIConnector& api, int internalRank) : 
-            _params(params), _api(api), _internal_rank(internalRank), 
-            _client_template(_params.seed()+_internal_rank, _params.clientTemplate()) {
-        
-        std::string jsonTemplateFile = _params.jobTemplate();
-        // Check if a client-specific template file is present
-        std::string clientSpecificFile = jsonTemplateFile + "." + std::to_string(_internal_rank);
-        if (FileUtils::isRegularFile(clientSpecificFile)) {
-            jsonTemplateFile = clientSpecificFile;
-        } else
-        // Is template file itself valid?
-        if (!FileUtils::isRegularFile(jsonTemplateFile)) {
-            LOG(V1_WARN, "Job template file %s does not exist\n", jsonTemplateFile.c_str());        
-            return;
-        }
+            _params(params), _api(api), _internal_rank(internalRank),
+            _rank_specific_file_fetcher(internalRank),
+            _client_template(_params.seed()+_internal_rank,
+            _rank_specific_file_fetcher.get(_params.clientTemplate())) {
 
         // Attempt to parse JSON from file
+        std::string jsonTemplateFile = _rank_specific_file_fetcher.get(_params.jobTemplate());
+        if (jsonTemplateFile.empty()) return;
         try {
             std::ifstream i(jsonTemplateFile);
             i >> _json_template;
@@ -72,7 +66,8 @@ public:
 
         // Parse job description files
         if (_params.jobDescriptionTemplate.isSet()) {
-            std::ifstream i(_params.jobDescriptionTemplate());
+            std::string descriptionTemplateFile = _rank_specific_file_fetcher.get(_params.jobDescriptionTemplate());
+            std::ifstream i(descriptionTemplateFile);
             std::string line;
             while (std::getline(i, line)) {
                 if (line.empty()) break;
@@ -166,7 +161,9 @@ public:
             bool writeResultsToFile = false;
             if (_params.streamerResultOutput.isSet()) {
                 writeResultsToFile = true;
-                _ofs_results.open(_params.streamerResultOutput());
+                _ofs_results.open(_params.streamerResultOutput() 
+                    + (_rank_specific_file_fetcher.hasRankSpecificTemplate() ?
+                        "." + std::to_string(_internal_rank) : ""));
             }
 
             while (_bg_deleter.continueRunning() || _num_jsons_to_delete.load(std::memory_order_relaxed) > 0) {

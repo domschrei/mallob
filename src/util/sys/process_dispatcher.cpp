@@ -1,6 +1,7 @@
 
 #include "process_dispatcher.hpp"
 
+#include <cstdlib>
 #include <sys/types.h>
 #include <stdlib.h>
 #include <fstream>
@@ -15,19 +16,27 @@
 #include "comm/mympi.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "util/sys/fileutils.hpp"
+#include "util/sys/tmpdir.hpp"
 
 void ProcessDispatcher::dispatch() {
 
+    const char* tmpdirCStr = std::getenv("MALLOB_TMP_DIR");
+    std::string tmpdir = tmpdirCStr ? tmpdirCStr : "/tmp";
+
     // Read command from tmp file
     pid_t myPid = Proc::getPid();
-    std::string commandOutfile = "/tmp/mallob_subproc_cmd_" + std::to_string(myPid);
-    std::ifstream ifs(commandOutfile);
-    while (!ifs.is_open()) {
-        usleep(100);
-        ifs = std::ifstream(commandOutfile);
+    std::string commandOutfile = tmpdir + "/mallob_subproc_cmd_" + std::to_string(myPid);
+    std::string command;
+    {
+        std::ifstream ifs(commandOutfile);
+        while (!ifs.is_open()) {
+            usleep(100);
+            ifs = std::ifstream(commandOutfile);
+        }
+        command = std::string(std::istreambuf_iterator<char>(ifs),
+            std::istreambuf_iterator<char>());
     }
-    std::string command((std::istreambuf_iterator<char>(ifs)),
-                    (std::istreambuf_iterator<char>()));
+    FileUtils::rm(commandOutfile); // clean up immediately
 
     // Assemble arguments list
     int numArgs = 0;

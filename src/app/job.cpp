@@ -80,7 +80,10 @@ void Job::pushRevision(const std::shared_ptr<std::vector<uint8_t>>& data) {
 
 void Job::start() {
     assertState(INACTIVE);
-    if (_time_of_activation <= 0) _time_of_activation = Timer::elapsedSecondsCached();
+    if (_time_of_activation <= 0) {
+        _time_of_activation = Timer::elapsedSecondsCached();
+        _time_of_increment_activation = _time_of_activation;
+    }
     _time_of_last_limit_check = Timer::elapsedSecondsCached();
     _volume = std::max(1, _volume);
     _state = ACTIVE;
@@ -120,6 +123,7 @@ void Job::resume() {
     assertState(SUSPENDED);
     _volume = std::max(1, _volume);
     _state = ACTIVE;
+    _time_of_increment_activation = Timer::elapsedSecondsCached();
     appl_resume();
     LOG(V4_VVER, "%s : resumed solving threads\n", toStr());
     _time_of_last_limit_check = Timer::elapsedSecondsCached();
@@ -167,9 +171,9 @@ int Job::getDemand() const {
         // Immediate growth
         demand = _job_tree.getCommSize();
     } else {
-        if (_time_of_activation <= 0) demand = 1;
+        if (_time_of_increment_activation <= 0) demand = 1;
         else {
-            float t = Timer::elapsedSecondsCached()-_time_of_activation;
+            float t = Timer::elapsedSecondsCached()-_time_of_increment_activation;
             
             // Continuous growth
             float numPeriods = std::min(t/_growth_period, 28.f); // overflow protection

@@ -119,6 +119,10 @@ SharingManager::SharingManager(
 			onProduceClause(call.solverId, call.solverRevision, call.clause, call.condVarOrZero, true);
 		}));
 	}
+
+	if (_job_index == 0 && _params.clauseLog.isSet()) {
+		_clause_logger.reset(new ClauseLogger(_params.clauseLog()));
+	}
 }
 
 void SharingManager::onProduceClause(int solverId, int solverRevision, const Clause& clause, int condVarOrZero, bool recursiveCall) {
@@ -344,7 +348,6 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 		auto& solver = _solvers[i];
 		if (!solver || !_solver_stats[i]) continue; // solver was cleaned up
 		if (!solver->isClauseSharingEnabled()) continue;
-		if (solver->getCurrentRevision() != _current_revision) continue;
 		importingSolvers.emplace_back(solver.get(), _solver_stats[i], _id_alignment.get());
 	}
 
@@ -371,6 +374,8 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	auto clause = reader.getNextIncomingClause();
 	while (clause.begin != nullptr) {
 
+		if (_clause_logger) _clause_logger->append(clause);
+
 		if (filterSizeBeingLocked != clause.size) {
 			if (filterSizeBeingLocked != -1) _clause_filter->releaseLock(filterSizeBeingLocked);
 			filterSizeBeingLocked = clause.size;
@@ -390,11 +395,13 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 		clause = reader.getNextIncomingClause();
 	}
 	if (filterSizeBeingLocked != -1) _clause_filter->releaseLock(filterSizeBeingLocked);
-	
-	for (auto& slv : importingSolvers) {
-		BufferReader reader = _clause_store->getBufferReader(begin, buflen);
-		reader.setFilterBitset(slv.filter);
-		slv.solver->addLearnedClauses(reader);
+
+	if (!_params.noImport()) {
+		for (auto& slv : importingSolvers) {
+			BufferReader reader = _clause_store->getBufferReader(begin, buflen);
+			reader.setFilterBitset(slv.filter);
+			slv.solver->addLearnedClauses(reader, _imported_revision);
+		}
 	}
 	
 	// Process-wide stats
@@ -405,6 +412,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	// Signal next garbage collection
 	_gc_pending = true;
 	_sharing_op_ongoing = false;
+	if (_clause_logger) _clause_logger->publish();
 }
 
 void SharingManager::applyFilterToBuffer(int* begin, int& buflen, const int* filter) {

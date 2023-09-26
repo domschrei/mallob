@@ -91,11 +91,19 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	std::string key = "diversification-offset";
 	int diversificationOffset = appConfig.map.count(key) ? atoi(appConfig.map[key].c_str()) : 0;
 
-    std::string numClausesStr = appConfig.map["__NC"];
-	while (numClausesStr[numClausesStr.size()-1] == '.') 
-		numClausesStr.resize(numClausesStr.size()-1);
-	int numClauses = atoi(numClausesStr.c_str());
-	assert(numClauses > 0);
+	// Read # clauses and # vars from app config
+	int numClauses, numVars;
+	std::vector<std::pair<int*, std::string>> fields {
+		{&numClauses, "__NC"},
+		{&numVars, "__NV"}
+	};
+	for (auto [out, id] : fields) {
+		std::string str = appConfig.map[id];
+		while (str[str.size()-1] == '.') 
+			str.resize(str.size()-1);
+		*out = atoi(str.c_str());
+		assert(*out > 0);
+	}
 
 	// Add solvers from full cycles on previous ranks
 	// and from the begun cycle on the previous rank
@@ -135,6 +143,9 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.numBufferedClsGenerations = params.bufferedImportedClsGenerations();
 	setup.skipClauseSharingDiagonally = params.skipClauseSharingDiagonally();
 	setup.diversifyNoise = params.diversifyNoise();
+	setup.diversifyNative = params.diversifyNative();
+	setup.diversifyFanOut = params.diversifyFanOut();
+	setup.diversifyInitShuffle = params.diversifyInitShuffle();
 	switch (_params.diversifyElimination()) {
 	case 0:
 		setup.eliminationSetting = SolverSetup::ALLOW_ALL;
@@ -152,6 +163,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.adaptiveImportManager = params.adaptiveImportManager();
 	setup.certifiedUnsat = params.certifiedUnsat();
 	setup.maxNumSolvers = config.mpisize * params.numThreadsPerProcess();
+	setup.numVars = numVars;
 	setup.numOriginalClauses = numClauses;
 	setup.proofDir = proofDirectory;
 
@@ -231,7 +243,7 @@ void SatEngine::appendRevision(int revision, size_t fSize, const int* fLits, siz
 	LOGGER(_logger, V4_VVER, "Import rev. %i: %i lits, %i assumptions\n", revision, fSize, aSize);
 	assert(_revision+1 == revision);
 	_revision_data.push_back(RevisionData{fSize, fLits, aSize, aLits});
-	_sharing_manager->setRevision(revision);
+	_sharing_manager->setImportedRevision(revision);
 	
 	for (size_t i = 0; i < _num_solvers; i++) {
 		if (revision == 0) {
@@ -347,6 +359,11 @@ bool SatEngine::isReadyToPrepareSharing() const {
 	// If certified UNSAT is enabled, no sharing operation can be ongoing
 	// (otherwise, this op must be finished first, for clause ID consistency)
 	return !ClauseMetadata::enabled() || !_sharing_manager->isSharingOperationOngoing();
+}
+
+void SatEngine::setClauseBufferRevision(int revision) {
+	if (isCleanedUp()) return;
+	_sharing_manager->setImportedRevision(revision);
 }
 
 int SatEngine::prepareSharing(int* begin, int maxSize, int& successfulSolverId, int& numLits) {

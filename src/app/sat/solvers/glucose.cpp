@@ -59,70 +59,73 @@ void MGlucose::diversify(int seed) {
 	random_seed = (std::abs(seed) % UINT16_MAX) + 1;
 	adaptStrategies = false;
 
-	if (rank >= 3) {
-		// For all but the first few solvers, randomize initial
-		// activity and DFS until first conflict
-		randomizeFirstDescent = true;
-		rnd_init_act = true;
-	}
+	if (_setup.diversifyNative) {
 
-	switch (rank % numDiversifications) {
-	case 0:
-		// adaptive solver with simplification
-		adaptStrategies = true;
-		use_simplification = true;
-		break;
-	case 1:
-		// special case for low successive conflicts
-		luby_restart = true;
-        luby_restart_factor = 100;
-        var_decay = 0.999;
-        max_var_decay = 0.999;
-		break;
-	case 2:
-		// special case for low decision levels
-		chanseokStrategy = true;
-        coLBDBound = 4;
-        glureduce = true;
-        firstReduceDB = 2000;
-        nbclausesbeforereduce = firstReduceDB;
-        curRestart = (conflicts / nbclausesbeforereduce) + 1;
-        incReduceDB = 0;
-		break;
-	case 3:
-		// Glucose 2.0 (+ blocked restarts)
-		var_decay = 0.95;
-		max_var_decay = 0.95;
-		firstReduceDB = 4000;
-		lbdQueue.growTo(100);
-		sizeLBDQueue = 100;
-		K = 0.7;
-		incReduceDB = 500;
-		break;
-	case 4:
-		// non-adaptive solver without simplification
-		adaptStrategies = false;
-		use_simplification = false;
-		break;
-	case 5:
-		// Chanseok strategy for clause deletion
-		chanseokStrategy = true;
-		break;
-	case 6:
-		// adaptive solver without simplification
-		adaptStrategies = true;
-		use_simplification = false;
-		break;
-	case 7:
-		// special case for high successive conflicts
-		chanseokStrategy = true;
-        glureduce = true;
-        coLBDBound = 3;
-        firstReduceDB = 30000;
-        var_decay = 0.99;
-        max_var_decay = 0.99;
-        randomize_on_restarts = 1;
-		break;
+		if (rank >= 3) {
+			// For all but the first few solvers, randomize initial
+			// activity and DFS until first conflict
+			randomizeFirstDescent = true;
+			rnd_init_act = true;
+		}
+
+		switch (rank % numDiversifications) {
+		case 0:
+			// adaptive solver with simplification
+			adaptStrategies = true;
+			use_simplification = true;
+			break;
+		case 1:
+			// special case for low successive conflicts
+			luby_restart = true;
+			luby_restart_factor = 100;
+			var_decay = 0.999;
+			max_var_decay = 0.999;
+			break;
+		case 2:
+			// special case for low decision levels
+			chanseokStrategy = true;
+			coLBDBound = 4;
+			glureduce = true;
+			firstReduceDB = 2000;
+			nbclausesbeforereduce = firstReduceDB;
+			curRestart = (conflicts / nbclausesbeforereduce) + 1;
+			incReduceDB = 0;
+			break;
+		case 3:
+			// Glucose 2.0 (+ blocked restarts)
+			var_decay = 0.95;
+			max_var_decay = 0.95;
+			firstReduceDB = 4000;
+			lbdQueue.growTo(100);
+			sizeLBDQueue = 100;
+			K = 0.7;
+			incReduceDB = 500;
+			break;
+		case 4:
+			// non-adaptive solver without simplification
+			adaptStrategies = false;
+			use_simplification = false;
+			break;
+		case 5:
+			// Chanseok strategy for clause deletion
+			chanseokStrategy = true;
+			break;
+		case 6:
+			// adaptive solver without simplification
+			adaptStrategies = true;
+			use_simplification = false;
+			break;
+		case 7:
+			// special case for high successive conflicts
+			chanseokStrategy = true;
+			glureduce = true;
+			coLBDBound = 3;
+			firstReduceDB = 30000;
+			var_decay = 0.99;
+			max_var_decay = 0.99;
+			randomize_on_restarts = 1;
+			break;
+		}
 	}
 
 	if (rank >= getNumOriginalDiversifications() && _setup.diversifyNoise) {

@@ -55,7 +55,7 @@ struct SatSharedMemory {
     int exportBufferMaxSize {0};
     int importBufferMaxSize;
     int importBufferSize {0};
-    int importBufferRevision;
+    int importBufferRevision {-1};
     int returnedBufferSize;
     Checksum importChecksum;
     int importEpoch;

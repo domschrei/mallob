@@ -15,6 +15,7 @@
 #include "util/params.hpp"
 #include "util/sys/terminator.hpp"
 #include "util/sys/timer.hpp"
+#include "util/sys/tmpdir.hpp"
 
 void handleUnsat(const Parameters& _params) {
 	LOG_OMIT_PREFIX(V0_CRIT, "s UNSATISFIABLE\n");
@@ -31,7 +32,7 @@ void handleUnsat(const Parameters& _params) {
 bool SatReader::read(JobDescription& desc) {
 
 	_raw_content_mode = desc.getAppConfiguration().map.count("content-mode")
-		&& desc.getAppConfiguration().map.at("content-mode") == "RAW";
+		&& desc.getAppConfiguration().map.at("content-mode") == "raw";
 
 	FILE* pipe = nullptr;
 	int namedpipe = -1;
@@ -164,12 +165,22 @@ bool SatReader::read(JobDescription& desc) {
 	}
 
 	desc.setNumVars(_max_var);
-	desc.setAppConfigurationEntry("__NC", std::to_string(_num_read_clauses));
-	desc.setAppConfigurationEntry("__NV", std::to_string(_max_var));
+	// Store # variables and # clauses in app config
+	std::vector<std::pair<int, std::string>> fields {
+		{_num_read_clauses, "__NC"},
+		{_max_var, "__NV"}
+	};
+	for (auto [nbRead, dest] : fields) {
+		std::string nbStr = std::to_string(nbRead);
+		assert(nbStr.size() < NC_DEFAULT_VAL.size());
+		while (nbStr.size() < NC_DEFAULT_VAL.size())
+			nbStr += ".";
+		desc.setAppConfigurationEntry(dest, nbStr);
+	}
 
-	{
-		std::ofstream ofs(".preprocessed-header.pipe", std::ofstream::app);
-		std::string out = "p cnf 0 " + std::to_string(_num_read_clauses) + "\n";
+	if (_params.satPreprocessor.isSet()) {
+		std::ofstream ofs(TmpDir::get() + "/preprocessed-header.pipe", std::ofstream::app);
+		std::string out = "p cnf " + std::to_string(_max_var) + " " + std::to_string(_num_read_clauses) + "\n";
 		if (ofs.is_open()) ofs.write(out.c_str(), out.size());
 	}
 

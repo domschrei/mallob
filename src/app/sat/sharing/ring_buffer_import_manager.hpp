@@ -50,6 +50,12 @@ public:
 
     const std::vector<int>& getUnitsBuffer() override {
 
+        auto lock = _mtx_revision.getLock();
+        if (!canImport()) {
+            _plain_units_out.clear();
+            return _plain_units_out;
+        }
+
         bool success = _units.consume(_plain_units_out);
         if (!success) {
             _plain_units_out.clear();
@@ -62,6 +68,12 @@ public:
     }
 
     Mallob::Clause& get(AdaptiveClauseStore::ExportMode mode) override {
+
+        auto lock = _mtx_revision.getLock();
+        if (!canImport()) {
+            _clause_out.begin = nullptr;
+            return _clause_out;
+        }
 
         // Retrieve clauses from parallel ringbuffer as necessary
         if (_plain_clauses_out.empty() || _plain_clauses_position >= _plain_clauses_out.size()) {

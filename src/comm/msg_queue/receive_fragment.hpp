@@ -59,8 +59,10 @@ struct ReceiveFragment {
         memcpy(&totalNumBatches, data+msglen - 1*sizeof(int), sizeof(int));
         msglen -= 3*sizeof(int);
         
-        if (msglen == 0 && sentBatch == 0 && totalNumBatches == 0) {
+        if (sentBatch == 0 && totalNumBatches == 0) {
             // Message was cancelled!
+            assert(msglen == 0 || log_return_false("[ERROR] Batched msg id=%i seems to be cancelled but has effective size %lu!\n",
+                id, msglen));
             cancelled = true;
             return;
         }

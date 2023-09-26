@@ -92,6 +92,7 @@ void ForkedSatJob::appl_suspend() {
 void ForkedSatJob::appl_resume() {
     if (!_initialized) return;
     _solver->setSolvingState(SolvingStates::ACTIVE);
+    loadIncrements();
     _clause_comm->communicate();
 }
 
@@ -259,6 +260,10 @@ std::vector<int> ForkedSatJob::getPreparedClauses(Checksum& checksum, int& succe
 int ForkedSatJob::getLastAdmittedNumLits() {
     if (!_initialized) return 0;
     return _solver->getLastAdmittedNumLits();
+}
+void ForkedSatJob::setClauseBufferRevision(int revision) {
+    if (!isInitialized()) return;
+    _solver->setClauseBufferRevision(revision);
 }
 
 void ForkedSatJob::filterSharing(int epoch, std::vector<int>& clauses) {

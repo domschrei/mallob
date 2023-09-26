@@ -244,6 +244,7 @@ void MessageQueue::processReceived() {
             // Fragment of a message
 
             tag -= MSG_OFFSET_BATCHED;
+            assert(msglen >= 3*sizeof(int));
             int id = ReceiveFragment::readId(recvData, msglen);
             auto key = std::pair<int, int>(source, id);
             

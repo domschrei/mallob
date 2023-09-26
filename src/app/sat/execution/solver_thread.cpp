@@ -89,14 +89,15 @@ bool SolverThread::readFormula() {
             float random = 0.0001f * (rand() % 10000); // random number in [0,1)
             assert(random >= 0); assert(random <= 1);
             // ... only if random throw hits user-defined probability
-            shuffle = shuffle && random <= _params.inputShuffleProbability();
+            shuffle = shuffle && _params.inputShuffleProbability() > 0
+                && random <= _params.inputShuffleProbability();
 
             if (shuffle) {
                 LOGGER(_logger, V4_VVER, "Shuffling input rev. %i\n", (int)_active_revision);
                 {
                     auto lock = _state_mutex.getLock();
                     assert(_active_revision < (int)_pending_formulae.size());
-                    fParser = &_pending_formulae[_active_revision];
+                    fParser = _pending_formulae[_active_revision].get();
                 }
                 fParser->shuffle(_solver.getGlobalId());
             }
@@ -106,7 +107,7 @@ bool SolverThread::readFormula() {
         {
             auto lock = _state_mutex.getLock();
             assert(_active_revision < (int)_pending_formulae.size());
-            fParser = &_pending_formulae[_active_revision];
+            fParser = _pending_formulae[_active_revision].get();
             aSize = _pending_assumptions[_active_revision].first;
             aLits = _pending_assumptions[_active_revision].second;
         }
@@ -201,8 +202,12 @@ bool SolverThread::readFormula() {
 void SolverThread::appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits) {
     {
         auto lock = _state_mutex.getLock();
-        _pending_formulae.emplace_back(_logger, fSize, fLits, 
-            revision == 0 ? _solver.getSolverSetup().numOriginalClauses : 0);
+        _pending_formulae.emplace_back(
+            new SerializedFormulaParser(
+                _logger, fSize, fLits,
+                revision == 0 ? _solver.getSolverSetup().numOriginalClauses : 0
+            )
+        );
         LOGGER(_logger, V4_VVER, "Received %i literals\n", fSize);
         _pending_assumptions.emplace_back(aSize, aLits);
         LOGGER(_logger, V4_VVER, "Received %i assumptions\n", aSize);
@@ -221,14 +226,17 @@ void SolverThread::appendRevision(int revision, size_t fSize, const int* fLits, 
 void SolverThread::diversifyInitially() {
 
     // Random seed
-    size_t seed = _params.seed() + _solver.getGlobalId();
-    //hash_combine(seed, (unsigned int)_tid);
-    hash_combine(seed, (unsigned int)_portfolio_size);
-    hash_combine(seed, (unsigned int)_portfolio_rank);
+    size_t seed = _params.seed();
+    if (_params.diversifySeeds()) {
+        seed += _solver.getGlobalId();
+        //hash_combine(seed, (unsigned int)_tid);
+        hash_combine(seed, (unsigned int)_portfolio_size);
+        hash_combine(seed, (unsigned int)_portfolio_rank);
+    }
     // Diversify solver based on seed
     _solver.diversify(seed);
     // RNG
-    _rng = SplitMix64Rng(seed);
+    _rng = SplitMix64Rng(seed+_solver.getGlobalId());
 }
 
 void SolverThread::diversifyAfterReading() {

@@ -6,8 +6,11 @@
 #include <thread>
 #include <unistd.h>
 #include <list>
+#include <filesystem>
 
 #include "client.hpp"
+#include "comm/msg_queue/message_handle.hpp"
+#include "comm/msgtags.h"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
 #include "util/permutation.hpp"
@@ -20,6 +23,7 @@
 #include "util/sys/thread_pool.hpp"
 #include "util/sys/atomics.hpp"
 #include "app/app_registry.hpp"
+#include "util/sys/tmpdir.hpp"
 #include "util/sys/watchdog.hpp"
 
 #include "interface/socket/socket_connector.hpp"
@@ -231,7 +235,17 @@ void Client::init() {
     // Set up various interfaces as bridges between the outside and the JSON interface
     if (_params.useFilesystemInterface()) {
         std::string path = getFilesystemInterfacePath();
+        {
+            // Write the available job submission path to an availability tmp file
+            std::ofstream ofs(TmpDir::get() + "/mallob.apipath." + std::to_string(Proc::getPid()));
+            // Differentiate absolute vs. relative path
+            if (path[0] == '/') ofs << path;
+            else ofs << std::filesystem::current_path().string() + "/" + path;
+        }
         LOG(V2_INFO, "Set up filesystem interface at %s\n", path.c_str());
+        // Tell JSON interface to output non-JSON result files to the interface path, too
+        _json_interface->setOutputDirectory(path);
+
         auto logger = Logger::getMainInstance().copy("I-FS", ".i-fs");
         auto conn = _params.inotify() ? 
             (Connector*) new InotifyFilesystemConnector(*_json_interface, _params, std::move(logger), path)
@@ -267,11 +281,11 @@ int Client::getInternalRank() {
 }
 
 std::string Client::getFilesystemInterfacePath() {
-    return ".api/jobs." + std::to_string(getInternalRank()) + "/";
+    return _params.apiDirectory() + "/jobs." + std::to_string(getInternalRank()) + "/";
 }
 
 std::string Client::getSocketPath() {
-    return "/tmp/mallob_" + std::to_string(Proc::getPid()) + "." + std::to_string(getInternalRank()) + ".sk";
+    return TmpDir::get() + "/mallob_" + std::to_string(Proc::getPid()) + "." + std::to_string(getInternalRank()) + ".sk";
 } 
 
 APIConnector& Client::getAPI() {
@@ -358,21 +372,28 @@ void Client::advance() {
     // Advance an all-reduction of the current system state
     if (_sys_state.aggregate(time)) {
         const std::vector<float>& result = _sys_state.getGlobal();
-        int processed = (int)result[SYSSTATE_PROCESSED_JOBS];
         if (MyMpi::rank(_comm) == 0) {
-            LOG(V2_INFO, "sysstate entered=%i parsed=%i scheduled=%i processed=%i\n", 
+            LOG(V2_INFO, "sysstate entered=%i parsed=%i scheduled=%i processed=%i successful=%i\n",
                 (int)result[SYSSTATE_ENTERED_JOBS], 
                 (int)result[SYSSTATE_PARSED_JOBS], 
-                (int)result[SYSSTATE_SCHEDULED_JOBS], 
-                processed);
+                (int)result[SYSSTATE_SCHEDULED_JOBS],
+                (int)result[SYSSTATE_PROCESSED_JOBS],
+                (int)result[SYSSTATE_SUCCESSFUL_JOBS]);
         }
     }
 
     // Any "done job" processings still pending?
     if (_done_job_futures.empty()) {
         // -- no: check if job limit has been reached
+
+        bool jobLimitReached = false;
         int jobLimit = _params.numJobs();
-        if (jobLimit > 0 && (int)_sys_state.getGlobal()[SYSSTATE_PROCESSED_JOBS] >= jobLimit) {
+        if (jobLimit > 0) jobLimitReached |= (int)_sys_state.getGlobal()[SYSSTATE_PROCESSED_JOBS] >= jobLimit;
+        int successfulJobLimit = _params.numSuccessfulJobs();
+        if (successfulJobLimit > 0)
+            jobLimitReached |= (int)_sys_state.getGlobal()[SYSSTATE_SUCCESSFUL_JOBS] >= successfulJobLimit;
+
+        if (jobLimitReached) {
             LOG(V2_INFO, "Job limit reached.\n");
             // Job limit reached - exit
             Terminator::setTerminating();
@@ -459,32 +480,44 @@ void Client::introduceNextJob() {
     req.timeOfBirth = job.getArrival();
 
     LOG_ADD_DEST(V2_INFO, "Introducing job #%i rev. %i : %s", nodeRank, jobId, req.revision, req.toStr().c_str());
-    MyMpi::isend(nodeRank, MSG_REQUEST_NODE, req);
+    if (job.isIncremental() && req.revision > 0) {
+        sendJobDescription(req, nodeRank);
+    } else {
+        MyMpi::isend(nodeRank, MSG_REQUEST_NODE, req);
+    }
 }
 
 void Client::handleOfferAdoption(MessageHandle& handle) {
     JobRequest req = Serializable::get<JobRequest>(handle.getRecvData());
+    sendJobDescription(req, handle.source);
+}
+
+void Client::sendJobDescription(JobRequest& req, int destRank) {
+
     float schedulingTime = Timer::elapsedSeconds() - req.timeOfBirth;
-    LOG(V3_VERB, "Scheduling %s on [%i] (latency: %.5fs)\n", req.toStr().c_str(), handle.source, schedulingTime);
-    
+    LOG(V3_VERB, "Scheduling %s on [%i] (latency: %.5fs)\n", req.toStr().c_str(), destRank, schedulingTime);
+
     JobDescription& desc = *_active_jobs[req.jobId];
     desc.getStatistics().schedulingTime = schedulingTime;
     desc.getStatistics().timeOfScheduling = Timer::elapsedSeconds();
     assert(desc.getId() == req.jobId || LOG_RETURN_FALSE("%i != %i\n", desc.getId(), req.jobId));
 
     // Send job description
-    LOG_ADD_DEST(V4_VVER, "Sending job desc. of #%i rev. %i of size %lu", handle.source, desc.getId(), 
+    LOG_ADD_DEST(V4_VVER, "Sending job desc. of #%i rev. %i of size %lu", destRank, desc.getId(),
         desc.getRevision(), desc.getTransferSize(desc.getRevision()));
-    
+
+    int tag = desc.isIncremental() && req.revision>0 ?
+        MSG_DEPLOY_NEW_REVISION : MSG_SEND_JOB_DESCRIPTION;
+
     auto data = desc.getSerialization(desc.getRevision());
     desc.clearPayload(desc.getRevision());
-    int msgId = MyMpi::isend(handle.source, MSG_SEND_JOB_DESCRIPTION, data);
+    int msgId = MyMpi::isend(destRank, tag, data);
     LOG_ADD_DEST(V4_VVER, "Sent job desc. of #%i of size %lu", 
-        handle.source, req.jobId, data->size());
+        destRank, req.jobId, data->size());
     //LOG(V4_VVER, "%p : use count %i\n", data.get(), data.use_count());
     
     // Remember transaction
-    _root_nodes[req.jobId] = handle.source;
+    _root_nodes[req.jobId] = destRank;
 
     // waiting instance reader might be able to continue now
     {
@@ -520,6 +553,11 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     LOG(V2_INFO, "SOLUTION #%i %s rev. %i\n", jobId,
         resultCode == RESULT_SAT ? "SAT" : resultCode == RESULT_UNSAT ? "UNSAT" : "UNKNOWN",
         revision);
+
+    // Increment # successful jobs if result is not "unknown"
+    if (resultCode != 0) {
+        _sys_state.addLocal(SYSSTATE_SUCCESSFUL_JOBS, 1);
+    }
 
     // Disable all watchdogs to avoid crashes while printing a huge model
     Watchdog::disableGlobally();
@@ -633,6 +671,8 @@ Client::~Client() {
     _incoming_job_cond_var.notify();
     _instance_reader.stop();
     _json_interface.reset();
+
+    FileUtils::rm(TmpDir::get() + "/mallob.apipath." + std::to_string(Proc::getPid()));
 
     LOG(V4_VVER, "Leaving client destructor\n");
 }

@@ -7,6 +7,7 @@
 #include <atomic>
 
 #include "comm/mympi.hpp"
+#include "data/job_transfer.hpp"
 #include "util/params.hpp"
 #include "data/job_description.hpp"
 #include "util/sys/threading.hpp"
@@ -22,6 +23,7 @@
 #define SYSSTATE_PARSED_JOBS 1
 #define SYSSTATE_SCHEDULED_JOBS 2
 #define SYSSTATE_PROCESSED_JOBS 3
+#define SYSSTATE_SUCCESSFUL_JOBS 4
 
 struct JobByArrivalComparator {
     inline bool operator() (const JobMetadata& struct1, const JobMetadata& struct2) const {
@@ -91,7 +93,7 @@ private:
 
     std::map<int, int> _root_nodes;
     std::set<int> _client_ranks;
-    SysState<4> _sys_state;
+    SysState<5> _sys_state;
 
     std::unique_ptr<JsonInterface> _json_interface;
     std::vector<Connector*> _interface_connectors;
@@ -110,7 +112,7 @@ private:
 public:
     Client(MPI_Comm comm, Parameters& params)
         : _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 
-        _params(params), _sys_state(_comm, params.sysstatePeriod(), SysState<4>::ALLREDUCE) {}
+        _params(params), _sys_state(_comm, params.sysstatePeriod(), SysState<5>::ALLREDUCE) {}
     ~Client();
     void init();
     void advance();
@@ -130,6 +132,8 @@ private:
     void readIncomingJobs();
     
     void handleOfferAdoption(MessageHandle& handle);
+    void sendJobDescription(JobRequest& req, int destRank);
+
     void handleJobDone(MessageHandle& handle);
     void handleAbort(MessageHandle& handle);
     void handleSendJobResult(MessageHandle& handle);

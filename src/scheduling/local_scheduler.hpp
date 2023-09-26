@@ -178,6 +178,14 @@ public:
         }
     }
 
+    bool canBeginResumptionAsRoot() {
+        for (auto& session : _sessions) {
+            if (!session) continue;
+            if (session->doesChildHaveNodes()) return false;
+        }
+        return true;
+    }
+
     void beginResumptionAsRoot() {
         assert(_index == 0);
         LOG(V5_DEBG, "RBS #%i:%i RESUMING\n", _job_id, _index);
@@ -222,7 +230,7 @@ public:
     }
 
     bool canResumeAsRoot() {
-        return _resuming && !_sessions[0]->doesChildHaveNodes() && !_sessions[1]->doesChildHaveNodes();
+        return _resuming && canBeginResumptionAsRoot();
     }
 
     /*

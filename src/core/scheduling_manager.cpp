@@ -1,6 +1,8 @@
 
 #include "scheduling_manager.hpp"
 
+#include "comm/msg_queue/message_handle.hpp"
+#include "comm/msgtags.h"
 #include "data/job_state.h"
 #include "data/job_transfer.hpp"
 #include "util/assert.hpp"
@@ -104,7 +106,9 @@ SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm,
     _subscriptions.emplace_back(MSG_JOB_TREE_BROADCAST, 
         [&](auto& h) {handleApplicationMessage(h);});
     _subscriptions.emplace_back(MSG_SEND_JOB_DESCRIPTION, 
-        [&](auto& h) {handleIncomingJobDescription(h);});
+        [&](auto& h) {handleIncomingJobDescription(h, false);});
+    _subscriptions.emplace_back(MSG_DEPLOY_NEW_REVISION,
+        [&](auto& h) {handleIncomingJobDescription(h, true);});
     _subscriptions.emplace_back(MSG_NOTIFY_ASSIGNMENT_UPDATE, 
         [&](auto& h) {_req_matcher->handle(h);});
     _subscriptions.emplace_back(MSG_SCHED_RELEASE_FROM_WAITING, 
@@ -140,7 +144,7 @@ RequestMatcher* SchedulingManager::createRequestMatcher() {
 void SchedulingManager::execute(Job& job, int source) {
 
     // Remove commitment
-    uncommit(job, /*leaving=*/false);
+    auto req = uncommit(job, /*leaving=*/false);
 
     // Execute job
     int jobId = job.getId();
@@ -233,6 +237,16 @@ void SchedulingManager::checkActiveJob() {
 }
 
 void SchedulingManager::checkSuspendedJobs() {
+
+    // Try to resume deferred root nodes in the process of suspending their tree
+    auto [deferredRootId, source] = _id_and_source_of_deferred_root_to_reactivate;
+    if (deferredRootId >= 0) {
+        if (_reactivation_scheduler.checkResumeDeferredRoot(deferredRootId)) {
+            handleJobAfterArrivedJobDescription(deferredRootId, source);
+            _id_and_source_of_deferred_root_to_reactivate = {-1, -1};
+        }
+    }
+
     for (auto& [id, job] : _job_registry.getJobMap()) {
         if (job->getState() == SUSPENDED) job->communicate();
     }
@@ -509,11 +523,29 @@ void SchedulingManager::handleAnswerToAdoptionOffer(MessageHandle& handle) {
     }
 }
 
-void SchedulingManager::handleIncomingJobDescription(MessageHandle& handle) {
+void SchedulingManager::handleIncomingJobDescription(MessageHandle& handle, bool deployNewRevision) {
 
     // Append revision description to job
     int jobId;
     if (!_desc_interface.handleIncomingJobDescription(handle, jobId)) return;
+    if (deployNewRevision) {
+        Job& job = get(jobId);
+        if (!job.getJobTree().isRoot()) return;
+        assert(job.getRevision() > 0);
+        auto req = _req_mgr.getIncrementalRootJobRequest(jobId, job.getRevision());
+        commit(job, req);
+    }
+    if (_reactivation_scheduler.checkResumeDeferredRoot(jobId)) {
+        handleJobAfterArrivedJobDescription(jobId, handle.source);
+    } else {
+        // This root node cannot be resumed yet
+        // since its suspension protocol is not done yet!
+        // Remember the id and source to resume later.
+        _id_and_source_of_deferred_root_to_reactivate = {jobId, handle.source};
+    }
+}
+
+void SchedulingManager::handleJobAfterArrivedJobDescription(int jobId, int source) {
 
     // If job has not started yet, execute it now
     Job& job = get(jobId);
@@ -522,12 +554,12 @@ void SchedulingManager::handleIncomingJobDescription(MessageHandle& handle) {
             const auto& req = _job_registry.getCommitment(jobId);
             job.setDesiredRevision(req.revision);
         }
-        execute(job, handle.source);
+        execute(job, source);
         initiateVolumeUpdate(job);
     }
     
     if (job.getState() == ACTIVE)
-        _desc_interface.queryNextRevisionIfNeeded(job, handle.source);
+        _desc_interface.queryNextRevisionIfNeeded(job, source);
 }
 
 void SchedulingManager::handleQueryForExplicitVolumeUpdate(MessageHandle& handle) {
@@ -604,7 +636,7 @@ void SchedulingManager::handleJobInterruption(MessageHandle& handle) {
 
     LOG(V3_VERB, "Acknowledge #%i aborting\n", jobId);
     auto& job = get(jobId);    
-    if (job.getJobTree().isRoot()) {
+    if (job.getJobTree().isRoot() && !job.isIncremental()) {
         // Forward information on aborted job to client
         MyMpi::isend(job.getJobTree().getParentNodeRank(), 
             MSG_NOTIFY_CLIENT_JOB_ABORTING, handle.moveRecvData());
@@ -984,10 +1016,16 @@ void SchedulingManager::commit(Job& job, JobRequest& req) {
     if (_params.reactivationScheduling()) {
         _reactivation_scheduler.initializeReactivator(req, job);
     }
+
+    // For root nodes of incremental jobs, remember the job request
+    // to later instantiate it when a new revision is deployed
+    if (job.getJobTree().isRoot() && req.revision == 0 && job.isIncremental()) {
+        _req_mgr.putIncrementalRootJobTemplate(req);
+    }
 }
 
-void SchedulingManager::uncommit(Job& job, bool leaving) {
-    if (!job.hasCommitment()) return;
+JobRequest SchedulingManager::uncommit(Job& job, bool leaving) {
+    if (!job.hasCommitment()) return JobRequest();
     LOG(V3_VERB, "UNCOMMIT %s\n", job.toStr());
     
     auto optReq = job.uncommit();
@@ -1002,6 +1040,7 @@ void SchedulingManager::uncommit(Job& job, bool leaving) {
         job.getRequestToMultiply(/*left=*/true).reset();
         job.getRequestToMultiply(/*left=*/false).reset();
     }
+    return optReq.value();
 }
 
 SchedulingManager::AdoptionResult SchedulingManager::tryAdopt(JobRequest& req, JobRequestMode mode, int sender) {
@@ -1054,7 +1093,7 @@ SchedulingManager::AdoptionResult SchedulingManager::tryAdopt(JobRequest& req, J
 
     // Request for a root node:
     // Possibly adopt the job while dismissing the active job
-    if (req.requestedNodeIndex == 0 && !_params.reactivationScheduling()) {
+    if (req.requestedNodeIndex == 0 && req.revision == 0 && !_params.reactivationScheduling()) {
 
         // Adoption only works if this node does not yet compute for that job
         if (!has(req.jobId) || get(req.jobId).getState() != ACTIVE) {

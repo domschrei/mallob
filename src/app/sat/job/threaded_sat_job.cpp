@@ -186,6 +186,9 @@ std::vector<int> ThreadedSatJob::getPreparedClauses(Checksum& checksum, int& suc
 int ThreadedSatJob::getLastAdmittedNumLits() {
     return _solver->getLastAdmittedClauseShare().nbAdmittedLits;
 }
+void ThreadedSatJob::setClauseBufferRevision(int revision) {
+    _solver->setClauseBufferRevision(revision);
+}
 
 void ThreadedSatJob::filterSharing(int epoch, std::vector<int>& clauses) {
     auto maxFilterSize = clauses.size()/(8*sizeof(int))+1;

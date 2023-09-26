@@ -153,6 +153,7 @@ private:
 
     float _time_of_arrival;
     float _time_of_activation = 0;
+    float _time_of_increment_activation = 0;
     float _time_of_first_volume_update = -1;
     float _time_of_abort = 0;
     
