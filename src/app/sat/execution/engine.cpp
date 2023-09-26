@@ -92,18 +92,10 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	int diversificationOffset = appConfig.map.count(key) ? atoi(appConfig.map[key].c_str()) : 0;
 
 	// Read # clauses and # vars from app config
-	int numClauses, numVars;
-	std::vector<std::pair<int*, std::string>> fields {
-		{&numClauses, "__NC"},
-		{&numVars, "__NV"}
-	};
-	for (auto [out, id] : fields) {
-		std::string str = appConfig.map[id];
-		while (str[str.size()-1] == '.') 
-			str.resize(str.size()-1);
-		*out = atoi(str.c_str());
-		assert(*out > 0);
-	}
+	int numClauses = appConfig.getFixedSizeIntOrDefault("__NC", -1);
+	int numVars = appConfig.getFixedSizeIntOrDefault("__NV", -1);
+	assert(numClauses >= 0);
+	assert(numVars >= 0);
 
 	// Add solvers from full cycles on previous ranks
 	// and from the begun cycle on the previous rank

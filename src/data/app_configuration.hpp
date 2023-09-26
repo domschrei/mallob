@@ -70,8 +70,26 @@ int getIntOrDefault(const std::string& key, int defaultVal) const {
     return res;
 }
 
+int getFixedSizeIntOrDefault(const std::string& key, int defaultVal) const {
+    const std::string NC_DEFAULT_VAL = "BMMMKKK111";
+    if (!map.count(key)) return defaultVal;
+    std::string str = map.at(key);
+    while (str[str.size()-1] == '.') 
+        str.resize(str.size()-1);
+    int value = atoi(str.c_str());
+    return value;
+}
+
 void setInt(const std::string& key, int val) {
     map[key] = std::to_string(val);
 }
 
+void setFixedSizeInt(const std::string& key, int val) {
+    const std::string NC_DEFAULT_VAL = "BMMMKKK111";
+    std::string nbStr = std::to_string(val);
+    assert(nbStr.size() < NC_DEFAULT_VAL.size());
+    while (nbStr.size() < NC_DEFAULT_VAL.size())
+        nbStr += ".";
+    map[key] = nbStr;
+}
 };

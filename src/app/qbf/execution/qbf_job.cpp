@@ -213,7 +213,7 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>>
     assert(ctx_);
     auto &ctx = *ctx_;
 
-    int vars = getAppConfig().getIntOrDefault("__NV", -1);
+    int vars = getAppConfig().getFixedSizeIntOrDefault("__NV", -1);
     assert(vars > -1);
 
     if (childJobsArePureSat) {
@@ -254,7 +254,7 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>>
       assert(ctx);
       depth = ctx->depth;
       id = ctx->nodeJobId;
-      vars = getAppConfig().getIntOrDefault("__NV", -1);
+      vars = getAppConfig().getFixedSizeIntOrDefault("__NV", -1);
     }
     assert(vars > -1);
 
@@ -271,7 +271,7 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>>
                         }) != formula.end();
     };
     while (!is_in_matrix(formula[depth])) {
-      LOGGER(_job_log, V3_VERB, "Increasing depth from %d to %d because literal %d was not in matrix\n", depth, (depth+1), formula[depth]);
+      LOGGER(_job_log, V3_VERB, "QBF #%i increase depth %d ~> %d as literal %d was not in matrix\n", id, depth, (depth+1), formula[depth]);
       ++depth;
     }
 
@@ -287,18 +287,20 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>>
 
     int res = -1;
     do {
+        LOGGER(_job_log, V3_VERB, "QBF #%i calling bloqqer at depth %i with %i vars, lit %i\n", id, depth, vars, formula[depth]);
         res = bloqqerCaller->process(formula,
                                      vars,
                                      id,
                                      formula[depth],
                                      _params.expansionCostThreshold());
 
-        LOGGER(_job_log, V3_VERB, "#%i bloqqer returned with result %i\n", id, res);
+        LOGGER(_job_log, V3_VERB, "QBF #%i bloqqer returned with result %i\n", id, res);
 
         switch(res) {
         case 1:
             // Bloqqer could expand the variable.
             // This means that this quantification was universal.
+            LOGGER(_job_log, V3_VERB, "QBF #%i depth=%i++ var %i expanded\n", getId(), depth, formula[depth]);
             assert(formula[depth] < 0);
             formula[depth] = -formula[depth];
             vars = bloqqerCaller->getVars();
@@ -314,9 +316,11 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>>
                 // Flip quantifier! But we need to remember that we had a universal at this space.
                 // We are in an AND-node.
                 // TODO: Put this into context.
+                LOGGER(_job_log, V3_VERB, "QBF #%i depth=%i var %i universal - flip - BREAK\n", getId(), depth, formula[depth]);
                 formula[depth] = -formula[depth];
                 ctx->nodeType = QbfContext::AND;
             } else {
+                LOGGER(_job_log, V3_VERB, "QBF #%i depth=%i var %i unexpanded - BREAK\n", getId(), depth, formula[depth]);
                 ctx->nodeType = QbfContext::OR;
             }
             break; }
@@ -362,8 +366,8 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>>
 
     if (formula[depth] != 0 && (ctx.nodeType == QbfContext::AND || universal_quantifiers_in_formula())) {
         // Spawn two new QBF jobs.
-        LOGGER(_job_log, V3_VERB, "QBF #%i spawning two QBF children\n", getId());
         int quantification = formula[depth];
+        LOGGER(_job_log, V3_VERB, "QBF #%i spawning two QBF children over var %i @ depth %i\n", getId(), quantification, depth);
         assert(quantification > 0);
         return std::make_pair(QBF, prepareQbfChildJobs(ctx, formula.data(), formula.data()+formula.size(), quantification, vars, depth+1));
     } else {
@@ -407,7 +411,7 @@ void QbfJob::spawnChildJob(QbfContext& ctx, ChildJobApp app, int childIdx, Child
     QbfContext childCtx = ctx.deriveChildContext(childIdx, childPayload.depth, getMyMpiRank());
     AppConfiguration config(getAppConfig());
     childCtx.writeToAppConfig(app==QBF, config);
-    config.setInt("__NV", childPayload.nbVars);
+    config.setFixedSizeInt("__NV", childPayload.nbVars);
     auto json = getJobSubmissionJson(app, config);
 
     // Access the API used to introduce a job from this job

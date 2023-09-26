@@ -64,7 +64,8 @@ void RoutingTreeRequestMatcher::deserialize(const std::vector<uint8_t>& packed, 
         size_t i = 1;
         while (i < packed.size()) {
             // Extract request
-            std::vector<uint8_t> data(packed.data()+i, packed.data()+i+JobRequest::getMaxTransferSize());
+            std::vector<uint8_t> data(packed.data()+i, packed.data()
+                + std::min(i+JobRequest::getMaxTransferSize(), packed.size()));
             JobRequest req = Serializable::get<JobRequest>(data);
             // Accept or discard request
             if (req.balancingEpoch >= _epoch || req.requestedNodeIndex == 0) {
