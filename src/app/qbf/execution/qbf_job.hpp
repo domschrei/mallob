@@ -37,6 +37,10 @@ private:
     };
     std::list<OutMessage> _out_msg_queue;
 
+    size_t _idx_begin_var_ordering {0};
+    size_t _idx_begin_formula_prefix;
+    size_t _idx_begin_formula_matrix;
+
 public:
     QbfJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table);
     void appl_start() override;
@@ -57,8 +61,21 @@ public:
 private:
     void run();
 
-    std::pair<size_t, const int*> getFormulaWithQuantifications();
-    size_t getNumQuantifications(size_t fSize, const int* fData);
+    int extractNextExpansionVariable() {
+        return getDescription().getFormulaPayload(0)[_idx_begin_var_ordering++];
+    }
+    std::pair<size_t, const int*> getFormulaWithPrefix() {
+        return {
+            getDescription().getFormulaPayloadSize(0)-_idx_begin_formula_prefix,
+            getDescription().getFormulaPayload(0)+_idx_begin_formula_prefix
+        };
+    }
+    std::pair<size_t, const int*> getFormulaMatrix() {
+        return {
+            getDescription().getFormulaPayloadSize(0)-_idx_begin_formula_matrix,
+            getDescription().getFormulaPayload(0)+_idx_begin_formula_matrix
+        };
+    }
 
     QbfContext buildQbfContextFromAppConfig();
     void installMessageListeners(QbfContext& submitCtx);

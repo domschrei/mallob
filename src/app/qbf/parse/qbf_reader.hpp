@@ -10,6 +10,7 @@ private:
     bool _reading_quantifications {false};
     bool _terminated_quantifications {false};
     enum QuantificationMode {FORALL, EXISTS} _quantification_mode;
+    int _nb_added_lits {0};
 
 public:
     QbfReader(const Parameters& params, const std::string& filename) :
@@ -88,6 +89,14 @@ public:
             if (!_terminated_quantifications) {
                 // End block of quantifications.
                 addData(0, desc);
+                // REPEAT the block of quantifications, since in the QbfJob
+                // we need a global and a local list of quantifiers.
+                auto data = desc.getFormulaPayload(desc.getRevision());
+                size_t prevSize = _nb_added_lits;
+                for (size_t i = 0; i < prevSize; i++) {
+                    addData(data[i], desc);
+                }
+                assert(_nb_added_lits == 2 * prevSize);
                 _terminated_quantifications = true;
             }
             addData(lit, desc);
@@ -107,6 +116,7 @@ public:
     void addData(int lit, JobDescription& desc) {
         LOG(V6_DEBGV, "ADD %i\n", lit);
         desc.addPermanentData(lit);
+        _nb_added_lits++;
         if (lit == 0) {
             if (!_reading_quantifications && _terminated_quantifications && _last_added_lit_was_zero)
                 _contains_empty_clause = true;

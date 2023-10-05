@@ -12,6 +12,16 @@
 #include "bloqqer_caller.hpp"
 #include "util/str_util.hpp"
 
+void dbg_output_file(const int* data, size_t size, const std::string& outfile) {
+    std::ofstream ofs(outfile);
+    for (size_t i = 0; i < size; i++)
+        ofs << data[i] << " ";
+    ofs << std::endl;
+}
+
+
+
+
 QbfJob::QbfJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table) 
     : Job(params, setup, table), _job_log(Logger::getMainInstance().copy(
         "<" + std::string(toStr()) + ">",
@@ -123,6 +133,33 @@ void QbfJob::run() {
         }
     }
 
+
+    // Prepare formula data
+
+    auto data = getDescription().getFormulaPayload(0);
+    auto dataSize = getDescription().getFormulaPayloadSize(0);
+
+    //dbg_output_file(data, dataSize, "tmp-payload-jobid-" + std::to_string(getId()));
+
+    _idx_begin_formula_prefix = _idx_begin_var_ordering;
+    while (data[_idx_begin_formula_prefix++] != 0) {}
+    _idx_begin_formula_matrix = _idx_begin_formula_prefix;
+    while (data[_idx_begin_formula_matrix++] != 0) {}
+
+    LOGGER(_job_log, V3_VERB, "QBF #%i varorder@%lu prefix@%lu matrix@%lu\n", getId(),
+        _idx_begin_var_ordering, _idx_begin_formula_prefix, _idx_begin_formula_matrix);
+
+    //dbg_output_file(data+_idx_begin_var_ordering, _idx_begin_formula_prefix-_idx_begin_var_ordering,
+    //    "tmp-varorder-jobid-" + std::to_string(getId()));
+    //dbg_output_file(data+_idx_begin_formula_prefix, _idx_begin_formula_matrix-_idx_begin_formula_prefix,
+    //    "tmp-prefix-jobid-" + std::to_string(getId()));
+    //dbg_output_file(data+_idx_begin_formula_matrix, dataSize-_idx_begin_formula_matrix,
+    //    "tmp-matrix-jobid-" + std::to_string(getId()));
+
+    assert(data[_idx_begin_formula_prefix-1] == 0 && data[_idx_begin_formula_prefix] != 0);
+    assert(data[_idx_begin_formula_matrix-1] == 0 && data[_idx_begin_formula_matrix] != 0);
+
+
     // Apply our splitting strategy (may be expensive).
     auto maybeSplit = applySplittingStrategy();
 
@@ -204,7 +241,7 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>>
 
     std::vector<ChildPayload> payloads;
     // Basic splitting
-    auto [fSize, fData] = getFormulaWithQuantifications();
+    auto [fSize, fData] = getFormulaWithPrefix();
     const int* childDataBegin = fData+1;
     const int* childDataEnd = fData+fSize;
     int quantification = fData[0];
@@ -247,7 +284,7 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>>
 
     int depth = 0;
     int id = 0;
-    int vars = 0;
+    int vars = -1;
 
     {
       auto ctx = QbfContextStore::tryAcquire(getId());
@@ -258,25 +295,33 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>>
     }
     assert(vars > -1);
 
-    auto [fSize, fData] = getFormulaWithQuantifications();
-    Formula formula(fData, fData + fSize);
+    // Data which ONLY contains the formula's matrix.
+    auto pair = getFormulaMatrix();
+    auto matrixSize = pair.first;
+    auto matrixData = pair.second;
+    
+    // Data which contains the formula's prefix and matrix (but NOT the global variable order).
+    auto [prefixSize, prefixData] = getFormulaWithPrefix();
+    Formula formula(prefixData, prefixData+prefixSize);
 
-    size_t matrixBeginIdx = findIdxOfFirstZero(formula.data(), formula.size());
-    ++matrixBeginIdx;
-    auto is_in_matrix = [matrixBeginIdx, &formula](int var) -> bool {
-
-      return std::find_if(formula.begin()+matrixBeginIdx, formula.end(),
+    // Helper function for checking if a literal is in the formula's matrix.
+    auto is_in_matrix = [&](int lit) -> bool {
+        int var = abs(lit);
+        return std::find_if(matrixData, matrixData+matrixSize,
                           [var](int l) {
                             return abs(l) == var;
-                        }) != formula.end();
+                        }) != matrixData+matrixSize;
     };
-    while (!is_in_matrix(formula[depth])) {
-      LOGGER(_job_log, V3_VERB, "QBF #%i increase depth %d ~> %d as literal %d was not in matrix\n", id, depth, (depth+1), formula[depth]);
+
+    // Try to find the next expansion variable which is part of the current formula.
+    int expansionVar = extractNextExpansionVariable();
+    while (expansionVar != 0 && !is_in_matrix(expansionVar)) {
+      LOGGER(_job_log, V3_VERB, "QBF #%i increase depth %d ~> %d as var %d was not in matrix\n", id, depth, (depth+1), expansionVar);
       ++depth;
+      expansionVar = extractNextExpansionVariable();
     }
 
-    // Keeps the prefix and modifies the matrix. Variable indices stay
-    // the same.
+    // Each bloqqer call modifies the prefix and the matrix. Variable indices stay the same.
     BloqqerCaller *bloqqerCaller = nullptr;
     {
       auto ctx = QbfContextStore::tryAcquire(getId());
@@ -285,26 +330,27 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>>
       bloqqerCaller = ctx->bloqqerCaller.get();
     }
 
-    int res = -1;
-    do {
-        LOGGER(_job_log, V3_VERB, "QBF #%i calling bloqqer at depth %i with %i vars, lit %i\n", id, depth, vars, formula[depth]);
+    int res = 1;
+    while (res == 1 && expansionVar != 0) {
+        LOGGER(_job_log, V3_VERB, "QBF #%i calling bloqqer at depth %i with %i vars, lit %i\n", id, depth, vars, expansionVar);
         res = bloqqerCaller->process(formula,
                                      vars,
                                      id,
-                                     formula[depth],
+                                     expansionVar,
                                      _params.expansionCostThreshold());
 
         LOGGER(_job_log, V3_VERB, "QBF #%i bloqqer returned with result %i\n", id, res);
 
-        switch(res) {
+        switch (res) {
         case 1:
-            // Bloqqer could expand the variable.
+            // Bloqqer was able to expand the variable.
             // This means that this quantification was universal.
-            LOGGER(_job_log, V3_VERB, "QBF #%i depth=%i++ var %i expanded\n", getId(), depth, formula[depth]);
-            assert(formula[depth] < 0);
-            formula[depth] = -formula[depth];
+            LOGGER(_job_log, V3_VERB, "QBF #%i depth=%i++ var %i expanded\n", getId(), depth, expansionVar);
+            assert(expansionVar < 0);
+            //formula[depth] = -formula[depth]; // TODO do we still need to perform a flip? I don't think so.
             vars = bloqqerCaller->getVars();
             depth++;
+            expansionVar = extractNextExpansionVariable();
             break;
         case 2: {
             // Bloqqer could not expand the variable, or the variable was
@@ -312,15 +358,15 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>>
             auto ctx = QbfContextStore::tryAcquire(getId());
             vars = bloqqerCaller->getVars();
             assert(ctx);
-            if (formula[depth] < 0) {
+            LOGGER(_job_log, V3_VERB, "QBF #%i depth=%i var %i unexpanded - break\n", getId(), depth, expansionVar);
+            if (expansionVar < 0) {
+                // Universal quantifier.
                 // Flip quantifier! But we need to remember that we had a universal at this space.
                 // We are in an AND-node.
-                // TODO: Put this into context.
-                LOGGER(_job_log, V3_VERB, "QBF #%i depth=%i var %i universal - flip - BREAK\n", getId(), depth, formula[depth]);
-                formula[depth] = -formula[depth];
+                //formula[depth] = -formula[depth]; // TODO do we still need to perform this flip?
+                expansionVar = -expansionVar;
                 ctx->nodeType = QbfContext::AND;
             } else {
-                LOGGER(_job_log, V3_VERB, "QBF #%i depth=%i var %i unexpanded - BREAK\n", getId(), depth, formula[depth]);
                 ctx->nodeType = QbfContext::OR;
             }
             break; }
@@ -343,8 +389,7 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>>
         auto ctx = QbfContextStore::tryAcquire(getId());
         assert(ctx);
         if (ctx->cancelled) break;
-
-    } while (res == 1 && formula[depth] != 0);
+    }
 
     auto ctx_ = QbfContextStore::tryAcquire(getId());
     assert(ctx_);
@@ -355,6 +400,9 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>>
         return {};
     }
 
+    // Find out if there are any universal quantifiers left in the formula
+    auto matrixBeginIdx = findIdxOfFirstZero(formula.data(), formula.size());
+    ++matrixBeginIdx;
     auto universal_quantifiers_in_formula = [&formula, matrixBeginIdx]() {
         auto it = std::find_if(formula.begin(), formula.begin()+matrixBeginIdx, [](int q) {
             return q < 0;
@@ -362,14 +410,25 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>>
 
         // our "end"
         return it != formula.begin()+matrixBeginIdx;
-    };
+    }();
 
-    if (formula[depth] != 0 && (ctx.nodeType == QbfContext::AND || universal_quantifiers_in_formula())) {
+    // Prepare child jobs.
+    if (expansionVar != 0 && (ctx.nodeType == QbfContext::AND || universal_quantifiers_in_formula)) {
         // Spawn two new QBF jobs.
-        int quantification = formula[depth];
+        int quantification = expansionVar;
         LOGGER(_job_log, V3_VERB, "QBF #%i spawning two QBF children over var %i @ depth %i\n", getId(), quantification, depth);
-        assert(quantification > 0);
-        return std::make_pair(QBF, prepareQbfChildJobs(ctx, formula.data(), formula.data()+formula.size(), quantification, vars, depth+1));
+        assert(quantification > 0); // existential!
+
+        // Assemble formula consisting of the remaining variable ordering
+        // and the current formula (including both prefix and matrix).
+        Formula childFormula(
+            getDescription().getFormulaPayload(0)+_idx_begin_var_ordering,
+            getDescription().getFormulaPayload(0)+_idx_begin_formula_prefix
+        );
+        assert(!childFormula.empty() && childFormula.back() == 0);
+        childFormula.insert(childFormula.end(), formula.begin(), formula.end());
+
+        return std::make_pair(QBF, prepareQbfChildJobs(ctx, childFormula.data(), childFormula.data()+childFormula.size(), quantification, vars, depth+1));
     } else {
         // Spawn a single SAT job.
         LOGGER(_job_log, V3_VERB, "QBF #%i spawning one SAT child\n", getId());
@@ -391,6 +450,17 @@ std::vector<QbfJob::ChildPayload> QbfJob::prepareQbfChildJobs(QbfContext& ctx, c
         Formula childTruePayload(begin, end);
         childTruePayload.push_back(varToSplitOn);
         childTruePayload.push_back(0);
+        
+        std::string tail;
+        for (long i = 0; i<std::min(10UL, childTruePayload.size()); i++) {
+            tail += std::to_string(childTruePayload.at(i)) + " ";
+        }
+        tail += "... ";
+        for (long i = std::max(0L, ((long)childTruePayload.size())-10); i<childTruePayload.size(); i++) {
+            tail += std::to_string(childTruePayload.at(i)) + " ";
+        }
+        LOGGER(_job_log, V3_VERB, "QBF #%i payload: %s\n", getId(), tail.c_str());
+
         payloads.push_back({vars, depth, std::move(childTruePayload)});
         ctx.appendChild(true, -1, -1);
     }
@@ -398,6 +468,17 @@ std::vector<QbfJob::ChildPayload> QbfJob::prepareQbfChildJobs(QbfContext& ctx, c
         Formula childFalsePayload(begin, end);
         childFalsePayload.push_back(-varToSplitOn);
         childFalsePayload.push_back(0);
+
+        std::string tail;
+        for (long i = 0; i<std::min(10UL, childFalsePayload.size()); i++) {
+            tail += std::to_string(childFalsePayload.at(i)) + " ";
+        }
+        tail += "... ";
+        for (long i = std::max(0L, ((long)childFalsePayload.size())-10); i<childFalsePayload.size(); i++) {
+            tail += std::to_string(childFalsePayload.at(i)) + " ";
+        }
+        LOGGER(_job_log, V3_VERB, "QBF #%i payload: %s\n", getId(), tail.c_str());
+
         payloads.push_back({vars, depth, std::move(childFalsePayload)});
         ctx.appendChild(true, -1, -1);
     }
@@ -472,19 +553,6 @@ void QbfJob::eraseContextAndConclude(int nodeJobId) {
         if (ctx->isRootNode) reportJobDone(*ctx, _internal_result_code);
     }
     QbfContextStore::erase(nodeJobId);
-}
-
-std::pair<size_t, const int*> QbfJob::getFormulaWithQuantifications() {
-    return {
-        getDescription().getFormulaPayloadSize(0),
-        getDescription().getFormulaPayload(0)
-    };
-}
-
-size_t QbfJob::getNumQuantifications(size_t fSize, const int* fData) {
-    size_t size = 0;
-    while (size < fSize && fData[size] != 0) ++size;
-    return size;
 }
 
 QbfContext QbfJob::buildQbfContextFromAppConfig() {

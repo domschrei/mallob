@@ -94,7 +94,7 @@ int BloqqerCaller::process(std::vector<int> &f, int vars, int jobId, int litToTr
     }
     writeQDIMACS(f, fifo, vars);
     fclose(fifo);
-    readQDIMACS(bloqqer, f, true);
+    readQDIMACS(bloqqer, f, false);
     fclose(bloqqer);
   }
   int wstatus = 0;
