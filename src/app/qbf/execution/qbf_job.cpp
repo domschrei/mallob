@@ -146,8 +146,8 @@ void QbfJob::run() {
     _idx_begin_formula_matrix = _idx_begin_formula_prefix;
     while (_idx_begin_formula_matrix < dataSize && data[_idx_begin_formula_matrix++] != 0) {}
 
-    LOGGER(_job_log, V3_VERB, "QBF #%i varorder@%lu prefix@%lu matrix@%lu\n", getId(),
-        _idx_begin_var_ordering, _idx_begin_formula_prefix, _idx_begin_formula_matrix);
+    LOGGER(_job_log, V3_VERB, "QBF #%i varorder@%lu prefix@%lu matrix@%lu end@%lu\n", getId(),
+        _idx_begin_var_ordering, _idx_begin_formula_prefix, _idx_begin_formula_matrix, dataSize);
 
     //dbg_output_file(data+_idx_begin_var_ordering, _idx_begin_formula_prefix-_idx_begin_var_ordering,
     //    "tmp-varorder-jobid-" + std::to_string(getId()));
@@ -303,8 +303,11 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>>
     auto matrixData = pair.second;
     
     // Data which contains the formula's prefix and matrix (but NOT the global variable order).
-    auto [prefixSize, prefixData] = getFormulaWithPrefix();
-    Formula formula(prefixData, prefixData+prefixSize);
+    Formula formula;
+    {
+        auto [prefixSize, prefixData] = getFormulaWithPrefix();
+        formula = Formula(prefixData, prefixData+prefixSize);
+    }
 
     // Helper function for checking if a literal is in the formula's matrix.
     auto is_in_matrix = [&](int lit) -> bool {

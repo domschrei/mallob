@@ -3281,19 +3281,17 @@ int main (int argc, char ** argv) {
   if (ipclose) pclose (ifile);
   flush_vars ();
 
-  if(expand_variable && universal(expand_variable)) {
+  if(empty_clause) exit(20);
+  else if(!num_clauses) exit(10);
+  else if(expand_variable && universal(expand_variable)) {
     apply_expansion_config();
     flush(1);
-    // This if is required, as otherwise trivial formulas could not be
-    // expanded!
-    if(!empty_clause && num_clauses) {
-      int cost = expand_cost(expand_variable, IM);
-      if(cost < maxexpvarcost) {
-        expand(expand_variable, cost);
-        res = 1;
-      } else {
-        res = 2;
-      }
+    int cost = expand_cost(expand_variable, IM);
+    if(cost < maxexpvarcost) {
+      expand(expand_variable, cost);
+      res = 1;
+    } else {
+      res = 2;
     }
   } else {
     res = 2;
