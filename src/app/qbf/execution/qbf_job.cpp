@@ -142,9 +142,9 @@ void QbfJob::run() {
     //dbg_output_file(data, dataSize, "tmp-payload-jobid-" + std::to_string(getId()));
 
     _idx_begin_formula_prefix = _idx_begin_var_ordering;
-    while (data[_idx_begin_formula_prefix++] != 0) {}
+    while (_idx_begin_formula_prefix < dataSize && data[_idx_begin_formula_prefix++] != 0) {}
     _idx_begin_formula_matrix = _idx_begin_formula_prefix;
-    while (data[_idx_begin_formula_matrix++] != 0) {}
+    while (_idx_begin_formula_matrix < dataSize && data[_idx_begin_formula_matrix++] != 0) {}
 
     LOGGER(_job_log, V3_VERB, "QBF #%i varorder@%lu prefix@%lu matrix@%lu\n", getId(),
         _idx_begin_var_ordering, _idx_begin_formula_prefix, _idx_begin_formula_matrix);
@@ -156,8 +156,10 @@ void QbfJob::run() {
     //dbg_output_file(data+_idx_begin_formula_matrix, dataSize-_idx_begin_formula_matrix,
     //    "tmp-matrix-jobid-" + std::to_string(getId()));
 
-    assert(data[_idx_begin_formula_prefix-1] == 0 && data[_idx_begin_formula_prefix] != 0);
-    assert(data[_idx_begin_formula_matrix-1] == 0 && data[_idx_begin_formula_matrix] != 0);
+    assert(data[_idx_begin_formula_prefix-1] == 0);
+    assert(_idx_begin_formula_prefix >= dataSize || data[_idx_begin_formula_prefix] != 0);
+    assert(data[_idx_begin_formula_matrix-1] == 0);
+    assert(_idx_begin_formula_matrix >= dataSize || data[_idx_begin_formula_matrix] != 0);
 
 
     // Apply our splitting strategy (may be expensive).
