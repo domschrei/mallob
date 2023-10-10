@@ -43,3 +43,5 @@ new_test(qbf_reader)
 add_executable(qbf_bloqqer
   ${CMAKE_CURRENT_SOURCE_DIR}/src/app/qbf/execution/bloqqer.c
   ${CMAKE_CURRENT_SOURCE_DIR}/src/app/qbf/execution/blqrcfg.c)
+target_include_directories(qbf_bloqqer PRIVATE ${BASE_INCLUDES})
+target_compile_options(qbf_bloqqer PRIVATE ${BASE_COMPILEFLAGS})

@@ -19,7 +19,7 @@ struct QbfContext {
     int childIdx;
     bool isRootNode;
 
-    std::unique_ptr<BloqqerCaller> bloqqerCaller;
+    std::shared_ptr<BloqqerCaller> bloqqerCaller;
 
     bool cancelled {false};
 

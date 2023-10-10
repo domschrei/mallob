@@ -327,12 +327,12 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>>
     }
 
     // Each bloqqer call modifies the prefix and the matrix. Variable indices stay the same.
-    BloqqerCaller *bloqqerCaller = nullptr;
+    std::shared_ptr<BloqqerCaller> bloqqerCaller;
     {
       auto ctx = QbfContextStore::tryAcquire(getId());
       assert(ctx);
-      ctx->bloqqerCaller = std::make_unique<BloqqerCaller>();
-      bloqqerCaller = ctx->bloqqerCaller.get();
+      ctx->bloqqerCaller = std::make_shared<BloqqerCaller>();
+      bloqqerCaller = ctx->bloqqerCaller;
     }
 
     int res = 1;
@@ -341,7 +341,7 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>>
         res = bloqqerCaller->process(formula,
                                      vars,
                                      id,
-                                     expansionVar,
+                                     abs(expansionVar),
                                      _params.expansionCostThreshold());
 
         LOGGER(_job_log, V3_VERB, "QBF #%i bloqqer returned with result %i\n", id, res);
@@ -404,11 +404,12 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>>
         markDone(ctx, true);
         return {};
     }
+    assert(res != 0);
 
     // Find out if there are any universal quantifiers left in the formula
     auto matrixBeginIdx = findIdxOfFirstZero(formula.data(), formula.size());
     ++matrixBeginIdx;
-    auto universal_quantifiers_in_formula = [&formula, matrixBeginIdx]() {
+    bool universal_quantifiers_in_formula = [&formula, matrixBeginIdx]() {
         auto it = std::find_if(formula.begin(), formula.begin()+matrixBeginIdx, [](int q) {
             return q < 0;
         });
@@ -422,7 +423,8 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>>
         // Spawn two new QBF jobs.
         int quantification = expansionVar;
         LOGGER(_job_log, V3_VERB, "QBF #%i spawning two QBF children over var %i @ depth %i\n", getId(), quantification, depth);
-        assert(quantification > 0); // existential!
+        // existential!
+        assert(quantification > 0 || log_return_false("[ERROR] QBF #%i quantification %i <= 0!\n", getId(), quantification));
 
         // Assemble formula consisting of the remaining variable ordering
         // and the current formula (including both prefix and matrix).

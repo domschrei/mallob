@@ -1,6 +1,5 @@
 /* Copyright (C) 2010, Armin Biere, JKU Linz. */
 
-#include <assert.h>
 #include <ctype.h>
 #include <limits.h>
 #include <stdarg.h>
@@ -11,6 +10,8 @@
 #include <sys/resource.h>
 #include <unistd.h>
 #include <signal.h>
+
+#include "util/assert.hpp"
 
 extern const char *blqr_id (void);
 extern const char *blqr_version (void);
@@ -3296,6 +3297,7 @@ int main (int argc, char ** argv) {
   } else {
     res = 2;
   }
+  assert(res != 0);
 
   for (;;) {
     flush (1);
@@ -3329,6 +3331,7 @@ int main (int argc, char ** argv) {
   if (oclose) fclose (ofile);
   release ();
   stats ();
+  assert(res != 0);
   return res;
 }
 

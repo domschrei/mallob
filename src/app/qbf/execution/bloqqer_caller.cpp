@@ -15,6 +15,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <fstream>
 
 BloqqerCaller::BloqqerCaller() {
 
@@ -69,6 +70,11 @@ std::pair<FILE*, pid_t> popen2(const char* command, const char *mode) {
 }
 
 int BloqqerCaller::process(std::vector<int> &f, int vars, int jobId, int litToTry, int maxCost) {
+  if (litToTry <= 0) {
+    LOG(V0_CRIT, "[ERROR] Illegal expansion variable %i for bloqqer!\n", litToTry);
+    abort();
+  }
+
   pid_t pid = getpid();
   std::string fifoPath = "/tmp/mallob.bloqqer." + std::to_string(pid) + "." + std::to_string(jobId);
   std::string command = "build/qbf_bloqqer "
@@ -86,6 +92,7 @@ int BloqqerCaller::process(std::vector<int> &f, int vars, int jobId, int litToTr
   auto [bloqqer, bloqqer_pid] = popen2(command.c_str(), "r");
   _pid = bloqqer_pid;
 
+  bool ok = true;
   if(bloqqer) {
     FILE* fifo = fopen(fifoPath.c_str(), "w");
     if (fifo == NULL) {
@@ -94,7 +101,7 @@ int BloqqerCaller::process(std::vector<int> &f, int vars, int jobId, int litToTr
     }
     writeQDIMACS(f, fifo, vars);
     fclose(fifo);
-    readQDIMACS(bloqqer, f, false);
+    ok = readQDIMACS(bloqqer, f, false);
     fclose(bloqqer);
   }
   int wstatus = 0;
@@ -104,6 +111,9 @@ int BloqqerCaller::process(std::vector<int> &f, int vars, int jobId, int litToTr
   FileUtils::rm(fifoPath);
 
   int exitcode = WEXITSTATUS(wstatus);
+  if (!ok) {
+    LOG(V1_WARN, "[WARN] Problem while reading QDIMACS from bloqqer - exitcode=%i\n", exitcode);
+  }
   return exitcode;
 }
 
@@ -179,7 +189,21 @@ bool BloqqerCaller::readQDIMACS(FILE* src, std::vector<int> &tgt, bool keepPrefi
 
   int read_items = fscanf(src, "p cnf %d %d\n", &_vars, &_clauses);
 
-  if(read_items != 2) return false;
+  if(read_items != 2) {
+    std::string out;
+    while (true) {
+      char q = fgetc(src);
+      if (q == EOF) break;
+      out += q;
+    }
+    {
+      auto outpath = "/tmp/mallob.bloqqer.error." + std::to_string(_pid);
+      std::ofstream errout(outpath);
+      errout << out;
+      LOG(V1_WARN, "[WARN] Unrecognized bloqqer output written to %s\n", outpath.c_str());
+    }
+    return false;
+  }
 
   if(_vars == 0)
     return true;
@@ -229,5 +253,6 @@ bool BloqqerCaller::readQDIMACS(FILE* src, std::vector<int> &tgt, bool keepPrefi
 
 void BloqqerCaller::kill() {
   pid_t p = _pid;
+  if (p <= 0) return;
   ::kill(p, SIGINT);
 }
