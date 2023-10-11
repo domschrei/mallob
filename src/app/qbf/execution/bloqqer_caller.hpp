@@ -1,5 +1,7 @@
 #pragma once
 
+#include "util/sys/background_worker.hpp"
+#include "util/sys/threading.hpp"
 #include <string>
 #include <vector>
 
@@ -19,7 +21,7 @@ public:
      Bloqqer may also give return code 10 or 20, saying the formula is
      trivially SAT or UNSAT.
    */
-  int process(std::vector<int> &f, int vars, int jobId, int litToTry = 0, int maxCost = 10000);
+  int process(std::vector<int> &f, int vars, int jobId, int litToTry = 0, int maxCost = 10000, bool logging = false);
 
   int computeNumberOfVars(const std::vector<int> &f) const;
 
@@ -29,9 +31,10 @@ public:
   int getVars() const { return _vars; }
   int getClauses() const { return _clauses; }
 
-  void kill();
+  void cancel();
 private:
   volatile pid_t _pid = 0;
   int _vars = 0;
   int _clauses = 0;
+  bool _cancelled {false};
 };

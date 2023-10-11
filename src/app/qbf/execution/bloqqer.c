@@ -36,21 +36,21 @@ static int loglevel;
 #define LOG(FMT,ARGS...) \
   do { \
     if (loglevel <= 0) break; \
-    fputs (LOGPREFIX, stdout); \
-    fprintf (stdout, FMT, ##ARGS); \
-    fputc ('\n', stdout); \
-    fflush (stdout); \
+    fputs (LOGPREFIX, stderr); \
+    fprintf (stderr, FMT, ##ARGS); \
+    fputc ('\n', stderr); \
+    fflush (stderr); \
   } while (0)
 #define LOGCLAUSE(CLAUSE,FMT,ARGS...) \
   do { \
     Node * LOGCLAUSE_P; \
     if (loglevel <= 0) break; \
-    fputs (LOGPREFIX, stdout); \
-    fprintf (stdout, FMT, ##ARGS); \
+    fputs (LOGPREFIX, stderr); \
+    fprintf (stderr, FMT, ##ARGS); \
     for (LOGCLAUSE_P = (CLAUSE)->nodes; LOGCLAUSE_P->lit; LOGCLAUSE_P++) \
-      fprintf (stdout, " %d", LOGCLAUSE_P->lit); \
-    fputc ('\n', stdout); \
-    fflush (stdout); \
+      fprintf (stderr, " %d", LOGCLAUSE_P->lit); \
+    fputc ('\n', stderr); \
+    fflush (stderr); \
   } while (0)
 #endif
 
@@ -180,6 +180,8 @@ static int elimoccs, elimsize, excess;
 
 static int expand_variable;
 static int maxexpvarcost;
+static int log_prefix;
+static int cancelled = 0;
 
 #define IM INT_MAX
 
@@ -228,6 +230,7 @@ static Opt opts[] = {
 // NEW ADDITIONS:
 {000,"maxexpvarcost",10000,0,IM,"maximum cost of expanding the variable",&maxexpvarcost},
 {000,"expvar",0,0,IM,"expand one variable",&expand_variable},
+{000,"logprefix",0,-IM,IM,"prefix to each log line",&log_prefix},
 
 {000,0},
 };
@@ -283,6 +286,7 @@ static struct { struct { int64_t lookups, hits; } sig1, sig2; } fw, bw;
 static long long hlas, clas;
 
 static int print_progress (void) { 
+  return 0;
 #ifndef NLOG
   if (loglevel) return 0;
 #endif
@@ -358,25 +362,25 @@ static void die (const char * fmt, ...) {
 
 static void msg (const char * fmt, ...) {
   va_list ap;
-  if (!verbose) return;
+  //if (!verbose) return;
   if (notclean) clean_line ();
-  fputs ("c [bloqqer] ", stdout);
+  fprintf (stderr, "c [bloqqer-%i] ", log_prefix);
   va_start (ap, fmt);
-  vfprintf (stdout, fmt, ap);
+  vfprintf (stderr, fmt, ap);
   va_end (ap);
-  fputc ('\n', stdout);
-  fflush (stdout);
+  fputc ('\n', stderr);
+  fflush (stderr);
 }
 
 static void wrn (const char * fmt, ...) {
   va_list ap;
   if (notclean) clean_line ();
-  fputs ("c *bloqqer* ", stdout);
+  fputs ("c *bloqqer* ", stderr);
   va_start (ap, fmt);
-  vfprintf (stdout, fmt, ap);
+  vfprintf (stderr, fmt, ap);
   va_end (ap);
-  fputc ('\n', stdout);
-  fflush (stdout);
+  fputc ('\n', stderr);
+  fflush (stderr);
 }
 
 static double seconds (void) {
@@ -918,11 +922,11 @@ static int forward_subsumed (void) {
   if (res) {
 #ifndef NLOG
     if (loglevel) {
-      fputs (LOGPREFIX, stdout);
-      fputs ("forward subsumed clause", stdout);
-      for (i = 0; i < num_lits; i++) printf (" %d", lits[i]);
-      fputc ('\n', stdout);
-      fflush (stdout);
+      fputs (LOGPREFIX, stderr);
+      fputs ("forward subsumed clause", stderr);
+      for (i = 0; i < num_lits; i++) fprintf (stderr, " %d", lits[i]);
+      fputc ('\n', stderr);
+      fflush (stderr);
       LOGCLAUSE (p, "forward subsuming clause");
     }
 #endif
@@ -976,11 +980,11 @@ RESTART:
       if (!pivot) continue;
 #ifndef NLOG
       if (loglevel) {
-	fputs (LOGPREFIX, stdout);
-	printf ("forward strengthening by removing %d from clause", pivot);
-	for (j = 0; j < num_lits; j++) printf (" %d", lits[j]);
-	fputc ('\n', stdout);
-	fflush (stdout);
+	fputs (LOGPREFIX, stderr);
+	fprintf (stderr, "forward strengthening by removing %d from clause", pivot);
+	for (j = 0; j < num_lits; j++) fprintf (stderr, " %d", lits[j]);
+	fputc ('\n', stderr);
+	fflush (stderr);
 	LOGCLAUSE (p, "used clause for forward strengthening");
       }
 #endif
@@ -1035,7 +1039,7 @@ static void add_clause (void) {
   if (!clause->size) {
     if (empty_clause) msg ("found another empty clause");
     else {
-      msg ("found empty clause");
+      msg ("found empty clause - %i read before", num_clauses);
       empty_clause = clause;
     }
   } else if (clause->size == 1) {
@@ -3030,6 +3034,9 @@ static void print (FILE * file) {
   print_scopes (file);
   print_clauses (file);
 }
+static void print_dummy (FILE * file) {
+  fprintf (file, "p cnf 0 0\n");
+}
 
 static void release_clauses (void) {
   Clause * p, * next;
@@ -3224,11 +3231,12 @@ static void stats (void) {
 }
 
 static void sigint_handler(int signal) {
-  exit(3);
+  cancelled = 1;
+  //exit(3);
 }
 
 int main (int argc, char ** argv) {
-  signal(SIGINT, &sigint_handler);
+  signal(SIGCHLD, &sigint_handler);
   const char * perr;
   int i, res = 0;
   init_opts ();
@@ -3282,24 +3290,23 @@ int main (int argc, char ** argv) {
   if (ipclose) pclose (ifile);
   flush_vars ();
 
-  if(empty_clause) exit(20);
-  else if(!num_clauses) exit(10);
-  else if(expand_variable && universal(expand_variable)) {
-    apply_expansion_config();
-    flush(1);
-    int cost = expand_cost(expand_variable, IM);
-    if(cost < maxexpvarcost) {
-      expand(expand_variable, cost);
-      res = 1;
+  if (!cancelled && !empty_clause && num_clauses > 0) {
+    if(expand_variable && universal(expand_variable)) {
+      apply_expansion_config();
+      flush(1);
+      int cost = expand_cost(expand_variable, IM);
+      if(cost < maxexpvarcost) {
+        expand(expand_variable, cost);
+        res = 1;
+      } else {
+        res = 2;
+      }
     } else {
       res = 2;
     }
-  } else {
-    res = 2;
   }
-  assert(res != 0);
 
-  for (;;) {
+  while (!cancelled) {
     flush (1);
     split ();
     if (empty_clause || !num_clauses) break;
@@ -3314,7 +3321,7 @@ int main (int argc, char ** argv) {
   
   if (empty_clause) { res = 20; msg ("definitely UNSATISFIABLE"); }
   else if (!num_clauses) { res = 10; msg ("definitely SATISFIABLE"); }
-  split ();
+  if (!cancelled) split ();
   if (keep) remaining = num_vars; else map_vars ();
   if (oname && strcmp (oname, "-")) {
     assert (output);
@@ -3327,7 +3334,12 @@ int main (int argc, char ** argv) {
   }
   if (propositional ()) msg ("result is propositional");
   else msg ("result still contains universal quantifiers");
-  if (output) print (ofile);
+  if (output) {
+    if (cancelled)
+      print_dummy (ofile);
+    else
+      print (ofile);
+  }
   if (oclose) fclose (ofile);
   release ();
   stats ();

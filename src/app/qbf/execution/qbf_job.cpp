@@ -115,6 +115,7 @@ void QbfJob::run() {
     {
         auto ctx = QbfContextStore::tryAcquire(getId());
         assert(ctx);
+        ctx->active = true;
         LOGGER(_job_log, V3_VERB, "QBF #%i - parent #%i depth %i\n", getId(), ctx->parentJobId, ctx->depth);
         // Install a callback for incoming messages of the tag MSG_QBF_NOTIFICATION_UPWARDS.
         // CAUTION: Callback may be executed AFTER the life time of this job instance!
@@ -128,6 +129,7 @@ void QbfJob::run() {
         auto ctx = QbfContextStore::tryAcquire(getId());
         assert(ctx);
         if (ctx->cancelled) {
+            ctx->active = false;
             markDone(*ctx, true);
             return;
         }
@@ -139,7 +141,7 @@ void QbfJob::run() {
     auto data = getDescription().getFormulaPayload(0);
     auto dataSize = getDescription().getFormulaPayloadSize(0);
 
-    //dbg_output_file(data, dataSize, "tmp-payload-jobid-" + std::to_string(getId()));
+    dbg_output_file(data, dataSize, "tmp-payload-jobid-" + std::to_string(getId()));
 
     _idx_begin_formula_prefix = _idx_begin_var_ordering;
     while (_idx_begin_formula_prefix < dataSize && data[_idx_begin_formula_prefix++] != 0) {}
@@ -170,6 +172,7 @@ void QbfJob::run() {
         auto ctx = QbfContextStore::tryAcquire(getId());
         assert(ctx);
         if (ctx->cancelled) {
+            ctx->active = false;
             markDone(*ctx, true);
             return;
         }
@@ -198,6 +201,7 @@ void QbfJob::run() {
             spawnChildJob(*ctx, childApp, childIdx, std::move(payload));
         }
 
+        ctx->active = false;
         // Non-root jobs should be cleaned up immediately again.
         if (!ctx->isRootNode) markDone(*ctx, true);
     }
@@ -305,8 +309,8 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>>
     // Data which contains the formula's prefix and matrix (but NOT the global variable order).
     Formula formula;
     {
-        auto [prefixSize, prefixData] = getFormulaWithPrefix();
-        formula = Formula(prefixData, prefixData+prefixSize);
+        auto [fSize, fData] = getFormulaWithPrefix();
+        formula = Formula(fData, fData+fSize);
     }
 
     // Helper function for checking if a literal is in the formula's matrix.
@@ -331,18 +335,32 @@ std::optional<std::pair<QbfJob::ChildJobApp, std::vector<QbfJob::ChildPayload>>>
     {
       auto ctx = QbfContextStore::tryAcquire(getId());
       assert(ctx);
+      if (ctx->cancelled) {
+        markDone(*ctx, true);
+        return {};
+      }
       ctx->bloqqerCaller = std::make_shared<BloqqerCaller>();
       bloqqerCaller = ctx->bloqqerCaller;
     }
 
     int res = 1;
     while (res == 1 && expansionVar != 0) {
-        LOGGER(_job_log, V3_VERB, "QBF #%i calling bloqqer at depth %i with %i vars, lit %i\n", id, depth, vars, expansionVar);
+
+        int expansionVarInPrefix = 0;
+        int qIdx = 0;
+        while (formula[qIdx] != 0 && abs(formula[qIdx]) != abs(expansionVar)) {
+            qIdx++;
+        }
+        if (abs(formula[qIdx]) == abs(expansionVar)) expansionVarInPrefix = formula[qIdx];
+
+        LOGGER(_job_log, V3_VERB, "QBF #%i calling bloqqer at depth %i with %i vars, lit %i (in prefix: %i)\n",
+            id, depth, vars, expansionVar, expansionVarInPrefix);
         res = bloqqerCaller->process(formula,
                                      vars,
                                      id,
                                      abs(expansionVar),
-                                     _params.expansionCostThreshold());
+                                     _params.expansionCostThreshold(),
+                                     _params.bloqqerLogging());
 
         LOGGER(_job_log, V3_VERB, "QBF #%i bloqqer returned with result %i\n", id, res);
 
@@ -557,6 +575,7 @@ void QbfJob::eraseContextAndConclude(int nodeJobId) {
     {
         auto ctx = QbfContextStore::tryAcquire(nodeJobId);
         assert(ctx);
+        ctx->active = false;
         if (ctx->isRootNode) reportJobDone(*ctx, _internal_result_code);
     }
     QbfContextStore::erase(nodeJobId);
@@ -628,8 +647,10 @@ void QbfJob::onJobCancelled(MessageHandle& h, const QbfContext& submitCtx) {
         if (!currCtx) return; // context not present any more!
         LOG(V3_VERB, "QBF #%i (local:#%i) cancelled\n", submitCtx.rootJobId, submitCtx.nodeJobId);
         currCtx->cancelled = true;
-        if(currCtx->bloqqerCaller)
-          currCtx->bloqqerCaller->kill();
+        if(currCtx->bloqqerCaller) {
+          LOG(V3_VERB, "QBF #%i cancel bloqqer\n", submitCtx.nodeJobId);
+          currCtx->bloqqerCaller->cancel();
+        }
         destruct = currCtx->isDestructible();
     }
     if (destruct) eraseContextAndConclude(submitCtx.nodeJobId);

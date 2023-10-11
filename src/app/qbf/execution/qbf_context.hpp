@@ -21,6 +21,7 @@ struct QbfContext {
 
     std::shared_ptr<BloqqerCaller> bloqqerCaller;
 
+    bool active {false};
     bool cancelled {false};
 
     enum NodeType {AND, OR} nodeType;
@@ -135,9 +136,10 @@ struct QbfContext {
 
     bool isDestructible() {
         cancelActiveChildren(); // only if "cancelled" is set to true
+        if (active) return false;
         for (int childIdx = 0; childIdx < children.size(); childIdx++) {
             auto& child = children[childIdx];
-            if (child.state == ChildInfo::INTRODUCED || child.state == ChildInfo::READY) {
+            if (child.state == ChildInfo::PREPARING || child.state == ChildInfo::INTRODUCED || child.state == ChildInfo::READY) {
                 LOG(V3_VERB, "QBF #%i waiting for childidx %i ...\n", nodeJobId, childIdx);
                 return false;
             }

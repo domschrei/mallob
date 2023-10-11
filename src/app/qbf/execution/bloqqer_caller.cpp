@@ -6,6 +6,7 @@
 #include <cassert>
 #include <algorithm>
 #include <cstring>
+#include <sstream>
 #include <stdexcept>
 #include <stdio.h>
 #include <signal.h>
@@ -18,9 +19,6 @@
 #include <fstream>
 
 BloqqerCaller::BloqqerCaller() {
-
-}
-BloqqerCaller::~BloqqerCaller() {
 
 }
 
@@ -69,20 +67,23 @@ std::pair<FILE*, pid_t> popen2(const char* command, const char *mode) {
   exit(1);
 }
 
-int BloqqerCaller::process(std::vector<int> &f, int vars, int jobId, int litToTry, int maxCost) {
-  if (litToTry <= 0) {
+int BloqqerCaller::process(std::vector<int> &f, int vars, int jobId, int litToTry, int maxCost, bool logging) {
+  if (litToTry == 0) {
     LOG(V0_CRIT, "[ERROR] Illegal expansion variable %i for bloqqer!\n", litToTry);
     abort();
   }
 
   pid_t pid = getpid();
-  std::string fifoPath = "/tmp/mallob.bloqqer." + std::to_string(pid) + "." + std::to_string(jobId);
+  std::string fifo_path = "/tmp/mallob.bloqqer." + std::to_string(pid) + "." + std::to_string(jobId);
   std::string command = "build/qbf_bloqqer "
-    + fifoPath
+    + fifo_path
+    + " --log=" + std::to_string(logging ? 1 : 0)
+    + " --logprefix=" + std::to_string(jobId)
     + " --maxexpvarcost=" + std::to_string(maxCost)
     + " --expvar=" + std::to_string(litToTry);
+  if (logging) command += " 2> " + fifo_path + ".stderr";
 
-  int res = mkfifo(fifoPath.c_str(), 0600);
+  int res = mkfifo(fifo_path.c_str(), 0600);
   if (res != 0) {
     LOG(V0_CRIT, "[ERROR] Could not make FIFO, res=%i err=%s\n", res,
         strerror(errno));
@@ -94,21 +95,23 @@ int BloqqerCaller::process(std::vector<int> &f, int vars, int jobId, int litToTr
 
   bool ok = true;
   if(bloqqer) {
-    FILE* fifo = fopen(fifoPath.c_str(), "w");
+    FILE* fifo = fopen(fifo_path.c_str(), "w");
     if (fifo == NULL) {
       LOG(V0_CRIT, "[ERROR] Could not open FIFO, err=%s\n", strerror(errno));
       abort();
     }
-    writeQDIMACS(f, fifo, vars);
+    if (_cancelled) ::kill(_pid, SIGCHLD);
+    writeQDIMACS(_cancelled ? std::vector<int>(1, 0) : f, fifo, _cancelled ? 0 : vars);
     fclose(fifo);
+    if (_cancelled) ::kill(_pid, SIGCHLD);
     ok = readQDIMACS(bloqqer, f, false);
     fclose(bloqqer);
   }
   int wstatus = 0;
-  waitpid(_pid, &wstatus, 0);
+  if (_pid > 0) waitpid(_pid, &wstatus, 0);
   _pid = 0;
 
-  FileUtils::rm(fifoPath);
+  FileUtils::rm(fifo_path);
 
   int exitcode = WEXITSTATUS(wstatus);
   if (!ok) {
@@ -166,11 +169,15 @@ void BloqqerCaller::writeQDIMACS(const std::vector<int> &src, FILE* tgt, int var
   CHECK(fprintf(tgt, "0\n"));
 
   // Matrix
+  bool clauseBegun = false;
   for(i = i + 1; i < src.size(); ++i) {
     if(src[i] == 0) {
+      assert(clauseBegun);
       CHECK(fprintf(tgt, "0\n"));
+      clauseBegun = false;
     } else {
       CHECK(fprintf(tgt, "%d ", src[i]));
+      clauseBegun = true;
     }
   }
 }
@@ -251,8 +258,8 @@ bool BloqqerCaller::readQDIMACS(FILE* src, std::vector<int> &tgt, bool keepPrefi
   return true;
 }
 
-void BloqqerCaller::kill() {
-  pid_t p = _pid;
-  if (p <= 0) return;
-  ::kill(p, SIGINT);
+void BloqqerCaller::cancel() {
+  _cancelled = true;
 }
+
+BloqqerCaller::~BloqqerCaller() {}
