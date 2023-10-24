@@ -19,6 +19,10 @@ Clone the Mallob repository into a subdirectory of `cluster`. Fetch Mallob's dep
 
 Also fetch and/or copy any additional files you require on the cluster, such as benchmark instances.
 
+If you are done with the `cluster` directory, do not forget to unmount:
+
+    fusermount -u cluster
+
 ## Building Mallob
 
 Login to the cluster. First load the modules necessary for building, like this:
