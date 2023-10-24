@@ -113,6 +113,8 @@ You can then submit the job with the command:
 
     sbatch myjob.sh
 
+You can cancel a job before or during its execution with the `scancel` command.
+
 ## Watching a Job
 
 After you submitted a job, you can monitor its status e.g. with these command:
