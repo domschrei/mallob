@@ -1,6 +1,9 @@
 
 #pragma once
 
+#include "util/logger.hpp"
+#include <cassert>
+#include <cstddef>
 #include <vector>
 
 struct InplaceClauseAggregation {
@@ -20,7 +23,14 @@ struct InplaceClauseAggregation {
         buffer.pop_back();
     }
 
-    static int numMetadataInts() {return 3;}
+    void replaceClauses(const std::vector<int>& clauses) {
+        assert(clauses.size() == buffer.size() - numMetadataInts() || log_return_false("[ERROR] %lu vs. %lu\n", clauses.size(), buffer.size()));
+        for (size_t i = 0; i < clauses.size(); i++) {
+            buffer[i] = clauses[i];
+        }
+    }
+
+    static int numMetadataInts() {return 4;}
     static InplaceClauseAggregation prepareRawBuffer(std::vector<int>& buffer,
             int maxRevision=-1, int numInputLits=0, int numAggregated=1, int winningSolverId=-1) {
         buffer.push_back(maxRevision);

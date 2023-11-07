@@ -1,6 +1,8 @@
 
 #pragma once
 
+#include "app/sat/sharing/buffer/buffer_reader.hpp"
+#include "app/sat/sharing/filter/clause_buffer_lbd_scrambler.hpp"
 #include "app/sat/sharing/filter/generic_clause_filter.hpp"
 #include "comm/msgtags.h"
 #include "data/job_transfer.hpp"
@@ -112,6 +114,21 @@ public:
             // Fetch initial clause buffer (result of all-reduction of clauses)
             _broadcast_clause_buffer = _allreduce_clauses.extractResult();
             auto aggregation = InplaceClauseAggregation(_broadcast_clause_buffer);
+            // If desired, scramble the LBD scores of featured clauses
+            if (_params.scrambleLbdScores()) {
+                float time = Timer::elapsedSeconds();
+                // 1. Create reader for shared clause buffer
+                BufferReader reader(_broadcast_clause_buffer.data(),
+                    _broadcast_clause_buffer.size() - aggregation.numMetadataInts(),
+                    _params.strictClauseLengthLimit(), false);
+                // 2. Scramble clauses within each clause length w.r.t. LBD scores
+                ClauseBufferLbdScrambler scrambler(_params, reader);
+                auto modifiedClauseBuffer = scrambler.scrambleLbdScores();
+                // 3. Overwrite clause buffer within our aggregation buffer
+                aggregation.replaceClauses(modifiedClauseBuffer);
+                time = Timer::elapsedSeconds() - time;
+                LOG(V4_VVER, "%s scrambled LBDs in %.4fs\n", _job->toStr(), time);
+            }
             int winningSolverId = aggregation.successfulSolver();
             assert(winningSolverId >= -1 || log_return_false("Winning solver ID = %i\n", winningSolverId));
             _job->setNumInputLitsOfLastSharing(aggregation.numInputLiterals());
