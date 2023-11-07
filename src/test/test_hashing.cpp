@@ -1,6 +1,8 @@
 
 #include "util/hashing.hpp"
 #include "app/sat/data/clause.hpp"
+#include "util/logger.hpp"
+#include "util/random.hpp"
 
 #include <unordered_set>
 #include <iostream>
@@ -28,8 +30,7 @@ size_t nonCommutativeHash(const int* begin, int size, int which = 3) {
     return res;
 }
 
-int main() {
-
+void testCollisions() {
     for (int shift = 0; shift < 64; shift += 4) {
         std::cout << "shift=" << shift << std::endl;
 
@@ -48,4 +49,31 @@ int main() {
         std::cout << noncommHashes.size() << " / 2'000'000 unique non-commutative hashes" << std::endl;
         std::cout << rhHashes.size() << " / 2'000'000 unique robin_hood hashes" << std::endl;
     }
+}
+
+void testNonCommutativeHashFunctionDistribution() {
+    auto hasher = Mallob::NonCommutativeClauseHasher();
+
+    int nbBuckets = 256;
+    std::vector<int> buckets(nbBuckets);
+    int nbTotal = 100'000;
+    for (size_t i = 0; i < nbTotal; i++) {
+        int clsLength = (int) (1 + 300*Random::rand());
+        std::vector<int> lits;
+        for (int k = 0; k < clsLength; k++) {
+            lits.push_back((int) (-100'000 + 200'000*Random::rand()));
+        }
+        Mallob::Clause c(lits.data(), clsLength, 2);
+        auto h = hasher(c);
+        buckets[h % nbBuckets]++;
+    }
+
+    for (int b = 0; b < nbBuckets; b++) {
+        LOG(V2_INFO, "b=%i\tn=%i\tr=%.3f\n", b, buckets[b], buckets[b]/(float)nbTotal);
+    }
+}
+
+int main() {
+    testCollisions();
+    testNonCommutativeHashFunctionDistribution();
 }
