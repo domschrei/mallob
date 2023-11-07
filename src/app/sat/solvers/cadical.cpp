@@ -191,6 +191,7 @@ SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 }
 
 void Cadical::setSolverInterrupt() {
+	solver->terminate(); // acknowledged faster / checked more frequently by CaDiCaL
 	terminator.setInterrupt();
 }
 
