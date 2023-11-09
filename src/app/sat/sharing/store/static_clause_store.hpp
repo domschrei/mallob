@@ -44,15 +44,15 @@ public:
             buckets.resize(bucketIdx+1);
         }
         auto& [touchCount, b] = buckets[bucketIdx];
-        if (bucketIdx > _max_admissible_bucket_idx) {
-            touchCount++;
-            addClauseLock.unlock();
-            return false; // bucket too bad - reject clause
-        }
         if (!b) {
             b = new Bucket(_bucket_size);
             b->clauseLength = clause.size;
             b->lbd = clause.lbd;
+        }
+        if (bucketIdx > _max_admissible_bucket_idx) {
+            touchCount++;
+            addClauseLock.unlock();
+            return false; // bucket too bad - reject clause
         }
         unsigned int top = b->size;
         while (top + clause.size > b->capacity()) {
@@ -136,6 +136,9 @@ public:
                         // subtract admissible literals from this bucket
                         nbRemainingAdmissibleLits -= effectiveSize;
                     }
+                } else if (i > _max_admissible_bucket_idx) {
+                    // clean up
+                    b->size = 0;
                 }
                 totalSizeBefore += b->capacity();
                 b->shrinkToFit();
@@ -156,25 +159,16 @@ public:
                 b->size -= clause.size;
             }
 
-            if (cleaningUp && i > _max_admissible_bucket_idx) {
-                // all subsequent buckets are cleared completely
-                if (b->size == 0) {
-                    totalSizeAfter -= b->capacity();
-                    delete b;
-                    buckets[i].second = nullptr;
-                }
-            }
-
-            if (buckets[i].second) maxNonemptyBufferIdx = i;
+            if (buckets[i].second && buckets[i].second->size > 0)
+                maxNonemptyBufferIdx = i;
         }
 
-        // reduce buckets vector to its required size
         if (cleaningUp) {
-            buckets.resize(maxNonemptyBufferIdx+1);
             // some logging
-            LOG(V4_VVER, "[clausestore] total size %lu->%lu - cap. %i - threshold @ idx %s\n",
-                totalSizeBefore, totalSizeAfter, _total_capacity,
-                bufferIdxToStr(_max_admissible_bucket_idx).c_str());
+            LOG(V4_VVER, "[clausestore] totalsize %lu->%lu - thresh B%s - maxne B%s\n",
+                totalSizeBefore, totalSizeAfter,
+                bufferIdxToStr(_max_admissible_bucket_idx).c_str(),
+                bufferIdxToStr(maxNonemptyBufferIdx).c_str());
         }
 
         nbExportedLits = 0;

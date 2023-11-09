@@ -14,11 +14,7 @@ struct Bucket {
 
     const size_t capacity() const {return dataVec.size();}
     void expand() {
-        if (dataVec.empty()) {
-            dataVec.resize(256);
-            return;
-        }
-        dataVec.resize(dataVec.size() * 2);
+        dataVec.resize(dataVec.empty() ? 256 : dataVec.size() * 2);
         data = dataVec.data();
     }
     void shrinkToFit() {
