@@ -23,23 +23,34 @@ private:
 	// Structures for EXPORTING
 	std::vector<std::pair<int, Bucket*>> buckets;
 
-    const int _bucket_size;
+    // Whether buckets are expanded and shrunk dynamically (true)
+    // or remain of a fixed, static size (false).
     const bool _expand_buckets;
+
+    // Size of each bucket (in literals) if buckets are not expanded.
+    const int _bucket_size;
+
+    // If buckets are being expanded, this is the user-provided
+    // limit on the global buffer size (in literals), disregarding
+    // unit clauses.
     const int _total_capacity;
 
+    // Current threshold bucket for storing new clauses.
     int _max_admissible_bucket_idx {INT32_MAX};
+    // Max. admissible number of literals in the threshold bucket. 
     int _max_admissible_bucket_lits;
 
 public:
     StaticClauseStore(int maxClauseLength, bool resetLbdAtExport, int bucketSize, bool expandBuckets, int totalCapacity) :
-        GenericClauseStore(maxClauseLength, resetLbdAtExport), _bucket_size(bucketSize),
-        _expand_buckets(expandBuckets), _total_capacity(totalCapacity) {}
+        GenericClauseStore(maxClauseLength, resetLbdAtExport), _expand_buckets(expandBuckets),
+            _bucket_size(bucketSize), _total_capacity(totalCapacity) {}
 
     bool addClause(const Mallob::Clause& clause) override {
         if (!addClauseLock.tryLock()) return false;
 
         int bucketIdx = getBufferIdx(clause.size, clause.lbd);
 
+        // Create bucket as necessary
         if (bucketIdx >= buckets.size()) {
             buckets.resize(bucketIdx+1);
         }
@@ -49,34 +60,44 @@ public:
             b->clauseLength = clause.size;
             b->lbd = clause.lbd;
         }
+
+        // Is the bucket "too bad" w.r.t. the current threshold?
         if (bucketIdx > _max_admissible_bucket_idx) {
+            // bucket too bad - reject clause
             touchCount++;
             addClauseLock.unlock();
-            return false; // bucket too bad - reject clause
+            return false;
         }
+
+        // Is sufficient space available?
         unsigned int top = b->size;
         while (top + clause.size > b->capacity()) {
-            // do we expand buckets?
+            // no -- do we expand buckets?
             if (!_expand_buckets) {
                 touchCount++;
                 addClauseLock.unlock();
-                return false; // no
+                return false; // -- no
             }
             // should this bucket be expanded?
             if (bucketIdx == _max_admissible_bucket_idx && top + clause.size > _max_admissible_bucket_lits) {
+                // -- no - fringe bucket, already too full
                 touchCount++;
                 addClauseLock.unlock();
-                return false; // no - fringe bucket, already too full
+                return false;
             }
-            // expand bucket
+            // -- yes, expand bucket (2x)
             b->expand();
         }
-        // copy the clause
+
+        // write the clause into the buffer
         for (unsigned int i = 0; i < clause.size; i++) {
             b->data[top + i] = clause.begin[i];
         }
+
         // update bucket size
         b->size += clause.size;
+
+        // success
         addClauseLock.unlock();
         return true;
     }
@@ -93,6 +114,7 @@ public:
             ExportMode mode = ANY, bool sortClauses = true,
             std::function<void(int*)> clauseDataConverter = [](int*){}) override {
 
+        // Builder object for our output
         BufferBuilder builder(limit, _max_clause_length, false);
 
         // lock clause adding
@@ -101,55 +123,65 @@ public:
         // Reset threshold for admissible clauses
         _max_admissible_bucket_idx = INT32_MAX;
 
-        int nbRemainingLits = limit;
-        std::vector<Mallob::Clause> clauses;
-        bool cleaningUp {false};
-        int nbRemainingAdmissibleLits = _total_capacity;
-        int maxNonemptyBufferIdx = -1;
-        size_t totalSizeBefore = 0;
-        size_t totalSizeAfter = 0;
+        // Fields for iterating over buckets
+        int nbRemainingLits = limit; // # lits to export
+        std::vector<Mallob::Clause> clauses; // exported clauses
+        int nbRemainingAdmissibleLits = _total_capacity; // # lits until cleanup
+        bool cleaningUp {false}; // in the process of cleaning buckets?
+        int maxNonemptyBufferIdx = -1; // last seen non-empty bucket
+        size_t totalSizeBefore = 0; // total space occupied before sweep
+        size_t totalSizeAfter = 0; // total space occupied after sweep
 
-        // Traverse buckets by priority in descending order
+        // Sweep over buckets by priority in descending order
         for (int i = 0; i < buckets.size(); i++) {
             auto& [touchCount, b] = buckets[i];
-            if (!b) continue;
+            if (!b) continue; // bucket is not initialized
 
+            // Initialize generic clause object for this bucket
             Mallob::Clause clause;
             clause.size = b->clauseLength;
             clause.lbd = _reset_lbd_at_export ? clause.size : b->lbd;
 
             // Check admissible literals bounds?
             if (_expand_buckets) {
+                // Not yet in cleaning up stage
                 if (!cleaningUp) {
+                    // Check if this bucket, together with its "shadow insertions"
+                    // tracked by the touchCount, exceed our capacity
                     int effectiveSize = b->size + b->clauseLength * touchCount;
                     if (nbRemainingAdmissibleLits < effectiveSize) {
-                        // all admissible literals counted: update threshold,
-                        LOG(V4_VVER, "[clausestore] new threshold @ idx %s:%i\n",
-                            bufferIdxToStr(i).c_str(), nbRemainingAdmissibleLits);
+                        // Capacity exceeded:
+                        // update threshold,
                         _max_admissible_bucket_idx = i;
                         _max_admissible_bucket_lits = nbRemainingAdmissibleLits;
+                        // trim buffer according to the remaining capacity,
                         b->size = std::min((int)b->size, (nbRemainingAdmissibleLits / b->clauseLength) * b->clauseLength);
-                        nbRemainingAdmissibleLits = 0;
                         // begin cleaning up all subsequent data
+                        nbRemainingAdmissibleLits = 0;
                         cleaningUp = true;
-                    } else if (clause.size > 1) { // skip unit clauses
+                    } else if (clause.size > 1) {
                         // subtract admissible literals from this bucket
+                        // except if the buffer stores unit clauses
                         nbRemainingAdmissibleLits -= effectiveSize;
                     }
                 } else if (i > _max_admissible_bucket_idx) {
-                    // clean up
+                    // clean up this bucket (see below)
                     b->size = 0;
                 }
+                // actual space clean-up takes place here:
+                // bucket is shrunk to its current capacity
                 totalSizeBefore += b->capacity();
                 b->shrinkToFit();
                 touchCount = 0;
                 totalSizeAfter += b->capacity();
             }
 
+            // follow traversal instruction
             assert(clause.size > 0 && clause.lbd > 0);
             if (clause.size == 1 && mode == NONUNITS) continue;
             if (clause.size > 1 && mode == UNITS) break;
 
+            // write clauses into export buffer
             while (b->size > 0 && nbRemainingLits >= clause.size) {
                 assert(b->size - clause.size >= 0);
                 clause.begin = b->data + b->size - clause.size;
@@ -159,18 +191,20 @@ public:
                 b->size -= clause.size;
             }
 
+            // track most recent non-empty bucket
             if (buckets[i].second && buckets[i].second->size > 0)
                 maxNonemptyBufferIdx = i;
         }
 
         if (cleaningUp) {
-            // some logging
+            // some logging on insertion threshold
             LOG(V4_VVER, "[clausestore] totalsize %lu->%lu - thresh B%s - maxne B%s\n",
                 totalSizeBefore, totalSizeAfter,
                 bufferIdxToStr(_max_admissible_bucket_idx).c_str(),
                 bufferIdxToStr(maxNonemptyBufferIdx).c_str());
         }
 
+        // Sort exported clauses and forward them to the builder
         nbExportedLits = 0;
         std::sort(clauses.begin(), clauses.end());
         Mallob::Clause lastClause;
