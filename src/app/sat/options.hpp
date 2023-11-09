@@ -47,8 +47,8 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "Clauses with an LBD score up to this value are considered \"high quality\"")
  OPT_INT(clauseFilterMode,                  "cfm", "clause-filter-mode",                 3,        0,   3, 
     "0 = no filtering, 1 = bloom filters, 2 = exact filters, 3 = exact filters with distributed filtering in a 2nd all-reduction")
- OPT_INT(clauseStoreMode,                   "csm", "clause-store-mode",                  2,        -1,  2,
-    "-1 = static by length w/ mixed LBD, 0 = static by length, 1 = static by LBD, 2 = adaptive by length + -mlbdps option")
+ OPT_INT(clauseStoreMode,                   "csm", "clause-store-mode",                  2,        -1,  3,
+    "-1 = static by length w/ mixed LBD, 0 = static by length, 1 = static by LBD, 2 = adaptive by length + -mlbdps option, 3 = simplified adaptive")
  OPT_INT(resetLbd,                          "rlbd", "reset-lbd-at-import",                1,        0,   3,
     "Reset each clause's LBD to its length 0=never; 1=at import; 2=at export; 3=at production")
  OPT_INT(strictClauseLengthLimit,           "scll", "strict-clause-length-limit",        16,       0,   255,

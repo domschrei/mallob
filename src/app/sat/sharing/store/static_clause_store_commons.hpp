@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <vector>
 
 struct Bucket {
@@ -10,4 +11,18 @@ struct Bucket {
     int clauseLength {0};
     int lbd {0};
     Bucket(int bucketSize) : dataVec(bucketSize), data(dataVec.data()) {}
+
+    const size_t capacity() const {return dataVec.size();}
+    void expand() {
+        if (dataVec.empty()) {
+            dataVec.resize(256);
+            return;
+        }
+        dataVec.resize(dataVec.size() * 2);
+        data = dataVec.data();
+    }
+    void shrinkToFit() {
+        dataVec.resize(size);
+        data = dataVec.data();
+    }
 };
