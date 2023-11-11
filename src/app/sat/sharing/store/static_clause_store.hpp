@@ -11,17 +11,22 @@
 #include "app/sat/sharing/buffer/buffer_builder.hpp"
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
+#include "util/params.hpp"
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
 #include "static_clause_store_commons.hpp"
 
+template <bool Concurrent>
 class StaticClauseStore : public GenericClauseStore {
 
 private:
 	Mutex addClauseLock;
 
-	// Structures for EXPORTING
-	std::vector<std::pair<int, Bucket*>> buckets;
+    // Structures for EXPORTING. Each bucket may be null (if never inserted to)
+    // and is accompanied by a counter for "shadow insertions" which did not
+    // actually take place but which we need to track for updating admission
+    // thresholds.
+    std::vector<std::pair<int, Bucket*>> buckets;
 
     // Whether buckets are expanded and shrunk dynamically (true)
     // or remain of a fixed, static size (false).
@@ -40,13 +45,108 @@ private:
     // Max. admissible number of literals in the threshold bucket. 
     int _max_admissible_bucket_lits;
 
+    std::vector<int> _bucket_idx_to_priority_idx;
+    std::vector<int> _priority_idx_to_bucket_idx;
+
 public:
-    StaticClauseStore(int maxClauseLength, bool resetLbdAtExport, int bucketSize, bool expandBuckets, int totalCapacity) :
-        GenericClauseStore(maxClauseLength, resetLbdAtExport), _expand_buckets(expandBuckets),
-            _bucket_size(bucketSize), _total_capacity(totalCapacity) {}
+    enum BucketPriorityMode {
+        LENGTH_FIRST,
+        LBD_FIRST,
+    };
+    // Helper struct to navigate clause store buckets according to a certain priority.
+    // Features an *inner* stage, where all clauses of certain quality limits (length, LBD)
+    // are traversed in a certain order, and an *outer* stage, where all remaining clauses
+    // are traversed, again in a certain order.
+    struct BucketIndex {
+        const Parameters& params;
+        int index {0};
+        int length {1};
+        int lbd {1};
+        BucketPriorityMode modeInner;
+        BucketPriorityMode modeOuter;
+        int thresholdLength = -1;
+        int thresholdLbd = -1;
+        bool inner {true};
+        BucketIndex(const Parameters& params, BucketPriorityMode modeInner, BucketPriorityMode modeOuter, int thresholdLength = -1, int thresholdLbd = -1) :
+            params(params), modeInner(modeInner), modeOuter(modeOuter), thresholdLength(thresholdLength),
+                thresholdLbd(std::min(thresholdLbd, thresholdLength)) {}
+
+        int next() {
+            if (inner && (lbd == thresholdLbd) && (length == thresholdLength)) {
+                // Switch from inner to outer part
+                inner = false;
+                if (modeOuter == LENGTH_FIRST && lbd < length) {
+                    // Proceed with all the short clauses of high LBD
+                    // where we only considered low-LBD ones so far
+                    lbd = thresholdLbd+1;
+                    length = lbd;
+                } else {
+                    // Proceed with the next clause length
+                    // since we already considered ALL shorter clauses
+                    length++;
+                    lbd = 2;
+                }
+            } else {
+                // Normal handling of inner or outer part
+                auto mode = inner ? modeInner : modeOuter;
+                if (mode == LENGTH_FIRST) {
+                    // Gone through all of the LBD values of the current length?
+                    if (lbd == (inner ? std::min(thresholdLbd, std::min(length, params.strictLbdLimit()))
+                            : std::min(length, params.strictLbdLimit()))) {
+                        // Go to next length, lowest admissible LBD
+                        length++;
+                        lbd = (inner || length > thresholdLength) ? 2 : thresholdLbd+1;
+                        assert(lbd <= length);
+                    } else {
+                        // Go to next LBD value for same length
+                        lbd++;
+                    }
+                }
+                if (mode == LBD_FIRST) {
+                    // Gone through all clause lengths with the current LBD?
+                    if (length == (inner ? thresholdLength : params.strictClauseLengthLimit())) {
+                        // Go to next LBD, lowest length
+                        lbd++;
+                        length = (inner || lbd > thresholdLbd) ? lbd : thresholdLength+1;
+                    } else {
+                        // Go to next length for same LBD
+                        length++;
+                        lbd = std::max(lbd, 2); // if going from length 1 to 2 ...
+                    }
+                }
+            }
+            index = getBufferIdx(length, lbd);
+            return index;
+        }
+    };
+
+    StaticClauseStore(const Parameters& params, bool resetLbdAtExport, int bucketSize, bool expandBuckets, int totalCapacity) :
+        GenericClauseStore(params.strictClauseLengthLimit(), resetLbdAtExport), _expand_buckets(expandBuckets),
+            _bucket_size(bucketSize), _total_capacity(totalCapacity) {
+
+        // Build bijection between (physical) bucket index and priority index
+        // (i.e., in which order the buckets are being sweeped)
+        BucketIndex index(params,
+            params.lbdPriorityInner() ? LBD_FIRST : LENGTH_FIRST,
+            params.lbdPriorityOuter() ? LBD_FIRST : LENGTH_FIRST,
+            params.qualityClauseLengthLimit(), params.qualityLbdLimit());
+        // Forward direction
+        while (index.length <= params.strictClauseLengthLimit() && index.lbd <= params.strictLbdLimit()) {
+            _priority_idx_to_bucket_idx.push_back(index.index);
+            index.next();
+        }
+        // Backward direction
+        _bucket_idx_to_priority_idx.reserve(_priority_idx_to_bucket_idx.size());
+        for (int prioIdx = 0; prioIdx < _priority_idx_to_bucket_idx.size(); prioIdx++) {
+            int bucketIdx = _priority_idx_to_bucket_idx[prioIdx];
+            if (bucketIdx >= _bucket_idx_to_priority_idx.size())
+                _bucket_idx_to_priority_idx.resize(bucketIdx+1);
+            _bucket_idx_to_priority_idx[bucketIdx] = prioIdx;
+        }
+    }
 
     bool addClause(const Mallob::Clause& clause) override {
-        if (!addClauseLock.tryLock()) return false;
+        if (Concurrent && !addClauseLock.tryLock()) return false;
 
         int bucketIdx = getBufferIdx(clause.size, clause.lbd);
 
@@ -62,11 +162,15 @@ public:
         }
 
         // Is the bucket "too bad" w.r.t. the current threshold?
-        if (bucketIdx > _max_admissible_bucket_idx) {
-            // bucket too bad - reject clause
-            touchCount++;
-            addClauseLock.unlock();
-            return false;
+        int priorityIdx = -1;
+        if (_max_admissible_bucket_idx < INT32_MAX) {
+            priorityIdx = getPriorityIndex(bucketIdx);
+            if (priorityIdx > _max_admissible_bucket_idx) {
+                // bucket too bad - reject clause
+                touchCount++;
+                if (Concurrent) addClauseLock.unlock();
+                return false;
+            }
         }
 
         // Is sufficient space available?
@@ -75,14 +179,14 @@ public:
             // no -- do we expand buckets?
             if (!_expand_buckets) {
                 touchCount++;
-                addClauseLock.unlock();
+                if (Concurrent) addClauseLock.unlock();
                 return false; // -- no
             }
             // should this bucket be expanded?
-            if (bucketIdx == _max_admissible_bucket_idx && top + clause.size > _max_admissible_bucket_lits) {
+            if (priorityIdx == _max_admissible_bucket_idx && top + clause.size > _max_admissible_bucket_lits) {
                 // -- no - fringe bucket, already too full
                 touchCount++;
-                addClauseLock.unlock();
+                if (Concurrent) addClauseLock.unlock();
                 return false;
             }
             // -- yes, expand bucket (2x)
@@ -98,7 +202,7 @@ public:
         b->size += clause.size;
 
         // success
-        addClauseLock.unlock();
+        if (Concurrent) addClauseLock.unlock();
         return true;
     }
 
@@ -118,7 +222,7 @@ public:
         BufferBuilder builder(limit, _max_clause_length, false);
 
         // lock clause adding
-        addClauseLock.lock();
+        if (Concurrent) addClauseLock.lock();
 
         // Reset threshold for admissible clauses
         _max_admissible_bucket_idx = INT32_MAX;
@@ -131,11 +235,15 @@ public:
         int maxNonemptyBufferIdx = -1; // last seen non-empty bucket
         size_t totalSizeBefore = 0; // total space occupied before sweep
         size_t totalSizeAfter = 0; // total space occupied after sweep
+        std::vector<std::pair<Bucket*, int>> shrinkableBucketsWithSize;
 
-        // Sweep over buckets by priority in descending order
-        for (int i = 0; i < buckets.size(); i++) {
+        // Sweep over buckets *by priority* in descending order
+        for (int prioIdx = 0; prioIdx < _priority_idx_to_bucket_idx.size(); prioIdx++) {
+            int i = getBucketIdx(prioIdx);
+            if (i >= buckets.size()) continue; // bucket has never been created
             auto& [touchCount, b] = buckets[i];
             if (!b) continue; // bucket is not initialized
+            //LOG(V4_VVER, "[clausestore] layout idx %i, priority idx %i, (%i,%i)\n", i, prioIdx, b->clauseLength, b->lbd);
 
             // Initialize generic clause object for this bucket
             Mallob::Clause clause;
@@ -143,7 +251,7 @@ public:
             clause.lbd = _reset_lbd_at_export ? clause.size : b->lbd;
 
             // Check admissible literals bounds?
-            if (_expand_buckets) {
+            if (_expand_buckets && nbRemainingAdmissibleLits < INT32_MAX) {
                 // Not yet in cleaning up stage
                 if (!cleaningUp) {
                     // Check if this bucket, together with its "shadow insertions"
@@ -152,7 +260,7 @@ public:
                     if (nbRemainingAdmissibleLits < effectiveSize) {
                         // Capacity exceeded:
                         // update threshold,
-                        _max_admissible_bucket_idx = i;
+                        _max_admissible_bucket_idx = prioIdx;
                         _max_admissible_bucket_lits = nbRemainingAdmissibleLits;
                         // trim buffer according to the remaining capacity,
                         b->size = std::min((int)b->size, (nbRemainingAdmissibleLits / b->clauseLength) * b->clauseLength);
@@ -168,12 +276,11 @@ public:
                     // clean up this bucket (see below)
                     b->size = 0;
                 }
-                // actual space clean-up takes place here:
-                // bucket is shrunk to its current capacity
+                // consider space clean-up of this bucket, reset shadow insertions
                 totalSizeBefore += b->capacity();
-                b->shrinkToFit();
+                if (b->shrinkable()) shrinkableBucketsWithSize.push_back({b, b->size});
+                else totalSizeAfter += b->capacity();
                 touchCount = 0;
-                totalSizeAfter += b->capacity();
             }
 
             // follow traversal instruction
@@ -196,14 +303,6 @@ public:
                 maxNonemptyBufferIdx = i;
         }
 
-        if (cleaningUp) {
-            // some logging on insertion threshold
-            LOG(V4_VVER, "[clausestore] totalsize %lu->%lu - thresh B%s - maxne B%s\n",
-                totalSizeBefore, totalSizeAfter,
-                bufferIdxToStr(_max_admissible_bucket_idx).c_str(),
-                bufferIdxToStr(maxNonemptyBufferIdx).c_str());
-        }
-
         // Sort exported clauses and forward them to the builder
         nbExportedLits = 0;
         std::sort(clauses.begin(), clauses.end());
@@ -217,7 +316,21 @@ public:
             nbExportedLits += c.size;
         }
 
-        addClauseLock.unlock();
+        // Now that all clauses have been read, perform actual shrinkage of buckets
+        for (auto& [b, size] : shrinkableBucketsWithSize) {
+            b->shrinkToFit(size);
+            totalSizeAfter += b->capacity();
+        }
+
+        if (cleaningUp) {
+            // some logging on insertion threshold
+            LOG(V4_VVER, "[clausestore] totalsize %lu->%lu - thresh B%s - maxne B%s\n",
+                totalSizeBefore, totalSizeAfter,
+                bufferIdxToStr(_max_admissible_bucket_idx).c_str(),
+                bufferIdxToStr(maxNonemptyBufferIdx).c_str());
+        }
+
+        if (Concurrent) addClauseLock.unlock();
         nbExportedClauses = builder.getNumAddedClauses();
         return builder.extractBuffer();
     }
@@ -245,10 +358,18 @@ private:
     // (5,4) -> 9
     // (5,5) -> 10
     // (6,2) -> 11      6: 11 prev. buckets
-    int getBufferIdx(int clauseLength, int lbd) {
+    static int getBufferIdx(int clauseLength, int lbd) {
         if (clauseLength <= 2) return clauseLength-1;
         int prevBuckets = ((clauseLength-2) * (clauseLength-1)) / 2 + 1;
         return prevBuckets + (lbd-2);
+    }
+    int getBucketIdx(int priorityIdx) {
+        assert(priorityIdx >= 0 && priorityIdx < _priority_idx_to_bucket_idx.size());
+        return _priority_idx_to_bucket_idx[priorityIdx];
+    }
+    int getPriorityIndex(int bucketIdx) {
+        assert(bucketIdx >= 0 && bucketIdx < _bucket_idx_to_priority_idx.size());
+        return _bucket_idx_to_priority_idx[bucketIdx];
     }
 
     std::string bufferIdxToStr(int bufferIdx) {

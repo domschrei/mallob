@@ -4,6 +4,7 @@
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
 #include "app/sat/sharing/filter/clause_buffer_lbd_scrambler.hpp"
 #include "app/sat/sharing/filter/generic_clause_filter.hpp"
+#include "app/sat/sharing/store/static_clause_store.hpp"
 #include "comm/msgtags.h"
 #include "data/job_transfer.hpp"
 #include "util/logger.hpp"
@@ -15,13 +16,13 @@
 #include "app/sat/sharing/filter/in_place_clause_filtering.hpp"
 #include "util/random.hpp"
 #include "inplace_sharing_aggregation.hpp"
+#include <cstdint>
 
 class ClauseSharingSession {
 
 private:
     const Parameters& _params;
     BaseSatJob* _job;
-    AdaptiveClauseDatabase& _cdb;
     HistoricClauseStorage* _cls_history;
     int _epoch;
     enum Stage {
@@ -44,9 +45,9 @@ private:
     SplitMix64Rng _rng;
 
 public:
-    ClauseSharingSession(const Parameters& params, BaseSatJob* job, AdaptiveClauseDatabase& cdb,
+    ClauseSharingSession(const Parameters& params, BaseSatJob* job,
             HistoricClauseStorage* clsHistory, int epoch, float compensationFactor) : 
-        _params(params), _job(job), _cdb(cdb), _cls_history(clsHistory), _epoch(epoch),
+        _params(params), _job(job), _cls_history(clsHistory), _epoch(epoch),
         _allreduce_clauses(
             job->getJobTree(),
             // Base message 
@@ -240,13 +241,28 @@ private:
         }
         int buflim = _job->getBufferLimit(numAggregated, false);
         numInputLits = std::min(numInputLits, buflim);
-        auto merger = _cdb.getBufferMerger(buflim);
-        for (auto& elem : elems) {
-            merger.add(_cdb.getBufferReader(elem.data(), elem.size()));
+
+        // actual merging
+        std::vector<int> merged;
+        float time = Timer::elapsedSeconds();
+        if (_params.priorityBasedBufferMerging()) {
+            StaticClauseStore<false> _merge_store(_params, false, 1000, true, INT32_MAX);
+            auto merger = BufferMerger(&_merge_store, buflim, _params.strictClauseLengthLimit(), false);
+            for (auto& elem : elems) {
+                merger.add(BufferReader(elem.data(), elem.size(), _params.strictClauseLengthLimit(), false));
+            }
+            merged = merger.mergePriorityBased(_params, _excess_clauses_from_merge, _rng);
+        } else {
+            auto merger = BufferMerger(buflim, _params.strictClauseLengthLimit(), false);
+            for (auto& elem : elems) {
+                merger.add(BufferReader(elem.data(), elem.size(), _params.strictClauseLengthLimit(), false));
+            }
+            merged = merger.mergePreservingExcessWithRandomTieBreaking(_excess_clauses_from_merge, _rng);
         }
-        std::vector<int> merged = merger.mergePreservingExcessWithRandomTieBreaking(_excess_clauses_from_merge, _rng);
-        LOG(V4_VVER, "%s : merged %i contribs rev=%i (inp=%i) ~> len=%i\n",
-            _job->toStr(), numAggregated, maxRevision, numInputLits, merged.size());
+        time = Timer::elapsedSeconds() - time;
+    
+        LOG(V4_VVER, "%s : merged %i contribs rev=%i (inp=%i, t=%.4fs) ~> len=%i\n",
+            _job->toStr(), numAggregated, maxRevision, numInputLits, time, merged.size());
         InplaceClauseAggregation::prepareRawBuffer(merged,
             maxRevision, numInputLits, numAggregated, successfulSolverId);
         return merged;

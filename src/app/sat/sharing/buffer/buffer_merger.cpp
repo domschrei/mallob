@@ -1,14 +1,21 @@
 
 #include <algorithm>
+#include <cstdint>
 
 #include "app/sat/sharing/buffer/buffer_builder.hpp"
+#include "app/sat/sharing/buffer/buffer_reader.hpp"
+#include "app/sat/sharing/store/static_clause_store.hpp"
 #include "buffer_merger.hpp"
 #include "util/logger.hpp"
 #include "util/random.hpp"
 #include "util/tsl/robin_set.h"
 
-BufferMerger::BufferMerger(int sizeLimit, int maxClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum) : 
+BufferMerger::BufferMerger(int sizeLimit, int maxClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum) :
     _size_limit(sizeLimit), _max_clause_length(maxClauseLength), 
+    _slots_for_sum_of_length_and_lbd(slotsForSumOfLengthAndLbd), _use_checksum(useChecksum) {}
+
+BufferMerger::BufferMerger(StaticClauseStore<false>* mergeStore, int sizeLimit, int maxClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum) :
+    _merge_store(mergeStore), _size_limit(sizeLimit), _max_clause_length(maxClauseLength),
     _slots_for_sum_of_length_and_lbd(slotsForSumOfLengthAndLbd), _use_checksum(useChecksum) {}
 
 void BufferMerger::add(BufferReader&& reader) {_readers.push_back(std::move(reader));}
@@ -21,6 +28,63 @@ std::vector<int> BufferMerger::mergePreservingExcess(std::vector<int>& excessOut
 }
 std::vector<int> BufferMerger::mergePreservingExcessWithRandomTieBreaking(std::vector<int>& excessOut, SplitMix64Rng& rng) {
     return merge(&excessOut, &rng);
+}
+
+std::vector<int> BufferMerger::mergePriorityBased(const Parameters& params, std::vector<int>& excessOut, SplitMix64Rng& rng) {
+
+    // Create a store holding all clauses from all producers
+    assert(_merge_store);
+    for (auto& reader : _readers) {
+        while (true) {
+            Mallob::Clause c = reader.getNextIncomingClause();
+            if (!c.begin) break;
+            _merge_store->addClause(c);
+        }
+    }
+
+    // Flush store completely, which brings all clauses into the proper, priority-based order
+    int nbExportedCls, nbExportedLits;
+    std::vector<int> storeOutput = _merge_store->exportBuffer(INT32_MAX, nbExportedCls, nbExportedLits, GenericClauseStore::ANY, false);
+
+    // Filter duplicates and split output into a main and an excess output
+    BufferBuilder mainBuilder(_size_limit, _max_clause_length, _slots_for_sum_of_length_and_lbd);
+    BufferBuilder excessBuilder(INT32_MAX, _max_clause_length, _slots_for_sum_of_length_and_lbd);
+    tsl::robin_set<Mallob::Clause, Mallob::NonCommutativeClauseHasher, Mallob::SortedClauseExactEquals> mergedClauseSet;
+    BufferReader storeOutputReader(storeOutput.data(), storeOutput.size(), _max_clause_length, _slots_for_sum_of_length_and_lbd);
+    BufferBuilder* currentBuilder = &mainBuilder;
+    int excessFirstCounterPosition = -1;
+    while (true) {
+        Mallob::Clause c = storeOutputReader.getNextIncomingClause();
+        if (!c.begin) break;
+        // Clause not seen before?
+        if (!mergedClauseSet.count(c)) {
+            mergedClauseSet.insert(c);
+            // try to insert into current output
+            if (!currentBuilder->append(c) && currentBuilder == &mainBuilder) {
+                // main output full - switch from main output to excess output
+                currentBuilder = &excessBuilder;
+                if (currentBuilder->append(c))
+                    excessFirstCounterPosition = currentBuilder->getCurrentCounterPosition();
+            }
+        }
+    }
+
+    // Extract built buffers for main and excess output
+    auto resultClauses = mainBuilder.extractBuffer();
+    excessOut = excessBuilder.extractBuffer();
+
+    // Do random tie breaking if necessary
+    if (excessFirstCounterPosition != -1) {
+        auto failedInfo = mainBuilder.getFailedInsertionInfo();
+        if (failedInfo.failedBucket == failedInfo.lastBucket) {
+            // Both the main and the excess buffer feature a non-zero number
+            // of clauses from this length-LBD bucket: break ties randomly
+            redistributeBorderBucketClausesRandomly(resultClauses, excessOut, 
+                rng, failedInfo, excessFirstCounterPosition);
+        } // else: insertion failed on a bucket border: no tie breaking needed
+    }
+
+    return resultClauses;
 }
 
 std::vector<int> BufferMerger::merge(std::vector<int>* excessClauses, SplitMix64Rng* rng) {

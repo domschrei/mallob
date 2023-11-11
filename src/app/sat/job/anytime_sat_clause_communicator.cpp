@@ -249,7 +249,7 @@ void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg) {
     assert(compensationFactor >= 0.1 && compensationFactor <= 10);
 
     _current_session.reset(
-        new ClauseSharingSession(_params, _job, _cdb, _cls_history.get(), _current_epoch, compensationFactor)
+        new ClauseSharingSession(_params, _job, _cls_history.get(), _current_epoch, compensationFactor)
     );
     advanceCollective(_job, msg, MSG_INITIATE_CLAUSE_SHARING);
 }

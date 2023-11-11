@@ -5,9 +5,11 @@
 #include <set>
 #include <forward_list>
 
+#include "app/sat/sharing/store/static_clause_store.hpp"
 #include "buffer_builder.hpp"
 #include "buffer_reader.hpp"
 #include "app/sat/data/clause_comparison.hpp"
+#include "util/params.hpp"
 #include "util/random.hpp"
 
 class BufferMerger {
@@ -35,14 +37,18 @@ private:
         }
     };
     std::forward_list<InputClause> _merger;
+    StaticClauseStore<false>* _merge_store {nullptr};
 
 public:
     BufferMerger(int sizeLimit, int maxClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum = false);
+    BufferMerger(StaticClauseStore<false>* mergeStore, int sizeLimit, int maxClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum = false);
     void add(BufferReader&& reader);
 
     std::vector<int> mergeDiscardingExcess();
     std::vector<int> mergePreservingExcess(std::vector<int>& excessOut);
     std::vector<int> mergePreservingExcessWithRandomTieBreaking(std::vector<int>& excessOut, SplitMix64Rng& rng);
+
+    std::vector<int> mergePriorityBased(const Parameters& params, std::vector<int>& excessOut, SplitMix64Rng& rng);
     
 private:
     std::vector<int> merge(std::vector<int>* excessClauses, SplitMix64Rng* rng);

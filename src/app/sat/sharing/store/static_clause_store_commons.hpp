@@ -14,11 +14,18 @@ struct Bucket {
 
     const size_t capacity() const {return dataVec.size();}
     void expand() {
-        dataVec.resize(dataVec.empty() ? 256 : dataVec.size() * 2);
+        dataVec.resize(dataVec.size() <= 256 ? 512 : dataVec.size() * 2);
         data = dataVec.data();
     }
-    void shrinkToFit() {
-        dataVec.resize(size);
+    bool shrinkable() {
+        if (size == 0) return dataVec.capacity() > 0;
+        if (size < 427) return false;
+        return dataVec.capacity() >= 2*size;
+    }
+    void shrinkToFit(int s) {
+        if (s < size) return;
+        if (s == 0) dataVec.clear();
+        else dataVec.resize(1.2*s);
         data = dataVec.data();
     }
 };
