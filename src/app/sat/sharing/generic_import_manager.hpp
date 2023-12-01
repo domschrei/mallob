@@ -7,14 +7,14 @@
 #include "app/sat/sharing/store/generic_clause_store.hpp"
 #include "util/sys/threading.hpp"
 #include <atomic>
+#include <functional>
 
 class GenericImportManager {
 
 protected:
     SolverStatistics& _stats;
+    std::function<void(Mallob::Clause&)> _preimport_clause_manipulator;
     int _max_clause_length;
-    bool _reset_lbd;
-    bool _increment_lbd;
 
     int _imported_revision {0};
     int _solver_revision {0};
@@ -22,9 +22,10 @@ protected:
 
 public:
     GenericImportManager(const SolverSetup& setup, SolverStatistics& stats) : _stats(stats), 
-        _max_clause_length(setup.strictClauseLengthLimit),
-        _reset_lbd(setup.resetLbdBeforeImport),
-        _increment_lbd(setup.incrementLbdBeforeImport) {}
+        _max_clause_length(setup.strictClauseLengthLimit) {}
+    void setPreimportClauseManipulator(std::function<void(Mallob::Clause&)> cb) {
+        _preimport_clause_manipulator = cb;
+    }
     virtual ~GenericImportManager() {};
 
     virtual void addSingleClause(const Mallob::Clause& c) = 0;
@@ -41,7 +42,13 @@ public:
         return _solver_revision >= _imported_revision;
     }
     virtual const std::vector<int>& getUnitsBuffer() = 0;
-    virtual Mallob::Clause& get(GenericClauseStore::ExportMode mode) = 0;
+    Mallob::Clause& getClause(GenericClauseStore::ExportMode mode) {
+        auto& cls = get(mode);
+        if (_preimport_clause_manipulator) {
+            _preimport_clause_manipulator(cls);
+        }
+        return cls;
+    }
 
     virtual bool empty() const {
         return size() == 0;
@@ -57,4 +64,8 @@ public:
             )
         );
     }
+
+protected:
+    virtual Mallob::Clause& get(GenericClauseStore::ExportMode mode) = 0;
+
 };

@@ -48,6 +48,7 @@ struct SolverSetup {
 	size_t anticipatedLitsToImportPerCycle;
 	bool resetLbdBeforeImport {false};
 	bool incrementLbdBeforeImport {false};
+	bool randomizeLbdBeforeImport {false};
 
 	bool adaptiveImportManager;
 	bool skipClauseSharingDiagonally;

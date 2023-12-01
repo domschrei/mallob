@@ -8,6 +8,7 @@
 #include <atomic>
 
 #include "app/sat/sharing/store/generic_clause_store.hpp"
+#include "util/random.hpp"
 #include "util/sys/threading.hpp"
 #include "../data/clause.hpp"
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
@@ -193,6 +194,8 @@ private:
 
 	SolverStatistics _stats;
 	std::unique_ptr<GenericImportManager> _import_manager;
+
+	SplitMix64Rng _rng;
 };
 
 // Returns the elapsed time (seconds) since the currently registered solver's start time.

@@ -7,6 +7,7 @@
 #include "app/sat/sharing/store/generic_clause_store.hpp"
 #include "util/assert.hpp"
 
+#include "util/random.hpp"
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
@@ -49,13 +50,28 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 			} else {
 				return new RingBufferImportManager(setup, _stats);
 			}
-		  }()) {
+		  }()), _rng(_setup.globalId) {
 	updateTimer(_job_name);
 	_global_name = "<h-" + _job_name + "_S" + std::to_string(_global_id) + ">";
 	_stats.histProduced = new ClauseHistogram(setup.strictClauseLengthLimit);
 	_stats.histDigested = new ClauseHistogram(setup.strictClauseLengthLimit);
 
 	LOGGER(_logger, V4_VVER, "Diversification index %i\n", getDiversificationIndex());
+
+	// Set manipulator for non-unit clauses just before they are handed to the solver.
+	_import_manager->setPreimportClauseManipulator([this](Mallob::Clause& c) {
+		if (!c.begin) return; // no clause
+		if (c.size == 1) return; // unit clause
+		if (_setup.randomizeLbdBeforeImport) {
+			// Workaround to get "uniform" drawing of numbers from [2, c.size]
+			c.lbd = (int) std::round(_rng.randomInRange(2 - 0.49999, c.size + 0.49999));
+			assert(c.lbd >= 2);
+			assert(c.lbd <= c.size);
+		}
+		if (_setup.incrementLbdBeforeImport && c.lbd < c.size)
+			c.lbd++;
+		if (_setup.resetLbdBeforeImport) c.lbd = c.size;
+	});
 }
 
 void PortfolioSolverInterface::interrupt() {
@@ -94,7 +110,7 @@ void PortfolioSolverInterface::addLearnedClause(const Mallob::Clause& c) {
 
 bool PortfolioSolverInterface::fetchLearnedClause(Mallob::Clause& clauseOut, GenericClauseStore::ExportMode mode) {
 	if (_clause_sharing_disabled) return false;
-	clauseOut = _import_manager->get(mode);
+	clauseOut = _import_manager->getClause(mode);
 	return clauseOut.begin != nullptr && clauseOut.size >= 1;
 }
 
