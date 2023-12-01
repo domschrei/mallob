@@ -267,8 +267,9 @@ void Kissat::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
 void Kissat::produceClause(int size, int lbd) {
     if (size > _setup.strictClauseLengthLimit) return;
     learntClause.size = size;
-    // In Kissat, LBD scores are represented from 1 to len-1. => Increment LBD.
-    learntClause.lbd = learntClause.size == 1 ? 1 : lbd+1; 
+    // In Kissat, long clauses of LBD 1 can be exported. => Increment LBD in this case.
+    learntClause.lbd = learntClause.size == 1 ? 1 : lbd;
+    if (learntClause.lbd == 1 && learntClause.size > 1) learntClause.lbd++;
     if (learntClause.lbd > _setup.strictLbdLimit) return;
     learntClause.begin = learntClauseBuffer.data();
     callback(learntClause, _setup.localId);
@@ -284,8 +285,7 @@ void Kissat::consumeClause(int** clause, int* size, int* lbd) {
         memcpy(producedClause.data(), c.begin, c.size*sizeof(int));
         *clause = producedClause.data();
         *size = c.size;
-        // In Kissat, LBD scores are represented from 1 to len-1. => Decrement LBD.
-        *lbd = c.size == 1 ? c.lbd : c.lbd-1;
+        *lbd = c.lbd;
     } else {
         *clause = 0;
         *size = 0;
