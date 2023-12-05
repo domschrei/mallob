@@ -16,7 +16,7 @@
 #include "util/distribution.hpp"
 
 extern "C" {
-	#include "lglib.h"
+	#include "lingeling/lglib.h"
 }
 
 #ifndef LGL_UNKNOWN
