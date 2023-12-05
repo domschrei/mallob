@@ -51,7 +51,7 @@ if echo $solvers|grep -q "k"; then
     if [ ! -d kissat ]; then
         if [ ! -f kissat.zip ]; then
             # for fixing a branch instead of a commit, prepend "refs/heads/"
-            branchorcommit="f9cf0f0134bc80970d1c5614f36a15955e1f2fb4" # updated from A. Biere's 2023 submission
+            branchorcommit="f9cf0f0134bc80970d1c5614f36a15955e1f2fb4" # updated from A. Biere's 2023 state
             wget -nc https://github.com/domschrei/kissat/archive/${branchorcommit}.zip -O kissat.zip
         fi
         unzip kissat.zip
@@ -64,8 +64,7 @@ if echo $solvers|grep -q "c"; then
     if [ ! -d cadical ]; then
         if [ ! -f cadical.zip ]; then
             # for fixing a branch instead of a commit, prepend "refs/heads/"
-            branchorcommit="382002ef82cf6809afc10bb277d152b6084b5782" # without fanout stuff
-            #branchorcommit="0bb5565ea61e8c0b356cc9df85f80baa1b82127b" # with fanout stuff
+            branchorcommit="78e5f219c382cc3c78fd4807ebac2fbf646520f0" # updated from A. Biere's 2023 state
             wget -nc https://github.com/domschrei/cadical/archive/${branchorcommit}.zip -O cadical.zip
         fi
         unzip cadical.zip

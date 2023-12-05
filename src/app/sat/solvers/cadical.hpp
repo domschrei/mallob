@@ -12,10 +12,10 @@
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
 
-#include "cadical_interface.hpp"
+#include "cadical/src/cadical.hpp"
 #include "cadical_terminator.hpp"
-#include "cadical_learner.hpp"
-#include "cadical_learn_source.hpp"
+#include "cadical_clause_export.hpp"
+#include "cadical_clause_import.hpp"
 
 class Cadical : public PortfolioSolverInterface {
 
@@ -27,9 +27,9 @@ private:
 	std::vector<std::vector<int> > learnedClauses;
 	std::vector<int> assumptions;
 
-	HordeTerminator terminator;
-    HordeLearner learner;
-	MallobLearnSource learnSource;
+	CadicalTerminator terminator;
+	CadicalClauseExport learner;
+	CadicalClauseImport learnSource;
 
 	bool seedSet = false;
 

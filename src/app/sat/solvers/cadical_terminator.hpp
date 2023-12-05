@@ -5,13 +5,13 @@
 #include "util/sys/threading.hpp"
 #include "util/sys/timer.hpp"
 
-#include "cadical_interface.hpp"
+#include "cadical/src/cadical.hpp"
 
-struct HordeTerminator : public CaDiCaL::Terminator {
-    HordeTerminator(Logger &logger) : _logger(logger) {
+struct CadicalTerminator : public CaDiCaL::Terminator {
+    CadicalTerminator(Logger &logger) : _logger(logger) {
         _lastTermCallbackTime = Timer::elapsedSeconds();
     };
-    ~HordeTerminator() override {}
+    ~CadicalTerminator() override {}
 
     bool terminate() override {
 

@@ -10,7 +10,7 @@ set(BASE_SOURCES ${BASE_SOURCES} ${SAT_SOURCES} CACHE INTERNAL "")
 # Include default SAT solvers as external libraries (their Mallob-side interfaces are part of SAT_SOURCES)
 link_directories(lib/lingeling lib/yalsat lib/kissat)
 set(BASE_LIBS ${BASE_LIBS} lgl yals cadical kissat CACHE INTERNAL "")
-set(BASE_INCLUDES ${BASE_INCLUDES} lib/lingeling CACHE INTERNAL "") # need to include some lingeling code
+set(BASE_INCLUDES ${BASE_INCLUDES} lib CACHE INTERNAL "") # need to include some solver code
 
 # Special case Cadical (used for certified UNSAT)
 if(MALLOB_CERTIFIED_UNSAT)
