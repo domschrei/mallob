@@ -231,8 +231,8 @@ void Lingeling::doProduce(int* cls, int glue) {
 		doProduceUnit(cls[0]);
 		return;
 	}
-	// In Lingeling, LBD scores are represented from 1 to len-1. => Increment LBD.
-	glue++;
+	// In Lingeling, LBD score can be 1. => Increment LBD in this case.
+	if (glue <= 1) glue = 2;
 	// LBD score check
 	if (glueLimit != 0 && glue > (int)glueLimit) {
 		return;
@@ -287,8 +287,7 @@ void Lingeling::doConsume(int** clause, int* glue) {
 	}
 	zeroTerminatedClause[c.size] = 0;
 
-	// In Lingeling, LBD scores are represented from 1 to len-1. => Decrement LBD.
-	*glue = c.lbd-1;
+	*glue = c.lbd;
 	*clause = zeroTerminatedClause.data();
 }
 
