@@ -49,6 +49,8 @@ public:
 
     void onProduceClause(const Mallob::Clause& clause, int solverId) {
         unsigned long clauseId = ClauseMetadata::readUnsignedLong(clause.begin);
+        assert(clauseId > _num_original_clauses);
+        assert(isLocallyProducedClause(clauseId));
 		assert(getProducingLocalSolverIndex(clauseId) == solverId);
 		_last_exported_clause_id[solverId]->store(clauseId, std::memory_order_relaxed);
     }
@@ -123,10 +125,10 @@ public:
 	}
 
 	int getProducingLocalSolverIndex(unsigned long clauseId) {
-		return (clauseId-_num_original_clauses-1) % _max_nb_threads_per_process;
+		return (clauseId-_num_original_clauses) % _max_nb_threads_per_process;
 	}
 	int getProducingInstanceId(unsigned long clauseId) {
-		return (clauseId-_num_original_clauses-1) % _solvers[0]->getSolverSetup().maxNumSolvers;
+		return (clauseId-_num_original_clauses) % _solvers[0]->getSolverSetup().maxNumSolvers;
 	}
 
     void alignClauseId(int* clauseData) {

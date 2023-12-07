@@ -118,7 +118,5 @@ public:
         return litsInUse;
     }
 
-    ~AdaptiveImportManager() {
-        if (_clause_out.begin != nullptr) free(_clause_out.begin);
-    }
+    ~AdaptiveImportManager() {}
 };

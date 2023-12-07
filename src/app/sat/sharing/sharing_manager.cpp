@@ -175,12 +175,12 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 	if (clauseSize == 1 && clause.lbd != 1) {
 		_logger.log(V1_WARN, "Observed unit LBD of %i\n", clause.lbd);
 	}
-	if (clauseSize-ClauseMetadata::numBytes() > 1) {
+	if (clauseSize-ClauseMetadata::numInts() > 1) {
 		_observed_nonunit_lbd_of_zero |= clause.lbd == 0;
 		_observed_nonunit_lbd_of_one |= clause.lbd == 1;
 		_observed_nonunit_lbd_of_two |= clause.lbd == 2;
-		_observed_nonunit_lbd_of_length_minus_one |= clause.lbd == clause.size-ClauseMetadata::numBytes()-1;
-		_observed_nonunit_lbd_of_length |= clause.lbd == clause.size-ClauseMetadata::numBytes();
+		_observed_nonunit_lbd_of_length_minus_one |= clause.lbd == clause.size-ClauseMetadata::numInts()-1;
+		_observed_nonunit_lbd_of_length |= clause.lbd == clause.size-ClauseMetadata::numInts();
 	}
 
 	//log(V4_VVER, "EXPORT %s\n", clause.toStr().c_str());
@@ -204,7 +204,7 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 	}
 
 	// Sort literals in clause
-	std::sort(clauseBegin+ClauseMetadata::numBytes(), clauseBegin+clauseSize);
+	std::sort(clauseBegin+ClauseMetadata::numInts(), clauseBegin+clauseSize);
 
 	_export_buffer->produce(clauseBegin, clauseSize, clauseLbd, solverId, _internal_epoch);
 	//log(V6_DEBGV, "%i : PRODUCED %s\n", solverId, tldClause.toStr().c_str());
@@ -238,7 +238,11 @@ int SharingManager::prepareSharing(int* begin, int totalLiteralLimit, int& succe
 			GenericClauseStore::ANY, /*sortClauses=*/true, [&](int* data) {
 
 		// Shift clause ID from a local solver according to the solver's offset
-		if (_id_alignment) _id_alignment->alignClauseId(data);
+		if (_id_alignment) {
+			uint64_t id = ClauseMetadata::readUnsignedLong(data);
+			assert(_id_alignment->isLocallyProducedClause(id) || log_return_false("[ERROR] Clause id=%lu is not locally produced!\n", id));
+			_id_alignment->alignClauseId(data);
+		}
 	});
 
 	_clause_filter->releaseAllLocks();
@@ -300,7 +304,9 @@ void SharingManager::returnClauses(int* begin, int buflen) {
 			// For certified UNSAT we need to drop returned clauses which do not
 			// originate from this solver, since we can not un-align them to
 			// correctly insert them into the database.
-			if (_id_alignment->isLocallyProducedClause(ClauseMetadata::readUnsignedLong(c.begin))) {
+			auto id = ClauseMetadata::readUnsignedLong(c.begin);
+			assert(id < 100'000'000);
+			if (_id_alignment->isLocallyProducedClause(id)) {
 
 				// Returned clauses would be aligned *again* when re-exported.
 				// => subtract the offsets again here ...
@@ -324,7 +330,7 @@ int SharingManager::filterSharing(int* begin, int buflen, int* filterOut) {
 	constexpr auto bitsPerElem = 8*sizeof(int);
 	int shift = bitsPerElem;
 	auto clause = reader.getNextIncomingClause();
-	int filterPos = -1 + ClauseMetadata::numBytes();
+	int filterPos = -1 + ClauseMetadata::numInts();
 	int nbFiltered = 0;
 	int nbTotal = 0;
 
@@ -403,6 +409,13 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	auto clause = reader.getNextIncomingClause();
 	while (clause.begin != nullptr) {
 
+		if (ClauseMetadata::enabled()) {
+			assert(clause.size >= ClauseMetadata::numInts()+1 || log_return_false("[ERROR] Clause of invalid size %i!\n", clause.size));
+			uint64_t id;
+			memcpy(&id, clause.begin, sizeof(uint64_t));
+			assert(id < 100'000'000);
+		}
+
 		if (_clause_logger) _clause_logger->append(clause);
 
 		if (filterSizeBeingLocked != clause.size) {
@@ -453,7 +466,7 @@ void SharingManager::applyFilterToBuffer(int* begin, int& buflen, const int* fil
 	_logger.log(verb+2, "DG apply global filter\n");
 	const int bitsPerElem = sizeof(int)*8;
 	int shift = bitsPerElem;
-	int filterPos = -1 + ClauseMetadata::numBytes();
+	int filterPos = -1 + ClauseMetadata::numInts();
 
 	if (_id_alignment) {
 		_id_alignment->beginNextEpoch(filter);

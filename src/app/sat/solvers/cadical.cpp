@@ -26,16 +26,25 @@ Cadical::Cadical(const SolverSetup& setup)
 	solver->connect_terminator(&terminator);
 	solver->connect_learn_source(&learnSource);
 
+	// In certified UNSAT mode?
 	if (setup.certifiedUnsat) {
-		//solver->set("binary", false);
-		auto ok = solver->set("proofdelete", false);
-		if (!ok) {
-			LOGGER(_logger, V0_CRIT, "[ERROR] Cannot configure CaDiCaL for certified UNSAT. "
-				"Did you link to the correct CaDiCaL?\n");
-			abort();
-		}
-		proofFileString = setup.proofDir + "/proof." + std::to_string(setup.globalId + 1) + ".lrat";
-		solver->trace_proof(proofFileString.c_str());
+
+		int solverRank = setup.globalId;
+		int maxNumSolvers = setup.maxNumSolvers;
+
+		LOGGER(_logger, V3_VERB, "Initializing rank=%i size=%i DI=%i #C=%ld with certified UNSAT support\n",
+			solverRank, maxNumSolvers, getDiversificationIndex(), getSolverSetup().numOriginalClauses);
+
+		bool okay;
+		okay = solver->set("lrat", 1); assert(okay); // enable LRAT proof logging
+		okay = solver->set("binary", 1); assert(okay); // set proof logging mode to binary format
+		okay = solver->set("lratdeletelines", 0); assert(okay); // disable printing deletion lines
+		okay = solver->set("lratsolverid", solverRank); assert(okay); // set this solver instance's ID
+		okay = solver->set("lratsolvercount", maxNumSolvers); assert(okay); // set # solvers
+		okay = solver->set("lratorigclscount", getSolverSetup().numOriginalClauses); assert(okay);
+
+		proofFileString = _setup.proofDir + "/proof." + std::to_string(_setup.globalId) + ".lrat";
+		okay = solver->trace_proof(proofFileString.c_str()); assert(okay);
 	}
 }
 
@@ -81,42 +90,6 @@ void Cadical::diversify(int seed) {
 
 	if (getDiversificationIndex() >= getNumOriginalDiversifications() && _setup.diversifyFanOut) {
 		okay = solver->set("fanout", 1); assert(okay);
-	}
-
-	// In certified UNSAT mode?
-	if (getSolverSetup().certifiedUnsat) {
-
-		int solverRank = getSolverSetup().globalId;
-		int maxNumSolvers = getSolverSetup().maxNumSolvers;
-
-		// Need to do +1 so we don't start at 0
-		okay = solver->set("instance_num", solverRank + 1); assert(okay);
-		okay = solver->set("total_instances", maxNumSolvers); assert(okay);
-		okay = solver->set("num_original_clauses", getSolverSetup().numOriginalClauses); assert(okay);
-
-		LOGGER(_logger, V3_VERB, "Diversifying rank=%i size=%i DI=%i #C=%ld with certified UNSAT support\n", 
-			solverRank, maxNumSolvers, getDiversificationIndex(), getSolverSetup().numOriginalClauses);
-
-		// Check that a version of CaDiCaL is used which has all the unsupported options switched off
-		auto requiredOptionsZero = {"elim", "decompose", "ternary", "vivify", "probe", "transred"};
-		for (auto& option : requiredOptionsZero) {
-			assert(solver->get(option) == 0 
-				|| log_return_false("CaDiCaL is configured with option \"%s\" "
-				"which is unsupported for certified UNSAT!\n", option));
-		}
-		
-		// Simple LRAT-safe portfolio (5/10 solvers are diversified)
-		if (_setup.diversifyNative) {
-			switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
-			case 1: okay = solver->set("shuffle", 1) && solver->set("shufflerandom", 1); break;
-			case 3: okay = solver->set("phase", 0); break;
-			case 5: okay = solver->set("walk", 0); break;
-			case 7: okay = solver->set("restartint", 100); break;
-			case 9: okay = solver->set("inprocessing", 0); break;
-			}
-			assert(okay);
-		}
-		return;
 	}
 
 	if (_setup.diversifyNative) {

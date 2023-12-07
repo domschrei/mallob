@@ -275,7 +275,7 @@ bool ForkedSatJob::hasFilteredSharing(int epoch) {
     return _solver->hasFilteredClauses(epoch);
 }
 std::vector<int> ForkedSatJob::getLocalFilter(int epoch) {
-    if (!isInitialized()) return std::vector<int>(ClauseMetadata::numBytes(), 0);
+    if (!isInitialized()) return std::vector<int>(ClauseMetadata::numInts(), 0);
     return _solver->getLocalFilter(epoch);
 }
 void ForkedSatJob::applyFilter(int epoch, std::vector<int>& filter) {

@@ -30,7 +30,7 @@ namespace Mallob {
             for (int i = 0; i < size; i++) assert(begin[i] != 0);
         }
         std::string toStr() const {
-            std::string out = "(len=" + std::to_string(size - ClauseMetadata::numBytes()) 
+            std::string out = "(len=" + std::to_string(size - ClauseMetadata::numInts())
                 + " lbd=" + std::to_string(lbd);
             if (ClauseMetadata::enabled()) {
                 unsigned long id;
@@ -38,7 +38,7 @@ namespace Mallob {
                 out += " id=" + std::to_string(id);
             }
             out += ") ";
-            for (auto it = begin + ClauseMetadata::numBytes(); it != begin+size; it++) {
+            for (auto it = begin + ClauseMetadata::numInts(); it != begin+size; it++) {
                 out += std::to_string(*it) + " ";
             }
             return out.substr(0, out.size()-1);
@@ -47,7 +47,7 @@ namespace Mallob {
         bool operator<(const Clause& other) const {
             if (size != other.size) return size < other.size;
             if (lbd != other.lbd) return lbd < other.lbd;
-            for (int i = ClauseMetadata::numBytes(); i < size; i++) {
+            for (int i = ClauseMetadata::numInts(); i < size; i++) {
                 if (begin[i] != other.begin[i]) return begin[i] < other.begin[i];
             }
             return false;
@@ -68,7 +68,7 @@ namespace Mallob {
             2038074751,	2038075231,	2038075751,	2038076267};
         
         size_t res = 1;
-        for (auto it = begin + ClauseMetadata::numBytes(); it != begin+size; it++) {
+        for (auto it = begin + ClauseMetadata::numInts(); it != begin+size; it++) {
             int lit = *it;
             res ^= lit * primes[abs((lit^which) & 15)];
         }
@@ -89,7 +89,7 @@ namespace Mallob {
     inline size_t nonCommutativeHash(const int* begin, int size, int which = 3) {
         
         size_t res = robin_hood::hash_int(size * which);
-        for (size_t i = ClauseMetadata::numBytes(); i < size; i++) {
+        for (size_t i = ClauseMetadata::numInts(); i < size; i++) {
             hash_combine(res, begin[i]);
         }
         return res;
@@ -130,7 +130,7 @@ namespace Mallob {
         bool operator()(const Clause& a, const Clause& b) const {
             if (a.size != b.size) return false; // only clauses of same size are equal
             // exact content comparison otherwise
-            for (size_t i = ClauseMetadata::numBytes(); i < a.size; i++) {
+            for (size_t i = ClauseMetadata::numInts(); i < a.size; i++) {
                 if (a.begin[i] != b.begin[i]) return false;
             }
             return true;

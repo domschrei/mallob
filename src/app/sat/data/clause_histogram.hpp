@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 
+#include "app/sat/data/clause_metadata.hpp"
 #include "util/sys/atomics.hpp"
 
 class ClauseHistogram {
@@ -38,7 +39,7 @@ public:
 
         // Assemble string
         std::string out = "total:" + std::to_string(_total.load(std::memory_order_relaxed));
-        for (size_t i = 0; i <= endIdx; i++) {
+        for (size_t i = ClauseMetadata::numInts(); i <= endIdx; i++) {
             out += " " + std::to_string(_hist[i]->load(std::memory_order_relaxed));
         }
         return out;

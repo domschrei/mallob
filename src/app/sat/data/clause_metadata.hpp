@@ -12,7 +12,7 @@ public:
 	static void enableClauseIds() {
 		metadataSize = 2;
 	}
-	static inline int numBytes() {
+	static inline int numInts() {
 		return metadataSize;
 	}
 	static inline bool enabled() {

@@ -351,7 +351,7 @@ private:
     }
     bool isSelfProducedClause(LratClauseId clauseId) {
         if (isOriginalClause(clauseId)) return false;
-        return _instance_id == (clauseId-_original_num_clauses-1) % _num_instances;
+        return _instance_id == (clauseId-_original_num_clauses) % _num_instances;
     }
     
     int getUnalignedClauseEpoch(LratClauseId clauseId) {

@@ -246,7 +246,7 @@ private:
             int instanceId = _this_worker_index * _orig_threads_per_worker + i;
             int numInstances = _num_workers * _orig_threads_per_worker;
             std::string proofFilenameBase = _params.logDirectory() + "/proof#" 
-                + std::to_string(_job_id) + "/proof." + std::to_string(instanceId+1);
+                + std::to_string(_job_id) + "/proof." + std::to_string(instanceId);
 
             // if necessary, create directory for external memory disk files 
             FileUtils::mkdir(_params.extMemDiskDirectory());

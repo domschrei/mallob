@@ -2,6 +2,7 @@
 #pragma once
 
 #include "app/sat/data/clause.hpp"
+#include "app/sat/data/clause_metadata.hpp"
 #include "util/sys/background_worker.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "util/sys/threading.hpp"
@@ -52,8 +53,14 @@ public:
                 outClauses = std::move(_parcelled_clauses);
             }
             for (auto& vec : outClauses) if (!vec.empty()) {
-                _ofs << (vec[0]-1);
-                for (size_t i = 1; i < vec.size(); i++) _ofs << " " << vec[i];
+                _ofs << vec[0];
+                if (ClauseMetadata::enabled()) {
+                    uint64_t id;
+                    memcpy(&id, vec.data()+1, sizeof(uint64_t));
+                    _ofs << " [id=" << id << "]";
+                }
+                for (size_t i = 1+ClauseMetadata::numInts(); i < vec.size(); i++)
+                    _ofs << " " << vec[i];
                 _ofs << std::endl;
             }
             outClauses.clear();

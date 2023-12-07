@@ -102,10 +102,10 @@ private:
             return endReading();
         }
 
-        if (_buffer[_current_pos+ClauseMetadata::numBytes()] == 0) {
+        if (_buffer[_current_pos+ClauseMetadata::numInts()] == 0) {
             std::string str; for (size_t i = 0; i < _size; i++) str += std::to_string(_buffer[i]) + " ";
             LOG(V0_CRIT, "ERROR: Buffer is zero @ pos %i/%i (bucket (%i,%i))! ===> %s\n", 
-                _current_pos+ClauseMetadata::numBytes(), _size, _it.clauseLength, _it.lbd, str.c_str());
+                _current_pos+ClauseMetadata::numInts(), _size, _it.clauseLength, _it.lbd, str.c_str());
             abort();
         }
 
