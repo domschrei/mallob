@@ -59,27 +59,15 @@ if echo $solvers|grep -q "k"; then
     fi
 fi
 
-# Normal (non-LRAT) CaDiCaL
+# CaDiCaL (supports LRAT proof production)
 if echo $solvers|grep -q "c"; then
     if [ ! -d cadical ]; then
         if [ ! -f cadical.zip ]; then
             # for fixing a branch instead of a commit, prepend "refs/heads/"
-            branchorcommit="78e5f219c382cc3c78fd4807ebac2fbf646520f0" # updated from A. Biere's 2023 state
+            branchorcommit="f51dfc452cf993f60a5799594557226d78ca2de6" # updated from A. Biere's 2023 state
             wget -nc https://github.com/domschrei/cadical/archive/${branchorcommit}.zip -O cadical.zip
         fi
         unzip cadical.zip
         mv cadical-* cadical
-    fi
-fi
-
-# LRAT-logging CaDiCaL
-if echo $solvers|grep -q "p"; then
-    if [ ! -d lrat-cadical ]; then
-        if [ ! -f lrat-cadical.zip ]; then
-            branchorcommit="refs/heads/certified-integrated"
-            wget -nc https://github.com/domschrei/cadical/archive/${branchorcommit}.zip -O lrat-cadical.zip
-        fi
-        unzip lrat-cadical.zip
-        mv cadical-* lrat-cadical
     fi
 fi
