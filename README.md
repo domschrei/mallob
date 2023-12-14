@@ -9,7 +9,7 @@ Mallob was tested on configurations with up to 6144 cores as described in our pu
 
 Most notably, Mallob features an engine for distributed SAT solving.
 According to the [International SAT Competitions](https://satcompetition.github.io/) 2020-2023, the premier competitive events for state-of-the-art SAT solving, Mallob is consistently the strongest SAT solving system for massively parallel and distributed systems (1600 hardware threads spread across 100 machines) and also a highly competitive system for moderately parallel SAT solving (64 hardware threads).
-Note that this version of Mallob also features a module to generate proofs of unsatisfiability due to a cooperation with external researchers from Amazon Web Services (see [docs/certified-unsat.md](docs/certified-unsat.md)).
+Note that this version of Mallob also features a module to generate proofs of unsatisfiability due to a cooperation with external researchers from Amazon Web Services and due to subsequent work by D. Schreiber.
 
 Furthermore, Mallob features an engine for K-Means clustering, authored by [Michael Dörr](https://github.com/MichaelDoerr) in the scope of his Bachelor thesis.
 
@@ -123,6 +123,22 @@ For running Mallob on distributed clusters, please also consult [the scripts and
 Use Mallob option `-mono=$PROBLEM_FILE` where `$PROBLEM_FILE` is the path and file name of the problem to solve (DIMACS CNF format, possibly with .xz or .lzma compression, for SAT; whitespace-separated plain text file for K-Means). Specify the application of this instance with `-mono-app=sat` or `-mono-app=kmeans`. 
 
 In this mode, all processes participate in solving, overhead is minimal, and Mallob terminates immediately after the job has been processed.
+
+### Producing Proofs of Unsatisfiability
+
+CaDiCaL is the only supported solver backend for parallel/distributed proof production (which does not really impact performance negatively – see D. Schreiber's doctoral thesis).
+
+To enable proof production, just set the option `-proof=path/to/final/compressed/prooffile.lrat` together with `-mono=path/to/input/cnf`. You also need to set a log directory with `-log=path/to/logdir` where intermediate files will be written to on each machine. The final proof in compressed LRAT format will then be written to the specified destination.
+
+You can use the [`drat-trim`](https://github.com/marijnheule/drat-trim) tool suite to decompress and check a proof:
+```bash
+decompress proof.lrat > proof-dec.lrat
+lrat-check path/to/input/cnf proof-dec.lrat
+```
+Note however that you need to set the following definition in `decompress.c` before building:
+```c
+#define MODE 2      // DRAT: MODE=1; LRAT: MODE=2
+```
 
 ## Solve multiple instances in an orchestrated manner
 
@@ -273,8 +289,12 @@ Within our codebase we make thankful use of the following liberally licensed pro
 * [Compile Time Regular Expressions](https://github.com/hanickadot/compile-time-regular-expressions) by Hana Dusíková, for matching particular user inputs
 * [robin_hood hashing](https://github.com/martinus/robin-hood-hashing) by Martin Ankerl, for efficient unordered maps and sets
 
-If you make use of Mallob in an academic setting, please cite the following conference papers. If you can (or want to) cite only one of them, then please cite the SAT'21 paper when focusing on our SAT engine and the Euro-Par'22 paper when focusing on the scheduling aspects of our system.
-```
+## Bibliography
+
+If you make use of Mallob in an academic setting or in a competitive event, please cite the most relevant among the following publications.
+
+#### SAT'21: Focus on SAT solving
+```bibtex
 @inproceedings{schreiber2021scalable,
   title={Scalable SAT Solving in the Cloud},
   author={Schreiber, Dominik and Sanders, Peter},
@@ -284,6 +304,9 @@ If you make use of Mallob in an academic setting, please cite the following conf
   organization={Springer},
   doi={10.1007/978-3-030-80223-3_35}
 }
+```
+#### Euro-Par'22: Focus on decentralized scheduling
+```bibtex
 @inproceedings{sanders2022decentralized,
   title={Decentralized Online Scheduling of Malleable {NP}-hard Jobs},
   author={Sanders, Peter and Schreiber, Dominik},
@@ -294,9 +317,20 @@ If you make use of Mallob in an academic setting, please cite the following conf
   doi={10.1007/978-3-031-12597-3_8}
 }
 ```
-
-If you want to specifically cite Mallob in the scope of an International SAT Competition, please cite: 
+#### TACAS'23: Proofs of unsatisfiability
+```bibtex
+@InProceedings{michaelson2023unsatisfiability,
+  author={Michaelson, Dawn and Schreiber, Dominik and Heule, Marijn J. H. and Kiesl-Reiter, Benjamin and Whalen, Michael W.},
+  title={Unsatisfiability proofs for distributed clause-sharing SAT solvers},
+  booktitle={Tools and Algorithms for the Construction and Analysis of Systems (TACAS)},
+  year={2023},
+  organization={Springer},
+  pages={348--366},
+  doi={10.1007/978-3-031-30823-9_18},
+}
 ```
+#### SAT Competition TRs
+```bibtex
 @article{schreiber2020engineering,
   title={Engineering HordeSat Towards Malleability: mallob-mono in the {SAT} 2020 Cloud Track},
   author={Schreiber, Dominik},
@@ -320,6 +354,16 @@ If you want to specifically cite Mallob in the scope of an International SAT Com
   author={Schreiber, Dominik},
   journal={SAT Competition 2023},
   pages={46--47}
+}
+```
+#### Doctoral thesis (featuring all of the above + new content)
+```bibtex
+@phdthesis{schreiber2023scalable,
+  author={Dominik Schreiber},
+  title={Scalable {SAT} Solving and its Application},
+  year={2023},
+  school={Karlsruhe Institute of Technology},
+  doi={10.5445/IR/1000165224}
 }
 ```
 
