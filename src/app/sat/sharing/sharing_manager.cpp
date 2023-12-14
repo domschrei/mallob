@@ -231,7 +231,7 @@ int SharingManager::prepareSharing(int* begin, int totalLiteralLimit, int& succe
 	float time = Timer::elapsedSeconds();
 	_clause_filter->acquireAllLocks();
 	time = Timer::elapsedSeconds() - time;
-	LOGGER(_logger, V4_VVER, "acquired all clause locks after %.6fs\n", time);
+	LOGGER(_logger, V5_DEBG, "acquired all clause locks after %.6fs\n", time);
 
 	int numExportedClauses = 0;
 	auto buffer = _clause_store->exportBuffer(totalLiteralLimit, numExportedClauses, numLits,
@@ -292,7 +292,7 @@ void SharingManager::returnClauses(int* begin, int buflen) {
 	float time = Timer::elapsedSeconds();
 	_clause_filter->acquireAllLocks();
 	time = Timer::elapsedSeconds() - time;
-	LOGGER(_logger, V4_VVER, "acquired all clause locks after %.6fs\n", time);
+	LOGGER(_logger, V5_DEBG, "acquired all clause locks after %.6fs\n", time);
 
 	if (!_id_alignment) {
 		// No clause ID alignments: Can just reinsert all clauses, no questions asked

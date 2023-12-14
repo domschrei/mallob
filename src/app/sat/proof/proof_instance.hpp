@@ -9,6 +9,7 @@
 #include "app/sat/proof/reverse_binary_lrat_parser.hpp"
 #include "app/sat/proof/serialized_lrat_line.hpp"
 #include "external_id_priority_queue.hpp"
+#include "util/logger.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "app/sat/proof/lrat_utils.hpp"
 #include "merging/proof_merge_connector.hpp"
@@ -112,7 +113,7 @@ public:
     std::vector<LratClauseId>&& extractNextOutgoingClauseIds() {
         assert(ready());
         _work_future.get();
-        LOGGER(_log, V3_VERB, "%i ~> %i IDs\n", _instance_id, _outgoing_clause_ids.size());
+        LOGGER(_log, V5_DEBG, "%i ~> %i IDs\n", _instance_id, _outgoing_clause_ids.size());
         return std::move(_outgoing_clause_ids);
     }
 
@@ -141,12 +142,12 @@ private:
                 numSelfClauses++;
             }
         }
-        LOGGER(_log, V3_VERB, "%i <~ %i self IDs\n", _instance_id, numSelfClauses);
+        LOGGER(_log, V5_DEBG, "%i <~ %i self IDs\n", _instance_id, numSelfClauses);
     }
 
     void readEpoch() {
 
-        LOGGER(_log, V4_VVER, "%i reading e.%i\n", _instance_id, _current_epoch);
+        LOGGER(_log, V5_DEBG, "%i reading e.%i\n", _instance_id, _current_epoch);
         int numReadLines = 0;
 
         std::ofstream dbgOfs;
@@ -198,7 +199,7 @@ private:
             }
             // stop reading if a former epoch has been reached
             if (epoch < _current_epoch) {
-                LOGGER(_log, V4_VVER, "%i stopping e.%i @ ID %lu (orig. %lu) from e.%i\n", 
+                LOGGER(_log, V5_DEBG, "%i stopping e.%i @ ID %lu (orig. %lu) from e.%i\n",
                     _instance_id, _current_epoch, id, unalignedId, epoch);
                 break; 
             }
@@ -265,7 +266,7 @@ private:
             numSkippedLines = 0;
         }
 
-        LOGGER(_log, V3_VERB, "%i e.%i: %i lines; last ID %s; %lu traced; %lu in blg; %lu in fnt\n", 
+        LOGGER(_log, V4_VVER, "%i e.%i read:%i last:%s traced:%lu blg:%lu frt:%lu\n",
             _instance_id, _current_epoch, numReadLines, 
             numReadLines==0 ? "-" : std::to_string(formerId).c_str(), 
             _num_traced_clauses, _backlog.size(), _frontier.size());
@@ -300,7 +301,7 @@ private:
             }
 
             _finished = true;
-            LOGGER(_log, V3_VERB, "%i finished pruning\n", _instance_id);
+            LOGGER(_log, V4_VVER, "%i finished pruning\n", _instance_id);
 
         } else {
             // Insert sentinel element / "stub" line to signal end of epoch
@@ -314,7 +315,7 @@ private:
                     assert(sentinelLine.isStub());
                     _merge_connector->pushBlocking(sentinelLine);
                     _num_output_lines++;
-                    LOGGER(_log, V4_VVER, "%i e.%i: push sentinel %lu ; outlines=%lu\n", 
+                    LOGGER(_log, V5_DEBG, "%i e.%i sentinel:%lu outlines:%lu\n", 
                         _instance_id, _current_epoch, sentinelId, _num_output_lines);
                 }
             }

@@ -157,7 +157,7 @@ public:
             }
 
             time = Timer::elapsedSeconds() - time;
-            LOGGER(logger, V4_VVER, "filter-gc clslen=%i epoch=%i removed=%lu/%lu time=%.4f\n",
+            LOGGER(logger, V5_DEBG, "filter-gc clslen=%i epoch=%i removed=%lu/%lu time=%.4f\n",
                 i+1, epoch, nbRemoved, mapSize, time);
 
             // Allow inserting threads to successfully tryGetSharedLock() again

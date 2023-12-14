@@ -324,7 +324,7 @@ public:
 
         if (cleaningUp) {
             // some logging on insertion threshold
-            LOG(V4_VVER, "[clausestore] totalsize %lu->%lu - thresh B%s - maxne B%s\n",
+            LOG(V5_DEBG, "[clausestore] totalsize %lu->%lu - thresh B%s - maxne B%s\n",
                 totalSizeBefore, totalSizeAfter,
                 bufferIdxToStr(_max_admissible_bucket_idx).c_str(),
                 bufferIdxToStr(maxNonemptyBufferIdx).c_str());

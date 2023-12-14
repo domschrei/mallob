@@ -169,7 +169,7 @@ public:
     void advance() {
 
         if (Timer::elapsedSeconds() - lastOutputReport > 1.0) {
-            LOGGER(_log, V3_VERB, "narrv:%ld noutp:%ld eff:%.4f exh:%s outbuf:%i\n", 
+            LOGGER(_log, V4_VVER, "narrv:%ld noutp:%ld eff:%.4f exh:%s outbuf:%i\n",
                 numArrivedLines, numOutputLines, 
                 1 - _time_inactive/(Timer::elapsedSeconds()-_timepoint_merge_begin), 
                 _all_sources_exhausted ? "yes":"no", 
@@ -177,7 +177,7 @@ public:
             if (_proof_writer) _proof_writer->reportProgress();
             if (_merger_valid) {
                 auto report = _merger->getReport();
-                LOGGER(_log, V3_VERB, "Merger buffers: %s\n", report.c_str());
+                LOGGER(_log, V5_DEBG, "Merger buffers: %s\n", report.c_str());
             }
 
             lastOutputReport = Timer::elapsedSeconds();

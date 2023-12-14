@@ -316,7 +316,7 @@ bool AnytimeSatClauseCommunicator::tryInitiateSharing() {
 
     // Self message to initiate clause sharing
     _job->getJobTree().sendToSelf(msg);
-    LOG(V4_VVER, "%s CS init\n", _job->toStr());
+    LOG(V5_DEBG, "%s CS init\n", _job->toStr());
     return true;
 }
 

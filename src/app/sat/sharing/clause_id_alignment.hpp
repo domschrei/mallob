@@ -39,7 +39,7 @@ public:
             _min_epoch_ids_per_solver[i].push_back(0);
             _last_exported_clause_id[i] = new std::atomic_ulong(_num_original_clauses+1);
 
-            LOGGER(_logger, V3_VERB, "EPOCH %i instance=%i prioroffset=%lu lastprodid=%lu startid=%lu\n", _min_epoch_ids_per_solver[i].size()-1, 
+            LOGGER(_logger, V5_DEBG, "EPOCH %i instance=%i prioroffset=%lu lastprodid=%lu startid=%lu\n", _min_epoch_ids_per_solver[i].size()-1,
                     _solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back(), _last_exported_clause_id[i]->load(std::memory_order_relaxed), 
                     _min_epoch_ids_per_solver[i].back());
         }
@@ -71,7 +71,7 @@ public:
 			firstIdOfEpoch = firstIdOfEpoch - (firstIdOfEpoch % maxNumSolvers) + maxNumSolvers;
 			maxFirstIdOfEpoch = std::max(maxFirstIdOfEpoch, firstIdOfEpoch);
 
-			LOGGER(_logger, V3_VERB, "EPOCH %i instance=%i prioroffset=%lu lastprodid=%lu startid=%lu\n", _min_epoch_ids_per_solver[i].size()-1, 
+			LOGGER(_logger, V5_DEBG, "EPOCH %i instance=%i prioroffset=%lu lastprodid=%lu startid=%lu\n", _min_epoch_ids_per_solver[i].size()-1, 
 				_solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back(), clauseIdCounter, _min_epoch_ids_per_solver[i].back());
 		}
 
@@ -83,7 +83,7 @@ public:
         auto numSolvers = _solvers[0]->getSolverSetup().maxNumSolvers;
 		unsigned long globalMinEpochId = ClauseMetadata::readUnsignedLong(bufferWithMaxFirstIdOfEpoch);
 		globalMinEpochId = std::max(globalMinEpochId, _global_epoch_ids.back() + numSolvers);
-		LOGGER(_logger, V3_VERB, "EPOCH %i GLOBAL_MAX_OF_1ST_ID %lu\n", _min_epoch_ids_per_solver[0].size()-1, globalMinEpochId);
+		LOGGER(_logger, V5_DEBG, "EPOCH %i GLOBAL_MAX_OF_1ST_ID %lu\n", _min_epoch_ids_per_solver[0].size()-1, globalMinEpochId);
 		assert(globalMinEpochId > _num_original_clauses);
 		_global_epoch_ids.push_back(globalMinEpochId);
 
@@ -93,7 +93,7 @@ public:
 			offset = offset - (offset % numSolvers) + numSolvers;
 			_id_offsets_per_solver[i].push_back(offset);
 
-			LOGGER(_logger, V3_VERB, "EPOCH %i instance=%i newoffset=%lu\n", 
+			LOGGER(_logger, V5_DEBG, "EPOCH %i instance=%i newoffset=%lu\n",
 				_min_epoch_ids_per_solver[i].size()-1, _solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back());
 		}
     }
@@ -143,7 +143,7 @@ public:
 		auto offset = _id_offsets_per_solver[localSolverId][epoch];
 		unsigned long alignedClauseId = clauseId + offset;
 
-		LOGGER(_logger, V5_DEBG, "ALIGN EPOCH=%i %lu => %lu\n", epoch, clauseId, alignedClauseId);
+		LOGGER(_logger, V6_DEBGV, "ALIGN EPOCH=%i %lu => %lu\n", epoch, clauseId, alignedClauseId);
 
 		assert(getEpochOfAlignedSelfClause(alignedClauseId) == getEpochOfUnalignedSelfClause(clauseId));
 		assert(getProducingLocalSolverIndex(alignedClauseId) == getProducingLocalSolverIndex(clauseId));
@@ -162,7 +162,7 @@ public:
 		auto offset = _id_offsets_per_solver[localSolverId][epoch];
 		unsigned long unalignedClauseId = clauseId - offset;
 
-		LOGGER(_logger, V5_DEBG, "UNALIGN EPOCH=%i %lu => %lu\n", epoch, clauseId, unalignedClauseId);
+		LOGGER(_logger, V6_DEBGV, "UNALIGN EPOCH=%i %lu => %lu\n", epoch, clauseId, unalignedClauseId);
 
 		assert(getEpochOfAlignedSelfClause(clauseId) == getEpochOfUnalignedSelfClause(unalignedClauseId) 
 			|| log_return_false("[ERROR] epoch of aligned clause %lu: %i; epoch of unaligned clause %lu: %i\n",

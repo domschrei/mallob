@@ -4,6 +4,7 @@
 #include <queue>
 
 #include "app/app_message_subscription.hpp"
+#include "util/logger.hpp"
 #include "util/robin_hood.hpp"
 #include "app/job.hpp"
 #include "app/app_registry.hpp"
@@ -54,7 +55,7 @@ public:
 
     void processAppMessage(int source, int mpiTag, JobMessage& msg) {
 
-        LOG(V2_INFO, "APPMSG RECV %lu <~ %lu [%i]\n", msg.contextIdOfDestination, msg.contextIdOfSender, source);
+        LOG(V5_DEBG, "APPMSG RECV %lu <~ %lu [%i]\n", msg.contextIdOfDestination, msg.contextIdOfSender, source);
 
         auto it = _app_msg_table.find({msg.jobId, msg.contextIdOfDestination});
         if (it == _app_msg_table.end()) {

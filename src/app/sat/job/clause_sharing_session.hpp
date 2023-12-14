@@ -74,7 +74,7 @@ public:
             );
         }
 
-        LOG(V4_VVER, "%s CS OPEN e=%i\n", _job->toStr(), _epoch);
+        LOG(V5_DEBG, "%s CS OPEN e=%i\n", _job->toStr(), _epoch);
         _local_export_limit = _job->setSharingCompensationFactorAndUpdateExportLimit(compensationFactor);
         if (!_job->hasPreparedSharing()) _job->prepareSharing();
     }
@@ -137,12 +137,12 @@ public:
 
             if (_allreduce_filter) {
                 // Initiate production of local filter element for 2nd all-reduction 
-                LOG(V4_VVER, "%s CS filter\n", _job->toStr());
+                LOG(V5_DEBG, "%s CS filter\n", _job->toStr());
                 _job->filterSharing(_epoch, _broadcast_clause_buffer);
                 _stage = PRODUCING_FILTER;
             } else {
                 // No distributed filtering: Sharing is done!
-                LOG(V4_VVER, "%s CS digest w/o filter\n", _job->toStr());
+                LOG(V5_DEBG, "%s CS digest w/o filter\n", _job->toStr());
                 _job->digestSharingWithoutFilter(_broadcast_clause_buffer);
                 if (_cls_history) {
                     InplaceClauseAggregation(_broadcast_clause_buffer).stripToRawBuffer();
@@ -154,14 +154,14 @@ public:
 
         if (_stage == PRODUCING_FILTER && _job->hasFilteredSharing(_epoch)) {
 
-            LOG(V4_VVER, "%s CS produced filter\n", _job->toStr());
+            LOG(V5_DEBG, "%s CS produced filter\n", _job->toStr());
             _allreduce_filter->produce([&]() {return _job->getLocalFilter(_epoch);});
             _stage = AGGREGATING_FILTER;
         }
 
         if (_stage == AGGREGATING_FILTER && _allreduce_filter->advance().hasResult()) {
 
-            LOG(V4_VVER, "%s CS digest w/ filter\n", _job->toStr());
+            LOG(V5_DEBG, "%s CS digest w/ filter\n", _job->toStr());
 
             // Extract and digest result
             auto filter = _allreduce_filter->extractResult();
@@ -205,7 +205,7 @@ public:
     }
 
     ~ClauseSharingSession() {
-        LOG(V4_VVER, "%s CS CLOSE e=%i\n", _job->toStr(), _epoch);
+        LOG(V5_DEBG, "%s CS CLOSE e=%i\n", _job->toStr(), _epoch);
         // If not done producing, will send empty clause buffer upwards
         _allreduce_clauses.cancel();
         // If not done producing, will send empty filter upwards
