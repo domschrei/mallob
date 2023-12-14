@@ -59,7 +59,6 @@ public:
 		if (_current_clause.lbd > _glue_limit) eligible = false;
 
 		if (ClauseMetadata::enabled()) {
-			assert(id < 100'000'000);
 			LOG(V5_DEBG, "EXPORT ID=%ld len=%i\n", id, _current_clause.size - ClauseMetadata::numInts());
 			memcpy(_current_clause.begin, &id, sizeof(uint64_t));
 		}

@@ -305,7 +305,6 @@ void SharingManager::returnClauses(int* begin, int buflen) {
 			// originate from this solver, since we can not un-align them to
 			// correctly insert them into the database.
 			auto id = ClauseMetadata::readUnsignedLong(c.begin);
-			assert(id < 100'000'000);
 			if (_id_alignment->isLocallyProducedClause(id)) {
 
 				// Returned clauses would be aligned *again* when re-exported.
@@ -413,7 +412,6 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 			assert(clause.size >= ClauseMetadata::numInts()+1 || log_return_false("[ERROR] Clause of invalid size %i!\n", clause.size));
 			uint64_t id;
 			memcpy(&id, clause.begin, sizeof(uint64_t));
-			assert(id < 100'000'000);
 		}
 
 		if (_clause_logger) _clause_logger->append(clause);
