@@ -16,7 +16,7 @@ public:
         Job(params, setup, appMsgTable) {
 
         // Launched in certified UNSAT mode?
-        if (params.certifiedUnsat()) {
+        if (params.proofOutputFile.isSet()) {
             
             // Check that the restrictions of this mode are met
             if (!params.monoFilename.isSet()) {

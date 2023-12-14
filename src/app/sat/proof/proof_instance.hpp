@@ -2,8 +2,12 @@
 #pragma once
 
 #include <algorithm>
+#include <fstream>
 
+#include "app/sat/data/clause_metadata.hpp"
+#include "app/sat/proof/lrat_line.hpp"
 #include "app/sat/proof/reverse_binary_lrat_parser.hpp"
+#include "app/sat/proof/serialized_lrat_line.hpp"
 #include "external_id_priority_queue.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "app/sat/proof/lrat_utils.hpp"
@@ -57,13 +61,15 @@ private:
     bool _interleave_merging {false};
     ProofMergeConnector* _merge_connector;
 
+    bool _debugging {false};
+
 public:
     ProofInstance(int instanceId, int numInstances, int originalNumClauses,
         const std::string& proofFilename, int finalEpoch, 
         int winningInstance, const std::vector<LratClauseId>& globalEpochStarts, 
         std::vector<LratClauseId>&& localEpochStarts, 
         std::vector<LratClauseId>&& localEpochOffsets, const std::string& extMemDiskDir, 
-        const std::string& outputFilenameOrEmpty) :
+        const std::string& outputFilenameOrEmpty, bool debugging) :
             _log(Logger::getMainInstance().copy("Proof", ".proof")),
             _instance_id(instanceId), _num_instances(numInstances), 
             _original_num_clauses(originalNumClauses),
@@ -80,7 +86,8 @@ public:
                 else return std::ofstream(outputFilenameOrEmpty, std::ofstream::binary);
             }()),
             _output_buf(_output),
-            _interleave_merging(outputFilenameOrEmpty.empty()) {}
+            _interleave_merging(outputFilenameOrEmpty.empty()),
+            _debugging(debugging) {}
 
     ~ProofInstance() {
         if (_work_future.valid()) _work_future.get();
@@ -142,10 +149,19 @@ private:
         LOGGER(_log, V4_VVER, "%i reading e.%i\n", _instance_id, _current_epoch);
         int numReadLines = 0;
 
+        std::ofstream dbgOfs;
+        if (_debugging) {
+            dbgOfs = std::ofstream(
+                _log.getLogFilename()
+                + "." + std::to_string(_instance_id)
+                + "." + std::to_string(_current_epoch)
+            );
+        }
+
         if (!_current_line.valid() && _parser.getNextLine(_current_line)) {
             _current_line_aligned = false;
             numReadLines++;
-        } 
+        }
         
         LratClauseId id = std::numeric_limits<unsigned long>::max();
         auto formerId = id;
@@ -158,6 +174,7 @@ private:
             auto [lits, numLits] = _current_line.getLiterals();
 
             if (!_current_line_aligned) {
+                if (_debugging) outputLratLine("INU", _current_line, dbgOfs);
                 alignSelfProducedClauseIds(alignedId, hints, numHints, /*assertSelfProduced=*/true);
                 _current_line_aligned = true;
             }
@@ -166,6 +183,7 @@ private:
                 _instance_id, nextId, id));
             formerId = id;
             id = nextId;
+            if (_debugging) outputLratLine("IN ", _current_line, dbgOfs);
 
             int epoch = getClauseEpoch(id);
             // skip the line if it is a stray one from a future epoch
@@ -198,6 +216,7 @@ private:
                     auto hintId = hints[i];
                     int hintEpoch = getClauseEpoch(hintId);
                     if (isSelfProducedClause(hintId)) {
+                        if (_debugging) outputLratId("FRT", hintId, dbgOfs);
                         _frontier.push(hintId, hintEpoch);
                     } else if (!isOriginalClause(hintId)) {
                         if (hintEpoch >= epoch) {
@@ -207,11 +226,13 @@ private:
                             _output.flush();
                             abort();
                         }
+                        if (_debugging) outputLratId("BLG", hintId, dbgOfs);
                         _backlog.push(hintId, hintEpoch);
                     }
                 }
 
                 // Output the line
+                if (_debugging) outputLratLine("OUT", _current_line, dbgOfs);
                 if (_interleave_merging) {
                     _merge_connector->pushBlocking(_current_line);
                 } else {
@@ -226,7 +247,7 @@ private:
                 // Next necessary clause ID must be smaller -
                 // Ignore this line
                 assert(_frontier.empty() || _frontier.top() < id || log_return_false(
-                    "[ERROR] Proof %i: clause ID=%lu found; expected ID smaller than %lu\n", 
+                    "[ERROR] Proof %i: clause ID=%lu found in frontier; expected ID smaller than %lu\n", 
                     _instance_id, _frontier.top(), id));
             }
 
@@ -359,5 +380,14 @@ private:
     }
     int getClauseEpoch(LratClauseId clauseId) {
         return ClauseMetadata::getEpoch(clauseId, _global_epoch_starts);
+    }
+
+    void outputLratLine(const std::string& op, const SerializedLratLine& line, std::ofstream& ofs) {
+        ofs << op << " " << line.toStr();
+        ofs.flush();
+    }
+    void outputLratId(const std::string& op, LratClauseId id, std::ofstream& ofs) {
+        ofs << op << " " << id << std::endl;
+        ofs.flush();
     }
 };

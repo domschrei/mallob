@@ -88,10 +88,10 @@ OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversificati
     "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")
 
 OPTION_GROUP(grpAppSatProof, "app/sat/proof", "Production of UNSAT proofs")
- OPT_BOOL(certifiedUnsat,                 "cu", "certified-unsat",                     false,                   "Generate UNSAT proof (only supports mono mode + CaDiCaL solver)")
- OPT_BOOL(distributedProofAssembly,  "dpa", "distributed-proof-assembly",              false,                   "Distributed UNSAT proof assembly into a single file")
- OPT_BOOL(interleaveProofMerging,        "ipm", "interleave-proof-merging",            false,                   "Interleave filtering and merging of proof lines")
- OPT_STRING(proofOutputFile,              "pof", "proof-output-file",                  "final-proof.lrat",      "Path and name of final LRAT proof file, output by rank zero")
+ OPT_STRING(proofOutputFile,              "proof", "",                                 "",                      "Enable UNSAT proof production, writing final LRAT proof to specified destination (output by rank zero)")
+ OPT_BOOL(distributedProofAssembly,       "dpa", "distributed-proof-assembly",         true,                    "Distributed UNSAT proof assembly into a single file")
+ OPT_BOOL(interleaveProofMerging,         "ipm", "interleave-proof-merging",           true,                    "Interleave filtering and merging of proof lines")
+ OPT_BOOL(proofDebugging,                 "proof-debugging", "",                       false,                   "Output debugging information into separate files - expensive and large!")
  OPT_STRING(extMemDiskDirectory,          "extmem-disk-dir", "",                       ".disk",                 "Directory where to create external memory files") //[[AUTOCOMPLETE_DIRECTORY]]
  OPT_STRING(satPreprocessor,              "sat-preprocessor", "",                      "",                      "Executable which preprocesses CNF file") //[[AUTOCOMPLETE_EXECUTABLE]]
  OPT_FLOAT(satSolvingWallclockLimit,      "sswl", "sat-solving-wallclock-limit",       0,    0, LARGE_INT,      "Cancel job if not done solving after this many seconds (0: no limit)")

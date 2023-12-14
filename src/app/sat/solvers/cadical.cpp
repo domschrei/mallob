@@ -42,6 +42,7 @@ Cadical::Cadical(const SolverSetup& setup)
 		okay = solver->set("lratsolverid", solverRank); assert(okay); // set this solver instance's ID
 		okay = solver->set("lratsolvercount", maxNumSolvers); assert(okay); // set # solvers
 		okay = solver->set("lratorigclscount", getSolverSetup().numOriginalClauses); assert(okay);
+		// okay = solver->set("compact", 0); assert(okay); // compacting internal vars destroys unit clause ID tracking
 
 		proofFileString = _setup.proofDir + "/proof." + std::to_string(_setup.globalId) + ".lrat";
 		okay = solver->trace_proof(proofFileString.c_str()); assert(okay);

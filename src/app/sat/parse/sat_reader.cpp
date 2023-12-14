@@ -18,7 +18,7 @@
 
 void handleUnsat(const Parameters& _params) {
 	LOG_OMIT_PREFIX(V0_CRIT, "s UNSATISFIABLE\n");
-	if (_params.certifiedUnsat()) {
+	if (_params.proofOutputFile.isSet()) {
 		// Output Mallob file with result code
 		std::ofstream resultFile(".mallob_result");
 		std::string resultCodeStr = std::to_string(20);

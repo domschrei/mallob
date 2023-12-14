@@ -138,7 +138,7 @@ public:
             getNumLiterals()
         );
     }
-    std::pair<LratClauseId*, int> getUnsignedHints() {
+    std::pair<LratClauseId*, int> getUnsignedHints() const {
         int dataStartIdx = getDataPosOfNumHints(getNumLiterals())+sizeof(int);
         int numHints = getNumHints();
         assert(dataStartIdx+(sizeof(LratClauseId)+sizeof(bool))*numHints <= _data.size());
@@ -153,7 +153,7 @@ public:
         );
     }
 
-    std::string toStr() {
+    std::string toStr() const {
         std::string out = std::to_string(getId());
         auto [literals, numLits] = getLiterals();
         for (size_t i = 0; i < numLits; i++) out += " " + std::to_string(literals[i]);

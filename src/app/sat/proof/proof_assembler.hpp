@@ -257,7 +257,8 @@ private:
                 _success_epoch, _winning_instance, globalIdStarts,
                 std::move(localIdStartsPerInstance[i]), std::move(localIdOffsetsPerInstance[i]),
                 _params.extMemDiskDirectory(), 
-                _params.interleaveProofMerging() ? "" : proofFilenameBase + ".filtered.lrat"
+                _params.interleaveProofMerging() ? "" : proofFilenameBase + ".filtered.lrat",
+                _params.proofDebugging()
             );
         }
     }

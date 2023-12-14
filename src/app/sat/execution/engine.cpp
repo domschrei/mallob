@@ -49,7 +49,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	std::string proofDirectory;
 
 	// Launched in certified UNSAT mode?
-    if (_params.certifiedUnsat()) {
+    if (_params.proofOutputFile.isSet()) {
 		
 		if (_params.inputShuffleProbability() > 0) {
 			LOG(V3_VERB, "Certified UNSAT mode: Disabling input shuffling\n");
@@ -162,7 +162,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		break;
 	}
 	setup.adaptiveImportManager = params.adaptiveImportManager();
-	setup.certifiedUnsat = params.certifiedUnsat();
+	setup.certifiedUnsat = params.proofOutputFile.isSet();
 	setup.maxNumSolvers = config.mpisize * params.numThreadsPerProcess();
 	setup.numVars = numVars;
 	setup.numOriginalClauses = numClauses;
