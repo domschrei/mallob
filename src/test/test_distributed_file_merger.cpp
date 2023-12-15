@@ -32,7 +32,8 @@ void testMerge(int myRank) {
     int lineCounter = 0;
     int maxLineCounter = 10000;
 
-    auto merger = DistributedProofMerger(MPI_COMM_WORLD, 5, new LambdaMergeSource<SerializedLratLine>(
+    Parameters params;
+    auto merger = DistributedProofMerger(params, MPI_COMM_WORLD, 5, new LambdaMergeSource<SerializedLratLine>(
         [&](SerializedLratLine& out) {
             if (lineCounter == maxLineCounter) {
                 return false;

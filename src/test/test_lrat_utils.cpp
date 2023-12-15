@@ -1,6 +1,7 @@
 
 #include "app/sat/proof/lrat_utils.hpp"
 #include "util/assert.hpp"
+#include "util/sys/buffered_io.hpp"
 
 void test() {
 
@@ -30,7 +31,8 @@ void test() {
     {
         LratLine readLine;
         std::ifstream ifs("test.lrat", std::ios_base::binary);
-        lrat_utils::ReadBuffer buf(ifs);
+        BufferedFileReader bufread(ifs);
+        lrat_utils::ReadBuffer buf(bufread);
         
         bool success = lrat_utils::readLine(buf, readLine);
         assert(success);

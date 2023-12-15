@@ -1,6 +1,7 @@
 
 #include "lrat_utils.hpp"
 #include "util/assert.hpp"
+#include "util/logger.hpp"
 
 
 namespace lrat_utils {
@@ -132,7 +133,8 @@ namespace lrat_utils {
         if (buf.endOfFile()) return false;
 
         int header = buf.get();
-        if (header != 'a') return false;
+        bool deletion = header == 'd';
+        if (!deletion && header != 'a') return false;
 
         // LratClauseId id;
         // int numLiterals;
@@ -143,8 +145,10 @@ namespace lrat_utils {
         std::vector<uint8_t>& data = line.data();
         data.clear();
 
-        int64_t signedId;
-        if (!buf.readSignedClauseId(signedId)) return false;
+        int64_t signedId = 1; // special ID for deletions
+        if (!deletion) {
+            if (!buf.readSignedClauseId(signedId)) return false;
+        }
         assert(signedId > 0);
         backInsert(data, (unsigned long) signedId);
 
@@ -154,12 +158,19 @@ namespace lrat_utils {
 
         // actual literals
         int numLiterals = 0;
-        int lit;
-        while (buf.readLiteral(lit)) {
-            backInsert(data, lit);
-            numLiterals++;
+        if (deletion) {
+            // Special placeholder for deletions
+            backInsert(data, -1);
+            backInsert(data, -1);
+            numLiterals = 2;
+        } else {
+            int lit;
+            while (buf.readLiteral(lit)) {
+                backInsert(data, lit);
+                numLiterals++;
+            }
+            // separator zero was read by "readLiteral" call that returned zero
         }
-        // separator zero was read by "readLiteral" call that returned zero
 
         // update literals counter
         memcpy(data.data()+litCounterPos, &numLiterals, sizeof(int));

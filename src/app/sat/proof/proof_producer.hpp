@@ -162,7 +162,7 @@ private:
         _local_merger.reset(new SmallMerger<SerializedLratLine>(ptrs));
 
         // Set up distributed merge procedure
-        _file_merger.reset(new DistributedProofMerger(MPI_COMM_WORLD, /*branchingFactor=*/6, 
+        _file_merger.reset(new DistributedProofMerger(_params, MPI_COMM_WORLD, /*branchingFactor=*/6, 
             _local_merger.get(), _params.proofOutputFile()));
 
         // Register callback for processing merge messages

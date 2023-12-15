@@ -1,11 +1,12 @@
 
 #pragma once
 
+#include "util/sys/buffered_io.hpp"
 #include <fstream>
 
 #define MALLOB_REVERSE_READER_BUF_SIZE 65536
 
-class ReverseFileReader {
+class ReverseFileReader : public LinearFileReader {
 
 private:
     std::ifstream _stream;
@@ -16,7 +17,8 @@ private:
     int _buffer_pos = -1;
 
 public:
-    ReverseFileReader(const std::string& filename) : 
+    ReverseFileReader() : LinearFileReader() {}
+    ReverseFileReader(const std::string& filename) : LinearFileReader(),
             _stream(filename, std::ios_base::ate | std::ios_base::binary) {
         if (_stream.good()) {
             _file_size = _stream.tellg();
@@ -25,11 +27,15 @@ public:
         }
     }
 
+    virtual bool endOfFile() override {
+        return !valid() || done();
+    }    
+
     bool valid() const {
         return _valid;
     }
 
-    bool nextAsChar(char& c) {
+    bool next(char& c) {
         if (!_valid) return false;
         if (_buffer_pos < 0) {
             refillBuffer();
@@ -40,15 +46,10 @@ public:
         return true;
     }
 
-    bool nextAsInt(int& c) {
-        if (!_valid) return false;
-        if (_buffer_pos < 0) {
-            refillBuffer();
-            if (_buffer_pos < 0) return false;
-        }
-        c = (int) _buffer[_buffer_pos];
-        _buffer_pos--;
-        return true;
+    virtual char next() override {
+        char c;
+        if (!next(c)) return '\0';
+        return c;
     }
 
     bool done() {

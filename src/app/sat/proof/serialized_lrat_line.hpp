@@ -120,6 +120,12 @@ public:
         return _data.size() == sizeof(LratClauseId)+2*sizeof(int);
     }
 
+    bool isDeletionStatement() const {
+        if (empty() || isStub()) return false;
+        auto [lits, nbLits] = getLiterals();
+        return getId() == 1 && nbLits == 2 && lits[0] == -1 && lits[1] == -1;
+    }
+
     int getNumLiterals() const {
         int numLits;
         memcpy(&numLits, _data.data() + getDataPosOfNumLits(), sizeof(int));

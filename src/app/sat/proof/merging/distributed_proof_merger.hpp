@@ -5,8 +5,10 @@
 #include <string>
 #include <fstream>
 
+#include "app/sat/proof/merging/lrat_compactifier.hpp"
 #include "comm/mympi.hpp"
 #include "data/serializable.hpp"
+#include "util/params.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
@@ -28,7 +30,8 @@ public:
 
 private:
     const static int FULL_CHUNK_SIZE_BYTES = 900'000;
-    
+
+    const Parameters& _params;
     MPI_Comm _comm;
     int _branching_factor;
     MergeSourceInterface<SerializedLratLine>* _local_source;
@@ -76,9 +79,9 @@ private:
     unsigned long _total_combined_proof_clauses = 0;
 
 public:
-    DistributedProofMerger(MPI_Comm comm, int branchingFactor, 
+    DistributedProofMerger(const Parameters& params, MPI_Comm comm, int branchingFactor, 
         MergeSourceInterface<SerializedLratLine>* localSource, const std::string& outputFileAtZero) : 
-            _log(Logger::getMainInstance().copy("DFM", ".proofmerge")),
+            _params(params), _log(Logger::getMainInstance().copy("DFM", ".proofmerge")),
             _comm(comm), _branching_factor(branchingFactor), _local_source(localSource) {
 
         int myRank = MyMpi::rank(comm);
@@ -410,20 +413,44 @@ private:
         LOG(V2_INFO, "PROOFSTATS partialproofbytes=%lu partialprooflines=%lu combinedprooflines=%lu\n",
                     _total_partial_proof_bytes, _total_partial_proof_clauses, _total_combined_proof_clauses);
 
+        std::string inputFilename = _output_filename + ".inv";
         if (_binary_output) {
-            // Read binary file in reverse order, output lines into new file
+            // Read binary file in reverse order byte by byte, output lines into new file
             std::ofstream ofs(_output_filename, std::ofstream::binary);
-            BufferedFileWriter writer(ofs);
-            ReverseFileReader reader(_output_filename + ".inv");
-            char c;
-            while (reader.nextAsChar(c)) {
-                writer.put(c);
+            ReverseFileReader reader(inputFilename);
+
+            if (_params.compactProof()) {
+                // Bring all LRAT IDs into a compact shape
+                // (may help efficiency of checking / prevents bugs in lrat-check)
+                LratCompactifier compactifier(_num_original_clauses);
+                lrat_utils::ReadBuffer readbuf(reader);
+                lrat_utils::WriteBuffer out(ofs);
+                SerializedLratLine line;
+                while (lrat_utils::readLine(readbuf, line)) {
+                    if (line.isDeletionStatement()) {
+                        // deletion
+                        auto [hints, nbHints] = line.getUnsignedHints();
+                        compactifier.handleClauseDeletion(nbHints, hints);
+                        lrat_utils::writeDeletionLine(out, 1, hints, nbHints, lrat_utils::NORMAL);
+                    } else {
+                        // addition
+                        compactifier.handleClauseAddition(line);
+                        lrat_utils::writeLine(out, line, lrat_utils::NORMAL);
+                    }
+                }
+            } else {
+                // Just reverse the file byte by byte without interpreting anything
+                BufferedFileWriter writer(ofs);
+                char c;
+                while (reader.next(c)) {
+                    writer.put(c);
+                }
+                writer.flush();
             }
-            writer.flush();
             ofs.close();
         } else {
             // Just "tac" the text file
-            std::string cmd = "tac " + _output_filename + ".inv > " + _output_filename;
+            std::string cmd = "tac " + inputFilename + " > " + _output_filename;
             int result = system(cmd.c_str());
             assert(result == 0);
         }

@@ -5,6 +5,7 @@
 
 #include "lrat_line.hpp"
 #include "serialized_lrat_line.hpp"
+#include "util/logger.hpp"
 #include "util/sys/buffered_io.hpp"
 
 namespace lrat_utils {
@@ -98,12 +99,13 @@ namespace lrat_utils {
 
     struct ReadBuffer {
 
-        BufferedFileReader reader;
+        LinearFileReader& reader;
 
-        ReadBuffer(std::ifstream& ifs) : reader(ifs) {}
+        ReadBuffer(LinearFileReader& reader) : reader(reader) {}
 
         char get() {
-            return reader.get();
+            auto c = reader.next();
+            return c;
         }
 
         bool endOfFile() const {
@@ -113,9 +115,9 @@ namespace lrat_utils {
         bool readSignedClauseId(int64_t& id) {
             int64_t unadjusted = 0;
             int64_t coefficient = 1;
-            int32_t tmp = reader.get();
+            int32_t tmp = get();
             if (tmp == 0) return false;
-            while (tmp) {
+            while (tmp != 0) {
                 // continuation bit set?
                 if (tmp & 0b10000000) {
                     unadjusted += coefficient * (tmp & 0b01111111); // remove first bit
@@ -125,7 +127,7 @@ namespace lrat_utils {
                     break;
                 }
                 coefficient *= 128; // 2^7 because we essentially have 7-bit bytes
-                tmp = reader.get(); //*((unsigned char*) (_num_buffer+i));
+                tmp = get(); //*((unsigned char*) (_num_buffer+i));
             }
             if (unadjusted % 2) { // odds map to negatives
                 id = -(unadjusted - 1) / 2;
@@ -138,9 +140,9 @@ namespace lrat_utils {
         bool readLiteral(int32_t& lit) {
             int32_t unadjusted = 0;
             int32_t coefficient = 1;
-            int32_t tmp = reader.get();
+            int32_t tmp = get();
             if (tmp == 0) return false;
-            while (tmp >= 0) {
+            while (tmp != 0) {
                 // continuation bit set?
                 if (tmp & 0b10000000) {
                     unadjusted += coefficient * (tmp & 0b01111111); // remove first bit
@@ -150,7 +152,7 @@ namespace lrat_utils {
                     break;
                 }
                 coefficient *= 128; // 2^7 because we essentially have 7-bit bytes
-                tmp = reader.get();
+                tmp = get();
             }
             if (unadjusted % 2) { // odds map to negatives
                 lit = -(unadjusted - 1) / 2;

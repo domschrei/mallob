@@ -28,18 +28,24 @@ public:
     }
 };
 
-class BufferedFileReader {
+class LinearFileReader {
+public:
+    virtual char next() = 0;
+    virtual bool endOfFile() = 0;
+};
+
+class BufferedFileReader : public LinearFileReader {
 
     std::ifstream& ifs;
-    unsigned char read_buffer[READ_BUFFER_SIZE];
+    char read_buffer[READ_BUFFER_SIZE];
     int read_pos {0};
     int max_pos {-1};
     bool eof {false};
 
 public:
-    BufferedFileReader(std::ifstream& ifs) : ifs(ifs) {}
+    BufferedFileReader(std::ifstream& ifs) : LinearFileReader(), ifs(ifs) {}
 
-    unsigned char get() {
+    virtual char next() override {
         if (read_pos > max_pos) {
             // refill
             ifs.read((char*) read_buffer, READ_BUFFER_SIZE);
@@ -53,8 +59,7 @@ public:
         }
         return read_buffer[read_pos++];
     }
-
-    bool endOfFile() const {
+    virtual bool endOfFile() override {
         return eof;
     }
 };

@@ -48,7 +48,7 @@ public:
         while (!readCompleteLine) {
 
             // Fetching of next (previous) byte unsuccessful?
-            if (!_reader.nextAsChar(byte)) {
+            if (!_reader.next(byte)) {
                 if (_state == PARSING_LITS_AND_ID_MAYBE_ENDING) {
                     // File has been read completely!
                     // Finalize last read line
