@@ -16,7 +16,6 @@ private:
     // int literals[numLiterals];
     // int numHints;
     // LratClauseId hints[numHints];
-    // bool signsOfHints[numHints];
     std::vector<uint8_t> _data;
 
 public:
@@ -68,7 +67,7 @@ public:
             + sizeof(int) 
             + line.literals.size()*sizeof(int) 
             + sizeof(int) 
-            + line.hints.size()*(sizeof(LratClauseId)+sizeof(bool))
+            + line.hints.size()*sizeof(LratClauseId)
         );
         size_t i = 0, n;
         n = sizeof(LratClauseId); memcpy(_data.data()+i, &line.id, n); i += n;
@@ -78,9 +77,6 @@ public:
         int numHints = line.hints.size();
         n = sizeof(int); memcpy(_data.data()+i, &numHints, n); i += n;
         n = numHints*sizeof(LratClauseId); memcpy(_data.data()+i, line.hints.data(), n); i += n;
-        for (bool sign : line.signsOfHints) {
-            n = sizeof(bool); memcpy(_data.data()+i, &sign, n); i += n;
-        }
         assert(i == _data.size());
     }
 
@@ -122,8 +118,7 @@ public:
 
     bool isDeletionStatement() const {
         if (empty() || isStub()) return false;
-        auto [lits, nbLits] = getLiterals();
-        return getId() == 1 && nbLits == 2 && lits[0] == -1 && lits[1] == -1;
+        return getId() == 1 && getNumLiterals() == 0;
     }
 
     int getNumLiterals() const {
@@ -144,19 +139,12 @@ public:
             getNumLiterals()
         );
     }
-    std::pair<LratClauseId*, int> getUnsignedHints() const {
+    std::pair<LratClauseId*, int> getHints() const {
         int dataStartIdx = getDataPosOfNumHints(getNumLiterals())+sizeof(int);
         int numHints = getNumHints();
-        assert(dataStartIdx+(sizeof(LratClauseId)+sizeof(bool))*numHints <= _data.size());
+        assert(dataStartIdx+sizeof(LratClauseId)*numHints <= _data.size());
         LratClauseId* ptr = (LratClauseId*) (_data.data()+dataStartIdx);
         return std::pair<LratClauseId*, int>(ptr, numHints);
-    }
-    const bool* getSignsOfHints() const {
-        return (const bool*) (_data.data()
-            + getDataPosOfNumHints(getNumLiterals())
-            + sizeof(int)
-            + sizeof(LratClauseId)*getNumHints()
-        );
     }
 
     std::string toStr() const {
@@ -164,10 +152,9 @@ public:
         auto [literals, numLits] = getLiterals();
         for (size_t i = 0; i < numLits; i++) out += " " + std::to_string(literals[i]);
         out += " 0 ";
-        auto [hints, numHints] = getUnsignedHints();
-        auto signsOfHints = getSignsOfHints();
+        auto [hints, numHints] = getHints();
         for (size_t i = 0; i < numHints; i++) {
-            out += (signsOfHints[i] ? "" : "-") + std::to_string(hints[i]) + " ";
+            out += std::to_string(hints[i]) + " ";
         }
         out += "0\n";
         return out;
@@ -190,8 +177,7 @@ public:
             + sizeof(int)
             + sizeof(int)*numLits
             + sizeof(int)
-            + sizeof(LratClauseId)*numHints
-            + sizeof(bool)*numHints;
+            + sizeof(LratClauseId)*numHints;
     }
     static int getDataPosOfNumLits() {
         return sizeof(LratClauseId);

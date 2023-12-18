@@ -13,19 +13,16 @@ void test() {
         line.id = 10;
         line.literals = {1, -2, 3};
         line.hints = {4, 5, 6};
-        line.signsOfHints = {false, true, false};
         lrat_utils::writeLine(buf, line);
 
         line.id = 111111;
         line.literals.push_back(-100000);
         line.hints.push_back(99999);
-        line.signsOfHints.push_back(false);
         lrat_utils::writeLine(buf, line);
 
         line.id = 111112;
         line.literals.clear();
         line.hints = {111111};
-        line.signsOfHints = {true};
         lrat_utils::writeLine(buf, line);
     }
     {
@@ -46,14 +43,14 @@ void test() {
         assert(readLine.literals.size() == 4 || log_return_false("%i\n", readLine.literals.size()));
         assert(readLine.literals.back() == -100000);
         assert(readLine.hints.size() == 4);
-        assert(readLine.hints.back() == 99999 && readLine.signsOfHints.back() == false);
+        assert(readLine.hints.back() == 99999);
 
         success = lrat_utils::readLine(buf, readLine);
         assert(success);
         assert(readLine.id == 111112);
         assert(readLine.literals.size() == 0);
         assert(readLine.hints.size() == 1);
-        assert(readLine.hints.back() == 111111 && readLine.signsOfHints.back() == true);
+        assert(readLine.hints.back() == 111111);
 
         LratLine noLine;
         assert(!lrat_utils::readLine(buf, noLine));

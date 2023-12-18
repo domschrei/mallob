@@ -34,7 +34,6 @@ public:
         out.clear();
         _line.literals.clear();
         _line.hints.clear();
-        _line.signsOfHints.clear();
 
         if (_exhausted || !_reader.valid()) return false;
 
@@ -167,8 +166,7 @@ private:
                     // Publish hint
                     auto hint = readSignedClauseId(numberLeftIdx, numberRightIdx);
                     LOG(V6_DEBGV, "PUSH_HINT %ld [%i,%i]\n", hint, numberLeftIdx, numberRightIdx);
-                    _line.hints.push_back(std::abs(hint));
-                    _line.signsOfHints.push_back(hint>0);
+                    _line.hints.push_back(hint);
                 } else if (firstNum) {
                     // Publish ID
                     auto id = readSignedClauseId(numberLeftIdx, numberRightIdx);

@@ -171,7 +171,7 @@ private:
 
             auto& alignedId = _current_line.getId();
             auto unalignedId = alignedId;
-            auto [hints, numHints] = _current_line.getUnsignedHints();
+            auto [hints, numHints] = _current_line.getHints();
             auto [lits, numLits] = _current_line.getLiterals();
 
             if (!_current_line_aligned) {
@@ -292,7 +292,6 @@ private:
                 auto stats = getStats();
                 for (auto stat : stats) {
                     statsLine.hints.push_back(stat);
-                    statsLine.signsOfHints.push_back(true);
                 }
                 SerializedLratLine serializedStatsLine(statsLine);
                 _merge_connector->pushBlocking(serializedStatsLine);

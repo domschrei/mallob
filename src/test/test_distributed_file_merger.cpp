@@ -43,7 +43,6 @@ void testMerge(int myRank) {
             line.id = MyMpi::size(MPI_COMM_WORLD)*(maxLineCounter - lineCounter + 1) + myRank + 1;
             line.literals.push_back(lineCounter);
             line.hints.push_back(myRank+1);
-            line.signsOfHints.push_back(true);
             out = SerializedLratLine(line);
             return true;
         }

@@ -5,6 +5,7 @@
 #include <string>
 #include <fstream>
 
+#include "app/sat/proof/merging/clause_id_filter.hpp"
 #include "app/sat/proof/merging/lrat_compactifier.hpp"
 #include "comm/mympi.hpp"
 #include "data/serializable.hpp"
@@ -58,7 +59,7 @@ private:
     // rank zero only
     std::string _output_filename;
     std::unique_ptr<ProofWriter> _proof_writer;
-    std::unique_ptr<BloomFilter<unsigned long>> _output_id_filter;
+    std::unique_ptr<ClauseIdFilter> _output_id_filter;
     std::future<void> _fut_root_prepare;
     bool _root_prepared = false;
 
@@ -96,8 +97,12 @@ public:
                 std::string reverseFilename = _output_filename + ".inv";
                 LOGGER(_log, V3_VERB, "Opening output file \"%s\"\n", reverseFilename.c_str());
                 _proof_writer.reset(new ProofWriter(reverseFilename, _binary_output));
-                // TODO choose size relative to proof size
-                _output_id_filter.reset(new BloomFilter<unsigned long>(268435399, 4));
+                if (_params.addClauseDeletionStatements() > 0) {
+                    _output_id_filter.reset(new ClauseIdFilter(
+                        _params.addClauseDeletionStatements() == 1 ?
+                        ClauseIdFilter::Mode::APPROX_BLOOM : ClauseIdFilter::Mode::EXACT
+                    ));
+                }
                 _root_prepared = true;
             });
         } else {
@@ -351,7 +356,7 @@ private:
             if (_is_root) {
                 if (chosenLine.getId() == 0) {
                     // final line of a certain proof instance
-                    auto [hintsPtr, numHints] = chosenLine.getUnsignedHints();
+                    auto [hintsPtr, numHints] = chosenLine.getHints();
                     assert(numHints == 3);
                     unsigned long numBytesOfPartialProof = hintsPtr[0];
                     unsigned long numClausesOfPartialProof = hintsPtr[1];
@@ -366,19 +371,26 @@ private:
                     chosenLine.clear();
                     continue;
                 }
-                auto [ptr, numHints] = chosenLine.getUnsignedHints();
-                for (size_t i = 0; i < numHints; i++) {
-                    auto hint = ptr[i];
-                    if (hint > _num_original_clauses &&
-                            _output_id_filter->tryInsert(hint)) {
-                        // Guarantee that ID was never output before.
-                        // Can add a deletion line.
-                        hintsToDelete.push_back(hint);
+                // Are we filtering clause IDs to output deletion statements?
+                if (_output_id_filter) {
+                    // Upon encountering an ID's derivation, we can remove it from the filter
+                    // since it will never re-occur.
+                    _output_id_filter->unregisterId(chosenLine.getId());
+                    // For which hints can we output a deletion statement?
+                    auto [ptr, numHints] = chosenLine.getHints();
+                    for (size_t i = 0; i < numHints; i++) {
+                        auto hint = ptr[i];
+                        if (hint > _num_original_clauses &&
+                                _output_id_filter->registerId(hint)) {
+                            // Guarantee that ID was never output before.
+                            // Can add a deletion line.
+                            hintsToDelete.push_back(hint);
+                        }
                     }
-                }
-                if (!hintsToDelete.empty()) {
-                    _proof_writer->pushDeletionBlocking(chosenId, hintsToDelete);
-                    hintsToDelete.clear();
+                    if (!hintsToDelete.empty()) {
+                        _proof_writer->pushDeletionBlocking(chosenId, hintsToDelete);
+                        hintsToDelete.clear();
+                    }
                 }
                 // Write into final file
                 _proof_writer->pushAdditionBlocking(chosenLine);
@@ -429,7 +441,7 @@ private:
                 while (lrat_utils::readLine(readbuf, line)) {
                     if (line.isDeletionStatement()) {
                         // deletion
-                        auto [hints, nbHints] = line.getUnsignedHints();
+                        auto [hints, nbHints] = line.getHints();
                         compactifier.handleClauseDeletion(nbHints, hints);
                         lrat_utils::writeDeletionLine(out, 1, hints, nbHints, lrat_utils::NORMAL);
                     } else {

@@ -37,7 +37,7 @@ public:
         _map[id] = line.getId();
 
         // map hints (which must already exist)
-        auto [hints, nbHints] = line.getUnsignedHints();
+        auto [hints, nbHints] = line.getHints();
         for (size_t i = 0; i < nbHints; i++) {
             LratClauseId& hint = hints[i];
             if (hint > _nb_original_clauses) hint = _map.at(hint);

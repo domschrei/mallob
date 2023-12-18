@@ -15,7 +15,7 @@ namespace lrat_utils {
         }
         buf.writeSeparator();
         for (size_t i = 0; i < line.hints.size(); i++) {
-            int64_t signedId = (line.signsOfHints[i] ? 1 : -1) * line.hints[i];
+            int64_t signedId = line.hints[i];
             buf.writeSignedClauseId(signedId, WriteMode::NORMAL);
         }
         buf.writeSeparator();
@@ -24,10 +24,9 @@ namespace lrat_utils {
     void writeLine(WriteBuffer& buf, SerializedLratLine& line, WriteMode mode) {
         if (mode == REVERSED) {
             buf.writeSeparator();
-            auto [hints, numHints] = line.getUnsignedHints();
-            auto signs = line.getSignsOfHints();
+            auto [hints, numHints] = line.getHints();
             for (int i = numHints-1; i >= 0; i--) {
-                int64_t signedId = (signs[i] ? 1 : -1) * hints[i];
+                int64_t signedId = hints[i];
                 buf.writeSignedClauseId(signedId, mode);
             }
             buf.writeSeparator();
@@ -47,10 +46,9 @@ namespace lrat_utils {
                 buf.writeLiteral(lits[i], mode);
             }
             buf.writeSeparator();
-            auto [hints, numHints] = line.getUnsignedHints();
-            auto signs = line.getSignsOfHints();
+            auto [hints, numHints] = line.getHints();
             for (size_t i = 0; i < numHints; i++) {
-                int64_t signedId = (signs[i] ? 1 : -1) * hints[i];
+                int64_t signedId = hints[i];
                 buf.writeSignedClauseId(signedId, mode);
             }
             buf.writeSeparator();
@@ -89,7 +87,6 @@ namespace lrat_utils {
         line.id = -1;
         line.literals.clear();
         line.hints.clear();
-        line.signsOfHints.clear();
 
         int header = buf.get();
         if (header != 'a') return false;
@@ -107,7 +104,6 @@ namespace lrat_utils {
 
         while (buf.readSignedClauseId(signedId)) {
             line.hints.push_back(std::abs(signedId));
-            line.signsOfHints.push_back(signedId>0);
         }
         // line termination zero was read by "readLiteral" call that returned zero
 
@@ -141,7 +137,6 @@ namespace lrat_utils {
         // int literals[numLiterals];
         // int numHints;
         // LratClauseId hints[numHints];
-        // bool signsOfHints[numHints];
         std::vector<uint8_t>& data = line.data();
         data.clear();
 
@@ -158,12 +153,7 @@ namespace lrat_utils {
 
         // actual literals
         int numLiterals = 0;
-        if (deletion) {
-            // Special placeholder for deletions
-            backInsert(data, -1);
-            backInsert(data, -1);
-            numLiterals = 2;
-        } else {
+        if (!deletion) {
             int lit;
             while (buf.readLiteral(lit)) {
                 backInsert(data, lit);
@@ -189,14 +179,6 @@ namespace lrat_utils {
 
         // update hints counter
         memcpy(data.data()+hintCounterPos, &numHints, sizeof(int));
-
-        // separate and append signs of hints from hints
-        for (int i = 0; i < numHints; i++) {
-            long* hint = (long*) (data.data()+hintCounterPos+sizeof(int)+i*sizeof(long));
-            bool sign = *hint > 0;
-            *hint = (unsigned long) std::abs(*hint);
-            backInsert(data, (char) (sign ? 1 : 0));
-        }
         
         return true;
     }

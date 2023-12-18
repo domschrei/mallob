@@ -13,7 +13,6 @@ struct LratLine {
     LratClauseId id = -1;
     std::vector<int> literals;
     std::vector<LratClauseId> hints;
-    std::vector<bool> signsOfHints;
     LratLine() {}
     LratLine(const char* string, long strlen, bool& success) {
 
@@ -48,7 +47,6 @@ struct LratLine {
                 } else {
                     //assert(num < 1000000000000000000UL);
                     hints.push_back(num);
-                    signsOfHints.push_back(sign > 0);
                 }
             }
             num = 0;
@@ -106,7 +104,7 @@ struct LratLine {
         for (auto lit : literals) out << " " << lit ;
         out << " 0";
         for (size_t i = 0; i < hints.size(); i++) {
-            out << " " << (signsOfHints[i] ? "" : "-") << hints[i];
+            out << " " << hints[i];
         }
         out << " 0\n";
         return out.str();
@@ -114,8 +112,6 @@ struct LratLine {
     size_t size() const {
         return sizeof(LratClauseId) 
             + sizeof(int) + literals.size()*sizeof(int) 
-            + sizeof(int) + hints.size()*(
-                sizeof(bool) + sizeof(LratClauseId)
-            );
+            + sizeof(int) + hints.size()*sizeof(LratClauseId);
     }
 };
