@@ -6,11 +6,11 @@ RUN apt-get update
 RUN DEBIAN_FRONTEND=noninteractive apt install -y git cmake build-essential zlib1g-dev libopenmpi-dev wget unzip build-essential zlib1g-dev cmake python3 build-essential gfortran wget curl libjemalloc-dev libjemalloc2 gdb psmisc
 
 # Fetch Mallob
-RUN git clone https://github.com/domschrei/mallob
-RUN cd mallob && git checkout 6609709be4c7cbcd67846615d7fc5dedf1f5b7a5
+RUN git clone https://github.com/domschrei/mallob && cd mallob && git checkout ade591635c8a9cdd8af78c1f10f43e78dcc74f05
 # Fetch solvers, build all of them
 RUN cd mallob/lib && bash fetch_and_build_solvers.sh gylck
-RUN cd mallob && sed -i 's/^new_test.*$//g' CMakeLists.txt src/app/sat/setup.cmake # disable building test classes to save time & energy
+# Disable building test classes to save time & energy
+RUN cd mallob && sed -i 's/^new_test.*$//g' CMakeLists.txt src/app/sat/setup.cmake 
 # Build Mallob
 RUN cd mallob && mkdir -p build && cd build \
   && cmake -DCMAKE_BUILD_TYPE=RELEASE \
