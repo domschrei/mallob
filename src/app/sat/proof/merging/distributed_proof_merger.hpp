@@ -431,10 +431,10 @@ private:
             std::ofstream ofs(_output_filename, std::ofstream::binary);
             ReverseFileReader reader(inputFilename);
 
-            if (_params.compactProof()) {
+            if (_params.compactProof() > 0) {
                 // Bring all LRAT IDs into a compact shape
                 // (may help efficiency of checking / prevents bugs in lrat-check)
-                LratCompactifier compactifier(_num_original_clauses);
+                LratCompactifier compactifier(_num_original_clauses, _params.compactProof() == 2);
                 lrat_utils::ReadBuffer readbuf(reader);
                 lrat_utils::WriteBuffer out(ofs);
                 SerializedLratLine line;
@@ -442,11 +442,13 @@ private:
                     if (line.isDeletionStatement()) {
                         // deletion
                         auto [hints, nbHints] = line.getHints();
-                        compactifier.handleClauseDeletion(nbHints, hints);
+                        if (!compactifier.handleClauseDeletion(nbHints, hints))
+                            continue;
                         lrat_utils::writeDeletionLine(out, 1, hints, nbHints, lrat_utils::NORMAL);
                     } else {
                         // addition
-                        compactifier.handleClauseAddition(line);
+                        if (!compactifier.handleClauseAddition(line))
+                            continue;
                         lrat_utils::writeLine(out, line, lrat_utils::NORMAL);
                     }
                 }

@@ -67,14 +67,15 @@ namespace lrat_utils {
         if (mode == REVERSED) {
             buf.writeSeparator();
             for (int i = numHints-1; i >= 0; i--) {
+                if (ids[i] == 0) continue;
                 buf.writeSignedClauseId(ids[i], mode);
             }
             buf.writeDeletionLineHeader();
         } else {
             buf.writeDeletionLineHeader();
             for (int i = 0; i < numHints; i++) {
-                auto id = ids[i];
-                buf.writeSignedClauseId(id, mode);
+                if (ids[i] == 0) continue;
+                buf.writeSignedClauseId(ids[i], mode);
             }
             buf.writeSeparator();
         }

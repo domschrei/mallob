@@ -92,7 +92,7 @@ OPTION_GROUP(grpAppSatProof, "app/sat/proof", "Production of UNSAT proofs")
  OPT_BOOL(distributedProofAssembly,       "dpa", "distributed-proof-assembly",         true,                    "Distributed UNSAT proof assembly into a single file")
  OPT_BOOL(interleaveProofMerging,         "ipm", "interleave-proof-merging",           true,                    "Interleave filtering and merging of proof lines")
  OPT_BOOL(proofDebugging,                 "proof-debugging", "",                       false,                   "Output debugging information into separate files - expensive and large!")
- OPT_BOOL(compactProof,                   "compact-proof", "",                         false,                   "Bring clause IDs in a compact shape when writing the final proof")
+ OPT_INT(compactProof,                    "compact-proof", "",                         0, 0, 2,        "1: Bring clause IDs in a compact shape when writing the final proof, 2: additionally deduplicate clauses")
  OPT_INT(addClauseDeletionStatements,     "cdel", "add-clause-deletions", 2, 0, 2, "0: don't add deletion statements to final proof, 1: add approximately via Bloom filter, 2: add exactly")
  OPT_STRING(extMemDiskDirectory,          "extmem-disk-dir", "",                       ".disk",                 "Directory where to create external memory files") //[[AUTOCOMPLETE_DIRECTORY]]
  OPT_STRING(satPreprocessor,              "sat-preprocessor", "",                      "",                      "Executable which preprocesses CNF file") //[[AUTOCOMPLETE_EXECUTABLE]]
