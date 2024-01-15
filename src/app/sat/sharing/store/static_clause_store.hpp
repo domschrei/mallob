@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <string.h>
 #include <stdio.h>
@@ -8,6 +9,7 @@
 #include <vector>
 
 #include "app/sat/data/clause.hpp"
+#include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/sharing/buffer/buffer_builder.hpp"
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
@@ -44,6 +46,7 @@ private:
     int _max_admissible_bucket_idx {INT32_MAX};
     // Max. admissible number of literals in the threshold bucket. 
     int _max_admissible_bucket_lits;
+    std::atomic_int _current_max_clause_length;
 
     std::vector<int> _bucket_idx_to_priority_idx;
     std::vector<int> _priority_idx_to_bucket_idx;
@@ -262,14 +265,15 @@ public:
                         // update threshold,
                         _max_admissible_bucket_idx = prioIdx;
                         _max_admissible_bucket_lits = nbRemainingAdmissibleLits;
+                        _current_max_clause_length.store(b->clauseLength, std::memory_order_relaxed);
                         // trim buffer according to the remaining capacity,
                         b->size = std::min((int)b->size, (nbRemainingAdmissibleLits / b->clauseLength) * b->clauseLength);
                         // begin cleaning up all subsequent data
                         nbRemainingAdmissibleLits = 0;
                         cleaningUp = true;
-                    } else if (clause.size > 1) {
+                    } else if (clause.size-ClauseMetadata::numInts() > 1) {
                         // subtract admissible literals from this bucket
-                        // except if the buffer stores unit clauses
+                        // except if the buffer stores (EFFECTIVE) unit clauses
                         nbRemainingAdmissibleLits -= effectiveSize;
                     }
                 } else if (i > _max_admissible_bucket_idx) {
@@ -285,16 +289,16 @@ public:
 
             // follow traversal instruction
             assert(clause.size > 0 && clause.lbd > 0);
-            if (clause.size == 1 && mode == NONUNITS) continue;
-            if (clause.size > 1 && mode == UNITS) break;
+            if (clause.size-ClauseMetadata::numInts() == 1 && mode == NONUNITS) continue;
+            if (clause.size-ClauseMetadata::numInts() > 1 && mode == UNITS) break;
 
             // write clauses into export buffer
-            while (b->size > 0 && nbRemainingLits >= clause.size) {
+            while (b->size > 0 && nbRemainingLits >= clause.size-ClauseMetadata::numInts()) {
                 assert(b->size - clause.size >= 0);
                 clause.begin = b->data + b->size - clause.size;
                 clauseDataConverter(clause.begin);
                 clauses.push_back(clause);
-                nbRemainingLits -= clause.size;
+                nbRemainingLits -= clause.size-ClauseMetadata::numInts();
                 b->size -= clause.size;
             }
 
@@ -313,7 +317,7 @@ public:
             lastClause = c;
             bool success = builder.append(c);
             assert(success);
-            nbExportedLits += c.size;
+            nbExportedLits += c.size - ClauseMetadata::numInts();
         }
 
         // Now that all clauses have been read, perform actual shrinkage of buckets
@@ -337,6 +341,12 @@ public:
 
     BufferReader getBufferReader(int* data, size_t buflen, bool useChecksums = false) const override {
         return BufferReader(data, buflen, _max_clause_length, false, useChecksums);
+    }
+
+    virtual int getMaxAdmissibleClauseLength() const override {
+        int priorityIdx = -1;
+        if (_max_admissible_bucket_idx == INT32_MAX) return _max_clause_length;
+        return _current_max_clause_length.load(std::memory_order_relaxed);
     }
 
     ~StaticClauseStore() {

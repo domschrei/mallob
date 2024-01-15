@@ -2,6 +2,7 @@
 #pragma once
 
 #include "optionslist.hpp"
+#include "util/option.hpp"
 
 // Application-specific program options for SAT solving.
 // memberName                               short option name, long option name          default   min  max
@@ -39,7 +40,7 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "Store clauses with up to this LBD in separate buckets")
  OPT_INT(minNumChunksForImportPerSolver,    "mcips", "min-import-chunks-per-solver",     10,       1,   LARGE_INT,      
     "Min. number of cbbs-sized chunks for buffering incoming clauses for import per solver")
- OPT_INT(numChunksForExport,                "nce", "export-chunks",                      10,       1,   LARGE_INT,
+ OPT_INT(numExportChunks,                   "nec", "export-chunks",                      10,       1,   LARGE_INT,
     "Number of cbbs-sized chunks for buffering produced clauses for export")
  OPT_INT(qualityClauseLengthLimit,          "qcll", "quality-clause-length-limit",       8,        0,   255,
     "Clauses up to this length are considered \"high quality\"")
@@ -57,7 +58,7 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "Only clauses up to this length will be shared")
  OPT_INT(strictLbdLimit,                    "slbdl", "strict-lbd-limit",                 16,       0,   255,
     "Only clauses with an LBD score up to this value will be shared")
- OPT_BOOL(skipClauseSharingDiagonally,    "scsd", "skip-clause-sharing-diagonally",    true,                    "In the ith diversification round, disable clause sharing for the (i%%numDivs)th solver")
+ OPT_BOOL(skipClauseSharingDiagonally,      "scsd", "skip-clause-sharing-diagonally",    false, "In the ith diversification round, disable clause sharing for the (i%%numDivs)th solver")
  OPT_FLOAT(maxSharingCompensationFactor,    "mscf", "max-sharing-compensation-factor",   5,        1,   LARGE_INT,
     "Max. relative increase in size of clause sharing buffers in case of many clauses being filtered")
  OPT_BOOL(backlogExportManager,             "bem", "backlog-export-manager",             true, "Use sequentialized export manager with backlogs instead of simple HordeSat-style export")
@@ -89,6 +90,7 @@ OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversificati
 
 OPTION_GROUP(grpAppSatProof, "app/sat/proof", "Production of UNSAT proofs")
  OPT_STRING(proofOutputFile,              "proof", "",                                 "",                      "Enable UNSAT proof production, writing final LRAT proof to specified destination (output by rank zero)")
+ OPT_BOOL(onTheFlyChecking,               "otfc", "on-the-fly-checking",               false,                   "Enable on-the-fly checking of local derivations; generate and validate signatures for shared clauses")
  OPT_BOOL(distributedProofAssembly,       "dpa", "distributed-proof-assembly",         true,                    "Distributed UNSAT proof assembly into a single file")
  OPT_BOOL(interleaveProofMerging,         "ipm", "interleave-proof-merging",           true,                    "Interleave filtering and merging of proof lines")
  OPT_BOOL(proofDebugging,                 "proof-debugging", "",                       false,                   "Output debugging information into separate files - expensive and large!")
@@ -97,3 +99,5 @@ OPTION_GROUP(grpAppSatProof, "app/sat/proof", "Production of UNSAT proofs")
  OPT_STRING(extMemDiskDirectory,          "extmem-disk-dir", "",                       ".disk",                 "Directory where to create external memory files") //[[AUTOCOMPLETE_DIRECTORY]]
  OPT_STRING(satPreprocessor,              "sat-preprocessor", "",                      "",                      "Executable which preprocesses CNF file") //[[AUTOCOMPLETE_EXECUTABLE]]
  OPT_FLOAT(satSolvingWallclockLimit,      "sswl", "sat-solving-wallclock-limit",       0,    0, LARGE_INT,      "Cancel job if not done solving after this many seconds (0: no limit)")
+ OPT_FLOAT(clauseErrorChancePerMille,     "cecpm", "clause-error-chance-per-mille",    0,    0, 1000,           "Chance per mille for tampering with some literal in a shared clause")
+ OPT_BOOL(hmacSignatures,                 "hmac", "", false, "Use HMAC-SHA256 (trunc. to 128) in clause signatures for crypto-level authenticity")

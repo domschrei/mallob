@@ -1,13 +1,17 @@
 
 #pragma once
 
+#include <sstream>
 #include <string>
 #include <vector>
 #include <cstring>
+#include <iomanip>
 
 #include "util/assert.hpp"
 #include "util/hashing.hpp"
 #include "app/sat/data/clause_metadata.hpp"
+#include "cadical/src/signature.hpp"
+#include "util/logger.hpp"
 
 namespace Mallob {
     
@@ -33,9 +37,16 @@ namespace Mallob {
             std::string out = "(len=" + std::to_string(size - ClauseMetadata::numInts())
                 + " lbd=" + std::to_string(lbd);
             if (ClauseMetadata::enabled()) {
-                unsigned long id;
-                memcpy(&id, begin, sizeof(unsigned long));
+                unsigned long id = ClauseMetadata::readUnsignedLong(begin);
                 out += " id=" + std::to_string(id);
+                if (ClauseMetadata::numInts() > 2) {
+                    std::vector<uint8_t> sig((uint8_t*) (begin+2), (uint8_t*) (begin+ClauseMetadata::numInts()));
+                    std::stringstream stream;
+                    for (auto x : sig) {
+                        stream << std::hex << std::setfill('0') << std::setw(2) << (int)x;
+                    }
+                    out += " sig=" + stream.str();
+                }
             }
             out += ") ";
             for (auto it = begin + ClauseMetadata::numInts(); it != begin+size; it++) {

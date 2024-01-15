@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include "app/sat/proof/lrat_checker.hpp"
+#include "app/sat/proof/trusted_solving.hpp"
 #include "portfolio_solver_interface.hpp"
 
 #include "util/sys/threading.hpp"
@@ -34,6 +36,8 @@ private:
 	bool seedSet = false;
 
 	std::string proofFileString;
+	std::unique_ptr<TrustedSolving> _trusted_solving;
+	const bool _do_trusted_solving;
 
 public:
 	Cadical(const SolverSetup& setup);
@@ -57,6 +61,7 @@ public:
 
 	// Set a function that should be called for each learned clause
 	void setLearnedClauseCallback(const LearnedClauseCallback& callback) override;
+	void setProbingLearnedClauseCallback(const ProbingLearnedClauseCallback& callback) override;
 
 	// Get the number of variables of the formula
 	int getVariablesCount() override;

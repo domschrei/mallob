@@ -55,4 +55,7 @@ struct SolverSetup {
 	bool certifiedUnsat;
 	int maxNumSolvers;
 	std::string proofDir;
+	bool onTheFlyChecking;
+	bool hmacSignatures;
+	std::string sigFormula;
 };

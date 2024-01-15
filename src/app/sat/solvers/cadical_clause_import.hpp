@@ -14,11 +14,20 @@ private:
     std::vector<int> _next_clause;
     uint64_t _next_id {0};
     int _next_glue;
+    std::vector<uint8_t> _next_signature {32};
+    bool _sign_shared_clauses {false};
 
 public:
     CadicalClauseImport(const SolverSetup& setup, std::function<Mallob::Clause()> clauseFetcher) : 
         _log(*setup.logger),
-        _clause_fetcher(clauseFetcher) {}
+        _clause_fetcher(clauseFetcher),
+        _sign_shared_clauses(setup.onTheFlyChecking) {
+
+        if (setup.onTheFlyChecking) {
+            assert(ClauseMetadata::numInts() > 2);
+            _next_signature.resize(sizeof(int) * (ClauseMetadata::numInts() - 2));
+        }
+    }
     ~CadicalClauseImport() { }
 
     bool hasNextClause() override {
@@ -27,10 +36,15 @@ public:
         if (clause.begin == nullptr) return false;
         
         assert(clause.size >= ClauseMetadata::numInts()+1);
+        assert(clause.lbd <= clause.size - ClauseMetadata::numInts());
         
         if (ClauseMetadata::enabled()) {
-            memcpy(&_next_id, clause.begin, sizeof(uint64_t));
-            LOG(V5_DEBG, "IMPORT ID=%ld len=%i\n", _next_id, clause.size);
+            _next_id = ClauseMetadata::readUnsignedLong(clause.begin);
+            if (_sign_shared_clauses) {
+                memcpy(_next_signature.data(), clause.begin+2, sizeof(int) * (ClauseMetadata::numInts()-2));
+            }
+            LOG(V5_DEBG, "IMPORT ID=%ld len=%i %s\n", _next_id,
+                clause.size - ClauseMetadata::numInts(), clause.toStr().c_str());
         }
         _next_clause.resize(clause.size - ClauseMetadata::numInts());
         for (size_t i = ClauseMetadata::numInts(); i < clause.size; ++i) {
@@ -39,9 +53,11 @@ public:
         _next_glue = clause.lbd;
         return true;
     }
-    const std::vector<int>& getNextClause(uint64_t& id, int& glue) override {
+    const std::vector<int>& getNextClause(uint64_t& id, int& glue, std::vector<uint8_t>*& signature) override {
         id = _next_id;
         glue = _next_glue;
+        signature = &_next_signature;
+        assert(glue <= _next_clause.size());
         return _next_clause;
     }
 };

@@ -16,7 +16,7 @@ public:
         Job(params, setup, appMsgTable) {
 
         // Launched in certified UNSAT mode?
-        if (params.proofOutputFile.isSet()) {
+        if (params.proofOutputFile.isSet() || _params.onTheFlyChecking()) {
             
             // Check that the restrictions of this mode are met
             if (!params.monoFilename.isSet()) {
@@ -24,13 +24,16 @@ public:
                     "which only supports -mono mode of operation.\n");
                 abort();
             }
-            if (!params.logDirectory.isSet()) {
-                LOG(V0_CRIT, "[ERROR] Mallob was launched with certified UNSAT support "
+            if (params.proofOutputFile.isSet() && !params.logDirectory.isSet()) {
+                LOG(V0_CRIT, "[ERROR] Mallob was launched with proof writing "
                     "which requires providing a log directory.\n");
                 abort();
             }
             
             ClauseMetadata::enableClauseIds();
+            if (_params.onTheFlyChecking()) {
+                ClauseMetadata::enableClauseSignatures(_params.hmacSignatures());
+            }
         }
     }
     virtual ~BaseSatJob() {

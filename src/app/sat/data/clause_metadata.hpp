@@ -10,7 +10,14 @@ class ClauseMetadata {
 
 public:
 	static void enableClauseIds() {
-		metadataSize = 2;
+		metadataSize += 2; // 2 32-bit integers = 64 bit ID
+	}
+	static void enableClauseSignatures(bool hmac) {
+		if (hmac) {
+			metadataSize += 4; // 4 32-bit integers = 128 bit signature
+		} else {
+			metadataSize += 2; // 2 32-bit integers = 64 bit signature
+		}
 	}
 	static inline int numInts() {
 		return metadataSize;

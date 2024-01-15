@@ -16,6 +16,7 @@ struct CadicalClauseExport : public CaDiCaL::Learner {
 private:
 	const SolverSetup& _setup;
 	LearnedClauseCallback _callback;
+	ProbingLearnedClauseCallback _probing_callback;
 
 	Clause _current_clause;
 	std::vector<int> _current_lits;
@@ -24,11 +25,13 @@ private:
 	unsigned long _num_produced;
 
 	uint64_t _last_id;
+	bool _sign_shared_clauses {false};
 	
 public:
 	CadicalClauseExport(const SolverSetup& setup) : _setup(setup), 
-			_current_lits(2+setup.strictClauseLengthLimit, 0),
-			_glue_limit(_setup.strictLbdLimit), _last_id(setup.numOriginalClauses) {
+			_current_lits(2+8+setup.strictClauseLengthLimit, 0),
+			_glue_limit(_setup.strictLbdLimit), _last_id(setup.numOriginalClauses),
+			_sign_shared_clauses(_setup.onTheFlyChecking) {
 
 		_current_clause.begin = _current_lits.data();
 		_current_clause.size = ClauseMetadata::numInts();
@@ -36,7 +39,10 @@ public:
 	~CadicalClauseExport() override {}
 
   	bool learning(int size) override {
-		return size > 0 && size <= _setup.strictClauseLengthLimit;
+		if (size <= 0) return false;
+		if (size > _setup.strictClauseLengthLimit) return false;
+		if (!_probing_callback(size)) return false;
+		return true;
 	}
 
 	void append_literal(int lit) override {
@@ -45,7 +51,7 @@ public:
 		_current_lits[_current_clause.size++] = lit;
 	}
 
-	void publish_clause (uint64_t id, int glue) override {
+	void publish_clause (uint64_t id, int glue, const uint8_t* signatureData, int signatureSize) override {
 		_num_produced++;
 		assert(!ClauseMetadata::enabled() || id > _last_id);
 		_last_id = id;
@@ -59,8 +65,12 @@ public:
 		if (_current_clause.lbd > _glue_limit) eligible = false;
 
 		if (ClauseMetadata::enabled()) {
-			LOG(V5_DEBG, "EXPORT ID=%ld len=%i\n", id, _current_clause.size - ClauseMetadata::numInts());
-			memcpy(_current_clause.begin, &id, sizeof(uint64_t));
+			ClauseMetadata::writeUnsignedLong(id, _current_clause.begin);
+			if (_sign_shared_clauses) {
+				memcpy(_current_clause.begin+2, signatureData, signatureSize);
+			}
+			LOG(V5_DEBG, "EXPORT ID=%ld len=%i %s\n", id,
+				_current_clause.size - ClauseMetadata::numInts(), _current_clause.toStr().c_str());
 		}
 		assert(_current_clause.size > ClauseMetadata::numInts());
 
@@ -72,6 +82,10 @@ public:
     void setCallback(const LearnedClauseCallback& callback) {
         _callback = callback;
     }
+
+	void setProbingCallback(const ProbingLearnedClauseCallback& callback) {
+		_probing_callback = callback;
+	}
 
 	unsigned long getNumProduced() const {
 		return _num_produced;

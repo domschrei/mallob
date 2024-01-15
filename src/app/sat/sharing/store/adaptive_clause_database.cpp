@@ -206,8 +206,8 @@ void AdaptiveClauseDatabase::readClauses(Slot<T>& slot, bool sortClauses, Buffer
         if (clause.size > remainingLits) break;
 
         // insert clause to export buffer
-        remainingLits -= clause.size;
-        collectedLits += clause.size;
+        remainingLits -= clause.size - ClauseMetadata::numInts();
+        collectedLits += clause.size - ClauseMetadata::numInts();
         readClauses.push_back(clause);
     }
 
@@ -267,8 +267,8 @@ void AdaptiveClauseDatabase::flushClauses(Slot<T>& slot, int slotIdx, bool sortC
 
         // insert clause to export buffer
         clauseDataConverter(clause.begin);
-        nbRemainingLits -= clause.size;
-        nbCollectedLits += clause.size;
+        nbRemainingLits -= clause.size - ClauseMetadata::numInts();
+        nbCollectedLits += clause.size - ClauseMetadata::numInts();
         flushedClauses.push_back(std::move(clause));
         ++it;
     }

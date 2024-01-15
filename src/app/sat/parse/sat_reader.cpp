@@ -2,7 +2,6 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <iostream>
-#include "util/assert.hpp"
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <fcntl.h>
@@ -10,7 +9,10 @@
 #include <stdlib.h>
 #include <fstream>
 
+#include "app/sat/proof/trusted_solving.hpp"
+#include "util/assert.hpp"
 #include "sat_reader.hpp"
+#include "util/logger.hpp"
 #include "util/params.hpp"
 #include "util/sys/terminator.hpp"
 #include "util/sys/timer.hpp"
@@ -49,6 +51,10 @@ bool SatReader::read(JobDescription& desc) {
 	const std::string NC_DEFAULT_VAL = "BMMMKKK111";
 	desc.setAppConfigurationEntry("__NC", NC_DEFAULT_VAL);
 	desc.setAppConfigurationEntry("__NV", NC_DEFAULT_VAL);
+	if (_params.onTheFlyChecking()) {
+		std::string placeholder(_params.hmacSignatures() ? 32 : 16, 'x');
+		desc.setAppConfigurationEntry("__SIG", placeholder.c_str());
+	}
 	desc.beginInitialization(desc.getRevision());
 
 	if (pipe == nullptr && namedpipe == -1) {
@@ -144,6 +150,7 @@ bool SatReader::read(JobDescription& desc) {
 			while ((iteration ^ 511) != 0 || !Terminator::isTerminating()) {
 				int numRead = ::read(fileno(pipe), buffer, sizeof(buffer));
 				if (numRead <= 0) break;
+				numRead /= sizeof(int);
 				for (int i = 0; i < numRead; i++) {
 					int c = buffer[i];
 					processInt(c, desc);
@@ -174,6 +181,14 @@ bool SatReader::read(JobDescription& desc) {
 		while (nbStr.size() < NC_DEFAULT_VAL.size())
 			nbStr += ".";
 		desc.setAppConfigurationEntry(dest, nbStr);
+	}
+
+	if (_params.onTheFlyChecking()) {
+		// Sign the parsed formula
+		const std::string sigStr = TrustedSolving::signParsedFormula(desc, _params.hmacSignatures());
+		assert(sigStr.size() == (_params.hmacSignatures() ? 32 : 16)); // 32 hex chars = 16 bytes = 128 bit
+		assert(desc.getAppConfiguration().map.at("__SIG").size() == sigStr.size());
+		desc.setAppConfigurationEntry("__SIG", sigStr);
 	}
 
 	if (_params.satPreprocessor.isSet()) {

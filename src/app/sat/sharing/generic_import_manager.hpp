@@ -47,6 +47,9 @@ public:
         if (_preimport_clause_manipulator) {
             _preimport_clause_manipulator(cls);
         }
+        assert(!cls.begin || cls.lbd <= cls.size - ClauseMetadata::numInts()
+            || log_return_false("[ERROR] Clause of effective size %i has LBD %i!\n",
+            cls.size-ClauseMetadata::numInts(), cls.lbd));
         return cls;
     }
 

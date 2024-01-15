@@ -33,7 +33,7 @@ public:
 
         const int bitsPerElem = sizeof(int)*8;
 		int shift = bitsPerElem;
-		int filterPos = -1 + ClauseMetadata::numInts();
+		int filterPos = -1 + (ClauseMetadata::enabled() ? 2 : 0);
 
         BufferReducer reducer(_clause_buffer, _clause_bufsize, 
             _params.strictClauseLengthLimit(), _params.groupClausesByLengthLbdSum());

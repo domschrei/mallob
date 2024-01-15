@@ -6,11 +6,15 @@
  */
 
 #include <ctype.h>
+#include <functional>
 #include <stdarg.h>
 #include <chrono>
 #include <filesystem>
 
+#include "app/sat/data/clause_metadata.hpp"
+#include "app/sat/proof/trusted_solving.hpp"
 #include "cadical.hpp"
+#include "util/hmac_sha256/hmac_sha256.hpp"
 #include "util/logger.hpp"
 #include "util/distribution.hpp"
 
@@ -21,35 +25,54 @@ Cadical::Cadical(const SolverSetup& setup)
 		  Mallob::Clause c;
 		  fetchLearnedClause(c, GenericClauseStore::ANY);
 		  return c;
-	  }) {
-	
+	  }), _do_trusted_solving(_setup.onTheFlyChecking) {
+
 	solver->connect_terminator(&terminator);
 	solver->connect_learn_source(&learnSource);
 
 	// In certified UNSAT mode?
-	if (setup.certifiedUnsat) {
+	if (setup.certifiedUnsat || _do_trusted_solving) {
 
 		int solverRank = setup.globalId;
 		int maxNumSolvers = setup.maxNumSolvers;
 
-		LOGGER(_logger, V3_VERB, "Initializing rank=%i size=%i DI=%i #C=%ld with certified UNSAT support\n",
-			solverRank, maxNumSolvers, getDiversificationIndex(), getSolverSetup().numOriginalClauses);
+		auto descriptor = _do_trusted_solving ? "on-the-fly LRAT checking" : "LRAT proof production";
+		LOGGER(_logger, V3_VERB, "Initializing rank=%i size=%i DI=%i #C=%ld with %s\n",
+			solverRank, maxNumSolvers, getDiversificationIndex(), setup.numOriginalClauses,
+			descriptor);
 
 		bool okay;
 		okay = solver->set("lrat", 1); assert(okay); // enable LRAT proof logging
-		okay = solver->set("binary", 1); assert(okay); // set proof logging mode to binary format
-		okay = solver->set("lratdeletelines", 0); assert(okay); // disable printing deletion lines
 		okay = solver->set("lratsolverid", solverRank); assert(okay); // set this solver instance's ID
 		okay = solver->set("lratsolvercount", maxNumSolvers); assert(okay); // set # solvers
-		okay = solver->set("lratorigclscount", getSolverSetup().numOriginalClauses); assert(okay);
-		// okay = solver->set("compact", 0); assert(okay); // compacting internal vars destroys unit clause ID tracking
+		okay = solver->set("lratorigclscount", setup.numOriginalClauses); assert(okay);
 
-		proofFileString = _setup.proofDir + "/proof." + std::to_string(_setup.globalId) + ".lrat";
-		okay = solver->trace_proof(proofFileString.c_str()); assert(okay);
+		if (_do_trusted_solving) {
+			_trusted_solving.reset(new TrustedSolving(_logger, _setup, setup.numVars));
+			_trusted_solving->init(_setup.sigFormula);
+			okay = solver->set("signsharedcls", 1); assert(okay);
+			solver->trace_proof_internally(
+				[&](unsigned long id, const int* lits, int nbLits, const unsigned long* hints, int nbHints, uint8_t* sigData, int& sigSize) {
+					return _trusted_solving->produceClause(id, lits, nbLits, hints, nbHints, sigData, sigSize);
+				},
+				[&](unsigned long id, const int* lits, int nbLits, const uint8_t* sigData, int sigSize) {
+					return _trusted_solving->importClause(id, lits, nbLits, sigData, sigSize);
+				},
+				[&](const unsigned long* ids, int nbIds) {
+					return _trusted_solving->deleteClauses(ids, nbIds);
+				}
+			);
+		} else {
+			okay = solver->set("binary", 1); assert(okay); // set proof logging mode to binary format
+			okay = solver->set("lratdeletelines", 0); assert(okay); // disable printing deletion lines
+			proofFileString = _setup.proofDir + "/proof." + std::to_string(_setup.globalId) + ".lrat";
+			okay = solver->trace_proof(proofFileString.c_str()); assert(okay);
+		}
 	}
 }
 
 void Cadical::addLiteral(int lit) {
+	if (_do_trusted_solving) _trusted_solving->loadLiteral(lit);
 	solver->add(lit);
 }
 
@@ -123,6 +146,8 @@ void Cadical::setPhase(const int var, const bool phase) {
 // return 10 for SAT, 20 for UNSAT, 0 for UNKNOWN
 SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 
+	if (_do_trusted_solving) _trusted_solving->endLoading();
+
 	// add the learned clauses
 	learnMutex.lock();
 	for (auto clauseToAdd : learnedClauses) {
@@ -158,6 +183,7 @@ SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 	case 10:
 		return SAT;
 	case 20:
+		if (_do_trusted_solving) _trusted_solving->validateUnsat();
 		return UNSAT;
 	default:
 		return UNKNOWN;
@@ -202,6 +228,9 @@ std::set<int> Cadical::getFailedAssumptions() {
 void Cadical::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
 	learner.setCallback(callback);
 	solver->connect_learner(&learner);
+}
+void Cadical::setProbingLearnedClauseCallback(const ProbingLearnedClauseCallback& callback) {
+	learner.setProbingCallback(callback);
 }
 
 int Cadical::getVariablesCount() {

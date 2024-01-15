@@ -111,7 +111,7 @@ public:
             lastClause = c;
             bool success = builder.append(c);
             assert(success);
-            nbExportedLits += c.size;
+            nbExportedLits += c.size - ClauseMetadata::numInts();
         }
 
         addClauseLock.unlock();

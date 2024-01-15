@@ -31,7 +31,7 @@ using namespace SolvingStates;
 
 SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, Logger& loggingInterface) : 
 			_params(params), _config(config), _logger(loggingInterface), _state(INITIALIZING) {
-	
+
     int appRank = config.apprank;
 
 	LOGGER(_logger, V4_VVER, "SAT engine for %s\n", config.getJobStr().c_str());
@@ -48,8 +48,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	std::string solverChoices = params.satSolverSequence();
 	std::string proofDirectory;
 
-	// Launched in certified UNSAT mode?
-    if (_params.proofOutputFile.isSet()) {
+	// Launched in some certified UNSAT mode?
+    if (_params.proofOutputFile.isSet() || _params.onTheFlyChecking()) {
 		
 		if (_params.inputShuffleProbability() > 0) {
 			LOG(V3_VERB, "Certified UNSAT mode: Disabling input shuffling\n");
@@ -62,13 +62,18 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 			solverChoices = "c";
 		}
 		ClauseMetadata::enableClauseIds();
+		if (_params.onTheFlyChecking()) {
+			ClauseMetadata::enableClauseSignatures(_params.hmacSignatures());
+		}
 
-		// Create directory for partial proofs
-		std::filesystem::path base_dir(params.logDirectory());
-		std::filesystem::path proof_dir("proof" + config.getJobStr());
-		std::filesystem::path full_path = base_dir / proof_dir;
-		create_directory(full_path);
-		proofDirectory = full_path.string();
+		if (_params.proofOutputFile.isSet()) {
+			// Create directory for partial proofs
+			std::filesystem::path base_dir(params.logDirectory());
+			std::filesystem::path proof_dir("proof" + config.getJobStr());
+			std::filesystem::path full_path = base_dir / proof_dir;
+			create_directory(full_path);
+			proofDirectory = full_path.string();
+		}
     }
 
 	// Launched for deterministic solving?
@@ -90,7 +95,6 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	AppConfiguration appConfig; appConfig.deserialize(params.applicationConfiguration());
 	std::string key = "diversification-offset";
 	int diversificationOffset = appConfig.map.count(key) ? atoi(appConfig.map[key].c_str()) : 0;
-
 	// Read # clauses and # vars from app config
 	int numClauses, numVars;
 	std::vector<std::pair<int*, std::string>> fields {
@@ -162,11 +166,14 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		break;
 	}
 	setup.adaptiveImportManager = params.adaptiveImportManager();
-	setup.certifiedUnsat = params.proofOutputFile.isSet();
+	setup.certifiedUnsat = params.proofOutputFile.isSet() || params.onTheFlyChecking();
 	setup.maxNumSolvers = config.mpisize * params.numThreadsPerProcess();
 	setup.numVars = numVars;
 	setup.numOriginalClauses = numClauses;
 	setup.proofDir = proofDirectory;
+	setup.onTheFlyChecking = params.onTheFlyChecking();
+	setup.hmacSignatures = params.hmacSignatures();
+	setup.sigFormula = appConfig.map["__SIG"];
 
 	// Instantiate solvers according to the global solver IDs and diversification indices
 	int cyclePos = begunCyclePos;
@@ -183,13 +190,14 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		case 'k': case 'K': setup.diversificationIndex = numKis++; break;
 		}
 		setup.diversificationIndex += diversificationOffset;
-		_solver_interfaces.emplace_back(createSolver(setup));
+		_solver_interfaces.push_back(createSolver(setup));
 		cyclePos = (cyclePos+1) % solverChoices.size();
 	}
 
 	_sharing_manager.reset(new SharingManager(_solver_interfaces, _params, _logger, 
 		/*max. deferred literals per solver=*/5*config.maxBroadcastedLitsPerCycle, config.apprank));
 	LOGGER(_logger, V5_DEBG, "initialized\n");
+
 }
 
 std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSetup& setup) {

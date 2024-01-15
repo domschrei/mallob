@@ -27,6 +27,7 @@ void updateTimer(std::string jobName);
 
 typedef std::function<void(const Mallob::Clause&, int)> LearnedClauseCallback;
 typedef std::function<void(const Mallob::Clause&, int, int, int)> ExtLearnedClauseCallback;
+typedef std::function<bool(int)> ProbingLearnedClauseCallback;
 
 /**
  * Interface for solvers that can be used in the portfolio.
@@ -70,6 +71,10 @@ public:
 
 	// Set a function that should be called for each learned clause
 	virtual void setLearnedClauseCallback(const LearnedClauseCallback& callback) = 0;
+
+	// Set a function that can be called to probe whether a clause of specified length
+	// may be eligible for export. (It might still be rejected upon export.)
+	virtual void setProbingLearnedClauseCallback(const ProbingLearnedClauseCallback& callback) {}
 
 	// Get solver statistics
 	virtual void writeStatistics(SolverStatistics& stats) = 0;

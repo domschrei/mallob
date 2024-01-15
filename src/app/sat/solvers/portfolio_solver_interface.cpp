@@ -2,6 +2,7 @@
 #include <map>
 #include <chrono>
 #include <atomic>
+#include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/sharing/adaptive_import_manager.hpp"
 #include "app/sat/sharing/ring_buffer_import_manager.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
@@ -58,19 +59,23 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 
 	LOGGER(_logger, V4_VVER, "Diversification index %i\n", getDiversificationIndex());
 
-	// Set manipulator for non-unit clauses just before they are handed to the solver.
+	// Set manipulator for incoming clauses just before they are handed to the solver.
 	_import_manager->setPreimportClauseManipulator([this](Mallob::Clause& c) {
 		if (!c.begin) return; // no clause
-		if (c.size == 1) return; // unit clause
+		if (c.size == 1 || c.size-ClauseMetadata::numInts() == 1) {
+			// unit clause (perhaps with metadata)
+			c.lbd = 1;
+			return;
+		}
 		if (_setup.randomizeLbdBeforeImport) {
 			// Workaround to get "uniform" drawing of numbers from [2, c.size]
-			c.lbd = (int) std::round(_rng.randomInRange(2 - 0.49999, c.size + 0.49999));
+			c.lbd = (int) std::round(_rng.randomInRange(2 - 0.49999, c.size-ClauseMetadata::numInts() + 0.49999));
 			assert(c.lbd >= 2);
-			assert(c.lbd <= c.size);
+			assert(c.lbd <= c.size-ClauseMetadata::numInts());
 		}
-		if (_setup.incrementLbdBeforeImport && c.lbd < c.size)
+		if (_setup.incrementLbdBeforeImport && c.lbd < c.size-ClauseMetadata::numInts())
 			c.lbd++;
-		if (_setup.resetLbdBeforeImport) c.lbd = c.size;
+		if (_setup.resetLbdBeforeImport) c.lbd = c.size-ClauseMetadata::numInts();
 	});
 }
 

@@ -55,8 +55,7 @@ public:
             for (auto& vec : outClauses) if (!vec.empty()) {
                 _ofs << vec[0];
                 if (ClauseMetadata::enabled()) {
-                    uint64_t id;
-                    memcpy(&id, vec.data()+1, sizeof(uint64_t));
+                    uint64_t id = ClauseMetadata::readUnsignedLong(vec.data()+1);
                     _ofs << " [id=" << id << "]";
                 }
                 for (size_t i = 1+ClauseMetadata::numInts(); i < vec.size(); i++)

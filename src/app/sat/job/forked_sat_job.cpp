@@ -126,7 +126,7 @@ int ForkedSatJob::appl_solved() {
         _done_locally = true;
 
         if (ClauseMetadata::enabled() && result == RESULT_UNSAT
-                && _params.distributedProofAssembly()) {
+                && _params.proofOutputFile.isSet() && _params.distributedProofAssembly()) {
             // Unsatisfiability: handle separately.
             int finalEpoch = _clause_comm->getCurrentEpoch();
             int winningInstance = _internal_result.winningInstanceId;
@@ -275,7 +275,7 @@ bool ForkedSatJob::hasFilteredSharing(int epoch) {
     return _solver->hasFilteredClauses(epoch);
 }
 std::vector<int> ForkedSatJob::getLocalFilter(int epoch) {
-    if (!isInitialized()) return std::vector<int>(ClauseMetadata::numInts(), 0);
+    if (!isInitialized()) return std::vector<int>(ClauseMetadata::enabled() ? 2 : 0, 0);
     return _solver->getLocalFilter(epoch);
 }
 void ForkedSatJob::applyFilter(int epoch, std::vector<int>& filter) {

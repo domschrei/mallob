@@ -285,11 +285,11 @@ std::vector<int> SatProcessAdapter::getLocalFilter(int epoch) {
         filter.resize(_hsm->filterSize);
         memcpy(filter.data(), _filter_buffer, _hsm->filterSize*sizeof(int));
         _hsm->doFilterImport = false;
-        assert(filter.size() >= ClauseMetadata::numInts());
+        assert(filter.size() >= ClauseMetadata::enabled() ? 2 : 0);
         if (_epoch_of_export_buffer != epoch)
-            filter.resize(ClauseMetadata::numInts()); // wrong epoch
+            filter.resize(ClauseMetadata::enabled() ? 2 : 0); // wrong epoch
     } else {
-        filter = std::vector<int>(ClauseMetadata::numInts(), 0);
+        filter = std::vector<int>(ClauseMetadata::enabled() ? 2 : 0, 0);
     }
     return filter;
 }

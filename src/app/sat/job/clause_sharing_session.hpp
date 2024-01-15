@@ -66,7 +66,7 @@ public:
                 // Base message
                 JobMessage(_job->getId(), _job->getContextId(), _job->getRevision(), epoch, MSG_ALLREDUCE_FILTER),
                 // Neutral element
-                std::vector<int>(ClauseMetadata::numInts(), 0),
+                std::vector<int>(ClauseMetadata::enabled() ? 2 : 0, 0),
                 // Aggregator for local + incoming elements
                 [&](std::list<std::vector<int>>& elems) {
                     return mergeFiltersDuringAggregation(elems);
@@ -287,7 +287,7 @@ private:
                 maxMinEpochId = std::max(maxMinEpochId, minEpochId);
             }
 
-            for (size_t i = ClauseMetadata::numInts(); i < elem.size(); i++) {
+            for (size_t i = ClauseMetadata::enabled() ? 2 : 0; i < elem.size(); i++) {
                 filter[i] |= elem[i]; // bitwise OR
             }
         }

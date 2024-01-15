@@ -3,6 +3,7 @@
 
 #include <vector>
 
+#include "app/sat/data/clause_metadata.hpp"
 #include "buffer_iterator.hpp"
 #include "../../data/clause.hpp"
 #include "util/logger.hpp"
@@ -51,7 +52,7 @@ public:
 
     bool append(const Mallob::Clause& c) {
 
-        if (_total_literal_limit >= 0 && _num_added_lits + c.size > _total_literal_limit) {
+        if (_total_literal_limit >= 0 && _num_added_lits + c.size-ClauseMetadata::numInts() > _total_literal_limit) {
             // Buffer is full!
             // Assemble some information on the fail
             _failed_insertion.lastCounterPosition = _counter_position;
@@ -78,7 +79,7 @@ public:
         (*_out)[_counter_position]++;
         assert(c.begin != nullptr);
         _out->insert(_out->end(), c.begin, c.begin+c.size);
-        _num_added_lits += c.size;
+        _num_added_lits += c.size - ClauseMetadata::numInts();
         _num_added_clauses++;
         return true;
     }

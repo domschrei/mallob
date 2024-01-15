@@ -56,13 +56,13 @@ SharingManager::SharingManager(
 		case MALLOB_CLAUSE_STORE_ADAPTIVE_SIMPLE:
 			return new StaticClauseStore<true>(_params,
 				resetLbdAtExport, 256, true,
-				_params.clauseBufferBaseSize()*_params.numChunksForExport());
+				_params.clauseBufferBaseSize()*_params.numExportChunks());
 		case MALLOB_CLAUSE_STORE_ADAPTIVE:
 		default:
 			AdaptiveClauseStore::Setup setup;
 			setup.maxClauseLength = _params.strictClauseLengthLimit();
 			setup.maxLbdPartitionedSize = _params.maxLbdPartitioningSize();
-			setup.numLiterals = _params.clauseBufferBaseSize()*_params.numChunksForExport();
+			setup.numLiterals = _params.clauseBufferBaseSize()*_params.numExportChunks();
 			setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
 			setup.resetLbdAtExport = resetLbdAtExport;
 			return new AdaptiveClauseStore(setup);
@@ -106,12 +106,15 @@ SharingManager::SharingManager(
 	_num_original_clauses = solvers[0]->getSolverSetup().numOriginalClauses;
 	int maxNumGlobalSolvers = solvers[0]->getSolverSetup().maxNumSolvers;
 
-	if (ClauseMetadata::enabled() && _params.distributedProofAssembly()) {
+	if (ClauseMetadata::enabled() && _params.proofOutputFile.isSet() && _params.distributedProofAssembly()) {
 		_id_alignment.reset(new ClauseIdAlignment(_logger, _solvers, _num_original_clauses, _params.numThreadsPerProcess()));
 	}
 
 	for (size_t i = 0; i < _solvers.size(); i++) {
 		_solvers[i]->setExtLearnedClauseCallback(callback);
+		_solvers[i]->setProbingLearnedClauseCallback([&](int clauseLength) {
+			return clauseLength <= _clause_store->getMaxAdmissibleClauseLength();
+		});
 		_solvers[i]->setCallbackResultFound([&](int localId) {
 			if (_det_sync) _det_sync->notifySolverDone(localId);
 		});
@@ -203,8 +206,10 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 		solverStats->histProduced->increment(clause.size);
 	}
 
-	// Sort literals in clause
-	std::sort(clauseBegin+ClauseMetadata::numInts(), clauseBegin+clauseSize);
+	if (!_params.onTheFlyChecking()) {
+		// Sort literals in clause
+		std::sort(clauseBegin+ClauseMetadata::numInts(), clauseBegin+clauseSize);
+	}
 
 	_export_buffer->produce(clauseBegin, clauseSize, clauseLbd, solverId, _internal_epoch);
 	//log(V6_DEBGV, "%i : PRODUCED %s\n", solverId, tldClause.toStr().c_str());
@@ -329,7 +334,7 @@ int SharingManager::filterSharing(int* begin, int buflen, int* filterOut) {
 	constexpr auto bitsPerElem = 8*sizeof(int);
 	int shift = bitsPerElem;
 	auto clause = reader.getNextIncomingClause();
-	int filterPos = -1 + ClauseMetadata::numInts();
+	int filterPos = -1 + (ClauseMetadata::enabled() ? 2 : 0);
 	int nbFiltered = 0;
 	int nbTotal = 0;
 
@@ -423,9 +428,20 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 		}
 
 		hist.increment(clause.size);
-		_last_num_admitted_lits_to_import += clause.size;
+		_last_num_admitted_lits_to_import += clause.size - ClauseMetadata::numInts();
 		// bitset of producing solvers
 		auto producers = _clause_filter->confirmSharingAndGetProducers(clause, _internal_epoch);
+
+		if (_params.clauseErrorChancePerMille() > 0) {
+			if (1000*Random::rand() <= _params.clauseErrorChancePerMille()) {
+				// Tamper with a random (non meta data) literal
+				_logger.log(V2_INFO, "TAMPERING with cls ID=%lu\n",
+					ClauseMetadata::numInts()>=2 ? ClauseMetadata::readUnsignedLong(clause.begin) : 0);
+				int idx = Random::rand() * (clause.size - ClauseMetadata::numInts());
+				assert(idx >= 0); assert(idx < clause.size - ClauseMetadata::numInts());
+				clause.begin[ClauseMetadata::numInts() + idx] += 1;
+			}
+		}
 
 		// Decide for each solver whether it should receive the clause
 		for (size_t i = 0; i < importingSolvers.size(); i++) {
@@ -464,7 +480,7 @@ void SharingManager::applyFilterToBuffer(int* begin, int& buflen, const int* fil
 	_logger.log(verb+2, "DG apply global filter\n");
 	const int bitsPerElem = sizeof(int)*8;
 	int shift = bitsPerElem;
-	int filterPos = -1 + ClauseMetadata::numInts();
+	int filterPos = -1 + (ClauseMetadata::enabled() ? 2 : 0);
 
 	if (_id_alignment) {
 		_id_alignment->beginNextEpoch(filter);
