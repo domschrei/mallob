@@ -41,7 +41,7 @@ int getProducer(const Mallob::Clause& clause, int nbProducers) {
 void testImport() {
 
     SolverSetup setup;
-    setup.strictClauseLengthLimit = 20;
+    setup.strictMaxLitsPerClause = 20;
 	setup.strictLbdLimit = 20;
 	setup.clauseBaseBufferSize = 1500;
 	setup.anticipatedLitsToImportPerCycle = 200'000;
@@ -56,14 +56,14 @@ void testImport() {
     // Generate some number of clauses
     std::vector<Mallob::Clause> clauses;
     for (int i = 0; i < 1000; i++) {
-        clauses.push_back(generateClause(1, setup.strictClauseLengthLimit));
+        clauses.push_back(generateClause(1, setup.strictMaxLitsPerClause));
     }
     std::sort(clauses.begin(), clauses.end());
 
     // Write sorted clauses into flat buffer
     // and filter the (pretended) self-produced clauses
     // for each solver
-    BufferBuilder builder(setup.anticipatedLitsToImportPerCycle, setup.strictClauseLengthLimit, false);
+    BufferBuilder builder(setup.anticipatedLitsToImportPerCycle, setup.strictMaxLitsPerClause, false);
     int nbSolvers = 4;
     std::vector<std::vector<bool>> filters(nbSolvers);
     for (auto& clause : clauses) {
@@ -83,7 +83,7 @@ void testImport() {
         std::set<Mallob::Clause> admittedClauses;
         // Verify output of buffer reader with respective filter set
         {
-            BufferReader reader(flatBuffer.data(), flatBuffer.size(), setup.strictClauseLengthLimit, false);
+            BufferReader reader(flatBuffer.data(), flatBuffer.size(), setup.strictMaxLitsPerClause, false);
             reader.setFilterBitset(filters[solverId]);
             auto clause = reader.getNextIncomingClause();
             while (clause.begin != nullptr) {
@@ -97,7 +97,7 @@ void testImport() {
         }
         // Import
         {
-            BufferReader reader(flatBuffer.data(), flatBuffer.size(), setup.strictClauseLengthLimit, false);
+            BufferReader reader(flatBuffer.data(), flatBuffer.size(), setup.strictMaxLitsPerClause, false);
             reader.setFilterBitset(filters[solverId]);
             importBuffer.performImport(reader);
             LOG(V2_INFO, "import buffer now has size %i\n", importBuffer.size());

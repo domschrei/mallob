@@ -3,6 +3,7 @@
 
 #include <list>
 
+#include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/data/produced_clause_candidate.hpp"
 #include "app/sat/sharing/filter/generic_clause_filter.hpp"
 #include "app/sat/sharing/generic_export_manager.hpp"
@@ -30,10 +31,10 @@ private:
 public:
     BacklogExportManager(GenericClauseStore& pcb, GenericClauseFilter& filter,
             std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
-            std::vector<SolverStatistics*>& solverStats, int maxClauseLength) :
-        GenericExportManager(pcb, filter, solvers, solverStats, maxClauseLength) {
+            std::vector<SolverStatistics*>& solverStats, int maxEffClauseLength) :
+        GenericExportManager(pcb, filter, solvers, solverStats, maxEffClauseLength) {
 
-        _slots.resize(maxClauseLength);
+        _slots.resize(maxEffClauseLength);
         for (size_t i = 0; i < _slots.size(); i++)
             _slots[i].reset(new Slot(pcb, i+1));
     }
@@ -43,7 +44,7 @@ public:
 
         ProducedClauseCandidate pcc(begin, size, lbd, producerId, epoch);
 
-        if (size > _clause_store.getMaxAdmissibleClauseLength()) {
+        if (size > _clause_store.getMaxAdmissibleEffectiveClauseLength()) {
             handleResult(producerId, GenericClauseFilter::DROPPED, size);
             return;
         }
@@ -98,16 +99,17 @@ public:
     }
 
 private:
-    Slot& getSlot(int clauseLength) {return *_slots.at(clauseLength-1);}
+    Slot& getSlot(int effClauseLength) {return *_slots.at(effClauseLength-1);}
 
     void processClause(ProducedClauseCandidate& pcc, bool checkedForAdmissibleClauseLength = false) {
-        int clauseLength = pcc.size;
+        int effClauseLength = pcc.size;
         int producerId = pcc.producerId;
-        if (!checkedForAdmissibleClauseLength && clauseLength > _clause_store.getMaxAdmissibleClauseLength()) {
-            handleResult(producerId, GenericClauseFilter::DROPPED, clauseLength);
+        if (!checkedForAdmissibleClauseLength &&
+                effClauseLength > _clause_store.getMaxAdmissibleEffectiveClauseLength()) {
+            handleResult(producerId, GenericClauseFilter::DROPPED, effClauseLength);
             return;
         }
         auto result = _filter.tryRegisterAndInsert(std::move(pcc));
-        handleResult(producerId, result, clauseLength);
+        handleResult(producerId, result, effClauseLength);
     }
 };

@@ -10,12 +10,12 @@
 #include "util/random.hpp"
 #include "util/tsl/robin_set.h"
 
-BufferMerger::BufferMerger(int sizeLimit, int maxClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum) :
-    _size_limit(sizeLimit), _max_clause_length(maxClauseLength), 
+BufferMerger::BufferMerger(int sizeLimit, int maxEffClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum) :
+    _size_limit(sizeLimit), _max_eff_clause_length(maxEffClauseLength), 
     _slots_for_sum_of_length_and_lbd(slotsForSumOfLengthAndLbd), _use_checksum(useChecksum) {}
 
-BufferMerger::BufferMerger(StaticClauseStore<false>* mergeStore, int sizeLimit, int maxClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum) :
-    _merge_store(mergeStore), _size_limit(sizeLimit), _max_clause_length(maxClauseLength),
+BufferMerger::BufferMerger(StaticClauseStore<false>* mergeStore, int sizeLimit, int maxEffClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum) :
+    _merge_store(mergeStore), _size_limit(sizeLimit), _max_eff_clause_length(maxEffClauseLength),
     _slots_for_sum_of_length_and_lbd(slotsForSumOfLengthAndLbd), _use_checksum(useChecksum) {}
 
 void BufferMerger::add(BufferReader&& reader) {_readers.push_back(std::move(reader));}
@@ -47,10 +47,10 @@ std::vector<int> BufferMerger::mergePriorityBased(const Parameters& params, std:
     std::vector<int> storeOutput = _merge_store->exportBuffer(INT32_MAX, nbExportedCls, nbExportedLits, GenericClauseStore::ANY, false);
 
     // Filter duplicates and split output into a main and an excess output
-    BufferBuilder mainBuilder(_size_limit, _max_clause_length, _slots_for_sum_of_length_and_lbd);
-    BufferBuilder excessBuilder(INT32_MAX, _max_clause_length, _slots_for_sum_of_length_and_lbd);
+    BufferBuilder mainBuilder(_size_limit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
+    BufferBuilder excessBuilder(INT32_MAX, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
     tsl::robin_set<Mallob::Clause, Mallob::NonCommutativeClauseHasher, Mallob::SortedClauseExactEquals> mergedClauseSet;
-    BufferReader storeOutputReader(storeOutput.data(), storeOutput.size(), _max_clause_length, _slots_for_sum_of_length_and_lbd);
+    BufferReader storeOutputReader(storeOutput.data(), storeOutput.size(), _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
     BufferBuilder* currentBuilder = &mainBuilder;
     int excessFirstCounterPosition = -1;
     while (true) {
@@ -90,7 +90,7 @@ std::vector<int> BufferMerger::mergePriorityBased(const Parameters& params, std:
 std::vector<int> BufferMerger::merge(std::vector<int>* excessClauses, SplitMix64Rng* rng) {
     
     AbstractClauseThreewayComparator* threewayCompare = _slots_for_sum_of_length_and_lbd ?
-        (AbstractClauseThreewayComparator*) new LengthLbdSumClauseThreewayComparator(_max_clause_length+2) :
+        (AbstractClauseThreewayComparator*) new LengthLbdSumClauseThreewayComparator(_max_eff_clause_length+2) :
         (AbstractClauseThreewayComparator*) new LexicographicClauseThreewayComparator();
     ClauseComparator compare(threewayCompare);
     InputClauseComparator inputCompare(threewayCompare);
@@ -118,10 +118,10 @@ std::vector<int> BufferMerger::merge(std::vector<int>* excessClauses, SplitMix64
     }
 
     // Setup builders for main buffer and excess clauses buffer
-    BufferBuilder mainBuilder(_size_limit, _max_clause_length, _slots_for_sum_of_length_and_lbd);
+    BufferBuilder mainBuilder(_size_limit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
     BufferBuilder* excessBuilder;
     if (excessClauses != nullptr) {
-        excessBuilder = new BufferBuilder(_size_limit, _max_clause_length, _slots_for_sum_of_length_and_lbd);
+        excessBuilder = new BufferBuilder(_size_limit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
     }
     BufferBuilder* currentBuilder = &mainBuilder;
     int excessFirstCounterPosition = -1;

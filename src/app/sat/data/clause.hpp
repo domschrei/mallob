@@ -10,7 +10,6 @@
 #include "util/assert.hpp"
 #include "util/hashing.hpp"
 #include "app/sat/data/clause_metadata.hpp"
-#include "cadical/src/signature.hpp"
 #include "util/logger.hpp"
 
 namespace Mallob {

@@ -60,7 +60,7 @@ SharingManager::SharingManager(
 		case MALLOB_CLAUSE_STORE_ADAPTIVE:
 		default:
 			AdaptiveClauseStore::Setup setup;
-			setup.maxClauseLength = _params.strictClauseLengthLimit();
+			setup.maxEffectiveClauseLength = _params.strictClauseLengthLimit()+ClauseMetadata::numInts();
 			setup.maxLbdPartitionedSize = _params.maxLbdPartitioningSize();
 			setup.numLiterals = _params.clauseBufferBaseSize()*_params.numExportChunks();
 			setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
@@ -74,24 +74,25 @@ SharingManager::SharingManager(
 			return new NoopClauseFilter(*_clause_store);
 		case MALLOB_CLAUSE_FILTER_BLOOM:
 			return new BloomClauseFilter(*_clause_store, _solvers.size(),
-				_params.strictClauseLengthLimit(), _params.backlogExportManager());
+				_params.strictClauseLengthLimit()+ClauseMetadata::numInts(),
+				_params.backlogExportManager());
 		case MALLOB_CLAUSE_FILTER_EXACT:
 		case MALLOB_CLAUSE_FILTER_EXACT_DISTRIBUTED:
 		default:
-			return new ExactClauseFilter(*_clause_store, _params.clauseFilterClearInterval(), _params.strictClauseLengthLimit());
+			return new ExactClauseFilter(*_clause_store, _params.clauseFilterClearInterval(), _params.strictClauseLengthLimit()+ClauseMetadata::numInts());
 		}
 	}()),
 	_export_buffer([&]() -> GenericExportManager* {
 		if (_params.backlogExportManager()) {
 			return new BacklogExportManager(*_clause_store.get(), *_clause_filter.get(),
-				_solvers, _solver_stats, params.strictClauseLengthLimit());
+				_solvers, _solver_stats, params.strictClauseLengthLimit()+ClauseMetadata::numInts());
 		} else {
 			return new SimpleExportManager(*_clause_store.get(), *_clause_filter.get(),
-				_solvers, _solver_stats, params.strictClauseLengthLimit());
+				_solvers, _solver_stats, params.strictClauseLengthLimit()+ClauseMetadata::numInts());
 		}
 	}()),
-	_hist_produced(params.strictClauseLengthLimit()), 
-	_hist_returned_to_db(params.strictClauseLengthLimit()) {
+	_hist_produced(params.strictClauseLengthLimit()+ClauseMetadata::numInts()), 
+	_hist_returned_to_db(params.strictClauseLengthLimit()+ClauseMetadata::numInts()) {
 
 	_stats.histProduced = &_hist_produced;
 	_stats.histFailedFilter = &_export_buffer->getFailedFilterHistogram();
@@ -112,8 +113,8 @@ SharingManager::SharingManager(
 
 	for (size_t i = 0; i < _solvers.size(); i++) {
 		_solvers[i]->setExtLearnedClauseCallback(callback);
-		_solvers[i]->setProbingLearnedClauseCallback([&](int clauseLength) {
-			return clauseLength <= _clause_store->getMaxAdmissibleClauseLength();
+		_solvers[i]->setProbingLearnedClauseCallback([&](int effectiveClauseLength) {
+			return effectiveClauseLength <= _clause_store->getMaxAdmissibleEffectiveClauseLength();
 		});
 		_solvers[i]->setCallbackResultFound([&](int localId) {
 			if (_det_sync) _det_sync->notifySolverDone(localId);
@@ -170,7 +171,7 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
     }
 
     // Check maximum size of clause
-    if (clauseSize > _params.strictClauseLengthLimit()) {
+    if (clauseSize-ClauseMetadata::numInts() > _params.strictClauseLengthLimit()) {
         if (tldClauseVec) delete tldClauseVec;
         return;
     }
@@ -207,7 +208,7 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 	}
 
 	if (!_params.onTheFlyChecking()) {
-		// Sort literals in clause
+		// Sort literals in clause (not the metadata!)
 		std::sort(clauseBegin+ClauseMetadata::numInts(), clauseBegin+clauseSize);
 	}
 
@@ -266,7 +267,7 @@ int SharingManager::prepareSharing(int* begin, int totalLiteralLimit, int& succe
 		// 1. Create reader for shared clause buffer
 		auto size = buffer.size();
 		BufferReader reader(buffer.data(), size,
-			_params.strictClauseLengthLimit(), false);
+			_params.strictClauseLengthLimit()+ClauseMetadata::numInts(), false);
 		// 2. Scramble clauses within each clause length w.r.t. LBD scores
 		ClauseBufferLbdScrambler scrambler(_params, reader);
 		auto modifiedClauseBuffer = scrambler.scrambleLbdScores();
@@ -378,7 +379,7 @@ void SharingManager::digestSharingWithFilter(int* begin, int buflen, const int* 
 	int verb = _job_index == 0 ? V3_VERB : V5_DEBG;
 
 	float time = Timer::elapsedSeconds();
-	ClauseHistogram hist(_params.strictClauseLengthLimit());
+	ClauseHistogram hist(_params.strictClauseLengthLimit()+ClauseMetadata::numInts());
 
 	_logger.log(verb, "digesting len=%ld\n", buflen);
 

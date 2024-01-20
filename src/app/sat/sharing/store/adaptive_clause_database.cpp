@@ -4,19 +4,19 @@
 AdaptiveClauseDatabase::AdaptiveClauseDatabase(Setup setup):
     _total_literal_limit(setup.numLiterals),
     _max_lbd_partitioned_size(setup.maxLbdPartitionedSize),
-    _max_clause_length(setup.maxClauseLength),
+    _max_eff_clause_length(setup.maxEffClauseLength),
     _slots_for_sum_of_length_and_lbd(setup.slotsForSumOfLengthAndLbd),
     _use_checksum(setup.useChecksums),
     _bucket_iterator(setup.slotsForSumOfLengthAndLbd ? 
         BucketLabel::MINIMIZE_SUM_OF_SIZE_AND_LBD : BucketLabel::MINIMIZE_SIZE, 
         setup.maxLbdPartitionedSize),
-    _hist_deleted_in_slots(setup.maxClauseLength) {
+    _hist_deleted_in_slots(setup.maxEffClauseLength) {
 
     // Choose max. sum such that the largest legal clauses will be admitted iff they have LBD 2. 
-    int maxSumOfLengthAndLbd = setup.maxClauseLength+2;
+    int maxSumOfLengthAndLbd = setup.maxEffClauseLength+2;
 
     // Iterate over all possible clause length - LBD combinations
-    for (int clauseLength = 1; clauseLength <= setup.maxClauseLength; clauseLength++) {
+    for (int clauseLength = 1; clauseLength <= setup.maxEffClauseLength; clauseLength++) {
         for (int lbd = std::min(clauseLength, 2); lbd <= clauseLength; lbd++) {
 
             std::pair<int, int> lengthLbdPair(clauseLength, lbd);
@@ -186,7 +186,7 @@ Mallob::Clause AdaptiveClauseDatabase::getMallobClause(T& elem, int implicitLbdO
     if constexpr (std::is_same<std::vector<int>, T>::value) {
         bool lbdInVector = implicitLbdOrZero == 0;
         int len = elem.size() - (lbdInVector ? 1 : 0);
-        assert(len <= _max_clause_length);
+        assert(len <= _max_eff_clause_length);
         return Mallob::Clause(elem.data() + (lbdInVector ? 1 : 0), len, 
             lbdInVector ? elem[0] : implicitLbdOrZero);
     }
@@ -324,7 +324,7 @@ void AdaptiveClauseDatabase::flushClauses(Slot<T>& slot, int slotIdx, bool sortC
 std::vector<int> AdaptiveClauseDatabase::exportBuffer(int totalLiteralLimit, int& numExportedClauses, 
         ExportMode mode, bool sortClauses, std::function<void(int*)> clauseDataConverter) {
 
-    BufferBuilder builder(totalLiteralLimit, _max_clause_length, _slots_for_sum_of_length_and_lbd);
+    BufferBuilder builder(totalLiteralLimit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
 
     /*
     std::string out = "lim=" + std::to_string(totalLiteralLimit) + " FREE LOCAL BUDGETS: ";
@@ -359,7 +359,7 @@ std::vector<int> AdaptiveClauseDatabase::exportBuffer(int totalLiteralLimit, int
 std::vector<int> AdaptiveClauseDatabase::exportBufferWithoutDeletion(int totalLiteralLimit, 
         int& numExportedClauses, ExportMode mode, bool sortClauses) {
     
-    BufferBuilder builder(totalLiteralLimit, _max_clause_length, _slots_for_sum_of_length_and_lbd);
+    BufferBuilder builder(totalLiteralLimit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
 
     if (mode != ExportMode::NONUNITS) {
         // Export unit clauses.
@@ -490,15 +490,15 @@ int AdaptiveClauseDatabase::stealBudgetFromSlot(Slot<T>& slot, int desiredLitera
 }
 
 BufferReader AdaptiveClauseDatabase::getBufferReader(int* begin, size_t size, bool useChecksums) {
-    return BufferReader(begin, size, _max_clause_length, _slots_for_sum_of_length_and_lbd, useChecksums);
+    return BufferReader(begin, size, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd, useChecksums);
 }
 
 BufferMerger AdaptiveClauseDatabase::getBufferMerger(int sizeLimit) {
-    return BufferMerger(sizeLimit, _max_clause_length, _slots_for_sum_of_length_and_lbd, _use_checksum);
+    return BufferMerger(sizeLimit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd, _use_checksum);
 }
 
 BufferBuilder AdaptiveClauseDatabase::getBufferBuilder(std::vector<int>* out) {
-    return BufferBuilder(-1, _max_clause_length, _slots_for_sum_of_length_and_lbd, out);
+    return BufferBuilder(-1, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd, out);
 }
 
 ClauseHistogram& AdaptiveClauseDatabase::getDeletedClausesHistogram() {

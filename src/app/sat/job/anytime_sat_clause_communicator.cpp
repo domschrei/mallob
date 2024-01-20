@@ -1,6 +1,7 @@
 
 #include "anytime_sat_clause_communicator.hpp"
 
+#include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/job/historic_clause_storage.hpp"
 #include "comm/msgtags.h"
 #include "util/logger.hpp"
@@ -27,19 +28,11 @@ void advanceCollective(BaseSatJob* job, JobMessage& msg, int broadcastTag) {
 }
 
 AnytimeSatClauseCommunicator::AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job) : 
-    _params(params), _job(job), 
-    _cdb([&]() {
-        AdaptiveClauseDatabase::Setup setup;
-        setup.maxClauseLength = _params.strictClauseLengthLimit();
-        setup.maxLbdPartitionedSize = _params.maxLbdPartitioningSize();
-        setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
-        setup.numLiterals = 0;
-        return setup;
-    }()),
+    _params(params), _job(job),
     _cls_history(!params.collectClauseHistory() ? nullptr :
         new HistoricClauseStorage([&]() {
             AdaptiveClauseDatabase::Setup setup;
-            setup.maxClauseLength = _params.strictClauseLengthLimit();
+            setup.maxEffClauseLength = _params.strictClauseLengthLimit()+ClauseMetadata::numInts();
             setup.maxLbdPartitionedSize = _params.maxLbdPartitioningSize();
             setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
             setup.numLiterals = _job->getBufferLimit(MyMpi::size(MPI_COMM_WORLD), false);

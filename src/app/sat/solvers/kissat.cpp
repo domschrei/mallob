@@ -1,4 +1,5 @@
 
+#include "app/sat/data/clause_metadata.hpp"
 #include "util/random.hpp"
 #include "util/sys/timer.hpp"
 #include "util/tsl/robin_set.h"
@@ -31,7 +32,7 @@ int terminate_callback(void* state) {
 
 Kissat::Kissat(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup), solver(kissat_init()),
-        learntClauseBuffer(_setup.strictClauseLengthLimit+3) {
+        learntClauseBuffer(_setup.strictMaxLitsPerClause+ClauseMetadata::numInts()) {
 
     kissat_set_terminate(solver, this, &terminate_callback);
     glueLimit = _setup.strictLbdLimit;
@@ -212,12 +213,12 @@ std::set<int> Kissat::getFailedAssumptions() {
 
 void Kissat::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
 	this->callback = callback;
-    kissat_set_clause_export_callback(solver, this, learntClauseBuffer.data(), _setup.strictClauseLengthLimit, &produce_clause);
+    kissat_set_clause_export_callback(solver, this, learntClauseBuffer.data(), _setup.strictMaxLitsPerClause, &produce_clause);
     kissat_set_clause_import_callback(solver, this, &consume_clause);
 }
 
 void Kissat::produceClause(int size, int lbd) {
-    if (size > _setup.strictClauseLengthLimit) return;
+    if (size > _setup.strictMaxLitsPerClause) return;
     learntClause.size = size;
     // In Kissat, long clauses of LBD 1 can be exported. => Increment LBD in this case.
     learntClause.lbd = learntClause.size == 1 ? 1 : lbd;

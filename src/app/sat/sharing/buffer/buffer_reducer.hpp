@@ -11,12 +11,12 @@ class BufferReducer {
 private:
     int* _buffer;
     int _size;
-    int _max_clause_length;
+    int _max_eff_clause_length;
     bool _slots_for_sum_of_length_and_lbd;
 
 public:
-    BufferReducer(int* buffer, int size, int maxClauseLength, bool slotsForSumOfLengthAndLbd) : 
-        _buffer(buffer), _size(size), _max_clause_length(maxClauseLength), 
+    BufferReducer(int* buffer, int size, int maxEffClauseLength, bool slotsForSumOfLengthAndLbd) : 
+        _buffer(buffer), _size(size), _max_eff_clause_length(maxEffClauseLength), 
         _slots_for_sum_of_length_and_lbd(slotsForSumOfLengthAndLbd) {}
 
     int reduce(std::function<bool()> acceptor) {
@@ -36,7 +36,7 @@ private:
         size_t currentPos = numInts+1;
         size_t currentWritePos = currentPos;
 
-        BufferIterator it(_max_clause_length, _slots_for_sum_of_length_and_lbd);
+        BufferIterator it(_max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
         Mallob::Clause currentClause(nullptr, it.clauseLength, it.lbd);
         
         // Local variable we count down on

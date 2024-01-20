@@ -29,7 +29,7 @@ private:
 	
 public:
 	CadicalClauseExport(const SolverSetup& setup) : _setup(setup), 
-			_current_lits(2+8+setup.strictClauseLengthLimit, 0),
+			_current_lits(2+8+setup.strictMaxLitsPerClause, 0),
 			_glue_limit(_setup.strictLbdLimit), _last_id(setup.numOriginalClauses),
 			_sign_shared_clauses(_setup.onTheFlyChecking) {
 
@@ -40,14 +40,15 @@ public:
 
   	bool learning(int size) override {
 		if (size <= 0) return false;
-		if (size > _setup.strictClauseLengthLimit) return false;
-		if (!_probing_callback(size)) return false;
+		if (size > _setup.strictMaxLitsPerClause) return false;
+		int effectiveSize = size + ClauseMetadata::numInts();
+		if (!_probing_callback(effectiveSize)) return false;
 		return true;
 	}
 
 	void append_literal(int lit) override {
 		// Received a literal
-		assert(_current_clause.size - ClauseMetadata::numInts() < _setup.strictClauseLengthLimit);
+		assert(_current_clause.size - ClauseMetadata::numInts() < _setup.strictMaxLitsPerClause);
 		_current_lits[_current_clause.size++] = lit;
 	}
 
@@ -69,9 +70,9 @@ public:
 			if (_sign_shared_clauses) {
 				memcpy(_current_clause.begin+2, signatureData, signatureSize);
 			}
-			LOG(V5_DEBG, "EXPORT ID=%ld len=%i %s\n", id,
-				_current_clause.size - ClauseMetadata::numInts(), _current_clause.toStr().c_str());
 		}
+		LOG(V5_DEBG, "EXPORT ID=%ld len=%i %s\n", id,
+			_current_clause.size - ClauseMetadata::numInts(), _current_clause.toStr().c_str());
 		assert(_current_clause.size > ClauseMetadata::numInts());
 
 		// Export clause (if eligible), reset current clause

@@ -78,9 +78,9 @@ private:
     int _last_gc_epoch {0};
 
 public:
-    ExactClauseFilter(GenericClauseStore& clauseStore, int epochHorizon, int maxClauseLength) :
+    ExactClauseFilter(GenericClauseStore& clauseStore, int epochHorizon, int maxEffClauseLength) :
         GenericClauseFilter(clauseStore), _epoch_horizon(epochHorizon),
-        _slots(maxClauseLength) {
+        _slots(maxEffClauseLength) {
 
         for (size_t i = 0; i < _slots.size(); i++) {
             _slots[i].reset(new Slot(_clause_store, i+1));
@@ -158,7 +158,7 @@ public:
 
             time = Timer::elapsedSeconds() - time;
             LOGGER(logger, V5_DEBG, "filter-gc clslen=%i epoch=%i removed=%lu/%lu time=%.4f\n",
-                i+1, epoch, nbRemoved, mapSize, time);
+                i+1-ClauseMetadata::numInts(), epoch, nbRemoved, mapSize, time);
 
             // Allow inserting threads to successfully tryGetSharedLock() again
             slot._mtx_map.unlock();

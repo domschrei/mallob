@@ -30,8 +30,8 @@ private:
     FailedInsertion _failed_insertion;
 
 public:
-    BufferBuilder(int totalLiteralLimit, int maxClauseLength, bool slotsForSumOfLengthAndLbd, std::vector<int>* out = nullptr) :
-        _out(out), _total_literal_limit(totalLiteralLimit), _it(maxClauseLength, slotsForSumOfLengthAndLbd) {
+    BufferBuilder(int totalLiteralLimit, int maxEffClauseLength, bool slotsForSumOfLengthAndLbd, std::vector<int>* out = nullptr) :
+        _out(out), _total_literal_limit(totalLiteralLimit), _it(maxEffClauseLength, slotsForSumOfLengthAndLbd) {
 
         if (_total_literal_limit < 0) _total_literal_limit = INT32_MAX;
 

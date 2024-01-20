@@ -322,7 +322,7 @@ void MGlucose::parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysi
 	assert(c.getExported() <= 3);
 	
 	// Clause does not pass the hard quality limits? Discard.
-	if (c.size() > (int)_setup.strictClauseLengthLimit || c.lbd() > _setup.strictLbdLimit) 
+	if (c.size() > (int)_setup.strictMaxLitsPerClause || c.lbd() > _setup.strictLbdLimit) 
 		return;
 		
 	// A clause has "very good quality" iff it satisfies the *soft* limits

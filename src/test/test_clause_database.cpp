@@ -37,7 +37,7 @@ void testMinimal() {
     LOG(V2_INFO, "Minimal test ...\n");
 
     AdaptiveClauseDatabase::Setup setup;
-    setup.maxClauseLength = 10;
+    setup.maxEffClauseLength = 10;
     setup.maxLbdPartitionedSize = 5;
     setup.numLiterals = 1500;
     setup.slotsForSumOfLengthAndLbd = true;
@@ -72,7 +72,7 @@ void testMerge() {
     LOG(V2_INFO, "Testing merge of clause buffers ...\n");
 
     AdaptiveClauseDatabase::Setup setup;
-    setup.maxClauseLength = 3;
+    setup.maxEffClauseLength = 3;
     setup.maxLbdPartitionedSize = 5;
     setup.numLiterals = 1'500'000;
     setup.slotsForSumOfLengthAndLbd = true;
@@ -86,7 +86,7 @@ void testMerge() {
         AdaptiveClauseDatabase cdb(setup);
         for (int j = 0; j < numClausesPerBuffer; j++) {
             std::vector<int> lits;
-            int clauseSize = 1 + (int)std::round(Random::rand() * (setup.maxClauseLength-1));
+            int clauseSize = 1 + (int)std::round(Random::rand() * (setup.maxEffClauseLength-1));
             for (int l = 0; l < clauseSize; l++) {
                 lits.push_back((Random::rand() < 0.5 ? -1 : 1) * (1 + Random::rand()*1000000));
             }
@@ -105,7 +105,7 @@ void testMerge() {
         auto reader = cdb.getBufferReader(buf.data(), buf.size());
         Clause lastClause;
         ClauseComparator compare(setup.slotsForSumOfLengthAndLbd ?
-            (AbstractClauseThreewayComparator*) new LengthLbdSumClauseThreewayComparator(setup.maxClauseLength+2) :
+            (AbstractClauseThreewayComparator*) new LengthLbdSumClauseThreewayComparator(setup.maxEffClauseLength+2) :
             (AbstractClauseThreewayComparator*) new LexicographicClauseThreewayComparator()
         );;
         int clsIdx = 0;
@@ -163,7 +163,7 @@ void testReduce() {
     LOG(V2_INFO, "Test in-place buffer reduction ...\n");
 
     AdaptiveClauseDatabase::Setup setup;
-    setup.maxClauseLength = 10;
+    setup.maxEffClauseLength = 10;
     setup.maxLbdPartitionedSize = 5;
     setup.numLiterals = 1500;
     setup.slotsForSumOfLengthAndLbd = true;
@@ -173,7 +173,7 @@ void testReduce() {
     
     const int nbMaxClausesPerSlot = 10;
     int nbClausesThisSlot = 0;
-    BufferIterator it(setup.maxClauseLength, setup.slotsForSumOfLengthAndLbd);
+    BufferIterator it(setup.maxEffClauseLength, setup.slotsForSumOfLengthAndLbd);
 
     while (success) {
         std::vector<int> lits(it.clauseLength);
@@ -196,41 +196,41 @@ void testReduce() {
 
     {
         auto copiedBuf = buf;
-        BufferReducer reducer(copiedBuf.data(), copiedBuf.size(), setup.maxClauseLength, setup.slotsForSumOfLengthAndLbd);
+        BufferReducer reducer(copiedBuf.data(), copiedBuf.size(), setup.maxEffClauseLength, setup.slotsForSumOfLengthAndLbd);
         int newSize = reducer.reduce([&](const Mallob::Clause& c) {
             return true;
         });
         copiedBuf.resize(newSize);
         assert(copiedBuf == buf);
 
-        BufferReader reader(copiedBuf.data(), copiedBuf.size(), setup.maxClauseLength, setup.slotsForSumOfLengthAndLbd);
+        BufferReader reader(copiedBuf.data(), copiedBuf.size(), setup.maxEffClauseLength, setup.slotsForSumOfLengthAndLbd);
         int nbClauses = 0;
         while (reader.getNextIncomingClause().begin != nullptr) nbClauses++;
         assert(nbClauses == numExported);
     }
     {
         auto copiedBuf = buf;
-        BufferReducer reducer(copiedBuf.data(), copiedBuf.size(), setup.maxClauseLength, setup.slotsForSumOfLengthAndLbd);
+        BufferReducer reducer(copiedBuf.data(), copiedBuf.size(), setup.maxEffClauseLength, setup.slotsForSumOfLengthAndLbd);
         int newSize = reducer.reduce([&](const Mallob::Clause& c) {
             return false;
         });
         copiedBuf.resize(newSize);
 
-        BufferReader reader(copiedBuf.data(), copiedBuf.size(), setup.maxClauseLength, setup.slotsForSumOfLengthAndLbd);
+        BufferReader reader(copiedBuf.data(), copiedBuf.size(), setup.maxEffClauseLength, setup.slotsForSumOfLengthAndLbd);
         int nbClauses = 0;
         while (reader.getNextIncomingClause().begin != nullptr) nbClauses++;
         assert(nbClauses == 0);
     }
     {
         auto copiedBuf = buf;
-        BufferReducer reducer(copiedBuf.data(), copiedBuf.size(), setup.maxClauseLength, setup.slotsForSumOfLengthAndLbd);
+        BufferReducer reducer(copiedBuf.data(), copiedBuf.size(), setup.maxEffClauseLength, setup.slotsForSumOfLengthAndLbd);
         auto reductor = [&](const Mallob::Clause& c) {
             return c.size == 4 && c.lbd == 3 && c.begin[0] == 1 && c.begin[1] == 2 && c.begin[2] == 3 && c.begin[3] == 4;
         };
         int newSize = reducer.reduce(reductor);
         copiedBuf.resize(newSize);
 
-        BufferReader reader(copiedBuf.data(), copiedBuf.size(), setup.maxClauseLength, setup.slotsForSumOfLengthAndLbd);
+        BufferReader reader(copiedBuf.data(), copiedBuf.size(), setup.maxEffClauseLength, setup.slotsForSumOfLengthAndLbd);
         int nbClauses = 0;
         while (reader.getNextIncomingClause().begin != nullptr) {
             nbClauses++;
@@ -240,14 +240,14 @@ void testReduce() {
     }
     {
         auto copiedBuf = buf;
-        BufferReducer reducer(copiedBuf.data(), copiedBuf.size(), setup.maxClauseLength, setup.slotsForSumOfLengthAndLbd);
+        BufferReducer reducer(copiedBuf.data(), copiedBuf.size(), setup.maxEffClauseLength, setup.slotsForSumOfLengthAndLbd);
         auto reductor = [&](const Mallob::Clause& c) {
             return c.size >= 4;
         };
         int newSize = reducer.reduce(reductor);
         copiedBuf.resize(newSize);
 
-        BufferReader reader(copiedBuf.data(), copiedBuf.size(), setup.maxClauseLength, setup.slotsForSumOfLengthAndLbd);
+        BufferReader reader(copiedBuf.data(), copiedBuf.size(), setup.maxEffClauseLength, setup.slotsForSumOfLengthAndLbd);
         int nbClauses = 0;
         while (reader.getNextIncomingClause().begin != nullptr) {
             nbClauses++;

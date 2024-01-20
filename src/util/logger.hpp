@@ -79,6 +79,7 @@ public:
     void flush() const;
 
     static std::string floatToStr(double num, int precision);
+    static std::string dataToHexStr(const uint8_t* data, unsigned long size);
 
     friend void log(int options, const char* str, ...);
     friend bool log_return_false(const char* str, ...);
@@ -95,6 +96,8 @@ private:
 
 void log(int options, const char* str, ...);
 bool log_return_false(const char* str, ...);
+
+void loggerCCallback(void* logger, const char* msg);
 
 #include "logger_defs.h"
 

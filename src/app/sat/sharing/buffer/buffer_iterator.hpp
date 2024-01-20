@@ -5,22 +5,22 @@
 
 struct BufferIterator {
 
-int maxClauseLength;
+int maxEffClauseLength;
 bool slotsForSumOfLengthAndLbd;
 int maxSumOfLengthAndLbd;
 
 int clauseLength;
 int lbd;
 
-BufferIterator() : maxClauseLength(0), slotsForSumOfLengthAndLbd(false), maxSumOfLengthAndLbd(0) {}
-BufferIterator(int maxClauseLength, bool slotsForSumOfLengthAndLbd) :
-    maxClauseLength(maxClauseLength), slotsForSumOfLengthAndLbd(slotsForSumOfLengthAndLbd), 
-    maxSumOfLengthAndLbd(maxClauseLength+2) {
+BufferIterator() : maxEffClauseLength(0), slotsForSumOfLengthAndLbd(false), maxSumOfLengthAndLbd(0) {}
+BufferIterator(int maxEffClauseLength, bool slotsForSumOfLengthAndLbd) :
+    maxEffClauseLength(maxEffClauseLength), slotsForSumOfLengthAndLbd(slotsForSumOfLengthAndLbd), 
+    maxSumOfLengthAndLbd(maxEffClauseLength+2) {
 
     clauseLength = 1;
     lbd = 1;
 }
-BufferIterator(const BufferIterator& other) : maxClauseLength(other.maxClauseLength), 
+BufferIterator(const BufferIterator& other) : maxEffClauseLength(other.maxEffClauseLength), 
     slotsForSumOfLengthAndLbd(other.slotsForSumOfLengthAndLbd), 
     maxSumOfLengthAndLbd(other.maxSumOfLengthAndLbd), clauseLength(other.clauseLength), lbd(other.lbd) {}
 

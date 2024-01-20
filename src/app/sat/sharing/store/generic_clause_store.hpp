@@ -16,14 +16,14 @@
 class GenericClauseStore {
 
 protected:
-    int _max_clause_length;
+    int _max_eff_clause_length;
     bool _reset_lbd_at_export;
     ClauseHistogram _hist_deleted_in_slots;
 
 public:
-    GenericClauseStore(int maxClauseLength, bool resetLbdAtExport) :
-        _max_clause_length(maxClauseLength), _reset_lbd_at_export(resetLbdAtExport),
-        _hist_deleted_in_slots(maxClauseLength) {}
+    GenericClauseStore(int maxEffClauseLength, bool resetLbdAtExport) :
+        _max_eff_clause_length(maxEffClauseLength), _reset_lbd_at_export(resetLbdAtExport),
+        _hist_deleted_in_slots(maxEffClauseLength) {}
     virtual ~GenericClauseStore() {}
 
     virtual bool addClause(const Mallob::Clause& c) = 0;
@@ -35,7 +35,7 @@ public:
         std::function<void(int*)> clauseDataConverter = [](int*){}) = 0;
 
     virtual BufferReader getBufferReader(int* data, size_t buflen, bool useChecksums = false) const = 0;
-    virtual int getMaxAdmissibleClauseLength() const {return _max_clause_length;}
+    virtual int getMaxAdmissibleEffectiveClauseLength() const {return _max_eff_clause_length;}
     virtual void setClauseDeletionCallback(int clauseLength, std::function<void(Mallob::Clause&)> cb) {}
 
     virtual int getCurrentlyUsedLiterals() const {return 0;}

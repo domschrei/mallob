@@ -36,12 +36,12 @@ struct SolverSetup {
 	// SAT Solving settings
 
 	// In any case, these bounds MUST be fulfilled for a clause to be exported
-	unsigned int strictClauseLengthLimit;
+	unsigned int strictMaxLitsPerClause;
 	unsigned int strictLbdLimit;
 	// These bounds must be fulfilled for a clause to be considered "high quality".
 	// Depending on the solver, this may imply that such a clause is exported
 	// while others are not. 
-	unsigned int qualityClauseLengthLimit;
+	unsigned int qualityMaxLitsPerClause;
 	unsigned int qualityLbdLimit;
 
 	size_t clauseBaseBufferSize;

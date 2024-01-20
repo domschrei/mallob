@@ -26,17 +26,17 @@ public:
         GenericImportManager(setup, stats), 
         _pcb([&]() {
             AdaptiveClauseStore::Setup pcbSetup;
-            pcbSetup.maxClauseLength = setup.strictClauseLengthLimit;
+            pcbSetup.maxEffectiveClauseLength = setup.strictMaxLitsPerClause+ClauseMetadata::numInts();
             pcbSetup.maxLbdPartitionedSize = 2;
             pcbSetup.numLiterals = getLiteralBudget(setup);
             pcbSetup.slotsForSumOfLengthAndLbd = false;
             pcbSetup.useChecksums = false;
             return pcbSetup;
         }()),
-        _clause_out_data(setup.strictClauseLengthLimit),
+        _clause_out_data(setup.strictMaxLitsPerClause+ClauseMetadata::numInts()),
         _clause_out(_clause_out_data.data(), 0, 0) {
 
-        for (int clslen = 1; clslen <= setup.strictClauseLengthLimit; clslen++) {
+        for (int clslen = 1; clslen <= setup.strictMaxLitsPerClause+ClauseMetadata::numInts(); clslen++) {
             _pcb.setClauseDeletionCallback(clslen, [&](Mallob::Clause& cls) {
                 _stats.receivedClausesDropped++;
             });

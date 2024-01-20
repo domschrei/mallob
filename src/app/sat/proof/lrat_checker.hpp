@@ -1,15 +1,9 @@
 
 #pragma once
 
-#include <cstdint>
-#include <cstdlib>
-#include "app/sat/data/clause.hpp"
-#include "app/sat/proof/lrat_line.hpp"
-#include "util/hmac_sha256/hmac_sha256.hpp"
-#include "util/hmac_sha256/sha256.hpp"
-#include "util/logger.hpp"
+#include "util/SipHash/siphash.hpp"
+#include "util/tsl/robin_growth_policy.h"
 #include "util/tsl/robin_map.h"
-#include "util/tsl/robin_set.h"
 
 class LratChecker {
 
@@ -39,19 +33,27 @@ private:
             free(data);
         }
     };
-    tsl::robin_map<LratClauseId, CompactClause> _clauses;
+    struct ClauseIdHasher {
+        std::size_t operator()(const uint64_t& val) const {
+            return (0xcbf29ce484222325UL ^ val) * 0x00000100000001B3UL;
+        }
+    };
+    tsl::robin_map<uint64_t, CompactClause, ClauseIdHasher> _clauses;
     std::vector<int8_t> _var_values;
-    std::string _errmsg;
+    const char* _errmsg;
     bool _unsat_proven {false};
 
-    LratClauseId _id_to_add {1};
+    uint64_t _id_to_add {1};
     std::vector<int> _clause_to_add;
     bool _done_loading {false};
 
-    Sha256Builder _sig_builder;
+    //Sha256Builder _sig_builder;
+    SipHash _siphash_builder;
 
 public:
-    LratChecker(int nbVars) : _var_values(nbVars+1, 0) {}
+    LratChecker(int nbVars, const uint8_t* sigKey128bit = nullptr) :
+        _clauses(1<<16),
+        _var_values(nbVars+1, 0), _siphash_builder(sigKey128bit) {}
 
     bool loadLiteral(int lit) {
         if (lit == 0) {
@@ -61,26 +63,26 @@ public:
             }
             _id_to_add++;
             _clause_to_add.push_back(0);
-            _sig_builder.update((uint8_t*) _clause_to_add.data(), _clause_to_add.size()*sizeof(int));
+            _siphash_builder.update((uint8_t*) _clause_to_add.data(), _clause_to_add.size()*sizeof(int));
             _clause_to_add.clear();
             return true;
         }
         _clause_to_add.push_back(lit);
         return true;
     }
-    bool endLoading(std::vector<uint8_t>* outSigOrNull) {
+    bool endLoading(uint8_t*& outSig) {
         if (!_clause_to_add.empty()) {
-            _errmsg = std::to_string(_clause_to_add.size()) + " literals left in unterminated clause";
+            _errmsg = "literals left in unterminated clause";
             abort();
             return false;
         }
-        if (outSigOrNull) *outSigOrNull = _sig_builder.get();
+        outSig = _siphash_builder.digest();
         _done_loading = true;
         return true;
     }
 
     bool loadOriginalClauses(const int* data, size_t size) {
-        LratClauseId id = 1;
+        uint64_t id = 1;
         int start = 0, end;
         for (size_t i = 0; i < size; i++) {
             int lit = data[i];
@@ -97,43 +99,33 @@ public:
         return true;
     }
 
-    bool addAxiomaticClause(LratClauseId id, const std::vector<int>& lits) {
-        return addAxiomaticClause(id, lits.data(), lits.size());
-    }
-    bool addClause(LratClauseId id, const std::vector<int>& lits, const std::vector<LratClauseId>& hints) {
-        return addClause(id, lits.data(), lits.size(), hints.data(), hints.size());
-    }
-    bool deleteClause(const std::vector<LratClauseId>& ids) {
-        return deleteClause(ids.data(), ids.size());
-    }
-
-    bool addAxiomaticClause(LratClauseId id, const int* lits, int nbLits) {
+    bool addAxiomaticClause(uint64_t id, const int* lits, int nbLits) {
         //LOG(V2_INFO, "IMPORT %lu\n", id);
         auto [it, ok] = _clauses.insert({id, CompactClause{lits, nbLits}});
-        if (!ok) _errmsg = "Unsuccessful insertion of clause of ID " + std::to_string(id);
+        if (!ok) _errmsg = "Unsuccessful insertion of clause";
         if (nbLits == 0) _unsat_proven = true; // added top-level empty clause!
         return ok;
     }
-    bool addClause(LratClauseId id, const int* lits, int nbLits, const LratClauseId* hints, int nbHints) {
+    bool addClause(uint64_t id, const int* lits, int nbLits, const uint64_t* hints, int nbHints) {
         //LOG(V2_INFO, "PRODUCE %lu\n", id);
         if (!checkClause(lits, nbLits, hints, nbHints)) return false;
         return addAxiomaticClause(id, lits, nbLits);
     }
-    bool deleteClause(const LratClauseId* ids, int nbIds) {
+    bool deleteClause(const uint64_t* ids, int nbIds) {
         for (int i = 0; i < nbIds; i++) {
             auto id = ids[i];
             //LOG(V2_INFO, "DELETE %lu\n", id);
             auto it = _clauses.find(id);
             if (it == _clauses.end()) {
                 // ERROR
-                _errmsg = "Clause deletion: ID " + std::to_string(id) + " not found";
+                _errmsg = "Clause deletion: ID not found";
                 return false;
             }
             _clauses.erase(it);
         }
         return true;
     }
-    const std::string& getErrorMessage() const {
+    const char* getErrorMessage() const {
         return _errmsg;
     }
 
@@ -150,10 +142,10 @@ public:
     }
 
 private:
-    bool checkClause(const int* lits, int nbLits, const LratClauseId* hints, int nbHints) {
-
+    bool checkClause(const int* lits, int nbLits, const uint64_t* hints, int nbHints) {
         // Keep track of asserted unit clauses in a stack
-        std::vector<int> setUnits;
+        static thread_local std::vector<int> setUnits;
+
         setUnits.reserve(nbLits + nbHints);
         // Assume the negation of each literal in the new clause
         for (int i = 0; i < nbLits; i++) {
@@ -171,7 +163,7 @@ private:
             auto hintClsIt = _clauses.find(hintId);
             if (hintClsIt == _clauses.end()) {
                 // ERROR - hint not found
-                _errmsg = "Clause addition: ID " + std::to_string(hintId) + " not found";
+                _errmsg = "Clause addition: ID not found";
                 ok = false; break;
             }
 
@@ -185,7 +177,7 @@ private:
                     // Literal is unassigned
                     if (newUnit != 0) {
                         // ERROR - multiple unassigned literals in hint clause!
-                        _errmsg = "Multiple literals unassigned: " + std::to_string(newUnit) + " " + std::to_string(lit);
+                        _errmsg = "Multiple literals unassigned";
                         ok = false; break;
                     }
                     newUnit = lit;
@@ -195,7 +187,7 @@ private:
                 bool sign = _var_values[var]>0;
                 if (sign == (lit>0)) {
                     // ERROR - clause is satisfied, so it does not belong to hints
-                    _errmsg = "Clause hint of ID " + std::to_string(hintId) + " is satisfied";
+                    _errmsg = "Clause hint is satisfied";
                     ok = false; break;
                 }
                 // All OK - literal is false, thus (virtually) removed from the clause
@@ -206,11 +198,12 @@ private:
                 // -> Empty clause derived.
                 if (i+1 < nbHints) {
                     // ERROR - not at the final hint yet!
-                    _errmsg = "Empty clause produced at hint " + std::to_string(i+1) + "/" + std::to_string(nbHints);
+                    _errmsg = "Empty clause produced at non-final hint";
                     ok = false; break;
                 }
                 // Final hint produced empty clause - everything OK!
                 for (int var : setUnits) _var_values[var] = 0; // reset variable values
+                setUnits.clear();
                 return true;
             }
             // Insert the new derived unit clause
@@ -221,7 +214,7 @@ private:
 
         // ERROR - something went wrong
         for (int var : setUnits) _var_values[var] = 0; // reset variable values
+        setUnits.clear();
         return false;
     }
-
 };

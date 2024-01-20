@@ -46,7 +46,7 @@ private:
     int _max_admissible_bucket_idx {INT32_MAX};
     // Max. admissible number of literals in the threshold bucket. 
     int _max_admissible_bucket_lits;
-    std::atomic_int _current_max_clause_length;
+    std::atomic_int _current_max_eff_clause_length;
 
     std::vector<int> _bucket_idx_to_priority_idx;
     std::vector<int> _priority_idx_to_bucket_idx;
@@ -107,7 +107,7 @@ public:
                 }
                 if (mode == LBD_FIRST) {
                     // Gone through all clause lengths with the current LBD?
-                    if (length == (inner ? thresholdLength : params.strictClauseLengthLimit())) {
+                    if (length == (inner ? thresholdLength : params.strictClauseLengthLimit()+ClauseMetadata::numInts())) {
                         // Go to next LBD, lowest length
                         lbd++;
                         length = (inner || lbd > thresholdLbd) ? lbd : thresholdLength+1;
@@ -124,7 +124,7 @@ public:
     };
 
     StaticClauseStore(const Parameters& params, bool resetLbdAtExport, int bucketSize, bool expandBuckets, int totalCapacity) :
-        GenericClauseStore(params.strictClauseLengthLimit(), resetLbdAtExport), _expand_buckets(expandBuckets),
+        GenericClauseStore(params.strictClauseLengthLimit()+ClauseMetadata::numInts(), resetLbdAtExport), _expand_buckets(expandBuckets),
             _bucket_size(bucketSize), _total_capacity(totalCapacity) {
 
         // Build bijection between (physical) bucket index and priority index
@@ -134,7 +134,8 @@ public:
             params.lbdPriorityOuter() ? LBD_FIRST : LENGTH_FIRST,
             params.qualityClauseLengthLimit(), params.qualityLbdLimit());
         // Forward direction
-        while (index.length <= params.strictClauseLengthLimit() && index.lbd <= params.strictLbdLimit()) {
+        while (index.length <= _max_eff_clause_length
+                && index.lbd <= params.strictLbdLimit()) {
             _priority_idx_to_bucket_idx.push_back(index.index);
             index.next();
         }
@@ -222,7 +223,7 @@ public:
             std::function<void(int*)> clauseDataConverter = [](int*){}) override {
 
         // Builder object for our output
-        BufferBuilder builder(limit, _max_clause_length, false);
+        BufferBuilder builder(limit, _max_eff_clause_length, false);
 
         // lock clause adding
         if (Concurrent) addClauseLock.lock();
@@ -265,7 +266,7 @@ public:
                         // update threshold,
                         _max_admissible_bucket_idx = prioIdx;
                         _max_admissible_bucket_lits = nbRemainingAdmissibleLits;
-                        _current_max_clause_length.store(b->clauseLength, std::memory_order_relaxed);
+                        _current_max_eff_clause_length.store(b->clauseLength, std::memory_order_relaxed);
                         // trim buffer according to the remaining capacity,
                         b->size = std::min((int)b->size, (nbRemainingAdmissibleLits / b->clauseLength) * b->clauseLength);
                         // begin cleaning up all subsequent data
@@ -340,13 +341,13 @@ public:
     }
 
     BufferReader getBufferReader(int* data, size_t buflen, bool useChecksums = false) const override {
-        return BufferReader(data, buflen, _max_clause_length, false, useChecksums);
+        return BufferReader(data, buflen, _max_eff_clause_length, false, useChecksums);
     }
 
-    virtual int getMaxAdmissibleClauseLength() const override {
+    virtual int getMaxAdmissibleEffectiveClauseLength() const override {
         int priorityIdx = -1;
-        if (_max_admissible_bucket_idx == INT32_MAX) return _max_clause_length;
-        return _current_max_clause_length.load(std::memory_order_relaxed);
+        if (_max_admissible_bucket_idx == INT32_MAX) return _max_eff_clause_length;
+        return _current_max_eff_clause_length.load(std::memory_order_relaxed);
     }
 
     ~StaticClauseStore() {

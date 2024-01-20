@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
 #include "app/sat/sharing/filter/clause_buffer_lbd_scrambler.hpp"
 #include "app/sat/sharing/filter/generic_clause_filter.hpp"
@@ -121,7 +122,8 @@ public:
                 // 1. Create reader for shared clause buffer
                 BufferReader reader(_broadcast_clause_buffer.data(),
                     _broadcast_clause_buffer.size() - aggregation.numMetadataInts(),
-                    _params.strictClauseLengthLimit(), false);
+                    _params.strictClauseLengthLimit()+ClauseMetadata::numInts(),
+                    false);
                 // 2. Scramble clauses within each clause length w.r.t. LBD scores
                 ClauseBufferLbdScrambler scrambler(_params, reader);
                 auto modifiedClauseBuffer = scrambler.scrambleLbdScores();
@@ -245,17 +247,18 @@ private:
         // actual merging
         std::vector<int> merged;
         float time = Timer::elapsedSeconds();
+        const int maxEffectiveClsLen = _params.strictClauseLengthLimit()+ClauseMetadata::numInts();
         if (_params.priorityBasedBufferMerging()) {
             StaticClauseStore<false> _merge_store(_params, false, 1000, true, INT32_MAX);
-            auto merger = BufferMerger(&_merge_store, buflim, _params.strictClauseLengthLimit(), false);
+            auto merger = BufferMerger(&_merge_store, buflim, maxEffectiveClsLen, false);
             for (auto& elem : elems) {
-                merger.add(BufferReader(elem.data(), elem.size(), _params.strictClauseLengthLimit(), false));
+                merger.add(BufferReader(elem.data(), elem.size(), maxEffectiveClsLen, false));
             }
             merged = merger.mergePriorityBased(_params, _excess_clauses_from_merge, _rng);
         } else {
-            auto merger = BufferMerger(buflim, _params.strictClauseLengthLimit(), false);
+            auto merger = BufferMerger(buflim, maxEffectiveClsLen, false);
             for (auto& elem : elems) {
-                merger.add(BufferReader(elem.data(), elem.size(), _params.strictClauseLengthLimit(), false));
+                merger.add(BufferReader(elem.data(), elem.size(), maxEffectiveClsLen, false));
             }
             merged = merger.mergePreservingExcessWithRandomTieBreaking(_excess_clauses_from_merge, _rng);
         }

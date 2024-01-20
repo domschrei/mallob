@@ -43,9 +43,9 @@ public:
             if (_sign_shared_clauses) {
                 memcpy(_next_signature.data(), clause.begin+2, sizeof(int) * (ClauseMetadata::numInts()-2));
             }
-            LOG(V5_DEBG, "IMPORT ID=%ld len=%i %s\n", _next_id,
-                clause.size - ClauseMetadata::numInts(), clause.toStr().c_str());
         }
+        LOG(V5_DEBG, "IMPORT ID=%ld len=%i %s\n", _next_id,
+            clause.size - ClauseMetadata::numInts(), clause.toStr().c_str());
         _next_clause.resize(clause.size - ClauseMetadata::numInts());
         for (size_t i = ClauseMetadata::numInts(); i < clause.size; ++i) {
             _next_clause[i-ClauseMetadata::numInts()] = clause.begin[i];

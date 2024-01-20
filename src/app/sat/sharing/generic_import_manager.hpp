@@ -14,7 +14,7 @@ class GenericImportManager {
 protected:
     SolverStatistics& _stats;
     std::function<void(Mallob::Clause&)> _preimport_clause_manipulator;
-    int _max_clause_length;
+    int _max_lits_per_clause;
 
     int _imported_revision {0};
     int _solver_revision {0};
@@ -22,7 +22,7 @@ protected:
 
 public:
     GenericImportManager(const SolverSetup& setup, SolverStatistics& stats) : _stats(stats), 
-        _max_clause_length(setup.strictClauseLengthLimit) {}
+        _max_lits_per_clause(setup.strictMaxLitsPerClause) {}
     void setPreimportClauseManipulator(std::function<void(Mallob::Clause&)> cb) {
         _preimport_clause_manipulator = cb;
     }

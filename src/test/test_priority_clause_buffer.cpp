@@ -38,7 +38,7 @@ int getProducer(const Mallob::Clause& clause, int nbProducers) {
 
 void testBasic() {
     AdaptiveClauseStore::Setup setup;
-    setup.maxClauseLength = 20;
+    setup.maxEffectiveClauseLength = 20;
     setup.slotsForSumOfLengthAndLbd = false;
     setup.maxLbdPartitionedSize = 2;
     setup.numLiterals = 10;

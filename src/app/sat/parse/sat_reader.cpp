@@ -52,7 +52,7 @@ bool SatReader::read(JobDescription& desc) {
 	desc.setAppConfigurationEntry("__NC", NC_DEFAULT_VAL);
 	desc.setAppConfigurationEntry("__NV", NC_DEFAULT_VAL);
 	if (_params.onTheFlyChecking()) {
-		std::string placeholder(_params.hmacSignatures() ? 32 : 16, 'x');
+		std::string placeholder(32, 'x');
 		desc.setAppConfigurationEntry("__SIG", placeholder.c_str());
 	}
 	desc.beginInitialization(desc.getRevision());
@@ -185,8 +185,15 @@ bool SatReader::read(JobDescription& desc) {
 
 	if (_params.onTheFlyChecking()) {
 		// Sign the parsed formula
-		const std::string sigStr = TrustedSolving::signParsedFormula(desc, _params.hmacSignatures());
-		assert(sigStr.size() == (_params.hmacSignatures() ? 32 : 16)); // 32 hex chars = 16 bytes = 128 bit
+		TrustedSolving ts(loggerCCallback, &Logger::getMainInstance(), _max_var);
+		int sigSize {16};
+		std::vector<uint8_t> sig(sigSize);
+		ts.signParsedFormula(
+			desc.getFormulaPayload(desc.getRevision()),
+			desc.getNumFormulaLiterals(),
+			sig.data(), sigSize
+		);
+		std::string sigStr = Logger::dataToHexStr(sig.data(), sigSize);
 		assert(desc.getAppConfiguration().map.at("__SIG").size() == sigStr.size());
 		desc.setAppConfigurationEntry("__SIG", sigStr);
 	}

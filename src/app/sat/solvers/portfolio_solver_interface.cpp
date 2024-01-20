@@ -54,8 +54,8 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 		  }()), _rng(_setup.globalId) {
 	updateTimer(_job_name);
 	_global_name = "<h-" + _job_name + "_S" + std::to_string(_global_id) + ">";
-	_stats.histProduced = new ClauseHistogram(setup.strictClauseLengthLimit);
-	_stats.histDigested = new ClauseHistogram(setup.strictClauseLengthLimit);
+	_stats.histProduced = new ClauseHistogram(setup.strictMaxLitsPerClause+ClauseMetadata::numInts());
+	_stats.histDigested = new ClauseHistogram(setup.strictMaxLitsPerClause+ClauseMetadata::numInts());
 
 	LOGGER(_logger, V4_VVER, "Diversification index %i\n", getDiversificationIndex());
 

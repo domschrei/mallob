@@ -10,7 +10,7 @@
 void testSimple() {
 
     AdaptiveClauseDatabase::Setup setup;
-    setup.maxClauseLength = 20;
+    setup.maxEffClauseLength = 20;
     setup.slotsForSumOfLengthAndLbd = false;
     setup.maxLbdPartitionedSize = 2;
     setup.numLiterals = 1500;

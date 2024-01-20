@@ -18,6 +18,7 @@
 #include "util/logger.hpp"
 #include "util/distribution.hpp"
 
+
 Cadical::Cadical(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup),
 	  solver(new CaDiCaL::Solver), terminator(*setup.logger), 
@@ -48,8 +49,27 @@ Cadical::Cadical(const SolverSetup& setup)
 		okay = solver->set("lratorigclscount", setup.numOriginalClauses); assert(okay);
 
 		if (_do_trusted_solving) {
-			_trusted_solving.reset(new TrustedSolving(_logger, _setup, setup.numVars));
-			_trusted_solving->init(_setup.sigFormula);
+			_trusted_solving.reset(new TrustedSolving(loggerCCallback, &_logger, setup.numVars));
+
+			// Convert hex string back to byte array
+			uint8_t* target;
+			{
+				std::string sigStr = _setup.sigFormula;
+				const char* src = sigStr.c_str();
+				target = (uint8_t*) malloc(16);
+				uint8_t* dest = target;
+				while(*src && src[1]) {
+					char c1 = src[0];
+					int i1 = (c1 >= '0' && c1 <= '9') ? (c1 - '0') : (c1 - 'a' + 10);
+					char c2 = src[1];
+					int i2 = (c2 >= '0' && c2 <= '9') ? (c2 - '0') : (c2 - 'a' + 10);
+					*(dest++) = i1*16 + i2;
+					src += 2;
+				}
+			}
+			_trusted_solving->init(target);
+			free(target);
+
 			okay = solver->set("signsharedcls", 1); assert(okay);
 			solver->trace_proof_internally(
 				[&](unsigned long id, const int* lits, int nbLits, const unsigned long* hints, int nbHints, uint8_t* sigData, int& sigSize) {
@@ -183,7 +203,11 @@ SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 	case 10:
 		return SAT;
 	case 20:
-		if (_do_trusted_solving) _trusted_solving->validateUnsat();
+		if (_do_trusted_solving) {
+			int sigSize {32};
+			std::vector<uint8_t> sig(sigSize);
+			_trusted_solving->validateUnsat(sig.data(), sigSize);
+		}
 		return UNSAT;
 	default:
 		return UNKNOWN;

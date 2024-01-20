@@ -28,7 +28,7 @@ private:
 
 public:
     BufferReader() = default;
-    BufferReader(int* buffer, int size, int maxClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum = false);
+    BufferReader(int* buffer, int size, int maxEffClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum = false);
 
     void releaseBuffer() {_buffer = nullptr;}
 

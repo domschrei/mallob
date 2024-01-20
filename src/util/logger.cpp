@@ -203,6 +203,13 @@ std::string Logger::floatToStr(double num, int precision) {
     oss << num;
     return oss.str();
 }
+std::string Logger::dataToHexStr(const uint8_t* data, unsigned long size) {
+    std::stringstream stream;
+    for (int i = 0; i < size; i++) {
+        stream << std::hex << std::setfill('0') << std::setw(2) << (int) data[i];
+    }
+    return stream.str();
+}
 
 void Logger::log(va_list& args, unsigned int options, const char* str) const {
         
@@ -289,4 +296,8 @@ void Logger::log(va_list& args, unsigned int options, const char* str) const {
 
 int Logger::getVerbosity() const {
     return _verbosity;
+}
+
+void loggerCCallback(void* logger, const char* msg) {
+	LOGGER((*(Logger*)logger), V2_INFO, msg);
 }

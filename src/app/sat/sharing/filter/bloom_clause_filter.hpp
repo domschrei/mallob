@@ -54,7 +54,7 @@ class BloomClauseFilter : public GenericClauseFilter {
 
 private:
 	std::vector<std::bitset<NUM_BITS>> _bitsets;
-	int _max_clause_length = 0;
+	int _max_eff_clause_length = 0;
 
 	tsl::robin_set<int> _units;
 	Mutex _mtx_units;
@@ -65,11 +65,11 @@ private:
 	std::vector<std::unique_ptr<Mutex>> _locks;
 
 public:
-	BloomClauseFilter(GenericClauseStore& clauseStore, int nbSolvers, int maxClauseLen, bool locking) :
-		GenericClauseFilter(clauseStore), _bitsets(nbSolvers), _max_clause_length(maxClauseLen), _locking(locking) {
+	BloomClauseFilter(GenericClauseStore& clauseStore, int nbSolvers, int maxEffClauseLength, bool locking) :
+		GenericClauseFilter(clauseStore), _bitsets(nbSolvers), _max_eff_clause_length(maxEffClauseLength), _locking(locking) {
 
 		if (_locking) {
-			_locks.resize(maxClauseLen+1);
+			_locks.resize(maxEffClauseLength+1);
 			for (size_t i = 0; i < _locks.size(); i++) _locks[i].reset(new Mutex());
 		}
 	}
@@ -147,7 +147,7 @@ private:
 
 	bool admitClause(const Mallob::Clause& c, int producerId) {
 		// Block clauses above maximum length
-		if (_max_clause_length > 0 && c.size > _max_clause_length) return false;
+		if (_max_eff_clause_length > 0 && c.size > _max_eff_clause_length) return false;
 
 		// unit clauses are checked explicitly
 		if (c.size == 1) { // Unit clause!

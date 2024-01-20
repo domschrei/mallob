@@ -1,9 +1,12 @@
 
 #include "buffer_reader.hpp"
+#include "app/sat/data/clause_metadata.hpp"
 #include "util/logger.hpp"
 
-BufferReader::BufferReader(int* buffer, int size, int maxClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum) : 
-        _buffer(buffer), _size(size), _it(maxClauseLength, slotsForSumOfLengthAndLbd), _use_checksum(useChecksum) {
+BufferReader::BufferReader(int* buffer, int size, int maxEffClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum) : 
+        _buffer(buffer), _size(size),
+        _it(maxEffClauseLength, slotsForSumOfLengthAndLbd),
+        _use_checksum(useChecksum) {
     
     int numInts = sizeof(size_t)/sizeof(int);
     if (_use_checksum && _size > 0) {

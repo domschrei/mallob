@@ -36,7 +36,7 @@ public:
 		int filterPos = -1 + (ClauseMetadata::enabled() ? 2 : 0);
 
         BufferReducer reducer(_clause_buffer, _clause_bufsize, 
-            _params.strictClauseLengthLimit(), _params.groupClausesByLengthLbdSum());
+            _params.strictClauseLengthLimit()+ClauseMetadata::numInts(), _params.groupClausesByLengthLbdSum());
 
         size_t newSize = reducer.reduce([&]() {
 			_num_cls++;

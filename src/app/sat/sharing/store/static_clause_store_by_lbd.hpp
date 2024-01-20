@@ -25,8 +25,8 @@ private:
     const int _bucket_size;
 
 public:
-    StaticClauseStoreByLbd(int maxClauseLength, bool resetLbdAtExport, int bucketSize) :
-        GenericClauseStore(maxClauseLength, resetLbdAtExport), _bucket_size(bucketSize) {}
+    StaticClauseStoreByLbd(int maxEffClauseLength, bool resetLbdAtExport, int bucketSize) :
+        GenericClauseStore(maxEffClauseLength, resetLbdAtExport), _bucket_size(bucketSize) {}
 
     bool addClause(const Mallob::Clause& clause) override {
         if (!addClauseLock.tryLock()) return false;
@@ -69,7 +69,7 @@ public:
             ExportMode mode = ANY, bool sortClauses = true,
             std::function<void(int*)> clauseDataConverter = [](int*){}) override {
 
-        BufferBuilder builder(limit, _max_clause_length, false);
+        BufferBuilder builder(limit, _max_eff_clause_length, false);
 
         // lock clause adding
         addClauseLock.lock();
@@ -121,7 +121,7 @@ public:
     }
 
     BufferReader getBufferReader(int* data, size_t buflen, bool useChecksums = false) const override {
-        return BufferReader(data, buflen, _max_clause_length, false, useChecksums);
+        return BufferReader(data, buflen, _max_eff_clause_length, false, useChecksums);
     }
 
     ~StaticClauseStoreByLbd() {

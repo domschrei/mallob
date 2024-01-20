@@ -133,9 +133,9 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.logger = &_logger;
 	setup.jobname = config.getJobStr();
 	setup.isJobIncremental = config.incremental;
-	setup.strictClauseLengthLimit = params.strictClauseLengthLimit();
+	setup.strictMaxLitsPerClause = params.strictClauseLengthLimit();
 	setup.strictLbdLimit = params.strictLbdLimit();
-	setup.qualityClauseLengthLimit = params.qualityClauseLengthLimit();
+	setup.qualityMaxLitsPerClause = params.qualityClauseLengthLimit();
 	setup.qualityLbdLimit = params.qualityLbdLimit();
 	setup.clauseBaseBufferSize = params.clauseBufferBaseSize();
 	setup.anticipatedLitsToImportPerCycle = config.maxBroadcastedLitsPerCycle;

@@ -1,17 +1,8 @@
 
 #pragma once
 
-#include <vector>
-#include <string>
-
-#include "app/sat/execution/solver_setup.hpp"
 #include "app/sat/proof/lrat_checker.hpp"
-#include "data/job_description.hpp"
-#include "util/hashing.hpp"
-#include "util/hmac_sha256/sha256.hpp"
-#include "util/logger.hpp"
-#include "util/params.hpp"
-#include "util/tsl/robin_hash.h"
+#include "util/SipHash/siphash.hpp"
 
 /*
 Interface for trusted solving.
@@ -21,13 +12,15 @@ class TrustedSolving {
 // ******************************** INTERFACE ********************************
 
 public:
-    TrustedSolving(Logger& logger, const SolverSetup& setup, int nbVars) :
-        _logger(logger), _setup(setup), _checker(nbVars) {}
+    TrustedSolving(void (*logFunction)(void*, const char*), void* logger, int nbVars) :
+        _log_function(logFunction), _logger(logger),
+        _checker(nbVars, _key),
+        _siphash(_key) {}
 
-    // Parse formula, return its signature. Single use and at one process only.
-    static std::string signParsedFormula(JobDescription& desc, bool hmac) {return doSignParsedFormula(desc, hmac);}
+    // Compute the parsed formula's signature. Single use and at one process only.
+    void signParsedFormula(const int* literals, int nbLiterals, uint8_t* outSig, int& inOutSigSize) {doSignParsedFormula(literals, nbLiterals, outSig, inOutSigSize);}
 
-    void init(const std::string& formulaSignature) {doInit(formulaSignature);}
+    void init(const uint8_t* formulaSignature) {doInit(formulaSignature);}
     void loadLiteral(int lit) {doLoadLiteral(lit);}
     bool endLoading() {return doEndLoading();}
 
@@ -42,34 +35,46 @@ public:
     }
     bool deleteClauses(const unsigned long* ids, int nbIds) {return doDeleteClauses(ids, nbIds);}
 
-    bool validateUnsat() {return doValidateUnsat();}
+    bool validateUnsat(uint8_t* outSignature, int& inOutSigSize) {return doValidateUnsat(outSignature, inOutSigSize);}
 
 // **************************** END OF INTERFACE *****************************
 
 
 
+#define SIG_SIZE_BYTES 16
+
 private:
-    Logger& _logger;
-    const SolverSetup _setup;
+    static uint8_t _key[SIG_SIZE_BYTES]; // secret
 
-    static unsigned long _orig_key; // secret
-    static bool _parsed_formula;
+    void (*_log_function)(void*, const char*);
+    void* _logger;
 
-    unsigned long _modi_key; // secret
-    std::string _formula_signature;
+    bool _parsed_formula {false};
+    uint8_t _formula_signature[SIG_SIZE_BYTES];
     LratChecker _checker;
+    SipHash _siphash;
 
-#define MAX_SIG_SIZE_BYTES 16
 
-    inline void doInit(const std::string& formulaSignature) {
+    inline void doSignParsedFormula(const int* lits, unsigned long nbLits, uint8_t* outSig, int& inOutSigSize) {
+        if (_parsed_formula) {
+            _log_function(_logger, "[ERROR] TS - attempt to sign multiple formulas\n");
+            abort();
+        }
+        // Sign the read data
+        if (inOutSigSize < SIG_SIZE_BYTES) {
+            abort();
+        }
+        inOutSigSize = SIG_SIZE_BYTES;
+        uint8_t* out = _siphash.reset()
+            .update((uint8_t*) lits, sizeof(int) * nbLits)
+            .digest();
+        copyBytes(outSig, out, SIG_SIZE_BYTES);
+        _parsed_formula = true;
+    }
+
+    inline void doInit(const uint8_t* formulaSignature) {
         // Store formula signature to validate later after loading
-        _formula_signature = formulaSignature;
-        // Compute updated key via SHA256 based on the original key and the formula's signature
-        auto modified = Sha256Builder()
-            .update((uint8_t*) &_orig_key, sizeof(unsigned long))
-            .update((uint8_t*) _formula_signature.data(), _formula_signature.size())
-            .get();
-        memcpy(&_modi_key, modified.data(), sizeof(unsigned long));
+        copyBytes(_formula_signature, formulaSignature, SIG_SIZE_BYTES);
     }
 
     inline void doLoadLiteral(int lit) {
@@ -77,18 +82,13 @@ private:
     }
 
     inline bool doEndLoading() {
-        std::vector<uint8_t> sha256;
-        bool ok = _checker.endLoading(&sha256);
+        uint8_t* sigFromChecker;
+        bool ok = _checker.endLoading(sigFromChecker);
         if (!ok) abortWithCheckerError();
-        // Compute HMAC signature based on the hash
-        int sigSize = 256 / 8;
-		std::vector<uint8_t> sigData(sigSize);
-        computeSignature(_setup.hmacSignatures, sha256.data(), sha256.size(), sigData.data(), sigSize, _orig_key);
-		const auto sigStr = dataToHexStr(sigData.data(), sigSize);
 		// Check against provided signature
-        ok = sigStr == _formula_signature; 
+        ok = equalSignatures(sigFromChecker, _formula_signature); 
 		if (!ok) {
-			LOGGER(_logger, V0_CRIT, "[ERROR] TS - formula signature does not match: %s vs. %s\n", sigStr.c_str(), _setup.sigFormula.c_str());
+			_log_function(_logger, "[ERROR] TS - formula signature does not match\n");
 			abort();
 		}
         return ok;
@@ -103,7 +103,7 @@ private:
         if (!ok) abortWithCheckerError();
         // compute signature if desired
         if (outSignatureOrNull) {
-            computeClauseSignature(_setup.hmacSignatures, id, literals, nbLiterals, outSignatureOrNull, inOutSigSize, _modi_key);
+            computeClauseSignature(id, literals, nbLiterals, outSignatureOrNull, inOutSigSize);
         }
         return ok;
     }
@@ -112,16 +112,15 @@ private:
         const uint8_t* signatureData, int signatureSize) {
         
         // verify signature
-        int computedSigSize = MAX_SIG_SIZE_BYTES;
+        int computedSigSize = SIG_SIZE_BYTES;
         uint8_t computedSignature[computedSigSize];
-        computeClauseSignature(_setup.hmacSignatures, id, literals, nbLiterals, computedSignature, computedSigSize, _modi_key);
+        computeClauseSignature(id, literals, nbLiterals, computedSignature, computedSigSize);
         if (computedSigSize != signatureSize) {
-            LOGGER(_logger, V0_CRIT, "[ERROR] TS - supplied clause signature has wrong size\n");
+            _log_function(_logger, "[ERROR] TS - supplied clause signature has wrong size\n");
             abort();
         }
         for (int i = 0; i < signatureSize; i++) if (computedSignature[i] != signatureData[i]) {
-            LOGGER(_logger, V0_CRIT, "[ERROR] TS - clause signature does not match: %s vs %s\n",
-                dataToHexStr(computedSignature, computedSigSize).c_str(), dataToHexStr(signatureData, signatureSize).c_str());
+            _log_function(_logger, "[ERROR] TS - clause signature does not match\n");
             abort();
         }
 
@@ -137,85 +136,73 @@ private:
         return ok;
     }
 
-    inline bool doValidateUnsat() {
+    inline bool doValidateUnsat(uint8_t* outSignature, int& inOutSigSize) {
         bool ok = _checker.validateUnsat();
         if (!ok) abortWithCheckerError();
-        uint8_t yes = 1;
-        int sigSize {16};
-        std::vector<uint8_t> signature(sigSize);
-        computeSignature(_setup.hmacSignatures, &yes, 1, signature.data(), sigSize, _modi_key);
-        std::string sigStr = dataToHexStr(signature.data(), sigSize);
-        LOGGER(_logger, V2_INFO, "TS - UNSAT of formula %s checked on-the-fly; confirmation: %s\n",
-            _formula_signature.c_str(), sigStr.c_str());
+        _log_function(_logger, "TS - UNSAT checked on-the-fly\n");
         return ok;
     }
 
     inline void abortWithCheckerError() {
-        LOGGER(_logger, V0_CRIT, "[ERROR] TS - LRAT checker error: %s\n", _checker.getErrorMessage().c_str());
+        _log_function(_logger, "[ERROR] TS - LRAT checker error:\n");
+        _log_function(_logger, _checker.getErrorMessage());
         abort();
     }
 
-    static inline std::string doSignParsedFormula(JobDescription& desc, bool hmac) {
-        if (_parsed_formula) {
-            LOG(V0_CRIT, "[ERROR] TS - attempt to sign multiple formulas\n");
-            abort();
-        }
-        // Sign the read data with HMAC-SHA256
-		Sha256Builder sigBuilder;
-		sigBuilder.update(
-			(uint8_t*) desc.getFormulaPayload(desc.getRevision()),
-			sizeof(int) * desc.getNumFormulaLiterals()
-		);
-		std::vector<uint8_t> sha256 = sigBuilder.get();
-        int sigSize = 16;
-		std::vector<uint8_t> sigData(sigSize);
-        computeSignature(hmac, sha256.data(), sha256.size(), sigData.data(), sigSize, _orig_key);
-		// Put the signature into the description as a config entry
-		const auto sigStr = dataToHexStr(sigData.data(), sigSize);
-		LOG(V2_INFO, "TS - Signed parsed formula #%i with signature %s\n", desc.getId(), sigStr.c_str());
-        _parsed_formula = true;
-        return sigStr;
+
+
+    inline void computeClauseSignature(uint64_t id, const int* lits, int nbLits, uint8_t* out, int& inOutSize) {
+        if (inOutSize < SIG_SIZE_BYTES) abort();
+        inOutSize = SIG_SIZE_BYTES;
+        const uint8_t* hashOut = _siphash.reset()
+            .update((uint8_t*) &id, sizeof(uint64_t))
+            .update((uint8_t*) lits, nbLits*sizeof(int))
+            .update(_key, SIG_SIZE_BYTES)
+            .digest();
+        copyBytes(out, hashOut, inOutSize);
     }
 
-    static inline void computeClauseSignature(bool hmac, uint64_t id, const int* lits, int nbLits, uint8_t* out, int& inOutSize, unsigned long key) {
-
-        const int MAX_CLAUSE_LENGTH = 1<<14;
-        int data[MAX_CLAUSE_LENGTH];
-        if (nbLits+2 >= MAX_CLAUSE_LENGTH) abort();
-        memcpy(data, lits, sizeof(int) * nbLits);
-        memcpy(data + nbLits, (uint8_t*) &id, sizeof(unsigned long));
-
-        computeSignature(hmac, (uint8_t*) data, sizeof(int) * (nbLits+2), out, inOutSize, key);
+    inline void computeSignature(const uint8_t* data, int size, uint8_t* out, int& inOutSize) {
+        if (inOutSize < SIG_SIZE_BYTES) abort();
+        inOutSize = SIG_SIZE_BYTES;
+        uint8_t* sipout = _siphash.reset()
+            .update(data, size)
+            .digest();
+        copyBytes(out, sipout, SIG_SIZE_BYTES);
     }
 
-    static inline void computeSignature(bool hmac, const uint8_t* data, int size, uint8_t* out, int& inOutSize, unsigned long key) {
-        if (hmac) {
-            computeHmacSignature(data, size, out, inOutSize, key);
-        } else {
-            computeSimpleSignature(data, size, out, inOutSize, key);
-        }
-    }
-
-    static inline void computeHmacSignature(const uint8_t* data, int size, uint8_t* out, int& inOutSize, unsigned long key) {
+/*
+    static inline void computeHmacSignature(const uint8_t* data, int size, uint8_t* out, int& inOutSize, const std::vector<uint8_t>& key) {
         if (inOutSize < 16) abort();
-        inOutSize = HMAC::sign_data_128bit(data, size, key, out);
-        return;
+        inOutSize = HMAC::sign_data_128bit(data, size, key.data(), key.size(), out);
     }
 
-    static inline void computeSimpleSignature(const uint8_t* data, int size, uint8_t* out, int& inOutSize, unsigned long key) {
+    static inline void computeSipHashSignature(const uint8_t* data, int size, uint8_t* out, int& inOutSize, const std::vector<uint8_t> key) {
+        if (inOutSize < 16) abort();
+        SipHash::sign_data_128bit(data, size, _orig_key.data(), out);
+        inOutSize = 16;
+    }
+
+    static inline void computeSimpleSignature(const uint8_t* data, int size, uint8_t* out, int& inOutSize, const std::vector<uint8_t>& key) {
         if (inOutSize < sizeof(unsigned long)) abort();
-        memcpy(out, &key, sizeof(unsigned long));
+        memcpy(out, key.data(), sizeof(unsigned long));
         for (int i = 0; i < size; i++) hash_combine((unsigned long&) *out, data[i]);
         inOutSize = sizeof(unsigned long);
     }
+*/
 
-    static inline std::string dataToHexStr(const uint8_t* data, unsigned long size) {
-        std::stringstream stream;
-		for (int i = 0; i < size; i++) {
-			stream << std::hex << std::setfill('0') << std::setw(2) << (int) data[i];
-		}
-		return stream.str();
+    void copyBytes(uint8_t* to, const uint8_t* from, size_t nbBytes) {
+        for (size_t i = 0; i < nbBytes; i++) {
+            to[i] = from[i];
+        }
     }
 
-#undef MAX_SIG_SIZE_BYTES
+    bool equalSignatures(const uint8_t* left, const uint8_t* right) {
+        for (size_t i = 0; i < SIG_SIZE_BYTES; i++) {
+            if (left[i] != right[i]) return false;
+        }
+        return true;
+    }
+
+#undef SIG_SIZE_BYTES
 };

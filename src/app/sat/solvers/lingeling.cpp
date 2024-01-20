@@ -90,7 +90,7 @@ Lingeling::Lingeling(const SolverSetup& setup)
 
 	lglsetime(solver, getTime);
 	lglseterm(solver, cbCheckTerminate, this);
-	sizeLimit = _setup.strictClauseLengthLimit;
+	sizeLimit = _setup.strictMaxLitsPerClause;
 	glueLimit = _setup.strictLbdLimit;
 
     suspendSolver = false;

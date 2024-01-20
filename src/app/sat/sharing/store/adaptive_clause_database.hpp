@@ -61,7 +61,7 @@ private:
     robin_hood::unordered_flat_map<std::pair<int, int>, std::pair<int, ClauseSlotMode>, IntPairHasher> _size_lbd_to_slot_idx_mode;
 
     int _max_lbd_partitioned_size;
-    int _max_clause_length;
+    int _max_eff_clause_length;
     bool _slots_for_sum_of_length_and_lbd;
 
     bool _use_checksum;
@@ -75,7 +75,7 @@ private:
 public:
     struct Setup {
         int numLiterals = 1000;
-        int maxClauseLength = 20;
+        int maxEffClauseLength = 20;
         int maxLbdPartitionedSize = 2;
         bool useChecksums = false;
         bool slotsForSumOfLengthAndLbd = false;

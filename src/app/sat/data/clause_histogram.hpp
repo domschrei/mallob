@@ -14,8 +14,8 @@ private:
     std::vector<std::atomic_ullong*> _hist;
 
 public:
-    ClauseHistogram(size_t maxSize): _hist(maxSize) {
-        for (size_t i = 0; i < maxSize; i++) _hist[i] = new std::atomic_ullong(0);
+    ClauseHistogram(size_t maxEffectiveSize): _hist(maxEffectiveSize) {
+        for (size_t i = 0; i < maxEffectiveSize; i++) _hist[i] = new std::atomic_ullong(0);
     }
     ~ClauseHistogram() {
         for (auto ptr : _hist) delete ptr;

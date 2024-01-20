@@ -2,7 +2,6 @@
 #pragma once
 
 #include "sha256.h"
-#include "util/logger.hpp"
 
 #include <cstring>
 #include <iomanip>
@@ -28,7 +27,6 @@ public:
     }
 
     std::vector<uint8_t> get() {
-        LOG(V2_INFO, "[SHA256] digested %lu bytes\n", _nb_bytes);
         SHA256_HASH hash;
         Sha256Finalise(&ctx, &hash);
         std::vector<uint8_t> res(SHA256_HASH_SIZE);
@@ -37,7 +35,6 @@ public:
     }
 
     std::string getAsHexStr() {
-        LOG(V2_INFO, "[SHA256] digested %lu bytes\n", _nb_bytes);
         SHA256_HASH hash;
         Sha256Finalise(&ctx, &hash);
         std::stringstream stream;

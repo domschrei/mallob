@@ -13,7 +13,7 @@ protected:
     GenericClauseFilter& _filter;
     std::vector<std::shared_ptr<PortfolioSolverInterface>>& _solvers;
     std::vector<SolverStatistics*>& _solver_stats;
-    int _max_clause_length;
+    int _max_eff_clause_length;
 
     ClauseHistogram _hist_failed_filter;
     ClauseHistogram _hist_admitted_to_db;
@@ -22,12 +22,12 @@ protected:
 public:
     GenericExportManager(GenericClauseStore& clauseStore, GenericClauseFilter& filter,
             std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
-            std::vector<SolverStatistics*>& solverStats, int maxClauseLength) : 
+            std::vector<SolverStatistics*>& solverStats, int maxEffectiveClauseLength) : 
         _clause_store(clauseStore), _filter(filter), _solvers(solvers), _solver_stats(solverStats),
-        _max_clause_length(maxClauseLength),
-        _hist_failed_filter(maxClauseLength), 
-        _hist_admitted_to_db(maxClauseLength), 
-        _hist_dropped_before_db(maxClauseLength) {}
+        _max_eff_clause_length(maxEffectiveClauseLength),
+        _hist_failed_filter(maxEffectiveClauseLength), 
+        _hist_admitted_to_db(maxEffectiveClauseLength), 
+        _hist_dropped_before_db(maxEffectiveClauseLength) {}
     virtual ~GenericExportManager() {}
 
     virtual void produce(int* begin, int size, int lbd, int producerId, int epoch) = 0;
@@ -37,16 +37,16 @@ public:
 	ClauseHistogram& getDroppedHistogram() {return _hist_dropped_before_db;}
 
 protected:
-    void handleResult(int producerId, GenericClauseFilter::ExportResult result, int clauseLength) {
+    void handleResult(int producerId, GenericClauseFilter::ExportResult result, int effClauseLength) {
         auto solverStats = _solver_stats.at(producerId);
         if (result == GenericClauseFilter::ADMITTED) {
-            _hist_admitted_to_db.increment(clauseLength);
+            _hist_admitted_to_db.increment(effClauseLength);
             if (solverStats) solverStats->producedClausesAdmitted++;
         } else if (result == GenericClauseFilter::FILTERED) {
-            _hist_failed_filter.increment(clauseLength);
+            _hist_failed_filter.increment(effClauseLength);
             if (solverStats) solverStats->producedClausesFiltered++;
         } else if (result == GenericClauseFilter::DROPPED) {
-            _hist_dropped_before_db.increment(clauseLength);
+            _hist_dropped_before_db.increment(effClauseLength);
             if (solverStats) solverStats->producedClausesDropped++;
         }
     }

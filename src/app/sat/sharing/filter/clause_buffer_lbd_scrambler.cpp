@@ -9,7 +9,8 @@
 ClauseBufferLbdScrambler::ClauseBufferLbdScrambler(const Parameters& params, BufferReader& reader) : _params(params), _reader(reader) {}
 
 std::vector<int> ClauseBufferLbdScrambler::scrambleLbdScores() {
-    BufferBuilder builder(-1, _params.strictClauseLengthLimit(), false);
+    BufferBuilder builder(-1, _params.strictClauseLengthLimit()+ClauseMetadata::numInts(),
+        false);
 
     std::vector<int*> clausePtrs;
     int clauseLength = 1;

@@ -32,7 +32,7 @@ private:
     robin_hood::unordered_flat_map<std::pair<int, int>, std::pair<int, ClauseSlotMode>, IntPairHasher> _size_lbd_to_slot_idx_mode;
 
     int _max_lbd_partitioned_size;
-    int _max_clause_length;
+    int _max_eff_clause_length;
     bool _slots_for_sum_of_length_and_lbd;
 
     bool _use_checksum;
@@ -45,7 +45,7 @@ private:
 public:
     struct Setup {
         int numLiterals = 1000;
-        int maxClauseLength = 20;
+        int maxEffectiveClauseLength = 20;
         int maxLbdPartitionedSize = 2;
         bool useChecksums = false;
         bool slotsForSumOfLengthAndLbd = false;
@@ -53,10 +53,10 @@ public:
     };
 
     AdaptiveClauseStore(Setup setup) :
-        GenericClauseStore(setup.maxClauseLength, setup.resetLbdAtExport),
+        GenericClauseStore(setup.maxEffectiveClauseLength, setup.resetLbdAtExport),
         _total_literal_limit(setup.numLiterals),
         _max_lbd_partitioned_size(setup.maxLbdPartitionedSize),
-        _max_clause_length(setup.maxClauseLength),
+        _max_eff_clause_length(setup.maxEffectiveClauseLength),
         _slots_for_sum_of_length_and_lbd(setup.slotsForSumOfLengthAndLbd),
         _use_checksum(setup.useChecksums),
         _bucket_iterator(setup.slotsForSumOfLengthAndLbd ? 
@@ -64,10 +64,10 @@ public:
             setup.maxLbdPartitionedSize) {
 
         // Choose max. sum such that the largest legal clauses will be admitted iff they have LBD 2. 
-        int maxSumOfLengthAndLbd = setup.maxClauseLength+2;
+        int maxSumOfLengthAndLbd = setup.maxEffectiveClauseLength+2;
 
         // Iterate over all possible clause length - LBD combinations
-        for (int clauseLength = 1; clauseLength <= setup.maxClauseLength; clauseLength++) {
+        for (int clauseLength = 1; clauseLength <= setup.maxEffectiveClauseLength; clauseLength++) {
             for (int lbd = std::min(clauseLength, 2); lbd <= clauseLength; lbd++) {
 
                 std::pair<int, int> lengthLbdPair(clauseLength, lbd);
@@ -195,7 +195,7 @@ public:
             ExportMode mode = ANY, bool sortClauses = true, 
             std::function<void(int*)> clauseDataConverter = [](int*){}) override {
 
-        BufferBuilder builder(sizeLimit, _max_clause_length, _slots_for_sum_of_length_and_lbd);
+        BufferBuilder builder(sizeLimit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
 
         if (mode != NONUNITS) {
             _slots[0]->flushAndShrink(builder, clauseDataConverter);
@@ -227,15 +227,15 @@ public:
     }
 
     BufferReader getBufferReader(int* begin, size_t size, bool useChecksums = false) const override {
-        return BufferReader(begin, size, _max_clause_length, _slots_for_sum_of_length_and_lbd, useChecksums);
+        return BufferReader(begin, size, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd, useChecksums);
     }
 
     BufferMerger getBufferMerger(int sizeLimit) const {
-        return BufferMerger(sizeLimit, _max_clause_length, _slots_for_sum_of_length_and_lbd, _use_checksum);
+        return BufferMerger(sizeLimit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd, _use_checksum);
     }
 
     BufferBuilder getBufferBuilder(std::vector<int>* out, int totalLiteralLimit = -1) const {
-        return BufferBuilder(totalLiteralLimit, _max_clause_length, _slots_for_sum_of_length_and_lbd, out);
+        return BufferBuilder(totalLiteralLimit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd, out);
     }
 
     int getCurrentlyUsedLiterals() const override {
@@ -280,7 +280,7 @@ public:
         }
     }
 
-    int getMaxAdmissibleClauseLength() const override {
+    int getMaxAdmissibleEffectiveClauseLength() const override {
         int slotIdx = _max_admissible_slot_idx.load(std::memory_order_relaxed);
         assert(slotIdx >= 0 && slotIdx < _slots.size());
         return _slots[slotIdx]->getClauseLength();

@@ -48,15 +48,15 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "Clauses with an LBD score up to this value are considered \"high quality\"")
  OPT_INT(clauseFilterMode,                  "cfm", "clause-filter-mode",                 3,        0,   3, 
     "0 = no filtering, 1 = bloom filters, 2 = exact filters, 3 = exact filters with distributed filtering in a 2nd all-reduction")
- OPT_INT(clauseStoreMode,                   "csm", "clause-store-mode",                  2,        -1,  3,
+ OPT_INT(clauseStoreMode,                   "csm", "clause-store-mode",                  3,        -1,  3,
     "-1 = static by length w/ mixed LBD, 0 = static by length, 1 = static by LBD, 2 = adaptive by length + -mlbdps option, 3 = simplified adaptive")
  OPT_BOOL(lbdPriorityInner, "lbdpi", "lbd-priority-inner", false, "Whether LBD should be used as primary quality metric in the inner buckets (bound by \"quality\" limits)")
  OPT_BOOL(lbdPriorityOuter, "lbdpo", "lbd-priority-outer", false, "Whether LBD should be used as primary quality metric in the outer buckets (bound by \"strict\" limits)")
  OPT_INT(resetLbd,                          "rlbd", "reset-lbd-at-import",                1,        0,   3,
     "Reset each clause's LBD to its length 0=never; 1=at import; 2=at export; 3=at production")
- OPT_INT(strictClauseLengthLimit,           "scll", "strict-clause-length-limit",        16,       0,   255,
+ OPT_INT(strictClauseLengthLimit,           "scll", "strict-clause-length-limit",        60,       0,   255,
     "Only clauses up to this length will be shared")
- OPT_INT(strictLbdLimit,                    "slbdl", "strict-lbd-limit",                 16,       0,   255,
+ OPT_INT(strictLbdLimit,                    "slbdl", "strict-lbd-limit",                 60,       0,   255,
     "Only clauses with an LBD score up to this value will be shared")
  OPT_BOOL(skipClauseSharingDiagonally,      "scsd", "skip-clause-sharing-diagonally",    false, "In the ith diversification round, disable clause sharing for the (i%%numDivs)th solver")
  OPT_FLOAT(maxSharingCompensationFactor,    "mscf", "max-sharing-compensation-factor",   5,        1,   LARGE_INT,
