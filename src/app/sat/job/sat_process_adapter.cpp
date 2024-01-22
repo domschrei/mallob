@@ -1,4 +1,5 @@
 
+#include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/execution/solving_state.hpp"
 #include "app/sat/job/inplace_sharing_aggregation.hpp"
 #include "app/sat/sharing/filter/in_place_clause_filtering.hpp"
@@ -100,8 +101,8 @@ void SatProcessAdapter::doInitialize() {
     _sum_of_revision_sizes += _f_size;
 
     // Allocate import and export buffers
-    _hsm->exportBufferAllocatedSize = 2 * _params.maxSharingCompensationFactor() * _params.clauseBufferBaseSize() + 1024;
-    _hsm->importBufferMaxSize = 2 * _params.maxSharingCompensationFactor() * MyMpi::getBinaryTreeBufferLimit(
+    _hsm->exportBufferAllocatedSize = (2+ClauseMetadata::numInts()) * _params.maxSharingCompensationFactor() * _params.clauseBufferBaseSize() + 1024;
+    _hsm->importBufferMaxSize = (2+ClauseMetadata::numInts()) * _params.maxSharingCompensationFactor() * MyMpi::getBinaryTreeBufferLimit(
         _hsm->config.mpisize, _params.clauseBufferBaseSize(), _params.clauseBufferLimitParam(),
         MyMpi::BufferQueryMode(_params.clauseBufferLimitMode())
     ) + 1024;
