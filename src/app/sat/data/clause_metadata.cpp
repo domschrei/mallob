@@ -4,6 +4,8 @@
 #include "util/assert.hpp"
 
 int ClauseMetadata::metadataSize = 0;
+bool ClauseMetadata::idsEnabled = false;
+bool ClauseMetadata::signaturesEnabled = false;
 
 int ClauseMetadata::getEpoch(unsigned long id, const std::vector<unsigned long>& globalIdStartsPerEpoch) {
     // will point to 1st element >= clauseId (or end)

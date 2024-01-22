@@ -19,7 +19,7 @@ public:
         if (params.proofOutputFile.isSet() || _params.onTheFlyChecking()) {
             
             // Check that the restrictions of this mode are met
-            if (!params.monoFilename.isSet()) {
+            if (params.proofOutputFile.isSet() && !params.monoFilename.isSet()) {
                 LOG(V0_CRIT, "[ERROR] Mallob was launched with certified UNSAT support "
                     "which only supports -mono mode of operation.\n");
                 abort();

@@ -7,13 +7,19 @@
 class ClauseMetadata {
 
 	static int metadataSize;
+	static bool idsEnabled;
+	static bool signaturesEnabled;
 
 public:
 	static void enableClauseIds() {
+		if (idsEnabled) return;
 		metadataSize += 2; // 2 32-bit integers = 64 bit ID
+		idsEnabled = true;
 	}
 	static void enableClauseSignatures(bool hmac) {
+		if (signaturesEnabled) return;
 		metadataSize += 4; // 4 32-bit integers = 128 bit signature
+		signaturesEnabled = true;
 	}
 
 	static inline int numInts() {
