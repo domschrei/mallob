@@ -536,10 +536,11 @@ void SatEngine::cleanUp() {
 	_logger.flush();
 
 	if (ClauseMetadata::enabled()) writeClauseEpochs();
-
-	_cleaned_up = true;
 }
 
 SatEngine::~SatEngine() {
-	if (!_cleaned_up) cleanUp();
+	if (!_cleaned_up) {
+		_cleaned_up = true;
+		cleanUp();
+	}
 }

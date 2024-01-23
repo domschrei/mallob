@@ -84,6 +84,7 @@ public:
     void setTerminate(bool cleanUp = false) {
         {
             auto lock = _state_mutex.getLock();
+            if (_terminated) return;
             _cleanup_within_thread = cleanUp;
             _terminated = true;
         }
