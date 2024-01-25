@@ -7,8 +7,9 @@
 
 #pragma once
 
-#include "app/sat/proof/lrat_checker.hpp"
-#include "app/sat/proof/trusted_solving.hpp"
+#include "app/sat/proof/trusted/lrat_checker.hpp"
+#include "app/sat/proof/trusted/trusted_solving.hpp"
+#include "app/sat/proof/trusted/trusted_solving_interface.hpp"
 #include "portfolio_solver_interface.hpp"
 
 #include "util/sys/threading.hpp"
@@ -26,7 +27,7 @@ private:
 
 	Mutex learnMutex;
 
-	std::vector<std::vector<int> > learnedClauses;
+	std::vector<std::vector<int>> learnedClauses;
 	std::vector<int> assumptions;
 
 	CadicalTerminator terminator;
@@ -36,8 +37,9 @@ private:
 	bool seedSet = false;
 
 	std::string proofFileString;
-	std::unique_ptr<TrustedSolving> _trusted_solving;
+	std::unique_ptr<TrustedSolvingInterface> _trusted_solving;
 	const bool _do_trusted_solving;
+	const bool _trusted_subprocessing;
 
 public:
 	Cadical(const SolverSetup& setup);

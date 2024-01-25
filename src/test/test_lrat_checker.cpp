@@ -1,6 +1,6 @@
 
 #include "app/sat/data/clause.hpp"
-#include "app/sat/proof/lrat_checker.hpp"
+#include "app/sat/proof/trusted/lrat_checker.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
 #include "util/random.hpp"

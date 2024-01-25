@@ -1,7 +1,7 @@
 
-#include "trusted_solving.hpp"
+#include "secret.hpp"
 
-uint8_t TrustedSolving::_key[16] = {
+unsigned char Secret::SECRET_KEY[] = {
     86, 93, 1, 209, 112, 176, 13, 40,
     168, 223, 25, 22, 134, 58, 21, 211
 };

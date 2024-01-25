@@ -334,7 +334,7 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
         } else {
             LOG(V1_WARN, "[WARN] Child %ld exited unexpectedly (status %i)\n", _child_pid, exitStatus);
         }
-        if (ClauseMetadata::enabled()) {
+        if (_params.proofOutputFile.isSet()) {
             // Certified UNSAT: Child crashing is not permitted!
             LOG(V1_WARN, "[ERROR] Child %ld exiting renders the proofs illegal - aborting\n", _child_pid);
             abort();

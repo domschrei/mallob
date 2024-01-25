@@ -19,6 +19,8 @@ private:
     const Parameters& _params;
     std::string _filename;
     bool _raw_content_mode;
+    FILE* _pipe {nullptr};
+	int _namedpipe {-1};
 
     // Content mode: ASCII
     int _sign = 1;
@@ -43,6 +45,8 @@ public:
     SatReader(const Parameters& params, const std::string& filename) : 
         _params(params), _filename(filename) {}
     bool read(JobDescription& desc);
+    bool parseInternally(JobDescription& desc);
+    bool parseWithTrustedParser(JobDescription& desc);
 
     inline void processInt(int x, JobDescription& desc) {
         

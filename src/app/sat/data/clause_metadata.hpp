@@ -16,7 +16,7 @@ public:
 		metadataSize += 2; // 2 32-bit integers = 64 bit ID
 		idsEnabled = true;
 	}
-	static void enableClauseSignatures(bool hmac) {
+	static void enableClauseSignatures() {
 		if (signaturesEnabled) return;
 		metadataSize += 4; // 4 32-bit integers = 128 bit signature
 		signaturesEnabled = true;

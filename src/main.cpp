@@ -288,7 +288,7 @@ int main(int argc, char *argv[]) {
         for (auto file : FileUtils::glob("/dev/shm/edu.kit.iti.mallob.*")) {
             doRemove(file);
         }
-        for (auto file : FileUtils::glob(TmpDir::get() + "/mallob.apipath.*")) {
+        for (auto file : FileUtils::glob(TmpDir::get() + "/mallob.*")) {
             doRemove(file);
         }
 

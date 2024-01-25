@@ -63,7 +63,7 @@ endif()
 # Libraries and includes
 
 set(BASE_LIBS ${BASE_LIBS} ${MPI_CXX_LIBRARIES} ${MPI_CXX_LINK_FLAGS} m z rt dl CACHE INTERNAL "")
-set(BASE_INCLUDES ${MPI_CXX_INCLUDE_PATH} src lib CACHE INTERNAL "")
+set(BASE_INCLUDES ${MPI_CXX_INCLUDE_PATH} src src/util/tsl lib CACHE INTERNAL "")
 
 
 # Base source files

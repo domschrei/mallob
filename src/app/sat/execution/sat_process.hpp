@@ -69,7 +69,7 @@ public:
         
         // Terminate directly?
         if (_hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/true)) {
-            doTerminate(/*gracefully=*/!ClauseMetadata::enabled());
+            doTerminate(/*gracefully=*/!_params.proofOutputFile.isSet());
             return;
         }
 
@@ -110,11 +110,11 @@ public:
             // Terminate
             if (_hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/false)) {
                 LOGGER(_log, V5_DEBG, "DO terminate\n");
-                _engine.dumpStats(/*final=*/true);
-                if (_params.proofOutputFile.isSet()) {
+                if (_params.proofOutputFile.isSet() || _params.onTheFlyChecking()) {
                     // clean up everything super gracefully to allow finishing all proofs
                     _engine.cleanUp();
-                    _engine.terminateSolvers();
+                } else {
+                    _engine.dumpStats(/*final=*/true);
                 }
                 break;
             }

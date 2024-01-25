@@ -56,6 +56,6 @@ struct SolverSetup {
 	int maxNumSolvers;
 	std::string proofDir;
 	bool onTheFlyChecking;
-	bool hmacSignatures;
+	bool onTheFlyCheckingSubprocessing;
 	std::string sigFormula;
 };

@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include <cstdlib>
+#include <stdlib.h> // malloc, free, abort
 
 class SipHash {
 

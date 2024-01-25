@@ -63,7 +63,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		}
 		ClauseMetadata::enableClauseIds();
 		if (_params.onTheFlyChecking()) {
-			ClauseMetadata::enableClauseSignatures(_params.hmacSignatures());
+			ClauseMetadata::enableClauseSignatures();
 		}
 
 		if (_params.proofOutputFile.isSet()) {
@@ -172,7 +172,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.numOriginalClauses = numClauses;
 	setup.proofDir = proofDirectory;
 	setup.onTheFlyChecking = params.onTheFlyChecking();
-	setup.hmacSignatures = params.hmacSignatures();
+	setup.onTheFlyCheckingSubprocessing = params.onTheFlyCheckingSubprocessing();
 	setup.sigFormula = appConfig.map["__SIG"];
 
 	// Instantiate solvers according to the global solver IDs and diversification indices

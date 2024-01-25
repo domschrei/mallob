@@ -1,9 +1,9 @@
 
 #pragma once
 
-#include "util/SipHash/siphash.hpp"
-#include "util/tsl/robin_growth_policy.h"
-#include "util/tsl/robin_map.h"
+#include "siphash/siphash.hpp"
+#include "robin_map.h"
+#include "trusted_utils.hpp"
 
 class LratChecker {
 
@@ -47,7 +47,6 @@ private:
     std::vector<int> _clause_to_add;
     bool _done_loading {false};
 
-    //Sha256Builder _sig_builder;
     SipHash _siphash_builder;
 
 public:
@@ -58,7 +57,7 @@ public:
     bool loadLiteral(int lit) {
         if (lit == 0) {
             if (!addAxiomaticClause(_id_to_add, _clause_to_add.data(), _clause_to_add.size())) {
-                abort();
+                TrustedUtils::doAbort();
                 return false;
             }
             _id_to_add++;
@@ -73,7 +72,7 @@ public:
     bool endLoading(uint8_t*& outSig) {
         if (!_clause_to_add.empty()) {
             _errmsg = "literals left in unterminated clause";
-            abort();
+            TrustedUtils::doAbort();
             return false;
         }
         outSig = _siphash_builder.digest();

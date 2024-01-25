@@ -32,7 +32,7 @@ public:
             
             ClauseMetadata::enableClauseIds();
             if (_params.onTheFlyChecking()) {
-                ClauseMetadata::enableClauseSignatures(_params.hmacSignatures());
+                ClauseMetadata::enableClauseSignatures();
             }
         }
     }

@@ -12,9 +12,9 @@
 #include <filesystem>
 
 #include "app/sat/data/clause_metadata.hpp"
-#include "app/sat/proof/trusted_solving.hpp"
+#include "app/sat/proof/trusted_checker_process_adapter.hpp"
+#include "app/sat/proof/trusted/trusted_solving.hpp"
 #include "cadical.hpp"
-#include "util/hmac_sha256/hmac_sha256.hpp"
 #include "util/logger.hpp"
 #include "util/distribution.hpp"
 
@@ -26,7 +26,8 @@ Cadical::Cadical(const SolverSetup& setup)
 		  Mallob::Clause c;
 		  fetchLearnedClause(c, GenericClauseStore::ANY);
 		  return c;
-	  }), _do_trusted_solving(_setup.onTheFlyChecking) {
+	  }), _do_trusted_solving(_setup.onTheFlyChecking),
+	  _trusted_subprocessing(_setup.onTheFlyCheckingSubprocessing) {
 
 	solver->connect_terminator(&terminator);
 	solver->connect_learn_source(&learnSource);
@@ -49,7 +50,11 @@ Cadical::Cadical(const SolverSetup& setup)
 		okay = solver->set("lratorigclscount", setup.numOriginalClauses); assert(okay);
 
 		if (_do_trusted_solving) {
-			_trusted_solving.reset(new TrustedSolving(loggerCCallback, &_logger, setup.numVars));
+			if (_trusted_subprocessing) {
+				_trusted_solving.reset(new TrustedCheckerProcessAdapter(setup.localId, setup.numVars));
+			} else {
+				_trusted_solving.reset(new TrustedSolving(loggerCCallback, &_logger, setup.numVars));
+			}
 
 			// Convert hex string back to byte array
 			uint8_t* target;
@@ -217,6 +222,9 @@ SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 void Cadical::setSolverInterrupt() {
 	solver->terminate(); // acknowledged faster / checked more frequently by CaDiCaL
 	terminator.setInterrupt();
+	if (_do_trusted_solving && _trusted_subprocessing) {
+		((TrustedCheckerProcessAdapter*) _trusted_solving.get())->terminate();
+	}
 }
 
 void Cadical::unsetSolverInterrupt() {

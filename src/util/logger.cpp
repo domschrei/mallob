@@ -299,5 +299,5 @@ int Logger::getVerbosity() const {
 }
 
 void loggerCCallback(void* logger, const char* msg) {
-	LOGGER((*(Logger*)logger), V2_INFO, msg);
+	LOGGER((*(Logger*)logger), V2_INFO, "%s\n", msg);
 }

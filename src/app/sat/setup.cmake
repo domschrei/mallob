@@ -1,6 +1,8 @@
 
 # SAT-specific sources
-set(SAT_SOURCES src/app/sat/parse/sat_reader.cpp src/app/sat/execution/engine.cpp src/app/sat/execution/solver_thread.cpp src/app/sat/execution/solving_state.cpp src/app/sat/job/anytime_sat_clause_communicator.cpp src/app/sat/job/forked_sat_job.cpp src/app/sat/job/threaded_sat_job.cpp src/app/sat/job/sat_process_adapter.cpp src/app/sat/job/sat_process_config.cpp src/app/sat/job/historic_clause_storage.cpp src/app/sat/sharing/store/adaptive_clause_database.cpp src/app/sat/sharing/buffer/buffer_merger.cpp src/app/sat/sharing/buffer/buffer_reader.cpp src/app/sat/sharing/filter/clause_buffer_lbd_scrambler.cpp src/app/sat/sharing/sharing_manager.cpp src/app/sat/solvers/cadical.cpp src/app/sat/solvers/kissat.cpp src/app/sat/solvers/lingeling.cpp src/app/sat/solvers/portfolio_solver_interface.cpp src/app/sat/data/clause_metadata.cpp src/app/sat/proof/lrat_utils.cpp src/util/SipHash/siphash.c src/util/SipHash/halfsiphash.c src/app/sat/proof/trusted_solving.cpp)
+set(SAT_SOURCES src/app/sat/parse/sat_reader.cpp src/app/sat/execution/engine.cpp src/app/sat/execution/solver_thread.cpp src/app/sat/execution/solving_state.cpp src/app/sat/job/anytime_sat_clause_communicator.cpp src/app/sat/job/forked_sat_job.cpp src/app/sat/job/threaded_sat_job.cpp src/app/sat/job/sat_process_adapter.cpp src/app/sat/job/sat_process_config.cpp src/app/sat/job/historic_clause_storage.cpp src/app/sat/sharing/store/adaptive_clause_database.cpp src/app/sat/sharing/buffer/buffer_merger.cpp src/app/sat/sharing/buffer/buffer_reader.cpp src/app/sat/sharing/filter/clause_buffer_lbd_scrambler.cpp src/app/sat/sharing/sharing_manager.cpp src/app/sat/solvers/cadical.cpp src/app/sat/solvers/kissat.cpp src/app/sat/solvers/lingeling.cpp src/app/sat/solvers/portfolio_solver_interface.cpp src/app/sat/data/clause_metadata.cpp src/app/sat/proof/lrat_utils.cpp src/util/SipHash/siphash.c src/util/SipHash/halfsiphash.c src/app/sat/proof/trusted/secret.cpp)
+
+set(TRUSTED_SOURCES src/app/sat/proof/trusted/secret.cpp)
 
 # Add SAT-specific sources to main Mallob executable
 set(BASE_SOURCES ${BASE_SOURCES} ${SAT_SOURCES} CACHE INTERNAL "")
@@ -33,6 +35,18 @@ add_executable(mallob_sat_process ${SAT_SOURCES} src/app/sat/main.cpp)
 target_include_directories(mallob_sat_process PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob_sat_process PRIVATE ${BASE_COMPILEFLAGS})
 target_link_libraries(mallob_sat_process mallob_commons)
+
+# Executable of SAT trusted checking instance
+add_executable(trusted_checker_process ${TRUSTED_SOURCES} src/app/sat/proof/trusted/trusted_checker_process.cpp)
+target_include_directories(trusted_checker_process PRIVATE src/util/tsl)
+target_compile_options(trusted_checker_process PRIVATE ${BASE_COMPILEFLAGS})
+#target_link_libraries(trusted_checker_process mallob_commons)
+
+# Executable of SAT trusted parser instance
+add_executable(trusted_parser_process ${TRUSTED_SOURCES} src/app/sat/proof/trusted/trusted_parser_process.cpp)
+#target_include_directories(trusted_checker_process PRIVATE src/util/tsl)
+target_compile_options(trusted_checker_process PRIVATE ${BASE_COMPILEFLAGS})
+#target_link_libraries(trusted_checker_process mallob_commons)
 
 # Add unit tests
 new_test(sat_reader)
