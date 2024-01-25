@@ -18,7 +18,7 @@ public:
 
     static Mutex _children_mutex;
     static std::set<pid_t> _children;
-    static std::atomic_bool _main_process;
+    static std::atomic_bool _leaf_process;
     static long _main_tid;
 
     static std::atomic_bool _exit_signal_caught;
@@ -38,7 +38,7 @@ public:
 
     static void sendSignal(pid_t childpid, int signum);
 
-    static bool isMainProcess();
+    static bool isLeafProcess();
     static void forwardTerminateToChildren();
 
     /* 0: running, -1: error, childpid: exited */

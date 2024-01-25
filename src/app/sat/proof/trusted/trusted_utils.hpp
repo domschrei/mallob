@@ -16,7 +16,7 @@ class TrustedUtils {
 
 public:
     static void doAbortEof() {
-        log("Unexpected end-of-file - terminating");
+        log("end-of-file - terminating");
         ::exit(0);
     }
     static void doAbort() {
@@ -28,10 +28,10 @@ public:
     }
 
     static void log(const char* msg) {
-        printf("[TRUSTED CORE %i] %s\n", getpid(), msg);
+        printf("[TRUSTED_CORE %i] %s\n", getpid(), msg);
     }
     static void log(const char* msg1, const char* msg2) {
-        printf("[TRUSTED CORE %i] %s %s\n", getpid(), msg1, msg2);
+        printf("[TRUSTED_CORE %i] %s %s\n", getpid(), msg1, msg2);
     }
 
     static bool beginsWith(const char* str, const char* prefix) {

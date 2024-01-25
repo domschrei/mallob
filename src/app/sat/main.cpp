@@ -1,4 +1,5 @@
 
+#include <cstdlib>
 #include <iostream>
 #include <stdlib.h>
 #include <unistd.h>
@@ -23,6 +24,10 @@
 #define MALLOB_VERSION "(dbg)"
 #endif
 
+void exitHandler() {
+    Process::forwardTerminateToChildren();
+}
+
 int main(int argc, char *argv[]) {
     
     Parameters params;
@@ -42,7 +47,8 @@ int main(int argc, char *argv[]) {
     ProcessWideThreadPool::init(1);
 
     // Initialize signal handlers
-    Process::init(rankOfParent, params.traceDirectory(), /*leafProcess=*/true);
+    Process::init(rankOfParent, params.traceDirectory());
+    atexit(exitHandler);
 
     std::string logdir = params.logDirectory();
     std::string logFilename = "subproc" + std::string(".") + std::to_string(rankOfParent);

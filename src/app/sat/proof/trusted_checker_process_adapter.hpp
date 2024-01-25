@@ -62,6 +62,7 @@ public:
     }
 
     virtual void init(const u8* formulaSignature) override {
+
         writeDirectiveType(TRUSTED_CHK_INIT);
         TrustedUtils::writeInt(_nb_vars, _f_directives);
         TrustedUtils::writeSignature(formulaSignature, _f_directives);
@@ -69,6 +70,7 @@ public:
     }
 
     virtual void loadLiteral(int lit) override {
+
         _buf_lits[_buflen_lits++] = lit;
         if (_buflen_lits+1 == TRUSTED_CHK_MAX_BUF_SIZE) {
             // flush buffer
@@ -77,6 +79,7 @@ public:
     }
 
     virtual bool endLoading() override {
+
         if (_buflen_lits > 0) flushLiteralBuffer();
         writeDirectiveType(TRUSTED_CHK_END_LOAD);
         if (!awaitResponse()) TrustedUtils::doAbort();
@@ -87,6 +90,7 @@ public:
         const unsigned long* hints, int nbHints,
         uint8_t* outSignatureOrNull, int& inOutSigSize) override {
 
+        if (_buflen_lits > 0) flushLiteralBuffer();
         writeDirectiveType(TRUSTED_CHK_CLS_PRODUCE);
         const int totalSize = 2 + nbLiterals + 1 + 2*nbHints;
         TrustedUtils::writeInt(totalSize, _f_directives);
@@ -106,7 +110,8 @@ public:
 
     virtual bool importClause(unsigned long id, const int* literals, int nbLiterals,
         const uint8_t* signatureData, int signatureSize) override {
-        
+
+        if (_buflen_lits > 0) flushLiteralBuffer();
         writeDirectiveType(TRUSTED_CHK_CLS_IMPORT);
         const int totalSize = 2 + nbLiterals + 1 + 4;
         TrustedUtils::writeInt(totalSize, _f_directives);
@@ -122,6 +127,7 @@ public:
 
     virtual bool deleteClauses(const unsigned long* ids, int nbIds) override {
 
+        if (_buflen_lits > 0) flushLiteralBuffer();
         writeDirectiveType(TRUSTED_CHK_CLS_DELETE);
         const int totalSize = 2 * nbIds;
         TrustedUtils::writeInt(totalSize, _f_directives);
@@ -132,13 +138,16 @@ public:
     }
 
     virtual bool validateUnsat(uint8_t* outSignature, int& inOutSigSize) override {
+
+        if (_buflen_lits > 0) flushLiteralBuffer();
         writeDirectiveType(TRUSTED_CHK_VALIDATE);
         if (!awaitResponse()) TrustedUtils::doAbort();
         return true;
     }
 
     void terminate() {
-        Process::sendSignal(_child_pid, SIGTERM);
+        if (_child_pid == -1) return;
+        Process::sendSignal(_child_pid, SIGKILL);
         while (Process::didChildExit(_child_pid) == 0) usleep(1000);
         _child_pid = -1;
     }

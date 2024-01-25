@@ -24,7 +24,7 @@ std::string Process::_trace_dir;
 
 Mutex Process::_children_mutex;
 std::set<pid_t> Process::_children;
-std::atomic_bool Process::_main_process;
+std::atomic_bool Process::_leaf_process;
 long Process::_main_tid;
 
 std::atomic_bool Process::_exit_signal_caught = false;
@@ -58,7 +58,7 @@ bool Process::isCrash(int signum) {
 }
 
 void Process::handleTerminationSignal(const SignalInfo& info) {
-    if (Process::isMainProcess()) Process::forwardTerminateToChildren();
+    if (!Process::isLeafProcess()) Process::forwardTerminateToChildren();
 
     if (isCrash(info.signum)) {
         if (Proc::getTid() == Process::_main_tid) {
@@ -87,7 +87,7 @@ void Process::init(int rank, const std::string& traceDir, bool leafProcess) {
     _rank = rank;
     _trace_dir = traceDir;
     _exit_signal_caught = false;
-    _main_process = !leafProcess;
+    _leaf_process = leafProcess;
     _main_tid = Proc::getTid();
 
     signal(SIGUSR1, doNothing); // override default action (exit) on SIGUSR1
@@ -135,8 +135,8 @@ void Process::wakeUp(pid_t childpid) {
     sendSignal(childpid, SIGUSR1);
 }
 
-bool Process::isMainProcess() {
-    return _main_process;
+bool Process::isLeafProcess() {
+    return _leaf_process;
 }
 
 void Process::forwardTerminateToChildren() { 
