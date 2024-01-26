@@ -493,7 +493,6 @@ void SatEngine::terminateSolvers() {
 		solver->setTerminate();
 		solver->setSuspend(false);
 	}
-	dumpStats(/*final=*/true);
 }
 
 SatEngine::LastAdmittedStats SatEngine::getLastAdmittedClauseShare() {
@@ -535,7 +534,7 @@ void SatEngine::cleanUp() {
 	LOGGER(_logger, V4_VVER, "[engine-cleanup] done, took %.3f s\n", time);
 	_logger.flush();
 
-	if (ClauseMetadata::enabled()) writeClauseEpochs();
+	if (_params.proofOutputFile.isSet()) writeClauseEpochs();
 }
 
 SatEngine::~SatEngine() {

@@ -109,12 +109,11 @@ public:
 
             // Terminate
             if (_hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/false)) {
-                LOGGER(_log, V5_DEBG, "DO terminate\n");
+                LOGGER(_log, V4_VVER, "DO terminate\n");
+                _engine.dumpStats(/*final=*/true);
                 if (_params.proofOutputFile.isSet() || _params.onTheFlyChecking()) {
                     // clean up everything super gracefully to allow finishing all proofs
                     _engine.cleanUp();
-                } else {
-                    _engine.dumpStats(/*final=*/true);
                 }
                 break;
             }
