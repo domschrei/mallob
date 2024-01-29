@@ -161,7 +161,7 @@ public:
                 bool res = _ts->validateUnsat(_buf_sig, sigSizeBytes);
                 _do_logging = false;
                 sayWithFlush(res);
-                //writeSignature();
+                TrustedUtils::writeSignature(_buf_sig, _output);
                 break;
 
             } else if (c == TRUSTED_CHK_TERMINATE) {

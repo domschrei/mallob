@@ -20,6 +20,7 @@
 class TrustedCheckerProcessAdapter {
 
 private:
+    Logger& _logger;
     std::string _path_directives;
     std::string _path_feedback;
     FILE* _f_directives;
@@ -34,7 +35,8 @@ private:
     int _buflen_lits {0};
 
 public:
-    TrustedCheckerProcessAdapter(int solverId, int nbVars) : _nb_vars(nbVars) {
+    TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars) :
+            _logger(logger), _nb_vars(nbVars) {
         auto basePath = "/tmp/mallob." + std::to_string(Proc::getPid()) + ".slv" 
             + std::to_string(solverId) + ".ts.";
         _path_directives = basePath + "directives";
@@ -137,11 +139,16 @@ public:
         return true;
     }
 
-    inline bool validateUnsat(uint8_t* outSignature, int& inOutSigSize) {
+    inline bool validateUnsat() {
 
         if (_buflen_lits > 0) flushLiteralBuffer();
         writeDirectiveType(TRUSTED_CHK_VALIDATE);
+
         if (!awaitResponse()) TrustedUtils::doAbort();
+        u8 sig[16];
+        TrustedUtils::readSignature(sig, _f_feedback);
+        auto str = Logger::dataToHexStr(sig, 16);
+        LOGGER(_logger, V2_INFO, "TRUSTED checker reported UNSAT - sig %s\n", str.c_str());
         return true;
     }
 

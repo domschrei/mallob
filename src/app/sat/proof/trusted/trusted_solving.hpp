@@ -116,10 +116,13 @@ public:
         bool ok = _checker.validateUnsat();
         if (!ok) abortWithCheckerError();
         _log_function(_logger, "TS - UNSAT VALIDATED");
-        u8 UNSAT = 20;
-        if (inOutSigSize < SIG_SIZE_BYTES) abort();
-        outSignature = _siphash.reset().update(_formula_signature, SIG_SIZE_BYTES).update(&UNSAT, 1).digest();
-        inOutSigSize = SIG_SIZE_BYTES;
+        if (outSignature) {
+            u8 UNSAT = 20;
+            if (inOutSigSize < SIG_SIZE_BYTES) abort();
+            auto sig = _siphash.reset().update(_formula_signature, SIG_SIZE_BYTES).update(&UNSAT, 1).digest();
+            for (size_t i = 0; i < 16; i++) outSignature[i] = sig[i];
+            inOutSigSize = SIG_SIZE_BYTES;
+        }
         return ok;
     }
 

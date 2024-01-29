@@ -41,6 +41,7 @@ bool SatReader::parseWithTrustedParser(JobDescription& desc) {
 	desc.setAppConfigurationEntry("__SIG", sigStr);
 	_max_var = tp.getNbVars();
 	_num_read_clauses = tp.getNbClauses();
+	LOG(V2_INFO, "TRUSTED parser read %i vars, %i cls - sig %s\n", _max_var, _num_read_clauses, sigStr.c_str());
 	_input_finished = true;
 	_input_invalid = false;
 	desc.setFSize(tp.getFSize());

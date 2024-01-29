@@ -145,7 +145,7 @@ private:
 public:
     LratConnector(Logger& logger, int localId, int nbVars) : _local_id(localId), _ringbuf(1<<16),
 #if MALLOB_TRUSTED_SUBPROCESSING
-            _checker(_local_id, nbVars) 
+            _checker(logger, _local_id, nbVars) 
 #else
             _checker(loggerCCallback, &logger, nbVars)
 #endif
@@ -210,7 +210,7 @@ private:
                 bool ok = _checker.deleteClauses(op.getHints(), op.getNbHints());
                 if (!ok) abort();
             } else if (type == LratOp::VALIDATION) {
-                bool ok = _checker.validateUnsat(sig, sigSize);
+                bool ok = _checker.validateUnsat();
                 if (!ok) abort();
                 _unsat_validated = true;
                 break;
