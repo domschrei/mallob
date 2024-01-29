@@ -39,6 +39,10 @@ if(MALLOB_SUBPROC_DISPATCH_PATH)
     add_definitions(-DMALLOB_SUBPROC_DISPATCH_PATH=${MALLOB_SUBPROC_DISPATCH_PATH})
 endif()
 
+if(DEFINED MALLOB_TRUSTED_SUBPROCESSING)
+    add_definitions(-DMALLOB_TRUSTED_SUBPROCESSING=${MALLOB_TRUSTED_SUBPROCESSING})
+endif()
+
 if(MALLOB_USE_ASAN)
     set(MY_DEBUG_OPTIONS "${MY_DEBUG_OPTIONS} -fno-omit-frame-pointer -fsanitize=address -static-libasan") 
 endif()

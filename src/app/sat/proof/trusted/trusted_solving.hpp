@@ -3,13 +3,13 @@
 
 #include "secret.hpp"
 #include "lrat_checker.hpp"
-#include "trusted_solving_interface.hpp"
 #include "siphash/siphash.hpp"
+#include <cstdlib>
 
 /*
 Interface for trusted solving.
 */
-class TrustedSolving : public TrustedSolvingInterface {
+class TrustedSolving {
 
 public:
     TrustedSolving(void (*logFunction)(void*, const char*), void* logger, int nbVars) :
@@ -48,16 +48,16 @@ public:
         _parsed_formula = true;
     }
 
-    void init(const uint8_t* formulaSignature) override {
+    void init(const uint8_t* formulaSignature) {
         // Store formula signature to validate later after loading
         copyBytes(_formula_signature, formulaSignature, SIG_SIZE_BYTES);
     }
 
-    void loadLiteral(int lit) override {
+    inline void loadLiteral(int lit) {
         _checker.loadLiteral(lit);
     }
 
-    bool endLoading() override {
+    inline bool endLoading() {
         uint8_t* sigFromChecker;
         bool ok = _checker.endLoading(sigFromChecker);
         if (!ok) abortWithCheckerError();
@@ -70,9 +70,9 @@ public:
         return ok;
     }
 
-    bool produceClause(unsigned long id, const int* literals, int nbLiterals,
+    inline bool produceClause(unsigned long id, const int* literals, int nbLiterals,
         const unsigned long* hints, int nbHints,
-        uint8_t* outSignatureOrNull, int& inOutSigSize) override {
+        uint8_t* outSignatureOrNull, int& inOutSigSize) {
         
         // forward clause to checker
         bool ok = _checker.addClause(id, literals, nbLiterals, hints, nbHints);
@@ -84,8 +84,8 @@ public:
         return ok;
     }
 
-    bool importClause(unsigned long id, const int* literals, int nbLiterals,
-        const uint8_t* signatureData, int signatureSize) override {
+    inline bool importClause(unsigned long id, const int* literals, int nbLiterals,
+        const uint8_t* signatureData, int signatureSize) {
         
         // verify signature
         int computedSigSize = SIG_SIZE_BYTES;
@@ -106,16 +106,20 @@ public:
         return ok;
     }
 
-    bool deleteClauses(const unsigned long* ids, int nbIds) override {
+    inline bool deleteClauses(const unsigned long* ids, int nbIds) {
         bool ok = _checker.deleteClause(ids, nbIds);
         if (!ok) abortWithCheckerError();
         return ok;
     }
 
-    bool validateUnsat(uint8_t* outSignature, int& inOutSigSize) override {
+    inline bool validateUnsat(uint8_t* outSignature, int& inOutSigSize) {
         bool ok = _checker.validateUnsat();
         if (!ok) abortWithCheckerError();
         _log_function(_logger, "TS - UNSAT VALIDATED");
+        u8 UNSAT = 20;
+        if (inOutSigSize < SIG_SIZE_BYTES) abort();
+        outSignature = _siphash.reset().update(_formula_signature, SIG_SIZE_BYTES).update(&UNSAT, 1).digest();
+        inOutSigSize = SIG_SIZE_BYTES;
         return ok;
     }
 

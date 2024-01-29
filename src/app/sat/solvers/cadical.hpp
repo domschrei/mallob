@@ -7,9 +7,11 @@
 
 #pragma once
 
+#include "app/sat/proof/lrat_connector.hpp"
 #include "app/sat/proof/trusted/lrat_checker.hpp"
 #include "app/sat/proof/trusted/trusted_solving.hpp"
 #include "app/sat/proof/trusted/trusted_solving_interface.hpp"
+#include "app/sat/proof/trusted_checker_process_adapter.hpp"
 #include "portfolio_solver_interface.hpp"
 
 #include "util/sys/threading.hpp"
@@ -37,9 +39,9 @@ private:
 	bool seedSet = false;
 
 	std::string proofFileString;
-	std::unique_ptr<TrustedSolvingInterface> _trusted_solving;
+	LratConnector _lrat;
+
 	const bool _do_trusted_solving;
-	const bool _trusted_subprocessing;
 
 public:
 	Cadical(const SolverSetup& setup);

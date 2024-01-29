@@ -56,6 +56,5 @@ struct SolverSetup {
 	int maxNumSolvers;
 	std::string proofDir;
 	bool onTheFlyChecking;
-	bool onTheFlyCheckingSubprocessing;
 	std::string sigFormula;
 };

@@ -9,15 +9,15 @@
 #include <signal.h>
 
 #include "trusted/trusted_utils.hpp"
-#include "trusted/trusted_solving_interface.hpp"
 #include "trusted/trusted_checker_process.hpp"
+#include "util/logger.hpp"
 #include "util/params.hpp"
 #include "util/sys/fileutils.hpp"
 #include "util/sys/proc.hpp"
 #include "util/sys/process.hpp"
 #include "util/sys/subprocess.hpp"
 
-class TrustedCheckerProcessAdapter : public TrustedSolvingInterface {
+class TrustedCheckerProcessAdapter {
 
 private:
     std::string _path_directives;
@@ -61,7 +61,7 @@ public:
         delete _subproc;
     }
 
-    virtual void init(const u8* formulaSignature) override {
+    void init(const u8* formulaSignature) {
 
         writeDirectiveType(TRUSTED_CHK_INIT);
         TrustedUtils::writeInt(_nb_vars, _f_directives);
@@ -69,7 +69,7 @@ public:
         if (!awaitResponse()) TrustedUtils::doAbort();
     }
 
-    virtual void loadLiteral(int lit) override {
+    inline void loadLiteral(int lit) {
 
         _buf_lits[_buflen_lits++] = lit;
         if (_buflen_lits+1 == TRUSTED_CHK_MAX_BUF_SIZE) {
@@ -78,7 +78,7 @@ public:
         }
     }
 
-    virtual bool endLoading() override {
+    inline bool endLoading() {
 
         if (_buflen_lits > 0) flushLiteralBuffer();
         writeDirectiveType(TRUSTED_CHK_END_LOAD);
@@ -86,9 +86,9 @@ public:
         return true;
     }
 
-    virtual bool produceClause(unsigned long id, const int* literals, int nbLiterals,
+    inline bool produceClause(unsigned long id, const int* literals, int nbLiterals,
         const unsigned long* hints, int nbHints,
-        uint8_t* outSignatureOrNull, int& inOutSigSize) override {
+        uint8_t* outSignatureOrNull, int& inOutSigSize) {
 
         if (_buflen_lits > 0) flushLiteralBuffer();
         writeDirectiveType(TRUSTED_CHK_CLS_PRODUCE);
@@ -108,8 +108,8 @@ public:
         return true;
     }
 
-    virtual bool importClause(unsigned long id, const int* literals, int nbLiterals,
-        const uint8_t* signatureData, int signatureSize) override {
+    inline bool importClause(unsigned long id, const int* literals, int nbLiterals,
+        const uint8_t* signatureData, int signatureSize) {
 
         if (_buflen_lits > 0) flushLiteralBuffer();
         writeDirectiveType(TRUSTED_CHK_CLS_IMPORT);
@@ -125,7 +125,7 @@ public:
         return true;
     }
 
-    virtual bool deleteClauses(const unsigned long* ids, int nbIds) override {
+    inline bool deleteClauses(const unsigned long* ids, int nbIds) {
 
         if (_buflen_lits > 0) flushLiteralBuffer();
         writeDirectiveType(TRUSTED_CHK_CLS_DELETE);
@@ -137,7 +137,7 @@ public:
         return true;
     }
 
-    virtual bool validateUnsat(uint8_t* outSignature, int& inOutSigSize) override {
+    inline bool validateUnsat(uint8_t* outSignature, int& inOutSigSize) {
 
         if (_buflen_lits > 0) flushLiteralBuffer();
         writeDirectiveType(TRUSTED_CHK_VALIDATE);

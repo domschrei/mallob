@@ -54,7 +54,7 @@ void handleSignal(int signum) {
 }
 
 bool Process::isCrash(int signum) {
-    return signum == SIGABRT || signum == SIGFPE || signum == SIGSEGV || signum == SIGBUS;
+    return signum == SIGABRT || signum == SIGFPE || signum == SIGSEGV || signum == SIGBUS || signum == SIGPIPE;
 }
 
 void Process::handleTerminationSignal(const SignalInfo& info) {
@@ -97,6 +97,7 @@ void Process::init(int rank, const std::string& traceDir, bool leafProcess) {
     signal(SIGBUS, handleSignal);
     signal(SIGTERM, handleSignal);
     signal(SIGINT,  handleSignal);
+    signal(SIGPIPE, handleSignal);
 
     // Allow any other process/thread to ptrace this process
     // (used for debugging of crashes via external gdb call)

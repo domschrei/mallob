@@ -3,6 +3,8 @@
 
 #include "trusted_utils.hpp"
 #include "trusted_solving.hpp"
+#include <cstdio>
+#include <cstdlib>
 
 // Initialize and begin the loading stage.
 // IN: #vars (int); 128-bit signature of the formula
@@ -62,13 +64,20 @@ private:
     uint8_t _buf_sig[ 32 ];
     int ibuf[TRUSTED_CHK_MAX_BUF_SIZE];
     int ibuflen {0};
-    unsigned long ulbuf[TRUSTED_CHK_MAX_BUF_SIZE];
+    size_t ulbufcap {TRUSTED_CHK_MAX_BUF_SIZE};
+    unsigned long* ulbuf;
     unsigned long ulbuflen {0};
 
 public:
     TrustedCheckerProcess(const char* fifoIn, const char* fifoOut) {
         _input = fopen(fifoIn, "r");
         _output = fopen(fifoOut, "w");
+        ulbuf = (u64*) malloc(ulbufcap * sizeof(u64));
+    }
+    ~TrustedCheckerProcess() {
+        free(ulbuf);
+        fclose(_output);
+        fclose(_input);
     }
 
     int run() {
@@ -163,8 +172,6 @@ public:
         }
 
         fflush(_output);
-        fclose(_input);
-        fclose(_output);
         return 0;
     }
 
@@ -203,14 +210,19 @@ private:
 
     void readHints(int& nbRemaining, unsigned long*& hints, int& nbHints) {
         ulbuflen = 0;
-        hints = ulbuf;
         nbHints = 0;
         while (nbRemaining >= 2) {
-            const auto hint = TrustedUtils::readUnsignedLong(_input);
+            const u64 hint = TrustedUtils::readUnsignedLong(_input);
             nbRemaining -= 2;
+            if (ulbuflen >= ulbufcap) {
+                // buffer exceeded - reallocate
+                ulbufcap *= 2;
+                ulbuf = (u64*) realloc(ulbuf, ulbufcap * sizeof(u64));
+            }
             ulbuf[ulbuflen++] = hint;
             nbHints++;
         }
+        hints = ulbuf;
     }
 
     void readFormulaSignature() {

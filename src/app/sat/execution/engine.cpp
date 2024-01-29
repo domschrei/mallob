@@ -172,7 +172,6 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.numOriginalClauses = numClauses;
 	setup.proofDir = proofDirectory;
 	setup.onTheFlyChecking = params.onTheFlyChecking();
-	setup.onTheFlyCheckingSubprocessing = params.onTheFlyCheckingSubprocessing();
 	setup.sigFormula = appConfig.map["__SIG"];
 
 	// Instantiate solvers according to the global solver IDs and diversification indices

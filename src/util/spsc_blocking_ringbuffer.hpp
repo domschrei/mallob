@@ -2,6 +2,7 @@
 #pragma once
 
 #include <vector>
+#include "util/logger.hpp"
 #include "util/sys/atomics.hpp"
 #include "util/sys/threading.hpp"
 #include "merge_source_interface.hpp"

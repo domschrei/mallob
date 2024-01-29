@@ -11,7 +11,7 @@ private:
     FILE* _f;
     FILE* _out;
 
-    int* _data;
+    int* _data {nullptr};
     unsigned long _datalen {0};
     unsigned long _datacap {0};
 

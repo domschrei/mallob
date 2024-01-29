@@ -29,8 +29,7 @@ private:
             return *this;
         }
         ~CompactClause() {
-            if (!data) return;
-            free(data);
+            if (data) free(data);
         }
     };
     struct ClauseIdHasher {
