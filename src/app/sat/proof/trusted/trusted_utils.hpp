@@ -71,7 +71,8 @@ public:
         return i;
     }
     static void readInts(int* data, size_t nbInts, FILE* file) {
-        UNLOCKED_IO(fread)(data, sizeof(int), nbInts, file);
+        u64 nbRead = UNLOCKED_IO(fread)(data, sizeof(int), nbInts, file);
+        if (nbRead < nbInts) doAbortEof();
     }
     static void writeInt(int i, FILE* file) {
         UNLOCKED_IO(fwrite)(&i, sizeof(int), 1, file);
