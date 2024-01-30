@@ -205,6 +205,7 @@ public:
         _terminated = true;
         _bg_worker.stopWithoutWaiting();
         _ringbuf.markExhausted();
+        _ringbuf.markTerminated();
         _bg_worker.stop();
 #if MALLOB_TRUSTED_SUBPROCESSING
         _checker.terminate();

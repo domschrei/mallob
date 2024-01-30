@@ -23,6 +23,7 @@ private:
     ConditionVariable _buffer_cond_var;
     
     bool _input_exhausted {false};
+    bool _terminated {false};
 
 public:
     SPSCBlockingRingbuffer() : _buffer(0) {}
@@ -44,7 +45,7 @@ public:
             // wait until space is available
             //LOG(V2_INFO, "SPSC wait nonfull\n");
             waitFor([&]() {
-                return size() < _buffer_size;
+                return _terminated || size() < _buffer_size;
             });
             //LOG(V2_INFO, "SPSC wait nonfull done\n");
         }
@@ -104,6 +105,14 @@ public:
         }
         _buffer_cond_var.notify();
         //LOG(V2_INFO, "SPSC notify exhausted\n");
+    }
+
+    void markTerminated() {
+        {
+            auto lock = _buffer_mutex.getLock();
+            _terminated = true;
+        }
+        _buffer_cond_var.notify();
     }
 
     size_t getCurrentSize() const override {
