@@ -11,7 +11,6 @@ private:
     struct CompactClause {
         int* data {nullptr};
         int nbLits = 0;
-        CompactClause() {}
         CompactClause(const int* data, int nbLits) {
             this->data = (int*) malloc(nbLits * sizeof(int));
             this->nbLits = nbLits;
@@ -28,6 +27,14 @@ private:
             moved.nbLits = 0;
             return *this;
         }
+        bool operator==(const CompactClause& other) const {
+            if (nbLits != other.nbLits) return false;
+            for (int i = 0; i < nbLits; i++) if (data[i] != other.data[i]) return false;
+            return true;
+        }
+        bool operator!=(const CompactClause& other) const {
+            return !(*this == other);
+        }
         ~CompactClause() {
             if (data) free(data);
         }
@@ -39,7 +46,7 @@ private:
     };
     tsl::robin_map<uint64_t, CompactClause, ClauseIdHasher> _clauses;
     std::vector<int8_t> _var_values;
-    const char* _errmsg;
+    const char* _errmsg = nullptr;
     bool _unsat_proven {false};
 
     uint64_t _id_to_add {1};
@@ -53,10 +60,9 @@ public:
         _clauses(1<<16),
         _var_values(nbVars+1, 0), _siphash_builder(sigKey128bit) {}
 
-    bool loadLiteral(int lit) {
+    inline bool loadLiteral(int lit) {
         if (lit == 0) {
             if (!addAxiomaticClause(_id_to_add, _clause_to_add.data(), _clause_to_add.size())) {
-                TrustedUtils::doAbort();
                 return false;
             }
             _id_to_add++;
@@ -71,7 +77,6 @@ public:
     bool endLoading(uint8_t*& outSig) {
         if (!_clause_to_add.empty()) {
             _errmsg = "literals left in unterminated clause";
-            TrustedUtils::doAbort();
             return false;
         }
         outSig = _siphash_builder.digest();
@@ -97,22 +102,24 @@ public:
         return true;
     }
 
-    bool addAxiomaticClause(uint64_t id, const int* lits, int nbLits) {
+    inline bool addAxiomaticClause(uint64_t id, const int* lits, int nbLits) {
         //LOG(V2_INFO, "IMPORT %lu\n", id);
         auto [it, ok] = _clauses.insert({id, CompactClause{lits, nbLits}});
         if (!ok) _errmsg = "Unsuccessful insertion of clause";
-        if (nbLits == 0) _unsat_proven = true; // added top-level empty clause!
+        else if (nbLits == 0) _unsat_proven = true; // added top-level empty clause!
         return ok;
     }
-    bool addClause(uint64_t id, const int* lits, int nbLits, const uint64_t* hints, int nbHints) {
+    inline bool addClause(uint64_t id, const int* lits, int nbLits, const uint64_t* hints, int nbHints) {
         //LOG(V2_INFO, "PRODUCE %lu\n", id);
-        if (!checkClause(lits, nbLits, hints, nbHints)) return false;
+        if (!checkClause(lits, nbLits, hints, nbHints)) {
+            return false;
+        }
         return addAxiomaticClause(id, lits, nbLits);
     }
-    bool deleteClause(const uint64_t* ids, int nbIds) {
+    inline bool deleteClause(const uint64_t* ids, int nbIds) {
         for (int i = 0; i < nbIds; i++) {
             auto id = ids[i];
-            //LOG(V2_INFO, "DELETE %lu\n", id);
+            //printf("PROOF?? DELETE %lu\n", id);
             auto it = _clauses.find(id);
             if (it == _clauses.end()) {
                 // ERROR
@@ -140,7 +147,7 @@ public:
     }
 
 private:
-    bool checkClause(const int* lits, int nbLits, const uint64_t* hints, int nbHints) {
+    inline bool checkClause(const int* lits, int nbLits, const uint64_t* hints, int nbHints) {
         // Keep track of asserted unit clauses in a stack
         static thread_local std::vector<int> setUnits;
 
@@ -166,7 +173,9 @@ private:
             }
 
             // Interpret hint clause (should derive a new unit clause)
-            auto& hintCls = hintClsIt->second;
+            const auto& hintCls = hintClsIt->second;
+            //std::string lits; for (int i = 0; i < hintCls.nbLits; i++) lits += std::to_string(hintCls.data[i]) + " ";
+            //printf("PROOF?? %lu : %s\n", hintId, lits.c_str());
             int newUnit = 0;
             for (int litIdx = 0; litIdx < hintCls.nbLits; litIdx++) {
                 int lit = hintCls.data[litIdx];
@@ -211,6 +220,7 @@ private:
         }
 
         // ERROR - something went wrong
+        if (!_errmsg) _errmsg = "No empty clause was produced";
         for (int var : setUnits) _var_values[var] = 0; // reset variable values
         setUnits.clear();
         return false;

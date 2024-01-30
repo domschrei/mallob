@@ -23,6 +23,7 @@
 
 // Forward declarations
 class SatEngine;
+class LratConnector;
 
 class SolverThread {
 
@@ -37,6 +38,8 @@ private:
     std::vector<std::pair<size_t, const int*>> _pending_assumptions;
 
     SplitMix64Rng _rng;
+
+    LratConnector* _lrat;
 
     int _local_id;
     std::string _name;

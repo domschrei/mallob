@@ -191,6 +191,9 @@ public:
         return true; // success
     }
 
+    const int* getRawPayload() const {
+        return _payload;
+    }
     size_t getPayloadSize() const {
         return _size;
     }

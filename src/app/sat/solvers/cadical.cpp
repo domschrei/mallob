@@ -12,6 +12,7 @@
 #include <filesystem>
 
 #include "app/sat/data/clause_metadata.hpp"
+#include "app/sat/proof/lrat_connector.hpp"
 #include "app/sat/proof/trusted_checker_process_adapter.hpp"
 #include "app/sat/proof/trusted/trusted_solving.hpp"
 #include "cadical.hpp"
@@ -25,19 +26,19 @@ Cadical::Cadical(const SolverSetup& setup)
 		  Mallob::Clause c;
 		  fetchLearnedClause(c, GenericClauseStore::ANY);
 		  return c;
-	  }), _do_trusted_solving(_setup.onTheFlyChecking),
-	  _lrat(_logger, _setup.localId, _setup.numVars) {
+	  }),
+	  _lrat(_setup.onTheFlyChecking ? new LratConnector(_logger, _setup.localId, _setup.numVars) : nullptr) {
 
 	solver->connect_terminator(&terminator);
 	solver->connect_learn_source(&learnSource);
 
 	// In certified UNSAT mode?
-	if (setup.certifiedUnsat || _do_trusted_solving) {
+	if (setup.certifiedUnsat || _lrat) {
 
 		int solverRank = setup.globalId;
 		int maxNumSolvers = setup.maxNumSolvers;
 
-		auto descriptor = _do_trusted_solving ? "on-the-fly LRAT checking" : "LRAT proof production";
+		auto descriptor = _lrat ? "on-the-fly LRAT checking" : "LRAT proof production";
 		LOGGER(_logger, V3_VERB, "Initializing rank=%i size=%i DI=%i #C=%ld with %s\n",
 			solverRank, maxNumSolvers, getDiversificationIndex(), setup.numOriginalClauses,
 			descriptor);
@@ -48,39 +49,19 @@ Cadical::Cadical(const SolverSetup& setup)
 		okay = solver->set("lratsolvercount", maxNumSolvers); assert(okay); // set # solvers
 		okay = solver->set("lratorigclscount", setup.numOriginalClauses); assert(okay);
 
-		if (_do_trusted_solving) {
-
-			// Convert hex string back to byte array
-			uint8_t* target;
-			{
-				std::string sigStr = _setup.sigFormula;
-				const char* src = sigStr.c_str();
-				target = (uint8_t*) malloc(16);
-				uint8_t* dest = target;
-				while(*src && src[1]) {
-					char c1 = src[0];
-					int i1 = (c1 >= '0' && c1 <= '9') ? (c1 - '0') : (c1 - 'a' + 10);
-					char c2 = src[1];
-					int i2 = (c2 >= '0' && c2 <= '9') ? (c2 - '0') : (c2 - 'a' + 10);
-					*(dest++) = i1*16 + i2;
-					src += 2;
-				}
-			}
-			_lrat.getChecker().init(target);
-			free(target);
-
+		if (_lrat) {
 			okay = solver->set("signsharedcls", 1); assert(okay);
 			solver->trace_proof_internally(
 				[&](unsigned long id, const int* lits, int nbLits, const unsigned long* hints, int nbHints, int glue) {
-					_lrat.push(LratConnector::LratOp {id, lits, nbLits, hints, nbHints, glue});
+					_lrat->push(LratConnector::LratOp {id, lits, nbLits, hints, nbHints, glue});
 					return true;
 				},
 				[&](unsigned long id, const int* lits, int nbLits, const uint8_t* sigData, int sigSize) {
-					_lrat.push(LratConnector::LratOp {id, lits, nbLits, sigData});
+					_lrat->push(LratConnector::LratOp {id, lits, nbLits, sigData});
 					return true;
 				},
 				[&](const unsigned long* ids, int nbIds) {
-					_lrat.push(LratConnector::LratOp {ids, nbIds});
+					_lrat->push(LratConnector::LratOp {ids, nbIds});
 					return true;
 				}
 			);
@@ -94,7 +75,6 @@ Cadical::Cadical(const SolverSetup& setup)
 }
 
 void Cadical::addLiteral(int lit) {
-	if (_do_trusted_solving) _lrat.getChecker().loadLiteral(lit);
 	solver->add(lit);
 }
 
@@ -168,8 +148,6 @@ void Cadical::setPhase(const int var, const bool phase) {
 // return 10 for SAT, 20 for UNSAT, 0 for UNKNOWN
 SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 
-	if (_do_trusted_solving) _lrat.getChecker().endLoading();
-
 	// add the learned clauses
 	learnMutex.lock();
 	for (auto clauseToAdd : learnedClauses) {
@@ -205,9 +183,9 @@ SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 	case 10:
 		return SAT;
 	case 20:
-		if (_do_trusted_solving) {
-			_lrat.push(LratConnector::LratOp {});
-			bool ok = _lrat.waitForValidation();
+		if (_lrat) {
+			_lrat->push(LratConnector::LratOp {});
+			bool ok = _lrat->waitForValidation();
 			return ok ? UNSAT : UNKNOWN;
 		}
 		return UNSAT;
@@ -219,7 +197,7 @@ SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 void Cadical::setSolverInterrupt() {
 	solver->terminate(); // acknowledged faster / checked more frequently by CaDiCaL
 	terminator.setInterrupt();
-	if (_do_trusted_solving) _lrat.terminate();
+	if (_lrat) _lrat->terminate();
 }
 
 void Cadical::unsetSolverInterrupt() {
@@ -253,16 +231,16 @@ std::set<int> Cadical::getFailedAssumptions() {
 }
 
 void Cadical::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
-	if (_do_trusted_solving) {
-		_lrat.setLearnedClauseCallback(callback);
+	if (_lrat) {
+		_lrat->setLearnedClauseCallback(callback);
 	} else {
 		learner.setCallback(callback);
 		solver->connect_learner(&learner);
 	}
 }
 void Cadical::setProbingLearnedClauseCallback(const ProbingLearnedClauseCallback& callback) {
-	if (_do_trusted_solving) {
-		_lrat.setProbingLearnedClauseCallback(callback);
+	if (_lrat) {
+		_lrat->setProbingLearnedClauseCallback(callback);
 	} else {
 		learner.setProbingCallback(callback);
 	}

@@ -54,7 +54,8 @@ public:
     }
 
     inline void loadLiteral(int lit) {
-        _checker.loadLiteral(lit);
+        bool ok = _checker.loadLiteral(lit);
+        if (!ok) abortWithCheckerError();
     }
 
     inline bool endLoading() {
@@ -126,9 +127,13 @@ public:
         return ok;
     }
 
-    inline void abortWithCheckerError() {
+    inline void abortWithCheckerError(const char* errmsgOrNull = nullptr) {
         _log_function(_logger, "[ERROR] TS - LRAT checker error:");
-        _log_function(_logger, _checker.getErrorMessage());
+        if (errmsgOrNull) {
+            _log_function(_logger, errmsgOrNull);
+        } else {
+            _log_function(_logger, _checker.getErrorMessage());
+        }
         TrustedUtils::doAbort();
     }
 

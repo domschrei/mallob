@@ -7,6 +7,8 @@
 #include <functional>
 #include <atomic>
 
+#include "app/sat/data/definitions.hpp"
+#include "app/sat/proof/lrat_connector.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
 #include "util/random.hpp"
 #include "util/sys/threading.hpp"
@@ -17,17 +19,9 @@
 #include "../data/solver_statistics.hpp"
 #include "../execution/solver_setup.hpp"
 
-enum SatResult {
-	SAT = 10,
-	UNSAT = 20,
-	UNKNOWN = 0
-};
-
 void updateTimer(std::string jobName);
 
-typedef std::function<void(const Mallob::Clause&, int)> LearnedClauseCallback;
-typedef std::function<void(const Mallob::Clause&, int, int, int)> ExtLearnedClauseCallback;
-typedef std::function<bool(int)> ProbingLearnedClauseCallback;
+class LratConnector; // fwd
 
 /**
  * Interface for solvers that can be used in the portfolio.
@@ -89,6 +83,8 @@ public:
 
 	virtual bool supportsIncrementalSat() = 0;
 	virtual bool exportsConditionalClauses() = 0;
+
+	virtual LratConnector* getLratConnector() {return nullptr;};
 
 	virtual void cleanUp() = 0;
 

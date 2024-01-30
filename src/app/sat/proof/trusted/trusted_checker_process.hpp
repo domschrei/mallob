@@ -96,12 +96,11 @@ public:
 
             } else if (c == TRUSTED_CHK_LOAD) {
 
-                const int len = TrustedUtils::readInt(_input);
-                TrustedUtils::doAssert(len > 0);
-                TrustedUtils::doAssert(len < TRUSTED_CHK_MAX_BUF_SIZE);
-                for (size_t i = 0; i < len; i++) {
-                    _ts->loadLiteral(TrustedUtils::readInt(_input));
-                }
+                const int nbInts = TrustedUtils::readInt(_input);
+                TrustedUtils::doAssert(nbInts > 0);
+                TrustedUtils::doAssert(nbInts <= TRUSTED_CHK_MAX_BUF_SIZE);
+                TrustedUtils::readInts(ibuf, nbInts, _input);
+                for (size_t i = 0; i < nbInts; i++) _ts->loadLiteral(ibuf[i]);
                 // NO FEEDBACK
 
             } else if (c == TRUSTED_CHK_END_LOAD) {
@@ -120,9 +119,12 @@ public:
                 readIdAndLiterals(nbRemaining, id, lits, nbLits);
                 readHints(nbRemaining, hints, nbHints);
                 TrustedUtils::doAssert(nbRemaining == 0);
+                //assert(nbLits == 1);
+                //assert(nbHints == 2);
+                //printf("PROOF?? a %lu %i 0 %lu %lu 0\n", id, lits[0], hints[0], hints[1]);
                 // forward to checker
                 bool res = _ts->produceClause(id, lits, nbLits, hints, nbHints,
-                    (uint8_t*) _buf_sig, sigSizeBytes);
+                    (u8*) _buf_sig, sigSizeBytes);
                 // respond
                 say(res);
                 TrustedUtils::writeSignature(_buf_sig, _output);
@@ -150,6 +152,7 @@ public:
                 int nbHints;
                 readHints(nbRemaining, hints, nbHints);
                 TrustedUtils::doAssert(nbRemaining == 0);
+                //printf("PROOF?? d %lu ... (%i)\n", hints[0], nbHints);
                 // forward to checker
                 bool res = _ts->deleteClauses(hints, nbHints);
                 // respond

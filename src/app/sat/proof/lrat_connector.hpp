@@ -115,6 +115,25 @@ public:
         const u8* getSignature() const {return (u8*) getHints();}
         int getGlue() const {return *(int*) (data + datalen - sizeof(int));}
 
+        std::string toStr() const {
+            std::string out;
+            auto type = getType();
+            if (type == DERIVATION) {
+                out += "a " + std::to_string(getId()) + " ";
+                for (int i = 0; i < getNbLits(); i++) out += std::to_string(getLits()[i]) + " ";
+                out += "0 ";
+                for (int i = 0; i < getNbHints(); i++) out += std::to_string(getHints()[i]) + " ";
+                out += "0";
+            } else if (type == IMPORT) {
+                out += "i " + std::to_string(getId()) + " ";
+                for (int i = 0; i < getNbLits(); i++) out += std::to_string(getLits()[i]) + " ";
+                out += "0 ";
+                out += Logger::dataToHexStr(getSignature(), 16) + " ";
+                out += "0";
+            }
+            return out;
+        }
+
         ~LratOp() {
             if (data) free(data);
         }
@@ -140,7 +159,9 @@ private:
     static constexpr int MAX_CLAUSE_LENGTH {512};
     int _clause_lits[MAX_CLAUSE_LENGTH];
     Mallob::Clause _clause {_clause_lits, 0, 0};
-    const int _subproc {MALLOB_TRUSTED_SUBPROCESSING};
+
+    const int* _f_data;
+    size_t _f_size;
 
 public:
     LratConnector(Logger& logger, int localId, int nbVars) : _local_id(localId), _ringbuf(1<<16),
@@ -149,9 +170,7 @@ public:
 #else
             _checker(loggerCCallback, &logger, nbVars)
 #endif
-            {
-        _bg_worker.run([&]() {runBackgroundWorker();});
-    }
+            {}
 
     inline auto& getChecker() {
         return _checker;
@@ -159,6 +178,20 @@ public:
 
     void setLearnedClauseCallback(const LearnedClauseCallback& cb) {_cb_learn = cb;}
     void setProbingLearnedClauseCallback(const ProbingLearnedClauseCallback& cb) {_cb_probe = cb;}
+
+    void launch(const int* fData, size_t fSize) {
+        _f_data = fData;
+        _f_size = fSize;
+
+        // summary of formula for debugging
+        //std::string summary;
+        //for (size_t i = 0; i < std::min(5UL, _f_size); i++) summary += std::to_string(_f_data[i]) + " ";
+        //if (_f_size > 10) summary += " ... ";
+        //for (size_t i = std::max(5UL, _f_size-5); i < _f_size; i++) summary += std::to_string(_f_data[i]) + " ";
+        //LOG(V2_INFO, "PROOF> got formula with %lu lits: %s\n", _f_size, summary.c_str());
+
+        _bg_worker.run([&]() {runBackgroundWorker();});
+    }
 
     inline void push(LratOp&& op) {
         _ringbuf.pushBlocking(op);
@@ -185,12 +218,28 @@ private:
         int sigSize {16};
         u8 sig[sigSize];
 
+        // Load formula
+        size_t offset = 0;
+        while (_bg_worker.continueRunning() && offset < _f_size) {
+            size_t nbInts = std::min(1UL<<16, _f_size-offset);
+            _checker.load(_f_data+offset, nbInts);
+            offset += nbInts;
+        }
+        if (!_bg_worker.continueRunning()) return;
+        assert(offset == _f_size);
+
+        // End loading, check signature
+        bool ok = _checker.endLoading();
+        if (!ok) abort();
+
         // Lrat operation processing loop
         while (_bg_worker.continueRunning()) {
 
             // Wait for an op, then poll it
             bool ok = _ringbuf.pollBlocking(op);
             if (!ok) continue;
+
+            //LOG(V2_INFO, "PROOF> %s\n", op.toStr().c_str());
 
             auto type = op.getType();
             if (type == LratOp::DERIVATION) {
@@ -210,7 +259,11 @@ private:
                 bool ok = _checker.deleteClauses(op.getHints(), op.getNbHints());
                 if (!ok) abort();
             } else if (type == LratOp::VALIDATION) {
+#if MALLOB_TRUSTED_SUBPROCESSING
                 bool ok = _checker.validateUnsat();
+#else
+                bool ok = _checker.validateUnsat(nullptr, sigSize);
+#endif
                 if (!ok) abort();
                 _unsat_validated = true;
                 break;

@@ -15,7 +15,9 @@ SolverThread::SolverThread(const Parameters& params, const SatProcessConfig& con
         size_t fSize, const int* fLits, size_t aSize, const int* aLits,
         int localId) : 
     _params(params), _solver_ptr(solver), _solver(*solver), 
-    _logger(_solver.getLogger()), _local_id(localId), 
+    _logger(_solver.getLogger()),
+    _lrat(_solver.getSolverSetup().onTheFlyChecking ? _solver.getLratConnector() : nullptr),
+    _local_id(localId),
     _has_pseudoincremental_solvers(solver->getSolverSetup().hasPseudoincrementalSolvers) {
     
     _portfolio_rank = config.apprank;
@@ -41,7 +43,26 @@ void SolverThread::init() {
     
     _active_revision = 0;
     _imported_lits_curr_revision = 0;
-    
+
+    if (_lrat) {
+        // Convert hex string back to byte array
+        uint8_t target[16];
+        {
+            std::string sigStr = _solver.getSolverSetup().sigFormula;
+            const char* src = sigStr.c_str();
+            uint8_t* dest = target;
+            while(*src && src[1]) {
+                char c1 = src[0];
+                int i1 = (c1 >= '0' && c1 <= '9') ? (c1 - '0') : (c1 - 'a' + 10);
+                char c2 = src[1];
+                int i2 = (c2 >= '0' && c2 <= '9') ? (c2 - '0') : (c2 - 'a' + 10);
+                *(dest++) = i1*16 + i2;
+                src += 2;
+            }
+        }
+        _lrat->getChecker().init(target);
+    }
+
     _initialized = true;
 }
 
@@ -111,6 +132,9 @@ bool SolverThread::readFormula() {
             aSize = _pending_assumptions[_active_revision].first;
             aLits = _pending_assumptions[_active_revision].second;
         }
+
+        // Forward raw formula data to LRAT connector
+        if (_lrat) _lrat->launch(fParser->getRawPayload(), fParser->getPayloadSize());
 
         LOGGER(_logger, V4_VVER, "Reading rev. %i, start %i\n", (int)_active_revision, (int)_imported_lits_curr_revision);
         

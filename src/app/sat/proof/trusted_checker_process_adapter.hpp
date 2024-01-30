@@ -2,6 +2,7 @@
 #pragma once
 
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include <sys/stat.h>
 #include <stdlib.h>
@@ -69,6 +70,19 @@ public:
         TrustedUtils::writeInt(_nb_vars, _f_directives);
         TrustedUtils::writeSignature(formulaSignature, _f_directives);
         if (!awaitResponse()) TrustedUtils::doAbort();
+    }
+
+    inline void load(const int* fData, size_t fSize) {
+        assert(_buflen_lits == 0);
+        size_t offset = 0;
+        while (offset < fSize) {
+            const auto nbInts = std::min(fSize-offset, (size_t)TRUSTED_CHK_MAX_BUF_SIZE);
+            memcpy(_buf_lits, fData+offset, nbInts*sizeof(int));
+            _buflen_lits = nbInts;
+            flushLiteralBuffer();
+            offset += nbInts;
+        }
+        assert(offset == fSize);
     }
 
     inline void loadLiteral(int lit) {

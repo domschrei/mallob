@@ -70,6 +70,9 @@ public:
         if (nbRead < 1) doAbortEof();
         return i;
     }
+    static void readInts(int* data, size_t nbInts, FILE* file) {
+        UNLOCKED_IO(fread)(data, sizeof(int), nbInts, file);
+    }
     static void writeInt(int i, FILE* file) {
         UNLOCKED_IO(fwrite)(&i, sizeof(int), 1, file);
     }
