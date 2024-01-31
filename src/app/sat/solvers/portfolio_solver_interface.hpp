@@ -8,7 +8,6 @@
 #include <atomic>
 
 #include "app/sat/data/definitions.hpp"
-#include "app/sat/proof/lrat_connector.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
 #include "util/random.hpp"
 #include "util/sys/threading.hpp"

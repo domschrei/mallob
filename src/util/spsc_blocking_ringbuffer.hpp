@@ -66,8 +66,14 @@ public:
     }
 
     bool pollBlocking(T& out) override {
+        return pollBlocking(out, false);
+    }
+
+    inline bool pollBlocking(T& out, bool returnIfEmpty) {
 
         if (empty()) {
+            if (returnIfEmpty) return false;
+
             // no elements AND input exhausted? => fully exhausted
             if (_input_exhausted) return false;
             

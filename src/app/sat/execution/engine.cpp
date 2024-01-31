@@ -7,6 +7,7 @@
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "data/app_configuration.hpp"
+#include "app/sat/proof/lrat_connector.hpp"
 #include "../solvers/cadical.hpp"
 #include "../solvers/lingeling.hpp"
 #include "../solvers/kissat.hpp"

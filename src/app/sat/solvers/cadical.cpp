@@ -53,15 +53,15 @@ Cadical::Cadical(const SolverSetup& setup)
 			okay = solver->set("signsharedcls", 1); assert(okay);
 			solver->trace_proof_internally(
 				[&](unsigned long id, const int* lits, int nbLits, const unsigned long* hints, int nbHints, int glue) {
-					_lrat->push(LratConnector::LratOp {id, lits, nbLits, hints, nbHints, glue});
+					_lrat->push(LratOp {id, lits, nbLits, hints, nbHints, glue});
 					return true;
 				},
 				[&](unsigned long id, const int* lits, int nbLits, const uint8_t* sigData, int sigSize) {
-					_lrat->push(LratConnector::LratOp {id, lits, nbLits, sigData});
+					_lrat->push(LratOp {id, lits, nbLits, sigData});
 					return true;
 				},
 				[&](const unsigned long* ids, int nbIds) {
-					_lrat->push(LratConnector::LratOp {ids, nbIds});
+					_lrat->push(LratOp {ids, nbIds});
 					return true;
 				}
 			);
@@ -184,7 +184,7 @@ SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 		return SAT;
 	case 20:
 		if (_lrat) {
-			_lrat->push(LratConnector::LratOp {});
+			_lrat->push(LratOp {});
 			bool ok = _lrat->waitForValidation();
 			return ok ? UNSAT : UNKNOWN;
 		}

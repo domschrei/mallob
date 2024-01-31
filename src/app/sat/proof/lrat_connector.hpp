@@ -6,7 +6,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <unistd.h>
-#include <vector>
 
 #include "app/sat/data/clause.hpp"
 #include "app/sat/proof/trusted/trusted_solving.hpp"
@@ -24,125 +23,11 @@
 
 class LratConnector {
 
-public:
-    struct LratOp {
-        size_t datalen {0};
-        u8* data {nullptr};
-
-        // Derivation / production / addition
-        LratOp(u64 id, const int* lits, int nbLits, const u64* hints, int nbHints, int glue) :
-                datalen(sizeof(nbLits) + sizeof(nbHints) + sizeof(id) 
-                      + nbLits*sizeof(int) + nbHints*sizeof(u64) + sizeof(int)),
-                data((u8*) malloc(datalen)) {
-            size_t i = 0, n;
-            assert(glue >= 0);
-            n = sizeof(nbLits);      memcpy(data+i, &nbLits, n);  i += n;
-            n = sizeof(nbHints);     memcpy(data+i, &nbHints, n); i += n;
-            n = sizeof(id);          memcpy(data+i, &id, n);      i += n;
-            n = sizeof(int)*nbLits;  memcpy(data+i, lits, n);     i += n;
-            n = sizeof(u64)*nbHints; memcpy(data+i, hints, n);    i += n;
-            n = sizeof(glue);        memcpy(data+i, &glue, n);    i += n;
-            //assert(isDerivation());
-        }
-        // Import
-        LratOp(u64 id, const int* lits, int nbLits, const u8* sig) :
-                datalen(2*sizeof(int) + sizeof(id) + nbLits*sizeof(int) + 16 + sizeof(int)),
-                data((u8*) malloc(datalen)) {
-            size_t i = 0, n;
-            const int nbHints = 16 / sizeof(u64);
-            const int glue = -1;
-            n = sizeof(nbLits);      memcpy(data+i, &nbLits, n);  i += n;
-            n = sizeof(nbHints);     memcpy(data+i, &nbHints, n); i += n;
-            n = sizeof(id);          memcpy(data+i, &id, n);      i += n;
-            n = sizeof(int)*nbLits;  memcpy(data+i, lits, n);     i += n;
-            n = sizeof(u64)*nbHints; memcpy(data+i, sig, n);      i += n;
-            n = sizeof(glue);        memcpy(data+i, &glue, n);    i += n;
-            //assert(isImport());
-        }
-        // Deletion
-        LratOp(const u64* hints, int nbHints) :
-                datalen(2*sizeof(int) + sizeof(u64) + nbHints*sizeof(u64)),
-                data((u8*) malloc(datalen)) {
-            size_t i = 0, n;
-            const int nbLits = 0;
-            const u64 id = 0;
-            n = sizeof(nbLits);      memcpy(data+i, &nbLits, n);  i += n;
-            n = sizeof(nbHints);     memcpy(data+i, &nbHints, n); i += n;
-            n = sizeof(id);          memcpy(data+i, &id, n);      i += n;
-            n = sizeof(u64)*nbHints; memcpy(data+i, hints, n);    i += n;
-            //assert(isDeletion());
-        }
-        // UNSAT Validation
-        LratOp() : datalen(1), data((u8*) malloc(1)) {
-            data[0] = 20;
-            //assert(isUnsatValidation());
-        }
-        LratOp(LratOp&& moved) : datalen(moved.datalen), data(moved.data) {
-            moved.datalen = 0;
-            moved.data = nullptr;
-        }
-        LratOp& operator=(LratOp&& moved) {
-            this->datalen = moved.datalen;
-            this->data = moved.data;
-            moved.datalen = 0;
-            moved.data = nullptr;
-            return *this;
-        }
-
-        void sortLiterals() {
-            std::sort(getLits(), getLits()+getNbLits());
-        }
-
-        bool isDerivation() const {return getType() == DERIVATION;}
-        bool isImport() const {return getType() == IMPORT;}
-        bool isDeletion() const {return getType() == DELETION;}
-        bool isUnsatValidation() const {return getType() == VALIDATION;}
-
-        enum Type {DERIVATION, IMPORT, DELETION, VALIDATION};
-        Type getType() const {
-            if (datalen == 1) return VALIDATION;
-            if (getId() == 0) return DELETION;
-            if (getGlue() < 0) return IMPORT;
-            return DERIVATION;
-        }
-
-        int getNbLits() const {return *(u64*) (data);}
-        int getNbHints() const {return *(u64*) (data + sizeof(int));}
-        u64 getId() const {return *(u64*) (data + 2*sizeof(int));}
-        int* getLits() {return (int*) (data + 2*sizeof(int) + sizeof(u64));}
-        const int* getLits() const {return (int*) (data + 2*sizeof(int) + sizeof(u64));}
-        const u64* getHints() const {return (u64*) (data + 2*sizeof(int) + sizeof(u64) + getNbLits()*sizeof(int));}
-        const u8* getSignature() const {return (u8*) getHints();}
-        int getGlue() const {return *(int*) (data + datalen - sizeof(int));}
-
-        std::string toStr() const {
-            std::string out;
-            auto type = getType();
-            if (type == DERIVATION) {
-                out += "a " + std::to_string(getId()) + " ";
-                for (int i = 0; i < getNbLits(); i++) out += std::to_string(getLits()[i]) + " ";
-                out += "0 ";
-                for (int i = 0; i < getNbHints(); i++) out += std::to_string(getHints()[i]) + " ";
-                out += "0";
-            } else if (type == IMPORT) {
-                out += "i " + std::to_string(getId()) + " ";
-                for (int i = 0; i < getNbLits(); i++) out += std::to_string(getLits()[i]) + " ";
-                out += "0 ";
-                out += Logger::dataToHexStr(getSignature(), 16) + " ";
-                out += "0";
-            }
-            return out;
-        }
-
-        ~LratOp() {
-            if (data) free(data);
-        }
-    };
-
 private:
     const int _local_id;
     SPSCBlockingRingbuffer<LratOp> _ringbuf;
-    BackgroundWorker _bg_worker;
+    BackgroundWorker _bg_emitter;
+    BackgroundWorker _bg_acceptor;
 #if MALLOB_TRUSTED_SUBPROCESSING
     TrustedCheckerProcessAdapter _checker;
 #else
@@ -190,7 +75,7 @@ public:
         //for (size_t i = std::max(5UL, _f_size-5); i < _f_size; i++) summary += std::to_string(_f_data[i]) + " ";
         //LOG(V2_INFO, "PROOF> got formula with %lu lits: %s\n", _f_size, summary.c_str());
 
-        _bg_worker.run([&]() {runBackgroundWorker();});
+        _bg_emitter.run([&]() {runEmitter();});
     }
 
     inline void push(LratOp&& op) {
@@ -203,71 +88,64 @@ public:
 
     void terminate() {
         _terminated = true;
-        _bg_worker.stopWithoutWaiting();
         _ringbuf.markExhausted();
         _ringbuf.markTerminated();
-        _bg_worker.stop();
+        _bg_emitter.stop();
 #if MALLOB_TRUSTED_SUBPROCESSING
         _checker.terminate();
 #endif
+        _bg_acceptor.stop();
     }
 
 private:
-    void runBackgroundWorker() {
-
-        LratOp op;
-        int sigSize {16};
-        u8 sig[sigSize];
+    void runEmitter() {
 
         // Load formula
         size_t offset = 0;
-        while (_bg_worker.continueRunning() && offset < _f_size) {
+        while (_bg_emitter.continueRunning() && offset < _f_size) {
             size_t nbInts = std::min(1UL<<16, _f_size-offset);
             _checker.load(_f_data+offset, nbInts);
             offset += nbInts;
         }
-        if (!_bg_worker.continueRunning()) return;
+        if (!_bg_emitter.continueRunning()) return;
         assert(offset == _f_size);
 
         // End loading, check signature
         bool ok = _checker.endLoading();
         if (!ok) abort();
 
-        // Lrat operation processing loop
-        while (_bg_worker.continueRunning()) {
+        // Start acceptor
+        _bg_acceptor.run([&]() {runAcceptor();});
 
+        // Lrat operation emission loop
+        LratOp op;
+        u8 sig[16];
+        while (_bg_emitter.continueRunning()) {
             // Wait for an op, then poll it
             bool ok = _ringbuf.pollBlocking(op);
             if (!ok) continue;
+            //LOG(V2_INFO, "PROOF> submit %s\n", op.toStr().c_str());
+            _checker.submit(op);
+        }
+    }
 
-            //LOG(V2_INFO, "PROOF> %s\n", op.toStr().c_str());
-
-            auto type = op.getType();
-            if (type == LratOp::DERIVATION) {
-                // only supply non-null signature ptr if shareable
+    void runAcceptor() {
+        LratOp op;
+        u8 sig[16];
+        while (_bg_acceptor.continueRunning()) {
+            bool res;
+            bool ok = _checker.accept(op, res, sig);
+            if (!ok) break;
+            //LOG(V2_INFO, "PROOF> accept (%i) %s\n", (int)res, op.toStr().c_str());
+            if (!res) abort();
+            if (op.isDerivation()) {
                 bool share = op.getGlue() > 0 && _cb_probe(op.getNbLits());
-                if (share) op.sortLiterals();
-                bool ok = _checker.produceClause(op.getId(), op.getLits(), op.getNbLits(), op.getHints(), op.getNbHints(), share ? sig : nullptr, sigSize);
-                if (!ok) abort();
-                // forward to clause export interface
-                if (!share) continue;
-                prepareClause(op, sig);
-                _cb_learn(_clause, _local_id);
-            } else if (type == LratOp::IMPORT) {
-                bool ok = _checker.importClause(op.getId(), op.getLits(), op.getNbLits(), op.getSignature(), 16);
-                if (!ok) abort();
-            } else if (type == LratOp::DELETION) {
-                bool ok = _checker.deleteClauses(op.getHints(), op.getNbHints());
-                if (!ok) abort();
-            } else if (type == LratOp::VALIDATION) {
-#if MALLOB_TRUSTED_SUBPROCESSING
-                bool ok = _checker.validateUnsat();
-#else
-                bool ok = _checker.validateUnsat(nullptr, sigSize);
-#endif
-                if (!ok) abort();
+                if (share) {
+                    prepareClause(op, sig);
+                    _cb_learn(_clause, _local_id);
+                }
+            } else if (op.isUnsatValidation()) {
                 _unsat_validated = true;
-                break;
             }
         }
     }

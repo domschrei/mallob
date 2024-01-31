@@ -7,6 +7,7 @@
 #include "util/random.hpp"
 #include "util/sys/proc.hpp"
 #include "util/hashing.hpp"
+#include "app/sat/proof/lrat_connector.hpp"
 
 using namespace SolvingStates;
 

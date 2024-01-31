@@ -1,10 +1,11 @@
 
 #pragma once
 
-#include "trusted_utils.hpp"
-#include "trusted_solving.hpp"
 #include <cstdio>
 #include <cstdlib>
+
+#include "trusted_utils.hpp"
+#include "trusted_solving.hpp"
 
 // Initialize and begin the loading stage.
 // IN: #vars (int); 128-bit signature of the formula
@@ -119,9 +120,6 @@ public:
                 readIdAndLiterals(nbRemaining, id, lits, nbLits);
                 readHints(nbRemaining, hints, nbHints);
                 TrustedUtils::doAssert(nbRemaining == 0);
-                //assert(nbLits == 1);
-                //assert(nbHints == 2);
-                //printf("PROOF?? a %lu %i 0 %lu %lu 0\n", id, lits[0], hints[0], hints[1]);
                 // forward to checker
                 bool res = _ts->produceClause(id, lits, nbLits, hints, nbHints,
                     (u8*) _buf_sig, sigSizeBytes);

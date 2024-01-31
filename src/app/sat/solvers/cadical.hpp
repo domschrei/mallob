@@ -7,7 +7,6 @@
 
 #pragma once
 
-#include "app/sat/proof/lrat_connector.hpp"
 #include "app/sat/proof/trusted/lrat_checker.hpp"
 #include "app/sat/proof/trusted/trusted_solving.hpp"
 #include "app/sat/proof/trusted/trusted_solving_interface.hpp"
@@ -21,6 +20,8 @@
 #include "cadical_terminator.hpp"
 #include "cadical_clause_export.hpp"
 #include "cadical_clause_import.hpp"
+
+class LratConnector; // fwd
 
 class Cadical : public PortfolioSolverInterface {
 
