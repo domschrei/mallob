@@ -29,7 +29,6 @@ private:
     const Parameters& _params;
     const SatProcessConfig& _config;
     Logger& _log;
-    SatEngine _engine;
 
     std::string _shmem_id;
     SatSharedMemory* _hsm;
@@ -47,7 +46,7 @@ private:
 
 public:
     SatProcess(const Parameters& params, const SatProcessConfig& config, Logger& log) 
-        : _params(params), _config(config), _log(log), _engine(_params, _config, _log) {
+        : _params(params), _config(config), _log(log) {
 
         // Set up "management" block of shared memory created by the parent
         _shmem_id = _config.getSharedMemId(Proc::getParentPid());
@@ -64,6 +63,18 @@ public:
     }
 
     void run() {
+        mainProgram();
+
+        // Everything has been safely cleaned up, so we can send the terminate response
+        // which allows the parent process to clean up all the shared memory.
+        _hsm->didTerminate = true;
+    }
+
+private:
+    void mainProgram() {
+
+        SatEngine engine(_params, _config, _log);
+
         // Wait until everything is prepared for the solver to begin
         while (!_hsm->doBegin) doSleep();
         
@@ -83,15 +94,15 @@ public:
 
         // Import first revision
         _desired_revision = _config.firstrev;
-        readFormulaAndAssumptionsFromSharedMem(0);
+        readFormulaAndAssumptionsFromSharedMem(engine, 0);
         _last_imported_revision = 0;
         // Import subsequent revisions
-        importRevisions();
+        importRevisions(engine);
         if (checkTerminate(false)) return;
-        _engine.setAllocatedSharingBufferSize(_hsm->exportBufferAllocatedSize);
+        engine.setAllocatedSharingBufferSize(_hsm->exportBufferAllocatedSize);
         
         // Start solver threads
-        _engine.solve();
+        engine.solve();
         
         std::vector<int> solutionVec;
         std::string solutionShmemId = "";
@@ -108,22 +119,18 @@ public:
             // Terminate
             if (_hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/false)) {
                 LOGGER(_log, V4_VVER, "DO terminate\n");
-                _engine.dumpStats(/*final=*/true);
-                if (_params.proofOutputFile.isSet() || _params.onTheFlyChecking()) {
-                    // clean up everything super gracefully to allow finishing all proofs
-                    _engine.cleanUp();
-                }
+                engine.dumpStats(/*final=*/true);
                 break;
             }
 
             // Read new revisions as necessary
-            importRevisions();
+            importRevisions(engine);
 
             // Dump stats
             if (_hsm->doDumpStats && !_hsm->didDumpStats) {
                 LOGGER(_log, V5_DEBG, "DO dump stats\n");
                 
-                _engine.dumpStats(/*final=*/false);
+                engine.dumpStats(/*final=*/false);
 
                 // For this management thread
                 double cpuShare; float sysShare;
@@ -133,7 +140,7 @@ public:
                 }
 
                 // For each solver thread
-                std::vector<long> threadTids = _engine.getSolverTids();
+                std::vector<long> threadTids = engine.getSolverTids();
                 for (size_t i = 0; i < threadTids.size(); i++) {
                     if (threadTids[i] < 0) continue;
                     
@@ -151,13 +158,13 @@ public:
             if (!_hsm->doDumpStats) _hsm->didDumpStats = false;
 
             // Check if clauses should be exported
-            if (_hsm->doExport && !_hsm->didExport && _engine.isReadyToPrepareSharing()) {
+            if (_hsm->doExport && !_hsm->didExport && engine.isReadyToPrepareSharing()) {
                 LOGGER(_log, V5_DEBG, "DO export clauses\n");
                 // Collect local clauses, put into shared memory
                 _hsm->exportChecksum = Checksum();
                 _hsm->successfulSolverId = -1;
                 assert(_hsm->exportBufferMaxSize >= 0 && _hsm->exportBufferMaxSize < 1048576);
-                _hsm->exportBufferTrueSize = _engine.prepareSharing(_export_buffer, _hsm->exportBufferMaxSize, _hsm->successfulSolverId, _hsm->numCollectedLits);
+                _hsm->exportBufferTrueSize = engine.prepareSharing(_export_buffer, _hsm->exportBufferMaxSize, _hsm->successfulSolverId, _hsm->numCollectedLits);
                 if (_hsm->exportBufferTrueSize != -1) {
                     assert(_hsm->exportBufferTrueSize <= _hsm->exportBufferAllocatedSize);
                     _hsm->didExport = true;
@@ -169,11 +176,11 @@ public:
             if (_hsm->doFilterImport && !_hsm->didFilterImport) {
                 LOGGER(_log, V5_DEBG, "DO filter clauses\n");
                 int winningSolverId = _hsm->winningSolverId;
-                _hsm->filterSize = _engine.filterSharing(_import_buffer, _hsm->importBufferSize, _filter_buffer);
+                _hsm->filterSize = engine.filterSharing(_import_buffer, _hsm->importBufferSize, _filter_buffer);
                 _hsm->didFilterImport = true;
                 if (winningSolverId >= 0) {
                     LOGGER(_log, V4_VVER, "winning solver ID: %i", winningSolverId);
-                    _engine.setWinningSolverId(winningSolverId);
+                    engine.setWinningSolverId(winningSolverId);
                 }
             }
             if (!_hsm->doFilterImport) _hsm->didFilterImport = false;
@@ -184,15 +191,15 @@ public:
                 LOGGER(_log, V5_DEBG, "DO import clauses\n");
                 // Write imported clauses from shared memory into vector
                 assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
-                _engine.setClauseBufferRevision(_hsm->importBufferRevision);
+                engine.setClauseBufferRevision(_hsm->importBufferRevision);
                 if (_hsm->doDigestImportWithFilter) {
-                    _engine.digestSharingWithFilter(_import_buffer, _hsm->importBufferSize, _filter_buffer);
+                    engine.digestSharingWithFilter(_import_buffer, _hsm->importBufferSize, _filter_buffer);
                 } else {
-                    _engine.digestSharingWithoutFilter(_import_buffer, _hsm->importBufferSize);
+                    engine.digestSharingWithoutFilter(_import_buffer, _hsm->importBufferSize);
                 }
-                _engine.addSharingEpoch(_hsm->importEpoch);
-                _engine.syncDeterministicSolvingAndCheckForLocalWinner();
-                _hsm->lastAdmittedStats = _engine.getLastAdmittedClauseShare();
+                engine.addSharingEpoch(_hsm->importEpoch);
+                engine.syncDeterministicSolvingAndCheckForLocalWinner();
+                _hsm->lastAdmittedStats = engine.getLastAdmittedClauseShare();
                 _hsm->didDigestImport = true;
             }
             if (!_hsm->doDigestImportWithFilter && !_hsm->doDigestImportWithoutFilter) 
@@ -201,22 +208,22 @@ public:
             // Re-insert returned clauses into the local clause database to be exported later
             if (_hsm->doReturnClauses && !_hsm->didReturnClauses) {
                 LOGGER(_log, V5_DEBG, "DO return clauses\n");
-                _engine.returnClauses(_returned_buffer, _hsm->returnedBufferSize);
+                engine.returnClauses(_returned_buffer, _hsm->returnedBufferSize);
                 _hsm->didReturnClauses = true;
             }
             if (!_hsm->doReturnClauses) _hsm->didReturnClauses = false;
 
             if (_hsm->doDigestHistoricClauses && !_hsm->didDigestHistoricClauses) {
                 LOGGER(_log, V5_DEBG, "DO digest historic clauses\n");
-                _engine.setClauseBufferRevision(_hsm->importBufferRevision);
-                _engine.digestHistoricClauses(_hsm->historicEpochBegin, _hsm->historicEpochEnd, 
+                engine.setClauseBufferRevision(_hsm->importBufferRevision);
+                engine.digestHistoricClauses(_hsm->historicEpochBegin, _hsm->historicEpochEnd, 
                     _import_buffer, _hsm->importBufferSize);
                 _hsm->didDigestHistoricClauses = true;
             }
             if (!_hsm->doDigestHistoricClauses) _hsm->didDigestHistoricClauses = false;
 
             // Check initialization state
-            if (!_hsm->isInitialized && _engine.isFullyInitialized()) {
+            if (!_hsm->isInitialized && engine.isFullyInitialized()) {
                 LOGGER(_log, V5_DEBG, "DO set initialized\n");
                 _hsm->isInitialized = true;
             }
@@ -230,7 +237,7 @@ public:
             // Reduce active thread count (to reduce memory usage)
             if (_hsm->doReduceThreadCount && !_hsm->didReduceThreadCount) {
                 LOGGER(_log, V3_VERB, "Reducing thread count\n");
-                _engine.reduceActiveThreadCount();
+                engine.reduceActiveThreadCount();
                 _hsm->didReduceThreadCount = true;
             }
             if (!_hsm->doReduceThreadCount) _hsm->didReduceThreadCount = false;
@@ -240,10 +247,10 @@ public:
             if (lastSolvedRevision == _last_imported_revision) continue;
 
             // Check solved state
-            int resultCode = _engine.solveLoop();
+            int resultCode = engine.solveLoop();
             if (resultCode >= 0 && !_hsm->hasSolution) {
                 // Solution found!
-                auto& result = _engine.getResult();
+                auto& result = engine.getResult();
                 result.id = _config.jobid;
                 if (_hsm->doTerminate || result.revision < _desired_revision) {
                     // Result obsolete
@@ -272,24 +279,23 @@ public:
             }
         }
 
-        if (checkTerminate(false)) return;
+        if (checkTerminate(!_params.onTheFlyChecking() && !_params.proofOutputFile.isSet()))
+            return;
 
         // Shared memory will be cleaned up by the parent process.
     }
-    
-private:
 
     bool checkTerminate(bool force) {
         bool terminate = _hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/true);
-        if (terminate) {
-            _hsm->didTerminate = true;
+        if (terminate && force) {
             _log.flush();
-            if (force) Process::hardkill(Proc::getPid()); // RIP
+            _hsm->didTerminate = true;
+            Process::terminate(Proc::getPid());
         }
         return terminate;
     }
 
-    void readFormulaAndAssumptionsFromSharedMem(int revision) {
+    void readFormulaAndAssumptionsFromSharedMem(SatEngine& engine, int revision) {
 
         float time = Timer::elapsedSeconds();
 
@@ -315,12 +321,12 @@ private:
             _read_assumptions.emplace_back(aPtr, aPtr+aSize);
 
             // Reference the according positions in local memory when forwarding the data
-            _engine.appendRevision(revision, fSize, _read_formulae.back().data(),
+            engine.appendRevision(revision, fSize, _read_formulae.back().data(),
                 aSize, _read_assumptions.back().data(), revision == _desired_revision);
             updateChecksum(_read_formulae.back().data(), fSize);
         } else {
             // Let the solvers read from shared memory directly
-            _engine.appendRevision(revision, fSize, fPtr, aSize, aPtr, revision == _desired_revision);
+            engine.appendRevision(revision, fSize, fPtr, aSize, aPtr, revision == _desired_revision);
             updateChecksum(fPtr, fSize);
         }
 
@@ -354,14 +360,14 @@ private:
         for (size_t i = 0; i < size; i++) _checksum->combine(ptr[i]);
     }
 
-    void importRevisions() {
+    void importRevisions(SatEngine& engine) {
         while ((_hsm->doStartNextRevision && !_hsm->didStartNextRevision) 
                 || _last_imported_revision < _desired_revision) {
             if (checkTerminate(false)) return;
             if (_hsm->doStartNextRevision && !_hsm->didStartNextRevision) {
                 _desired_revision = _hsm->desiredRevision;
                 _last_imported_revision++;
-                readFormulaAndAssumptionsFromSharedMem(_last_imported_revision);
+                readFormulaAndAssumptionsFromSharedMem(engine, _last_imported_revision);
                 _hsm->didStartNextRevision = true;
                 _hsm->hasSolution = false;
             } else doSleep();
