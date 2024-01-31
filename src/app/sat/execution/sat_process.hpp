@@ -68,10 +68,7 @@ public:
         while (!_hsm->doBegin) doSleep();
         
         // Terminate directly?
-        if (_hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/true)) {
-            doTerminate(/*gracefully=*/!_params.proofOutputFile.isSet());
-            return;
-        }
+        if (checkTerminate(false)) return;
 
         // Set up export and import buffers for clause exchanges
         {
@@ -90,6 +87,7 @@ public:
         _last_imported_revision = 0;
         // Import subsequent revisions
         importRevisions();
+        if (checkTerminate(false)) return;
         _engine.setAllocatedSharingBufferSize(_hsm->exportBufferAllocatedSize);
         
         // Start solver threads
@@ -274,12 +272,22 @@ public:
             }
         }
 
-        doTerminate(/*gracefully=*/!_params.proofOutputFile.isSet());
+        if (checkTerminate(false)) return;
 
         // Shared memory will be cleaned up by the parent process.
     }
     
 private:
+
+    bool checkTerminate(bool force) {
+        bool terminate = _hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/true);
+        if (terminate) {
+            _hsm->didTerminate = true;
+            _log.flush();
+            if (force) Process::hardkill(Proc::getPid()); // RIP
+        }
+        return terminate;
+    }
 
     void readFormulaAndAssumptionsFromSharedMem(int revision) {
 
@@ -349,7 +357,7 @@ private:
     void importRevisions() {
         while ((_hsm->doStartNextRevision && !_hsm->didStartNextRevision) 
                 || _last_imported_revision < _desired_revision) {
-            if (_hsm->doTerminate) doTerminate(/*gracefully=*/true);
+            if (checkTerminate(false)) return;
             if (_hsm->doStartNextRevision && !_hsm->didStartNextRevision) {
                 _desired_revision = _hsm->desiredRevision;
                 _last_imported_revision++;
@@ -366,11 +374,5 @@ private:
         // Wait until something happens
         // (can be interrupted by Fork::wakeUp(hsm->childPid))
         usleep(1000 /*1 millisecond*/);
-    }
-
-    void doTerminate(bool gracefully) {
-        _hsm->didTerminate = true;
-        _log.flush();   
-        Process::sendSignal(Proc::getPid(), gracefully ? SIGTERM : SIGKILL);
     }
 };
