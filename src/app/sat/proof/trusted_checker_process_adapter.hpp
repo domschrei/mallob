@@ -194,12 +194,14 @@ public:
         return true;
     }
 
-    void terminate() {
-        if (_child_pid == -1) return;
+    void stop() {
         _op_queue.markExhausted();
         _op_queue.markTerminated();
-        Process::sendSignal(_child_pid, SIGTERM);
-        while (Process::didChildExit(_child_pid) == 0) usleep(1000);
+    }
+    void terminate() {
+        if (_child_pid == -1) return;
+        Process::sendSignal(_child_pid, SIGKILL);
+        while (!Process::didChildExit(_child_pid)) usleep(1000);
         _child_pid = -1;
     }
 

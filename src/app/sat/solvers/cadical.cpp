@@ -197,7 +197,6 @@ SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 void Cadical::setSolverInterrupt() {
 	solver->terminate(); // acknowledged faster / checked more frequently by CaDiCaL
 	terminator.setInterrupt();
-	if (_lrat) _lrat->terminate();
 }
 
 void Cadical::unsetSolverInterrupt() {
@@ -269,4 +268,5 @@ void Cadical::writeStatistics(SolverStatistics& stats) {
 
 void Cadical::cleanUp() {
 	solver.reset();
+	if (_lrat) _lrat.reset();
 }

@@ -86,18 +86,23 @@ public:
         return _unsat_validated;
     }
 
+    ~LratConnector() {
+        terminate();
+    }
+
+private:
+
     void terminate() {
         _terminated = true;
         _ringbuf.markExhausted();
         _ringbuf.markTerminated();
-        _bg_emitter.stop();
 #if MALLOB_TRUSTED_SUBPROCESSING
-        _checker.terminate();
+        _checker.stop();
 #endif
+        _bg_emitter.stop();
         _bg_acceptor.stop();
     }
 
-private:
     void runEmitter() {
 
         // Load formula
