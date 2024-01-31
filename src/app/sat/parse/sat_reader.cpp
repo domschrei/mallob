@@ -32,7 +32,7 @@ void handleUnsat(const Parameters& _params) {
 
 bool SatReader::parseWithTrustedParser(JobDescription& desc) {
 	// Parse and sign in a separate subprocess
-	TrustedParserProcessAdapter tp;
+	TrustedParserProcessAdapter tp(desc.getId());
 	uint8_t* sig;
 	bool ok = tp.parseAndSign(_filename.c_str(), *desc.getRevisionData(desc.getRevision()).get(), sig);
 	if (!ok) return false;

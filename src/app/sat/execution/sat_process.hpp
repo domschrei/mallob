@@ -336,7 +336,7 @@ private:
         void* ptr = SharedMemory::access(shmemId, size, accessMode);
         if (ptr == nullptr) {
             LOGGER(_log, V0_CRIT, "[ERROR] Could not access shmem %s\n", shmemId.c_str());  
-            Process::doExit(0);  
+            abort();
         }
         return ptr;
     }
@@ -371,7 +371,6 @@ private:
     void doTerminate(bool gracefully) {
         _hsm->didTerminate = true;
         _log.flush();   
-        if (gracefully) Process::doExit(0);
-        else Process::sendSignal(Proc::getPid(), SIGKILL);
+        Process::sendSignal(Proc::getPid(), gracefully ? SIGTERM : SIGKILL);
     }
 };

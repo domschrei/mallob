@@ -14,6 +14,7 @@
 class TrustedParserProcessAdapter {
 
 private:
+    int _id;
     FILE* _f_parsed_formula;
     Subprocess* _subproc {nullptr};
     pid_t _child_pid;
@@ -24,15 +25,16 @@ private:
     unsigned long _f_size {0};
 
 public:
-    TrustedParserProcessAdapter() {}
+    TrustedParserProcessAdapter(int id) : _id(id) {}
     ~TrustedParserProcessAdapter() {
         if (_subproc) delete _subproc;
     }
 
     template <typename T>
     bool parseAndSign(const char* source, std::vector<T>& out, uint8_t*& outSignature) {
-        auto basePath = "/tmp/mallob." + std::to_string(Proc::getPid()) + ".tsparse.";
-        auto pathParsedFormula = basePath + "parsedformula";
+        auto basePath = "/tmp/mallob." + std::to_string(Proc::getPid())
+            + ".tsparse." + std::to_string(_id);
+        auto pathParsedFormula = basePath + ".parsedformula";
         mkfifo(pathParsedFormula.c_str(), 0666);
 
         Parameters params;

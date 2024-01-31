@@ -24,10 +24,6 @@
 #define MALLOB_VERSION "(dbg)"
 #endif
 
-void exitHandler() {
-    Process::forwardTerminateToChildren();
-}
-
 int main(int argc, char *argv[]) {
     
     Parameters params;
@@ -47,8 +43,7 @@ int main(int argc, char *argv[]) {
     ProcessWideThreadPool::init(1);
 
     // Initialize signal handlers
-    Process::init(rankOfParent, params.traceDirectory());
-    atexit(exitHandler);
+    Process::init(rankOfParent, params.traceDirectory(), true);
 
     std::string logdir = params.logDirectory();
     std::string logFilename = "subproc" + std::string(".") + std::to_string(rankOfParent);
@@ -77,10 +72,10 @@ int main(int argc, char *argv[]) {
     } catch (const std::exception &ex) {
         LOG(V0_CRIT, "[ERROR] uncaught \"%s\"\n", ex.what());
         Logger::getMainInstance().flush();
-        Process::doExit(1);
+        abort();
     } catch (...) {
         LOG(V0_CRIT, "[ERROR] uncaught exception\n");
         Logger::getMainInstance().flush();
-        Process::doExit(1);
+        abort();
     }
 }
