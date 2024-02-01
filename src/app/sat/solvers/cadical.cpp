@@ -184,6 +184,7 @@ SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 		return SAT;
 	case 20:
 		if (_lrat) {
+			LOGGER(_logger, V4_VVER, "waiting for UNSAT validation ...\n");
 			_lrat->push(LratOp {});
 			bool ok = _lrat->waitForValidation();
 			return ok ? UNSAT : UNKNOWN;

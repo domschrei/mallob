@@ -163,15 +163,17 @@ public:
                 _do_logging = false;
                 sayWithFlush(res);
                 TrustedUtils::writeSignature(_buf_sig, _output);
-                break;
 
             } else if (c == TRUSTED_CHK_TERMINATE) {
                 break;
+
             } else {
+                log("Invalid directive!");
                 TrustedUtils::doAbort(); // invalid directive
             }
         }
 
+        log("Exiting normally");
         fflush(_output);
         return 0;
     }

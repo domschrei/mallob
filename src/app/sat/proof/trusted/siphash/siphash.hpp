@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <cstdio> // printf (error printing)
 #include <stdlib.h> // malloc, free, abort
 
 class SipHash {
@@ -136,7 +137,10 @@ private:
 
     void processFinalBlock() {
         const int left = inlen & 7;
-        if (left != buflen) abort();
+        if (left != buflen) {
+            printf("[ERROR] SipHash : wrong residual buffer length! (%i vs %i)\n", left, buflen);
+            abort();
+        }
         uint64_t b = ((uint64_t)inlen) << 56;
         auto ni = buf;
 
