@@ -70,31 +70,25 @@ public:
     }
 
     inline bool produceClause(unsigned long id, const int* literals, int nbLiterals,
-        const unsigned long* hints, int nbHints,
-        uint8_t* outSignatureOrNull, int& inOutSigSize) {
+        const unsigned long* hints, int nbHints, uint8_t* outSignatureOrNull) {
         
         // forward clause to checker
         bool ok = _checker.addClause(id, literals, nbLiterals, hints, nbHints);
         if (!ok) abortWithCheckerError();
         // compute signature if desired
         if (outSignatureOrNull) {
-            computeClauseSignature(id, literals, nbLiterals, outSignatureOrNull, inOutSigSize);
+            computeClauseSignature(id, literals, nbLiterals, outSignatureOrNull);
         }
         return ok;
     }
 
     inline bool importClause(unsigned long id, const int* literals, int nbLiterals,
-        const uint8_t* signatureData, int signatureSize) {
+        const uint8_t* signatureData) {
         
         // verify signature
-        int computedSigSize = SIG_SIZE_BYTES;
-        uint8_t computedSignature[computedSigSize];
-        computeClauseSignature(id, literals, nbLiterals, computedSignature, computedSigSize);
-        if (computedSigSize != signatureSize) {
-            _log_function(_logger, "[ERROR] TS - supplied clause signature has wrong size");
-            TrustedUtils::doAbort();
-        }
-        for (int i = 0; i < signatureSize; i++) if (computedSignature[i] != signatureData[i]) {
+        uint8_t computedSignature[SIG_SIZE_BYTES];
+        computeClauseSignature(id, literals, nbLiterals, computedSignature);
+        for (int i = 0; i < SIG_SIZE_BYTES; i++) if (computedSignature[i] != signatureData[i]) {
             _log_function(_logger, "[ERROR] TS - clause signature does not match");
             TrustedUtils::doAbort();
         }
@@ -111,16 +105,14 @@ public:
         return ok;
     }
 
-    inline bool validateUnsat(uint8_t* outSignature, int& inOutSigSize) {
+    inline bool validateUnsat(uint8_t* outSignature) {
         bool ok = _checker.validateUnsat();
         if (!ok) abortWithCheckerError();
         _log_function(_logger, "TS - UNSAT VALIDATED");
         if (outSignature) {
-            u8 UNSAT = 20;
-            if (inOutSigSize < SIG_SIZE_BYTES) abort();
+            const u8 UNSAT = 20;
             auto sig = _siphash.reset().update(_formula_signature, SIG_SIZE_BYTES).update(&UNSAT, 1).digest();
             for (size_t i = 0; i < SIG_SIZE_BYTES; i++) outSignature[i] = sig[i];
-            inOutSigSize = SIG_SIZE_BYTES;
         }
         return ok;
     }
@@ -135,15 +127,13 @@ public:
         TrustedUtils::doAbort();
     }
 
-    inline void computeClauseSignature(uint64_t id, const int* lits, int nbLits, uint8_t* out, int& inOutSize) {
-        if (inOutSize < SIG_SIZE_BYTES) TrustedUtils::doAbort();
-        inOutSize = SIG_SIZE_BYTES;
+    inline void computeClauseSignature(uint64_t id, const int* lits, int nbLits, uint8_t* out) {
         const uint8_t* hashOut = _siphash.reset()
             .update((uint8_t*) &id, sizeof(uint64_t))
             .update((uint8_t*) lits, nbLits*sizeof(int))
             .update(Secret::SECRET_KEY, SIG_SIZE_BYTES)
             .digest();
-        copyBytes(out, hashOut, inOutSize);
+        copyBytes(out, hashOut, SIG_SIZE_BYTES);
     }
 
     inline void computeSignature(const uint8_t* data, int size, uint8_t* out, int& inOutSize) {

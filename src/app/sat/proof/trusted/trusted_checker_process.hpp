@@ -63,7 +63,7 @@ private:
 
     // Buffering.
     signature _buf_sig;
-    int ibuf[TRUSTED_CHK_MAX_BUF_SIZE];
+    int* ibuf;
     int ibuflen {0};
     size_t ulbufcap {TRUSTED_CHK_MAX_BUF_SIZE};
     unsigned long* ulbuf;
@@ -73,17 +73,17 @@ public:
     TrustedCheckerProcess(const char* fifoIn, const char* fifoOut) {
         _input = fopen(fifoIn, "r");
         _output = fopen(fifoOut, "w");
+        ibuf = (int*) malloc(TRUSTED_CHK_MAX_BUF_SIZE * sizeof(int));
         ulbuf = (u64*) malloc(ulbufcap * sizeof(u64));
     }
     ~TrustedCheckerProcess() {
         free(ulbuf);
+        free(ibuf);
         fclose(_output);
         fclose(_input);
     }
 
     int run() {
-
-        int sigSizeBytes {SIG_SIZE_BYTES};
 
         while (true) {
             int c = TrustedUtils::readChar(_input);
@@ -113,16 +113,14 @@ public:
                 // parse
                 int nbRemaining = TrustedUtils::readInt(_input);
                 unsigned long id;
-                int* lits;
                 int nbLits;
                 unsigned long* hints;
                 int nbHints;
-                readIdAndLiterals(nbRemaining, id, lits, nbLits);
+                readIdAndLiterals(nbRemaining, id, nbLits);
                 readHints(nbRemaining, hints, nbHints);
                 TrustedUtils::doAssert(nbRemaining == 0);
                 // forward to checker
-                bool res = _ts->produceClause(id, lits, nbLits, hints, nbHints,
-                    (u8*) _buf_sig, sigSizeBytes);
+                bool res = _ts->produceClause(id, ibuf, nbLits, hints, nbHints, _buf_sig);
                 // respond
                 say(res);
                 TrustedUtils::writeSignature(_buf_sig, _output);
@@ -133,12 +131,11 @@ public:
                 // parse
                 int nbRemaining = TrustedUtils::readInt(_input);
                 unsigned long id;
-                int* lits;
                 int nbLits;
-                readIdAndLiterals(nbRemaining, id, lits, nbLits);
+                readIdAndLiterals(nbRemaining, id, nbLits);
                 TrustedUtils::readSignature(_buf_sig, _input);
                 // forward to checker
-                bool res = _ts->importClause(id, lits, nbLits, _buf_sig, sigSizeBytes);
+                bool res = _ts->importClause(id, ibuf, nbLits, _buf_sig);
                 // respond
                 sayWithFlush(res);
 
@@ -160,7 +157,7 @@ public:
 
                 const bool doLoggingPrev = _do_logging;
                 _do_logging = true;
-                bool res = _ts->validateUnsat(_buf_sig, sigSizeBytes);
+                bool res = _ts->validateUnsat(_buf_sig);
                 _do_logging = doLoggingPrev;
                 sayWithFlush(res);
                 TrustedUtils::writeSignature(_buf_sig, _output);
@@ -193,13 +190,12 @@ private:
         TrustedUtils::writeChar(ok ? TRUSTED_CHK_RES_ACCEPT : TRUSTED_CHK_RES_ERROR, _output);
     }
 
-    void readIdAndLiterals(int& nbRemaining, unsigned long& id, int*& lits, int& nbLits) {
+    void readIdAndLiterals(int& nbRemaining, unsigned long& id, int& nbLits) {
         // parse ID
         id = TrustedUtils::readUnsignedLong(_input);
         nbRemaining -= 2;
         // parse clause
         ibuflen = 0;
-        lits = ibuf;
         nbLits = 0;
         while (nbRemaining > 0) {
             const int lit = TrustedUtils::readInt(_input);

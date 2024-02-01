@@ -1,13 +1,18 @@
 
+#include <cstdio>
+#include <sys/prctl.h>
+
 #include "trusted_checker_process.hpp"
 #include "trusted_utils.hpp"
-#include <cstdio>
 
 void logInCheckerProcess(void*, const char* msg) {
     TrustedUtils::log(msg);
 }
 
 int main(int argc, char *argv[]) {
+
+    prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY, 0, 0, 0);
+
     const char optDirectives[] = "-fifo-directives=";
     const char optFeedback[] = "-fifo-feedback=";
     const char* fifoDirectives;
