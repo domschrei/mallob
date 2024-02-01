@@ -1,6 +1,7 @@
 
 #include "trusted_checker_process.hpp"
 #include "trusted_utils.hpp"
+#include <cstdio>
 
 void logInCheckerProcess(void*, const char* msg) {
     TrustedUtils::log(msg);
@@ -22,5 +23,7 @@ int main(int argc, char *argv[]) {
     TrustedUtils::log("Using input path", fifoDirectives);
     TrustedUtils::log("Using output path", fifoFeedback);
     TrustedCheckerProcess p(fifoDirectives, fifoFeedback);
-    return p.run();
+    int res = p.run();
+    fflush(stdout);
+    return res;
 }

@@ -59,7 +59,7 @@ private:
 
     TrustedSolving* _ts;
 
-    bool _do_logging {false};
+    bool _do_logging {true};
 
     // Buffering.
     uint8_t _buf_sig[ 32 ];
@@ -158,9 +158,10 @@ public:
 
             } else if (c == TRUSTED_CHK_VALIDATE) {
 
+                const bool doLoggingPrev = _do_logging;
                 _do_logging = true;
                 bool res = _ts->validateUnsat(_buf_sig, sigSizeBytes);
-                _do_logging = false;
+                _do_logging = doLoggingPrev;
                 sayWithFlush(res);
                 TrustedUtils::writeSignature(_buf_sig, _output);
 

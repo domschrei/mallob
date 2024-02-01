@@ -59,7 +59,10 @@ public:
     }
 
     ~TrustedCheckerProcessAdapter() {
-        if (_child_pid != -1) terminate();
+        if (_child_pid != -1) {
+            stop();
+            terminate();
+        }
         fclose(_f_feedback);
         fclose(_f_directives);
         FileUtils::rm(_path_feedback);
