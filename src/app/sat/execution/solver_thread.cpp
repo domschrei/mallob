@@ -47,7 +47,7 @@ void SolverThread::init() {
 
     if (_lrat) {
         // Convert hex string back to byte array
-        uint8_t target[16];
+        signature target;
         {
             std::string sigStr = _solver.getSolverSetup().sigFormula;
             const char* src = sigStr.c_str();

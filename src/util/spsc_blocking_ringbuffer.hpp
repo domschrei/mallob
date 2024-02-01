@@ -39,7 +39,7 @@ public:
         return *this;
     }
 
-    void pushBlocking(T& input) {
+    bool pushBlocking(T& input) {
 
         if (size() == _buffer_size) {
             // wait until space is available
@@ -47,6 +47,7 @@ public:
             waitFor([&]() {
                 return _terminated || size() < _buffer_size;
             });
+            if (_terminated) return false;
             //LOG(V2_INFO, "SPSC wait nonfull done\n");
         }
 
@@ -63,6 +64,7 @@ public:
             _buffer_cond_var.notify();
         }
         //LOG(V2_INFO, "SPSC notify nonempty\n");
+        return true;
     }
 
     bool pollBlocking(T& out) override {

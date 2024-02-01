@@ -55,14 +55,14 @@ private:
     FILE* _input; // named pipe
     FILE* _output; // named pipe
     int _nb_vars; // # variables in formula
-    int _formula_signature[ 32 ]; // formula signature
+    signature _formula_signature; // formula signature
 
     TrustedSolving* _ts;
 
     bool _do_logging {true};
 
     // Buffering.
-    uint8_t _buf_sig[ 32 ];
+    signature _buf_sig;
     int ibuf[TRUSTED_CHK_MAX_BUF_SIZE];
     int ibuflen {0};
     size_t ulbufcap {TRUSTED_CHK_MAX_BUF_SIZE};
@@ -83,7 +83,7 @@ public:
 
     int run() {
 
-        int sigSizeBytes {16};
+        int sigSizeBytes {SIG_SIZE_BYTES};
 
         while (true) {
             int c = TrustedUtils::readChar(_input);
@@ -164,8 +164,11 @@ public:
                 _do_logging = doLoggingPrev;
                 sayWithFlush(res);
                 TrustedUtils::writeSignature(_buf_sig, _output);
+                UNLOCKED_IO(fflush)(_output);
 
             } else if (c == TRUSTED_CHK_TERMINATE) {
+
+                sayWithFlush(TRUSTED_CHK_RES_ACCEPT);
                 break;
 
             } else {
@@ -174,8 +177,6 @@ public:
             }
         }
 
-        log("Exiting normally");
-        fflush(_output);
         return 0;
     }
 
@@ -231,7 +232,7 @@ private:
 
     void readFormulaSignature() {
         TrustedUtils::readSignature(_buf_sig, _input);
-        for (size_t i = 0; i < 4; i++) {
+        for (size_t i = 0; i < SIG_SIZE_BYTES; i++) {
             _formula_signature[i] = _buf_sig[i];
         }
     }

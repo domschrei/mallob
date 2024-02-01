@@ -16,29 +16,22 @@
 #include "util/logger.hpp"
 #include "util/spsc_blocking_ringbuffer.hpp"
 #include "util/sys/background_worker.hpp"
-
-#ifndef MALLOB_TRUSTED_SUBPROCESSING
-#define MALLOB_TRUSTED_SUBPROCESSING 1
-#endif
+#include "util/sys/terminator.hpp"
 
 class LratConnector {
 
 private:
     const int _local_id;
     SPSCBlockingRingbuffer<LratOp> _ringbuf;
-    BackgroundWorker _bg_emitter;
-    BackgroundWorker _bg_acceptor;
-#if MALLOB_TRUSTED_SUBPROCESSING
+
     TrustedCheckerProcessAdapter _checker;
-#else
-    TrustedSolving _checker;
-#endif
+    BackgroundWorker _bg_acceptor;
+    BackgroundWorker _bg_emitter;
 
     ProbingLearnedClauseCallback _cb_probe;
     LearnedClauseCallback _cb_learn;
 
     bool _unsat_validated {false};
-    bool _terminated {false};
 
     // buffering
     static constexpr int MAX_CLAUSE_LENGTH {512};
@@ -50,12 +43,7 @@ private:
 
 public:
     LratConnector(Logger& logger, int localId, int nbVars) : _local_id(localId), _ringbuf(1<<16),
-#if MALLOB_TRUSTED_SUBPROCESSING
-            _checker(logger, _local_id, nbVars) 
-#else
-            _checker(loggerCCallback, &logger, nbVars)
-#endif
-            {}
+        _checker(logger, _local_id, nbVars) {}
 
     inline auto& getChecker() {
         return _checker;
@@ -82,28 +70,18 @@ public:
         _ringbuf.pushBlocking(op);
     }
     bool waitForValidation() {
-        while (!_terminated && !_unsat_validated) usleep(1000);
+        while (!_unsat_validated) usleep(1000);
         return _unsat_validated;
     }
 
     ~LratConnector() {
-        terminate();
+        _ringbuf.markExhausted();
     }
 
 private:
 
-    void terminate() {
-        _terminated = true;
-        _ringbuf.markExhausted();
-        _ringbuf.markTerminated();
-#if MALLOB_TRUSTED_SUBPROCESSING
-        _checker.stop();
-#endif
-        _bg_emitter.stop();
-        _bg_acceptor.stop();
-    }
-
     void runEmitter() {
+        LratOp end(0);
 
         // Load formula
         size_t offset = 0;
@@ -112,7 +90,10 @@ private:
             _checker.load(_f_data+offset, nbInts);
             offset += nbInts;
         }
-        if (!_bg_emitter.continueRunning()) return;
+        if (!_bg_emitter.continueRunning()) {
+            _checker.submit(end);
+            return;
+        }
         assert(offset == _f_size);
 
         // End loading, check signature
@@ -124,7 +105,6 @@ private:
 
         // Lrat operation emission loop
         LratOp op;
-        u8 sig[16];
         while (_bg_emitter.continueRunning()) {
             // Wait for an op, then poll it
             bool ok = _ringbuf.pollBlocking(op);
@@ -132,11 +112,14 @@ private:
             //LOG(V2_INFO, "PROOF> submit %s\n", op.toStr().c_str());
             _checker.submit(op);
         }
+
+        // Termination sentinel
+        _checker.submit(end);
     }
 
     void runAcceptor() {
         LratOp op;
-        u8 sig[16];
+        signature sig;
         while (_bg_acceptor.continueRunning()) {
             bool res;
             bool ok = _checker.accept(op, res, sig);
@@ -151,6 +134,8 @@ private:
                 }
             } else if (op.isUnsatValidation()) {
                 _unsat_validated = true;
+            } else if (op.isTermination()) {
+                break; // end
             }
         }
     }
@@ -160,7 +145,7 @@ private:
         assert(_clause.size <= MAX_CLAUSE_LENGTH);
         auto id = op.getId();
         memcpy(_clause.begin, &id, 8);
-        memcpy(_clause.begin+2, sig, 16);
+        memcpy(_clause.begin+2, sig, SIG_SIZE_BYTES);
         memcpy(_clause.begin+2+4, op.getLits(), op.getNbLits()*sizeof(int));
         _clause.lbd = op.getGlue();
         if (op.getNbLits() == 1) _clause.lbd = 1;

@@ -19,7 +19,7 @@ private:
     Subprocess* _subproc {nullptr};
     pid_t _child_pid;
 
-    uint8_t _sig[16];
+    signature _sig;
     int _nb_vars;
     int _nb_cls;
     unsigned long _f_size {0};

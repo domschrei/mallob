@@ -17,15 +17,13 @@ public:
         _checker(nbVars, Secret::SECRET_KEY),
         _siphash(Secret::SECRET_KEY) {}
 
-#define SIG_SIZE_BYTES 16
-
 private:
 
     void (*_log_function)(void*, const char*);
     void* _logger;
 
     bool _parsed_formula {false};
-    uint8_t _formula_signature[SIG_SIZE_BYTES];
+    signature _formula_signature;
     LratChecker _checker;
     SipHash _siphash;
 
@@ -121,7 +119,7 @@ public:
             u8 UNSAT = 20;
             if (inOutSigSize < SIG_SIZE_BYTES) abort();
             auto sig = _siphash.reset().update(_formula_signature, SIG_SIZE_BYTES).update(&UNSAT, 1).digest();
-            for (size_t i = 0; i < 16; i++) outSignature[i] = sig[i];
+            for (size_t i = 0; i < SIG_SIZE_BYTES; i++) outSignature[i] = sig[i];
             inOutSigSize = SIG_SIZE_BYTES;
         }
         return ok;

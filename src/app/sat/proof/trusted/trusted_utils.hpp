@@ -12,6 +12,9 @@
 typedef unsigned long u64;
 typedef unsigned char u8;
 
+static constexpr int SIG_SIZE_BYTES = 16;
+typedef u8 signature[SIG_SIZE_BYTES];
+
 class TrustedUtils {
 
 public:
@@ -45,7 +48,7 @@ public:
     }
 
     static void readSignature(u8* outSig, FILE* file) {
-        u8 dummy[16];
+        signature dummy;
         if (!outSig) outSig = dummy;
         u64 nbRead = UNLOCKED_IO(fread)(outSig, sizeof(int), 4, file);
         if (nbRead < 4) doAbortEof();

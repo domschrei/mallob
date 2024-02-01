@@ -29,10 +29,10 @@ struct LratOp {
     }
     // Import
     LratOp(u64 id, const int* lits, int nbLits, const u8* sig) :
-            datalen(2*sizeof(int) + sizeof(id) + nbLits*sizeof(int) + 16 + sizeof(int)),
+            datalen(2*sizeof(int) + sizeof(id) + nbLits*sizeof(int) + SIG_SIZE_BYTES + sizeof(int)),
             data((u8*) malloc(datalen)) {
         size_t i = 0, n;
-        const int nbHints = 16 / sizeof(u64);
+        const int nbHints = SIG_SIZE_BYTES / sizeof(u64);
         const int glue = -1;
         n = sizeof(nbLits);      memcpy(data+i, &nbLits, n);  i += n;
         n = sizeof(nbHints);     memcpy(data+i, &nbHints, n); i += n;
@@ -55,11 +55,11 @@ struct LratOp {
         n = sizeof(u64)*nbHints; memcpy(data+i, hints, n);    i += n;
         //assert(isDeletion());
     }
-    // UNSAT Validation
-    LratOp() : datalen(1), data((u8*) malloc(1)) {
-        data[0] = 20;
-        //assert(isUnsatValidation());
+    // UNSAT Validation (20) or termination (0)
+    LratOp(char x) : datalen(1), data((u8*) malloc(1)) {
+        data[0] = x;
     }
+    LratOp() {}
     LratOp(LratOp&& moved) : datalen(moved.datalen), data(moved.data) {
         moved.datalen = 0;
         moved.data = nullptr;
@@ -80,10 +80,11 @@ struct LratOp {
     bool isImport() const {return getType() == IMPORT;}
     bool isDeletion() const {return getType() == DELETION;}
     bool isUnsatValidation() const {return getType() == VALIDATION;}
+    bool isTermination() const {return getType() == TERMINATION;}
 
-    enum Type {DERIVATION, IMPORT, DELETION, VALIDATION};
+    enum Type {DERIVATION, IMPORT, DELETION, VALIDATION, TERMINATION};
     Type getType() const {
-        if (datalen == 1) return VALIDATION;
+        if (datalen == 1) return data[0] == 0 ? TERMINATION : VALIDATION;
         if (getId() == 0) return DELETION;
         if (getGlue() < 0) return IMPORT;
         return DERIVATION;
@@ -111,7 +112,7 @@ struct LratOp {
             out += "i " + std::to_string(getId()) + " ";
             for (int i = 0; i < getNbLits(); i++) out += std::to_string(getLits()[i]) + " ";
             out += "0 ";
-            out += Logger::dataToHexStr(getSignature(), 16) + " ";
+            out += Logger::dataToHexStr(getSignature(), SIG_SIZE_BYTES) + " ";
             out += "0";
         }
         return out;

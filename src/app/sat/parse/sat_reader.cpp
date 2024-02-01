@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <fstream>
 
+#include "app/sat/proof/trusted/trusted_utils.hpp"
 #include "app/sat/proof/trusted_parser_process_adapter.hpp"
 #include "util/assert.hpp"
 #include "sat_reader.hpp"
@@ -36,7 +37,7 @@ bool SatReader::parseWithTrustedParser(JobDescription& desc) {
 	uint8_t* sig;
 	bool ok = tp.parseAndSign(_filename.c_str(), *desc.getRevisionData(desc.getRevision()).get(), sig);
 	if (!ok) return false;
-	std::string sigStr = Logger::dataToHexStr(sig, 16);
+	std::string sigStr = Logger::dataToHexStr(sig, SIG_SIZE_BYTES);
 	assert(desc.getAppConfiguration().map.at("__SIG").size() == sigStr.size());
 	desc.setAppConfigurationEntry("__SIG", sigStr);
 	_max_var = tp.getNbVars();
