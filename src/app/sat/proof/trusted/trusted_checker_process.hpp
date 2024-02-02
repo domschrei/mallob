@@ -64,7 +64,7 @@ private:
 
     // Buffering.
     signature _buf_sig;
-    static size_t constexpr _bufcap_lits {TRUSTED_CHK_MAX_BUF_SIZE};
+    size_t _bufcap_lits {TRUSTED_CHK_MAX_BUF_SIZE};
     int* _buf_lits;
     int _buflen_lits {0};
     size_t _bufcap_hints {TRUSTED_CHK_MAX_BUF_SIZE};
@@ -208,13 +208,14 @@ private:
         while (nbRemaining > 0) {
             const int lit = TrustedUtils::readInt(_input);
             nbRemaining--;
-            if (lit == 0) {
-                break;
-            } else {
-                TrustedUtils::doAssert(_buflen_lits < _bufcap_lits);
-                _buf_lits[_buflen_lits++] = lit;
-                nbLits++;
+            if (lit == 0) break;
+            if (_buflen_lits >= _bufcap_lits) {
+                // buffer exceeded - reallocate
+                _bufcap_lits *= 2;
+                _buf_lits = (int*) realloc(_buf_lits, _bufcap_lits * sizeof(int));
             }
+            _buf_lits[_buflen_lits++] = lit;
+            nbLits++;
         }
         return nbLits;
     }
