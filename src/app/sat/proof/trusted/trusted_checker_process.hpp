@@ -129,7 +129,6 @@ public:
                 // respond
                 say(res);
                 TrustedUtils::writeSignature(_buf_sig, _output);
-                UNLOCKED_IO(fflush)(_output);
 
             } else if (c == TRUSTED_CHK_CLS_IMPORT) {
 
@@ -142,7 +141,7 @@ public:
                 // forward to checker
                 bool res = _ts->importClause(id, _buf_lits, nbLits, _buf_sig);
                 // respond
-                sayWithFlush(res);
+                say(res);
 
             } else if (c == TRUSTED_CHK_CLS_DELETE) {
                 
@@ -155,7 +154,7 @@ public:
                 // forward to checker
                 bool res = _ts->deleteClauses(_buf_hints, nbHints);
                 // respond
-                sayWithFlush(res);
+                say(res);
 
             } else if (c == TRUSTED_CHK_VALIDATE) {
 
@@ -164,7 +163,7 @@ public:
                 _printer.printValidateDirective();
                 bool res = _ts->validateUnsat(_buf_sig);
                 _do_logging = doLoggingPrev;
-                sayWithFlush(res);
+                say(res);
                 TrustedUtils::writeSignature(_buf_sig, _output);
                 UNLOCKED_IO(fflush)(_output);
 

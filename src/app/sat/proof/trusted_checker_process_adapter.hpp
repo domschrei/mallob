@@ -141,7 +141,6 @@ private:
         TrustedUtils::writeInt(0, _f_directives);
         for (size_t i = 0; i < nbHints; i++)
             TrustedUtils::writeUnsignedLong(hints[i], _f_directives);
-        UNLOCKED_IO(fflush)(_f_directives);
     }
     inline bool acceptProduceClause(u8* sig) {
         if (!awaitResponse()) TrustedUtils::doAbort();
@@ -160,7 +159,6 @@ private:
             TrustedUtils::writeInt(literals[i], _f_directives);
         TrustedUtils::writeInt(0, _f_directives);
         TrustedUtils::writeSignature(signatureData, _f_directives);
-        UNLOCKED_IO(fflush)(_f_directives);
     }
     inline bool acceptImportClause() {
         if (!awaitResponse()) TrustedUtils::doAbort();
@@ -173,7 +171,6 @@ private:
         const int totalSize = 2 * nbIds;
         TrustedUtils::writeInt(totalSize, _f_directives);
         for (size_t i = 0; i < nbIds; i++) TrustedUtils::writeUnsignedLong(ids[i], _f_directives);
-        UNLOCKED_IO(fflush)(_f_directives);
     }
     inline bool acceptDeleteClauses() {
         if (!awaitResponse()) TrustedUtils::doAbort();
@@ -207,7 +204,6 @@ private:
         TrustedUtils::writeInt(_buflen_lits, _f_directives);
         TrustedUtils::writeInts(_buf_lits, _buflen_lits, _f_directives);
         _buflen_lits = 0;
-        UNLOCKED_IO(fflush)(_f_directives);
     }
 
     void writeDirectiveType(char type) {
