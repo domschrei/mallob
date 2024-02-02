@@ -63,22 +63,23 @@ private:
 
     // Buffering.
     signature _buf_sig;
-    int* ibuf;
-    int ibuflen {0};
-    size_t ulbufcap {TRUSTED_CHK_MAX_BUF_SIZE};
-    unsigned long* ulbuf;
-    unsigned long ulbuflen {0};
+    static size_t constexpr _bufcap_lits {TRUSTED_CHK_MAX_BUF_SIZE};
+    int* _buf_lits;
+    int _buflen_lits {0};
+    size_t _bufcap_hints {TRUSTED_CHK_MAX_BUF_SIZE};
+    unsigned long* _buf_hints;
+    unsigned long _buflen_hints {0};
 
 public:
     TrustedCheckerProcess(const char* fifoIn, const char* fifoOut) {
         _input = fopen(fifoIn, "r");
         _output = fopen(fifoOut, "w");
-        ibuf = (int*) malloc(TRUSTED_CHK_MAX_BUF_SIZE * sizeof(int));
-        ulbuf = (u64*) malloc(ulbufcap * sizeof(u64));
+        _buf_lits = (int*) malloc(_bufcap_lits * sizeof(int));
+        _buf_hints = (u64*) malloc(_bufcap_hints * sizeof(u64));
     }
     ~TrustedCheckerProcess() {
-        free(ulbuf);
-        free(ibuf);
+        free(_buf_hints);
+        free(_buf_lits);
         fclose(_output);
         fclose(_input);
     }
@@ -99,9 +100,9 @@ public:
 
                 const int nbInts = TrustedUtils::readInt(_input);
                 TrustedUtils::doAssert(nbInts > 0);
-                TrustedUtils::doAssert(nbInts <= TRUSTED_CHK_MAX_BUF_SIZE);
-                TrustedUtils::readInts(ibuf, nbInts, _input);
-                for (size_t i = 0; i < nbInts; i++) _ts->loadLiteral(ibuf[i]);
+                TrustedUtils::doAssert(nbInts <= _bufcap_lits);
+                TrustedUtils::readInts(_buf_lits, nbInts, _input);
+                for (size_t i = 0; i < nbInts; i++) _ts->loadLiteral(_buf_lits[i]);
                 // NO FEEDBACK
 
             } else if (c == TRUSTED_CHK_END_LOAD) {
@@ -112,15 +113,12 @@ public:
 
                 // parse
                 int nbRemaining = TrustedUtils::readInt(_input);
-                unsigned long id;
-                int nbLits;
-                unsigned long* hints;
-                int nbHints;
-                readIdAndLiterals(nbRemaining, id, nbLits);
-                readHints(nbRemaining, hints, nbHints);
+                unsigned long id = readId(nbRemaining);
+                int nbLits = readLiterals(nbRemaining);
+                int nbHints = readHints(nbRemaining);
                 TrustedUtils::doAssert(nbRemaining == 0);
                 // forward to checker
-                bool res = _ts->produceClause(id, ibuf, nbLits, hints, nbHints, _buf_sig);
+                bool res = _ts->produceClause(id, _buf_lits, nbLits, _buf_hints, nbHints, _buf_sig);
                 // respond
                 say(res);
                 TrustedUtils::writeSignature(_buf_sig, _output);
@@ -130,12 +128,11 @@ public:
 
                 // parse
                 int nbRemaining = TrustedUtils::readInt(_input);
-                unsigned long id;
-                int nbLits;
-                readIdAndLiterals(nbRemaining, id, nbLits);
+                unsigned long id = readId(nbRemaining);
+                int nbLits = readLiterals(nbRemaining);
                 TrustedUtils::readSignature(_buf_sig, _input);
                 // forward to checker
-                bool res = _ts->importClause(id, ibuf, nbLits, _buf_sig);
+                bool res = _ts->importClause(id, _buf_lits, nbLits, _buf_sig);
                 // respond
                 sayWithFlush(res);
 
@@ -143,13 +140,11 @@ public:
                 
                 // parse
                 int nbRemaining = TrustedUtils::readInt(_input);
-                unsigned long* hints;
-                int nbHints;
-                readHints(nbRemaining, hints, nbHints);
+                int nbHints = readHints(nbRemaining);
                 TrustedUtils::doAssert(nbRemaining == 0);
                 //printf("PROOF?? d %lu ... (%i)\n", hints[0], nbHints);
                 // forward to checker
-                bool res = _ts->deleteClauses(hints, nbHints);
+                bool res = _ts->deleteClauses(_buf_hints, nbHints);
                 // respond
                 sayWithFlush(res);
 
@@ -190,40 +185,44 @@ private:
         TrustedUtils::writeChar(ok ? TRUSTED_CHK_RES_ACCEPT : TRUSTED_CHK_RES_ERROR, _output);
     }
 
-    void readIdAndLiterals(int& nbRemaining, unsigned long& id, int& nbLits) {
-        // parse ID
-        id = TrustedUtils::readUnsignedLong(_input);
+    inline u64 readId(int& nbRemaining) {
         nbRemaining -= 2;
+        return TrustedUtils::readUnsignedLong(_input);
+    }
+
+    inline int readLiterals(int& nbRemaining) {
         // parse clause
-        ibuflen = 0;
-        nbLits = 0;
+        _buflen_lits = 0;
+        int nbLits = 0;
         while (nbRemaining > 0) {
             const int lit = TrustedUtils::readInt(_input);
             nbRemaining--;
             if (lit == 0) {
                 break;
             } else {
-                ibuf[ibuflen++] = lit;
+                TrustedUtils::doAssert(_buflen_lits < _bufcap_lits);
+                _buf_lits[_buflen_lits++] = lit;
                 nbLits++;
             }
         }
+        return nbLits;
     }
 
-    void readHints(int& nbRemaining, unsigned long*& hints, int& nbHints) {
-        ulbuflen = 0;
-        nbHints = 0;
+    inline int readHints(int& nbRemaining) {
+        _buflen_hints = 0;
+        int nbHints = 0;
         while (nbRemaining >= 2) {
             const u64 hint = TrustedUtils::readUnsignedLong(_input);
             nbRemaining -= 2;
-            if (ulbuflen >= ulbufcap) {
+            if (_buflen_hints >= _bufcap_hints) {
                 // buffer exceeded - reallocate
-                ulbufcap *= 2;
-                ulbuf = (u64*) realloc(ulbuf, ulbufcap * sizeof(u64));
+                _bufcap_hints *= 2;
+                _buf_hints = (u64*) realloc(_buf_hints, _bufcap_hints * sizeof(u64));
             }
-            ulbuf[ulbuflen++] = hint;
+            _buf_hints[_buflen_hints++] = hint;
             nbHints++;
         }
-        hints = ulbuf;
+        return nbHints;
     }
 
     void readFormulaSignature() {
