@@ -1,54 +1,82 @@
 
 #pragma once
 
+#define MALLOB_PRINT_TRUSTED_DIRECTIVES 0
+
+#if MALLOB_PRINT_TRUSTED_DIRECTIVES
 #include <fstream>
 #include <iomanip>
 #include <sstream>
 #include <string>
 #include <unistd.h>
+#endif
 
 #include "trusted_utils.hpp"
+
 
 class Printer {
 
 private:
+#if MALLOB_PRINT_TRUSTED_DIRECTIVES
     std::ofstream _ofs;
+#endif
 
 public:
-    Printer() : _ofs("lrat-directives-" + std::to_string(getpid())) {}
+    Printer()
+#if MALLOB_PRINT_TRUSTED_DIRECTIVES
+        : _ofs("lrat-directives-" + std::to_string(getpid()))
+#endif
+        {}
 
-    void printInitDirective(int nbVars, signature sig) {
+    inline void printInitDirective(int nbVars, signature sig) {
+#if MALLOB_PRINT_TRUSTED_DIRECTIVES
         _ofs << "B " + std::to_string(nbVars) + " " + signatureToString(sig) + "\n";
+#endif
     }
 
-    void printLoadDirective(const int* lits, int nbLits) {
+    inline void printLoadDirective(const int* lits, int nbLits) {
+#if MALLOB_PRINT_TRUSTED_DIRECTIVES
         _ofs << "L " + literalsToString(lits, nbLits) + "\n";
+#endif
     }
 
-    void printEndLoadingDirective() {
+    inline void printEndLoadingDirective() {
+#if MALLOB_PRINT_TRUSTED_DIRECTIVES
         _ofs << "E\n";
+#endif
     }
 
-    void printProduceDirective(u64 id, const int* lits, int nbLits, const u64* hints, int nbHints) {
+    inline void printProduceDirective(u64 id, const int* lits, int nbLits, const u64* hints, int nbHints) {
+#if MALLOB_PRINT_TRUSTED_DIRECTIVES
         _ofs << "a " + std::to_string(id) + " " + literalsToString(lits, nbLits) + "0 " + hintsToString(hints, nbHints) + "\n";
+#endif
     }
 
-    void printImportDirective(u64 id, const int* lits, int nbLits, signature sig) {
+    inline void printImportDirective(u64 id, const int* lits, int nbLits, signature sig) {
+#if MALLOB_PRINT_TRUSTED_DIRECTIVES
         _ofs << "i " + std::to_string(id) + " " + literalsToString(lits, nbLits) + "0 " + signatureToString(sig) + "\n";
+#endif
     }
 
-    void printDeleteDirective(const u64* hints, int nbHints) {
+    inline void printDeleteDirective(const u64* hints, int nbHints) {
+#if MALLOB_PRINT_TRUSTED_DIRECTIVES
         _ofs << "d " + hintsToString(hints, nbHints) + "\n";
+#endif
     }
 
-    void printValidateDirective() {
+    inline void printValidateDirective() {
+#if MALLOB_PRINT_TRUSTED_DIRECTIVES
         _ofs << "V\n";
+#endif
     }
 
-    void printTerminateDirective() {
+    inline void printTerminateDirective() {
+#if MALLOB_PRINT_TRUSTED_DIRECTIVES
         _ofs << "T\n";
+#endif
     }
 
+#if MALLOB_PRINT_TRUSTED_DIRECTIVES
 private:
     std::string signatureToString(signature sig) {
         std::stringstream stream;
@@ -67,5 +95,6 @@ private:
         for (int i = 0; i < nbHints; i++) out += std::to_string(hints[i]) + " ";
         return out;
     }
+#endif
 
 };
