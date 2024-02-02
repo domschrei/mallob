@@ -31,6 +31,7 @@ private:
     ProbingLearnedClauseCallback _cb_probe;
     LearnedClauseCallback _cb_learn;
 
+    bool _launched {false};
     bool _unsat_validated {false};
 
     // buffering
@@ -53,6 +54,9 @@ public:
     void setProbingLearnedClauseCallback(const ProbingLearnedClauseCallback& cb) {_cb_probe = cb;}
 
     void launch(const int* fData, size_t fSize) {
+        if (_launched) return;
+        _launched = true;
+
         _f_data = fData;
         _f_size = fSize;
 
@@ -75,6 +79,12 @@ public:
     }
 
     ~LratConnector() {
+        // If no background thread was ever launched, we need to submit
+        // a termination directive to the checker process manually here.
+        if (!_launched) {
+            LratOp end(0);
+            _checker.submit(end);
+        }
         _ringbuf.markExhausted();
     }
 

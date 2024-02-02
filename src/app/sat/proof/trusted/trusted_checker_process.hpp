@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 
+#include "printer.hpp"
 #include "trusted_utils.hpp"
 #include "trusted_solving.hpp"
 
@@ -70,6 +71,8 @@ private:
     unsigned long* _buf_hints;
     unsigned long _buflen_hints {0};
 
+    Printer _printer;
+
 public:
     TrustedCheckerProcess(const char* fifoIn, const char* fifoOut) {
         _input = fopen(fifoIn, "r");
@@ -92,8 +95,9 @@ public:
 
                 _nb_vars = TrustedUtils::readInt(_input);
                 _ts = new TrustedSolving(logInCheckerProcess, this, _nb_vars);
-                readFormulaSignature();
-                _ts->init(_buf_sig);
+                TrustedUtils::readSignature(_formula_signature, _input);
+                _printer.printInitDirective(_nb_vars, _formula_signature);
+                _ts->init(_formula_signature);
                 sayWithFlush(true);
 
             } else if (c == TRUSTED_CHK_LOAD) {
@@ -102,11 +106,13 @@ public:
                 TrustedUtils::doAssert(nbInts > 0);
                 TrustedUtils::doAssert(nbInts <= _bufcap_lits);
                 TrustedUtils::readInts(_buf_lits, nbInts, _input);
+                _printer.printLoadDirective(_buf_lits, nbInts);
                 for (size_t i = 0; i < nbInts; i++) _ts->loadLiteral(_buf_lits[i]);
                 // NO FEEDBACK
 
             } else if (c == TRUSTED_CHK_END_LOAD) {
 
+                _printer.printEndLoadingDirective();
                 sayWithFlush(_ts->endLoading());
 
             } else if (c == TRUSTED_CHK_CLS_PRODUCE) {
@@ -117,6 +123,7 @@ public:
                 int nbLits = readLiterals(nbRemaining);
                 int nbHints = readHints(nbRemaining);
                 TrustedUtils::doAssert(nbRemaining == 0);
+                _printer.printProduceDirective(id, _buf_lits, nbLits, _buf_hints, nbHints);
                 // forward to checker
                 bool res = _ts->produceClause(id, _buf_lits, nbLits, _buf_hints, nbHints, _buf_sig);
                 // respond
@@ -131,6 +138,7 @@ public:
                 unsigned long id = readId(nbRemaining);
                 int nbLits = readLiterals(nbRemaining);
                 TrustedUtils::readSignature(_buf_sig, _input);
+                _printer.printImportDirective(id, _buf_lits, nbLits, _buf_sig);
                 // forward to checker
                 bool res = _ts->importClause(id, _buf_lits, nbLits, _buf_sig);
                 // respond
@@ -142,6 +150,7 @@ public:
                 int nbRemaining = TrustedUtils::readInt(_input);
                 int nbHints = readHints(nbRemaining);
                 TrustedUtils::doAssert(nbRemaining == 0);
+                _printer.printDeleteDirective(_buf_hints, nbHints);
                 //printf("PROOF?? d %lu ... (%i)\n", hints[0], nbHints);
                 // forward to checker
                 bool res = _ts->deleteClauses(_buf_hints, nbHints);
@@ -152,6 +161,7 @@ public:
 
                 const bool doLoggingPrev = _do_logging;
                 _do_logging = true;
+                _printer.printValidateDirective();
                 bool res = _ts->validateUnsat(_buf_sig);
                 _do_logging = doLoggingPrev;
                 sayWithFlush(res);
@@ -160,6 +170,7 @@ public:
 
             } else if (c == TRUSTED_CHK_TERMINATE) {
 
+                _printer.printTerminateDirective();
                 sayWithFlush(TRUSTED_CHK_RES_ACCEPT);
                 break;
 
@@ -223,12 +234,5 @@ private:
             nbHints++;
         }
         return nbHints;
-    }
-
-    void readFormulaSignature() {
-        TrustedUtils::readSignature(_buf_sig, _input);
-        for (size_t i = 0; i < SIG_SIZE_BYTES; i++) {
-            _formula_signature[i] = _buf_sig[i];
-        }
     }
 };

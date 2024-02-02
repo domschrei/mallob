@@ -89,15 +89,6 @@ public:
         assert(offset == fSize);
     }
 
-    inline void loadLiteral(int lit) {
-
-        _buf_lits[_buflen_lits++] = lit;
-        if (_buflen_lits+1 == TRUSTED_CHK_MAX_BUF_SIZE) {
-            // flush buffer
-            flushLiteralBuffer();
-        }
-    }
-
     inline bool endLoading() {
 
         if (_buflen_lits > 0) flushLiteralBuffer();

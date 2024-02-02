@@ -146,9 +146,7 @@ public:
     }
 
     void copyBytes(uint8_t* to, const uint8_t* from, size_t nbBytes) {
-        for (size_t i = 0; i < nbBytes; i++) {
-            to[i] = from[i];
-        }
+        for (size_t i = 0; i < nbBytes; i++) to[i] = from[i];
     }
 
     bool equalSignatures(const uint8_t* left, const uint8_t* right) {
