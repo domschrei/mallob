@@ -91,6 +91,8 @@ public:
 private:
 
     void runEmitter() {
+        Proc::nameThisThread("LRATEmitter");
+
         LratOp end(0);
 
         // Load formula
@@ -128,6 +130,8 @@ private:
     }
 
     void runAcceptor() {
+        Proc::nameThisThread("LRATAcceptor");
+
         LratOp op;
         signature sig;
         while (_bg_acceptor.continueRunning()) {

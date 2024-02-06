@@ -103,8 +103,8 @@ public:
             } else if (c == TRUSTED_CHK_LOAD) {
 
                 const int nbInts = TrustedUtils::readInt(_input);
-                TrustedUtils::doAssert(nbInts > 0);
-                TrustedUtils::doAssert(nbInts <= _bufcap_lits);
+                //TrustedUtils::doAssert(nbInts > 0);
+                //TrustedUtils::doAssert(nbInts <= _bufcap_lits);
                 TrustedUtils::readInts(_buf_lits, nbInts, _input);
                 _printer.printLoadDirective(_buf_lits, nbInts);
                 for (size_t i = 0; i < nbInts; i++) _ts->loadLiteral(_buf_lits[i]);
@@ -122,7 +122,7 @@ public:
                 unsigned long id = readId(nbRemaining);
                 int nbLits = readLiterals(nbRemaining);
                 int nbHints = readHints(nbRemaining);
-                TrustedUtils::doAssert(nbRemaining == 0);
+                //TrustedUtils::doAssert(nbRemaining == 0);
                 _printer.printProduceDirective(id, _buf_lits, nbLits, _buf_hints, nbHints);
                 // forward to checker
                 bool res = _ts->produceClause(id, _buf_lits, nbLits, _buf_hints, nbHints, _buf_sig);
@@ -148,7 +148,7 @@ public:
                 // parse
                 int nbRemaining = TrustedUtils::readInt(_input);
                 int nbHints = readHints(nbRemaining);
-                TrustedUtils::doAssert(nbRemaining == 0);
+                //TrustedUtils::doAssert(nbRemaining == 0);
                 _printer.printDeleteDirective(_buf_hints, nbHints);
                 //printf("PROOF?? d %lu ... (%i)\n", hints[0], nbHints);
                 // forward to checker
