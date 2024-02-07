@@ -17,6 +17,7 @@ private:
 	Mallob::Clause learntClause;
     std::vector<int> producedClause;
 
+	bool interruptionInitialized = false;
     bool interrupted = false;
     bool suspended = false;
     Mutex suspendMutex;

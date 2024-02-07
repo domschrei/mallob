@@ -81,19 +81,32 @@ void Kissat::diversify(int seed) {
     }
 
     if (_setup.diversifyNative) {
-        // Base portfolio of different configurations
-        switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
-        case 0: kissat_set_option(solver, "eliminate", 0); break;
-        case 1: kissat_set_option(solver, "restartint", 10); break;
-        case 2: kissat_set_option(solver, "walkinitially", 1); break;
-        case 3: kissat_set_option(solver, "restartint", 100); break;
-        case 4: kissat_set_option(solver, "sweep", 0); break;
-        case 5: kissat_set_configuration(solver, "unsat"); break;
-        case 6: kissat_set_configuration(solver, "sat"); break;
-        case 7: kissat_set_option(solver, "probe", 0); break;
-        case 8: kissat_set_option(solver, "minimizedepth", 1e4); break;
-        case 9: kissat_set_option(solver, "reducefraction", 90); break;
-        case 10: kissat_set_option(solver, "vivifyeffort", 1000); break;
+        if (_setup.flavour == PortfolioSequence::SAT) {
+            switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
+                case 0: /*use default*/ break;
+                case 1: kissat_set_configuration(solver, "sat"); break;
+                case 2: kissat_set_configuration(solver, "plain"); break;
+                case 3: kissat_set_option(solver, "eliminate", 0); break;
+            }
+        } else {
+            if (_setup.flavour != PortfolioSequence::DEFAULT) {
+                LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");
+                _setup.flavour = PortfolioSequence::DEFAULT;
+            }
+            // Base portfolio of different configurations
+            switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
+                case 0: kissat_set_option(solver, "eliminate", 0); break;
+                case 1: kissat_set_option(solver, "restartint", 10); break;
+                case 2: kissat_set_option(solver, "walkinitially", 1); break;
+                case 3: kissat_set_option(solver, "restartint", 100); break;
+                case 4: kissat_set_option(solver, "sweep", 0); break;
+                case 5: kissat_set_configuration(solver, "unsat"); break;
+                case 6: kissat_set_configuration(solver, "sat"); break;
+                case 7: kissat_set_option(solver, "probe", 0); break;
+                case 8: kissat_set_option(solver, "minimizedepth", 1e4); break;
+                case 9: kissat_set_option(solver, "reducefraction", 90); break;
+                case 10: kissat_set_option(solver, "vivifyeffort", 1000); break;
+            }
         }
     }
 
@@ -124,10 +137,12 @@ void Kissat::diversify(int seed) {
 
     seedSet = true;
     setClauseSharing(getNumOriginalDiversifications());
+
+    interruptionInitialized = true;
 }
 
 int Kissat::getNumOriginalDiversifications() {
-    return 11;
+    return _setup.flavour == PortfolioSequence::SAT ? 4 : 11;
 }
 
 void Kissat::setPhase(const int var, const bool phase) {
@@ -162,6 +177,7 @@ SatResult Kissat::solve(size_t numAssumptions, const int* assumptions) {
 
 void Kissat::setSolverInterrupt() {
 	interrupted = true;
+    if (interruptionInitialized) kissat_terminate (solver);
 }
 
 void Kissat::unsetSolverInterrupt() {
@@ -187,6 +203,7 @@ bool Kissat::shouldTerminate() {
 
 void Kissat::cleanUp() {
     if (solver) {
+        setSolverInterrupt();
         kissat_release(solver);
         solver = nullptr;
     }
@@ -218,6 +235,7 @@ void Kissat::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
 }
 
 void Kissat::produceClause(int size, int lbd) {
+    interruptionInitialized = true;
     if (size > _setup.strictMaxLitsPerClause) return;
     learntClause.size = size;
     // In Kissat, long clauses of LBD 1 can be exported. => Increment LBD in this case.
@@ -234,10 +252,10 @@ void Kissat::consumeClause(int** clause, int* size, int* lbd) {
     if (success) {
         assert(c.begin != nullptr);
         assert(c.size >= 1);
-        producedClause.resize(c.size);
-        memcpy(producedClause.data(), c.begin, c.size*sizeof(int));
+        *size = c.size - ClauseMetadata::numInts();
+        producedClause.resize(*size);
+        memcpy(producedClause.data(), c.begin+ClauseMetadata::numInts(), *size*sizeof(int));
         *clause = producedClause.data();
-        *size = c.size;
         *lbd = c.lbd;
     } else {
         *clause = 0;

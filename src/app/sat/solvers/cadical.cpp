@@ -119,6 +119,10 @@ void Cadical::diversify(int seed) {
 	}
 
 	if (_setup.diversifyNative) {
+		if (_setup.flavour != PortfolioSequence::DEFAULT) {
+			LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");
+			_setup.flavour = PortfolioSequence::DEFAULT;
+		}
 		switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
 		// Greedy 10-portfolio according to tests of the above configurations on SAT2020 instances
 		case 0: okay = solver->set("phase", 0); break;

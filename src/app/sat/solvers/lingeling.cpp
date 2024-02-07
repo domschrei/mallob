@@ -11,6 +11,7 @@
 #include <string.h>
 #include <cmath>
 
+#include "app/sat/data/clause_metadata.hpp"
 #include "lingeling.hpp"
 #include "util/sys/timer.hpp"
 #include "util/distribution.hpp"
@@ -121,6 +122,11 @@ void Lingeling::diversify(int seed) {
 	
 	lglsetopt(solver, "seed", seed);
 	int rank = getDiversificationIndex();
+
+	if (_setup.flavour != PortfolioSequence::DEFAULT) {
+		LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");
+		_setup.flavour = PortfolioSequence::DEFAULT;
+	}
 
 	// This portfolio is based on Plingeling (mix of ayv and bcj)
 	lglsetopt(solver, "classify", 0);
@@ -276,16 +282,16 @@ void Lingeling::doConsume(int** clause, int* glue) {
 	// Assemble a zero-terminated array of all the literals
 	// (and keep it as a member until this function is called for the next time)
 	assert(c.size > 1);
-	zeroTerminatedClause.resize(c.size+1);
+	zeroTerminatedClause.resize(c.size-ClauseMetadata::numInts()+1);
 	//std::string str = "consume cls : ";
-	for (size_t i = 0; i < c.size; i++) {
-		int lit = c.begin[i];
+	for (size_t i = 0; i < zeroTerminatedClause.size()-1; i++) {
+		int lit = c.begin[ClauseMetadata::numInts() + i];
 		//str += std::to_string(lit) + " ";
 		assert(i == 0 || std::abs(lit) <= maxvar 
 			|| LOG_RETURN_FALSE("ERROR: tried to import lit %i (max. var: %i)!\n", lit, maxvar));
 		zeroTerminatedClause[i] = lit;
 	}
-	zeroTerminatedClause[c.size] = 0;
+	zeroTerminatedClause[zeroTerminatedClause.size()-1] = 0;
 
 	*glue = c.lbd;
 	*clause = zeroTerminatedClause.data();

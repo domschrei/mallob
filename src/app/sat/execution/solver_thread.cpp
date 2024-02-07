@@ -1,5 +1,6 @@
 
 #include <sys/resource.h>
+#include "app/sat/job/sat_constants.h"
 #include "util/assert.hpp"
 
 #include "solver_thread.hpp"
@@ -359,6 +360,12 @@ void SolverThread::reportResult(int res, int revision) {
 
     if (revision != _latest_revision) {
         LOGGER(_logger, V4_VVER, "discard obsolete result %s for rev. %i\n", resultString, revision);
+        return;
+    }
+
+    if (res == RESULT_UNSAT && _solver.getSolverSetup().ignoreUnsatResult) {
+        LOGGER(_logger, V4_VVER, "ignore uncertified UNSAT result\n");
+        _terminated = true;
         return;
     }
 

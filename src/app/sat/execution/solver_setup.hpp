@@ -3,6 +3,7 @@
 
 #include <string>
 
+#include "app/sat/data/portfolio_sequence.hpp"
 #include "util/logger.hpp"
 #include "util/random.hpp"
 
@@ -32,8 +33,7 @@ struct SolverSetup {
 	enum EliminationSetting {
 		ALLOW_ALL, DISABLE_SOME, DISABLE_MOST, DISABLE_ALL
 	} eliminationSetting;
-
-	// SAT Solving settings
+	PortfolioSequence::Flavour flavour;
 
 	// In any case, these bounds MUST be fulfilled for a clause to be exported
 	unsigned int strictMaxLitsPerClause;
@@ -44,6 +44,7 @@ struct SolverSetup {
 	unsigned int qualityMaxLitsPerClause;
 	unsigned int qualityLbdLimit;
 
+	bool shareClauses; // exporting clauses to other solvers?
 	size_t clauseBaseBufferSize;
 	size_t anticipatedLitsToImportPerCycle;
 	bool resetLbdBeforeImport {false};
@@ -52,9 +53,11 @@ struct SolverSetup {
 
 	bool adaptiveImportManager;
 	bool skipClauseSharingDiagonally;
+
 	bool certifiedUnsat;
+	bool onTheFlyChecking;
+	bool ignoreUnsatResult;
 	int maxNumSolvers;
 	std::string proofDir;
-	bool onTheFlyChecking;
 	std::string sigFormula;
 };

@@ -21,10 +21,9 @@ public:
     CadicalClauseImport(const SolverSetup& setup, std::function<Mallob::Clause()> clauseFetcher) : 
         _log(*setup.logger),
         _clause_fetcher(clauseFetcher),
-        _sign_shared_clauses(setup.onTheFlyChecking) {
+        _sign_shared_clauses(ClauseMetadata::numInts() > 2) {
 
-        if (setup.onTheFlyChecking) {
-            assert(ClauseMetadata::numInts() > 2);
+        if (_sign_shared_clauses) {
             _next_signature.resize(sizeof(int) * (ClauseMetadata::numInts() - 2));
         }
     }

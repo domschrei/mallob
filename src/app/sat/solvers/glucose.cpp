@@ -61,6 +61,11 @@ void MGlucose::diversify(int seed) {
 
 	if (_setup.diversifyNative) {
 
+		if (_setup.flavour != PortfolioSequence::DEFAULT) {
+			LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");
+			_setup.flavour = PortfolioSequence::DEFAULT;
+		}
+
 		if (rank >= 3) {
 			// For all but the first few solvers, randomize initial
 			// activity and DFS until first conflict

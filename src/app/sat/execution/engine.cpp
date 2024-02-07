@@ -4,6 +4,7 @@
 #include "../sharing/sharing_manager.hpp"
 #include "app/sat/data/clause.hpp"
 #include "app/sat/data/clause_metadata.hpp"
+#include "app/sat/data/portfolio_sequence.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "data/app_configuration.hpp"
@@ -46,7 +47,13 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 
 	// Retrieve the string defining the cycle of solver choices, one character per solver
 	// e.g. "llgc" => lingeling lingeling glucose cadical lingeling lingeling glucose ...
-	std::string solverChoices = params.satSolverSequence();
+	std::string solverChoicesStr = params.satSolverSequence();
+	PortfolioSequence portfolio;
+	bool ok = portfolio.parse(solverChoicesStr);
+	if (!ok) {
+		LOG(V0_CRIT, "[ERROR] Invalid portfolio specified!\n");
+		abort();
+	}
 	std::string proofDirectory;
 
 	// Launched in some certified UNSAT mode?
@@ -58,9 +65,16 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		}
 
 		// Override options
-		if (solverChoices != "c") {
-			LOG(V2_INFO, "Certified UNSAT mode: Overriding portfolio to non-incremental CaDiCaL only\n");
-			solverChoices = "c";
+		if (!portfolio.featuresProofOutput()) {
+			LOG(V2_INFO, "Certified UNSAT mode: Overriding portfolio to have all CaDiCaLs produce proofs\n");
+			for (auto set : {&portfolio.prefix, &portfolio.cycle})
+				for (auto& item : *set)
+					if (item.baseSolver == PortfolioSequence::CADICAL)
+						item.outputProof = true;
+			if (!portfolio.featuresProofOutput()) {
+				LOG(V0_CRIT, "[ERROR] No specified solver capable of producing proofs!\n");
+				abort();
+			}
 		}
 		ClauseMetadata::enableClauseIds();
 		if (_params.onTheFlyChecking()) {
@@ -84,18 +98,13 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 			_params.skipClauseSharingDiagonally.set(false);
 		}
 	}
-	
-	// These numbers become the diversifier indices of the solvers on this node
-	int numLgl = 0;
-	int numGlu = 0;
-	int numCdc = 0;
-	int numMrg = 0;
-	int numKis = 0;
 
 	// Read options from app config
 	AppConfiguration appConfig; appConfig.deserialize(params.applicationConfiguration());
-	std::string key = "diversification-offset";
-	int diversificationOffset = appConfig.map.count(key) ? atoi(appConfig.map[key].c_str()) : 0;
+	const std::string keyPrefix = "div-offset-prefix";
+	const std::string keyCycle = "div-offset-cycle";
+	const int divOffsetPrefix = appConfig.map.count(keyPrefix) ? atoi(appConfig.map[keyPrefix].c_str()) : 0;
+	const int divOffsetCycle = appConfig.map.count(keyCycle) ? atoi(appConfig.map[keyCycle].c_str()) : 0;
 	// Read # clauses and # vars from app config
 	int numClauses, numVars;
 	std::vector<std::pair<int*, std::string>> fields {
@@ -109,22 +118,29 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		*out = atoi(str.c_str());
 		assert(*out > 0);
 	}
+	
+	// These numbers become the diversifier indices of the solvers on this node
+	int numLgl = 0;
+	int numGlu = 0;
+	int numCdc = 0;
+	int numMrg = 0;
+	int numKis = 0;
 
 	// Add solvers from full cycles on previous ranks
 	// and from the begun cycle on the previous rank
-	int numFullCycles = (appRank * numOrigSolvers) / solverChoices.size();
-	int begunCyclePos = (appRank * numOrigSolvers) % solverChoices.size();
+	int numFullCycles = std::max(0, appRank * numOrigSolvers - (int)portfolio.prefix.size()) / portfolio.cycle.size();
+	int begunCyclePos = std::max(0, appRank * numOrigSolvers - (int)portfolio.prefix.size()) % portfolio.cycle.size();
 	bool hasPseudoincrementalSolvers = false;
-	for (size_t i = 0; i < solverChoices.size(); i++) {
+	for (size_t i = 0; i < portfolio.cycle.size(); i++) {
 		int* solverToAdd;
-		bool pseudoIncremental = islower(solverChoices[i]);
+		bool pseudoIncremental = !portfolio.cycle[i].incremental;
 		if (pseudoIncremental) hasPseudoincrementalSolvers = true;
-		switch (solverChoices[i]) {
-		case 'l': case 'L': solverToAdd = &numLgl; break;
-		case 'g': case 'G': solverToAdd = &numGlu; break;
-		case 'c': case 'C': solverToAdd = &numCdc; break;
-		case 'm': case 'M': solverToAdd = &numMrg; break;
-		case 'k': case 'K': solverToAdd = &numKis; break;
+		switch (portfolio.cycle[i].baseSolver) {
+		case PortfolioSequence::LINGELING: solverToAdd = &numLgl; break;
+		case PortfolioSequence::GLUCOSE: solverToAdd = &numGlu; break;
+		case PortfolioSequence::CADICAL: solverToAdd = &numCdc; break;
+		case PortfolioSequence::MERGESAT: solverToAdd = &numMrg; break;
+		case PortfolioSequence::KISSAT: solverToAdd = &numKis; break;
 		}
 		*solverToAdd += numFullCycles + (i < begunCyclePos);
 	}
@@ -167,31 +183,47 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		break;
 	}
 	setup.adaptiveImportManager = params.adaptiveImportManager();
-	setup.certifiedUnsat = params.proofOutputFile.isSet() || params.onTheFlyChecking();
 	setup.maxNumSolvers = config.mpisize * params.numThreadsPerProcess();
 	setup.numVars = numVars;
 	setup.numOriginalClauses = numClauses;
 	setup.proofDir = proofDirectory;
-	setup.onTheFlyChecking = params.onTheFlyChecking();
 	setup.sigFormula = appConfig.map["__SIG"];
 
 	// Instantiate solvers according to the global solver IDs and diversification indices
 	int cyclePos = begunCyclePos;
 	for (setup.localId = 0; setup.localId < _num_solvers; setup.localId++) {
 		setup.globalId = appRank * numOrigSolvers + setup.localId;
-		// Which solver?
-		setup.solverType = solverChoices[cyclePos];
-		setup.doIncrementalSolving = setup.isJobIncremental && !islower(setup.solverType);
-		switch (setup.solverType) {
-		case 'l': case 'L': setup.diversificationIndex = numLgl++; break;
-		case 'c': case 'C': setup.diversificationIndex = numCdc++; break;
-		case 'm': case 'M': setup.diversificationIndex = numMrg++; break;
-		case 'g': case 'G': setup.diversificationIndex = numGlu++; break;
-		case 'k': case 'K': setup.diversificationIndex = numKis++; break;
+
+		// Which solver? Which diversification?
+		PortfolioSequence::Item item;
+		if (setup.globalId < portfolio.prefix.size()) {
+			// This solver belongs to the specified prefix
+			item = portfolio.prefix[setup.globalId];
+			const int nbBefore = std::count_if(portfolio.prefix.begin(),
+				portfolio.prefix.begin()+setup.globalId,
+				[&](auto& x) {return x.baseSolver == item.baseSolver;});
+			setup.diversificationIndex = nbBefore + divOffsetPrefix;
+		} else {
+			item = portfolio.cycle[cyclePos];
+			switch (item.baseSolver) {
+			case PortfolioSequence::LINGELING: setup.diversificationIndex = numLgl++; break;
+			case PortfolioSequence::CADICAL: setup.diversificationIndex = numCdc++; break;
+			case PortfolioSequence::MERGESAT: setup.diversificationIndex = numMrg++; break;
+			case PortfolioSequence::GLUCOSE: setup.diversificationIndex = numGlu++; break;
+			case PortfolioSequence::KISSAT: setup.diversificationIndex = numKis++; break;
+			}
+			setup.diversificationIndex += divOffsetCycle;
 		}
-		setup.diversificationIndex += diversificationOffset;
+		setup.solverType = item.baseSolver;
+		setup.flavour = item.flavour;
+		setup.doIncrementalSolving = setup.isJobIncremental && item.incremental;
+		setup.certifiedUnsat = item.outputProof && (params.proofOutputFile.isSet() || params.onTheFlyChecking());
+		setup.onTheFlyChecking = setup.certifiedUnsat && params.onTheFlyChecking();
+		setup.ignoreUnsatResult = (params.proofOutputFile.isSet() || params.onTheFlyChecking()) && !item.outputProof;
+		setup.shareClauses = !setup.ignoreUnsatResult;
+
 		_solver_interfaces.push_back(createSolver(setup));
-		cyclePos = (cyclePos+1) % solverChoices.size();
+		cyclePos = (cyclePos+1) % portfolio.cycle.size();
 	}
 
 	_sharing_manager.reset(new SharingManager(_solver_interfaces, _params, _logger, 
