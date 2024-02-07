@@ -83,8 +83,8 @@ void Kissat::diversify(int seed) {
     if (_setup.diversifyNative) {
         if (_setup.flavour == PortfolioSequence::SAT) {
             switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
-                case 0: /*use default*/ break;
-                case 1: kissat_set_configuration(solver, "sat"); break;
+                case 0: kissat_set_configuration(solver, "sat"); break;
+                case 1: /*use default*/ break;
                 case 2: kissat_set_configuration(solver, "plain"); break;
                 case 3: kissat_set_option(solver, "eliminate", 0); break;
             }

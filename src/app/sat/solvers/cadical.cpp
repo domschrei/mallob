@@ -12,6 +12,7 @@
 #include <filesystem>
 
 #include "app/sat/data/clause_metadata.hpp"
+#include "app/sat/data/definitions.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
 #include "app/sat/proof/trusted_checker_process_adapter.hpp"
 #include "app/sat/proof/trusted/trusted_solving.hpp"
@@ -119,29 +120,37 @@ void Cadical::diversify(int seed) {
 	}
 
 	if (_setup.diversifyNative) {
-		if (_setup.flavour != PortfolioSequence::DEFAULT) {
-			LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");
-			_setup.flavour = PortfolioSequence::DEFAULT;
-		}
-		switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
-		// Greedy 10-portfolio according to tests of the above configurations on SAT2020 instances
-		case 0: okay = solver->set("phase", 0); break;
-		case 1: okay = solver->configure("sat"); break;
-		case 2: okay = solver->set("elim", 0); break;
-		case 3: okay = solver->configure("unsat"); break;
-		case 4: okay = solver->set("condition", 1); break;
-		case 5: okay = solver->set("walk", 0); break;
-		case 6: okay = solver->set("restartint", 100); break;
-		case 7: okay = solver->set("cover", 1); break;
-		case 8: okay = solver->set("shuffle", 1) && solver->set("shufflerandom", 1); break;
-		case 9: okay = solver->set("inprocessing", 0); break;
+		if (_setup.flavour == PortfolioSequence::SAT) {
+			switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
+			case 0: okay = solver->configure("sat"); break;
+			case 1: /*default configuration*/ break;
+			case 2: okay = solver->set("inprocessing", 0); break;
+			}
+		} else {
+			if (_setup.flavour != PortfolioSequence::DEFAULT) {
+				LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");
+				_setup.flavour = PortfolioSequence::DEFAULT;
+			}
+			switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
+			// Greedy 10-portfolio according to tests of the above configurations on SAT2020 instances
+			case 0: okay = solver->set("phase", 0); break;
+			case 1: okay = solver->configure("sat"); break;
+			case 2: okay = solver->set("elim", 0); break;
+			case 3: okay = solver->configure("unsat"); break;
+			case 4: okay = solver->set("condition", 1); break;
+			case 5: okay = solver->set("walk", 0); break;
+			case 6: okay = solver->set("restartint", 100); break;
+			case 7: okay = solver->set("cover", 1); break;
+			case 8: okay = solver->set("shuffle", 1) && solver->set("shufflerandom", 1); break;
+			case 9: okay = solver->set("inprocessing", 0); break;
+			}
 		}
 		assert(okay);
 	}
 }
 
 int Cadical::getNumOriginalDiversifications() {
-	return 10;
+	return _setup.flavour == PortfolioSequence::SAT ? 3 : 10;
 }
 
 void Cadical::setPhase(const int var, const bool phase) {
@@ -176,7 +185,7 @@ SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 
 	// Flush solver logs
 	_logger.flush();
-	if (ClauseMetadata::enabled()) {
+	if (_setup.certifiedUnsat) {
 		solver->flush_proof_trace ();
 		solver->close_proof_trace ();
 	}
