@@ -78,22 +78,34 @@ public:
         return _unsat_validated;
     }
 
-    ~LratConnector() {
-        // If no background thread was ever launched, we need to submit
-        // a termination directive to the checker process manually here.
-        if (!_launched) {
-            LratOp end(0);
-            _checker.submit(end);
-        }
+    void stop() {
+
+        // Tell solver and emitter thread to stop inserting/processing statements
         _ringbuf.markExhausted();
+        _ringbuf.markTerminated();
+
+        // Terminate the emitter thread
+        _bg_emitter.stop();
+
+        // Manually submit a termination sentinel to the checker process.
+        LratOp end(0);
+        _checker.submit(end);
+
+        // Wait for the sentinel to make the round through the process
+        // and back to the acceptor
+        _bg_acceptor.stop();
+
+        // Wait until the checker process did in fact exit
+        _checker.terminate();
+    }
+    ~LratConnector() {
+        stop();
     }
 
 private:
 
     void runEmitter() {
         Proc::nameThisThread("LRATEmitter");
-
-        LratOp end(0);
 
         // Load formula
         size_t offset = 0;
@@ -102,10 +114,7 @@ private:
             _checker.load(_f_data+offset, nbInts);
             offset += nbInts;
         }
-        if (!_bg_emitter.continueRunning()) {
-            _checker.submit(end);
-            return;
-        }
+        if (!_bg_emitter.continueRunning()) return;
         assert(offset == _f_size);
 
         // End loading, check signature
@@ -124,9 +133,6 @@ private:
             //LOG(V2_INFO, "PROOF> submit %s\n", op.toStr().c_str());
             _checker.submit(op);
         }
-
-        // Termination sentinel
-        _checker.submit(end);
     }
 
     void runAcceptor() {

@@ -87,7 +87,7 @@ public:
 
     void setPaused();
     void unsetPaused();
-	void terminateSolvers();
+	void terminateSolvers(bool hardTermination = false);
 
 	const Parameters& getParams() {return _params;}
 	void dumpStats(bool final);
@@ -100,7 +100,7 @@ public:
 		return tids;
 	}
 
-	void cleanUp();
+	void cleanUp(bool hardTermination = false);
 	bool isCleanedUp() {return _cleaned_up;}
 
 private:

@@ -29,6 +29,11 @@ public:
                     "which requires providing a log directory.\n");
                 abort();
             }
+            if (params.proofOutputFile.isSet() && params.onTheFlyChecking()) {
+                LOG(V0_CRIT, "[ERROR] Mallob does not yet support proof writing "
+                    "and on-the-fly checking at the same time.\n");
+                abort();
+            }
             
             ClauseMetadata::enableClauseIds();
             if (_params.onTheFlyChecking()) {

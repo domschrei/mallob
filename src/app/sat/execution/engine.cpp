@@ -219,8 +219,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		setup.doIncrementalSolving = setup.isJobIncremental && item.incremental;
 		setup.certifiedUnsat = item.outputProof && (params.proofOutputFile.isSet() || params.onTheFlyChecking());
 		setup.onTheFlyChecking = setup.certifiedUnsat && params.onTheFlyChecking();
-		setup.ignoreUnsatResult = (params.proofOutputFile.isSet() || params.onTheFlyChecking()) && !item.outputProof;
-		setup.shareClauses = !setup.ignoreUnsatResult;
+		setup.avoidUnsatParticipation = (params.proofOutputFile.isSet() || params.onTheFlyChecking()) && !item.outputProof;
+		setup.shareClauses = !setup.avoidUnsatParticipation;
 
 		_solver_interfaces.push_back(createSolver(setup));
 		cyclePos = (cyclePos+1) % portfolio.cycle.size();
@@ -520,9 +520,9 @@ void SatEngine::unsetPaused() {
 	for (auto& solver : _solver_threads) solver->setSuspend(false);
 }
 
-void SatEngine::terminateSolvers() {
+void SatEngine::terminateSolvers(bool hardTermination) {
 	for (auto& solver : _solver_threads) {
-		solver->setTerminate();
+		solver->setTerminate(hardTermination);
 		solver->setSuspend(false);
 	}
 }
@@ -542,13 +542,18 @@ void SatEngine::writeClauseEpochs() {
 		_solver_interfaces[0]->getGlobalId(), */filename);
 }
 
-void SatEngine::cleanUp() {
+void SatEngine::cleanUp(bool hardTermination) {
 	double time = Timer::elapsedSeconds();
 
-	LOGGER(_logger, V5_DEBG, "[engine-cleanup] enter\n");
+	LOGGER(_logger, V4_VVER, "[engine-cleanup] enter\n");
 
 	// Terminate any remaining running threads
-	terminateSolvers();
+	terminateSolvers(hardTermination);
+	if (hardTermination) {
+		if (_params.proofOutputFile.isSet()) writeClauseEpochs();
+		LOGGER(_logger, V4_VVER, "[engine-cleanup] done - hard exit pending\n");
+		return;
+	}
 	
 	// join and delete threads
 	for (auto& thread : _solver_threads) thread->tryJoin();

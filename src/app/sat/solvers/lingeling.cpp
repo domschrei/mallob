@@ -350,13 +350,11 @@ void Lingeling::writeStatistics(SolverStatistics& stats) {
 	stats.producedClauses = numProduced;
 }
 
-void Lingeling::cleanUp() {
+void Lingeling::cleanUp() {}
+
+Lingeling::~Lingeling() {
 	if (solver) {
 		lglrelease(solver);
 		solver = nullptr;
 	}
-}
-
-Lingeling::~Lingeling() {
-	cleanUp();
 }

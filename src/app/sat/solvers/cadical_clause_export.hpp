@@ -39,6 +39,7 @@ public:
 	~CadicalClauseExport() override {}
 
   	bool learning(int size) override {
+		if (!_setup.shareClauses) return false;
 		if (size <= 0) return false;
 		if (size > _setup.strictMaxLitsPerClause) return false;
 		int effectiveSize = size + ClauseMetadata::numInts();

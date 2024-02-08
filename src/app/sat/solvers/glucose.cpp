@@ -237,16 +237,7 @@ void MGlucose::writeStatistics(SolverStatistics& stats) {
 	stats.producedClauses = numProduced;
 }
 
-void MGlucose::cleanUp() {
-	// Best effort cleanup of the probably most space-hogging structures
-	watches.clear(true);
-	watchesBin.clear(true);
-	unaryWatches.clear(true);
-	clauses.clear(true);
-	learnts.clear(true);
-	permanentLearnts.clear(true);
-	occurs.clear(true);
-}
+void MGlucose::cleanUp() {}
 
 MGlucose::~MGlucose() {
 	resetMaps();

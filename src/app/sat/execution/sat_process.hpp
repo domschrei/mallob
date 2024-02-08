@@ -79,7 +79,7 @@ private:
         while (!_hsm->doBegin) doSleep();
         
         // Terminate directly?
-        if (checkTerminate(false)) return;
+        if (checkTerminate(engine, false)) return;
 
         // Set up export and import buffers for clause exchanges
         {
@@ -98,7 +98,7 @@ private:
         _last_imported_revision = 0;
         // Import subsequent revisions
         importRevisions(engine);
-        if (checkTerminate(false)) return;
+        if (checkTerminate(engine, false)) return;
         engine.setAllocatedSharingBufferSize(_hsm->exportBufferAllocatedSize);
         
         // Start solver threads
@@ -109,6 +109,8 @@ private:
         char* solutionShmem;
         int solutionShmemSize = 0;
         int lastSolvedRevision = -1;
+
+        int exitStatus = 0;
 
         // Main loop
         while (true) {
@@ -231,7 +233,8 @@ private:
             // Terminate "improperly" in order to be restarted automatically
             if (_hsm->doCrash) {
                 LOGGER(_log, V3_VERB, "Restarting this subprocess\n");
-                raise(SIGUSR2);
+                exitStatus = SIGUSR2;
+                break;
             }
 
             // Reduce active thread count (to reduce memory usage)
@@ -279,18 +282,22 @@ private:
             }
         }
 
-        if (checkTerminate(!_params.onTheFlyChecking() && !_params.proofOutputFile.isSet()))
-            return;
+        Terminator::setTerminating();
+        checkTerminate(engine, true, exitStatus); // exits
+        abort(); // should be unreachable
 
         // Shared memory will be cleaned up by the parent process.
     }
 
-    bool checkTerminate(bool force) {
+    bool checkTerminate(SatEngine& engine, bool force, int exitStatus = 0) {
         bool terminate = _hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/true);
         if (terminate && force) {
+            // clean up all resources which MUST be cleaned up (e.g., child processes)
+            engine.cleanUp(true);
             _log.flush();
             _hsm->didTerminate = true;
-            Process::terminate(Proc::getPid());
+            // terminate yourself
+            Process::doExit(exitStatus);
         }
         return terminate;
     }
@@ -363,7 +370,7 @@ private:
     void importRevisions(SatEngine& engine) {
         while ((_hsm->doStartNextRevision && !_hsm->didStartNextRevision) 
                 || _last_imported_revision < _desired_revision) {
-            if (checkTerminate(false)) return;
+            if (checkTerminate(engine, false)) return;
             if (_hsm->doStartNextRevision && !_hsm->didStartNextRevision) {
                 _desired_revision = _hsm->desiredRevision;
                 _last_imported_revision++;

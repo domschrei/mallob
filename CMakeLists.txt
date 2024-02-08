@@ -3,12 +3,15 @@ project (mallob)
 
 find_package(MPI REQUIRED)
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
 set(CMAKE_CXX_STANDARD 17)
 
 
 # Build-specific compile options
 
-set(BASE_LIBS "")
+set(BASE_LIBS Threads::Threads)
 set(MY_DEBUG_OPTIONS "-rdynamic -g -ggdb")
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
@@ -68,6 +71,7 @@ endif()
 
 set(BASE_LIBS ${BASE_LIBS} ${MPI_CXX_LIBRARIES} ${MPI_CXX_LINK_FLAGS} m z rt dl CACHE INTERNAL "")
 set(BASE_INCLUDES ${MPI_CXX_INCLUDE_PATH} src src/util/tsl lib CACHE INTERNAL "")
+set(BASE_COMPILEFLAGS CACHE INTERNAL "")
 
 
 # Base source files

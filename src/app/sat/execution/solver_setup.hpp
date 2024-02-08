@@ -54,9 +54,14 @@ struct SolverSetup {
 	bool adaptiveImportManager;
 	bool skipClauseSharingDiagonally;
 
+	// This solver emits proof information, either for on-the-fly checking or for proof production.
 	bool certifiedUnsat;
+	// This solver's proof information is checked on-the-fly.
 	bool onTheFlyChecking;
-	bool ignoreUnsatResult;
+	// This solver is NOT allowed to participate in UNSAT solving by exporting clauses or reporting UNSAT,
+	// usually because it does not emit proof information while other solvers do.
+	bool avoidUnsatParticipation;
+
 	int maxNumSolvers;
 	std::string proofDir;
 	std::string sigFormula;

@@ -185,10 +185,6 @@ SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 
 	// Flush solver logs
 	_logger.flush();
-	if (_setup.certifiedUnsat) {
-		solver->flush_proof_trace ();
-		solver->close_proof_trace ();
-	}
 
 	switch (res) {
 	case 0:
@@ -281,6 +277,9 @@ void Cadical::writeStatistics(SolverStatistics& stats) {
 }
 
 void Cadical::cleanUp() {
-	solver.reset();
-	if (_lrat) _lrat.reset();
+	// Clean up proof output pipeline *while the solver may still be running*
+	if (_setup.certifiedUnsat) {
+		solver->close_proof_asynchronously ();
+		if (_lrat) _lrat->stop();
+	}
 }

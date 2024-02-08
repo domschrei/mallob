@@ -63,7 +63,6 @@ private:
     std::atomic_bool _interrupted = false;
     std::atomic_bool _suspended = false;
     std::atomic_bool _terminated = false;
-    bool _cleanup_within_thread {false};
 
     bool _found_result = false;
     JobResult _result;
@@ -84,15 +83,16 @@ public:
         }
         _state_cond.notify();
     }
-    void setTerminate(bool cleanUp = false) {
+    void setTerminate(bool cleanUpAsynchronously = false) {
         {
             auto lock = _state_mutex.getLock();
             if (_terminated) return;
-            _cleanup_within_thread = cleanUp;
             _terminated = true;
         }
         _state_cond.notify();
         _solver.setTerminate();
+        // Clean up solver
+        if (cleanUpAsynchronously) _solver.cleanUp();
     }
     void tryJoin() {if (_thread.joinable()) _thread.join();}
 
