@@ -9,23 +9,30 @@
 
 struct SolverSetup {
 
+
 	// General important fields
+
 	Logger* logger;
 	int globalId;
 	int localId; 
 	std::string jobname; 
-	int diversificationIndex;
+
+
+	// Properties of the SAT problem
+
+	int numVars;
+	int numOriginalClauses;
+	int maxNumSolvers;
 	bool isJobIncremental;
-	bool doIncrementalSolving;
 	bool hasPseudoincrementalSolvers;
-	char solverType;
 	int solverRevision;
 
-	int numOriginalClauses;
-	int numVars;
 
-	int minNumChunksPerSolver;
-	int numBufferedClsGenerations;
+	// Solver configuration and diversification
+
+	char solverType;
+	bool doIncrementalSolving;
+	int diversificationIndex;
 	bool diversifyNoise;
 	bool diversifyNative;
 	bool diversifyFanOut;
@@ -35,6 +42,11 @@ struct SolverSetup {
 	} eliminationSetting;
 	PortfolioSequence::Flavour flavour;
 
+
+	// Clause export
+
+	bool exportClauses; // exporting clauses to other solvers?
+	bool skipClauseSharingDiagonally;
 	// In any case, these bounds MUST be fulfilled for a clause to be exported
 	unsigned int strictMaxLitsPerClause;
 	unsigned int strictLbdLimit;
@@ -43,16 +55,21 @@ struct SolverSetup {
 	// while others are not. 
 	unsigned int qualityMaxLitsPerClause;
 	unsigned int qualityLbdLimit;
-
-	bool shareClauses; // exporting clauses to other solvers?
 	size_t clauseBaseBufferSize;
+
+
+	// Clause import
+
+	int minImportChunksPerSolver;
+	int numBufferedClsGenerations;
 	size_t anticipatedLitsToImportPerCycle;
 	bool resetLbdBeforeImport {false};
 	bool incrementLbdBeforeImport {false};
 	bool randomizeLbdBeforeImport {false};
-
 	bool adaptiveImportManager;
-	bool skipClauseSharingDiagonally;
+
+
+	// Certified UNSAT and proof production
 
 	// This solver emits proof information, either for on-the-fly checking or for proof production.
 	bool certifiedUnsat;
@@ -61,8 +78,8 @@ struct SolverSetup {
 	// This solver is NOT allowed to participate in UNSAT solving by exporting clauses or reporting UNSAT,
 	// usually because it does not emit proof information while other solvers do.
 	bool avoidUnsatParticipation;
-
-	int maxNumSolvers;
+	// Directory to write proofs to
 	std::string proofDir;
+	// Signature of the formula to process - to be validated by the on-the-fly checker
 	std::string sigFormula;
 };

@@ -60,7 +60,7 @@ public:
 
     int getLiteralBudget(const SolverSetup& setup) {
         return setup.clauseBaseBufferSize * std::max(
-            setup.minNumChunksPerSolver, 
+            setup.minImportChunksPerSolver, 
             (int) (
                 ((float) setup.numBufferedClsGenerations) * 
                 setup.anticipatedLitsToImportPerCycle / setup.clauseBaseBufferSize

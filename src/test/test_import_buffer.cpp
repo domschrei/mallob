@@ -46,7 +46,7 @@ void testImport() {
 	setup.clauseBaseBufferSize = 1500;
 	setup.anticipatedLitsToImportPerCycle = 200'000;
 	setup.solverRevision = 0;
-	setup.minNumChunksPerSolver = 100;
+	setup.minImportChunksPerSolver = 100;
 	setup.numBufferedClsGenerations = 4;
     SolverStatistics stats;
     stats.histProduced = new ClauseHistogram(20);

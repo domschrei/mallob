@@ -101,7 +101,7 @@ void PortfolioSolverInterface::setTerminate() {
 
 void PortfolioSolverInterface::setExtLearnedClauseCallback(const ExtLearnedClauseCallback& callback) {
 	setLearnedClauseCallback([callback, this](const Mallob::Clause& c, int solverId) {
-		if (_terminated || !_setup.shareClauses) return;
+		if (_terminated || !_setup.exportClauses) return;
 		int condVar = _current_cond_var_or_zero;
 		assert(condVar >= 0);
 		callback(c, solverId, getSolverSetup().solverRevision, condVar);
