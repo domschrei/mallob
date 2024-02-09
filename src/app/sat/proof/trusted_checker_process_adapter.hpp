@@ -19,6 +19,7 @@
 #include "util/sys/proc.hpp"
 #include "util/sys/process.hpp"
 #include "util/sys/subprocess.hpp"
+#include "util/sys/tmpdir.hpp"
 
 class TrustedCheckerProcessAdapter {
 
@@ -41,7 +42,7 @@ private:
 public:
     TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars) :
             _logger(logger), _nb_vars(nbVars), _op_queue(1<<16) {
-        auto basePath = "/tmp/mallob." + std::to_string(Proc::getPid()) + ".slv" 
+        auto basePath = TmpDir::get() + "/mallob." + std::to_string(Proc::getPid()) + ".slv"
             + std::to_string(solverId) + ".ts.";
         _path_directives = basePath + "directives";
         _path_feedback = basePath + "feedback";

@@ -32,7 +32,7 @@ public:
 
     template <typename T>
     bool parseAndSign(const char* source, std::vector<T>& out, uint8_t*& outSignature) {
-        auto basePath = "/tmp/mallob." + std::to_string(Proc::getPid())
+        auto basePath = TmpDir::get() + "/mallob." + std::to_string(Proc::getPid())
             + ".tsparse." + std::to_string(_id);
         auto pathParsedFormula = basePath + ".parsedformula";
         mkfifo(pathParsedFormula.c_str(), 0666);
