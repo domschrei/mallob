@@ -92,7 +92,10 @@ public:
         _state_cond.notify();
         _solver.setTerminate();
         // Clean up solver
-        if (cleanUpAsynchronously) _solver.cleanUp();
+        if (cleanUpAsynchronously) {
+            while (_thread.joinable() && !_initialized) usleep(1000);
+            _solver.cleanUp();
+        }
     }
     void tryJoin() {if (_thread.joinable()) _thread.join();}
 
