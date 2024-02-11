@@ -6,6 +6,7 @@
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "util/logger.hpp"
+#include "util/sys/fileutils.hpp"
 #include "util/sys/timer.hpp"
 #include "data/app_configuration.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
@@ -83,11 +84,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 
 		if (_params.proofOutputFile.isSet()) {
 			// Create directory for partial proofs
-			std::filesystem::path base_dir(params.logDirectory());
-			std::filesystem::path proof_dir("proof" + config.getJobStr());
-			std::filesystem::path full_path = base_dir / proof_dir;
-			create_directory(full_path);
-			proofDirectory = full_path.string();
+			proofDirectory = params.proofDirectory() + "/proof" + config.getJobStr();
+			FileUtils::mkdir(proofDirectory);
 		}
     }
 
@@ -536,7 +534,7 @@ SatEngine::LastAdmittedStats SatEngine::getLastAdmittedClauseShare() {
 }
 
 void SatEngine::writeClauseEpochs() {
-	std::string filename = _params.logDirectory() + "/proof" 
+	std::string filename = _params.proofDirectory() + "/proof"
 		+ _config.getJobStr() + "/clauseepochs." + std::to_string(_config.apprank);
 	_sharing_manager->writeClauseEpochs(/*_solver_interfaces[0]->getSolverSetup().proofDir, 
 		_solver_interfaces[0]->getGlobalId(), */filename);

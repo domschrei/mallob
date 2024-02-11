@@ -24,9 +24,9 @@ public:
                     "which only supports -mono mode of operation.\n");
                 abort();
             }
-            if (params.proofOutputFile.isSet() && !params.logDirectory.isSet()) {
+            if (params.proofOutputFile.isSet() && !params.proofDirectory.isSet()) {
                 LOG(V0_CRIT, "[ERROR] Mallob was launched with proof writing "
-                    "which requires providing a log directory.\n");
+                    "which requires providing a proof directory (-proof-dir).\n");
                 abort();
             }
             if (params.proofOutputFile.isSet() && params.onTheFlyChecking()) {

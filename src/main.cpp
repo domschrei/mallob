@@ -270,8 +270,8 @@ int main(int argc, char *argv[]) {
             FileUtils::rmrf(fileOrDir);
         };
 
-        if (!params.logDirectory().empty()) {
-            for (auto file : FileUtils::glob(params.logDirectory() + "/proof#*/")) {
+        if (!params.proofDirectory().empty()) {
+            for (auto file : FileUtils::glob(params.proofDirectory() + "/proof#*/")) {
                 doRemove(file);
             }
         }
