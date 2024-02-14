@@ -27,11 +27,12 @@ private:
     Logger& _logger;
     std::string _path_directives;
     std::string _path_feedback;
-    FILE* _f_directives;
+    FILE* _f_directives {nullptr};
     FILE* _f_feedback;
     Subprocess* _subproc;
     pid_t _child_pid {-1};
 
+    const int _solver_id;
     const int _nb_vars;
 
     // buffering
@@ -41,25 +42,11 @@ private:
 
 public:
     TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars) :
-            _logger(logger), _nb_vars(nbVars), _op_queue(1<<16) {
-        auto basePath = TmpDir::get() + "/mallob." + std::to_string(Proc::getPid()) + ".slv"
-            + std::to_string(solverId) + ".ts.";
-        _path_directives = basePath + "directives";
-        _path_feedback = basePath + "feedback";
-        mkfifo(_path_directives.c_str(), 0666);
-        mkfifo(_path_feedback.c_str(), 0666);
-
-        Parameters params;
-        params.fifoDirectives.set(_path_directives);
-        params.fifoFeedback.set(_path_feedback);
-        _subproc = new Subprocess(params, "trusted_checker_process");
-        _child_pid = _subproc->start();
-
-        _f_directives = fopen(_path_directives.c_str(), "w");
-        _f_feedback = fopen(_path_feedback.c_str(), "r");
+            _logger(logger), _solver_id(solverId), _nb_vars(nbVars), _op_queue(1<<16) {
     }
 
     ~TrustedCheckerProcessAdapter() {
+        if (!_f_directives) return;
         if (_child_pid != -1) terminate();
         fclose(_f_feedback);
         fclose(_f_directives);
@@ -69,6 +56,25 @@ public:
     }
 
     void init(const u8* formulaSignature) {
+
+        auto basePath = TmpDir::get() + "/mallob." + std::to_string(Proc::getPid()) + ".slv"
+            + std::to_string(_solver_id) + ".ts.";
+        _path_directives = basePath + "directives";
+        _path_feedback = basePath + "feedback";
+        int res;
+        res = mkfifo(_path_directives.c_str(), 0666);
+        if (res != 0) abort();
+        res = mkfifo(_path_feedback.c_str(), 0666);
+        if (res != 0) abort();
+
+        Parameters params;
+        params.fifoDirectives.set(_path_directives);
+        params.fifoFeedback.set(_path_feedback);
+        _subproc = new Subprocess(params, "trusted_checker_process");
+        _child_pid = _subproc->start();
+
+        _f_directives = fopen(_path_directives.c_str(), "w");
+        _f_feedback = fopen(_path_feedback.c_str(), "r");
 
         writeDirectiveType(TRUSTED_CHK_INIT);
         TrustedUtils::writeInt(_nb_vars, _f_directives);
@@ -125,6 +131,7 @@ public:
         _op_queue.markExhausted();
         if (_child_pid == -1) return;
         while (!Process::didChildExit(_child_pid)) usleep(1000);
+        LOGGER(_logger, V4_VVER, "Checker process %i exited\n", _child_pid);
         _child_pid = -1;
     }
 

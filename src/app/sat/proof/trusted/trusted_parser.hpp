@@ -34,7 +34,7 @@ public:
     TrustedParser(const char* filename, FILE* out) : _hash(Secret::SECRET_KEY) {
         _f = fopen(filename, "r");
         _out = out;
-        _datacap = 1<<14;
+        _datacap = 1<<16;
         _data = (int*) malloc(_datacap * sizeof(int));
     }
     ~TrustedParser() {

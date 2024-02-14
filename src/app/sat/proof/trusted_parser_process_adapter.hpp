@@ -50,21 +50,25 @@ public:
         _nb_cls = TrustedUtils::readInt(_f_parsed_formula);
         LOG(V3_VERB, "TPPA Parsed %i vars, %i cls\n", _nb_vars, _nb_cls);
         // Parse formula
-        const size_t maxBytesToRead = 1<<14;
         size_t fSizeBytes = out.size() * sizeof(T);
+        out.resize(out.size() + (_nb_cls*2*sizeof(int))/sizeof(T));
+        size_t capacityBytes = out.size() * sizeof(T);
         const size_t outSizeBytesBefore = fSizeBytes;
+        const size_t maxBytesToRead = 1<<16;
         while (true) {
-            out.resize((fSizeBytes + maxBytesToRead) / sizeof(T));
+            if (fSizeBytes + maxBytesToRead > capacityBytes) {
+                capacityBytes = std::max((unsigned long) (1.25*capacityBytes), fSizeBytes+maxBytesToRead);
+                out.resize(capacityBytes / sizeof(T));
+            }
             const size_t nbReadInts = UNLOCKED_IO(fread)(((uint8_t*) out.data())+fSizeBytes,
                 sizeof(int), maxBytesToRead/sizeof(int), _f_parsed_formula);
             const size_t nbReadBytes = nbReadInts * sizeof(int);
             fSizeBytes += nbReadBytes;
             if (nbReadBytes < maxBytesToRead) break;
         }
-        out.resize(fSizeBytes / sizeof(T));
         // Pop signature from the end of the data
         int* sigOutIntPtr = (int*) _sig;
-        int* fIntPtr = (int*) (out.data() + out.size());
+        int* fIntPtr = (int*) (((u8*)out.data()) + fSizeBytes);
         for (int i = 0; i < 4; i++) sigOutIntPtr[i] = *(fIntPtr-4+i);
         out.resize((fSizeBytes - 4*sizeof(int)) / sizeof(T));
         outSignature = _sig;

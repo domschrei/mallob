@@ -3,9 +3,11 @@
 
 #include "util/logger.hpp"
 #include "util/params.hpp"
+#include "util/sys/fileutils.hpp"
 #include "util/sys/process.hpp"
 #include "util/assert.hpp"
 #include "util/sys/tmpdir.hpp"
+#include <cstdio>
 #include <cstdlib>
 #include <ctime>
 #include <string>
@@ -37,7 +39,7 @@ public:
     pid_t start() {
 
         // FORK: Create a child process
-        pid_t res = Process::createChild();
+        const pid_t res = Process::createChild();
         if (res == 0) {
             // [child process]
             // Danger zone: Do not touch any memory.
@@ -54,18 +56,23 @@ public:
         // Assemble SAT subprocess command
         std::string executable;
         if (_cmd[0] == '/') executable = _cmd;
-        else executable = std::string(MALLOB_SUBPROC_DISPATCH_PATH) + "/" + _cmd;
+        else executable = std::string(MALLOB_SUBPROC_DISPATCH_PATH) + _cmd;
         //char* const* argv = _params.asCArgs(executable.c_str());
         std::string command = _params.getSubprocCommandAsString(executable.c_str());
         
         // Write command to tmp file (to be read by child process)
-        std::string commandOutfile = TmpDir::get() + "/mallob_subproc_cmd_" + std::to_string(res);
-        mkfifo(commandOutfile.c_str(), 0666);
-        {
-            std::ofstream ofs(commandOutfile);
-            ofs << command << " " << std::endl;
+        const std::string commandOutfile = TmpDir::get() + "/mallob_subproc_cmd_" + std::to_string(res);
+        int retval = mkfifo(commandOutfile.c_str(), 0666);
+        if (retval != 0) {
+            LOG(V0_CRIT, "[ERROR] mkfifo returned errno %i\n", (int)errno);
+            abort();
         }
+        auto f = fopen(commandOutfile.c_str(), "w");
+        const int size = command.size();
+        fwrite(&size, sizeof(int), 1, f);
+        fwrite(command.c_str(), 1, command.size(), f);
+        fflush(f);
+        fclose(f);
         return res;
     }
-
 };

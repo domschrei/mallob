@@ -114,14 +114,15 @@ private:
             _checker.load(_f_data+offset, nbInts);
             offset += nbInts;
         }
-        if (!_bg_emitter.continueRunning()) return;
-        assert(offset == _f_size);
+        if (_bg_emitter.continueRunning()) {
 
-        // End loading, check signature
-        bool ok = _checker.endLoading();
-        if (!ok) abort();
+            // End loading, check signature
+            assert(offset == _f_size);
+            bool ok = _checker.endLoading();
+            if (!ok) abort();
+        }
 
-        // Start acceptor
+        // *Always* start acceptor to ensure sound termination
         _bg_acceptor.run([&]() {runAcceptor();});
 
         // Lrat operation emission loop

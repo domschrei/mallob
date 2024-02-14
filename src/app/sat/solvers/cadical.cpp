@@ -34,7 +34,7 @@ Cadical::Cadical(const SolverSetup& setup)
 	solver->connect_learn_source(&learnSource);
 
 	// In certified UNSAT mode?
-	if (setup.certifiedUnsat || _lrat) {
+	if (setup.certifiedUnsat) {
 
 		int solverRank = setup.globalId;
 		int maxNumSolvers = setup.maxNumSolvers;
@@ -279,6 +279,7 @@ void Cadical::writeStatistics(SolverStatistics& stats) {
 void Cadical::cleanUp() {
 	// Clean up proof output pipeline *while the solver may still be running*
 	if (_setup.certifiedUnsat) {
+		LOGGER(_logger, V4_VVER, "Closing proof output asynchronously\n");
 		solver->close_proof_asynchronously ();
 		if (_lrat) _lrat->stop();
 	}

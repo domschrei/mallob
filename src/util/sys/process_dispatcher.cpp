@@ -21,22 +21,23 @@
 void ProcessDispatcher::dispatch() {
 
     const char* tmpdirCStr = std::getenv("MALLOB_TMP_DIR");
-    std::string tmpdir = tmpdirCStr ? tmpdirCStr : "/tmp";
+    const std::string tmpdir = tmpdirCStr ? tmpdirCStr : "/tmp";
 
     // Read command from tmp file
-    pid_t myPid = Proc::getPid();
-    std::string commandOutfile = tmpdir + "/mallob_subproc_cmd_" + std::to_string(myPid);
-    std::string command;
-    {
-        std::ifstream ifs(commandOutfile);
-        while (!ifs.is_open()) {
-            usleep(100);
-            ifs = std::ifstream(commandOutfile);
-        }
-        command = std::string(std::istreambuf_iterator<char>(ifs),
-            std::istreambuf_iterator<char>());
+    const pid_t myPid = Proc::getPid();
+    const std::string commandOutfile = tmpdir + "/mallob_subproc_cmd_" + std::to_string(myPid);
+    while (!FileUtils::exists(commandOutfile)) {
+        usleep(1000);
     }
+    const auto f = fopen(commandOutfile.c_str(), "r");
+    int size;
+    fread(&size, sizeof(int), 1, f);
+    char str[size];
+    fread(str, 1, size, f);
+    fclose(f);
     FileUtils::rm(commandOutfile); // clean up immediately
+
+    std::string command(str, size);
 
     // Assemble arguments list
     int numArgs = 0;
