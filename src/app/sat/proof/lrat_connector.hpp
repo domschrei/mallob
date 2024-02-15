@@ -93,7 +93,8 @@ public:
 
         // Wait for the sentinel to make the round through the process
         // and back to the acceptor
-        _bg_acceptor.stop();
+        _bg_acceptor.join(); // NOT stop()! We want it to finish on its own!
+        // Terminate signal arrived at the checker process, threads joined
 
         // Wait until the checker process did in fact exit
         _checker.terminate();

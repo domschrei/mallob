@@ -30,10 +30,13 @@ public:
     }
     void stop() {
         _terminate = true;
-        if (_thread.joinable()) _thread.join();
+        join();
     }
     void stopWithoutWaiting() {
         _terminate = true;
+    }
+    void join() {
+        if (_thread.joinable()) _thread.join();
     }
     ~BackgroundWorker() {
         stop();

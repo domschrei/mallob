@@ -36,6 +36,7 @@ public:
         _buffer_size = moved._buffer_size;
         _num_elems = moved._num_elems.load(std::memory_order_relaxed);
         _input_exhausted = moved._input_exhausted;
+        _terminated = moved._terminated;
         return *this;
     }
 
