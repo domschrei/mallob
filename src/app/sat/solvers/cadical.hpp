@@ -7,7 +7,6 @@
 
 #pragma once
 
-#include "app/sat/proof/trusted/lrat_checker.hpp"
 #include "app/sat/proof/trusted/trusted_solving.hpp"
 #include "app/sat/proof/trusted/trusted_solving_interface.hpp"
 #include "app/sat/proof/trusted_checker_process_adapter.hpp"

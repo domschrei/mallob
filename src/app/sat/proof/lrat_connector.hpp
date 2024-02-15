@@ -142,7 +142,7 @@ private:
 
         LratOp op;
         signature sig;
-        while (_bg_acceptor.continueRunning()) {
+        while (true) { // This thread can only be terminated with a "termination" LratOp.
             bool res;
             bool ok = _checker.accept(op, res, sig);
             if (!ok) break;

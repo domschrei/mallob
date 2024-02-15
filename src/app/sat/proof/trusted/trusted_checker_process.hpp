@@ -3,6 +3,8 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <ctime>
 
 #include "printer.hpp"
 #include "trusted_utils.hpp"
@@ -89,6 +91,12 @@ public:
 
     int run() {
 
+        clock_t start = clock();
+
+        u64 nbProduced {0};
+        u64 nbImported {0};
+        u64 nbDeleted {0};
+
         while (true) {
             int c = TrustedUtils::readChar(_input);
             if (c == TRUSTED_CHK_INIT) {
@@ -129,6 +137,7 @@ public:
                 // respond
                 say(res);
                 TrustedUtils::writeSignature(_buf_sig, _output);
+                nbProduced++;
 
             } else if (c == TRUSTED_CHK_CLS_IMPORT) {
 
@@ -142,6 +151,7 @@ public:
                 bool res = _ts->importClause(id, _buf_lits, nbLits, _buf_sig);
                 // respond
                 say(res);
+                nbImported++;
 
             } else if (c == TRUSTED_CHK_CLS_DELETE) {
                 
@@ -155,6 +165,7 @@ public:
                 bool res = _ts->deleteClauses(_buf_hints, nbHints);
                 // respond
                 say(res);
+                nbDeleted++;
 
             } else if (c == TRUSTED_CHK_VALIDATE) {
 
@@ -179,11 +190,17 @@ public:
             }
         }
 
+        float elapsed = (float) (clock() - start) / CLOCKS_PER_SEC;
+
+        char msg[128];
+        sprintf(msg, "cpu:%.3f prod:%lu imp:%lu del:%lu", elapsed, nbProduced, nbImported, nbDeleted);
+        log(msg);
+
         return 0;
     }
 
     void log(const char* msg) {
-        if (_do_logging) printf("%s", msg);
+        if (_do_logging) TrustedUtils::log(msg);
     }
 
 private:
