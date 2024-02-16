@@ -39,7 +39,7 @@ AnytimeSatClauseCommunicator::AnytimeSatClauseCommunicator(const Parameters& par
             return setup;
         }(), _job)
     ),
-    _sent_cert_unsat_ready_msg(!ClauseMetadata::enabled() && !params.deterministicSolving()) {
+    _sent_cert_unsat_ready_msg(!params.proofOutputFile.isSet() && !params.deterministicSolving()) {
 
     _time_of_last_epoch_initiation = Timer::elapsedSecondsCached();
 }
@@ -328,7 +328,7 @@ void AnytimeSatClauseCommunicator::checkCertifiedUnsatReadyMsg() {
         numExpectedReadyMsgs++;
     if (2*_job->getIndex()+2 < _job->getGlobalNumWorkers())
         numExpectedReadyMsgs++;
-    if (numExpectedReadyMsgs < _num_ready_msgs_from_children) return;
+    if (_num_ready_msgs_from_children < numExpectedReadyMsgs) return;
 
     _sent_cert_unsat_ready_msg = true;
     if (!_job->getJobTree().isRoot()) {
@@ -337,7 +337,7 @@ void AnytimeSatClauseCommunicator::checkCertifiedUnsatReadyMsg() {
             _job->getRevision(), 0, MSG_NOTIFY_READY_FOR_PROOF_SAFE_SHARING);
         _job->getJobTree().sendToParent(msg);
     } else {
-        LOG(V3_VERB, "sharing enabled\n");
+        LOG(V3_VERB, "sharing enabled (%i/%i ready)\n", _num_ready_msgs_from_children, numExpectedReadyMsgs);
         if (!_proof_producer && !_msg_unsat_found.payload.empty()) {
             // A solver has already found UNSAT which was deferred then.
             // Now the message can be processed properly
