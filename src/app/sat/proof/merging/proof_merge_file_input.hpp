@@ -18,7 +18,7 @@ public:
     ProofMergeFileInput(const std::string& inputFilename) : 
         _ifs(inputFilename, std::ios::binary), _reader(_ifs), _readbuf(_reader) {}
 
-    bool pollBlocking(SerializedLratLine& elem) override {
+    inline bool pollBlocking(SerializedLratLine& elem) override {
         return lrat_utils::readLine(_readbuf, elem);
     }
     size_t getCurrentSize() const override {

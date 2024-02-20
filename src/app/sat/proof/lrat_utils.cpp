@@ -90,6 +90,14 @@ namespace lrat_utils {
         line.hints.clear();
 
         int header = buf.get();
+        if (header == 'd') {
+            line.id = 0;
+            int64_t id;
+            while (buf.readSignedClauseId(id)) {
+                line.hints.push_back(std::abs(id));
+            }
+            return !line.hints.empty();
+        }
         if (header != 'a') return false;
 
         int64_t signedId;
@@ -121,7 +129,7 @@ namespace lrat_utils {
     */
     
     template <typename T>
-    void backInsert(std::vector<uint8_t>& data, const T& thing) {
+    inline void backInsert(std::vector<uint8_t>& data, const T& thing) {
         data.insert(data.end(), (uint8_t*) &thing, ((uint8_t*) (&thing))+sizeof(T));
     }
 

@@ -48,6 +48,12 @@ add_executable(trusted_parser_process ${TRUSTED_SOURCES} src/app/sat/proof/trust
 target_compile_options(trusted_checker_process PRIVATE ${BASE_COMPILEFLAGS})
 #target_link_libraries(trusted_checker_process mallob_commons)
 
+# Executable of standalone LRAT checker
+add_executable(standalone_lrat_checker ${SAT_SOURCES} src/app/sat/proof/standalone_checker.cpp)
+target_include_directories(standalone_lrat_checker PRIVATE ${BASE_INCLUDES})
+target_compile_options(standalone_lrat_checker PRIVATE ${BASE_COMPILEFLAGS})
+target_link_libraries(standalone_lrat_checker mallob_commons)
+
 # Add unit tests
 new_test(sat_reader)
 new_test(clause_database)

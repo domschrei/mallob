@@ -103,16 +103,16 @@ namespace lrat_utils {
 
         ReadBuffer(LinearFileReader& reader) : reader(reader) {}
 
-        char get() {
+        inline char get() {
             auto c = reader.next();
             return c;
         }
 
-        bool endOfFile() const {
+        inline bool endOfFile() const {
             return reader.endOfFile();
         }
 
-        bool readSignedClauseId(int64_t& id) {
+        inline bool readSignedClauseId(int64_t& id) {
             int64_t unadjusted = 0;
             int64_t coefficient = 1;
             int32_t tmp = get();
@@ -137,7 +137,7 @@ namespace lrat_utils {
             return true;
         }
 
-        bool readLiteral(int32_t& lit) {
+        inline bool readLiteral(int32_t& lit) {
             int32_t unadjusted = 0;
             int32_t coefficient = 1;
             int32_t tmp = get();

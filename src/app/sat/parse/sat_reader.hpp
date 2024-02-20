@@ -148,6 +148,13 @@ public:
     bool isValidInput() const {
         return _input_finished && !_input_invalid;
     }
+
+    int getNbVars() const {
+        return _max_var;
+    }
+    int getNbClauses() const {
+        return _num_read_clauses;
+    }
 };
 
 #endif

@@ -79,7 +79,7 @@ public:
     SipHash(const unsigned char* key_128bit) : kk(key_128bit),
             out((uint8_t*) malloc(128 / 8)) {
         buf = (uint8_t*) malloc(8);
-        reset();
+        if (kk) reset();
     }
     ~SipHash() {
         free(buf);

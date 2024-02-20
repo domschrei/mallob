@@ -100,9 +100,13 @@ struct LratLine {
     bool empty() const {return literals.empty() && hints.empty();}
     std::string toStr() const {
         std::stringstream out;
-        out << id;
-        for (auto lit : literals) out << " " << lit ;
-        out << " 0";
+        if (isDeletionStatement()) {
+            out << "d";
+        } else {
+            out << id;
+            for (auto lit : literals) out << " " << lit ;
+            out << " 0";
+        }
         for (size_t i = 0; i < hints.size(); i++) {
             out << " " << hints[i];
         }
@@ -113,5 +117,9 @@ struct LratLine {
         return sizeof(LratClauseId) 
             + sizeof(int) + literals.size()*sizeof(int) 
             + sizeof(int) + hints.size()*sizeof(LratClauseId);
+    }
+
+    bool isDeletionStatement() const {
+        return id == 0;
     }
 };
