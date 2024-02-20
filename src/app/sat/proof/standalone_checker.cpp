@@ -5,20 +5,19 @@
 #include "app/sat/proof/serialized_lrat_line.hpp"
 #include "app/sat/proof/trusted/lrat_checker.hpp"
 #include "app/sat/proof/trusted/trusted_checker_process.hpp"
+#include "app/sat/proof/trusted/trusted_utils.hpp"
 #include "app/sat/proof/trusted_parser_process_adapter.hpp"
 #include "data/job_description.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
+#include "util/reverse_file_reader.hpp"
+#include "util/sys/buffered_io.hpp"
 #include "util/sys/timer.hpp"
 #include <linux/prctl.h>
 #include <sys/prctl.h>
 
 int main(int argc, char** argv) {
     prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY, 0, 0, 0);
-
-    if (argc < 3) exit(1);
-    const char* cnfInput = argv[1];
-    const char* proofInput = argv[2];
 
     Timer::init();
     Parameters params;
@@ -30,6 +29,27 @@ int main(int argc, char** argv) {
     logConfig.quiet = params.quiet();
     logConfig.cPrefix = true;
     Logger::init(logConfig);
+
+    LOG(V2_INFO, "MallobSat standalone LRAT checker\n");
+
+    const char* cnfInput = nullptr;
+    const char* proofInput = nullptr;
+    enum ProofReadMode {NORMAL, REVERSED} proofReadMode = NORMAL;
+    if (argc < 3) exit(1);
+    for (int i = 1; i < argc; i++) {
+        if (TrustedUtils::beginsWith(argv[i], "-reversed")
+        || TrustedUtils::beginsWith(argv[i], "--reversed"))
+            proofReadMode = REVERSED;
+        else if (!cnfInput) cnfInput = argv[i];
+        else if (!proofInput) proofInput = argv[i];
+        else {
+            LOG(V1_WARN, "[WARN] Extraneous argument \"%s\"\n", argv[i]);
+        }
+    }
+    if (!cnfInput || !proofInput) {
+        LOG(V0_CRIT, "Usage: %s <cnf-file> <proof-file>\n", argv[0]);
+        exit(1);
+    }
 
     float time = Timer::elapsedSeconds();
     SatReader reader(params, cnfInput);
@@ -63,9 +83,15 @@ int main(int argc, char** argv) {
     LOG(V2_INFO, "Deleted parsed CNF; time %.3f\n", time);
 
     LOG(V2_INFO, "Reading and traversing binary LRAT proof %s\n", proofInput);
-    std::ifstream ifs(proofInput, std::ios::binary);
-    BufferedFileReader proofReader(ifs);
-    lrat_utils::ReadBuffer readbuf(proofReader);
+    std::ifstream ifs;
+    LinearFileReader* proofReader;
+    if (proofReadMode == NORMAL) {
+        ifs = std::ifstream(proofInput, std::ios::binary);
+        proofReader = new BufferedFileReader(ifs);
+    } else {
+        proofReader = new ReverseFileReader(proofInput);
+    }
+    lrat_utils::ReadBuffer readbuf(*proofReader);
 
     unsigned long nbLines {0};
     unsigned long nbAdditions {0};
@@ -74,7 +100,8 @@ int main(int argc, char** argv) {
     unsigned long maxLiveClauses = liveClauses;
     LratLine line;
     time = Timer::elapsedSeconds();
-    while (lrat_utils::readLine(readbuf, line)) {
+    bool failureFlag {false};
+    while (lrat_utils::readLine(readbuf, line, &failureFlag)) {
         nbLines++;
         if (line.isDeletionStatement()) {
             nbDeletions += line.hints.size();
@@ -83,7 +110,7 @@ int main(int argc, char** argv) {
             ok = chk.deleteClause(line.hints.data(), line.hints.size());
             if (!ok) {
                 LOG(V0_CRIT, "[ERROR] Problem with clause deletion.\n");
-                LOG(V0_CRIT, "Offending line: %s", line.toStr().c_str());
+                LOG(V0_CRIT, "Offending line %i: %s", nbLines, line.toStr().c_str());
                 LOG(V0_CRIT, "Checker message: %s\n", chk.getErrorMessage());
                 exit(1);
             }
@@ -93,21 +120,26 @@ int main(int argc, char** argv) {
             ok = chk.addClause(line.id, line.literals.data(), line.literals.size(), line.hints.data(), line.hints.size());
             if (!ok) {
                 LOG(V0_CRIT, "[ERROR] problem while adding clause derivation.\n");
-                LOG(V0_CRIT, "Offending line: %s", line.toStr().c_str());
+                LOG(V0_CRIT, "Offending line %i: %s", nbLines, line.toStr().c_str());
                 LOG(V0_CRIT, "Checker message: %s\n", chk.getErrorMessage());
                 exit(1);
             }
         }
     }
     time = Timer::elapsedSeconds() - time;
+
     LOG(V2_INFO, "Done; %lu lines, %lu added cls, %lu deleted cls, %lu bottleneck cls; time %.3f (= %.1f lines/sec)\n",
         nbLines, nbAdditions, nbDeletions, maxLiveClauses, time, nbLines/std::max(0.0001f, time));
     LOG(V2_INFO, "%lu non-deleted clauses remaining\n", liveClauses);
+    if (failureFlag) {
+        LOG(V0_CRIT, "[ERROR] parsing error in line %i\n", nbLines+1);
+        exit(1);
+    }
 
     if (!chk.validateUnsat()) {
         LOG(V0_CRIT, "[ERROR] %s\n", chk.getErrorMessage());
         exit(1);
     }
     LOG_OMIT_PREFIX(V0_CRIT, "s VERIFIED\n");
-    LOG(V2_INFO, "Terminating\n");
+    LOG(V2_INFO, "Exiting happily\n");
 }

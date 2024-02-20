@@ -10,6 +10,7 @@
 #include "comm/mympi.hpp"
 #include "data/serializable.hpp"
 #include "util/params.hpp"
+#include "util/sys/fileutils.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
@@ -425,7 +426,15 @@ private:
         LOG(V2_INFO, "PROOFSTATS partialproofbytes=%lu partialprooflines=%lu combinedprooflines=%lu\n",
                     _total_partial_proof_bytes, _total_partial_proof_clauses, _total_combined_proof_clauses);
 
-        std::string inputFilename = _output_filename + ".inv";
+        const std::string inputFilename = _output_filename + ".inv";
+
+        if (!_params.uninvertProof()) {
+            int res = ::rename(inputFilename.c_str(), _output_filename.c_str());
+            assert(res == 0);
+            _reversed_file = true;
+            return;
+        }
+
         if (_binary_output) {
             // Read binary file in reverse order byte by byte, output lines into new file
             std::ofstream ofs(_output_filename, std::ofstream::binary);
@@ -469,8 +478,7 @@ private:
             assert(result == 0);
         }
         // remove original (reversed) file
-        std::string cmd = "rm " + _output_filename + ".inv";
-        int result = system(cmd.c_str());
+        int result = FileUtils::rm(inputFilename);
         assert(result == 0);
 
         _reversed_file = true;

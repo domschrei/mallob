@@ -3,7 +3,6 @@
 #include "util/assert.hpp"
 #include "util/logger.hpp"
 
-
 namespace lrat_utils {
 
     void writeLine(WriteBuffer& buf, const LratLine& line) {
@@ -81,8 +80,8 @@ namespace lrat_utils {
         }
     }
 
-    bool readLine(ReadBuffer& buf, LratLine& line) {
-        
+    bool readLine(ReadBuffer& buf, LratLine& line, bool* failureFlag) {
+
         if (buf.endOfFile()) return false;
 
         line.id = -1;
@@ -98,10 +97,16 @@ namespace lrat_utils {
             }
             return !line.hints.empty();
         }
-        if (header != 'a') return false;
+        if (header != 'a') {
+            if (failureFlag) *failureFlag = !buf.endOfFile();
+            return false;
+        }
 
         int64_t signedId;
-        if (!buf.readSignedClauseId(signedId)) return false;
+        if (!buf.readSignedClauseId(signedId)) {
+            if (failureFlag) *failureFlag = true;
+            return false;
+        }
         assert(signedId > 0);
         line.id = signedId;
 
@@ -133,13 +138,16 @@ namespace lrat_utils {
         data.insert(data.end(), (uint8_t*) &thing, ((uint8_t*) (&thing))+sizeof(T));
     }
 
-    bool readLine(ReadBuffer& buf, SerializedLratLine& line) {
+    bool readLine(ReadBuffer& buf, SerializedLratLine& line, bool* failureFlag) {
 
         if (buf.endOfFile()) return false;
 
         int header = buf.get();
         bool deletion = header == 'd';
-        if (!deletion && header != 'a') return false;
+        if (!deletion && header != 'a') {
+            if (failureFlag) *failureFlag = !buf.endOfFile();
+            return false;
+        }
 
         // LratClauseId id;
         // int numLiterals;
@@ -151,7 +159,10 @@ namespace lrat_utils {
 
         int64_t signedId = 1; // special ID for deletions
         if (!deletion) {
-            if (!buf.readSignedClauseId(signedId)) return false;
+            if (!buf.readSignedClauseId(signedId)) {
+                if (failureFlag) *failureFlag = true;
+                return false;
+            }
         }
         assert(signedId > 0);
         backInsert(data, (unsigned long) signedId);

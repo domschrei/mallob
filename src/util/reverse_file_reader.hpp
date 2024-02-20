@@ -35,7 +35,7 @@ public:
         return _valid;
     }
 
-    bool next(char& c) {
+    inline bool next(char& c) {
         if (!_valid) return false;
         if (_buffer_pos < 0) {
             refillBuffer();
@@ -46,13 +46,13 @@ public:
         return true;
     }
 
-    virtual char next() override {
+    inline virtual char next() override {
         char c;
         if (!next(c)) return '\0';
         return c;
     }
 
-    bool done() {
+    inline bool done() {
         if (!_valid) return false;
         if (_buffer_pos >= 0) return false;
         refillBuffer();
@@ -60,7 +60,7 @@ public:
     }
 
 private:
-    void refillBuffer() {
+    inline void refillBuffer() {
         if (!_valid || !_stream.good()) return;
         
         // Check by how far you can go back
