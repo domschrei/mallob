@@ -429,6 +429,9 @@ private:
         const std::string inputFilename = _output_filename + ".inv";
 
         if (!_params.uninvertProof()) {
+            if (_params.compactProof() > 0) {
+                LOG(V1_WARN, "[WARN] Not compacting proof since uninverting is disabled!\n");
+            }
             int res = ::rename(inputFilename.c_str(), _output_filename.c_str());
             assert(res == 0);
             _reversed_file = true;
