@@ -12,6 +12,7 @@
 #include "util/params.hpp"
 #include "util/reverse_file_reader.hpp"
 #include "util/sys/buffered_io.hpp"
+#include "util/sys/proc.hpp"
 #include "util/sys/timer.hpp"
 #include <linux/prctl.h>
 #include <sys/prctl.h>
@@ -35,7 +36,7 @@ int main(int argc, char** argv) {
     const char* cnfInput = nullptr;
     const char* proofInput = nullptr;
     enum ProofReadMode {NORMAL, REVERSED} proofReadMode = NORMAL;
-    if (argc < 3) exit(1);
+
     for (int i = 1; i < argc; i++) {
         if (TrustedUtils::beginsWith(argv[i], "-reversed")
         || TrustedUtils::beginsWith(argv[i], "--reversed"))
@@ -124,6 +125,10 @@ int main(int argc, char** argv) {
                 LOG(V0_CRIT, "Checker message: %s\n", chk.getErrorMessage());
                 exit(1);
             }
+        }
+        if (nbLines % 1048576 == 0) {
+            auto rss = Proc::getRecursiveProportionalSetSizeKbs(Proc::getPid());
+            LOG(V2_INFO, "%lu lines passed; RAM usage: %.1f MB\n", nbLines, rss/1024.0);
         }
     }
     time = Timer::elapsedSeconds() - time;
