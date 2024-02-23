@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include "app/sat/data/clause.hpp"
+#include "app/sat/proof/lrat_op_tamperer.hpp"
 #include "app/sat/proof/trusted/trusted_solving.hpp"
 #include "app/sat/proof/trusted_checker_process_adapter.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
@@ -21,6 +22,7 @@
 class LratConnector {
 
 private:
+    Logger& _logger;
     const int _local_id;
     SPSCBlockingRingbuffer<LratOp> _ringbuf;
 
@@ -42,8 +44,10 @@ private:
     const int* _f_data;
     size_t _f_size;
 
+    float _tampering_chance_per_mille {0};
+
 public:
-    LratConnector(Logger& logger, int localId, int nbVars) : _local_id(localId), _ringbuf(1<<14),
+    LratConnector(Logger& logger, int localId, int nbVars) : _logger(logger), _local_id(localId), _ringbuf(1<<14),
         _checker(logger, _local_id, nbVars) {}
 
     inline auto& getChecker() {
@@ -52,6 +56,9 @@ public:
 
     void setLearnedClauseCallback(const LearnedClauseCallback& cb) {_cb_learn = cb;}
     void setProbingLearnedClauseCallback(const ProbingLearnedClauseCallback& cb) {_cb_probe = cb;}
+    void setTamperingChancePerMille(float chance) {
+        _tampering_chance_per_mille = chance;
+    }
 
     void launch(const int* fData, size_t fSize) {
         if (_launched) return;
@@ -82,6 +89,14 @@ public:
             bool share = glue > 0 && _cb_probe(op.getNbLits());
             if (share) op.sortLiterals();
             else glue = 0;
+
+            if (MALLOB_UNLIKELY(_tampering_chance_per_mille > 0)) {
+                if (1000*Random::rand() <= _tampering_chance_per_mille) {
+                    // Tampering with this derivation!
+                    op.glue() = 0;
+                    LratOpTamperer(_logger).tamper(op);
+                }
+            }
         }
         _ringbuf.pushBlocking(op);
     }
@@ -157,9 +172,8 @@ private:
         while (true) { // This thread can only be terminated with a "termination" LratOp.
             bool res;
             bool ok = _checker.accept(op, res, sig);
-            if (!ok) break;
+            if (!ok || !res) break;
             //LOG(V2_INFO, "PROOF> accept (%i) %s\n", (int)res, op.toStr().c_str());
-            if (!res) abort();
             if (op.isDerivation()) {
                 bool share = op.getGlue() > 0;
                 if (share) {

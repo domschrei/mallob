@@ -96,6 +96,7 @@ struct LratOp {
     u64 getId() const {return *(u64*) (data + 2*sizeof(int));}
     int* getLits() {return (int*) (data + 2*sizeof(int) + sizeof(u64));}
     const int* getLits() const {return (int*) (data + 2*sizeof(int) + sizeof(u64));}
+    u64* getHints() {return (u64*) (data + 2*sizeof(int) + sizeof(u64) + getNbLits()*sizeof(int));}
     const u64* getHints() const {return (u64*) (data + 2*sizeof(int) + sizeof(u64) + getNbLits()*sizeof(int));}
     const u8* getSignature() const {return (u8*) getHints();}
     int getGlue() const {return *(int*) (data + datalen - sizeof(int));}

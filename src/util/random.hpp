@@ -38,10 +38,23 @@ public:
     static int roundProbabilistically(float x) {
         return rand() < x-(int)x ? std::ceil(x) : std::floor(x);
     }
-    static int choice(std::vector<int> vec) {
-        return vec[ (int) (vec.size()*rand()) ];
+    template<typename T>
+    static T& choice(T* data, size_t size) {
+        return data[ (size_t) (size*rand()) ];
     }
-    static int choice(std::set<int> set) {
+    template<typename T>
+    static const T& choice(const T* data, size_t size) {
+        return data[ (size_t) (size*rand()) ];
+    }
+    template<typename T>
+    static T& choice(std::vector<T>& vec) {
+        return vec[ (size_t) (vec.size()*rand()) ];
+    }
+    template<typename T>
+    static const T& choice(const std::vector<T>& vec) {
+        return vec[ (size_t) (vec.size()*rand()) ];
+    }
+    static int choice(const std::set<int>& set) {
         assert(!set.empty());
         size_t picked = rand() * set.size();
         assert(picked < set.size());

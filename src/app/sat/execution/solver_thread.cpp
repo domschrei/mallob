@@ -28,6 +28,10 @@ SolverThread::SolverThread(const Parameters& params, const SatProcessConfig& con
 
     appendRevision(0, fSize, fLits, aSize, aLits);
     _result.result = UNKNOWN;
+
+    if (_lrat && _params.derivationErrorChancePerMille() > 0) {
+        _lrat->setTamperingChancePerMille(_params.derivationErrorChancePerMille());
+    }
 }
 
 void SolverThread::start() {

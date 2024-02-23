@@ -10,6 +10,7 @@
 OPTION_GROUP(grpAppSat, "app/sat", "SAT solving options")
  OPT_BOOL(abortNonincrementalSubprocess,    "ans", "abort-noninc-subproc",               false,                   
     "Abort (hence restart) each sub-process which works (partially) non-incrementally upon the arrival of a new revision")
+ OPT_BOOL(restartSubprocessAtAbort,         "rspaa", "restart-subproc-at-abort", false, "Ignore abort() of a subprocess and just restart it rather than aborting yourself")
  OPT_INT(maxLiteralsPerThread,              "mlpt", "max-lits-per-thread",               50000000, 0,   MAX_INT,    
     "If formula is larger than threshold, reduce #threads per PE until #threads=1 or until limit is met \"on average\"")
  OPT_STRING(satEngineConfig,                "sec", "sat-engine-config",                  "",                      
@@ -101,7 +102,8 @@ OPTION_GROUP(grpAppSatProof, "app/sat/proof", "Production of UNSAT proofs")
  OPT_STRING(extMemDiskDirectory,          "extmem-disk-dir", "",                       ".disk",                 "Directory where to create external memory files") //[[AUTOCOMPLETE_DIRECTORY]]
  OPT_STRING(satPreprocessor,              "sat-preprocessor", "",                      "",                      "Executable which preprocesses CNF file") //[[AUTOCOMPLETE_EXECUTABLE]]
  OPT_FLOAT(satSolvingWallclockLimit,      "sswl", "sat-solving-wallclock-limit",       0,    0, LARGE_INT,      "Cancel job if not done solving after this many seconds (0: no limit)")
- OPT_FLOAT(clauseErrorChancePerMille,     "cecpm", "clause-error-chance-per-mille",    0,    0, 1000,           "Chance per mille for tampering with some literal in a shared clause")
+ OPT_FLOAT(clauseErrorChancePerMille,     "cecpm", "clause-error-chance-per-mille",    0,    0, 1000,  "Chance per mille for tampering with some literal in a shared clause")
+ OPT_FLOAT(derivationErrorChancePerMille, "decpm", "deriv-error-chance-per-mille",     0,    0, 1000,  "Chance per mille for tampering with some on-the-fly checking clause derivation")
  OPT_STRING(fifoDirectives, "fifo-directives", "", "", "For internal use only")
  OPT_STRING(fifoFeedback, "fifo-feedback", "", "", "For internal use only")
  OPT_STRING(fifoParsedFormula, "fifo-parsed-formula", "", "", "For internal use only")

@@ -19,6 +19,7 @@
 #include "util/sys/proc.hpp"
 #include "util/sys/process.hpp"
 #include "util/sys/subprocess.hpp"
+#include "util/sys/terminator.hpp"
 #include "util/sys/tmpdir.hpp"
 
 class TrustedCheckerProcessAdapter {
@@ -80,7 +81,7 @@ public:
         TrustedUtils::writeInt(_nb_vars, _f_directives);
         TrustedUtils::writeSignature(formulaSignature, _f_directives);
         UNLOCKED_IO(fflush)(_f_directives);
-        if (!awaitResponse()) doAbort("INIT failed");
+        if (!awaitResponse()) handleError("INIT failed");
     }
 
     inline void load(const int* fData, size_t fSize) {
@@ -101,7 +102,10 @@ public:
         if (_buflen_lits > 0) flushLiteralBuffer();
         writeDirectiveType(TRUSTED_CHK_END_LOAD);
         UNLOCKED_IO(fflush)(_f_directives);
-        if (!awaitResponse()) doAbort("Loaded formula not accepted");
+        if (!awaitResponse()) {
+            handleError("Loaded formula not accepted");
+            return false;
+        }
         return true;
     }
 
@@ -130,15 +134,19 @@ public:
     void terminate() {
         _op_queue.markExhausted();
         if (_child_pid == -1) return;
-        while (!Process::didChildExit(_child_pid)) usleep(1000);
+        while (isSubprocessRunning()) usleep(1000);
         LOGGER(_logger, V4_VVER, "Checker process %i exited\n", _child_pid);
         _child_pid = -1;
     }
 
+    bool isSubprocessRunning() {
+        return _child_pid != -1 && !Process::didChildExit(_child_pid);
+    }
+
 private:
-    void doAbort(const std::string& errMsg) {
+    void handleError(const std::string& errMsg) {
         LOGGER(_logger, V0_CRIT, "[ERROR] Checker module rejected operation: %s\n", errMsg.c_str());
-        abort();
+        Terminator::setTerminating();
     }
 
     inline void submitProduceClause(unsigned long id, const int* literals, int nbLiterals,
@@ -156,7 +164,10 @@ private:
         TrustedUtils::writeChar(share ? 1 : 0, _f_directives);
     }
     inline bool acceptProduceClause(u8* sig, bool readSig) {
-        if (!awaitResponse()) doAbort("Clause derivation not accepted");
+        if (!awaitResponse()) {
+            handleError("Clause derivation not accepted");
+            return false;
+        }
         if (readSig) TrustedUtils::readSignature(sig, _f_feedback);
         return true;
     }
@@ -174,7 +185,10 @@ private:
         TrustedUtils::writeSignature(signatureData, _f_directives);
     }
     inline bool acceptImportClause() {
-        if (!awaitResponse()) doAbort("Imported clause not accepted");
+        if (!awaitResponse()) {
+            handleError("Imported clause not accepted");
+            return false;
+        }
         return true;
     }
 
@@ -186,7 +200,10 @@ private:
         for (size_t i = 0; i < nbIds; i++) TrustedUtils::writeUnsignedLong(ids[i], _f_directives);
     }
     inline bool acceptDeleteClauses() {
-        if (!awaitResponse()) doAbort("Error in deletion of clauses");
+        if (!awaitResponse()) {
+            handleError("Error in deletion of clauses");
+            return false;
+        }
         return true;
     }
 
@@ -195,7 +212,10 @@ private:
         UNLOCKED_IO(fflush)(_f_directives);
     }
     inline bool acceptValidateUnsat() {
-        if (!awaitResponse()) doAbort("UNSAT NOT valid");
+        if (!awaitResponse()) {
+            handleError("UNSAT NOT valid");
+            return false;
+        }
         signature sig;
         TrustedUtils::readSignature(sig, _f_feedback);
         auto str = Logger::dataToHexStr(sig, SIG_SIZE_BYTES);

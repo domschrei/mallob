@@ -333,6 +333,10 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
             LOG(V3_VERB, "Restarting non-incremental child %ld\n", _child_pid);
         } else {
             LOG(V1_WARN, "[WARN] Child %ld exited unexpectedly (status %i)\n", _child_pid, exitStatus);
+            if (!_params.restartSubprocessAtAbort()) {
+                LOG(V0_CRIT, "[ERROR] Mallob is configured to abort together with the sub-process\n");
+                abort();
+            }
         }
         if (_params.proofOutputFile.isSet()) {
             // Certified UNSAT: Child crashing is not permitted!
