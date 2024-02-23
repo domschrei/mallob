@@ -8,7 +8,6 @@
 #pragma once
 
 #include "app/sat/proof/trusted/trusted_solving.hpp"
-#include "app/sat/proof/trusted/trusted_solving_interface.hpp"
 #include "app/sat/proof/trusted_checker_process_adapter.hpp"
 #include "portfolio_solver_interface.hpp"
 
