@@ -41,6 +41,8 @@ private:
     int _buflen_lits {0};
     SPSCBlockingRingbuffer<LratOp> _op_queue;
 
+    bool _error_reported {false};
+
 public:
     TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars) :
             _logger(logger), _solver_id(solverId), _nb_vars(nbVars), _op_queue(1<<14) {
@@ -145,8 +147,10 @@ public:
 
 private:
     void handleError(const std::string& errMsg) {
+        if (_error_reported) return;
         LOGGER(_logger, V0_CRIT, "[ERROR] Checker module rejected operation: %s\n", errMsg.c_str());
         Terminator::setTerminating();
+        _error_reported = true;
     }
 
     inline void submitProduceClause(unsigned long id, const int* literals, int nbLiterals,

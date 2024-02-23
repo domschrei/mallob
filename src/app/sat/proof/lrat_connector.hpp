@@ -172,7 +172,8 @@ private:
         while (true) { // This thread can only be terminated with a "termination" LratOp.
             bool res;
             bool ok = _checker.accept(op, res, sig);
-            if (!ok || !res) break;
+            if (!ok) break; // terminated
+            if (!res) continue; // error in checker - nonetheless, wait for proper termination
             //LOG(V2_INFO, "PROOF> accept (%i) %s\n", (int)res, op.toStr().c_str());
             if (op.isDerivation()) {
                 bool share = op.getGlue() > 0;
