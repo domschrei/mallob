@@ -1,24 +1,17 @@
 
 #pragma once
 
-#include "secret.hpp"
 #include "lrat_checker.hpp"
 #include "siphash/siphash.hpp"
-#include <cstdlib>
+#include "trusted_utils.hpp"
+#include "secret.hpp"
 
 /*
 Interface for trusted solving.
 */
 class TrustedSolving {
 
-public:
-    TrustedSolving(void (*logFunction)(void*, const char*), void* logger, int nbVars) :
-        _log_function(logFunction), _logger(logger),
-        _checker(nbVars, Secret::SECRET_KEY),
-        _siphash(Secret::SECRET_KEY) {}
-
 private:
-
     void (*_log_function)(void*, const char*);
     void* _logger;
 
@@ -27,134 +20,100 @@ private:
     LratChecker _checker;
     SipHash _siphash;
 
+    bool _valid {true};
+    char _errmsg[512] = {0};
 
 public:
-    void signParsedFormula(const int* lits, unsigned long nbLits, uint8_t* outSig, int& inOutSigSize) {
-        if (_parsed_formula) {
-            _log_function(_logger, "[ERROR] TS - attempt to sign multiple formulas");
-            TrustedUtils::doAbort();
-        }
-        // Sign the read data
-        if (inOutSigSize < SIG_SIZE_BYTES) {
-            TrustedUtils::doAbort();
-        }
-        inOutSigSize = SIG_SIZE_BYTES;
-        uint8_t* out = _siphash.reset()
-            .update((uint8_t*) lits, sizeof(int) * nbLits)
-            .digest();
-        copyBytes(outSig, out, SIG_SIZE_BYTES);
-        _parsed_formula = true;
-    }
+    TrustedSolving(void (*logFunction)(void*, const char*), void* logger, int nbVars) :
+        _log_function(logFunction), _logger(logger),
+        _checker(nbVars, Secret::SECRET_KEY),
+        _siphash(Secret::SECRET_KEY) {}
 
-    void init(const uint8_t* formulaSignature) {
+    void init(const u8* formulaSignature) {
         // Store formula signature to validate later after loading
-        copyBytes(_formula_signature, formulaSignature, SIG_SIZE_BYTES);
+        TrustedUtils::copyBytes(_formula_signature, formulaSignature, SIG_SIZE_BYTES);
     }
 
     inline void loadLiteral(int lit) {
-        bool ok = _checker.loadLiteral(lit);
-        if (!ok) abortWithCheckerError();
+        _valid &= _checker.loadLiteral(lit);
     }
 
     inline bool endLoading() {
-        uint8_t* sigFromChecker;
-        bool ok = _checker.endLoading(sigFromChecker);
-        if (!ok) abortWithCheckerError();
+        u8* sigFromChecker;
+        _valid = _valid && _checker.endLoading(sigFromChecker);
+        if (!_valid) return false;
 		// Check against provided signature
-        ok = equalSignatures(sigFromChecker, _formula_signature); 
-		if (!ok) {
-			_log_function(_logger, "[ERROR] TS - formula signature does not match");
-			TrustedUtils::doAbort();
-		}
-        return ok;
+        _valid = TrustedUtils::equalSignatures(sigFromChecker, _formula_signature);
+        if (!_valid) snprintf(_errmsg, 512, "Formula signature check failed");
+		return _valid;
     }
 
     inline bool produceClause(unsigned long id, const int* literals, int nbLiterals,
-        const unsigned long* hints, int nbHints, uint8_t* outSignatureOrNull) {
+        const unsigned long* hints, int nbHints, u8* outSignatureOrNull) {
         
         // forward clause to checker
-        bool ok = _checker.addClause(id, literals, nbLiterals, hints, nbHints);
-        if (!ok) abortWithCheckerError();
+        _valid &= _checker.addClause(id, literals, nbLiterals, hints, nbHints);
+        if (!_valid) return false;
         // compute signature if desired
         if (outSignatureOrNull) {
             computeClauseSignature(id, literals, nbLiterals, outSignatureOrNull);
         }
-        return ok;
+        return true;
     }
 
     inline bool importClause(unsigned long id, const int* literals, int nbLiterals,
-        const uint8_t* signatureData) {
+        const u8* signatureData) {
         
         // verify signature
-        uint8_t computedSignature[SIG_SIZE_BYTES];
+        signature computedSignature;
         computeClauseSignature(id, literals, nbLiterals, computedSignature);
-        for (int i = 0; i < SIG_SIZE_BYTES; i++) if (computedSignature[i] != signatureData[i]) {
-            _log_function(_logger, "[ERROR] TS - clause signature does not match");
-            TrustedUtils::doAbort();
+        if (!TrustedUtils::equalSignatures(signatureData, computedSignature)) {
+            _valid = false;
+            snprintf(_errmsg, 512, "Signature check of clause %lu failed", id);
+            return false;
         }
 
         // signature verified - forward clause to checker as an axiom
-        bool ok = _checker.addAxiomaticClause(id, literals, nbLiterals);
-        if (!ok) abortWithCheckerError();
-        return ok;
+        _valid &= _checker.addAxiomaticClause(id, literals, nbLiterals);
+        return _valid;
     }
 
     inline bool deleteClauses(const unsigned long* ids, int nbIds) {
-        bool ok = _checker.deleteClause(ids, nbIds);
-        if (!ok) abortWithCheckerError();
-        return ok;
+        return _checker.deleteClause(ids, nbIds);
     }
 
-    inline bool validateUnsat(uint8_t* outSignature) {
-        bool ok = _checker.validateUnsat();
-        if (!ok) abortWithCheckerError();
+    inline bool validateUnsat(u8* outSignature) {
+        _valid &= _checker.validateUnsat();
+        if (!_valid) return false;
         _log_function(_logger, "TS - UNSAT VALIDATED");
         if (outSignature) {
             const u8 UNSAT = 20;
             auto sig = _siphash.reset().update(_formula_signature, SIG_SIZE_BYTES).update(&UNSAT, 1).digest();
-            for (size_t i = 0; i < SIG_SIZE_BYTES; i++) outSignature[i] = sig[i];
-        }
-        return ok;
-    }
-
-    inline void abortWithCheckerError(const char* errmsgOrNull = nullptr) {
-        _log_function(_logger, "[ERROR] TS - LRAT checker error:");
-        if (errmsgOrNull) {
-            _log_function(_logger, errmsgOrNull);
-        } else {
-            _log_function(_logger, _checker.getErrorMessage());
-        }
-        TrustedUtils::doAbort();
-    }
-
-    inline void computeClauseSignature(uint64_t id, const int* lits, int nbLits, uint8_t* out) {
-        const uint8_t* hashOut = _siphash.reset()
-            .update((uint8_t*) &id, sizeof(uint64_t))
-            .update((uint8_t*) lits, nbLits*sizeof(int))
-            .update(Secret::SECRET_KEY, SIG_SIZE_BYTES)
-            .digest();
-        copyBytes(out, hashOut, SIG_SIZE_BYTES);
-    }
-
-    inline void computeSignature(const uint8_t* data, int size, uint8_t* out, int& inOutSize) {
-        if (inOutSize < SIG_SIZE_BYTES) TrustedUtils::doAbort();
-        inOutSize = SIG_SIZE_BYTES;
-        uint8_t* sipout = _siphash.reset()
-            .update(data, size)
-            .digest();
-        copyBytes(out, sipout, SIG_SIZE_BYTES);
-    }
-
-    void copyBytes(uint8_t* to, const uint8_t* from, size_t nbBytes) {
-        for (size_t i = 0; i < nbBytes; i++) to[i] = from[i];
-    }
-
-    bool equalSignatures(const uint8_t* left, const uint8_t* right) {
-        for (size_t i = 0; i < SIG_SIZE_BYTES; i++) {
-            if (left[i] != right[i]) return false;
+            TrustedUtils::copyBytes(outSignature, sig, SIG_SIZE_BYTES);
         }
         return true;
     }
 
-#undef SIG_SIZE_BYTES
+    inline void computeClauseSignature(u64 id, const int* lits, int nbLits, u8* out) {
+        const u8* hashOut = _siphash.reset()
+            .update((u8*) &id, sizeof(u64))
+            .update((u8*) lits, nbLits*sizeof(int))
+            .update(_formula_signature, SIG_SIZE_BYTES)
+            .digest();
+        TrustedUtils::copyBytes(out, hashOut, SIG_SIZE_BYTES);
+    }
+
+    inline void computeSignature(const u8* data, int size, u8* out) {
+        u8* sipout = _siphash.reset()
+            .update(data, size)
+            .digest();
+        TrustedUtils::copyBytes(out, sipout, SIG_SIZE_BYTES);
+    }
+
+    inline bool valid() const {return _valid;}
+
+    const char* getErrorMessage() {
+        if (_errmsg[0] != '\0') return _errmsg;
+        return _checker.getErrorMessage();
+    }
 };

@@ -43,7 +43,7 @@ private:
     size_t _f_size;
 
 public:
-    LratConnector(Logger& logger, int localId, int nbVars) : _local_id(localId), _ringbuf(1<<16),
+    LratConnector(Logger& logger, int localId, int nbVars) : _local_id(localId), _ringbuf(1<<14),
         _checker(logger, _local_id, nbVars) {}
 
     inline auto& getChecker() {
@@ -71,6 +71,18 @@ public:
     }
 
     inline void push(LratOp&& op) {
+        if (op.isDerivation()) {
+            // Clauses which will potentially be shared need to be sorted.
+            // We use the glue value as an indicator for sharing (0 = no sharing)
+            // and probe if the clause is currently eligible for sharing.
+            // If the clause is not eligible, we set the glue to zero.
+            // This skips the computation of a clause signature in the checker
+            // and signals to the acceptor thread that the clause is NOT to be shared.
+            int& glue = op.glue();
+            bool share = glue > 0 && _cb_probe(op.getNbLits());
+            if (share) op.sortLiterals();
+            else glue = 0;
+        }
         _ringbuf.pushBlocking(op);
     }
     bool waitForValidation() {
@@ -111,7 +123,7 @@ private:
         // Load formula
         size_t offset = 0;
         while (_bg_emitter.continueRunning() && offset < _f_size) {
-            size_t nbInts = std::min(1UL<<16, _f_size-offset);
+            size_t nbInts = std::min(1UL<<14, _f_size-offset);
             _checker.load(_f_data+offset, nbInts);
             offset += nbInts;
         }
@@ -149,7 +161,7 @@ private:
             //LOG(V2_INFO, "PROOF> accept (%i) %s\n", (int)res, op.toStr().c_str());
             if (!res) abort();
             if (op.isDerivation()) {
-                bool share = op.getGlue() > 0 && _cb_probe(op.getNbLits());
+                bool share = op.getGlue() > 0;
                 if (share) {
                     prepareClause(op, sig);
                     _cb_learn(_clause, _local_id);

@@ -6,6 +6,14 @@
 #include <bits/types/FILE.h> // FILE* datatype
 #include <unistd.h> // getpid
 
+#ifdef _MSC_VER
+#    define MALLOB_LIKELY(condition) condition
+#    define MALLOB_UNLIKELY(condition) condition
+#else
+#    define MALLOB_LIKELY(condition) __builtin_expect(condition, 1)
+#    define MALLOB_UNLIKELY(condition) __builtin_expect(condition, 0)
+#endif
+
 #define UNLOCKED_IO(fun) fun##_unlocked
 //#define UNLOCKED_IO(fun) fun
 
@@ -45,6 +53,17 @@ public:
             if (str[i] != prefix[i]) return false;
             i++;
         }
+    }
+
+    static void copyBytes(u8* to, const u8* from, size_t nbBytes) {
+        for (size_t i = 0; i < nbBytes; i++) to[i] = from[i];
+    }
+
+    static bool equalSignatures(const u8* left, const u8* right) {
+        for (size_t i = 0; i < SIG_SIZE_BYTES; i++) {
+            if (left[i] != right[i]) return false;
+        }
+        return true;
     }
 
     static void readSignature(u8* outSig, FILE* file) {

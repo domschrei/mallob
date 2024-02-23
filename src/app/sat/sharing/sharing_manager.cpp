@@ -5,6 +5,7 @@
  *      Author: balyo
  */
 
+#include <climits>
 #include <signal.h>
 #include <algorithm>
 #include <fstream>
@@ -211,6 +212,13 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 		// Sort literals in clause (not the metadata!)
 		std::sort(clauseBegin+ClauseMetadata::numInts(), clauseBegin+clauseSize);
 	}
+
+	// Check that the clause is sorted
+	//int lit = INT_MIN;
+	//for (int i = ClauseMetadata::numInts(); i < clauseSize; i++) {
+	//	assert(clauseBegin[i] > lit || log_return_false("[ERROR] Clause not sorted: %s\n", clause.toStr().c_str()));
+	//	lit = clauseBegin[i];
+	//}
 
 	_export_buffer->produce(clauseBegin, clauseSize, clauseLbd, solverId, _internal_epoch);
 	//log(V6_DEBGV, "%i : PRODUCED %s\n", solverId, tldClause.toStr().c_str());

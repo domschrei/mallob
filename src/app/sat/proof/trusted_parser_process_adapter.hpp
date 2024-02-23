@@ -54,7 +54,7 @@ public:
         out.resize(out.size() + (_nb_cls*2*sizeof(int))/sizeof(T));
         size_t capacityBytes = out.size() * sizeof(T);
         const size_t outSizeBytesBefore = fSizeBytes;
-        const size_t maxBytesToRead = 1<<16;
+        const size_t maxBytesToRead = 1<<14;
         while (true) {
             if (fSizeBytes + maxBytesToRead > capacityBytes) {
                 capacityBytes = std::max((unsigned long) (1.25*capacityBytes), fSizeBytes+maxBytesToRead);

@@ -42,7 +42,7 @@ private:
 
 public:
     TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars) :
-            _logger(logger), _solver_id(solverId), _nb_vars(nbVars), _op_queue(1<<16) {
+            _logger(logger), _solver_id(solverId), _nb_vars(nbVars), _op_queue(1<<14) {
     }
 
     ~TrustedCheckerProcessAdapter() {
@@ -80,7 +80,7 @@ public:
         TrustedUtils::writeInt(_nb_vars, _f_directives);
         TrustedUtils::writeSignature(formulaSignature, _f_directives);
         UNLOCKED_IO(fflush)(_f_directives);
-        if (!awaitResponse()) TrustedUtils::doAbort();
+        if (!awaitResponse()) doAbort("INIT failed");
     }
 
     inline void load(const int* fData, size_t fSize) {
@@ -101,13 +101,13 @@ public:
         if (_buflen_lits > 0) flushLiteralBuffer();
         writeDirectiveType(TRUSTED_CHK_END_LOAD);
         UNLOCKED_IO(fflush)(_f_directives);
-        if (!awaitResponse()) TrustedUtils::doAbort();
+        if (!awaitResponse()) doAbort("Loaded formula not accepted");
         return true;
     }
 
     inline void submit(LratOp& op) {
         auto type = op.getType();
-        if (type == LratOp::DERIVATION) submitProduceClause(op.getId(), op.getLits(), op.getNbLits(), op.getHints(), op.getNbHints());
+        if (type == LratOp::DERIVATION) submitProduceClause(op.getId(), op.getLits(), op.getNbLits(), op.getHints(), op.getNbHints(), op.getGlue() > 0);
         else if (type == LratOp::IMPORT) submitImportClause(op.getId(), op.getLits(), op.getNbLits(), op.getSignature());
         else if (type == LratOp::DELETION) submitDeleteClauses(op.getHints(), op.getNbHints());
         else if (type == LratOp::VALIDATION) submitValidateUnsat();
@@ -119,7 +119,7 @@ public:
         bool ok = _op_queue.pollBlocking(op);
         if (!ok) return false;
         auto type = op.getType();
-        if (type == LratOp::DERIVATION) res = acceptProduceClause(sig);
+        if (type == LratOp::DERIVATION) res = acceptProduceClause(sig, op.getGlue() > 0);
         else if (type == LratOp::IMPORT) res = acceptImportClause();
         else if (type == LratOp::DELETION) res = acceptDeleteClauses();
         else if (type == LratOp::VALIDATION) res = acceptValidateUnsat();
@@ -136,9 +136,13 @@ public:
     }
 
 private:
+    void doAbort(const std::string& errMsg) {
+        LOGGER(_logger, V0_CRIT, "[ERROR] Checker module rejected operation: %s\n", errMsg.c_str());
+        abort();
+    }
 
     inline void submitProduceClause(unsigned long id, const int* literals, int nbLiterals,
-        const unsigned long* hints, int nbHints) {
+        const unsigned long* hints, int nbHints, bool share) {
 
         writeDirectiveType(TRUSTED_CHK_CLS_PRODUCE);
         const int totalSize = 2 + nbLiterals + 1 + 2*nbHints;
@@ -149,10 +153,11 @@ private:
         TrustedUtils::writeInt(0, _f_directives);
         for (size_t i = 0; i < nbHints; i++)
             TrustedUtils::writeUnsignedLong(hints[i], _f_directives);
+        TrustedUtils::writeChar(share ? 1 : 0, _f_directives);
     }
-    inline bool acceptProduceClause(u8* sig) {
-        if (!awaitResponse()) TrustedUtils::doAbort();
-        TrustedUtils::readSignature(sig, _f_feedback);
+    inline bool acceptProduceClause(u8* sig, bool readSig) {
+        if (!awaitResponse()) doAbort("Clause derivation not accepted");
+        if (readSig) TrustedUtils::readSignature(sig, _f_feedback);
         return true;
     }
 
@@ -169,7 +174,7 @@ private:
         TrustedUtils::writeSignature(signatureData, _f_directives);
     }
     inline bool acceptImportClause() {
-        if (!awaitResponse()) TrustedUtils::doAbort();
+        if (!awaitResponse()) doAbort("Imported clause not accepted");
         return true;
     }
 
@@ -181,7 +186,7 @@ private:
         for (size_t i = 0; i < nbIds; i++) TrustedUtils::writeUnsignedLong(ids[i], _f_directives);
     }
     inline bool acceptDeleteClauses() {
-        if (!awaitResponse()) TrustedUtils::doAbort();
+        if (!awaitResponse()) doAbort("Error in deletion of clauses");
         return true;
     }
 
@@ -190,7 +195,7 @@ private:
         UNLOCKED_IO(fflush)(_f_directives);
     }
     inline bool acceptValidateUnsat() {
-        if (!awaitResponse()) TrustedUtils::doAbort();
+        if (!awaitResponse()) doAbort("UNSAT NOT valid");
         signature sig;
         TrustedUtils::readSignature(sig, _f_feedback);
         auto str = Logger::dataToHexStr(sig, SIG_SIZE_BYTES);

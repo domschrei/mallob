@@ -1,4 +1,4 @@
 
 #pragma once
 
-struct Secret { static unsigned char SECRET_KEY[]; };
+struct Secret { static const unsigned char SECRET_KEY[]; };

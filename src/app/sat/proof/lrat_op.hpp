@@ -73,7 +73,8 @@ struct LratOp {
     }
 
     void sortLiterals() {
-        std::sort(getLits(), getLits()+getNbLits());
+        auto lits = getLits();
+        std::sort(lits, lits+getNbLits());
     }
 
     bool isDerivation() const {return getType() == DERIVATION;}
@@ -98,6 +99,7 @@ struct LratOp {
     const u64* getHints() const {return (u64*) (data + 2*sizeof(int) + sizeof(u64) + getNbLits()*sizeof(int));}
     const u8* getSignature() const {return (u8*) getHints();}
     int getGlue() const {return *(int*) (data + datalen - sizeof(int));}
+    int& glue() {return *(int*) (data + datalen - sizeof(int));}
 
     std::string toStr() const {
         std::string out;

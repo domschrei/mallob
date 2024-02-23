@@ -48,7 +48,7 @@
 #define TRUSTED_CHK_RES_ACCEPT 'A'
 #define TRUSTED_CHK_RES_ERROR 'E'
 
-#define TRUSTED_CHK_MAX_BUF_SIZE (1<<16)
+#define TRUSTED_CHK_MAX_BUF_SIZE (1<<14)
 
 void logInCheckerProcess(void* logger, const char* msg);
 
@@ -97,6 +97,8 @@ public:
         u64 nbImported {0};
         u64 nbDeleted {0};
 
+        bool reportedError {false};
+
         while (true) {
             int c = TrustedUtils::readChar(_input);
             if (c == TRUSTED_CHK_INIT) {
@@ -130,13 +132,14 @@ public:
                 unsigned long id = readId(nbRemaining);
                 int nbLits = readLiterals(nbRemaining);
                 int nbHints = readHints(nbRemaining);
+                bool share = TrustedUtils::readChar(_input);
                 //TrustedUtils::doAssert(nbRemaining == 0);
                 _printer.printProduceDirective(id, _buf_lits, nbLits, _buf_hints, nbHints);
                 // forward to checker
-                bool res = _ts->produceClause(id, _buf_lits, nbLits, _buf_hints, nbHints, _buf_sig);
+                bool res = _ts->produceClause(id, _buf_lits, nbLits, _buf_hints, nbHints, share ? _buf_sig : nullptr);
                 // respond
                 say(res);
-                TrustedUtils::writeSignature(_buf_sig, _output);
+                if (share) TrustedUtils::writeSignature(_buf_sig, _output);
                 nbProduced++;
 
             } else if (c == TRUSTED_CHK_CLS_IMPORT) {
@@ -185,8 +188,17 @@ public:
                 break;
 
             } else {
-                log("Invalid directive!");
-                TrustedUtils::doAbort(); // invalid directive
+                log("[ERROR] Invalid directive!");
+                break;
+            }
+
+            if (MALLOB_UNLIKELY(!_ts->valid())) {
+                if (!reportedError) {
+                    char msg[1024];
+                    snprintf(msg, 1024, "[ERROR] %s", _ts->getErrorMessage());
+                    log(msg);
+                    reportedError = true;
+                }
             }
         }
 
@@ -225,7 +237,7 @@ private:
             const int lit = TrustedUtils::readInt(_input);
             nbRemaining--;
             if (lit == 0) break;
-            if (_buflen_lits >= _bufcap_lits) {
+            if (MALLOB_UNLIKELY(_buflen_lits >= _bufcap_lits)) {
                 // buffer exceeded - reallocate
                 _bufcap_lits *= 2;
                 _buf_lits = (int*) realloc(_buf_lits, _bufcap_lits * sizeof(int));
@@ -242,7 +254,7 @@ private:
         while (nbRemaining >= 2) {
             const u64 hint = TrustedUtils::readUnsignedLong(_input);
             nbRemaining -= 2;
-            if (_buflen_hints >= _bufcap_hints) {
+            if (MALLOB_UNLIKELY(_buflen_hints >= _bufcap_hints)) {
                 // buffer exceeded - reallocate
                 _bufcap_hints *= 2;
                 _buf_hints = (u64*) realloc(_buf_hints, _bufcap_hints * sizeof(u64));

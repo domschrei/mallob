@@ -17,6 +17,11 @@
 #include <linux/prctl.h>
 #include <sys/prctl.h>
 
+void exitUnverified() {
+    LOG_OMIT_PREFIX(V0_CRIT, "s NOT VERIFIED\n");
+    exit(1);
+}
+
 int main(int argc, char** argv) {
     prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY, 0, 0, 0);
 
@@ -49,7 +54,7 @@ int main(int argc, char** argv) {
     }
     if (!cnfInput || !proofInput) {
         LOG(V0_CRIT, "Usage: %s <cnf-file> <proof-file>\n", argv[0]);
-        exit(1);
+        exitUnverified();
     }
 
     float time = Timer::elapsedSeconds();
@@ -60,7 +65,7 @@ int main(int argc, char** argv) {
     bool ok = reader.read(*desc);
     if (!ok) {
         LOG(V0_CRIT, "[ERROR] problem while parsing CNF!\n");
-        exit(1);
+        exitUnverified();
     }
     time = Timer::elapsedSeconds() - time;
     LOG(V2_INFO, "Parsed CNF %s with %i variables, %i clauses; time %.3f\n",
@@ -71,7 +76,7 @@ int main(int argc, char** argv) {
     ok = chk.loadOriginalClauses(desc->getFormulaPayload(0), desc->getFormulaPayloadSize(0));
     if (!ok) {
         LOG(V0_CRIT, "[ERROR] problem while loading CNF to LRAT checker! %s\n", chk.getErrorMessage());
-        exit(1);
+        exitUnverified();
     }
     time = Timer::elapsedSeconds() - time;
     LOG(V2_INFO, "Loaded CNF to LRAT checker; time %.3f\n", time);
@@ -113,7 +118,7 @@ int main(int argc, char** argv) {
                 LOG(V0_CRIT, "[ERROR] Problem with clause deletion.\n");
                 LOG(V0_CRIT, "Offending line %i: %s", nbLines, line.toStr().c_str());
                 LOG(V0_CRIT, "Checker message: %s\n", chk.getErrorMessage());
-                exit(1);
+                exitUnverified();
             }
         } else {
             nbAdditions++;
@@ -123,7 +128,7 @@ int main(int argc, char** argv) {
                 LOG(V0_CRIT, "[ERROR] problem while adding clause derivation.\n");
                 LOG(V0_CRIT, "Offending line %i: %s", nbLines, line.toStr().c_str());
                 LOG(V0_CRIT, "Checker message: %s\n", chk.getErrorMessage());
-                exit(1);
+                exitUnverified();
             }
         }
         if (nbLines % 1048576 == 0) {
@@ -138,13 +143,14 @@ int main(int argc, char** argv) {
     LOG(V2_INFO, "%lu non-deleted clauses remaining\n", liveClauses);
     if (failureFlag) {
         LOG(V0_CRIT, "[ERROR] parsing error in line %i\n", nbLines+1);
-        exit(1);
+        exitUnverified();
     }
 
     if (!chk.validateUnsat()) {
         LOG(V0_CRIT, "[ERROR] %s\n", chk.getErrorMessage());
-        exit(1);
+        exitUnverified();
     }
     LOG_OMIT_PREFIX(V0_CRIT, "s VERIFIED\n");
     LOG(V2_INFO, "Exiting happily\n");
+    return 0;
 }
