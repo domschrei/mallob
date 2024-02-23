@@ -12,9 +12,6 @@ Interface for trusted solving.
 class TrustedSolving {
 
 private:
-    void (*_log_function)(void*, const char*);
-    void* _logger;
-
     bool _parsed_formula {false};
     signature _formula_signature;
     LratChecker _checker;
@@ -24,8 +21,7 @@ private:
     char _errmsg[512] = {0};
 
 public:
-    TrustedSolving(void (*logFunction)(void*, const char*), void* logger, int nbVars) :
-        _log_function(logFunction), _logger(logger),
+    TrustedSolving(int nbVars) :
         _checker(nbVars, Secret::SECRET_KEY),
         _siphash(Secret::SECRET_KEY) {}
 
@@ -85,7 +81,6 @@ public:
     inline bool validateUnsat(u8* outSignature) {
         _valid &= _checker.validateUnsat();
         if (!_valid) return false;
-        _log_function(_logger, "TS - UNSAT VALIDATED");
         if (outSignature) {
             const u8 UNSAT = 20;
             auto sig = _siphash.reset().update(_formula_signature, SIG_SIZE_BYTES).update(&UNSAT, 1).digest();

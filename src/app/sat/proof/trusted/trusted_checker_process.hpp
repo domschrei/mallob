@@ -50,8 +50,6 @@
 
 #define TRUSTED_CHK_MAX_BUF_SIZE (1<<14)
 
-void logInCheckerProcess(void* logger, const char* msg);
-
 class TrustedCheckerProcess {
 
 private:
@@ -104,7 +102,7 @@ public:
             if (c == TRUSTED_CHK_INIT) {
 
                 _nb_vars = TrustedUtils::readInt(_input);
-                _ts = new TrustedSolving(logInCheckerProcess, this, _nb_vars);
+                _ts = new TrustedSolving(_nb_vars);
                 TrustedUtils::readSignature(_formula_signature, _input);
                 _printer.printInitDirective(_nb_vars, _formula_signature);
                 _ts->init(_formula_signature);
