@@ -64,7 +64,7 @@ if echo $solvers|grep -q "c"; then
     if [ ! -d cadical ]; then
         if [ ! -f cadical.zip ]; then
             # for fixing a branch instead of a commit, prepend "refs/heads/"
-            branchorcommit="ca55a7ac6e38a9970191d9fb33077c4dbe1d1b72"
+            branchorcommit="298c8a0367dedbe7b6891fcb0656301cf8c43cd5"
             wget -nc https://github.com/domschrei/cadical/archive/${branchorcommit}.zip -O cadical.zip
         fi
         unzip cadical.zip
