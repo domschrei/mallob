@@ -85,6 +85,9 @@ public:
     static void writeUnsignedLong(u64 u, FILE* file) {
         UNLOCKED_IO(fwrite)(&u, sizeof(u64), 1, file);
     }
+    static void writeUnsignedLongs(const u64* data, size_t nbHints, FILE* file) {
+        UNLOCKED_IO(fwrite)(data, sizeof(u64), nbHints, file);
+    }
 
     static int readInt(FILE* file) {
         int i;

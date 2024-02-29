@@ -157,14 +157,11 @@ private:
         const unsigned long* hints, int nbHints, bool share) {
 
         writeDirectiveType(TRUSTED_CHK_CLS_PRODUCE);
-        const int totalSize = 2 + nbLiterals + 1 + 2*nbHints;
-        TrustedUtils::writeInt(totalSize, _f_directives);
         TrustedUtils::writeUnsignedLong(id, _f_directives);
-        for (size_t i = 0; i < nbLiterals; i++)
-            TrustedUtils::writeInt(literals[i], _f_directives);
-        TrustedUtils::writeInt(0, _f_directives);
-        for (size_t i = 0; i < nbHints; i++)
-            TrustedUtils::writeUnsignedLong(hints[i], _f_directives);
+        TrustedUtils::writeInt(nbLiterals, _f_directives);
+        TrustedUtils::writeInts(literals, nbLiterals, _f_directives);
+        TrustedUtils::writeInt(nbHints, _f_directives);
+        TrustedUtils::writeUnsignedLongs(hints, nbHints, _f_directives);
         TrustedUtils::writeChar(share ? 1 : 0, _f_directives);
     }
     inline bool acceptProduceClause(u8* sig, bool readSig) {
@@ -180,12 +177,9 @@ private:
         const uint8_t* signatureData) {
 
         writeDirectiveType(TRUSTED_CHK_CLS_IMPORT);
-        const int totalSize = 2 + nbLiterals + 1 + 4;
-        TrustedUtils::writeInt(totalSize, _f_directives);
         TrustedUtils::writeUnsignedLong(id, _f_directives);
-        for (size_t i = 0; i < nbLiterals; i++)
-            TrustedUtils::writeInt(literals[i], _f_directives);
-        TrustedUtils::writeInt(0, _f_directives);
+        TrustedUtils::writeInt(nbLiterals, _f_directives);
+        TrustedUtils::writeInts(literals, nbLiterals, _f_directives);
         TrustedUtils::writeSignature(signatureData, _f_directives);
     }
     inline bool acceptImportClause() {
@@ -199,9 +193,8 @@ private:
     inline void submitDeleteClauses(const unsigned long* ids, int nbIds) {
 
         writeDirectiveType(TRUSTED_CHK_CLS_DELETE);
-        const int totalSize = 2 * nbIds;
-        TrustedUtils::writeInt(totalSize, _f_directives);
-        for (size_t i = 0; i < nbIds; i++) TrustedUtils::writeUnsignedLong(ids[i], _f_directives);
+        TrustedUtils::writeInt(nbIds, _f_directives);
+        TrustedUtils::writeUnsignedLongs(ids, nbIds, _f_directives);
     }
     inline bool acceptDeleteClauses() {
         if (!awaitResponse()) {

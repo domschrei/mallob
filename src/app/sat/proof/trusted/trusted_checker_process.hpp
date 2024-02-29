@@ -111,8 +111,6 @@ public:
             } else if (c == TRUSTED_CHK_LOAD) {
 
                 const int nbInts = TrustedUtils::readInt(_input);
-                //TrustedUtils::doAssert(nbInts > 0);
-                //TrustedUtils::doAssert(nbInts <= _bufcap_lits);
                 TrustedUtils::readInts(_buf_lits, nbInts, _input);
                 _printer.printLoadDirective(_buf_lits, nbInts);
                 for (size_t i = 0; i < nbInts; i++) _ts->loadLiteral(_buf_lits[i]);
@@ -126,10 +124,11 @@ public:
             } else if (c == TRUSTED_CHK_CLS_PRODUCE) {
 
                 // parse
-                int nbRemaining = TrustedUtils::readInt(_input);
-                unsigned long id = readId(nbRemaining);
-                int nbLits = readLiterals(nbRemaining);
-                int nbHints = readHints(nbRemaining);
+                const unsigned long id = readId();
+                const int nbLits = TrustedUtils::readInt(_input);
+                readLiterals(nbLits);
+                const int nbHints = TrustedUtils::readInt(_input);
+                readHints(nbHints);
                 bool share = TrustedUtils::readChar(_input);
                 //TrustedUtils::doAssert(nbRemaining == 0);
                 _printer.printProduceDirective(id, _buf_lits, nbLits, _buf_hints, nbHints);
@@ -143,9 +142,9 @@ public:
             } else if (c == TRUSTED_CHK_CLS_IMPORT) {
 
                 // parse
-                int nbRemaining = TrustedUtils::readInt(_input);
-                unsigned long id = readId(nbRemaining);
-                int nbLits = readLiterals(nbRemaining);
+                const unsigned long id = readId();
+                const int nbLits = TrustedUtils::readInt(_input);
+                readLiterals(nbLits);
                 TrustedUtils::readSignature(_buf_sig, _input);
                 _printer.printImportDirective(id, _buf_lits, nbLits, _buf_sig);
                 // forward to checker
@@ -157,8 +156,8 @@ public:
             } else if (c == TRUSTED_CHK_CLS_DELETE) {
                 
                 // parse
-                int nbRemaining = TrustedUtils::readInt(_input);
-                int nbHints = readHints(nbRemaining);
+                int nbHints = TrustedUtils::readInt(_input);
+                readHints(nbHints);
                 //TrustedUtils::doAssert(nbRemaining == 0);
                 _printer.printDeleteDirective(_buf_hints, nbHints);
                 //printf("PROOF?? d %lu ... (%i)\n", hints[0], nbHints);
@@ -222,44 +221,34 @@ private:
         TrustedUtils::writeChar(ok ? TRUSTED_CHK_RES_ACCEPT : TRUSTED_CHK_RES_ERROR, _output);
     }
 
-    inline u64 readId(int& nbRemaining) {
-        nbRemaining -= 2;
+    inline u64 readId() {
         return TrustedUtils::readUnsignedLong(_input);
     }
 
-    inline int readLiterals(int& nbRemaining) {
+    inline void readLiterals(int nbLits) {
         // parse clause
         _buflen_lits = 0;
-        int nbLits = 0;
-        while (nbRemaining > 0) {
+        for (int i = 0; i < nbLits; i++) {
             const int lit = TrustedUtils::readInt(_input);
-            nbRemaining--;
-            if (lit == 0) break;
             if (MALLOB_UNLIKELY(_buflen_lits >= _bufcap_lits)) {
                 // buffer exceeded - reallocate
                 _bufcap_lits *= 2;
                 _buf_lits = (int*) realloc(_buf_lits, _bufcap_lits * sizeof(int));
             }
             _buf_lits[_buflen_lits++] = lit;
-            nbLits++;
         }
-        return nbLits;
     }
 
-    inline int readHints(int& nbRemaining) {
+    inline void readHints(int nbHints) {
         _buflen_hints = 0;
-        int nbHints = 0;
-        while (nbRemaining >= 2) {
+        for (int i = 0; i < nbHints; i++) {
             const u64 hint = TrustedUtils::readUnsignedLong(_input);
-            nbRemaining -= 2;
             if (MALLOB_UNLIKELY(_buflen_hints >= _bufcap_hints)) {
                 // buffer exceeded - reallocate
                 _bufcap_hints *= 2;
                 _buf_hints = (u64*) realloc(_buf_hints, _bufcap_hints * sizeof(u64));
             }
             _buf_hints[_buflen_hints++] = hint;
-            nbHints++;
         }
-        return nbHints;
     }
 };
