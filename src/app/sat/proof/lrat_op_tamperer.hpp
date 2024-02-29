@@ -16,13 +16,19 @@ public:
 
     void tamper(LratOp& op) {
         std::vector<std::function<void(LratOp&)>> manipulators;
-        manipulators.push_back([&](LratOp& op) {manipulateRandomLiteral(op);});
-        manipulators.push_back([&](LratOp& op) {manipulateRandomHint(op);});
-        manipulators.push_back([&](LratOp& op) {injectRandomLiteral(op);});
-        manipulators.push_back([&](LratOp& op) {injectRandomHint(op);});
-        if (op.getNbLits() > 0) manipulators.push_back([&](LratOp& op) {dropRandomLiteral(op);});
-        if (op.getNbHints() > 0) manipulators.push_back([&](LratOp& op) {dropRandomNonFinalHint(op);});
-        if (op.getNbHints() > 0) manipulators.push_back([&](LratOp& op) {dropFinalHint(op);});
+        if (op.isDerivation()) {
+            manipulators.push_back([&](LratOp& op) {manipulateRandomLiteral(op);});
+            manipulators.push_back([&](LratOp& op) {manipulateRandomHint(op);});
+            manipulators.push_back([&](LratOp& op) {injectRandomLiteral(op);});
+            manipulators.push_back([&](LratOp& op) {injectRandomHint(op);});
+            if (op.getNbLits() > 0) manipulators.push_back([&](LratOp& op) {dropRandomLiteral(op);});
+            if (op.getNbHints() > 0) manipulators.push_back([&](LratOp& op) {dropRandomNonFinalHint(op);});
+            if (op.getNbHints() > 0) manipulators.push_back([&](LratOp& op) {dropFinalHint(op);});
+        }
+        if (op.isImport()) {
+            manipulators.push_back([&](LratOp& op) {manipulateRandomImportLiteral(op);});
+            manipulators.push_back([&](LratOp& op) {manipulateImportSignature(op);});
+        }
         Random::choice(manipulators)(op);
     }
 
@@ -75,5 +81,18 @@ private:
         u64& hint = Random::choice(op.getHints(), op.getNbHints());
         u64 mask = 1 << (int) (Random::rand() * 32);
         hint ^= mask;
+    }
+
+    void manipulateRandomImportLiteral(LratOp& op) {
+        LOGGER(_logger, V2_INFO, "TAMPERING with import %lu: manipulating random lit\n", op.getId());
+        int& lit = Random::choice(op.getLits(), op.getNbLits());
+        int mask = 1 << (int) (Random::rand() * 16);
+        lit ^= mask;
+    }
+    void manipulateImportSignature(LratOp& op) {
+        LOGGER(_logger, V2_INFO, "TAMPERING with import %lu: flipping random signature bit\n", op.getId());
+        u8* sig = op.signature();
+        u8 pos = (u8) (8 * SIG_SIZE_BYTES * Random::rand());
+        sig[pos / 8] ^= 1 << (pos % 8);
     }
 };

@@ -99,6 +99,7 @@ struct LratOp {
     u64* getHints() {return (u64*) (data + 2*sizeof(int) + sizeof(u64) + getNbLits()*sizeof(int));}
     const u64* getHints() const {return (u64*) (data + 2*sizeof(int) + sizeof(u64) + getNbLits()*sizeof(int));}
     const u8* getSignature() const {return (u8*) getHints();}
+    u8* signature() {return (u8*) getHints();}
     int getGlue() const {return *(int*) (data + datalen - sizeof(int));}
     int& glue() {return *(int*) (data + datalen - sizeof(int));}
 

@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
     int rankOfParent = config.mpirank;
     TmpDir::init(rankOfParent);
 
-    Random::init(config.mpisize, rankOfParent);
+    Random::init(params.seed(), rankOfParent);
 
     ProcessWideThreadPool::init(1);
 

@@ -98,6 +98,12 @@ public:
                 }
             }
         }
+        if (MALLOB_UNLIKELY(op.isImport() && _tampering_chance_per_mille > 0)) {
+            if (1000*Random::rand() <= _tampering_chance_per_mille) {
+                // Tampering with this import!
+                LratOpTamperer(_logger).tamper(op);
+            }
+        }
         _ringbuf.pushBlocking(op);
     }
     bool waitForValidation() {
