@@ -40,7 +40,7 @@ public:
         Parameters params;
         params.formulaInput.set(source);
         params.fifoParsedFormula.set(pathParsedFormula);
-        _subproc = new Subprocess(params, "trusted_parser_process");
+        _subproc = new Subprocess(params, "impcheck_parse");
         _child_pid = _subproc->start();
 
         _f_parsed_formula = fopen(pathParsedFormula.c_str(), "r");

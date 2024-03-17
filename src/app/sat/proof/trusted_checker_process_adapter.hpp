@@ -35,6 +35,7 @@ private:
 
     const int _solver_id;
     const int _nb_vars;
+    const bool _check_model;
 
     // buffering
     int _buf_lits[TRUSTED_CHK_MAX_BUF_SIZE];
@@ -45,9 +46,9 @@ private:
     std::vector<int> _model;
 
 public:
-    TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars) :
-            _logger(logger), _solver_id(solverId), _nb_vars(nbVars), _op_queue(1<<14) {
-    }
+    TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars, bool checkModel) :
+            _logger(logger), _solver_id(solverId), _nb_vars(nbVars), _op_queue(1<<14),
+            _check_model(checkModel) {}
 
     ~TrustedCheckerProcessAdapter() {
         if (!_f_directives) return;
@@ -74,7 +75,7 @@ public:
         Parameters params;
         params.fifoDirectives.set(_path_directives);
         params.fifoFeedback.set(_path_feedback);
-        _subproc = new Subprocess(params, "trusted_checker_process");
+        _subproc = new Subprocess(params, "impcheck_check", _check_model ? "-check-model" : "");
         _child_pid = _subproc->start();
 
         _f_directives = fopen(_path_directives.c_str(), "w");

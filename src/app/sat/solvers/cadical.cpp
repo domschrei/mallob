@@ -28,7 +28,9 @@ Cadical::Cadical(const SolverSetup& setup)
 		  fetchLearnedClause(c, GenericClauseStore::ANY);
 		  return c;
 	  }),
-	  _lrat(_setup.onTheFlyChecking ? new LratConnector(_logger, _setup.localId, _setup.numVars) : nullptr) {
+	  _lrat(_setup.onTheFlyChecking ? new LratConnector(
+		_logger, _setup.localId, _setup.numVars, _setup.onTheFlyCheckModel
+	  ) : nullptr) {
 
 	solver->connect_terminator(&terminator);
 	solver->connect_learn_source(&learnSource);
@@ -190,7 +192,7 @@ SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 	case 0:
 		return UNKNOWN;
 	case 10:
-		if (_lrat) {
+		if (_lrat && _setup.onTheFlyCheckModel) {
 			std::vector<int> model(getVariablesCount());
 			for (int v = 1; v <= getVariablesCount(); v++) {
 				model[v-1] = solver->val(v);

@@ -48,8 +48,9 @@ private:
     float _tampering_chance_per_mille {0};
 
 public:
-    LratConnector(Logger& logger, int localId, int nbVars) : _logger(logger), _local_id(localId), _ringbuf(1<<14),
-        _checker(logger, _local_id, nbVars) {}
+    LratConnector(Logger& logger, int localId, int nbVars, bool checkModel) :
+        _logger(logger), _local_id(localId), _ringbuf(1<<14),
+        _checker(logger, _local_id, nbVars, checkModel) {}
 
     inline auto& getChecker() {
         return _checker;

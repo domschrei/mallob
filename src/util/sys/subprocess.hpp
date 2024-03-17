@@ -30,9 +30,15 @@ class Subprocess {
 private:
     const Parameters& _params;
     const std::string _cmd;
+    const std::string _additional_args;
 
 public:
-    Subprocess(const Parameters& params, const std::string& cmd) : _params(params), _cmd(cmd) {
+    Subprocess(const Parameters& params, const std::string& cmd) :
+            _params(params), _cmd(cmd) {
+        assert(!_cmd.empty());
+    }
+    Subprocess(const Parameters& params, const std::string& cmd, const std::string& additionalArgs) :
+            _params(params), _cmd(cmd), _additional_args(additionalArgs) {
         assert(!_cmd.empty());
     }
 
@@ -58,8 +64,9 @@ public:
         if (_cmd[0] == '/') executable = _cmd;
         else executable = std::string(MALLOB_SUBPROC_DISPATCH_PATH) + _cmd;
         //char* const* argv = _params.asCArgs(executable.c_str());
-        std::string command = _params.getSubprocCommandAsString(executable.c_str());
-        
+        std::string command = _params.getSubprocCommandAsString(executable.c_str()) + " ";
+        if (!_additional_args.empty()) command += _additional_args + " ";
+
         // Write command to tmp file (to be read by child process)
         const std::string commandOutfile = TmpDir::get() + "/mallob_subproc_cmd_" + std::to_string(res);
         int retval = mkfifo(commandOutfile.c_str(), 0666);

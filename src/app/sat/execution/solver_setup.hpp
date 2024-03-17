@@ -75,6 +75,8 @@ struct SolverSetup {
 	bool certifiedUnsat;
 	// This solver's proof information is checked on-the-fly.
 	bool onTheFlyChecking;
+	// If on-the-fly checking is enabled: this solver also seeks to have a found satisfying assignment checked.
+	bool onTheFlyCheckModel;
 	// This solver is NOT allowed to participate in UNSAT solving by exporting clauses or reporting UNSAT,
 	// usually because it does not emit proof information while other solvers do.
 	bool avoidUnsatParticipation;

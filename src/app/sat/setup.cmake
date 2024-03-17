@@ -36,18 +36,15 @@ target_include_directories(mallob_sat_process PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob_sat_process PRIVATE ${BASE_COMPILEFLAGS})
 target_link_libraries(mallob_sat_process mallob_commons)
 
-if(MALLOB_BUILD_CPP_TRUSTED_MODULES)
-    # Executable of SAT trusted checking instance
-    add_executable(trusted_checker_process ${TRUSTED_SOURCES} src/app/sat/proof/trusted/trusted_checker_process.cpp)
-    target_include_directories(trusted_checker_process PRIVATE src/util/tsl)
-    target_compile_options(trusted_checker_process PRIVATE ${BASE_COMPILEFLAGS})
-    #target_link_libraries(trusted_checker_process mallob_commons)
-
-    # Executable of SAT trusted parser instance
-    add_executable(trusted_parser_process ${TRUSTED_SOURCES} src/app/sat/proof/trusted/trusted_parser_process.cpp)
+if(MALLOB_BUILD_LRAT_MODULES)
+    # Executable of SAT trusted checking instance (deprecated in favor of github.com/domschrei/impcheck)
+    #add_executable(trusted_checker_process ${TRUSTED_SOURCES} src/app/sat/proof/trusted/trusted_checker_process.cpp)
     #target_include_directories(trusted_checker_process PRIVATE src/util/tsl)
-    target_compile_options(trusted_checker_process PRIVATE ${BASE_COMPILEFLAGS})
-    #target_link_libraries(trusted_checker_process mallob_commons)
+    #target_compile_options(trusted_checker_process PRIVATE ${BASE_COMPILEFLAGS})
+
+    # Executable of SAT trusted parser instance (deprecated in favor of github.com/domschrei/impcheck)
+    #add_executable(trusted_parser_process ${TRUSTED_SOURCES} src/app/sat/proof/trusted/trusted_parser_process.cpp)
+    #target_compile_options(trusted_checker_process PRIVATE ${BASE_COMPILEFLAGS})
 
     # Executable of standalone LRAT checker
     add_executable(standalone_lrat_checker ${SAT_SOURCES} src/app/sat/proof/standalone_checker.cpp)
