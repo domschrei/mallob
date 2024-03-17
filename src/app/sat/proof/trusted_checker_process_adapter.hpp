@@ -42,6 +42,7 @@ private:
     SPSCBlockingRingbuffer<LratOp> _op_queue;
 
     bool _error_reported {false};
+    std::vector<int> _model;
 
 public:
     TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars) :
@@ -116,7 +117,8 @@ public:
         if (type == LratOp::DERIVATION) submitProduceClause(op.getId(), op.getLits(), op.getNbLits(), op.getHints(), op.getNbHints(), op.getGlue() > 0);
         else if (type == LratOp::IMPORT) submitImportClause(op.getId(), op.getLits(), op.getNbLits(), op.getSignature());
         else if (type == LratOp::DELETION) submitDeleteClauses(op.getHints(), op.getNbHints());
-        else if (type == LratOp::VALIDATION) submitValidateUnsat();
+        else if (type == LratOp::VALIDATION_UNSAT) submitValidateUnsat();
+        else if (type == LratOp::VALIDATION_SAT) submitValidateSat();
         else if (type == LratOp::TERMINATION) submitTerminate();
         _op_queue.pushBlocking(op);
     }
@@ -128,7 +130,8 @@ public:
         if (type == LratOp::DERIVATION) res = acceptProduceClause(sig, op.getGlue() > 0);
         else if (type == LratOp::IMPORT) res = acceptImportClause();
         else if (type == LratOp::DELETION) res = acceptDeleteClauses();
-        else if (type == LratOp::VALIDATION) res = acceptValidateUnsat();
+        else if (type == LratOp::VALIDATION_UNSAT) res = acceptValidateUnsat();
+        else if (type == LratOp::VALIDATION_SAT) res = acceptValidateSat();
         else if (type == LratOp::TERMINATION) res = acceptTerminate();
         return true;
     }
@@ -143,6 +146,10 @@ public:
 
     bool isSubprocessRunning() {
         return _child_pid != -1 && !Process::didChildExit(_child_pid);
+    }
+
+    void setModel(std::vector<int>&& model) {
+        _model = std::move(model);
     }
 
 private:
@@ -205,7 +212,7 @@ private:
     }
 
     inline void submitValidateUnsat() {
-        writeDirectiveType(TRUSTED_CHK_VALIDATE);
+        writeDirectiveType(TRUSTED_CHK_VALIDATE_UNSAT);
         UNLOCKED_IO(fflush)(_f_directives);
     }
     inline bool acceptValidateUnsat() {
@@ -217,6 +224,25 @@ private:
         TrustedUtils::readSignature(sig, _f_feedback);
         auto str = Logger::dataToHexStr(sig, SIG_SIZE_BYTES);
         LOGGER(_logger, V2_INFO, "TRUSTED checker reported UNSAT - sig %s\n", str.c_str());
+        return true;
+    }
+
+    inline void submitValidateSat() {
+        writeDirectiveType(TRUSTED_CHK_VALIDATE_SAT);
+        // write model
+        TrustedUtils::writeInt(_model.size(), _f_directives);
+        TrustedUtils::writeInts(_model.data(), _model.size(), _f_directives);
+        UNLOCKED_IO(fflush)(_f_directives);
+    }
+    inline bool acceptValidateSat() {
+        if (!awaitResponse()) {
+            handleError("SAT NOT valid");
+            return false;
+        }
+        signature sig;
+        TrustedUtils::readSignature(sig, _f_feedback);
+        auto str = Logger::dataToHexStr(sig, SIG_SIZE_BYTES);
+        LOGGER(_logger, V2_INFO, "TRUSTED checker reported SAT - sig %s\n", str.c_str());
         return true;
     }
 

@@ -35,6 +35,7 @@ private:
 
     bool _launched {false};
     bool _unsat_validated {false};
+    bool _sat_validated {false};
 
     // buffering
     static constexpr int MAX_CLAUSE_LENGTH {512};
@@ -106,9 +107,16 @@ public:
         }
         _ringbuf.pushBlocking(op);
     }
-    bool waitForValidation() {
+    void setSolution(std::vector<int>&& model) {
+        _checker.setModel(std::move(model));
+    }
+    bool waitForUnsatValidation() {
         while (!_unsat_validated) usleep(1000);
         return _unsat_validated;
+    }
+    bool waitForSatValidation() {
+        while (!_sat_validated) usleep(1000);
+        return _sat_validated;
     }
 
     void stop() {
@@ -189,6 +197,8 @@ private:
                 }
             } else if (op.isUnsatValidation()) {
                 _unsat_validated = true;
+            } else if (op.isSatValidation()) {
+                _sat_validated = true;
             } else if (op.isTermination()) {
                 break; // end
             }

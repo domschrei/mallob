@@ -190,12 +190,23 @@ SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 	case 0:
 		return UNKNOWN;
 	case 10:
+		if (_lrat) {
+			std::vector<int> model(getVariablesCount());
+			for (int v = 1; v <= getVariablesCount(); v++) {
+				model[v-1] = solver->val(v);
+			}
+			_lrat->setSolution(std::move(model));
+			LOGGER(_logger, V4_VVER, "waiting for SAT validation ...\n");
+			_lrat->push(LratOp(10));
+			bool ok = _lrat->waitForSatValidation();
+			return ok ? SAT : UNKNOWN;
+		}
 		return SAT;
 	case 20:
 		if (_lrat) {
 			LOGGER(_logger, V4_VVER, "waiting for UNSAT validation ...\n");
 			_lrat->push(LratOp(20));
-			bool ok = _lrat->waitForValidation();
+			bool ok = _lrat->waitForUnsatValidation();
 			return ok ? UNSAT : UNKNOWN;
 		}
 		return UNSAT;

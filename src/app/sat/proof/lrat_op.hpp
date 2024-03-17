@@ -80,12 +80,22 @@ struct LratOp {
     bool isDerivation() const {return getType() == DERIVATION;}
     bool isImport() const {return getType() == IMPORT;}
     bool isDeletion() const {return getType() == DELETION;}
-    bool isUnsatValidation() const {return getType() == VALIDATION;}
+    bool isUnsatValidation() const {return getType() == VALIDATION_UNSAT;}
+    bool isSatValidation() const {return getType() == VALIDATION_SAT;}
     bool isTermination() const {return getType() == TERMINATION;}
 
-    enum Type {DERIVATION, IMPORT, DELETION, VALIDATION, TERMINATION};
+    enum Type {DERIVATION, IMPORT, DELETION, VALIDATION_SAT, VALIDATION_UNSAT, TERMINATION};
     Type getType() const {
-        if (datalen == 1) return data[0] == 0 ? TERMINATION : VALIDATION;
+        if (datalen == 1) {
+            switch (data[0]) {
+            case 0:
+                return TERMINATION;
+            case 10:
+                return VALIDATION_SAT;
+            case 20:
+                return VALIDATION_UNSAT;
+            }
+        }
         if (getId() == 0) return DELETION;
         if (getGlue() < 0) return IMPORT;
         return DERIVATION;
