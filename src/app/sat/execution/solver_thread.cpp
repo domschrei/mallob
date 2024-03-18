@@ -362,21 +362,21 @@ void SolverThread::reportResult(int res, int revision) {
     if (res == 0 || _found_result) return;
     const char* resultString = res==SAT?"SAT":"UNSAT";
 
-    auto lock = _state_mutex.getLock();
+    {
+        auto lock = _state_mutex.getLock();
 
-    if (revision != _latest_revision) {
-        LOGGER(_logger, V4_VVER, "discard obsolete result %s for rev. %i\n", resultString, revision);
-        return;
+        if (revision != _latest_revision) {
+            LOGGER(_logger, V4_VVER, "discard obsolete result %s for rev. %i\n", resultString, revision);
+            return;
+        }
+
+        if (res == RESULT_UNSAT && _solver.getSolverSetup().avoidUnsatParticipation) {
+            LOGGER(_logger, V4_VVER, "ignore uncertified UNSAT result\n");
+            _terminated = true;
+            return;
+        }
     }
 
-    if (res == RESULT_UNSAT && _solver.getSolverSetup().avoidUnsatParticipation) {
-        LOGGER(_logger, V4_VVER, "ignore uncertified UNSAT result\n");
-        _terminated = true;
-        return;
-    }
-
-    _result.result = SatResult(res);
-    _result.revision = revision;
     if (res == SAT) {
         auto solution = _solver.getSolution();
         auto lrat = _solver.getSolverSetup().modelCheckingLratConnector;
@@ -389,6 +389,7 @@ void SolverThread::reportResult(int res, int revision) {
             } // else: another solver reported SAT earlier. Wait indefinitely
             lrat->waitForSatValidation();
         }
+        _state_mutex.lock();
         _result.setSolutionToSerialize(solution.data(), solution.size());
     } else {
         if (_lrat) {
@@ -398,8 +399,11 @@ void SolverThread::reportResult(int res, int revision) {
         }
         auto failed = _solver.getFailedAssumptions();
         auto failedVec = std::vector<int>(failed.begin(), failed.end());
+        _state_mutex.lock();
         _result.setSolutionToSerialize(failedVec.data(), failedVec.size());
     }
+    _result.result = SatResult(res);
+    _result.revision = revision;
     LOGGER(_logger, V3_VERB, "found result %s for rev. %i\n", resultString, revision);
 
     // If necessary, convert solution back to original variable domain
@@ -423,6 +427,7 @@ void SolverThread::reportResult(int res, int revision) {
 
     _found_result = true;
     _solver.setFoundResult();
+    _state_mutex.unlock();
 }
 
 SolverThread::~SolverThread() {
