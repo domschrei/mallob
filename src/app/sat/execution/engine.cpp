@@ -186,6 +186,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.numOriginalClauses = numClauses;
 	setup.proofDir = proofDirectory;
 	setup.sigFormula = appConfig.map["__SIG"];
+	LratConnector* modelCheckingLratConnector {nullptr};
 
 	// Instantiate solvers according to the global solver IDs and diversification indices
 	int cyclePos = begunCyclePos;
@@ -217,12 +218,15 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		setup.doIncrementalSolving = setup.isJobIncremental && item.incremental;
 		setup.certifiedUnsat = item.outputProof && (params.proofOutputFile.isSet() || params.onTheFlyChecking());
 		setup.onTheFlyChecking = setup.certifiedUnsat && params.onTheFlyChecking();
-		setup.onTheFlyCheckModel = params.onTheFlyCheckModel();
+		setup.onTheFlyCheckModel = params.onTheFlyChecking() && params.onTheFlyCheckModel();
+		setup.modelCheckingLratConnector = modelCheckingLratConnector;
 		setup.avoidUnsatParticipation = (params.proofOutputFile.isSet() || params.onTheFlyChecking()) && !item.outputProof;
 		setup.exportClauses = !setup.avoidUnsatParticipation;
 
 		_solver_interfaces.push_back(createSolver(setup));
 		cyclePos = (cyclePos+1) % portfolio.cycle.size();
+		auto mclc = _solver_interfaces.back()->getSolverSetup().modelCheckingLratConnector;
+		if (mclc) modelCheckingLratConnector = mclc;
 	}
 
 	_sharing_manager.reset(new SharingManager(_solver_interfaces, _params, _logger, 

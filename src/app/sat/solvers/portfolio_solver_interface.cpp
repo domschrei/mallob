@@ -12,6 +12,7 @@
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
+#include "app/sat/proof/lrat_connector.hpp"
 
 #include "portfolio_solver_interface.hpp"
 
@@ -56,6 +57,33 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 	_global_name = "<h-" + _job_name + "_S" + std::to_string(_global_id) + ">";
 	_stats.histProduced = new ClauseHistogram(setup.strictMaxLitsPerClause+ClauseMetadata::numInts());
 	_stats.histDigested = new ClauseHistogram(setup.strictMaxLitsPerClause+ClauseMetadata::numInts());
+
+	// Is on-the-fly checking generally enabled?
+	if (_setup.onTheFlyChecking || _setup.onTheFlyCheckModel) {
+		// Yes. Is this the thread that needs to create *the* model-checking LRAT connector?
+		bool createModelCheckingLratConn = _setup.onTheFlyCheckModel && !_setup.modelCheckingLratConnector;
+		// Does this thread in particular run in certified UNSAT mode?
+		if (_setup.onTheFlyChecking) {
+			// Yes: ALWAYS create your own LRAT connector. Have it support checking of models
+			// ONLY IF desired and there is no pre-created LRATConnector instance for this purpose.
+			LOGGER(_logger, V3_VERB, "Creating full LratConnector%s\n", createModelCheckingLratConn?" with checking models":"");
+			_lrat = new LratConnector(_logger, _setup.localId, _setup.numVars,
+				createModelCheckingLratConn
+			);
+			if (createModelCheckingLratConn) _setup.modelCheckingLratConnector = _lrat;
+		} else {
+			// No: only create a model-checking LRATConnector if it is not precreated yet.
+			if (createModelCheckingLratConn) {
+				LOGGER(_logger, V3_VERB, "Creating dedicated LratConnector for checking models\n");
+				_setup.modelCheckingLratConnector = new LratConnector(
+					_logger, _setup.localId, _setup.numVars, true
+				);
+				_setup.owningModelCheckingLratConnector = true;
+			}
+		}
+		// if (createModelCheckingLratConn), the next solvers on this process will be given
+		// the LRATConnector that was just created, for the purpose of checking any found model.
+	}
 
 	LOGGER(_logger, V4_VVER, "Diversification index %i\n", getDiversificationIndex());
 

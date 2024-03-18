@@ -7,6 +7,8 @@
 #include "util/logger.hpp"
 #include "util/random.hpp"
 
+class LratConnector; // fwd
+
 struct SolverSetup {
 
 
@@ -77,6 +79,10 @@ struct SolverSetup {
 	bool onTheFlyChecking;
 	// If on-the-fly checking is enabled: this solver also seeks to have a found satisfying assignment checked.
 	bool onTheFlyCheckModel;
+	// If non-null, use this LratConnector instance for checking a model;
+	// if null && onTheFlyCheckModel, then *create* a model-checking LRAT connector instance yourself (also to use for others).
+	LratConnector* modelCheckingLratConnector {nullptr};
+	bool owningModelCheckingLratConnector {false};
 	// This solver is NOT allowed to participate in UNSAT solving by exporting clauses or reporting UNSAT,
 	// usually because it does not emit proof information while other solvers do.
 	bool avoidUnsatParticipation;

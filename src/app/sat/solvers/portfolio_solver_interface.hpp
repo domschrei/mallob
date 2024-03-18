@@ -30,6 +30,7 @@ class PortfolioSolverInterface {
 protected:
 	Logger _logger;
 	SolverSetup _setup;
+	LratConnector* _lrat;
 
 // ************** INTERFACE TO IMPLEMENT **************
 
@@ -82,8 +83,6 @@ public:
 
 	virtual bool supportsIncrementalSat() = 0;
 	virtual bool exportsConditionalClauses() = 0;
-
-	virtual LratConnector* getLratConnector() {return nullptr;};
 
 	virtual void cleanUp() = 0;
 
@@ -180,6 +179,10 @@ public:
 	void setCallbackResultFound(std::function<void(int)> cb) {_cb_result_found = cb;}
 	void setFoundResult() {
 		_cb_result_found(_local_id);
+	}
+
+	LratConnector* getLratConnector() {
+		return _lrat;
 	}
 
 private:

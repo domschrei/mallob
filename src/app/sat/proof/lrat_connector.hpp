@@ -108,8 +108,8 @@ public:
         }
         _ringbuf.pushBlocking(op);
     }
-    void setSolution(std::vector<int>&& model) {
-        _checker.setModel(std::move(model));
+    bool setSolution(const int* modelData, size_t modelSize) {
+        return _checker.setModel(modelData, modelSize);
     }
     bool waitForUnsatValidation() {
         while (!_unsat_validated) usleep(1000);

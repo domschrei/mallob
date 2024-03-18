@@ -20,6 +20,7 @@
 #include "util/sys/process.hpp"
 #include "util/sys/subprocess.hpp"
 #include "util/sys/terminator.hpp"
+#include "util/sys/threading.hpp"
 #include "util/sys/tmpdir.hpp"
 
 class TrustedCheckerProcessAdapter {
@@ -44,6 +45,7 @@ private:
 
     bool _error_reported {false};
     std::vector<int> _model;
+    Mutex _mtx_model;
 
 public:
     TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars, bool checkModel) :
@@ -149,8 +151,11 @@ public:
         return _child_pid != -1 && !Process::didChildExit(_child_pid);
     }
 
-    void setModel(std::vector<int>&& model) {
-        _model = std::move(model);
+    bool setModel(const int* modelData, size_t modelSize) {
+        auto lock = _mtx_model.getLock();
+        if (!_model.empty()) return false;
+        _model = std::vector(modelData, modelData + modelSize);
+        return true;
     }
 
 private:

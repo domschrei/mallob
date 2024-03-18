@@ -38,7 +38,6 @@ private:
 	bool seedSet = false;
 
 	std::string proofFileString;
-	std::unique_ptr<LratConnector> _lrat;
 
 public:
 	Cadical(const SolverSetup& setup);
@@ -77,10 +76,6 @@ public:
 
 	bool supportsIncrementalSat() override {return true;}
 	bool exportsConditionalClauses() override {return false;}
-
-	LratConnector* getLratConnector() override {
-		return _lrat.get();
-	}
 
 	void cleanUp() override;
 };

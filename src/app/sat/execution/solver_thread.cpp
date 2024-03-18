@@ -5,6 +5,7 @@
 
 #include "solver_thread.hpp"
 #include "engine.hpp"
+#include "util/logger.hpp"
 #include "util/random.hpp"
 #include "util/sys/proc.hpp"
 #include "util/hashing.hpp"
@@ -50,7 +51,7 @@ void SolverThread::init() {
     _active_revision = 0;
     _imported_lits_curr_revision = 0;
 
-    if (_lrat) {
+    if (_lrat || _solver.getSolverSetup().owningModelCheckingLratConnector) {
         // Convert hex string back to byte array
         signature target;
         {
@@ -66,7 +67,9 @@ void SolverThread::init() {
                 src += 2;
             }
         }
-        _lrat->getChecker().init(target);
+        if (_lrat) _lrat->getChecker().init(target);
+        if (_solver.getSolverSetup().owningModelCheckingLratConnector)
+            _solver.getSolverSetup().modelCheckingLratConnector->getChecker().init(target);
     }
 
     _initialized = true;
@@ -138,6 +141,8 @@ bool SolverThread::readFormula() {
 
         // Forward raw formula data to LRAT connector
         if (_lrat) _lrat->launch(fParser->getRawPayload(), fParser->getPayloadSize());
+        if (_solver.getSolverSetup().owningModelCheckingLratConnector)
+            _solver.getSolverSetup().modelCheckingLratConnector->launch(fParser->getRawPayload(), fParser->getPayloadSize());
 
         LOGGER(_logger, V4_VVER, "Reading rev. %i, start %i\n", (int)_active_revision, (int)_imported_lits_curr_revision);
         
@@ -370,17 +375,32 @@ void SolverThread::reportResult(int res, int revision) {
         return;
     }
 
-    LOGGER(_logger, V3_VERB, "found result %s for rev. %i\n", resultString, revision);
     _result.result = SatResult(res);
     _result.revision = revision;
-    if (res == SAT) { 
+    if (res == SAT) {
         auto solution = _solver.getSolution();
+        auto lrat = _solver.getSolverSetup().modelCheckingLratConnector;
+        if (lrat) {
+            LOGGER(_logger, V3_VERB, "Validating SAT ...\n");
+            // omit first "0" in solution vector
+            if (lrat->setSolution(solution.data()+1, solution.size()-1)) {
+                // solution accepted
+                lrat->push({10});
+            } // else: another solver reported SAT earlier. Wait indefinitely
+            lrat->waitForSatValidation();
+        }
         _result.setSolutionToSerialize(solution.data(), solution.size());
     } else {
+        if (_lrat) {
+            LOGGER(_logger, V3_VERB, "Validating UNSAT ...\n");
+            _lrat->push({20});
+            _lrat->waitForUnsatValidation();
+        }
         auto failed = _solver.getFailedAssumptions();
         auto failedVec = std::vector<int>(failed.begin(), failed.end());
         _result.setSolutionToSerialize(failedVec.data(), failedVec.size());
     }
+    LOGGER(_logger, V3_VERB, "found result %s for rev. %i\n", resultString, revision);
 
     // If necessary, convert solution back to original variable domain
     if (!_vt.getExtraVariables().empty()) {

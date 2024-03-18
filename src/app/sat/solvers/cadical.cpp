@@ -27,10 +27,7 @@ Cadical::Cadical(const SolverSetup& setup)
 		  Mallob::Clause c;
 		  fetchLearnedClause(c, GenericClauseStore::ANY);
 		  return c;
-	  }),
-	  _lrat(_setup.onTheFlyChecking ? new LratConnector(
-		_logger, _setup.localId, _setup.numVars, _setup.onTheFlyCheckModel
-	  ) : nullptr) {
+	  }) {
 
 	solver->connect_terminator(&terminator);
 	solver->connect_learn_source(&learnSource);
@@ -192,25 +189,8 @@ SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 	case 0:
 		return UNKNOWN;
 	case 10:
-		if (_lrat && _setup.onTheFlyCheckModel) {
-			std::vector<int> model(getVariablesCount());
-			for (int v = 1; v <= getVariablesCount(); v++) {
-				model[v-1] = solver->val(v);
-			}
-			_lrat->setSolution(std::move(model));
-			LOGGER(_logger, V4_VVER, "waiting for SAT validation ...\n");
-			_lrat->push(LratOp(10));
-			bool ok = _lrat->waitForSatValidation();
-			return ok ? SAT : UNKNOWN;
-		}
 		return SAT;
 	case 20:
-		if (_lrat) {
-			LOGGER(_logger, V4_VVER, "waiting for UNSAT validation ...\n");
-			_lrat->push(LratOp(20));
-			bool ok = _lrat->waitForUnsatValidation();
-			return ok ? UNSAT : UNKNOWN;
-		}
 		return UNSAT;
 	default:
 		return UNKNOWN;
@@ -235,11 +215,10 @@ void Cadical::unsetSolverSuspend() {
 }
 
 std::vector<int> Cadical::getSolution() {
-	std::vector<int> result = {0};
-
+	std::vector<int> result(1+getVariablesCount());
+	result[0] = 0;
 	for (int i = 1; i <= getVariablesCount(); i++)
-		result.push_back(solver->val(i));
-
+		result[i] = solver->val(i);
 	return result;
 }
 
