@@ -131,7 +131,14 @@ void Lingeling::diversify(int seed) {
 	// This portfolio is based on Plingeling (mix of ayv and bcj)
 	lglsetopt(solver, "classify", 0);
 	if (_setup.diversifyNative) {
-		switch (rank % numDiversifications) {
+		if (_setup.flavour == PortfolioSequence::SAT) {
+			// sat preset: just run YalSAT
+			lglsetopt (solver, "plain", rank % 2 == 0);
+			lglsetopt (solver, "locs", -1);
+			lglsetopt (solver, "locsrtc", 1);
+			lglsetopt (solver, "locswait", 0);
+			lglsetopt (solver, "locsclim", (1<<24));
+		} else switch (rank % numDiversifications) {
 			case 0: lglsetopt (solver, "gluescale", 5); break; // from 3 (value "ld" moved)
 			case 1: 
 				lglsetopt (solver, "plain", 1);

@@ -120,7 +120,7 @@ void Cadical::diversify(int seed) {
 
 	if (_setup.diversifyNative) {
 		if (_setup.flavour == PortfolioSequence::SAT) {
-			switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
+			switch (getDiversificationIndex() % 3) {
 			case 0: okay = solver->configure("sat"); break;
 			case 1: /*default configuration*/ break;
 			case 2: okay = solver->set("inprocessing", 0); break;
