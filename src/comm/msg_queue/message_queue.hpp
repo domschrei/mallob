@@ -89,6 +89,7 @@ public:
     void advance();
 
     bool hasOpenSends();
+    bool hasOpenRecvFragments();
 
 private:
     void runFragmentedMessageAssembler();

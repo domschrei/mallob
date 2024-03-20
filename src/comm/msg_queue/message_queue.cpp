@@ -39,7 +39,7 @@ MessageQueue::~MessageQueue() {
         h.cancel();
     }
     // Advance until all send handles have been processed
-    while (hasOpenSends()) advance();
+    while (hasOpenSends() || hasOpenRecvFragments()) advance();
     // Stop background threads
     _batch_assembler.stop();
     _gc.stop();
@@ -127,6 +127,10 @@ void MessageQueue::advance() {
 
 bool MessageQueue::hasOpenSends() {
     return !_send_queue.empty();
+}
+
+bool MessageQueue::hasOpenRecvFragments() {
+    return !_fragmented_messages.empty();
 }
 
 void MessageQueue::runFragmentedMessageAssembler() {

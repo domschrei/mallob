@@ -123,7 +123,7 @@ void Lingeling::diversify(int seed) {
 	lglsetopt(solver, "seed", seed);
 	int rank = getDiversificationIndex();
 
-	if (_setup.flavour != PortfolioSequence::DEFAULT) {
+	if (_setup.flavour == PortfolioSequence::UNSAT) {
 		LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");
 		_setup.flavour = PortfolioSequence::DEFAULT;
 	}

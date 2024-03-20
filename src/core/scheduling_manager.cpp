@@ -1256,15 +1256,20 @@ SchedulingManager::~SchedulingManager() {
         watchdog.reset();
     }
 
-    // Empty destruct queue into garbage for janitor to clean up
-    while (_job_registry.hasJobsLeftToDelete()) {
-        MyMpi::getMessageQueue().advance();
+    // Empty destruct queue into garbage for janitor to clean up.
+    // We also need to make sure that any remaining open sends
+    // and fragmented receives are completed before returning
+    // (otherwise we might prevent another node from terminating).
+    auto& q = MyMpi::getMessageQueue();
+    while (_job_registry.hasJobsLeftToDelete() || q.hasOpenSends() || q.hasOpenRecvFragments()) {
+        q.advance();
         checkOldJobs();
         forgetOldJobs();
         //_janitor_cond_var.notify(); // TODO needed?
         watchdog.reset();
         usleep(10*1000); // 10 milliseconds
     }
+    LOG(V4_VVER, "all jobs deleted\n");
 
     watchdog.stop();
 }
