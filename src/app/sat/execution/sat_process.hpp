@@ -19,6 +19,7 @@
 #include "util/sys/proc.hpp"
 #include "data/checksum.hpp"
 #include "util/sys/terminator.hpp"
+#include "app/sat/job/clause_pipe.hpp"
 
 #include "engine.hpp"
 #include "../job/sat_shared_memory.hpp"
@@ -32,10 +33,6 @@ private:
 
     std::string _shmem_id;
     SatSharedMemory* _hsm;
-    int* _export_buffer;
-    int* _import_buffer;
-    int* _filter_buffer;
-    int* _returned_buffer;
 
     int _last_imported_revision;
     int _desired_revision;
@@ -75,22 +72,18 @@ private:
 
         SatEngine engine(_params, _config, _log);
 
+        // Set up pipe communication for clause sharing
+        BiDirectionalPipe pipe(BiDirectionalPipe::ACCESS,
+            TmpDir::get()+_shmem_id+".fromsub.pipe",
+            TmpDir::get()+_shmem_id+".tosub.pipe");
+        pipe.open();
+        LOGGER(_log, V4_VVER, "Pipes set up\n");
+
         // Wait until everything is prepared for the solver to begin
         while (!_hsm->doBegin) doSleep();
         
         // Terminate directly?
         if (checkTerminate(engine, false)) return;
-
-        // Set up export and import buffers for clause exchanges
-        {
-            int maxExportBufferSize = _hsm->exportBufferAllocatedSize * sizeof(int);
-            _export_buffer = (int*) accessMemory(_shmem_id + ".clauseexport", maxExportBufferSize);
-            int maxImportBufferSize = _hsm->importBufferMaxSize * sizeof(int);
-            _import_buffer = (int*) accessMemory(_shmem_id + ".clauseimport", maxImportBufferSize);
-            int maxFilterSize = _hsm->importBufferMaxSize/8 + 1;
-            _filter_buffer = (int*) accessMemory(_shmem_id + ".clausefilter", maxFilterSize);
-            _returned_buffer = (int*) accessMemory(_shmem_id + ".returnedclauses", maxImportBufferSize);
-        }
 
         // Import first revision
         _desired_revision = _config.firstrev;
@@ -99,7 +92,6 @@ private:
         // Import subsequent revisions
         importRevisions(engine);
         if (checkTerminate(engine, false)) return;
-        engine.setAllocatedSharingBufferSize(_hsm->exportBufferAllocatedSize);
         
         // Start solver threads
         engine.solve();
@@ -111,6 +103,8 @@ private:
         int lastSolvedRevision = -1;
 
         int exitStatus = 0;
+
+        std::vector<int> incomingClauses;
 
         // Main loop
         while (true) {
@@ -165,11 +159,10 @@ private:
                 // Collect local clauses, put into shared memory
                 _hsm->exportChecksum = Checksum();
                 _hsm->successfulSolverId = -1;
-                assert(_hsm->exportBufferMaxSize >= 0 && _hsm->exportBufferMaxSize < 1048576);
-                _hsm->exportBufferTrueSize = engine.prepareSharing(_export_buffer, _hsm->exportBufferMaxSize, _hsm->successfulSolverId, _hsm->numCollectedLits);
-                if (_hsm->exportBufferTrueSize != -1) {
-                    assert(_hsm->exportBufferTrueSize <= _hsm->exportBufferAllocatedSize);
+                auto clauses = engine.prepareSharing(_hsm->exportLiteralLimit, _hsm->successfulSolverId, _hsm->numCollectedLits);
+                if (!clauses.empty()) {
                     _hsm->didExport = true;
+                    pipe.writeData(clauses);
                 }
             }
             if (!_hsm->doExport) _hsm->didExport = false;
@@ -178,8 +171,10 @@ private:
             if (_hsm->doFilterImport && !_hsm->didFilterImport) {
                 LOGGER(_log, V5_DEBG, "DO filter clauses\n");
                 int winningSolverId = _hsm->winningSolverId;
-                _hsm->filterSize = engine.filterSharing(_import_buffer, _hsm->importBufferSize, _filter_buffer);
+                incomingClauses = pipe.readData();
+                auto filter = engine.filterSharing(incomingClauses);
                 _hsm->didFilterImport = true;
+                pipe.writeData(filter);
                 if (winningSolverId >= 0) {
                     LOGGER(_log, V4_VVER, "winning solver ID: %i", winningSolverId);
                     engine.setWinningSolverId(winningSolverId);
@@ -192,12 +187,12 @@ private:
                     && !_hsm->didDigestImport && _hsm->importBufferRevision <= _last_imported_revision) {
                 LOGGER(_log, V5_DEBG, "DO import clauses\n");
                 // Write imported clauses from shared memory into vector
-                assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
                 engine.setClauseBufferRevision(_hsm->importBufferRevision);
                 if (_hsm->doDigestImportWithFilter) {
-                    engine.digestSharingWithFilter(_import_buffer, _hsm->importBufferSize, _filter_buffer);
+                    auto filter = pipe.readData();
+                    engine.digestSharingWithFilter(incomingClauses, filter);
                 } else {
-                    engine.digestSharingWithoutFilter(_import_buffer, _hsm->importBufferSize);
+                    engine.digestSharingWithoutFilter(incomingClauses);
                 }
                 engine.addSharingEpoch(_hsm->importEpoch);
                 engine.syncDeterministicSolvingAndCheckForLocalWinner();
@@ -210,7 +205,8 @@ private:
             // Re-insert returned clauses into the local clause database to be exported later
             if (_hsm->doReturnClauses && !_hsm->didReturnClauses) {
                 LOGGER(_log, V5_DEBG, "DO return clauses\n");
-                engine.returnClauses(_returned_buffer, _hsm->returnedBufferSize);
+                auto clauses = pipe.readData();
+                engine.returnClauses(clauses);
                 _hsm->didReturnClauses = true;
             }
             if (!_hsm->doReturnClauses) _hsm->didReturnClauses = false;
@@ -218,8 +214,9 @@ private:
             if (_hsm->doDigestHistoricClauses && !_hsm->didDigestHistoricClauses) {
                 LOGGER(_log, V5_DEBG, "DO digest historic clauses\n");
                 engine.setClauseBufferRevision(_hsm->importBufferRevision);
+                auto clauses = pipe.readData();
                 engine.digestHistoricClauses(_hsm->historicEpochBegin, _hsm->historicEpochEnd, 
-                    _import_buffer, _hsm->importBufferSize);
+                    clauses);
                 _hsm->didDigestHistoricClauses = true;
             }
             if (!_hsm->doDigestHistoricClauses) _hsm->didDigestHistoricClauses = false;

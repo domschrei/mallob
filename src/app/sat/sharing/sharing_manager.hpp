@@ -57,7 +57,6 @@ protected:
 	int _last_num_cls_to_import = 0;
 	int _last_num_admitted_cls_to_import = 0;
 	int _last_num_admitted_lits_to_import = 0;
-	int _allocated_sharing_buffer_size {-1};
 
 	ClauseHistogram _hist_produced;
 	ClauseHistogram _hist_returned_to_db;
@@ -92,14 +91,13 @@ public:
 			int jobIndex);
 	~SharingManager();
 
-	void setAllocatedSharingBufferSize(int allocatedSize) {_allocated_sharing_buffer_size = allocatedSize;}
 	void addSharingEpoch(int epoch) {_digested_epochs.insert(epoch);}
-    int prepareSharing(int* begin, int totalLiteralLimit, int& successfulSolverId, int& numLits);
-	int filterSharing(int* begin, int buflen, int* filterOut);
-	void digestSharingWithFilter(int* begin, int buflen, const int* filter);
-    void digestSharingWithoutFilter(int* begin, int buflen);
-	void returnClauses(int* begin, int buflen);
-	void digestHistoricClauses(int epochBegin, int epochEnd, int* begin, int buflen);
+	std::vector<int> prepareSharing(int totalLiteralLimit, int& outSuccessfulSolverId, int& outNbLits);
+	std::vector<int> filterSharing(std::vector<int>& clauseBuf);
+	void digestSharingWithFilter(std::vector<int>& clauseBuf, std::vector<int>* filter);
+	void digestSharingWithoutFilter(std::vector<int>& clauseBuf);
+	void returnClauses(std::vector<int>& clauseBuf);
+	void digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauseBuf);
 	void collectGarbageInFilter();
 
 	void setWinningSolverId(int globalId);
@@ -129,7 +127,7 @@ public:
 
 private:
 
-	void applyFilterToBuffer(int* begin, int& buflen, const int* filter);
+	void applyFilterToBuffer(std::vector<int>& clauseBuf, std::vector<int>* filter);
 
 	void onProduceClause(int solverId, int solverRevision, const Mallob::Clause& clause, int condVarOrZero, bool recursiveCall = false);
 

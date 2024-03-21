@@ -4,7 +4,6 @@
 #include "app/app_message_subscription.hpp"
 #include "app/app_registry.hpp"
 #include "job/forked_sat_job.hpp"
-#include "job/threaded_sat_job.hpp"
 #include "parse/sat_reader.hpp"
 
 void register_mallob_app_sat() {
@@ -15,11 +14,7 @@ void register_mallob_app_sat() {
         },
         // Job creator
         [](const Parameters& params, const Job::JobSetup& setup, AppMessageTable& table) -> Job* {
-            if (params.applicationSpawnMode() == "fork") {
-                return new ForkedSatJob(params, setup, table);
-            } else {
-                return new ThreadedSatJob(params, setup, table);
-            }
+            return new ForkedSatJob(params, setup, table);
         },
         // Job solution formatter
         [](const JobResult& result) {

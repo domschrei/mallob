@@ -13,6 +13,7 @@
 #include "data/checksum.hpp"
 #include "util/sys/background_worker.hpp"
 #include "data/job_result.hpp"
+#include "app/sat/job/clause_pipe.hpp"
 
 class ForkedSatJob; // fwd
 class AnytimeSatClauseCommunicator;
@@ -62,6 +63,8 @@ private:
     std::string _shmem_id;
     SatSharedMemory* _hsm = nullptr;
 
+    std::unique_ptr<BiDirectionalPipe> _pipe;
+
     volatile bool _running = false;
     volatile bool _initialized = false;
     volatile bool _terminate = false;
@@ -69,11 +72,6 @@ private:
 
     std::future<void> _bg_initializer;
     std::future<void> _bg_writer;
-
-    int* _export_buffer;
-    int* _import_buffer;
-    int* _filter_buffer;
-    int* _returned_buffer;
 
     struct BufferTask {
         enum Type {

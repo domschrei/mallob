@@ -11,7 +11,7 @@
 
 #include "app/sat/proof/lrat_op.hpp"
 #include "trusted/trusted_utils.hpp"
-#include "trusted/trusted_checker_process.hpp"
+#include "trusted/trusted_checker_defs.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
 #include "util/spsc_blocking_ringbuffer.hpp"

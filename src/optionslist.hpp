@@ -92,7 +92,6 @@ OPTION_GROUP(grpSchedulingMapping, "scheduling/mapping", "Options for mapping wo
 OPTION_GROUP(grpJob, "job", "Global configuration of jobs")
  OPT_FLOAT(appCommPeriod,                 "s", "app-comm-period",                      1,    0, LARGE_INT,      "Do job-internal communication every t seconds") 
  OPT_STRING(applicationConfiguration,     "app-config", "",                            "",                      "Application configuration: structured as (-key=value;)*")
- OPT_STRING(applicationSpawnMode,         "appmode", "app-spawn-mode",                 "fork",                  "Application mode: \"fork\" (spawn child process for each job on each MPI process) or \"thread\" (execute jobs in separate threads but within the same process)")
  OPT_BOOL(continuousGrowth,               "cg", "continuous-growth",                   true,                    "Continuous growth of job demands")
  OPT_FLOAT(growthPeriod,                  "g", "growth-period",                        0,    0, LARGE_INT,      "Grow job demand exponentially every t seconds (0: immediate full growth)" )
  OPT_BOOL(jitterJobPriorities,            "jjp", "jitter-job-priorities",              false,                   "Jitter job priorities to break ties during rebalancing")

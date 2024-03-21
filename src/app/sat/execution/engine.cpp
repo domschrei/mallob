@@ -395,10 +395,6 @@ int SatEngine::solveLoop() {
     return -1; // no result yet
 }
 
-void SatEngine::setAllocatedSharingBufferSize(int allocatedSize) {
-	_sharing_manager->setAllocatedSharingBufferSize(allocatedSize);
-}
-
 bool SatEngine::isReadyToPrepareSharing() const {
 	// If certified UNSAT is enabled, no sharing operation can be ongoing
 	// (otherwise, this op must be finished first, for clause ID consistency)
@@ -410,16 +406,15 @@ void SatEngine::setClauseBufferRevision(int revision) {
 	_sharing_manager->setImportedRevision(revision);
 }
 
-int SatEngine::prepareSharing(int* begin, int maxSize, int& successfulSolverId, int& numLits) {
-	if (isCleanedUp()) return sizeof(size_t) / sizeof(int); // checksum, nothing else
+std::vector<int> SatEngine::prepareSharing(int literalLimit, int& outSuccessfulSolverId, int& outNbLits) {
+	if (isCleanedUp()) return std::vector<int>(2); // checksum, nothing else
 	LOGGER(_logger, V5_DEBG, "collecting clauses on this node\n");
-	int size = _sharing_manager->prepareSharing(begin, maxSize, successfulSolverId, numLits);
-	return size;
+	return _sharing_manager->prepareSharing(literalLimit, outSuccessfulSolverId, outNbLits);
 }
 
-int SatEngine::filterSharing(int* begin, int size, int* filterOut) {
-	if (isCleanedUp()) return 0;
-	return _sharing_manager->filterSharing(begin, size, filterOut);
+std::vector<int> SatEngine::filterSharing(std::vector<int>& clauseBuf) {
+	if (isCleanedUp()) return std::vector<int>();
+	return _sharing_manager->filterSharing(clauseBuf);
 }
 
 void SatEngine::addSharingEpoch(int epoch) {
@@ -427,24 +422,24 @@ void SatEngine::addSharingEpoch(int epoch) {
 	_sharing_manager->addSharingEpoch(epoch);
 }
 
-void SatEngine::digestSharingWithFilter(int* begin, int size, const int* filter) {
+void SatEngine::digestSharingWithFilter(std::vector<int>& clauseBuf, std::vector<int>& filter) {
 	if (isCleanedUp()) return;
-	_sharing_manager->digestSharingWithFilter(begin, size, filter);
+	_sharing_manager->digestSharingWithFilter(clauseBuf, &filter);
 }
 
-void SatEngine::digestSharingWithoutFilter(int* begin, int size) {
+void SatEngine::digestSharingWithoutFilter(std::vector<int>& clauseBuf) {
 	if (isCleanedUp()) return;
-	_sharing_manager->digestSharingWithoutFilter(begin, size);
+	_sharing_manager->digestSharingWithoutFilter(clauseBuf);
 }
 
-void SatEngine::returnClauses(int* begin, int size) {
+void SatEngine::returnClauses(std::vector<int>& clauseBuf) {
 	if (isCleanedUp()) return;
-	_sharing_manager->returnClauses(begin, size);
+	_sharing_manager->returnClauses(clauseBuf);
 }
 
-void SatEngine::digestHistoricClauses(int epochBegin, int epochEnd, int* begin, int size) {
+void SatEngine::digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauseBuf) {
 	if (isCleanedUp()) return;
-	_sharing_manager->digestHistoricClauses(epochBegin, epochEnd, begin, size);
+	_sharing_manager->digestHistoricClauses(epochBegin, epochEnd, clauseBuf);
 }
 
 void SatEngine::syncDeterministicSolvingAndCheckForLocalWinner() {

@@ -55,7 +55,7 @@ public:
 		_last_exported_clause_id[solverId]->store(clauseId, std::memory_order_relaxed);
     }
 
-    void contributeFirstClauseIdOfEpoch(int* bufferPositionOut) {
+    unsigned long contributeFirstClauseIdOfEpoch() {
         // Proceed with the next epoch.
 		// Find max. first clause ID
 		unsigned long maxFirstIdOfEpoch = 0;
@@ -74,8 +74,7 @@ public:
 			LOGGER(_logger, V5_DEBG, "EPOCH %i instance=%i prioroffset=%lu lastprodid=%lu startid=%lu\n", _min_epoch_ids_per_solver[i].size()-1, 
 				_solvers[i]->getGlobalId(), _id_offsets_per_solver[i].back(), clauseIdCounter, _min_epoch_ids_per_solver[i].back());
 		}
-
-		ClauseMetadata::writeUnsignedLong(maxFirstIdOfEpoch, bufferPositionOut);
+        return maxFirstIdOfEpoch;
     }
 
     void beginNextEpoch(const int* bufferWithMaxFirstIdOfEpoch) {

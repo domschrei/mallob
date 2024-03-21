@@ -56,22 +56,21 @@ public:
 
 	void solve();
 	void setClauseBufferRevision(int revision);
-    void appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits, 
+	void appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits, 
 		bool lastRevisionForNow = true);
 
 	bool isFullyInitialized();
-    int solveLoop();
+	int solveLoop();
 	JobResult& getResult() {return _result;}
 
-	void setAllocatedSharingBufferSize(int allocatedSize);
 	bool isReadyToPrepareSharing() const;
-    int prepareSharing(int* begin, int maxSize, int& successfulSolverId, int& numLits);
-	int filterSharing(int* begin, int size, int* filterOut);
+	std::vector<int> prepareSharing(int literalLimit, int& outSuccessfulSolverId, int& outNbLits);
+	std::vector<int> filterSharing(std::vector<int>& clauseBuf);
 	void addSharingEpoch(int epoch);
-	void digestSharingWithFilter(int* begin, int size, const int* filter);
-	void digestSharingWithoutFilter(int* begin, int size);
-	void returnClauses(int* begin, int size);
-	void digestHistoricClauses(int epochBegin, int epochEnd, int* begin, int size);
+	void digestSharingWithFilter(std::vector<int>& clauseBuf, std::vector<int>& filter);
+	void digestSharingWithoutFilter(std::vector<int>& clauseBuf);
+	void returnClauses(std::vector<int>& clauseBuf);
+	void digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauseBuf);
 
 	struct LastAdmittedStats {
 		int nbAdmittedCls;

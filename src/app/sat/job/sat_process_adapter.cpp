@@ -19,7 +19,6 @@
 #include "util/sys/timer.hpp"
 #include "util/sys/process.hpp"
 #include "util/logger.hpp"
-#include "comm/mympi.hpp"
 #include "forked_sat_job.hpp"
 #include "anytime_sat_clause_communicator.hpp"
 #include "util/sys/thread_pool.hpp"
@@ -100,24 +99,14 @@ void SatProcessAdapter::doInitialize() {
     _hsm->config = _config;
     _sum_of_revision_sizes += _f_size;
 
-    // Allocate import and export buffers
-    _hsm->exportBufferAllocatedSize = (2+ClauseMetadata::numInts()) * _params.maxSharingCompensationFactor() * _params.clauseBufferBaseSize() + 1024;
-    _hsm->importBufferMaxSize = (2+ClauseMetadata::numInts()) * _params.maxSharingCompensationFactor() * MyMpi::getBinaryTreeBufferLimit(
-        _hsm->config.mpisize, _params.clauseBufferBaseSize(), _params.clauseBufferLimitParam(),
-        MyMpi::BufferQueryMode(_params.clauseBufferLimitMode())
-    ) + 1024;
-    _export_buffer = (int*) createSharedMemoryBlock("clauseexport", 
-            sizeof(int)*_hsm->exportBufferAllocatedSize, nullptr);
-    _import_buffer = (int*) createSharedMemoryBlock("clauseimport", 
-            sizeof(int)*_hsm->importBufferMaxSize, nullptr);
-    _filter_buffer = (int*) createSharedMemoryBlock("clausefilter", 
-            _hsm->importBufferMaxSize/8 + 1, nullptr);
-    _returned_buffer = (int*) createSharedMemoryBlock("returnedclauses",
-            sizeof(int)*_hsm->importBufferMaxSize, nullptr);
-
     // Allocate shared memory for formula, assumptions of initial revision
     createSharedMemoryBlock("formulae.0", sizeof(int) * _f_size, (void*)_f_lits);
     createSharedMemoryBlock("assumptions.0", sizeof(int) * _a_size, (void*)_a_lits);
+
+    // Set up bi-directional pipe to and from the subprocess
+    _pipe.reset(new BiDirectionalPipe(BiDirectionalPipe::CREATE,
+        TmpDir::get()+_shmem_id+".tosub.pipe",
+        TmpDir::get()+_shmem_id+".fromsub.pipe"));
 
     if (_terminate) return;
 
@@ -128,6 +117,7 @@ void SatProcessAdapter::doInitialize() {
     {
         auto lock = _state_mutex.getLock();
         _initialized = true;
+        _pipe->open();
         _hsm->doBegin = true;
         _child_pid = res;
         _state = SolvingStates::ACTIVE;
@@ -181,7 +171,7 @@ void SatProcessAdapter::doTerminateInitializedProcess() {
 void SatProcessAdapter::collectClauses(int maxSize) {
     if (!_initialized) return;
     if (_hsm->doExport || _hsm->didExport) return;
-    _hsm->exportBufferMaxSize = maxSize;
+    _hsm->exportLiteralLimit = maxSize;
     _hsm->doExport = true;
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
@@ -190,8 +180,7 @@ bool SatProcessAdapter::hasCollectedClauses() {
 }
 std::vector<int> SatProcessAdapter::getCollectedClauses(int& successfulSolverId, int& numLits) {
     if (!_initialized || !hasCollectedClauses()) return std::vector<int>();
-    assert(_hsm->exportBufferTrueSize <= _hsm->exportBufferAllocatedSize);
-    std::vector<int> clauses(_export_buffer, _export_buffer+_hsm->exportBufferTrueSize);
+    std::vector<int> clauses = _pipe->readData();
     successfulSolverId = _hsm->successfulSolverId;
     numLits = _hsm->numCollectedLits;
     _hsm->doExport = false;
@@ -212,45 +201,37 @@ bool SatProcessAdapter::process(BufferTask& task) {
     auto& buffer = task.payload;
     if (task.type == BufferTask::FILTER_CLAUSES) {
         InplaceClauseAggregation agg(buffer);
-        _hsm->importBufferSize = buffer.size() - InplaceClauseAggregation::numMetadataInts();
         _hsm->importBufferRevision = _clause_buffer_revision;
         _epoch_of_export_buffer = task.epoch;
-        assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
-        memcpy(_import_buffer, buffer.data(), _hsm->importBufferSize*sizeof(int));
         _hsm->winningSolverId = agg.successfulSolver();
         assert(_hsm->winningSolverId >= -1);
         _hsm->doFilterImport = true;
+        _pipe->writeData(buffer.data(), buffer.size() - InplaceClauseAggregation::numMetadataInts());
         _epochs_to_filter.erase(task.epoch);
 
     } else if (task.type == BufferTask::APPLY_FILTER) {
         if (_epoch_of_export_buffer == task.epoch) {
-            memcpy(_filter_buffer, buffer.data(), buffer.size()*sizeof(int));
             _hsm->importEpoch = task.epoch;
             _hsm->doDigestImportWithFilter = true;
+            _pipe->writeData(buffer);
         } // else: discard this filter since the clauses are not present in any buffer
 
     } else if (task.type == BufferTask::RETURN_CLAUSES) {
-        _hsm->returnedBufferSize = buffer.size();
-        memcpy(_returned_buffer, buffer.data(),
-            std::min((size_t)_hsm->importBufferMaxSize, buffer.size()) * sizeof(int));
         _hsm->doReturnClauses = true;
+        _pipe->writeData(buffer);
 
     } else if (task.type == BufferTask::DIGEST_CLAUSES_WITHOUT_FILTER) {
-        _hsm->importBufferSize = buffer.size() - InplaceClauseAggregation::numMetadataInts();
         _hsm->importBufferRevision = _clause_buffer_revision;
         _hsm->importEpoch = task.epoch;
-        assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
-        memcpy(_import_buffer, buffer.data(), _hsm->importBufferSize*sizeof(int));
         _hsm->doDigestImportWithoutFilter = true;
+        _pipe->writeData(buffer.data(), buffer.size() - InplaceClauseAggregation::numMetadataInts());
 
     } else if (task.type == BufferTask::DIGEST_HISTORIC_CLAUSES) {
         _hsm->historicEpochBegin = task.epoch;
         _hsm->historicEpochEnd = task.epochEnd;
-        _hsm->importBufferSize = buffer.size();
         _hsm->importBufferRevision = _clause_buffer_revision;
-        assert(_hsm->importBufferSize <= _hsm->importBufferMaxSize);
-        memcpy(_import_buffer, buffer.data(), buffer.size()*sizeof(int));
         _hsm->doDigestHistoricClauses = true;
+        _pipe->writeData(buffer);
     }
 
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
@@ -283,8 +264,7 @@ bool SatProcessAdapter::hasFilteredClauses(int epoch) {
 std::vector<int> SatProcessAdapter::getLocalFilter(int epoch) {
     std::vector<int> filter;
     if (_initialized && _hsm->doFilterImport && _hsm->didFilterImport) {
-        filter.resize(_hsm->filterSize);
-        memcpy(filter.data(), _filter_buffer, _hsm->filterSize*sizeof(int));
+        filter = _pipe->readData();
         _hsm->doFilterImport = false;
         assert(filter.size() >= ClauseMetadata::enabled() ? 2 : 0);
         if (_epoch_of_export_buffer != epoch)

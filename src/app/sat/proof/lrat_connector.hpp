@@ -9,7 +9,6 @@
 
 #include "app/sat/data/clause.hpp"
 #include "app/sat/proof/lrat_op_tamperer.hpp"
-#include "app/sat/proof/trusted/trusted_solving.hpp"
 #include "app/sat/proof/trusted_checker_process_adapter.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
 #include "trusted/trusted_utils.hpp"

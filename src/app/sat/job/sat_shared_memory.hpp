@@ -51,12 +51,8 @@ struct SatSharedMemory {
     unsigned long globalStartOfSuccessEpoch;
     
     // Clause buffers: parent->child
-    int exportBufferAllocatedSize;
-    int exportBufferMaxSize {0};
-    int importBufferMaxSize;
-    int importBufferSize {0};
+    int exportLiteralLimit;
     int importBufferRevision {-1};
-    int returnedBufferSize;
     Checksum importChecksum;
     int importEpoch;
     int historicEpochBegin;
@@ -65,9 +61,7 @@ struct SatSharedMemory {
     int numCollectedLits {0};
     
     // Clause buffers: child->parent
-    int exportBufferTrueSize {0};
     Checksum exportChecksum;
-    int filterSize;
     SatEngine::LastAdmittedStats lastAdmittedStats;
     int successfulSolverId {-1};
 };

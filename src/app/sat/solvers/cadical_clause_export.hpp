@@ -72,7 +72,7 @@ public:
 				memcpy(_current_clause.begin+2, signatureData, signatureSize);
 			}
 		}
-		LOG(V5_DEBG, "EXPORT ID=%ld len=%i %s\n", id,
+		LOG(V6_DEBGV, "EXPORT ID=%ld len=%i %s\n", id,
 			_current_clause.size - ClauseMetadata::numInts(), _current_clause.toStr().c_str());
 		assert(_current_clause.size > ClauseMetadata::numInts());
 

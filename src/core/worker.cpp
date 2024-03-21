@@ -221,10 +221,4 @@ Worker::~Worker() {
     Terminator::setTerminating();
 
     LOG(V4_VVER, "Destruct worker\n");
-
-    if (_params.monoFilename.isSet() && _params.applicationSpawnMode() != "fork") {
-        // Terminate directly without destructing resident job
-        MPI_Finalize();
-        Process::doExit(0);
-    }
 }
