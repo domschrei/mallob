@@ -232,19 +232,11 @@ std::set<int> Cadical::getFailedAssumptions() {
 }
 
 void Cadical::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
-	if (_lrat) {
-		_lrat->setLearnedClauseCallback(callback);
-	} else {
-		learner.setCallback(callback);
-		solver->connect_learner(&learner);
-	}
+	learner.setCallback(callback);
+	solver->connect_learner(&learner);
 }
 void Cadical::setProbingLearnedClauseCallback(const ProbingLearnedClauseCallback& callback) {
-	if (_lrat) {
-		_lrat->setProbingLearnedClauseCallback(callback);
-	} else {
-		learner.setProbingCallback(callback);
-	}
+	learner.setProbingCallback(callback);
 }
 
 int Cadical::getVariablesCount() {
@@ -273,6 +265,5 @@ void Cadical::cleanUp() {
 	if (_setup.certifiedUnsat) {
 		LOGGER(_logger, V4_VVER, "Closing proof output asynchronously\n");
 		solver->close_proof_asynchronously ();
-		if (_lrat) _lrat->stop();
 	}
 }

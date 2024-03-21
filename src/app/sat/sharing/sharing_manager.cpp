@@ -114,7 +114,7 @@ SharingManager::SharingManager(
 
 	for (size_t i = 0; i < _solvers.size(); i++) {
 		_solvers[i]->setExtLearnedClauseCallback(callback);
-		_solvers[i]->setProbingLearnedClauseCallback([&](int effectiveClauseLength) {
+		_solvers[i]->setExtProbingLearnedClauseCallback([&](int effectiveClauseLength) {
 			return effectiveClauseLength <= _clause_store->getMaxAdmissibleEffectiveClauseLength();
 		});
 		_solvers[i]->setCallbackResultFound([&](int localId) {

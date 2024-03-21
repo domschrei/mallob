@@ -39,7 +39,7 @@ public:
 	PortfolioSolverInterface(const SolverSetup& setup);
 
     // destructor
-	virtual ~PortfolioSolverInterface() {}
+	virtual ~PortfolioSolverInterface();
 
 	// Get the number of variables of the formula
 	virtual int getVariablesCount() = 0;
@@ -140,6 +140,7 @@ public:
 
 	void setCurrentCondVarOrZero(int condVarOrZero) {_current_cond_var_or_zero = condVarOrZero;}
 	void setExtLearnedClauseCallback(const ExtLearnedClauseCallback& callback);
+	void setExtProbingLearnedClauseCallback(const ProbingLearnedClauseCallback& callback);
 
 	void setCurrentRevision(int revision) {
 		if (_import_manager) _import_manager->updateSolverRevision(revision);

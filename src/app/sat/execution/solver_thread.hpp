@@ -20,10 +20,10 @@
 #include "clause_shuffler.hpp"
 #include "variable_translator.hpp"
 #include "../parse/serialized_formula_parser.hpp"
+#include "app/sat/proof/lrat_connector.hpp"
 
 // Forward declarations
 class SatEngine;
-class LratConnector;
 
 class SolverThread {
 
@@ -95,6 +95,11 @@ public:
         if (cleanUpAsynchronously) {
             while (_thread.joinable() && !_initialized) usleep(1000);
             _solver.cleanUp();
+            // also asynchronously close LRAT pipelines
+            if (_lrat) _lrat->stop();
+            if (_solver.getSolverSetup().owningModelCheckingLratConnector) {
+                _solver.getSolverSetup().modelCheckingLratConnector->stop();
+            }
         }
     }
     void tryJoin() {if (_thread.joinable()) _thread.join();}

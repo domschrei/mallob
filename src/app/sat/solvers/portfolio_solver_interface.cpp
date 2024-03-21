@@ -128,12 +128,19 @@ void PortfolioSolverInterface::setTerminate() {
 }
 
 void PortfolioSolverInterface::setExtLearnedClauseCallback(const ExtLearnedClauseCallback& callback) {
-	setLearnedClauseCallback([callback, this](const Mallob::Clause& c, int solverId) {
+	auto cb = ([callback, this](const Mallob::Clause& c, int solverId) {
 		if (_terminated || !_setup.exportClauses) return;
 		int condVar = _current_cond_var_or_zero;
 		assert(condVar >= 0);
 		callback(c, solverId, getSolverSetup().solverRevision, condVar);
 	});
+	setLearnedClauseCallback(cb);
+	if (_lrat) _lrat->setLearnedClauseCallback(cb);
+}
+
+void PortfolioSolverInterface::setExtProbingLearnedClauseCallback(const ProbingLearnedClauseCallback& callback) {
+	setProbingLearnedClauseCallback(callback);
+	if (_lrat) _lrat->setProbingLearnedClauseCallback(callback);
 }
 
 void PortfolioSolverInterface::addLearnedClause(const Mallob::Clause& c) {
@@ -150,4 +157,9 @@ bool PortfolioSolverInterface::fetchLearnedClause(Mallob::Clause& clauseOut, Gen
 std::vector<int> PortfolioSolverInterface::fetchLearnedUnitClauses() {
 	if (_clause_sharing_disabled) return std::vector<int>();
 	return _import_manager->getUnitsBuffer();
+}
+
+PortfolioSolverInterface::~PortfolioSolverInterface() {
+	if (_lrat) delete _lrat;
+	if (_setup.owningModelCheckingLratConnector) delete _setup.modelCheckingLratConnector;
 }
