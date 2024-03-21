@@ -30,7 +30,7 @@ class PortfolioSolverInterface {
 protected:
 	Logger _logger;
 	SolverSetup _setup;
-	LratConnector* _lrat;
+	LratConnector* _lrat {nullptr};
 
 // ************** INTERFACE TO IMPLEMENT **************
 
