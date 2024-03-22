@@ -35,6 +35,7 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "Employ clause history collection mechanism")
  OPT_BOOL(compensateUnusedSharingVolume,    "cusv", "compensate-unused-sharing-volume",  true,
     "Compensate for unused or filtered parts of clause buffer in the next sharings")
+ OPT_INT(freeClauseLengthLimit, "fcll", "free-clause-length-limit", 1, 0, LARGE_INT, "Max. length of clauses which are considered \"free\" for sharing")
  OPT_BOOL(groupClausesByLengthLbdSum,       "gclls", "group-by-length-lbd-sum",          false,                   
     "Group and prioritize clauses in buffers by the sum of clause length and LBD score")
  OPT_INT(maxLbdPartitioningSize,            "mlbdps", "max-lbd-partition-size",          2,        1,   LARGE_INT,

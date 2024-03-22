@@ -338,8 +338,8 @@ std::vector<int> SharingManager::filterSharing(std::vector<int>& clauseBuf) {
 
 	std::vector<int> result;
 
-	if (_id_alignment) {
-		auto id = _id_alignment->contributeFirstClauseIdOfEpoch();
+	if (ClauseMetadata::enabled()) {
+		auto id = _id_alignment ? _id_alignment->contributeFirstClauseIdOfEpoch() : 0UL;
 		result.resize(sizeof(unsigned long) / sizeof(int));
 		memcpy(result.data(), &id, sizeof(unsigned long));
 	}
@@ -430,7 +430,8 @@ void SharingManager::digestSharingWithFilter(std::vector<int>& clauseBuf, std::v
 		}
 
 		hist.increment(clause.size);
-		_last_num_admitted_lits_to_import += clause.size - ClauseMetadata::numInts();
+		if (clause.size - ClauseMetadata::numInts() > _params.freeClauseLengthLimit())
+			_last_num_admitted_lits_to_import += clause.size - ClauseMetadata::numInts();
 		// bitset of producing solvers
 		auto producers = _clause_filter->confirmSharingAndGetProducers(clause, _internal_epoch);
 

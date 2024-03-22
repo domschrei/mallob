@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cstdint>
 
+#include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/sharing/buffer/buffer_builder.hpp"
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
 #include "app/sat/sharing/store/static_clause_store.hpp"
@@ -10,8 +11,8 @@
 #include "util/random.hpp"
 #include "util/tsl/robin_set.h"
 
-BufferMerger::BufferMerger(int sizeLimit, int maxEffClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum) :
-    _size_limit(sizeLimit), _max_eff_clause_length(maxEffClauseLength), 
+BufferMerger::BufferMerger(int sizeLimit, int maxEffClauseLength, int maxFreeEffClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum) :
+    _size_limit(sizeLimit), _max_eff_clause_length(maxEffClauseLength), _max_free_eff_clause_length(maxFreeEffClauseLength),
     _slots_for_sum_of_length_and_lbd(slotsForSumOfLengthAndLbd), _use_checksum(useChecksum) {}
 
 BufferMerger::BufferMerger(StaticClauseStore<false>* mergeStore, int sizeLimit, int maxEffClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum) :
@@ -49,6 +50,7 @@ std::vector<int> BufferMerger::mergePriorityBased(const Parameters& params, std:
     // Filter duplicates and split output into a main and an excess output
     BufferBuilder mainBuilder(_size_limit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
     BufferBuilder excessBuilder(INT32_MAX, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
+    mainBuilder.setFreeClauseLengthLimit(_max_free_eff_clause_length - ClauseMetadata::numInts());
     tsl::robin_set<Mallob::Clause, Mallob::NonCommutativeClauseHasher, Mallob::SortedClauseExactEquals> mergedClauseSet;
     BufferReader storeOutputReader(storeOutput.data(), storeOutput.size(), _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
     BufferBuilder* currentBuilder = &mainBuilder;
@@ -119,6 +121,7 @@ std::vector<int> BufferMerger::merge(std::vector<int>* excessClauses, SplitMix64
 
     // Setup builders for main buffer and excess clauses buffer
     BufferBuilder mainBuilder(_size_limit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
+    mainBuilder.setFreeClauseLengthLimit(_max_free_eff_clause_length - ClauseMetadata::numInts());
     BufferBuilder* excessBuilder;
     if (excessClauses != nullptr) {
         excessBuilder = new BufferBuilder(_size_limit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);

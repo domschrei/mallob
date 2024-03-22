@@ -4,6 +4,7 @@
 #include <vector>
 #include <list>
 
+#include "app/sat/data/clause.hpp"
 #include "app/sat/data/clause_histogram.hpp"
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
@@ -27,6 +28,7 @@ public:
         _pcb([&]() {
             AdaptiveClauseStore::Setup pcbSetup;
             pcbSetup.maxEffectiveClauseLength = setup.strictMaxLitsPerClause+ClauseMetadata::numInts();
+            pcbSetup.maxFreeEffectiveClauseLength = setup.freeMaxLitsPerClause+ClauseMetadata::numInts();
             pcbSetup.maxLbdPartitionedSize = 2;
             pcbSetup.numLiterals = getLiteralBudget(setup);
             pcbSetup.slotsForSumOfLengthAndLbd = false;
@@ -74,9 +76,8 @@ public:
 
         int numUnits = 0;
         int numLits = 0;
-        std::vector<int> buf;
-        buf = _pcb.exportBuffer(-1, numUnits, numLits, AdaptiveClauseStore::UNITS, /*sortClauses=*/false);
-        assert(numUnits == numLits);
+        std::vector<int> buf = _pcb.exportBuffer(-1, numUnits, numLits, AdaptiveClauseStore::UNITS, /*sortClauses=*/false);
+        assert(numUnits >= numLits);
 
         _plain_units_out = std::vector<int>(buf.data()+(buf.size()-numUnits), buf.data()+buf.size());
         assert(_plain_units_out.size() == numUnits);

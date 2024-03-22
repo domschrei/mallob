@@ -152,6 +152,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.strictLbdLimit = params.strictLbdLimit();
 	setup.qualityMaxLitsPerClause = params.qualityClauseLengthLimit();
 	setup.qualityLbdLimit = params.qualityLbdLimit();
+	setup.freeMaxLitsPerClause = params.freeClauseLengthLimit();
 	setup.clauseBaseBufferSize = params.clauseBufferBaseSize();
 	setup.anticipatedLitsToImportPerCycle = config.maxBroadcastedLitsPerCycle;
 	setup.resetLbdBeforeImport = params.resetLbd() == MALLOB_RESET_LBD_AT_IMPORT;
@@ -552,6 +553,7 @@ void SatEngine::cleanUp(bool hardTermination) {
 		LOGGER(_logger, V4_VVER, "[engine-cleanup] done - hard exit pending\n");
 		return;
 	}
+	_cleaned_up = true;
 	
 	// join and delete threads
 	for (auto& thread : _solver_threads) thread->tryJoin();
@@ -561,7 +563,9 @@ void SatEngine::cleanUp(bool hardTermination) {
 
 	LOGGER(_logger, V5_DEBG, "[engine-cleanup] joined threads\n");
 
-	// delete solvers
+	// delete solvers in reverse order of how they were created
+	for (int i = _solver_interfaces.size()-1; i >= 0; i--)
+		_solver_interfaces[i].reset();
 	_solver_interfaces.clear();
 	LOGGER(_logger, V5_DEBG, "[engine-cleanup] cleared solvers\n");
 
@@ -574,7 +578,6 @@ void SatEngine::cleanUp(bool hardTermination) {
 
 SatEngine::~SatEngine() {
 	if (!_cleaned_up) {
-		_cleaned_up = true;
 		cleanUp();
 	}
 }

@@ -116,8 +116,8 @@ void SatProcessAdapter::doInitialize() {
 
     {
         auto lock = _state_mutex.getLock();
-        _initialized = true;
         _pipe->open();
+        _initialized = true;
         _hsm->doBegin = true;
         _child_pid = res;
         _state = SolvingStates::ACTIVE;

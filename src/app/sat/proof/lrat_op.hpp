@@ -94,6 +94,8 @@ struct LratOp {
                 return VALIDATION_SAT;
             case 20:
                 return VALIDATION_UNSAT;
+            default:
+                abort();
             }
         }
         if (getId() == 0) return DELETION;

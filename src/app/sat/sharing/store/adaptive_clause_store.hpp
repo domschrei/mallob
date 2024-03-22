@@ -24,7 +24,7 @@ private:
     std::vector<std::unique_ptr<ClauseSlot>> _slots;
     std::atomic_int _free_budget {0};
     const int UNIT_SLOT_MAX_BUDGET {std::numeric_limits<int>::max() - 1024};
-    std::atomic_int _unit_slot_budget {UNIT_SLOT_MAX_BUDGET};
+    std::atomic_int _infinite_budget {UNIT_SLOT_MAX_BUDGET};
 
     std::atomic_int _max_admissible_slot_idx;
 
@@ -33,6 +33,7 @@ private:
 
     int _max_lbd_partitioned_size;
     int _max_eff_clause_length;
+    int _max_free_eff_clause_length;
     bool _slots_for_sum_of_length_and_lbd;
 
     bool _use_checksum;
@@ -46,6 +47,7 @@ public:
     struct Setup {
         int numLiterals = 1000;
         int maxEffectiveClauseLength = 20;
+        int maxFreeEffectiveClauseLength = 1;
         int maxLbdPartitionedSize = 2;
         bool useChecksums = false;
         bool slotsForSumOfLengthAndLbd = false;
@@ -57,6 +59,7 @@ public:
         _total_literal_limit(setup.numLiterals),
         _max_lbd_partitioned_size(setup.maxLbdPartitionedSize),
         _max_eff_clause_length(setup.maxEffectiveClauseLength),
+        _max_free_eff_clause_length(setup.maxFreeEffectiveClauseLength),
         _slots_for_sum_of_length_and_lbd(setup.slotsForSumOfLengthAndLbd),
         _use_checksum(setup.useChecksums),
         _bucket_iterator(setup.slotsForSumOfLengthAndLbd ? 
@@ -94,7 +97,7 @@ public:
                 if (!_size_lbd_to_slot_idx_mode.count(representantKey)) {
                     // Create new slot
                     int slotIdx = _slots.size();
-                    _slots.emplace_back(new ClauseSlot(clauseLength == 1 ? _unit_slot_budget : _free_budget, 
+                    _slots.emplace_back(new ClauseSlot(clauseLength <= _max_free_eff_clause_length ? _infinite_budget : _free_budget, 
                         slotIdx, clauseLength, opMode == SAME_SIZE_AND_LBD ? lbd : 0));
                     if (_slots.size() > 1) _slots.back()->setLeftNeighbor(_slots[_slots.size()-2].get());
                     _size_lbd_to_slot_idx_mode[representantKey] = std::pair<int, ClauseSlotMode>(slotIdx, opMode);
@@ -196,6 +199,7 @@ public:
             std::function<void(int*)> clauseDataConverter = [](int*){}) override {
 
         BufferBuilder builder(sizeLimit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
+        builder.setFreeClauseLengthLimit(_max_free_eff_clause_length);
 
         if (mode != NONUNITS) {
             _slots[0]->flushAndShrink(builder, clauseDataConverter);
@@ -231,7 +235,7 @@ public:
     }
 
     BufferMerger getBufferMerger(int sizeLimit) const {
-        return BufferMerger(sizeLimit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd, _use_checksum);
+        return BufferMerger(sizeLimit, _max_eff_clause_length, 0, _slots_for_sum_of_length_and_lbd, _use_checksum);
     }
 
     BufferBuilder getBufferBuilder(std::vector<int>* out, int totalLiteralLimit = -1) const {
@@ -245,7 +249,7 @@ public:
         return (_total_literal_limit - _free_budget.load(std::memory_order_relaxed));
     }
     int getCurrentlyUsedUnitLiterals() const {
-        return (UNIT_SLOT_MAX_BUDGET - _unit_slot_budget.load(std::memory_order_relaxed));
+        return (UNIT_SLOT_MAX_BUDGET - _infinite_budget.load(std::memory_order_relaxed));
     }
     std::string getCurrentlyUsedLiteralsReport() const override {
         std::string out;

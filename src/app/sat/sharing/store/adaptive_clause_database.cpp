@@ -494,7 +494,7 @@ BufferReader AdaptiveClauseDatabase::getBufferReader(int* begin, size_t size, bo
 }
 
 BufferMerger AdaptiveClauseDatabase::getBufferMerger(int sizeLimit) {
-    return BufferMerger(sizeLimit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd, _use_checksum);
+    return BufferMerger(sizeLimit, _max_eff_clause_length, 0, _slots_for_sum_of_length_and_lbd, _use_checksum);
 }
 
 BufferBuilder AdaptiveClauseDatabase::getBufferBuilder(std::vector<int>* out) {

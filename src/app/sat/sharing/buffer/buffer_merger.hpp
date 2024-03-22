@@ -17,6 +17,7 @@ class BufferMerger {
 private:
     int _size_limit;
     int _max_eff_clause_length;
+    int _max_free_eff_clause_length;
     int _slots_for_sum_of_length_and_lbd;
 
     bool _use_checksum;
@@ -40,7 +41,7 @@ private:
     StaticClauseStore<false>* _merge_store {nullptr};
 
 public:
-    BufferMerger(int sizeLimit, int maxEffClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum = false);
+    BufferMerger(int sizeLimit, int maxEffClauseLength, int maxFreeEffClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum = false);
     BufferMerger(StaticClauseStore<false>* mergeStore, int sizeLimit, int maxEffClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum = false);
     void add(BufferReader&& reader);
 

@@ -60,17 +60,23 @@ public:
     }
 
     void run() {
-        mainProgram();
-
-        // Everything has been safely cleaned up, so we can send the terminate response
-        // which allows the parent process to clean up all the shared memory.
-        _hsm->didTerminate = true;
+        SatEngine engine(_params, _config, _log);
+        try {
+            mainProgram(engine);
+            // Everything has been safely cleaned up, so we can send the terminate response
+            // which allows the parent process to clean up all the shared memory.
+            _hsm->didTerminate = true;
+        } catch (const std::exception& ex) {
+            LOG(V0_CRIT, "[ERROR] uncaught \"%s\"\n", ex.what());
+            Process::doExit(1);
+        } catch (...) {
+            LOG(V0_CRIT, "[ERROR] uncaught exception\n");
+            Process::doExit(1);
+        }
     }
 
 private:
-    void mainProgram() {
-
-        SatEngine engine(_params, _config, _log);
+    void mainProgram(SatEngine& engine) {
 
         // Set up pipe communication for clause sharing
         BiDirectionalPipe pipe(BiDirectionalPipe::ACCESS,

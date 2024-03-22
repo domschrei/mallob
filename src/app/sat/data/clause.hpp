@@ -90,7 +90,7 @@ namespace Mallob {
         size_t res = robin_hood::hash_int(size + which);
         for (auto it = begin; it != begin+size; it++) {
             int lit = *it;
-            res ^= robin_hood::hash_int(lit); //* primes[abs((lit^which) & 15)];
+            res ^= robin_hood::hash_int(lit); // * primes[abs((lit^which) & 15)];
         }
         return res;
     }

@@ -248,15 +248,16 @@ private:
         std::vector<int> merged;
         float time = Timer::elapsedSeconds();
         const int maxEffectiveClsLen = _params.strictClauseLengthLimit()+ClauseMetadata::numInts();
+        const int maxFreeEffectiveClsLen = _params.freeClauseLengthLimit()+ClauseMetadata::numInts();
         if (_params.priorityBasedBufferMerging()) {
             StaticClauseStore<false> _merge_store(_params, false, 1000, true, INT32_MAX);
-            auto merger = BufferMerger(&_merge_store, buflim, maxEffectiveClsLen, false);
+            auto merger = BufferMerger(&_merge_store, buflim, maxEffectiveClsLen, maxFreeEffectiveClsLen, false);
             for (auto& elem : elems) {
                 merger.add(BufferReader(elem.data(), elem.size(), maxEffectiveClsLen, false));
             }
             merged = merger.mergePriorityBased(_params, _excess_clauses_from_merge, _rng);
         } else {
-            auto merger = BufferMerger(buflim, maxEffectiveClsLen, false);
+            auto merger = BufferMerger(buflim, maxEffectiveClsLen, maxFreeEffectiveClsLen, false);
             for (auto& elem : elems) {
                 merger.add(BufferReader(elem.data(), elem.size(), maxEffectiveClsLen, false));
             }

@@ -57,6 +57,7 @@ struct SolverSetup {
 	// while others are not. 
 	unsigned int qualityMaxLitsPerClause;
 	unsigned int qualityLbdLimit;
+	unsigned int freeMaxLitsPerClause;
 	size_t clauseBaseBufferSize;
 
 
