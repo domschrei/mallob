@@ -47,7 +47,7 @@ if(MALLOB_BUILD_LRAT_MODULES)
     #target_compile_options(trusted_checker_process PRIVATE ${BASE_COMPILEFLAGS})
 
     # Executable of standalone LRAT checker
-    add_executable(standalone_lrat_checker ${SAT_SOURCES} src/app/sat/proof/standalone_checker.cpp)
+    add_executable(standalone_lrat_checker src/app/sat/proof/standalone_checker.cpp)
     target_include_directories(standalone_lrat_checker PRIVATE ${BASE_INCLUDES})
     target_compile_options(standalone_lrat_checker PRIVATE ${BASE_COMPILEFLAGS})
     target_link_libraries(standalone_lrat_checker mallob_commons)

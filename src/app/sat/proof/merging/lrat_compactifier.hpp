@@ -40,7 +40,8 @@ public:
         _nb_mapped = _nb_original_clauses + 1;
     }
 
-    bool handleClauseAddition(SerializedLratLine& line) {
+    template <typename T>
+    bool handleClauseAddition(T& line) {
         if (_nb_original_clauses == 0) return true; // empty instance: do nothing
 
         // original ID
@@ -71,13 +72,14 @@ public:
         return true;
     }
 
-    bool handleClauseDeletion(int nbHints, LratClauseId* hints) {
+    bool handleClauseDeletion(int& inOutNbHints, LratClauseId* hints) {
         if (_nb_original_clauses == 0) return true; // accept
 
         // walk through all hints, accept the line iff
         // at least one deletion is valid and should be output
         bool hasAcceptedDeletion = !_deduplicate;
-        for (size_t i = 0; i < nbHints; i++) {
+        int newNbHints = inOutNbHints;
+        for (size_t i = 0; i < inOutNbHints; i++) {
             LratClauseId& hint = hints[i];
             if (hint <= _nb_original_clauses) continue;
             auto it = _map.find(hint);
@@ -106,12 +108,16 @@ public:
                 // do NOT delete.
                 hint = 0; // remove hint from this deletion
                 LOG(V6_DEBGV, "COMP RED %lu (%i)\n", hint, nbAliases);
+                newNbHints--;
             }
         }
+        assert(newNbHints >= 0);
+        inOutNbHints = newNbHints;
         return hasAcceptedDeletion;
     }
 
-    bool checkDuplicate(SerializedLratLine& line) {
+    template <typename T>
+    bool checkDuplicate(T& line) {
         if (!_deduplicate) return false;
         auto [lits, size] = line.getLiterals();
 

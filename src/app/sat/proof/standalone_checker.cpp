@@ -2,6 +2,7 @@
 #include "app/job.hpp"
 #include "app/sat/parse/sat_reader.hpp"
 #include "app/sat/proof/lrat_utils.hpp"
+#include "app/sat/proof/merging/lrat_compactifier.hpp"
 #include "app/sat/proof/serialized_lrat_line.hpp"
 #include "app/sat/proof/trusted/lrat_checker.hpp"
 #include "app/sat/proof/trusted/trusted_checker_process.hpp"
@@ -41,11 +42,15 @@ int main(int argc, char** argv) {
     const char* cnfInput = nullptr;
     const char* proofInput = nullptr;
     enum ProofReadMode {NORMAL, REVERSED} proofReadMode = NORMAL;
+    bool deduplicate {false};
 
     for (int i = 1; i < argc; i++) {
         if (TrustedUtils::beginsWith(argv[i], "-reversed")
         || TrustedUtils::beginsWith(argv[i], "--reversed"))
             proofReadMode = REVERSED;
+        else if (TrustedUtils::beginsWith(argv[i], "-deduplicate")
+        || TrustedUtils::beginsWith(argv[i], "--deduplicate"))
+            deduplicate = true;
         else if (!cnfInput) cnfInput = argv[i];
         else if (!proofInput) proofInput = argv[i];
         else {
@@ -104,15 +109,22 @@ int main(int argc, char** argv) {
     unsigned long nbDeletions {0};
     unsigned long liveClauses = reader.getNbClauses();
     unsigned long maxLiveClauses = liveClauses;
+    LratCompactifier compactifier(deduplicate ? liveClauses : 0, deduplicate);
+    unsigned long duplicates {0};
     LratLine line;
     time = Timer::elapsedSeconds();
     bool failureFlag {false};
     while (lrat_utils::readLine(readbuf, line, &failureFlag)) {
         nbLines++;
         if (line.isDeletionStatement()) {
-            nbDeletions += line.hints.size();
+            int nbHints = line.hints.size();
+            if (!compactifier.handleClauseDeletion(nbHints, line.hints.data()))
+                continue;
+            assert(nbHints >= 0);
+            assert(nbHints <= line.hints.size() || log_return_false("[ERROR] %i >= %lu\n", nbHints, line.hints.size()));
+            nbDeletions += nbHints;
             if (liveClauses > maxLiveClauses) maxLiveClauses = liveClauses;
-            liveClauses -= line.hints.size();
+            liveClauses -= nbHints;
             ok = chk.deleteClause(line.hints.data(), line.hints.size());
             if (!ok) {
                 LOG(V0_CRIT, "[ERROR] Problem with clause deletion.\n");
@@ -121,6 +133,10 @@ int main(int argc, char** argv) {
                 exitUnverified();
             }
         } else {
+            if (!compactifier.handleClauseAddition(line)) {
+                duplicates++;
+                continue;
+            }
             nbAdditions++;
             liveClauses++;
             ok = chk.addClause(line.id, line.literals.data(), line.literals.size(), line.hints.data(), line.hints.size());
@@ -138,8 +154,8 @@ int main(int argc, char** argv) {
     }
     time = Timer::elapsedSeconds() - time;
 
-    LOG(V2_INFO, "Done; %lu lines, %lu added cls, %lu deleted cls, %lu bottleneck cls; time %.3f (= %.1f lines/sec)\n",
-        nbLines, nbAdditions, nbDeletions, maxLiveClauses, time, nbLines/std::max(0.0001f, time));
+    LOG(V2_INFO, "Done; %lu lines, %lu added cls, %lu deleted cls, %lu bottleneck cls, %lu duplicates; time %.3f (= %.1f lines/sec)\n",
+        nbLines, nbAdditions, nbDeletions, maxLiveClauses, duplicates, time, nbLines/std::max(0.0001f, time));
     LOG(V2_INFO, "%lu non-deleted clauses remaining\n", liveClauses);
     if (failureFlag) {
         LOG(V0_CRIT, "[ERROR] parsing error in line %i\n", nbLines+1);
