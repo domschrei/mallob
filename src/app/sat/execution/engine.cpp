@@ -557,7 +557,8 @@ void SatEngine::cleanUp(bool hardTermination) {
 		LOGGER(_logger, V4_VVER, "[engine-cleanup] done - hard exit pending\n");
 		return;
 	}
-	
+	_cleaned_up = true;
+
 	// join and delete threads
 	for (auto& thread : _solver_threads) thread->tryJoin();
 	for (auto& thread : _obsolete_solver_threads) thread->tryJoin();
@@ -565,9 +566,9 @@ void SatEngine::cleanUp(bool hardTermination) {
 	_obsolete_solver_threads.clear();
 
 	LOGGER(_logger, V5_DEBG, "[engine-cleanup] joined threads\n");
-
-	// delete solvers
-	_solver_interfaces.clear();
+	// delete solvers in reverse order of how they were created
+	for (int i = _solver_interfaces.size()-1; i >= 0; i--)
+		_solver_interfaces[i].reset();
 	LOGGER(_logger, V5_DEBG, "[engine-cleanup] cleared solvers\n");
 
 	time = Timer::elapsedSeconds() - time;
@@ -579,7 +580,6 @@ void SatEngine::cleanUp(bool hardTermination) {
 
 SatEngine::~SatEngine() {
 	if (!_cleaned_up) {
-		_cleaned_up = true;
 		cleanUp();
 	}
 }
