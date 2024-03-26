@@ -1,15 +1,25 @@
 
 #include "anytime_sat_clause_communicator.hpp"
 
+#include <assert.h>
+#include <string.h>
+#include <algorithm>
+#include <cmath>
+#include <utility>
+
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/job/historic_clause_storage.hpp"
 #include "comm/msgtags.h"
 #include "util/logger.hpp"
 #include "comm/mympi.hpp"
-#include "app/sat/data/clause_comparison.hpp"
-#include "util/sys/thread_pool.hpp"
 #include "clause_sharing_session.hpp"
 #include "base_sat_job.hpp"
+#include "app/job_tree.hpp"
+#include "app/sat/sharing/store/adaptive_clause_database.hpp"
+#include "comm/mpi_base.hpp"
+#include "data/job_state.h"
+#include "util/option.hpp"
+#include "util/sys/timer.hpp"
 
 void advanceCollective(BaseSatJob* job, JobMessage& msg, int broadcastTag) {
     if (job->getJobTree().isRoot() && msg.tag != broadcastTag) {

@@ -1,11 +1,21 @@
 
-#include "app/sat/data/clause_metadata.hpp"
-#include "util/random.hpp"
-#include "util/sys/timer.hpp"
-#include "util/tsl/robin_set.h"
+#include <assert.h>
+#include <bits/std_abs.h>
+#include <stdlib.h>
+#include <string.h>
+#include <algorithm>
+#include <cmath>
+#include <functional>
+#include <random>
 
+#include "app/sat/data/clause_metadata.hpp"
 #include "util/logger.hpp"
-#include "util/permutation.hpp"
+#include "app/sat/data/portfolio_sequence.hpp"
+#include "app/sat/data/solver_statistics.hpp"
+#include "app/sat/execution/solver_setup.hpp"
+#include "app/sat/sharing/store/generic_clause_store.hpp"
+#include "app/sat/solvers/portfolio_solver_interface.hpp"
+
 extern "C" {
 #include "kissat/src/kissat.h"
 }

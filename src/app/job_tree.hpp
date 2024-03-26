@@ -4,6 +4,7 @@
 
 #include <set>
 #include <list>
+#include "comm/msg_queue/message_queue.hpp"
 #include "comm/msgtags.h"
 #include "util/assert.hpp"
 

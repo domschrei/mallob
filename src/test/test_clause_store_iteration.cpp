@@ -1,19 +1,17 @@
 
-#include <bitset>
+#include <assert.h>
+#include <stdlib.h>
 #include <set>
 #include <vector>
+#include <tuple>
 
 #include "app/sat/sharing/store/static_clause_store.hpp"
 #include "util/params.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
-#include "util/sys/proc.hpp"
 #include "util/random.hpp"
 #include "util/sys/process.hpp"
-
-#include "app/sat/sharing/filter/bloom_clause_filter.hpp"
-#include "util/atomic_bitset/atomic_wide_bitset.hpp"
-#include "util/atomic_bitset/atomic_bitset.hpp"
+#include "util/option.hpp"
 
 
 int main(int argc, char** argv) {

@@ -1,12 +1,17 @@
 
 #pragma once
 
+#include <stddef.h>
+#include <utility>
+
 #include "comm/mympi.hpp"
 #include "util/assert.hpp"
 #include "data/job_transfer.hpp"
 #include "util/logger.hpp"
 #include "util/tsl/robin_map.h"
 #include "util/hashing.hpp"
+#include "comm/mpi_base.hpp"
+#include "robin_hash.h"
 
 class Job; // fwd declaration
 

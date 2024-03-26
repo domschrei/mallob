@@ -5,20 +5,28 @@
  *      Author: schick
  */
 
-#include <ctype.h>
+#include <assert.h>
+#include <stdint.h>
 #include <functional>
-#include <stdarg.h>
-#include <chrono>
-#include <filesystem>
+#include <algorithm>
+#include <cmath>
+#include <random>
 
-#include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/data/definitions.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
-#include "app/sat/proof/trusted_checker_process_adapter.hpp"
-#include "app/sat/proof/trusted/trusted_solving.hpp"
 #include "cadical.hpp"
 #include "util/logger.hpp"
 #include "util/distribution.hpp"
+#include "app/sat/data/clause.hpp"
+#include "app/sat/data/portfolio_sequence.hpp"
+#include "app/sat/data/solver_statistics.hpp"
+#include "app/sat/execution/solver_setup.hpp"
+#include "app/sat/proof/lrat_op.hpp"
+#include "app/sat/sharing/store/generic_clause_store.hpp"
+#include "app/sat/solvers/cadical_clause_export.hpp"
+#include "app/sat/solvers/cadical_clause_import.hpp"
+#include "app/sat/solvers/cadical_terminator.hpp"
+#include "app/sat/solvers/portfolio_solver_interface.hpp"
 
 Cadical::Cadical(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup),

@@ -1,10 +1,18 @@
 
 #include "clause_buffer_lbd_scrambler.hpp"
 
+#include <assert.h>
+#include <stddef.h>
+#include <algorithm>
+
 #include "app/sat/sharing/buffer/buffer_builder.hpp"
+#include "util/params.hpp"
 #include "util/random.hpp"
 #include "util/tsl/robin_map.h"
-#include "util/assert.hpp"
+#include "app/sat/data/clause.hpp"
+#include "app/sat/data/clause_metadata.hpp"
+#include "robin_hash.h"
+#include "util/option.hpp"
 
 ClauseBufferLbdScrambler::ClauseBufferLbdScrambler(const Parameters& params, BufferReader& reader) : _params(params), _reader(reader) {}
 

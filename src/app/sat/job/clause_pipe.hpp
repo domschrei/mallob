@@ -1,4 +1,6 @@
 
+#pragma once
+
 #include <bits/types/FILE.h>
 #include <cstddef>
 #include <cstdint>

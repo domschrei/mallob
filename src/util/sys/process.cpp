@@ -1,23 +1,16 @@
 
-#include <sys/types.h>
 #include <unistd.h>
-#include <cstdlib>
 #include <sys/wait.h>
 #include <sys/prctl.h>
-#include <iostream>
-#include <exception>
-#include <execinfo.h>
 #include <signal.h>
-#include <sys/syscall.h>
-
-#include "util/assert.hpp"
+#include <errno.h>
+#include <cstdlib>
+#include <thread>
 
 #include "process.hpp"
 #include "proc.hpp"
 #include "util/logger.hpp"
-#include "util/sys/stacktrace.hpp"
-#include "util/sys/background_worker.hpp"
-#include "util/sys/thread_pool.hpp"
+#include "util/sys/threading.hpp"
 
 int Process::_rank;
 std::string Process::_trace_dir;

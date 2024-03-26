@@ -1,27 +1,41 @@
 
 #include "scheduling_manager.hpp"
 
+#include <assert.h>
+#include <unistd.h>
+#include <algorithm>
+#include <utility>
+#include <functional>
+#include <optional>
+#include <string>
+#include <vector>
+
 #include "comm/msg_queue/message_handle.hpp"
 #include "comm/msgtags.h"
 #include "data/job_state.h"
 #include "data/job_transfer.hpp"
-#include "util/assert.hpp"
-#include <algorithm>
-#include <queue>
-#include <utility>
-#include <climits>
-
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
 #include "util/sys/watchdog.hpp"
-#include "util/sys/proc.hpp"
-#include "util/sys/thread_pool.hpp"
-#include "comm/randomized_routing_tree.hpp"
 #include "job_registry.hpp"
 #include "balancing/request_matcher.hpp"
-#include "latency_report.hpp"
 #include "balancing/routing_tree_request_matcher.hpp"
 #include "balancing/prefix_sum_request_matcher.hpp"
+#include "app/job.hpp"
+#include "app/job_tree.hpp"
+#include "comm/msg_queue/message_queue.hpp"
+#include "comm/mympi.hpp"
+#include "comm/sysstate_impl.hpp"
+#include "core/job_description_interface.hpp"
+#include "core/reactivation_scheduler.hpp"
+#include "core/request_manager.hpp"
+#include "core/result_store.hpp"
+#include "data/job_description.hpp"
+#include "data/job_result.hpp"
+#include "data/serializable.hpp"
+#include "util/option.hpp"
+#include "util/params.hpp"
+#include "util/robin_hood.hpp"
 
 SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm, 
             RandomizedRoutingTree& routingTree,

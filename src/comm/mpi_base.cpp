@@ -1,6 +1,8 @@
 
 #include "comm/mpi_base.hpp"
 
+#include <stdlib.h>
+
 #include "util/logger.hpp"
 
 void chkerr(int err) {

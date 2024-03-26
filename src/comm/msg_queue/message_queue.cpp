@@ -1,15 +1,24 @@
 
 #include "message_queue.hpp"
 
-#include <list>
-#include <cmath>
-#include "util/assert.hpp"
-#include <unistd.h>
+#include <stdlib.h>                             // for free, malloc, abort
+#include <string.h>                             // for memcpy
+#include <unistd.h>                             // for size_t, usleep
+#include <assert.h>
+#include <cstdint>                              // for uint8_t
+#include <list>                                 // for list, _List_iterator
+#include <memory>                               // for unique_ptr, __shared_...
+#include <vector>                               // for vector
 
-#include "util/hashing.hpp"
-#include "util/sys/background_worker.hpp"
-#include "util/logger.hpp"
-#include "comm/msgtags.h"
+#include "comm/msg_queue/message_handle.hpp"    // for MessageHandle
+#include "comm/msg_queue/receive_fragment.hpp"  // for ReceiveFragment
+#include "comm/msg_queue/send_handle.hpp"       // for SendHandle, DataPtr
+#include "comm/msgtags.h"                       // for MSG_OFFSET_BATCHED
+#include "util/logger.hpp"                      // for LOG, LOGGER_LOG_V5
+#include "util/sys/atomics.hpp"                 // for incrementRelaxed, dec...
+#include "util/sys/background_worker.hpp"       // for BackgroundWorker
+#include "util/sys/proc.hpp"                    // for Proc
+
 
 MessageQueue::MessageQueue(int maxMsgSize) : _max_msg_size(maxMsgSize) {
     

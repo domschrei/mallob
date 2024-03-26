@@ -1,21 +1,33 @@
 
 #pragma once
 
+#include <assert.h>
+#include <stddef.h>
 #include <atomic>
 #include <list>
 #include <limits>
 #include <memory>
-#include <numeric>
+#include <algorithm>
+#include <functional>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
-
-#include "../../data/produced_clause.hpp"
+#include "app/sat/data/clause_histogram.hpp"
 #include "bucket_label.hpp"
 #include "../buffer/buffer_reader.hpp"
 #include "../buffer/buffer_merger.hpp"
 #include "util/logger.hpp"
-#include "util/periodic_event.hpp"
-#include "../../data/solver_statistics.hpp"
 #include "util/sys/threading.hpp"
+#include "util/sys/timer.hpp"
+#include "app/sat/data/clause.hpp"
+#include "app/sat/sharing/buffer/buffer_builder.hpp"
+#include "util/assert.hpp"
+#include "util/robin_hood.hpp"
+#include "util/sys/atomics.hpp"
+
+struct IntPairHasher;
 
 /*
 Buffering structure for clauses which sorts and prioritizes clauses 

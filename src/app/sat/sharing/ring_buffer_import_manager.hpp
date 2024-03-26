@@ -2,13 +2,10 @@
 #pragma once
 
 #include <vector>
-#include <list>
 
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
 #include "app/sat/sharing/generic_import_manager.hpp"
 #include "store/adaptive_clause_store.hpp"
-#include "../execution/solver_setup.hpp"
-#include "util/logger.hpp"
 #include "util/ringbuffer.hpp"
 
 class RingBufferImportManager : public GenericImportManager {

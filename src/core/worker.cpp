@@ -1,15 +1,10 @@
 
-#include <cmath>
-#include <thread>
 #include <unistd.h>
-#include <iostream>
-#include <fstream>
-#include <initializer_list>
-#include <limits>
+#include <string>
+#include <vector>
 
+#include "comm/host_comm.hpp"
 #include "worker.hpp"
-
-#include "util/sys/process.hpp"
 #include "util/sys/proc.hpp"
 #include "util/sys/timer.hpp"
 #include "util/sys/watchdog.hpp"
@@ -17,6 +12,15 @@
 #include "util/sys/terminator.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "comm/message_warmup.hpp"
+#include "app/job.hpp"
+#include "app/job_tree.hpp"
+#include "comm/job_comm.hpp"
+#include "comm/msg_queue/message_queue.hpp"
+#include "comm/mympi.hpp"
+#include "comm/sysstate.hpp"
+#include "comm/sysstate_impl.hpp"
+#include "util/option.hpp"
+#include "util/params.hpp"
 
 Worker::Worker(MPI_Comm comm, Parameters& params) :
     _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 

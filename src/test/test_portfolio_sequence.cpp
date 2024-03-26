@@ -1,4 +1,10 @@
 
+#include <assert.h>
+#include <stdio.h>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "app/sat/data/portfolio_sequence.hpp"
 
 int main() {

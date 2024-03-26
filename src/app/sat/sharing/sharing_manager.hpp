@@ -1,20 +1,31 @@
 
 #pragma once
 
-#include <cstring>
-#include <memory>
-#include <list>
+#include <algorithm>                                // for max
+#include <cstdint>                                  // for uint32_t
+#include <cstring>                                  // for size_t
+#include <list>                                     // for list
+#include <memory>                                   // for unique_ptr, share...
+#include <string>                                   // for string
+#include <vector>                                   // for vector
 
-#include "app/sat/sharing/clause_id_alignment.hpp"
-#include "app/sat/sharing/clause_logger.hpp"
-#include "app/sat/sharing/generic_export_manager.hpp"
-#include "../solvers/portfolio_solver_interface.hpp"
-#include "app/sat/sharing/store/generic_clause_store.hpp"
-#include "util/params.hpp"
-#include "../data/sharing_statistics.hpp"
-#include "util/tsl/robin_map.h"
-#include "util/tsl/robin_set.h"
-#include "buffer/deterministic_clause_synchronizer.hpp"
+#include "../data/sharing_statistics.hpp"           // for SharingStatistics
+#include "app/sat/data/clause.hpp"                  // for Clause
+#include "app/sat/data/clause_histogram.hpp"        // for ClauseHistogram
+#include "app/sat/data/definitions.hpp"             // for ExtLearnedClauseC...
+#include "app/sat/data/solver_statistics.hpp"       // for SolverStatistics
+#include "app/sat/sharing/clause_id_alignment.hpp"  // for ClauseIdAlignment
+#include "util/tsl/robin_hash.h"                    // for robin_hash<>::buc...
+#include "util/tsl/robin_set.h"                     // for robin_set
+
+class ClauseLogger;
+class DeterministicClauseSynchronizer;
+class GenericClauseFilter;
+class GenericClauseStore;
+class GenericExportManager;
+class Logger;
+class PortfolioSolverInterface;
+struct Parameters;
 
 #define CLAUSE_LEN_HIST_LENGTH 256
 
@@ -22,6 +33,8 @@
 #define MALLOB_RESET_LBD_AT_IMPORT 1
 #define MALLOB_RESET_LBD_AT_EXPORT 2
 #define MALLOB_RESET_LBD_AT_PRODUCE 3
+
+struct Parameters;
 
 class SharingManager {
 

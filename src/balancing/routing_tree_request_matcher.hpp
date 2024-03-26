@@ -1,13 +1,21 @@
 
 #pragma once
 
+#include <stdint.h>
 #include <set>
 #include <functional>
+#include <vector>
 
 #include "data/job_transfer.hpp"
 #include "comm/mympi.hpp"
 #include "request_matcher.hpp"
 #include "comm/randomized_routing_tree.hpp"
+#include "comm/mpi_base.hpp"
+#include "util/robin_hood.hpp"
+
+class JobRegistry;
+class RandomizedRoutingTree;
+struct MessageHandle;
 
 class RoutingTreeRequestMatcher : public RequestMatcher {
 

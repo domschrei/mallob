@@ -2,14 +2,12 @@
 #pragma once
 
 #include <atomic>
-#include <limits>
 #include <memory>
 #include <cmath>
 #include "app/sat/data/clause.hpp"
 #include "app/sat/data/clause_histogram.hpp"
 #include "app/sat/sharing/buffer/buffer_builder.hpp"
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
-#include "util/logger.hpp"
 #include "util/sys/threading.hpp"
 
 class ClauseSlot {

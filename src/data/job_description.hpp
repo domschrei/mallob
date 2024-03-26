@@ -2,9 +2,15 @@
 #ifndef DOMPASCH_MALLOB_JOB_DESCRIPTION_HPP
 #define DOMPASCH_MALLOB_JOB_DESCRIPTION_HPP
 
+#include <ext/alloc_traits.h>
+#include <stdint.h>
 #include <vector>
 #include <cstring>
 #include <memory>
+#include <algorithm>
+#include <map>
+#include <string>
+#include <utility>
 
 #include "data/serializable.hpp"
 #include "data/checksum.hpp"

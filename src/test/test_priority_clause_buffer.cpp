@@ -1,5 +1,9 @@
 
+#include <assert.h>
+#include <bits/std_abs.h>
+#include <stdlib.h>
 #include <algorithm>
+#include <string>
 
 #include "util/sys/process.hpp"
 #include "util/sys/thread_pool.hpp"
@@ -7,10 +11,7 @@
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "app/sat/sharing/store/adaptive_clause_store.hpp"
-#include "app/sat/sharing/buffer/buffer_merger.hpp"
-#include "app/sat/sharing/buffer/buffer_reducer.hpp"
-#include "util/sys/terminator.hpp"
-#include "util/assert.hpp"
+#include "app/sat/data/clause.hpp"
 
 Mallob::Clause generateClause(int minLength, int maxLength) {
     int length = minLength + (int) (Random::rand() * (maxLength-minLength));

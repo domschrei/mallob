@@ -4,8 +4,12 @@
 
 #include <unistd.h>
 #include <map>
+#include <utility>
+#include <vector>
 
 #include "util/sys/threading.hpp"
+
+class Mutex;
 
 /*
 Interface to some process-related information from the /proc filesystem.

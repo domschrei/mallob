@@ -5,9 +5,14 @@
 #include <string>
 #include <set>
 #include <atomic>
+#include <algorithm>
+#include <future>
+#include <list>
+#include <map>
+#include <memory>
+#include <vector>
 
 #include "comm/mympi.hpp"
-#include "data/job_transfer.hpp"
 #include "util/params.hpp"
 #include "data/job_description.hpp"
 #include "util/sys/threading.hpp"
@@ -18,6 +23,17 @@
 #include "util/periodic_event.hpp"
 #include "interface/api/api_connector.hpp"
 #include "comm/msg_queue/message_subscription.hpp"
+#include "comm/mpi_base.hpp"
+#include "comm/sysstate_impl.hpp"
+#include "data/checksum.hpp"
+#include "util/option.hpp"
+#include "util/robin_hood.hpp"
+
+struct JobRequest;
+class APIConnector;
+class Connector;
+class JsonInterface;
+struct MessageHandle;
 
 #define SYSSTATE_ENTERED_JOBS 0
 #define SYSSTATE_PARSED_JOBS 1

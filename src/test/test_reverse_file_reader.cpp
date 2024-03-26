@@ -1,4 +1,7 @@
 
+#include <stdio.h>
+#include <string>
+
 #include "util/reverse_file_reader.hpp"
 
 void test() {

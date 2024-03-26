@@ -6,6 +6,7 @@
 #include <ctime>
 
 class Parameters; // forward declaration
+struct timespec;
 
 class Timer {
 

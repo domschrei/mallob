@@ -1,7 +1,12 @@
 
+#include <assert.h>
+#include <ios>
+#include <vector>
+
 #include "app/sat/proof/lrat_utils.hpp"
-#include "util/assert.hpp"
 #include "util/sys/buffered_io.hpp"
+#include "app/sat/proof/lrat_line.hpp"
+#include "util/logger.hpp"
 
 void test() {
 

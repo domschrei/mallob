@@ -6,6 +6,8 @@
 #include <thread>
 #include <atomic>
 #include <future>
+#include <list>
+#include <vector>
 
 #include "app/app_message_subscription.hpp"
 #include "app/job.hpp"
@@ -13,8 +15,13 @@
 #include "sat_process_adapter.hpp"
 #include "sat_constants.h"
 #include "base_sat_job.hpp"
+#include "data/job_result.hpp"
 
 class AnytimeSatClauseCommunicator; // fwd decl
+class Checksum;
+class Parameters;
+class SatProcessAdapter;
+struct JobMessage;
 
 class ForkedSatJob : public BaseSatJob {
 

@@ -2,19 +2,26 @@
 #ifndef DOMPASCH_BALANCER_EVENT_DRIVEN_H
 #define DOMPASCH_BALANCER_EVENT_DRIVEN_H
 
+#include <stddef.h>
 #include <utility>
 #include <map>
 #include <list>
 #include <functional>
+#include <vector>
 
+#include "comm/msg_queue/message_handle.hpp"
 #include "comm/mympi.hpp"
 #include "util/params.hpp"
 #include "data/reduceable.hpp"
 #include "util/logger.hpp"
 #include "balancing/event_map.hpp"
 #include "util/periodic_event.hpp"
+#include "comm/mpi_base.hpp"
+#include "util/robin_hood.hpp"
 
 class Job;
+class Parameters;
+struct MessageHandle;
 
 class EventDrivenBalancer {
 

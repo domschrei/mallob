@@ -1,14 +1,20 @@
 
-#include "util/assert.hpp"
+#include <sstream>
 #include <string.h>
+#include <assert.h>
 #include <map>
 #include <istream>
 #include <iterator>
-#include <sstream>
+#include <algorithm>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 #include "params.hpp"
 #include "logger.hpp"
 #include "comm/sysstate.hpp"
+#include "util/option.hpp"
+#include "util/robin_hood.hpp"
 
 const char* BANNER = "\nMallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving\nDesigned by P. Sanders and D. Schreiber 2018-2022\nDeveloped by D. Schreiber 2019-2022\n";
 const char* BANNER_C_PREFIXED = "c \nc Mallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving\nc Designed by P. Sanders and D. Schreiber 2018-2022\nc Developed by D. Schreiber 2019-2022\nc ";

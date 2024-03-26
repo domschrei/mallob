@@ -1,7 +1,6 @@
 
 #pragma once
 
-#include <iomanip>
 #include <fstream>
 #include <atomic>
 #include <cmath>
@@ -9,11 +8,9 @@
 #include "util/ctre.hpp"
 
 #include "mympi.hpp"
-#include "util/hashing.hpp"
 #include "util/params.hpp"
 #include "util/sys/fileutils.hpp"
 #include "comm/sysstate.hpp"
-#include "util/sys/proc.hpp"
 #include "util/sys/tmpdir.hpp"
 
 class HostComm {

@@ -3,7 +3,6 @@
 
 #include <vector>
 
-#include "app/sat/data/clause.hpp"
 #include "app/sat/data/clause_histogram.hpp"
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
 

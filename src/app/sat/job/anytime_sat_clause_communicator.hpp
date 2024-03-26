@@ -1,8 +1,11 @@
 
 #pragma once
 
+#include <stddef.h>
 #include <future>
 #include <memory>
+#include <list>
+#include <vector>
 
 #include "app/sat/data/clause.hpp"
 #include "util/params.hpp"
@@ -12,6 +15,7 @@
 #include "comm/job_tree_all_reduction.hpp"
 #include "clause_sharing_session.hpp"
 #include "app/sat/proof/proof_producer.hpp"
+#include "app/sat/job/historic_clause_storage.hpp"
 
 class BaseSatJob; // fwd decl
 class HistoricClauseStorage; // fwd decl

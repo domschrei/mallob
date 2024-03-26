@@ -1,13 +1,14 @@
 
-#include <iostream>
-#include "util/assert.hpp"
+#include <unistd.h>
+#include <assert.h>
+#include <stdlib.h>
 #include <vector>
 #include <string>
-#include <thread>
-#include <set>
-#include <random>
-#include <unistd.h>
-
+#include <algorithm>
+#include <cmath>
+#include <memory>
+#include <unordered_map>
+#include <utility>
 
 #include "util/sys/process.hpp"
 #include "util/sys/thread_pool.hpp"
@@ -17,7 +18,12 @@
 #include "app/sat/sharing/store/adaptive_clause_database.hpp"
 #include "app/sat/sharing/buffer/buffer_merger.hpp"
 #include "app/sat/sharing/buffer/buffer_reducer.hpp"
-#include "util/sys/terminator.hpp"
+#include "app/sat/data/clause.hpp"
+#include "app/sat/data/clause_comparison.hpp"
+#include "app/sat/sharing/buffer/buffer_iterator.hpp"
+#include "app/sat/sharing/buffer/buffer_reader.hpp"
+#include "app/sat/sharing/store/bucket_label.hpp"
+#include "util/hashing.hpp"
 
 bool insertUntilSuccess(AdaptiveClauseDatabase& cdb, size_t prodId, Clause& c) {
     return cdb.addClause(c);

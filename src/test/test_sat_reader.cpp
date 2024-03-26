@@ -1,13 +1,15 @@
 
-#include <iostream>
-#include "util/assert.hpp"
-#include <vector>
+#include <assert.h>
+#include <stdlib.h>
 #include <string>
+#include <initializer_list>
 
 #include "util/random.hpp"
 #include "app/sat/parse/sat_reader.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
+#include "util/params.hpp"
+#include "data/job_description.hpp"
 
 int main(int argc, char *argv[]) {
 

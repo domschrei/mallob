@@ -1,14 +1,20 @@
 
 #pragma once
 
+#include <assert.h>
+#include <string.h>
 #include <vector>
 #include <list>
 #include <set>
 #include <string>
+#include <algorithm>
+#include <cstdint>
+#include <utility>
 
 #include "util/hashing.hpp"
 #include "data/serializable.hpp"
 #include "util/assert.hpp"
+#include "util/robin_hood.hpp"
 
 struct InactiveJobNode : public Serializable {
     int rank;

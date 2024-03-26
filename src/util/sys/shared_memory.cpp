@@ -2,10 +2,10 @@
 #include "shared_memory.hpp"
 
 #include <sys/mman.h>
-#include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include "util/assert.hpp"
+#include <assert.h>
+#include <stdlib.h>
 
 namespace SharedMemory {
 

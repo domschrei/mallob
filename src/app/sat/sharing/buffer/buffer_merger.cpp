@@ -1,6 +1,10 @@
 
+#include <assert.h>
+#include <string.h>
 #include <algorithm>
 #include <cstdint>
+#include <memory>
+#include <string>
 
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/sharing/buffer/buffer_builder.hpp"
@@ -10,6 +14,9 @@
 #include "util/logger.hpp"
 #include "util/random.hpp"
 #include "util/tsl/robin_set.h"
+#include "app/sat/sharing/buffer/buffer_iterator.hpp"
+#include "app/sat/sharing/store/generic_clause_store.hpp"
+#include "robin_hash.h"
 
 BufferMerger::BufferMerger(int sizeLimit, int maxEffClauseLength, int maxFreeEffClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum) :
     _size_limit(sizeLimit), _max_eff_clause_length(maxEffClauseLength), _max_free_eff_clause_length(maxFreeEffClauseLength),

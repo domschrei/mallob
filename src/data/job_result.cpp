@@ -1,9 +1,6 @@
 
 #include "job_result.hpp"
 
-#include "util/assert.hpp"
-#include "util/logger.hpp"
-
 JobResult::JobResult(std::vector<uint8_t>&& packedData) : packedData(std::move(packedData)) {
     int i = 0, n;
     n = sizeof(int); memcpy(&id, this->packedData.data()+i, n); i += n;

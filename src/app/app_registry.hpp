@@ -1,17 +1,16 @@
 
 #pragma once
 
-#include <functional>
-#include <vector>
-#include <string>
-#include <iostream>
+#include <functional>                        // for function
+#include <string>                            // for string
+#include <vector>                            // for vector
+#include "app/app_message_subscription.hpp"  // for AppMessageTable
+#include "app/job.hpp"                       // for Job
+#include "util/json.hpp"                     // for json
 
-#include "util/params.hpp"
-#include "data/job_description.hpp"
-#include "app/job.hpp"
-#include "util/tsl/robin_map.h"
-#include "util/json.hpp"
-#include "app/app_message_subscription.hpp"
+class JobDescription;
+class Parameters;
+struct JobResult;
 
 namespace app_registry {
 

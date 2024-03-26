@@ -2,9 +2,11 @@
 #ifndef DOMPASCH_MALLOB_JOB_RESULT_H
 #define DOMPASCH_MALLOB_JOB_RESULT_H
 
-#include <memory>
+#include <assert.h>
 #include <vector>
 #include <cstring>
+#include <cstdint>
+#include <utility>
 
 #include "serializable.hpp"
 #include "util/assert.hpp"

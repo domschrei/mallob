@@ -2,10 +2,16 @@
 #ifndef DOMPASCH_RANDOM
 #define DOMPASCH_RANDOM
 
+#include <assert.h>
+#include <stdint.h>
+#include <stdlib.h>
 #include <random>
 #include <functional>
 #include <set>
 #include <vector>
+#include <cmath>
+#include <limits>
+
 #include "util/assert.hpp"
 
 class Random {

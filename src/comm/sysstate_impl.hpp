@@ -2,6 +2,7 @@
 #ifndef DOMPASCH_MALLOB_SYSSTATE_IMPL_HPP
 #define DOMPASCH_MALLOB_SYSSTATE_IMPL_HPP
 
+#include "util/sys/timer.hpp"
 #include "sysstate.hpp"
 
 template <int N>
@@ -24,7 +25,7 @@ bool SysState<N>::canStartAggregating(float time) const {
 template <int N>
 void SysState<N>::setLocal(std::initializer_list<float> elems) {
     int i = 0;
-    for (float& elem : elems) {
+    for (float elem : elems) {
         _local_state[i++] = elem;
     }
 }

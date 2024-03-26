@@ -1,7 +1,9 @@
 
 #include "clause_metadata.hpp"
 
-#include "util/assert.hpp"
+#include <assert.h>
+#include <algorithm>
+#include <iterator>
 
 int ClauseMetadata::metadataSize = 0;
 bool ClauseMetadata::idsEnabled = false;

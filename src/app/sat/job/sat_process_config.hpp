@@ -1,12 +1,16 @@
 
 #pragma once
 
+#include <stdlib.h>
+#include <sys/types.h>
 #include <sstream>
 #include <iostream>
+#include <string>
 
 #include "util/params.hpp"
 
 class Job; // forward definition
+class Parameters;
 
 struct SatProcessConfig {
 

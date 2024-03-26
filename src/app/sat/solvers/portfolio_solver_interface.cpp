@@ -1,20 +1,23 @@
 
+#include <assert.h>
+#include <bits/chrono.h>
 #include <map>
-#include <chrono>
 #include <atomic>
+#include <cmath>
+
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/sharing/adaptive_import_manager.hpp"
 #include "app/sat/sharing/ring_buffer_import_manager.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
-#include "util/assert.hpp"
-
 #include "util/random.hpp"
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
-
 #include "portfolio_solver_interface.hpp"
+#include "app/sat/solvers/portfolio_solver_interface.hpp"
+#include "app/sat/data/clause.hpp"
+#include "app/sat/data/clause_histogram.hpp"
 
 using namespace std::chrono;
 

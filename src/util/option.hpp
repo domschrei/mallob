@@ -2,12 +2,15 @@
 #ifndef DOMPASCH_MALLOB_OPTION_HPP
 #define DOMPASCH_MALLOB_OPTION_HPP
 
+#include <stdint.h>
 #include <string>
 #include <list>
 
 #include "util/hashing.hpp"
+#include "util/robin_hood.hpp"
 
 struct Option;
+
 typedef robin_hood::unordered_node_map<std::string, Option*> OptMap;
 struct OptGroup {
     std::string groupId; std::string desc; OptMap map;

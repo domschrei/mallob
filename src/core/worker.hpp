@@ -2,25 +2,20 @@
 #ifndef DOMPASCH_MALLOB_WORKER_HPP
 #define DOMPASCH_MALLOB_WORKER_HPP
 
-#include <set>
-#include <chrono>
-#include <string>
-#include <memory>
+#include <atomic>
+#include <list>
 
-#include "comm/mympi.hpp"
-#include "util/params.hpp"
-#include "app/job.hpp"
-#include "data/job_description.hpp"
-#include "data/job_result.hpp"
-#include "data/job_transfer.hpp"
 #include "core/scheduling_manager.hpp"
 #include "data/worker_sysstate.hpp"
-#include "balancing/request_matcher.hpp"
 #include "util/periodic_event.hpp"
 #include "util/sys/watchdog.hpp"
-#include "comm/host_comm.hpp"
 #include "comm/msg_queue/message_subscription.hpp"
 #include "comm/randomized_routing_tree.hpp"
+#include "comm/mpi_base.hpp"
+#include "core/job_registry.hpp"
+
+class HostComm;
+class Parameters;
 
 /*
 Primary actor in the system who is responsible for participating in the scheduling and execution of jobs.

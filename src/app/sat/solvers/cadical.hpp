@@ -7,19 +7,26 @@
 
 #pragma once
 
+#include <stddef.h>
+#include <memory>
+#include <set>
+#include <string>
+#include <vector>
+
 #include "app/sat/proof/trusted/trusted_solving.hpp"
 #include "app/sat/proof/trusted_checker_process_adapter.hpp"
 #include "portfolio_solver_interface.hpp"
-
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
-
 #include "cadical/src/cadical.hpp"
 #include "cadical_terminator.hpp"
 #include "cadical_clause_export.hpp"
 #include "cadical_clause_import.hpp"
+#include "app/sat/data/definitions.hpp"
 
 class LratConnector; // fwd
+struct SolverSetup;
+struct SolverStatistics;
 
 class Cadical : public PortfolioSolverInterface {
 

@@ -1,10 +1,7 @@
 
-#include <iostream>
-#include "util/assert.hpp"
+#include <assert.h>
+#include <stdlib.h>
 #include <vector>
-#include <string>
-#include <thread>
-#include <set>
 
 #include "util/random.hpp"
 #include "util/logger.hpp"

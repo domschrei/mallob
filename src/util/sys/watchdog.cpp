@@ -2,10 +2,12 @@
 #include "watchdog.hpp"
 
 #include <unistd.h>
+#include <signal.h>
 
 #include "util/logger.hpp"
 #include "util/sys/proc.hpp"
 #include "util/sys/process.hpp"
+#include "util/sys/timer.hpp"
 
 Watchdog::Watchdog(bool enabled, int checkIntervalMillis, float time) {
     if (!enabled) return;

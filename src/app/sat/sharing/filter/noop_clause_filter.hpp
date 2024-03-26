@@ -1,7 +1,9 @@
 
 #pragma once
 
+#include "app/sat/data/clause.hpp"
 #include "app/sat/sharing/filter/generic_clause_filter.hpp"
+#include "app/sat/sharing/store/generic_clause_store.hpp"
 
 // This filter does nothing but attempt to add each clause to the clause store directly.
 // No clauses are filtered out and only ADMITTED and DROPPED are possible results of

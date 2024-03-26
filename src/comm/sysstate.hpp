@@ -5,6 +5,7 @@
 #include "comm/mympi.hpp"
 
 #include <vector>
+#include <atomic>
 
 bool SysState_isUnresponsiveNodeCrashingEnabled();
 void SysState_disableUnresponsiveNodeCrashing();

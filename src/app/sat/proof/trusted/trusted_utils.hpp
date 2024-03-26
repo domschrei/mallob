@@ -3,7 +3,6 @@
 
 #include <cstdlib> // exit
 #include <stdio.h> // file I/O
-#include <bits/types/FILE.h> // FILE* datatype
 #include <unistd.h> // getpid
 
 #ifdef _MSC_VER

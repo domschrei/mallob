@@ -1,8 +1,13 @@
 
-#include "util/categorized_external_memory.hpp"
+#include <assert.h>
+#include <stddef.h>
+#include <ostream>
+#include <vector>
 
+#include "util/categorized_external_memory.hpp"
 #include "util/sys/timer.hpp"
 #include "util/random.hpp"
+#include "util/logger.hpp"
 
 void testBasic() {
     auto blocksize = 4096;

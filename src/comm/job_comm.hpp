@@ -3,13 +3,11 @@
 #define DOMPASCH_MALLOB_JOB_COMM_HPP
 
 #include <vector>
-#include "data/job_transfer.hpp"
-#include "util/assert.hpp"
 
-#include "util/hashing.hpp"
+#include "data/job_transfer.hpp"
 #include "util/sys/timer.hpp"
 #include "app/job_tree.hpp"
-#include "comm/mympi.hpp"
+#include "comm/msgtags.h"
 #include "util/sys/threading.hpp"
 
 class JobComm {

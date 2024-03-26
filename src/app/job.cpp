@@ -1,12 +1,11 @@
 
 #include <cmath>
 #include <limits>
-#include "util/assert.hpp"
 
 #include "app/job.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
-#include "util/permutation.hpp"
+#include "comm/msgtags.h"
 
 
 Job::Job(const Parameters& params, const JobSetup& setup, AppMessageTable& appMsgTable) :

@@ -2,17 +2,27 @@
 #include "engine.hpp"
 
 #include "../sharing/sharing_manager.hpp"
-#include "app/sat/data/clause.hpp"
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "util/logger.hpp"
 #include "util/sys/fileutils.hpp"
 #include "util/sys/timer.hpp"
 #include "data/app_configuration.hpp"
-#include "app/sat/proof/lrat_connector.hpp"
 #include "../solvers/cadical.hpp"
 #include "../solvers/lingeling.hpp"
 #include "../solvers/kissat.hpp"
+#include "app/sat/data/clause_histogram.hpp"
+#include "app/sat/data/definitions.hpp"
+#include "app/sat/data/sharing_statistics.hpp"
+#include "app/sat/data/solver_statistics.hpp"
+#include "app/sat/execution/solver_setup.hpp"
+#include "app/sat/execution/solver_thread.hpp"
+#include "app/sat/execution/solving_state.hpp"
+#include "app/sat/job/sat_process_config.hpp"
+#include "app/sat/solvers/portfolio_solver_interface.hpp"
+#include "util/option.hpp"
+
+class LratConnector;
 #if MALLOB_USE_MERGESAT
 #include "../solvers/mergesat.hpp"
 #endif
@@ -22,13 +32,14 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <ctype.h>
+#include <assert.h>
 #include <algorithm>
 #include <csignal>
-#include <unistd.h>
-#include <sched.h>
-#include <filesystem>
-#include "util/assert.hpp"
+#include <cmath>
+#include <initializer_list>
+#include <map>
+#include <string>
+#include <utility>
 
 using namespace SolvingStates;
 

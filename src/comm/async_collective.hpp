@@ -1,9 +1,7 @@
 
 #pragma once
 
-#include <limits>
-
-#include "data/reduceable.hpp"
+#include "data/serializable.hpp"
 #include "mympi.hpp"
 #include "util/tsl/robin_map.h"
 #include "util/sys/timer.hpp"

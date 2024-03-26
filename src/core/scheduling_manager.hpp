@@ -2,10 +2,9 @@
 #pragma once
 
 #include <list>
+#include <memory>
+#include <utility>
 
-#include "comm/msg_queue/message_handle.hpp"
-#include "util/hashing.hpp"
-#include "app/job.hpp"
 #include "data/job_transfer.hpp"
 #include "data/worker_sysstate.hpp"
 #include "comm/msg_queue/message_subscription.hpp"
@@ -14,11 +13,15 @@
 #include "result_store.hpp"
 #include "job_description_interface.hpp"
 #include "balancing/event_driven_balancer.hpp"
+#include "comm/mpi_base.hpp"
 
 // forward declarations
 class RandomizedRoutingTree;
 class RequestMatcher;
 class JobRegistry;
+class Job;
+class Parameters;
+struct MessageHandle;
 
 class SchedulingManager {
 

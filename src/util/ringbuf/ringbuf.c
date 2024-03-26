@@ -57,12 +57,10 @@
  */
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <stddef.h>
 #include <stdbool.h>
 #include <inttypes.h>
 #include <string.h>
-#include <limits.h>
 #include <errno.h>
 
 #include "ringbuf.h"

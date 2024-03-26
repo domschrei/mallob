@@ -5,18 +5,13 @@
 #include <sys/inotify.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include "util/assert.hpp"
-#include <fcntl.h>
 #include <dirent.h>
 #include <fstream>
-
 #include <string>
 #include <functional>
-#include <memory>
 
 #include "util/logger.hpp"
 #include "util/sys/fileutils.hpp"
-#include "util/logger.hpp"
 #include "util/sys/background_worker.hpp"
 #include "util/sys/thread_pool.hpp"
 

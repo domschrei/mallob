@@ -1,16 +1,16 @@
 
 #pragma once
 
-#include <vector>
-#include <set>
-#include <forward_list>
-
-#include "app/sat/sharing/store/static_clause_store.hpp"
-#include "buffer_builder.hpp"
-#include "buffer_reader.hpp"
-#include "app/sat/data/clause_comparison.hpp"
-#include "util/params.hpp"
-#include "util/random.hpp"
+#include <forward_list>                        // for forward_list
+#include <utility>                             // for pair
+#include <vector>                              // for vector
+#include "app/sat/data/clause.hpp"             // for Clause
+#include "app/sat/data/clause_comparison.hpp"  // for AbstractClauseThreeway...
+#include "buffer_builder.hpp"                  // for BufferBuilder
+#include "buffer_reader.hpp"                   // for BufferReader
+class Parameters;
+class SplitMix64Rng;
+template <bool Concurrent> class StaticClauseStore;
 
 class BufferMerger {
     

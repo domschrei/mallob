@@ -1,13 +1,17 @@
 
 #pragma once
 
-#include <random>
 #include <sys/types.h>
 #include <unistd.h>
+#include <random>
 #include <utility>
 #include <thread>
 #include <atomic>
 #include <list>
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include "util/params.hpp"
 #include "util/random.hpp"
@@ -21,9 +25,13 @@
 #include "variable_translator.hpp"
 #include "../parse/serialized_formula_parser.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
+#include "app/sat/execution/solver_setup.hpp"
 
 // Forward declarations
 class SatEngine;
+class Logger;
+class Parameters;
+class SerializedFormulaParser;
 
 class SolverThread {
 

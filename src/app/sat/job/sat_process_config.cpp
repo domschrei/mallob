@@ -1,7 +1,14 @@
 
 #include "sat_process_config.hpp"
+
+#include <time.h>
+
 #include "app/job.hpp"
-#include "util/sys/proc.hpp"
+#include "comm/mympi.hpp"
+#include "data/job_description.hpp"
+#include "util/option.hpp"
+#include "util/params.hpp"
+#include "util/sys/timer.hpp"
 
 SatProcessConfig::SatProcessConfig(const Parameters& params, const Job& job, int recoveryIndex) {
 

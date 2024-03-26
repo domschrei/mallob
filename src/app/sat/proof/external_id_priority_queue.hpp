@@ -4,7 +4,6 @@
 #include <queue>
 
 #include "util/categorized_external_memory.hpp"
-#include "util/logger.hpp"
 
 class ExternalIdPriorityQueue {
 

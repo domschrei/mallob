@@ -1,23 +1,20 @@
 
 
-#include <sys/time.h>
-#include <sys/resource.h>
 #include <sched.h>
-#include <sys/resource.h>
-#include <sys/syscall.h>
+#include <pthread.h>
+#include <assert.h>
+#include <stdlib.h>
+#include <syscall.h>
 #include <map>
-#include "util/assert.hpp"
-#include <ios>
-#include <iostream>
 #include <fstream>
 #include <string>
 #include <set>
-#include <pthread.h>
 
 #include "util/sys/fileutils.hpp"
 #include "proc.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
+#include "util/sys/threading.hpp"
 
 std::map<long, Proc::CpuInfo> Proc::_cpu_info_per_tid;
 Mutex Proc::_cpu_info_lock;

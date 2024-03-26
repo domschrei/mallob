@@ -1,11 +1,15 @@
 
+#include <stdlib.h>
+#include <unordered_set>
+#include <iostream>
+#include <algorithm>
+#include <vector>
+
 #include "util/hashing.hpp"
 #include "app/sat/data/clause.hpp"
 #include "util/logger.hpp"
 #include "util/random.hpp"
-
-#include <unordered_set>
-#include <iostream>
+#include "util/robin_hood.hpp"
 
 size_t commutativeHash(const int* begin, int size, int which = 3) {
     static unsigned const int primes [] = 

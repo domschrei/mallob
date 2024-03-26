@@ -3,6 +3,8 @@
 
 #include <functional>
 #include <atomic>
+#include <string>
+#include <utility>
 
 #include "util/logger.hpp"
 #include "util/hashing.hpp"
@@ -15,8 +17,12 @@
 #include "util/logger.hpp"
 #include "api/job_id_allocator.hpp"
 #include "util/sys/tmpdir.hpp"
+#include "util/robin_hood.hpp"
 
 class Parameters; // fwd declaration
+struct IntPairHasher;
+struct JobMetadata;
+struct JobResult;
 
 class JsonInterface {
 

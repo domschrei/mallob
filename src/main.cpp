@@ -1,10 +1,17 @@
 
-#include <iostream>
-#include <set>
 #include <stdlib.h>
 #include <unistd.h>
-#include <algorithm> 
+#include <assert.h>
+#include <ctype.h>
+#include <iostream>
+#include <algorithm>
 #include <string>
+#include <exception>
+#include <initializer_list>
+#include <list>
+#include <memory>
+#include <thread>
+#include <vector>
 
 #include "comm/mympi.hpp"
 #include "interface/api/rank_specific_file_fetcher.hpp"
@@ -13,7 +20,6 @@
 #include "util/logger.hpp"
 #include "util/random.hpp"
 #include "util/params.hpp"
-#include "util/sys/shared_memory.hpp"
 #include "util/sys/process.hpp"
 #include "util/sys/proc.hpp"
 #include "core/worker.hpp"
@@ -24,7 +30,17 @@
 #include "data/job_transfer.hpp"
 #include "comm/msg_queue/message_subscription.hpp"
 #include "util/sys/tmpdir.hpp"
-
+#include "comm/mpi_base.hpp"
+#include "comm/msg_queue/message_handle.hpp"
+#include "comm/msg_queue/message_queue.hpp"
+#include "comm/msgtags.h"
+#include "interface/api/api_connector.hpp"
+#include "interface/json_interface.hpp"
+#include "util/json.hpp"
+#include "util/option.hpp"
+#include "util/sys/background_worker.hpp"
+#include "util/sys/fileutils.hpp"
+#include "util/sys/terminator.hpp"
 #include "app/.register_includes.h"
 
 #ifndef MALLOB_VERSION

@@ -1,11 +1,16 @@
 
-#include "util/assert.hpp"
+#include <assert.h>
+#include <ext/alloc_traits.h>
+#include <stdlib.h>
 #include <set>
+#include <utility>
+#include <vector>
 
 #include "util/random.hpp"
 #include "util/permutation.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
+#include "util/robin_hood.hpp"
 
 void testPermutations() {
 

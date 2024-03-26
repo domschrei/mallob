@@ -2,9 +2,6 @@
 #pragma once
 
 #include "clause.hpp"
-#include "util/assert.hpp"
-#include "util/tsl/robin_map.h"
-#include "util/logger.hpp"
 
 struct ProducedUnitClause {
     int literal = 0;

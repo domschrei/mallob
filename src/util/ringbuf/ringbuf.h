@@ -8,6 +8,9 @@
 #ifndef _RINGBUF_H_
 #define _RINGBUF_H_
 
+#include <features.h>
+#include <sys/types.h>
+
 __BEGIN_DECLS
 
 typedef struct ringbuf ringbuf_t;

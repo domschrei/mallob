@@ -1,11 +1,25 @@
 
+#include <assert.h>
 #include <climits>
+#include <algorithm>
+#include <map>
+#include <numeric>
+#include <string>
 
 #include "event_driven_balancer.hpp"
-#include "util/random.hpp"
 #include "app/job.hpp"
 #include "volume_calculator.hpp"
 #include "util/data_statistics.hpp"
+#include "app/job_tree.hpp"
+#include "balancing/balancing_entry.hpp"
+#include "comm/msg_queue/message_handle.hpp"
+#include "comm/msgtags.h"
+#include "comm/mympi.hpp"
+#include "data/serializable.hpp"
+#include "util/logger.hpp"
+#include "util/sys/timer.hpp"
+
+class Parameters;
 
 EventDrivenBalancer::EventDrivenBalancer(MPI_Comm& comm, Parameters& params) : _comm(comm), _params(params) {
 

@@ -1,10 +1,11 @@
 
-#include "job_transfer.hpp"
-
+#include <assert.h>
 #include <cstring>
 #include <sstream>
+#include <algorithm>
+#include <cstdint>
 
-#include "data/job_description.hpp"
+#include "job_transfer.hpp"
 #include "comm/mympi.hpp"
 
 /*static!*/ size_t JobRequest::getMaxTransferSize() {

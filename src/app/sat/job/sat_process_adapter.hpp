@@ -1,8 +1,14 @@
 
 #pragma once
 
+#include <sys/types.h>
 #include <list>
 #include <future>
+#include <algorithm>
+#include <atomic>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include "util/logger.hpp"
 #include "util/robin_hood.hpp"
@@ -14,9 +20,14 @@
 #include "util/sys/background_worker.hpp"
 #include "data/job_result.hpp"
 #include "app/sat/job/clause_pipe.hpp"
+#include "app/sat/job/sat_process_config.hpp"
+#include "util/hashing.hpp"
 
 class ForkedSatJob; // fwd
 class AnytimeSatClauseCommunicator;
+class BiDirectionalPipe;
+class Logger;
+struct SatSharedMemory;
 
 class SatProcessAdapter {
 

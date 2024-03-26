@@ -1,7 +1,8 @@
 
 #pragma once
 
-#include "app/sat/data/clause.hpp"
+#include <functional>  // for function
+namespace Mallob { struct Clause; }
 
 enum SatResult {
 	SAT = 10,

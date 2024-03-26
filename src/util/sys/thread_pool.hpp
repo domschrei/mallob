@@ -2,10 +2,16 @@
 #ifndef DOMPASCH_MALLOB_THREAD_POOL_HPP
 #define DOMPASCH_MALLOB_THREAD_POOL_HPP
 
+#include <ext/alloc_traits.h>
+#include <stdlib.h>
 #include <vector>
 #include <list>
 #include <thread>
 #include <future>
+#include <functional>
+#include <memory>
+#include <string>
+#include <utility>
 
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"

@@ -1,7 +1,11 @@
 
 #include "lrat_utils.hpp"
-#include "util/assert.hpp"
-#include "util/logger.hpp"
+
+#include <string.h>
+#include <cstdint>
+
+#include "app/sat/proof/lrat_line.hpp"
+#include "app/sat/proof/serialized_lrat_line.hpp"
 
 namespace lrat_utils {
 

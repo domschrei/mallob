@@ -1,12 +1,13 @@
 
-#include <iostream>
+#include <unistd.h>
+#include <assert.h>
 #include <fstream>
 #include <string>
-#include <chrono>
-#include <thread>
-#include <unistd.h>
 #include <list>
 #include <filesystem>
+#include <functional>
+#include <initializer_list>
+#include <utility>
 
 #include "client.hpp"
 #include "comm/msg_queue/message_handle.hpp"
@@ -17,7 +18,6 @@
 #include "util/sys/proc.hpp"
 #include "data/job_transfer.hpp"
 #include "data/job_result.hpp"
-#include "util/random.hpp"
 #include "app/sat/job/sat_constants.h"
 #include "util/sys/terminator.hpp"
 #include "util/sys/thread_pool.hpp"
@@ -25,11 +25,16 @@
 #include "app/app_registry.hpp"
 #include "util/sys/tmpdir.hpp"
 #include "util/sys/watchdog.hpp"
-
 #include "interface/socket/socket_connector.hpp"
 #include "interface/filesystem/naive_filesystem_connector.hpp"
 #include "interface/filesystem/inotify_filesystem_connector.hpp"
 #include "interface/api/api_connector.hpp"
+#include "data/serializable.hpp"
+#include "interface/api/job_id_allocator.hpp"
+#include "interface/connector.hpp"
+#include "interface/json_interface.hpp"
+#include "util/json.hpp"
+#include "util/sys/fileutils.hpp"
 
 
 // Executed by a separate worker thread

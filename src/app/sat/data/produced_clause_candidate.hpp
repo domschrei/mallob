@@ -1,7 +1,10 @@
 
 #pragma once
 
-#include "clause.hpp"
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <utility>
 
 struct ProducedClauseCandidate {
 

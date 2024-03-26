@@ -1,18 +1,20 @@
 
 #pragma once
 
-#include <vector>
+#include <assert.h>
+#include <stddef.h>
+#include <algorithm>
 #include <bitset>
-#include "app/sat/sharing/filter/generic_clause_filter.hpp"
-#include "util/hashing.hpp"
+#include <memory>
+#include <vector>
 
 #include "../../data/clause.hpp"
-using namespace Mallob;
-#include "../../data/clause_comparison.hpp"
-
+#include "app/sat/data/produced_clause_candidate.hpp"
+#include "app/sat/sharing/filter/generic_clause_filter.hpp"
+#include "app/sat/sharing/filter/produced_clause_filter_commons.hpp"
+#include "app/sat/sharing/store/generic_clause_store.hpp"
 #include "util/sys/threading.hpp"
-#include "util/logger.hpp"
-#include "util/atomic_bitset/atomic_bitset.hpp"
+#include "util/tsl/robin_hash.h"
 #include "util/tsl/robin_set.h"
 
 /*
@@ -163,10 +165,10 @@ private:
 			return admit;
 		}
 
-		size_t h1 = ClauseHasher::hash(c.begin, c.size, 1) % NUM_BITS;
-		size_t h2 = ClauseHasher::hash(c.begin, c.size, 2) % NUM_BITS;
-		size_t h3 = ClauseHasher::hash(c.begin, c.size, 3) % NUM_BITS;
-		size_t h4 = ClauseHasher::hash(c.begin, c.size, 4) % NUM_BITS;
+		size_t h1 = Mallob::ClauseHasher::hash(c.begin, c.size, 1) % NUM_BITS;
+		size_t h2 = Mallob::ClauseHasher::hash(c.begin, c.size, 2) % NUM_BITS;
+		size_t h3 = Mallob::ClauseHasher::hash(c.begin, c.size, 3) % NUM_BITS;
+		size_t h4 = Mallob::ClauseHasher::hash(c.begin, c.size, 4) % NUM_BITS;
 
 		//std::string lits;
 		//for (size_t i = 0; i < size; i++) lits += std::to_string(begin[i]) + ",";

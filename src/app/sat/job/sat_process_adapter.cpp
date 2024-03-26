@@ -1,28 +1,29 @@
 
+#include <stdlib.h>
+#include <assert.h>
+#include <signal.h>
+#include <string.h>
+#include <unistd.h>
+#include <atomic>
+#include <functional>
+#include <new>
+#include <utility>
+
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/execution/solving_state.hpp"
 #include "app/sat/job/inplace_sharing_aggregation.hpp"
-#include "app/sat/sharing/filter/in_place_clause_filtering.hpp"
-#include "util/assert.hpp"
-#include <atomic>
-#include <sys/types.h>
-#include <stdlib.h>
-#include <fstream>
-#include <cstdio>
-
 #include "sat_process_adapter.hpp"
-
 #include "../execution/engine.hpp"
 #include "util/sys/shared_memory.hpp"
 #include "util/sys/proc.hpp"
 #include "util/sys/subprocess.hpp"
-#include "util/sys/timer.hpp"
 #include "util/sys/process.hpp"
 #include "util/logger.hpp"
-#include "forked_sat_job.hpp"
-#include "anytime_sat_clause_communicator.hpp"
 #include "util/sys/thread_pool.hpp"
-#include "util/sys/fileutils.hpp"
+#include "app/sat/job/clause_pipe.hpp"
+#include "app/sat/job/sat_shared_memory.hpp"
+#include "util/option.hpp"
+#include "util/sys/tmpdir.hpp"
 
 #ifndef MALLOB_SUBPROC_DISPATCH_PATH
 #define MALLOB_SUBPROC_DISPATCH_PATH ""

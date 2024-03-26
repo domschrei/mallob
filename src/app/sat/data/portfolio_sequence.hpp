@@ -1,7 +1,6 @@
 
 #pragma once
 
-#include "util/assert.hpp"
 #include <algorithm>
 #include <cctype>
 #include <string>

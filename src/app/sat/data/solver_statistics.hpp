@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include "clause_histogram.hpp"
+class ClauseHistogram;
 
 struct SolverStatistics {
 

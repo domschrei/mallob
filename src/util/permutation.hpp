@@ -3,9 +3,9 @@
 #define DOMPASCH_PERMUTATION
 
 #include <random>
-#include <algorithm>
-#include <cmath>
-#include "util/hashing.hpp"
+#include <vector>
+
+#include "util/robin_hood.hpp"
 
 class AdjustablePermutation {
 

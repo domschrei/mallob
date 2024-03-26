@@ -1,4 +1,8 @@
 
+#include <assert.h>
+#include <stdlib.h>
+#include <vector>
+
 #include "app/sat/parse/serialized_formula_parser.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"

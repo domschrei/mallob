@@ -1,25 +1,19 @@
 
 #pragma once
 
-#include <array>
 #include <atomic>
 #include <variant>
-#include <shared_mutex>
 
 #include "app/sat/data/clause.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
 #include "app/sat/sharing/filter/generic_clause_filter.hpp"
-#include "util/libcuckoo/cuckoohash_map.hh"
-#include "util/libcuckoo/cuckoohash_util.hh"
 #include "util/logger.hpp"
-#include "util/sys/process.hpp"
 #include "util/tsl/robin_map.h"
 #include "../../data/produced_clause.hpp"
 #include "../../data/produced_clause_candidate.hpp"
 #include "util/sys/threading.hpp"
-#include "util/params.hpp"
 #include "produced_clause_filter_commons.hpp"
-#include "util/sys/background_worker.hpp"
+#include "util/sys/timer.hpp"
 
 typedef std::variant<ProducedUnitClause, ProducedBinaryClause, ProducedLargeClause> AnyProducedClause;
 

@@ -1,23 +1,28 @@
 
-#include <ctype.h>
 #include <stdio.h>
-#include <iostream>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <assert.h>
 #include <fstream>
+#include <cstdint>
+#include <map>
+#include <memory>
+#include <utility>
+#include <vector>
 
 #include "app/sat/proof/trusted/trusted_utils.hpp"
 #include "app/sat/proof/trusted_parser_process_adapter.hpp"
-#include "util/assert.hpp"
 #include "sat_reader.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
 #include "util/sys/terminator.hpp"
 #include "util/sys/timer.hpp"
 #include "util/sys/tmpdir.hpp"
+#include "data/app_configuration.hpp"
+#include "util/option.hpp"
 
 void handleUnsat(const Parameters& _params) {
 	LOG_OMIT_PREFIX(V0_CRIT, "s UNSATISFIABLE\n");

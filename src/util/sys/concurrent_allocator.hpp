@@ -15,13 +15,13 @@ class ConcurrentAllocator {
 
 private:
     BackgroundWorker _worker;
-    std::atomic_bool _thread_done = true;
+    std::atomic_bool _thread_done {true};
 
-    std::atomic_int _num_open = 0;
+    std::atomic_int _num_open {0};
     Mutex _work_mutex;
     std::list<std::pair<T, size_t>> _work_queue;
     
-    std::atomic_int _num_ready = 0;
+    std::atomic_int _num_ready {0};
     Mutex _ready_mutex;
     std::list<std::pair<T, std::shared_ptr<std::vector<uint8_t>>>> _ready_list;
 

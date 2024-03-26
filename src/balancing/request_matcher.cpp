@@ -1,7 +1,7 @@
 
 #include "request_matcher.hpp"
 
-#include "core/scheduling_manager.hpp"
+#include "core/job_registry.hpp"
 
 bool RequestMatcher::isIdle() {
     return !_job_registry->isBusyOrCommitted() 

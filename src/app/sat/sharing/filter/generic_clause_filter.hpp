@@ -1,11 +1,13 @@
 
 #pragma once
 
-#include "app/sat/data/produced_clause_candidate.hpp"
-#include "app/sat/sharing/filter/produced_clause_filter_commons.hpp"
-#include "app/sat/sharing/store/generic_clause_store.hpp"
-#include "util/logger.hpp"
+#include <stddef.h>
 #include <atomic>
+#include "app/sat/sharing/filter/produced_clause_filter_commons.hpp"
+class GenericClauseStore;
+class Logger;
+namespace Mallob { struct Clause; }
+struct ProducedClauseCandidate;
 
 #define MALLOB_CLAUSE_FILTER_NONE 0
 #define MALLOB_CLAUSE_FILTER_BLOOM 1

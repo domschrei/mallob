@@ -2,6 +2,7 @@
 #pragma once
 
 #include "app/sat/data/produced_clause_candidate.hpp"
+#include "util/assert.hpp"
 
 #ifndef MALLOB_MAX_N_APPTHREADS_PER_PROCESS
 #define MALLOB_MAX_N_APPTHREADS_PER_PROCESS 32

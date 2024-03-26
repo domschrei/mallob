@@ -7,8 +7,12 @@
 #include "data/job_transfer.hpp"
 #include "comm/mympi.hpp"
 #include "core/job_registry.hpp"
+#include "comm/mpi_base.hpp"
 
 class SchedulingManager; // forward declaration
+class JobRegistry;
+struct JobRequest;
+struct MessageHandle;
 
 class RequestMatcher {
 

@@ -3,6 +3,7 @@
 #define DOMPASCH_PARAMETERPROCESSOR_H_
 
 #include <list>
+#include <string>
 
 #include "util/option.hpp"
 

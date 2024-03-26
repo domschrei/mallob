@@ -1,15 +1,30 @@
 
-#include <sys/resource.h>
-#include "app/sat/job/sat_constants.h"
-#include "util/assert.hpp"
+#include <assert.h>
+#include <bits/std_abs.h>
+#include <math.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <algorithm>
+#include <set>
 
+#include "app/sat/job/sat_constants.h"
 #include "solver_thread.hpp"
-#include "engine.hpp"
 #include "util/logger.hpp"
 #include "util/random.hpp"
 #include "util/sys/proc.hpp"
 #include "util/hashing.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
+#include "app/sat/data/definitions.hpp"
+#include "app/sat/execution/solving_state.hpp"
+#include "app/sat/execution/variable_translator.hpp"
+#include "app/sat/job/sat_process_config.hpp"
+#include "app/sat/parse/serialized_formula_parser.hpp"
+#include "app/sat/proof/trusted/trusted_utils.hpp"
+#include "app/sat/proof/trusted_checker_process_adapter.hpp"
+#include "app/sat/solvers/portfolio_solver_interface.hpp"
+#include "util/option.hpp"
+#include "util/params.hpp"
 
 using namespace SolvingStates;
 

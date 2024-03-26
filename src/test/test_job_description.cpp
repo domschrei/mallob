@@ -1,14 +1,17 @@
 
-#include <iostream>
-#include "util/assert.hpp"
-#include <vector>
+#include <assert.h>
+#include <stdlib.h>
 #include <string>
+#include <initializer_list>
+#include <memory>
 
 #include "util/random.hpp"
 #include "app/sat/parse/sat_reader.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "app/app_registry.hpp"
+#include "data/job_description.hpp"
+#include "util/params.hpp"
 
 void testSatInstances(Parameters& params) {
 

@@ -1,11 +1,19 @@
 
 #include "routing_tree_request_matcher.hpp"
 
-#include "util/assert.hpp"
+#include <assert.h>
+#include <string.h>
+#include <cstdint>
+#include <string>
+#include <utility>
 
 #include "util/logger.hpp"
-#include "core/scheduling_manager.hpp"
 #include "util/random.hpp"
+#include "comm/msg_queue/message_handle.hpp"
+#include "comm/msgtags.h"
+#include "comm/mympi.hpp"
+#include "comm/randomized_routing_tree.hpp"
+#include "data/serializable.hpp"
 
 const uint8_t COLL_ASSIGN_STATUS = 1;
 const uint8_t COLL_ASSIGN_REQUESTS = 2;

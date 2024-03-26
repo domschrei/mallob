@@ -1,17 +1,25 @@
 
-#include <iostream>
-#include "util/assert.hpp"
+#include <stdlib.h>
 #include <vector>
-#include <string>
+#include <functional>
 
+#include "comm/msg_queue/message_queue.hpp"
 #include "util/random.hpp"
-#include "app/sat/parse/sat_reader.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "comm/mympi.hpp"
 #include "util/params.hpp"
 #include "app/sat/proof/merging/distributed_proof_merger.hpp"
 #include "util/sys/watchdog.hpp"
+#include "app/sat/proof/lrat_line.hpp"
+#include "app/sat/proof/merging/merge_message.hpp"
+#include "app/sat/proof/serialized_lrat_line.hpp"
+#include "comm/mpi_base.hpp"
+#include "comm/msg_queue/message_handle.hpp"
+#include "comm/msgtags.h"
+#include "util/merge_source_interface.hpp"
+#include "util/sys/process.hpp"
+#include "util/sys/thread_pool.hpp"
 
 template<typename T>
 class LambdaMergeSource : public MergeSourceInterface<T> {

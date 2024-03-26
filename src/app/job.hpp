@@ -2,11 +2,18 @@
 #ifndef DOMPASCH_BALANCER_JOB_BASE_H
 #define DOMPASCH_BALANCER_JOB_BASE_H
 
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <string>
 #include <memory>
-#include "util/assert.hpp"
 #include <atomic>
-#include <list>
+#include <algorithm>
+#include <functional>
+#include <optional>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 #include "util/sys/threading.hpp"
 #include "util/params.hpp"
@@ -17,8 +24,12 @@
 #include "util/logger.hpp"
 #include "app/job_tree.hpp"
 #include "comm/job_comm.hpp"
-#include "scheduling/local_scheduler.hpp"
 #include "app/app_message_subscription.hpp"
+#include "util/option.hpp"
+#include "util/robin_hood.hpp"
+#include "util/sys/timer.hpp"
+
+struct IntPairHasher;
 
 typedef std::function<void(JobRequest& req, int tag, bool left, int dest)> EmitDirectedJobRequestCallback;
 

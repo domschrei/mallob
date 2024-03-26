@@ -3,7 +3,6 @@
 #define DOMPASCH_MALLOB_DISTRIBUTED_BFS_HPP
 
 #include <vector>
-#include <map>
 
 #include "data/serializable.hpp"
 #include "data/job_transfer.hpp"

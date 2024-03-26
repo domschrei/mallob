@@ -1,22 +1,26 @@
 
 #pragma once
 
+#include <stddef.h>
 #include <vector>
 #include <set>
-#include <stdexcept>
-#include <functional>
 #include <atomic>
+#include <functional>
+#include <memory>
+#include <string>
 
 #include "app/sat/data/definitions.hpp"
+#include "app/sat/data/solver_statistics.hpp"
+#include "app/sat/execution/solver_setup.hpp"
+#include "app/sat/sharing/generic_import_manager.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
 #include "util/random.hpp"
-#include "util/sys/threading.hpp"
-#include "../data/clause.hpp"
-#include "app/sat/sharing/buffer/buffer_reader.hpp"
 #include "util/logger.hpp"
-#include "../sharing/generic_import_manager.hpp"
-#include "../data/solver_statistics.hpp"
-#include "../execution/solver_setup.hpp"
+
+class BufferReader;
+namespace Mallob {
+struct Clause;
+}  // namespace Mallob
 
 void updateTimer(std::string jobName);
 

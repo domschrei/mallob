@@ -1,18 +1,27 @@
 
+#include <assert.h>
+#include <bits/std_abs.h>
+#include <stdlib.h>
 #include <algorithm>
+#include <memory>
+#include <set>
+#include <string>
+#include <vector>
 
 #include "app/sat/sharing/adaptive_import_manager.hpp"
-
 #include "util/sys/process.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "util/random.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "app/sat/sharing/store/adaptive_clause_store.hpp"
-#include "app/sat/sharing/buffer/buffer_merger.hpp"
-#include "app/sat/sharing/buffer/buffer_reducer.hpp"
-#include "util/sys/terminator.hpp"
-#include "util/assert.hpp"
+#include "app/sat/data/clause.hpp"
+#include "app/sat/data/clause_histogram.hpp"
+#include "app/sat/data/solver_statistics.hpp"
+#include "app/sat/execution/solver_setup.hpp"
+#include "app/sat/sharing/buffer/buffer_builder.hpp"
+#include "app/sat/sharing/buffer/buffer_reader.hpp"
+#include "app/sat/sharing/store/generic_clause_store.hpp"
 
 Mallob::Clause generateClause(int minLength, int maxLength) {
     int length = minLength + (int) (Random::rand() * (maxLength-minLength));

@@ -1,17 +1,11 @@
-/*
- * AllToAllSharingManager.cpp
- *
- *  Created on: Mar 5, 2015
- *      Author: balyo
- */
 
-#include <climits>
 #include <signal.h>
+#include <assert.h>
+#include <ext/alloc_traits.h>
 #include <algorithm>
-#include <fstream>
-#include <cstdio>
-#include <unistd.h>
+#include <utility>
 
+#include "app/sat/sharing/clause_logger.hpp"
 #include "app/sat/sharing/filter/clause_buffer_lbd_scrambler.hpp"
 #include "app/sat/sharing/filter/generic_clause_filter.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
@@ -31,11 +25,17 @@
 #include "app/sat/sharing/clause_id_alignment.hpp"
 #include "app/sat/sharing/filter/importing_solver.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
-#include "util/assert.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "util/random.hpp"
 #include "filter/in_place_clause_filtering.hpp"
+#include "app/sat/data/sharing_statistics.hpp"
+#include "app/sat/execution/solver_setup.hpp"
+#include "app/sat/sharing/buffer/buffer_reader.hpp"
+#include "app/sat/sharing/generic_export_manager.hpp"
+#include "robin_set.h"
+#include "util/option.hpp"
+#include "util/params.hpp"
 
 SharingManager::SharingManager(
 		std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers, 

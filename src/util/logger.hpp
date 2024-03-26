@@ -2,8 +2,11 @@
 #ifndef DOMPASCH_CONSOLE_H
 #define DOMPASCH_CONSOLE_H
 
-#include <string>
 #include <stdarg.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <string>
 
 #define V0_CRIT 0
 #define V1_WARN 1

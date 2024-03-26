@@ -1,6 +1,15 @@
 
-#include "util/assert.hpp"
+#include <assert.h>
+#include <ext/alloc_traits.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <set>
+#include <algorithm>
+#include <cmath>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <utility>
 
 #include "permutation.hpp"
 #include "util/logger.hpp"

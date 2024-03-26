@@ -1,6 +1,13 @@
 
 #include "adaptive_clause_database.hpp"
 
+#include <stdlib.h>
+
+#include "app/sat/data/clause_metadata.hpp"
+#include "app/sat/sharing/buffer/buffer_merger.hpp"
+#include "app/sat/sharing/buffer/buffer_reader.hpp"
+#include "app/sat/sharing/store/bucket_label.hpp"
+
 AdaptiveClauseDatabase::AdaptiveClauseDatabase(Setup setup):
     _total_literal_limit(setup.numLiterals),
     _max_lbd_partitioned_size(setup.maxLbdPartitionedSize),

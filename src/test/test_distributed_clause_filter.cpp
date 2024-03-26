@@ -1,22 +1,15 @@
 
-#include <iostream>
-#include "util/assert.hpp"
 #include <vector>
-#include <string>
-#include <thread>
-#include <set>
-#include <random>
-#include <unistd.h>
 #include <algorithm>
-
+#include <utility>
 
 #include "util/sys/process.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "util/random.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
-#include "util/sys/terminator.hpp"
 #include "app/sat/job/distributed_clause_filter.hpp"
+#include "app/sat/data/clause.hpp"
 
 
 int main() {

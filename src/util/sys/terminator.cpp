@@ -1,7 +1,11 @@
 
 #include "terminator.hpp"
 
+#include <cstdint>
+#include <vector>
+
 #include "comm/mympi.hpp"
+#include "comm/msgtags.h"
 
 std::atomic_bool Terminator::_exit = false;
 

@@ -6,7 +6,6 @@
 #include "app/sat/data/clause_metadata.hpp"
 #include "buffer_iterator.hpp"
 #include "../../data/clause.hpp"
-#include "util/logger.hpp"
 
 class BufferBuilder {
 

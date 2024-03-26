@@ -1,9 +1,19 @@
 
 #pragma once
 
+#include <stddef.h>
+#include <set>
+#include <vector>
+
 #include "portfolio_solver_interface.hpp"
+#include "app/sat/data/clause.hpp"
+#include "app/sat/data/definitions.hpp"
+#include "kissat/src/kissat.h"
+#include "util/sys/threading.hpp"
 
 struct kissat;
+struct SolverSetup;
+struct SolverStatistics;
 
 class Kissat : public PortfolioSolverInterface {
 

@@ -1,10 +1,12 @@
 
+#include <assert.h>
+#include <stdlib.h>
+
 #include "util/sys/timer.hpp"
 #include "util/random.hpp"
 #include "util/logger.hpp"
 #include "util/sys/process.hpp"
 #include "util/sys/thread_pool.hpp"
-
 #include "util/morton/morton_filter.hpp"
 
 void testMortonFilter() {

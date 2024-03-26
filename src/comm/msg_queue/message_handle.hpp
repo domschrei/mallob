@@ -3,9 +3,7 @@
 
 #include <vector>
 #include <cstring>
-
-#include "comm/mpi_base.hpp"
-#include "data/serializable.hpp"
+#include <stdint.h>
 
 /*
 Represents a single message that is being sent or received.

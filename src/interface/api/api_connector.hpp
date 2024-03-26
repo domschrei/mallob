@@ -2,9 +2,15 @@
 #pragma once
 
 #include <future>
+#include <functional>
+#include <utility>
 
 #include "interface/connector.hpp"
 #include "interface/json_interface.hpp"
+#include "util/json.hpp"
+#include "util/logger.hpp"
+
+class Parameters;
 
 class APIConnector : public Connector {
 

@@ -1,11 +1,15 @@
 
+#include <assert.h>
+#include <stddef.h>
 #include <vector>
+#include <string>
+
 #include "util/random.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "util/params.hpp"
-
 #include "app/sat/data/clause_histogram.hpp"
+#include "util/option.hpp"
 
 void testSelection(Parameters& params) {
 

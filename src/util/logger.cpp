@@ -1,18 +1,15 @@
 
+#include <errno.h>
 #include <iostream>
-#include <ostream>
-#include <ctime>
 #include <iomanip>
-#include <cstring>
-#include <cmath>
 #include <cstdlib>
+#include <algorithm>
+#include <utility>
 
 #include "util/sys/fileutils.hpp"
 #include "util/sys/timer.hpp"
-#include "util/sys/threading.hpp"
-#include "util/sys/proc.hpp"
-
 #include "logger.hpp"
+#include "util/logger_defs.h"
 
 // Taken from https://stackoverflow.com/a/17469726
 enum Code {

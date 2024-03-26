@@ -2,20 +2,24 @@
 #ifndef DOMPASCH_MALLOB_MESSAGE_QUEUE_HPP
 #define DOMPASCH_MALLOB_MESSAGE_QUEUE_HPP
 
-#include "message_handle.hpp"
-#include "receive_fragment.hpp"
-#include "send_handle.hpp"
+#include <stdint.h>                        // for uint8_t
+#include <unistd.h>                        // for size_t
+#include <atomic>                          // for atomic_int
+#include <functional>                      // for function
+#include <list>                            // for list, list<>::iterator
+#include <utility>                         // for pair
 
-#include <list>
-#include <cmath>
-#include "util/assert.hpp"
-#include <unistd.h>
-
+#include "comm/mpi_base.hpp"               // for MPI_REQUEST_NULL, MPI_Request
+#include "message_handle.hpp"              // for MessageHandle
+#include "receive_fragment.hpp"            // for ReceiveFragment
+#include "send_handle.hpp"                 // for DataPtr, SendHandle
 #include "util/hashing.hpp"
-#include "util/sys/background_worker.hpp"
-#include "util/logger.hpp"
-#include "comm/msgtags.h"
-#include "util/sys/atomics.hpp"
+#include "util/robin_hood.hpp"             // for unordered_map, unordered_n...
+#include "util/sys/background_worker.hpp"  // for BackgroundWorker
+#include "util/sys/threading.hpp"          // for Mutex, ConditionVariable
+
+struct IntPairHasher;
+
 
 class MessageQueue {
 
@@ -45,7 +49,7 @@ private:
     Mutex _fragmented_mutex;
     ConditionVariable _fragmented_cond_var;
     std::list<ReceiveFragment> _fragmented_queue;
-    std::atomic_int _num_fused = 0;
+    std::atomic_int _num_fused {0};
     Mutex _fused_mutex;
     std::list<MessageHandle> _fused_queue;
 
@@ -56,7 +60,7 @@ private:
     int _max_concurrent_sends = 16;
 
     // Garbage collection
-    std::atomic_int _num_garbage = 0;
+    std::atomic_int _num_garbage {0};
     Mutex _garbage_mutex;
     std::list<DataPtr> _garbage_queue;
 

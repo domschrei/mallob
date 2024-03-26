@@ -1,6 +1,10 @@
 
 #pragma once
 
+#include <string>
+
+class ClauseHistogram;
+
 struct SharingStatistics {
 
 	unsigned long exportedClauses = 0;

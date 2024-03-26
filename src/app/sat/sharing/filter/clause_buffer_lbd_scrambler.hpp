@@ -1,9 +1,11 @@
 
 #pragma once
 
-#include "app/sat/execution/clause_shuffler.hpp"
+#include <vector>
+
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
-#include "util/params.hpp"
+
+class Parameters;
 
 class ClauseBufferLbdScrambler {
 

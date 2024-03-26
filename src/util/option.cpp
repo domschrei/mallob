@@ -1,8 +1,8 @@
 
 #include "option.hpp"
 
+#include <stdlib.h>
 #include <string>
-#include "util/assert.hpp"
 #include <iostream>
 
 Option::Option(OptMap& map, GroupedOptionsList& groupedOpts, const std::string& id, const std::string& longid, const std::string& desc):

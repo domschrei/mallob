@@ -4,7 +4,6 @@
 #include "app/sat/data/clause.hpp"
 #include "app/sat/data/clause_metadata.hpp"
 #include "util/sys/background_worker.hpp"
-#include "util/sys/thread_pool.hpp"
 #include "util/sys/threading.hpp"
 #include <fstream>
 #include <vector>

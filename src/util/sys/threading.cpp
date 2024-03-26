@@ -1,17 +1,10 @@
 
 #include "threading.hpp"
 
-#include <pthread.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <execinfo.h>
-#include <unistd.h>
-#include <signal.h>
-
+#include <bits/chrono.h>
 #include <functional>
 #include <mutex>
 #include <condition_variable>
-#include <chrono>
 
 void Mutex::lock() {
     mtx.lock();

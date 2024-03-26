@@ -1,13 +1,19 @@
 
 #pragma once
 
-#include <list>
+#include <stddef.h>
+#include <set>
+#include <string>
+#include <vector>
 
 #include "portfolio_solver_interface.hpp"
 #include "util/sys/threading.hpp"
-#include "util/logger.hpp"
+#include "app/sat/data/clause.hpp"
+#include "app/sat/data/definitions.hpp"
 
 struct LGL;
+struct SolverSetup;
+struct SolverStatistics;
 
 class Lingeling : public PortfolioSolverInterface {
 

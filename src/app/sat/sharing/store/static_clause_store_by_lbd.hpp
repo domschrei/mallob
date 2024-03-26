@@ -1,9 +1,7 @@
 
 #pragma once
 
-#include <string.h>
 #include <stdio.h>
-#include <assert.h>
 #include <vector>
 
 #include "app/sat/data/clause.hpp"
@@ -11,7 +9,6 @@
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
 #include "util/sys/threading.hpp"
-#include "util/logger.hpp"
 #include "static_clause_store_commons.hpp"
 
 class StaticClauseStoreByLbd : public GenericClauseStore {

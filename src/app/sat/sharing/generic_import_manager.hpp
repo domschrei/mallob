@@ -1,13 +1,14 @@
 
 #pragma once
 
+#include <functional>
+
 #include "app/sat/data/solver_statistics.hpp"
 #include "app/sat/execution/solver_setup.hpp"
-#include "app/sat/sharing/buffer/buffer_reader.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
 #include "util/sys/threading.hpp"
-#include <atomic>
-#include <functional>
+
+struct SolverStatistics;
 
 class GenericImportManager {
 

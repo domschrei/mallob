@@ -1,6 +1,17 @@
 
 #pragma once
 
+#include <assert.h>
+#include <limits>
+#include <algorithm>
+#include <iterator>
+#include <list>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "app/sat/data/clause.hpp"
 #include "app/sat/data/produced_clause_candidate.hpp"
 #include "app/sat/sharing/filter/produced_clause_filter.hpp"
@@ -13,8 +24,10 @@
 #include "util/sys/process.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "util/sys/threading.hpp"
-
-#include <limits>
+#include "app/job_tree.hpp"
+#include "app/sat/sharing/buffer/buffer_builder.hpp"
+#include "app/sat/sharing/buffer/buffer_reader.hpp"
+#include "util/sys/background_worker.hpp"
 
 bool areIntervalsOverlapping(int begin1, int end1, int begin2, int end2);
 

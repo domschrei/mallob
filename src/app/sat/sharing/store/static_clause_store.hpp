@@ -3,9 +3,7 @@
 
 #include <atomic>
 #include <cstdint>
-#include <string.h>
 #include <stdio.h>
-#include <assert.h>
 #include <vector>
 
 #include "app/sat/data/clause.hpp"

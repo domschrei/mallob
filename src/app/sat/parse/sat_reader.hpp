@@ -2,16 +2,15 @@
 #ifndef MALLOB_SAT_READER_H
 #define MALLOB_SAT_READER_H
 
+#include <stdio.h>
+#include <bits/std_abs.h>
+#include <stdlib.h>
 #include <string>
-#include <vector>
-#include <memory>
-#include <stdio.h> 
-#include "util/assert.hpp"
+#include <algorithm>
 
 #include "data/job_description.hpp"
-#include "util/params.hpp"
 
-#include <iostream>
+class Parameters;
 
 class SatReader {
 

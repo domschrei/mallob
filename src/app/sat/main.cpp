@@ -1,24 +1,21 @@
 
-#include <cstdlib>
-#include <iostream>
 #include <stdlib.h>
 #include <unistd.h>
+#include <time.h>
 #include <string>
-#include <vector>
-#include <memory>
-#include "util/assert.hpp"
+#include <exception>
 
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
-#include "util/sys/shared_memory.hpp"
 #include "util/sys/process.hpp"
 #include "util/sys/proc.hpp"
 #include "util/sys/thread_pool.hpp"
-#include "data/checksum.hpp"
 #include "execution/sat_process.hpp"
-#include "util/sys/fileutils.hpp"
 #include "util/sys/tmpdir.hpp"
+#include "app/sat/job/sat_process_config.hpp"
+#include "util/option.hpp"
+#include "util/random.hpp"
 
 #ifndef MALLOB_VERSION
 #define MALLOB_VERSION "(dbg)"

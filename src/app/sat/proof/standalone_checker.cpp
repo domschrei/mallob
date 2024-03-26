@@ -1,12 +1,15 @@
 
-#include "app/job.hpp"
+#include <sys/prctl.h>
+#include <stdlib.h>
+#include <algorithm>
+#include <iosfwd>
+#include <string>
+#include <vector>
+
 #include "app/sat/parse/sat_reader.hpp"
 #include "app/sat/proof/lrat_utils.hpp"
-#include "app/sat/proof/serialized_lrat_line.hpp"
 #include "app/sat/proof/trusted/lrat_checker.hpp"
-#include "app/sat/proof/trusted/trusted_checker_process.hpp"
 #include "app/sat/proof/trusted/trusted_utils.hpp"
-#include "app/sat/proof/trusted_parser_process_adapter.hpp"
 #include "data/job_description.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
@@ -14,8 +17,8 @@
 #include "util/sys/buffered_io.hpp"
 #include "util/sys/proc.hpp"
 #include "util/sys/timer.hpp"
-#include <linux/prctl.h>
-#include <sys/prctl.h>
+#include "app/sat/proof/lrat_line.hpp"
+#include "util/option.hpp"
 
 void exitUnverified() {
     LOG_OMIT_PREFIX(V0_CRIT, "s NOT VERIFIED\n");

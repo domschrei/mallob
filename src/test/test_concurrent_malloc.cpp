@@ -1,15 +1,16 @@
 
-#include <memory.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <vector>
+#include <thread>
+#include <list>
+#include <algorithm>
 
 #include "util/sys/timer.hpp"
 #include "util/params.hpp"
 #include "util/random.hpp"
 #include "util/logger.hpp"
-
-#include <vector>
-#include <thread>
-#include <list>
+#include "util/option.hpp"
 
 void testConcurrentAllocation() {
 

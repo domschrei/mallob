@@ -1,10 +1,13 @@
 
 #pragma once
 
-#include "app/sat/sharing/filter/generic_clause_filter.hpp"
-#include "app/sat/solvers/portfolio_solver_interface.hpp"
-#include <vector>
-#include <memory>
+#include <memory>                                            // for shared_ptr
+#include <vector>                                            // for vector
+#include "app/sat/data/clause_histogram.hpp"                 // for ClauseHi...
+#include "app/sat/data/solver_statistics.hpp"                // for SolverSt...
+#include "app/sat/sharing/filter/generic_clause_filter.hpp"  // for GenericC...
+class GenericClauseStore;
+class PortfolioSolverInterface;
 
 class GenericExportManager {
 

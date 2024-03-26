@@ -1,17 +1,30 @@
 
-#include <thread>
-#include "app/app_message_subscription.hpp"
-#include "util/assert.hpp"
+#include <assert.h>
+#include <string.h>
+#include <algorithm>
+#include <utility>
 
+#include "app/app_message_subscription.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
-#include "comm/mympi.hpp"
 #include "forked_sat_job.hpp"
 #include "anytime_sat_clause_communicator.hpp"
-#include "util/sys/proc.hpp"
-#include "util/sys/process.hpp"
 #include "sat_process_config.hpp"
 #include "util/sys/thread_pool.hpp"
+#include "app/job_tree.hpp"
+#include "app/sat/data/clause_metadata.hpp"
+#include "app/sat/execution/solving_state.hpp"
+#include "app/sat/job/base_sat_job.hpp"
+#include "app/sat/job/sat_constants.h"
+#include "app/sat/job/sat_process_adapter.hpp"
+#include "comm/msgtags.h"
+#include "data/app_configuration.hpp"
+#include "data/checksum.hpp"
+#include "data/job_description.hpp"
+#include "data/job_state.h"
+#include "data/job_transfer.hpp"
+#include "util/option.hpp"
+#include "util/params.hpp"
 
 std::atomic_int ForkedSatJob::_static_subprocess_index = 1;
 

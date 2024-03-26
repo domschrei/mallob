@@ -1,11 +1,16 @@
 
-#include <string>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <assert.h>
+#include <unistd.h>
+#include <string>
+#include <algorithm>
+#include <map>
+#include <memory>
+#include <stdexcept>
+#include <vector>
 
 #include "json_interface.hpp"
-
 #include "util/sys/terminator.hpp"
 #include "util/params.hpp"
 #include "util/random.hpp"
@@ -13,7 +18,13 @@
 #include "app/sat/job/sat_constants.h"
 #include "util/sys/thread_pool.hpp"
 #include "app/app_registry.hpp"
-#include "util/sys/tmpdir.hpp"
+#include "data/app_configuration.hpp"
+#include "data/job_metadata.hpp"
+#include "data/job_result.hpp"
+#include "interface/api/job_id_allocator.hpp"
+#include "optionslist.hpp"
+#include "util/option.hpp"
+#include "util/sys/timer.hpp"
 
 JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson, 
     std::function<void(nlohmann::json&)> feedback) {

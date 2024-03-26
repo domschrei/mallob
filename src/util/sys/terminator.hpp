@@ -2,8 +2,9 @@
 #ifndef DOMPASCH_MALLOB_TERMINATOR_HPP
 #define DOMPASCH_MALLOB_TERMINATOR_HPP
 
-#include <atomic>
 #include <signal.h>
+#include <atomic>
+#include <optional>
 
 #include "util/logger.hpp"
 #include "util/sys/process.hpp"

@@ -2,8 +2,6 @@
 #ifndef DOMPASCH_MALLOB_REDUCEABLE_HPP
 #define DOMPASCH_MALLOB_REDUCEABLE_HPP
 
-#include <memory>
-
 #include "serializable.hpp"
 
 class Reduceable : public Serializable {

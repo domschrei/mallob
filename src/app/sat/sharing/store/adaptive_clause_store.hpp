@@ -2,19 +2,14 @@
 #pragma once
 
 #include <atomic>
-#include <list>
 #include <limits>
 #include <memory>
-#include <numeric>
 
-#include "../../data/produced_clause.hpp"
 #include "app/sat/data/clause_histogram.hpp"
 #include "app/sat/sharing/buffer/buffer_merger.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
 #include "bucket_label.hpp"
 #include "util/logger.hpp"
-#include "util/periodic_event.hpp"
-#include "../../data/solver_statistics.hpp"
 #include "clause_slot.hpp"
 
 class AdaptiveClauseStore : public GenericClauseStore {

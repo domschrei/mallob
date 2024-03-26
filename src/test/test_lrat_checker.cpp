@@ -1,11 +1,14 @@
 
-#include "app/sat/data/clause.hpp"
+#include <assert.h>
+#include <stdlib.h>
+#include <cstdint>
+#include <vector>
+
 #include "app/sat/proof/trusted/lrat_checker.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
 #include "util/random.hpp"
 #include "util/sys/timer.hpp"
-#include <iostream>
 
 bool addCls(LratChecker& chk, uint64_t id, const std::vector<int>& lits, const std::vector<uint64_t>& hints) {
     return chk.addClause(id, lits.data(), lits.size(), hints.data(), hints.size());

@@ -1,13 +1,16 @@
 
 #pragma once
 
+#include <stdint.h>
 #include <vector>
 #include <cstring>
-#include <sstream>
+#include <functional>
+#include <initializer_list>
+#include <string>
+#include <utility>
 
 #include "serializable.hpp"
 #include "data/checksum.hpp"
-#include "data/job_description.hpp"
 #include "util/sys/timer.hpp"
 
 // Context ID: unique to a particular worker for a particular job

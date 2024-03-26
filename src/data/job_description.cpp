@@ -1,8 +1,9 @@
 
-#include "util/assert.hpp"
+#include <assert.h>
+#include <cstdint>
+#include <type_traits>
 
 #include "job_description.hpp"
-#include "util/logger.hpp"
 
 
 void JobDescription::beginInitialization(int revision) {

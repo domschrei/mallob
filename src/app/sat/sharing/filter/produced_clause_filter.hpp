@@ -1,14 +1,11 @@
 
 #pragma once
 
-#include <array>
-
+#include "app/sat/sharing/store/adaptive_clause_database.hpp"
 #include "util/tsl/robin_map.h"
 #include "../../data/produced_clause.hpp"
 #include "../../data/produced_clause_candidate.hpp"
 #include "util/sys/threading.hpp"
-#include "../store/adaptive_clause_database.hpp"
-#include "util/params.hpp"
 #include "produced_clause_filter_commons.hpp"
 
 // Packed struct to get in all meta data for a produced clause.

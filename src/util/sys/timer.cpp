@@ -1,8 +1,5 @@
 
-#include <sys/time.h>
-
 #include "timer.hpp"
-#include "util/params.hpp"
 
 timespec Timer::timespecStart;
 timespec Timer::timespecEnd;

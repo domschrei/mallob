@@ -1,7 +1,9 @@
 
 #include "buffer_reader.hpp"
-#include "app/sat/data/clause_metadata.hpp"
+
 #include "util/logger.hpp"
+#include "app/sat/data/clause.hpp"
+#include "app/sat/sharing/buffer/buffer_iterator.hpp"
 
 BufferReader::BufferReader(int* buffer, int size, int maxEffClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum) : 
         _buffer(buffer), _size(size),

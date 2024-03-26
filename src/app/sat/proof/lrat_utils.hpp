@@ -1,12 +1,17 @@
 
 #pragma once
 
+#include <assert.h>
+#include <bits/std_abs.h>
+#include <stdint.h>
 #include <fstream>
+#include <vector>
 
+#include "app/sat/proof/serialized_lrat_line.hpp"
 #include "lrat_line.hpp"
-#include "serialized_lrat_line.hpp"
-#include "util/logger.hpp"
 #include "util/sys/buffered_io.hpp"
+
+class SerializedLratLine;
 
 namespace lrat_utils {
 

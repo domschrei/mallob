@@ -1,12 +1,13 @@
 
+#include <stdlib.h>
 #include <bitset>
+#include <vector>
 
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
 #include "util/sys/proc.hpp"
 #include "util/random.hpp"
 #include "util/sys/process.hpp"
-
 #include "app/sat/sharing/filter/bloom_clause_filter.hpp"
 #include "util/atomic_bitset/atomic_wide_bitset.hpp"
 #include "util/atomic_bitset/atomic_bitset.hpp"

@@ -2,13 +2,16 @@
 #ifndef DOMPASCH_MALLOB_FORK_H
 #define DOMPASCH_MALLOB_FORK_H
 
+#include <sys/types.h>
 #include <set>
 #include <atomic>
 #include <optional>
+#include <string>
 
 #include "util/sys/threading.hpp"
 
 class BackgroundWorker; // forward declaration
+class Mutex;
 
 class Process {
 

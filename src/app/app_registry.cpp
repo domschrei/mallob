@@ -1,6 +1,13 @@
 
 #include "app_registry.hpp"
 
+#include <stdlib.h>
+#include <iostream>
+#include <memory>
+#include <utility>
+
+#include "robin_hash.h"
+#include "robin_map.h"
 
 namespace app_registry {
 

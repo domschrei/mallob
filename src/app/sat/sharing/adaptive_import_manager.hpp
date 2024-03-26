@@ -2,12 +2,10 @@
 #pragma once
 
 #include <vector>
-#include <list>
 
 #include "app/sat/data/clause.hpp"
 #include "app/sat/data/clause_histogram.hpp"
 #include "app/sat/data/clause_metadata.hpp"
-#include "app/sat/sharing/buffer/buffer_reader.hpp"
 #include "app/sat/sharing/generic_import_manager.hpp"
 #include "store/adaptive_clause_store.hpp"
 #include "../execution/solver_setup.hpp"

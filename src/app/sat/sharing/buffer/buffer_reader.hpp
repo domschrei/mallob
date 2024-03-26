@@ -1,13 +1,18 @@
 
 #pragma once
 
+#include <assert.h>
+#include <stdlib.h>
 #include <cstring>
+#include <string>
+#include <vector>
 
 #include "util/assert.hpp"
 #include "buffer_iterator.hpp"
 #include "../../data/clause.hpp"
 #include "util/hashing.hpp"
 #include "util/logger.hpp"
+#include "app/sat/data/clause_metadata.hpp"
 
 class BufferReader {
 private:

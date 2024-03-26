@@ -1,6 +1,8 @@
 
 #pragma once
 
+#include <ext/alloc_traits.h>
+#include <stddef.h>
 #include <atomic>
 #include <vector>
 #include <memory>
@@ -14,6 +16,11 @@
 #include "data/checksum.hpp"
 #include "data/job_result.hpp"
 #include "../job/sat_process_config.hpp"
+
+class Logger;
+class PortfolioSolverInterface;
+class SharingManager;
+struct SolverSetup;
 
 class SatEngine {
 

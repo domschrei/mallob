@@ -1,22 +1,20 @@
 
 #pragma once
 
-#include <memory>
-#include <set>
-#include <map>
+#include <stddef.h>                        // for size_t
+#include <stdint.h>                        // for uint8_t
+#include <vector>                          // for vector
 
-#include "comm/mpi_base.hpp"
-#include "comm/msg_queue/message_handle.hpp"
-#include "comm/msg_queue/message_queue.hpp"
-#include "data/serializable.hpp"
-#include "util/sys/timer.hpp"
-#include "util/sys/concurrent_allocator.hpp"
-#include "util/hashing.hpp"
+#include "comm/mpi_base.hpp"               // for MPI_Comm, MPI_Request, MPI_Op
+#include "comm/msg_queue/send_handle.hpp"  // for DataPtr
 
-#include "msgtags.h"
+class MessageQueue;
+class Parameters;  // lines 13-13
+class Serializable;  // lines 12-12
 
 #define MIN_PRIORITY 0
 
+class Serializable;
 class Parameters;
 
 class MyMpi {

@@ -3,8 +3,11 @@
 #define DOMPASCH_MALLOB_DUMMY_READER_HPP
 
 #include <string>
+#include <vector>
 
 #include "data/job_description.hpp"
+
+class JobDescription;
 
 namespace DummyReader {
     /*
