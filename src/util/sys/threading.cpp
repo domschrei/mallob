@@ -1,7 +1,7 @@
 
 #include "threading.hpp"
 
-#include <bits/chrono.h>
+#include <chrono>
 #include <functional>
 #include <mutex>
 #include <condition_variable>
