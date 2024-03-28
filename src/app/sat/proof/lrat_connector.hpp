@@ -35,6 +35,7 @@ private:
     bool _launched {false};
     bool _unsat_validated {false};
     bool _sat_validated {false};
+    volatile bool _sat_validation_requested {false};
 
     // buffering
     static constexpr int MAX_CLAUSE_LENGTH {512};
@@ -108,7 +109,14 @@ public:
         _ringbuf.pushBlocking(op);
     }
     bool setSolution(const int* modelData, size_t modelSize) {
-        return _checker.setModel(modelData, modelSize);
+        // setModel() is threadsafe and only succeeds for one single call
+        bool success = _checker.setModel(modelData, modelSize);
+        if (success) {
+            // Signal a concluding request to the emitter thread.
+            _sat_validation_requested = true;
+            _ringbuf.markExhausted(); // "wakes up" blocked emitter thread
+        }
+        return success;
     }
     bool waitForUnsatValidation() {
         while (!_unsat_validated) usleep(1000);
@@ -170,9 +178,15 @@ private:
         // Lrat operation emission loop
         LratOp op;
         while (_bg_emitter.continueRunning()) {
-            // Wait for an op, then poll it
-            bool ok = _ringbuf.pollBlocking(op);
-            if (!ok) continue;
+            if (MALLOB_UNLIKELY(_sat_validation_requested)) {
+                // SAT validation requested, model is already present in _checker
+                op = LratOp {10};
+                _sat_validation_requested = false;
+                // SAT op is submitted below
+            } else if (!_ringbuf.pollBlocking(op)) { // poll for an op
+                // no success
+                continue;
+            }
             //LOG(V2_INFO, "PROOF> submit %s\n", op.toStr().c_str());
             _checker.submit(op);
         }

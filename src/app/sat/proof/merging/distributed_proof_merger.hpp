@@ -454,7 +454,8 @@ private:
                     if (line.isDeletionStatement()) {
                         // deletion
                         auto [hints, nbHints] = line.getHints();
-                        if (!compactifier.handleClauseDeletion(nbHints, hints))
+                        int newNbHints = nbHints;
+                        if (!compactifier.handleClauseDeletion(newNbHints, hints))
                             continue;
                         lrat_utils::writeDeletionLine(out, 1, hints, nbHints, lrat_utils::NORMAL);
                     } else {

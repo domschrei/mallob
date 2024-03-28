@@ -119,6 +119,20 @@ struct LratLine {
             + sizeof(int) + hints.size()*sizeof(LratClauseId);
     }
 
+    LratClauseId& getId() {return id;}
+    std::pair<const int*, int> getLiterals() const {
+        return std::pair<const int*, int>(
+            literals.data(), 
+            literals.size()
+        );
+    }
+    std::pair<const LratClauseId*, int> getHints() const {
+        return std::pair<const LratClauseId*, int>(hints.data(), hints.size());
+    }
+    std::pair<LratClauseId*, int> getHints() {
+        return std::pair<LratClauseId*, int>(hints.data(), hints.size());
+    }
+
     bool isDeletionStatement() const {
         return id == 0;
     }

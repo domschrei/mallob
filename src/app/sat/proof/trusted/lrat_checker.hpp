@@ -113,6 +113,7 @@ public:
     inline bool deleteClause(const u64* ids, int nbIds) {
         for (int i = 0; i < nbIds; i++) {
             auto id = ids[i];
+            if (id == 0) continue;
             auto it = _clauses.find(id);
             if (it == _clauses.end()) {
                 snprintf(_errmsg, 512, "Clause deletion: ID %lu not found", id);

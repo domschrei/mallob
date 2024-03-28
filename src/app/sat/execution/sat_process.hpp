@@ -62,10 +62,7 @@ public:
     void run() {
         SatEngine engine(_params, _config, _log);
         try {
-            mainProgram(engine);
-            // Everything has been safely cleaned up, so we can send the terminate response
-            // which allows the parent process to clean up all the shared memory.
-            _hsm->didTerminate = true;
+            mainProgram(engine); // does not return
         } catch (const std::exception& ex) {
             LOG(V0_CRIT, "[ERROR] uncaught \"%s\"\n", ex.what());
             Process::doExit(1);

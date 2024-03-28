@@ -138,7 +138,14 @@ public:
             getNumLiterals()
         );
     }
-    std::pair<LratClauseId*, int> getHints() const {
+    std::pair<const LratClauseId*, int> getHints() const {
+        int dataStartIdx = getDataPosOfNumHints(getNumLiterals())+sizeof(int);
+        int numHints = getNumHints();
+        assert(dataStartIdx+sizeof(LratClauseId)*numHints <= _data.size());
+        const LratClauseId* ptr = (const LratClauseId*) (_data.data()+dataStartIdx);
+        return std::pair<const LratClauseId*, int>(ptr, numHints);
+    }
+    std::pair<LratClauseId*, int> getHints() {
         int dataStartIdx = getDataPosOfNumHints(getNumLiterals())+sizeof(int);
         int numHints = getNumHints();
         assert(dataStartIdx+sizeof(LratClauseId)*numHints <= _data.size());

@@ -398,10 +398,9 @@ void SolverThread::reportResult(int res, int revision) {
         if (lrat) {
             LOGGER(_logger, V3_VERB, "Validating SAT ...\n");
             // omit first "0" in solution vector
-            if (lrat->setSolution(solution.data()+1, solution.size()-1)) {
-                // solution accepted
-                lrat->push({10});
-            } // else: another solver reported SAT earlier. Wait indefinitely
+            lrat->setSolution(solution.data()+1, solution.size()-1);
+            // Whether or not this was successful (another thread might have been earlier),
+            // wait until SAT was validated.
             lrat->waitForSatValidation();
         }
         _state_mutex.lock();

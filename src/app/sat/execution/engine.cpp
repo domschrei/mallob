@@ -565,7 +565,7 @@ void SatEngine::cleanUp(bool hardTermination) {
 		return;
 	}
 	_cleaned_up = true;
-	
+
 	// join and delete threads
 	for (auto& thread : _solver_threads) thread->tryJoin();
 	for (auto& thread : _obsolete_solver_threads) thread->tryJoin();
