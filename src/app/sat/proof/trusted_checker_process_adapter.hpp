@@ -44,6 +44,7 @@ private:
     SPSCBlockingRingbuffer<LratOp> _op_queue;
 
     bool _error_reported {false};
+    bool _model_set {false};
     std::vector<int> _model;
     Mutex _mtx_model;
 
@@ -153,8 +154,9 @@ public:
 
     bool setModel(const int* modelData, size_t modelSize) {
         auto lock = _mtx_model.getLock();
-        if (!_model.empty()) return false;
+        if (_model_set) return false;
         _model = std::vector(modelData, modelData + modelSize);
+        _model_set = true;
         return true;
     }
 
