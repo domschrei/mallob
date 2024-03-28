@@ -38,11 +38,13 @@ fi
 # Lingeling
 if echo $solvers|grep -q "l"; then
     if [ ! -d lingeling ]; then
-        if [ ! -f lingeling-isc22.zip ]; then
-            wget -nc https://dominikschreiber.de/share/lingeling-isc22.zip
+        if [ ! -f lingeling.zip ]; then
+            # for fixing a branch instead of a commit, prepend "refs/heads/"
+	    branchorcommit="89a167d0d2efe98d983c87b5b84175b40ea55842" # version 1.0.0, March 2024
+            wget -nc https://github.com/arminbiere/lingeling/archive/${branchorcommit}.zip -O lingeling.zip
         fi
-        unzip lingeling-isc22.zip
-        mv lingeling-*/ lingeling
+        unzip lingeling.zip
+        mv lingeling-* lingeling
     fi
 fi
 
