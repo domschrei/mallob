@@ -276,10 +276,16 @@ int main(int argc, char *argv[]) {
     if (params.preCleanup()) {
         LOG(V2_INFO, "Cleaning up pre-execution\n");
 
-        std::string subprocName = MALLOB_SUBPROC_DISPATCH_PATH"mallob_sat_process";
-        std::string cmd = "killall -9 " + subprocName + " 2>/dev/null";
-        LOG(V2_INFO, "Killing old subprocesses: \"%s\"\n", cmd.c_str());
-        (void) system(cmd.c_str());
+        for (const std::string& subprocName : {
+            MALLOB_SUBPROC_DISPATCH_PATH"mallob_sat_process",
+            MALLOB_SUBPROC_DISPATCH_PATH"impcheck_parse",
+            MALLOB_SUBPROC_DISPATCH_PATH"impcheck_check",
+            MALLOB_SUBPROC_DISPATCH_PATH"impcheck_confirm",
+        }) {
+            std::string cmd = "killall -9 " + subprocName + " 2>/dev/null";
+            LOG(V2_INFO, "Killing old subprocesses: \"%s\"\n", cmd.c_str());
+            (void) system(cmd.c_str());
+        }
 
         auto doRemove = [&](const std::string& fileOrDir) {
             LOG(V2_INFO, "Remove %s\n", fileOrDir.c_str());
