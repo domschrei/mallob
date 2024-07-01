@@ -8,7 +8,12 @@ logs/*
 .api/jobs.*
 .api/users
 lib/*/
+lib/*.zip
+lib/*.tgz
+lib/*.tar.gz
 build/
+data/
+bin/
 instances/*.cnf
 instances/*.cnf.xz
 instances/*.uri
