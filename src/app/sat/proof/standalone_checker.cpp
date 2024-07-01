@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
         }
     }
     if (!cnfInput || !proofInput) {
-        LOG(V0_CRIT, "Usage: %s <cnf-file> <proof-file>\n", argv[0]);
+        LOG(V0_CRIT, "Usage: %s <cnf-file> <proof-file> [--reversed] [--deduplicate]\n", argv[0]);
         exitUnverified();
     }
 

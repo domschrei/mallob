@@ -1,5 +1,5 @@
 [![status](https://joss.theoj.org/papers/700e9010c4080ffe8ae4df21cf1cc899/status.svg)](https://joss.theoj.org/papers/700e9010c4080ffe8ae4df21cf1cc899)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6890240.svg)](https://doi.org/10.5281/zenodo.6890240)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6890239.svg)](https://doi.org/10.5281/zenodo.6890239)
 
 # Introduction
 
@@ -29,14 +29,19 @@ Note that we only support Linux as an operating system.
 
 ## Building
 
-```
-# This call is only necessary if building with MALLOB_APP_SAT (enabled by default).
+```bash
+# Only needed if building with MALLOB_APP_SAT (enabled by default).
 # For non-x86-64 architectures (ARM, POWER9, etc.), prepend `DISABLE_FPU=1` to "bash".
 ( cd lib && bash fetch_and_build_sat_solvers.sh )
+
+# Build Mallob
 mkdir -p build
 cd build
 CC=$(which mpicc) CXX=$(which mpicxx) cmake -DCMAKE_BUILD_TYPE=RELEASE -DMALLOB_APP_SAT=1 -DMALLOB_USE_JEMALLOC=1 -DMALLOB_LOG_VERBOSITY=4 -DMALLOB_ASSERT=1 -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\" ..
 make; cd ..
+
+# Optional - only needed for on-the-fly LRAT checking
+( cd lib && bash fetch_and_build_impcheck.sh && cp impcheck/build/impcheck_* ../build/ )
 ```
 
 Specify `-DCMAKE_BUILD_TYPE=RELEASE` for a release build or `-DCMAKE_BUILD_TYPE=DEBUG` for a debug build.
@@ -49,11 +54,12 @@ You can use the following Mallob-specific build options:
 | -DMALLOB_LOG_VERBOSITY=<0..6>               | Only compile logging messages of the provided maximum verbosity and discard more verbose log calls.        |
 | -DMALLOB_SUBPROC_DISPATCH_PATH=\\"path\\"   | Subprocess executables must be located under <path> for Mallob to find. (Use `\"build/\"` by default.)     |
 | -DMALLOB_USE_ASAN=<0/1>                     | Compile with Address Sanitizer for debugging purposes.                                                     |
-| -DMALLOB_USE_GLUCOSE=<0/1>                  | Compile with support for Glucose SAT solver (disabled by default due to licensing issues, see below).      |
+| -DMALLOB_USE_GLUCOSE=<0/1>                  | Compile with support for Glucose SAT solver (disabled by default for licensing reasons, see below).        |
 | -DMALLOB_USE_JEMALLOC=<0/1>                 | Compile with Scalable Memory Allocator `jemalloc` instead of default `malloc`.                             |
 | -DMALLOB_APP_KMEANS=<0/1>                   | Compile with K-Means clustering engine.                                                                    |
 | -DMALLOB_APP_SAT=<0/1>                      | Compile with SAT solving engine.                                                                           |
-| -DMALLOB_MAX_N_APPTHREADS_PER_PROCESS=<0/1> | Max. number of application threads (solver threads for SAT) per process to support. (max: 128)             |
+| -DMALLOB_MAX_N_APPTHREADS_PER_PROCESS=<N>   | Max. number of application threads (solver threads for SAT) per process to support. (max: 128)             |
+| -DMALLOB_BUILD_LRAT_MODULES=<0/1>           | Also build standalone LRAT checker                                                                         |
 
 ## Docker
 
@@ -85,6 +91,8 @@ Running the tests takes a few minutes and in the end "All tests done." should be
 
 # Usage
 
+We first explain how to execute Mallob in general, then detail how to solve an isolated problem and then turn to solving many instances in a row or at the same time.
+
 ## General
 
 Given a single machine with two hardware threads per core, the following command executed in Mallob's base directory assigns one MPI process to each set of four physical cores (eight hardware threads) and then runs four solver threads on each MPI process.
@@ -111,28 +119,57 @@ This can be combined with the `-q` option to suppress Mallob's output to STDOUT.
 Verbosity of logging can be set with the `-v` option (as long as Mallob was compiled with the respective verbosity or higher, see `-DMALLOB_LOG_VERBOSITY` above).
 All further options of Mallob can be seen by executing Mallob with the `-h` option. (This also works without the `mpirun` prefix.)
 
-For running Mallob on distributed clusters, please also consult [the scripts and documentation from our Euro-Par 2022 software artifact](https://doi.org/10.6084/m9.figshare.20000642), [our more recent quickstart guide for clusters](docs/clusters.md) and/or the user documentation of your particular cluster.
+For running Mallob on distributed clusters, please also consult [our quickstart guide for clusters](docs/clusters.md) and/or the user documentation of your particular cluster.
 
-## Solve a single problem
+## SAT Solving
 
-Use Mallob option `-mono=$PROBLEM_FILE` where `$PROBLEM_FILE` is the path and file name of the problem to solve (DIMACS CNF format, possibly with .xz or .lzma compression, for SAT; whitespace-separated plain text file for K-Means). Specify the application of this instance with `-mono-app=sat` or `-mono-app=kmeans`. 
+In general, in order to let Mallob process only a single instance, use option `-mono=$PROBLEM_FILE` where `$PROBLEM_FILE` is the path and file name of the problem to solve (DIMACS CNF format, possibly with .xz or .lzma compression, for SAT; whitespace-separated plain text file for K-Means). Specify the application of this instance with `-mono-app=sat` or `-mono-app=kmeans`.
 
 In this mode, all processes participate in solving, overhead is minimal, and Mallob terminates immediately after the job has been processed.
+Use option `-s2f=path/to/output.txt` ("solution to file") to write the result and (if applicable) the found satisfying assignment to a text file.
 
 ### Producing Proofs of Unsatisfiability
 
-CaDiCaL is the only supported solver backend for parallel/distributed proof production (which does not really impact performance negatively – see D. Schreiber's doctoral thesis).
+To enable proof production, just set the option `-proof=path/to/final/compressed/prooffile.lrat` together with `-mono=path/to/input.cnf`. You also need to set a log directory with `-proof-dir=path/to/dir` where intermediate files will be written to on each machine. The final proof is output in compressed LRAT format.
 
-To enable proof production, just set the option `-proof=path/to/final/compressed/prooffile.lrat` together with `-mono=path/to/input/cnf`. You also need to set a log directory with `-log=path/to/logdir` where intermediate files will be written to on each machine. The final proof in compressed LRAT format will then be written to the specified destination.
+CaDiCaL is currently the only supported solver backend for parallel/distributed proof production. However, it is possible to employ other solvers as long as their only purpose is to find a satisfying assignment (i.e., exported clauses and unsatisfiability results from these solvers are discarded). See *Portfolio Tweaking* below.
 
-You can use the [`drat-trim`](https://github.com/marijnheule/drat-trim) tool suite to decompress and check a proof:
+For instance, you can check the output proof with the standalone LRAT checker that comes with Mallob if you set `-DMALLOB_BUILD_LRAT_MODULES=1` at build time:
 ```bash
-decompress proof.lrat > proof-dec.lrat
-lrat-check path/to/input/cnf proof-dec.lrat
+build/standalone_lrat_checker path/to/input.cnf path/to/final/compressed/prooffile.lrat
 ```
-Note however that you need to set the following definition in `decompress.c` before building:
-```c
-#define MODE 2      // DRAT: MODE=1; LRAT: MODE=2
+Further synergies are possible; you can set `-uninvert=0` for Mallob and `--reversed` for the checker to avoid one entire I/O pass over the proof that "uninverts" its lines.
+You can use the [`drat-trim`](https://github.com/marijnheule/drat-trim) tool suite to decompress a proof; note that you need to `#define MODE 2` (1=DRAT, 2=LRAT) in `decompress.c` before building.
+
+### Trusted solving *without* explicit proof production
+
+Proof production can be costly and bottlenecked by the I/O bandwidth of the single process which needs to write the entire proof. A more scalable approach is to check all proof information on-the-fly, without writing it to disk, and to transfer clause soundness guarantees across machines via cryptographic signatures. This is explained in detail in our [2024 SAT publication](https://dominikschreiber.de/papers/2024-sat-trusted-pre.pdf).
+
+Execute the command chain fetching and building [ImpCheck](https://github.com/domschrei/impcheck) in the above *Building* section. Then just use Mallob's option `-otfc=1` (without any `-proof*` options) to enable on-the-fly checking. Again, only CaDiCaL is supported for UNSAT whereas any solver can be employed for boosting satisfying assignments. By default, found satisfying assignments are also validated, which can be disabled via `-otfcm=0`.
+
+Log lines of the following shape are reporting a trusted result from a proof checking process:
+```
+c 0.851 0 <#11606> S0.0 TRUSTED checker reported UNSAT - sig c6c0a823f35ce38cdb31c9483dc98143
+```
+```
+c 0.242 0 <#11607> S0.0 TRUSTED checker reported SAT - sig a43e47d81715035d79290d1a6acf05e8
+```
+To be extra safe (e.g., if you are suspecting garbled or tampered-with logging output), execute the following command to validate the output signature:
+```bash
+build/impcheck_confirm -formula-input=path/to/input.cnf -result=X -result-sig=SIG
+```
+where `X` is either 10 (for SAT) or 20 (for UNSAT), and `SIG` is the reported signature.
+
+### Portfolio Tweaking
+
+Mallob allows to customize the employed SAT solver backends and some of their flavors. This is done with the `-satsolver` option, which expects a string representing the solver backends to cycle over. The option also allows for a limited set of regular expression symbols. Here are some examples:
+```bash
+... -satsolver='c' # CaDiCaL only.
+... -satsolver='kcl' # Kissat, CaDiCaL, Lingeling, Kissat, CaDiCaL, Lingeling, Kissat, ...
+... -satsolver='k(c)*' # One Kissat, then only CaDiCaL (always put brackets around the argument of '*')
+... -satsolver='kCLCLcl' # Capital letters indicate using truly incremental SAT solving for incremental jobs
+... -satsolver='l+(c!){37}' # One Lingeling configured for satisfiable instances (+), then 37 LRAT-producing (!) CaDiCaLs, repeat
+... -satsolver='(c!){37}k+((c!){37}l+)*' # As above, but replacing the 1st Lingeling with Kissat
 ```
 
 ## Solve multiple instances in an orchestrated manner
