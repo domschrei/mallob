@@ -308,6 +308,7 @@ Mallob can be extended in the following ways:
 # Licensing and remarks
 
 The source code of Mallob can be used, changed and redistributed under the terms of the **Lesser General Public License (LGPLv3)**, one exception being the Glucose interface which is excluded from compilation by default (see below).
+**Please approach us if you require a deviating license.**
 
 The used versions of Lingeling, YalSAT, CaDiCaL, and Kissat are MIT-licensed, as is HordeSat (the massively parallel solver system our SAT engine was based on) and the proof-related tools which are included and/or fetched in the `tools/` directory.
 
@@ -402,5 +403,6 @@ If you make use of Mallob in an academic setting or in a competitive event, plea
 Further references:
 
 * **[Mallob IPASIR Bridge for incremental SAT solving](https://github.com/domschrei/mallob-ipasir-bridge)**
-* **[Experimental data of our publications](https://github.com/domschrei/mallob-experimental-data)**
-* **[Repository of our Euro-Par 2022 software artifact](https://github.com/domschrei/europar22-artifact-mallob)**
+* **[ImpCheck - Immediate Massively Parallel Propositional Proof Checking](https://github.com/domschrei/impcheck)**
+* **[Experimental data at Zenodo](https://zenodo.org/doi/10.5281/zenodo.10184679)**
+* **[Mallob at Helmholtz Research Software Directory (RSD)](https://helmholtz.software/software/mallob)**
