@@ -57,12 +57,7 @@ You can use the following Mallob-specific build options:
 
 ## Docker
 
-We also provide a Dockerfile using an Ubuntu 20.04 setup.
-
-```
-cd docker/leader
-docker build -t mallob:leader ../.. -f ./Dockerfile
-```
+We also provide a setup based on Docker containerization. Please consult the documentation in the `docker/` directory.
 
 ## Bash Autocompletion
 
