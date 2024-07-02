@@ -56,8 +56,9 @@ function run() {
     echo "[$testcount] -np $@"
     np=$1
     shift 1
+    echo "ARGS: $@" > _systest
     if echo "$@"|grep -q "incrementaltest"; then
-        RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $np --oversubscribe build/mallob $@ 2>&1 > _systest &
+        RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $np --oversubscribe build/mallob $@ 2>&1 >> _systest &
         waitpids=$!
         for f in _incremental_jobs-* ; do
             run_incremental "$f" &
@@ -69,7 +70,7 @@ function run() {
             echo "Wait for $pid done"
         done
     else
-        RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $np --oversubscribe build/mallob $@ 2>&1 > _systest
+        RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $np --oversubscribe build/mallob $@ 2>&1 >> _systest
         #RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $np --oversubscribe build/mallob $@ 2>&1 |grep -B10 -A10 "No such file"
     fi
 }
@@ -93,6 +94,21 @@ function check() {
     fi
     if grep -q "assertresult=UNSAT" _systest && ! grep -q "found result UNSAT" _systest ; then
         error "Expected result UNSAT was not found."
+    fi
+    if grep -qE "assertresult=V(UN)?SAT" _systest; then
+        sig=$(cat _systest|grep -oE "TRUSTED checker reported (UN)?SAT - sig [0-9a-f]{32}"|grep -oE "[0-9a-f]{32}")
+        res=$(cat .mallob_result)
+        input=$(cat _systest|grep -oP "\-mono=.*?\.cnf "|sed 's/-mono=//g'|sed 's/ $//g')
+        build/impcheck_confirm -formula-input=$input -result=$(cat .mallob_result) -result-sig=$sig >> _systest
+        if [ $res != 10 ] && [ $res != 20 ]; then
+            error "Invalid result $res reported."
+        fi
+        if [ $res == 10 ] && ! grep -q "s VERIFIED SATISFIABLE" _systest; then
+            error "SAT was not properly verified."
+        fi
+        if [ $res == 20 ] && ! grep -q "s VERIFIED UNSATISFIABLE" _systest; then
+            error "UNSAT was not properly verified."
+        fi
     fi
     if grep -q "checkjsonresults" _systest; then
         cd .api/jobs.0/introduced

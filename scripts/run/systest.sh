@@ -15,19 +15,17 @@ if [ x$GLUCOSE == x1 ]; then
 fi
 
 function test_mono() {
-    for mode in fork thread; do
-        for slv in l${glucose}ck; do
+    for slv in l${glucose}ck; do
 
-            instancefile="instances/r3sat_300.cnf"
-            test 1 -t=1 -mono=$instancefile -satsolver=$slv -appmode=$mode -assertresult=SAT $@
-            test 1 -t=8 -mono=$instancefile -satsolver=$slv -appmode=$mode -assertresult=SAT $@
-            test 8 -t=2 -mono=$instancefile -satsolver=$slv -appmode=$mode -assertresult=SAT $@
+        instancefile="instances/r3sat_300.cnf"
+        test 1 -t=1 -mono=$instancefile -satsolver=$slv -assertresult=SAT $@
+        test 1 -t=8 -mono=$instancefile -satsolver=$slv -assertresult=SAT $@
+        test 8 -t=2 -mono=$instancefile -satsolver=$slv -assertresult=SAT $@
 
-            instancefile="instances/r3unsat_300.cnf"
-            test 1 -t=1 -mono=$instancefile -satsolver=$slv -appmode=$mode -assertresult=UNSAT $@
-            test 1 -t=8 -mono=$instancefile -satsolver=$slv -appmode=$mode -assertresult=UNSAT $@
-            test 8 -t=2 -mono=$instancefile -satsolver=$slv -appmode=$mode -assertresult=UNSAT $@
-        done
+        instancefile="instances/r3unsat_300.cnf"
+        test 1 -t=1 -mono=$instancefile -satsolver=$slv -assertresult=UNSAT $@
+        test 1 -t=8 -mono=$instancefile -satsolver=$slv -assertresult=UNSAT $@
+        test 8 -t=2 -mono=$instancefile -satsolver=$slv -assertresult=UNSAT $@
     done
 }
 
@@ -116,6 +114,20 @@ function test_certified_unsat() {
     test_cert_unsat 8 instances/r3unsat_250.cnf -assertresult=UNSAT -t=2 $@
 }
 
+function test_ontheflycheck() {
+    
+    instancefile="instances/r3sat_200.cnf"
+    test 1 -t=1 -mono=$instancefile -otfc=1 -assertresult=VSAT
+    test 1 -t=8 -mono=$instancefile -otfc=1 -satsolver='k+l+(c)*' -assertresult=VSAT
+    test 4 -t=4 -mono=$instancefile -otfc=1 -satsolver='k+l+(c)*' -assertresult=VSAT
+    
+    for instancefile in instances/r3unsat_{2,3}00.cnf ; do
+        test 1 -t=1 -mono=$instancefile -otfc=1 -assertresult=VUNSAT
+        test 1 -t=8 -mono=$instancefile -otfc=1 -satsolver='k+l+(c)*' -assertresult=VUNSAT
+        test 4 -t=4 -mono=$instancefile -otfc=1 -satsolver='k+l+(c)*' -assertresult=VUNSAT
+    done
+}
+
 
 if [ -z "$1" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
     echo "Usage: [nocleanup=1] $0 [<mallob-option-overrides>] <test case> [<more test cases> ...]"
@@ -137,6 +149,7 @@ while [ ! -z "$1" ]; do
             test_many_incremental $progopts
             test_incremental_scheduling $progopts
             test_certified_unsat $progopts
+            test_ontheflycheck $progopts
             ;;
         mono)
             test_mono $progopts
@@ -164,6 +177,9 @@ while [ ! -z "$1" ]; do
             ;;
         certunsat)
             test_certified_unsat $progopts
+            ;;
+        ontheflycheck)
+            test_ontheflycheck $progopts
             ;;
         -*)
             print_separator
