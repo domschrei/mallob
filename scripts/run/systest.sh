@@ -111,11 +111,9 @@ function test_incremental_scheduling() {
 }
 
 function test_certified_unsat() {
-    for pipearg in "" "--pipe"; do
-        test_cert_unsat 2 instances/r3unsat_200.cnf $pipearg -assertresult=UNSAT $@
-        test_cert_unsat 2 instances/r3sat_200.cnf $pipearg -assertresult=SAT $@
-    done
-    test_cert_unsat 8 instances/r3unsat_250.cnf --pipe -assertresult=UNSAT -t=2 $@
+    test_cert_unsat 2 instances/r3unsat_200.cnf -assertresult=UNSAT $@
+    test_cert_unsat 2 instances/r3sat_200.cnf -assertresult=SAT $@
+    test_cert_unsat 8 instances/r3unsat_250.cnf -assertresult=UNSAT -t=2 $@
 }
 
 

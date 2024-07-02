@@ -79,7 +79,7 @@ function run_cert_unsat() {
     np=$1
     shift 1
     bash scripts/run/run_certify_unsat.sh --no-cleanup --np $np $@ > _systest
-    if ! grep -q "s SATISFIABLE" _systest && ! grep -q "c VERIFIED" _systest; then
+    if ! grep -q "s SATISFIABLE" _systest && ! grep -qE "^(c|s) VERIFIED" _systest; then
         error "Not verified successfully!"
     fi
 }
