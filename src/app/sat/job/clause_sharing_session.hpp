@@ -107,7 +107,7 @@ public:
         if (_stage == AGGREGATING_CLAUSES && _allreduce_clauses.advance().hasResult()) {
 
             // Some clauses may have been left behind during merge
-            if (_excess_clauses_from_merge.size() > sizeof(size_t)/sizeof(int)) {
+            if (_excess_clauses_from_merge.size() > 4) {
                 // Add them as produced clauses to your local solver
                 // so that they can be re-exported (if they are good enough)
                 _job->returnClauses(_excess_clauses_from_merge);
@@ -145,7 +145,7 @@ public:
             } else {
                 // No distributed filtering: Sharing is done!
                 LOG(V5_DEBG, "%s CS digest w/o filter\n", _job->toStr());
-                _job->digestSharingWithoutFilter(_broadcast_clause_buffer);
+                _job->digestSharingWithoutFilter(_epoch, _broadcast_clause_buffer);
                 if (_cls_history) {
                     InplaceClauseAggregation(_broadcast_clause_buffer).stripToRawBuffer();
                     _cls_history->importSharing(_epoch, std::move(_broadcast_clause_buffer));

@@ -10,6 +10,7 @@
 #include <utility>
 
 #include "app/sat/data/clause_metadata.hpp"
+#include "app/sat/execution/clause_pipe_defs.hpp"
 #include "app/sat/execution/solving_state.hpp"
 #include "app/sat/job/inplace_sharing_aggregation.hpp"
 #include "sat_process_adapter.hpp"
@@ -96,7 +97,6 @@ void SatProcessAdapter::doInitialize() {
     _hsm = new ((char*)mainShmem) SatSharedMemory();
     _hsm->fSize = _f_size;
     _hsm->aSize = _a_size;
-    _hsm->desiredRevision = _config.firstrev;
     _hsm->config = _config;
     _sum_of_revision_sizes += _f_size;
 
@@ -155,7 +155,6 @@ void SatProcessAdapter::applySolvingState() {
     }
     if (_state == SolvingStates::SUSPENDED || _state == SolvingStates::STANDBY) {
         Process::suspend(_child_pid); // Stop (suspend) process.
-        _pending_tasks.clear(); // delete pending tasks
     }
     if (_state == SolvingStates::ACTIVE) {
         Process::resume(_child_pid); // Continue (resume) process.
@@ -170,103 +169,43 @@ void SatProcessAdapter::doTerminateInitializedProcess() {
 }
 
 void SatProcessAdapter::collectClauses(int maxSize) {
-    if (!_initialized) return;
-    if (_hsm->doExport || _hsm->didExport) return;
-    _hsm->exportLiteralLimit = maxSize;
-    _hsm->doExport = true;
+    if (!_initialized || _state != SolvingStates::ACTIVE || _clause_collecting_stage != NONE)
+        return;
+    _pipe->writeData({maxSize}, CLAUSE_PIPE_PREPARE_CLAUSES);
+    _clause_collecting_stage = QUERIED;
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
 bool SatProcessAdapter::hasCollectedClauses() {
-    return !_initialized || (_hsm->doExport && _hsm->didExport);
+    return !_initialized || _state != SolvingStates::ACTIVE || _clause_collecting_stage == RETURNED;
 }
 std::vector<int> SatProcessAdapter::getCollectedClauses(int& successfulSolverId, int& numLits) {
-    if (!_initialized || !hasCollectedClauses()) return std::vector<int>();
-    std::vector<int> clauses = _pipe->readData();
-    successfulSolverId = _hsm->successfulSolverId;
-    numLits = _hsm->numCollectedLits;
-    _hsm->doExport = false;
-    return clauses;
+    if (_clause_collecting_stage != RETURNED) return std::vector<int>();
+    _clause_collecting_stage = NONE;
+    return std::move(_collected_clauses);
 }
 int SatProcessAdapter::getLastAdmittedNumLits() {
     return _last_admitted_nb_lits;
 }
 
-bool SatProcessAdapter::process(BufferTask& task) {
-
-    if (!_initialized || _hsm->doFilterImport || _hsm->doDigestImportWithFilter 
-            || _hsm->doReturnClauses || _hsm->doDigestImportWithoutFilter 
-            || _hsm->doDigestHistoricClauses) {
-        return false;
-    }
-
-    auto& buffer = task.payload;
-    if (task.type == BufferTask::FILTER_CLAUSES) {
-        InplaceClauseAggregation agg(buffer);
-        _hsm->importBufferRevision = _clause_buffer_revision;
-        _epoch_of_export_buffer = task.epoch;
-        _hsm->winningSolverId = agg.successfulSolver();
-        assert(_hsm->winningSolverId >= -1);
-        _hsm->doFilterImport = true;
-        _pipe->writeData(buffer.data(), buffer.size() - InplaceClauseAggregation::numMetadataInts());
-        _epochs_to_filter.erase(task.epoch);
-
-    } else if (task.type == BufferTask::APPLY_FILTER) {
-        if (_epoch_of_export_buffer == task.epoch) {
-            _hsm->importEpoch = task.epoch;
-            _hsm->doDigestImportWithFilter = true;
-            _pipe->writeData(buffer);
-        } // else: discard this filter since the clauses are not present in any buffer
-
-    } else if (task.type == BufferTask::RETURN_CLAUSES) {
-        _hsm->doReturnClauses = true;
-        _pipe->writeData(buffer);
-
-    } else if (task.type == BufferTask::DIGEST_CLAUSES_WITHOUT_FILTER) {
-        _hsm->importBufferRevision = _clause_buffer_revision;
-        _hsm->importEpoch = task.epoch;
-        _hsm->doDigestImportWithoutFilter = true;
-        _pipe->writeData(buffer.data(), buffer.size() - InplaceClauseAggregation::numMetadataInts());
-
-    } else if (task.type == BufferTask::DIGEST_HISTORIC_CLAUSES) {
-        _hsm->historicEpochBegin = task.epoch;
-        _hsm->historicEpochEnd = task.epochEnd;
-        _hsm->importBufferRevision = _clause_buffer_revision;
-        _hsm->doDigestHistoricClauses = true;
-        _pipe->writeData(buffer);
-    }
-
-    if (_hsm->isInitialized) Process::wakeUp(_child_pid);
-    return true;
-}
-
-void SatProcessAdapter::tryProcessNextTasks() {
-    if (!_initialized || _state == SolvingStates::ABORTING) return;
-    while (!_pending_tasks.empty() && process(_pending_tasks.front())) {
-        _pending_tasks.pop_front();
-    }
-}
-
 void SatProcessAdapter::filterClauses(int epoch, const std::vector<int>& clauses) {
-    getLocalFilter(-1); // fetch any previous, old result
-    _epochs_to_filter.insert(epoch);
-    _pending_tasks.emplace_back(BufferTask{BufferTask::FILTER_CLAUSES, clauses, epoch});
-    tryProcessNextTasks();
+    if (!_initialized || _state != SolvingStates::ACTIVE) return;
+    _pipe->writeData(clauses, {epoch},
+        CLAUSE_PIPE_FILTER_IMPORT);
+    if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
 
 bool SatProcessAdapter::hasFilteredClauses(int epoch) {
     if (!_initialized) return true; // will return dummy
     if (_state != SolvingStates::ACTIVE) return true; // may return dummy
-    if (_epochs_to_filter.count(epoch)) {
-        return false; // filtering task still in processing queue, job is active
-    }
-    return _hsm->doFilterImport && _hsm->didFilterImport;
+    return _filters_by_epoch.count(epoch);
 }
 
 std::vector<int> SatProcessAdapter::getLocalFilter(int epoch) {
     std::vector<int> filter;
-    if (_initialized && _hsm->doFilterImport && _hsm->didFilterImport) {
-        filter = _pipe->readData();
-        _hsm->doFilterImport = false;
+    auto it = _filters_by_epoch.find(epoch);
+    if (it != _filters_by_epoch.end()) {
+        filter = std::move(it->second);
+        _filters_by_epoch.erase(it);
         assert(filter.size() >= ClauseMetadata::enabled() ? 2 : 0);
         if (_epoch_of_export_buffer != epoch)
             filter.resize(ClauseMetadata::enabled() ? 2 : 0); // wrong epoch
@@ -277,29 +216,31 @@ std::vector<int> SatProcessAdapter::getLocalFilter(int epoch) {
 }
 
 void SatProcessAdapter::applyFilter(int epoch, const std::vector<int>& filter) {
-    _pending_tasks.emplace_back(BufferTask{BufferTask::APPLY_FILTER, filter, epoch});
-    tryProcessNextTasks();
+    if (!_initialized || _state != SolvingStates::ACTIVE) return;
+    _pipe->writeData(filter, {epoch}, CLAUSE_PIPE_DIGEST_IMPORT);
+    if (_hsm->isInitialized) Process::wakeUp(_child_pid);
+}
+
+void SatProcessAdapter::digestClausesWithoutFilter(int epoch, const std::vector<int>& clauses) {
+    if (!_initialized || _state != SolvingStates::ACTIVE) return;
+    _pipe->writeData(clauses, {epoch}, CLAUSE_PIPE_DIGEST_IMPORT_WITHOUT_FILTER);
+    if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
 
 void SatProcessAdapter::returnClauses(const std::vector<int>& clauses) {
-    _pending_tasks.emplace_back(BufferTask{BufferTask::RETURN_CLAUSES, clauses, -1});
-    tryProcessNextTasks();
+    if (!_initialized || _state != SolvingStates::ACTIVE) return;
+    _pipe->writeData(clauses, {_clause_buffer_revision}, CLAUSE_PIPE_RETURN_CLAUSES);
 }
 
 void SatProcessAdapter::digestHistoricClauses(int epochBegin, int epochEnd, const std::vector<int>& clauses) {
-    _pending_tasks.emplace_back(BufferTask{BufferTask::DIGEST_HISTORIC_CLAUSES, clauses, epochBegin, epochEnd});
-    tryProcessNextTasks();
-}
-
-void SatProcessAdapter::digestClausesWithoutFilter(const std::vector<int>& clauses) {
-    _pending_tasks.emplace_back(BufferTask{BufferTask::DIGEST_CLAUSES_WITHOUT_FILTER, clauses, -1});
-    tryProcessNextTasks();
+    if (!_initialized || _state != SolvingStates::ACTIVE) return;
+    _pipe->writeData(clauses, {epochBegin, epochEnd, _clause_buffer_revision}, CLAUSE_PIPE_DIGEST_HISTORIC);
 }
 
 
 void SatProcessAdapter::dumpStats() {
-    if (!_initialized) return;
-    _hsm->doDumpStats = true;
+    if (!_initialized || _state != SolvingStates::ACTIVE) return;
+    _pipe->writeData({}, CLAUSE_PIPE_DUMP_STATS);
     // No hard need to wake up immediately
 }
 
@@ -330,26 +271,25 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
 
     doWriteRevisions();
 
-    if (_hsm->didReturnClauses)         _hsm->doReturnClauses         = false;
-    if (_hsm->didDigestHistoricClauses) _hsm->doDigestHistoricClauses = false;
-    if (_hsm->didStartNextRevision)     _hsm->doStartNextRevision     = false;
-    if (_hsm->didDumpStats)             _hsm->doDumpStats             = false;
-    if (_hsm->didReduceThreadCount)     _hsm->doReduceThreadCount     = false;
-    if (_hsm->didDigestImport) {
-        _hsm->doDigestImportWithFilter = false;
-        _hsm->doDigestImportWithoutFilter = false;
-        _last_admitted_nb_lits = _hsm->lastAdmittedStats.nbAdmittedLits;
+    if (_state != SolvingStates::ACTIVE) return NORMAL;
+
+    char c = _pipe->pollForData();
+    if (c == CLAUSE_PIPE_PREPARE_CLAUSES) {
+        _collected_clauses = _pipe->readData(c);
+        _clause_collecting_stage = RETURNED;
+        LOG(V4_VVER, "collected clauses from subprocess\n");
+    } else if (c == CLAUSE_PIPE_FILTER_IMPORT) {
+        std::vector<int> filter = _pipe->readData(c);
+        int epoch = filter.back(); filter.pop_back();
+        _filters_by_epoch[epoch] = std::move(filter);
+    } else if (c == CLAUSE_PIPE_DIGEST_IMPORT) {
+        _last_admitted_nb_lits = _pipe->readData(c).front();
     }
 
-    if (!_hsm->doStartNextRevision 
-        && !_hsm->didStartNextRevision 
-        && _published_revision < _written_revision) {
-        _published_revision++;
-        _hsm->desiredRevision = _desired_revision;
-        _hsm->doStartNextRevision = true;
+    if (_published_revision < _written_revision) {
+        _published_revision = _written_revision;
+        _pipe->writeData({_desired_revision, _published_revision}, CLAUSE_PIPE_START_NEXT_REVISION);
     }
-
-    tryProcessNextTasks();
 
     // Solution preparation just ended?
     if (!_solution_in_preparation && _solution_prepare_future.valid()) {
@@ -440,8 +380,8 @@ void SatProcessAdapter::crash() {
 }
 
 void SatProcessAdapter::reduceThreadCount() {
-    if (!_hsm->doReduceThreadCount && !_hsm->didReduceThreadCount)
-        _hsm->doReduceThreadCount = true;
+    if (!_initialized || _state != SolvingStates::ACTIVE) return;
+    _pipe->writeData({}, CLAUSE_PIPE_REDUCE_THREAD_COUNT);
 }
 
 SatProcessAdapter::~SatProcessAdapter() {

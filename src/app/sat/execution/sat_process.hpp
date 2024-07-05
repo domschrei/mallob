@@ -9,6 +9,7 @@
 #include <vector>
 #include <memory>
 #include "app/sat/data/clause_metadata.hpp"
+#include "app/sat/job/inplace_sharing_aggregation.hpp"
 #include "util/assert.hpp"
 
 #include "util/sys/timer.hpp"
@@ -20,6 +21,7 @@
 #include "data/checksum.hpp"
 #include "util/sys/terminator.hpp"
 #include "app/sat/job/clause_pipe.hpp"
+#include "clause_pipe_defs.hpp"
 
 #include "engine.hpp"
 #include "../job/sat_shared_memory.hpp"
@@ -35,6 +37,7 @@ private:
     SatSharedMemory* _hsm;
 
     int _last_imported_revision;
+    int _last_present_revision;
     int _desired_revision;
     Checksum* _checksum;
 
@@ -73,6 +76,26 @@ public:
     }
 
 private:
+    void doImportClauses(SatEngine& engine, std::vector<int>& incomingClauses, std::vector<int>* filterOrNull, int revision, int epoch) {
+        LOGGER(_log, V5_DEBG, "DO import clauses rev=%i\n", revision);
+        // Write imported clauses from shared memory into vector
+        if (revision >= 0) engine.setClauseBufferRevision(revision);
+        if (filterOrNull) {
+            engine.digestSharingWithFilter(incomingClauses, *filterOrNull);
+        } else {
+            engine.digestSharingWithoutFilter(incomingClauses);
+        }
+        engine.addSharingEpoch(epoch);
+        engine.syncDeterministicSolvingAndCheckForLocalWinner();
+        _hsm->lastAdmittedStats = engine.getLastAdmittedClauseShare();
+    }
+
+    int popLast(std::vector<int>& v) {
+        int res = v.back();
+        v.pop_back();
+        return res;
+    }
+
     void mainProgram(SatEngine& engine) {
 
         // Set up pipe communication for clause sharing
@@ -92,6 +115,7 @@ private:
         _desired_revision = _config.firstrev;
         readFormulaAndAssumptionsFromSharedMem(engine, 0);
         _last_imported_revision = 0;
+        _last_present_revision = 0;
         // Import subsequent revisions
         importRevisions(engine);
         if (checkTerminate(engine, false)) return;
@@ -107,6 +131,8 @@ private:
 
         int exitStatus = 0;
 
+        bool collectClauses = false;
+        int exportLiteralLimit;
         std::vector<int> incomingClauses;
 
         // Main loop
@@ -125,104 +151,101 @@ private:
             // Read new revisions as necessary
             importRevisions(engine);
 
-            // Dump stats
-            if (_hsm->doDumpStats && !_hsm->didDumpStats) {
-                LOGGER(_log, V5_DEBG, "DO dump stats\n");
-                
-                engine.dumpStats(/*final=*/false);
+            char c;
+            while ((c = pipe.pollForData()) != 0) {
 
-                // For this management thread
-                double cpuShare; float sysShare;
-                bool success = Proc::getThreadCpuRatio(Proc::getTid(), cpuShare, sysShare);
-                if (success) {
-                    LOGGER(_log, V3_VERB, "child_main cpuratio=%.3f sys=%.3f\n", cpuShare, sysShare);
-                }
+                if (c == CLAUSE_PIPE_DUMP_STATS) {
+                    LOGGER(_log, V5_DEBG, "DO dump stats\n");
+                    pipe.readData(c, true);
 
-                // For each solver thread
-                std::vector<long> threadTids = engine.getSolverTids();
-                for (size_t i = 0; i < threadTids.size(); i++) {
-                    if (threadTids[i] < 0) continue;
-                    
-                    success = Proc::getThreadCpuRatio(threadTids[i], cpuShare, sysShare);
+                    engine.dumpStats(/*final=*/false);
+
+                    // For this management thread
+                    double cpuShare; float sysShare;
+                    bool success = Proc::getThreadCpuRatio(Proc::getTid(), cpuShare, sysShare);
                     if (success) {
-                        LOGGER(_log, V3_VERB, "td.%ld cpuratio=%.3f sys=%.3f\n", threadTids[i], cpuShare, sysShare);
+                        LOGGER(_log, V3_VERB, "child_main cpuratio=%.3f sys=%.3f\n", cpuShare, sysShare);
                     }
-                }
 
-                auto rtInfo = Proc::getRuntimeInfo(Proc::getPid(), Proc::SubprocessMode::FLAT);
-                LOGGER(_log, V3_VERB, "child_mem=%.3fGB\n", 0.001*0.001*rtInfo.residentSetSize);
+                    // For each solver thread
+                    std::vector<long> threadTids = engine.getSolverTids();
+                    for (size_t i = 0; i < threadTids.size(); i++) {
+                        if (threadTids[i] < 0) continue;
+                        
+                        success = Proc::getThreadCpuRatio(threadTids[i], cpuShare, sysShare);
+                        if (success) {
+                            LOGGER(_log, V3_VERB, "td.%ld cpuratio=%.3f sys=%.3f\n", threadTids[i], cpuShare, sysShare);
+                        }
+                    }
 
-                _hsm->didDumpStats = true;
-            }
-            if (!_hsm->doDumpStats) _hsm->didDumpStats = false;
+                    auto rtInfo = Proc::getRuntimeInfo(Proc::getPid(), Proc::SubprocessMode::FLAT);
+                    LOGGER(_log, V3_VERB, "child_mem=%.3fGB\n", 0.001*0.001*rtInfo.residentSetSize);
 
-            // Check if clauses should be exported
-            if (_hsm->doExport && !_hsm->didExport && engine.isReadyToPrepareSharing()) {
-                LOGGER(_log, V5_DEBG, "DO export clauses\n");
-                // Collect local clauses, put into shared memory
-                _hsm->exportChecksum = Checksum();
-                _hsm->successfulSolverId = -1;
-                auto clauses = engine.prepareSharing(_hsm->exportLiteralLimit, _hsm->successfulSolverId, _hsm->numCollectedLits);
-                if (!clauses.empty()) {
-                    _hsm->didExport = true;
-                    pipe.writeData(clauses);
-                }
-            }
-            if (!_hsm->doExport) _hsm->didExport = false;
+                } else if (c == CLAUSE_PIPE_PREPARE_CLAUSES) {
+                    collectClauses = true;
+                    exportLiteralLimit = pipe.readData(c, true)[0];
 
-            // Check if clauses should be filtered
-            if (_hsm->doFilterImport && !_hsm->didFilterImport) {
-                LOGGER(_log, V5_DEBG, "DO filter clauses\n");
-                int winningSolverId = _hsm->winningSolverId;
-                incomingClauses = pipe.readData();
-                auto filter = engine.filterSharing(incomingClauses);
-                _hsm->didFilterImport = true;
-                pipe.writeData(filter);
-                if (winningSolverId >= 0) {
-                    LOGGER(_log, V4_VVER, "winning solver ID: %i", winningSolverId);
-                    engine.setWinningSolverId(winningSolverId);
-                }
-            }
-            if (!_hsm->doFilterImport) _hsm->didFilterImport = false;
+                } else if (c == CLAUSE_PIPE_FILTER_IMPORT) {
+                    incomingClauses = pipe.readData(c, true);
+                    int epoch = popLast(incomingClauses);
+                    InplaceClauseAggregation agg(incomingClauses);
+                    int winningSolverId = agg.successfulSolver();
+                    int bufferRevision = agg.maxRevision();
+                    agg.stripToRawBuffer();
+                    LOGGER(_log, V5_DEBG, "DO filter clauses\n");
+                    engine.setClauseBufferRevision(bufferRevision);
+                    auto filter = engine.filterSharing(incomingClauses);
+                    pipe.writeData(filter, {epoch}, CLAUSE_PIPE_FILTER_IMPORT);
+                    if (winningSolverId >= 0) {
+                        LOGGER(_log, V4_VVER, "winning solver ID: %i\n", winningSolverId);
+                        engine.setWinningSolverId(winningSolverId);
+                    }
 
-            // Check if clauses should be digested (must not be "from the future")
-            if ((_hsm->doDigestImportWithFilter || _hsm->doDigestImportWithoutFilter) 
-                    && !_hsm->didDigestImport && _hsm->importBufferRevision <= _last_imported_revision) {
-                LOGGER(_log, V5_DEBG, "DO import clauses\n");
-                // Write imported clauses from shared memory into vector
-                engine.setClauseBufferRevision(_hsm->importBufferRevision);
-                if (_hsm->doDigestImportWithFilter) {
-                    auto filter = pipe.readData();
-                    engine.digestSharingWithFilter(incomingClauses, filter);
+                } else if (c == CLAUSE_PIPE_DIGEST_IMPORT) {
+                    auto filter = pipe.readData(c, true);
+                    int epoch = popLast(filter);
+                    doImportClauses(engine, incomingClauses, &filter, -1, epoch);
+
+                } else if (c == CLAUSE_PIPE_DIGEST_IMPORT_WITHOUT_FILTER) {
+                    incomingClauses = pipe.readData(c, true);
+                    int epoch = popLast(incomingClauses);
+                    InplaceClauseAggregation agg(incomingClauses);
+                    int bufferRevision = agg.maxRevision();
+                    agg.stripToRawBuffer();
+                    doImportClauses(engine, incomingClauses, nullptr, bufferRevision, epoch);
+
+                } else if (c == CLAUSE_PIPE_RETURN_CLAUSES) {
+                    LOGGER(_log, V5_DEBG, "DO return clauses\n");
+                    auto clauses = pipe.readData(c, true);
+                    int bufferRevision = popLast(clauses);
+                    engine.setClauseBufferRevision(bufferRevision);
+                    engine.returnClauses(clauses);
+
+                } else if (c == CLAUSE_PIPE_DIGEST_HISTORIC) {
+                    LOGGER(_log, V5_DEBG, "DO digest historic clauses\n");
+                    auto data = pipe.readData(c, true);
+                    int bufferRevision = popLast(data);
+                    int epochEnd = popLast(data);
+                    int epochBegin = popLast(data);
+                    engine.setClauseBufferRevision(bufferRevision);
+                    engine.digestHistoricClauses(epochBegin, epochEnd, data);
+
+                } else if (c == CLAUSE_PIPE_REDUCE_THREAD_COUNT) {
+                    LOGGER(_log, V3_VERB, "DO reduce thread count\n");
+                    pipe.readData(c, true);
+                    engine.reduceActiveThreadCount();
+
+                } else if (c == CLAUSE_PIPE_START_NEXT_REVISION) {
+                    LOGGER(_log, V5_DEBG, "DO start next revision\n");
+                    auto data = pipe.readData(c, true);
+                    _last_present_revision = popLast(data);
+                    _desired_revision = popLast(data);
+
                 } else {
-                    engine.digestSharingWithoutFilter(incomingClauses);
+                    LOGGER(_log, V0_CRIT, "[ERROR] Unknown pipe directive \"%c\"!\n", c);
+                    abort();
                 }
-                engine.addSharingEpoch(_hsm->importEpoch);
-                engine.syncDeterministicSolvingAndCheckForLocalWinner();
-                _hsm->lastAdmittedStats = engine.getLastAdmittedClauseShare();
-                _hsm->didDigestImport = true;
             }
-            if (!_hsm->doDigestImportWithFilter && !_hsm->doDigestImportWithoutFilter) 
-                _hsm->didDigestImport = false;
-
-            // Re-insert returned clauses into the local clause database to be exported later
-            if (_hsm->doReturnClauses && !_hsm->didReturnClauses) {
-                LOGGER(_log, V5_DEBG, "DO return clauses\n");
-                auto clauses = pipe.readData();
-                engine.returnClauses(clauses);
-                _hsm->didReturnClauses = true;
-            }
-            if (!_hsm->doReturnClauses) _hsm->didReturnClauses = false;
-
-            if (_hsm->doDigestHistoricClauses && !_hsm->didDigestHistoricClauses) {
-                LOGGER(_log, V5_DEBG, "DO digest historic clauses\n");
-                engine.setClauseBufferRevision(_hsm->importBufferRevision);
-                auto clauses = pipe.readData();
-                engine.digestHistoricClauses(_hsm->historicEpochBegin, _hsm->historicEpochEnd, 
-                    clauses);
-                _hsm->didDigestHistoricClauses = true;
-            }
-            if (!_hsm->doDigestHistoricClauses) _hsm->didDigestHistoricClauses = false;
 
             // Check initialization state
             if (!_hsm->isInitialized && engine.isFullyInitialized()) {
@@ -237,13 +260,18 @@ private:
                 break;
             }
 
-            // Reduce active thread count (to reduce memory usage)
-            if (_hsm->doReduceThreadCount && !_hsm->didReduceThreadCount) {
-                LOGGER(_log, V3_VERB, "Reducing thread count\n");
-                engine.reduceActiveThreadCount();
-                _hsm->didReduceThreadCount = true;
+            // Collect clauses if ready for sharing
+            if (collectClauses && engine.isReadyToPrepareSharing()) {
+                LOGGER(_log, V5_DEBG, "DO export clauses\n");
+                // Collect local clauses, put into shared memory
+                int successfulSolverId = -1;
+                int numCollectedLits;
+                auto clauses = engine.prepareSharing(exportLiteralLimit, successfulSolverId, numCollectedLits);
+                if (!clauses.empty()) {
+                    pipe.writeData(clauses, {numCollectedLits, successfulSolverId}, CLAUSE_PIPE_PREPARE_CLAUSES);
+                }
+                collectClauses = false;
             }
-            if (!_hsm->doReduceThreadCount) _hsm->didReduceThreadCount = false;
 
             // Do not check solved state if the current 
             // revision has already been solved
@@ -368,19 +396,12 @@ private:
     }
 
     void importRevisions(SatEngine& engine) {
-        while ((_hsm->doStartNextRevision && !_hsm->didStartNextRevision) 
-                || _last_imported_revision < _desired_revision) {
+        while (_last_imported_revision < _last_present_revision) {
             if (checkTerminate(engine, false)) return;
-            if (_hsm->doStartNextRevision && !_hsm->didStartNextRevision) {
-                _desired_revision = _hsm->desiredRevision;
-                _last_imported_revision++;
-                readFormulaAndAssumptionsFromSharedMem(engine, _last_imported_revision);
-                _hsm->didStartNextRevision = true;
-                _hsm->hasSolution = false;
-            } else doSleep();
-            if (!_hsm->doStartNextRevision) _hsm->didStartNextRevision = false;
+            _last_imported_revision++;
+            readFormulaAndAssumptionsFromSharedMem(engine, _last_imported_revision);
+            _hsm->hasSolution = false;
         }
-        if (!_hsm->doStartNextRevision) _hsm->didStartNextRevision = false;
     }
 
     void doSleep() {

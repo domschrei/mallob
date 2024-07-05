@@ -153,6 +153,10 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		}
 		*solverToAdd += numFullCycles + (i < begunCyclePos);
 	}
+	if (config.incremental && hasPseudoincrementalSolvers) {
+		LOG(V0_CRIT, "[ERROR] Non-incremental solvers are currently unsupported for incremental jobs.\n");
+		abort();
+	}
 
 	// Solver-agnostic options each solver in the portfolio will receive
 	SolverSetup setup;
@@ -309,9 +313,11 @@ void SatEngine::appendRevision(int revision, size_t fSize, const int* fLits, siz
 			));
 		} else {
 			if (_solver_interfaces[i]->getSolverSetup().doIncrementalSolving) {
+				LOGGER(_logger, V4_VVER, "Solver %i is incremental: forward next revision\n", i);
 				// True incremental SAT solving
 				_solver_threads[i]->appendRevision(revision, fSize, fLits, aSize, aLits);
 			} else {
+				LOGGER(_logger, V4_VVER, "Solver %i is non-incremental: phase out\n", i);
 				if (!lastRevisionForNow) {
 					// Another revision will be imported momentarily: 
 					// Wait with restarting a whole new solver thread
@@ -410,11 +416,12 @@ int SatEngine::solveLoop() {
 bool SatEngine::isReadyToPrepareSharing() const {
 	// If certified UNSAT is enabled, no sharing operation can be ongoing
 	// (otherwise, this op must be finished first, for clause ID consistency)
-	return !ClauseMetadata::enabled() || !_sharing_manager->isSharingOperationOngoing();
+	return !_params.proofOutputFile.isSet() || !_sharing_manager->isSharingOperationOngoing();
 }
 
 void SatEngine::setClauseBufferRevision(int revision) {
 	if (isCleanedUp()) return;
+ 	LOGGER(_logger, V5_DEBG, "set clause rev=%i\n", revision);
 	_sharing_manager->setImportedRevision(revision);
 }
 

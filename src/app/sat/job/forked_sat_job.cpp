@@ -295,9 +295,9 @@ void ForkedSatJob::applyFilter(int epoch, std::vector<int>& filter) {
     if (!isInitialized()) return;
     _solver->applyFilter(epoch, filter);
 }
-void ForkedSatJob::digestSharingWithoutFilter(std::vector<int>& clauses) {
+void ForkedSatJob::digestSharingWithoutFilter(int epoch, std::vector<int>& clauses) {
     if (!isInitialized()) return;
-    _solver->digestClausesWithoutFilter(clauses);
+    _solver->digestClausesWithoutFilter(epoch, clauses);
     if (getJobTree().isRoot()) {
         LOG(V3_VERB, "%s : Digested clause buffer of size %ld\n", toStr(), clauses.size());
     }

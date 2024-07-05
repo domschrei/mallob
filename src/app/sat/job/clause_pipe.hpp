@@ -5,9 +5,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <fcntl.h>
 #include <string>
+#include <sys/poll.h>
 #include <sys/stat.h>
 #include <vector>
+#include <poll.h>
 
 #include "util/logger.hpp"
 #include "util/assert.hpp"
@@ -24,6 +27,8 @@ private:
     std::string _path_in;
     FILE* _pipe_out;
     FILE* _pipe_in;
+
+    char _read_tag = 0;
 
 public:
     BiDirectionalPipe(Mode mode, const std::string& fifoOut, const std::string& fifoIn) :
@@ -50,32 +55,66 @@ public:
             _pipe_out = fopen(_path_out.c_str(), "w");
             assert(_pipe_out);
         }
+        // non-blocking reading
+        for (auto stream : {_pipe_in}) {
+            int fd = fileno(stream);
+            int retval = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
+            assert(retval == 0);
+        }
     }
 
-    std::vector<int> readData() {
-        int size, nbRead;
-        nbRead = fread(&size, sizeof(int), 1, _pipe_in);
-        assert(nbRead == 1);
+    char pollForData() {
+        if (_read_tag == 0) {
+            int nbRead = fread(&_read_tag, 1, 1, _pipe_in);
+            assert((nbRead == 0) == (_read_tag == 0));
+        }
+        return _read_tag;
+    }
+
+    std::vector<int> readData(char& contentTag, bool assertRightTag = false) {
+        char expectedTag = contentTag;
+        if (_read_tag == 0) {
+            while (fread(&contentTag, 1, 1, _pipe_in) == 0) {}
+        } else {
+            contentTag = _read_tag;
+            _read_tag = 0;
+        }
+        assert(contentTag != 0);
+        if (assertRightTag) assert(expectedTag == contentTag);
+        int size;
+        readNonblocking(&size, sizeof(int));
         std::vector<int> out(size);
-        nbRead = fread(out.data(), sizeof(int), size, _pipe_in);
-        assert(nbRead == size);
-        LOG(V5_DEBG, "[PIPE] read %i ints\n", size);
+        readNonblocking(out.data(), size*sizeof(int));
+        LOG(V5_DEBG, "[PIPE] read %i ints \"%c\"\n", size, contentTag);
         return out;
     }
 
-    void writeData(const std::vector<int>& data) {
-        writeData(data.data(), data.size());
+    void writeData(const std::vector<int>& data, char contentTag) {
+        writeData(data.data(), data.size(), contentTag);
+    }
+    void writeData(const std::vector<int>& data1, const std::vector<int>& data2, char contentTag) {
+        writeData(data1.data(), data1.size(), data2.data(), data2.size(), contentTag);
     }
 
-    void writeData(const int* data, size_t size) {
+    void writeData(const int* data, size_t size, char contentTag) {
         assert(size < INT32_MAX);
-        int nbWritten;
-        nbWritten = fwrite(&size, sizeof(int), 1, _pipe_out);
-        assert(nbWritten == 1);
-        nbWritten = fwrite(data, sizeof(int), size, _pipe_out);
-        assert(nbWritten == size);
+        int isize = size;
+        writeNonblocking(&contentTag, 1);
+        writeNonblocking(&isize, sizeof(int));
+        writeNonblocking(data, sizeof(int)*size);
         fflush(_pipe_out);
-        LOG(V5_DEBG, "[PIPE] wrote %i ints\n", size);
+        LOG(V5_DEBG, "[PIPE] wrote %i ints \"%c\"\n", size, contentTag);
+    }
+
+    void writeData(const int* data1, size_t size1, const int* data2, size_t size2, char contentTag) {
+        assert(size1+size2 < INT32_MAX);
+        int totalSize = size1+size2;
+        writeNonblocking(&contentTag, 1);
+        writeNonblocking(&totalSize, sizeof(int));
+        writeNonblocking(data1, sizeof(int)*size1);
+        writeNonblocking(data2, sizeof(int)*size2);
+        fflush(_pipe_out);
+        LOG(V5_DEBG, "[PIPE] wrote %i ints \"%c\"\n", totalSize, contentTag);
     }
 
     ~BiDirectionalPipe() {
@@ -86,4 +125,30 @@ public:
             FileUtils::rm(_path_in);
         }
     }
+
+private:
+    void readNonblocking(void* data, size_t size) {
+        size_t pos = 0;
+        while (pos < size) {
+            const auto posBefore = pos;
+            pos += fread(((char*) data)+pos, 1, size-pos, _pipe_in);
+            if (pos < size && pos != posBefore) {
+                LOG(V5_DEBG, "[PIPE] partial read %i/%i\n", pos, size);
+            }
+        }
+        assert(pos == size);
+    }
+
+    void writeNonblocking(const void* data, size_t size) {
+        size_t pos = 0;
+        while (pos < size) {
+            const auto posBefore = pos;
+            pos += fwrite(((const char*) data)+pos, 1, size-pos, _pipe_out);
+            if (pos < size && pos != posBefore) {
+                LOG(V5_DEBG, "[PIPE] partial write %i/%i\n", pos, size);
+            }
+        } 
+        assert(pos == size);
+    }
+
 };

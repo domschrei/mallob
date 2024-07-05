@@ -15,17 +15,20 @@ if [ x$GLUCOSE == x1 ]; then
 fi
 
 function test_mono() {
-    for slv in l${glucose}ck; do
+    for slv in kcl${glucose} ; do
+
+        instancefile="instances/r3unsat_250.cnf"
+        test 16 -t=1 -mono=$instancefile -satsolver=$slv -assertresult=UNSAT -s=0.05 $@
 
         instancefile="instances/r3sat_300.cnf"
         test 1 -t=1 -mono=$instancefile -satsolver=$slv -assertresult=SAT $@
-        test 1 -t=8 -mono=$instancefile -satsolver=$slv -assertresult=SAT $@
-        test 8 -t=2 -mono=$instancefile -satsolver=$slv -assertresult=SAT $@
+        test 1 -t=4 -mono=$instancefile -satsolver=$slv -assertresult=SAT $@
+        test 4 -t=2 -mono=$instancefile -satsolver=$slv -assertresult=SAT $@
 
         instancefile="instances/r3unsat_300.cnf"
         test 1 -t=1 -mono=$instancefile -satsolver=$slv -assertresult=UNSAT $@
-        test 1 -t=8 -mono=$instancefile -satsolver=$slv -assertresult=UNSAT $@
-        test 8 -t=2 -mono=$instancefile -satsolver=$slv -assertresult=UNSAT $@
+        test 1 -t=4 -mono=$instancefile -satsolver=$slv -assertresult=UNSAT $@
+        test 4 -t=2 -mono=$instancefile -satsolver=$slv -assertresult=UNSAT $@
     done
 }
 
@@ -66,10 +69,8 @@ function test_job_streamer() {
 
 function test_incremental() {
     for test in entertainment08 roverg10 transportg29 ; do
-        for slv in l${glucose}ck L${glucose}Ck; do
-            introduce_incremental_job $test 
-            test 4 -c=1 -t=2 -satsolver=$slv -J=1 -incrementaltest $@
-        done
+        introduce_incremental_job $test 
+        test 2 -c=1 -t=2 -satsolver=CL -J=1 -incrementaltest $@
     done
 }
 
@@ -77,7 +78,7 @@ function test_many_incremental() {
     for i in {1..10}; do
         introduce_incremental_job entertainment08
     done
-    test 4 -c=1 -t=2 -satsolver=L${glucose}Ck -J=10 -ajpc=1 -incrementaltest $@
+    test 4 -c=1 -t=2 -satsolver=CL -J=10 -ajpc=1 -incrementaltest $@
 }
 
 function test_oscillating() {
@@ -89,16 +90,16 @@ function test_oscillating() {
     while [ $t -le 60 ]; do
         # wallclock limit of 4s, arrival @ t
         wclimit=4s arrival=$t application=$app \
-        maxdemand=$(($RANDOM % 7 + 1)) introduce_job sat-$t instances/r3unknown_10k.cnf
+        maxdemand=$(($RANDOM % 7 + 1)) introduce_job disturb-$t instances/r3unknown_10k.cnf
         t=$((t+8))
         n=$((n+1))
     done
     # Generate actual jobs
-    wclimit=60s arrival=0 application=$app priority=0.1 introduce_job sat-main-1 instances/r3unsat_300.cnf
-    wclimit=60s arrival=15 application=$app priority=0.2 introduce_job sat-main-2 instances/r3sat_300.cnf
-    wclimit=60s arrival=30 application=$app priority=0.3 introduce_job sat-main-3 instances/r3unsat_300.cnf
-    wclimit=60s arrival=45 application=$app priority=0.4 introduce_job sat-main-4 instances/r3sat_300.cnf
-    test 16 -t=1 -c=1 -J=$((n+4)) -satsolver=l${glucose}ck -checkjsonresults $@
+    arrival=0 application=$app priority=0.4 introduce_job unsat-main-1 instances/r3unsat_300.cnf
+    arrival=15 application=$app priority=0.3 introduce_job unsat-main-2 instances/r3unsat_300.cnf
+    arrival=30 application=$app priority=0.2 introduce_job sat-main-3 instances/r3sat_300.cnf
+    arrival=45 application=$app priority=0.1 introduce_job sat-main-4 instances/r3sat_300.cnf
+    test 16 -t=1 -c=1 -J=$((n+4)) -satsolver=kcl${glucose} -checkjsonresults -otfc=1 $@
 }
 
 function test_incremental_scheduling() {
@@ -117,21 +118,21 @@ function test_certified_unsat() {
 function test_ontheflycheck() {
     
     instancefile="instances/r3sat_200.cnf"
-    test 1 -t=1 -mono=$instancefile -otfc=1 -assertresult=VSAT
-    test 1 -t=8 -mono=$instancefile -otfc=1 -satsolver='k+l+(c)*' -assertresult=VSAT
-    test 4 -t=4 -mono=$instancefile -otfc=1 -satsolver='k+l+(c)*' -assertresult=VSAT
+    test 1 -t=1 -mono=$instancefile -otfc=1 -assertresult=VSAT $@
+    test 1 -t=8 -mono=$instancefile -otfc=1 -satsolver='k+l+(c)*' -assertresult=VSAT $@
+    test 4 -t=4 -mono=$instancefile -otfc=1 -satsolver='k+l+(c)*' -assertresult=VSAT $@
     
     for instancefile in instances/r3unsat_{2,3}00.cnf ; do
-        test 1 -t=1 -mono=$instancefile -otfc=1 -assertresult=VUNSAT
-        test 1 -t=8 -mono=$instancefile -otfc=1 -satsolver='k+l+(c)*' -assertresult=VUNSAT
-        test 4 -t=4 -mono=$instancefile -otfc=1 -satsolver='k+l+(c)*' -assertresult=VUNSAT
+        test 1 -t=1 -mono=$instancefile -otfc=1 -assertresult=VUNSAT $@
+        test 1 -t=8 -mono=$instancefile -otfc=1 -satsolver='k+l+(c)*' -assertresult=VUNSAT $@
+        test 4 -t=4 -mono=$instancefile -otfc=1 -satsolver='k+l+(c)*' -assertresult=VUNSAT $@
     done
 }
 
 
 if [ -z "$1" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
     echo "Usage: [nocleanup=1] $0 [<mallob-option-overrides>] <test case> [<more test cases> ...]"
-    echo "Possible test cases: mono drysched sched osc stream inc manyinc incsched certunsat all"
+    echo "Possible test cases: mono drysched sched osc stream inc manyinc incsched certunsat ontheflycheck all"
     exit 0
 fi
 

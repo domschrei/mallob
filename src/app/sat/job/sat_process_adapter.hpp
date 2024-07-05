@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "robin_map.h"
 #include "util/logger.hpp"
 #include "util/robin_hood.hpp"
 #include "util/sys/threading.hpp"
@@ -84,17 +85,10 @@ private:
     std::future<void> _bg_initializer;
     std::future<void> _bg_writer;
 
-    struct BufferTask {
-        enum Type {
-            FILTER_CLAUSES, APPLY_FILTER, DIGEST_CLAUSES_WITHOUT_FILTER, RETURN_CLAUSES, DIGEST_HISTORIC_CLAUSES
-        } type;
-        std::vector<int> payload;
-        int epoch;
-        int epochEnd;
-    };
-    std::list<BufferTask> _pending_tasks;
     int _last_admitted_nb_lits {0};
-    robin_hood::unordered_flat_set<int> _epochs_to_filter;
+    enum ClauseCollectingStage {NONE, QUERIED, RETURNED} _clause_collecting_stage {NONE};
+    std::vector<int> _collected_clauses;
+    tsl::robin_map<int, std::vector<int>> _filters_by_epoch;
     int _epoch_of_export_buffer {-1};
 
     pid_t _child_pid = -1;
@@ -142,8 +136,8 @@ public:
     bool hasFilteredClauses(int epoch);
     std::vector<int> getLocalFilter(int epoch);
     void applyFilter(int epoch, const std::vector<int>& filter);
+    void digestClausesWithoutFilter(int epoch, const std::vector<int>& clauses);
 
-    void digestClausesWithoutFilter(const std::vector<int>& clauses);
     void returnClauses(const std::vector<int>& clauses);
     void digestHistoricClauses(int epochBegin, int epochEnd, const std::vector<int>& clauses);
 
@@ -161,9 +155,6 @@ private:
     void doWriteRevisions();
     void doPrepareSolution();
     void doTerminateInitializedProcess();
-
-    void tryProcessNextTasks();
-    bool process(BufferTask& task);
     
     void applySolvingState();
     void initSharedMemory(SatProcessConfig&& config);

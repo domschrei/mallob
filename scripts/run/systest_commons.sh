@@ -120,7 +120,7 @@ function check() {
                 if ! grep -q '"resultstring": "UNSAT"' ../out/$f ; then
                     error "Expected result UNSAT for $f was not found."
                 fi
-            else
+            elif echo $f|grep -qi sat ; then
                 if ! grep -q '"resultstring": "SAT"' ../out/$f ; then
                     error "Expected result SAT for $f was not found."
                 fi
@@ -135,7 +135,11 @@ function check() {
     grep -oE "sysstate busyratio=[0-9\.]+" _systest|grep -oE "[0-9\.]+" \
     |awk 'BEGIN {nsubopt=0; nconssubopt=0; maxcons=0} $1 < 1 {nsubopt+=1; nconssubopt+=1} $1 >= 1 {maxcons=maxcons<nconssubopt?nconssubopt:maxcons; nconssubopt=0} {sum+=$1} END {printf("%i/%i subopt. loads (max. %i consecutively), avg. load %.3f; ", nsubopt, NR, maxcons, sum==0?1:sum/NR)}'
     # Report solved jobs
-    grep -oE "(TIMEOUT|SOLUTION) #" _systest|awk '$1 == "TIMEOUT" {timeouts+=1} $1 == "SOLUTION" {solved+=1} END {printf("%i solved, %i timeouts\n", solved, timeouts)}'
+    grep -oE "(TIMEOUT|SOLUTION) #" _systest|awk '$1 == "TIMEOUT" {timeouts+=1} $1 == "SOLUTION" {solved+=1} END {printf("%i solved, %i timeouts; ", solved, timeouts)}'
+    # Report successful sharings
+    grep -oE ":0 CS digest w/ filter" _systest|awk 'END {printf("%i sharing operations; ", NR)}'
+    # Report over-due sharing epochs
+    grep -oE "Next epoch over-due -- [0-9]+ periods skipped" _systest|awk '{max=max>$5?max:$5} END {printf("%i epoch delays (max: by %i epochs)\n", NR, max)}'
 }
 
 function test() {

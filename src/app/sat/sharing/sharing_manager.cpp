@@ -553,6 +553,9 @@ void SharingManager::continueClauseImport(int solverId) {
 	_solver_revisions[solverId] = _solvers[solverId]->getSolverSetup().solverRevision;
 	_solvers[solverId]->setExtLearnedClauseCallback(getCallback());
 	_solver_stats[solverId] = &_solvers[solverId]->getSolverStatsRef();
+	_solvers[solverId]->setCallbackResultFound([&](int localId) {
+		if (_det_sync) _det_sync->notifySolverDone(localId);
+	});
 }
 
 SharingManager::~SharingManager() {}
