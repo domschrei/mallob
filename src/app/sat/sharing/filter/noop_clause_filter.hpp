@@ -15,9 +15,10 @@ public:
 		GenericClauseFilter(clauseStore) {}
 	virtual ~NoopClauseFilter() {}
 
-	ExportResult tryRegisterAndInsert(ProducedClauseCandidate&& pcc) override {
+	ExportResult tryRegisterAndInsert(ProducedClauseCandidate&& pcc, GenericClauseStore* storeOrNullptr = nullptr) override {
 		Mallob::Clause c(pcc.begin, pcc.size, pcc.lbd);
-		if (_clause_store.addClause(c)) {
+		auto clauseStore = storeOrNullptr ? storeOrNullptr : &_clause_store;
+		if (clauseStore->addClause(c)) {
 			return ADMITTED;
 		} else return DROPPED;
 	}

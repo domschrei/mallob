@@ -2,6 +2,7 @@
 #pragma once
 
 #include <atomic>
+#include <climits>
 #include <cstdint>
 #include <stdio.h>
 #include <vector>
@@ -340,6 +341,57 @@ public:
 
         if (Concurrent) addClauseLock.unlock();
         nbExportedClauses = builder.getNumAddedClauses();
+        return builder.extractBuffer();
+    }
+
+    std::vector<int> readBuffer() override {
+
+        // Builder object for our output
+        BufferBuilder builder(INT_MAX, _max_eff_clause_length, false);
+        builder.setFreeClauseLengthLimit(_free_clause_length_limit);
+
+        // lock clause adding
+        if (Concurrent) addClauseLock.lock();
+
+        // Reset threshold for admissible clauses
+        _max_admissible_bucket_idx = INT32_MAX;
+
+        // Fields for iterating over buckets
+        std::vector<Mallob::Clause> clauses; // exported clauses
+
+        // Sweep over buckets *by priority* in descending order
+        for (int prioIdx = 0; prioIdx < _priority_idx_to_bucket_idx.size(); prioIdx++) {
+            int i = getBucketIdx(prioIdx);
+            if (i >= buckets.size()) continue; // bucket has never been created
+            auto& [touchCount, b] = buckets[i];
+            if (!b) continue; // bucket is not initialized
+            //LOG(V4_VVER, "[clausestore] layout idx %i, priority idx %i, (%i,%i)\n", i, prioIdx, b->clauseLength, b->lbd);
+
+            // Initialize generic clause object for this bucket
+            Mallob::Clause clause;
+            clause.size = b->clauseLength;
+            clause.lbd = _reset_lbd_at_export ? clause.size : b->lbd;
+            assert(clause.size > 0 && clause.lbd > 0);
+
+            // write clauses into export buffer
+            for (size_t j = 0; j+clause.size <= b->size; j += clause.size) {
+                clause.begin = b->data + j;
+                clauses.push_back(clause);
+            }
+        }
+
+        // Sort exported clauses and forward them to the builder
+        std::sort(clauses.begin(), clauses.end());
+        Mallob::Clause lastClause;
+        for (auto& c : clauses) {
+            assert(lastClause.begin == nullptr || lastClause == c || lastClause < c
+                || log_return_false("[ERROR] %s > %s\n", lastClause.toStr().c_str(), c.toStr().c_str()));
+            lastClause = c;
+            bool success = builder.append(c);
+            assert(success);
+        }
+
+        if (Concurrent) addClauseLock.unlock();
         return builder.extractBuffer();
     }
 

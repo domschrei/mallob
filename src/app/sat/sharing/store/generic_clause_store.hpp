@@ -32,10 +32,13 @@ public:
     virtual std::vector<int> exportBuffer(int size, int& nbExportedClauses, int& nbExportedLits,
         ExportMode mode = ANY, bool sortClauses = true,
         std::function<void(int*)> clauseDataConverter = [](int*){}) = 0;
+    virtual std::vector<int> readBuffer() = 0;
 
     virtual BufferReader getBufferReader(int* data, size_t buflen, bool useChecksums = false) const = 0;
     virtual int getMaxAdmissibleEffectiveClauseLength() const {return _max_eff_clause_length;}
+    virtual void setClauseDeletionCallback(std::function<void(Mallob::Clause&)> cb) {}
     virtual void setClauseDeletionCallback(int clauseLength, std::function<void(Mallob::Clause&)> cb) {}
+    virtual void clearClauseDeletionCallbacks() {}
 
     virtual int getCurrentlyUsedLiterals() const {return 0;}
     virtual std::string getCurrentlyUsedLiteralsReport() const {return std::string();}

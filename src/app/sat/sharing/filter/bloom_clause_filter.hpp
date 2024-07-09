@@ -77,8 +77,8 @@ public:
 	}
 	virtual ~BloomClauseFilter() {}
 
-	ExportResult tryRegisterAndInsert(ProducedClauseCandidate&& c) override {
-		return registerClause(Mallob::Clause(c.begin, c.size, c.lbd), c.producerId);
+	ExportResult tryRegisterAndInsert(ProducedClauseCandidate&& c, GenericClauseStore* clauseStoreOrNullptr) override {
+		return registerClause(Mallob::Clause(c.begin, c.size, c.lbd), c.producerId, clauseStoreOrNullptr);
 	}
 
     cls_producers_bitset confirmSharingAndGetProducers(Mallob::Clause& c, int epoch) override {
@@ -137,11 +137,12 @@ public:
 	}
 
 private:
-	ExportResult registerClause(const Mallob::Clause& c, int producerId) {
+	ExportResult registerClause(const Mallob::Clause& c, int producerId, GenericClauseStore* clauseStoreOrNullptr = nullptr) {
 		
 		if (!admitClause(c, producerId)) return FILTERED;
-		
-		if (_clause_store.addClause(c)) {
+
+		auto clauseStore = clauseStoreOrNullptr ? clauseStoreOrNullptr : &_clause_store;
+		if (clauseStore->addClause(c)) {
 			_nb_inserted++;
 			return ADMITTED;
 		} else return DROPPED;

@@ -25,7 +25,7 @@ public:
     virtual ~GenericClauseFilter() {}
 
     enum ExportResult {ADMITTED, FILTERED, DROPPED};
-    virtual ExportResult tryRegisterAndInsert(ProducedClauseCandidate&& c) = 0;
+    virtual ExportResult tryRegisterAndInsert(ProducedClauseCandidate&& c, GenericClauseStore* storeOrNullptr = nullptr) = 0;
     virtual cls_producers_bitset confirmSharingAndGetProducers(Mallob::Clause& c, int epoch) = 0;
     virtual bool admitSharing(Mallob::Clause& c, int epoch) = 0;
     virtual size_t size(int clauseLength = 0) const = 0;

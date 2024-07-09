@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <climits>
 #include <stdio.h>
 #include <vector>
 
@@ -114,6 +115,46 @@ public:
 
         addClauseLock.unlock();
         nbExportedClauses = builder.getNumAddedClauses();
+        return builder.extractBuffer();
+    }
+
+    std::vector<int> readBuffer() override {
+
+        BufferBuilder builder(INT_MAX, _max_eff_clause_length, false);
+
+        // lock clause adding
+        addClauseLock.lock();
+
+        // Read clauses bucket by bucket (most important clauses first)
+        std::vector<Mallob::Clause> clauses;
+        for (Bucket* b : buckets) {
+
+            Mallob::Clause clause;
+            clause.lbd = b->lbd;
+            if (clause.lbd == 0) continue;
+
+            for (size_t j = b->size-1; j > 0; j -= clause.size+1) {
+                clause.size = b->data[j];
+                assert(clause.size > 0 && clause.size < 256);
+                assert(j - clause.size >= 0);
+                if (_reset_lbd_at_export) clause.lbd = clause.size;
+                clause.begin = b->data + j - clause.size;
+                clauses.push_back(clause);
+            }
+        }
+
+        // Sort all flushed clauses by length -> lbd -> lexicographically
+        std::sort(clauses.begin(), clauses.end());
+        Mallob::Clause lastClause;
+        for (auto& c : clauses) {
+            assert(lastClause.begin == nullptr || lastClause == c || lastClause < c
+                || log_return_false("[ERROR] %s > %s\n", lastClause.toStr().c_str(), c.toStr().c_str()));
+            lastClause = c;
+            bool success = builder.append(c);
+            assert(success);
+        }
+
+        addClauseLock.unlock();
         return builder.extractBuffer();
     }
 

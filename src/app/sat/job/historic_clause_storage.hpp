@@ -14,12 +14,14 @@
 
 #include "app/sat/data/clause.hpp"
 #include "app/sat/data/produced_clause_candidate.hpp"
-#include "app/sat/sharing/filter/produced_clause_filter.hpp"
+#include "app/sat/sharing/filter/exact_clause_filter.hpp"
+#include "app/sat/sharing/filter/generic_clause_filter.hpp"
+#include "app/sat/sharing/store/adaptive_clause_store.hpp"
+#include "app/sat/sharing/store/generic_clause_store.hpp"
 #include "comm/msgtags.h"
 #include "data/job_transfer.hpp"
 #include "util/params.hpp"
 #include "base_sat_job.hpp"
-#include "../sharing/store/adaptive_clause_database.hpp"
 #include "util/logger.hpp"
 #include "util/sys/process.hpp"
 #include "util/sys/thread_pool.hpp"
@@ -60,18 +62,19 @@ private:
     class Worker {
     
     private:
-        AdaptiveClauseDatabase::Setup _setup;
+        AdaptiveClauseStore::Setup _setup;
         int _max_same_breadth_slots {3};
         // storage
         struct Slot {
             int epochBegin;
             int epochEnd;
-            AdaptiveClauseDatabase cdb;
-            Slot(int epochBegin, int epochEnd, AdaptiveClauseDatabase::Setup setup) : 
+            AdaptiveClauseStore cdb;
+            Slot(int epochBegin, int epochEnd, AdaptiveClauseStore::Setup setup) : 
                 epochBegin(epochBegin), epochEnd(epochEnd), cdb(setup) {}
         };
         std::list<Slot> _storage_list;
-        ProducedClauseFilter _filter;
+        std::unique_ptr<GenericClauseStore> _filter_store; // really only a dummy required for the filter
+        std::unique_ptr<ExactClauseFilter> _filter;
 
         ConditionVariable _cond_var_bg_tasks;
         Mutex _mtx_bg_tasks;
@@ -81,8 +84,9 @@ private:
         int _num_open_tasks {0};
 
     public:
-        Worker(const AdaptiveClauseDatabase::Setup& setup) : _setup(setup), 
-                _filter(std::numeric_limits<int>::max(), false) {
+        Worker(const AdaptiveClauseStore::Setup& setup) : _setup(setup),
+                _filter_store(new AdaptiveClauseStore(_setup)),
+                _filter(new ExactClauseFilter(*_filter_store, std::numeric_limits<int>::max(), _setup.maxEffectiveClauseLength)) {
             _bg_worker.run([this]() {runBackgroundWorker();});
         }
 
@@ -159,8 +163,7 @@ private:
                     task.epochEnd = slot.epochEnd;
                     // Read clauses from the slot into the task's clauses
                     int numExported;
-                    task.clauses = slot.cdb.exportBufferWithoutDeletion(-1, numExported,
-                        AdaptiveClauseDatabase::ANY, false);
+                    task.clauses = slot.cdb.readBuffer();
                     return;
                 }
             }
@@ -191,7 +194,7 @@ private:
 
                 // Create new storage slot of breadth 1
                 _storage_list.emplace_back(task.epochBegin, task.epochBegin+1, _setup);
-                AdaptiveClauseDatabase& cdb = _storage_list.back().cdb;
+                AdaptiveClauseStore& cdb = _storage_list.back().cdb;
 
                 // Insert non-duplicate clauses into new storage slot as well as lookup table
                 auto [accepted, total] = addClausesIntoDatabase(cdb, task.clauses, 
@@ -209,7 +212,7 @@ private:
             for (auto& slot : _storage_list) {
                 numStoredLits += slot.cdb.getCurrentlyUsedLiterals();
             }
-            task.storageDiagnostics.numClausesInStorage = _filter.size();
+            task.storageDiagnostics.numClausesInStorage = _filter->size(0);
             task.storageDiagnostics.numLitsInStorage = numStoredLits;
             if (_storage_list.back().epochEnd < 80)
                 task.storageDiagnostics.slotLayout = reportSlots();
@@ -264,25 +267,24 @@ private:
             }
         }
 
-        void mergeDatabases(AdaptiveClauseDatabase& into, AdaptiveClauseDatabase& from) {
+        void mergeDatabases(AdaptiveClauseStore& into, AdaptiveClauseStore& from) {
             
             // Flush clauses from "from"
             int numExported;
-            auto clauses = from.exportBufferWithoutDeletion(-1, numExported, 
-                AdaptiveClauseDatabase::ANY, false);
+            auto clauses = from.readBuffer();
 
             // Insert clauses into "into"
             addClausesIntoDatabase(into, clauses, -1, ClauseAdditionMode::MERGE_OR_DROP);
         }
 
         enum ClauseAdditionMode {INSERT, INSERT_AND_IMPORT, MERGE_OR_DROP};
-        std::pair<int, int> addClausesIntoDatabase(AdaptiveClauseDatabase& cdb, std::vector<int>& clauses, int epoch, ClauseAdditionMode mode) {
+        std::pair<int, int> addClausesIntoDatabase(AdaptiveClauseStore& cdb, std::vector<int>& clauses, int epoch, ClauseAdditionMode mode) {
 
             // Track each clause that is being deleted from the database to make room for a new one;
             // also erase each such clause from the filter table
             cdb.setClauseDeletionCallback([&](Mallob::Clause& cls) {
                 ProducedClauseCandidate pcc(cls.begin, cls.size, cls.lbd, 0, epoch);
-                _filter.erase(pcc);
+                _filter->erase(pcc);
             });
 
             // Iterate over all clauses to be added
@@ -297,8 +299,8 @@ private:
                 if (mode == INSERT || mode == INSERT_AND_IMPORT) {
                     // Attempting to add a new clause from an external source:
                     // check against filter, only insert of not contained yet
-                    auto result = _filter.tryRegisterAndInsert(std::move(pcc), cdb);
-                    if (result == ProducedClauseFilter::ADMITTED) {
+                    auto result = _filter->tryRegisterAndInsert(std::move(pcc), &cdb);
+                    if (result == GenericClauseFilter::ADMITTED) {
                         numAccepted++;
                         if (mode == INSERT_AND_IMPORT) builder.append(cls);
                     }
@@ -309,7 +311,7 @@ private:
                     if (accepted) {
                         numAccepted++;
                     } else {
-                        _filter.erase(pcc);
+                        _filter->erase(pcc);
                     }
                 }
                 numTotal++;
@@ -317,7 +319,7 @@ private:
             }
 
             // Clear deletion callback again
-            cdb.clearClauseDeletionCallback();
+            cdb.clearClauseDeletionCallbacks();
 
             if (mode == INSERT_AND_IMPORT) clauses = builder.extractBuffer();
 
@@ -347,7 +349,7 @@ private:
     std::vector<std::pair<int, int>> _missing_epoch_intervals;
 
 public:
-    HistoricClauseStorage(const AdaptiveClauseDatabase::Setup& setup, BaseSatJob* job) : 
+    HistoricClauseStorage(const AdaptiveClauseStore::Setup& setup, BaseSatJob* job) : 
         _job(job), _worker(setup)  {}
 
     void importSharing(int epoch, std::vector<int>&& clauses) {

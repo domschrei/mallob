@@ -54,6 +54,9 @@ public:
         assert(!_hist_discarded_cls);
         _hist_discarded_cls = &hist;
     }
+    void clearDiscardedClausesNotification() {
+        _hist_discarded_cls = nullptr;
+    }
 
     // Reduces global budget by clause.size
     // AND/OR
@@ -174,6 +177,29 @@ public:
 
         // Shrink vector to fit actual data
         shrink();
+    }
+
+    void readAll(BufferBuilder& buf, std::function<void(int*)> clauseDataConverter = [](int*){},
+        bool resetLbd = false) {
+
+        // Acquire lock
+        auto lock = _mtx.getLock();
+
+        std::vector<Mallob::Clause> flushedClauses;
+        int dataIdx = _data_size - _effective_clause_length;
+        while (dataIdx >= 0) {
+            // Clause freed - read, append to buffer, pop
+            readClause(dataIdx, _tmp_clause);
+            clauseDataConverter(_tmp_clause.begin);
+            flushedClauses.push_back(_tmp_clause);
+            if (resetLbd) flushedClauses.back().lbd = _tmp_clause.size;
+            dataIdx -= _effective_clause_length;
+        }
+        std::sort(flushedClauses.begin(), flushedClauses.end());
+        for (auto& cls : flushedClauses) {
+            bool success = buf.append(cls);
+            if (!success) break;
+        }
     }
 
     // (called from another clause slot)

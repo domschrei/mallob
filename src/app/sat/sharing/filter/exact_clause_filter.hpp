@@ -81,7 +81,7 @@ public:
         }
     }
 
-    ExportResult tryRegisterAndInsert(ProducedClauseCandidate&& c) override {
+    ExportResult tryRegisterAndInsert(ProducedClauseCandidate&& c, GenericClauseStore* storeOrNullptr = nullptr) override {
         Mallob::Clause cls;
 
         AnyProducedClause apc = getAnyProducedClause(c);
@@ -107,7 +107,8 @@ public:
         if (!filtered) {
             // Try to insert clause to clause store
             cls.begin = data; cls.size = c.size; cls.lbd = c.lbd;
-            if (_clause_store.addClause(cls)) {
+            auto clauseStore = storeOrNullptr ? storeOrNullptr : &_clause_store;
+            if (clauseStore->addClause(cls)) {
                 // Success!
                 updateClauseInfo(c, apc, it, true); // create if nonexistent
                 result = ADMITTED;

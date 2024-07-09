@@ -15,7 +15,6 @@
 #include "clause_sharing_session.hpp"
 #include "base_sat_job.hpp"
 #include "app/job_tree.hpp"
-#include "app/sat/sharing/store/adaptive_clause_database.hpp"
 #include "comm/mpi_base.hpp"
 #include "data/job_state.h"
 #include "util/option.hpp"
@@ -41,8 +40,8 @@ AnytimeSatClauseCommunicator::AnytimeSatClauseCommunicator(const Parameters& par
     _params(params), _job(job),
     _cls_history(!params.collectClauseHistory() ? nullptr :
         new HistoricClauseStorage([&]() {
-            AdaptiveClauseDatabase::Setup setup;
-            setup.maxEffClauseLength = _params.strictClauseLengthLimit()+ClauseMetadata::numInts();
+            AdaptiveClauseStore::Setup setup;
+            setup.maxEffectiveClauseLength = _params.strictClauseLengthLimit()+ClauseMetadata::numInts();
             setup.maxLbdPartitionedSize = _params.maxLbdPartitioningSize();
             setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
             setup.numLiterals = _job->getBufferLimit(MyMpi::size(MPI_COMM_WORLD), false);

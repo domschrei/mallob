@@ -11,7 +11,6 @@
 #include "util/logger.hpp"
 #include "util/params.hpp"
 #include "base_sat_job.hpp"
-#include "app/sat/sharing/store/adaptive_clause_database.hpp"
 #include "comm/job_tree_all_reduction.hpp"
 #include "historic_clause_storage.hpp"
 #include "app/sat/sharing/filter/in_place_clause_filtering.hpp"

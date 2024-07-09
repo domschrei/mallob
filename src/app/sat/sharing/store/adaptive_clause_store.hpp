@@ -2,6 +2,7 @@
 #pragma once
 
 #include <atomic>
+#include <climits>
 #include <limits>
 #include <memory>
 
@@ -225,6 +226,16 @@ public:
         return builder.extractBuffer();
     }
 
+    std::vector<int> readBuffer() override {
+
+        BufferBuilder builder(INT_MAX, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
+        builder.setFreeClauseLengthLimit(_max_free_eff_clause_length);
+        for (auto& slot : _slots) {
+            slot->readAll(builder);
+        }
+        return builder.extractBuffer();
+    }
+
     BufferReader getBufferReader(int* begin, size_t size, bool useChecksums = false) const override {
         return BufferReader(begin, size, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd, useChecksums);
     }
@@ -267,6 +278,11 @@ public:
         return true;
     }
 
+    void setClauseDeletionCallback(std::function<void(Mallob::Clause&)> cb) override {
+        for (auto& slot : _slots) {
+            slot->setDiscardedClausesNotification(cb, _hist_deleted_in_slots);
+        }
+    }
     void setClauseDeletionCallback(int clauseLength, std::function<void(Mallob::Clause&)> cb) override {
         // Iterate over all distinct slots with the specified clause length
         int lastSlotIdx = -1;
@@ -276,6 +292,11 @@ public:
                 lastSlotIdx = slotIdx;
                 _slots[slotIdx]->setDiscardedClausesNotification(cb, _hist_deleted_in_slots);
             }
+        }
+    }
+    void clearClauseDeletionCallbacks() override {
+        for (auto& slot : _slots) {
+            slot->clearDiscardedClausesNotification();
         }
     }
 
