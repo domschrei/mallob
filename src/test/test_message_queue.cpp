@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <utility>
 
+#include "mpi.h"
 #include "util/random.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
@@ -184,6 +185,7 @@ int main(int argc, char *argv[]) {
     MyMpi::init();
     Timer::init();
     int rank = MyMpi::rank(MPI_COMM_WORLD);
+    assert(MyMpi::size(MPI_COMM_WORLD) == 2);
 
     Process::init(rank);
 

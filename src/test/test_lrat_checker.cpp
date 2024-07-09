@@ -1,5 +1,6 @@
 
 #include <assert.h>
+#include <cstdio>
 #include <stdlib.h>
 #include <cstdint>
 #include <vector>
@@ -54,4 +55,6 @@ int main(int argc, char** argv) {
     ok = addCls(chk, 13, {1, 2, 3}, {8, 12}); assert(ok);
     ok = addCls(chk, 14, {}, {11, 10, 1}); assert(ok);
     ok = chk.validateUnsat(); assert(ok);
+
+    printf("All ok.\n");
 }

@@ -130,6 +130,8 @@ void testBuckets() {
 }
 
 int main() {
+    Timer::init();
+
     testBasic();
     testPerformance();
     testBuckets();

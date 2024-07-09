@@ -172,6 +172,7 @@ SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MY_DEBUG_OPTIONS}")
 
 enable_testing()
 
+new_test(bitsets)
 new_test(permutation)
 new_test(message_queue)
 new_test(volume_calculator)
@@ -181,4 +182,3 @@ new_test(async_collective)
 new_test(random)
 new_test(reverse_file_reader)
 new_test(categorized_external_memory)
-new_test(amq)

@@ -1,5 +1,5 @@
 
-#include <assert.h>
+#include "util/assert.hpp"
 #include <stdio.h>
 #include <memory>
 #include <string>
@@ -13,15 +13,18 @@ int main() {
     assert(!seq.parse("*"));
 
     assert(seq.parse(""));
+    printf("%s\n", seq.toStr().c_str());
     assert(seq.prefix.empty());
     assert(seq.cycle.empty());
 
     assert(seq.parse("k"));
+    printf("%s\n", seq.toStr().c_str());
     assert(seq.prefix.empty());
     assert(seq.cycle.size() == 1);
     assert(seq.cycle[0].baseSolver == PortfolioSequence::KISSAT);
 
     assert(seq.parse("kcl"));
+    printf("%s\n", seq.toStr().c_str());
     assert(seq.prefix.empty());
     assert(seq.cycle.size()==3);
 

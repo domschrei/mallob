@@ -547,7 +547,6 @@ int main(int argc, char *argv[]) {
     params.init(argc, argv);
     MyMpi::setOptions(params);
 
-    /*
     testIntegerSum();
     testStringConcatenation();
     testIntToIntMap();
@@ -557,8 +556,6 @@ int main(int argc, char *argv[]) {
     testIntegerPrefixSum();
     testStringPrefixSum();
     testSparsePrefixSum();
-    */
-
     testDifferentialSparsePrefixSum();
 
     // Exit properly

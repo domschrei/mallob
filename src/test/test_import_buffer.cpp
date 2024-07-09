@@ -129,15 +129,16 @@ void testImport() {
         {
             auto clause = importBuffer.get(AdaptiveClauseStore::NONUNITS);
             int nbRetrievedNonunits = 0;
-            while (!importBuffer.empty() || clause.begin != nullptr) {
-                if (clause.begin != nullptr) {
+            while (!importBuffer.empty() && clause.begin) {
+                if (clause.begin) {
                     assert(getProducer(clause, filters.size()) != solverId);
                     assert(admittedClauses.count(clause));
                     admittedClauses.erase(clause);
                     nbRetrievedCls++;
                     nbRetrievedNonunits++;
                 }
-                //LOG(V2_INFO, "%lu lits remaining; pop result: %s\n", importBuffer.size(), clause.begin==nullptr ? "(null)" : clause.toStr().c_str());
+                //LOG(V2_INFO, "%lu lits remaining; pop result: %s\n", importBuffer.size(),
+                //    clause.begin==nullptr ? "(null)" : clause.toStr().c_str());
                 clause = importBuffer.get(AdaptiveClauseStore::NONUNITS);
             }
             LOG(V2_INFO, "Retrieved %i non-units\n", nbRetrievedNonunits);

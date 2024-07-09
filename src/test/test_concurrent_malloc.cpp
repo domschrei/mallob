@@ -12,9 +12,9 @@
 #include "util/logger.hpp"
 #include "util/option.hpp"
 
-void testConcurrentAllocation() {
+void testConcurrentAllocation(Parameters& params) {
 
-    const int nThreads = 4;
+    const int nThreads = params.numThreadsPerProcess();
     const int nAllocs = 10000;
 
     std::vector<std::thread> threads;
@@ -57,5 +57,5 @@ int main(int argc, char *argv[]) {
 
     Logger::init(0, params.verbosity());
 
-    testConcurrentAllocation();
+    testConcurrentAllocation(params);
 }
