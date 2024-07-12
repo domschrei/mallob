@@ -106,7 +106,7 @@ function test_incremental_scheduling() {
     for test in entertainment08 roverg10 transportg29 towers05 ; do
         introduce_incremental_job $test
     done
-    test 8 -t=1 -c=1 -satsolver=L${glucose}Ck -J=4 -incrementaltest $@
+    test 8 -t=1 -c=1 -satsolver=CL -J=4 -incrementaltest $@
 }
 
 function test_certified_unsat() {

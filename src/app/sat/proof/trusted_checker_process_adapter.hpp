@@ -78,7 +78,9 @@ public:
         Parameters params;
         params.fifoDirectives.set(_path_directives);
         params.fifoFeedback.set(_path_feedback);
-        _subproc = new Subprocess(params, "impcheck_check", _check_model ? "-check-model" : "");
+        std::string moreArgs = "-lenient";
+        if (_check_model) moreArgs += " -check-model";
+        _subproc = new Subprocess(params, "impcheck_check", moreArgs);
         _child_pid = _subproc->start();
 
         _f_directives = fopen(_path_directives.c_str(), "w");
