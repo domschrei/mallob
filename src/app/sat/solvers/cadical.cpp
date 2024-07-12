@@ -47,8 +47,8 @@ Cadical::Cadical(const SolverSetup& setup)
 		int maxNumSolvers = setup.maxNumSolvers;
 
 		auto descriptor = _lrat ? "on-the-fly LRAT checking" : "LRAT proof production";
-		LOGGER(_logger, V3_VERB, "Initializing rank=%i size=%i DI=%i #C=%ld with %s\n",
-			solverRank, maxNumSolvers, getDiversificationIndex(), setup.numOriginalClauses,
+		LOGGER(_logger, V3_VERB, "Initializing rank=%i size=%i DI=%i #C=%ld IDskips=%i with %s\n",
+			solverRank, maxNumSolvers, getDiversificationIndex(), setup.numOriginalClauses, setup.nbSkippedIdEpochs,
 			descriptor);
 
 		bool okay;
@@ -56,6 +56,7 @@ Cadical::Cadical(const SolverSetup& setup)
 		okay = solver->set("lratsolverid", solverRank); assert(okay); // set this solver instance's ID
 		okay = solver->set("lratsolvercount", maxNumSolvers); assert(okay); // set # solvers
 		okay = solver->set("lratorigclscount", setup.numOriginalClauses); assert(okay);
+		okay = solver->set("lratskippedepochs", setup.nbSkippedIdEpochs); assert(okay);
 
 		if (_lrat) {
 			okay = solver->set("signsharedcls", 1); assert(okay);

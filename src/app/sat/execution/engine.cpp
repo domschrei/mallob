@@ -203,6 +203,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.proofDir = proofDirectory;
 	setup.sigFormula = appConfig.map["__SIG"];
 	LratConnector* modelCheckingLratConnector {nullptr};
+	setup.nbSkippedIdEpochs = config.nbPreviousBalancingEpochs;
 
 	// Instantiate solvers according to the global solver IDs and diversification indices
 	int cyclePos = begunCyclePos;

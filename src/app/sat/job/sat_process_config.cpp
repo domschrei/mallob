@@ -6,6 +6,7 @@
 #include "app/job.hpp"
 #include "comm/mympi.hpp"
 #include "data/job_description.hpp"
+#include "util/logger.hpp"
 #include "util/option.hpp"
 #include "util/params.hpp"
 #include "util/sys/timer.hpp"
@@ -25,6 +26,9 @@ SatProcessConfig::SatProcessConfig(const Parameters& params, const Job& job, int
     maxBroadcastedLitsPerCycle = params.maxSharingCompensationFactor() *
     MyMpi::getBinaryTreeBufferLimit(job.getGlobalNumWorkers(), params.clauseBufferBaseSize(), params.clauseBufferLimitParam(), MyMpi::BufferQueryMode(params.clauseBufferLimitMode()));
     this->recoveryIndex = recoveryIndex;
+    nbPreviousBalancingEpochs = job.getLatestJobBalancingEpoch() - job.getDescription().getFirstBalancingEpoch() - 1;
+    LOG(V5_DEBG, "#%i:%i : Job balancing epochs: %i (first: %i)\n", job.getId(), job.getIndex(),
+        nbPreviousBalancingEpochs, job.getDescription().getFirstBalancingEpoch());
 }
 
 std::string SatProcessConfig::getSharedMemId(pid_t pid) const {

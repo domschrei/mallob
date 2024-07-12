@@ -26,6 +26,7 @@ struct SatProcessConfig {
     int threads;
     int maxBroadcastedLitsPerCycle;
     int recoveryIndex;
+    int nbPreviousBalancingEpochs;
 
     SatProcessConfig() {}
     SatProcessConfig(const Parameters& params, const Job& job, int recoveryIndex);
@@ -43,6 +44,7 @@ struct SatProcessConfig {
         getline(s_stream, substr, ','); threads = atoi(substr.c_str());
         getline(s_stream, substr, ','); maxBroadcastedLitsPerCycle = atoi(substr.c_str());
         getline(s_stream, substr, ','); recoveryIndex = atoi(substr.c_str());
+        getline(s_stream, substr, ','); nbPreviousBalancingEpochs = atoi(substr.c_str());
     }
 
     std::string getSharedMemId(pid_t pid) const;
@@ -59,7 +61,8 @@ struct SatProcessConfig {
         out += std::to_string(firstrev) + ",";
         out += std::to_string(threads) + ",";
         out += std::to_string(maxBroadcastedLitsPerCycle) + ",";
-        out += std::to_string(recoveryIndex);
+        out += std::to_string(recoveryIndex) + ",";
+        out += std::to_string(nbPreviousBalancingEpochs);
         return out;
     }
 

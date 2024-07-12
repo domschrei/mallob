@@ -91,4 +91,5 @@ struct SolverSetup {
 	std::string proofDir;
 	// Signature of the formula to process - to be validated by the on-the-fly checker
 	std::string sigFormula;
+	int nbSkippedIdEpochs {0};
 };

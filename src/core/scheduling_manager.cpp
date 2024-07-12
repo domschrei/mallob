@@ -904,6 +904,7 @@ job.toStr(), volume, balancingEpoch, tree.getBalancingEpochOfLastRequests(), eve
 #undef LOG_VOL_UPDATE
 
     // Apply volume update to local job structure
+    job.updateJobBalancingEpoch(balancingEpoch);
     job.updateVolumeAndUsedCpu(volume);
     tree.stopWaitingForReactivation(balancingEpoch-1);
     

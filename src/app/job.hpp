@@ -182,6 +182,7 @@ private:
     Mutex _job_manipulation_lock;
     std::optional<JobRequest> _commitment;
     int _balancing_epoch_of_last_commitment = -1;
+    int _latest_balancing_epoch {0};
     std::optional<JobResult> _result;
     robin_hood::unordered_node_set<std::pair<int, int>, IntPairHasher> _waiting_rank_revision_pairs;
 
@@ -292,6 +293,14 @@ public:
     robin_hood::unordered_node_set<std::pair<int, int>, IntPairHasher>& getWaitingRankRevisionPairs() {
         return _waiting_rank_revision_pairs;
     }
+
+    void updateJobBalancingEpoch(int latestEpoch) {
+        _latest_balancing_epoch = std::max(_latest_balancing_epoch, latestEpoch);
+        if (getJobTree().isRoot() && hasDescription() && getDescription().getFirstBalancingEpoch() < 0) {
+            _description.setFirstBalancingEpoch(_latest_balancing_epoch);
+        }
+    }
+    int getLatestJobBalancingEpoch() const {return _latest_balancing_epoch;}
 
     // Updates the job's resource usage based on the period of time which passed
     // since the last call (or the job's activation) and the old volume of the job,

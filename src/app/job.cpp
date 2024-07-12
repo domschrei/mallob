@@ -40,6 +40,7 @@ void Job::commit(const JobRequest& req) {
     _job_tree.clearJobNodeUpdates();
     updateJobTree(req.requestedNodeIndex, req.rootRank, req.rootContextId, 
         req.requestingNodeRank, req.requestingNodeContextId);
+    updateJobBalancingEpoch(_balancing_epoch_of_last_commitment);
     _commitment = req;
 }
 

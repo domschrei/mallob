@@ -102,6 +102,27 @@ function test_oscillating() {
     test 16 -t=1 -c=1 -J=$((n+4)) -satsolver=kcl${glucose} -checkjsonresults -otfc=1 $@
 }
 
+function test_oscillating_ontheflycheck() {
+    # Generate periodic "disturbance" jobs
+    t=4
+    n=0
+    RANDOM=1
+    app=SAT
+    while [ $t -le 90 ]; do
+        # wallclock limit of 4s, arrival @ t
+        wclimit=4s arrival=$t application=$app \
+        maxdemand=$(($RANDOM % 7 + 1)) introduce_job disturb-$t instances/r3unknown_10k.cnf
+        t=$((t+8))
+        n=$((n+1))
+    done
+    # Generate actual jobs
+    arrival=0 application=$app priority=0.4 introduce_job unsat-main-1 instances/r3unsat_300.cnf
+    arrival=15 application=$app priority=0.3 introduce_job unsat-main-2 instances/r3unsat_300.cnf
+    arrival=30 application=$app priority=0.2 introduce_job sat-main-3 instances/r3sat_300.cnf
+    arrival=45 application=$app priority=0.1 introduce_job sat-main-4 instances/r3sat_300.cnf
+    test 16 -t=1 -c=1 -J=$((n+4)) -satsolver='ck+(c)*' -checkjsonresults -otfc=1 -jc=2 $@
+}
+
 function test_incremental_scheduling() {
     for test in entertainment08 roverg10 transportg29 towers05 ; do
         introduce_incremental_job $test
@@ -119,20 +140,20 @@ function test_ontheflycheck() {
     
     instancefile="instances/r3sat_200.cnf"
     test 1 -t=1 -mono=$instancefile -otfc=1 -assertresult=VSAT $@
-    test 1 -t=8 -mono=$instancefile -otfc=1 -satsolver='k+l+(c)*' -assertresult=VSAT $@
-    test 4 -t=4 -mono=$instancefile -otfc=1 -satsolver='k+l+(c)*' -assertresult=VSAT $@
+    test 1 -t=8 -mono=$instancefile -otfc=1 -satsolver='ck+l+(c)*' -assertresult=VSAT $@
+    test 4 -t=4 -mono=$instancefile -otfc=1 -satsolver='ck+l+(c)*' -assertresult=VSAT $@
     
     for instancefile in instances/r3unsat_{2,3}00.cnf ; do
         test 1 -t=1 -mono=$instancefile -otfc=1 -assertresult=VUNSAT $@
-        test 1 -t=8 -mono=$instancefile -otfc=1 -satsolver='k+l+(c)*' -assertresult=VUNSAT $@
-        test 4 -t=4 -mono=$instancefile -otfc=1 -satsolver='k+l+(c)*' -assertresult=VUNSAT $@
+        test 1 -t=8 -mono=$instancefile -otfc=1 -satsolver='ck+l+(c)*' -assertresult=VUNSAT $@
+        test 4 -t=4 -mono=$instancefile -otfc=1 -satsolver='ck+l+(c)*' -assertresult=VUNSAT $@
     done
 }
 
 
 if [ -z "$1" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
     echo "Usage: [nocleanup=1] $0 [<mallob-option-overrides>] <test case> [<more test cases> ...]"
-    echo "Possible test cases: mono drysched sched osc stream inc manyinc incsched certunsat ontheflycheck all"
+    echo "Possible test cases: mono drysched sched osc stream inc manyinc incsched certunsat ontheflycheck oscontheflycheck all"
     exit 0
 fi
 
@@ -151,6 +172,7 @@ while [ ! -z "$1" ]; do
             test_incremental_scheduling $progopts
             test_certified_unsat $progopts
             test_ontheflycheck $progopts
+            test_oscillating_ontheflycheck $progopts
             ;;
         mono)
             test_mono $progopts
@@ -163,6 +185,9 @@ while [ ! -z "$1" ]; do
             ;;
         osc)
             test_oscillating $progopts
+            ;;
+        oscontheflycheck)
+            test_oscillating_ontheflycheck $progopts
             ;;
         stream)
             test_job_streamer $progopts

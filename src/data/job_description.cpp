@@ -50,8 +50,9 @@ void JobDescription::writeMetadata() {
     n = sizeof(int);         memcpy(data->data()+i, &_application_id, n); i += n;
     n = sizeof(bool);        memcpy(data->data()+i, &_incremental, n); i += n;
     n = sizeof(int);         memcpy(data->data()+i, &_group_id, n); i += n;
+    n = sizeof(int);         memcpy(data->data()+i, &_first_balancing_epoch, n); i += n;
     n = sizeof(Checksum);    memcpy(data->data()+i, &_checksum, n); i += n;
-    
+
     auto configSerialized = _app_config.serialize();
     n = configSerialized.size();
     memcpy(data->data()+i, &n, sizeof(int)); i += sizeof(int); // size of config
@@ -97,7 +98,7 @@ size_t JobDescription::getTransferSize(int revision) const {
 
 
 int JobDescription::getMetadataSize() const {
-    return 6*sizeof(int)
+    return 7*sizeof(int)
            +3*sizeof(float)
            +2*sizeof(size_t)
            +sizeof(Checksum)
@@ -164,6 +165,7 @@ void JobDescription::deserialize() {
     n = sizeof(int);         memcpy(&_application_id, latestData->data()+i, n);  i += n;
     n = sizeof(bool);        memcpy(&_incremental, latestData->data()+i, n);     i += n;
     n = sizeof(int);         memcpy(&_group_id, latestData->data()+i, n);        i += n;
+    n = sizeof(int); memcpy(&_first_balancing_epoch, latestData->data()+i, n); i += n;
     n = sizeof(Checksum);    memcpy(&_checksum, latestData->data()+i, n);        i += n;
     // size of config
     memcpy(&n, latestData->data()+i, sizeof(int)); i += sizeof(int);

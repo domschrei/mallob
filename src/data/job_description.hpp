@@ -48,6 +48,7 @@ private:
     int _application_id; // see app_registry
     bool _incremental = false;
     int _group_id {0};
+    int _first_balancing_epoch {-1};
 
     Checksum _checksum;
     const bool _use_checksums = false;
@@ -108,6 +109,7 @@ public:
         _priority = std::move(other._priority);
         _incremental = std::move(other._incremental);
         _group_id = std::move(other._group_id);
+        _first_balancing_epoch = std::move(other._first_balancing_epoch);
         _revision = std::move(other._revision);
         _client_rank = std::move(other._client_rank);
         _wallclock_limit = std::move(other._wallclock_limit);
@@ -187,6 +189,7 @@ public:
     void setIncremental(bool incremental) {_incremental = incremental;}
     bool isIncremental() const {return _incremental;}
     int getGroupId() const {return _group_id;}
+    int getFirstBalancingEpoch() const {return _first_balancing_epoch;}
     int getMetadataSize() const;
     
     size_t getFullNonincrementalTransferSize() const {return _data_per_revision[0]->size();}
@@ -205,6 +208,10 @@ public:
     void setPreloadedAssumptions(std::vector<int>&& asmpt) {_preloaded_assumptions = std::move(asmpt);}
     void setAppConfigurationEntry(const std::string& key, const std::string& val) {_app_config.map[key] = val;}
     void setGroupId(int groupId) {_group_id = groupId;}
+    void setFirstBalancingEpoch(int nb) {
+        _first_balancing_epoch = nb;
+        writeMetadata();
+    }
 
     Checksum getChecksum() const {return _checksum;}
     void setChecksum(const Checksum& checksum) {_checksum = checksum;}
