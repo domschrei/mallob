@@ -27,6 +27,7 @@
 #include "app/sat/solvers/cadical_clause_import.hpp"
 #include "app/sat/solvers/cadical_terminator.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
+#include "util/sys/tmpdir.hpp"
 
 Cadical::Cadical(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup),
@@ -39,6 +40,13 @@ Cadical::Cadical(const SolverSetup& setup)
 
 	solver->connect_terminator(&terminator);
 	solver->connect_learn_source(&learnSource);
+
+	if (setup.profilingLevel > 0) {
+		bool okay = solver->set("profile", setup.profilingLevel); assert(okay);
+		profileFileString = (setup.profilingBaseDir.empty() ? TmpDir::get() : setup.profilingBaseDir)
+			+ "/profile." + setup.jobname + "." + std::to_string(setup.globalId);
+		LOGGER(_logger, V3_VERB, "will write profiling to %s\n", profileFileString.c_str());
+	}
 
 	// In certified UNSAT mode?
 	if (setup.certifiedUnsat) {
@@ -274,5 +282,8 @@ void Cadical::cleanUp() {
 	if (_setup.certifiedUnsat) {
 		LOGGER(_logger, V4_VVER, "Closing proof output asynchronously\n");
 		solver->close_proof_asynchronously ();
+	}
+	if (_setup.profilingLevel > 0) {
+		solver->profile_to_file(profileFileString.c_str());
 	}
 }

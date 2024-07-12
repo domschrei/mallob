@@ -17,7 +17,9 @@ struct SolverSetup {
 	Logger* logger;
 	int globalId;
 	int localId; 
-	std::string jobname; 
+	std::string jobname;
+	std::string profilingBaseDir; 
+	int profilingLevel;
 
 
 	// Properties of the SAT problem

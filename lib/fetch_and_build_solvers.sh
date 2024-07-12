@@ -11,7 +11,7 @@ elif [ x$DISABLE_FPU != x1 ]; then
 fi
 
 if [ -z $1 ]; then
-    solvers="cplyk"
+    solvers="clyk"
     echo "Defaulting to solvers $solvers (supply another string to override solvers to build)"
 else
     solvers="$1"
@@ -94,20 +94,9 @@ fi
 
 # Normal (non-LRAT) CaDiCaL
 if echo $solvers|grep -q "c" && [ ! -f cadical/libcadical.a ]; then
-    echo "Building CaDiCaL (no LRAT support) ..."
+    echo "Building CaDiCaL ..."
 
     cd cadical
-    ./configure
-    make
-    cp build/libcadical.a .
-    cd ..
-fi
-
-# LRAT-logging CaDiCaL
-if echo $solvers|grep -q "p" && [ ! -f lrat-cadical/libcadical.a ]; then
-    echo "Building CaDiCaL with LRAT support ..."
-
-    cd lrat-cadical
     ./configure
     make
     cp build/libcadical.a .

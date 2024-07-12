@@ -45,6 +45,7 @@ private:
 	bool seedSet = false;
 
 	std::string proofFileString;
+	std::string profileFileString;
 
 public:
 	Cadical(const SolverSetup& setup);
