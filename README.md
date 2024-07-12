@@ -160,6 +160,8 @@ build/impcheck_confirm -formula-input=path/to/input.cnf -result=X -result-sig=SI
 ```
 where `X` is either 10 (for SAT) or 20 (for UNSAT), and `SIG` is the reported signature.
 
+**Note:** On-the-fly checking can also be used in Mallob's scheduled mode of operation. Globally unique clause IDs are ensured by adding a large offset times $x$ to a new solver thread's clause ID counter if the job has already experienced $x$ _balancing epochs_, i.e., received $x$ volume updates, since its initialization. The offset is chosen in such a way that 10,000 solvers each producing 10,000 clauses per second can run for 10,000 seconds before they may begin overlapping with clause IDs from the next balancing epoch. `ImpCheck` notices and reports any errors that would result from such a corner case.
+
 ### Portfolio Tweaking
 
 Mallob allows to customize the employed SAT solver backends and some of their flavors. This is done with the `-satsolver` option, which expects a string representing the solver backends to cycle over. The option also allows for a limited set of regular expression symbols. Here are some examples:
