@@ -20,7 +20,7 @@
 #include "util/sys/proc.hpp"
 #include "data/checksum.hpp"
 #include "util/sys/terminator.hpp"
-#include "app/sat/job/clause_pipe.hpp"
+#include "util/sys/bidirectional_pipe.hpp"
 #include "clause_pipe_defs.hpp"
 
 #include "engine.hpp"

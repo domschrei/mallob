@@ -204,8 +204,12 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.sigFormula = appConfig.map["__SIG"];
 	LratConnector* modelCheckingLratConnector {nullptr};
 	setup.nbSkippedIdEpochs = config.nbPreviousBalancingEpochs;
-	setup.profilingBaseDir = params.cadicalProfilingDir();
-	setup.profilingLevel = params.cadicalProfilingLevel();
+	if (params.cadicalProfilingLevel() >= 0) {
+		setup.profilingBaseDir = params.cadicalProfilingDir();
+		if (setup.profilingBaseDir.empty()) setup.profilingBaseDir = TmpDir::get();
+		setup.profilingBaseDir += "/" + std::to_string(appRank) + "/";
+		setup.profilingLevel = params.cadicalProfilingLevel();
+	}
 
 	// Instantiate solvers according to the global solver IDs and diversification indices
 	int cyclePos = begunCyclePos;

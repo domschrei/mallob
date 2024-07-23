@@ -21,7 +21,7 @@
 #include "util/sys/process.hpp"
 #include "util/logger.hpp"
 #include "util/sys/thread_pool.hpp"
-#include "app/sat/job/clause_pipe.hpp"
+#include "util/sys/bidirectional_pipe.hpp"
 #include "app/sat/job/sat_shared_memory.hpp"
 #include "util/option.hpp"
 #include "util/sys/tmpdir.hpp"

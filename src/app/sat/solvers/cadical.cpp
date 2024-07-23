@@ -41,11 +41,11 @@ Cadical::Cadical(const SolverSetup& setup)
 	solver->connect_terminator(&terminator);
 	solver->connect_learn_source(&learnSource);
 
-	if (setup.profilingLevel > 0) {
+	if (setup.profilingLevel >= 0) {
 		bool okay = solver->set("profile", setup.profilingLevel); assert(okay);
 		okay = solver->set("realtime", 1); assert(okay);
-		profileFileString = (setup.profilingBaseDir.empty() ? TmpDir::get() : setup.profilingBaseDir)
-			+ "/profile." + setup.jobname + "." + std::to_string(setup.globalId);
+		profileFileString = setup.profilingBaseDir + "/profile." + setup.jobname
+			+ "." + std::to_string(setup.globalId);
 		LOGGER(_logger, V3_VERB, "will write profiling to %s\n", profileFileString.c_str());
 	}
 
@@ -285,6 +285,8 @@ void Cadical::cleanUp() {
 		solver->close_proof_asynchronously ();
 	}
 	if (_setup.profilingLevel > 0) {
+		LOGGER(_logger, V4_VVER, "Writing profile ...\n");
 		solver->profile_to_file(profileFileString.c_str());
+		LOGGER(_logger, V4_VVER, "Profile written\n");
 	}
 }

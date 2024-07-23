@@ -20,7 +20,7 @@
 #include "data/checksum.hpp"
 #include "util/sys/background_worker.hpp"
 #include "data/job_result.hpp"
-#include "app/sat/job/clause_pipe.hpp"
+#include "util/sys/bidirectional_pipe.hpp"
 #include "app/sat/job/sat_process_config.hpp"
 #include "util/hashing.hpp"
 
