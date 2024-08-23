@@ -86,6 +86,8 @@ private:
     std::future<void> _bg_writer;
 
     int _last_admitted_nb_lits {0};
+    int _successful_solver_id {-1};
+    int _nb_incoming_lits {0};
     enum ClauseCollectingStage {NONE, QUERIED, RETURNED} _clause_collecting_stage {NONE};
     std::vector<int> _collected_clauses;
     tsl::robin_map<int, std::vector<int>> _filters_by_epoch;

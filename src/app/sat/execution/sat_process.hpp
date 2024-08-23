@@ -205,6 +205,7 @@ private:
                     auto filter = pipe.readData(c, true);
                     int epoch = popLast(filter);
                     doImportClauses(engine, incomingClauses, &filter, -1, epoch);
+                    pipe.writeData({engine.getLastAdmittedClauseShare().nbAdmittedLits}, CLAUSE_PIPE_DIGEST_IMPORT);
 
                 } else if (c == CLAUSE_PIPE_DIGEST_IMPORT_WITHOUT_FILTER) {
                     incomingClauses = pipe.readData(c, true);

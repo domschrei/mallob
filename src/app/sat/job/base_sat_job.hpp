@@ -133,9 +133,9 @@ public:
 
         if (_params.compensateUnusedSharingVolume()) {
 
-            if (_estimate_shared_lits == -1.f) {
-                // initialize expected next sharing volume
-                _estimate_shared_lits = _last_num_input_lits;
+            if (_estimate_shared_lits <= 0) {
+                // initialize estimate
+                _estimate_shared_lits = nbAdmittedLits;
             } else {
                 // update internal state
                 _accumulated_shared_lits = 0.9f * _accumulated_shared_lits + nbAdmittedLits;
@@ -173,6 +173,7 @@ public:
     }
     void setNumInputLitsOfLastSharing(int numInputLits) {
         _last_num_input_lits = numInputLits;
+        if (_estimate_incoming_lits <= 0) _estimate_incoming_lits = numInputLits;
     }
 
     size_t getBufferLimit(int numAggregatedNodes, bool selfOnly) {
