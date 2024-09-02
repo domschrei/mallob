@@ -137,7 +137,7 @@ function check() {
     # Report solved jobs
     grep -oE "(TIMEOUT|SOLUTION) #" _systest|awk '$1 == "TIMEOUT" {timeouts+=1} $1 == "SOLUTION" {solved+=1} END {printf("%i solved, %i timeouts; ", solved, timeouts)}'
     # Report successful sharings
-    grep -oE ":0 CS digest w/ filter" _systest|awk 'END {printf("%i sharing operations; ", NR)}'
+    grep -oE ":0 CS last sharing:" _systest|awk 'END {printf("%i sharing operations; ", NR)}'
     # Report over-due sharing epochs
     grep -oE "Next epoch over-due -- [0-9]+ periods skipped" _systest|awk '{max=max>$5?max:$5} END {printf("%i epoch delays (max: by %i epochs)\n", NR, max)}'
 }
