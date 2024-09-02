@@ -212,6 +212,8 @@ private:
         int size;
         doReadFromPipe(&size, sizeof(int), 1, abortAtFailure);
         //printf("-- read size %i\n", size);
+        if (MALLOB_UNLIKELY(_failed)) return std::vector<int>();
+        assert(size >= 0);
         std::vector<int> out(size);
         doReadFromPipe(out.data(), sizeof(int), size, abortAtFailure);
         //printf("-- read %i ints\n", size);
@@ -245,7 +247,7 @@ private:
 
     void doWriteToPipe(const void* data, int size, int nbElems, bool abortAtFailure) {
         const int nbWritten = fwrite(data, size, nbElems, _pipe_out);
-        if (nbWritten < nbElems) {
+        if (MALLOB_UNLIKELY(nbWritten < nbElems)) {
             _failed = true;
             if (abortAtFailure) abort();
         }
@@ -253,7 +255,7 @@ private:
     }
     void doReadFromPipe(void* data, int size, int nbElems, bool abortAtFailure) {
         const int nbRead = fread(data, size, nbElems, _pipe_in);
-        if (nbRead < nbElems) {
+        if (MALLOB_UNLIKELY(nbRead < nbElems)) {
             _failed = true;
             if (abortAtFailure) abort();
         }
