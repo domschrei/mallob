@@ -44,6 +44,7 @@ public:
 				filterPos++;
 				shift = 0;
 			}
+			assert(filterPos < _filter_size);
 			bool admitted = ((_filter[filterPos] & (1 << shift)) == 0);
 			if (admitted) {
 				_num_admitted_cls++;

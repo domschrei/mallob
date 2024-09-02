@@ -12,6 +12,7 @@
 #include "app/sat/job/inplace_sharing_aggregation.hpp"
 #include "util/assert.hpp"
 
+#include "util/sys/bidirectional_anytime_pipe.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
@@ -20,7 +21,6 @@
 #include "util/sys/proc.hpp"
 #include "data/checksum.hpp"
 #include "util/sys/terminator.hpp"
-#include "util/sys/bidirectional_pipe.hpp"
 #include "clause_pipe_defs.hpp"
 
 #include "engine.hpp"
@@ -99,9 +99,10 @@ private:
     void mainProgram(SatEngine& engine) {
 
         // Set up pipe communication for clause sharing
-        BiDirectionalPipe pipe(BiDirectionalPipe::ACCESS,
+        BiDirectionalAnytimePipe pipe(BiDirectionalAnytimePipe::ACCESS,
             TmpDir::get()+_shmem_id+".fromsub.pipe",
-            TmpDir::get()+_shmem_id+".tosub.pipe");
+            TmpDir::get()+_shmem_id+".tosub.pipe",
+            &_hsm->childReadyToWrite);
         pipe.open();
         LOGGER(_log, V4_VVER, "Pipes set up\n");
 
@@ -156,7 +157,7 @@ private:
 
                 if (c == CLAUSE_PIPE_DUMP_STATS) {
                     LOGGER(_log, V5_DEBG, "DO dump stats\n");
-                    pipe.readData(c, true);
+                    pipe.readData(c);
 
                     engine.dumpStats(/*final=*/false);
 
@@ -183,10 +184,10 @@ private:
 
                 } else if (c == CLAUSE_PIPE_PREPARE_CLAUSES) {
                     collectClauses = true;
-                    exportLiteralLimit = pipe.readData(c, true)[0];
+                    exportLiteralLimit = pipe.readData(c)[0];
 
                 } else if (c == CLAUSE_PIPE_FILTER_IMPORT) {
-                    incomingClauses = pipe.readData(c, true);
+                    incomingClauses = pipe.readData(c);
                     int epoch = popLast(incomingClauses);
                     InplaceClauseAggregation agg(incomingClauses);
                     int winningSolverId = agg.successfulSolver();
@@ -195,6 +196,7 @@ private:
                     LOGGER(_log, V5_DEBG, "DO filter clauses\n");
                     engine.setClauseBufferRevision(bufferRevision);
                     auto filter = engine.filterSharing(incomingClauses);
+                    LOGGER(_log, V5_DEBG, "filter result has size %i\n", filter.size());
                     pipe.writeData(filter, {epoch}, CLAUSE_PIPE_FILTER_IMPORT);
                     if (winningSolverId >= 0) {
                         LOGGER(_log, V4_VVER, "winning solver ID: %i\n", winningSolverId);
@@ -202,13 +204,13 @@ private:
                     }
 
                 } else if (c == CLAUSE_PIPE_DIGEST_IMPORT) {
-                    auto filter = pipe.readData(c, true);
+                    auto filter = pipe.readData(c);
                     int epoch = popLast(filter);
                     doImportClauses(engine, incomingClauses, &filter, -1, epoch);
                     pipe.writeData({engine.getLastAdmittedClauseShare().nbAdmittedLits}, CLAUSE_PIPE_DIGEST_IMPORT);
 
                 } else if (c == CLAUSE_PIPE_DIGEST_IMPORT_WITHOUT_FILTER) {
-                    incomingClauses = pipe.readData(c, true);
+                    incomingClauses = pipe.readData(c);
                     int epoch = popLast(incomingClauses);
                     InplaceClauseAggregation agg(incomingClauses);
                     int bufferRevision = agg.maxRevision();
@@ -217,14 +219,14 @@ private:
 
                 } else if (c == CLAUSE_PIPE_RETURN_CLAUSES) {
                     LOGGER(_log, V5_DEBG, "DO return clauses\n");
-                    auto clauses = pipe.readData(c, true);
+                    auto clauses = pipe.readData(c);
                     int bufferRevision = popLast(clauses);
                     engine.setClauseBufferRevision(bufferRevision);
                     engine.returnClauses(clauses);
 
                 } else if (c == CLAUSE_PIPE_DIGEST_HISTORIC) {
                     LOGGER(_log, V5_DEBG, "DO digest historic clauses\n");
-                    auto data = pipe.readData(c, true);
+                    auto data = pipe.readData(c);
                     int bufferRevision = popLast(data);
                     int epochEnd = popLast(data);
                     int epochBegin = popLast(data);
@@ -233,12 +235,12 @@ private:
 
                 } else if (c == CLAUSE_PIPE_REDUCE_THREAD_COUNT) {
                     LOGGER(_log, V3_VERB, "DO reduce thread count\n");
-                    pipe.readData(c, true);
+                    pipe.readData(c);
                     engine.reduceActiveThreadCount();
 
                 } else if (c == CLAUSE_PIPE_START_NEXT_REVISION) {
                     LOGGER(_log, V5_DEBG, "DO start next revision\n");
-                    auto data = pipe.readData(c, true);
+                    auto data = pipe.readData(c);
                     _last_present_revision = popLast(data);
                     _desired_revision = popLast(data);
 
@@ -312,18 +314,23 @@ private:
         }
 
         Terminator::setTerminating();
-        checkTerminate(engine, true, exitStatus); // exits
+        // This call ends the program.
+        checkTerminate(engine, true, exitStatus, [&]() {
+            // clean up bidirectional pipe - THIS BLOCKS UNTIL PARENT SENT FINAL BYTE
+            pipe.~BiDirectionalAnytimePipe();
+        });
         abort(); // should be unreachable
 
         // Shared memory will be cleaned up by the parent process.
     }
 
-    bool checkTerminate(SatEngine& engine, bool force, int exitStatus = 0) {
+    bool checkTerminate(SatEngine& engine, bool force, int exitStatus = 0, std::function<void()> cbAtForcedExit = [](){}) {
         bool terminate = _hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/true);
         if (terminate && force) {
             // clean up all resources which MUST be cleaned up (e.g., child processes)
             engine.cleanUp(true);
             _log.flush();
+            cbAtForcedExit();
             _hsm->didTerminate = true;
             // terminate yourself
             Process::doExit(exitStatus);

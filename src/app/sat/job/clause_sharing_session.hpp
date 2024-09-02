@@ -155,17 +155,20 @@ public:
 
         if (_stage == PRODUCING_FILTER && _job->hasFilteredSharing(_epoch)) {
 
-            LOG(V5_DEBG, "%s CS produced filter\n", _job->toStr());
-            _allreduce_filter->produce([&]() {return _job->getLocalFilter(_epoch);});
+            _allreduce_filter->produce([&]() {
+                auto f = _job->getLocalFilter(_epoch);
+                LOG(V5_DEBG, "%s CS produced filter, size %i\n", _job->toStr(), f.size());
+                return f;
+            });
             _stage = AGGREGATING_FILTER;
         }
 
         if (_stage == AGGREGATING_FILTER && _allreduce_filter->advance().hasResult()) {
 
-            LOG(V5_DEBG, "%s CS digest w/ filter\n", _job->toStr());
 
             // Extract and digest result
             auto filter = _allreduce_filter->extractResult();
+            LOG(V5_DEBG, "%s CS digest w/ filter, size %i\n", _job->toStr(), filter.size());
             _job->applyFilter(_epoch, filter);
             if (_cls_history) {
                 InplaceClauseAggregation(_broadcast_clause_buffer).stripToRawBuffer();

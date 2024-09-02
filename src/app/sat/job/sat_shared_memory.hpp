@@ -20,6 +20,7 @@ struct SatSharedMemory {
     bool doBegin {false};
     bool doTerminate {false};
     bool doCrash {false};
+    bool childReadyToWrite {false};
 
     // Signals child->parent
     bool didTerminate {false};

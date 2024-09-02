@@ -15,13 +15,13 @@
 #include "app/sat/job/inplace_sharing_aggregation.hpp"
 #include "sat_process_adapter.hpp"
 #include "../execution/engine.hpp"
+#include "util/sys/bidirectional_anytime_pipe.hpp"
 #include "util/sys/shared_memory.hpp"
 #include "util/sys/proc.hpp"
 #include "util/sys/subprocess.hpp"
 #include "util/sys/process.hpp"
 #include "util/logger.hpp"
 #include "util/sys/thread_pool.hpp"
-#include "util/sys/bidirectional_pipe.hpp"
 #include "app/sat/job/sat_shared_memory.hpp"
 #include "util/option.hpp"
 #include "util/sys/tmpdir.hpp"
@@ -105,9 +105,10 @@ void SatProcessAdapter::doInitialize() {
     createSharedMemoryBlock("assumptions.0", sizeof(int) * _a_size, (void*)_a_lits);
 
     // Set up bi-directional pipe to and from the subprocess
-    _pipe.reset(new BiDirectionalPipe(BiDirectionalPipe::CREATE,
+    _pipe.reset(new BiDirectionalAnytimePipe(BiDirectionalAnytimePipe::CREATE,
         TmpDir::get()+_shmem_id+".tosub.pipe",
-        TmpDir::get()+_shmem_id+".fromsub.pipe"));
+        TmpDir::get()+_shmem_id+".fromsub.pipe",
+        &_hsm->childReadyToWrite));
 
     if (_terminate) return;
 
@@ -193,6 +194,7 @@ void SatProcessAdapter::filterClauses(int epoch, const std::vector<int>& clauses
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
     _pipe->writeData(clauses, {epoch},
         CLAUSE_PIPE_FILTER_IMPORT);
+    _epoch_of_export_buffer = epoch;
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
 
@@ -219,6 +221,7 @@ std::vector<int> SatProcessAdapter::getLocalFilter(int epoch) {
 
 void SatProcessAdapter::applyFilter(int epoch, const std::vector<int>& filter) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
+    if (epoch != _epoch_of_export_buffer) return; // ignore filter if the corresponding clauses are not present
     _pipe->writeData(filter, {epoch}, CLAUSE_PIPE_DIGEST_IMPORT);
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
@@ -357,6 +360,7 @@ void SatProcessAdapter::waitUntilChildExited() {
         usleep(100*1000); // 0.1s
     }
     doTerminateInitializedProcess(); // make sure that the process receives a terminate signal
+    _pipe.reset(); // clean up bidirectional pipe
     while (true) {
         // Check if child exited
         auto lock = _state_mutex.getLock();

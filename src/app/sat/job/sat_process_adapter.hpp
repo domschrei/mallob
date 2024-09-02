@@ -13,6 +13,7 @@
 #include "robin_map.h"
 #include "util/logger.hpp"
 #include "util/robin_hood.hpp"
+#include "util/sys/bidirectional_anytime_pipe.hpp"
 #include "util/sys/threading.hpp"
 #include "util/params.hpp"
 #include "../execution/solving_state.hpp"
@@ -20,7 +21,6 @@
 #include "data/checksum.hpp"
 #include "util/sys/background_worker.hpp"
 #include "data/job_result.hpp"
-#include "util/sys/bidirectional_pipe.hpp"
 #include "app/sat/job/sat_process_config.hpp"
 #include "util/hashing.hpp"
 
@@ -75,7 +75,7 @@ private:
     std::string _shmem_id;
     SatSharedMemory* _hsm = nullptr;
 
-    std::unique_ptr<BiDirectionalPipe> _pipe;
+    std::unique_ptr<BiDirectionalAnytimePipe> _pipe;
 
     volatile bool _running = false;
     volatile bool _initialized = false;
