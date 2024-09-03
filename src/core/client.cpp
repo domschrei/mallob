@@ -158,11 +158,27 @@ void Client::readIncomingJobs() {
                             id, filesList.c_str(), time, foundJob.description->getNumFormulaLiterals(), 
                             foundJob.description->getNumAssumptionLiterals());
                     foundJob.description->getStatistics().parseTime = time;
-                    
-                    // Enqueue in ready jobs
-                    auto lock = _ready_job_lock.getLock();
-                    _ready_job_queue.push_back(std::move(foundJob.description));
-                    atomics::incrementRelaxed(_num_ready_jobs);
+
+                    const int appId = foundJob.description->getApplicationId();
+                    if (app_registry::isClientSide(appId)) {
+                        // Launch client-side program
+                        auto lock = _client_side_jobs_mutex.getLock();
+                        {
+                            _client_side_jobs.emplace_back(std::move(foundJob.description));
+                            _sys_state.addLocal(SYSSTATE_SCHEDULED_JOBS, 1);
+                        }
+                        bool* done = &_client_side_jobs.back().done;
+                        auto* desc = _client_side_jobs.back().desc.get();
+                        _client_side_jobs.back().thread.run([&, appId, done, desc = desc]() {
+                            app_registry::getClientSideProgram(appId)(_params, getAPI(), *desc);
+                            *done = true;
+                        });
+                    } else {
+                        // Enqueue in ready jobs to be scheduled properly
+                        auto lock = _ready_job_lock.getLock();
+                        _ready_job_queue.push_back(std::move(foundJob.description));
+                        atomics::incrementRelaxed(_num_ready_jobs);
+                    }
                     atomics::incrementRelaxed(_num_loaded_jobs);
                     _sys_state.addLocal(SYSSTATE_PARSED_JOBS, 1);
                 }
@@ -310,6 +326,20 @@ void Client::advance() {
             MyMpi::isend(_root_nodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
             finishJob(jobId, /*hasIncrementalSuccessors=*/false);
         }
+    }
+
+    // Check if any client-side jobs are done
+    if (_periodic_check_client_side_jobs.ready(time) && _client_side_jobs_mutex.tryLock()) {
+        for (auto it = _client_side_jobs.begin(); it != _client_side_jobs.end(); ++it) {
+            auto& job = *it;
+            if (!job.done) continue;
+            const int id = job.desc->getId();
+            _active_jobs[id] = std::move(job.desc);
+            MyMpi::isend(_world_rank, MSG_SEND_JOB_RESULT, job.result);
+            it = _client_side_jobs.erase(it);
+            --it;
+        }
+        _client_side_jobs_mutex.unlock();
     }
 
     if (_num_jobs_to_interrupt.load(std::memory_order_relaxed) > 0 && _jobs_to_interrupt_lock.tryLock()) {

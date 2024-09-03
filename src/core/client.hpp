@@ -121,6 +121,18 @@ private:
 
     PeriodicEvent<100> _periodic_check_done_jobs;
 
+    struct ClientSideJob {
+        std::unique_ptr<JobDescription> desc;
+        bool done {false};
+        BackgroundWorker thread;
+        JobResult result;
+        ClientSideJob() {}
+        ClientSideJob(std::unique_ptr<JobDescription>&& desc) : desc(std::move(desc)) {}
+    };
+    Mutex _client_side_jobs_mutex;
+    std::list<ClientSideJob> _client_side_jobs;
+    PeriodicEvent<100> _periodic_check_client_side_jobs;
+
 public:
     Client(MPI_Comm comm, Parameters& params)
         : _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 
