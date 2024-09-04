@@ -11,7 +11,7 @@ Most notably, Mallob features an engine for distributed SAT solving.
 According to the [International SAT Competitions](https://satcompetition.github.io/) 2020-2023, the premier competitive events for state-of-the-art SAT solving, Mallob is consistently the strongest SAT solving system for massively parallel and distributed systems (1600 hardware threads spread across 100 machines) and also a highly competitive system for moderately parallel SAT solving (64 hardware threads).
 Note that this version of Mallob also features a module to generate proofs of unsatisfiability due to a cooperation with external researchers from Amazon Web Services and due to subsequent work by D. Schreiber.
 
-Furthermore, Mallob features an engine for K-Means clustering, authored by [Michael Dörr](https://github.com/MichaelDoerr) in the scope of his Bachelor thesis.
+Furthermore, Mallob features engines for K-Means clustering, authored by [Michael Dörr](https://github.com/MichaelDoerr), and for MaxSAT solving (highly experimental as of yet).
 
 <hr/>
 
@@ -30,9 +30,12 @@ Note that we only support Linux as an operating system.
 ## Building
 
 ```bash
-# Only needed if building with MALLOB_APP_SAT (enabled by default).
+# Only needed if building with -DMALLOB_APP_SAT=1 (enabled by default).
 # For non-x86-64 architectures (ARM, POWER9, etc.), prepend `DISABLE_FPU=1` to "bash".
 ( cd lib && bash fetch_and_build_sat_solvers.sh )
+
+# Only needed if building with -DMALLOB_APP_MAXSAT=1.
+( cd lib && bash fetch_and_build_rustsat.sh )
 
 # Build Mallob
 mkdir -p build
@@ -58,6 +61,7 @@ You can use the following Mallob-specific build options:
 | -DMALLOB_USE_JEMALLOC=<0/1>                 | Compile with Scalable Memory Allocator `jemalloc` instead of default `malloc`.                             |
 | -DMALLOB_APP_KMEANS=<0/1>                   | Compile with K-Means clustering engine.                                                                    |
 | -DMALLOB_APP_SAT=<0/1>                      | Compile with SAT solving engine.                                                                           |
+| -DMALLOB_APP_MAXSAT=<0/1>                   | Compile with MaxSAT solving engine (requires SAT solving engine).                                          |
 | -DMALLOB_MAX_N_APPTHREADS_PER_PROCESS=<N>   | Max. number of application threads (solver threads for SAT) per process to support. (max: 128)             |
 | -DMALLOB_BUILD_LRAT_MODULES=<0/1>           | Also build standalone LRAT checker                                                                         |
 
