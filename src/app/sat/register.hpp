@@ -19,7 +19,7 @@ void register_mallob_app_sat() {
         // Job solution formatter
         [](const JobResult& result) {
             auto json = nlohmann::json::array();
-            std::stringstream modelString;
+            /*std::stringstream modelString;
             int numAdded = 0;
             auto solSize = result.getSolutionSize();
             for (size_t x = 1; x < solSize; x++) {
@@ -37,6 +37,8 @@ void register_mallob_app_sat() {
                     numAdded = 0;
                 }
             }
+            */
+            json = result.copySolution();
             return json;
         }
     );

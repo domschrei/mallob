@@ -124,14 +124,14 @@ endfunction()
 
 # Include applications
 register_mallob_app("dummy") # always register the "no-op" application
+if(MALLOB_APP_MAXSAT)
+    register_mallob_app("maxsat")
+endif()
 if(MALLOB_APP_SAT) 
     register_mallob_app("sat")
 endif()
 if(MALLOB_APP_KMEANS)
     register_mallob_app("kmeans")
-endif()
-if(MALLOB_APP_MAXSAT)
-    register_mallob_app("maxsat")
 endif()
 # Include further applications here:
 #if(MALLOB_APP_YOURAPP)

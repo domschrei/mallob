@@ -77,3 +77,11 @@ std::vector<int> JobResult::extractSolution() {
     }
     return std::vector<int>(std::move(solution));
 }
+std::vector<int> JobResult::copySolution() const {
+    if (!packedData.empty()) {
+        JobResult res; res.deserialize(packedData);
+        return res.solution;
+    }
+    return solution;
+}
+

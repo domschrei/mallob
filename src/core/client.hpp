@@ -70,7 +70,9 @@ private:
     // Safeguards _incoming_job_queue.
     Mutex _incoming_job_lock;
     ConditionVariable _incoming_job_cond_var;
-    
+
+    int _mono_job_id {-1};
+
     std::atomic_long _next_arrival_time_millis = -1;
     std::set<float> _arrival_times;
     Mutex _arrival_times_lock;

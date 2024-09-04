@@ -126,6 +126,7 @@ void Client::readIncomingJobs() {
             // Job can be read: Enqueue reader task into thread pool
             LOGGER(log, V4_VVER, "ENQUEUE #%i\n", data.description->getId());
             unreadyJobs.erase(std::pair<int, int>(data.description->getId(), data.description->getRevision()));
+            if (_params.monoFilename.isSet() && _mono_job_id < 0) _mono_job_id = data.description->getId();
 
             auto node = _incoming_job_queue.extract(data);
             auto future = ProcessWideThreadPool::get().addTask(
@@ -137,7 +138,7 @@ void Client::readIncomingJobs() {
                 // Read job
                 int id = foundJob.description->getId();
                 float time = Timer::elapsedSeconds();
-                bool success = false;
+                bool success = true;
                 auto filesList = foundJob.getFilesList();
                 foundJob.description->beginInitialization(foundJob.description->getRevision());
                 if (foundJob.hasFiles()) {
@@ -168,9 +169,10 @@ void Client::readIncomingJobs() {
                             _sys_state.addLocal(SYSSTATE_SCHEDULED_JOBS, 1);
                         }
                         bool* done = &_client_side_jobs.back().done;
+                        JobResult* res = &_client_side_jobs.back().result;
                         auto* desc = _client_side_jobs.back().desc.get();
-                        _client_side_jobs.back().thread.run([&, appId, done, desc = desc]() {
-                            app_registry::getClientSideProgram(appId)(_params, getAPI(), *desc);
+                        _client_side_jobs.back().thread.run([&, appId, done, res, desc = desc]() {
+                            *res = app_registry::getClientSideProgram(appId)(_params, getAPI(), *desc);
                             *done = true;
                         });
                     } else {
@@ -578,29 +580,36 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     JobDescription& desc = *_active_jobs.at(jobId);
     desc.getStatistics().processingTime = Timer::elapsedSeconds() - desc.getStatistics().timeOfScheduling;
 
+    std::string resultCodeString = "UNKNOWN";
+    if (resultCode == RESULT_SAT) resultCodeString = "SATISFIABLE";
+    if (resultCode == RESULT_UNSAT) resultCodeString = "UNSATISFIABLE";
+    if (resultCode == RESULT_OPTIMUM_FOUND) resultCodeString = "OPTIMUM FOUND";
+
     // Output response time and solution header
     LOG(V2_INFO, "RESPONSE_TIME #%i %.6f rev. %i\n", jobId, Timer::elapsedSeconds()-desc.getArrival(), revision);
-    LOG(V2_INFO, "SOLUTION #%i %s rev. %i\n", jobId, resultCode == RESULT_SAT ? "SAT" : "UNSAT", revision);
+    LOG(V2_INFO, "SOLUTION #%i %s rev. %i\n", jobId, resultCodeString.c_str(), revision);
 
     // Increment # successful jobs if result is not "unknown"
     if (resultCode != 0) {
         _sys_state.addLocal(SYSSTATE_SUCCESSFUL_JOBS, 1);
     }
 
-    // Disable all watchdogs to avoid crashes while printing a huge model
-    Watchdog::disableGlobally();
-
-    std::string resultString = "s " + std::string(resultCode == RESULT_SAT ? "SATISFIABLE" 
-                        : resultCode == RESULT_UNSAT ? "UNSATISFIABLE" : "UNKNOWN") + "\n";
+    std::string resultString = "s " + resultCodeString + "\n";
     std::vector<std::string> modelStrings;
-    if ((_params.solutionToFile.isSet() || (_params.monoFilename.isSet() && !_params.omitSolution())) 
+    if ((_params.solutionToFile.isSet() || (_params.monoFilename.isSet() && !_params.omitSolution() && jobId==_mono_job_id)) 
             && resultCode == RESULT_SAT) {
+
+        // Disable all watchdogs to avoid crashes while printing a huge model
+        Watchdog::disableGlobally();
+
         auto json = app_registry::getJobSolutionFormatter(desc.getApplicationId())(jobResult);
-        if (json.is_array()) {
+        if (json.is_array() && (json.size()==0 || json[0].is_string())) {
             auto jsonArr = json.get<std::vector<std::string>>();
             for (auto&& str : jsonArr) modelStrings.push_back(std::move(str));
-        } else {
+        } else if (json.is_string()) {
             modelStrings.push_back(json.get<std::string>());
+        } else {
+            modelStrings.push_back(json.dump()+"\n");
         }
     }
     if (_params.solutionToFile.isSet()) {
@@ -613,7 +622,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
             for (auto& modelString : modelStrings) file << modelString;
             file.close();
         }
-    } else if (_params.monoFilename.isSet()) {
+    } else if (_params.monoFilename.isSet() && jobId==_mono_job_id) {
         LOG_OMIT_PREFIX(V0_CRIT, resultString.c_str());
         if (!_params.omitSolution()) {
             for (auto& modelString : modelStrings)

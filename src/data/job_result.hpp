@@ -69,6 +69,7 @@ public:
     }
 
     std::vector<int> extractSolution();
+    std::vector<int> copySolution() const;
 };
 
 #endif
