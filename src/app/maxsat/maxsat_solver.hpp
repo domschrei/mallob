@@ -136,6 +136,8 @@ public:
         size_t lb = 0, ub = _best_cost;
         while (lb != ub) {
             // Encode any cardinality constraints that are still missing for the upcoming call
+            // TODO Question: Do we need to provide the "hull" of all tested bounds so far (as it is now)
+            // or only the "new" interval that wasn't included in a call to gte_encode_ub yet?
             RustSAT::gte_encode_ub(cardi, ub-1, _initial_cost-1, &_nb_vars, &maxsat_collect_clause, this);
             // Generate the assumptions needed for this particular upper bound
             RustSAT::gte_enforce_ub(cardi, ub-1, &maxsat_collect_assumption, this);
