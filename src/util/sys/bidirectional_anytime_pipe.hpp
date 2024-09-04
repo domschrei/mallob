@@ -94,7 +94,7 @@ public:
             });
             _bg_writer.run([&]() {
                 Message msg;
-                while (_bg_writer.continueRunning()) {
+                while (_bg_writer.continueRunning()) { // run until terminating
                     // read message from writing queue
                     bool success = _buf_out.pollBlocking(msg);
                     if (!success) break;
@@ -112,12 +112,12 @@ public:
         }
     }
 
-    char pollForData() {
+    char pollForData(bool abortAtFailure = true) {
         if (_read_tag != 0) return _read_tag;
         if (_mode == CREATE) {
             // parent process checks if there is in fact some data ready to be read
             if (*_child_ready_to_write) {
-                doReadFromPipe(&_read_tag, 1, 1, true);
+                doReadFromPipe(&_read_tag, 1, 1, abortAtFailure);
                 *_child_ready_to_write = false;
             }
         } else {
@@ -181,12 +181,21 @@ public:
 
     ~BiDirectionalAnytimePipe() {
         if (_mode == CREATE) {
+            // Parent: Send a signal to the child process that we close the pipes.
             writeToPipe({}, 0, false);
+            // Finish reading whatever the child process has sent in the meantime.
+            while (!_failed) {
+                char tag = pollForData(false);
+                if (_failed) break;
+                (void) readFromPipe(false);
+            }
         } else {
+            // Child: stop taking data from the buffers.
             _buf_in.markExhausted();
             _buf_in.markTerminated();
             _buf_out.markExhausted();
             _buf_out.markTerminated();
+            // Join with the background threads once they are done.
             _bg_reader.stop();
             _bg_writer.stop();
         }
@@ -203,6 +212,8 @@ private:
         int size;
         doReadFromPipe(&size, sizeof(int), 1, abortAtFailure);
         //printf("-- read size %i\n", size);
+        if (MALLOB_UNLIKELY(_failed)) return std::vector<int>();
+        assert(size >= 0);
         std::vector<int> out(size);
         doReadFromPipe(out.data(), sizeof(int), size, abortAtFailure);
         //printf("-- read %i ints\n", size);
@@ -236,7 +247,7 @@ private:
 
     void doWriteToPipe(const void* data, int size, int nbElems, bool abortAtFailure) {
         const int nbWritten = fwrite(data, size, nbElems, _pipe_out);
-        if (nbWritten < nbElems) {
+        if (MALLOB_UNLIKELY(nbWritten < nbElems)) {
             _failed = true;
             if (abortAtFailure) abort();
         }
@@ -244,7 +255,7 @@ private:
     }
     void doReadFromPipe(void* data, int size, int nbElems, bool abortAtFailure) {
         const int nbRead = fread(data, size, nbElems, _pipe_in);
-        if (nbRead < nbElems) {
+        if (MALLOB_UNLIKELY(nbRead < nbElems)) {
             _failed = true;
             if (abortAtFailure) abort();
         }
