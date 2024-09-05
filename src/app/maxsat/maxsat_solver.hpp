@@ -1,25 +1,25 @@
 
 #pragma once
 
+#include "app/maxsat/maxsat_instance.hpp"
+#include "app/maxsat/maxsat_search_procedure.hpp"
 #include "app/maxsat/parse/maxsat_reader.hpp"
-#include "app/maxsat/sat_job_stream.hpp"
 #include "app/sat/data/definitions.hpp"
 #include "app/sat/job/sat_constants.h"
+#include "comm/mympi.hpp"
 #include "data/job_description.hpp"
 #include "data/job_result.hpp"
 #include "data/job_transfer.hpp"
 #include "interface/api/api_connector.hpp"
 #include <algorithm>
+#include <climits>
 #include <list>
 #include <unistd.h>
 #include "util/logger.hpp"
 // external
 #include "rustsat.h"
-
-// C-style clause collector function for RustSAT C API
-void maxsat_collect_clause(int lit, void* solver);
-// C-style assumption collector function for RustSAT C API
-void maxsat_collect_assumption(int lit, void* solver);
+#include "util/sys/terminator.hpp"
+#include "util/params.hpp"
 
 // A MaxSAT solving approach based on solution improving search, i.e., 
 // a sequence of SAT calls which impose varying restrictions on admissible
@@ -34,47 +34,18 @@ private:
     APIConnector& _api; // for submitting jobs to Mallob
     JobDescription& _desc; // contains our instance to solve and all metadata
 
-    // required for Mallob's job submission API
-    std::string _username;
-
-    // raw C array of the formula (hard clauses) to solve
-    const int* _f_data;
-    struct ObjectiveTerm {
-        int factor;
-        int lit;
-    };
-    // objective function as a linear combination of literals
-    std::vector<ObjectiveTerm> _objective;
-    // size of the raw C array _f_data
-    const size_t _f_size;
-    // number of variables in the formula - update when adding new ones
-    unsigned int _nb_vars;
-
-    // vector of 0-separated (hard) clauses to add in the next SAT call
-    std::vector<int> _lits_to_add;
-    // vector of assumption literals for the next SAT call
-    std::vector<int> _assumptions_to_set;
+    std::unique_ptr<MaxSatInstance> _instance; // the problem instance we're solving
 
     // holds all active streams of Mallob jobs and allows interacting with them
-    std::list<std::unique_ptr<SatJobStream>> _job_streams;
-
-    // the best found satisfying assignment so far
-    std::vector<int> _best_solution;
-    // the cost associated with the best found satisfying assignment so far
-    size_t _best_cost;
+    std::list<std::unique_ptr<MaxSatSearchProcedure>> _searches;
 
 public:
     // Initializes the solver instance and parses the description's formula.
     MaxSatSolver(const Parameters& params, APIConnector& api, JobDescription& desc) :
-        _params(params), _api(api), _desc(desc), _username("maxsat#" + std::to_string(_desc.getId())),
-        _f_data(desc.getFormulaPayload(0)), _f_size([&]() {
-            return parseFormulaAndGetFormulaSize();
-        }()) {
+        _params(params), _api(api), _desc(desc) {
+
         LOG(V2_INFO, "Mallob client-side MaxSAT solver, by Jeremias Berg & Dominik Schreiber\n");
-        std::string nbVarsString = desc.getAppConfiguration().map.at("__NV");
-        while (nbVarsString[nbVarsString.size()-1] == '.') 
-			nbVarsString.resize(nbVarsString.size()-1);
-		_nb_vars = atoi(nbVarsString.c_str());
+        parseFormula();
     }
 
     // Perform exact MaxSAT solving and return an according result.
@@ -87,23 +58,29 @@ public:
         r.result = RESULT_UNKNOWN;
 
         // Just for debugging
-        printFormula();
+        _instance->print();
 
-        // Little bit of boilerplate to initialize a new incremental SAT job stream
-        _job_streams.emplace_back(new SatJobStream(_params, _api, _desc,
-            _job_streams.size(), true));
-        SatJobStream* stream = _job_streams.back().get();
+        // Parse the user-provided sequence of search strategies.
+        std::string searchStrats = _params.maxSatSearchStrategy();
+        const int nbWorkers = _params.numWorkers() == -1 ? MyMpi::size(MPI_COMM_WORLD) : _params.numWorkers();
+        // Loop over each specified search strategy
+        for (char c : searchStrats) {
+            // Check if we have enough workers in the system for another job stream
+            if (nbWorkers <= _searches.size()) {
+                LOG(V1_WARN, "MAXSAT [WARN] Truncating number of parallel search strategies to %i due to lack of workers\n",
+                    nbWorkers);
+                break;
+            }
+            // Initialize search procedure
+            _searches.emplace_back(initializeSearchProcedure(c));
+        }
+        assert(!_searches.empty());
 
         // Initial SAT call: just solve the hard clauses.
-        std::vector<int> initialFormula(_f_data, _f_data+_f_size);
-        stream->submitNext(std::move(initialFormula), {});
-        // TODO Once we have parallel jobs, we may want to think about a more clever way
-        // to wait for a job to finish, like with condition variables.
-        while (stream->isPending()) usleep(1000 * 10); // 10 ms
-
-        // Job is done - retrieve the result.
-        auto result = std::move(stream->getResult());
-        const int resultCode = result["result"]["resultcode"];
+        // We just use the first specified search strategy for this task.
+        MaxSatSearchProcedure* search = _searches.front().get();
+        // Only for this initial solve call, we don't need to enforce a bound first.
+        int resultCode = search->solveBlocking(); // solve and wait for a result
         if (resultCode == RESULT_UNSAT) {
             // UNSAT in the initial call
             LOG(V2_INFO, "MAXSAT Problem is utterly unsatisfiable\n");
@@ -117,74 +94,40 @@ public:
             return r;
         }
         // Initial formula is SATisfiable.
+        LOG(V2_INFO, "MAXSAT Initial model has cost %lu\n", _instance->bestCost);
 
-        // Retrieve the initial model and compute its cost as a first upper bound.
-        _best_solution = std::move(result["result"]["solution"].get<std::vector<int>>());
-        _best_cost = getObjectiveValueOfModel(_best_solution);
-        LOG(V2_INFO, "MAXSAT Initial model has cost %lu\n", _best_cost);
-        const size_t _initial_cost = _best_cost;
-
-        // Initialize cardinality constraint encoder.
-        auto cardi = RustSAT::gte_new();
-        for (auto& [factor, lit] : _objective) {
-            // add each term of the objective function
-            RustSAT::gte_add(cardi, lit, factor);
-        }
-
-        // We can now submit a sequence of increments of this job to Mallob.
-        // Begin with trivial initial bounds. TODO Better initial bounds?
-        size_t lb = 0, ub = _best_cost;
-        while (lb != ub) {
-            // Encode any cardinality constraints that are still missing for the upcoming call
-            // TODO Question: Do we need to provide the "hull" of all tested bounds so far (as it is now)
-            // or only the "new" interval that wasn't included in a call to gte_encode_ub yet?
-            RustSAT::gte_encode_ub(cardi, ub-1, _initial_cost-1, &_nb_vars, &maxsat_collect_clause, this);
-            // Generate the assumptions needed for this particular upper bound
-            RustSAT::gte_enforce_ub(cardi, ub-1, &maxsat_collect_assumption, this);
-
-            // Submit a SAT job increment and wait until it returns
-            LOG(V2_INFO, "MAXSAT testing bound %lu\n", ub-1);
-            stream->submitNext(std::move(_lits_to_add), std::move(_assumptions_to_set));
-            while (stream->isPending()) usleep(1000 * 10); // 10 ms
-
-            // Retrieve the result
-            auto result = std::move(stream->getResult());
-            const int resultCode = result["result"]["resultcode"];
-            if (resultCode == RESULT_UNSAT) {
-                // UNSAT
-                LOG(V2_INFO, "MAXSAT Bound %lu found unsatisfiable\n", ub-1);
-                LOG(V2_INFO, "MAXSAT OPTIMAL COST %lu\n", ub);
-                lb = ub;
-            } else if (resultCode == RESULT_SAT) {
-                // SAT
-                std::vector<int> solution = std::move(result["result"]["solution"]);
-                const size_t newCost = getObjectiveValueOfModel(solution);
-                LOG(V2_INFO, "MAXSAT Found model with cost %lu <= %lu\n", newCost, ub-1);
-                assert(newCost < ub);
-                ub = newCost;
-                _best_solution = std::move(solution);
-                _best_cost = newCost;
-            } else {
-                // UNKNOWN or something else - a problem in this case since we didn't cancel the job
-                LOG(V1_WARN, "[WARN] MAXSAT Unexpected result code %i\n", resultCode);
-                return r;
+        // Main loop for solution improving search.
+        while (!Terminator::isTerminating() && _instance->lowerBound < _instance->upperBound) {
+            // Loop over all search strategies
+            for (auto& search : _searches) {
+                // No solving procedure ongoing nor pending?
+                if (search->isIdle()) {
+                    // Compute and enforce the next bound for this strategy
+                    search->enforceNextBound();
+                    // Launch a SAT job
+                    search->solveNonblocking();
+                } else if (!search->isNonblockingSolvePending()) {
+                    // Current solving procedure has finished:
+                    // apply the result to the MaxSAT instance
+                    const int resultCode = search->processNonblockingSolveResult();
+                }
             }
+            // Wait a bit
+            usleep(1000 * 10); // 10 ms
         }
 
-        // Clean up cardinality encoder
-        RustSAT::gte_drop(cardi);
-
-        // construct & return final job result
-        r.result = RESULT_OPTIMUM_FOUND;
-        r.setSolution(std::move(_best_solution));
+        // Did we actually find an optimal result?
+        if (_instance->lowerBound >= _instance->upperBound) {
+            // construct & return final job result
+            r.result = RESULT_OPTIMUM_FOUND;
+            r.setSolution(std::move(_instance->bestSolution));
+        }
         return r;
     }
 
 private:
-
-    // Parses the formula contained in _desc and returns
-    // the total size of the description *without* the objective function.
-    int parseFormulaAndGetFormulaSize() {
+    // Parses the formula contained in _desc and initializes _instance accordingly.
+    void parseFormula() {
 
         // Fetch serialized WCNF description
         const int* fPtr = _desc.getFormulaPayload(0);
@@ -195,7 +138,8 @@ private:
         size_t pos = fSize-2;
         while (pos < fSize && fPtr[pos] != 0) pos--;
         // pos now points at the separation zero right before the objective
-        const size_t endOfClauses = pos; // hard clauses end at the separation zero to the objective 
+        // hard clauses end at the separation zero to the objective
+        _instance.reset(new MaxSatInstance(fPtr, pos));
 
         // Now actually parse the objective function
         ++pos;
@@ -204,49 +148,52 @@ private:
             int lit = -fPtr[pos+1];
             assert(factor != 0);
             assert(lit != 0);
-            _objective.push_back({factor, lit});
+            _instance->objective.push_back({factor, lit});
             pos += 2;
         }
+        // Sort the objective terms by weight in increasing order
+        // (may help to find the required steps to take in solution-improving search)
+        std::sort(_instance->objective.begin(), _instance->objective.end(),
+            [&](const MaxSatInstance::ObjectiveTerm& termLeft, const MaxSatInstance::ObjectiveTerm& termRight) {
+            return termLeft.factor < termRight.factor;
+        });
 
-        return endOfClauses;
+        // Extract number of variables
+        std::string nbVarsString = _desc.getAppConfiguration().map.at("__NV");
+        while (nbVarsString[nbVarsString.size()-1] == '.') 
+			nbVarsString.resize(nbVarsString.size()-1);
+		_instance->nbVars = atoi(nbVarsString.c_str());
+
+        _instance->lowerBound = 0;
+        _instance->upperBound = 0;
+        for (auto term : _instance->objective) _instance->upperBound += term.factor;
+        _instance->bestCost = ULONG_MAX;
     }
 
-    // Print some nice-to-know diagnostics.
-    void printFormula() const {
-        LOG(V2_INFO, "%i (hard) clause lits, %i objective terms\n", _f_size, _objective.size());
-        std::string o;
-        for (auto& term : _objective) {
-            o += std::to_string(term.factor) + "*[" + std::to_string(term.lit) + "] + ";
+    MaxSatSearchProcedure* initializeSearchProcedure(char c) {
+        // Parse search strategy
+        MaxSatSearchProcedure::SearchStrategy strat;
+        std::string label;
+        switch (c) {
+        case 'd':
+            strat = MaxSatSearchProcedure::DECREASING;
+            label = "DEC";
+            break;
+        case 'i':
+            strat = MaxSatSearchProcedure::INCREASING;
+            label = "INC";
+            break;
+        case 'b':
+            strat = MaxSatSearchProcedure::BISECTION;
+            label = "BIS";
+            break;
+        case 'r':
+            strat = MaxSatSearchProcedure::NAIVE_REFINEMENT;
+            label = "NRE";
+            break;
         }
-        o = o.substr(0, o.size()-2);
-        LOG(V2_INFO, "objective: %s\n", o.c_str());
+        // Initialize search procedure
+        return new MaxSatSearchProcedure(_params, _api, _desc,
+            *_instance, strat, label);
     }
-
-    // Evaluate a satisfying assignment (as returned by a Mallob SAT job)
-    // w.r.t. its objective function cost.
-    size_t getObjectiveValueOfModel(const std::vector<int>& model) const {
-        size_t sum = 0;
-        for (auto& term : _objective) {
-            const int termLit = term.lit;
-            assert(std::abs(termLit) < model.size());
-            const int modelLit = model[std::abs(termLit)];
-            assert(termLit == modelLit || termLit == -modelLit);
-            if (modelLit == termLit) {
-                sum += term.factor;
-            }
-        }
-        return sum;
-    }
-
-    // Add a permanent literal to the next SAT call. (0 = end of clause)
-    void appendLiteral(int lit) {
-        _lits_to_add.push_back(lit);
-    }
-    // Append an assumption for the next SAT call.
-    void appendAssumption(int lit) {
-        _assumptions_to_set.push_back(lit);
-    }
-
-    friend void maxsat_collect_clause(int lit, void *solver);
-    friend void maxsat_collect_assumption(int lit, void *solver);
 };

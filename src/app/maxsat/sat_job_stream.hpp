@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include "app/maxsat/maxsat_instance.hpp"
 #include "data/job_description.hpp"
 #include "interface/api/api_connector.hpp"
 #include "util/json.hpp"
@@ -38,14 +39,14 @@ public:
             _json_base["configuration"][key] = desc.getAppConfiguration().map.at(key);
     }
 
-    void submitNext(std::vector<int>&& newLiterals, std::vector<int>&& assumptions) {
+    void submitNext(const std::vector<int>& newLiterals, const std::vector<int>& assumptions) {
         assert(!_pending);
         if (_incremental && _json_base.contains("name")) {
             _json_base["precursor"] = _username + std::string(".") + _json_base["name"].get<std::string>();
         }
         _json_base["name"] = _base_job_name + std::to_string(++_subjob_counter);
-        _json_base["literals"] = std::move(newLiterals);
-        _json_base["assumptions"] = std::move(assumptions);
+        _json_base["literals"] = newLiterals;
+        _json_base["assumptions"] = assumptions;
         _pending = true;
         nlohmann::json copy(_json_base);
         _api.submit(copy, [&](nlohmann::json& result) {
@@ -84,5 +85,8 @@ public:
     nlohmann::json& getResult() {
         assert(!_pending);
         return _json_result;
+    }
+    int getSubjobCount() const {
+        return _subjob_counter;
     }
 };

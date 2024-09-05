@@ -8,3 +8,5 @@
 // memberName                               short option name, long option name          default   min  max
 
 OPTION_GROUP(grpAppMaxsat, "app/maxsat", "MaxSAT solving options")
+
+OPT_STRING(maxSatSearchStrategy, "maxsat-search-strat", "", "d", "Sequence of search strategies to employ (d=decreasing i=increasing b=bisection r=naive-refinement)")

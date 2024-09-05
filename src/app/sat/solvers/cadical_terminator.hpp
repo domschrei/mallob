@@ -21,14 +21,14 @@ struct CadicalTerminator : public CaDiCaL::Terminator {
         _lastTermCallbackTime = time;
 
         if (_stop) {
-            LOGGER(_logger, V3_VERB, "STOP (%.2fs since last cb)\n", elapsed);
+            LOGGER(_logger, V4_VVER, "STOP (%.2fs since last cb)\n", elapsed);
             _is_in_callback = false;
             return true;
         }
 
         if (_suspend) {
             // Stay inside this function call as long as solver is suspended
-            LOGGER(_logger, V3_VERB, "SUSPEND (%.2fs since last cb)\n", elapsed);
+            LOGGER(_logger, V4_VVER, "SUSPEND (%.2fs since last cb)\n", elapsed);
 
             _suspendCond.wait(_suspendMutex, [this] { return !_suspend; });
             LOGGER(_logger, V4_VVER, "RESUME\n");
