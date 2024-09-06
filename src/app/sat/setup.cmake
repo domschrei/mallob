@@ -9,20 +9,20 @@ set(BASE_SOURCES ${BASE_SOURCES} ${SAT_MALLOB_SOURCES} CACHE INTERNAL "")
 #message("commons+SAT sources: ${BASE_SOURCES}") # Use to debug
 
 # Include default SAT solvers as external libraries (their Mallob-side interfaces are part of SAT_SOURCES)
-link_directories(lib/lingeling lib/yalsat lib/cadical lib/kissat)
+set(BASE_LINK_DIRS ${BASE_LINK_DIRS} lib/lingeling lib/yalsat lib/cadical lib/kissat CACHE INTERNAL "")
 set(BASE_LIBS ${BASE_LIBS} lgl yals cadical kissat CACHE INTERNAL "")
 set(BASE_INCLUDES ${BASE_INCLUDES} lib CACHE INTERNAL "") # need to include some solver code
 
 # Add new non-default solvers here
 if(MALLOB_USE_GLUCOSE)
-    link_directories(lib/glucose)
+set(BASE_LINK_DIRS ${BASE_LINK_DIRS} lib/glucose CACHE INTERNAL "")
     set(SAT_SUBPROC_SOURCES ${SAT_SUBPROC_SOURCES} src/app/sat/solvers/glucose.cpp CACHE INTERNAL "")
     set(BASE_LIBS ${BASE_LIBS} glucose CACHE INTERNAL "")
     set(BASE_INCLUDES ${BASE_INCLUDES} lib/glucose CACHE INTERNAL "")
     add_definitions(-DMALLOB_USE_GLUCOSE)
 endif()    
 if(MALLOB_USE_MERGESAT)
-    link_directories(lib/mergesat)
+set(BASE_LINK_DIRS ${BASE_LINK_DIRS} lib/mergesat CACHE INTERNAL "")
     set(SAT_SUBPROC_SOURCES ${SAT_SUBPROC_SOURCES} src/app/sat/solvers/mergesat.cpp CACHE INTERNAL "")
     set(BASE_LIBS ${BASE_LIBS} mergesat CACHE INTERNAL "")
     add_definitions(-DMALLOB_USE_MERGESAT)

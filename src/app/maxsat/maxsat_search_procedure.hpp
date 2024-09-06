@@ -7,7 +7,6 @@
 #include "rustsat.h"
 #include "util/logger.hpp"
 #include "util/sys/terminator.hpp"
-#include "util/random.hpp"
 
 #include <climits>
 #include <unistd.h>
@@ -208,7 +207,6 @@ private:
 
         size_t addedCost = 0; // count the cost of "true" literals so far
         std::string clauseStr;
-        std::vector<int> unitClausesToAdd;
 
         // Code to execute for each term in the objective function.
         auto loopBody = [&](MaxSatInstance::ObjectiveTerm term) {
@@ -224,45 +222,23 @@ private:
                 addedCost += term.factor;
                 appendLiteral(-modelLit); // add to combination to forbid
                 clauseStr += std::to_string(-modelLit) + " ";
-                // If this SINGLE term already matches or exceeds our upper bound,
-                // we can simply forbid it for subsequent solve calls.
-                if (term.factor >= _instance.bestCost) {
-                    unitClausesToAdd.push_back(-term.lit);
-                    return true;
-                }
                 if (addedCost >= _instance.bestCost) {
-                    // The literals we collected up to now already sum up to our upper bound (or more),
+                    // The literals we collected up to now sum up to our upper bound (or more),
                     // so forbidding these to go together does not exclude any solution we would still want.
-                    // We can thus just "greedily" forbid the terms up to now and ignore the remaining ones.
+                    // We can thus forbid this set of terms and ignore the remaining ones.
                     return false;
                 }
             }
             return true;
         };
 
-        // Decide based on the iteration number how to iterate over the objective terms:
-        // all in all, going in reverse order (i.e., by weight descendingly) leads to the
-        // shortest clauses. From time to time, go in random order to also catch some
-        // other combinations.
-        if (_job_stream.getSubjobCount() % 16 == 0) {
-            if (_shuffled_objective.empty()) _shuffled_objective = _instance.objective;
-            ::random_shuffle(_shuffled_objective.data(), _shuffled_objective.size());
-            for (auto term : _shuffled_objective)
-                if (!loopBody(term)) break;
-        } else {
-            for (int i = _instance.objective.size()-1; i >= 0; i--)
-                if (!loopBody(_instance.objective[i])) break;
-        }
-
-        // end clause forbidding the last found term combination
-        appendLiteral(0);
+        // Traversing the objective in reverse order (i.e., by weight descendingly)
+        // should lead to decently short clauses.
+        for (int i = _instance.objective.size()-1; i >= 0; i--)
+            if (!loopBody(_instance.objective[i])) break;
+        appendLiteral(0); // end clause forbidding the last found term combination
+        
         LOG(V6_DEBGV, "MAXSAT ADD_CLAUSE %s0\n", clauseStr.c_str());
-
-        // forbid each term that has a prohibitive cost in and of itself
-        for (int unit : unitClausesToAdd) {
-            appendLiteral(unit);
-            appendLiteral(0);
-        }
     }
 
     // Add a permanent literal to the next SAT call. (0 = end of clause)

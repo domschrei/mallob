@@ -150,6 +150,7 @@ add_library(mallob_commons
 target_include_directories(mallob_commons PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob_commons PRIVATE ${BASE_COMPILEFLAGS})
 target_link_libraries(mallob_commons ${BASE_LIBS})
+target_link_directories(mallob_commons PUBLIC ${BASE_LINK_DIRS})
 
 
 # Executables
