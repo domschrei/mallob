@@ -64,7 +64,8 @@ public:
         std::string searchStrats = _params.maxSatSearchStrategy();
         const int nbWorkers = _params.numWorkers() == -1 ? MyMpi::size(MPI_COMM_WORLD) : _params.numWorkers();
         // Loop over each specified search strategy
-        for (char c : searchStrats) {
+        for (int i = 0; i < searchStrats.size(); i++) {
+            char c = searchStrats[i];
             // Check if we have enough workers in the system for another job stream
             if (nbWorkers <= _searches.size()) {
                 LOG(V1_WARN, "MAXSAT [WARN] Truncating number of parallel search strategies to %i due to lack of workers\n",
@@ -72,7 +73,7 @@ public:
                 break;
             }
             // Initialize search procedure
-            _searches.emplace_back(initializeSearchProcedure(c));
+            _searches.emplace_back(initializeSearchProcedure(c, i, searchStrats.size()));
         }
         assert(!_searches.empty());
 
@@ -99,21 +100,35 @@ public:
         // Main loop for solution improving search.
         while (!Terminator::isTerminating() && _instance->lowerBound < _instance->upperBound) {
             // Loop over all search strategies
+            bool change = false;
             for (auto& search : _searches) {
+                // In a solve call right now?
+                if (!search->isIdle()) {
+                    if (!search->isNonblockingSolvePending()) {
+                        // Current solving procedure has finished:
+                        // apply the result to the MaxSAT instance
+                        (void) search->processNonblockingSolveResult();
+                        change = true;
+                        if (_instance->lowerBound >= _instance->upperBound)
+                            break;
+                    } else if (search->isSolvingAttemptObsolete()) {
+                        // The current bounds have made this solve call obsolete:
+                        // interrupt it.
+                        search->interrupt();
+                        change = true;
+                    }
+                }
                 // No solving procedure ongoing nor pending?
                 if (search->isIdle()) {
                     // Compute and enforce the next bound for this strategy
                     search->enforceNextBound();
                     // Launch a SAT job
                     search->solveNonblocking();
-                } else if (!search->isNonblockingSolvePending()) {
-                    // Current solving procedure has finished:
-                    // apply the result to the MaxSAT instance
-                    const int resultCode = search->processNonblockingSolveResult();
+                    change = true;
                 }
             }
-            // Wait a bit
-            usleep(1000 * 10); // 10 ms
+            // Wait a bit if nothing changed
+            if (!change) usleep(1000 * 10); // 10 ms
         }
 
         // Did we actually find an optimal result?
@@ -170,30 +185,34 @@ private:
         _instance->bestCost = ULONG_MAX;
     }
 
-    MaxSatSearchProcedure* initializeSearchProcedure(char c) {
+    MaxSatSearchProcedure* initializeSearchProcedure(char c, int index, int nbTotal) {
         // Parse search strategy
         MaxSatSearchProcedure::SearchStrategy strat;
-        std::string label;
+        std::string label = std::to_string(index) + ":";
         switch (c) {
         case 'd':
             strat = MaxSatSearchProcedure::DECREASING;
-            label = "DEC";
+            label += "DEC";
             break;
         case 'i':
             strat = MaxSatSearchProcedure::INCREASING;
-            label = "INC";
+            label += "INC";
             break;
         case 'b':
             strat = MaxSatSearchProcedure::BISECTION;
-            label = "BIS";
+            label += "BIS";
             break;
         case 'r':
             strat = MaxSatSearchProcedure::NAIVE_REFINEMENT;
-            label = "NRE";
+            label += "NRE";
             break;
         }
         // Initialize search procedure
-        return new MaxSatSearchProcedure(_params, _api, _desc,
+        auto p = new MaxSatSearchProcedure(_params, _api, _desc,
             *_instance, strat, label);
+        if (_params.maxSatCombSearch()) {
+            p->enableCombSearch(index, nbTotal);
+        }
+        return p;
     }
 };

@@ -10,3 +10,5 @@
 OPTION_GROUP(grpAppMaxsat, "app/maxsat", "MaxSAT solving options")
 
 OPT_STRING(maxSatSearchStrategy, "maxsat-search-strat", "", "d", "Sequence of search strategies to employ (d=decreasing i=increasing b=bisection r=naive-refinement)")
+OPT_INT(maxSatCardinalityEncoding, "maxsat-card-encoding", "", 1, 0, 1, "0=GTE 1=DPW")
+OPT_BOOL(maxSatCombSearch, "maxsat-comb-search", "", false, "Override provided list of search strategies to parallelize over the interval of admissible bounds")

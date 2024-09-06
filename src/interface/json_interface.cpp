@@ -86,6 +86,7 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
             data.jobName = jobName;
             data.description = std::unique_ptr<JobDescription>(new JobDescription(id, 0, applicationId));
             data.description->setIncremental(incremental);
+            data.description->setRevision(rev);
             data.interrupt = true;
             _job_callback(std::move(data));
             return ACCEPT;

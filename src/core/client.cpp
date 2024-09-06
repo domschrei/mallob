@@ -215,8 +215,9 @@ void Client::handleNewJob(JobMetadata&& data) {
     if (data.interrupt) {
         // Interrupt job (-> abort entire job if non-incremental, abort iteration if incremental)
         int jobId = data.description->getId();
+        int rev = data.description->getRevision();
         auto lock = _jobs_to_interrupt_lock.getLock();
-        _jobs_to_interrupt.insert(jobId);
+        _jobs_to_interrupt.push_back({jobId, rev});
         atomics::incrementRelaxed(_num_jobs_to_interrupt);
         return;
     }
@@ -348,12 +349,13 @@ void Client::advance() {
         
         auto it = _jobs_to_interrupt.begin();
         while (it != _jobs_to_interrupt.end()) {
-            int jobId = *it;
-            if (_done_jobs.count(jobId)) {
+            auto [jobId, rev] = *it;
+            if (_done_jobs.count(jobId) && _done_jobs[jobId].revision >= rev) {
+                LOG(V2_INFO, "Interrupt #%i obsolete\n", jobId);
                 it = _jobs_to_interrupt.erase(it);
             } else if (_root_nodes.count(jobId)) {
                 LOG(V2_INFO, "Interrupt #%i\n", jobId);
-                MyMpi::isend(_root_nodes.at(jobId), MSG_NOTIFY_JOB_ABORTING, IntVec({jobId}));
+                MyMpi::isend(_root_nodes.at(jobId), MSG_NOTIFY_JOB_ABORTING, IntVec({jobId, rev, /*fromUser=*/1}));
                 it = _jobs_to_interrupt.erase(it);
                 atomics::decrementRelaxed(_num_jobs_to_interrupt);
             } else ++it;
@@ -660,13 +662,16 @@ void Client::handleAbort(MessageHandle& handle) {
 
     IntVec request = Serializable::get<IntVec>(handle.getRecvData());
     int jobId = request[0];
-    LOG_ADD_SRC(V2_INFO, "TIMEOUT #%i %.6f", handle.source, jobId, 
-            Timer::elapsedSeconds() - _active_jobs[jobId]->getArrival());
-    
+    int rev = request[1];
+    if (rev < _active_jobs[jobId]->getRevision()) return;
+
+    LOG_ADD_SRC(V2_INFO, "TIMEOUT/UNKNOWN #%i rev. %i %.6f", handle.source, jobId,
+        rev, Timer::elapsedSeconds() - _active_jobs[jobId]->getArrival());
+
     if (_json_interface) {
         JobResult result;
         result.id = jobId;
-        result.revision = _active_jobs[result.id]->getRevision();
+        result.revision = rev;
         result.result = 0;
         _json_interface->handleJobDone(std::move(result), _active_jobs[result.id]->getStatistics(), 
             _active_jobs[result.id]->getApplicationId());

@@ -204,7 +204,7 @@ void SchedulingManager::checkActiveJob() {
         // Timeout (CPUh or wallclock time) hit
         
         // "Virtual self message" aborting the job
-        IntVec payload({id});
+        IntVec payload({id, job.getRevision(), /*fromUser=*/0});
         MessageHandle handle;
         handle.tag = MSG_NOTIFY_JOB_ABORTING;
         handle.receiveSelfMessage(payload.serialize(), MyMpi::rank(MPI_COMM_WORLD));
@@ -645,12 +645,20 @@ void SchedulingManager::handleLeavingChild(MessageHandle& handle) {
 
 void SchedulingManager::handleJobInterruption(MessageHandle& handle) {
 
-    int jobId = Serializable::get<int>(handle.getRecvData());
-    if (!has(jobId)) return;
+    IntVec vec = Serializable::get<IntVec>(handle.getRecvData());
+    int jobId = vec[0];
+    int rev = vec[1];
+    bool fromUser = vec[2] ? true : false;
 
-    LOG(V3_VERB, "Acknowledge #%i aborting\n", jobId);
-    auto& job = get(jobId);    
-    if (job.getJobTree().isRoot() && !job.isIncremental()) {
+    if (!has(jobId)) return;
+    auto& job = get(jobId);
+    if (job.getRevision() > rev || job.getState() != ACTIVE) {
+        LOG(V3_VERB, "#%i interrupt concerns old or inactive revision %i (rev. %i now)\n",
+            jobId, rev, job.getRevision());
+        return;
+    }
+    LOG(V3_VERB, "Acknowledge #%i interrupt\n", jobId);
+    if (job.getJobTree().isRoot() && (!job.isIncremental() || fromUser)) {
         // Forward information on aborted job to client
         MyMpi::isend(job.getJobTree().getParentNodeRank(), 
             MSG_NOTIFY_CLIENT_JOB_ABORTING, handle.moveRecvData());
@@ -720,6 +728,12 @@ void SchedulingManager::handleJobResultFound(MessageHandle& handle) {
 
     // Terminate job and propagate termination message
     if (get(jobId).getDescription().isIncremental()) {
+        // Need to re-build the handle to feature the job ID 
+        // and whether interruption came from the user (it didn't)
+        std::vector<int> dataInts {jobId, revision, /*fromUser=*/0};
+        std::vector<uint8_t> data(3*sizeof(int));
+        memcpy(data.data(), dataInts.data(), 3*sizeof(int));
+        handle.setReceive(std::move(data));
         handleJobInterruption(handle);
     } else {
         interruptJob(Serializable::get<int>(handle.getRecvData()), /*terminate=*/true, /*reckless=*/false);
@@ -1199,7 +1213,7 @@ void SchedulingManager::interruptJob(int jobId, bool doTerminate, bool reckless)
     if (job.getJobTree().hasLeftChild()) destinations.insert(job.getJobTree().getLeftChildNodeRank());
     if (job.getJobTree().hasRightChild()) destinations.insert(job.getJobTree().getRightChildNodeRank());
     for (auto childRank : destinations) {
-        MyMpi::isend(childRank, msgTag, IntVec({jobId}));
+        MyMpi::isend(childRank, msgTag, IntVec({jobId, /*fromUser=*/0}));
         LOG_ADD_DEST(V4_VVER, "Propagate interruption of %s ...", childRank, job.toStr());
     }
     if (doTerminate) job.getJobTree().getPastChildren().clear();

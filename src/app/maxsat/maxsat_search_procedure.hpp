@@ -38,6 +38,12 @@ public:
         NAIVE_REFINEMENT
     };
 
+    enum EncodingStrategy {
+        NONE,
+        GENERALIZED_TOTALIZER,
+        DYNAMIC_POLYNOMIAL_WATCHDOG
+    };
+
 private:
     static int _running_stream_id;
 
@@ -55,16 +61,23 @@ private:
     std::vector<int> _assumptions_to_set;
     size_t _current_bound;
     bool _solving {false};
+    // holds the assumptions which should be added as permanent units
+    // if the result is "satisfiable"
+    std::vector<int> _assumptions_to_persist_upon_sat;
 
-    RustSAT::DbGte* _cardi_gte;
-    RustSAT::DynamicPolyWatchdog* _cardi_dpw;
+    EncodingStrategy _encoding_strat;
+    RustSAT::DbGte* _cardi_gte {nullptr};
+    RustSAT::DynamicPolyWatchdog* _cardi_dpw {nullptr};
 
-    SearchStrategy _strategy;
+    SearchStrategy _search_strat;
     const std::string _label;
 
     // only for NAIVE_REFINEMENT strategy
     std::vector<int> _last_found_solution;
     std::vector<MaxSatInstance::ObjectiveTerm> _shuffled_objective;
+
+    int _comb_search_idx {-1};
+    int _nb_comb_searchers;
 
 public:
     MaxSatSearchProcedure(const Parameters& params, APIConnector& api, JobDescription& desc,
@@ -73,25 +86,33 @@ public:
         _username("maxsat#" + std::to_string(_desc.getId())),
         _job_stream(_params, _api, _desc, _running_stream_id++, true),
         _lits_to_add(_instance.formulaData, _instance.formulaData+_instance.formulaSize),
-        _current_bound(_instance.upperBound), _cardi_gte(RustSAT::gte_new()), _cardi_dpw(RustSAT::dpw_new()),
-        _strategy(strategy), _label(label) {
+        _current_bound(_instance.upperBound), _search_strat(strategy), _label(label) {
 
+        // Decide on the strategy to use for cardinality encoding.
+        _encoding_strat = DYNAMIC_POLYNOMIAL_WATCHDOG; // TODO when to use GTE?
+        if (_search_strat == NAIVE_REFINEMENT) _encoding_strat = NONE;
         // Initialize cardinality constraint encoder.
-        // TODO Does the ordering matter for performance?
-        for (auto& [factor, lit] : _instance.objective) {
+        if (_encoding_strat == DYNAMIC_POLYNOMIAL_WATCHDOG) {
+            _cardi_dpw = RustSAT::dpw_new();
             // add each term of the objective function
-            RustSAT::gte_add(_cardi_gte, lit, factor);
-            RustSAT::dpw_add(_cardi_dpw, lit, factor);
+            for (auto& [factor, lit] : _instance.objective)
+                RustSAT::dpw_add(_cardi_dpw, lit, factor);
         }
-        // TODO what about the precision of DPW?
-        //while (!RustSAT::dpw_is_max_precision(_cardi_dpw)) {
-        //    const auto prec = RustSAT::dpw_next_precision(_cardi_dpw);
-        //    RustSAT::dpw_set_precision(_cardi_dpw, prec);
-        //}
+        if (_encoding_strat == GENERALIZED_TOTALIZER) {
+            _cardi_gte = RustSAT::gte_new();
+            // add each term of the objective function
+            for (auto& [factor, lit] : _instance.objective)
+                RustSAT::gte_add(_cardi_gte, lit, factor);
+        }
     }
     ~MaxSatSearchProcedure() {
-        RustSAT::gte_drop(_cardi_gte);
-        RustSAT::dpw_drop(_cardi_dpw);
+        if (_cardi_gte) RustSAT::gte_drop(_cardi_gte);
+        if (_cardi_dpw) RustSAT::dpw_drop(_cardi_dpw);
+    }
+
+    void enableCombSearch(int index, int size) {
+        _comb_search_idx = index;
+        _nb_comb_searchers = size;
     }
 
     bool isIdle() const {
@@ -100,15 +121,23 @@ public:
 
     void enforceNextBound() {
 
-        switch (_strategy) {
+        size_t myLb = _instance.lowerBound;
+        size_t myUb = _instance.upperBound;
+        if (_comb_search_idx >= 0 && (myUb-myLb) >= _nb_comb_searchers) {
+            myLb = _instance.lowerBound + (_comb_search_idx * (_instance.upperBound-_instance.lowerBound)) / _nb_comb_searchers;
+            myUb = _instance.lowerBound + ((_comb_search_idx+1) * (_instance.upperBound-_instance.lowerBound)) / _nb_comb_searchers;
+            LOG(V3_VERB, "MAXSAT %s Comb search in [%lu,%lu]\n", _label.c_str(), myLb, myUb);
+        }
+
+        switch (_search_strat) {
         case INCREASING:
-            _current_bound = _instance.lowerBound;
+            _current_bound = myLb;
             break;
         case DECREASING:
-            _current_bound = _instance.findNextPossibleLowerCost(_instance.upperBound);
+            _current_bound = _instance.findNextPossibleLowerCost(myUb);
             break;
         case BISECTION:
-            _current_bound = _instance.lowerBound + (_instance.upperBound-_instance.lowerBound) / 2;
+            _current_bound = myLb + (myUb-myLb) / 2;
             break;
         case NAIVE_REFINEMENT:
             if (_last_found_solution.empty()) {
@@ -118,24 +147,31 @@ public:
             }
             LOG(V4_VVER, "MAXSAT %s Forbidding naive core of last solution ...\n", _label.c_str());
             refineLastSolution();
-            return; // we do *not* encode any cardinality constraints with this strategy
+            break;
         }
+        if (_encoding_strat == NONE) return;
+
 
         LOG(V4_VVER, "MAXSAT %s Enforcing bound %lu ...\n", _label.c_str(), _current_bound);
         const int prevNbVars = _instance.nbVars;
-        // Encode any cardinality constraints that are still missing for the upcoming call
-        // TODO Question: Do we need to provide the "hull" of all tested bounds so far
-        // or only the "new" interval that wasn't included in a call to gte_encode_ub yet?
-        RustSAT::dpw_limit_range(_cardi_dpw, _instance.lowerBound, _instance.upperBound,
-            &maxsat_collect_clause, this);
-        RustSAT::dpw_encode_ub(_cardi_dpw, _current_bound, _current_bound,
-            &_instance.nbVars, &maxsat_collect_clause, this);
-        //RustSAT::gte_encode_ub(_cardi_gte, _current_bound, _current_bound,
-        //    &_instance.nbVars, &maxsat_collect_clause, this);
-
-        // Generate the assumptions needed for this particular upper bound
-        RustSAT::dpw_enforce_ub(_cardi_dpw, _current_bound, &maxsat_collect_assumption, this);
-        //RustSAT::gte_enforce_ub(_cardi_gte, _current_bound, &maxsat_collect_assumption, this);
+        // Encode any cardinality constraints that are still missing for the upcoming call.
+        if (_encoding_strat == DYNAMIC_POLYNOMIAL_WATCHDOG) {
+            RustSAT::dpw_limit_range(_cardi_dpw, _instance.lowerBound, _instance.upperBound,
+                &maxsat_collect_clause, this);
+            RustSAT::dpw_encode_ub(_cardi_dpw, _current_bound, _current_bound,
+                &_instance.nbVars, &maxsat_collect_clause, this);
+            RustSAT::dpw_enforce_ub(_cardi_dpw, _current_bound, &maxsat_collect_assumption, this);
+            // If the result is SAT, we can add the 1st assumption permanently.
+            if (!_assumptions_to_set.empty())
+                _assumptions_to_persist_upon_sat.push_back(_assumptions_to_set.front());
+        }
+        if (_encoding_strat == GENERALIZED_TOTALIZER) {
+            RustSAT::gte_encode_ub(_cardi_gte, _current_bound, _current_bound,
+                &_instance.nbVars, &maxsat_collect_clause, this);
+            RustSAT::gte_enforce_ub(_cardi_gte, _current_bound, &maxsat_collect_assumption, this);
+            // If the result is SAT, we can add all assumptions permanently.
+            _assumptions_to_persist_upon_sat = _assumptions_to_set;
+        }
         LOG(V4_VVER, "MAXSAT %s Enforced bound %lu (%i new vars)\n", _label.c_str(), _current_bound, _instance.nbVars-prevNbVars);
     }
 
@@ -160,7 +196,7 @@ public:
         const int resultCode = result["result"]["resultcode"];
         if (resultCode == RESULT_UNSAT) {
             // UNSAT
-            if (_strategy == NAIVE_REFINEMENT) {
+            if (_search_strat == NAIVE_REFINEMENT) {
                 // Special case naive refinement: we didn't enforce a certain bound *explicitly*.
                 // If we get UNSAT nonetheless, then we were successful in ruling out all solutions
                 // matching or exceeding the best cost found so far. Then this is our sharp UNSAT bound.
@@ -176,15 +212,15 @@ public:
             return RESULT_UNSAT;
         }
         if (resultCode != RESULT_SAT) {
-            // UNKNOWN or something else - an error in this case since we didn't cancel the job
-            LOG(V1_WARN, "[WARN] MAXSAT %s Unexpected result code %i\n", _label.c_str(), resultCode);
+            // UNKNOWN or something else - presumably because the job was interrupted
+            LOG(V2_INFO, "MAXSAT %s Call returned UNKNOWN\n", _label.c_str(), _current_bound);
             return RESULT_UNKNOWN;
         }
         // Formula is SATisfiable.
 
         // Retrieve the initial model and compute its cost as a first upper bound.
         auto solution = std::move(result["result"]["solution"].get<std::vector<int>>());
-        if (_strategy == NAIVE_REFINEMENT) {
+        if (_search_strat == NAIVE_REFINEMENT) {
             // remember *any* found solution to forbid it in the next step
             _last_found_solution = solution;
         }
@@ -199,6 +235,12 @@ public:
             LOG(V2_INFO, "MAXSAT %s Bound %lu solved with cost %lu - bounds unchanged\n",
                 _label.c_str(), _current_bound, _instance.bestCost);
         }
+        // Since we found SAT, add assumptions as permanent unit clauses where possible.
+        for (int asmpt : _assumptions_to_persist_upon_sat) {
+            //appendLiteral(asmpt);
+            //appendLiteral(0);
+        }
+        _assumptions_to_persist_upon_sat.clear();
 
         return RESULT_SAT;
     }
@@ -207,6 +249,25 @@ public:
         solveNonblocking();
         while (isNonblockingSolvePending()) usleep(1000 * 10); // 10 ms
         return processNonblockingSolveResult();       
+    }
+
+    bool isSolvingAttemptObsolete() const {
+        assert(_solving);
+        // We are solving for (cost <= _current_bound).
+        // Case 1: We already know that this cost is impossible to achieve. 
+        if (_current_bound < _instance.lowerBound) return true;
+        // Case 2: We already know of a better solution than the tested bound.
+        // We allow some leniency here since it may be better to keep a job running
+        // if its bound is only slightly suboptimal w.r.t. the best known bound. 
+        if (_current_bound > 1.01 * _instance.bestCost) return true;
+        // Otherwise, the solving attempt is not obsolete.
+        return false;
+    }
+
+    void interrupt() {
+        assert(_solving);
+        if (_job_stream.interrupt())
+            LOG(V2_INFO, "MAXSAT %s Interrupt solving with bound %i\n", _label.c_str(), _current_bound);
     }
 
 private:

@@ -5,6 +5,7 @@
 #include "data/job_description.hpp"
 #include "interface/api/api_connector.hpp"
 #include "util/json.hpp"
+#include "util/logger.hpp"
 
 class SatJobStream {
 
@@ -19,6 +20,7 @@ private:
     nlohmann::json _json_base;
     int _subjob_counter {0};
     bool _pending {false};
+    bool _interrupt_set {false};
     nlohmann::json _json_result;
 
 public:
@@ -48,21 +50,27 @@ public:
         _json_base["literals"] = newLiterals;
         _json_base["assumptions"] = assumptions;
         _pending = true;
+        _interrupt_set = false;
         nlohmann::json copy(_json_base);
         _api.submit(copy, [&](nlohmann::json& result) {
             _json_result = std::move(result);
             _pending = false;
         });
     }
-    void interrupt() {
-        if (!_pending) return;
-        _pending = true;
-        nlohmann::json copy(_json_base);
-        copy["interrupt"] = true;
-        _api.submit(copy, [&](nlohmann::json& result) {
-            _json_result = std::move(result);
-            _pending = false;
-        });
+    bool interrupt() {
+        if (!_pending || _interrupt_set) return false;
+        _interrupt_set = true;
+        nlohmann::json jsonInterrupt {
+            {"name", _json_base["name"]},
+            {"user", _json_base["user"]},
+            {"application", _json_base["application"]},
+            {"incremental", _json_base["incremental"]},
+            {"interrupt", true}
+        };
+        // In this particular case, the callback is never called.
+        // Instead, the callback of the job's original submission is called.
+        _api.submit(jsonInterrupt, [&](nlohmann::json& result) {});
+        return true;
     }
     void finalize() {
         assert(!_pending);
