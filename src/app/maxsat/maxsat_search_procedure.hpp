@@ -56,7 +56,8 @@ private:
     size_t _current_bound;
     bool _solving {false};
 
-    RustSAT::DbGte* _cardi;
+    RustSAT::DbGte* _cardi_gte;
+    RustSAT::DynamicPolyWatchdog* _cardi_dpw;
 
     SearchStrategy _strategy;
     const std::string _label;
@@ -72,18 +73,25 @@ public:
         _username("maxsat#" + std::to_string(_desc.getId())),
         _job_stream(_params, _api, _desc, _running_stream_id++, true),
         _lits_to_add(_instance.formulaData, _instance.formulaData+_instance.formulaSize),
-        _current_bound(_instance.upperBound), _cardi(RustSAT::gte_new()),
+        _current_bound(_instance.upperBound), _cardi_gte(RustSAT::gte_new()), _cardi_dpw(RustSAT::dpw_new()),
         _strategy(strategy), _label(label) {
 
         // Initialize cardinality constraint encoder.
         // TODO Does the ordering matter for performance?
         for (auto& [factor, lit] : _instance.objective) {
             // add each term of the objective function
-            RustSAT::gte_add(_cardi, lit, factor);
+            RustSAT::gte_add(_cardi_gte, lit, factor);
+            RustSAT::dpw_add(_cardi_dpw, lit, factor);
         }
+        // TODO what about the precision of DPW?
+        //while (!RustSAT::dpw_is_max_precision(_cardi_dpw)) {
+        //    const auto prec = RustSAT::dpw_next_precision(_cardi_dpw);
+        //    RustSAT::dpw_set_precision(_cardi_dpw, prec);
+        //}
     }
     ~MaxSatSearchProcedure() {
-        RustSAT::gte_drop(_cardi);
+        RustSAT::gte_drop(_cardi_gte);
+        RustSAT::dpw_drop(_cardi_dpw);
     }
 
     bool isIdle() const {
@@ -118,12 +126,16 @@ public:
         // Encode any cardinality constraints that are still missing for the upcoming call
         // TODO Question: Do we need to provide the "hull" of all tested bounds so far
         // or only the "new" interval that wasn't included in a call to gte_encode_ub yet?
-        RustSAT::gte_encode_ub(_cardi, _current_bound, _current_bound,
-            //std::min(_instance.lowerBound, _current_bound),
-            //std::max(_instance.upperBound, _current_bound),
+        RustSAT::dpw_limit_range(_cardi_dpw, _instance.lowerBound, _instance.upperBound,
+            &maxsat_collect_clause, this);
+        RustSAT::dpw_encode_ub(_cardi_dpw, _current_bound, _current_bound,
             &_instance.nbVars, &maxsat_collect_clause, this);
+        //RustSAT::gte_encode_ub(_cardi_gte, _current_bound, _current_bound,
+        //    &_instance.nbVars, &maxsat_collect_clause, this);
+
         // Generate the assumptions needed for this particular upper bound
-        RustSAT::gte_enforce_ub(_cardi, _current_bound, &maxsat_collect_assumption, this);
+        RustSAT::dpw_enforce_ub(_cardi_dpw, _current_bound, &maxsat_collect_assumption, this);
+        //RustSAT::gte_enforce_ub(_cardi_gte, _current_bound, &maxsat_collect_assumption, this);
         LOG(V4_VVER, "MAXSAT %s Enforced bound %lu (%i new vars)\n", _label.c_str(), _current_bound, _instance.nbVars-prevNbVars);
     }
 
