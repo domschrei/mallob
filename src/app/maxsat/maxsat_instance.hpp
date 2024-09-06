@@ -37,7 +37,13 @@ struct MaxSatInstance {
     void print() const {
         LOG(V2_INFO, "MAXSAT %i (hard) clause lits, %i objective terms\n", formulaSize, objective.size());
         std::string o;
-        for (auto& term : objective) {
+        for (size_t i = 0; i < objective.size(); i++) {
+
+            // only print head and tail of the objective
+            if (i == 5 && objective.size() > 10) o += "... + ";
+            if (i >= 5 && i+5 < objective.size()) continue;
+
+            auto& term = objective[i];
             o += std::to_string(term.factor) + "*[" + std::to_string(term.lit) + "] + ";
         }
         o = o.substr(0, o.size()-2);
