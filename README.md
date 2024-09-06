@@ -178,6 +178,16 @@ Mallob allows to customize the employed SAT solver backends and some of their fl
 ... -satsolver='(c!){37}k+((c!){37}l+)*' # As above, but replacing the 1st Lingeling with Kissat
 ```
 
+## MaxSAT Solving
+
+Compile Mallob with `-DMALLOB_APP_MAXSAT=1` after building the RustSAT dependency as indicated above.  
+Mallob expects `WCNF` instances following the [2022+ benchmark format of the MaxSAT evaluations](https://maxsat-evaluations.github.io/2022/rules.html#input) and preprocessed with [MaxPRE2](https://bitbucket.org/coreo-group/maxpre2) to rule out some awkward corner cases.  
+You can use MaxPRE2 like this to preprocess a WCNF formula `$f`:
+
+```
+tools/maxpre2/maxpre $f -techniques="[bu]#[buvsrgcT]" -outputformat=wpms22 > ${f}-preprocessed.wcnf
+```
+
 ## Solve multiple instances in an orchestrated manner
 
 If you want to solve a fixed set of $n$ formulae or wish to evaluate Mallob's scheduling behavior with simulated jobs, follow these steps:
