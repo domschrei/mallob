@@ -1,11 +1,13 @@
 
 #include "fileutils.hpp"
 
+#include <fcntl.h>
 #include <glob.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <errno.h>
 #include <cstdlib>
+#include <unistd.h>
 #include <vector>
 #include <fstream>
 #include <utility>
@@ -25,6 +27,20 @@ bool FileUtils::isRegularFile(const std::string& file) {
 bool FileUtils::isDirectory(const std::string& dirpath) {
     struct stat sb;
     return stat(dirpath.c_str(), &sb) == 0 && S_ISDIR(sb.st_mode);
+}
+
+bool FileUtils::create(const std::string& path) {
+    int fd = open(path.c_str(), O_CREAT);
+    if (fd == -1) return false;
+    close(fd);
+    return true;
+}
+
+bool FileUtils::createExclusively(const std::string& path) {
+    int fd = open(path.c_str(), O_CREAT|O_EXCL);
+    if (fd == -1) return false;
+    close(fd);
+    return true;
 }
 
 int FileUtils::mkdir(const std::string& dir) {
@@ -78,6 +94,11 @@ int FileUtils::append(const std::string& srcFile, const std::string& destFile) {
 
 int FileUtils::rm(const std::string& file) {
     return remove(file.c_str());
+}
+
+int FileUtils::rmf(const std::string& file) {
+    std::string cmd = "rm -f \"" + file + "\"";
+    return system(cmd.c_str());
 }
 
 int FileUtils::rmrf(const std::string& dir) {

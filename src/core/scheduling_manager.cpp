@@ -44,7 +44,7 @@ SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm,
         _sys_state(sysstate), _job_registry(jobRegistry),
         _req_matcher(createRequestMatcher()),
         _req_mgr(_params, _sys_state, _routing_tree, _req_matcher.get()),
-        _balancer(_comm, _params), _desc_interface(_job_registry),
+        _balancer(_comm, _params), _desc_interface(_job_registry, _params.aggressiveDescriptionCaching()),
         _reactivation_scheduler(_params, _job_registry,
             // Callback for emitting a job request
             [&](JobRequest& req, int tag, bool left, int dest) {
@@ -121,6 +121,8 @@ SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm,
         [&](auto& h) {handleApplicationMessage(h);});
     _subscriptions.emplace_back(MSG_SEND_JOB_DESCRIPTION, 
         [&](auto& h) {handleIncomingJobDescription(h, false);});
+    _subscriptions.emplace_back(MSG_SEND_JOB_DESCRIPTION_SKELETON, 
+        [&](auto& h) {handleIncomingJobDescription(h, false);});
     _subscriptions.emplace_back(MSG_DEPLOY_NEW_REVISION,
         [&](auto& h) {handleIncomingJobDescription(h, true);});
     _subscriptions.emplace_back(MSG_NOTIFY_ASSIGNMENT_UPDATE, 
@@ -175,6 +177,12 @@ void SchedulingManager::execute(Job& job, int source) {
     int demand = job.getDemand();
     _balancer.onActivate(job, demand);
     job.setLastDemand(demand);
+
+    // execute post-execution hooks once, then delete them
+    if (_job_execution_hooks.count(jobId)) {
+        for (auto& fun : _job_execution_hooks[jobId]) fun();
+        _job_execution_hooks.erase(jobId);
+    }
 }
 
 void SchedulingManager::preregisterJobInBalancer(Job& job) {
@@ -209,11 +217,6 @@ void SchedulingManager::checkActiveJob() {
         handle.tag = MSG_NOTIFY_JOB_ABORTING;
         handle.receiveSelfMessage(payload.serialize(), MyMpi::rank(MPI_COMM_WORLD));
         handleJobInterruption(handle);
-        if (_params.monoFilename.isSet()) {
-            // Single job hit a limit, so there is no solution to be reported:
-            // begin to propagate exit signal
-            MyMpi::isend(0, MSG_DO_EXIT, IntVec({0}));
-        }
 
     } else if (job.getState() == ACTIVE) {
         
@@ -520,8 +523,9 @@ void SchedulingManager::handleAnswerToAdoptionOffer(MessageHandle& handle) {
 
         // Set new revision, request next revision as needed
         _desc_interface.updateRevisionAndDescription(job, req.revision, handle.source);
-        
-        if (job.hasDescription()) {
+
+        int missingRev;
+        if (job.hasDescription() && (job.hasAllDescriptionsForSolving(missingRev) || missingRev > 0)) {
             // At least the initial description is present: Begin to execute job
             if (job.getState() == SUSPENDED) {
                 resume(job, req, handle.source);
@@ -561,15 +565,20 @@ void SchedulingManager::handleIncomingJobDescription(MessageHandle& handle, bool
 
 void SchedulingManager::handleJobAfterArrivedJobDescription(int jobId, int source) {
 
-    // If job has not started yet, execute it now
+    // If job has not started yet, execute it now IF the description is complete
     Job& job = get(jobId);
     if (_job_registry.hasCommitment(jobId)) {
-        {
-            const auto& req = _job_registry.getCommitment(jobId);
-            job.setDesiredRevision(req.revision);
+        int missingRev;
+        if (!job.hasAllDescriptionsForSolving(missingRev)) {
+            _desc_interface.queryNextRevisionIfNeeded(job, source);
+        } else {
+            {
+                const auto& req = _job_registry.getCommitment(jobId);
+                job.setDesiredRevision(req.revision);
+            }
+            execute(job, source);
+            initiateVolumeUpdate(job);
         }
-        execute(job, source);
-        initiateVolumeUpdate(job);
     }
     
     if (job.getState() == ACTIVE)
@@ -650,10 +659,17 @@ void SchedulingManager::handleJobInterruption(MessageHandle& handle) {
     int rev = vec[1];
     bool fromUser = vec[2] ? true : false;
 
-    if (!has(jobId)) return;
+    if (!has(jobId) || get(jobId).getState() != ACTIVE) {
+        // defer message until the job is ACTIVE in revision "rev"
+        _job_execution_hooks[jobId].push_back([&, h = std::move(handle)]() mutable {
+            LOG(V4_VVER, "#%i post-execution hook : interrupt\n", Serializable::get<IntVec>(h.getRecvData())[0]);
+            handleJobInterruption(h);
+        });
+        return;
+    }
     auto& job = get(jobId);
-    if (job.getRevision() > rev || job.getState() != ACTIVE) {
-        LOG(V3_VERB, "#%i interrupt concerns old or inactive revision %i (rev. %i now)\n",
+    if (job.getRevision() > rev) {
+        LOG(V3_VERB, "#%i interrupt concerns old revision %i (rev. %i now)\n",
             jobId, rev, job.getRevision());
         return;
     }
@@ -662,6 +678,7 @@ void SchedulingManager::handleJobInterruption(MessageHandle& handle) {
         // Forward information on aborted job to client
         MyMpi::isend(job.getJobTree().getParentNodeRank(), 
             MSG_NOTIFY_CLIENT_JOB_ABORTING, handle.moveRecvData());
+        LOG(V4_VVER, "#%i sent feedback of interrupt to client\n", jobId);
     }
 
     if (job.isIncremental()) {

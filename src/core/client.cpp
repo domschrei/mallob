@@ -339,6 +339,7 @@ void Client::advance() {
             const int id = job.desc->getId();
             _active_jobs[id] = std::move(job.desc);
             MyMpi::isend(_world_rank, MSG_SEND_JOB_RESULT, job.result);
+            job.thread.join();
             it = _client_side_jobs.erase(it);
             --it;
         }
@@ -353,6 +354,8 @@ void Client::advance() {
             if (_done_jobs.count(jobId) && _done_jobs[jobId].revision >= rev) {
                 LOG(V2_INFO, "Interrupt #%i obsolete\n", jobId);
                 it = _jobs_to_interrupt.erase(it);
+            } else if (rev > (_active_jobs.count(jobId) ? _active_jobs[jobId]->getRevision() : -1)) {
+                ++it;
             } else if (_root_nodes.count(jobId)) {
                 LOG(V2_INFO, "Interrupt #%i\n", jobId);
                 MyMpi::isend(_root_nodes.at(jobId), MSG_NOTIFY_JOB_ABORTING, IntVec({jobId, rev, /*fromUser=*/1}));
@@ -432,7 +435,7 @@ void Client::advance() {
             // Job limit reached - exit
             Terminator::setTerminating();
             // Send MSG_EXIT to worker of rank 0, which will broadcast it
-            MyMpi::isend(0, MSG_DO_EXIT, IntVec({0}));
+            Terminator::broadcastExitSignal();
             // Stop instance reader immediately
             _instance_reader.stopWithoutWaiting();
         }
@@ -492,7 +495,7 @@ void Client::introduceNextJob() {
     job.setArrival(time);
 
     int nodeRank;
-    if (job.isIncremental()) {
+    if (job.isIncremental() && _root_nodes.count(jobId)) {
         // Incremental job: Send request to root node in standby
         nodeRank = _root_nodes[jobId];
     } else {
@@ -537,19 +540,35 @@ void Client::sendJobDescription(JobRequest& req, int destRank) {
     assert(desc.getId() == req.jobId || LOG_RETURN_FALSE("%i != %i\n", desc.getId(), req.jobId));
 
     // Send job description
-    LOG_ADD_DEST(V4_VVER, "Sending job desc. of #%i rev. %i of size %lu", destRank, desc.getId(),
-        desc.getRevision(), desc.getTransferSize(desc.getRevision()));
+    LOG_ADD_DEST(V4_VVER, "Sending job desc. of #%i rev. %i of size %lu, formula begins at idx %lu", destRank, desc.getId(),
+        desc.getRevision(), desc.getTransferSize(desc.getRevision()),
+        ((const uint8_t*)desc.getFormulaPayload(desc.getRevision()) - desc.getRevisionData(desc.getRevision())->data()));
 
     int tag = desc.isIncremental() && req.revision>0 ?
         MSG_DEPLOY_NEW_REVISION : MSG_SEND_JOB_DESCRIPTION;
 
     auto data = desc.getSerialization(desc.getRevision());
+
+    /*
+    const int* fData = (const int*) desc.getFormulaPayload(desc.getRevision());
+    size_t fSize = desc.getFormulaPayloadSize(desc.getRevision());
+    std::string summary;
+    for (int i = 0; i < fSize; i++) {
+        if (i >= 5 && i+5 < fSize) {
+            if (i == 5) summary += "... ";
+            continue;
+        }
+        summary += std::to_string(fData[i]) + " ";
+    }
+    log(V4_VVER, "Set up formula of size %lu : %s\n", fSize, summary.c_str());
+    */
+
     desc.clearPayload(desc.getRevision());
     int msgId = MyMpi::isend(destRank, tag, data);
     LOG_ADD_DEST(V4_VVER, "Sent job desc. of #%i of size %lu", 
         destRank, req.jobId, data->size());
     //LOG(V4_VVER, "%p : use count %i\n", data.get(), data.use_count());
-    
+
     // Remember transaction
     _root_nodes[req.jobId] = destRank;
 
@@ -563,6 +582,9 @@ void Client::sendJobDescription(JobRequest& req, int destRank) {
 
 void Client::handleJobDone(MessageHandle& handle) {
     JobStatistics stats = Serializable::get<JobStatistics>(handle.getRecvData());
+
+    if (!_active_jobs.count(stats.jobId)) return; // user-side terminated in the meantime?
+
     LOG_ADD_SRC(V4_VVER, "Will receive job result for job #%i rev. %i", handle.source, stats.jobId, stats.revision);
     MyMpi::isendCopy(stats.successfulRank, MSG_QUERY_JOB_RESULT, handle.getRecvData());
     JobDescription& desc = *_active_jobs[stats.jobId];
@@ -577,6 +599,8 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     int jobId = jobResult.id;
     int resultCode = jobResult.result;
     int revision = jobResult.revision;
+
+    if (!_active_jobs.count(jobId)) return; // user-side terminated in the meantime?
 
     LOG_ADD_SRC(V4_VVER, "Received result of job #%i rev. %i, code: %i", handle.source, jobId, revision, resultCode);
     JobDescription& desc = *_active_jobs.at(jobId);

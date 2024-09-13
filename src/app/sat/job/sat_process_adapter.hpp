@@ -41,6 +41,17 @@ public:
         size_t aSize;
         const int* aLits;
     };
+    struct ShmemObject {
+        std::string id; 
+        void* data {nullptr}; 
+        size_t size;
+        bool managedInCache {false};
+        int revision {0};
+        std::string userLabel;
+        bool operator==(const ShmemObject& other) const {
+            return id == other.id && size == other.size;
+        }
+    };
 
 private:
     Parameters _params;
@@ -54,15 +65,7 @@ private:
     const int* _f_lits;
     size_t _a_size;
     const int* _a_lits;
-    
-    struct ShmemObject {
-        std::string id; 
-        void* data; 
-        size_t size;
-        bool operator==(const ShmemObject& other) const {
-            return id == other.id && size == other.size;
-        }
-    };
+
     struct ShmemObjectHasher {
         size_t operator()(const ShmemObject& obj) const {
             size_t hash = 1;
@@ -74,6 +77,8 @@ private:
     robin_hood::unordered_flat_set<ShmemObject, ShmemObjectHasher> _shmem;
     std::string _shmem_id;
     SatSharedMemory* _hsm = nullptr;
+    Mutex _mtx_preregistered_shmem;
+    robin_hood::unordered_flat_map<std::string, ShmemObject> _preregistered_shmem;
 
     std::unique_ptr<BiDirectionalAnytimePipe> _pipe;
 
@@ -121,6 +126,7 @@ public:
     void run();
     bool isFullyInitialized();
     void appendRevisions(const std::vector<RevisionData>& revisions, int desiredRevision);
+    void preregisterShmemObject(ShmemObject&& obj);
     void crash();
     void reduceThreadCount();
 
@@ -160,6 +166,6 @@ private:
     
     void applySolvingState();
     void initSharedMemory(SatProcessConfig&& config);
-    void* createSharedMemoryBlock(std::string shmemSubId, size_t size, void* data);
+    void* createSharedMemoryBlock(std::string shmemSubId, size_t size, const void* data, int rev = 0, bool managedInCache = false);
 
 };

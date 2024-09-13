@@ -47,4 +47,8 @@ public:
         }
         return nextId;
     }
+
+    int getNbClients() const {
+        return _num_clients;
+    }
 };

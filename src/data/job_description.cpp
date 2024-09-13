@@ -4,7 +4,7 @@
 #include <type_traits>
 
 #include "job_description.hpp"
-
+#include "util/logger.hpp"
 
 void JobDescription::beginInitialization(int revision) {
     _revision = revision;
@@ -50,11 +50,15 @@ void JobDescription::writeMetadata() {
     n = sizeof(int);         memcpy(data->data()+i, &_application_id, n); i += n;
     n = sizeof(bool);        memcpy(data->data()+i, &_incremental, n); i += n;
     n = sizeof(int);         memcpy(data->data()+i, &_group_id, n); i += n;
+    n = sizeof(int);         memcpy(data->data()+i, &_description_id, n); i += n;
     n = sizeof(int);         memcpy(data->data()+i, &_first_balancing_epoch, n); i += n;
     n = sizeof(Checksum);    memcpy(data->data()+i, &_checksum, n); i += n;
 
     auto configSerialized = _app_config.serialize();
     n = configSerialized.size();
+    assert(i + sizeof(int) + n <= getMetadataSize() 
+        || log_return_false("[ERROR] Serialization of size %i+%i+%i=%i larger than advertised meta data size of %i!\n",
+            i, sizeof(int), n, i+sizeof(int)+n, getMetadataSize()));
     memcpy(data->data()+i, &n, sizeof(int)); i += sizeof(int); // size of config
     memcpy(data->data()+i, configSerialized.c_str(), n); i += n; // bytes of config
 }
@@ -81,14 +85,23 @@ size_t JobDescription::getAssumptionsSize(int revision) const {
     return aSize;
 }
 
+int JobDescription::getJobDescriptionId(int revision) const {
+    int id;
+    memcpy(&id, getRevisionData(revision)->data()
+           +8*sizeof(int)
+           +2*sizeof(size_t)
+           +3*sizeof(float)
+           +sizeof(bool), sizeof(int));
+    return id;
+}
+
 const int* JobDescription::getFormulaPayload(int revision) const {
     size_t pos = getMetadataSize();
     return (const int*) (getRevisionData(revision)->data()+pos);
 }
 
 const int* JobDescription::getAssumptionsPayload(int revision) const {
-    size_t pos = getMetadataSize() + sizeof(int)*getFormulaPayloadSize(revision);
-    return (const int*) (getRevisionData(revision)->data()+pos);
+    return (const int*) (getRevisionData(revision)->data() + getRevisionData(revision)->size() - sizeof(int)*getAssumptionsSize(revision));
 }
 
 size_t JobDescription::getTransferSize(int revision) const {
@@ -98,14 +111,12 @@ size_t JobDescription::getTransferSize(int revision) const {
 
 
 int JobDescription::getMetadataSize() const {
-    return 7*sizeof(int)
-           +3*sizeof(float)
+    return 10*sizeof(int)
            +2*sizeof(size_t)
-           +sizeof(Checksum)
-           +sizeof(int)
+           +3*sizeof(float)
            +sizeof(bool)
-           +sizeof(int)
-           + sizeof(int)+_app_config.getSerializedSize();
+           +sizeof(Checksum)
+           +sizeof(int)+_app_config.getSerializedSize();
 }
 
 
@@ -165,7 +176,8 @@ void JobDescription::deserialize() {
     n = sizeof(int);         memcpy(&_application_id, latestData->data()+i, n);  i += n;
     n = sizeof(bool);        memcpy(&_incremental, latestData->data()+i, n);     i += n;
     n = sizeof(int);         memcpy(&_group_id, latestData->data()+i, n);        i += n;
-    n = sizeof(int); memcpy(&_first_balancing_epoch, latestData->data()+i, n); i += n;
+    n = sizeof(int);         memcpy(&_description_id, latestData->data()+i, n);  i += n;
+    n = sizeof(int);   memcpy(&_first_balancing_epoch, latestData->data()+i, n); i += n;
     n = sizeof(Checksum);    memcpy(&_checksum, latestData->data()+i, n);        i += n;
     // size of config
     memcpy(&n, latestData->data()+i, sizeof(int)); i += sizeof(int);

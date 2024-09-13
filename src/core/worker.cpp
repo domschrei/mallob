@@ -24,8 +24,8 @@
 
 Worker::Worker(MPI_Comm comm, Parameters& params) :
     _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 
-    _params(params), _job_registry(_params, _comm), _routing_tree(_params, _comm), 
-    _sys_state(_comm, params.sysstatePeriod(), SysState<9>::ALLREDUCE), 
+    _params(params), _sys_state(_comm, params.sysstatePeriod(), SysState<9>::ALLREDUCE),
+    _job_registry(_params, _comm), _routing_tree(_params, _comm),
     _sched_man(_params, _comm, _routing_tree, _job_registry, _sys_state), 
     _watchdog(/*enabled=*/_params.watchdog(), /*checkIntervMillis=*/100, Timer::elapsedSeconds())
 {

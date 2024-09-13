@@ -6,6 +6,7 @@
 #include <string>
 #include <utility>
 
+#include "interface/api/job_description_id_allocator.hpp"
 #include "util/logger.hpp"
 #include "util/hashing.hpp"
 #include "data/job_description.hpp"
@@ -50,6 +51,7 @@ private:
 
     Mutex _job_map_mutex;
     JobIdAllocator _job_id_allocator;
+    JobDescriptionIdAllocator _job_desc_id_allocator;
 
     std::function<void(JobMetadata&&)> _job_callback;
     
@@ -65,6 +67,7 @@ public:
         _output_dir(TmpDir::get()),
         _job_map_mutex(),
         _job_id_allocator(std::move(jobIdAllocator)),
+        _job_desc_id_allocator(clientRank, _job_id_allocator.getNbClients()),
         _job_callback(jobCallback) {}
     ~JsonInterface() {}
 

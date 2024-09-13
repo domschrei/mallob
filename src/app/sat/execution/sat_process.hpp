@@ -353,10 +353,28 @@ private:
             aSize = *aSizePtr;
         }
 
-        const int* fPtr = (const int*) accessMemory(_shmem_id + ".formulae." + std::to_string(revision),
+        std::string formulaShmemId = _shmem_id + ".formulae." + std::to_string(revision);
+        int* descIdPtr = (int*) accessMemory(_shmem_id + ".descid." + std::to_string(revision),
+            sizeof(int), SharedMemory::ARBITRARY, false);
+        if (descIdPtr) {
+            const int descId = *descIdPtr;
+            formulaShmemId = "/edu.kit.iti.mallob.jobdesc." + std::to_string(descId);
+        }
+
+        const int* fPtr = (const int*) accessMemory(formulaShmemId,
             sizeof(int) * fSize, SharedMemory::READONLY);
         const int* aPtr = (const int*) accessMemory(_shmem_id + ".assumptions." + std::to_string(revision),
             sizeof(int) * aSize, SharedMemory::READONLY);
+
+        std::string summary;
+        for (int i = 0; i < aSize; i++) {
+            if (i >= 5 && i+5 < aSize) {
+                if (i == 5) summary += "... ";
+                continue;
+            }
+            summary += std::to_string(aPtr[i]) + " ";
+        }
+        LOG(V2_INFO, "ASSUMPTIONS rev. %i : %s\n", revision, summary.c_str());
 
         if (_params.copyFormulaeFromSharedMem()) {
             // Copy formula and assumptions to your own local memory
@@ -389,9 +407,9 @@ private:
         LOGGER(_log, V3_VERB, "Read formula rev. %i (size:%lu,%lu) from shared memory in %.4fs\n", revision, fSize, aSize, time);
     }
 
-    void* accessMemory(const std::string& shmemId, size_t size, SharedMemory::AccessMode accessMode = SharedMemory::ARBITRARY) {
+    void* accessMemory(const std::string& shmemId, size_t size, SharedMemory::AccessMode accessMode = SharedMemory::ARBITRARY, bool abortOnFailure = true) {
         void* ptr = SharedMemory::access(shmemId, size, accessMode);
-        if (ptr == nullptr) {
+        if (abortOnFailure && ptr == nullptr) {
             LOGGER(_log, V0_CRIT, "[ERROR] Could not access shmem %s\n", shmemId.c_str());  
             abort();
         }

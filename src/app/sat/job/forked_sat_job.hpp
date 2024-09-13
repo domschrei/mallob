@@ -11,6 +11,7 @@
 
 #include "app/app_message_subscription.hpp"
 #include "app/job.hpp"
+#include "app/sat/job/formula_shmem_cache.hpp"
 #include "util/params.hpp"
 #include "sat_process_adapter.hpp"
 #include "sat_constants.h"
@@ -32,6 +33,7 @@ private:
 
     std::unique_ptr<SatProcessAdapter> _solver;
     int _last_imported_revision = 0;
+    std::vector<SatProcessAdapter::ShmemObject> _formulas_in_shmem;
 
     std::future<void> _destruction;
     std::atomic_bool _shmem_freed = false;
@@ -86,6 +88,8 @@ public:
     
     virtual void returnClauses(std::vector<int>& clauses) override;
     virtual void digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauses) override;
+
+    virtual bool canHandleIncompleteRevision(int rev) override;
 
 private:
     void doStartSolver();

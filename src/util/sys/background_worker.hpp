@@ -23,7 +23,7 @@ public:
         _thread = std::thread(runnable);
     }
     bool continueRunning() const {
-        return !Terminator::isTerminating() && !_terminate;
+        return !_terminate;
     }
     bool isRunning() const {
         return _thread.joinable();

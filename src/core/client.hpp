@@ -121,19 +121,19 @@ private:
     Mutex _finished_msg_ids_mutex;
     std::vector<int> _finished_msg_ids;
 
-    PeriodicEvent<100> _periodic_check_done_jobs;
+    PeriodicEvent<50> _periodic_check_done_jobs;
 
     struct ClientSideJob {
         std::unique_ptr<JobDescription> desc;
+        JobResult result;
         bool done {false};
         BackgroundWorker thread;
-        JobResult result;
         ClientSideJob() {}
         ClientSideJob(std::unique_ptr<JobDescription>&& desc) : desc(std::move(desc)) {}
     };
-    Mutex _client_side_jobs_mutex;
     std::list<ClientSideJob> _client_side_jobs;
-    PeriodicEvent<100> _periodic_check_client_side_jobs;
+    PeriodicEvent<50> _periodic_check_client_side_jobs;
+    Mutex _client_side_jobs_mutex;
 
 public:
     Client(MPI_Comm comm, Parameters& params)

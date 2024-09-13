@@ -48,6 +48,7 @@ private:
     int _application_id; // see app_registry
     bool _incremental = false;
     int _group_id {0};
+    int _description_id {0};
     int _first_balancing_epoch {-1};
 
     Checksum _checksum;
@@ -94,9 +95,9 @@ public:
 
     JobDescription() = default;
     JobDescription(int id, float priority, int applicationId, bool computeChecksums = false) : _id(id), _root_rank(-1),
-                _priority(priority), _application_id(applicationId), _revision(0), 
+                _priority(priority), _revision(0), _application_id(applicationId),
                 _use_checksums(computeChecksums) {}
-    ~JobDescription() {
+    virtual ~JobDescription() {
         if (_stats != nullptr) delete _stats;
         for (auto& data : _data_per_revision)
             data.reset();
@@ -109,6 +110,7 @@ public:
         _priority = std::move(other._priority);
         _incremental = std::move(other._incremental);
         _group_id = std::move(other._group_id);
+        _description_id = std::move(other._description_id);
         _first_balancing_epoch = std::move(other._first_balancing_epoch);
         _revision = std::move(other._revision);
         _client_rank = std::move(other._client_rank);
@@ -174,6 +176,12 @@ public:
     JobDescription& deserialize(const std::shared_ptr<std::vector<uint8_t>>& packed);
     void deserialize();
 
+    bool isRevisionIncomplete(int rev) const {
+        return getRevisionData(rev)->size() < getMetadataSize()
+            + getAssumptionsSize(rev) * sizeof(int)
+            + getFormulaPayloadSize(rev) * sizeof(int);
+    }
+
     int getId() const {return _id;}
     int getRootRank() const {return _root_rank;}
     float getPriority() const {return _priority;}
@@ -208,6 +216,7 @@ public:
     void setPreloadedAssumptions(std::vector<int>&& asmpt) {_preloaded_assumptions = std::move(asmpt);}
     void setAppConfigurationEntry(const std::string& key, const std::string& val) {_app_config.map[key] = val;}
     void setGroupId(int groupId) {_group_id = groupId;}
+    void setJobDescriptionId(int descId) {_description_id = descId;}
     void setFirstBalancingEpoch(int nb) {
         _first_balancing_epoch = nb;
         writeMetadata();
@@ -229,7 +238,8 @@ public:
     const int* getFormulaPayload(int revision) const;
     size_t getAssumptionsSize(int revision) const;
     const int* getAssumptionsPayload(int revision) const;
-    
+    int getJobDescriptionId(int revision) const;
+
     size_t getTransferSize(int revision) const;
     
     static int readRevisionIndex(const std::vector<uint8_t>& serialized);

@@ -231,3 +231,25 @@ void Job::communicate(int source, int mpiTag, JobMessage& msg) {
         appl_communicate(source, mpiTag, msg);
     }
 }
+
+bool Job::hasAllDescriptionsForSolving(int& missingOrIncompleteRevIdx) {
+    if (!hasDescription()) {
+        missingOrIncompleteRevIdx = 0;
+        return false;
+    }
+    for (int r = _last_usable_revision+1; r <= getRevision(); r++) {
+        if (getDescription().isRevisionIncomplete(r)) {
+            if (canHandleIncompleteRevision(r)) {
+                _last_usable_revision = r;
+                continue;
+            }
+            missingOrIncompleteRevIdx = r;
+            return false;
+        }
+    }
+    if (getRevision() < getDesiredRevision()) {
+        missingOrIncompleteRevIdx = getRevision()+1;
+        return false;
+    }
+    return true;
+}

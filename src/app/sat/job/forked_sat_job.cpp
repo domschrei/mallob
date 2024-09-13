@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "app/app_message_subscription.hpp"
+#include "app/sat/job/formula_shmem_cache.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "forked_sat_job.hpp"
@@ -74,17 +75,25 @@ void ForkedSatJob::loadIncrements() {
     const auto& desc = getDescription();
     int lastRev = desc.getRevision();
     std::vector<SatProcessAdapter::RevisionData> revisions;
+    int missingRev;
+    bool someMissing = !hasAllDescriptionsForSolving(missingRev);
     while (_last_imported_revision < lastRev) {
+        if (someMissing && _last_imported_revision+1 == missingRev) break;
         _last_imported_revision++;
         size_t numLits = desc.getFormulaPayloadSize(_last_imported_revision);
         size_t numAssumptions = desc.getAssumptionsSize(_last_imported_revision);
         LOG(V4_VVER, "%s : Forward rev. %i : %i lits, %i assumptions\n", toStr(), 
                 _last_imported_revision, numLits, numAssumptions);
+        if (_last_imported_revision < _formulas_in_shmem.size() && _formulas_in_shmem[_last_imported_revision].data) {
+            // there is a shared memory segment
+            _solver->preregisterShmemObject(std::move(_formulas_in_shmem[_last_imported_revision]));
+            _formulas_in_shmem[_last_imported_revision].data = nullptr;
+        }
         revisions.emplace_back(SatProcessAdapter::RevisionData {
             _last_imported_revision,
             _last_imported_revision == lastRev ? desc.getChecksum() : Checksum(),
-            numLits, 
-            desc.getFormulaPayload(_last_imported_revision),
+            numLits,
+            desc.isRevisionIncomplete(_last_imported_revision) ? nullptr : desc.getFormulaPayload(_last_imported_revision),
             numAssumptions,
             desc.getAssumptionsPayload(_last_imported_revision)
         });
@@ -319,10 +328,39 @@ void ForkedSatJob::startDestructThreadIfNecessary() {
         _destruction = ProcessWideThreadPool::get().addTask([this]() {
             _solver->waitUntilChildExited();
             _solver->freeSharedMemory();
+            // manually clean up formulas in shared memory which haven't been forwarded yet
+            for (auto& obj : _formulas_in_shmem) {
+                if (!obj.data) continue;
+                int descriptionId = getDescription().getJobDescriptionId(obj.revision);
+                StaticFormulaSharedMemoryCache::get().drop(descriptionId, obj.userLabel, obj.size, obj.data);
+                obj.data = nullptr;
+            }
             LOG(V4_VVER, "%s : FSJ mem freed\n", toStr());
             _shmem_freed = true;
         });
     }
+}
+
+bool ForkedSatJob::canHandleIncompleteRevision(int rev) {
+    if (rev < _formulas_in_shmem.size() && _formulas_in_shmem[rev].data) return true;
+    // Probe if the job description of the revision is present
+    // as a shared memory segment. This check *must* also add a reference
+    // to it (so that it doesn't get deleted in the meantime).
+    if (!hasDescription()) return false;
+    int descriptionId = getDescription().getJobDescriptionId(rev);
+    if (descriptionId == 0) return false;
+    size_t size = getDescription().getFormulaPayloadSize(rev);
+    std::string shmemId;
+    std::string userLabel = "/edu.kit.iti.mallob."
+        + std::to_string(getMyMpiRank()) + ".nopidyet"
+        + std::string(toStr()) + "~" + std::to_string(_static_subprocess_index)
+        + ".formulae." + std::to_string(rev);
+    void* shmem = StaticFormulaSharedMemoryCache::get().tryAccess(descriptionId,
+        userLabel, size, shmemId);
+    if (!shmem) return false;
+    if (_formulas_in_shmem.size() <= rev) _formulas_in_shmem.resize(2*rev+1);
+    _formulas_in_shmem[rev] = {std::move(shmemId), shmem, size, true, rev, std::move(userLabel)};
+    return true;
 }
 
 ForkedSatJob::~ForkedSatJob() {

@@ -12,6 +12,8 @@
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/execution/clause_pipe_defs.hpp"
 #include "app/sat/execution/solving_state.hpp"
+#include "app/sat/job/forked_sat_job.hpp"
+#include "app/sat/job/formula_shmem_cache.hpp"
 #include "app/sat/job/inplace_sharing_aggregation.hpp"
 #include "sat_process_adapter.hpp"
 #include "../execution/engine.hpp"
@@ -34,7 +36,9 @@ SatProcessAdapter::SatProcessAdapter(Parameters&& params, SatProcessConfig&& con
     size_t fSize, const int* fLits, size_t aSize, const int* aLits, 
     std::shared_ptr<AnytimeSatClauseCommunicator>& comm) :    
         _params(std::move(params)), _config(std::move(config)), _job(job), _clause_comm(comm),
-        _f_size(fSize), _f_lits(fLits), _a_size(aSize), _a_lits(aLits) {
+        _f_size(fSize), _f_lits(
+            _job->getDescription().isRevisionIncomplete(0) ? nullptr : fLits
+        ), _a_size(aSize), _a_lits(aLits) {
 
     _desired_revision = _config.firstrev;
     _shmem_id = _config.getSharedMemId(Proc::getPid());
@@ -66,7 +70,7 @@ void SatProcessAdapter::doWriteRevisions() {
             auto revStr = std::to_string(revData.revision);
             createSharedMemoryBlock("fsize."       + revStr, sizeof(size_t),              (void*)&revData.fSize);
             createSharedMemoryBlock("asize."       + revStr, sizeof(size_t),              (void*)&revData.aSize);
-            createSharedMemoryBlock("formulae."    + revStr, sizeof(int) * revData.fSize, (void*)revData.fLits);
+            createSharedMemoryBlock("formulae."    + revStr, sizeof(int) * revData.fSize, (void*)revData.fLits, revData.revision, true);
             createSharedMemoryBlock("assumptions." + revStr, sizeof(int) * revData.aSize, (void*)revData.aLits);
             createSharedMemoryBlock("checksum."    + revStr, sizeof(Checksum),            (void*)&(revData.checksum));
             _written_revision = revData.revision;
@@ -101,7 +105,7 @@ void SatProcessAdapter::doInitialize() {
     _sum_of_revision_sizes += _f_size;
 
     // Allocate shared memory for formula, assumptions of initial revision
-    createSharedMemoryBlock("formulae.0", sizeof(int) * _f_size, (void*)_f_lits);
+    createSharedMemoryBlock("formulae.0", sizeof(int) * _f_size, (void*)_f_lits, 0, true);
     createSharedMemoryBlock("assumptions.0", sizeof(int) * _a_size, (void*)_a_lits);
 
     // Set up bi-directional pipe to and from the subprocess
@@ -140,6 +144,12 @@ void SatProcessAdapter::appendRevisions(const std::vector<RevisionData>& revisio
         for (auto& data : revisions) _sum_of_revision_sizes += data.fSize;
     }
     doWriteRevisions();
+}
+
+void SatProcessAdapter::preregisterShmemObject(ShmemObject&& obj) {
+    std::string shmemId = obj.id;
+    auto lock = _mtx_preregistered_shmem.getLock();
+    _preregistered_shmem[shmemId] = std::move(obj);
 }
 
 void SatProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
@@ -253,8 +263,8 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
     if (!_initialized) return NORMAL;
 
     int exitStatus = 0;
-    if (!_hsm->doTerminate && (_hsm->didTerminate || 
-            Process::didChildExit(_child_pid, &exitStatus) && exitStatus != 0)) {
+    if (!_hsm->doTerminate && (_hsm->didTerminate ||
+            (Process::didChildExit(_child_pid, &exitStatus) && exitStatus != 0))) {
         // Child has exited without being told to.
         if (exitStatus == SIGUSR2) {
             LOG(V3_VERB, "Restarting non-incremental child %ld\n", _child_pid);
@@ -370,16 +380,53 @@ void SatProcessAdapter::waitUntilChildExited() {
     }
 }
 
-void* SatProcessAdapter::createSharedMemoryBlock(std::string shmemSubId, size_t size, void* data) {
-    std::string id = _shmem_id + "." + shmemSubId;
-    void* shmem = SharedMemory::create(id, size);
-    if (data == nullptr) {
-        memset(shmem, 0, size);
-    } else {
-        memcpy(shmem, data, size);
+void* SatProcessAdapter::createSharedMemoryBlock(std::string shmemSubId, size_t size, const void* data, int rev, bool managedInCache) {
+    if (size == 0) return (void*) 1;
+
+    const std::string qualifiedShmemId = _shmem_id + "." + shmemSubId;
+    std::string actualShmemId = qualifiedShmemId;
+    const int descId = _job->getDescription().getJobDescriptionId(rev);
+
+    void* shmem {nullptr};
+
+    if (!managedInCache || descId == 0) {
+        shmem = SharedMemory::create(qualifiedShmemId, size);
+        assert(shmem);
+        if (data) {
+            memcpy(shmem, data, size);
+        } else {
+            memset(shmem, 0, size);
+        }
+        _shmem.insert(ShmemObject{actualShmemId, shmem, size,
+            false, rev, qualifiedShmemId});
+        return shmem;
     }
-    _shmem.insert(ShmemObject{id, shmem, size});
-    //log(V4_VVER, "DBG set up shmem %s\n", id.c_str());
+
+    actualShmemId = FormulaSharedMemoryCache::getShmemId(descId);
+    {
+        ShmemObject obj;
+        auto lock = _mtx_preregistered_shmem.getLock();
+        if (_preregistered_shmem.contains(actualShmemId)) {
+            obj = std::move(_preregistered_shmem[actualShmemId]);
+            shmem = obj.data;
+            _preregistered_shmem.erase(actualShmemId);
+        }
+        if (shmem)
+            _shmem.insert(ShmemObject{actualShmemId, shmem, size,
+                true, rev, obj.userLabel});
+    }
+    if (!shmem) {
+        bool created;
+        shmem = StaticFormulaSharedMemoryCache::get().createOrAccess(descId, qualifiedShmemId, size,
+            data, actualShmemId, created);
+        _shmem.insert(ShmemObject{actualShmemId, shmem, size,
+            true, rev, qualifiedShmemId});
+    }
+
+    assert(shmem);
+    auto descIdShmemId = "descid." + std::to_string(rev);
+    createSharedMemoryBlock(descIdShmemId, sizeof(int), &descId);
+
     return shmem;
 }
 
@@ -421,9 +468,21 @@ void SatProcessAdapter::freeSharedMemory() {
     }
 
     // Clean up shared memory objects created here
+    {
+        auto lock = _mtx_preregistered_shmem.getLock();
+        for (auto& [id, obj] : _preregistered_shmem) _shmem.insert(std::move(obj));
+        _preregistered_shmem.clear();
+    }
     for (auto& shmemObj : _shmem) {
         //log(V4_VVER, "DBG deleting %s\n", shmemObj.id.c_str());
-        SharedMemory::free(shmemObj.id, (char*)shmemObj.data, shmemObj.size);
+        if (shmemObj.managedInCache) {
+            const int descId = _job->getDescription().getJobDescriptionId(shmemObj.revision);
+            assert(descId > 0);
+            assert(shmemObj.data);
+            StaticFormulaSharedMemoryCache::get().drop(descId, shmemObj.userLabel, shmemObj.size, shmemObj.data);
+        } else {
+            SharedMemory::free(shmemObj.id, (char*)shmemObj.data, shmemObj.size);
+        }
     }
     _shmem.clear();
 }

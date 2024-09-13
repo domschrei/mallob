@@ -15,6 +15,7 @@
 #include <utility>
 #include <vector>
 
+#include "util/hashing.hpp"
 #include "util/sys/threading.hpp"
 #include "util/params.hpp"
 #include "data/job_description.hpp"
@@ -161,6 +162,9 @@ private:
     JobDescription _description;
     int _desired_revision = 0;
     int _last_solved_revision = -1;
+    // highest revision confirmed to be "sufficiently present" for solving, i.e.,
+    // either completely present or its skeleton is enough for the job
+    int _last_usable_revision = -1; 
 
     float _time_of_arrival;
     float _time_of_activation = 0;
@@ -184,7 +188,24 @@ private:
     int _balancing_epoch_of_last_commitment = -1;
     int _latest_balancing_epoch {0};
     std::optional<JobResult> _result;
-    robin_hood::unordered_node_set<std::pair<int, int>, IntPairHasher> _waiting_rank_revision_pairs;
+    struct ChildWaitingForDescription {
+        int rank;
+        int revision;
+        bool sendSkeletonOnly;
+        bool operator==(const ChildWaitingForDescription& other) const {
+            return rank == other.rank && revision == other.revision && sendSkeletonOnly == other.sendSkeletonOnly;
+        }
+    };
+    struct ChildWaitingForDescriptionHasher {
+        size_t operator()(const ChildWaitingForDescription& o) const {
+            size_t h = 1;
+            hash_combine(h, o.rank);
+            hash_combine(h, o.revision);
+            hash_combine(h, o.sendSkeletonOnly);
+            return h;
+        }
+    };
+    robin_hood::unordered_node_set<ChildWaitingForDescription, ChildWaitingForDescriptionHasher> _children_waiting_for_description;
 
     AppMessageSubscription _app_msg_subscription;
     JobTree _job_tree;
@@ -256,6 +277,14 @@ public:
     bool hasDescription() const {return _has_description;};
     const JobDescription& getDescription() const {assert(hasDescription()); return _description;};
     const std::shared_ptr<std::vector<uint8_t>>& getSerializedDescription(int revision) {return _description.getSerialization(revision);};
+    std::vector<uint8_t> getSerializedDescriptionSkeleton(int revision) {
+        // Prepare serialization of the desired revision
+        // with the formula data itself "cut out"
+        std::vector<uint8_t> out {_description.getRevisionData(revision)->data(), (uint8_t*)_description.getFormulaPayload(revision)};
+        const int* aPtr = _description.getAssumptionsPayload(revision);
+        out.insert(out.end(), (uint8_t*)aPtr, (uint8_t*)(aPtr+getDescription().getAssumptionsSize(revision)));
+        return out;
+    }
     bool hasCommitment() const {return _commitment.has_value();}
     const JobRequest& getCommitment() const {assert(hasCommitment()); return _commitment.value();}
     int getId() const {return _id;};
@@ -263,6 +292,9 @@ public:
     int getRevision() const {return !hasDescription() ? -1 : getDescription().getRevision();};
     int getMaxConsecutiveRevision() const {return !hasDescription() ? -1 : getDescription().getMaxConsecutiveRevision();};
     int getDesiredRevision() const {return _desired_revision;}
+    // Returns true if the present job description revisions are sufficient to begin solving.
+    // Returns false and the 1st missing or incomplete revision index otherwise.
+    bool hasAllDescriptionsForSolving(int& missingOrIncompleteRevIdx);
     JobResult& getResult();
     // Elapsed seconds since the job's constructor call.
     float getAge() const {return Timer::elapsedSeconds() - _time_of_arrival;}
@@ -290,8 +322,8 @@ public:
     JobTree& getJobTree() {return _job_tree;}
     const JobTree& getJobTree() const {return _job_tree;}
     const JobComm& getJobComm() const {return _comm;}
-    robin_hood::unordered_node_set<std::pair<int, int>, IntPairHasher>& getWaitingRankRevisionPairs() {
-        return _waiting_rank_revision_pairs;
+    robin_hood::unordered_node_set<ChildWaitingForDescription, ChildWaitingForDescriptionHasher>& getChildrenWaitingForDescription() {
+        return _children_waiting_for_description;
     }
 
     void updateJobBalancingEpoch(int latestEpoch) {
@@ -345,8 +377,10 @@ public:
         return false;
     }
 
+    virtual bool canHandleIncompleteRevision(int rev) {return false;}
+
     // Marks the job to be indestructible as long as pending is true.
-    void addChildWaitingForRevision(int rank, int revision) {_waiting_rank_revision_pairs.insert(std::pair<int, int>(rank, revision));}
+    void addChildWaitingForRevision(int rank, int revision, bool sendSkeletonOnly) {_children_waiting_for_description.insert({rank, revision, sendSkeletonOnly});}
     void setDesiredRevision(int revision) {_desired_revision = revision;}
     bool isRevisionSolved(int revision) {return _last_solved_revision >= revision;}
     void setRevisionSolved(int revision) {_last_solved_revision = revision;}

@@ -26,6 +26,7 @@ const int MSG_OFFER_ADOPTION = 4;
 const int MSG_ANSWER_ADOPTION_OFFER = 5;
 
 const int MSG_QUERY_JOB_DESCRIPTION = 6;
+const int MSG_QUERY_JOB_DESCRIPTION_SKELETON = 600;
 
 /*
 The sender propagates a job's volume update to the receiver.
@@ -38,6 +39,7 @@ Data type: JobDescription
 Warning: Length may exceed the default maximum message length.
 */
 const int MSG_SEND_JOB_DESCRIPTION = 9;
+const int MSG_SEND_JOB_DESCRIPTION_SKELETON = 99;
 /*
 The sender informs the receiver that a solution was found for the job
 of the specified ID.

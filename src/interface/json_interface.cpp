@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "json_interface.hpp"
+#include "util/logger.hpp"
 #include "util/sys/terminator.hpp"
 #include "util/params.hpp"
 #include "util/random.hpp"
@@ -194,6 +195,12 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
     if (json.contains("literals")) {
         job->setPreloadedLiterals(json["literals"].get<std::vector<int>>());
     }
+    if (json.contains("description-id")) {
+        const std::string label = json["user"].get<std::string>() + "." + json["description-id"].get<std::string>();
+        const int descId = _job_desc_id_allocator.getId(label);
+        job->setJobDescriptionId(descId);
+        LOGGER(_logger, V4_VVER, "MAXSAT Job #%i rev. %i: set job description ID %i\n", id, job->getRevision(), descId);
+    } else job->setJobDescriptionId(0);
     job->setArrival(arrival);
     std::vector<std::string> files = json.contains("files") ? 
         json["files"].get<std::vector<std::string>>() : std::vector<std::string>();

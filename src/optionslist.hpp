@@ -100,6 +100,7 @@ OPTION_GROUP(grpJob, "job", "Global configuration of jobs")
  OPT_FLOAT(jobWallclockLimit,             "jwl", "job-wallclock-limit",                0,    0, LARGE_INT,      "Timeout an instance after x seconds wall clock time")
  OPT_INT(maxDemand,                       "md", "max-demand",                          0,    0, LARGE_INT,      "Limit any job's demand to this value")
  OPT_INT(numThreadsPerProcess,            "t", "threads-per-process",                  1,    1, MALLOB_MAX_N_APPTHREADS_PER_PROCESS,      "Number of application worker threads per MPI process")
+ OPT_BOOL(aggressiveDescriptionCaching, "adc", "aggressive-desc-caching", false, "Try to reuse cached job descriptions by only transferring them when not repairable without them")
 
 ///////////////////////////////////////////////////////////////////////
 
