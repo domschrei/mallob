@@ -4,6 +4,7 @@
 
 #include <set>
 #include <list>
+#include "comm/job_tree_snapshot.hpp"
 #include "comm/msg_queue/message_queue.hpp"
 #include "comm/msgtags.h"
 #include "util/assert.hpp"
@@ -343,6 +344,24 @@ public:
         if (hasLeftChild()) numChildren++;
         if (hasRightChild()) numChildren++;
         return numChildren;
+    }
+
+    JobTreeSnapshot getSnapshot() const {
+        JobTreeSnapshot snapshot;
+        snapshot.nodeRank = getRank();
+        snapshot.index = getIndex();
+        snapshot.contextId = getContextId();
+        snapshot.nbChildren = getNumChildren();
+        snapshot.leftChildNodeRank = getLeftChildNodeRank();
+        snapshot.leftChildIndex = getLeftChildIndex();
+        snapshot.leftChildContextId = getLeftChildContextId();
+        snapshot.rightChildNodeRank = getRightChildNodeRank();
+        snapshot.rightChildIndex = getRightChildIndex();
+        snapshot.rightChildContextId = getRightChildContextId();
+        snapshot.parentNodeRank = getParentNodeRank();
+        snapshot.parentIndex = getParentIndex();
+        snapshot.parentContextId = getParentContextId();
+        return snapshot;
     }
 
 private:

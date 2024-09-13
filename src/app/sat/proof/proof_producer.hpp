@@ -179,7 +179,7 @@ private:
         JobMessage baseMsg(_setup.jobId, 0, _setup.revision, 
             _proof_assembler->getEpoch(), MSG_ALLREDUCE_PROOF_RELEVANT_CLAUSES);
 
-        _proof_all_reduction.emplace(_job_tree, baseMsg, std::vector<int>(), [&](auto& list) {
+        _proof_all_reduction.emplace(_job_tree.getSnapshot(), baseMsg, std::vector<int>(), [&](auto& list) {
             
             std::list<std::pair<LratClauseId*, size_t>> idArrays;
             for (auto& vec : list) {

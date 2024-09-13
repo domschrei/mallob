@@ -28,19 +28,6 @@ void MyMpi::init() {
     }
 }
 
-size_t MyMpi::getBinaryTreeBufferLimit(int numWorkers, int baseSize, float functionParam, BufferQueryMode mode) {
-    if (mode == LEVEL) {
-        float limit = baseSize * std::pow(functionParam, std::log2(numWorkers+1)-1);
-        return std::ceil(numWorkers * limit);
-    }
-    if (mode == LIMITED) {
-        float upperBound = functionParam;
-        auto buflim = upperBound - (upperBound - baseSize) * std::exp((baseSize / (baseSize - upperBound)) * (numWorkers-1));
-        return std::ceil(buflim);
-    }
-    return 0;
-}
-
 void MyMpi::setOptions(const Parameters& params) {
     int verb = MyMpi::rank(MPI_COMM_WORLD) == 0 ? V2_INFO : V4_VVER;
     _msg_queue = new MessageQueue(params.messageBatchingThreshold());

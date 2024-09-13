@@ -5,6 +5,7 @@
 #include <set>
 
 #include "app/job_tree.hpp"
+#include "comm/job_tree_snapshot.hpp"
 #include "util/logger.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "data/job_transfer.hpp"
@@ -15,7 +16,6 @@ public:
     typedef std::vector<int> AllReduceElement;
 
 private:
-    JobTree& _tree;
     JobMessage _base_msg;
     AllReduceElement _neutral_elem;
     
@@ -37,6 +37,7 @@ private:
     std::pair<ctx_id_t, ctx_id_t> _expected_child_ctx_ids;
     std::pair<bool, bool> _received_child_elems;
 
+    bool _is_root;
     int _parent_rank;
     int _parent_index;
     ctx_id_t _parent_ctx_id;
@@ -56,30 +57,31 @@ private:
     bool _broadcastEnabled = true;
 
 public:
-    JobTreeAllReduction(JobTree& jobTree, JobMessage baseMsg, AllReduceElement&& neutralElem, 
+    JobTreeAllReduction(const JobTreeSnapshot& _tree, JobMessage baseMsg, AllReduceElement&& neutralElem, 
             std::function<AllReduceElement(std::list<AllReduceElement>&)> aggregator) :
-        _tree(jobTree), _base_msg(baseMsg), _neutral_elem(std::move(neutralElem)), 
-        _num_expected_child_elems(_tree.getNumChildren()), _aggregator(aggregator) {
+        _base_msg(baseMsg), _neutral_elem(std::move(neutralElem)), 
+        _num_expected_child_elems(_tree.nbChildren), _aggregator(aggregator) {
 
-        int leftRank = _tree.hasLeftChild() ? _tree.getLeftChildNodeRank() : -1;
-        int rightRank = _tree.hasRightChild() ? _tree.getRightChildNodeRank() : -1;
+        int leftRank = _tree.leftChildNodeRank;
+        int rightRank = _tree.rightChildNodeRank;
         _expected_child_ranks = IntPair(leftRank, rightRank);
         _expected_child_indices = IntPair(
-            leftRank<0?-1: _tree.getLeftChildIndex(),
-            rightRank<0?-1: _tree.getRightChildIndex()
+            leftRank<0?-1: _tree.leftChildIndex,
+            rightRank<0?-1: _tree.rightChildIndex
         );
         _expected_child_ctx_ids = std::pair<ctx_id_t, ctx_id_t>(
-            leftRank<0?0:_tree.getLeftChildContextId(), 
-            rightRank<0?0:_tree.getRightChildContextId()
+            leftRank<0?0:_tree.leftChildContextId, 
+            rightRank<0?0:_tree.rightChildContextId
         );
         _received_child_elems = std::pair<bool, bool>(false, false);
 
-        _parent_rank = _tree.getParentNodeRank();
-        _parent_index = _tree.getParentIndex();
-        _parent_ctx_id = _tree.getParentContextId();
+        _parent_rank = _tree.parentNodeRank;
+        _parent_index = _tree.parentIndex;
+        _parent_ctx_id = _tree.parentContextId;
     
-        _base_msg.treeIndexOfSender = _tree.getIndex();
-        _base_msg.contextIdOfSender = _tree.getContextId();
+        _is_root = _tree.index == 0;
+        _base_msg.treeIndexOfSender = _tree.index;
+        _base_msg.contextIdOfSender = _tree.contextId;
     }
 
     void pruneChild(int rank) {
@@ -180,7 +182,7 @@ public:
             _future_aggregate.get();
             _reduction_locally_done = true;
             
-            if (_tree.isRoot()) {
+            if (_is_root) {
                 // Transform reduced element at root
                 if (_has_transformation_at_root) {
                     _aggregated_elem.emplace(_transformation_at_root(_aggregated_elem.value()));

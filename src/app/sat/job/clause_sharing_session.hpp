@@ -1,11 +1,14 @@
 
 #pragma once
 
+#include "app/job_tree.hpp"
 #include "app/sat/data/clause_metadata.hpp"
+#include "app/sat/job/clause_sharing_actor.hpp"
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
 #include "app/sat/sharing/filter/clause_buffer_lbd_scrambler.hpp"
 #include "app/sat/sharing/filter/generic_clause_filter.hpp"
 #include "app/sat/sharing/store/static_clause_store.hpp"
+#include "comm/job_tree_snapshot.hpp"
 #include "comm/msgtags.h"
 #include "data/job_transfer.hpp"
 #include "util/logger.hpp"
@@ -22,7 +25,7 @@ class ClauseSharingSession {
 
 private:
     const Parameters& _params;
-    BaseSatJob* _job;
+    ClauseSharingActor* _job;
     HistoricClauseStorage* _cls_history;
     int _epoch;
     enum Stage {
@@ -45,13 +48,13 @@ private:
     SplitMix64Rng _rng;
 
 public:
-    ClauseSharingSession(const Parameters& params, BaseSatJob* job,
+    ClauseSharingSession(const Parameters& params, ClauseSharingActor* actor, const JobTreeSnapshot& snapshot,
             HistoricClauseStorage* clsHistory, int epoch, float compensationFactor) : 
-        _params(params), _job(job), _cls_history(clsHistory), _epoch(epoch),
+        _params(params), _job(actor), _cls_history(clsHistory), _epoch(epoch),
         _allreduce_clauses(
-            job->getJobTree(),
+            snapshot,
             // Base message 
-            JobMessage(_job->getId(), _job->getContextId(), _job->getRevision(), epoch, MSG_ALLREDUCE_CLAUSES),
+            JobMessage(_job->getActorJobId(), _job->getActorContextId(), _job->getClausesRevision(), epoch, MSG_ALLREDUCE_CLAUSES),
             // Neutral element
             InplaceClauseAggregation::neutralElem(),
             // Aggregator for local + incoming elements
@@ -62,9 +65,9 @@ public:
 
         if (_params.clauseFilterMode() == MALLOB_CLAUSE_FILTER_EXACT_DISTRIBUTED) {
             _allreduce_filter.emplace(
-                job->getJobTree(), 
+                snapshot, 
                 // Base message
-                JobMessage(_job->getId(), _job->getContextId(), _job->getRevision(), epoch, MSG_ALLREDUCE_FILTER),
+                JobMessage(_job->getActorJobId(), _job->getActorContextId(), _job->getClausesRevision(), epoch, MSG_ALLREDUCE_FILTER),
                 // Neutral element
                 std::vector<int>(ClauseMetadata::enabled() ? 2 : 0, 0),
                 // Aggregator for local + incoming elements
@@ -74,7 +77,7 @@ public:
             );
         }
 
-        LOG(V5_DEBG, "%s CS OPEN e=%i\n", _job->toStr(), _epoch);
+        LOG(V5_DEBG, "%s CS OPEN e=%i\n", _job->getLabel(), _epoch);
         _local_export_limit = _job->setSharingCompensationFactorAndUpdateExportLimit(compensationFactor);
         if (!_job->hasPreparedSharing()) _job->prepareSharing();
     }
@@ -94,9 +97,9 @@ public:
                 int successfulSolverId;
                 int numLits;
                 auto clauses = _job->getPreparedClauses(checksum, successfulSolverId, numLits);
-                LOG(V4_VVER, "%s CS produced cls size=%lu lits=%i/%i\n", _job->toStr(), clauses.size(), numLits, _local_export_limit);
+                LOG(V4_VVER, "%s CS produced cls size=%lu lits=%i/%i\n", _job->getLabel(), clauses.size(), numLits, _local_export_limit);
                 InplaceClauseAggregation::prepareRawBuffer(clauses,
-                    _job->getDesiredRevision(), numLits, 1, successfulSolverId);
+                    _job->getClausesMaxRevision(), numLits, 1, successfulSolverId);
                 return clauses;
             });
 
@@ -129,7 +132,7 @@ public:
                 // 3. Overwrite clause buffer within our aggregation buffer
                 aggregation.replaceClauses(modifiedClauseBuffer);
                 time = Timer::elapsedSeconds() - time;
-                LOG(V4_VVER, "%s scrambled LBDs in %.4fs\n", _job->toStr(), time);
+                LOG(V4_VVER, "%s scrambled LBDs in %.4fs\n", _job->getLabel(), time);
             }
             int winningSolverId = aggregation.successfulSolver();
             assert(winningSolverId >= -1 || log_return_false("Winning solver ID = %i\n", winningSolverId));
@@ -138,12 +141,12 @@ public:
 
             if (_allreduce_filter) {
                 // Initiate production of local filter element for 2nd all-reduction 
-                LOG(V5_DEBG, "%s CS filter\n", _job->toStr());
+                LOG(V5_DEBG, "%s CS filter\n", _job->getLabel());
                 _job->filterSharing(_epoch, _broadcast_clause_buffer);
                 _stage = PRODUCING_FILTER;
             } else {
                 // No distributed filtering: Sharing is done!
-                LOG(V5_DEBG, "%s CS digest w/o filter\n", _job->toStr());
+                LOG(V5_DEBG, "%s CS digest w/o filter\n", _job->getLabel());
                 _job->digestSharingWithoutFilter(_epoch, _broadcast_clause_buffer);
                 if (_cls_history) {
                     InplaceClauseAggregation(_broadcast_clause_buffer).stripToRawBuffer();
@@ -157,7 +160,7 @@ public:
 
             _allreduce_filter->produce([&]() {
                 auto f = _job->getLocalFilter(_epoch);
-                LOG(V5_DEBG, "%s CS produced filter, size %i\n", _job->toStr(), f.size());
+                LOG(V5_DEBG, "%s CS produced filter, size %i\n", _job->getLabel(), f.size());
                 return f;
             });
             _stage = AGGREGATING_FILTER;
@@ -168,7 +171,7 @@ public:
 
             // Extract and digest result
             auto filter = _allreduce_filter->extractResult();
-            LOG(V5_DEBG, "%s CS digest w/ filter, size %i\n", _job->toStr(), filter.size());
+            LOG(V5_DEBG, "%s CS digest w/ filter, size %i\n", _job->getLabel(), filter.size());
             _job->applyFilter(_epoch, filter);
             if (_cls_history) {
                 InplaceClauseAggregation(_broadcast_clause_buffer).stripToRawBuffer();
@@ -209,7 +212,7 @@ public:
     }
 
     ~ClauseSharingSession() {
-        LOG(V5_DEBG, "%s CS CLOSE e=%i\n", _job->toStr(), _epoch);
+        LOG(V5_DEBG, "%s CS CLOSE e=%i\n", _job->getLabel(), _epoch);
         // If not done producing, will send empty clause buffer upwards
         _allreduce_clauses.cancel();
         // If not done producing, will send empty filter upwards
@@ -268,7 +271,7 @@ private:
         time = Timer::elapsedSeconds() - time;
     
         LOG(V4_VVER, "%s : merged %i contribs rev=%i (inp=%i, t=%.4fs) ~> len=%i\n",
-            _job->toStr(), numAggregated, maxRevision, numInputLits, time, merged.size());
+            _job->getLabel(), numAggregated, maxRevision, numInputLits, time, merged.size());
         InplaceClauseAggregation::prepareRawBuffer(merged,
             maxRevision, numInputLits, numAggregated, successfulSolverId);
         return merged;

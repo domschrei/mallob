@@ -9,6 +9,7 @@
 
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/job/historic_clause_storage.hpp"
+#include "comm/job_tree_snapshot.hpp"
 #include "comm/msgtags.h"
 #include "util/logger.hpp"
 #include "comm/mympi.hpp"
@@ -251,7 +252,7 @@ void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg) {
     assert(compensationFactor >= 0.1 && compensationFactor <= 10);
 
     _current_session.reset(
-        new ClauseSharingSession(_params, _job, _cls_history.get(), _current_epoch, compensationFactor)
+        new ClauseSharingSession(_params, _job, _job->getJobTree().getSnapshot(), _cls_history.get(), _current_epoch, compensationFactor)
     );
     advanceCollective(_job, msg, MSG_INITIATE_CLAUSE_SHARING);
 }

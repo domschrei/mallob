@@ -4,6 +4,7 @@
 #include <time.h>
 
 #include "app/job.hpp"
+#include "comm/binary_tree_buffer_limit.hpp"
 #include "comm/mympi.hpp"
 #include "data/job_description.hpp"
 #include "util/logger.hpp"
@@ -24,7 +25,7 @@ SatProcessConfig::SatProcessConfig(const Parameters& params, const Job& job, int
     firstrev = job.getDesiredRevision();
     threads = job.getNumThreads();
     maxBroadcastedLitsPerCycle = params.maxSharingCompensationFactor() *
-    MyMpi::getBinaryTreeBufferLimit(job.getGlobalNumWorkers(), params.clauseBufferBaseSize(), params.clauseBufferLimitParam(), MyMpi::BufferQueryMode(params.clauseBufferLimitMode()));
+    BinaryTreeBufferLimit::getLimit(job.getGlobalNumWorkers(), params.clauseBufferBaseSize(), params.clauseBufferLimitParam(), BinaryTreeBufferLimit::BufferQueryMode(params.clauseBufferLimitMode()));
     this->recoveryIndex = recoveryIndex;
     nbPreviousBalancingEpochs = job.getLatestJobBalancingEpoch() - job.getDescription().getFirstBalancingEpoch() - 1;
     LOG(V5_DEBG, "#%i:%i : Job balancing epochs: %i (first: %i)\n", job.getId(), job.getIndex(),
