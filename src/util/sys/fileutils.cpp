@@ -30,14 +30,14 @@ bool FileUtils::isDirectory(const std::string& dirpath) {
 }
 
 bool FileUtils::create(const std::string& path) {
-    int fd = open(path.c_str(), O_CREAT);
+    int fd = open(path.c_str(), O_CREAT, S_IRWXU|S_IRWXG);
     if (fd == -1) return false;
     close(fd);
     return true;
 }
 
 bool FileUtils::createExclusively(const std::string& path) {
-    int fd = open(path.c_str(), O_CREAT|O_EXCL);
+    int fd = open(path.c_str(), O_CREAT|O_EXCL, S_IRWXU|S_IRWXG);
     if (fd == -1) return false;
     close(fd);
     return true;
