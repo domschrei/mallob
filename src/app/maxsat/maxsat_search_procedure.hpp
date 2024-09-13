@@ -211,7 +211,7 @@ public:
         // Formula is SATisfiable.
 
         // Retrieve the initial model and compute its cost as a first upper bound.
-        auto solution = std::move(result["result"]["solution"].get<std::vector<int>>());
+        auto solution = result["result"]["solution"].get<std::vector<int>>();
         if (_search_strat == NAIVE_REFINEMENT) {
             // remember *any* found solution to forbid it in the next step
             _last_found_solution = solution;
@@ -245,6 +245,9 @@ public:
 
     bool isSolvingAttemptObsolete() const {
         assert(_solving);
+        // With the "naive refinement" strategy, we don't encode bounds explicitly,
+        // so this search does not become obsolete with improved bounds per se.
+        if (_search_strat == NAIVE_REFINEMENT) return false;
         // We are solving for (cost <= _current_bound).
         // Case 1: We already know that this cost is impossible to achieve. 
         if (_current_bound < _instance.lowerBound) return true;
