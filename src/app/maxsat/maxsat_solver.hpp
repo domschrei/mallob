@@ -1,6 +1,9 @@
 
 #pragma once
 
+#include "app/maxsat/encoding/cardinality_encoding.hpp"
+#include "app/maxsat/encoding/generalized_totalizer.hpp"
+#include "app/maxsat/encoding/polynomial_watchdog.hpp"
 #include "app/maxsat/maxsat_instance.hpp"
 #include "app/maxsat/maxsat_search_procedure.hpp"
 #include "app/maxsat/parse/maxsat_reader.hpp"
@@ -21,6 +24,8 @@
 #include "util/sys/terminator.hpp"
 #include "util/params.hpp"
 
+void maxsat_collect_clause_for_shared_encoding(int lit, void* data);
+
 // A MaxSAT solving approach based on solution improving search, i.e., 
 // a sequence of SAT calls which impose varying restrictions on admissible
 // values of our objective function. This solver is meant to be executed
@@ -39,6 +44,10 @@ private:
     // holds all active streams of Mallob jobs and allows interacting with them
     std::list<std::unique_ptr<MaxSatSearchProcedure>> _searches;
 
+    bool _shared_encoder;
+    MaxSatSearchProcedure::EncodingStrategy _encoding_strat;
+    std::vector<int> _shared_lits_to_add;
+
 public:
     // Initializes the solver instance and parses the description's formula.
     MaxSatSolver(const Parameters& params, APIConnector& api, JobDescription& desc) :
@@ -46,6 +55,11 @@ public:
 
         LOG(V2_INFO, "Mallob client-side MaxSAT solver, by Jeremias Berg & Dominik Schreiber\n");
         parseFormula();
+
+        _shared_encoder = _params.maxSatSharedEncoder();
+        _encoding_strat = _params.maxSatCardinalityEncoding() == 0 ?
+            MaxSatSearchProcedure::GENERALIZED_TOTALIZER :
+            MaxSatSearchProcedure::DYNAMIC_POLYNOMIAL_WATCHDOG;
     }
 
     // Perform exact MaxSAT solving and return an according result.
@@ -74,28 +88,60 @@ public:
             }
             // Initialize search procedure
             _searches.emplace_back(initializeSearchProcedure(c, i, searchStrats.size()));
+            _searches.back()->setDescriptionLabelForNextCall("base-formula");
         }
         assert(!_searches.empty());
 
-        // Initial SAT call: just solve the hard clauses.
-        // We just use the first specified search strategy for this task.
-        MaxSatSearchProcedure* search = _searches.front().get();
-        // Only for this initial solve call, we don't need to enforce a bound first.
-        int resultCode = search->solveBlocking(); // solve and wait for a result
-        if (resultCode == RESULT_UNSAT) {
-            // UNSAT in the initial call
-            LOG(V2_INFO, "MAXSAT Problem is utterly unsatisfiable\n");
-            // Return an UNSAT result.
-            r.result = RESULT_UNSAT;
-            return r;
+        {
+            // Initial SAT call: just solve the hard clauses.
+            // We just use the first specified search strategy for this task.
+            MaxSatSearchProcedure* search = _searches.front().get();
+            // Only for this initial solve call, we don't need to enforce a bound first.
+            int resultCode = search->solveBlocking(); // solve and wait for a result
+            if (resultCode == RESULT_UNSAT) {
+                // UNSAT in the initial call
+                LOG(V2_INFO, "MAXSAT Problem is utterly unsatisfiable\n");
+                // Return an UNSAT result.
+                r.result = RESULT_UNSAT;
+                return r;
+            }
+            if (resultCode != RESULT_SAT) {
+                // UNKNOWN or something else - an error in this case since we didn't cancel the job
+                LOG(V1_WARN, "[WARN] MAXSAT Unexpected result code %i\n", resultCode);
+                return r;
+            }
+            // Initial formula is SATisfiable.
+            LOG(V2_INFO, "MAXSAT Initial model has cost %lu\n", _instance->bestCost);
         }
-        if (resultCode != RESULT_SAT) {
-            // UNKNOWN or something else - an error in this case since we didn't cancel the job
-            LOG(V1_WARN, "[WARN] MAXSAT Unexpected result code %i\n", resultCode);
-            return r;
+
+        // Run the initial formula revision through ALL searches, so that everyone has the same one.
+        for (auto& search : _searches) {
+            if (search == _searches.front()) continue;
+            search->solveNonblocking();
+            search->interrupt();
         }
-        // Initial formula is SATisfiable.
-        LOG(V2_INFO, "MAXSAT Initial model has cost %lu\n", _instance->bestCost);
+        for (auto& search : _searches) {
+            if (search == _searches.front()) continue;
+            while (search->isNonblockingSolvePending()) usleep(1000 * 10);
+            search->processNonblockingSolveResult();
+        }
+
+        if (_shared_encoder) {
+            // Initialize cardinality constraint encoder.
+            std::shared_ptr<CardinalityEncoding> encoder;
+            if (_encoding_strat == MaxSatSearchProcedure::DYNAMIC_POLYNOMIAL_WATCHDOG)
+                encoder.reset(new PolynomialWatchdog(_instance->nbVars, _instance->objective));
+            if (_encoding_strat == MaxSatSearchProcedure::GENERALIZED_TOTALIZER)
+                encoder.reset(new GeneralizedTotalizer(_instance->nbVars, _instance->objective));
+            encoder->encode(_instance->lowerBound, _instance->upperBound, [&](int lit) {_shared_lits_to_add.push_back(lit);});
+
+            // Add the encoder and its encoding to each search
+            for (auto& search : _searches) {
+                search->setSharedEncoder(encoder);
+                search->setDescriptionLabelForNextCall("initial-bounds");
+                search->appendLiterals(_shared_lits_to_add);
+            }
+        }
 
         // Main loop for solution improving search.
         while (!Terminator::isTerminating() && _instance->lowerBound < _instance->upperBound) {
@@ -131,12 +177,29 @@ public:
             if (!change) usleep(1000 * 10); // 10 ms
         }
 
+        // Make sure to stop all searches
+        while (true) {
+            bool allIdle = true;
+            for (auto& search : _searches) {
+                if (!search->isIdle()) {
+                    if (!search->isNonblockingSolvePending()) search->processNonblockingSolveResult();
+                    else search->interrupt();
+                }
+                if (!search->isIdle()) allIdle = false;
+            }
+            if (allIdle) break;
+            usleep(1000 * 10);
+        }
+        // Now clean up all searches
+        _searches.clear();
+
         // Did we actually find an optimal result?
         if (_instance->lowerBound >= _instance->upperBound) {
             // construct & return final job result
             r.result = RESULT_OPTIMUM_FOUND;
             r.setSolution(std::move(_instance->bestSolution));
         }
+
         return r;
     }
 
@@ -187,29 +250,29 @@ private:
 
     MaxSatSearchProcedure* initializeSearchProcedure(char c, int index, int nbTotal) {
         // Parse search strategy
-        MaxSatSearchProcedure::SearchStrategy strat;
+        MaxSatSearchProcedure::SearchStrategy searchStrat;
         std::string label = std::to_string(index) + ":";
         switch (c) {
         case 'd':
-            strat = MaxSatSearchProcedure::DECREASING;
+            searchStrat = MaxSatSearchProcedure::DECREASING;
             label += "DEC";
             break;
         case 'i':
-            strat = MaxSatSearchProcedure::INCREASING;
+            searchStrat = MaxSatSearchProcedure::INCREASING;
             label += "INC";
             break;
         case 'b':
-            strat = MaxSatSearchProcedure::BISECTION;
+            searchStrat = MaxSatSearchProcedure::BISECTION;
             label += "BIS";
             break;
         case 'r':
-            strat = MaxSatSearchProcedure::NAIVE_REFINEMENT;
+            searchStrat = MaxSatSearchProcedure::NAIVE_REFINEMENT;
             label += "NRE";
             break;
         }
         // Initialize search procedure
         auto p = new MaxSatSearchProcedure(_params, _api, _desc,
-            *_instance, strat, label);
+            *_instance, _encoding_strat, searchStrat, label);
         if (_params.maxSatCombSearch()) {
             p->enableCombSearch(index, nbTotal);
         }

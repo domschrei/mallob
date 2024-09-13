@@ -1,20 +1,20 @@
 
 #pragma once
 
+#include "app/maxsat/encoding/cardinality_encoding.hpp"
+#include "app/maxsat/encoding/generalized_totalizer.hpp"
+#include "app/maxsat/encoding/polynomial_watchdog.hpp"
 #include "app/maxsat/maxsat_instance.hpp"
 #include "app/maxsat/sat_job_stream.hpp"
 #include "app/sat/job/sat_constants.h"
 #include "rustsat.h"
 #include "util/logger.hpp"
 #include "util/sys/terminator.hpp"
+#include "util/params.hpp"
 
 #include <climits>
+#include <memory>
 #include <unistd.h>
-
-// C-style clause collector function for RustSAT C API
-void maxsat_collect_clause(int lit, void* solver);
-// C-style assumption collector function for RustSAT C API
-void maxsat_collect_assumption(int lit, void* solver);
 
 // Bundles an iterative solution improving procedure. There can be many at once.
 // A MaxSatSearchProcedure is associated 1:1 with a Mallob job stream (SatJobStream).
@@ -66,8 +66,8 @@ private:
     std::vector<int> _assumptions_to_persist_upon_sat;
 
     EncodingStrategy _encoding_strat;
-    RustSAT::DbGte* _cardi_gte {nullptr};
-    RustSAT::DynamicPolyWatchdog* _cardi_dpw {nullptr};
+    std::shared_ptr<CardinalityEncoding> _enc;
+    bool _shared_encoder;
 
     SearchStrategy _search_strat;
     const std::string _label;
@@ -79,40 +79,38 @@ private:
     int _comb_search_idx {-1};
     int _nb_comb_searchers;
 
+    std::string _desc_label_next_call;
+
 public:
     MaxSatSearchProcedure(const Parameters& params, APIConnector& api, JobDescription& desc,
-            MaxSatInstance& instance, SearchStrategy strategy, const std::string& label) :
+            MaxSatInstance& instance, EncodingStrategy encStrat, SearchStrategy searchStrat, const std::string& label) :
         _params(params), _api(api), _desc(desc), _instance(instance),
         _username("maxsat#" + std::to_string(_desc.getId())),
         _job_stream(_params, _api, _desc, _running_stream_id++, true),
         _lits_to_add(_instance.formulaData, _instance.formulaData+_instance.formulaSize),
-        _current_bound(_instance.upperBound), _search_strat(strategy), _label(label) {
+        _current_bound(_instance.upperBound), _encoding_strat(encStrat), _search_strat(searchStrat), _label(label) {
 
-        // Decide on the strategy to use for cardinality encoding.
-        _encoding_strat = DYNAMIC_POLYNOMIAL_WATCHDOG; // TODO when to use GTE?
-        if (_search_strat == NAIVE_REFINEMENT) _encoding_strat = NONE;
-        // Initialize cardinality constraint encoder.
-        if (_encoding_strat == DYNAMIC_POLYNOMIAL_WATCHDOG) {
-            _cardi_dpw = RustSAT::dpw_new();
-            // add each term of the objective function
-            for (auto& [factor, lit] : _instance.objective)
-                RustSAT::dpw_add(_cardi_dpw, lit, factor);
+        _shared_encoder = _params.maxSatSharedEncoder();
+        if (!_shared_encoder) {
+            if (encStrat == DYNAMIC_POLYNOMIAL_WATCHDOG)
+                _enc.reset(new PolynomialWatchdog(_instance.nbVars, _instance.objective));
+            if (encStrat == GENERALIZED_TOTALIZER)
+                _enc.reset(new GeneralizedTotalizer(_instance.nbVars, _instance.objective));
         }
-        if (_encoding_strat == GENERALIZED_TOTALIZER) {
-            _cardi_gte = RustSAT::gte_new();
-            // add each term of the objective function
-            for (auto& [factor, lit] : _instance.objective)
-                RustSAT::gte_add(_cardi_gte, lit, factor);
-        }
-    }
-    ~MaxSatSearchProcedure() {
-        if (_cardi_gte) RustSAT::gte_drop(_cardi_gte);
-        if (_cardi_dpw) RustSAT::dpw_drop(_cardi_dpw);
     }
 
     void enableCombSearch(int index, int size) {
         _comb_search_idx = index;
         _nb_comb_searchers = size;
+    }
+
+    void setSharedEncoder(const std::shared_ptr<CardinalityEncoding>& encoder) {
+        assert(_shared_encoder);
+        _enc = encoder;
+    }
+
+    void appendLiterals(const std::vector<int>& litsToAdd) {
+        _lits_to_add.insert(_lits_to_add.end(), litsToAdd.begin(), litsToAdd.end());
     }
 
     bool isIdle() const {
@@ -151,40 +149,34 @@ public:
         }
         if (_encoding_strat == NONE) return;
 
-
         LOG(V4_VVER, "MAXSAT %s Enforcing bound %lu ...\n", _label.c_str(), _current_bound);
         const int prevNbVars = _instance.nbVars;
         // Encode any cardinality constraints that are still missing for the upcoming call.
-        if (_encoding_strat == DYNAMIC_POLYNOMIAL_WATCHDOG) {
-            RustSAT::dpw_limit_range(_cardi_dpw, _instance.lowerBound, _instance.upperBound,
-                &maxsat_collect_clause, this);
-            RustSAT::dpw_encode_ub(_cardi_dpw, _current_bound, _current_bound,
-                &_instance.nbVars, &maxsat_collect_clause, this);
-            RustSAT::dpw_enforce_ub(_cardi_dpw, _current_bound, &maxsat_collect_assumption, this);
-            // If the result is SAT, we can add the 1st assumption permanently.
-            if (!_assumptions_to_set.empty())
-                _assumptions_to_persist_upon_sat.push_back(_assumptions_to_set.front());
+        
+        // If we use a shared encoder, the constraints are already encoded. Otherwise, encode them now.
+        if (!_shared_encoder) {
+            _enc->encode(_current_bound, _current_bound, [&](int lit) {appendLiteral(lit);});
         }
-        if (_encoding_strat == GENERALIZED_TOTALIZER) {
-            RustSAT::gte_encode_ub(_cardi_gte, _current_bound, _current_bound,
-                &_instance.nbVars, &maxsat_collect_clause, this);
-            RustSAT::gte_enforce_ub(_cardi_gte, _current_bound, &maxsat_collect_assumption, this);
-            // If the result is SAT, we can add all assumptions permanently.
-            _assumptions_to_persist_upon_sat = _assumptions_to_set;
-        }
+        // Enforce our current bound (assumptions only)
+        _enc->enforceBound(_current_bound, [&](int lit) {appendAssumption(lit);});
+        // If the result is SAT, we can add the 1st assumption permanently.
+        //if (!_assumptions_to_set.empty())
+        //    _assumptions_to_persist_upon_sat.push_back(_assumptions_to_set.front());
         LOG(V4_VVER, "MAXSAT %s Enforced bound %lu (%i new vars)\n", _label.c_str(), _current_bound, _instance.nbVars-prevNbVars);
     }
 
     void solveNonblocking() {
         LOG(V2_INFO, "MAXSAT %s Calling SAT with bound %lu (%i new lits, %i assumptions)\n",
             _label.c_str(), _current_bound, _lits_to_add.size(), _assumptions_to_set.size());
-        _job_stream.submitNext(_lits_to_add, _assumptions_to_set);
+        _job_stream.submitNext(_lits_to_add, _assumptions_to_set,
+            _desc_label_next_call);
         _lits_to_add.clear();
         _assumptions_to_set.clear();
+        _desc_label_next_call = "";
         _solving = true;
     }
     bool isNonblockingSolvePending() const {
-        return !Terminator::isTerminating() && _job_stream.isPending() && _solving;
+        return _job_stream.isPending() && _solving;
     }
     int processNonblockingSolveResult() {
         _solving = false;
@@ -270,6 +262,14 @@ public:
             LOG(V2_INFO, "MAXSAT %s Interrupt solving with bound %i\n", _label.c_str(), _current_bound);
     }
 
+    void setDescriptionLabelForNextCall(const std::string& label) {
+        _desc_label_next_call = label;
+    }
+
+    ~MaxSatSearchProcedure() {
+        _job_stream.finalize();
+    }
+
 private:
 
     // We use the best solution and now forbid the solver to select 
@@ -321,9 +321,7 @@ private:
     }
     // Append an assumption for the next SAT call.
     void appendAssumption(int lit) {
+        assert(std::abs(lit) <= _instance.nbVars);
         _assumptions_to_set.push_back(lit);
     }
-
-    friend void maxsat_collect_clause(int lit, void *solver);
-    friend void maxsat_collect_assumption(int lit, void *solver);
 };

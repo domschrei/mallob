@@ -41,17 +41,22 @@ public:
             _json_base["configuration"][key] = desc.getAppConfiguration().map.at(key);
     }
 
-    void submitNext(const std::vector<int>& newLiterals, const std::vector<int>& assumptions) {
+    void submitNext(const std::vector<int>& newLiterals, const std::vector<int>& assumptions,
+            const std::string& descriptionLabel = "") {
         assert(!_pending);
         if (_incremental && _json_base.contains("name")) {
             _json_base["precursor"] = _username + std::string(".") + _json_base["name"].get<std::string>();
         }
-        _json_base["name"] = _base_job_name + std::to_string(++_subjob_counter);
+        const int subjob = ++_subjob_counter;
+        _json_base["name"] = _base_job_name + std::to_string(subjob);
         _json_base["literals"] = newLiterals;
         _json_base["assumptions"] = assumptions;
         _pending = true;
         _interrupt_set = false;
         nlohmann::json copy(_json_base);
+        if (!descriptionLabel.empty()) {
+            copy["description-id"] = descriptionLabel;
+        }
         _api.submit(copy, [&](nlohmann::json& result) {
             _json_result = std::move(result);
             _pending = false;
@@ -69,22 +74,19 @@ public:
         };
         // In this particular case, the callback is never called.
         // Instead, the callback of the job's original submission is called.
-        _api.submit(jsonInterrupt, [&](nlohmann::json& result) {});
+        _api.submit(jsonInterrupt, [&](nlohmann::json& result) {assert(false);});
         return true;
     }
     void finalize() {
         assert(!_pending);
         if (!_incremental) return;
         if (!_json_base.contains("name")) return;
-        _json_base["precursor"] = _json_base["name"];
+        _json_base["precursor"] = _username + std::string(".") + _json_base["name"].get<std::string>();
         _json_base["name"] = _base_job_name + std::to_string(++_subjob_counter);
-        _pending = true;
         nlohmann::json copy(_json_base);
         copy["done"] = true;
-        _api.submit(copy, [&](nlohmann::json& result) {
-            _json_result = std::move(result);
-            _pending = false;
-        });
+        // The callback is never called.
+        _api.submit(copy, [&](nlohmann::json& result) {assert(false);});
     }
 
     bool isPending() const {
