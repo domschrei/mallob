@@ -110,7 +110,6 @@ public:
     virtual int getActorJobId() const override {return getId();}
     virtual int getActorContextId() const override {return getContextId();}
     virtual int getClausesRevision() const override {return getRevision();}
-    virtual int getClausesMaxRevision() const override {return getDesiredRevision();}
     virtual const char* getLabel() override {return toStr();}
     virtual int getNbSharingParticipants() const override {return getVolume();}
 };

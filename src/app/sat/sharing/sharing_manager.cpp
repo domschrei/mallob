@@ -7,6 +7,7 @@
 
 #include "app/sat/sharing/clause_logger.hpp"
 #include "app/sat/sharing/filter/clause_buffer_lbd_scrambler.hpp"
+#include "app/sat/sharing/filter/filter_vector_builder.hpp"
 #include "app/sat/sharing/filter/generic_clause_filter.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
 #include "app/sat/sharing/store/static_clause_store_by_lbd.hpp"
@@ -328,52 +329,14 @@ void SharingManager::returnClauses(std::vector<int>& clauseBuf) {
 std::vector<int> SharingManager::filterSharing(std::vector<int>& clauseBuf) {
 
 	auto reader = _clause_store->getBufferReader(clauseBuf.data(), clauseBuf.size());
-	
-	constexpr auto bitsPerElem = 8*sizeof(int);
-	int shift = bitsPerElem;
-	auto clause = reader.getNextIncomingClause();
-	int filterPos = -1 + (ClauseMetadata::enabled() ? 2 : 0);
-	int nbFiltered = 0;
-	int nbTotal = 0;
-
-	std::vector<int> result;
-
-	if (ClauseMetadata::enabled()) {
-		auto id = _id_alignment ? _id_alignment->contributeFirstClauseIdOfEpoch() : 0UL;
-		result.resize(sizeof(unsigned long) / sizeof(int));
-		memcpy(result.data(), &id, sizeof(unsigned long));
-	}
-
-	int filterSizeBeingLocked = -1;
-	while (clause.begin != nullptr) {
-		++nbTotal;
-
-		if (filterSizeBeingLocked != clause.size) {
-			if (filterSizeBeingLocked != -1) _clause_filter->releaseLock(filterSizeBeingLocked);
-			filterSizeBeingLocked = clause.size;
-			_clause_filter->acquireLock(filterSizeBeingLocked);
-		}
-
-		if (shift == bitsPerElem) {
-			++filterPos;
-			result.push_back(0);
-			shift = 0;
-		}
-		
-		if (!_clause_filter->admitSharing(clause, _internal_epoch)) {
-			// filtered!
-			auto bitFiltered = 1 << shift;
-			result[filterPos] |= bitFiltered;
-			++nbFiltered;
-		}
-		
-		++shift;
-		clause = reader.getNextIncomingClause();
-	}
-	if (filterSizeBeingLocked != -1) _clause_filter->releaseLock(filterSizeBeingLocked);
-
-	_logger.log(V4_VVER, "filtered %i/%i\n", nbFiltered, nbTotal);
-	return result;
+	auto id = _id_alignment ? _id_alignment->contributeFirstClauseIdOfEpoch() : 0UL;
+	return FilterVectorBuilder(id, _internal_epoch).build(reader, [&](Mallob::Clause& clause) {
+		return _clause_filter->admitSharing(clause, _internal_epoch);
+	}, [&](int len) {
+		_clause_filter->acquireLock(len);
+	}, [&](int len) {
+		_clause_filter->releaseLock(len);
+	});
 }
 
 void SharingManager::digestSharingWithFilter(std::vector<int>& clauseBuf, std::vector<int>* filter) {

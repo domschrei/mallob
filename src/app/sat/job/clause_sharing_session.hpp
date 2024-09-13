@@ -99,7 +99,7 @@ public:
                 auto clauses = _job->getPreparedClauses(checksum, successfulSolverId, numLits);
                 LOG(V4_VVER, "%s CS produced cls size=%lu lits=%i/%i\n", _job->getLabel(), clauses.size(), numLits, _local_export_limit);
                 InplaceClauseAggregation::prepareRawBuffer(clauses,
-                    _job->getClausesMaxRevision(), numLits, 1, successfulSolverId);
+                    _job->getClausesRevision(), numLits, 1, successfulSolverId);
                 return clauses;
             });
 

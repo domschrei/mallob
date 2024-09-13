@@ -33,7 +33,6 @@ public:
     virtual int getActorJobId() const = 0;
     virtual int getActorContextId() const = 0;
     virtual int getClausesRevision() const = 0;
-    virtual int getClausesMaxRevision() const = 0;
     virtual const char* getLabel() = 0;
     virtual int getNbSharingParticipants() const = 0;
 
