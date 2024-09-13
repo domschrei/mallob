@@ -37,9 +37,9 @@ private:
 
 public:
     ClauseSlot(std::atomic_int& globalBudget, int slotIdx, int clauseLength, int commonLbdOrZero) : 
-        _global_budget(globalBudget), 
         _slot_idx(slotIdx), _clause_length(clauseLength), _common_lbd_or_zero(commonLbdOrZero),
-        _effective_clause_length(hasIndividualLbds() ? _clause_length+1 : _clause_length), 
+        _effective_clause_length(hasIndividualLbds() ? _clause_length+1 : _clause_length),
+        _global_budget(globalBudget),
         _tmp_clause_data(_effective_clause_length), _tmp_clause(_tmp_clause_data.data(), _clause_length, _common_lbd_or_zero) {}
 
     void setLeftNeighbor(ClauseSlot* leftNeighbor) {

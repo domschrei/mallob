@@ -27,6 +27,7 @@ private:
 public:
     JobResult() {}
     JobResult(std::vector<uint8_t>&& packedData);
+    virtual ~JobResult() {}
 
     JobResult(JobResult&& other) {
         *this = std::move(other);

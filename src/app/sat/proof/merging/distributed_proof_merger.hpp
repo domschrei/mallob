@@ -83,7 +83,7 @@ private:
 public:
     DistributedProofMerger(const Parameters& params, MPI_Comm comm, int branchingFactor, 
         MergeSourceInterface<SerializedLratLine>* localSource, const std::string& outputFileAtZero) : 
-            _params(params), _log(Logger::getMainInstance().copy("DFM", ".proofmerge")),
+            _log(Logger::getMainInstance().copy("DFM", ".proofmerge")), _params(params),
             _comm(comm), _branching_factor(branchingFactor), _local_source(localSource) {
 
         int myRank = MyMpi::rank(comm);

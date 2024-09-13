@@ -19,7 +19,7 @@ struct SolverSetup {
 	int localId; 
 	std::string jobname;
 	std::string profilingBaseDir; 
-	int profilingLevel;
+	int profilingLevel {-1};
 
 
 	// Properties of the SAT problem

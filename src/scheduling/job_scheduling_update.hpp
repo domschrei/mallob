@@ -40,13 +40,16 @@ struct InactiveJobNode : public Serializable {
     }
 
     std::vector<uint8_t> serialize() const override {
-        std::vector<uint8_t> packed(sizeof(InactiveJobNode));    
-        memcpy(packed.data(), this, sizeof(InactiveJobNode));
+        std::vector<int> packedInts {rank, originalIndex, lastEpoch, status};
+        std::vector<uint8_t> packed((uint8_t*)packedInts.data(), (uint8_t*)(packedInts.data()+packedInts.size()));    
         return packed;
     }
 
     InactiveJobNode& deserialize(const std::vector<uint8_t>& packed) override {
-        memcpy(this, packed.data(), sizeof(InactiveJobNode));
+        rank = * (int*) (packed.data());
+        originalIndex = * (int*) (packed.data() + sizeof(int));
+        lastEpoch = * (int*) (packed.data() + 2*sizeof(int));
+        status = (Status) * (int*) (packed.data() + 3*sizeof(int));
         return *this;
     }
 };

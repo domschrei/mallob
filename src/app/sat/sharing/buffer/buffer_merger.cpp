@@ -23,8 +23,8 @@ BufferMerger::BufferMerger(int sizeLimit, int maxEffClauseLength, int maxFreeEff
     _slots_for_sum_of_length_and_lbd(slotsForSumOfLengthAndLbd), _use_checksum(useChecksum) {}
 
 BufferMerger::BufferMerger(StaticClauseStore<false>* mergeStore, int sizeLimit, int maxEffClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum) :
-    _merge_store(mergeStore), _size_limit(sizeLimit), _max_eff_clause_length(maxEffClauseLength),
-    _slots_for_sum_of_length_and_lbd(slotsForSumOfLengthAndLbd), _use_checksum(useChecksum) {}
+    _size_limit(sizeLimit), _max_eff_clause_length(maxEffClauseLength),
+    _slots_for_sum_of_length_and_lbd(slotsForSumOfLengthAndLbd), _use_checksum(useChecksum), _merge_store(mergeStore) {}
 
 void BufferMerger::add(BufferReader&& reader) {_readers.push_back(std::move(reader));}
 

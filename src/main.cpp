@@ -192,12 +192,12 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
         if (params.yield()) std::this_thread::yield();
         if (monoJobDone) {
             // Terminate all processes
-            MyMpi::isend(0, MSG_DO_EXIT, IntVec({0}));
+            Terminator::broadcastExitSignal();
         }
     }
 
     // Clean up
-    if (streamer != nullptr) delete streamer;
+    if (streamer) delete streamer;
     if (isWorker) delete worker;
     if (isClient) delete client;
 }

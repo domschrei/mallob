@@ -12,7 +12,7 @@ set(CMAKE_CXX_STANDARD 17)
 # Build-specific compile options
 
 set(BASE_LIBS Threads::Threads)
-set(MY_DEBUG_OPTIONS "-rdynamic -g -ggdb")
+set(MY_DEBUG_OPTIONS "-rdynamic -g -ggdb -Wall -Wno-sign-compare -Wno-unused-variable")
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
     add_definitions(-DMALLOB_VERSION=\"dbg\")
@@ -47,7 +47,7 @@ if(DEFINED MALLOB_TRUSTED_SUBPROCESSING)
 endif()
 
 if(MALLOB_USE_ASAN)
-    set(MY_DEBUG_OPTIONS "${MY_DEBUG_OPTIONS} -fno-omit-frame-pointer -fsanitize=address -static-libasan") 
+    set(MY_DEBUG_OPTIONS "${MY_DEBUG_OPTIONS} -fno-omit-frame-pointer -fsanitize=address,leak,undefined -static-libasan") 
 endif()
 
 if(MALLOB_USE_TBBMALLOC)

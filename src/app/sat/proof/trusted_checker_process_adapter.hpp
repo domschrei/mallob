@@ -50,8 +50,7 @@ private:
 
 public:
     TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars, bool checkModel) :
-            _logger(logger), _solver_id(solverId), _nb_vars(nbVars), _op_queue(1<<14),
-            _check_model(checkModel) {}
+            _logger(logger), _solver_id(solverId), _nb_vars(nbVars), _check_model(checkModel), _op_queue(1<<14) {}
 
     ~TrustedCheckerProcessAdapter() {
         if (!_f_directives) return;
