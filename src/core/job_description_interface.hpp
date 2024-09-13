@@ -76,7 +76,7 @@ public:
         auto it = waitingChildren.begin();
         while (it != waitingChildren.end()) {
             auto& [rank, rev, sendSkeletonOnly] = *it;
-            if (rev > job.getRevision()) {
+            if (rev > job.getRevision() || (!sendSkeletonOnly && job.getDescription().isRevisionIncomplete(rev))) {
                 ++it;
                 continue;
             }
