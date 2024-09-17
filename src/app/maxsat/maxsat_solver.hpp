@@ -48,6 +48,8 @@ private:
     MaxSatSearchProcedure::EncodingStrategy _encoding_strat;
     std::vector<int> _shared_lits_to_add;
 
+    float _start_time;
+
 public:
     // Initializes the solver instance and parses the description's formula.
     MaxSatSolver(const Parameters& params, APIConnector& api, JobDescription& desc) :
@@ -64,6 +66,8 @@ public:
 
     // Perform exact MaxSAT solving and return an according result.
     JobResult solve() {
+
+        _start_time = Timer::elapsedSeconds();
 
         // Template for the result we will return in the end
         JobResult r;
@@ -144,10 +148,11 @@ public:
         }
 
         // Main loop for solution improving search.
-        while (!Terminator::isTerminating() && _instance->lowerBound < _instance->upperBound) {
+        while (!isTimeoutHit() && _instance->lowerBound < _instance->upperBound && !_searches.empty()) {
             // Loop over all search strategies
             bool change = false;
-            for (auto& search : _searches) {
+            for (auto it = _searches.begin(); it != _searches.end(); ++it) {
+                auto& search = *it;
                 // In a solve call right now?
                 if (!search->isIdle()) {
                     if (!search->isNonblockingSolvePending()) {
@@ -178,7 +183,7 @@ public:
         }
 
         // Make sure to stop all searches
-        while (true) {
+        while (!isTimeoutHit()) {
             bool allIdle = true;
             for (auto& search : _searches) {
                 if (!search->isIdle()) {
@@ -277,5 +282,15 @@ private:
             p->enableCombSearch(index, nbTotal);
         }
         return p;
+    }
+
+    bool isTimeoutHit() const {
+        if (_params.timeLimit() > 0 && Timer::elapsedSeconds() >= _params.timeLimit())
+            return true;
+        if (_desc.getWallclockLimit() > 0 && (Timer::elapsedSeconds() - _start_time) >= _desc.getWallclockLimit())
+            return true;
+        if (Terminator::isTerminating())
+            return true;
+        return false;
     }
 };

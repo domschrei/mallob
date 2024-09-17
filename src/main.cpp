@@ -87,8 +87,9 @@ inline bool doTerminate(Parameters& params, int rank) {
     
     bool terminate = false;
     if (Terminator::isTerminating(/*fromMainThread=*/true)) terminate = true;
-    if (params.timeLimit() > 0 && Timer::elapsedSecondsCached() > params.timeLimit()) {
+    if (monoJobDone || (params.timeLimit() > 0 && Timer::elapsedSecondsCached() > params.timeLimit())) {
         terminate = true;
+        Terminator::broadcastExitSignal();
     }
     if (terminate) {
         if (rank == 0) {
@@ -190,10 +191,6 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
             break;
         if (params.sleepMicrosecs() > 0) usleep(params.sleepMicrosecs());
         if (params.yield()) std::this_thread::yield();
-        if (monoJobDone) {
-            // Terminate all processes
-            Terminator::broadcastExitSignal();
-        }
     }
 
     // Clean up

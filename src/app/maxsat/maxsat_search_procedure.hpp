@@ -181,8 +181,6 @@ public:
     int processNonblockingSolveResult() {
         _solving = false;
 
-        if (Terminator::isTerminating()) return RESULT_UNKNOWN;
-
         // Job is done - retrieve the result.
         auto result = std::move(_job_stream.getResult());
         const int resultCode = result["result"]["resultcode"];

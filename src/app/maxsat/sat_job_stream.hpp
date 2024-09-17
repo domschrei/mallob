@@ -79,7 +79,7 @@ public:
         return true;
     }
     void finalize() {
-        assert(!_pending);
+        if (_pending) return; // if a job is still running, then we must be terminating alltogether.
         if (!_incremental) return;
         if (!_json_base.contains("name")) return;
         _json_base["precursor"] = _username + std::string(".") + _json_base["name"].get<std::string>();
