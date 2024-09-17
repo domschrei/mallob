@@ -121,10 +121,21 @@ public:
 
         size_t myLb = _instance.lowerBound;
         size_t myUb = _instance.upperBound;
-        if (_comb_search_idx >= 0 && (myUb-myLb) >= _nb_comb_searchers) {
-            myLb = _instance.lowerBound + (_comb_search_idx * (_instance.upperBound-_instance.lowerBound)) / _nb_comb_searchers;
-            myUb = _instance.lowerBound + ((_comb_search_idx+1) * (_instance.upperBound-_instance.lowerBound)) / _nb_comb_searchers;
-            LOG(V3_VERB, "MAXSAT %s Comb search in [%lu,%lu]\n", _label.c_str(), myLb, myUb);
+        if (_comb_search_idx >= 0) {
+            // Comb search: first identify the general interval to search
+            const size_t newMyLb = myLb + _params.maxSatCombMinRatio() * (myUb-myLb);
+            const size_t newMyUb = myLb + _params.maxSatCombMaxRatio() * (myUb-myLb);
+            // Is the interval still large enough for comb search?
+            if ((newMyUb-newMyLb) >= _nb_comb_searchers) {
+                // -- yes
+                myLb = newMyLb;
+                myUb = newMyUb;
+                assert(myLb <= myUb);
+                // now identify the particular sub-interval THIS procedure should search
+                myLb = _instance.lowerBound + (_comb_search_idx * (_instance.upperBound-_instance.lowerBound)) / _nb_comb_searchers;
+                myUb = _instance.lowerBound + ((_comb_search_idx+1) * (_instance.upperBound-_instance.lowerBound)) / _nb_comb_searchers;
+                LOG(V3_VERB, "MAXSAT %s Comb search in [%lu,%lu]\n", _label.c_str(), myLb, myUb);
+            }
         }
 
         switch (_search_strat) {
