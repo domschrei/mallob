@@ -34,7 +34,8 @@ public:
             {"user", _username},
             {"incremental", incremental},
             {"priority", 1},
-            {"application", "SAT"}
+            {"application", "SAT"},
+            {"group-id", "common-logic"}
         };
         _json_base["files"] = std::vector<std::string>();
         for (auto key : {"__NV", "__NC", "__NO"})

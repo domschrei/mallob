@@ -15,6 +15,7 @@
 #include <utility>
 #include <vector>
 
+#include "comm/group_comm.hpp"
 #include "util/hashing.hpp"
 #include "util/sys/threading.hpp"
 #include "util/params.hpp"
@@ -34,7 +35,7 @@ struct IntPairHasher;
 
 typedef std::function<void(JobRequest& req, int tag, bool left, int dest)> EmitDirectedJobRequestCallback;
 
-class Job {
+class Job : public AppMessageListener {
 
 // Protected fields, may be accessed by your application code.
 protected:
@@ -220,6 +221,8 @@ private:
     std::optional<JobRequest> _request_to_multiply_left;
     std::optional<JobRequest> _request_to_multiply_right;
 
+    GroupComm _group_comm;
+
 // Public methods.
 public:
 
@@ -253,7 +256,7 @@ public:
 
     // Initiate a communication with other nodes in the associated job tree.
     void communicate(); // outgoing
-    void communicate(int source, int mpiTag, JobMessage& msg); // incoming (+ outgoing)
+    void communicate(int source, int mpiTag, JobMessage& msg) override; // incoming (+ outgoing)
 
     // Interrupt the execution of solvers and withdraw the associated solvers 
     // and the job's payload. Only leaves behind the job's meta data.
@@ -287,7 +290,7 @@ public:
     }
     bool hasCommitment() const {return _commitment.has_value();}
     const JobRequest& getCommitment() const {assert(hasCommitment()); return _commitment.value();}
-    int getId() const {return _id;};
+    int getId() const override {return _id;};
     int getIndex() const {return _job_tree.getIndex();};
     int getRevision() const {return !hasDescription() ? -1 : getDescription().getRevision();};
     int getMaxConsecutiveRevision() const {return !hasDescription() ? -1 : getDescription().getMaxConsecutiveRevision();};
@@ -325,6 +328,8 @@ public:
     robin_hood::unordered_node_set<ChildWaitingForDescription, ChildWaitingForDescriptionHasher>& getChildrenWaitingForDescription() {
         return _children_waiting_for_description;
     }
+    void setGroupComm(GroupComm&& comm) {_group_comm = std::move(comm);}
+    const GroupComm& getGroupComm() const {return _group_comm;}
 
     void updateJobBalancingEpoch(int latestEpoch) {
         _latest_balancing_epoch = std::max(_latest_balancing_epoch, latestEpoch);

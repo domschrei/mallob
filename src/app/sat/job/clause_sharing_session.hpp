@@ -47,6 +47,9 @@ private:
 
     SplitMix64Rng _rng;
 
+    bool _has_clause_listener {false};
+    std::function<void(std::vector<int>&)> _clause_listener;
+
 public:
     ClauseSharingSession(const Parameters& params, ClauseSharingActor* actor, const JobTreeSnapshot& snapshot,
             HistoricClauseStorage* clsHistory, int epoch, float compensationFactor) : 
@@ -85,6 +88,11 @@ public:
     void pruneChild(int rank) {
         _allreduce_clauses.pruneChild(rank);
         if (_allreduce_filter) _allreduce_filter->pruneChild(rank);
+    }
+
+    void setAdditionalClauseListener(std::function<void(std::vector<int>&)> cb) {
+        _has_clause_listener = true;
+        _clause_listener = cb;
     }
 
     void advanceSharing() {
@@ -147,7 +155,7 @@ public:
             } else {
                 // No distributed filtering: Sharing is done!
                 LOG(V5_DEBG, "%s CS digest w/o filter\n", _job->getLabel());
-                _job->digestSharingWithoutFilter(_epoch, _broadcast_clause_buffer);
+                _job->digestSharingWithoutFilter(_epoch, _broadcast_clause_buffer, false);
                 if (_cls_history) {
                     InplaceClauseAggregation(_broadcast_clause_buffer).stripToRawBuffer();
                     _cls_history->importSharing(_epoch, std::move(_broadcast_clause_buffer));
@@ -173,11 +181,15 @@ public:
             auto filter = _allreduce_filter->extractResult();
             LOG(V5_DEBG, "%s CS digest w/ filter, size %i\n", _job->getLabel(), filter.size());
             _job->applyFilter(_epoch, filter);
-            if (_cls_history) {
+            if (_cls_history || _has_clause_listener) {
                 InplaceClauseAggregation(_broadcast_clause_buffer).stripToRawBuffer();
                 applyGlobalFilter(filter, _broadcast_clause_buffer);
-                // Add clause batch to history
-                _cls_history->importSharing(_epoch, std::move(_broadcast_clause_buffer));
+                if (_cls_history) {
+                    // Add clause batch to history
+                    std::vector<int> copy(_broadcast_clause_buffer);
+                    _cls_history->importSharing(_epoch, std::move(copy));
+                }
+                if (_has_clause_listener) _clause_listener(_broadcast_clause_buffer);
             }
 
             // Conclude this sharing epoch
@@ -187,6 +199,7 @@ public:
 
     bool advanceClauseAggregation(int source, int mpiTag, JobMessage& msg) {
         bool success = false;
+        if (msg.contextIdOfDestination != _job->getActorContextId()) return success;
         if (msg.tag == MSG_ALLREDUCE_CLAUSES && _allreduce_clauses.isValid()) {
             success = _allreduce_clauses.receive(source, mpiTag, msg);
             advanceSharing();
@@ -195,6 +208,7 @@ public:
     }
     bool advanceFilterAggregation(int source, int mpiTag, JobMessage& msg) {
         bool success = false;
+        if (msg.contextIdOfDestination != _job->getActorContextId()) return success;
         if (msg.tag == MSG_ALLREDUCE_FILTER && _allreduce_filter->isValid()) {
             success = _allreduce_filter->receive(source, mpiTag, msg);
             advanceSharing();

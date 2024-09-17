@@ -210,7 +210,7 @@ struct JobMessage : public Serializable {
     ctx_id_t contextIdOfSender {0};
     ctx_id_t contextIdOfDestination {0};
     int revision;
-    int tag;
+    int tag {0};
     int epoch;
     bool returnedToSender = false;
     Checksum checksum;

@@ -84,7 +84,7 @@ public:
     virtual bool hasFilteredSharing(int epoch) override;
     virtual std::vector<int> getLocalFilter(int epoch) override;
     virtual void applyFilter(int epoch, std::vector<int>& filter) override;
-    virtual void digestSharingWithoutFilter(int epoch, std::vector<int>& clauses) override;
+    virtual void digestSharingWithoutFilter(int epoch, std::vector<int>& clauses, bool stateless) override;
     
     virtual void returnClauses(std::vector<int>& clauses) override;
     virtual void digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauses) override;

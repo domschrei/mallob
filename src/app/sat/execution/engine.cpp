@@ -453,9 +453,9 @@ void SatEngine::digestSharingWithFilter(std::vector<int>& clauseBuf, std::vector
 	_sharing_manager->digestSharingWithFilter(clauseBuf, &filter);
 }
 
-void SatEngine::digestSharingWithoutFilter(std::vector<int>& clauseBuf) {
+void SatEngine::digestSharingWithoutFilter(std::vector<int>& clauseBuf, bool stateless) {
 	if (isCleanedUp()) return;
-	_sharing_manager->digestSharingWithoutFilter(clauseBuf);
+	_sharing_manager->digestSharingWithoutFilter(clauseBuf, stateless);
 }
 
 void SatEngine::returnClauses(std::vector<int>& clauseBuf) {

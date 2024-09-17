@@ -236,9 +236,10 @@ void SatProcessAdapter::applyFilter(int epoch, const std::vector<int>& filter) {
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
 
-void SatProcessAdapter::digestClausesWithoutFilter(int epoch, const std::vector<int>& clauses) {
+void SatProcessAdapter::digestClausesWithoutFilter(int epoch, const std::vector<int>& clauses, bool stateless) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
-    _pipe->writeData(clauses, {epoch}, CLAUSE_PIPE_DIGEST_IMPORT_WITHOUT_FILTER);
+    _pipe->writeData(clauses, {epoch, stateless?1:0},
+        CLAUSE_PIPE_DIGEST_IMPORT_WITHOUT_FILTER);
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
 

@@ -76,14 +76,14 @@ public:
     }
 
 private:
-    void doImportClauses(SatEngine& engine, std::vector<int>& incomingClauses, std::vector<int>* filterOrNull, int revision, int epoch) {
+    void doImportClauses(SatEngine& engine, std::vector<int>& incomingClauses, std::vector<int>* filterOrNull, int revision, int epoch, bool stateless = false) {
         LOGGER(_log, V5_DEBG, "DO import clauses rev=%i\n", revision);
         // Write imported clauses from shared memory into vector
         if (revision >= 0) engine.setClauseBufferRevision(revision);
         if (filterOrNull) {
             engine.digestSharingWithFilter(incomingClauses, *filterOrNull);
         } else {
-            engine.digestSharingWithoutFilter(incomingClauses);
+            engine.digestSharingWithoutFilter(incomingClauses, stateless);
         }
         engine.addSharingEpoch(epoch);
         engine.syncDeterministicSolvingAndCheckForLocalWinner();
@@ -211,11 +211,12 @@ private:
 
                 } else if (c == CLAUSE_PIPE_DIGEST_IMPORT_WITHOUT_FILTER) {
                     incomingClauses = pipe.readData(c);
+                    bool stateless = popLast(incomingClauses)==1;
                     int epoch = popLast(incomingClauses);
                     InplaceClauseAggregation agg(incomingClauses);
                     int bufferRevision = agg.maxRevision();
                     agg.stripToRawBuffer();
-                    doImportClauses(engine, incomingClauses, nullptr, bufferRevision, epoch);
+                    doImportClauses(engine, incomingClauses, nullptr, bufferRevision, epoch, stateless);
 
                 } else if (c == CLAUSE_PIPE_RETURN_CLAUSES) {
                     LOGGER(_log, V5_DEBG, "DO return clauses\n");

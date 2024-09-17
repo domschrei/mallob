@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "app/sat/data/clause.hpp"
+#include "app/sat/job/inter_job_clause_sharer.hpp"
 #include "util/params.hpp"
 #include "util/hashing.hpp"
 #include "data/job_transfer.hpp"
@@ -31,6 +32,9 @@ private:
 
     std::unique_ptr<ClauseSharingSession> _current_session;
     std::list<std::unique_ptr<ClauseSharingSession>> _cancelled_sessions;
+
+    std::unique_ptr<InterJobClauseSharer> _cross_job_clause_sharer;
+    std::unique_ptr<ClauseSharingSession> _cross_sharing_session;
 
     int _current_epoch = 0;
     float _time_of_last_epoch_initiation = 0;

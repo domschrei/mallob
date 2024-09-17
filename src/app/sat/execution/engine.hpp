@@ -75,7 +75,7 @@ public:
 	std::vector<int> filterSharing(std::vector<int>& clauseBuf);
 	void addSharingEpoch(int epoch);
 	void digestSharingWithFilter(std::vector<int>& clauseBuf, std::vector<int>& filter);
-	void digestSharingWithoutFilter(std::vector<int>& clauseBuf);
+	void digestSharingWithoutFilter(std::vector<int>& clauseBuf, bool stateless);
 	void returnClauses(std::vector<int>& clauseBuf);
 	void digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauseBuf);
 

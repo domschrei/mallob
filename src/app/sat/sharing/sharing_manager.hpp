@@ -108,7 +108,7 @@ public:
 	std::vector<int> prepareSharing(int totalLiteralLimit, int& outSuccessfulSolverId, int& outNbLits);
 	std::vector<int> filterSharing(std::vector<int>& clauseBuf);
 	void digestSharingWithFilter(std::vector<int>& clauseBuf, std::vector<int>* filter);
-	void digestSharingWithoutFilter(std::vector<int>& clauseBuf);
+	void digestSharingWithoutFilter(std::vector<int>& clauseBuf, bool stateless);
 	void returnClauses(std::vector<int>& clauseBuf);
 	void digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauseBuf);
 	void collectGarbageInFilter();

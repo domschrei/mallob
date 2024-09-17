@@ -57,18 +57,14 @@ public:
 
         LOG(V5_DEBG, "APPMSG RECV %lu <~ %lu [%i]\n", msg.contextIdOfDestination, msg.contextIdOfSender, source);
 
-        auto it = _app_msg_table.find({msg.jobId, msg.contextIdOfDestination});
+        auto it = _app_msg_table.find(msg.contextIdOfDestination);
         if (it == _app_msg_table.end()) {
             LOG(V1_WARN, "[WARN] Job message for unregistered job #%i\n", msg.jobId);
             msg.returnToSender(source, mpiTag);
             return;
         }
-        Job& job = *it->second;
-        if (job.getIndex() != msg.treeIndexOfDestination) {
-            LOG(V1_WARN, "[WARN] Job message for #%i:%i ; local context is #%i:%i. Still delivering\n", 
-                msg.jobId, msg.treeIndexOfDestination, msg.jobId, job.getIndex());
-        }
-        it->second->communicate(source, mpiTag, msg);
+        AppMessageListener& l = *it->second;
+        l.communicate(source, mpiTag, msg);
     }
 
     void setCommitted() {

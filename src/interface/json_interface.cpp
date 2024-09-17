@@ -201,6 +201,12 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
         job->setJobDescriptionId(descId);
         LOGGER(_logger, V4_VVER, "MAXSAT Job #%i rev. %i: set job description ID %i\n", id, job->getRevision(), descId);
     } else job->setJobDescriptionId(0);
+    if (json.contains("group-id")) {
+        const std::string label = json["user"].get<std::string>() + "." + json["group-id"].get<std::string>();
+        const int groupId = _job_desc_id_allocator.getId(label);
+        job->setGroupId(groupId);
+        LOGGER(_logger, V4_VVER, "MAXSAT Job #%i rev. %i: set group ID %i\n", id, job->getRevision(), groupId);
+    }
     job->setArrival(arrival);
     std::vector<std::string> files = json.contains("files") ? 
         json["files"].get<std::vector<std::string>>() : std::vector<std::string>();

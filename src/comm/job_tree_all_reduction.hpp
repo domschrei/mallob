@@ -124,8 +124,7 @@ public:
 
         assert(tag == MSG_JOB_TREE_REDUCTION || tag == MSG_JOB_TREE_BROADCAST);
 
-        bool accept = msg.jobId == _base_msg.jobId 
-                    && msg.epoch == _base_msg.epoch 
+        bool accept = msg.epoch == _base_msg.epoch 
                     //&& msg.revision == _base_msg.revision 
                     && msg.tag == _base_msg.tag;
         if (!accept) return false;
@@ -269,5 +268,4 @@ private:
             MyMpi::isend(_expected_child_ranks.second, MSG_JOB_TREE_BROADCAST, _base_msg);
         }
     }
-
 };

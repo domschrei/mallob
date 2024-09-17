@@ -144,7 +144,7 @@ public:
     bool hasFilteredClauses(int epoch);
     std::vector<int> getLocalFilter(int epoch);
     void applyFilter(int epoch, const std::vector<int>& filter);
-    void digestClausesWithoutFilter(int epoch, const std::vector<int>& clauses);
+    void digestClausesWithoutFilter(int epoch, const std::vector<int>& clauses, bool stateless);
 
     void returnClauses(const std::vector<int>& clauses);
     void digestHistoricClauses(int epochBegin, int epochEnd, const std::vector<int>& clauses);

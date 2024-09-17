@@ -5,6 +5,7 @@
 #include <atomic>
 #include <list>
 
+#include "comm/group_comm_builder.hpp"
 #include "core/scheduling_manager.hpp"
 #include "data/worker_sysstate.hpp"
 #include "util/periodic_event.hpp"
@@ -34,6 +35,7 @@ private:
     JobRegistry _job_registry;
     RandomizedRoutingTree _routing_tree;
     SchedulingManager _sched_man;
+    GroupCommBuilder _group_comm_builder;
 
     long long _iteration = 0;
     PeriodicEvent<1000> _periodic_stats_check;

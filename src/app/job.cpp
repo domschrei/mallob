@@ -16,7 +16,7 @@ Job::Job(const Parameters& params, const JobSetup& setup, AppMessageTable& appMs
             _incremental(setup.incremental),
             _time_of_arrival(Timer::elapsedSeconds()), 
             _state(INACTIVE),
-            _app_msg_subscription(appMsgTable, setup.jobId, this),
+            _app_msg_subscription(appMsgTable, this),
             _job_tree(setup.commSize, setup.worldRank, _app_msg_subscription.getContextId(), 
                 setup.jobId, params.useDormantChildren()), 
             _comm(_id, _job_tree, params.jobCommUpdatePeriod()) {

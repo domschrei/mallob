@@ -15,35 +15,33 @@
 
 class Job; // fwd declaration
 
-struct JobIdContextIdHasher {
-    size_t operator()(const std::pair<int, ctx_id_t>& obj) const {
-        size_t val = 314'159UL;
-        hash_combine(val, obj.first);
-        hash_combine(val, obj.second);
-        return val;
-    }
+class AppMessageListener {
+public:
+    virtual int getId() const = 0;
+    virtual void communicate(int source, int mpiTag, JobMessage& msg) = 0;
 };
-typedef tsl::robin_map<std::pair<int, ctx_id_t>, Job*, JobIdContextIdHasher> AppMessageTable;
+
+typedef tsl::robin_map<ctx_id_t, AppMessageListener*> AppMessageTable;
 
 class AppMessageSubscription {
 
 private:
     AppMessageTable& _table;
-    int _job_id;
+    int _id;
     ctx_id_t _ctx_id;
 
     static ctx_id_t _running_ctx_id;
 
 public:
-    AppMessageSubscription(AppMessageTable& table, int jobId, Job* job) : 
-            _table(table), _job_id(jobId) {
+    AppMessageSubscription(AppMessageTable& table, AppMessageListener* listener) :
+            _table(table), _id(listener->getId()) {
 
         // ID must be unique among all MPI processes
         // and also unique within this process
         _ctx_id = _running_ctx_id * MyMpi::size(MPI_COMM_WORLD) + MyMpi::rank(MPI_COMM_WORLD);
         _running_ctx_id++;
 
-        registerJobInTable(job);
+        registerListenerInTable(listener);
     }
 
     ctx_id_t getContextId() const {
@@ -51,21 +49,19 @@ public:
     }
 
     void destroy() {
-        unregisterJobFromTable();
+        unregisterListenerFromTable();
     }
 
     ~AppMessageSubscription() {
-        unregisterJobFromTable();
+        unregisterListenerFromTable();
     }
 
 private:
-    void registerJobInTable(Job* job) {
-        std::pair<int, ctx_id_t> pair(_job_id, _ctx_id);
-        _table[pair] = job;
+    void registerListenerInTable(AppMessageListener* l) {
+        _table[_ctx_id] = l;
     }
 
-    void unregisterJobFromTable() {
-        std::pair<int, ctx_id_t> pair(_job_id, _ctx_id);
-        _table.erase(pair);
+    void unregisterListenerFromTable() {
+        _table.erase(_ctx_id);
     }
 };

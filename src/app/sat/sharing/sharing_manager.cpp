@@ -352,7 +352,8 @@ void SharingManager::digestSharingWithFilter(std::vector<int>& clauseBuf, std::v
 		auto& solver = _solvers[i];
 		if (!solver || !_solver_stats[i]) continue; // solver was cleaned up
 		if (!solver->isClauseSharingEnabled()) continue;
-		importingSolvers.emplace_back(solver.get(), _solver_stats[i], _id_alignment.get());
+		assert(i == solver->getLocalId());
+		importingSolvers.emplace_back(solver->getGlobalId(), solver->getLocalId(), _solver_stats[i], _id_alignment.get());
 	}
 
 	_last_num_cls_to_import = 0;
@@ -422,7 +423,7 @@ void SharingManager::digestSharingWithFilter(std::vector<int>& clauseBuf, std::v
 		for (auto& slv : importingSolvers) {
 			BufferReader reader = _clause_store->getBufferReader(clauseBuf.data(), clauseBuf.size());
 			reader.setFilterBitset(slv.filter);
-			slv.solver->addLearnedClauses(reader, _imported_revision);
+			_solvers[slv.localId]->addLearnedClauses(reader, _imported_revision);
 		}
 	}
 	
@@ -457,8 +458,10 @@ void SharingManager::applyFilterToBuffer(std::vector<int>& clauseBuf, std::vecto
 	_last_num_admitted_cls_to_import += filtering.getNumAdmittedClauses();
 }
 
-void SharingManager::digestSharingWithoutFilter(std::vector<int>& clauseBuf) {
+void SharingManager::digestSharingWithoutFilter(std::vector<int>& clauseBuf, bool stateless) {
+	bool sharingOpOngoing = _sharing_op_ongoing;
 	digestSharingWithFilter(clauseBuf, nullptr);
+	if (stateless) _sharing_op_ongoing = sharingOpOngoing;
 }
 
 void SharingManager::digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauseBuf) {
@@ -471,7 +474,7 @@ void SharingManager::digestHistoricClauses(int epochBegin, int epochEnd, std::ve
 		// More than half of the historic epochs are missing: do import.
 		_logger.log(V2_INFO, "Import historic cls [%i,%i) (missing %i/%i)\n", 
 			epochBegin, epochEnd, numUnknown, epochEnd-epochBegin);
-		digestSharingWithoutFilter(clauseBuf);
+		digestSharingWithoutFilter(clauseBuf, true);
 		for (int e = epochBegin; e < epochEnd; e++) addSharingEpoch(e);
 	}
 }
