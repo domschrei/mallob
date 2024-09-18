@@ -89,7 +89,6 @@ void Parameters::expand() {
         loadFactor.set(1); // full load factor
         maxDemand.set(0); // no limit of max. demand
         balancingPeriod.set(0.01); // low balancing delay to immediately get full demand
-        numJobs.set(1); // one job to process
         
         // Disable detection of unresponsive nodes since printing a huge model
         // may lead to such timeouts. 

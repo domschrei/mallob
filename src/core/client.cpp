@@ -584,10 +584,10 @@ void Client::handleJobDone(MessageHandle& handle) {
     JobStatistics stats = Serializable::get<JobStatistics>(handle.getRecvData());
 
     if (!_active_jobs.count(stats.jobId)) return; // user-side terminated in the meantime?
-
+    JobDescription& desc = *_active_jobs[stats.jobId];
+    if (desc.getRevision() > stats.revision) return; // revision obsolete!
     LOG_ADD_SRC(V4_VVER, "Will receive job result for job #%i rev. %i", handle.source, stats.jobId, stats.revision);
     MyMpi::isendCopy(stats.successfulRank, MSG_QUERY_JOB_RESULT, handle.getRecvData());
-    JobDescription& desc = *_active_jobs[stats.jobId];
     desc.getStatistics().usedWallclockSeconds = stats.usedWallclockSeconds;
     desc.getStatistics().usedCpuSeconds = stats.usedCpuSeconds;
     desc.getStatistics().latencyOf1stVolumeUpdate = stats.latencyOf1stVolumeUpdate;
@@ -601,9 +601,10 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     int revision = jobResult.revision;
 
     if (!_active_jobs.count(jobId)) return; // user-side terminated in the meantime?
+    JobDescription& desc = *_active_jobs.at(jobId);
+    if (desc.getRevision() > revision) return; // revision obsolete!
 
     LOG_ADD_SRC(V4_VVER, "Received result of job #%i rev. %i, code: %i", handle.source, jobId, revision, resultCode);
-    JobDescription& desc = *_active_jobs.at(jobId);
     desc.getStatistics().processingTime = Timer::elapsedSeconds() - desc.getStatistics().timeOfScheduling;
 
     std::string resultCodeString = "UNKNOWN";

@@ -366,9 +366,11 @@ bool ForkedSatJob::canHandleIncompleteRevision(int rev) {
 ForkedSatJob::~ForkedSatJob() {
     LOG(V5_DEBG, "%s : enter FSJ destructor\n", toStr());
 
-    if (_initialized) _solver->setSolvingState(SolvingStates::ABORTING);
-    if (_destruction.valid()) _destruction.get();
-    if (_initialized) _solver = NULL;
+    if (_initialized) {
+        startDestructThreadIfNecessary();
+        if (_destruction.valid()) _destruction.get();
+        _solver.reset();
+    }
 
     // Wait for destruction of old solvers
     for (auto& future : _old_solver_destructions) {

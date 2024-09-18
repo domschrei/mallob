@@ -84,8 +84,9 @@ private:
 
     volatile bool _running = false;
     volatile bool _initialized = false;
-    volatile bool _terminate = false;
     volatile bool _bg_writer_running = false;
+    std::atomic_bool _terminate {false};
+    volatile bool _destructed {false};
 
     std::future<void> _bg_initializer;
     std::future<void> _bg_writer;
@@ -112,10 +113,7 @@ private:
     Mutex _state_mutex;
     unsigned long _sum_of_revision_sizes {0};
 
-    bool _solution_in_preparation = false;
-    int _solution_revision_in_preparation = -1;
     JobResult _solution;
-    std::future<void> _solution_prepare_future;
 
 public:
     SatProcessAdapter(Parameters&& params, SatProcessConfig&& config, ForkedSatJob* job, 
@@ -161,7 +159,6 @@ public:
 private:
     void doInitialize();
     void doWriteRevisions();
-    void doPrepareSolution();
     void doTerminateInitializedProcess();
     
     void applySolvingState();

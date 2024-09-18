@@ -84,6 +84,14 @@ public:
         return snapshot;
     }
 
+    std::string toStr() const {
+        std::string summary;
+        for (size_t i = 0; i < _ranks.size(); i++) {
+            summary += std::to_string(_ranks[i]) + "," + std::to_string(_ctx_ids[i]) + " ";
+        }
+        return summary;
+    }
+
     virtual std::vector<uint8_t> serialize() const override {
         std::vector<uint8_t> packed(_ranks.size() * (sizeof(int) + sizeof(ctx_id_t)));
         memcpy(packed.data(), _ranks.data(), _ranks.size() * sizeof(int));

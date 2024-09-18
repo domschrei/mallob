@@ -44,6 +44,8 @@ private:
     std::vector<std::vector<int>> _read_formulae;
     std::vector<std::vector<int>> _read_assumptions;
 
+    bool _has_solution {false};
+
 public:
     SatProcess(const Parameters& params, const SatProcessConfig& config, Logger& log) 
         : _params(params), _config(config), _log(log) {
@@ -108,7 +110,8 @@ private:
 
         // Wait until everything is prepared for the solver to begin
         while (!_hsm->doBegin) doSleep();
-        
+        _hsm->didBegin = true;
+
         // Terminate directly?
         if (checkTerminate(engine, false)) return;
 
@@ -124,10 +127,6 @@ private:
         // Start solver threads
         engine.solve();
         
-        std::vector<int> solutionVec;
-        std::string solutionShmemId = "";
-        char* solutionShmem;
-        int solutionShmemSize = 0;
         int lastSolvedRevision = -1;
 
         int exitStatus = 0;
@@ -283,7 +282,7 @@ private:
 
             // Check solved state
             int resultCode = engine.solveLoop();
-            if (resultCode >= 0 && !_hsm->hasSolution) {
+            if (resultCode >= 0 && !_has_solution) {
                 // Solution found!
                 auto& result = engine.getResult();
                 result.id = _config.jobid;
@@ -293,24 +292,18 @@ private:
                 }
                 assert(result.revision == _last_imported_revision);
 
-                solutionVec = result.extractSolution();
-                _hsm->solutionRevision = result.revision;
-                _hsm->winningInstance = result.winningInstanceId;
-                _hsm->globalStartOfSuccessEpoch = result.globalStartOfSuccessEpoch;
-                LOGGER(_log, V5_DEBG, "DO write solution (winning instance: %i)\n", _hsm->winningInstance);
-                _hsm->result = SatResult(result.result);
-                size_t* solutionSize = (size_t*) SharedMemory::create(_shmem_id + ".solutionsize." + std::to_string(_hsm->solutionRevision), sizeof(size_t));
-                *solutionSize = solutionVec.size();
-                // Write solution
-                if (*solutionSize > 0) {
-                    solutionShmemId = _shmem_id + ".solution." + std::to_string(_hsm->solutionRevision);
-                    solutionShmemSize =  *solutionSize*sizeof(int);
-                    solutionShmem = (char*) SharedMemory::create(solutionShmemId, solutionShmemSize);
-                    memcpy(solutionShmem, solutionVec.data(), solutionShmemSize);
-                }
-                lastSolvedRevision = result.revision;
+                std::vector<int> solutionVec = result.extractSolution();
+                int solutionRevision = result.revision;
+                int winningInstance = result.winningInstanceId;
+                unsigned long globalStartOfSuccessEpoch = result.globalStartOfSuccessEpoch;
+
+                LOGGER(_log, V5_DEBG, "DO write solution (winning instance: %i)\n", winningInstance);
+                pipe.writeData(solutionVec, {
+                    solutionRevision, winningInstance, ((int*) &globalStartOfSuccessEpoch)[0], ((int*) &globalStartOfSuccessEpoch)[1], result.result
+                }, CLAUSE_PIPE_SOLUTION);
+                lastSolvedRevision = solutionRevision;
                 LOGGER(_log, V5_DEBG, "DONE write solution\n");
-                _hsm->hasSolution = true;
+                _has_solution = true;
             }
         }
 
@@ -427,7 +420,7 @@ private:
             if (checkTerminate(engine, false)) return;
             _last_imported_revision++;
             readFormulaAndAssumptionsFromSharedMem(engine, _last_imported_revision);
-            _hsm->hasSolution = false;
+            _has_solution = false;
         }
     }
 

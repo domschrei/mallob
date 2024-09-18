@@ -152,6 +152,7 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
         auto comm = Serializable::get<GroupComm>(bytesOfComm);
         comm.localize(_job->getActorContextId());
         JobTreeSnapshot snapshot = comm.getTreeSnapshot();
+        LOG(V4_VVER, "CROSSCOMM init: %s\n", comm.toStr().c_str());
         _cross_sharing_session.reset(
             new ClauseSharingSession(_params, _cross_job_clause_sharer.get(), snapshot, nullptr, 0, 1)
         );
@@ -166,6 +167,7 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
         return;
     }
     if (msg.tag == MSG_BROADCAST_CLAUSES_STATELESS) {
+        if (_job->getState() != ACTIVE) return;
         _job->getJobTree().sendToAnyChildren(msg);
         _job->digestSharingWithoutFilter(0, msg.payload, true);
         return;

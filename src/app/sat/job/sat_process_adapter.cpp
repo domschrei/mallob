@@ -114,8 +114,6 @@ void SatProcessAdapter::doInitialize() {
         TmpDir::get()+_shmem_id+".fromsub.pipe",
         &_hsm->childReadyToWrite));
 
-    if (_terminate) return;
-
     // Create SAT solving child process
     Subprocess subproc(_params, "mallob_sat_process");
     pid_t res = subproc.start();
@@ -161,7 +159,7 @@ void SatProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
 }
 void SatProcessAdapter::applySolvingState() {
     assert(_initialized && _child_pid != -1);
-    if (_state == SolvingStates::ABORTING && _hsm != nullptr) {
+    if (_state == SolvingStates::ABORTING) {
         doTerminateInitializedProcess();
     }
     if (_state == SolvingStates::SUSPENDED || _state == SolvingStates::STANDBY) {
@@ -173,10 +171,12 @@ void SatProcessAdapter::applySolvingState() {
 }
 
 void SatProcessAdapter::doTerminateInitializedProcess() {
-    //Fork::terminate(_child_pid); // Terminate child process by signal.
-    _hsm->doTerminate = true; // Kindly ask child process to terminate.
-    _hsm->doBegin = true; // Let child process know termination even if it waits for first revision
+    if (!_running || _hsm->doTerminate) return; // running?
+    while (!_initialized) usleep(10*1000); // wait until initialized
     Process::resume(_child_pid); // Continue (resume) process.
+    while (!_hsm->didBegin) usleep(10*1000); // wait until child is actually in the main loop
+    _hsm->doTerminate = true; // Kindly ask child process to terminate.
+    _pipe.reset(); // clean up bidirectional pipe
 }
 
 void SatProcessAdapter::collectClauses(int maxSize) {
@@ -302,6 +302,21 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
         _filters_by_epoch[epoch] = std::move(filter);
     } else if (c == CLAUSE_PIPE_DIGEST_IMPORT) {
         _last_admitted_nb_lits = _pipe->readData(c).front();
+    } else if (c == CLAUSE_PIPE_SOLUTION) {
+        std::vector<int> solution = _pipe->readData(c);
+        const int resultCode = solution.back(); solution.pop_back();
+        const unsigned long globalStartOfSuccessEpoch = * (unsigned long*) (solution.data()+solution.size()-2);
+        solution.pop_back(); solution.pop_back();
+        const int winningInstance = solution.back(); solution.pop_back();
+        const int solutionRevision = solution.back(); solution.pop_back();
+        if (solutionRevision == _desired_revision) {
+            _solution.result = resultCode;
+            _solution.revision = solutionRevision;
+            _solution.winningInstanceId = winningInstance;
+            _solution.globalStartOfSuccessEpoch = globalStartOfSuccessEpoch;
+            _solution.setSolutionToSerialize(solution.empty() ? nullptr : solution.data(), solution.size());
+            return FOUND_RESULT;
+        }
     }
 
     if (_published_revision < _written_revision) {
@@ -309,55 +324,7 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
         _pipe->writeData({_desired_revision, _published_revision}, CLAUSE_PIPE_START_NEXT_REVISION);
     }
 
-    // Solution preparation just ended?
-    if (!_solution_in_preparation && _solution_prepare_future.valid()) {
-        _solution_prepare_future.get();
-    }
-    if (_hsm->hasSolution && _hsm->solutionRevision == _desired_revision) {
-        // Preparation still going on?
-        if (_solution_in_preparation) return NORMAL;
-        // Correct solution prepared successfully?
-        if (_solution_revision_in_preparation == _desired_revision)
-            return FOUND_RESULT;
-        // No preparation going on yet?
-        if (!_solution_prepare_future.valid()) {
-            // Begin preparation of solution
-            _solution_revision_in_preparation = _desired_revision;
-            _solution_in_preparation = true;
-            if (_sum_of_revision_sizes <= 500'000) {
-                // Small job: Extract solution immediately in this thread.
-                doPrepareSolution();
-                return FOUND_RESULT;
-            }
-            // Large job: Extract solution concurrently
-            _solution_prepare_future = ProcessWideThreadPool::get().addTask([&]() {
-                doPrepareSolution();
-            });
-        }
-    } 
     return NORMAL;
-}
-
-void SatProcessAdapter::doPrepareSolution() {
-
-    int rev = _solution_revision_in_preparation;
-    size_t* solutionSize = (size_t*) SharedMemory::access(_shmem_id + ".solutionsize." + std::to_string(rev), sizeof(size_t));
-    if (*solutionSize == 0) {
-        _solution.result = _hsm->result;
-        _solution.winningInstanceId = _hsm->winningInstance;
-        _solution.globalStartOfSuccessEpoch = _hsm->globalStartOfSuccessEpoch;
-        _solution.setSolutionToSerialize(nullptr, 0);
-        _solution_in_preparation = false;
-        return;
-    } 
-
-    // ACCESS the existing shared memory segment to the solution vector
-    int* shmemSolution = (int*) SharedMemory::access(_shmem_id + ".solution." + std::to_string(rev), *solutionSize*sizeof(int));
-    
-    _solution.result = _hsm->result;
-    _solution.winningInstanceId = _hsm->winningInstance;
-    _solution.setSolutionToSerialize(shmemSolution, *solutionSize);
-    _solution_in_preparation = false;
 }
 
 JobResult& SatProcessAdapter::getSolution() {
@@ -365,13 +332,7 @@ JobResult& SatProcessAdapter::getSolution() {
 }
 
 void SatProcessAdapter::waitUntilChildExited() {
-    if (!_running) return;
-    // Wait until initialized
-    while (!_initialized) {
-        usleep(100*1000); // 0.1s
-    }
     doTerminateInitializedProcess(); // make sure that the process receives a terminate signal
-    _pipe.reset(); // clean up bidirectional pipe
     while (true) {
         // Check if child exited
         auto lock = _state_mutex.getLock();
@@ -445,30 +406,19 @@ SatProcessAdapter::~SatProcessAdapter() {
 }
 
 void SatProcessAdapter::freeSharedMemory() {
-    
-    if (!_terminate) {
-        _terminate = true;
 
-        // wait for termination of background threads
-        if (_bg_initializer.valid()) _bg_initializer.get();
-        if (_bg_writer.valid()) _bg_writer.get();
-        if (_solution_prepare_future.valid()) _solution_prepare_future.get();
+    bool terminated = false;
+    if (!_terminate.compare_exchange_strong(terminated, true)) {
+        while (!_destructed) usleep(1000*10);
+        return;
     }
 
-    // Clean up found solutions in shared memory
-    if (_hsm != nullptr) {
-        for (int rev = 0; rev <= _written_revision; rev++) {
-            size_t* solSize = (size_t*) SharedMemory::access(_shmem_id + ".solutionsize." + std::to_string(rev), sizeof(size_t));
-            if (solSize != nullptr) {
-                char* solution = (char*) SharedMemory::access(_shmem_id + ".solution." + std::to_string(rev), *solSize * sizeof(int));
-                SharedMemory::free(_shmem_id + ".solution." + std::to_string(rev), solution, *solSize * sizeof(int));
-                SharedMemory::free(_shmem_id + ".solutionsize." + std::to_string(rev), (char*)solSize, sizeof(size_t));
-            }
-        }
-        _hsm = nullptr;
-    }
+    // wait for termination of background threads
+    if (_bg_initializer.valid()) _bg_initializer.get();
+    if (_bg_writer.valid()) _bg_writer.get();
 
     // Clean up shared memory objects created here
+    _hsm = nullptr;
     {
         auto lock = _mtx_preregistered_shmem.getLock();
         for (auto& [id, obj] : _preregistered_shmem) _shmem.insert(std::move(obj));
@@ -486,4 +436,5 @@ void SatProcessAdapter::freeSharedMemory() {
         }
     }
     _shmem.clear();
+    _destructed = true;
 }

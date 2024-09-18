@@ -178,9 +178,13 @@ public:
                     change = true;
                 }
             }
+            if (_instance->lowerBound >= _instance->upperBound)
+                break;
             // Wait a bit if nothing changed
             if (!change) usleep(1000 * 10); // 10 ms
         }
+
+        LOG(V4_VVER, "MAXSAT trying to stop all searches ...\n");
 
         // Make sure to stop all searches
         while (!isTimeoutHit()) {
@@ -203,6 +207,7 @@ public:
             // construct & return final job result
             r.result = RESULT_OPTIMUM_FOUND;
             r.setSolution(std::move(_instance->bestSolution));
+            LOG(V2_INFO, "MAXSAT OPTIMAL COST %lu\n", _instance->bestCost);
         }
 
         return r;

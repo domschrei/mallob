@@ -52,7 +52,7 @@ public:
         hashStream << std::hex << paramsHash;
         _hash_string = std::string(hashStream.str());
         // Create empty file
-        _base_filename = TmpDir::get() + "/mallob.colleaguerecognition." + _hash_string + ".";
+        _base_filename = TmpDir::get() + "/edu.kit.iti.mallob.colleaguerecognition." + _hash_string + ".";
         std::ofstream output(_base_filename + std::to_string(MyMpi::rank(_parent_comm)));
     }
 
@@ -70,7 +70,7 @@ public:
             auto files = FileUtils::glob(_base_filename + "*");
             int nbWorkersThisMachine = files.size();
             static constexpr ctll::fixed_string REGEX_COLLEAGUE_RECOGNITION = 
-                ctll::fixed_string{ "/mallob\\.colleaguerecognition\\.([0-9a-f]+)\\.([0-9\\.]+)" };
+                ctll::fixed_string{ "/edu\\.kit\\.iti\\.mallob\\.colleaguerecognition\\.([0-9a-f]+)\\.([0-9\\.]+)" };
             int minRank = MyMpi::size(MPI_COMM_WORLD);
             for (auto& file : files) {
                 auto match = ctre::search<REGEX_COLLEAGUE_RECOGNITION>(file);

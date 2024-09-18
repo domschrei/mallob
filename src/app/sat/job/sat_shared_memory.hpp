@@ -23,15 +23,11 @@ struct SatSharedMemory {
     bool childReadyToWrite {false};
 
     // Signals child->parent
+    bool didBegin {false};
     bool didTerminate {false};
     
     // State alerts child->parent
     bool isInitialized {false};
-    bool hasSolution {false};
-    SatResult result {UNKNOWN};
-    int solutionRevision {-1};
-    int winningInstance {-1};
-    unsigned long globalStartOfSuccessEpoch;
     
     // Clause buffers: parent->child
     int importBufferRevision {-1};

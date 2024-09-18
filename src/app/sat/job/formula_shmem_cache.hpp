@@ -6,6 +6,7 @@
 #include "util/sys/fileutils.hpp"
 #include "util/sys/shared_memory.hpp"
 #include "util/sys/threading.hpp"
+#include "util/sys/tmpdir.hpp"
 #include <cstring>
 #include <string>
 #include <unistd.h>
@@ -13,12 +14,17 @@
 class FormulaSharedMemoryCache {
 
 private:
-    struct Entry {
-        std::string shmemPath;
-        const int* data;
-        size_t size;
-        std::vector<std::string> lockFilePaths;
+    struct ProcessWideOwnedShmemTable {
+        Mutex mtx;
+        tsl::robin_map<int, std::pair<void*, size_t>> table;
+        ~ProcessWideOwnedShmemTable() {
+            auto lock = mtx.getLock();
+            for (auto it : table) {
+                SharedMemory::free(getShmemId(it.first), (char*)it.second.first, it.second.second);
+            }
+        }
     };
+    static ProcessWideOwnedShmemTable procWideOwnedShmemTable;
 
 public:
     void* createOrAccess(int descriptionId, const std::string& userLabel, size_t size, const void* data, std::string& outShmemId, bool& outCreated) {
@@ -29,7 +35,7 @@ public:
         FileBasedLock lock("jobdesc", descriptionId);
 
         // Add a reference to the shared memory segment
-        bool ok = FileUtils::create(getRefFilename(descriptionId, userLabel));
+        bool ok = FileUtils::createExclusively(getRefFilename(descriptionId, userLabel));
         assert(ok);
 
         // Try to create the shared memory segment
@@ -38,7 +44,11 @@ public:
         bool mustWaitUntilInitialized = false;
         if (shmem) {
             // successfully created - initialize while releasing the general lock.
-            // Instead, we acquire a file specifically representing the initialization process.
+            {
+                auto lock = procWideOwnedShmemTable.mtx.getLock();
+                procWideOwnedShmemTable.table[descriptionId] = {shmem, size};
+            }
+            // acquire a file specifically representing the initialization process.
             outCreated = true;
             FileBasedLock createLock("jobdesccreate", descriptionId);
             lock.unlock();
@@ -94,17 +104,25 @@ public:
         FileBasedLock lock("jobdesc", descriptionId);
 
         // Remove your own lock file
-        int res = FileUtils::rmf(getRefFilename(descriptionId, userLabel));
+        int res = FileUtils::rm(getRefFilename(descriptionId, userLabel));
         assert(res == 0);
-
-        auto lockFiles = FileUtils::glob(getRefFilename(descriptionId, "*"));
         LOG(V5_DEBG, "CACHE dropped %i via %s\n", descriptionId, userLabel.c_str());
-        if (lockFiles.empty()) {
-            // reference count became zero: delete
-            LOG(V5_DEBG, "CACHE delete %i\n", descriptionId);
-            // FIXME leads to crashes if enabled.
-            //SharedMemory::free(getShmemId(descriptionId), (char*) data, size);
-            FileUtils::rmf("/dev/shm" + getShmemId(descriptionId));
+
+        tryDelete(descriptionId);
+    }
+
+    static void collectGarbage() {
+        LOG(V5_DEBG, "CACHE gc\n");
+
+        auto shmemTable = [&]() {
+            auto lock = procWideOwnedShmemTable.mtx.getLock();
+            return procWideOwnedShmemTable.table;
+        }();
+        for (auto [descriptionId, val] : shmemTable) {
+
+            // Acquire RAII lock to manipulate this job description's shared memory exclusively
+            FileBasedLock lock("jobdesc", descriptionId);
+            tryDelete(descriptionId);
         }
     }
 
@@ -113,6 +131,25 @@ public:
     }
 
 private:
+    static bool tryDelete(int descriptionId) {
+        auto lockFiles = FileUtils::glob(getRefFilename(descriptionId, "*"));
+        if (!lockFiles.empty()) return false;
+        // reference count became zero: delete
+        LOG(V5_DEBG, "CACHE delete %i\n", descriptionId);
+        void* data;
+        size_t size;
+        {
+            auto lock = procWideOwnedShmemTable.mtx.getLock();
+            auto it = procWideOwnedShmemTable.table.find(descriptionId);
+            if (it == procWideOwnedShmemTable.table.end()) return false;
+            data = it.value().first;
+            size = it.value().second;
+            procWideOwnedShmemTable.table.erase(it);
+        }
+        SharedMemory::free(getShmemId(descriptionId), (char*) data, size);
+        return true;
+    }
+
     struct FileBasedLock {
         std::string label;
         int id;
@@ -122,7 +159,9 @@ private:
         }
         void lock() {
             if (label.empty() || locked) return;
-            while (!FileUtils::createExclusively(opLockFile(label, id)))
+            auto file = opLockFile(label, id);
+            LOG(V5_DEBG, "CACHE acquire lock %s\n", file.c_str());
+            while (!FileUtils::createExclusively(file))
                 usleep(3000);
             locked = true;
         }
@@ -135,7 +174,7 @@ private:
         }
         void unlock() {
             if (label.empty() || !locked) return;
-            int res = FileUtils::rmf(opLockFile(label, id));
+            int res = FileUtils::rm(opLockFile(label, id));
             assert(res == 0);
             locked = false;
         }
@@ -143,12 +182,12 @@ private:
             unlock();
         }
         static std::string opLockFile(const std::string& label, int id) {
-            return "/dev/shm/edu.kit.iti.mallob." + label + "-lock." + std::to_string(id);
+            return TmpDir::get() + "/edu.kit.iti.mallob." + label + "-lock." + std::to_string(id);
         }
     };
 
-    std::string getRefFilename(int descriptionId, const std::string& userLabel) const {
-        return "/dev/shm/" + userLabel + ".jobdesc-ref." + std::to_string(descriptionId);
+    static std::string getRefFilename(int descriptionId, const std::string& userLabel) {
+        return TmpDir::get() + "/" + userLabel + ".jobdesc-ref." + std::to_string(descriptionId);
     }
 };
 

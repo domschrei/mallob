@@ -99,7 +99,8 @@ public:
             for (auto& [rank, ctxId, groupId] : list.list) {
                 int jobId = _ctx_id_to_job_id.at(ctxId);
                 GroupComm comm(_group_id_to_comm.at(groupId), ctxId);
-                _job_registry.get(jobId).setGroupComm(std::move(comm));
+                if (_job_registry.has(jobId))
+                    _job_registry.get(jobId).setGroupComm(std::move(comm));
             }
             _ctx_id_to_job_id.clear();
             _relevant_group_ids.clear();

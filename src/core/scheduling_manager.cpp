@@ -715,7 +715,7 @@ void SchedulingManager::handleJobResultFound(MessageHandle& handle) {
     if (!has(jobId) || !get(jobId).getJobTree().isRoot()) {
         obsolete = true;
         LOG(V1_WARN, "[WARN] Invalid adressee for job result of #%i\n", jobId);
-    } else if (get(jobId).getRevision() > revision || get(jobId).isRevisionSolved(revision)) {
+    } else if (get(jobId).getRevision() > revision || get(jobId).getState() != ACTIVE) {
         obsolete = true;
         LOG_ADD_SRC(V4_VVER, "Discard obsolete result for job #%i rev. %i", handle.source, jobId, revision);
     }
@@ -1008,7 +1008,7 @@ void SchedulingManager::propagateVolumeUpdate(Job& job, int volume, int balancin
         } else {
             if (index < volume 
                     && tree.getBalancingEpochOfLastRequests() < balancingEpoch) {
-                if (_job_registry.hasDormantRoot()) {
+                if (!tree.isRoot() && _job_registry.hasDormantRoot()) {
                     // Becoming an inner node is not acceptable
                     // because then the dormant root cannot be restarted seamlessly
                     LOG(V4_VVER, "%s cannot grow due to dormant root\n", job.toStr());

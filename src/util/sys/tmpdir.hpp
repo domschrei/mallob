@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include "util/sys/fileutils.hpp"
 #include <filesystem>
 #include <string>
 #include <cstdlib>
@@ -25,5 +26,10 @@ public:
     }
     static std::string get() {
         return _tmpdir;
+    }
+    static void wipe() {
+        for (const std::string& file : FileUtils::glob(get() + "/edu.kit.iti.mallob.*")) {
+            FileUtils::rm(file);
+        }
     }
 };

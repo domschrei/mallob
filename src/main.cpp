@@ -307,9 +307,7 @@ int main(int argc, char *argv[]) {
         for (auto file : FileUtils::glob("/dev/shm/edu.kit.iti.mallob.*")) {
             doRemove(file);
         }
-        for (auto file : FileUtils::glob(TmpDir::get() + "/mallob.*")) {
-            doRemove(file);
-        }
+        TmpDir::wipe();
 
         // Wait for all processes to have cleaned up before proceeding
         // (creating new files which shouldn't be cleaned up!)
@@ -373,6 +371,7 @@ int main(int argc, char *argv[]) {
     // Exit properly
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Finalize();
+    TmpDir::wipe();
     LOG(V2_INFO, "Exiting happily\n");
     Process::doExit(0);
 }
