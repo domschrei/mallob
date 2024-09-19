@@ -86,7 +86,6 @@ void Parameters::expand() {
         numWorkers.set(-1); // all workers
         loadFactor.set(1); // full load factor
         maxDemand.set(0); // no limit of max. demand
-        balancingPeriod.set(0.01); // low balancing delay to immediately get full demand
     }
 }
 
