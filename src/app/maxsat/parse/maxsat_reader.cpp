@@ -113,6 +113,7 @@ bool MaxSatReader::read(JobDescription& desc) {
 	desc.beginInitialization(desc.getRevision());
 
 	if (!parseInternally(desc)) return false;
+	assert(getNbClauses() > 0);
 
 	// Store # variables and # clauses in app config
 	std::vector<std::pair<int, std::string>> fields {

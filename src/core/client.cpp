@@ -722,10 +722,6 @@ void Client::finishJob(int jobId, bool hasIncrementalSuccessors) {
     introduceNextJob();
 }
 
-void Client::handleExit(MessageHandle& handle) {
-    Terminator::setTerminating();
-}
-
 Client::~Client() {
 
     for (auto& fut : _done_job_futures) fut.get();

@@ -161,7 +161,6 @@ private:
     void handleAbort(MessageHandle& handle);
     void handleSendJobResult(MessageHandle& handle);
     void handleClientFinished(MessageHandle& handle);
-    void handleExit(MessageHandle& handle);
 
     int getMaxNumParallelJobs();
     void introduceNextJob();
