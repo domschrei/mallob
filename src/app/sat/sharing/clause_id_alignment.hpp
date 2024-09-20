@@ -137,7 +137,7 @@ public:
 
 		// take the offset that belongs to the clause's epoch!
 		int epoch = getEpochOfUnalignedSelfClause(clauseId);
-		assert(epoch >= 0 && epoch < _id_offsets_per_solver[localSolverId].size() 
+		assert((epoch >= 0 && epoch < _id_offsets_per_solver[localSolverId].size())
 			|| log_return_false("Invalid epoch %i found for clause ID %lu\n", epoch, clauseId));
 		auto offset = _id_offsets_per_solver[localSolverId][epoch];
 		unsigned long alignedClauseId = clauseId + offset;
@@ -156,7 +156,7 @@ public:
 		int localSolverId = getProducingLocalSolverIndex(clauseId);
 
 		int epoch = getEpochOfAlignedSelfClause(clauseId);
-		assert(epoch >= 0 && epoch < _id_offsets_per_solver[localSolverId].size() 
+		assert((epoch >= 0 && epoch < _id_offsets_per_solver[localSolverId].size())
 			|| log_return_false("Invalid epoch %i found for clause ID %lu\n", epoch, clauseId));
 		auto offset = _id_offsets_per_solver[localSolverId][epoch];
 		unsigned long unalignedClauseId = clauseId - offset;

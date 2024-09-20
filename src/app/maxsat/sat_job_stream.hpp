@@ -45,6 +45,8 @@ public:
     void submitNext(const std::vector<int>& newLiterals, const std::vector<int>& assumptions,
             const std::string& descriptionLabel = "") {
         assert(!_pending);
+        assert(newLiterals.empty() || newLiterals.front() != 0);
+        assert(newLiterals.empty() || newLiterals.back() == 0);
         if (_incremental && _json_base.contains("name")) {
             _json_base["precursor"] = _username + std::string(".") + _json_base["name"].get<std::string>();
         }

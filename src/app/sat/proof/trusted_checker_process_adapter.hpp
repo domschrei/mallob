@@ -64,7 +64,7 @@ public:
 
     void init(const u8* formulaSignature) {
 
-        auto basePath = TmpDir::get() + "/mallob." + std::to_string(Proc::getPid()) + ".slv"
+        auto basePath = TmpDir::getGeneralTmpDir() + "/mallob." + std::to_string(Proc::getPid()) + ".slv"
             + std::to_string(_solver_id) + ".ts.";
         _path_directives = basePath + "directives";
         _path_feedback = basePath + "feedback";

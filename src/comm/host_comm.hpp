@@ -52,7 +52,7 @@ public:
         hashStream << std::hex << paramsHash;
         _hash_string = std::string(hashStream.str());
         // Create empty file
-        _base_filename = TmpDir::get() + "/edu.kit.iti.mallob.colleaguerecognition." + _hash_string + ".";
+        _base_filename = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob.colleaguerecognition." + _hash_string + ".";
         std::ofstream output(_base_filename + std::to_string(MyMpi::rank(_parent_comm)));
     }
 

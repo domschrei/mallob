@@ -218,7 +218,7 @@ bool SatReader::read(JobDescription& desc) {
 	}
 
 	if (_params.satPreprocessor.isSet()) {
-		std::ofstream ofs(TmpDir::get() + "/preprocessed-header.pipe", std::ofstream::app);
+		std::ofstream ofs(TmpDir::getGeneralTmpDir() + "/preprocessed-header.pipe", std::ofstream::app);
 		std::string out = "p cnf " + std::to_string(_max_var) + " " + std::to_string(_num_read_clauses) + "\n";
 		if (ofs.is_open()) ofs.write(out.c_str(), out.size());
 	}

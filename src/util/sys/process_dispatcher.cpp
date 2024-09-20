@@ -19,7 +19,7 @@ void ProcessDispatcher::dispatch() {
 
     // Read command from tmp file
     const pid_t myPid = Proc::getPid();
-    const std::string commandOutfile = tmpdir + "/mallob_subproc_cmd_" + std::to_string(myPid);
+    const std::string commandOutfile = tmpdir + "/edu.kit.iti.mallob.subproc_cmd_" + std::to_string(myPid);
     while (!FileUtils::exists(commandOutfile)) {
         usleep(1000);
     }

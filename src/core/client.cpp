@@ -12,6 +12,7 @@
 #include "client.hpp"
 #include "comm/msg_queue/message_handle.hpp"
 #include "comm/msgtags.h"
+#include "util/string_utils.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
 #include "util/permutation.hpp"
@@ -257,7 +258,7 @@ void Client::init() {
         std::string path = getFilesystemInterfacePath();
         {
             // Write the available job submission path to an availability tmp file
-            std::ofstream ofs(TmpDir::get() + "/mallob.apipath." + std::to_string(Proc::getPid()));
+            std::ofstream ofs(TmpDir::getGeneralTmpDir() + "/edu.kit.iti.mallob.apipath." + std::to_string(Proc::getPid()));
             // Differentiate absolute vs. relative path
             if (path[0] == '/') ofs << path;
             else ofs << std::filesystem::current_path().string() + "/" + path;
@@ -304,7 +305,7 @@ std::string Client::getFilesystemInterfacePath() {
 }
 
 std::string Client::getSocketPath() {
-    return TmpDir::get() + "/mallob_" + std::to_string(Proc::getPid()) + "." + std::to_string(getInternalRank()) + ".sk";
+    return TmpDir::getGeneralTmpDir() + "/edu.kit.iti.mallob." + std::to_string(Proc::getPid()) + "." + std::to_string(getInternalRank()) + ".sk";
 } 
 
 APIConnector& Client::getAPI() {
@@ -549,19 +550,9 @@ void Client::sendJobDescription(JobRequest& req, int destRank) {
 
     auto data = desc.getSerialization(desc.getRevision());
 
-    /*
-    const int* fData = (const int*) desc.getFormulaPayload(desc.getRevision());
-    size_t fSize = desc.getFormulaPayloadSize(desc.getRevision());
-    std::string summary;
-    for (int i = 0; i < fSize; i++) {
-        if (i >= 5 && i+5 < fSize) {
-            if (i == 5) summary += "... ";
-            continue;
-        }
-        summary += std::to_string(fData[i]) + " ";
-    }
-    log(V4_VVER, "Set up formula of size %lu : %s\n", fSize, summary.c_str());
-    */
+    log(V5_DEBG, "Set up formula : %s\n",
+        StringUtils::getSummary((const int*) desc.getFormulaPayload(desc.getRevision()),
+        desc.getFormulaPayloadSize(desc.getRevision())).c_str());
 
     desc.clearPayload(desc.getRevision());
     int msgId = MyMpi::isend(destRank, tag, data);
@@ -734,7 +725,7 @@ Client::~Client() {
     _instance_reader.stop();
     _json_interface.reset();
 
-    FileUtils::rm(TmpDir::get() + "/mallob.apipath." + std::to_string(Proc::getPid()));
+    FileUtils::rm(TmpDir::getGeneralTmpDir() + "/edu.kit.iti.mallob.apipath." + std::to_string(Proc::getPid()));
 
     LOG(V4_VVER, "Leaving client destructor\n");
 }

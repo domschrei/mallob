@@ -68,7 +68,7 @@ public:
         if (!_additional_args.empty()) command += _additional_args + " ";
 
         // Write command to tmp file (to be read by child process)
-        const std::string commandOutfile = TmpDir::get() + "/mallob_subproc_cmd_" + std::to_string(res);
+        const std::string commandOutfile = TmpDir::getGeneralTmpDir() + "/edu.kit.iti.mallob.subproc_cmd_" + std::to_string(res);
         int retval = mkfifo(commandOutfile.c_str(), 0666);
         if (retval != 0) {
             LOG(V0_CRIT, "[ERROR] mkfifo returned errno %i\n", (int)errno);

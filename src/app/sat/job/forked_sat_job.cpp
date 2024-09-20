@@ -75,17 +75,19 @@ void ForkedSatJob::loadIncrements() {
     const auto& desc = getDescription();
     int lastRev = desc.getRevision();
     std::vector<SatProcessAdapter::RevisionData> revisions;
-    int missingRev;
-    bool someMissing = !hasAllDescriptionsForSolving(missingRev);
+    
     while (_last_imported_revision < lastRev) {
-        if (someMissing && _last_imported_revision+1 == missingRev) break;
+        if (desc.isRevisionIncomplete(_last_imported_revision+1) && !canHandleIncompleteRevision(_last_imported_revision+1))
+            break;
         _last_imported_revision++;
         size_t numLits = desc.getFormulaPayloadSize(_last_imported_revision);
         size_t numAssumptions = desc.getAssumptionsSize(_last_imported_revision);
         LOG(V4_VVER, "%s : Forward rev. %i : %i lits, %i assumptions\n", toStr(), 
                 _last_imported_revision, numLits, numAssumptions);
-        if (_last_imported_revision < _formulas_in_shmem.size() && _formulas_in_shmem[_last_imported_revision].data) {
+        if (desc.isRevisionIncomplete(_last_imported_revision) && numLits > 0) {
+            assert(_last_imported_revision < _formulas_in_shmem.size() && _formulas_in_shmem[_last_imported_revision].data);
             // there is a shared memory segment
+            assert(_formulas_in_shmem[_last_imported_revision].size == numLits*sizeof(int));
             _solver->preregisterShmemObject(std::move(_formulas_in_shmem[_last_imported_revision]));
             _formulas_in_shmem[_last_imported_revision].data = nullptr;
         }
@@ -349,7 +351,8 @@ bool ForkedSatJob::canHandleIncompleteRevision(int rev) {
     if (!hasDescription()) return false;
     int descriptionId = getDescription().getJobDescriptionId(rev);
     if (descriptionId == 0) return false;
-    size_t size = getDescription().getFormulaPayloadSize(rev);
+    size_t size = getDescription().getFormulaPayloadSize(rev) * sizeof(int);
+    if (size == 0) return true;
     std::string shmemId;
     std::string userLabel = "/edu.kit.iti.mallob."
         + std::to_string(getMyMpiRank()) + ".nopidyet"

@@ -273,7 +273,7 @@ int main(int argc, char *argv[]) {
     if (params.preCleanup()) {
         LOG(V2_INFO, "Cleaning up pre-execution\n");
 
-        for (const std::string& subprocName : {
+        for (std::string subprocName : {
             MALLOB_SUBPROC_DISPATCH_PATH"mallob_sat_process",
             MALLOB_SUBPROC_DISPATCH_PATH"impcheck_parse",
             MALLOB_SUBPROC_DISPATCH_PATH"impcheck_check",

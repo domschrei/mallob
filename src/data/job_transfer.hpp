@@ -110,8 +110,7 @@ public:
         *this = std::move(other);
     }
 
-    static size_t getMaxTransferSize();
-    size_t getTransferSize() const;
+    static size_t getTransferSize();
     std::vector<uint8_t> serialize() const override;
     JobRequest& deserialize(const std::vector<uint8_t> &packed) override;
     std::string toStr() const;

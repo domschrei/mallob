@@ -12,6 +12,7 @@
 #include "app/sat/job/inplace_sharing_aggregation.hpp"
 #include "util/assert.hpp"
 
+#include "util/string_utils.hpp"
 #include "util/sys/bidirectional_anytime_pipe.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
@@ -102,8 +103,8 @@ private:
 
         // Set up pipe communication for clause sharing
         BiDirectionalAnytimePipe pipe(BiDirectionalAnytimePipe::ACCESS,
-            TmpDir::get()+_shmem_id+".fromsub.pipe",
-            TmpDir::get()+_shmem_id+".tosub.pipe",
+            TmpDir::getGeneralTmpDir()+_shmem_id+".fromsub.pipe",
+            TmpDir::getGeneralTmpDir()+_shmem_id+".tosub.pipe",
             &_hsm->childReadyToWrite);
         pipe.open();
         LOGGER(_log, V4_VVER, "Pipes set up\n");
@@ -360,15 +361,18 @@ private:
         const int* aPtr = (const int*) accessMemory(_shmem_id + ".assumptions." + std::to_string(revision),
             sizeof(int) * aSize, SharedMemory::READONLY);
 
-        std::string summary;
-        for (int i = 0; i < aSize; i++) {
-            if (i >= 5 && i+5 < aSize) {
-                if (i == 5) summary += "... ";
-                continue;
-            }
-            summary += std::to_string(aPtr[i]) + " ";
+        LOGGER(_log, V5_DEBG, "FORMULA rev. %i : %s\n", revision, StringUtils::getSummary(fPtr, fSize).c_str());
+        if (fSize > 0 && (fPtr[0] == 0)) {
+            LOGGER(_log, V0_CRIT, "[ERROR] rev. %i begins with a zero\n", revision);  
+            _log.flush();
+            abort();
         }
-        LOG(V2_INFO, "ASSUMPTIONS rev. %i : %s\n", revision, summary.c_str());
+        if (fSize > 0 && (fPtr[fSize-1] != 0)) {
+            LOGGER(_log, V0_CRIT, "[ERROR] rev. %i does not end with a zero\n", revision);  
+            _log.flush();
+            abort();
+        }
+        LOGGER(_log, V5_DEBG, "ASSUMPTIONS rev. %i : %s\n", revision, StringUtils::getSummary(aPtr, aSize).c_str());
 
         if (_params.copyFormulaeFromSharedMem()) {
             // Copy formula and assumptions to your own local memory

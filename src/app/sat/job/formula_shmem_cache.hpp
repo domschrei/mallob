@@ -27,9 +27,8 @@ private:
     static ProcessWideOwnedShmemTable procWideOwnedShmemTable;
 
 public:
-    void* createOrAccess(int descriptionId, const std::string& userLabel, size_t size, const void* data, std::string& outShmemId, bool& outCreated) {
+    void* createOrAccess(int descriptionId, const std::string& userLabel, size_t size, const void* data, std::string& outShmemId) {
         LOG(V5_DEBG, "CACHE create or access %i via %s\n", descriptionId, userLabel.c_str());
-        outCreated = false;
 
         // Acquire RAII lock to manipulate this job description's shared memory exclusively
         FileBasedLock lock("jobdesc", descriptionId);
@@ -41,7 +40,6 @@ public:
         // Try to create the shared memory segment
         const std::string shmemId = getShmemId(descriptionId);
         void* shmem = SharedMemory::create(shmemId, size);
-        bool mustWaitUntilInitialized = false;
         if (shmem) {
             // successfully created - initialize while releasing the general lock.
             {
@@ -49,26 +47,26 @@ public:
                 procWideOwnedShmemTable.table[descriptionId] = {shmem, size};
             }
             // acquire a file specifically representing the initialization process.
-            outCreated = true;
             FileBasedLock createLock("jobdesccreate", descriptionId);
             lock.unlock();
+            assert(data);
             memcpy(shmem, data, size);
-            LOG(V5_DEBG, "CACHE created %i\n", descriptionId);
-        } else {
-            // shmem file already exists - access it
-            mustWaitUntilInitialized = true;
-            shmem = SharedMemory::access(shmemId, size);
-            LOG(V5_DEBG, "CACHE accessed %i\n", descriptionId);
+            LOG(V5_DEBG, "CACHE created %i (size %lu)\n", descriptionId, size);
+            outShmemId = shmemId;
+            return shmem;
         }
+        // shmem file already exists - access it
 
+        // Release manipulation lock
         lock.unlock();
 
-        if (mustWaitUntilInitialized) {
-            while (FileUtils::exists(FileBasedLock::opLockFile("jobdesccreate", descriptionId)))
-                usleep(3000);
-        }
+        // Wait until the shmem segment has been fully initialized
+        while (FileUtils::exists(FileBasedLock::opLockFile("jobdesccreate", descriptionId)))
+            usleep(3000);
 
-        // Return the shared memory pointer and its shared memory ID
+        // Now you can *safely* access the shared memory outside the lock (since you wrote a reference to it)
+        shmem = SharedMemory::access(shmemId, size, SharedMemory::READONLY);
+        LOG(V5_DEBG, "CACHE accessed %i (size %lu)\n", descriptionId, size);
         outShmemId = shmemId;
         return shmem;
     }
@@ -82,19 +80,26 @@ public:
         // Try to access the shared memory segment
         void* shmem;
         const std::string shmemId = getShmemId(descriptionId);
-        if (FileUtils::exists("/dev/shm" + shmemId)) {
-            // Shared memory segment seems to be present.
-            shmem = SharedMemory::access(shmemId, size);
-            LOG(V5_DEBG, "CACHE accessed %i\n", descriptionId);
+        if (!FileUtils::exists("/dev/shm" + shmemId)) return nullptr;
 
-            // Add a reference to the shared memory segment
-            bool ok = FileUtils::create(getRefFilename(descriptionId, userLabel));
-            assert(ok);
-            outShmemId = shmemId;
-            return shmem;
-        }
+        // Shared memory segment seems to be present.
         
-        return nullptr;
+        // Add a reference to the shared memory segment
+        bool ok = FileUtils::create(getRefFilename(descriptionId, userLabel));
+        assert(ok);
+
+        // Release manipulation lock
+        lock.unlock();
+        
+        // Wait until the shmem segment has been fully initialized
+        while (FileUtils::exists(FileBasedLock::opLockFile("jobdesccreate", descriptionId)))
+            usleep(3000);
+
+        // Now you can *safely* access the shared memory outside the lock (since you wrote a reference to it)
+        shmem = SharedMemory::access(shmemId, size, SharedMemory::READONLY);
+        LOG(V5_DEBG, "CACHE accessed %i (size %lu)\n", descriptionId, size);
+        outShmemId = shmemId;
+        return shmem;
     }
 
     void drop(int descriptionId, const std::string& userLabel, size_t size, void* data) {
@@ -182,12 +187,12 @@ private:
             unlock();
         }
         static std::string opLockFile(const std::string& label, int id) {
-            return TmpDir::get() + "/edu.kit.iti.mallob." + label + "-lock." + std::to_string(id);
+            return TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob." + label + "-lock." + std::to_string(id);
         }
     };
 
     static std::string getRefFilename(int descriptionId, const std::string& userLabel) {
-        return TmpDir::get() + "/" + userLabel + ".jobdesc-ref." + std::to_string(descriptionId);
+        return TmpDir::getMachineLocalTmpDir() + "/" + userLabel + ".jobdesc-ref." + std::to_string(descriptionId);
     }
 };
 

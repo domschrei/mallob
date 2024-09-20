@@ -227,7 +227,7 @@ public:
 
 private:
     Slot& getSlot(int clauseLength) const {
-        assert(clauseLength-1 >= 0 && clauseLength-1 < _slots.size()
+        assert((clauseLength-1 >= 0 && clauseLength-1 < _slots.size())
             || log_return_false("[ERROR] Invalid clause length %i\n", clauseLength));
         return *_slots.at(clauseLength-1);
     }

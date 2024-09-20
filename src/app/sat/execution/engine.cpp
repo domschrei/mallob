@@ -206,7 +206,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.nbSkippedIdEpochs = config.nbPreviousBalancingEpochs;
 	if (params.cadicalProfilingLevel() >= 0) {
 		setup.profilingBaseDir = params.cadicalProfilingDir();
-		if (setup.profilingBaseDir.empty()) setup.profilingBaseDir = TmpDir::get();
+		if (setup.profilingBaseDir.empty()) setup.profilingBaseDir = TmpDir::getGeneralTmpDir();
 		setup.profilingBaseDir += "/" + std::to_string(appRank) + "/";
 		setup.profilingLevel = params.cadicalProfilingLevel();
 	}

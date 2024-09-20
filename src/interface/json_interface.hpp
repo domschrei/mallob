@@ -64,7 +64,7 @@ public:
             std::function<void(JobMetadata&&)> jobCallback, JobIdAllocator&& jobIdAllocator) : 
         _params(params),
         _logger(std::move(logger)),
-        _output_dir(TmpDir::get()),
+        _output_dir(TmpDir::getGeneralTmpDir()),
         _job_map_mutex(),
         _job_id_allocator(std::move(jobIdAllocator)),
         _job_desc_id_allocator(clientRank, _job_id_allocator.getNbClients()),

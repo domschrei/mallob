@@ -24,12 +24,17 @@ public:
         if (!tmpdirFromEnv || _tmpdir != tmpdirFromEnv)
             setenv("MALLOB_TMP_DIR", _tmpdir.c_str(), 1);
     }
-    static std::string get() {
+    static std::string getGeneralTmpDir() {
         return _tmpdir;
     }
+    static std::string getMachineLocalTmpDir() {
+        return "/dev/shm/";
+    }
     static void wipe() {
-        for (const std::string& file : FileUtils::glob(get() + "/edu.kit.iti.mallob.*")) {
-            FileUtils::rm(file);
+        for (std::string base : {getGeneralTmpDir(), getMachineLocalTmpDir()}) {
+            for (std::string file : FileUtils::glob(base + "/edu.kit.iti.mallob.*")) {
+                FileUtils::rm(file);
+            }
         }
     }
 };

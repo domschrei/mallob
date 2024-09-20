@@ -17,6 +17,7 @@
 #include "app/sat/job/inplace_sharing_aggregation.hpp"
 #include "sat_process_adapter.hpp"
 #include "../execution/engine.hpp"
+#include "util/string_utils.hpp"
 #include "util/sys/bidirectional_anytime_pipe.hpp"
 #include "util/sys/shared_memory.hpp"
 #include "util/sys/proc.hpp"
@@ -70,7 +71,10 @@ void SatProcessAdapter::doWriteRevisions() {
             auto revStr = std::to_string(revData.revision);
             createSharedMemoryBlock("fsize."       + revStr, sizeof(size_t),              (void*)&revData.fSize);
             createSharedMemoryBlock("asize."       + revStr, sizeof(size_t),              (void*)&revData.aSize);
-            createSharedMemoryBlock("formulae."    + revStr, sizeof(int) * revData.fSize, (void*)revData.fLits, revData.revision, true);
+            const int* fPtr = (const int*) createSharedMemoryBlock("formulae." + revStr, sizeof(int) * revData.fSize, (void*)revData.fLits, revData.revision, true);
+            LOG(V2_INFO, "SUMMARY %s\n", StringUtils::getSummary(fPtr, revData.fSize).c_str());
+            if (revData.fSize > 0) assert(fPtr[0] != 0);
+            if (revData.fSize > 0) assert(fPtr[revData.fSize-1] == 0);
             createSharedMemoryBlock("assumptions." + revStr, sizeof(int) * revData.aSize, (void*)revData.aLits);
             createSharedMemoryBlock("checksum."    + revStr, sizeof(Checksum),            (void*)&(revData.checksum));
             _written_revision = revData.revision;
@@ -105,13 +109,16 @@ void SatProcessAdapter::doInitialize() {
     _sum_of_revision_sizes += _f_size;
 
     // Allocate shared memory for formula, assumptions of initial revision
-    createSharedMemoryBlock("formulae.0", sizeof(int) * _f_size, (void*)_f_lits, 0, true);
+    const int* fInShmem = (const int*) createSharedMemoryBlock("formulae.0", sizeof(int) * _f_size, (void*)_f_lits, 0, true);
+    LOG(V2_INFO, "SUMMARY %s\n", StringUtils::getSummary(fInShmem, _f_size).c_str());
+    if (_f_size > 0) assert(fInShmem[0] != 0);
+    if (_f_size > 0) assert(fInShmem[_f_size-1] == 0);
     createSharedMemoryBlock("assumptions.0", sizeof(int) * _a_size, (void*)_a_lits);
 
     // Set up bi-directional pipe to and from the subprocess
     _pipe.reset(new BiDirectionalAnytimePipe(BiDirectionalAnytimePipe::CREATE,
-        TmpDir::get()+_shmem_id+".tosub.pipe",
-        TmpDir::get()+_shmem_id+".fromsub.pipe",
+        TmpDir::getGeneralTmpDir()+_shmem_id+".tosub.pipe",
+        TmpDir::getGeneralTmpDir()+_shmem_id+".fromsub.pipe",
         &_hsm->childReadyToWrite));
 
     // Create SAT solving child process
@@ -220,7 +227,7 @@ std::vector<int> SatProcessAdapter::getLocalFilter(int epoch) {
     if (it != _filters_by_epoch.end()) {
         filter = std::move(it->second);
         _filters_by_epoch.erase(it);
-        assert(filter.size() >= ClauseMetadata::enabled() ? 2 : 0);
+        assert(filter.size() >= (ClauseMetadata::enabled() ? 2 : 0));
         if (_epoch_of_export_buffer != epoch)
             filter.resize(ClauseMetadata::enabled() ? 2 : 0); // wrong epoch
     } else {
@@ -378,9 +385,8 @@ void* SatProcessAdapter::createSharedMemoryBlock(std::string shmemSubId, size_t 
                 true, rev, obj.userLabel});
     }
     if (!shmem) {
-        bool created;
         shmem = StaticFormulaSharedMemoryCache::get().createOrAccess(descId, qualifiedShmemId, size,
-            data, actualShmemId, created);
+            data, actualShmemId);
         _shmem.insert(ShmemObject{actualShmemId, shmem, size,
             true, rev, qualifiedShmemId});
     }
