@@ -47,6 +47,7 @@ private:
 
     JobMessage _msg_unsat_found;
     std::list<JobMessage> _deferred_sharing_initiation_msgs;
+    std::list<JobMessage> _deferred_cross_sharing_initiation_msgs;
 
     bool _initiated_proof_assembly = false;
     std::unique_ptr<ProofProducer> _proof_producer;
@@ -72,6 +73,7 @@ private:
     void addToClauseHistory(std::vector<int>& clauses, int epoch);
 
     void initiateClauseSharing(JobMessage& msg);
+    void initiateCrossSharing(JobMessage& msg);
     void tryActivateDeferredSharingInitiation();
     
     void checkCertifiedUnsatReadyMsg();
