@@ -65,7 +65,7 @@ private:
     struct Slot {
         Mutex _mtx_map;
         ProducedMap _map;
-        Slot(GenericClauseStore& clauseStore, int clauseLength) : _map(32'768) {}
+        Slot(GenericClauseStore& clauseStore, int clauseLength) {}
     };
     std::vector<std::unique_ptr<Slot>> _slots;
     

@@ -1291,7 +1291,7 @@ SchedulingManager::~SchedulingManager() {
         setLoad(0, _job_registry.getActive().getId());
 
     // Setup a watchdog to get feedback on hanging destructors
-    Watchdog watchdog(/*enabled=*/_params.watchdog(), /*checkIntervMillis=*/200, 
+    Watchdog watchdog(/*enabled=*/_params.watchdog(), /*checkIntervMillis=*/3, 
         Timer::elapsedSeconds());
     watchdog.setWarningPeriod(500);
     watchdog.setAbortPeriod(10*1000);
@@ -1313,7 +1313,7 @@ SchedulingManager::~SchedulingManager() {
         forgetOldJobs();
         //_janitor_cond_var.notify(); // TODO needed?
         watchdog.reset();
-        usleep(10*1000); // 10 milliseconds
+        usleep(1*1000); // 1 ms
     }
     LOG(V4_VVER, "all jobs deleted\n");
 

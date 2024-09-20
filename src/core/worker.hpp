@@ -29,6 +29,8 @@ private:
     int _world_rank;
     Parameters& _params;
 
+    Watchdog _watchdog;
+
     std::list<MessageSubscription> _subscriptions;
 
     WorkerSysState _sys_state;
@@ -43,7 +45,6 @@ private:
     PeriodicEvent<10, 1> _periodic_job_check;
     PeriodicEvent<1> _periodic_balance_check;
     PeriodicEvent<1000> _periodic_maintenance;
-    Watchdog _watchdog;
     bool _job_active {false};
 
     std::atomic_bool _node_stats_calculated = true;

@@ -96,7 +96,7 @@ private:
                 _num_stored_jobs--;
             }
 
-            if (!_worker.continueRunning()) usleep(100 * 1000); // wait for last jobs to finish
+            if (!_worker.continueRunning()) usleep(1000); // wait for last jobs to finish
         }
     }
 };

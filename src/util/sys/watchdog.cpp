@@ -54,6 +54,10 @@ void Watchdog::stop() {
     _worker.stop();
 }
 
+void Watchdog::stopWithoutWaiting() {
+    _worker.stopWithoutWaiting();
+}
+
 std::atomic_bool Watchdog::_globally_enabled {true};
 void Watchdog::disableGlobally() {
     _globally_enabled.store(false, std::memory_order_relaxed);

@@ -46,6 +46,7 @@ public:
     int* activityRecvTag() {return &_activity_recv_tag;}
     int* activitySendTag() {return &_activity_send_tag;}
     void stop();
+    void stopWithoutWaiting();
 
     static void disableGlobally();
 };

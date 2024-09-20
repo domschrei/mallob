@@ -179,9 +179,9 @@ void SatProcessAdapter::applySolvingState() {
 
 void SatProcessAdapter::doTerminateInitializedProcess() {
     if (!_running || _hsm->doTerminate) return; // running?
-    while (!_initialized) usleep(10*1000); // wait until initialized
+    while (!_initialized) usleep(3*1000); // wait until initialized
     Process::resume(_child_pid); // Continue (resume) process.
-    while (!_hsm->didBegin) usleep(10*1000); // wait until child is actually in the main loop
+    while (!_hsm->didBegin) usleep(3*1000); // wait until child is actually in the main loop
     _hsm->doTerminate = true; // Kindly ask child process to terminate.
     _pipe.reset(); // clean up bidirectional pipe
 }
@@ -345,7 +345,7 @@ void SatProcessAdapter::waitUntilChildExited() {
         auto lock = _state_mutex.getLock();
         if (_child_pid == -1 || Process::didChildExit(_child_pid)) 
             return;
-        usleep(100*1000); // 0.1s
+        usleep(1*1000); // 1ms
     }
 }
 
@@ -415,7 +415,7 @@ void SatProcessAdapter::freeSharedMemory() {
 
     bool terminated = false;
     if (!_terminate.compare_exchange_strong(terminated, true)) {
-        while (!_destructed) usleep(1000*10);
+        while (!_destructed) usleep(1000*1);
         return;
     }
 

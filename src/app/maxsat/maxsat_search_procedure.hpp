@@ -248,7 +248,7 @@ public:
 
     int solveBlocking() {
         solveNonblocking();
-        while (isNonblockingSolvePending()) usleep(1000 * 10); // 10 ms
+        while (isNonblockingSolvePending()) usleep(1000); // 1 ms
         return processNonblockingSolveResult();       
     }
 

@@ -176,7 +176,7 @@ public:
             if (_instance->lowerBound >= _instance->upperBound)
                 break;
             // Wait a bit if nothing changed
-            if (!change) usleep(1000 * 10); // 10 ms
+            if (!change) usleep(1000); // 1 ms
         }
 
         LOG(V4_VVER, "MAXSAT trying to stop all searches ...\n");
@@ -192,7 +192,7 @@ public:
                 if (!search->isIdle()) allIdle = false;
             }
             if (allIdle) break;
-            usleep(1000 * 10);
+            usleep(1000 * 1); // 1 ms
         }
         // Now clean up all searches
         _searches.clear();

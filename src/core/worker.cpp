@@ -27,11 +27,11 @@
 
 Worker::Worker(MPI_Comm comm, Parameters& params) :
     _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 
-    _params(params), _sys_state(_comm, params.sysstatePeriod(), SysState<9>::ALLREDUCE),
+    _params(params), _watchdog(/*enabled=*/_params.watchdog(), /*checkIntervMillis=*/100, Timer::elapsedSeconds()),
+    _sys_state(_comm, params.sysstatePeriod(), SysState<9>::ALLREDUCE),
     _job_registry(_params, _comm), _routing_tree(_params, _comm),
     _sched_man(_params, _comm, _routing_tree, _job_registry, _sys_state),
-    _group_comm_builder(_comm, _job_registry),
-    _watchdog(/*enabled=*/_params.watchdog(), /*checkIntervMillis=*/100, Timer::elapsedSeconds())
+    _group_comm_builder(_comm, _job_registry)
 {
     _watchdog.setWarningPeriod(50); // warn after 50ms without a reset
     _watchdog.setAbortPeriod(_params.watchdogAbortMillis()); // abort after X ms without a reset
@@ -228,7 +228,7 @@ void Worker::publishAndResetSysState() {
 
 Worker::~Worker() {
 
-    _watchdog.stop();
+    _watchdog.stopWithoutWaiting();
     Terminator::setTerminating();
 
     LOG(V4_VVER, "Destruct worker\n");
