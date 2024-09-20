@@ -89,7 +89,8 @@ void AnytimeSatClauseCommunicator::communicate() {
             assert(_cross_job_clause_sharer->hasClausesToBroadcastInternally());
             JobMessage msg;
             msg.payload = _cross_job_clause_sharer->getClausesToBroadcastInternally();
-            msg.contextIdOfDestination = _job->getActorContextId();
+            msg.treeIndexOfDestination = msg.treeIndexOfSender = 0;
+            msg.contextIdOfDestination = msg.contextIdOfSender = _job->getActorContextId();
             advanceCollective(_job, msg, MSG_BROADCAST_CLAUSES_STATELESS);
             _cancelled_sessions.emplace_back(_cross_sharing_session.release());
         }
@@ -245,11 +246,11 @@ bool AnytimeSatClauseCommunicator::handleClauseSharingMessage(int source, int mp
 
     // Initial signal to initiate a sharing epoch
     if (msg.tag == MSG_INITIATE_CLAUSE_SHARING) {
-        initiateClauseSharing(msg);
+        initiateClauseSharing(msg, false);
         return true;
     }
     if (msg.tag == MSG_INITIATE_CROSS_JOB_CLAUSE_SHARING) {
-        initiateCrossSharing(msg);
+        initiateCrossSharing(msg, false);
         return true;
     }
 
@@ -266,9 +267,9 @@ bool AnytimeSatClauseCommunicator::handleClauseSharingMessage(int source, int mp
     return success;
 }
 
-void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg) {
+void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg, bool fromDeferredQueue) {
 
-    if (_current_session || !_deferred_sharing_initiation_msgs.empty()) {
+    if (_current_session || (!fromDeferredQueue && !_deferred_sharing_initiation_msgs.empty())) {
         // defer message until all past sessions are done
         // and all earlier deferred initiation messages have been processed
         LOG(V3_VERB, "%s : deferring CS initiation\n", _job->toStr());
@@ -296,22 +297,28 @@ void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg) {
         _cross_job_clause_sharer->addInternalSharedClauses(clauses);
         auto& comm = _job->getGroupComm();
         if (comm.getCommSize() > 1 && comm.getMyLocalRank() == 0) {
-            // initiate!
+            // build a cross-job clause sharing initiation message
             JobMessage msg;
             msg.tag = MSG_INITIATE_CROSS_JOB_CLAUSE_SHARING;
             auto packedComm = comm.serialize();
             msg.payload.resize(packedComm.size() / sizeof(int));
             memcpy(msg.payload.data(), packedComm.data(), packedComm.size());
-            _job->getJobTree().sendToSelf(msg);
+            if (_cross_sharing_session) {
+                // some cross-sharing session is still ongoing - defer
+                _deferred_cross_sharing_initiation_msgs.push_back(std::move(msg));
+            } else {
+                // initiate!
+                _job->getJobTree().sendToSelf(msg);
+            }
         }
     });
 
     advanceCollective(_job, msg, MSG_INITIATE_CLAUSE_SHARING);
 }
 
-void AnytimeSatClauseCommunicator::initiateCrossSharing(JobMessage& msg) {
+void AnytimeSatClauseCommunicator::initiateCrossSharing(JobMessage& msg, bool fromDeferredQueue) {
 
-    if (_cross_sharing_session || !_deferred_cross_sharing_initiation_msgs.empty()) {
+    if (_cross_sharing_session || (!fromDeferredQueue && !_deferred_cross_sharing_initiation_msgs.empty())) {
         LOG(V3_VERB, "%s CROSSCOMM deferring initiation\n", _job->toStr());
         _deferred_cross_sharing_initiation_msgs.push_back(msg);
         return;
@@ -327,12 +334,16 @@ void AnytimeSatClauseCommunicator::initiateCrossSharing(JobMessage& msg) {
     _cross_sharing_session.reset(
         new ClauseSharingSession(_params, _cross_job_clause_sharer.get(), snapshot, nullptr, 0, 1)
     );
+    msg.contextIdOfSender = snapshot.contextId;
+    msg.treeIndexOfSender = snapshot.index;
     if (snapshot.leftChildNodeRank >= 0) {
         msg.contextIdOfDestination = snapshot.leftChildContextId;
+        msg.treeIndexOfDestination = snapshot.leftChildIndex;
         MyMpi::isend(snapshot.leftChildNodeRank, MSG_SEND_APPLICATION_MESSAGE, msg);
     }
     if (snapshot.rightChildNodeRank >= 0) {
         msg.contextIdOfDestination = snapshot.rightChildContextId;
+        msg.treeIndexOfDestination = snapshot.rightChildIndex;
         MyMpi::isend(snapshot.rightChildNodeRank, MSG_SEND_APPLICATION_MESSAGE, msg);
     }
     return;
@@ -345,13 +356,13 @@ void AnytimeSatClauseCommunicator::tryActivateDeferredSharingInitiation() {
         // -> initiation message CAN be deleted afterwards.
         JobMessage msg = std::move(_deferred_sharing_initiation_msgs.front());
         _deferred_sharing_initiation_msgs.pop_front();
-        initiateClauseSharing(msg);
+        initiateClauseSharing(msg, true);
     }
 
     if (!_deferred_cross_sharing_initiation_msgs.empty() && !_cross_sharing_session) {
         JobMessage msg = std::move(_deferred_cross_sharing_initiation_msgs.front());
         _deferred_cross_sharing_initiation_msgs.pop_front();
-        initiateCrossSharing(msg);
+        initiateCrossSharing(msg, true);
     }
 }
 

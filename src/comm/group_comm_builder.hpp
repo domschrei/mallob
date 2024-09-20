@@ -61,7 +61,6 @@ private:
     AsyncCollective<GroupsAddressList> _collective;
     JobRegistry& _job_registry;
 
-    int _group_comm_counter {1};
     bool _group_comm_reduce_ongoing {false};
     PeriodicEvent<1000> _periodic_group_comm_check;
 
@@ -88,7 +87,7 @@ public:
         bool relevant = !list.isEmpty();
 
         _group_comm_reduce_ongoing = true;
-        _collective.allReduce(_group_comm_counter++, list, [&, relevant, list](std::list<GroupsAddressList> results) {
+        _collective.allReduce(GROUP_COMM_INSTANCE_ID, list, [&, relevant, list](std::list<GroupsAddressList> results) {
             if (!relevant) return;
             assert(results.size() == 1);
             tsl::robin_map<int, std::vector<std::pair<int, ctx_id_t>>> _group_id_to_comm;

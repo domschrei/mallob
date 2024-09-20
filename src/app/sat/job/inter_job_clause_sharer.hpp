@@ -80,11 +80,14 @@ public:
 
     void addInternalSharedClauses(std::vector<int>& clauses) {
         BufferReader reader = _clause_store->getBufferReader(clauses.data(), clauses.size());
+        size_t nbAdded = 0;
         while (true) {
             Mallob::Clause clause = reader.getNextIncomingClause();
             if (!clause.begin) break;
             _export_manager->produce(clause.begin, clause.size, clause.lbd, 0, _epoch);
+            nbAdded++;
         }
+        LOG(V4_VVER, "CROSSCOMM added %lu int. shared cls\n", nbAdded);
     }
 
     void broadcastCrossSharedClauses(std::vector<int>& clauses, int nbLits) {

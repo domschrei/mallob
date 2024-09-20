@@ -72,8 +72,8 @@ private:
 
     void addToClauseHistory(std::vector<int>& clauses, int epoch);
 
-    void initiateClauseSharing(JobMessage& msg);
-    void initiateCrossSharing(JobMessage& msg);
+    void initiateClauseSharing(JobMessage& msg, bool fromDeferredQueue);
+    void initiateCrossSharing(JobMessage& msg, bool fromDeferredQueue);
     void tryActivateDeferredSharingInitiation();
     
     void checkCertifiedUnsatReadyMsg();
