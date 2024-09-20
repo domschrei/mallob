@@ -217,8 +217,10 @@ void Client::handleNewJob(JobMetadata&& data) {
         // Interrupt job (-> abort entire job if non-incremental, abort iteration if incremental)
         int jobId = data.description->getId();
         int rev = data.description->getRevision();
-        auto lock = _jobs_to_interrupt_lock.getLock();
-        _jobs_to_interrupt.push_back({jobId, rev});
+        {
+            auto lock = _jobs_to_interrupt_lock.getLock();
+            _jobs_to_interrupt.push_back({jobId, rev});
+        }
         atomics::incrementRelaxed(_num_jobs_to_interrupt);
         return;
     }
@@ -355,6 +357,7 @@ void Client::advance() {
             if (_done_jobs.count(jobId) && _done_jobs[jobId].revision >= rev) {
                 LOG(V2_INFO, "Interrupt #%i obsolete\n", jobId);
                 it = _jobs_to_interrupt.erase(it);
+                atomics::decrementRelaxed(_num_jobs_to_interrupt);
             } else if (rev > (_active_jobs.count(jobId) ? _active_jobs[jobId]->getRevision() : -1)) {
                 ++it;
             } else if (_root_nodes.count(jobId)) {

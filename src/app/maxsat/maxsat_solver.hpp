@@ -124,11 +124,6 @@ public:
             search->solveNonblocking();
             search->interrupt();
         }
-        for (auto& search : _searches) {
-            if (search == _searches.front()) continue;
-            while (search->isNonblockingSolvePending()) usleep(1000 * 10);
-            search->processNonblockingSolveResult();
-        }
 
         if (_shared_encoder) {
             // Initialize cardinality constraint encoder.
