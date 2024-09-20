@@ -76,7 +76,7 @@ public:
 
         GroupsAddressList list;
         for (auto& [id, job] : _job_registry.getJobMap()) {
-            if (job->getJobTree().isRoot() && job->getDescription().getGroupId() > 0) {
+            if (job->getJobTree().isRoot() && job->hasDescription() && job->getDescription().getGroupId() > 0) {
                 auto ctxId = job->getContextId();
                 int groupId = job->getDescription().getGroupId();
                 list.list.push_back({MyMpi::rank(MPI_COMM_WORLD), ctxId, groupId});
