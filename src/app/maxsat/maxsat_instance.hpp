@@ -13,7 +13,7 @@ struct MaxSatInstance {
     // raw C array of the formula (hard clauses) to solve
     const int* formulaData;
     struct ObjectiveTerm {
-        int factor;
+        size_t factor;
         int lit;
     };
     // objective function as a linear combination of literals

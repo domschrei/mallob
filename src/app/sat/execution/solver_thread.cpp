@@ -170,7 +170,7 @@ bool SolverThread::readFormula() {
             int lit;
             while (_imported_lits_curr_revision < end && fParser->getNextLiteral(lit)) {
 
-                if (std::abs(lit) > 134217723) {
+                if (std::abs(lit) > (1<<30)) {
                     LOGGER(_logger, V0_CRIT, "[ERROR] Invalid literal %i at rev. %i pos. %ld/%ld.\n",
                         lit, (int)_active_revision, _imported_lits_curr_revision, fParser->getPayloadSize());
                     abort();

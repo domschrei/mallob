@@ -25,7 +25,7 @@ private:
 	bool _comment = false;
 	bool _began_num = false;
     bool _assumption = false;
-	int _num = 0;
+	size_t _num = 0;
 	int _max_var = 0;
     int _num_read_clauses = 0;
     bool _last_added_lit_was_zero {true};
@@ -33,7 +33,7 @@ private:
     bool _hard_clause = false;
 
     struct SoftUnit {
-        int weight;
+        size_t weight;
         int literal;
     };
     std::vector<SoftUnit> _objective;
@@ -95,23 +95,28 @@ public:
             break;
         case ' ':
             if (_began_num) {
-                _max_var = std::max(_max_var, _num);
                 if (!_assumption) {
-                    int lit = _sign * _num;
+                    int lit = _sign * (int)_num;
                     if (_hard_clause) {
+                        _max_var = std::max(_max_var, std::abs(lit));
                         desc.addPermanentData(lit);
-                    } else if (lit != 0) {
+                    } else if (_num != 0) {
                         // soft unit clause
-                        if (_current_soft_unit.weight == 0) _current_soft_unit.weight = lit;
-                        else if (_current_soft_unit.literal == 0) _current_soft_unit.literal = lit;
+                        if (_current_soft_unit.weight == 0) {
+                            assert(_sign == 1);
+                            _current_soft_unit.weight = _num;
+                        } else if (_current_soft_unit.literal == 0) {
+                            _max_var = std::max(_max_var, std::abs(lit));
+                            _current_soft_unit.literal = lit;
+                        }
                     }
-                    if (lit == 0) {
+                    if (_num == 0) {
                         if (_last_added_lit_was_zero) _contains_empty_clause = true;
                         _num_read_clauses++;
                     }
                     _last_added_lit_was_zero = lit == 0;
                 } else if (_num != 0) {
-                    desc.addTransientData(_sign * _num);
+                    desc.addTransientData(_sign * (int)_num);
                 }
                 _num = 0;
                 _began_num = false;
@@ -133,10 +138,13 @@ public:
     void finalize(JobDescription& desc) {
         desc.addPermanentData(0);
         for (auto& softUnit : _objective) {
-            desc.addPermanentData(softUnit.weight);
+            // Need to write each weight, which could be 64-bit, as two 32-bit integers ...
+            const int* weightAsTwoInts = (int*) &softUnit.weight;
+            desc.addPermanentData(weightAsTwoInts[0]);
+            desc.addPermanentData(weightAsTwoInts[1]);
             desc.addPermanentData(softUnit.literal);
         }
-        desc.addPermanentData(0);
+        desc.addPermanentData((int) _objective.size());
     }
 
     bool isValidInput() const {

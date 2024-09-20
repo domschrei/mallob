@@ -222,22 +222,24 @@ private:
         const size_t fSize = _desc.getFormulaPayloadSize(0);
 
         // Traverse the objective function from back to front until you find the beginning
-        assert(fSize >= 2 && fPtr[fSize-1] == 0 && fPtr[fSize-2] != 0);
-        size_t pos = fSize-2;
-        while (pos < fSize && fPtr[pos] != 0) pos--;
+        assert(fSize >= 1);
+        const int nbObjectiveTerms = fPtr[fSize-1];
+        assert(nbObjectiveTerms > 0);
+        size_t pos = fSize - 1 - 3*nbObjectiveTerms - 1;
+        assert(fPtr[pos] == 0);
         // pos now points at the separation zero right before the objective
         // hard clauses end at the separation zero to the objective
         _instance.reset(new MaxSatInstance(fPtr, pos));
 
         // Now actually parse the objective function
         ++pos;
-        while (pos+1 < fSize) {
-            int factor = fPtr[pos];
-            int lit = -fPtr[pos+1];
+        while (pos+2 < fSize) {
+            size_t factor = * (size_t*) (fPtr+pos);
+            int lit = -fPtr[pos+2];
             assert(factor != 0);
             assert(lit != 0);
             _instance->objective.push_back({factor, lit});
-            pos += 2;
+            pos += 3;
         }
         // Sort the objective terms by weight in increasing order
         // (may help to find the required steps to take in solution-improving search)
