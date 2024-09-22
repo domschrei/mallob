@@ -34,12 +34,15 @@ public:
             {"user", _username},
             {"incremental", incremental},
             {"priority", 1},
-            {"application", "SAT"},
-            {"group-id", "common-logic"}
+            {"application", "SAT"}
         };
         _json_base["files"] = std::vector<std::string>();
         for (auto key : {"__NV", "__NC", "__NO"})
             _json_base["configuration"][key] = desc.getAppConfiguration().map.at(key);
+    }
+
+    void setGroupId(const std::string& groupId) {
+        _json_base["group-id"] = groupId;
     }
 
     void submitNext(const std::vector<int>& newLiterals, const std::vector<int>& assumptions,

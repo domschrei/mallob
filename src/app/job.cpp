@@ -62,7 +62,7 @@ void Job::pushRevision(const std::shared_ptr<std::vector<uint8_t>>& data) {
             _description.getMaxDemand() // no global max. demand defined
             : std::min(_max_demand, _description.getMaxDemand()); // both limits defined
     }
-    
+
     if (_params.maxLiteralsPerThread() > 0 && _description.getNumFormulaLiterals() > _params.maxLiteralsPerThread()) {
         
         // Solver literal threshold exceeded: reduce number of solvers for this job

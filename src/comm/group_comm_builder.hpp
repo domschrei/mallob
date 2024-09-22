@@ -84,11 +84,9 @@ public:
                 _relevant_group_ids.insert(groupId);
             }
         }
-        bool relevant = !list.isEmpty();
 
         _group_comm_reduce_ongoing = true;
-        _collective.allReduce(GROUP_COMM_INSTANCE_ID, list, [&, relevant, list](std::list<GroupsAddressList> results) {
-            if (!relevant) return;
+        _collective.allReduce(GROUP_COMM_INSTANCE_ID, list, [&, list](std::list<GroupsAddressList> results) {
             assert(results.size() == 1);
             tsl::robin_map<int, std::vector<std::pair<int, ctx_id_t>>> _group_id_to_comm;
             for (auto& addr : results.begin()->list) {

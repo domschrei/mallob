@@ -110,6 +110,14 @@ void AnytimeSatClauseCommunicator::communicate() {
     // Distributed proof assembly methods
     if (_proof_producer) _proof_producer->advanceProofAssembly();
 
+    if (!_cross_job_clause_sharer && _job->getDescription().getGroupId() > 0 && _job->getJobTree().isRoot()) {
+        _cross_job_clause_sharer.reset(new InterJobClauseSharer(_params,
+            _job->getDescription().getGroupId(), _job->getContextId(), _job->toStr()));
+        if (_current_session) _current_session->setAdditionalClauseListener([&](std::vector<int>& clauses) {
+            feedLocalClausesIntoCrossSharing(clauses);
+        });
+    }
+
     // root: initiate sharing
     if (_job->getJobTree().isRoot() && tryInitiateSharing()) return;
 
@@ -294,31 +302,36 @@ void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg, bool f
 
     // register listener to grab final, filtered shared clauses and share them with other jobs
     if (_cross_job_clause_sharer) _current_session->setAdditionalClauseListener([&](std::vector<int>& clauses) {
-        _cross_job_clause_sharer->addInternalSharedClauses(clauses);
-        auto& comm = _job->getGroupComm();
-        if (comm.getCommSize() > 1 && comm.getMyLocalRank() == 0) {
-            // build a cross-job clause sharing initiation message
-            JobMessage msg;
-            msg.tag = MSG_INITIATE_CROSS_JOB_CLAUSE_SHARING;
-            auto packedComm = comm.serialize();
-            msg.payload.resize(packedComm.size() / sizeof(int));
-            memcpy(msg.payload.data(), packedComm.data(), packedComm.size());
-            if (_cross_sharing_session) {
-                // some cross-sharing session is still ongoing - defer
-                _deferred_cross_sharing_initiation_msgs.push_back(std::move(msg));
-            } else {
-                // initiate!
-                _job->getJobTree().sendToSelf(msg);
-            }
-        }
+        feedLocalClausesIntoCrossSharing(clauses);
     });
 
     advanceCollective(_job, msg, MSG_INITIATE_CLAUSE_SHARING);
 }
 
+void AnytimeSatClauseCommunicator::feedLocalClausesIntoCrossSharing(std::vector<int>& clauses) {
+    _cross_job_clause_sharer->addInternalSharedClauses(clauses);
+    auto& comm = _job->getGroupComm();
+    if (comm.getCommSize() > 1 && comm.getMyLocalRank() == 0) {
+        // build a cross-job clause sharing initiation message
+        JobMessage msg;
+        msg.tag = MSG_INITIATE_CROSS_JOB_CLAUSE_SHARING;
+        auto packedComm = comm.serialize();
+        msg.payload.resize(packedComm.size() / sizeof(int));
+        memcpy(msg.payload.data(), packedComm.data(), packedComm.size());
+        if (_cross_sharing_session) {
+            // some cross-sharing session is still ongoing - defer
+            _deferred_cross_sharing_initiation_msgs.push_back(std::move(msg));
+        } else {
+            // initiate!
+            _job->getJobTree().sendToSelf(msg);
+        }
+    }
+}
+
 void AnytimeSatClauseCommunicator::initiateCrossSharing(JobMessage& msg, bool fromDeferredQueue) {
 
-    if (_cross_sharing_session || (!fromDeferredQueue && !_deferred_cross_sharing_initiation_msgs.empty())) {
+    if (_cross_sharing_session || !_cross_job_clause_sharer ||
+            (!fromDeferredQueue && !_deferred_cross_sharing_initiation_msgs.empty())) {
         LOG(V3_VERB, "%s CROSSCOMM deferring initiation\n", _job->toStr());
         _deferred_cross_sharing_initiation_msgs.push_back(msg);
         return;

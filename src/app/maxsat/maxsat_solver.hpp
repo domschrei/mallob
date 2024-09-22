@@ -138,6 +138,7 @@ public:
             for (auto& search : _searches) {
                 search->setSharedEncoder(encoder);
                 search->setDescriptionLabelForNextCall("initial-bounds");
+                search->setGroupId("common-logic"); // enable cross job clause sharing
                 search->appendLiterals(_shared_lits_to_add);
             }
         }

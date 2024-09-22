@@ -278,6 +278,10 @@ public:
         _desc_label_next_call = label;
     }
 
+    void setGroupId(const std::string& groupId) {
+        _job_stream.setGroupId(groupId);
+    }
+
     ~MaxSatSearchProcedure() {
         _job_stream.finalize();
     }
