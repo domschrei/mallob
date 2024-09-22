@@ -36,7 +36,7 @@ private:
     BackgroundWorker _bg_writer;
     volatile bool* volatile _child_ready_to_write;
     struct Message {
-        char tag;
+        char tag = 0;
         std::vector<int> data;
     };
     SPSCBlockingRingbuffer<Message> _buf_in;
