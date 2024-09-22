@@ -331,6 +331,7 @@ void AnytimeSatClauseCommunicator::initiateCrossSharing(JobMessage& msg, bool fr
     comm.localize(_job->getActorContextId());
     JobTreeSnapshot snapshot = comm.getTreeSnapshot();
     LOG(V4_VVER, "CROSSCOMM init: %s\n", comm.toStr().c_str());
+    _cross_job_clause_sharer->updateCommunicator(comm.getCommSize(), comm.getMyLocalRank());
     _cross_sharing_session.reset(
         new ClauseSharingSession(_params, _cross_job_clause_sharer.get(), snapshot, nullptr, 0, 1)
     );

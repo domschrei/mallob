@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "app/app_message_subscription.hpp"
+#include "app/sat/data/clause_histogram.hpp"
 #include "app/sat/data/solver_statistics.hpp"
 #include "app/sat/job/clause_sharing_actor.hpp"
 #include "app/sat/job/inplace_sharing_aggregation.hpp"
@@ -42,15 +43,14 @@ private:
     std::unique_ptr<GenericClauseFilter> _clause_filter;
     std::unique_ptr<GenericExportManager> _export_manager;
 
-    std::vector<std::shared_ptr<PortfolioSolverInterface>> _dummy_solvers_vec;
+    std::vector<std::shared_ptr<PortfolioSolverInterface>> _dummy_solvers_vec {{nullptr}};
     std::unique_ptr<SolverStatistics> _solver_stats;
-    std::vector<SolverStatistics*> _stats_vec;
+    std::vector<SolverStatistics*> _stats_vec {nullptr};
 
     int _epoch {-1};
     bool _has_prepared_internal_shared_clauses {false};
     std::vector<int> _internal_shared_clauses;
     int _nb_internal_shared_lits;
-    int _internal_revision {0};
 
     std::vector<int> _cross_shared_clauses;
     bool _has_filtered_shared_clauses {false};
@@ -111,7 +111,7 @@ public:
         return _context_id;
     }
     virtual int getClausesRevision() const override {
-        return _internal_revision;
+        return 0;
     }
     virtual const char* getLabel() override {
         return _label.c_str();
@@ -121,7 +121,8 @@ public:
     }
 
     virtual void prepareSharing() override {
-        const int size = BinaryTreeBufferLimit::getLimit(getNbSharingParticipants(), _single_buf_lim, 5*_single_buf_lim, BinaryTreeBufferLimit::LIMITED);
+        if (_has_prepared_internal_shared_clauses) return;
+        const int size = BinaryTreeBufferLimit::getLimit(getNbSharingParticipants(), _single_buf_lim, 2*_single_buf_lim, BinaryTreeBufferLimit::LIMITED);
         int nbExportedClauses;
         int nbExportedLits;
         _internal_shared_clauses = _clause_store->exportBuffer(size, nbExportedClauses, nbExportedLits,
@@ -142,8 +143,8 @@ public:
         _cross_shared_clauses = std::move(clauseBuf);
         InplaceClauseAggregation(_cross_shared_clauses).stripToRawBuffer();
         auto reader = _clause_store->getBufferReader(_cross_shared_clauses.data(), _cross_shared_clauses.size());
-        _filter_vector = FilterVectorBuilder(0UL, epoch).build(reader, [&](Mallob::Clause& clause) {
-            return _clause_filter->admitSharing(clause, epoch);
+        _filter_vector = FilterVectorBuilder(0UL, _epoch).build(reader, [&](Mallob::Clause& clause) {
+            return _clause_filter->admitSharing(clause, _epoch);
         }, [&](int len) {
             _clause_filter->acquireLock(len);
         }, [&](int len) {
@@ -173,13 +174,14 @@ public:
         reader = _clause_store->getBufferReader(_cross_shared_clauses.data(), _cross_shared_clauses.size());
         reader.setFilterBitset(importingSolvers[0].filter);
         BufferBuilder builder(_single_buf_lim, 255, false);
+        ClauseHistogram hist(_cs_params.strictClauseLengthLimit()+ClauseMetadata::numInts());
         while (true) {
             Mallob::Clause clause = reader.getNextIncomingClause();
             if (!clause.begin) break;
-            builder.append(clause);
+            if (builder.append(clause)) hist.increment(clause.size);
         }
 
-        LOG(V4_VVER, "%s CROSSCOMM broadcast %i cross-shared lits\n", _label.c_str(), builder.getNumAddedLits());
+        LOG(V4_VVER, "%s CROSSCOMM digest %s\n", _label.c_str(), hist.getReport().c_str());
         std::vector<int> output = std::move(builder.extractBuffer());
         broadcastCrossSharedClauses(output, builder.getNumAddedLits());
 
@@ -199,7 +201,5 @@ public:
     virtual int getLastAdmittedNumLits() override {
         return _last_num_admitted_cross_cls_to_import;
     }
-    virtual void setClauseBufferRevision(int revision) override {
-        _internal_revision = revision;
-    }
+    virtual void setClauseBufferRevision(int revision) override {}
 };
