@@ -229,8 +229,8 @@ private:
             //printf("-- wrote size %i\n", intsize);
             doWriteToPipe(data.data(), sizeof(int), intsize, abortAtFailure);
             //printf("-- wrote %i ints\n", intsize);
+            fflush(_pipe_out);
         }
-        fflush(_pipe_out);
     }
     void writeToPipe(const std::vector<int>& data1, const std::vector<int>& data2, char tag, bool abortAtFailure) {
         doWriteToPipe(&tag, 1, 1, abortAtFailure);
