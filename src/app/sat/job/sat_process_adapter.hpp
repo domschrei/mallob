@@ -80,6 +80,7 @@ private:
     Mutex _mtx_preregistered_shmem;
     robin_hood::unordered_flat_map<std::string, ShmemObject> _preregistered_shmem;
 
+    Mutex _mtx_pipe;
     std::unique_ptr<BiDirectionalAnytimePipe> _pipe;
 
     volatile bool _running = false;
