@@ -122,7 +122,7 @@ public:
 
     virtual void prepareSharing() override {
         if (_has_prepared_internal_shared_clauses) return;
-        const int size = BinaryTreeBufferLimit::getLimit(getNbSharingParticipants(), _single_buf_lim, 2*_single_buf_lim, BinaryTreeBufferLimit::LIMITED);
+        const int size = getBufferLimit(1, true);
         int nbExportedClauses;
         int nbExportedLits;
         _internal_shared_clauses = _clause_store->exportBuffer(size, nbExportedClauses, nbExportedLits,
@@ -173,7 +173,7 @@ public:
 
         reader = _clause_store->getBufferReader(_cross_shared_clauses.data(), _cross_shared_clauses.size());
         reader.setFilterBitset(importingSolvers[0].filter);
-        BufferBuilder builder(_single_buf_lim, 255, false);
+        BufferBuilder builder(-1, 255, false);
         ClauseHistogram hist(_cs_params.strictClauseLengthLimit()+ClauseMetadata::numInts());
         while (true) {
             Mallob::Clause clause = reader.getNextIncomingClause();
@@ -202,4 +202,11 @@ public:
         return _last_num_admitted_cross_cls_to_import;
     }
     virtual void setClauseBufferRevision(int revision) override {}
+
+    virtual size_t getBufferLimit(int numAggregatedNodes, bool selfOnly) override {
+        if (selfOnly) return _single_buf_lim;
+        return BinaryTreeBufferLimit::getLimit(numAggregatedNodes,
+            _single_buf_lim, 2*_single_buf_lim,
+            BinaryTreeBufferLimit::BufferQueryMode::LIMITED);
+    }
 };

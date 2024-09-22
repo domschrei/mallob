@@ -103,7 +103,7 @@ public:
         if (_estimate_incoming_lits <= 0) _estimate_incoming_lits = numInputLits;
     }
 
-    size_t getBufferLimit(int numAggregatedNodes, bool selfOnly) {
+    virtual size_t getBufferLimit(int numAggregatedNodes, bool selfOnly) {
         if (selfOnly) return _compensation_factor * _cs_params.clauseBufferBaseSize();
         return _compensation_factor * BinaryTreeBufferLimit::getLimit(numAggregatedNodes,
             _cs_params.clauseBufferBaseSize(), _cs_params.clauseBufferLimitParam(),
