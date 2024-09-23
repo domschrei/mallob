@@ -119,7 +119,7 @@ void SatProcessAdapter::doInitialize() {
     _pipe.reset(new BiDirectionalAnytimePipe(BiDirectionalAnytimePipe::CREATE,
         TmpDir::getGeneralTmpDir()+_shmem_id+".tosub.pipe",
         TmpDir::getGeneralTmpDir()+_shmem_id+".fromsub.pipe",
-        &_hsm->childReadyToWrite));
+        &_hsm->pipeChildReadyToWrite, &_hsm->pipeTerminate));
 
     // Create SAT solving child process
     Subprocess subproc(_params, "mallob_sat_process");
@@ -191,7 +191,7 @@ void SatProcessAdapter::collectClauses(int maxSize) {
     if (!_initialized || _state != SolvingStates::ACTIVE || _clause_collecting_stage != NONE)
         return;
     auto lock = _mtx_pipe.getLock();
-    _pipe->writeData({maxSize}, CLAUSE_PIPE_PREPARE_CLAUSES);
+    if (_pipe) _pipe->writeData({maxSize}, CLAUSE_PIPE_PREPARE_CLAUSES);
     _clause_collecting_stage = QUERIED;
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
@@ -212,7 +212,7 @@ int SatProcessAdapter::getLastAdmittedNumLits() {
 void SatProcessAdapter::filterClauses(int epoch, const std::vector<int>& clauses) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
     auto lock = _mtx_pipe.getLock();
-    _pipe->writeData(clauses, {epoch},
+    if (_pipe) _pipe->writeData(clauses, {epoch},
         CLAUSE_PIPE_FILTER_IMPORT);
     _epoch_of_export_buffer = epoch;
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
@@ -243,14 +243,14 @@ void SatProcessAdapter::applyFilter(int epoch, const std::vector<int>& filter) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
     if (epoch != _epoch_of_export_buffer) return; // ignore filter if the corresponding clauses are not present
     auto lock = _mtx_pipe.getLock();
-    _pipe->writeData(filter, {epoch}, CLAUSE_PIPE_DIGEST_IMPORT);
+    if (_pipe) _pipe->writeData(filter, {epoch}, CLAUSE_PIPE_DIGEST_IMPORT);
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
 
 void SatProcessAdapter::digestClausesWithoutFilter(int epoch, const std::vector<int>& clauses, bool stateless) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
     auto lock = _mtx_pipe.getLock();
-    _pipe->writeData(clauses, {epoch, stateless?1:0},
+    if (_pipe) _pipe->writeData(clauses, {epoch, stateless?1:0},
         CLAUSE_PIPE_DIGEST_IMPORT_WITHOUT_FILTER);
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
@@ -258,20 +258,20 @@ void SatProcessAdapter::digestClausesWithoutFilter(int epoch, const std::vector<
 void SatProcessAdapter::returnClauses(const std::vector<int>& clauses) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
     auto lock = _mtx_pipe.getLock();
-    _pipe->writeData(clauses, {_clause_buffer_revision}, CLAUSE_PIPE_RETURN_CLAUSES);
+    if (_pipe) _pipe->writeData(clauses, {_clause_buffer_revision}, CLAUSE_PIPE_RETURN_CLAUSES);
 }
 
 void SatProcessAdapter::digestHistoricClauses(int epochBegin, int epochEnd, const std::vector<int>& clauses) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
     auto lock = _mtx_pipe.getLock();
-    _pipe->writeData(clauses, {epochBegin, epochEnd, _clause_buffer_revision}, CLAUSE_PIPE_DIGEST_HISTORIC);
+    if (_pipe) _pipe->writeData(clauses, {epochBegin, epochEnd, _clause_buffer_revision}, CLAUSE_PIPE_DIGEST_HISTORIC);
 }
 
 
 void SatProcessAdapter::dumpStats() {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
     auto lock = _mtx_pipe.getLock();
-    _pipe->writeData({}, CLAUSE_PIPE_DUMP_STATS);
+    if (_pipe) _pipe->writeData({}, CLAUSE_PIPE_DUMP_STATS);
     // No hard need to wake up immediately
 }
 
@@ -305,6 +305,7 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
     if (_state != SolvingStates::ACTIVE) return NORMAL;
 
     auto lock = _mtx_pipe.getLock();
+    if (!_pipe) return NORMAL;
     char c = _pipe->pollForData();
     if (c == CLAUSE_PIPE_PREPARE_CLAUSES) {
         _collected_clauses = _pipe->readData(c);
@@ -340,7 +341,7 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
     if (_published_revision < _written_revision) {
         _published_revision = _written_revision;
         auto lock = _mtx_pipe.getLock();
-        _pipe->writeData({_desired_revision, _published_revision}, CLAUSE_PIPE_START_NEXT_REVISION);
+        if (_pipe) _pipe->writeData({_desired_revision, _published_revision}, CLAUSE_PIPE_START_NEXT_REVISION);
     }
 
     return NORMAL;
@@ -417,7 +418,7 @@ void SatProcessAdapter::crash() {
 void SatProcessAdapter::reduceThreadCount() {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
     auto lock = _mtx_pipe.getLock();
-    _pipe->writeData({}, CLAUSE_PIPE_REDUCE_THREAD_COUNT);
+    if (_pipe) _pipe->writeData({}, CLAUSE_PIPE_REDUCE_THREAD_COUNT);
 }
 
 SatProcessAdapter::~SatProcessAdapter() {

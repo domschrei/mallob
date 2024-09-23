@@ -34,7 +34,8 @@ private:
 
     BackgroundWorker _bg_reader;
     BackgroundWorker _bg_writer;
-    volatile bool* volatile _child_ready_to_write;
+    volatile bool* volatile _shmem_child_ready_to_write;
+    volatile bool* volatile _shmem_terminate;
     struct Message {
         char tag = 0;
         std::vector<int> data;
@@ -48,8 +49,8 @@ private:
     bool _failed {false};
 
 public:
-    BiDirectionalAnytimePipe(InitializationMode mode, const std::string& fifoOut, const std::string& fifoIn, bool* shmemReadFlag) :
-        _mode(mode), _path_out(fifoOut), _path_in(fifoIn), _child_ready_to_write(shmemReadFlag),
+    BiDirectionalAnytimePipe(InitializationMode mode, const std::string& fifoOut, const std::string& fifoIn, bool* shmemReadFlag, bool* shmemTerminateFlag) :
+        _mode(mode), _path_out(fifoOut), _path_in(fifoIn), _shmem_child_ready_to_write(shmemReadFlag), _shmem_terminate(shmemTerminateFlag),
         _buf_in(128), _buf_out(128) {
 
         if (_mode == CREATE) {
@@ -58,7 +59,8 @@ public:
             assert(res == 0);
             res = mkfifo(_path_in.c_str(), 0666);
             assert(res == 0);
-            *_child_ready_to_write = false;
+            *_shmem_child_ready_to_write = false;
+            *_shmem_terminate = false;
         }
     }
 
@@ -81,7 +83,7 @@ public:
                 while (true) { // run indefinitely until the pipe is closed!
                     // read message from the pipe - blocks until parent writes something
                     doReadFromPipe(&msg.tag, 1, 1, false);
-                    if (msg.tag == 0 || _failed) break;
+                    if (_failed) break;
                     //printf("READING %c FROM PIPE\n", msg.tag);
                     msg.data = readFromPipe(false);
                     if (_failed) break;
@@ -99,10 +101,11 @@ public:
                     bool success = _buf_out.pollBlocking(msg);
                     if (!success) break;
                     // wait until the previous message has been read by the parent
-                    while (*_child_ready_to_write) {usleep(1);}
+                    while (!*_shmem_terminate && *_shmem_child_ready_to_write) {usleep(1);}
+                    if (*_shmem_terminate) break;
                     //printf("CAN WRITE FROM QUEUE TO PIPE\n");
                     // signal to the parent that new message is available
-                    *_child_ready_to_write = true;
+                    *_shmem_child_ready_to_write = true;
                     // write message to the pipe - may block until parent reads it
                     writeToPipe(msg.data, msg.tag, false);
                     if (_failed) break;
@@ -116,9 +119,9 @@ public:
         if (_read_tag != 0) return _read_tag;
         if (_mode == CREATE) {
             // parent process checks if there is in fact some data ready to be read
-            if (*_child_ready_to_write) {
+            if (*_shmem_child_ready_to_write) {
                 doReadFromPipe(&_read_tag, 1, 1, abortAtFailure);
-                *_child_ready_to_write = false;
+                *_shmem_child_ready_to_write = false;
             }
         } else {
             // child process works via dedicated reading queue and side thread
@@ -180,16 +183,8 @@ public:
     }
 
     ~BiDirectionalAnytimePipe() {
-        if (_mode == CREATE) {
-            // Parent: Send a signal to the child process that we close the pipes.
-            writeToPipe({}, 0, false);
-            // Finish reading whatever the child process has sent in the meantime.
-            while (!_failed) {
-                char tag = pollForData(false);
-                if (_failed) break;
-                (void) readFromPipe(false);
-            }
-        } else {
+        if (_mode == CREATE) *_shmem_terminate = true;
+        if (_mode != CREATE) {
             // Child: stop taking data from the buffers.
             _buf_in.markExhausted();
             _buf_in.markTerminated();
@@ -222,15 +217,13 @@ private:
     void writeToPipe(const std::vector<int>& data, char tag, bool abortAtFailure) {
         doWriteToPipe(&tag, 1, 1, abortAtFailure);
         //printf("-- wrote tag %c\n", tag);
-        if (MALLOB_LIKELY(tag != 0)) {
-            const int intsize = data.size();
-            assert(intsize == data.size());
-            doWriteToPipe(&intsize, sizeof(int), 1, abortAtFailure);
-            //printf("-- wrote size %i\n", intsize);
-            doWriteToPipe(data.data(), sizeof(int), intsize, abortAtFailure);
-            //printf("-- wrote %i ints\n", intsize);
-            fflush(_pipe_out);
-        }
+        const int intsize = data.size();
+        assert(intsize == data.size());
+        doWriteToPipe(&intsize, sizeof(int), 1, abortAtFailure);
+        //printf("-- wrote size %i\n", intsize);
+        doWriteToPipe(data.data(), sizeof(int), intsize, abortAtFailure);
+        //printf("-- wrote %i ints\n", intsize);
+        fflush(_pipe_out);
     }
     void writeToPipe(const std::vector<int>& data1, const std::vector<int>& data2, char tag, bool abortAtFailure) {
         doWriteToPipe(&tag, 1, 1, abortAtFailure);

@@ -92,7 +92,8 @@ void testBasic() {
 void testAnytimeChild() {
     {
         bool* childReadyToWrite = (bool*) SharedMemory::access("edu.kit.mallob.test.bidirpipe", 1);
-        BiDirectionalAnytimePipe pipe(BiDirectionalAnytimePipe::ACCESS, pathChildToParentAnytime, pathParentToChildAnytime, childReadyToWrite);
+        bool* terminatePipe = (bool*) SharedMemory::access("edu.kit.mallob.test.bidirpipe.close", 1);
+        BiDirectionalAnytimePipe pipe(BiDirectionalAnytimePipe::ACCESS, pathChildToParentAnytime, pathParentToChildAnytime, childReadyToWrite, terminatePipe);
         pipe.open();
 
         LOG(V2_INFO, "[child]  wait for data ...\n");
@@ -117,10 +118,12 @@ void testAnytime() {
     FileUtils::rm("/dev/shm/edu.kit.mallob.test.bidirpipe");
 
     bool* childReadyToWrite = (bool*) SharedMemory::create("edu.kit.mallob.test.bidirpipe", 1);
+    bool* terminatePipe = (bool*) SharedMemory::create("edu.kit.mallob.test.bidirpipe.close", 1);
     *childReadyToWrite = false;
+    *terminatePipe = false;
     pid_t pid;
     {
-        BiDirectionalAnytimePipe pipe(BiDirectionalAnytimePipe::CREATE, pathParentToChildAnytime, pathChildToParentAnytime, childReadyToWrite);
+        BiDirectionalAnytimePipe pipe(BiDirectionalAnytimePipe::CREATE, pathParentToChildAnytime, pathChildToParentAnytime, childReadyToWrite, terminatePipe);
 
         int res = Process::createChild();
         if (res == 0) {

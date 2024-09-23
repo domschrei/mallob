@@ -105,7 +105,7 @@ private:
         BiDirectionalAnytimePipe pipe(BiDirectionalAnytimePipe::ACCESS,
             TmpDir::getGeneralTmpDir()+_shmem_id+".fromsub.pipe",
             TmpDir::getGeneralTmpDir()+_shmem_id+".tosub.pipe",
-            &_hsm->childReadyToWrite);
+            &_hsm->pipeChildReadyToWrite, &_hsm->pipeTerminate);
         pipe.open();
         LOGGER(_log, V4_VVER, "Pipes set up\n");
 

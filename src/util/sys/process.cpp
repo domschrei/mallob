@@ -90,7 +90,8 @@ void Process::init(int rank, const std::string& traceDir, bool leafProcess) {
     signal(SIGBUS, handleSignal);
     signal(SIGTERM, handleSignal);
     signal(SIGINT,  handleSignal);
-    signal(SIGPIPE, handleSignal);
+    if (_leaf_process) signal(SIGPIPE, SIG_IGN);
+    else signal(SIGPIPE, handleSignal);
 
     // Allow any other process/thread to ptrace this process
     // (used for debugging of crashes via external gdb call)
