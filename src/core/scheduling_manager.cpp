@@ -1230,6 +1230,7 @@ void SchedulingManager::interruptJob(int jobId, bool doTerminate, bool reckless)
     if (job.getJobTree().hasLeftChild()) destinations.insert(job.getJobTree().getLeftChildNodeRank());
     if (job.getJobTree().hasRightChild()) destinations.insert(job.getJobTree().getRightChildNodeRank());
     for (auto childRank : destinations) {
+        if (childRank < 0) continue;
         MyMpi::isend(childRank, msgTag, IntVec({jobId, /*fromUser=*/0}));
         LOG_ADD_DEST(V4_VVER, "Propagate interruption of %s ...", childRank, job.toStr());
     }

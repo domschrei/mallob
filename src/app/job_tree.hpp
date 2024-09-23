@@ -117,6 +117,7 @@ public:
         return req;
     }
     TreeRelative prune(int leavingRank, int leavingIndex) {
+        assert(leavingRank >= 0);
         if (hasLeftChild() && getLeftChildIndex() == leavingIndex && getLeftChildNodeRank() == leavingRank) {
             unsetLeftChild();
             return LEFT_CHILD;
@@ -129,6 +130,7 @@ public:
     }
 
     TreeRelative setChild(int rank, int index, ctx_id_t contextId) {
+        assert(rank >= 0);
         if (index == getLeftChildIndex()) {
             setLeftChild(rank, contextId);
             return LEFT_CHILD;
