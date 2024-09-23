@@ -124,8 +124,7 @@ public:
         if (_has_prepared_internal_shared_clauses) return;
         const int size = getBufferLimit(1, true);
         int nbExportedClauses;
-        int nbExportedLits;
-        _internal_shared_clauses = _clause_store->exportBuffer(size, nbExportedClauses, nbExportedLits,
+        _internal_shared_clauses = _clause_store->exportBuffer(size, nbExportedClauses, _nb_internal_shared_lits,
             GenericClauseStore::ANY, /*sortClauses=*/true);
         _has_prepared_internal_shared_clauses = true;
         _epoch++;

@@ -285,10 +285,16 @@ void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg, bool f
         return;
     }
 
+    // reject the clause sharing initiation if you are not active right now
+    if (_job->getState() != ACTIVE && !_job->getJobTree().isRoot()) {
+        msg.returnToSender(_job->getMyMpiRank(), MSG_SEND_APPLICATION_MESSAGE);
+        return;
+    }
+
     // no current sessions active - can start new session
     _current_epoch = msg.epoch;
-    LOG(V5_DEBG, "%s : INIT COMM e=%i nc=%i\n", _job->toStr(), _current_epoch, 
-        _job->getJobTree().getNumChildren());
+    const auto snapshot = _job->getJobTree().getSnapshot();
+    LOG(V4_VVER, "%s : INIT COMM e=%i nc=%i\n", _job->toStr(), _current_epoch, snapshot.nbChildren);
 
     // extract compensation factor for this session from the message
     float compensationFactor;
@@ -297,7 +303,7 @@ void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg, bool f
     assert(compensationFactor >= 0.1 && compensationFactor <= 10);
 
     _current_session.reset(
-        new ClauseSharingSession(_params, _job, _job->getJobTree().getSnapshot(), _cls_history.get(), _current_epoch, compensationFactor)
+        new ClauseSharingSession(_params, _job, snapshot, _cls_history.get(), _current_epoch, compensationFactor)
     );
 
     // register listener to grab final, filtered shared clauses and share them with other jobs
@@ -305,7 +311,19 @@ void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg, bool f
         feedLocalClausesIntoCrossSharing(clauses);
     });
 
-    advanceCollective(_job, msg, MSG_INITIATE_CLAUSE_SHARING);
+    // advance broadcast of initiation message
+    msg.contextIdOfSender = snapshot.contextId;
+    msg.treeIndexOfSender = snapshot.index;
+    if (snapshot.leftChildContextId != 0) {
+        msg.contextIdOfDestination = snapshot.leftChildContextId;
+        msg.treeIndexOfDestination = snapshot.leftChildIndex;
+        MyMpi::isend(snapshot.leftChildNodeRank, MSG_SEND_APPLICATION_MESSAGE, msg);
+    }
+    if (snapshot.rightChildContextId != 0) {
+        msg.contextIdOfDestination = snapshot.rightChildContextId;
+        msg.treeIndexOfDestination = snapshot.rightChildIndex;
+        MyMpi::isend(snapshot.rightChildNodeRank, MSG_SEND_APPLICATION_MESSAGE, msg);
+    }
 }
 
 void AnytimeSatClauseCommunicator::feedLocalClausesIntoCrossSharing(std::vector<int>& clauses) {

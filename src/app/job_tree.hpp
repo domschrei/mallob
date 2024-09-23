@@ -117,7 +117,6 @@ public:
         return req;
     }
     TreeRelative prune(int leavingRank, int leavingIndex) {
-        assert(leavingRank >= 0);
         if (hasLeftChild() && getLeftChildIndex() == leavingIndex && getLeftChildNodeRank() == leavingRank) {
             unsetLeftChild();
             return LEFT_CHILD;
@@ -257,6 +256,8 @@ public:
         _job_node_ranks.clear(getRightChildIndex());
     }
     void update(int index, int rootRank, ctx_id_t rootContextId, int parentRank, ctx_id_t parentContextId) {    
+        if (hasLeftChild()) unsetLeftChild();
+        if (hasRightChild()) unsetRightChild();
         _index = index;
         if (index == 0 || rootRank < 0) rootRank = _rank; // this is the root node
         updateJobNode(0, rootRank);
