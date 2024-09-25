@@ -674,6 +674,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
         _done_job_futures.push_back(std::move(fut));
     }
 
+    Logger::getMainInstance().flush();
     finishJob(jobId, /*hasIncrementalSuccessors=*/_active_jobs[jobId]->isIncremental());
 }
 

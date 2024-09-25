@@ -47,6 +47,8 @@ private:
 
     int _sharing_max_size {0};
 
+    int _subproc_idx;
+
 public:
 
     ForkedSatJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table);

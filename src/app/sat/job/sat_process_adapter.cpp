@@ -119,7 +119,7 @@ void SatProcessAdapter::doInitialize() {
     _pipe.reset(new BiDirectionalAnytimePipe(BiDirectionalAnytimePipe::CREATE,
         TmpDir::getGeneralTmpDir()+_shmem_id+".tosub.pipe",
         TmpDir::getGeneralTmpDir()+_shmem_id+".fromsub.pipe",
-        &_hsm->pipeChildReadyToWrite, &_hsm->pipeTerminate));
+        &_hsm->pipeChildReadyToWrite, &_hsm->pipeDoTerminate, &_hsm->pipeDidTerminate));
 
     // Create SAT solving child process
     Subprocess subproc(_params, "mallob_sat_process");
@@ -297,6 +297,8 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
             abort();
         }
         // Notify to restart solver engine
+        auto lock = _mtx_pipe.getLock();
+        if (_pipe) _pipe->notifyChildTerminated();
         return CRASHED;
     }
 

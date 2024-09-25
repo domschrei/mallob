@@ -35,7 +35,8 @@ private:
     BackgroundWorker _bg_reader;
     BackgroundWorker _bg_writer;
     volatile bool* volatile _shmem_child_ready_to_write;
-    volatile bool* volatile _shmem_terminate;
+    volatile bool* volatile _shmem_do_terminate;
+    volatile bool* volatile _shmem_did_terminate;
     struct Message {
         char tag = 0;
         std::vector<int> data;
@@ -49,9 +50,9 @@ private:
     bool _failed {false};
 
 public:
-    BiDirectionalAnytimePipe(InitializationMode mode, const std::string& fifoOut, const std::string& fifoIn, bool* shmemReadFlag, bool* shmemTerminateFlag) :
-        _mode(mode), _path_out(fifoOut), _path_in(fifoIn), _shmem_child_ready_to_write(shmemReadFlag), _shmem_terminate(shmemTerminateFlag),
-        _buf_in(128), _buf_out(128) {
+    BiDirectionalAnytimePipe(InitializationMode mode, const std::string& fifoOut, const std::string& fifoIn, bool* shmemReadFlag, bool* shmemDoTerminate, bool* shmemDidTerminate) :
+        _mode(mode), _path_out(fifoOut), _path_in(fifoIn), _shmem_child_ready_to_write(shmemReadFlag), _shmem_do_terminate(shmemDoTerminate),
+        _shmem_did_terminate(shmemDidTerminate), _buf_in(128), _buf_out(128) {
 
         if (_mode == CREATE) {
             int res;
@@ -60,7 +61,8 @@ public:
             res = mkfifo(_path_in.c_str(), 0666);
             assert(res == 0);
             *_shmem_child_ready_to_write = false;
-            *_shmem_terminate = false;
+            *_shmem_do_terminate = false;
+            *_shmem_did_terminate = false;
         }
     }
 
@@ -80,10 +82,10 @@ public:
             // ensuring that the parent process never needs to block
             _bg_reader.run([&]() {
                 Message msg;
-                while (true) { // run indefinitely until the pipe is closed!
+                while (!*_shmem_do_terminate) { // run indefinitely until you should terminate
                     // read message from the pipe - blocks until parent writes something
                     doReadFromPipe(&msg.tag, 1, 1, false);
-                    if (_failed) break;
+                    if (_failed || msg.tag == 0) break;
                     //printf("READING %c FROM PIPE\n", msg.tag);
                     msg.data = readFromPipe(false);
                     if (_failed) break;
@@ -101,8 +103,8 @@ public:
                     bool success = _buf_out.pollBlocking(msg);
                     if (!success) break;
                     // wait until the previous message has been read by the parent
-                    while (!*_shmem_terminate && *_shmem_child_ready_to_write) {usleep(1);}
-                    if (*_shmem_terminate) break;
+                    while (!*_shmem_do_terminate && *_shmem_child_ready_to_write) {usleep(1);}
+                    if (*_shmem_do_terminate) break;
                     //printf("CAN WRITE FROM QUEUE TO PIPE\n");
                     // signal to the parent that new message is available
                     *_shmem_child_ready_to_write = true;
@@ -182,17 +184,30 @@ public:
         }
     }
 
+    void notifyChildTerminated() {
+        *_shmem_did_terminate = true;
+    }
+
     ~BiDirectionalAnytimePipe() {
-        if (_mode == CREATE) *_shmem_terminate = true;
-        if (_mode != CREATE) {
+        if (_mode == CREATE) {
+            if (!*_shmem_did_terminate)
+                writeToPipe({}, 0, false); // "wake up", stop child reader
+            // Send termination signal to child, wait for answer
+            *_shmem_do_terminate = true;
+            while (!*_shmem_did_terminate) usleep(1000);
+        } else {
             // Child: stop taking data from the buffers.
             _buf_in.markExhausted();
             _buf_in.markTerminated();
             _buf_out.markExhausted();
             _buf_out.markTerminated();
+            // Wait until termination signal from parent arrived
+            while (!*_shmem_do_terminate) usleep(1000);
             // Join with the background threads once they are done.
             _bg_reader.stop();
             _bg_writer.stop();
+            // Return termination signal to parent
+            *_shmem_did_terminate = true;
         }
         fclose(_pipe_out);
         fclose(_pipe_in);
@@ -217,12 +232,14 @@ private:
     void writeToPipe(const std::vector<int>& data, char tag, bool abortAtFailure) {
         doWriteToPipe(&tag, 1, 1, abortAtFailure);
         //printf("-- wrote tag %c\n", tag);
-        const int intsize = data.size();
-        assert(intsize == data.size());
-        doWriteToPipe(&intsize, sizeof(int), 1, abortAtFailure);
-        //printf("-- wrote size %i\n", intsize);
-        doWriteToPipe(data.data(), sizeof(int), intsize, abortAtFailure);
-        //printf("-- wrote %i ints\n", intsize);
+        if (MALLOB_LIKELY(tag != 0)) {
+            const int intsize = data.size();
+            assert(intsize == data.size());
+            doWriteToPipe(&intsize, sizeof(int), 1, abortAtFailure);
+            //printf("-- wrote size %i\n", intsize);
+            doWriteToPipe(data.data(), sizeof(int), intsize, abortAtFailure);
+            //printf("-- wrote %i ints\n", intsize);
+        }
         fflush(_pipe_out);
     }
     void writeToPipe(const std::vector<int>& data1, const std::vector<int>& data2, char tag, bool abortAtFailure) {

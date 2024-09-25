@@ -21,7 +21,8 @@ struct SatSharedMemory {
     bool doTerminate {false};
     bool doCrash {false};
     bool pipeChildReadyToWrite {false};
-    bool pipeTerminate {false};
+    bool pipeDoTerminate {false};
+    bool pipeDidTerminate {false};
 
     // Signals child->parent
     bool didBegin {false};

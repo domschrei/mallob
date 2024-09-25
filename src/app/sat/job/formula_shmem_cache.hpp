@@ -85,7 +85,7 @@ public:
         // Shared memory segment seems to be present.
         
         // Add a reference to the shared memory segment
-        bool ok = FileUtils::create(getRefFilename(descriptionId, userLabel));
+        bool ok = FileUtils::createExclusively(getRefFilename(descriptionId, userLabel));
         assert(ok);
 
         // Release manipulation lock

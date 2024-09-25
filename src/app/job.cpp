@@ -53,6 +53,7 @@ std::optional<JobRequest> Job::uncommit() {
 
 void Job::pushRevision(const std::shared_ptr<std::vector<uint8_t>>& data) {
 
+    const int prevGroupId = _description.getGroupId();
     _description.deserialize(data);
     _priority = _description.getPriority();
     if (_description.getMaxDemand() > 0) {
@@ -70,6 +71,13 @@ void Job::pushRevision(const std::shared_ptr<std::vector<uint8_t>>& data) {
         int optNumThreads = std::floor(((double)maxAllowedLiterals) / _description.getNumFormulaLiterals());
         _threads_per_job = std::max(1, optNumThreads);
         LOG(V3_VERB, "%s : literal threshold exceeded - cut down #threads to %i\n", toStr(), _threads_per_job);
+    }
+
+    if (_description.getGroupId() != prevGroupId) {
+        assert(prevGroupId == 0 || log_return_false("[ERROR] Trying to change group ID %i => %i: "
+            "Only a single group ID is allowed throughout all revisions of an incremental job!\n",
+            prevGroupId, _description.getGroupId()));
+        _rev_to_reach_for_group_id = _description.getRevision();
     }
 
     _has_description = true;

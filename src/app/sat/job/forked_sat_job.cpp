@@ -1,5 +1,6 @@
 
 #include <assert.h>
+#include <atomic>
 #include <string.h>
 #include <algorithm>
 #include <utility>
@@ -31,6 +32,7 @@ std::atomic_int ForkedSatJob::_static_subprocess_index = 1;
 
 ForkedSatJob::ForkedSatJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table) : 
         BaseSatJob(params, setup, table) {
+    _subproc_idx = _static_subprocess_index.fetch_add(1, std::memory_order_relaxed);
 }
 
 void ForkedSatJob::appl_start() {
@@ -42,7 +44,7 @@ void ForkedSatJob::appl_start() {
 
 void ForkedSatJob::doStartSolver() {
 
-    SatProcessConfig config(_params, *this, _static_subprocess_index++);
+    SatProcessConfig config(_params, *this, _subproc_idx);
     Parameters hParams(_params);
     hParams.satEngineConfig.set(config.toString());
     hParams.applicationConfiguration.set(getDescription().getAppConfiguration().serialize());
@@ -184,6 +186,7 @@ void ForkedSatJob::handleSolverCrash() {
         delete solver;
     });
     _old_solver_destructions.push_back(std::move(future));
+    _subproc_idx = _static_subprocess_index.fetch_add(1, std::memory_order_relaxed);
 
     // Start new solver (with renamed shared memory segments)
     doStartSolver();
@@ -356,7 +359,7 @@ bool ForkedSatJob::canHandleIncompleteRevision(int rev) {
     std::string shmemId;
     std::string userLabel = "/edu.kit.iti.mallob."
         + std::to_string(getMyMpiRank()) + ".nopidyet"
-        + std::string(toStr()) + "~" + std::to_string(_static_subprocess_index)
+        + std::string(toStr()) + "~" + std::to_string(_subproc_idx)
         + ".formulae." + std::to_string(rev);
     void* shmem = StaticFormulaSharedMemoryCache::get().tryAccess(descriptionId,
         userLabel, size, shmemId);

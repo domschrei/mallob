@@ -9,6 +9,7 @@
 
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/job/historic_clause_storage.hpp"
+#include "app/sat/job/inplace_sharing_aggregation.hpp"
 #include "app/sat/job/inter_job_clause_sharer.hpp"
 #include "comm/job_tree_snapshot.hpp"
 #include "comm/msgtags.h"
@@ -89,6 +90,8 @@ void AnytimeSatClauseCommunicator::communicate() {
             assert(_cross_job_clause_sharer->hasClausesToBroadcastInternally());
             JobMessage msg;
             msg.payload = _cross_job_clause_sharer->getClausesToBroadcastInternally();
+            InplaceClauseAggregation agg(msg.payload);
+            agg.maxRevision() = _job->getRevisionToReachForGroupId();
             msg.treeIndexOfDestination = msg.treeIndexOfSender = 0;
             msg.contextIdOfDestination = msg.contextIdOfSender = _job->getActorContextId();
             advanceCollective(_job, msg, MSG_BROADCAST_CLAUSES_STATELESS);

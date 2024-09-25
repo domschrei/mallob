@@ -222,6 +222,7 @@ private:
     std::optional<JobRequest> _request_to_multiply_right;
 
     GroupComm _group_comm;
+    int _rev_to_reach_for_group_id {0};
 
 // Public methods.
 public:
@@ -295,6 +296,7 @@ public:
     int getRevision() const {return !hasDescription() ? -1 : getDescription().getRevision();};
     int getMaxConsecutiveRevision() const {return !hasDescription() ? -1 : getDescription().getMaxConsecutiveRevision();};
     int getDesiredRevision() const {return _desired_revision;}
+    int getRevisionToReachForGroupId() const {return _rev_to_reach_for_group_id;}
     // Returns true if the present job description revisions are sufficient to begin solving.
     // Returns false and the 1st missing or incomplete revision index otherwise.
     bool hasAllDescriptionsForSolving(int& missingOrIncompleteRevIdx);
