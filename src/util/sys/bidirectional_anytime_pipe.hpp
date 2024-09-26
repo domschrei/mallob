@@ -9,6 +9,7 @@
 #include <string>
 #include <sys/poll.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <vector>
 #include <poll.h>
@@ -48,6 +49,7 @@ private:
     Message _read_msg;
 
     bool _failed {false};
+    pid_t _child_pid {-1};
 
 public:
     BiDirectionalAnytimePipe(InitializationMode mode, const std::string& fifoOut, const std::string& fifoIn, bool* shmemReadFlag, bool* shmemDoTerminate, bool* shmemDidTerminate) :
@@ -187,6 +189,9 @@ public:
     void notifyChildTerminated() {
         *_shmem_did_terminate = true;
     }
+    void setChildPid(pid_t pid) {
+        _child_pid = pid;
+    }
 
     ~BiDirectionalAnytimePipe() {
         if (_mode == CREATE) {
@@ -194,7 +199,8 @@ public:
                 writeToPipe({}, 0, false); // "wake up", stop child reader
             // Send termination signal to child, wait for answer
             *_shmem_do_terminate = true;
-            while (!*_shmem_did_terminate) usleep(1000);
+            while (!*_shmem_did_terminate && (_child_pid==-1 || !Process::didChildExit(_child_pid)))
+                usleep(1000);
         } else {
             // Child: stop taking data from the buffers.
             _buf_in.markExhausted();

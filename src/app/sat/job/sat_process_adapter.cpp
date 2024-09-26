@@ -184,6 +184,7 @@ void SatProcessAdapter::doTerminateInitializedProcess() {
     while (!_hsm->didBegin) usleep(3*1000); // wait until child is actually in the main loop
     _hsm->doTerminate = true; // Kindly ask child process to terminate.
     auto lock = _mtx_pipe.getLock();
+    _pipe->setChildPid(_child_pid);
     _pipe.reset(); // clean up bidirectional pipe
 }
 
