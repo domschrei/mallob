@@ -4,6 +4,7 @@
 #include "app/maxsat/encoding/cardinality_encoding.hpp"
 #include "app/maxsat/encoding/generalized_totalizer.hpp"
 #include "app/maxsat/encoding/polynomial_watchdog.hpp"
+#include "app/maxsat/encoding/warners_adder.hpp"
 #include "app/maxsat/maxsat_instance.hpp"
 #include "app/maxsat/maxsat_search_procedure.hpp"
 #include "app/maxsat/parse/maxsat_reader.hpp"
@@ -18,6 +19,7 @@
 #include <climits>
 #include <list>
 #include <unistd.h>
+#include "robin_set.h"
 #include "util/logger.hpp"
 // external
 #include "rustsat.h"
@@ -59,9 +61,14 @@ public:
         parseFormula();
 
         _shared_encoder = _params.maxSatSharedEncoder();
-        _encoding_strat = _params.maxSatCardinalityEncoding() == 0 ?
-            MaxSatSearchProcedure::GENERALIZED_TOTALIZER :
-            MaxSatSearchProcedure::DYNAMIC_POLYNOMIAL_WATCHDOG;
+        switch (_params.maxSatCardinalityEncoding()) {
+        case 0: {_encoding_strat = MaxSatSearchProcedure::WARNERS_ADDER; break;}
+        case 1: {_encoding_strat = MaxSatSearchProcedure::DYNAMIC_POLYNOMIAL_WATCHDOG; break;}
+        case 2: {_encoding_strat = MaxSatSearchProcedure::GENERALIZED_TOTALIZER; break;}
+        case 3: {_encoding_strat = pickCardinalityEncoding(); break;}
+        default: {_encoding_strat = MaxSatSearchProcedure::NONE; break;}
+        }
+        LOG(V2_INFO, "MAXSAT Using cardinality encoding %i\n", _encoding_strat);
     }
 
     // Perform exact MaxSAT solving and return an according result.
@@ -128,11 +135,15 @@ public:
         if (_shared_encoder) {
             // Initialize cardinality constraint encoder.
             std::shared_ptr<CardinalityEncoding> encoder;
+            if (_encoding_strat == MaxSatSearchProcedure::WARNERS_ADDER)
+                encoder.reset(new WarnersAdder(_instance->nbVars, _instance->objective));
             if (_encoding_strat == MaxSatSearchProcedure::DYNAMIC_POLYNOMIAL_WATCHDOG)
                 encoder.reset(new PolynomialWatchdog(_instance->nbVars, _instance->objective));
             if (_encoding_strat == MaxSatSearchProcedure::GENERALIZED_TOTALIZER)
                 encoder.reset(new GeneralizedTotalizer(_instance->nbVars, _instance->objective));
-            encoder->encode(_instance->lowerBound, _instance->upperBound, [&](int lit) {_shared_lits_to_add.push_back(lit);});
+            encoder->setClauseCollector([&](int lit) {_shared_lits_to_add.push_back(lit);});
+            encoder->setAssumptionCollector([&](int lit) {abort();}); // no assumptions at this stage!
+            encoder->encode(_instance->lowerBound, _instance->upperBound, _instance->upperBound);
 
             // Add the encoder and its encoding to each search
             for (auto& search : _searches) {
@@ -254,6 +265,30 @@ private:
         _instance->upperBound = 0;
         for (auto term : _instance->objective) _instance->upperBound += term.factor;
         _instance->bestCost = ULONG_MAX;
+    }
+
+    MaxSatSearchProcedure::EncodingStrategy pickCardinalityEncoding() {
+
+        // Small instance in terms of the total sum: Can use GTE.
+        if (_instance->upperBound <= 100)
+            return MaxSatSearchProcedure::GENERALIZED_TOTALIZER;
+
+        // Low number of unique factors in the objective: Can use GTE.
+        tsl::robin_set<size_t> uniqueFactors;
+        for (auto term : _instance->objective) uniqueFactors.insert(term.factor);
+        if (uniqueFactors.size() <= 30)
+            return MaxSatSearchProcedure::GENERALIZED_TOTALIZER;
+
+        // Large number of objective terms: Fallback to Adder.
+        if (_instance->objective.size() >= 50'000)
+            return MaxSatSearchProcedure::WARNERS_ADDER;
+
+        // Very large total sum: Fallback to Adder.
+        if (_instance->upperBound >= 80'000'000'000UL)
+            return MaxSatSearchProcedure::WARNERS_ADDER;
+
+        // Otherwise, middle ground met for DPW.
+        return MaxSatSearchProcedure::DYNAMIC_POLYNOMIAL_WATCHDOG;
     }
 
     MaxSatSearchProcedure* initializeSearchProcedure(char c, int index, int nbTotal) {

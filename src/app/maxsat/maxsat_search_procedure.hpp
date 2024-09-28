@@ -4,6 +4,7 @@
 #include "app/maxsat/encoding/cardinality_encoding.hpp"
 #include "app/maxsat/encoding/generalized_totalizer.hpp"
 #include "app/maxsat/encoding/polynomial_watchdog.hpp"
+#include "app/maxsat/encoding/warners_adder.hpp"
 #include "app/maxsat/maxsat_instance.hpp"
 #include "app/maxsat/sat_job_stream.hpp"
 #include "app/sat/job/sat_constants.h"
@@ -40,8 +41,9 @@ public:
 
     enum EncodingStrategy {
         NONE,
-        GENERALIZED_TOTALIZER,
-        DYNAMIC_POLYNOMIAL_WATCHDOG
+        WARNERS_ADDER,
+        DYNAMIC_POLYNOMIAL_WATCHDOG,
+        GENERALIZED_TOTALIZER
     };
 
 private:
@@ -92,10 +94,14 @@ public:
 
         _shared_encoder = _params.maxSatSharedEncoder();
         if (!_shared_encoder) {
+            if (encStrat == WARNERS_ADDER)
+                _enc.reset(new WarnersAdder(_instance.nbVars, _instance.objective));
             if (encStrat == DYNAMIC_POLYNOMIAL_WATCHDOG)
                 _enc.reset(new PolynomialWatchdog(_instance.nbVars, _instance.objective));
             if (encStrat == GENERALIZED_TOTALIZER)
                 _enc.reset(new GeneralizedTotalizer(_instance.nbVars, _instance.objective));
+            _enc->setClauseCollector([&](int lit) {appendLiteral(lit);});
+            _enc->setAssumptionCollector([&](int lit) {appendAssumption(lit);});
         }
     }
 
@@ -111,6 +117,9 @@ public:
 
     void appendLiterals(const std::vector<int>& litsToAdd) {
         _lits_to_add.insert(_lits_to_add.end(), litsToAdd.begin(), litsToAdd.end());
+    }
+    void appendAssumptions(const std::vector<int>& assumptions) {
+        _assumptions_to_set.insert(_assumptions_to_set.end(), assumptions.begin(), assumptions.end());
     }
 
     bool isIdle() const {
@@ -164,12 +173,16 @@ public:
         const int prevNbVars = _instance.nbVars;
         // Encode any cardinality constraints that are still missing for the upcoming call.
         
-        // If we use a shared encoder, the constraints are already encoded. Otherwise, encode them now.
-        if (!_shared_encoder) {
-            _enc->encode(_current_bound, _current_bound, [&](int lit) {appendLiteral(lit);});
+        // If we use a shared encoder, the constraints are already encoded, but we need to re-link 
+        // the collectors for the enforceBound() call. Otherwise, we encode the constraints now.
+        if (_shared_encoder) {
+            _enc->setClauseCollector([&](int lit) {appendLiteral(lit);});
+            _enc->setAssumptionCollector([&](int lit) {appendAssumption(lit);});
+        } else {
+            _enc->encode(_current_bound, _current_bound, _instance.upperBound);
         }
         // Enforce our current bound (assumptions only)
-        _enc->enforceBound(_current_bound, [&](int lit) {appendAssumption(lit);});
+        _enc->enforceBound(_current_bound);
         // If the result is SAT, we can add the 1st assumption permanently.
         //if (!_assumptions_to_set.empty())
         //    _assumptions_to_persist_upon_sat.push_back(_assumptions_to_set.front());

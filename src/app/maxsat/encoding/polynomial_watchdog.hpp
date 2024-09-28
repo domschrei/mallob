@@ -16,7 +16,7 @@ public:
         _enc = RustSAT::dpw_new();
         for (auto& term : objective) RustSAT::dpw_add(_enc, term.lit, term.factor);
     }
-    virtual void doEncode(size_t lb, size_t ub) override {
+    virtual void doEncode(size_t lb, size_t ub, size_t max) override {
         RustSAT::dpw_limit_range(_enc, lb, ub,
             &cardinality_encoding_add_literal, this);
         RustSAT::dpw_encode_ub(_enc, lb, ub, &_nb_vars,
