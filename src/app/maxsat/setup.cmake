@@ -3,7 +3,7 @@
 set(MAXSAT_SUBPROC_SOURCES "" CACHE INTERNAL "")
 
 # Add MaxSAT-specific sources to main Mallob executable
-set(MAXSAT_MALLOB_SOURCES src/app/maxsat/parse/maxsat_reader.cpp src/app/maxsat/maxsat_solver.cpp src/app/maxsat/maxsat_search_procedure.cpp src/app/maxsat/encoding/cardinality_encoding.cpp src/app/maxsat/encoding/openwbo/enc_adder.hpp)
+set(MAXSAT_MALLOB_SOURCES src/app/maxsat/parse/maxsat_reader.cpp src/app/maxsat/maxsat_solver.cpp src/app/maxsat/maxsat_search_procedure.cpp src/app/maxsat/encoding/cardinality_encoding.cpp src/app/maxsat/encoding/openwbo/enc_adder.cpp)
 set(BASE_SOURCES ${BASE_SOURCES} ${MAXSAT_MALLOB_SOURCES} CACHE INTERNAL "")
 
 #message("commons+SAT sources: ${BASE_SOURCES}") # Use to debug
