@@ -276,15 +276,15 @@ private:
         // Low number of unique factors in the objective: Can use GTE.
         tsl::robin_set<size_t> uniqueFactors;
         for (auto term : _instance->objective) uniqueFactors.insert(term.factor);
-        if (uniqueFactors.size() <= 30)
+        if (uniqueFactors.size() <= 20)
             return MaxSatSearchProcedure::GENERALIZED_TOTALIZER;
 
         // Large number of objective terms: Fallback to Adder.
-        if (_instance->objective.size() >= 50'000)
+        if (_instance->objective.size() > 50'000)
             return MaxSatSearchProcedure::WARNERS_ADDER;
 
         // Very large total sum: Fallback to Adder.
-        if (_instance->upperBound >= 80'000'000'000UL)
+        if (_instance->upperBound > 10'000'000'000UL)
             return MaxSatSearchProcedure::WARNERS_ADDER;
 
         // Otherwise, middle ground met for DPW.
