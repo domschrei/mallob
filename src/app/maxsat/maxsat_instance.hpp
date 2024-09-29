@@ -22,6 +22,8 @@ struct MaxSatInstance {
     size_t formulaSize;
     // number of variables in the formula - update when adding new ones
     unsigned int nbVars;
+    size_t sumOfWeights;
+    size_t nbUniqueWeights;
 
     size_t lowerBound;
     size_t upperBound;
@@ -35,7 +37,7 @@ struct MaxSatInstance {
 
     // Print some nice-to-know diagnostics.
     void print() const {
-        LOG(V2_INFO, "MAXSAT %i (hard) clause lits, %i objective terms\n", formulaSize, objective.size());
+        LOG(V2_INFO, "MAXSAT lits=%lu #o=%lu sow=%lu #uniq=%lu\n", formulaSize, objective.size(), sumOfWeights, nbUniqueWeights);
         std::string o;
         for (size_t i = 0; i < objective.size(); i++) {
 

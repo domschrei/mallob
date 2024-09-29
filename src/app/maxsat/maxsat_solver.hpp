@@ -240,14 +240,17 @@ private:
 
         // Now actually parse the objective function
         ++pos;
+        tsl::robin_set<size_t> uniqueFactors;
         while (pos+2 < fSize) {
             size_t factor = * (size_t*) (fPtr+pos);
             int lit = -fPtr[pos+2];
             assert(factor != 0);
             assert(lit != 0);
             _instance->objective.push_back({factor, lit});
+            uniqueFactors.insert(factor);
             pos += 3;
         }
+        _instance->nbUniqueWeights = uniqueFactors.size();
         // Sort the objective terms by weight in increasing order
         // (may help to find the required steps to take in solution-improving search)
         std::sort(_instance->objective.begin(), _instance->objective.end(),
@@ -264,28 +267,27 @@ private:
         _instance->lowerBound = 0;
         _instance->upperBound = 0;
         for (auto term : _instance->objective) _instance->upperBound += term.factor;
+        _instance->sumOfWeights = _instance->upperBound;
         _instance->bestCost = ULONG_MAX;
     }
 
     MaxSatSearchProcedure::EncodingStrategy pickCardinalityEncoding() {
-
-        // Small instance in terms of the total sum: Can use GTE.
-        if (_instance->upperBound <= 100)
-            return MaxSatSearchProcedure::GENERALIZED_TOTALIZER;
-
-        // Low number of unique factors in the objective: Can use GTE.
-        tsl::robin_set<size_t> uniqueFactors;
-        for (auto term : _instance->objective) uniqueFactors.insert(term.factor);
-        if (uniqueFactors.size() <= 20)
-            return MaxSatSearchProcedure::GENERALIZED_TOTALIZER;
 
         // Large number of objective terms: Fallback to Adder.
         if (_instance->objective.size() > 50'000)
             return MaxSatSearchProcedure::WARNERS_ADDER;
 
         // Very large total sum: Fallback to Adder.
-        if (_instance->upperBound > 10'000'000'000UL)
+        if (_instance->sumOfWeights > 10'000'000'000UL)
             return MaxSatSearchProcedure::WARNERS_ADDER;
+
+        // Small instance in terms of the total sum: Can use GTE.
+        if (_instance->sumOfWeights <= 100)
+            return MaxSatSearchProcedure::GENERALIZED_TOTALIZER;
+
+        // Low number of unique factors in the objective: Can use GTE.
+        if (_instance->nbUniqueWeights <= 20)
+            return MaxSatSearchProcedure::GENERALIZED_TOTALIZER;
 
         // Otherwise, middle ground met for DPW.
         return MaxSatSearchProcedure::DYNAMIC_POLYNOMIAL_WATCHDOG;
