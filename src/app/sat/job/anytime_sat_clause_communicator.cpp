@@ -257,11 +257,11 @@ bool AnytimeSatClauseCommunicator::handleClauseSharingMessage(int source, int mp
 
     // Initial signal to initiate a sharing epoch
     if (msg.tag == MSG_INITIATE_CLAUSE_SHARING) {
-        initiateClauseSharing(msg, false);
+        initiateClauseSharing(msg, source, false);
         return true;
     }
     if (msg.tag == MSG_INITIATE_CROSS_JOB_CLAUSE_SHARING) {
-        initiateCrossSharing(msg, false);
+        initiateCrossSharing(msg, source, false);
         return true;
     }
 
@@ -278,7 +278,7 @@ bool AnytimeSatClauseCommunicator::handleClauseSharingMessage(int source, int mp
     return success;
 }
 
-void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg, bool fromDeferredQueue) {
+void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg, int source, bool fromDeferredQueue) {
 
     if (_current_session || (!fromDeferredQueue && !_deferred_sharing_initiation_msgs.empty())) {
         // defer message until all past sessions are done
@@ -290,7 +290,7 @@ void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg, bool f
 
     // reject the clause sharing initiation if you are not active right now
     if (_job->getState() != ACTIVE && !_job->getJobTree().isRoot()) {
-        msg.returnToSender(_job->getMyMpiRank(), MSG_SEND_APPLICATION_MESSAGE);
+        msg.returnToSender(source, MSG_SEND_APPLICATION_MESSAGE);
         return;
     }
 
@@ -349,7 +349,7 @@ void AnytimeSatClauseCommunicator::feedLocalClausesIntoCrossSharing(std::vector<
     }
 }
 
-void AnytimeSatClauseCommunicator::initiateCrossSharing(JobMessage& msg, bool fromDeferredQueue) {
+void AnytimeSatClauseCommunicator::initiateCrossSharing(JobMessage& msg, int source, bool fromDeferredQueue) {
 
     if (_cross_sharing_session || !_cross_job_clause_sharer ||
             (!fromDeferredQueue && !_deferred_cross_sharing_initiation_msgs.empty())) {
@@ -391,13 +391,13 @@ void AnytimeSatClauseCommunicator::tryActivateDeferredSharingInitiation() {
         // -> initiation message CAN be deleted afterwards.
         JobMessage msg = std::move(_deferred_sharing_initiation_msgs.front());
         _deferred_sharing_initiation_msgs.pop_front();
-        initiateClauseSharing(msg, true);
+        initiateClauseSharing(msg, _job->getMyMpiRank(), true);
     }
 
     if (!_deferred_cross_sharing_initiation_msgs.empty() && !_cross_sharing_session) {
         JobMessage msg = std::move(_deferred_cross_sharing_initiation_msgs.front());
         _deferred_cross_sharing_initiation_msgs.pop_front();
-        initiateCrossSharing(msg, true);
+        initiateCrossSharing(msg, _job->getMyMpiRank(), true);
     }
 }
 

@@ -72,8 +72,8 @@ private:
 
     void addToClauseHistory(std::vector<int>& clauses, int epoch);
 
-    void initiateClauseSharing(JobMessage& msg, bool fromDeferredQueue);
-    void initiateCrossSharing(JobMessage& msg, bool fromDeferredQueue);
+    void initiateClauseSharing(JobMessage& msg, int source, bool fromDeferredQueue);
+    void initiateCrossSharing(JobMessage& msg, int source, bool fromDeferredQueue);
     void feedLocalClausesIntoCrossSharing(std::vector<int>& clauses);
     void tryActivateDeferredSharingInitiation();
     
