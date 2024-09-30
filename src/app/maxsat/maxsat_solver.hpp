@@ -161,7 +161,7 @@ public:
             for (auto it = _searches.begin(); it != _searches.end(); ++it) {
                 auto& search = *it;
                 // In a solve call right now?
-                if (!search->isIdle()) {
+                if (!search->isIdle() && !search->isEncoding()) {
                     if (!search->isNonblockingSolvePending()) {
                         // Current solving procedure has finished:
                         // apply the result to the MaxSAT instance
@@ -180,6 +180,9 @@ public:
                 if (search->isIdle()) {
                     // Compute and enforce the next bound for this strategy
                     search->enforceNextBound();
+                    change = true;
+                }
+                if (search->isDoneEncoding()) {
                     // Launch a SAT job
                     search->solveNonblocking();
                     change = true;
@@ -197,10 +200,11 @@ public:
         while (!isTimeoutHit()) {
             bool allIdle = true;
             for (auto& search : _searches) {
-                if (!search->isIdle()) {
+                if (!search->isIdle() && !search->isEncoding()) {
                     if (!search->isNonblockingSolvePending()) search->processNonblockingSolveResult();
                     else search->interrupt();
                 }
+                if (search->isDoneEncoding()) {}
                 if (!search->isIdle()) allIdle = false;
             }
             if (allIdle) break;

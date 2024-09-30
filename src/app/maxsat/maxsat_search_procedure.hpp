@@ -10,8 +10,10 @@
 #include "app/sat/job/sat_constants.h"
 #include "rustsat.h"
 #include "util/logger.hpp"
+#include "util/sys/background_worker.hpp"
 #include "util/sys/terminator.hpp"
 #include "util/params.hpp"
+#include "util/sys/thread_pool.hpp"
 
 #include <climits>
 #include <memory>
@@ -70,6 +72,9 @@ private:
     EncodingStrategy _encoding_strat;
     std::shared_ptr<CardinalityEncoding> _enc;
     bool _shared_encoder;
+    volatile bool _is_encoding {false};
+    volatile bool _is_done_encoding {false};
+    std::future<void> _future_encoder;
 
     SearchStrategy _search_strat;
     const std::string _label;
@@ -123,7 +128,10 @@ public:
     }
 
     bool isIdle() const {
-        return !_solving;
+        return !_solving && !_is_encoding;
+    }
+    bool isEncoding() const {
+        return _is_encoding;
     }
 
     void enforceNextBound() {
@@ -170,7 +178,6 @@ public:
         if (_encoding_strat == NONE) return;
 
         LOG(V4_VVER, "MAXSAT %s Enforcing bound %lu ...\n", _label.c_str(), _current_bound);
-        const int prevNbVars = _instance.nbVars;
         // Encode any cardinality constraints that are still missing for the upcoming call.
         
         // If we use a shared encoder, the constraints are already encoded, but we need to re-link 
@@ -178,18 +185,33 @@ public:
         if (_shared_encoder) {
             _enc->setClauseCollector([&](int lit) {appendLiteral(lit);});
             _enc->setAssumptionCollector([&](int lit) {appendAssumption(lit);});
-        } else {
-            _enc->encode(_current_bound, _current_bound, _instance.upperBound);
         }
-        // Enforce our current bound (assumptions only)
-        _enc->enforceBound(_current_bound);
-        // If the result is SAT, we can add the 1st assumption permanently.
-        //if (!_assumptions_to_set.empty())
-        //    _assumptions_to_persist_upon_sat.push_back(_assumptions_to_set.front());
-        LOG(V4_VVER, "MAXSAT %s Enforced bound %lu (%i new vars)\n", _label.c_str(), _current_bound, _instance.nbVars-prevNbVars);
+
+        assert(!_future_encoder.valid());
+        _is_encoding = true;
+        _future_encoder = ProcessWideThreadPool::get().addTask([&, lb=_current_bound, ub=_current_bound, max=_instance.upperBound]() {
+            if (!_shared_encoder) {
+                _enc->encode(lb, ub, max);
+            }
+            // Enforce our current bound (assumptions only)
+            _enc->enforceBound(ub);
+            // If the result is SAT, we can add the 1st assumption permanently.
+            //if (!_assumptions_to_set.empty())
+            //    _assumptions_to_persist_upon_sat.push_back(_assumptions_to_set.front());
+            _is_done_encoding = true;
+        });
+    }
+    bool isDoneEncoding() {
+        if (!_is_encoding) return false;
+        if (!_is_done_encoding) return false;
+        _future_encoder.get();
+        _is_done_encoding = false;
+        _is_encoding = false;
+        return true;
     }
 
     void solveNonblocking() {
+        assert(!_is_encoding && !_future_encoder.valid());
         LOG(V2_INFO, "MAXSAT %s Calling SAT with bound %lu (%i new lits, %i assumptions)\n",
             _label.c_str(), _current_bound, _lits_to_add.size(), _assumptions_to_set.size());
         _job_stream.submitNext(_lits_to_add, _assumptions_to_set,
