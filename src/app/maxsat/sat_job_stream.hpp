@@ -37,12 +37,14 @@ public:
             {"application", "SAT"}
         };
         _json_base["files"] = std::vector<std::string>();
-        for (auto key : {"__NV", "__NC", "__NO"})
+        for (auto key : {"__NV", "__NC", "__NO", "__XL", "__XU"})
             _json_base["configuration"][key] = desc.getAppConfiguration().map.at(key);
     }
 
-    void setGroupId(const std::string& groupId) {
+    void setGroupId(const std::string& groupId, int minVar = -1, int maxVar = -1) {
         _json_base["group-id"] = groupId;
+        if (minVar >= 0) _json_base["configuration"]["__XL"] = std::to_string(minVar);
+        if (maxVar >= 0) _json_base["configuration"]["__XU"] = std::to_string(maxVar);
     }
 
     void submitNext(const std::vector<int>& newLiterals, const std::vector<int>& assumptions,

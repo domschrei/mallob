@@ -152,6 +152,12 @@ public:
                 search->setGroupId("common-logic"); // enable cross job clause sharing
                 search->appendLiterals(_shared_lits_to_add);
             }
+        } else {
+            // If everybody uses their own encoder, we can still put all of them in the same cross-sharing group
+            // but need to specify the interval of variables which the shared clauses may contain.
+            for (auto& search : _searches) {
+                search->setGroupId("consistent-logic", 1, _instance->nbVars);
+            }
         }
 
         // Main loop for solution improving search.

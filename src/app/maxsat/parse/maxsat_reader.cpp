@@ -106,6 +106,8 @@ bool MaxSatReader::read(JobDescription& desc) {
 	desc.setAppConfigurationEntry("__NC", NC_DEFAULT_VAL);
 	desc.setAppConfigurationEntry("__NV", NC_DEFAULT_VAL);
 	desc.setAppConfigurationEntry("__NO", NC_DEFAULT_VAL);
+	desc.setAppConfigurationEntry("__XL", NC_DEFAULT_VAL);
+	desc.setAppConfigurationEntry("__XU", NC_DEFAULT_VAL);
 	if (_params.onTheFlyChecking()) {
 		std::string placeholder(32, 'x');
 		desc.setAppConfigurationEntry("__SIG", placeholder.c_str());
@@ -119,7 +121,9 @@ bool MaxSatReader::read(JobDescription& desc) {
 	std::vector<std::pair<int, std::string>> fields {
 		{_num_read_clauses, "__NC"},
 		{_max_var, "__NV"},
-		{_objective.size(), "__NO"}
+		{_objective.size(), "__NO"},
+		{-1, "__XL"},
+		{-1, "__XU"}
 	};
 	for (auto [nbRead, dest] : fields) {
 		std::string nbStr = std::to_string(nbRead);

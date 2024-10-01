@@ -116,6 +116,21 @@ void AnytimeSatClauseCommunicator::communicate() {
     if (!_cross_job_clause_sharer && _job->getDescription().getGroupId() > 0 && _job->getJobTree().isRoot()) {
         _cross_job_clause_sharer.reset(new InterJobClauseSharer(_params,
             _job->getDescription().getGroupId(), _job->getContextId(), _job->toStr()));
+
+        int minVar, maxVar;
+        std::vector<std::pair<int*, std::string>> fields {
+            {&minVar, "__XL"},
+            {&maxVar, "__XU"}
+        };
+        for (auto [out, id] : fields) {
+            std::string str = _job->getDescription().getAppConfiguration().map.at(id);
+            while (str[str.size()-1] == '.')
+                str.resize(str.size()-1);
+            *out = atoi(str.c_str());
+            assert(*out > 0 || log_return_false("[ERROR] illegal argument for app config key %s\n", id.c_str()));
+        }
+        _cross_job_clause_sharer->setAdmissibleVariableRange(minVar, maxVar);
+
         if (_current_session) _current_session->setAdditionalClauseListener([&](std::vector<int>& clauses) {
             feedLocalClausesIntoCrossSharing(clauses);
         });

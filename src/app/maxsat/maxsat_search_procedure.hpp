@@ -313,8 +313,8 @@ public:
         _desc_label_next_call = label;
     }
 
-    void setGroupId(const std::string& groupId) {
-        _job_stream.setGroupId(groupId);
+    void setGroupId(const std::string& groupId, int minVar = -1, int maxVar = -1) {
+        _job_stream.setGroupId(groupId, minVar, maxVar);
     }
 
     ~MaxSatSearchProcedure() {

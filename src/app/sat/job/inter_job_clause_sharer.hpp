@@ -6,6 +6,7 @@
 
 #include "app/app_message_subscription.hpp"
 #include "app/sat/data/clause_histogram.hpp"
+#include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/data/solver_statistics.hpp"
 #include "app/sat/job/clause_sharing_actor.hpp"
 #include "app/sat/job/inplace_sharing_aggregation.hpp"
@@ -61,6 +62,9 @@ private:
     size_t _last_num_cross_cls_to_import {0};
     size_t _last_num_admitted_cross_cls_to_import {0};
 
+    int _min_admissible_var {-1};
+    int _max_admissible_var {INT32_MAX};
+
 public:
     InterJobClauseSharer(const Parameters& params, int groupId, ctx_id_t contextId, const std::string& label) :
         ClauseSharingActor(params), _group_id(groupId), _context_id(contextId), _label(label),
@@ -78,16 +82,35 @@ public:
         _comm_rank = commRank;
     }
 
+    void setAdmissibleVariableRange(int minVar, int maxVar) {
+        LOG(V4_VVER, "CROSSCOMM limit var interval to [%i,%i]\n", minVar, maxVar);
+        if (minVar > 0) _min_admissible_var = minVar;
+        if (maxVar > 0) _max_admissible_var = maxVar;
+    }
+
     void addInternalSharedClauses(std::vector<int>& clauses) {
         BufferReader reader = _clause_store->getBufferReader(clauses.data(), clauses.size());
         size_t nbAdded = 0;
+        size_t nbBlocked = 0;
         while (true) {
             Mallob::Clause clause = reader.getNextIncomingClause();
             if (!clause.begin) break;
+
+            // block clauses featuring non-admissible variables
+            for (int i = ClauseMetadata::numInts(); i < clause.size; i++) {
+                const int v = std::abs(clause.begin[i]);
+                if (v < _min_admissible_var || v > _max_admissible_var) {
+                    clause.begin = nullptr;
+                    nbBlocked++;
+                    break;
+                }
+            }
+            if (!clause.begin) continue;
+
             _export_manager->produce(clause.begin, clause.size, clause.lbd, 0, _epoch);
             nbAdded++;
         }
-        LOG(V4_VVER, "CROSSCOMM added %lu int. shared cls\n", nbAdded);
+        LOG(V4_VVER, "CROSSCOMM added %lu/%lu int. shared cls\n", nbAdded, nbAdded+nbBlocked);
     }
 
     void broadcastCrossSharedClauses(std::vector<int>& clauses, int nbLits) {
