@@ -32,7 +32,7 @@ private:
 
 public:
     WarnersAdder(unsigned int nbVars, const std::vector<MaxSatInstance::ObjectiveTerm>& objective) : CardinalityEncoding(nbVars, objective),
-            _solver(this, nbVars) {
+            _solver(this, _nb_vars) {
         for (auto& term : objective) {
             _lits.push_back(term.lit);
             _weights.push_back(term.factor);
