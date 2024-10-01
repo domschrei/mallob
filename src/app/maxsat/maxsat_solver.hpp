@@ -275,25 +275,19 @@ private:
         _instance->bestCost = ULONG_MAX;
     }
 
+    // Heuristic picking a suitable cardinality encoding based on the objective function's properties.
+    // Obtained by a mix of educated guesses and 1-minute runs on MaxSAT Eval'23 instances.
     MaxSatSearchProcedure::EncodingStrategy pickCardinalityEncoding() {
 
-        // Large number of objective terms: Fallback to Adder.
-        if (_instance->objective.size() > 50'000)
+        // Large objective function or very large sum of weights: Fallback to Adder.
+        if (_instance->objective.size() > 10'000 || _instance->sumOfWeights > 1'000'000'000'000UL)
             return MaxSatSearchProcedure::WARNERS_ADDER;
 
-        // Very large total sum: Fallback to Adder.
-        if (_instance->sumOfWeights > 10'000'000'000UL)
-            return MaxSatSearchProcedure::WARNERS_ADDER;
-
-        // Small instance in terms of the total sum: Can use GTE.
-        if (_instance->sumOfWeights <= 100)
+        // Very small sum of weights and few unique weights: GTE can be used.
+        if (_instance->sumOfWeights <= 100 && _instance->nbUniqueWeights <= 20)
             return MaxSatSearchProcedure::GENERALIZED_TOTALIZER;
 
-        // Low number of unique factors in the objective: Can use GTE.
-        if (_instance->nbUniqueWeights <= 20)
-            return MaxSatSearchProcedure::GENERALIZED_TOTALIZER;
-
-        // Otherwise, middle ground met for DPW.
+        // Otherwise, default case of DPW.
         return MaxSatSearchProcedure::DYNAMIC_POLYNOMIAL_WATCHDOG;
     }
 
