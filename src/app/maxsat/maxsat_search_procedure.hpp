@@ -318,6 +318,7 @@ public:
     }
 
     ~MaxSatSearchProcedure() {
+        while (isEncoding() && !isDoneEncoding()) {usleep(1000);}
         _job_stream.finalize();
     }
 
