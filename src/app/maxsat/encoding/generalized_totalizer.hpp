@@ -11,7 +11,7 @@ class GeneralizedTotalizer : public CardinalityEncoding {
 private:
     RustSAT::DbGte* _enc {nullptr};
 public:
-    GeneralizedTotalizer(unsigned int& nbVars, const std::vector<MaxSatInstance::ObjectiveTerm>& objective) : CardinalityEncoding(nbVars, objective) {
+    GeneralizedTotalizer(unsigned int nbVars, const std::vector<MaxSatInstance::ObjectiveTerm>& objective) : CardinalityEncoding(nbVars, objective) {
         _enc = RustSAT::gte_new();
         for (auto& term : objective) RustSAT::gte_add(_enc, term.lit, term.factor);
     }

@@ -373,7 +373,6 @@ private:
     }
     // Append an assumption for the next SAT call.
     void appendAssumption(int lit) {
-        assert(std::abs(lit) <= _instance.nbVars);
         _assumptions_to_set.push_back(lit);
     }
 };

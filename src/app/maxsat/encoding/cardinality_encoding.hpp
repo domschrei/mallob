@@ -10,7 +10,7 @@ void cardinality_encoding_add_assumption(int lit, void* instance);
 
 class CardinalityEncoding {
 public:
-    CardinalityEncoding(unsigned int& nbVars, const std::vector<MaxSatInstance::ObjectiveTerm>& objective) : _nb_vars(nbVars) {}
+    CardinalityEncoding(unsigned int nbVars, const std::vector<MaxSatInstance::ObjectiveTerm>& objective) : _nb_vars(nbVars) {}
     void setClauseCollector(std::function<void(int)> clauseCollector) {
         _clause_collector = clauseCollector;
     }
@@ -25,7 +25,7 @@ public:
     }
     virtual ~CardinalityEncoding() {}
 protected:
-    unsigned int& _nb_vars;
+    unsigned int _nb_vars;
     std::function<void(int)> _clause_collector;
     std::function<void(int)> _assumption_collector;
     virtual void doEncode(size_t lb, size_t ub, size_t max) = 0;

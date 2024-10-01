@@ -12,7 +12,7 @@ class PolynomialWatchdog : public CardinalityEncoding {
 private:
     RustSAT::DynamicPolyWatchdog* _enc {nullptr};
 public:
-    PolynomialWatchdog(unsigned int& nbVars, const std::vector<MaxSatInstance::ObjectiveTerm>& objective) : CardinalityEncoding(nbVars, objective) {
+    PolynomialWatchdog(unsigned int nbVars, const std::vector<MaxSatInstance::ObjectiveTerm>& objective) : CardinalityEncoding(nbVars, objective) {
         _enc = RustSAT::dpw_new();
         for (auto& term : objective) RustSAT::dpw_add(_enc, term.lit, term.factor);
     }

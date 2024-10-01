@@ -100,6 +100,12 @@ public:
             // Initialize search procedure
             _searches.emplace_back(initializeSearchProcedure(c, i, searchStrats.size()));
             _searches.back()->setDescriptionLabelForNextCall("base-formula");
+
+            // If everybody uses their own encoder, we can still put all of them in the same cross-sharing group
+            // but need to specify the interval of variables which the shared clauses may contain.
+            if (!_shared_encoder) {
+                _searches.back()->setGroupId("consistent-logic", 1, _instance->nbVars);
+            }
         }
         assert(!_searches.empty());
 
@@ -151,12 +157,6 @@ public:
                 search->setDescriptionLabelForNextCall("initial-bounds");
                 search->setGroupId("common-logic"); // enable cross job clause sharing
                 search->appendLiterals(_shared_lits_to_add);
-            }
-        } else {
-            // If everybody uses their own encoder, we can still put all of them in the same cross-sharing group
-            // but need to specify the interval of variables which the shared clauses may contain.
-            for (auto& search : _searches) {
-                search->setGroupId("consistent-logic", 1, _instance->nbVars);
             }
         }
 

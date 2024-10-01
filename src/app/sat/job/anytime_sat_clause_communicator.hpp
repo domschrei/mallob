@@ -56,6 +56,7 @@ private:
 
 public:
     AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job);
+    void initCrossSharer();
 
     void communicate();
     void handle(int source, int mpiTag, JobMessage& msg);

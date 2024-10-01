@@ -31,7 +31,7 @@ private:
     openwbo::Adder::vec<openwbo::Lit> _enforcing_assumptions;
 
 public:
-    WarnersAdder(unsigned int& nbVars, const std::vector<MaxSatInstance::ObjectiveTerm>& objective) : CardinalityEncoding(nbVars, objective),
+    WarnersAdder(unsigned int nbVars, const std::vector<MaxSatInstance::ObjectiveTerm>& objective) : CardinalityEncoding(nbVars, objective),
             _solver(this, nbVars) {
         for (auto& term : objective) {
             _lits.push_back(term.lit);
