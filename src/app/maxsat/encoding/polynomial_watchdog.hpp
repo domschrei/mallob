@@ -16,10 +16,11 @@ public:
         _enc = RustSAT::dpw_new();
         for (auto& term : objective) RustSAT::dpw_add(_enc, term.lit, term.factor);
     }
-    virtual void doEncode(size_t lb, size_t ub, size_t max) override {
-        RustSAT::dpw_limit_range(_enc, lb, max,
+    virtual void doEncode(size_t min, size_t ub, size_t max) override {
+        assert(min <= ub && ub <= max);
+        RustSAT::dpw_limit_range(_enc, min, max,
             &cardinality_encoding_add_literal, this);
-        RustSAT::dpw_encode_ub(_enc, lb, ub, &_nb_vars,
+        RustSAT::dpw_encode_ub(_enc, ub, ub, &_nb_vars,
             &cardinality_encoding_add_literal, this);
     }
     virtual void doEnforce(size_t bound) override {

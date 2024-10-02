@@ -2,6 +2,7 @@
 #pragma once
 
 #include "util/hashing.hpp"
+#include "util/logger.hpp"
 #include "util/robin_hood.hpp"
 #include "data/job_result.hpp"
 
@@ -19,7 +20,14 @@ public:
 
     std::vector<uint8_t> retrieveSerialization(int jobId, int revision) {
         auto key = std::pair<int, int>(jobId, revision);
-        assert(_pending_results.count(key));
+        if (!_pending_results.count(key)) {
+            LOG(V1_WARN, "[WARN] No job result for #%i rev. %i present – returning UNKNOWN\n", jobId, revision);
+            JobResult res;
+            res.id = jobId;
+            res.revision = revision;
+            res.result = 0;
+            return res.serialize();
+        }
         JobResult& result = _pending_results.at(key);
         assert(result.id == jobId);
         result.updateSerialization();

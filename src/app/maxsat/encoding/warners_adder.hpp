@@ -38,7 +38,7 @@ public:
             _weights.push_back(term.factor);
         }
     }
-    virtual void doEncode(size_t lb, size_t ub, size_t max) override {
+    virtual void doEncode(size_t min, size_t ub, size_t max) override {
         if (_enc.hasCreatedEncoding()) return;
         auto internalLits = _enc.convertLiterals(_lits);
         _enc.encodeInc(&_solver, internalLits, _weights, max, _enforcing_assumptions);

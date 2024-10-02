@@ -189,7 +189,7 @@ public:
 
         assert(!_future_encoder.valid());
         _is_encoding = true;
-        _future_encoder = ProcessWideThreadPool::get().addTask([&, lb=_current_bound, ub=_current_bound, max=_instance.upperBound]() {
+        _future_encoder = ProcessWideThreadPool::get().addTask([&, lb=_instance.lowerBound, ub=_current_bound, max=_instance.upperBound]() {
             if (!_shared_encoder) {
                 _enc->encode(lb, ub, max);
             }

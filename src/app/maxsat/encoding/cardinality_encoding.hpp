@@ -28,7 +28,7 @@ protected:
     unsigned int _nb_vars;
     std::function<void(int)> _clause_collector;
     std::function<void(int)> _assumption_collector;
-    virtual void doEncode(size_t lb, size_t ub, size_t max) = 0;
+    virtual void doEncode(size_t min, size_t ub, size_t max) = 0;
     virtual void doEnforce(size_t bound) = 0;
 private:
     void addLiteral(int lit) {

@@ -17,7 +17,7 @@ struct JobResult : public Serializable {
     int revision;
     int result;
     enum EncodedType {INT, FLOAT} encodedType = INT;
-    int winningInstanceId;
+    int winningInstanceId {-1};
     unsigned long globalStartOfSuccessEpoch;
 
 private:
