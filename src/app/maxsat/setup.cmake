@@ -21,4 +21,5 @@ set(BASE_INCLUDES ${BASE_INCLUDES} lib/rustsat/capi CACHE INTERNAL "")
 
 # Add unit tests: for each $arg there must be a standalone cpp file under "test/test_${arg}.cpp".
 new_test(rustsat_encoders)
+new_test(comb_search)
 # ...

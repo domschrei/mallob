@@ -1,10 +1,13 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
+#include <memory>
 #include <valarray>
 #include <vector>
 
+#include "app/maxsat/comb_search.hpp"
 #include "util/assert.hpp"
 #include "util/logger.hpp"
 
@@ -32,6 +35,8 @@ struct MaxSatInstance {
     std::vector<int> bestSolution;
     // the cost associated with the best found satisfying assignment so far
     size_t bestCost;
+
+    std::unique_ptr<CombSearch> combSearch;
 
     MaxSatInstance(const int* formulaData, size_t formulaSize) : formulaData(formulaData), formulaSize(formulaSize) {}
 

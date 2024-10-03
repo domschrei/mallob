@@ -83,10 +83,10 @@ private:
     std::vector<int> _last_found_solution;
     std::vector<MaxSatInstance::ObjectiveTerm> _shuffled_objective;
 
-    int _comb_search_idx {-1};
-    int _nb_comb_searchers;
-
     std::string _desc_label_next_call;
+
+    bool _yield_searcher {false};
+    bool _finalized {false};
 
 public:
     MaxSatSearchProcedure(const Parameters& params, APIConnector& api, JobDescription& desc,
@@ -110,11 +110,6 @@ public:
         }
     }
 
-    void enableCombSearch(int index, int size) {
-        _comb_search_idx = index;
-        _nb_comb_searchers = size;
-    }
-
     void setSharedEncoder(const std::shared_ptr<CardinalityEncoding>& encoder) {
         assert(_shared_encoder);
         _enc = encoder;
@@ -134,48 +129,38 @@ public:
         return _is_encoding;
     }
 
-    void enforceNextBound() {
+    bool enforceNextBound() {
+        if (_yield_searcher) return false;
 
-        size_t myLb = _instance.lowerBound;
-        size_t myUb = _instance.upperBound;
-        if (_comb_search_idx >= 0) {
-            // Comb search: first identify the general interval to search
-            const size_t newMyLb = myLb + _params.maxSatCombMinRatio() * (myUb-myLb);
-            const size_t newMyUb = myLb + _params.maxSatCombMaxRatio() * (myUb-myLb);
-            // Is the interval still large enough for comb search?
-            if ((newMyUb-newMyLb) >= _nb_comb_searchers) {
-                // -- yes
-                myLb = newMyLb;
-                myUb = newMyUb;
-                assert(myLb <= myUb);
-                // now identify the particular sub-interval THIS procedure should search
-                myLb = _instance.lowerBound + (_comb_search_idx * (_instance.upperBound-_instance.lowerBound)) / _nb_comb_searchers;
-                myUb = _instance.lowerBound + ((_comb_search_idx+1) * (_instance.upperBound-_instance.lowerBound)) / _nb_comb_searchers;
-                LOG(V3_VERB, "MAXSAT %s Comb search in [%lu,%lu]\n", _label.c_str(), myLb, myUb);
+        const size_t globalLowerBound = _instance.lowerBound;
+        const size_t globalUpperBound = _instance.upperBound;
+        if (globalUpperBound <= globalLowerBound) return false;
+
+        if (_instance.combSearch) {
+            if (!_instance.combSearch->getNextBound(_current_bound)) return false;
+        } else {
+            switch (_search_strat) {
+            case INCREASING:
+                _current_bound = globalLowerBound;
+                break;
+            case DECREASING:
+                _current_bound = _instance.findNextPossibleLowerCost(globalUpperBound);
+                break;
+            case BISECTION:
+                _current_bound = globalLowerBound + (globalUpperBound-globalLowerBound) / 2;
+                break;
+            case NAIVE_REFINEMENT:
+                if (_last_found_solution.empty()) {
+                    // no local solution yet
+                    if (_instance.bestCost == ULONG_MAX) return true; // - solve bound-free
+                    _last_found_solution = _instance.bestSolution; // - use best solution thus far
+                }
+                LOG(V4_VVER, "MAXSAT %s Forbidding naive core of last solution ...\n", _label.c_str());
+                refineLastSolution();
+                break;
             }
         }
-
-        switch (_search_strat) {
-        case INCREASING:
-            _current_bound = myLb;
-            break;
-        case DECREASING:
-            _current_bound = _instance.findNextPossibleLowerCost(myUb);
-            break;
-        case BISECTION:
-            _current_bound = myLb + (myUb-myLb) / 2;
-            break;
-        case NAIVE_REFINEMENT:
-            if (_last_found_solution.empty()) {
-                // no local solution yet
-                if (_instance.bestCost == ULONG_MAX) return; // - solve bound-free
-                _last_found_solution = _instance.bestSolution; // - use best solution thus far
-            }
-            LOG(V4_VVER, "MAXSAT %s Forbidding naive core of last solution ...\n", _label.c_str());
-            refineLastSolution();
-            break;
-        }
-        if (_encoding_strat == NONE) return;
+        if (_encoding_strat == NONE) return true;
 
         LOG(V4_VVER, "MAXSAT %s Enforcing bound %lu ...\n", _label.c_str(), _current_bound);
         // Encode any cardinality constraints that are still missing for the upcoming call.
@@ -189,9 +174,9 @@ public:
 
         assert(!_future_encoder.valid());
         _is_encoding = true;
-        _future_encoder = ProcessWideThreadPool::get().addTask([&, lb=_instance.lowerBound, ub=_current_bound, max=_instance.upperBound]() {
+        _future_encoder = ProcessWideThreadPool::get().addTask([&, min=globalLowerBound, ub=_current_bound, max=globalUpperBound]() {
             if (!_shared_encoder) {
-                _enc->encode(lb, ub, max);
+                _enc->encode(min, ub, max);
             }
             // Enforce our current bound (assumptions only)
             _enc->enforceBound(ub);
@@ -200,6 +185,7 @@ public:
             //    _assumptions_to_persist_upon_sat.push_back(_assumptions_to_set.front());
             _is_done_encoding = true;
         });
+        return true;
     }
     bool isDoneEncoding() {
         if (!_is_encoding) return false;
@@ -242,14 +228,20 @@ public:
                 _instance.lowerBound = _instance.findNextPossibleHigherCost(_current_bound);
                 LOG(V2_INFO, "MAXSAT %s Bound %lu unsat - new bounds: (%lu,%lu)\n",
                     _label.c_str(), _current_bound, _instance.lowerBound, _instance.upperBound);
+                if (_instance.combSearch)
+                    _instance.combSearch->stopTestingAndUpdateLower(_current_bound);
             } else {
                 LOG(V2_INFO, "MAXSAT %s Bound %lu unsat - bounds unchanged\n", _label.c_str(), _current_bound);
+                if (_instance.combSearch)
+                    _instance.combSearch->stopTestingWithoutUpdates(_current_bound);
             }
             return RESULT_UNSAT;
         }
         if (resultCode != RESULT_SAT) {
             // UNKNOWN or something else - presumably because the job was interrupted
             LOG(V2_INFO, "MAXSAT %s Call returned UNKNOWN\n", _label.c_str(), _current_bound);
+            if (_instance.combSearch)
+                _instance.combSearch->stopTestingWithoutUpdates(_current_bound);
             return RESULT_UNKNOWN;
         }
         // Formula is SATisfiable.
@@ -267,9 +259,13 @@ public:
             _instance.bestSolution = solution;
             LOG(V2_INFO, "MAXSAT %s Bound %lu solved with cost %lu - new bounds: (%lu,%lu)\n",
                 _label.c_str(), _current_bound, _instance.bestCost, _instance.lowerBound, _instance.upperBound);
+            if (_instance.combSearch)
+                _instance.combSearch->stopTestingAndUpdateUpper(_current_bound, cost-1);
         } else {
             LOG(V2_INFO, "MAXSAT %s Bound %lu solved with cost %lu - bounds unchanged\n",
                 _label.c_str(), _current_bound, _instance.bestCost);
+            if (_instance.combSearch)
+                _instance.combSearch->stopTestingWithoutUpdates(_current_bound);
         }
         // Since we found SAT, add assumptions as permanent unit clauses where possible.
         for (int asmpt : _assumptions_to_persist_upon_sat) {
@@ -303,8 +299,9 @@ public:
         return false;
     }
 
-    void interrupt() {
+    void interrupt(bool terminate = false) {
         assert(_solving);
+        if (terminate) _yield_searcher = true;
         if (_job_stream.interrupt())
             LOG(V2_INFO, "MAXSAT %s Interrupt solving with bound %i\n", _label.c_str(), _current_bound);
     }
@@ -317,9 +314,22 @@ public:
         _job_stream.setGroupId(groupId, minVar, maxVar);
     }
 
-    ~MaxSatSearchProcedure() {
-        while (isEncoding() && !isDoneEncoding()) {usleep(1000);}
+    size_t getCurrentBound() const {
+        return _current_bound;
+    }
+
+    bool canBeFinalized() {
+        return !isEncoding() || isDoneEncoding();
+    }
+    void finalize() {
+        if (_finalized) return;
         _job_stream.finalize();
+        _finalized = true;
+    }
+
+    ~MaxSatSearchProcedure() {
+        while (!canBeFinalized()) {usleep(1000);}
+        finalize();
     }
 
 private:

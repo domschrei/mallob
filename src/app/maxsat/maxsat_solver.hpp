@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <climits>
 #include <list>
+#include <memory>
 #include <unistd.h>
 #include "robin_set.h"
 #include "util/logger.hpp"
@@ -138,6 +139,9 @@ public:
             search->interrupt();
         }
 
+        // Initialize comb search if needed
+        if (_instance->combSearch) _instance->combSearch->init(_instance->lowerBound, _instance->upperBound);
+
         if (_shared_encoder) {
             // Initialize cardinality constraint encoder.
             std::shared_ptr<CardinalityEncoding> encoder;
@@ -161,6 +165,8 @@ public:
         }
 
         // Main loop for solution improving search.
+        std::list<std::unique_ptr<MaxSatSearchProcedure>> searchesToFinalize;
+        float timeOfLastChange = Timer::elapsedSeconds();
         while (!isTimeoutHit() && _instance->lowerBound < _instance->upperBound && !_searches.empty()) {
             // Loop over all search strategies
             bool change = false;
@@ -185,8 +191,16 @@ public:
                 // No solving procedure ongoing nor pending?
                 if (search->isIdle()) {
                     // Compute and enforce the next bound for this strategy
-                    search->enforceNextBound();
                     change = true;
+                    bool goOn = search->enforceNextBound();
+                    if (!goOn) {
+                        // This search procedure does not want to continue: stop and remove it.
+                        searchesToFinalize.emplace_back();
+                        std::swap(search, searchesToFinalize.back());
+                        it = _searches.erase(it);
+                        --it;
+                        continue;
+                    }
                 }
                 if (search->isDoneEncoding()) {
                     // Launch a SAT job
@@ -197,7 +211,36 @@ public:
             if (_instance->lowerBound >= _instance->upperBound)
                 break;
             // Wait a bit if nothing changed
-            if (!change) usleep(1000); // 1 ms
+            if (!change) {
+                usleep(1000); // 1 ms
+                if (_params.maxSatFocusPeriod() > 0 && Timer::elapsedSeconds() - timeOfLastChange > _params.maxSatFocusPeriod()
+                        && _searches.size() > _params.maxSatFocusMin()) {
+                    // cancel the searcher at the lowest bound
+                    MaxSatSearchProcedure* lowest {nullptr};
+                    for (auto& search : _searches) {
+                        if (search->isNonblockingSolvePending() &&
+                            (!lowest || search->getCurrentBound() < lowest->getCurrentBound())) {
+                            lowest = search.get();
+                        }
+                    }
+                    if (lowest) {
+                        LOG(V2_INFO, "MAXSAT focus: cancel search at bound %lu\n", lowest->getCurrentBound());
+                        lowest->interrupt(true);
+                        change = true;
+                    }
+                }
+            }
+            if (change) timeOfLastChange = Timer::elapsedSeconds();
+
+            // delete old searches where possibe
+            for (auto it = searchesToFinalize.begin(); it != searchesToFinalize.end(); ++it) {
+                auto& search = *it;
+                if (search->canBeFinalized()) {
+                    search->finalize();
+                    it = searchesToFinalize.erase(it);
+                    --it;
+                }
+            }
         }
 
         LOG(V4_VVER, "MAXSAT trying to stop all searches ...\n");
@@ -218,6 +261,7 @@ public:
         }
         // Now clean up all searches
         _searches.clear();
+        searchesToFinalize.clear();
 
         // Did we actually find an optimal result?
         if (_instance->lowerBound >= _instance->upperBound) {
@@ -279,6 +323,9 @@ private:
         for (auto term : _instance->objective) _instance->upperBound += term.factor;
         _instance->sumOfWeights = _instance->upperBound;
         _instance->bestCost = ULONG_MAX;
+        if (_params.maxSatCombSearch()) {
+            _instance->combSearch.reset(new CombSearch(_params.maxSatCombSkew()));
+        }
     }
 
     // Heuristic picking a suitable cardinality encoding based on the objective function's properties.
@@ -322,9 +369,6 @@ private:
         // Initialize search procedure
         auto p = new MaxSatSearchProcedure(_params, _api, _desc,
             *_instance, _encoding_strat, searchStrat, label);
-        if (_params.maxSatCombSearch()) {
-            p->enableCombSearch(index, nbTotal);
-        }
         return p;
     }
 
