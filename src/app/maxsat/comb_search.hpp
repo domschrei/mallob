@@ -181,7 +181,7 @@ public:
             density += std::to_string(i.weight / i.size()) + " ";
             weightTotal += i.weight;
         }
-        LOG(V2_INFO, "COMBSEARCH W=%.3f %s\n", weightTotal, out.c_str());
-        LOG(V2_INFO, "COMBSEARCH DENSITY %s\n", density.c_str());
+        LOG(V4_VVER, "COMBSEARCH W=%.3f %s\n", weightTotal, out.c_str());
+        LOG(V5_DEBG, "COMBSEARCH DENSITY %s\n", density.c_str());
     }
 };
