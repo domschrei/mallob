@@ -568,14 +568,12 @@ void SchedulingManager::handleJobAfterArrivedJobDescription(int jobId, int sourc
     // If job has not started yet, execute it now IF the description is complete
     Job& job = get(jobId);
     if (_job_registry.hasCommitment(jobId)) {
+        {
+            const auto& req = _job_registry.getCommitment(jobId);
+            _desc_interface.updateRevisionAndDescription(job, req.revision, source);
+        }
         int missingRev;
-        if (!job.hasAllDescriptionsForSolving(missingRev)) {
-            _desc_interface.queryNextRevisionIfNeeded(job, source);
-        } else {
-            {
-                const auto& req = _job_registry.getCommitment(jobId);
-                job.setDesiredRevision(req.revision);
-            }
+        if (job.hasAllDescriptionsForSolving(missingRev)) {
             execute(job, source);
             initiateVolumeUpdate(job);
         }

@@ -140,14 +140,17 @@ int ForkedSatJob::appl_solved() {
     }
 
     // Did a solver find a result?
+    _solver->setDesiredRevision(getDesiredRevision());
     auto status = _solver->check();
     if (status == SatProcessAdapter::FOUND_RESULT) {
         _internal_result = std::move(_solver->getSolution());
         assert(_internal_result.hasSerialization());
         result = _internal_result.result;
-        LOG_ADD_DEST(V2_INFO, "%s rev. %i : found result %s", getJobTree().getRootNodeRank(), toStr(), getRevision(), 
+        LOG_ADD_DEST(V2_INFO, "%s rev. %i : found result %s", getJobTree().getRootNodeRank(), toStr(), _internal_result.revision, 
                             result == RESULT_SAT ? "SAT" : result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN");
         _internal_result.id = getId();
+        assert(getRevision() == _internal_result.revision || log_return_false("[ERROR] Wrong result revision %i (now: %i)\n",
+            _internal_result.revision, getRevision()));
         _internal_result.revision = getRevision();
         _done_locally = true;
 

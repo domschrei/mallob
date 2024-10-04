@@ -125,6 +125,7 @@ public:
     void run();
     bool isFullyInitialized();
     void appendRevisions(const std::vector<RevisionData>& revisions, int desiredRevision);
+    void setDesiredRevision(int desiredRevision) {_desired_revision = desiredRevision;}
     void preregisterShmemObject(ShmemObject&& obj);
     void crash();
     void reduceThreadCount();

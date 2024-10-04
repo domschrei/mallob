@@ -253,6 +253,7 @@ public:
             _last_found_solution = solution;
         }
         const size_t cost = _instance.getCostOfModel(solution);
+        assert(cost <= _current_bound || log_return_false("[ERROR] MAXSAT Returned solution for bound %lu has cost %lu!\n", _current_bound, cost));
         if (cost < _instance.bestCost) {
             _instance.upperBound = std::min(_instance.upperBound, cost);
             _instance.bestCost = cost;

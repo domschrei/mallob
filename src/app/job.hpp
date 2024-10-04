@@ -388,7 +388,7 @@ public:
 
     // Marks the job to be indestructible as long as pending is true.
     void addChildWaitingForRevision(int rank, int revision, bool sendSkeletonOnly) {_children_waiting_for_description.insert({rank, revision, sendSkeletonOnly});}
-    void setDesiredRevision(int revision) {_desired_revision = revision;}
+    void setDesiredRevision(int revision) {_desired_revision = std::max(_desired_revision, revision);}
     bool isRevisionSolved(int revision) {return _last_solved_revision >= revision;}
     void setRevisionSolved(int revision) {_last_solved_revision = revision;}
 
