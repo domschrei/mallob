@@ -201,7 +201,11 @@ public:
         LOG(V2_INFO, "MAXSAT %s Calling SAT with bound %lu (%i new lits, %i assumptions)\n",
             _label.c_str(), _current_bound, _lits_to_add.size(), _assumptions_to_set.size());
         _job_stream.submitNext(_lits_to_add, _assumptions_to_set,
-            _desc_label_next_call);
+            _desc_label_next_call,
+            // We let the position of the tested bound influence the job's priority
+            // as a tie-breaker for the scheduler - considering the highest bounds
+            // as the most useful to give resources to.
+            1.0f + 0.01f * (_current_bound - _instance.lowerBound) / (float) (_instance.upperBound - _instance.lowerBound));
         _lits_to_add.clear();
         _assumptions_to_set.clear();
         _desc_label_next_call = "";

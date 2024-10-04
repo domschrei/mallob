@@ -48,13 +48,14 @@ public:
     }
 
     void submitNext(const std::vector<int>& newLiterals, const std::vector<int>& assumptions,
-            const std::string& descriptionLabel = "") {
+            const std::string& descriptionLabel = "", float priority = 0) {
         assert(!_pending);
         assert(newLiterals.empty() || newLiterals.front() != 0);
         assert(newLiterals.empty() || newLiterals.back() == 0);
         if (_incremental && _json_base.contains("name")) {
             _json_base["precursor"] = _username + std::string(".") + _json_base["name"].get<std::string>();
         }
+        _json_base["priority"] = priority > 0 ? priority : 1;
         const int subjob = ++_subjob_counter;
         _json_base["name"] = _base_job_name + std::to_string(subjob);
         _json_base["literals"] = newLiterals;
