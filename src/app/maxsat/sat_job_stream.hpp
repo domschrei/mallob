@@ -58,14 +58,14 @@ public:
         _json_base["priority"] = priority > 0 ? priority : 1;
         const int subjob = ++_subjob_counter;
         _json_base["name"] = _base_job_name + std::to_string(subjob);
-        _json_base["literals"] = newLiterals;
-        _json_base["assumptions"] = assumptions;
-        _pending = true;
-        _interrupt_set = false;
         nlohmann::json copy(_json_base);
+        copy["literals"] = newLiterals;
+        copy["assumptions"] = assumptions;
         if (!descriptionLabel.empty()) {
             copy["description-id"] = descriptionLabel;
         }
+        _pending = true;
+        _interrupt_set = false;
         _api.submit(copy, [&](nlohmann::json& result) {
             _json_result = std::move(result);
             _pending = false;

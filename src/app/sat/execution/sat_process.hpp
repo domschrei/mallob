@@ -239,6 +239,11 @@ private:
                     pipe.readData(c);
                     engine.reduceActiveThreadCount();
 
+                } else if (c == CLAUSE_PIPE_SET_THREAD_COUNT) {
+                    LOGGER(_log, V3_VERB, "DO set thread count\n");
+                    int nbThreads = pipe.readData(c)[0];
+                    engine.setActiveThreadCount(nbThreads);
+
                 } else if (c == CLAUSE_PIPE_START_NEXT_REVISION) {
                     LOGGER(_log, V5_DEBG, "DO start next revision\n");
                     auto data = pipe.readData(c);

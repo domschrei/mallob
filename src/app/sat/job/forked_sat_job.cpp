@@ -103,7 +103,7 @@ void ForkedSatJob::loadIncrements() {
         });
     }
     if (!revisions.empty()) {
-        _solver->appendRevisions(revisions, getDesiredRevision());
+        _solver->appendRevisions(revisions, getDesiredRevision(), getNumThreads());
         _done_locally = false;
         _internal_result = JobResult();
     }

@@ -48,6 +48,8 @@ private:
     std::list<SearchInterval> _current_bounds;
     float _skew {0.9};
 
+    std::list<size_t> _bounds_to_replay; // for debugging
+
 public:
     CombSearch(float skew) : _skew(skew) {}
 
@@ -59,6 +61,12 @@ public:
     }
 
     bool getNextBound(size_t& b) {
+        if (!_bounds_to_replay.empty()) {
+            b = _bounds_to_replay.front();
+            _bounds_to_replay.pop_front();
+            return true;
+        }
+
         if (_current_bounds.empty()) return false;
         std::list<SearchInterval>::iterator best = _current_bounds.begin();
         {

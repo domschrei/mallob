@@ -224,6 +224,8 @@ private:
     GroupComm _group_comm;
     int _rev_to_reach_for_group_id {0};
 
+    int _sum_of_description_sizes {0};
+
 // Public methods.
 public:
 

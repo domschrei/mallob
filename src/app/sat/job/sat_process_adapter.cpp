@@ -140,7 +140,7 @@ bool SatProcessAdapter::isFullyInitialized() {
     return _initialized && _hsm->isInitialized;
 }
 
-void SatProcessAdapter::appendRevisions(const std::vector<RevisionData>& revisions, int desiredRevision) {
+void SatProcessAdapter::appendRevisions(const std::vector<RevisionData>& revisions, int desiredRevision, int nbThreads) {
     {
         auto lock = _revisions_mutex.getLock();
         _revisions_to_write.insert(_revisions_to_write.end(), revisions.begin(), revisions.end());
@@ -149,6 +149,10 @@ void SatProcessAdapter::appendRevisions(const std::vector<RevisionData>& revisio
         for (auto& data : revisions) _sum_of_revision_sizes += data.fSize;
     }
     doWriteRevisions();
+    {
+        auto lock = _mtx_pipe.getLock();
+        if (_pipe) _pipe->writeData({nbThreads}, CLAUSE_PIPE_SET_THREAD_COUNT);
+    }
 }
 
 void SatProcessAdapter::preregisterShmemObject(ShmemObject&& obj) {

@@ -64,11 +64,12 @@ void Job::pushRevision(const std::shared_ptr<std::vector<uint8_t>>& data) {
             : std::min(_max_demand, _description.getMaxDemand()); // both limits defined
     }
 
-    if (_params.maxLiteralsPerThread() > 0 && _description.getNumFormulaLiterals() > _params.maxLiteralsPerThread()) {
+    _sum_of_description_sizes += data->size() / sizeof(int);
+    if (_params.maxLiteralsPerThread() > 0 && _sum_of_description_sizes > _params.maxLiteralsPerThread()) {
         
         // Solver literal threshold exceeded: reduce number of solvers for this job
         long maxAllowedLiterals = _threads_per_job * (long)_params.maxLiteralsPerThread();
-        int optNumThreads = std::floor(((double)maxAllowedLiterals) / _description.getNumFormulaLiterals());
+        int optNumThreads = std::floor(((double)maxAllowedLiterals) / _sum_of_description_sizes);
         _threads_per_job = std::max(1, optNumThreads);
         LOG(V3_VERB, "%s : literal threshold exceeded - cut down #threads to %i\n", toStr(), _threads_per_job);
     }

@@ -90,6 +90,7 @@ public:
 	void syncDeterministicSolvingAndCheckForLocalWinner();
 
 	void reduceActiveThreadCount();
+	void setActiveThreadCount(int nbThreads);
 
     void setPaused();
     void unsetPaused();

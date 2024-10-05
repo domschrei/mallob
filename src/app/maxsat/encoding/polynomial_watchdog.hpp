@@ -17,6 +17,7 @@ public:
         for (auto& term : objective) RustSAT::dpw_add(_enc, term.lit, term.factor);
     }
     virtual void doEncode(size_t min, size_t ub, size_t max) override {
+        //max = std::max(max, ub);
         assert(min <= ub && ub <= max);
         RustSAT::dpw_limit_range(_enc, min, max,
             &cardinality_encoding_add_literal, this);
