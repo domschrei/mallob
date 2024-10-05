@@ -149,10 +149,8 @@ void SatProcessAdapter::appendRevisions(const std::vector<RevisionData>& revisio
         for (auto& data : revisions) _sum_of_revision_sizes += data.fSize;
     }
     doWriteRevisions();
-    {
-        auto lock = _mtx_pipe.getLock();
-        if (_pipe) _pipe->writeData({nbThreads}, CLAUSE_PIPE_SET_THREAD_COUNT);
-    }
+    _nb_threads = nbThreads;
+    _thread_count_update = true;
 }
 
 void SatProcessAdapter::preregisterShmemObject(ShmemObject&& obj) {
@@ -349,6 +347,12 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
         _published_revision = _written_revision;
         auto lock = _mtx_pipe.getLock();
         if (_pipe) _pipe->writeData({_desired_revision, _published_revision}, CLAUSE_PIPE_START_NEXT_REVISION);
+    }
+
+    if (_thread_count_update) {
+        auto lock = _mtx_pipe.getLock();
+        if (_pipe) _pipe->writeData({_nb_threads}, CLAUSE_PIPE_SET_THREAD_COUNT);
+        _thread_count_update = false;
     }
 
     return NORMAL;

@@ -114,6 +114,9 @@ private:
     Mutex _state_mutex;
     unsigned long _sum_of_revision_sizes {0};
 
+    bool _thread_count_update {false};
+    int _nb_threads {0};
+
     JobResult _solution;
 
 public:

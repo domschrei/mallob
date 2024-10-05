@@ -12,6 +12,7 @@
 #include "solver_thread.hpp"
 #include "util/logger.hpp"
 #include "util/random.hpp"
+#include "util/string_utils.hpp"
 #include "util/sys/proc.hpp"
 #include "util/hashing.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
@@ -255,9 +256,9 @@ void SolverThread::appendRevision(int revision, size_t fSize, const int* fLits, 
                 revision == 0 ? _solver.getSolverSetup().numOriginalClauses : 0
             )
         );
-        LOGGER(_logger, V4_VVER, "Received %i literals\n", fSize);
+        LOGGER(_logger, V4_VVER, "Received %i literals: %s\n", fSize, StringUtils::getSummary(fLits, fSize).c_str());
         _pending_assumptions.emplace_back(aSize, aLits);
-        LOGGER(_logger, V4_VVER, "Received %i assumptions\n", aSize);
+        LOGGER(_logger, V4_VVER, "Received %i assumptions: %s\n", aSize, StringUtils::getSummary(aLits, aSize).c_str());
         _latest_revision = revision;
         _found_result = false;
         assert(_latest_revision+1 == (int)_pending_formulae.size() 
@@ -333,7 +334,7 @@ void SolverThread::runOnce() {
     }
 
     // Perform solving (blocking)
-    LOGGER(_logger, V4_VVER, "BEGSOL rev. %i (%i assumptions)\n", revision, aSize);
+    LOGGER(_logger, V4_VVER, "BEGSOL rev. %i (%i assumptions): %s\n", revision, aSize, StringUtils::getSummary(aLits, aSize).c_str());
     //std::ofstream ofs("DBG_" + std::to_string(_solver.getGlobalId()) + "_" + std::to_string(_active_revision));
     //ofs << _dbg_lits << "\n";
     //ofs.close();
