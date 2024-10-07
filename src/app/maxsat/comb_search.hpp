@@ -28,6 +28,7 @@ private:
         SearchInterval(size_t lb, size_t ub, double weight) : lb(lb), ub(ub), weight(weight) {}
         size_t size() const {return ub-lb;}
         std::pair<SearchInterval, SearchInterval> split(float skew) const {
+            if (skew <= 0 || skew >= 1) skew = 0.5;
             size_t mid = lb + (ub-lb) * skew;
             SearchInterval left {lb, mid, 0.5*weight};
             SearchInterval right {mid, ub, 0.5*weight};
