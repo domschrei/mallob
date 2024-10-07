@@ -260,15 +260,19 @@ public:
             _last_found_solution = solution;
         }
         const size_t cost = _instance.getCostOfModel(solution);
-        assert(cost <= _current_bound || log_return_false("[ERROR] MAXSAT Returned solution for bound %lu has cost %lu!\n", _current_bound, cost));
+        if (cost > _current_bound) {
+            LOG(V0_CRIT, "[ERROR] MAXSAT Returned solution for bound %lu has cost %lu! Continuing still ...\n", _current_bound, cost);
+        }
         if (cost < _instance.bestCost) {
             _instance.upperBound = std::min(_instance.upperBound, cost);
             _instance.bestCost = cost;
             _instance.bestSolution = solution;
             LOG(V2_INFO, "MAXSAT %s Bound %lu solved with cost %lu - new bounds: (%lu,%lu)\n",
                 _label.c_str(), _current_bound, _instance.bestCost, _instance.lowerBound, _instance.upperBound);
-            if (_instance.combSearch)
-                _instance.combSearch->stopTestingAndUpdateUpper(_current_bound, cost-1);
+            if (_instance.combSearch) {
+                size_t prevBound = std::max(_current_bound, _instance.bestCost); // hardening in case of the above error
+                _instance.combSearch->stopTestingAndUpdateUpper(prevBound, cost-1);
+            }
         } else {
             LOG(V2_INFO, "MAXSAT %s Bound %lu solved with cost %lu - bounds unchanged\n",
                 _label.c_str(), _current_bound, _instance.bestCost);
