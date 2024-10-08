@@ -243,6 +243,15 @@ public:
             }
         }
 
+        // Did we actually find an optimal result?
+        if (_instance->lowerBound >= _instance->upperBound) {
+            // construct & return final job result
+            r.result = RESULT_OPTIMUM_FOUND;
+            r.setSolution(std::move(_instance->bestSolution));
+            LOG(V2_INFO, "MAXSAT OPTIMAL COST %lu\n", _instance->bestCost);
+            Logger::getMainInstance().flush();
+        }
+
         LOG(V4_VVER, "MAXSAT trying to stop all searches ...\n");
 
         // Make sure to stop all searches
@@ -262,14 +271,6 @@ public:
         // Now clean up all searches
         _searches.clear();
         searchesToFinalize.clear();
-
-        // Did we actually find an optimal result?
-        if (_instance->lowerBound >= _instance->upperBound) {
-            // construct & return final job result
-            r.result = RESULT_OPTIMUM_FOUND;
-            r.setSolution(std::move(_instance->bestSolution));
-            LOG(V2_INFO, "MAXSAT OPTIMAL COST %lu\n", _instance->bestCost);
-        }
 
         return r;
     }

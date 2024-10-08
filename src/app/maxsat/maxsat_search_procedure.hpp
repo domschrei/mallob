@@ -273,7 +273,7 @@ public:
                 _label.c_str(), _current_bound, _instance.bestCost, _instance.lowerBound, _instance.upperBound);
             if (_instance.combSearch) {
                 size_t prevBound = std::max(_current_bound, _instance.bestCost); // hardening in case of the above error
-                _instance.combSearch->stopTestingAndUpdateUpper(prevBound, cost-1);
+                _instance.combSearch->stopTestingAndUpdateUpper(prevBound, cost==0 ? 0 : cost-1);
             }
         } else {
             LOG(V2_INFO, "MAXSAT %s Bound %lu solved with cost %lu - bounds unchanged\n",
