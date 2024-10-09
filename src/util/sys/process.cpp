@@ -47,7 +47,7 @@ void handleSignal(int signum) {
 }
 
 bool Process::isCrash(int signum) {
-    return signum == SIGABRT || signum == SIGFPE || signum == SIGSEGV || signum == SIGBUS || signum == SIGPIPE;
+    return signum == SIGABRT || signum == SIGFPE || signum == SIGSEGV || signum == SIGBUS;
 }
 
 void Process::handleTerminationSignal(const SignalInfo& info) {

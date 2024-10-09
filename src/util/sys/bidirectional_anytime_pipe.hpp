@@ -186,23 +186,22 @@ public:
         }
     }
 
-    void notifyChildTerminated() {
-        *_shmem_did_terminate = true;
-    }
     void setChildPid(pid_t pid) {
         _child_pid = pid;
     }
 
     ~BiDirectionalAnytimePipe() {
         if (_mode == CREATE) {
-            if (!*_shmem_did_terminate)
-                writeToPipe({}, 0, false); // "wake up", stop child reader
+            writeToPipe({}, 0, false); // "wake up", stop child reader
             // Send termination signal to child, wait for answer
             *_shmem_do_terminate = true;
-            while (!*_shmem_did_terminate && (_child_pid==-1 || !Process::didChildExit(_child_pid)))
+            float time = Timer::elapsedSeconds();
+            while (!*_shmem_did_terminate && _child_pid!=-1 && !Process::didChildExit(_child_pid)
+                    && Timer::elapsedSeconds() - time < 1.0f) // 1s grace period
                 usleep(1000);
         } else {
             // Child: stop taking data from the buffers.
+            _bg_writer.stopWithoutWaiting();
             _buf_in.markExhausted();
             _buf_in.markTerminated();
             _buf_out.markExhausted();

@@ -333,6 +333,7 @@ private:
             cbAtForcedExit();
             _hsm->didTerminate = true;
             // terminate yourself
+            LOGGER(_log, V4_VVER, "Exiting\n");
             Process::doExit(exitStatus);
         }
         return terminate;

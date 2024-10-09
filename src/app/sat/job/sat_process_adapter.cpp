@@ -131,6 +131,7 @@ void SatProcessAdapter::doInitialize() {
         _initialized = true;
         _hsm->doBegin = true;
         _child_pid = res;
+        _pipe->setChildPid(_child_pid);
         _state = SolvingStates::ACTIVE;
         applySolvingState();
     }
@@ -186,7 +187,6 @@ void SatProcessAdapter::doTerminateInitializedProcess() {
     while (!_hsm->didBegin) usleep(3*1000); // wait until child is actually in the main loop
     _hsm->doTerminate = true; // Kindly ask child process to terminate.
     auto lock = _mtx_pipe.getLock();
-    _pipe->setChildPid(_child_pid);
     _pipe.reset(); // clean up bidirectional pipe
 }
 
@@ -302,7 +302,7 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
         _child_pid = -1;
         // Notify to restart solver engine
         auto lock = _mtx_pipe.getLock();
-        if (_pipe) _pipe->notifyChildTerminated();
+        if (_pipe) _pipe->setChildPid(-1);
         return CRASHED;
     }
 
@@ -372,7 +372,7 @@ void SatProcessAdapter::waitUntilChildExited() {
         if (Process::didChildExit(_child_pid)) {
             _child_pid = -1;
             auto lock = _mtx_pipe.getLock();
-            if (_pipe) _pipe->notifyChildTerminated();
+            if (_pipe) _pipe->setChildPid(-1);
             return;
         }
         lock.unlock();
