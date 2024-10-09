@@ -179,11 +179,11 @@ std::optional<Process::SignalInfo> Process::getCaughtSignal() {
 
 void Process::writeTrace(long tid) {
     long callingTid = Proc::getTid();
-    std::string command = "kill -20 " + std::to_string(tid) 
-            + " && gdb --q --n --ex bt --batch --pid " + std::to_string(tid) 
-            + " > " + _trace_dir + "/mallob_thread_trace_of_" + std::to_string(tid) 
+    std::string command = "kill -20 " + std::to_string(tid)
+            + " ; gdb --q --n --ex bt --batch --pid " + std::to_string(tid)
+            + " > " + _trace_dir + "/mallob_thread_trace_of_" + std::to_string(tid)
             + "_from_" + std::to_string(callingTid) + " 2>&1"
-            + " && kill -18 " + std::to_string(tid);
+            + " ; kill -18 " + std::to_string(tid);
     // Execute GDB in separate thread to avoid self-tracing
     std::thread thread([&]() {
         (void) system(command.c_str());
