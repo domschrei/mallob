@@ -53,6 +53,9 @@ bool Process::isCrash(int signum) {
 void Process::handleTerminationSignal(const SignalInfo& info) {
     if (!Process::isLeafProcess()) Process::forwardTerminateToChildren();
 
+    auto cmd = "bash scripts/kill-delayed.sh " + std::to_string(Proc::getPid());
+    system(cmd.c_str());
+
     if (isCrash(info.signum)) {
         if (Proc::getTid() == Process::_main_tid) {
             // Main thread: handle crash directly
