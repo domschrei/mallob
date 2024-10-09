@@ -193,8 +193,10 @@ private:
         int rank;
         int revision;
         bool sendSkeletonOnly;
+        bool directChild {true};
         bool operator==(const ChildWaitingForDescription& other) const {
-            return rank == other.rank && revision == other.revision && sendSkeletonOnly == other.sendSkeletonOnly;
+            return rank == other.rank && revision == other.revision && sendSkeletonOnly == other.sendSkeletonOnly
+                && directChild == other.directChild;
         }
     };
     struct ChildWaitingForDescriptionHasher {
@@ -389,7 +391,7 @@ public:
     virtual bool canHandleIncompleteRevision(int rev) {return false;}
 
     // Marks the job to be indestructible as long as pending is true.
-    void addChildWaitingForRevision(int rank, int revision, bool sendSkeletonOnly) {_children_waiting_for_description.insert({rank, revision, sendSkeletonOnly});}
+    void addChildWaitingForRevision(int rank, int revision, bool sendSkeletonOnly, bool directChild = true) {_children_waiting_for_description.insert({rank, revision, sendSkeletonOnly, directChild});}
     void setDesiredRevision(int revision) {_desired_revision = std::max(_desired_revision, revision);}
     bool isRevisionSolved(int revision) {return _last_solved_revision >= revision;}
     void setRevisionSolved(int revision) {_last_solved_revision = revision;}

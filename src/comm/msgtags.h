@@ -27,6 +27,7 @@ const int MSG_ANSWER_ADOPTION_OFFER = 5;
 
 const int MSG_QUERY_JOB_DESCRIPTION = 6;
 const int MSG_QUERY_JOB_DESCRIPTION_SKELETON = 600;
+const int MSG_QUERY_JOB_DESCRIPTION_BY_PROXY = 601;
 
 /*
 The sender propagates a job's volume update to the receiver.

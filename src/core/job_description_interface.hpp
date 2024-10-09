@@ -2,9 +2,11 @@
 #pragma once
 
 #include "comm/msgtags.h"
+#include "data/serializable.hpp"
 #include "util/hashing.hpp"
 #include "app/job.hpp"
 #include "job_registry.hpp"
+#include "util/logger.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "comm/msg_queue/message_subscription.hpp"
 
@@ -25,6 +27,8 @@ public:
             [&](auto& h) {handleQueryForJobDescription(h);});
         _subscriptions.emplace_back(MSG_QUERY_JOB_DESCRIPTION_SKELETON,
             [&](auto& h) {handleQueryForJobDescription(h);});
+        _subscriptions.emplace_back(MSG_QUERY_JOB_DESCRIPTION_BY_PROXY,
+            [&](auto& h) {handleProxyQueryForJobDescription(h);});
 
         MyMpi::getMessageQueue().registerSentCallback(MSG_SEND_JOB_DESCRIPTION, [&](int sendId) {
             handleJobDescriptionSent(sendId);
@@ -75,16 +79,13 @@ public:
         auto& waitingChildren = job.getChildrenWaitingForDescription();
         auto it = waitingChildren.begin();
         while (it != waitingChildren.end()) {
-            auto& [rank, rev, sendSkeletonOnly] = *it;
+            auto& [rank, rev, sendSkeletonOnly, directChild] = *it;
             if (rev > job.getRevision() || (!sendSkeletonOnly && job.getDescription().isRevisionIncomplete(rev))) {
                 ++it;
                 continue;
             }
-            if (job.getJobTree().hasLeftChild() && job.getJobTree().getLeftChildNodeRank() == rank) {
-                // Left child
-                send(job, rev, rank, sendSkeletonOnly);
-            } else if (job.getJobTree().hasRightChild() && job.getJobTree().getRightChildNodeRank() == rank) {
-                // Right child
+            if (!directChild || (job.getJobTree().hasLeftChild() && job.getJobTree().getLeftChildNodeRank() == rank)
+                || (job.getJobTree().hasRightChild() && job.getJobTree().getRightChildNodeRank() == rank)) {
                 send(job, rev, rank, sendSkeletonOnly);
             } // else: obsolete request
             // Remove processed request
@@ -166,11 +167,36 @@ private:
 
         if (job.getRevision() >= revision && (sendSkeletonOnly || !job.getDescription().isRevisionIncomplete(revision))) {
             send(job, revision, handle.source, sendSkeletonOnly);
+        } else if (job.getRevision() >= revision && !sendSkeletonOnly && !job.getJobTree().isRoot()) {
+            MyMpi::isend(job.getJobTree().getParentNodeRank(), MSG_QUERY_JOB_DESCRIPTION_BY_PROXY, IntVec{jobId, revision, handle.source});
         } else {
             // This revision is not present yet: Defer this query
             // and send the job description upon receiving it
             job.addChildWaitingForRevision(handle.source, revision, sendSkeletonOnly);
             return;
+        }
+    }
+
+    void handleProxyQueryForJobDescription(MessageHandle& handle) {
+
+        IntVec vec = Serializable::get<IntVec>(handle.getRecvData());
+        int jobId = vec[0];
+        int revision = vec[1];
+        int requestingRank = vec[2];
+
+        if (!_job_registry.has(jobId)) return;
+        Job& job = _job_registry.get(jobId);
+        if (job.getRevision() < revision) {
+            job.addChildWaitingForRevision(requestingRank, revision, false, false);
+            return;
+        }
+
+        if (!job.getDescription().isRevisionIncomplete(revision)) {
+            send(job, revision, requestingRank, false);
+        } else if (!job.getJobTree().isRoot()) {
+            MyMpi::isend(job.getJobTree().getParentNodeRank(), MSG_QUERY_JOB_DESCRIPTION_BY_PROXY, IntVec{jobId, revision, handle.source});
+        } else {
+            job.addChildWaitingForRevision(requestingRank, revision, false, false);
         }
     }
 };

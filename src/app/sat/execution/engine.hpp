@@ -2,6 +2,8 @@
 #pragma once
 
 #include <ext/alloc_traits.h>
+#include <future>
+#include <list>
 #include <stddef.h>
 #include <atomic>
 #include <vector>
@@ -38,6 +40,7 @@ private:
 	std::vector<std::shared_ptr<PortfolioSolverInterface>> _solver_interfaces;
 	std::vector<std::shared_ptr<SolverThread>> _solver_threads;
 	std::vector<std::shared_ptr<SolverThread>> _obsolete_solver_threads;
+	std::list<std::future<void>> _solver_thread_cleanups;
 
 	struct RevisionData {
 		size_t fSize;

@@ -6,6 +6,7 @@
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "util/logger.hpp"
 #include "util/sys/fileutils.hpp"
+#include "util/sys/thread_pool.hpp"
 #include "util/sys/timer.hpp"
 #include "data/app_configuration.hpp"
 #include "../solvers/cadical.hpp"
@@ -312,7 +313,7 @@ void SatEngine::appendRevision(int revision, size_t fSize, const int* fLits, siz
 	_revision_data.push_back(RevisionData{fSize, fLits, aSize, aLits});
 	_sharing_manager->setImportedRevision(revision);
 	
-	for (size_t i = 0; i < _num_solvers; i++) {
+	for (size_t i = 0; i < _num_active_solvers; i++) {
 		if (revision == 0) {
 			// Initialize solver thread
 			_solver_threads.emplace_back(new SolverThread(
@@ -373,7 +374,8 @@ void SatEngine::solve() {
 	if (!_solvers_started) {
 		// Need to start threads
 		LOGGER(_logger, V4_VVER, "starting threads\n");
-		for (auto& thread : _solver_threads) thread->start();
+		for (size_t i = 0; i < std::min(_num_active_solvers, _solver_threads.size()); i++)
+			_solver_threads[i]->start();
 		_solvers_started = true;
 	}
 	_state = ACTIVE;
@@ -381,7 +383,7 @@ void SatEngine::solve() {
 
 bool SatEngine::isFullyInitialized() {
 	if (_state == INITIALIZING) return false;
-	for (size_t i = 0; i < _solver_threads.size(); i++) {
+	for (size_t i = 0; i < std::min(_num_active_solvers, _solver_threads.size()); i++) {
 		if (!_solver_threads[i]->isInitialized()) return false;
 	}
 	return true;
@@ -396,7 +398,7 @@ int SatEngine::solveLoop() {
 
     // Solving done?
 	bool done = false;
-	for (size_t i = 0; i < _solver_threads.size(); i++) {
+	for (size_t i = 0; i < std::min(_num_active_solvers, _solver_threads.size()); i++) {
 		if (_solver_threads[i]->hasFoundResult(_revision)) {
 
 			if (_params.deterministicSolving() && _solver_interfaces[i]->getGlobalId() != _winning_solver_id)
@@ -482,14 +484,29 @@ void SatEngine::reduceActiveThreadCount() {
 
 void SatEngine::setActiveThreadCount(int nbThreads) {
 	if (nbThreads < 1) return;
-	int nbThreadsToTerminate = _num_active_solvers - nbThreads;
+	int nbThreadsToTerminate = (int)_num_active_solvers - nbThreads;
 	if (nbThreadsToTerminate <= 0) return;
 	for (int termIdx = 0; termIdx < nbThreadsToTerminate; termIdx++) {
 		size_t i = _num_active_solvers-1;
 		LOGGER(_logger, V3_VERB, "Terminating %lu-th solver to reduce thread count\n", i);
 		_sharing_manager->stopClauseImport(i);
+		SolverSetup s = _solver_interfaces[i]->getSolverSetup();
+		s.solverRevision++;
 		_solver_threads[i]->setTerminate(true);
+		auto movedSolver = std::move(_solver_interfaces[i]);
+		_solver_interfaces[i] = createSolver(s);
+		auto movedThread = std::move(_solver_threads[i]);
+		_solver_threads[i] = std::shared_ptr<SolverThread>(new SolverThread(
+			_params, _config, _solver_interfaces[i],
+			0, 0, 0, 0, i
+		));
+		_solver_threads[i]->setTerminate();
 		_num_active_solvers--;
+		_solver_thread_cleanups.push_back(ProcessWideThreadPool::get().addTask([thread = std::move(movedThread), solver = std::move(movedSolver)]() mutable {
+			thread->tryJoin();
+			thread.reset();
+			solver.reset();
+		}));
 	}
 }
 
@@ -589,6 +606,8 @@ void SatEngine::cleanUp(bool hardTermination) {
 	for (auto& thread : _obsolete_solver_threads) thread->tryJoin();
 	_solver_threads.clear();
 	_obsolete_solver_threads.clear();
+	for (auto& fut : _solver_thread_cleanups) fut.get(); // wait for cleanups
+	_solver_thread_cleanups.clear();
 
 	LOGGER(_logger, V5_DEBG, "[engine-cleanup] joined threads\n");
 
