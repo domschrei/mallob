@@ -137,8 +137,8 @@ public:
         const size_t globalUpperBound = _instance.upperBound;
         if (globalUpperBound <= globalLowerBound) return false;
 
-        if (_instance.combSearch) {
-            if (!_instance.combSearch->getNextBound(_current_bound)) return false;
+        if (_instance.intervalSearch) {
+            if (!_instance.intervalSearch->getNextBound(_current_bound)) return false;
         } else {
             switch (_search_strat) {
             case INCREASING:
@@ -237,20 +237,20 @@ public:
                 _instance.lowerBound = _instance.findNextPossibleHigherCost(_current_bound);
                 LOG(V2_INFO, "MAXSAT %s Bound %lu unsat - new bounds: (%lu,%lu)\n",
                     _label.c_str(), _current_bound, _instance.lowerBound, _instance.upperBound);
-                if (_instance.combSearch)
-                    _instance.combSearch->stopTestingAndUpdateLower(_current_bound);
+                if (_instance.intervalSearch)
+                    _instance.intervalSearch->stopTestingAndUpdateLower(_current_bound);
             } else {
                 LOG(V2_INFO, "MAXSAT %s Bound %lu unsat - bounds unchanged\n", _label.c_str(), _current_bound);
-                if (_instance.combSearch)
-                    _instance.combSearch->stopTestingWithoutUpdates(_current_bound);
+                if (_instance.intervalSearch)
+                    _instance.intervalSearch->stopTestingWithoutUpdates(_current_bound);
             }
             return RESULT_UNSAT;
         }
         if (resultCode != RESULT_SAT) {
             // UNKNOWN or something else - presumably because the job was interrupted
             LOG(V2_INFO, "MAXSAT %s Call returned UNKNOWN\n", _label.c_str(), _current_bound);
-            if (_instance.combSearch)
-                _instance.combSearch->stopTestingWithoutUpdates(_current_bound);
+            if (_instance.intervalSearch)
+                _instance.intervalSearch->stopTestingWithoutUpdates(_current_bound);
             return RESULT_UNKNOWN;
         }
         // Formula is SATisfiable.
@@ -271,15 +271,15 @@ public:
             _instance.bestSolution = solution;
             LOG(V2_INFO, "MAXSAT %s Bound %lu solved with cost %lu - new bounds: (%lu,%lu)\n",
                 _label.c_str(), _current_bound, _instance.bestCost, _instance.lowerBound, _instance.upperBound);
-            if (_instance.combSearch) {
+            if (_instance.intervalSearch) {
                 size_t prevBound = std::max(_current_bound, _instance.bestCost); // hardening in case of the above error
-                _instance.combSearch->stopTestingAndUpdateUpper(prevBound, cost==0 ? 0 : cost-1);
+                _instance.intervalSearch->stopTestingAndUpdateUpper(prevBound, cost==0 ? 0 : cost-1);
             }
         } else {
             LOG(V2_INFO, "MAXSAT %s Bound %lu solved with cost %lu - bounds unchanged\n",
                 _label.c_str(), _current_bound, _instance.bestCost);
-            if (_instance.combSearch)
-                _instance.combSearch->stopTestingWithoutUpdates(_current_bound);
+            if (_instance.intervalSearch)
+                _instance.intervalSearch->stopTestingWithoutUpdates(_current_bound);
         }
         // Since we found SAT, add assumptions as permanent unit clauses where possible.
         for (int asmpt : _assumptions_to_persist_upon_sat) {

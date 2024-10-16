@@ -14,7 +14,7 @@
 #include "util/assert.hpp"
 #include "util/logger.hpp"
 
-class CombSearch {
+class IntervalSearch {
 
 public:
     static constexpr double WEIGHT_SUM = (1<<20);
@@ -52,7 +52,7 @@ private:
     std::list<size_t> _bounds_to_replay; // for debugging
 
 public:
-    CombSearch(float skew) : _skew(skew) {}
+    IntervalSearch(float skew) : _skew(skew) {}
 
     void init(size_t min, size_t max) {
         // Create first interval with full weight

@@ -13,7 +13,7 @@
 #include "app/maxsat/comb_search.hpp"
 
 void test() {
-    CombSearch s(0.9);
+    IntervalSearch s(0.9);
     s.init(0, 10'000);
     size_t bound {-1UL};
     bool ok;
@@ -39,7 +39,7 @@ void test() {
 }
 
 void testExhaustive() {
-    CombSearch s(0.9);
+    IntervalSearch s(0.9);
     s.init(0, 1'000'000);
     size_t bound {-1UL};
     bool ok;

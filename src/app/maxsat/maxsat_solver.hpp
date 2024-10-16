@@ -87,7 +87,7 @@ public:
         _instance->print();
 
         // Parse the user-provided sequence of search strategies.
-        std::string searchStrats = _params.maxSatSearchStrategy();
+        std::string searchStrats = std::string(_params.maxSatNumSearchers(), 'd');
         const int nbWorkers = _params.numWorkers() == -1 ? MyMpi::size(MPI_COMM_WORLD) : _params.numWorkers();
         // Loop over each specified search strategy
         for (int i = 0; i < searchStrats.size(); i++) {
@@ -140,7 +140,7 @@ public:
         }
 
         // Initialize comb search if needed
-        if (_instance->combSearch) _instance->combSearch->init(_instance->lowerBound, _instance->upperBound);
+        if (_instance->intervalSearch) _instance->intervalSearch->init(_instance->lowerBound, _instance->upperBound);
 
         if (_shared_encoder) {
             // Initialize cardinality constraint encoder.
@@ -324,9 +324,7 @@ private:
         for (auto term : _instance->objective) _instance->upperBound += term.factor;
         _instance->sumOfWeights = _instance->upperBound;
         _instance->bestCost = ULONG_MAX;
-        if (_params.maxSatCombSearch()) {
-            _instance->combSearch.reset(new CombSearch(_params.maxSatCombSkew()));
-        }
+        _instance->intervalSearch.reset(new IntervalSearch(_params.maxSatIntervalSkew()));
     }
 
     // Heuristic picking a suitable cardinality encoding based on the objective function's properties.

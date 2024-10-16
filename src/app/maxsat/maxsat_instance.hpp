@@ -7,7 +7,7 @@
 #include <valarray>
 #include <vector>
 
-#include "app/maxsat/comb_search.hpp"
+#include "app/maxsat/interval_search.hpp"
 #include "util/assert.hpp"
 #include "util/logger.hpp"
 
@@ -36,7 +36,7 @@ struct MaxSatInstance {
     // the cost associated with the best found satisfying assignment so far
     size_t bestCost;
 
-    std::unique_ptr<CombSearch> combSearch;
+    std::unique_ptr<IntervalSearch> intervalSearch;
 
     MaxSatInstance(const int* formulaData, size_t formulaSize) : formulaData(formulaData), formulaSize(formulaSize) {}
 

@@ -416,7 +416,7 @@ int SatEngine::solveLoop() {
 	}
 
 	if (done) {
-		LOGGER(_logger, V5_DEBG, "Returning result\n");
+		LOGGER(_logger, V6_DEBGV, "Returning result\n");
 		return _result.result;
 	}
     return -1; // no result yet

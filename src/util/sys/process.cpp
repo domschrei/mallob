@@ -65,9 +65,6 @@ void Process::handleTerminationSignal(const SignalInfo& info) {
             // Try to write a trace of the concerned thread with gdb
             Process::writeTrace(tid);
             Process::doExit(1);
-        } else {
-            // Sleep indefinitely until killed by main thread
-            while (true) {}
         }
     }
 }

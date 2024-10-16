@@ -32,6 +32,7 @@ public:
 
                 if (fromMainThread) {
                     Process::handleTerminationSignal(optSignalInfo.value());
+                    broadcastExitSignal();
                 }
 
                 return true;
