@@ -10,7 +10,7 @@
 #include "util/sys/proc.hpp"
 #include "util/random.hpp"
 #include "util/sys/process.hpp"
-#include "app/maxsat/comb_search.hpp"
+#include "app/maxsat/interval_search.hpp"
 
 void test() {
     IntervalSearch s(0.9);
