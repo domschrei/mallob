@@ -1,4 +1,5 @@
 
+#include <climits>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -13,6 +14,7 @@
 #include <utility>
 #include <vector>
 
+#include "parserinterface.hpp"
 #include "app/sat/proof/trusted/trusted_utils.hpp"
 #include "app/sat/proof/trusted_parser_process_adapter.hpp"
 #include "maxsat_reader.hpp"
@@ -102,36 +104,63 @@ bool MaxSatReader::parseInternally(JobDescription& desc) {
 
 bool MaxSatReader::read(JobDescription& desc) {
 
-	const std::string NC_DEFAULT_VAL = "BMMMKKK111";
-	desc.setAppConfigurationEntry("__NC", NC_DEFAULT_VAL);
-	desc.setAppConfigurationEntry("__NV", NC_DEFAULT_VAL);
-	desc.setAppConfigurationEntry("__NO", NC_DEFAULT_VAL);
-	desc.setAppConfigurationEntry("__XL", NC_DEFAULT_VAL);
-	desc.setAppConfigurationEntry("__XU", NC_DEFAULT_VAL);
+	auto& config = desc.getAppConfiguration();
+	config.updateFixedSizeEntry("__NC", 0);
+	config.updateFixedSizeEntry("__NV", 0);
+	config.updateFixedSizeEntry("__NO", 0);
+	config.updateFixedSizeEntry("__XL", 0);
+	config.updateFixedSizeEntry("__XU", 0);
 	if (_params.onTheFlyChecking()) {
 		std::string placeholder(32, 'x');
 		desc.setAppConfigurationEntry("__SIG", placeholder.c_str());
 	}
 	desc.beginInitialization(desc.getRevision());
 
-	if (!parseInternally(desc)) return false;
+	std::unique_ptr<maxPreprocessor::ParserInterface> parser;
+	if (_params.maxPre()) {
+		parser.reset(new maxPreprocessor::ParserInterface());
+		std::ifstream ifs {_filename};
+		float time = Timer::elapsedSeconds();
+		int res = parser->read_file_init_interface(ifs);
+		const float timeParse = Timer::elapsedSeconds() - time;
+		if (res != 0) return false;
+		time = Timer::elapsedSeconds();
+		parser->preprocess(_params.maxPreTechniques(), 0, _params.maxPreTimeout());
+		const float timePreprocess = Timer::elapsedSeconds() - time;
+		std::vector<int> formula;
+		parser->getInstance(formula, _objective, _max_var, _num_read_clauses);
+		LOG(V3_VERB, "MAXSAT MaxPRE stat lits:%i vars:%i cls:%i obj:%lu\n", formula.size(), _max_var, _num_read_clauses, _objective.size());
+		LOG(V3_VERB, "MAXSAT MaxPRE time parse:%.3f preprocess:%.3f\n", timeParse, timePreprocess);
+
+		// Parcel job description
+		for (int lit : formula) desc.addPermanentData(lit);
+		desc.addPermanentData(0);
+		for (auto& [weight, lit] : _objective) {
+			// Need to write each 64-bit weight as two 32-bit integers ...
+			const int* weightAsTwoInts = (int*) &weight;
+			desc.addPermanentData(weightAsTwoInts[0]);
+			desc.addPermanentData(weightAsTwoInts[1]);
+			desc.addPermanentData(lit);
+		}
+		desc.addPermanentData((int) _objective.size());
+	} else {
+		if (!parseInternally(desc)) return false;
+	}
+
+	unsigned long lb = parser ? parser->get_lb() : 0;
+	unsigned long ub = parser ? parser->get_ub() : ULONG_MAX;
+	desc.addPermanentData(((int*) &lb)[0]);
+	desc.addPermanentData(((int*) &lb)[1]);
+	desc.addPermanentData(((int*) &ub)[0]);
+	desc.addPermanentData(((int*) &ub)[1]);
+
 	assert(getNbClauses() > 0);
 
-	// Store # variables and # clauses in app config
-	std::vector<std::pair<int, std::string>> fields {
-		{_num_read_clauses, "__NC"},
-		{_max_var, "__NV"},
-		{_objective.size(), "__NO"},
-		{-1, "__XL"},
-		{-1, "__XU"}
-	};
-	for (auto [nbRead, dest] : fields) {
-		std::string nbStr = std::to_string(nbRead);
-		assert(nbStr.size() < NC_DEFAULT_VAL.size());
-		while (nbStr.size() < NC_DEFAULT_VAL.size())
-			nbStr += ".";
-		desc.setAppConfigurationEntry(dest, nbStr);
-	}
+	config.updateFixedSizeEntry("__NC", _num_read_clauses);
+	config.updateFixedSizeEntry("__NV", _max_var);
+	config.updateFixedSizeEntry("__NO", (int)_objective.size());
+	config.updateFixedSizeEntry("__XL", -1);
+	config.updateFixedSizeEntry("__XU", -1);
 
 	desc.endInitialization();
 
@@ -142,5 +171,5 @@ bool MaxSatReader::read(JobDescription& desc) {
 		return false;
 	}
 
-	return isValidInput();
+	return _params.maxPre() || isValidInput();
 }

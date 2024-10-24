@@ -9,9 +9,9 @@ set(BASE_SOURCES ${BASE_SOURCES} ${MAXSAT_MALLOB_SOURCES} CACHE INTERNAL "")
 #message("commons+SAT sources: ${BASE_SOURCES}") # Use to debug
 
 # Include external libraries if necessary
-set(BASE_LINK_DIRS ${BASE_LINK_DIRS} lib/rustsat CACHE INTERNAL "")
-set(BASE_LIBS ${BASE_LIBS} rustsat CACHE INTERNAL "")
-set(BASE_INCLUDES ${BASE_INCLUDES} lib/rustsat/capi CACHE INTERNAL "")
+set(BASE_LINK_DIRS ${BASE_LINK_DIRS} lib/rustsat lib/maxpre-mallob CACHE INTERNAL "")
+set(BASE_LIBS ${BASE_LIBS} rustsat maxpre CACHE INTERNAL "")
+set(BASE_INCLUDES ${BASE_INCLUDES} lib/rustsat/capi lib/maxpre-mallob/src CACHE INTERNAL "")
 
 # Executable of subprocess (N/A in our case so far)
 #add_executable(mallob_maxsat_process ${MAXSAT_SUBPROC_SOURCES} src/app/maxsat/main.cpp)
@@ -22,4 +22,5 @@ set(BASE_INCLUDES ${BASE_INCLUDES} lib/rustsat/capi CACHE INTERNAL "")
 # Add unit tests: for each $arg there must be a standalone cpp file under "test/test_${arg}.cpp".
 new_test(rustsat_encoders)
 new_test(interval_search)
+new_test(maxpre)
 # ...

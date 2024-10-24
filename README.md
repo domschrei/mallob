@@ -35,7 +35,7 @@ Note that we only support Linux as an operating system.
 ( cd lib && bash fetch_and_build_sat_solvers.sh )
 
 # Only needed if building with -DMALLOB_APP_MAXSAT=1.
-( cd lib && bash fetch_and_build_rustsat.sh )
+( cd lib && bash fetch_and_build_maxsat_deps.sh )
 
 # Build Mallob
 mkdir -p build

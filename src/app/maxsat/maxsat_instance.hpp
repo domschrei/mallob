@@ -42,7 +42,8 @@ struct MaxSatInstance {
 
     // Print some nice-to-know diagnostics.
     void print() const {
-        LOG(V2_INFO, "MAXSAT lits=%lu #o=%lu sow=%lu #uniq=%lu\n", formulaSize, objective.size(), sumOfWeights, nbUniqueWeights);
+        LOG(V2_INFO, "MAXSAT lits=%lu #o=%lu sow=%lu #uniq=%lu lb=%lu ub=%lu\n",
+            formulaSize, objective.size(), sumOfWeights, nbUniqueWeights, lowerBound, upperBound);
         std::string o;
         for (size_t i = 0; i < objective.size(); i++) {
 

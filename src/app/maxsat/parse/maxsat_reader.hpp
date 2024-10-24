@@ -32,12 +32,8 @@ private:
     bool _contains_empty_clause {false};
     bool _hard_clause = false;
 
-    struct SoftUnit {
-        size_t weight;
-        int literal;
-    };
-    std::vector<SoftUnit> _objective;
-    SoftUnit _current_soft_unit {0, 0};
+    std::vector<std::pair<uint64_t, int>> _objective;
+    std::pair<uint64_t, int> _current_soft_unit {0, 0};
 
     bool _input_invalid {false};
     bool _input_finished {false};
@@ -72,8 +68,7 @@ public:
                     } else {
                         // soft clause
                         _objective.push_back(_current_soft_unit);
-                        _current_soft_unit.weight = 0;
-                        _current_soft_unit.literal = 0;
+                        _current_soft_unit = {0, 0};
                     }
                     if (_last_added_lit_was_zero) _contains_empty_clause = true;
                     _last_added_lit_was_zero = true;
@@ -102,12 +97,12 @@ public:
                         desc.addPermanentData(lit);
                     } else if (_num != 0) {
                         // soft unit clause
-                        if (_current_soft_unit.weight == 0) {
+                        if (_current_soft_unit.first == 0) {
                             assert(_sign == 1);
-                            _current_soft_unit.weight = _num;
-                        } else if (_current_soft_unit.literal == 0) {
+                            _current_soft_unit.first = _num;
+                        } else if (_current_soft_unit.second == 0) {
                             _max_var = std::max(_max_var, std::abs(lit));
-                            _current_soft_unit.literal = lit;
+                            _current_soft_unit.second = lit;
                         }
                     }
                     if (_num == 0) {
@@ -139,10 +134,10 @@ public:
         desc.addPermanentData(0);
         for (auto& softUnit : _objective) {
             // Need to write each weight, which could be 64-bit, as two 32-bit integers ...
-            const int* weightAsTwoInts = (int*) &softUnit.weight;
+            const int* weightAsTwoInts = (int*) &softUnit.first;
             desc.addPermanentData(weightAsTwoInts[0]);
             desc.addPermanentData(weightAsTwoInts[1]);
-            desc.addPermanentData(softUnit.literal);
+            desc.addPermanentData(softUnit.second);
         }
         desc.addPermanentData((int) _objective.size());
     }

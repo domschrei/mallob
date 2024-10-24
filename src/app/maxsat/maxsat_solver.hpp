@@ -24,6 +24,7 @@
 #include "util/logger.hpp"
 // external
 #include "rustsat.h"
+#include "util/string_utils.hpp"
 #include "util/sys/terminator.hpp"
 #include "util/params.hpp"
 
@@ -86,6 +87,16 @@ public:
         // Just for debugging
         _instance->print();
 
+        // TODO If the preprocessor found a non-trivial upper bound,
+        // can we extract a solution from it?
+        if (_instance->lowerBound == _instance->upperBound) {
+            r.result = RESULT_OPTIMUM_FOUND;
+            r.setSolution({}); // TODO
+            LOG(V2_INFO, "MAXSAT OPTIMAL COST %lu\n", _instance->upperBound);
+            Logger::getMainInstance().flush();
+            return r;
+        }
+
         // Parse the user-provided sequence of search strategies.
         std::string searchStrats = std::string(_params.maxSatNumSearchers(), 'd');
         const int nbWorkers = _params.numWorkers() == -1 ? MyMpi::size(MPI_COMM_WORLD) : _params.numWorkers();
@@ -110,7 +121,11 @@ public:
         }
         assert(!_searches.empty());
 
-        {
+        // If the best known upper bound is trivial, we first perform a solving attempt
+        // without encoding any constraints. If we know a non-trivial bound from preprocessing,
+        // we skip this and instead begin encoding it right away.
+        const bool solveWithoutBounds = _instance->upperBound == _instance->sumOfWeights;
+        if (solveWithoutBounds) {
             // Initial SAT call: just solve the hard clauses.
             // We just use the first specified search strategy for this task.
             MaxSatSearchProcedure* search = _searches.front().get();
@@ -133,14 +148,16 @@ public:
         }
 
         // Run the initial formula revision through ALL searches, so that everyone has the same one.
-        for (auto& search : _searches) {
-            if (search == _searches.front()) continue;
+        if (_searches.size() > 1) for (auto& search : _searches) {
+            if (solveWithoutBounds && search == _searches.front())
+                continue; // this search has already been run once
             search->solveNonblocking();
             search->interrupt();
         }
 
-        // Initialize comb search if needed
-        if (_instance->intervalSearch) _instance->intervalSearch->init(_instance->lowerBound, _instance->upperBound);
+        // Initialize interval search if needed
+        if (_instance->intervalSearch)
+            _instance->intervalSearch->init(_instance->lowerBound, _instance->upperBound);
 
         if (_shared_encoder) {
             // Initialize cardinality constraint encoder.
@@ -285,20 +302,31 @@ private:
 
         // Traverse the objective function from back to front until you find the beginning
         assert(fSize >= 1);
-        const int nbObjectiveTerms = fPtr[fSize-1];
+        size_t pos = fSize;
+        pos -= 2;
+        unsigned long ub = * (unsigned long*) (fPtr + pos);
+        pos -= 2;
+        unsigned long lb = * (unsigned long*) (fPtr + pos);
+        pos--;
+        const int nbObjectiveTerms = fPtr[pos];
+        pos -= 3*nbObjectiveTerms;
+        LOG(V2_INFO, "MAXSAT lb=%lu ub=%lu o=%i\n", lb, ub, nbObjectiveTerms);
         assert(nbObjectiveTerms > 0);
-        size_t pos = fSize - 1 - 3*nbObjectiveTerms - 1;
+        pos--;
         assert(fPtr[pos] == 0);
         // pos now points at the separation zero right before the objective
         // hard clauses end at the separation zero to the objective
         _instance.reset(new MaxSatInstance(fPtr, pos));
+        _instance->lowerBound = lb;
+        _instance->upperBound = ub;
 
         // Now actually parse the objective function
         ++pos;
         tsl::robin_set<size_t> uniqueFactors;
-        while (pos+2 < fSize) {
+        while (_instance->objective.size() < nbObjectiveTerms) {
             size_t factor = * (size_t*) (fPtr+pos);
-            int lit = -fPtr[pos+2];
+            // MaxPRE already flips the literals' polarity
+            int lit = (_params.maxPre() ? 1 : -1) * fPtr[pos+2];
             assert(factor != 0);
             assert(lit != 0);
             _instance->objective.push_back({factor, lit});
@@ -313,17 +341,12 @@ private:
             return termLeft.factor < termRight.factor;
         });
 
-        // Extract number of variables
-        std::string nbVarsString = _desc.getAppConfiguration().map.at("__NV");
-        while (nbVarsString[nbVarsString.size()-1] == '.') 
-			nbVarsString.resize(nbVarsString.size()-1);
-		_instance->nbVars = atoi(nbVarsString.c_str());
-
-        _instance->lowerBound = 0;
-        _instance->upperBound = 0;
-        for (auto term : _instance->objective) _instance->upperBound += term.factor;
-        _instance->sumOfWeights = _instance->upperBound;
+        _instance->nbVars = _desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
+        _instance->sumOfWeights = 0;
+        for (auto term : _instance->objective) _instance->sumOfWeights += term.factor;
+        _instance->upperBound = std::min(_instance->upperBound, _instance->sumOfWeights);
         _instance->bestCost = ULONG_MAX;
+
         _instance->intervalSearch.reset(new IntervalSearch(_params.maxSatIntervalSkew()));
     }
 

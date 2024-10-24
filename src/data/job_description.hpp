@@ -192,6 +192,7 @@ public:
     int getMaxDemand() const {return _max_demand;}
     int getApplicationId() const {return _application_id;}
     const AppConfiguration& getAppConfiguration() const {return _app_config;}
+    AppConfiguration& getAppConfiguration() {return _app_config;}
     
     float getArrival() const {return _arrival;}
     void setIncremental(bool incremental) {_incremental = incremental;}
