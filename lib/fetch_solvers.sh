@@ -61,12 +61,12 @@ if echo $solvers|grep -q "k"; then
     fi
 fi
 
-# CaDiCaL (supports LRAT proof production)
+# CaDiCaL
 if echo $solvers|grep -q "c"; then
     if [ ! -d cadical ]; then
         if [ ! -f cadical.zip ]; then
             # for fixing a branch instead of a commit, prepend "refs/heads/"
-            branchorcommit="0ef9def35e2e25da84f5b421909d0e5bb28aa59f"
+            branchorcommit="3671892c92d383486048567057e4325d7930d108"
             wget -nc https://github.com/domschrei/cadical/archive/${branchorcommit}.zip -O cadical.zip
         fi
         unzip cadical.zip

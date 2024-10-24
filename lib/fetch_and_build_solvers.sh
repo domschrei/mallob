@@ -92,7 +92,7 @@ if echo $solvers|grep -q "k" && [ ! -f kissat/libkissat.a ]; then
     cd ..
 fi
 
-# Normal (non-LRAT) CaDiCaL
+# CaDiCaL
 if echo $solvers|grep -q "c" && [ ! -f cadical/libcadical.a ]; then
     echo "Building CaDiCaL ..."
 
