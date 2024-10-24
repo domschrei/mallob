@@ -323,7 +323,7 @@ void MGlucose::parallelExportClause(Glucose::Clause &c, bool fromConflictAnalysi
 		
 	// A clause has "very good quality" iff it satisfies the *soft* limits
 	// (soft because they are not strict for exporting a clause).
-	bool veryGoodQuality = c.size() <= (int)_setup.qualityClauseLengthLimit 
+	bool veryGoodQuality = c.size() <= (int)_setup.qualityMaxLitsPerClause
 						&& c.lbd() <= _setup.qualityLbdLimit;
 
 	// Accept the clause if seen for the 1st time with very good quality
