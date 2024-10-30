@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <climits>
 #include <memory>
 #include <vector>
 
@@ -83,9 +84,9 @@ public:
     }
 
     void setAdmissibleVariableRange(int minVar, int maxVar) {
-        LOG(V4_VVER, "CROSSCOMM limit var interval to [%i,%i]\n", minVar, maxVar);
-        if (minVar > 0) _min_admissible_var = minVar;
-        if (maxVar > 0) _max_admissible_var = maxVar;
+        _min_admissible_var = std::max(0, minVar);
+        _max_admissible_var = maxVar < 0 ? INT_MAX : maxVar;
+        LOG(V4_VVER, "CROSSCOMM limit var interval to [%i,%i]\n", _min_admissible_var, _max_admissible_var);
     }
 
     void addInternalSharedClauses(std::vector<int>& clauses) {

@@ -13,6 +13,7 @@
 #include "app/sat/job/inter_job_clause_sharer.hpp"
 #include "comm/job_tree_snapshot.hpp"
 #include "comm/msgtags.h"
+#include "data/app_configuration.hpp"
 #include "data/job_transfer.hpp"
 #include "util/logger.hpp"
 #include "comm/mympi.hpp"
@@ -61,18 +62,8 @@ AnytimeSatClauseCommunicator::AnytimeSatClauseCommunicator(const Parameters& par
 }
 
 void AnytimeSatClauseCommunicator::initCrossSharer() {
-    int minVar, maxVar;
-    std::vector<std::pair<int*, std::string>> fields {
-        {&minVar, "__XL"},
-        {&maxVar, "__XU"}
-    };
-    for (auto [out, id] : fields) {
-        std::string str = _job->getDescription().getAppConfiguration().map.at(id);
-        while (str[str.size()-1] == '.')
-            str.resize(str.size()-1);
-        *out = atoi(str.c_str());
-        assert(*out > 0 || log_return_false("[ERROR] illegal argument for app config key %s\n", id.c_str()));
-    }
+    int minVar = _job->getDescription().getAppConfiguration().fixedSizeEntryToInt("__XL");
+    int maxVar = _job->getDescription().getAppConfiguration().fixedSizeEntryToInt("__XU");
     _cross_job_clause_sharer->setAdmissibleVariableRange(minVar, maxVar);
 }
 

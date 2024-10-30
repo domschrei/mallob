@@ -114,9 +114,9 @@ public:
             _searches.back()->setDescriptionLabelForNextCall("base-formula");
 
             // If everybody uses their own encoder, we can still put all of them in the same cross-sharing group
-            // but need to specify the interval of variables which the shared clauses may contain.
+            // due to the consistent naming of variables across all encoders.
             if (!_shared_encoder) {
-                _searches.back()->setGroupId("consistent-logic", 1, _instance->nbVars);
+                _searches.back()->setGroupId("consistent-logic"/*, 1, _instance->nbVars*/);
             }
         }
         assert(!_searches.empty());
