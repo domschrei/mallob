@@ -49,8 +49,6 @@ class OptimizingPropagator : public CaDiCaL::ExternalPropagator {
     obj_cur -= obj_map[lit];
   }
 
-  bool there_is_conflict();
-
 public:
 
   OptimizingPropagator(const std::vector<std::pair<long, int>>& objective, int maxVar) :
@@ -101,10 +99,16 @@ public:
     best_cost_found_globally.store(cost, std::memory_order_relaxed);
   }
 
+  // Check whether this optimizer instance has access to a solution (model)
+  // that matches its currently best known cost.
   bool has_best_solution() const {
     return best_cost_found_locally.load(std::memory_order_relaxed) == obj_bsf;
   }
 
+  // Return a solution vector as Mallob expects it, i.e., beginning with a zero
+  // and then containing the literal of variable i at position i.
+  // TODO Is the model returned by cb_check_found_model only for the observed variables?
+  // In that case we need to somehow gain access to the total model.
   std::vector<int> get_solution() const {
     std::vector<int> result(max_var+1, 0);
     int solIdx = 0;
@@ -176,34 +180,167 @@ public:
     // cerr << "Calling cb_decide" << endl;
 
     int res = 0;
-    /*for (const auto& [_, lit] : obj_lst)
+    /*
+    for (const auto& [_, lit] : obj_lst)
       if (ass_map[lit] == 0) {
-	res = -lit;
-	break;
-      }*/
+        res = -lit;
+        break;
+      }
+    */
 
     // cerr << "Called cb_decide" << endl;
     
     return res;
   }
 
-
-  bool cb_check_found_model (const std::vector<int> &model) override;
-
-  void notify_backtrack (size_t new_level) override;
-
-  int cb_propagate () override;
-
-  int cb_add_reason_clause_lit (int propagated_lit) override;
-
+  // update solution cost set from the outside
   void apply_best_solution_cost_from_outside() {
-    // update solution cost from outside
     auto globalBest = best_cost_found_globally.load(std::memory_order_relaxed);
     if (MALLOB_LIKELY(globalBest >= obj_bsf)) return;
     LOG(V3_VERB, "[prop] update cost via external source: %lld\n", globalBest);
     obj_bsf = globalBest;
     obj_bsf_safe.store(obj_bsf, std::memory_order_relaxed);
     ++sol_cnt;
+  }
+
+  bool cb_check_found_model (const std::vector<int> &model) override {
+
+    // cerr << "Calling cb_check_found_model" << endl;
+
+    //cout << "c Found solution with objective " << obj_cur << endl;
+    //LOG(V2_INFO, "[prop] found solution with cost %lu\n", obj_cur);
+
+    ++sol_cnt;
+    assert(obj_bsf > obj_cur);
+    obj_bsf = obj_cur;
+    obj_bsf_safe.store(obj_bsf, std::memory_order_relaxed);
+    best_cost_found_locally.store(obj_bsf, std::memory_order_relaxed);
+
+    best_solution = model;
+
+    // Write model in DIMACS format onto a file whose name indicates the cost.
+    //ofstream ost("modelWithCost-" + to_string(obj_bsf) + ".txt");
+    //for (auto lit : model) 
+    //  ost << "v " << lit << " " << endl;
+    //ost << "v 0" << endl;
+    
+    // cerr << "Called cb_check_found_model" << endl;
+
+    return false;
+  }
+
+  void notify_backtrack (size_t new_level) override {
+
+    // cerr << "Calling notify_backtrack" << endl;
+
+    if (level > new_level) { // Pending propagations may now have become unsound.
+      pending.clear();
+      propagate = true;
+    }
+    
+    while (level > new_level) {
+      int top_lit = ass_stk.back();
+      ass_stk.pop_back();
+      while (top_lit != 0) {
+        unset_in_assignment_map(top_lit);
+        top_lit = ass_stk.back();
+        ass_stk.pop_back();
+      }
+      --level;
+    }
+
+    // cerr << "Called notify_backtrack" << endl;
+  }
+
+  int cb_propagate () override {
+
+    // cerr << "Calling cb_propagate" << endl;
+
+    if (propagate) {
+      if (there_is_conflict()) {
+        assert(not clause.empty());
+        pending.push_back( clause.front() );
+        explain = false;
+      }
+      else if (obj_bsf <= obj_cur + max_coe) {
+        for (const auto& [coe, lit] : obj_lst)
+          if (ass_map[lit] == 0) {
+            if (obj_bsf <= obj_cur + coe) {
+              pending.push_back(-lit);
+            }
+            else break;
+          }
+      }
+      propagate = false;
+    }
+
+    int res;
+    if (not pending.empty()) {
+      res = pending.back();
+      pending.pop_back();
+    }
+    else {
+      res = 0;
+      propagate = true;
+    }
+
+    // cerr << "Called cb_propagate" << endl;
+
+    return res;
+  };
+
+  int cb_add_reason_clause_lit (int propagated_lit) override {
+
+    // cerr << "Calling cb_add_reason_clause_lit(" << propagated_lit << ")" << endl;
+
+    if (explain) {
+      assert(clause.empty());
+      clause.push_back(propagated_lit);
+      int coe = obj_map[-propagated_lit];
+      long long int obj = 0;
+      for (int lit : ass_stk) {
+        assert(lit != propagated_lit);
+        if (lit != 0 and lit != -propagated_lit and obj_map[lit] > 0) {
+          obj += obj_map[lit];
+          clause.push_back(-lit);
+          if (obj_bsf <= obj + coe) break;
+        }
+      }
+      assert(obj_bsf <= obj + coe);
+      explain = false;
+    }
+
+    int res;
+    if (not clause.empty()) {
+      res = clause.back();
+      clause.pop_back();
+    }
+    else {
+      res = 0;
+      explain = true;
+    }
+
+    // cerr << "Called cb_add_reason_clause_lit" << endl;
+
+    return res;
+  };
+
+  bool there_is_conflict() {
+
+    assert(clause.empty());
+    
+    if (obj_bsf <= obj_cur) {
+      long long int obj = 0;
+      for (const auto& [coe, lit] : obj_lst)
+        if (ass_map[lit] > 0) {
+          clause.push_back(-lit);
+          obj += coe;
+          if (obj_bsf <= obj) break;
+        }
+      return true;
+    }
+    else
+      return false;
   }
 };
 
