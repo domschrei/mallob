@@ -41,6 +41,7 @@ private:
     int _local_export_limit;
     int _num_broadcast_clauses;
     int _num_admitted_clauses;
+    long long _best_found_solution_cost;
 
     JobTreeAllReduction _allreduce_clauses;
     std::optional<JobTreeAllReduction> _allreduce_filter;
@@ -106,8 +107,9 @@ public:
                 int numLits;
                 auto clauses = _job->getPreparedClauses(checksum, successfulSolverId, numLits);
                 LOG(V4_VVER, "%s CS produced cls size=%lu lits=%i/%i\n", _job->getLabel(), clauses.size(), numLits, _local_export_limit);
-                InplaceClauseAggregation::prepareRawBuffer(clauses,
-                    _job->getClausesRevision(), numLits, 1, successfulSolverId);
+                auto agg = InplaceClauseAggregation::prepareRawBuffer(clauses,
+                    _job->getClausesRevision(), numLits, 1, successfulSolverId,
+                    _job->getBestFoundObjectiveCost());
                 return clauses;
             });
 
@@ -126,6 +128,7 @@ public:
             // Fetch initial clause buffer (result of all-reduction of clauses)
             _broadcast_clause_buffer = _allreduce_clauses.extractResult();
             auto aggregation = InplaceClauseAggregation(_broadcast_clause_buffer);
+            _best_found_solution_cost = aggregation.bestFoundSolutionCost();
             // If desired, scramble the LBD scores of featured clauses
             if (_params.scrambleLbdScores()) {
                 float time = Timer::elapsedSeconds();
@@ -146,6 +149,7 @@ public:
             assert(winningSolverId >= -1 || log_return_false("Winning solver ID = %i\n", winningSolverId));
             _job->setNumInputLitsOfLastSharing(aggregation.numInputLiterals());
             _job->setClauseBufferRevision(aggregation.maxRevision());
+            _job->updateBestFoundSolutionCost(_best_found_solution_cost);
 
             if (_allreduce_filter) {
                 // Initiate production of local filter element for 2nd all-reduction 
@@ -225,6 +229,10 @@ public:
             (!_allreduce_filter || _allreduce_filter->isDestructible());
     }
 
+    long long getBestFoundSolutionCost() const {
+        return _best_found_solution_cost;
+    }
+
     ~ClauseSharingSession() {
         LOG(V5_DEBG, "%s CS CLOSE e=%i\n", _job->getLabel(), _epoch);
         // If not done producing, will send empty clause buffer upwards
@@ -245,12 +253,16 @@ private:
     }
     
     std::vector<int> mergeClauseBuffersDuringAggregation(std::list<std::vector<int>>& elems) {
+
+        // aggregate metadata
         int maxRevision = -1;
         int numAggregated = 0;
         int numInputLits = 0;
         int successfulSolverId = -1;
+        long long bestFoundSolutionCost = LLONG_MAX;
         for (auto& elem : elems) {
-            assert(elem.size() >= 4 || log_return_false("[ERROR] Clause buffer has size %ld!\n", elem.size()));
+            assert(elem.size() >= InplaceClauseAggregation::numMetadataInts()
+                || log_return_false("[ERROR] Clause buffer has size %ld!\n", elem.size()));
             auto agg = InplaceClauseAggregation(elem);
             if (agg.successfulSolver() != -1 && (successfulSolverId == -1 || successfulSolverId > agg.successfulSolver())) {
                 successfulSolverId = agg.successfulSolver();
@@ -258,6 +270,7 @@ private:
             numAggregated += agg.numAggregatedNodes();
             numInputLits += agg.numInputLiterals();
             maxRevision = std::max(maxRevision, agg.maxRevision());
+            bestFoundSolutionCost = std::min(bestFoundSolutionCost, agg.bestFoundSolutionCost());
             agg.stripToRawBuffer();
         }
         int buflim = _job->getBufferLimit(numAggregated, false);
@@ -287,7 +300,8 @@ private:
         LOG(V4_VVER, "%s : merged %i contribs rev=%i (inp=%i, t=%.4fs) ~> len=%i\n",
             _job->getLabel(), numAggregated, maxRevision, numInputLits, time, merged.size());
         InplaceClauseAggregation::prepareRawBuffer(merged,
-            maxRevision, numInputLits, numAggregated, successfulSolverId);
+            maxRevision, numInputLits, numAggregated, successfulSolverId,
+            bestFoundSolutionCost);
         return merged;
     }
 

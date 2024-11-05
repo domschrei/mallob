@@ -250,6 +250,12 @@ private:
                     _last_present_revision = popLast(data);
                     _desired_revision = popLast(data);
 
+                } else if (c == CLAUSE_PIPE_UPDATE_BEST_FOUND_OBJECTIVE_COST) {
+                    LOGGER(_log, V5_DEBG, "DO update best found objective cost\n");
+                    auto data = pipe.readData(c);
+                    long long bestCost = * (long long*) data.data();
+                    engine.updateBestFoundObjectiveCost(bestCost);
+
                 } else {
                     LOGGER(_log, V0_CRIT, "[ERROR] Unknown pipe directive \"%c\"!\n", c);
                     abort();
@@ -277,7 +283,15 @@ private:
                 int numCollectedLits;
                 auto clauses = engine.prepareSharing(exportLiteralLimit, successfulSolverId, numCollectedLits);
                 if (!clauses.empty()) {
-                    pipe.writeData(clauses, {numCollectedLits, successfulSolverId}, CLAUSE_PIPE_PREPARE_CLAUSES);
+                    long long bestFoundObjectiveCost = engine.getBestFoundObjectiveCost();
+                    int costAsInts[sizeof(long long)/sizeof(int)];
+                    memcpy(costAsInts, &bestFoundObjectiveCost, sizeof(long long));
+                    std::vector<int> metadata;
+                    for (int i = 0; i < sizeof(long long)/sizeof(int); i++)
+                        metadata.push_back(costAsInts[i]);
+                    metadata.push_back(numCollectedLits);
+                    metadata.push_back(successfulSolverId);
+                    pipe.writeData(clauses, metadata, CLAUSE_PIPE_PREPARE_CLAUSES);
                 }
                 collectClauses = false;
             }

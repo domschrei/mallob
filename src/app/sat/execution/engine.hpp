@@ -9,6 +9,7 @@
 #include <vector>
 #include <memory>
 
+#include "app/sat/data/theories/integer_rule.hpp"
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
 #include "../sharing/sharing_manager.hpp"
@@ -59,6 +60,8 @@ private:
 	bool _block_result {false};
 	int _winning_solver_id {-1};
 
+	std::vector<std::pair<long, int>> _objective;
+
 public:
 
     SatEngine(const Parameters& params, const SatProcessConfig& config, Logger& loggingInterface);
@@ -88,6 +91,8 @@ public:
 		int nbAdmittedLits;
 	};
 	LastAdmittedStats getLastAdmittedClauseShare();
+	long long getBestFoundObjectiveCost() const;
+	void updateBestFoundObjectiveCost(long long bestFoundObjectiveCost);
 
 	void setWinningSolverId(int globalId);
 	void syncDeterministicSolvingAndCheckForLocalWinner();

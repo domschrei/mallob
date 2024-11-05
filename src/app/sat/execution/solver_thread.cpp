@@ -358,6 +358,15 @@ void SolverThread::runOnce() {
     LOGGER(_logger, V4_VVER, "ENDSOL\n");
 
     // Report result, if present
+    if (res == UNSAT && _solver.getOptimizer() && _solver.getOptimizer()->nb_solutions_found() > 0) {
+        if (_solver.getOptimizer()->has_best_solution()) {
+            LOGGER(_logger, V2_INFO, "BEST FOUND SOLUTION COST: %lu\n",
+                _solver.getOptimizer()->best_objective_found_so_far());
+            res = SAT;
+        } else {
+            res = UNKNOWN;
+        }
+    }
     reportResult(res, revision);
 }
 
@@ -394,7 +403,8 @@ void SolverThread::reportResult(int res, int revision) {
     }
 
     if (res == SAT) {
-        auto solution = _solver.getSolution();
+        auto solution = _solver.getOptimizer() ?
+            _solver.getOptimizer()->get_solution() : _solver.getSolution();
         auto lrat = _solver.getSolverSetup().modelCheckingLratConnector;
         if (lrat) {
             LOGGER(_logger, V3_VERB, "Validating SAT ...\n");

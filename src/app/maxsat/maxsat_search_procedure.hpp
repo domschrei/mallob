@@ -7,6 +7,8 @@
 #include "app/maxsat/encoding/warners_adder.hpp"
 #include "app/maxsat/maxsat_instance.hpp"
 #include "app/maxsat/sat_job_stream.hpp"
+#include "app/sat/data/theories/integer_term.hpp"
+#include "app/sat/data/theories/theory_specification.hpp"
 #include "app/sat/job/sat_constants.h"
 #include "rustsat.h"
 #include "util/logger.hpp"
@@ -46,7 +48,8 @@ public:
         NONE,
         WARNERS_ADDER,
         DYNAMIC_POLYNOMIAL_WATCHDOG,
-        GENERALIZED_TOTALIZER
+        GENERALIZED_TOTALIZER,
+        VIRTUAL
     };
 
 private:
@@ -106,8 +109,30 @@ public:
                 _enc.reset(new PolynomialWatchdog(_instance.nbVars, _instance.objective));
             if (encStrat == GENERALIZED_TOTALIZER)
                 _enc.reset(new GeneralizedTotalizer(_instance.nbVars, _instance.objective));
-            _enc->setClauseCollector([&](int lit) {appendLiteral(lit);});
-            _enc->setAssumptionCollector([&](int lit) {appendAssumption(lit);});
+            if (_enc) {
+                _enc->setClauseCollector([&](int lit) {appendLiteral(lit);});
+                _enc->setAssumptionCollector([&](int lit) {appendAssumption(lit);});
+            }
+        }
+
+        if (_encoding_strat == VIRTUAL) {
+            LOG(V2_INFO, "MAXSAT Setting up virtual \"theory\" encoding ...\n");
+            IntegerTerm termSum(IntegerTerm::ADD);
+            for (auto [coeffWeight, coeffLit] : _instance.objective) {
+                IntegerTerm termWeight(IntegerTerm::CONSTANT);
+                termWeight.inner() = coeffWeight;
+                IntegerTerm termLit(IntegerTerm::LITERAL);
+                termLit.inner() = coeffLit;
+                IntegerTerm termCoeff(IntegerTerm::MULTIPLY);
+                termCoeff.addChildAndTryFlatten(std::move(termWeight));
+                termCoeff.addChildAndTryFlatten(std::move(termLit));
+                termSum.addChildAndTryFlatten(std::move(termCoeff));
+            }
+            IntegerRule rule(IntegerRule::MINIMIZE, std::move(termSum));
+            TheorySpecification spec({std::move(rule)});
+            std::string specStr = spec.toStr();
+            specStr.erase(std::remove_if(specStr.begin(), specStr.end(), ::isspace), specStr.end());
+            _job_stream.setInnerObjective(specStr);
         }
     }
 
@@ -175,23 +200,27 @@ public:
 
         assert(!_future_encoder.valid());
         _is_encoding = true;
-        _future_encoder = ProcessWideThreadPool::get().addTask([&, min=globalLowerBound, ub=_current_bound, max=globalUpperBound]() {
-            if (!_shared_encoder) {
-                _enc->encode(min, ub, max);
-            }
-            // Enforce our current bound (assumptions only)
-            _enc->enforceBound(ub);
-            // If the result is SAT, we can add the 1st assumption permanently.
-            //if (!_assumptions_to_set.empty())
-            //    _assumptions_to_persist_upon_sat.push_back(_assumptions_to_set.front());
+        if (_enc) {
+            _future_encoder = ProcessWideThreadPool::get().addTask([&, min=globalLowerBound, ub=_current_bound, max=globalUpperBound]() {
+                if (!_shared_encoder) {
+                    _enc->encode(min, ub, max);
+                }
+                // Enforce our current bound (assumptions only)
+                _enc->enforceBound(ub);
+                // If the result is SAT, we can add the 1st assumption permanently.
+                //if (!_assumptions_to_set.empty())
+                //    _assumptions_to_persist_upon_sat.push_back(_assumptions_to_set.front());
+                _is_done_encoding = true;
+            });
+        } else {
             _is_done_encoding = true;
-        });
+        }
         return true;
     }
     bool isDoneEncoding() {
         if (!_is_encoding) return false;
         if (!_is_done_encoding) return false;
-        _future_encoder.get();
+        if (_future_encoder.valid()) _future_encoder.get();
         _is_done_encoding = false;
         _is_encoding = false;
         return true;

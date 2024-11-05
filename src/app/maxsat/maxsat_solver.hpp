@@ -68,6 +68,7 @@ public:
         case 1: {_encoding_strat = MaxSatSearchProcedure::DYNAMIC_POLYNOMIAL_WATCHDOG; break;}
         case 2: {_encoding_strat = MaxSatSearchProcedure::GENERALIZED_TOTALIZER; break;}
         case 3: {_encoding_strat = pickCardinalityEncoding(); break;}
+        case 4: {_encoding_strat = MaxSatSearchProcedure::VIRTUAL; break;}
         default: {_encoding_strat = MaxSatSearchProcedure::NONE; break;}
         }
         LOG(V2_INFO, "MAXSAT Using cardinality encoding %i\n", _encoding_strat);
@@ -145,6 +146,15 @@ public:
             }
             // Initial formula is SATisfiable.
             LOG(V2_INFO, "MAXSAT Initial model has cost %lu\n", _instance->bestCost);
+
+            if (_encoding_strat == MaxSatSearchProcedure::VIRTUAL) {
+                // if SAT is returned in this mode, the solution was proven optimal
+                r.result = RESULT_OPTIMUM_FOUND;
+                r.setSolution(std::move(_instance->bestSolution));
+                LOG(V2_INFO, "MAXSAT OPTIMAL COST %lu\n", _instance->upperBound);
+                Logger::getMainInstance().flush();
+                return r;
+            }
         }
 
         // Run the initial formula revision through ALL searches, so that everyone has the same one.
@@ -265,7 +275,7 @@ public:
             // construct & return final job result
             r.result = RESULT_OPTIMUM_FOUND;
             r.setSolution(std::move(_instance->bestSolution));
-            LOG(V2_INFO, "MAXSAT OPTIMAL COST %lu\n", _instance->bestCost);
+            LOG(V2_INFO, "MAXSAT OPTIMAL COST %lu\n", _instance->upperBound);
             Logger::getMainInstance().flush();
         }
 

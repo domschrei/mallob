@@ -94,4 +94,9 @@ struct SolverSetup {
 	// Signature of the formula to process - to be validated by the on-the-fly checker
 	std::string sigFormula;
 	int nbSkippedIdEpochs {0};
+
+
+	// Optimization and theories
+
+	std::vector<std::pair<long, int>> objectiveFunction;
 };

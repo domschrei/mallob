@@ -99,6 +99,7 @@ private:
     std::vector<int> _collected_clauses;
     tsl::robin_map<int, std::vector<int>> _filters_by_epoch;
     int _epoch_of_export_buffer {-1};
+    long long _best_found_objective_cost {LLONG_MAX};
 
     pid_t _child_pid = -1;
     SolvingStates::SolvingState _state = SolvingStates::INITIALIZING;
@@ -135,6 +136,7 @@ public:
 
     void setSolvingState(SolvingStates::SolvingState state);
     void setClauseBufferRevision(int revision) {_clause_buffer_revision = std::max(_clause_buffer_revision, revision);}
+    void updateBestFoundSolutionCost(long long bestFoundSolutionCost);
 
     int getStartedNumThreads() const {return _config.threads;}
 
@@ -142,6 +144,7 @@ public:
     bool hasCollectedClauses();
     std::vector<int> getCollectedClauses(int& successfulSolverId, int& numLits);
     int getLastAdmittedNumLits();
+    long long getBestFoundObjectiveCost() const;
 
     void filterClauses(int epoch, const std::vector<int>& clauses);
     bool hasFilteredClauses(int epoch);

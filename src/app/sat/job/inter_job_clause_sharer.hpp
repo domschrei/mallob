@@ -66,6 +66,8 @@ private:
     int _min_admissible_var {-1};
     int _max_admissible_var {INT32_MAX};
 
+    long long _best_found_solution_cost {LLONG_MAX};
+
 public:
     InterJobClauseSharer(const Parameters& params, int groupId, ctx_id_t contextId, const std::string& label) :
         ClauseSharingActor(params), _group_id(groupId), _context_id(contextId), _label(label),
@@ -114,9 +116,14 @@ public:
         LOG(V4_VVER, "CROSSCOMM added %lu/%lu int. shared cls\n", nbAdded, nbAdded+nbBlocked);
     }
 
+    void updateBestFoundSolutionCost(long long cost) override {
+        _best_found_solution_cost = std::min(_best_found_solution_cost, cost);
+    }
+
     void broadcastCrossSharedClauses(std::vector<int>& clauses, int nbLits) {
         InplaceClauseAggregation::prepareRawBuffer(clauses,
-            getClausesRevision(), nbLits, 1, -1);
+            getClausesRevision(), nbLits, 1, -1,
+            _best_found_solution_cost);
         _clauses_to_broadcast_internally = std::move(clauses);
         _has_clauses_to_broadcast_internally = true;
     }
@@ -164,7 +171,9 @@ public:
     }
     virtual void filterSharing(int epoch, std::vector<int>& clauseBuf) override {
         _cross_shared_clauses = std::move(clauseBuf);
-        InplaceClauseAggregation(_cross_shared_clauses).stripToRawBuffer();
+        InplaceClauseAggregation agg(_cross_shared_clauses);
+        updateBestFoundSolutionCost(agg.bestFoundSolutionCost());
+        agg.stripToRawBuffer();
         auto reader = _clause_store->getBufferReader(_cross_shared_clauses.data(), _cross_shared_clauses.size());
         _filter_vector = FilterVectorBuilder(0UL, _epoch).build(reader, [&](Mallob::Clause& clause) {
             return _clause_filter->admitSharing(clause, _epoch);
@@ -223,6 +232,9 @@ public:
 
     virtual int getLastAdmittedNumLits() override {
         return _last_num_admitted_cross_cls_to_import;
+    }
+    long long getBestFoundObjectiveCost() override {
+        return _best_found_solution_cost;
     }
     virtual void setClauseBufferRevision(int revision) override {}
 

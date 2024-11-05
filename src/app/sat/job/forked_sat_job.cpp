@@ -291,9 +291,17 @@ int ForkedSatJob::getLastAdmittedNumLits() {
     if (!_initialized) return 0;
     return _solver->getLastAdmittedNumLits();
 }
+long long ForkedSatJob::getBestFoundObjectiveCost() {
+    if (!_initialized) return 0;
+    return _solver->getBestFoundObjectiveCost();
+}
 void ForkedSatJob::setClauseBufferRevision(int revision) {
     if (!isInitialized()) return;
     _solver->setClauseBufferRevision(revision);
+}
+void ForkedSatJob::updateBestFoundSolutionCost(long long bestFoundSolutionCost) {
+    if (!isInitialized()) return;
+    _solver->updateBestFoundSolutionCost(bestFoundSolutionCost);
 }
 
 void ForkedSatJob::filterSharing(int epoch, std::vector<int>& clauses) {

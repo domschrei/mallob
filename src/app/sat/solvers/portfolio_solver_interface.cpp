@@ -108,6 +108,10 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 			c.lbd++;
 		if (_setup.resetLbdBeforeImport) c.lbd = c.size-ClauseMetadata::numInts();
 	});
+
+	if (!_setup.objectiveFunction.empty()) {
+		_optimizer.reset(new OptimizingPropagator(_setup.objectiveFunction, _setup.numVars));
+	}
 }
 
 void PortfolioSolverInterface::interrupt() {

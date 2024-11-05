@@ -1,6 +1,6 @@
 
 # SAT-specific sources for the sub-process
-set(SAT_SUBPROC_SOURCES src/app/sat/execution/engine.cpp src/app/sat/execution/solver_thread.cpp src/app/sat/execution/solving_state.cpp src/app/sat/job/sat_process_config.cpp src/app/sat/sharing/buffer/buffer_merger.cpp src/app/sat/sharing/buffer/buffer_reader.cpp src/app/sat/sharing/filter/clause_buffer_lbd_scrambler.cpp src/app/sat/sharing/sharing_manager.cpp src/app/sat/solvers/cadical.cpp src/app/sat/solvers/kissat.cpp src/app/sat/solvers/lingeling.cpp src/app/sat/solvers/portfolio_solver_interface.cpp src/app/sat/data/clause_metadata.cpp src/app/sat/proof/lrat_utils.cpp CACHE INTERNAL "")
+set(SAT_SUBPROC_SOURCES src/app/sat/execution/engine.cpp src/app/sat/execution/solver_thread.cpp src/app/sat/execution/solving_state.cpp src/app/sat/job/sat_process_config.cpp src/app/sat/sharing/buffer/buffer_merger.cpp src/app/sat/sharing/buffer/buffer_reader.cpp src/app/sat/sharing/filter/clause_buffer_lbd_scrambler.cpp src/app/sat/sharing/sharing_manager.cpp src/app/sat/solvers/cadical.cpp src/app/sat/solvers/optimizing_propagator.cpp src/app/sat/solvers/kissat.cpp src/app/sat/solvers/lingeling.cpp src/app/sat/solvers/portfolio_solver_interface.cpp src/app/sat/data/clause_metadata.cpp src/app/sat/proof/lrat_utils.cpp CACHE INTERNAL "")
 
 # Add SAT-specific sources to main Mallob executable
 set(SAT_MALLOB_SOURCES src/app/sat/parse/sat_reader.cpp src/app/sat/execution/solving_state.cpp src/app/sat/job/anytime_sat_clause_communicator.cpp src/app/sat/job/forked_sat_job.cpp src/app/sat/job/sat_process_adapter.cpp src/app/sat/job/sat_process_config.cpp src/app/sat/job/historic_clause_storage.cpp src/app/sat/sharing/buffer/buffer_merger.cpp src/app/sat/sharing/buffer/buffer_reader.cpp src/app/sat/sharing/filter/clause_buffer_lbd_scrambler.cpp src/app/sat/data/clause_metadata.cpp src/app/sat/proof/lrat_utils.cpp src/app/sat/job/formula_shmem_cache.cpp)
@@ -56,5 +56,6 @@ new_test(priority_clause_buffer)
 new_test(clause_store_iteration)
 new_test(lrat_checker)
 new_test(portfolio_sequence)
+new_test(theory_specification)
 #new_test(formula_separator)
 #new_test(historic_clause_storage)

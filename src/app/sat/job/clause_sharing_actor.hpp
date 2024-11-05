@@ -48,7 +48,9 @@ public:
     virtual void digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauses) = 0;
 
     virtual int getLastAdmittedNumLits() = 0;
+    virtual long long getBestFoundObjectiveCost() = 0;
     virtual void setClauseBufferRevision(int revision) = 0;
+    virtual void updateBestFoundSolutionCost(long long bestFoundSolutionCost) = 0;
 
     float updateSharingCompensationFactor() {
 

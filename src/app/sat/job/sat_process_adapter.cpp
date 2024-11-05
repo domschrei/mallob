@@ -211,6 +211,16 @@ std::vector<int> SatProcessAdapter::getCollectedClauses(int& successfulSolverId,
 int SatProcessAdapter::getLastAdmittedNumLits() {
     return _last_admitted_nb_lits;
 }
+long long SatProcessAdapter::getBestFoundObjectiveCost() const {
+    return _best_found_objective_cost;
+}
+void SatProcessAdapter::updateBestFoundSolutionCost(long long bestFoundSolutionCost) {
+    if (!_initialized || _state != SolvingStates::ACTIVE) return;
+    auto lock = _mtx_pipe.getLock();
+    if (_pipe) _pipe->writeData(
+        {(int*) &bestFoundSolutionCost, (int*) ((&bestFoundSolutionCost)+1)},
+        CLAUSE_PIPE_UPDATE_BEST_FOUND_OBJECTIVE_COST);
+}
 
 void SatProcessAdapter::filterClauses(int epoch, const std::vector<int>& clauses) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
@@ -315,8 +325,19 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
     char c = _pipe->pollForData();
     if (c == CLAUSE_PIPE_PREPARE_CLAUSES) {
         _collected_clauses = _pipe->readData(c);
+
         _successful_solver_id = _collected_clauses.back(); _collected_clauses.pop_back();
         _nb_incoming_lits = _collected_clauses.back(); _collected_clauses.pop_back();
+
+        // read best found objective cost
+        int costAsInts[sizeof(long long)/sizeof(int)];
+        for (size_t i = 0; i < sizeof(long long)/sizeof(int); i++) {
+            costAsInts[sizeof(long long)/sizeof(int) - 1 - i] = _collected_clauses.back();
+            _collected_clauses.pop_back();
+        }
+        _best_found_objective_cost = * (long long*) costAsInts;
+        LOG(V4_VVER, "best found objective cost: %lld\n", _best_found_objective_cost);
+
         _clause_collecting_stage = RETURNED;
         LOG(V4_VVER, "collected clauses from subprocess\n");
     } else if (c == CLAUSE_PIPE_FILTER_IMPORT) {

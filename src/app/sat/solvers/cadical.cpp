@@ -90,6 +90,12 @@ Cadical::Cadical(const SolverSetup& setup)
 			okay = solver->trace_proof(proofFileString.c_str()); assert(okay);
 		}
 	}
+
+	if (_optimizer) {
+		solver->connect_external_propagator(_optimizer.get());
+		for (auto [weight, lit] : _setup.objectiveFunction)
+			solver->add_observed_var(std::abs(lit));
+	}
 }
 
 void Cadical::addLiteral(int lit) {

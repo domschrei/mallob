@@ -4,6 +4,7 @@
 #include "../sharing/sharing_manager.hpp"
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/data/portfolio_sequence.hpp"
+#include "app/sat/data/theories/theory_specification.hpp"
 #include "util/logger.hpp"
 #include "util/sys/fileutils.hpp"
 #include "util/sys/thread_pool.hpp"
@@ -128,7 +129,25 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		*out = atoi(str.c_str());
 		assert(*out > 0 || log_return_false("[ERROR] illegal argument for app config key %s\n", id.c_str()));
 	}
-	
+
+	if (appConfig.map.count("__OBJ")) {
+		TheorySpecification spec(appConfig.map.at("__OBJ"));
+		assert(spec.getRuleset().size() == 1);
+		assert(spec.getRuleset()[0].type == IntegerRule::MINIMIZE);
+		const IntegerTerm& sum = spec.getRuleset()[0].term1;
+		assert(sum.type == IntegerTerm::ADD || sum.type == IntegerTerm::BIG_ADD);
+		for (auto& prod : sum.children()) {
+			assert(prod.type == IntegerTerm::MULTIPLY);
+			assert(prod.children().size() == 2);
+			assert(prod.children()[0].type == IntegerTerm::CONSTANT);
+			long weight = prod.children()[0].inner();
+			assert(prod.children()[1].type == IntegerTerm::LITERAL);
+			int literal = prod.children()[1].inner();
+			_objective.push_back({weight, literal});
+		}
+		LOGGER(_logger, V4_VVER, "Parsed objective\n");
+	}
+
 	// These numbers become the diversifier indices of the solvers on this node
 	int numLgl = 0;
 	int numGlu = 0;
@@ -211,6 +230,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		setup.profilingBaseDir += "/" + std::to_string(appRank) + "/";
 		setup.profilingLevel = params.cadicalProfilingLevel();
 	}
+	setup.objectiveFunction = _objective;
 
 	// Instantiate solvers according to the global solver IDs and diversification indices
 	int cyclePos = begunCyclePos;
@@ -434,6 +454,15 @@ void SatEngine::setClauseBufferRevision(int revision) {
 	_sharing_manager->setImportedRevision(revision);
 }
 
+void SatEngine::updateBestFoundObjectiveCost(long long bestFoundObjectiveCost) {
+	if (isCleanedUp()) return;
+	LOGGER(_logger, V4_VVER, "update best found objective cost: %lld\n", bestFoundObjectiveCost);
+	for (size_t i = 0; i < _num_active_solvers; i++) {
+		if (_solver_interfaces[i] && _solver_interfaces[i]->getOptimizer())
+			_solver_interfaces[i]->getOptimizer()->update_best_found_objective_cost(bestFoundObjectiveCost);
+	}
+}
+
 std::vector<int> SatEngine::prepareSharing(int literalLimit, int& outSuccessfulSolverId, int& outNbLits) {
 	if (isCleanedUp()) return std::vector<int>(2); // checksum, nothing else
 	LOGGER(_logger, V5_DEBG, "collecting clauses on this node\n");
@@ -578,6 +607,15 @@ SatEngine::LastAdmittedStats SatEngine::getLastAdmittedClauseShare() {
 		_sharing_manager->getLastNumClausesToImport(),
 		_sharing_manager->getLastNumAdmittedLitsToImport()
 	};
+}
+
+long long SatEngine::getBestFoundObjectiveCost() const {
+	long long best {LLONG_MAX};
+	for (size_t i = 0; i < _num_active_solvers; i++) {
+		if (_solver_interfaces[i] && _solver_interfaces[i]->getOptimizer())
+			best = std::min(best, _solver_interfaces[i]->getOptimizer()->best_objective_found_so_far());
+	}
+	return best;
 }
 
 void SatEngine::writeClauseEpochs() {

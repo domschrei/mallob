@@ -46,6 +46,9 @@ public:
         if (minVar >= 0) _json_base["configuration"]["__XL"] = std::to_string(minVar);
         if (maxVar >= 0) _json_base["configuration"]["__XU"] = std::to_string(maxVar);
     }
+    void setInnerObjective(const std::string& objective) {
+        _json_base["configuration"]["__OBJ"] = objective;
+    }
 
     void submitNext(const std::vector<int>& newLiterals, const std::vector<int>& assumptions,
             const std::string& descriptionLabel = "", float priority = 0) {

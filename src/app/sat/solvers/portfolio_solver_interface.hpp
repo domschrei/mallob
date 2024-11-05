@@ -14,6 +14,7 @@
 #include "app/sat/execution/solver_setup.hpp"
 #include "app/sat/sharing/generic_import_manager.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
+#include "app/sat/solvers/optimizing_propagator.hpp"
 #include "util/random.hpp"
 #include "util/logger.hpp"
 
@@ -35,6 +36,7 @@ protected:
 	Logger _logger;
 	SolverSetup _setup;
 	LratConnector* _lrat {nullptr};
+	std::unique_ptr<OptimizingPropagator> _optimizer;
 
 // ************** INTERFACE TO IMPLEMENT **************
 
@@ -188,6 +190,9 @@ public:
 
 	LratConnector* getLratConnector() {
 		return _lrat;
+	}
+	OptimizingPropagator* getOptimizer() {
+		return _optimizer.get();
 	}
 
 private:

@@ -126,9 +126,11 @@ void AnytimeSatClauseCommunicator::communicate() {
             _job->getDescription().getGroupId(), _job->getContextId(), _job->toStr()));
         initCrossSharer();
 
-        if (_current_session) _current_session->setAdditionalClauseListener([&](std::vector<int>& clauses) {
-            feedLocalClausesIntoCrossSharing(clauses);
-        });
+        if (_current_session) _current_session->setAdditionalClauseListener(
+            [&, session = _current_session.get()](std::vector<int>& clauses) {
+                feedLocalClausesIntoCrossSharing(clauses, session);
+            }
+        );
     }
 
     // root: initiate sharing
@@ -320,9 +322,11 @@ void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg, int so
     );
 
     // register listener to grab final, filtered shared clauses and share them with other jobs
-    if (_cross_job_clause_sharer) _current_session->setAdditionalClauseListener([&](std::vector<int>& clauses) {
-        feedLocalClausesIntoCrossSharing(clauses);
-    });
+    if (_cross_job_clause_sharer) _current_session->setAdditionalClauseListener(
+        [&, session = _current_session.get()](std::vector<int>& clauses) {
+            feedLocalClausesIntoCrossSharing(clauses, session);
+        }
+    );
 
     // advance broadcast of initiation message
     msg.contextIdOfSender = snapshot.contextId;
@@ -339,8 +343,9 @@ void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg, int so
     }
 }
 
-void AnytimeSatClauseCommunicator::feedLocalClausesIntoCrossSharing(std::vector<int>& clauses) {
+void AnytimeSatClauseCommunicator::feedLocalClausesIntoCrossSharing(std::vector<int>& clauses, ClauseSharingSession* session) {
     _cross_job_clause_sharer->addInternalSharedClauses(clauses);
+    _cross_job_clause_sharer->updateBestFoundSolutionCost(session->getBestFoundSolutionCost());
     auto& comm = _job->getGroupComm();
     if (comm.getCommSize() > 1 && comm.getMyLocalRank() == 0) {
         // build a cross-job clause sharing initiation message

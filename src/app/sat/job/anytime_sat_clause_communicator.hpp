@@ -75,7 +75,7 @@ private:
 
     void initiateClauseSharing(JobMessage& msg, int source, bool fromDeferredQueue);
     void initiateCrossSharing(JobMessage& msg, int source, bool fromDeferredQueue);
-    void feedLocalClausesIntoCrossSharing(std::vector<int>& clauses);
+    void feedLocalClausesIntoCrossSharing(std::vector<int>& clauses, ClauseSharingSession* session);
     void tryActivateDeferredSharingInitiation();
     
     void checkCertifiedUnsatReadyMsg();
