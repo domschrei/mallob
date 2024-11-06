@@ -131,6 +131,9 @@ public:
       ass_stk.push_back(lit);
     }
 
+    // In principle we can do this anywhere, but it should be a place
+    // that's not quite the absolute hottest path and that's still
+    // called rather frequently.
     apply_best_solution_cost_from_outside();
 
     // cerr << "Called notify_assignment" << endl;
