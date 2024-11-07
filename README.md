@@ -175,12 +175,15 @@ Mallob allows to customize the employed SAT solver backends and some of their fl
 
 ## MaxSAT Solving
 
-Compile Mallob with `-DMALLOB_APP_MAXSAT=1` after building the RustSAT dependency as indicated above.  
-Mallob expects `WCNF` instances following the [2022+ benchmark format of the MaxSAT evaluations](https://maxsat-evaluations.github.io/2022/rules.html#input) and preprocessed with [MaxPRE2](https://bitbucket.org/coreo-group/maxpre2) to rule out some awkward corner cases.  
-You can use MaxPRE2 like this to preprocess a WCNF formula `$f`:
+Compile Mallob with `-DMALLOB_APP_MAXSAT=1` after building the MaxSAT dependencies as indicated above.  
+
+Mallob expects `WCNF` instances and internally invokes `MaxPRE` to preprocess the instance and arrive at an objective-based formulation of the problem. 
+
+Here is an example 16-core (4x4) invocation that runs MaxPRE for up to (roughly) 5 seconds, decides on the PB encoding heuristically (`-maxsat-card-encoding=3`), runs two searchers in parallel initially and deletes the "leftmost" searcher after 30s of stagnation.
 
 ```
-tools/maxpre2/maxpre $f -techniques="[bu]#[buvsrgcT]" -outputformat=wpms22 > ${f}-preprocessed.wcnf
+export RDMAV_FORK_SAFE=1;
+mpirun -np 4 --oversubscribe build/mallob -mono-app=MAXSAT -mono=instances/wcnf/warehouses_wt-warehouse0.wcsp.wcnf -v=4 -t=4 -satsolver=C -adc=1 -cjc=1 -pre-cleanup=1 -maxpre=1 -maxpre-timeout=5 -maxsat-card-encoding=3s -maxsat-searchers=2 -maxsat-focus-period=30 | grep -iE "maxsat|solution"
 ```
 
 ## Solve multiple instances in an orchestrated manner
