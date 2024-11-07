@@ -1,17 +1,12 @@
 [![status](https://joss.theoj.org/papers/700e9010c4080ffe8ae4df21cf1cc899/status.svg)](https://joss.theoj.org/papers/700e9010c4080ffe8ae4df21cf1cc899)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6890239.svg)](https://doi.org/10.5281/zenodo.6890239)
 
-# Introduction
+# Mallob
 
-Mallob is a platform for massively parallel and distributed on-demand processing of malleable jobs, handling their scheduling and load balancing.
-Malleability means that the CPU resources allotted to a job may vary _during its execution_ depending on the system's overall load.
-Mallob was tested on configurations with up to 6144 cores as described in our publications: [SAT 2021](https://dominikschreiber.de/papers/2021-sat-scalable.pdf), [Euro-Par 2022](https://publikationen.bibliothek.kit.edu/1000149349/149124221).
+The platform **Mallob** (**Mal**leable **Lo**ad **B**alancer, or **Ma**ssively P**a**ra**ll**el **Lo**gic **B**ackend) is a distributed platform for processing automated reasoning tasks in modern large-scale HPC and cloud environments. Mallob primarily solves instances of the NP-complete _propositional satisfiability_ (SAT) problem – an essential building block at the core of automated reasoning and Symbolic AI. Mallob's flexible and decentralized approach to job scheduling allows to concurrently process many tasks of varying priority by different users. As such, Mallob can drastically improve your academic or industrial workflows tied to automated reasoning.
 
-Most notably, Mallob features an engine for distributed SAT solving.
-According to the [International SAT Competitions](https://satcompetition.github.io/) 2020-2023, the premier competitive events for state-of-the-art SAT solving, Mallob is consistently the strongest SAT solving system for massively parallel and distributed systems (1600 hardware threads spread across 100 machines) and also a highly competitive system for moderately parallel SAT solving (64 hardware threads).
-Note that this version of Mallob also features a module to generate proofs of unsatisfiability due to a cooperation with external researchers from Amazon Web Services and due to subsequent work by D. Schreiber.
-
-Furthermore, Mallob features engines for K-Means clustering, authored by [Michael Dörr](https://github.com/MichaelDoerr), and for MaxSAT solving (highly experimental as of yet).
+Mallob's tightly integrated distributed general-purpose SAT solving engine, which we refer to as MallobSat, has received a large amount of attention, five gold medals of the International SAT Competition's Cloud Track in a row, and Amazon's proposition that our system is, "by a _wide_ margin, the most powerful SAT solver on the planet" (Byron Cook, [Amazon Science blog post](https://www.amazon.science/blog/automated-reasonings-scientific-frontiers)).
+Mallob is also the first distributed system that supports _incremental SAT solving_, i.e., interactive solving procedures over evolving formulas. Most recently, Mallob spearheaded the adoption of unsatisfiability proof checking in parallel and distributed SAT solving. Since proofs can serve as crucial witnesses for a result’s correctness, Mallob is suitable even for the most critical use cases.
 
 <hr/>
 

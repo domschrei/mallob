@@ -11,8 +11,8 @@ lib/*/
 lib/*.zip
 lib/*.tgz
 lib/*.tar.gz
-build/
-./data/
+build*/
+data/
 bin/
 instances/*.cnf
 instances/*.cnf.xz
@@ -20,3 +20,7 @@ instances/*.uri
 upload.sh
 download.sh
 .unused/
+*.pdf
+callgrind.out.*
+nohup.out
+directives.*.impcheck
