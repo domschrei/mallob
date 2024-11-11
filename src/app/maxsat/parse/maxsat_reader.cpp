@@ -14,7 +14,9 @@
 #include <utility>
 #include <vector>
 
+#if MALLOB_USE_MAXPRE == 1
 #include "parserinterface.hpp"
+#endif
 #include "app/sat/proof/trusted/trusted_utils.hpp"
 #include "app/sat/proof/trusted_parser_process_adapter.hpp"
 #include "maxsat_reader.hpp"
@@ -116,6 +118,9 @@ bool MaxSatReader::read(JobDescription& desc) {
 	}
 	desc.beginInitialization(desc.getRevision());
 
+	unsigned long lb = 0;
+	unsigned long ub = ULONG_MAX;
+#if MALLOB_USE_MAXPRE == 1
 	std::unique_ptr<maxPreprocessor::ParserInterface> parser;
 	if (_params.maxPre()) {
 		parser.reset(new maxPreprocessor::ParserInterface());
@@ -143,12 +148,12 @@ bool MaxSatReader::read(JobDescription& desc) {
 			desc.addPermanentData(lit);
 		}
 		desc.addPermanentData((int) _objective.size());
-	} else {
-		if (!parseInternally(desc)) return false;
-	}
+		unsigned long lb = parser->get_lb();
+		unsigned long ub = parser->get_ub();
+	} else
+#endif
+	if (!parseInternally(desc)) return false;
 
-	unsigned long lb = parser ? parser->get_lb() : 0;
-	unsigned long ub = parser ? parser->get_ub() : ULONG_MAX;
 	desc.addPermanentData(((int*) &lb)[0]);
 	desc.addPermanentData(((int*) &lb)[1]);
 	desc.addPermanentData(((int*) &ub)[0]);

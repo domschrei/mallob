@@ -57,6 +57,7 @@ You can use the following Mallob-specific build options:
 | -DMALLOB_APP_KMEANS=<0/1>                   | Compile with K-Means clustering engine.                                                                    |
 | -DMALLOB_APP_SAT=<0/1>                      | Compile with SAT solving engine.                                                                           |
 | -DMALLOB_APP_MAXSAT=<0/1>                   | Compile with MaxSAT solving engine (requires SAT solving engine).                                          |
+| -DMALLOB_USE_MAXPRE=<0/1>                   | For MaxSAT: Include a library of the preprocessor MaxPRE (note: not public yet)                            |
 | -DMALLOB_MAX_N_APPTHREADS_PER_PROCESS=<N>   | Max. number of application threads (solver threads for SAT) per process to support. (max: 128)             |
 | -DMALLOB_BUILD_LRAT_MODULES=<0/1>           | Also build standalone LRAT checker                                                                         |
 
@@ -183,7 +184,7 @@ Here is an example 16-core (4x4) invocation that runs MaxPRE for up to (roughly)
 
 ```
 export RDMAV_FORK_SAFE=1;
-mpirun -np 4 --oversubscribe build/mallob -mono-app=MAXSAT -mono=instances/wcnf/warehouses_wt-warehouse0.wcsp.wcnf -v=4 -t=4 -satsolver=C -adc=1 -cjc=1 -pre-cleanup=1 -maxpre=1 -maxpre-timeout=5 -maxsat-card-encoding=3s -maxsat-searchers=2 -maxsat-focus-period=30 | grep -iE "maxsat|solution"
+mpirun -np 4 --oversubscribe build/mallob -mono-app=MAXSAT -mono=instances/wcnf/warehouses_wt-warehouse0.wcsp.wcnf -v=4 -t=4 -satsolver=C -adc=1 -cjc=1 -pre-cleanup=1 -maxpre=1 -maxpre-timeout=5 -maxsat-card-encoding=3 -maxsat-searchers=2 -maxsat-focus-period=30 | grep -iE "maxsat|solution"
 ```
 
 ## Solve multiple instances in an orchestrated manner
