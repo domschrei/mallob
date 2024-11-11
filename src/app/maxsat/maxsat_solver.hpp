@@ -45,9 +45,6 @@ private:
 
     std::unique_ptr<MaxSatInstance> _instance; // the problem instance we're solving
 
-    // holds all active streams of Mallob jobs and allows interacting with them
-    std::list<std::unique_ptr<MaxSatSearchProcedure>> _searches;
-
     bool _shared_encoder;
     MaxSatSearchProcedure::EncodingStrategy _encoding_strat;
     std::vector<int> _shared_lits_to_add;
@@ -77,6 +74,9 @@ public:
     // Perform exact MaxSAT solving and return an according result.
     JobResult solve() {
 
+        // holds all active streams of Mallob jobs and allows interacting with them
+        std::list<std::unique_ptr<MaxSatSearchProcedure>> searches;
+
         _start_time = Timer::elapsedSeconds();
 
         // Template for the result we will return in the end
@@ -105,31 +105,33 @@ public:
         for (int i = 0; i < searchStrats.size(); i++) {
             char c = searchStrats[i];
             // Check if we have enough workers in the system for another job stream
-            if (nbWorkers <= _searches.size()) {
+            if (nbWorkers <= searches.size()) {
                 LOG(V1_WARN, "MAXSAT [WARN] Truncating number of parallel search strategies to %i due to lack of workers\n",
                     nbWorkers);
                 break;
             }
             // Initialize search procedure
-            _searches.emplace_back(initializeSearchProcedure(c, i, searchStrats.size()));
-            _searches.back()->setDescriptionLabelForNextCall("base-formula");
+            searches.emplace_back(initializeSearchProcedure(c, i, searchStrats.size()));
+            searches.back()->setDescriptionLabelForNextCall("base-formula");
 
             // If everybody uses their own encoder, we can still put all of them in the same cross-sharing group
             // due to the consistent naming of variables across all encoders.
             if (!_shared_encoder) {
-                _searches.back()->setGroupId("consistent-logic"/*, 1, _instance->nbVars*/);
+                searches.back()->setGroupId("consistent-logic"/*, 1, _instance->nbVars*/);
             }
         }
-        assert(!_searches.empty());
+        assert(!searches.empty());
 
         // If the best known upper bound is trivial, we first perform a solving attempt
         // without encoding any constraints. If we know a non-trivial bound from preprocessing,
         // we skip this and instead begin encoding it right away.
-        const bool solveWithoutBounds = _instance->upperBound == _instance->sumOfWeights;
+        const bool solveWithoutBounds = _instance->upperBound == _instance->sumOfWeights
+            || _instance->objective.empty()
+            || _encoding_strat == MaxSatSearchProcedure::VIRTUAL;
         if (solveWithoutBounds) {
             // Initial SAT call: just solve the hard clauses.
             // We just use the first specified search strategy for this task.
-            MaxSatSearchProcedure* search = _searches.front().get();
+            MaxSatSearchProcedure* search = searches.front().get();
             // Only for this initial solve call, we don't need to enforce a bound first.
             int resultCode = search->solveBlocking(); // solve and wait for a result
             if (resultCode == RESULT_UNSAT) {
@@ -147,8 +149,8 @@ public:
             // Initial formula is SATisfiable.
             LOG(V2_INFO, "MAXSAT Initial model has cost %lu\n", _instance->bestCost);
 
-            if (_encoding_strat == MaxSatSearchProcedure::VIRTUAL) {
-                // if SAT is returned in this mode, the solution was proven optimal
+            if (_instance->objective.empty() || _encoding_strat == MaxSatSearchProcedure::VIRTUAL) {
+                // the solution is already proven optimal
                 r.result = RESULT_OPTIMUM_FOUND;
                 r.setSolution(std::move(_instance->bestSolution));
                 LOG(V2_INFO, "MAXSAT OPTIMAL COST %lu\n", _instance->upperBound);
@@ -158,8 +160,8 @@ public:
         }
 
         // Run the initial formula revision through ALL searches, so that everyone has the same one.
-        if (_searches.size() > 1) for (auto& search : _searches) {
-            if (solveWithoutBounds && search == _searches.front())
+        if (searches.size() > 1) for (auto& search : searches) {
+            if (solveWithoutBounds && search == searches.front())
                 continue; // this search has already been run once
             search->solveNonblocking();
             search->interrupt();
@@ -183,7 +185,7 @@ public:
             encoder->encode(_instance->lowerBound, _instance->upperBound, _instance->upperBound);
 
             // Add the encoder and its encoding to each search
-            for (auto& search : _searches) {
+            for (auto& search : searches) {
                 search->setSharedEncoder(encoder);
                 search->setDescriptionLabelForNextCall("initial-bounds");
                 search->setGroupId("common-logic"); // enable cross job clause sharing
@@ -194,10 +196,10 @@ public:
         // Main loop for solution improving search.
         std::list<std::unique_ptr<MaxSatSearchProcedure>> searchesToFinalize;
         float timeOfLastChange = Timer::elapsedSeconds();
-        while (!isTimeoutHit() && _instance->lowerBound < _instance->upperBound && !_searches.empty()) {
+        while (!isTimeoutHit() && _instance->lowerBound < _instance->upperBound && !searches.empty()) {
             // Loop over all search strategies
             bool change = false;
-            for (auto it = _searches.begin(); it != _searches.end(); ++it) {
+            for (auto it = searches.begin(); it != searches.end(); ++it) {
                 auto& search = *it;
                 // In a solve call right now?
                 if (!search->isIdle() && !search->isEncoding()) {
@@ -224,7 +226,7 @@ public:
                         // This search procedure does not want to continue: stop and remove it.
                         searchesToFinalize.emplace_back();
                         std::swap(search, searchesToFinalize.back());
-                        it = _searches.erase(it);
+                        it = searches.erase(it);
                         --it;
                         continue;
                     }
@@ -241,10 +243,10 @@ public:
             if (!change) {
                 usleep(1000); // 1 ms
                 if (_params.maxSatFocusPeriod() > 0 && Timer::elapsedSeconds() - timeOfLastChange > _params.maxSatFocusPeriod()
-                        && _searches.size() > _params.maxSatFocusMin()) {
+                        && searches.size() > _params.maxSatFocusMin()) {
                     // cancel the searcher at the lowest bound
                     MaxSatSearchProcedure* lowest {nullptr};
-                    for (auto& search : _searches) {
+                    for (auto& search : searches) {
                         if (search->isNonblockingSolvePending() &&
                             (!lowest || search->getCurrentBound() < lowest->getCurrentBound())) {
                             lowest = search.get();
@@ -284,7 +286,7 @@ public:
         // Make sure to stop all searches
         while (!isTimeoutHit()) {
             bool allIdle = true;
-            for (auto& search : _searches) {
+            for (auto& search : searches) {
                 if (!search->isIdle() && !search->isEncoding()) {
                     if (!search->isNonblockingSolvePending()) search->processNonblockingSolveResult();
                     else search->interrupt();
@@ -295,10 +297,7 @@ public:
             if (allIdle) break;
             usleep(1000 * 1); // 1 ms
         }
-        // Now clean up all searches
-        _searches.clear();
-        searchesToFinalize.clear();
-
+        // Now all searches can be cleaned up by leaving this method
         return r;
     }
 
@@ -321,7 +320,8 @@ private:
         const int nbObjectiveTerms = fPtr[pos];
         pos -= 3*nbObjectiveTerms;
         LOG(V2_INFO, "MAXSAT lb=%lu ub=%lu o=%i\n", lb, ub, nbObjectiveTerms);
-        assert(nbObjectiveTerms > 0);
+        Logger::getMainInstance().flush();
+        assert(nbObjectiveTerms >= 0);
         pos--;
         assert(fPtr[pos] == 0);
         // pos now points at the separation zero right before the objective
