@@ -38,7 +38,11 @@ class OptimizingPropagator : public CaDiCaL::ExternalPropagator {
   std::atomic_llong best_cost_found_locally {LLONG_MAX}; // to decide whether a locally found solution is globally best
   std::atomic_llong best_cost_found_globally {LLONG_MAX}; // to share external improvements with the internal
 
+  int nb_assigned = 0;
+  bool lb_proven = false;
+
   void set_true_in_assignment_map(int lit) {
+    //nb_assigned += ass_map[lit] == 0;
     ass_map[ lit] =  1;
     ass_map[-lit] = -1;
     obj_cur += obj_map[lit];
@@ -47,6 +51,7 @@ class OptimizingPropagator : public CaDiCaL::ExternalPropagator {
   void unset_in_assignment_map(int lit) {
     ass_map[lit] = ass_map[-lit] = 0;
     obj_cur -= obj_map[lit];
+    //--nb_assigned;
   }
 
 public:
@@ -93,7 +98,12 @@ public:
 
   int nb_solutions_found() const {return sol_cnt;}
 
-  long long int best_objective_found_so_far() const { return obj_bsf_safe.load(std::memory_order_relaxed); }
+  // negative if proven to be optimal
+  long long int best_objective_found_so_far() const {
+    auto bestCostFoundGlobally = best_cost_found_globally.load(std::memory_order_relaxed);
+    if (bestCostFoundGlobally < 0) return bestCostFoundGlobally;
+    return obj_bsf_safe.load(std::memory_order_relaxed);
+  }
 
   void update_best_found_objective_cost(long long cost) {
     best_cost_found_globally.store(cost, std::memory_order_relaxed);
@@ -103,6 +113,10 @@ public:
   // that matches its currently best known cost.
   bool has_best_solution() const {
     return best_cost_found_locally.load(std::memory_order_relaxed) == obj_bsf;
+  }
+
+  void set_lower_bound_proven() {
+    update_best_found_objective_cost(-obj_bsf);
   }
 
   // Return a solution vector as Mallob expects it, i.e., beginning with a zero
@@ -171,7 +185,7 @@ public:
     // cerr << "Calling cb_has_external_clause" << endl;
 
     is_forgettable = false;
-    bool res = there_is_conflict();
+    bool res = there_is_conflict() || lb_proven;
   
     // cerr << "Called cb_has_external_clause" << endl;
 
@@ -182,14 +196,14 @@ public:
 
     // cerr << "Calling cb_decide" << endl;
 
+    //if (nb_assigned == obj_lst.size()) return 0;
+
     int res = 0;
-    /*
     for (const auto& [_, lit] : obj_lst)
       if (ass_map[lit] == 0) {
         res = -lit;
         break;
       }
-    */
 
     // cerr << "Called cb_decide" << endl;
     
@@ -199,6 +213,8 @@ public:
   // update solution cost set from the outside
   void apply_best_solution_cost_from_outside() {
     auto globalBest = best_cost_found_globally.load(std::memory_order_relaxed);
+    lb_proven = lb_proven || (globalBest < 0);
+    globalBest = std::abs(globalBest);
     if (MALLOB_LIKELY(globalBest >= obj_bsf)) return;
     LOG(V3_VERB, "[prop] update cost via external source: %lld\n", globalBest);
     obj_bsf = globalBest;
@@ -342,8 +358,7 @@ public:
         }
       return true;
     }
-    else
-      return false;
+    return false;
   }
 };
 

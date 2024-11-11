@@ -358,13 +358,14 @@ void SolverThread::runOnce() {
     LOGGER(_logger, V4_VVER, "ENDSOL\n");
 
     // Report result, if present
-    if (res == UNSAT && _solver.getOptimizer() && _solver.getOptimizer()->nb_solutions_found() > 0) {
+    if (res == UNSAT && _solver.getOptimizer()) {
+        res = UNKNOWN;
+        _solver.getOptimizer()->set_lower_bound_proven(); // exports proven bound to other solvers
         if (_solver.getOptimizer()->has_best_solution()) {
+            // this solver is the one to report the optimal result
             LOGGER(_logger, V2_INFO, "BEST FOUND SOLUTION COST: %lu\n",
-                _solver.getOptimizer()->best_objective_found_so_far());
+                std::abs(_solver.getOptimizer()->best_objective_found_so_far()));
             res = SAT;
-        } else {
-            res = UNKNOWN;
         }
     }
     reportResult(res, revision);
