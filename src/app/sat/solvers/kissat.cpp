@@ -61,9 +61,10 @@ void Kissat::diversify(int seed) {
     LOGGER(_logger, V3_VERB, "Diversifying %i\n", getDiversificationIndex());
 
     // Basic configuration options for all solvers
-    kissat_set_option(solver, "quiet", 1);
+    kissat_set_option(solver, "quiet", 1); // do not log to stdout / stderr
     kissat_set_option(solver, "check", 0); // do not check model or derived clauses
-    
+    kissat_set_option(solver, "factor", 0); // do not perform bounded variable addition
+
     // Set random seed
     kissat_set_option(solver, "seed", seed);
 
@@ -88,6 +89,13 @@ void Kissat::diversify(int seed) {
             kissat_set_option(solver, "eliminate", 0);
         if (divIdx % 4 < 2)
             kissat_set_option(solver, "substitute", 0);
+    }
+
+    if (_setup.solverType == 'v') {
+        configureBoundedVariableAddition();
+        seedSet = true;
+        interruptionInitialized = true;
+        return;
     }
 
     if (_setup.diversifyNative) {
@@ -287,6 +295,22 @@ void Kissat::writeStatistics(SolverStatistics& stats) {
     stats.discarded = kstats.discarded;
     LOGGER(_logger, V4_VVER, "disc_reasons r_ee:%ld,r_ed:%ld,r_pb:%ld,r_ss:%ld,r_sw:%ld,r_tr:%ld,r_fx:%ld,r_ia:%ld,r_tl:%ld\n",
         kstats.r_ee, kstats.r_ed, kstats.r_pb, kstats.r_ss, kstats.r_sw, kstats.r_tr, kstats.r_fx, kstats.r_ia, kstats.r_tl);
+}
+
+void Kissat::configureBoundedVariableAddition() {
+    kissat_set_option(solver, "probe", 1);
+    kissat_set_option(solver, "preprocess", 1);
+    kissat_set_option(solver, "preprocessrounds", 1'000'000);
+    kissat_set_option(solver, "preprocessbackbone", 0);
+    kissat_set_option(solver, "preprocesscongruence", 0);
+    kissat_set_option(solver, "preprocessfactor", 1);
+    kissat_set_option(solver, "preprocessprobe", 1);
+    kissat_set_option(solver, "preprocessrounds", 0);
+    kissat_set_option(solver, "preprocessweep", 0);
+    kissat_set_option(solver, "factor", 1);
+    kissat_set_option(solver, "factoreffort", 1'000'000);
+    kissat_set_option(solver, "factoriniticks", 1'000'000);
+    kissat_set_option(solver, "factorexport", 1);
 }
 
 Kissat::~Kissat() {

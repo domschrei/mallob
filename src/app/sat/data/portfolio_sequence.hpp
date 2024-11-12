@@ -12,7 +12,8 @@ struct PortfolioSequence {
         CADICAL = 'c',
         LINGELING = 'l',
         GLUCOSE = 'g',
-        MERGESAT = 'm'
+        MERGESAT = 'm',
+        VARIABLE_ADDITION = 'v'
     };
     enum Flavour {
         DEFAULT, SAT, UNSAT
@@ -89,6 +90,9 @@ private:
                 break;
             case 'm':
                 next.baseSolver = MERGESAT;
+                break;
+            case 'v':
+                next.baseSolver = VARIABLE_ADDITION;
                 break;
             case '(': {
                 if (begun) {
