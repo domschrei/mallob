@@ -22,11 +22,13 @@
 #include <unistd.h>
 #include "robin_set.h"
 #include "util/logger.hpp"
-// external
-#include "rustsat.h"
+#include "rustsat.h" // external
 #include "util/string_utils.hpp"
 #include "util/sys/terminator.hpp"
 #include "util/params.hpp"
+#if MALLOB_USE_MAXPRE == 1
+#include "parse/static_maxsat_parser_store.hpp"
+#endif
 
 void maxsat_collect_clause_for_shared_encoding(int lit, void* data);
 
@@ -51,6 +53,26 @@ private:
 
     float _start_time;
 
+    struct InstanceUpdate {
+        std::vector<int> formula;
+        std::vector<std::pair<uint64_t, int>> objective;
+        int nbVars;
+        int nbReadClauses;
+        unsigned long lowerBound;
+        unsigned long upperBound;
+        void reset(unsigned long lowerBound, unsigned long upperBound) {
+            formula.clear();
+            objective.clear();
+            this->lowerBound = lowerBound;
+            this->upperBound = upperBound;
+        }
+    } _instance_update;
+    struct UpdateResult {
+        bool boundsImproved;
+        bool instanceImproved;
+    };
+    std::future<void> _fut_instance_update;
+
 public:
     // Initializes the solver instance and parses the description's formula.
     MaxSatSolver(const Parameters& params, APIConnector& api, JobDescription& desc) :
@@ -58,21 +80,17 @@ public:
 
         LOG(V2_INFO, "Mallob client-side MaxSAT solver, by Jeremias Berg & Dominik Schreiber\n");
         parseFormula();
+        pickEncodingStrategy();
+    }
 
-        _shared_encoder = _params.maxSatSharedEncoder();
-        switch (_params.maxSatCardinalityEncoding()) {
-        case 0: {_encoding_strat = MaxSatSearchProcedure::WARNERS_ADDER; break;}
-        case 1: {_encoding_strat = MaxSatSearchProcedure::DYNAMIC_POLYNOMIAL_WATCHDOG; break;}
-        case 2: {_encoding_strat = MaxSatSearchProcedure::GENERALIZED_TOTALIZER; break;}
-        case 3: {_encoding_strat = pickCardinalityEncoding(); break;}
-        case 4: {_encoding_strat = MaxSatSearchProcedure::VIRTUAL; break;}
-        default: {_encoding_strat = MaxSatSearchProcedure::NONE; break;}
-        }
-        LOG(V2_INFO, "MAXSAT Using cardinality encoding %i\n", _encoding_strat);
+    ~MaxSatSolver() {
+#if MALLOB_USE_MAXPRE == 1
+        StaticMaxSatParserStore::erase(_desc.getId());
+#endif
     }
 
     // Perform exact MaxSAT solving and return an according result.
-    JobResult solve() {
+    JobResult solve(int updateLayer = 0) {
 
         // holds all active streams of Mallob jobs and allows interacting with them
         std::list<std::unique_ptr<MaxSatSearchProcedure>> searches;
@@ -88,14 +106,18 @@ public:
         // Just for debugging
         _instance->print();
 
-        // TODO If the preprocessor found a non-trivial upper bound,
-        // can we extract a solution from it?
+        bool maxPreRunDone = false;
+        UpdateResult updateResult;
+#if MALLOB_USE_MAXPRE == 1
+        if (updateLayer < 10 && _params.maxPreTimeoutPost() > 0) {
+            launchImprovingMaxPreRun(updateLayer, maxPreRunDone, updateResult);
+        }
+#endif
+
+        // If the preprocessor found a non-trivial upper bound,
+        // we unfortunately do not know the according solution.
         if (_instance->lowerBound == _instance->upperBound) {
-            r.result = RESULT_OPTIMUM_FOUND;
-            r.setSolution({}); // TODO
-            LOG(V2_INFO, "MAXSAT OPTIMAL COST %lu\n", _instance->upperBound);
-            Logger::getMainInstance().flush();
-            return r;
+            _instance->upperBound++; // workaround: force finding a solution of the exact bound
         }
 
         // Parse the user-provided sequence of search strategies.
@@ -112,12 +134,12 @@ public:
             }
             // Initialize search procedure
             searches.emplace_back(initializeSearchProcedure(c, i, searchStrats.size()));
-            searches.back()->setDescriptionLabelForNextCall("base-formula");
+            searches.back()->setDescriptionLabelForNextCall("base-formula-" + std::to_string(updateLayer));
 
             // If everybody uses their own encoder, we can still put all of them in the same cross-sharing group
             // due to the consistent naming of variables across all encoders.
             if (!_shared_encoder) {
-                searches.back()->setGroupId("consistent-logic"/*, 1, _instance->nbVars*/);
+                searches.back()->setGroupId("consistent-logic-" + std::to_string(updateLayer) /*, 1, _instance->nbVars*/);
             }
         }
         assert(!searches.empty());
@@ -187,8 +209,8 @@ public:
             // Add the encoder and its encoding to each search
             for (auto& search : searches) {
                 search->setSharedEncoder(encoder);
-                search->setDescriptionLabelForNextCall("initial-bounds");
-                search->setGroupId("common-logic"); // enable cross job clause sharing
+                search->setDescriptionLabelForNextCall("initial-bounds-" + std::to_string(updateLayer));
+                search->setGroupId("common-logic-" + std::to_string(updateLayer)); // enable cross job clause sharing
                 search->appendLiterals(_shared_lits_to_add);
             }
         }
@@ -261,7 +283,7 @@ public:
             }
             if (change) timeOfLastChange = Timer::elapsedSeconds();
 
-            // delete old searches where possibe
+            // delete old searches where possible
             for (auto it = searchesToFinalize.begin(); it != searchesToFinalize.end(); ++it) {
                 auto& search = *it;
                 if (search->canBeFinalized()) {
@@ -270,6 +292,40 @@ public:
                     --it;
                 }
             }
+
+#if MALLOB_USE_MAXPRE == 1
+            // concurrent improving preprocessing run done?
+            if (_instance->lowerBound < _instance->upperBound && maxPreRunDone) {
+                maxPreRunDone = false;
+                _fut_instance_update.get();
+                if (updateResult.instanceImproved) {
+                    // cleanup (has to happen before update)
+                    tryStopAllSearches(searches);
+                    if (!isTimeoutHit()) {
+                        searches.clear();
+                        searchesToFinalize.clear();
+                        // update
+                        updateInstance(_instance_update); // nukes and rewrites instance
+                        // try again on updated instance
+                        return solve(updateLayer+1);
+                    }
+                } else {
+                    if (updateResult.boundsImproved) {
+                        // update with improved bounds from preprocessing
+                        _instance->lowerBound = std::max(_instance_update.lowerBound, _instance->lowerBound);
+                        _instance->upperBound = std::min(_instance_update.upperBound, _instance->upperBound);
+                        if (_instance->lowerBound >= _instance->upperBound) {
+                            _instance->upperBound++; // workaround to actually get a solution
+                        }
+                    }
+                    if (updateLayer < 10) {
+                        // retry concurrent preprocessing with higher limit
+                        updateLayer++;
+                        launchImprovingMaxPreRun(updateLayer, maxPreRunDone, updateResult);
+                    }
+                }
+            }
+#endif
         }
 
         // Did we actually find an optimal result?
@@ -282,21 +338,8 @@ public:
         }
 
         LOG(V4_VVER, "MAXSAT trying to stop all searches ...\n");
+        tryStopAllSearches(searches);
 
-        // Make sure to stop all searches
-        while (!isTimeoutHit()) {
-            bool allIdle = true;
-            for (auto& search : searches) {
-                if (!search->isIdle() && !search->isEncoding()) {
-                    if (!search->isNonblockingSolvePending()) search->processNonblockingSolveResult();
-                    else search->interrupt();
-                }
-                if (search->isDoneEncoding()) {}
-                if (!search->isIdle()) allIdle = false;
-            }
-            if (allIdle) break;
-            usleep(1000 * 1); // 1 ms
-        }
         // Now all searches can be cleaned up by leaving this method
         return r;
     }
@@ -336,7 +379,11 @@ private:
         while (_instance->objective.size() < nbObjectiveTerms) {
             size_t factor = * (size_t*) (fPtr+pos);
             // MaxPRE already flips the literals' polarity
+#if MALLOB_USE_MAXPRE == 1
             int lit = (_params.maxPre() ? 1 : -1) * fPtr[pos+2];
+#else
+            int lit = -1 * fPtr[pos+2];
+#endif
             assert(factor != 0);
             assert(lit != 0);
             _instance->objective.push_back({factor, lit});
@@ -359,6 +406,74 @@ private:
 
         _instance->intervalSearch.reset(new IntervalSearch(_params.maxSatIntervalSkew()));
     }
+
+    void pickEncodingStrategy() {
+        _shared_encoder = _params.maxSatSharedEncoder();
+        switch (_params.maxSatCardinalityEncoding()) {
+        case 0: {_encoding_strat = MaxSatSearchProcedure::WARNERS_ADDER; break;}
+        case 1: {_encoding_strat = MaxSatSearchProcedure::DYNAMIC_POLYNOMIAL_WATCHDOG; break;}
+        case 2: {_encoding_strat = MaxSatSearchProcedure::GENERALIZED_TOTALIZER; break;}
+        case 3: {_encoding_strat = pickCardinalityEncoding(); break;}
+        case 4: {_encoding_strat = MaxSatSearchProcedure::VIRTUAL; break;}
+        default: {_encoding_strat = MaxSatSearchProcedure::NONE; break;}
+        }
+        LOG(V2_INFO, "MAXSAT Using cardinality encoding %i\n", _encoding_strat);
+    }
+
+#if MALLOB_USE_MAXPRE == 1
+    void launchImprovingMaxPreRun(int updateLayer, bool& runDone, UpdateResult& res) {
+        _instance_update.reset(_instance->lowerBound, _instance->upperBound);
+        _fut_instance_update = ProcessWideThreadPool::get().addTask([&, updateLayer]() {
+            auto& update = _instance_update;
+            auto parser = StaticMaxSatParserStore::get(_desc.getId());
+            float time = Timer::elapsedSeconds();
+            parser->preprocess(_params.maxPreTechniquesPost(), 0, _params.maxPreTimeoutPost() * std::pow(2, updateLayer));
+            const float timePreprocess = Timer::elapsedSeconds() - time;
+            parser->getInstance(update.formula, update.objective, update.nbVars, update.nbReadClauses);
+            LOG(V3_VERB, "MAXSAT MaxPRE' stat lits:%i vars:%i cls:%i obj:%lu\n",
+                update.formula.size(), update.nbVars, update.nbReadClauses, update.objective.size());
+            LOG(V3_VERB, "MAXSAT MaxPRE' time preprocess:%.3f\n", timePreprocess);
+            res.boundsImproved = (parser->get_lb() > update.lowerBound || parser->get_ub() < update.upperBound);
+            update.lowerBound = parser->get_lb();
+            update.upperBound = parser->get_ub();
+            res.instanceImproved = update.nbVars <= 0.99 * _instance->nbVars
+                || update.formula.size() <= 0.99 * _instance->formulaSize
+                || update.objective.size() <= 0.99 * _instance->objective.size();
+            runDone = true;
+        });
+    }
+
+    void updateInstance(InstanceUpdate& update) {
+
+        // re-apply best known bounds from any prior attempts
+        auto lb = _instance->lowerBound;
+        auto ub = _instance->upperBound;
+
+        // construct new instance object
+        _instance.reset(new MaxSatInstance(update.formula.data(), update.formula.size()));
+        _instance->nbVars = update.nbVars;
+        _instance->lowerBound = std::max(update.lowerBound, lb);
+        _instance->upperBound = std::min(update.upperBound, ub);
+        tsl::robin_set<size_t> uniqueFactors;
+        for (auto [weight, lit] : update.objective) {
+            _instance->objective.push_back({weight, lit});
+            uniqueFactors.insert(weight);
+        }
+        _instance->nbUniqueWeights = uniqueFactors.size();
+        // Sort the objective terms by weight in increasing order
+        // (may help to find the required steps to take in solution-improving search)
+        std::sort(_instance->objective.begin(), _instance->objective.end(),
+            [&](const MaxSatInstance::ObjectiveTerm& termLeft, const MaxSatInstance::ObjectiveTerm& termRight) {
+            return termLeft.factor < termRight.factor;
+        });
+        _instance->sumOfWeights = 0;
+        for (auto term : _instance->objective) _instance->sumOfWeights += term.factor;
+        _instance->upperBound = std::min(_instance->upperBound, _instance->sumOfWeights);
+        _instance->bestCost = ULONG_MAX;
+        _instance->intervalSearch.reset(new IntervalSearch(_params.maxSatIntervalSkew()));
+        pickEncodingStrategy();
+    }
+#endif
 
     // Heuristic picking a suitable cardinality encoding based on the objective function's properties.
     // Obtained by a mix of educated guesses and 1-minute runs on MaxSAT Eval'23 instances.
@@ -412,5 +527,21 @@ private:
         if (Terminator::isTerminating())
             return true;
         return false;
+    }
+
+    void tryStopAllSearches(std::list<std::unique_ptr<MaxSatSearchProcedure>>& searches) {
+        while (!isTimeoutHit()) {
+            bool allIdle = true;
+            for (auto& search : searches) {
+                if (!search->isIdle() && !search->isEncoding()) {
+                    if (!search->isNonblockingSolvePending()) search->processNonblockingSolveResult();
+                    else search->interrupt();
+                }
+                if (search->isDoneEncoding()) {}
+                if (!search->isIdle()) allIdle = false;
+            }
+            if (allIdle) break;
+            usleep(1000 * 1); // 1 ms
+        }
     }
 };

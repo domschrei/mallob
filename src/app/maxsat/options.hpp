@@ -17,6 +17,8 @@ OPT_INT(maxSatNumSearchers, "maxsat-searchers", "", 1, 1, LARGE_INT, "Number of 
 OPT_FLOAT(maxSatIntervalSkew, "maxsat-interval-skew", "", 0.5, 0, 1, "Skew to cut search intervals with")
 #if MALLOB_USE_MAXPRE == 1
 OPT_BOOL(maxPre, "maxpre", "", true, "true: use MaxPRE2 preprocessor library to preprocess instance; false: assume appropriately preprocessed file")
-OPT_STRING(maxPreTechniques, "maxpre-techniques", "", "[bu]#[buvsrgcHTVGR]", "Techniques string to forward to MaxPRE; minimum \"#\", (reasonable) maximum \"[bu]#[buvsrgcHTVGR]\"")
-OPT_FLOAT(maxPreTimeout, "maxpre-timeout", "", 0, 0, LARGE_INT, "Timeout for MaxPRE in seconds")
+OPT_STRING(maxPreTechniques, "maxpre-techniques", "", "#", "Techniques string to forward to MaxPRE; minimum \"#\", (reasonable) maximum \"[bu]#[buvsrgcHTVGR]\"")
+OPT_FLOAT(maxPreTimeout, "maxpre-timeout", "", LARGE_INT, 0, LARGE_INT, "Timeout for MaxPRE in seconds")
+OPT_STRING(maxPreTechniquesPost, "maxpre-techniques-post", "", "[bu]#[buvsrgcHTVGR]", "Techniques string to forward to post- MaxPRE; minimum \"#\", (reasonable) maximum \"[bu]#[buvsrgcHTVGR]\"")
+OPT_FLOAT(maxPreTimeoutPost, "maxpre-timeout-post", "", 0, 0, LARGE_INT, "Base timeout for post- MaxPRE in seconds (0: don't make improving MaxPRE calls)")
 #endif

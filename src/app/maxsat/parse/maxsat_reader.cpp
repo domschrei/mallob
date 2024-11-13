@@ -16,6 +16,7 @@
 
 #if MALLOB_USE_MAXPRE == 1
 #include "parserinterface.hpp"
+#include "static_maxsat_parser_store.hpp"
 #endif
 #include "app/sat/proof/trusted/trusted_utils.hpp"
 #include "app/sat/proof/trusted_parser_process_adapter.hpp"
@@ -121,9 +122,9 @@ bool MaxSatReader::read(JobDescription& desc) {
 	unsigned long lb = 0;
 	unsigned long ub = ULONG_MAX;
 #if MALLOB_USE_MAXPRE == 1
-	std::unique_ptr<maxPreprocessor::ParserInterface> parser;
+	std::shared_ptr<maxPreprocessor::ParserInterface> parser;
 	if (_params.maxPre()) {
-		parser.reset(new maxPreprocessor::ParserInterface());
+		parser = StaticMaxSatParserStore::get(desc.getId());
 		std::ifstream ifs {_filename};
 		float time = Timer::elapsedSeconds();
 		int res = parser->read_file_init_interface(ifs);
@@ -176,5 +177,9 @@ bool MaxSatReader::read(JobDescription& desc) {
 		return false;
 	}
 
-	return _params.maxPre() || isValidInput();
+#if MALLOB_USE_MAXPRE == 1
+	if (_params.maxPre()) return true;
+#endif
+
+	return isValidInput();
 }
