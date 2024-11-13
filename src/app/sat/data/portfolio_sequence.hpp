@@ -16,7 +16,7 @@ struct PortfolioSequence {
         VARIABLE_ADDITION = 'v'
     };
     enum Flavour {
-        DEFAULT, SAT, UNSAT
+        DEFAULT, SAT, UNSAT, PLAIN
     };
     struct Item {
         BaseSolver baseSolver;
@@ -143,6 +143,10 @@ private:
             case '-':
                 // UNSAT flavour
                 next.flavour = UNSAT;
+                break;
+            case '_':
+                // "Plain" flavour
+                next.flavour = PLAIN;
                 break;
             case '!':
                 // Proof generation
