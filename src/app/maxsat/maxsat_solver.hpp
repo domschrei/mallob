@@ -109,7 +109,15 @@ public:
         bool maxPreRunDone = false;
         UpdateResult updateResult;
 #if MALLOB_USE_MAXPRE == 1
-        if (updateLayer < 10 && _params.maxPreTimeoutPost() > 0) {
+        auto parser = StaticMaxSatParserStore::get(_desc.getId());
+        // Conditions for running a concurrent preprocessing:
+        // * within max. number of preprocessing iterations
+        // * non-zero timeout specified for "post" MaxPRE runs
+        // * if we try the same techniques as in the initial parsing,
+        //   the last preprocessing must have been interrupted
+        if (updateLayer < 10 && _params.maxPreTimeoutPost() > 0
+            && (_params.maxPreTechniques() != _params.maxPreTechniquesPost()
+                || parser->lastCallInterrupted())) {
             launchImprovingMaxPreRun(updateLayer, maxPreRunDone, updateResult);
         }
 #endif
@@ -318,7 +326,7 @@ public:
                             _instance->upperBound++; // workaround to actually get a solution
                         }
                     }
-                    if (updateLayer < 10) {
+                    if (updateLayer < 10 && StaticMaxSatParserStore::get(_desc.getId())->lastCallInterrupted()) {
                         // retry concurrent preprocessing with higher limit
                         updateLayer++;
                         launchImprovingMaxPreRun(updateLayer, maxPreRunDone, updateResult);
@@ -423,6 +431,7 @@ private:
 #if MALLOB_USE_MAXPRE == 1
     void launchImprovingMaxPreRun(int updateLayer, bool& runDone, UpdateResult& res) {
         _instance_update.reset(_instance->lowerBound, _instance->upperBound);
+        LOG(V3_VERB, "MAXSAT calling MaxPRE concurrently\n");
         _fut_instance_update = ProcessWideThreadPool::get().addTask([&, updateLayer]() {
             auto& update = _instance_update;
             auto parser = StaticMaxSatParserStore::get(_desc.getId());
@@ -430,8 +439,9 @@ private:
             parser->preprocess(_params.maxPreTechniquesPost(), 0, _params.maxPreTimeoutPost() * std::pow(2, updateLayer));
             const float timePreprocess = Timer::elapsedSeconds() - time;
             parser->getInstance(update.formula, update.objective, update.nbVars, update.nbReadClauses);
-            LOG(V3_VERB, "MAXSAT MaxPRE' stat lits:%i vars:%i cls:%i obj:%lu\n",
-                update.formula.size(), update.nbVars, update.nbReadClauses, update.objective.size());
+            LOG(V3_VERB, "MAXSAT MaxPRE' stat lits:%i vars:%i cls:%i obj:%lu lb:%lu ub:%lu\n",
+                update.formula.size(), update.nbVars, update.nbReadClauses, update.objective.size(),
+                parser->get_lb(), parser->get_ub());
             LOG(V3_VERB, "MAXSAT MaxPRE' time preprocess:%.3f\n", timePreprocess);
             res.boundsImproved = (parser->get_lb() > update.lowerBound || parser->get_ub() < update.upperBound);
             update.lowerBound = parser->get_lb();
