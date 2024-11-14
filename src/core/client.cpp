@@ -618,7 +618,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     std::string resultString = "s " + resultCodeString + "\n";
     std::vector<std::string> modelStrings;
     if ((_params.solutionToFile.isSet() || (_params.monoFilename.isSet() && !_params.omitSolution() && jobId==_mono_job_id)) 
-            && resultCode == RESULT_SAT) {
+            && (resultCode == RESULT_SAT || resultCode == RESULT_OPTIMUM_FOUND)) {
 
         // Disable all watchdogs to avoid crashes while printing a huge model
         Watchdog::disableGlobally();
