@@ -72,8 +72,8 @@ private:
                     next = Item();
                 }
                 begun = true;
+                next.incremental = std::isupper(c);
             }
-            next.incremental = std::isupper(c);
             c = std::tolower(c);
             switch (c) {
             case 'k':
