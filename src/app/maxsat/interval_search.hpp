@@ -91,12 +91,13 @@ public:
         if (best->orphaned) {
             best->orphaned = false;
             b = best->ub;
+        } else if (best->size() == 1) {
+            // nothing to split left
+            return false;
         } else {
             SearchInterval bestInt = *best;
             auto [left, right] = bestInt.split(_skew);
-            if (left.size() == 0 || right.size() == 0) {
-                return false;
-            }
+            assert(left.size() > 0 && right.size() > 0);
             best->lb = right.lb;
             best->ub = right.ub;
             best->weight = right.weight;
@@ -122,15 +123,15 @@ public:
         double summedWeight {0};
         while (it != _current_bounds.end()) {
             SearchInterval i = *it;
-            if (updateUpper && i.ub >= newMax) { // implies i.ub >= bound
+            if (updateUpper && newMax <= i.ub) {
                 // the corresponding call is being stopped
-                if (i.lb >= newMax) {
+                if (newMax <= i.lb) {
                     // interval is falling out of the considered range *completely*
                     it = _current_bounds.erase(it);
                 } else {
                     // delete all intervals coming afterwards
                     size_t lb = it->lb;
-                    while (_current_bounds.back().lb > lb) {
+                    while (lb < _current_bounds.back().lb) {
                         _current_bounds.pop_back();
                     }
                     // interval needs to be split so that the cutoff can be deleted
@@ -138,7 +139,7 @@ public:
                     // now erase the interval itself
                     _current_bounds.pop_back();
                     if (left.size() > 0) {
-                        left.orphaned = true;
+                        left.orphaned = i.ub == bound; // only mark as orphaned if this was your interval!
                         _current_bounds.push_back(left);
                         summedWeight += left.weight;
                         break;
