@@ -61,9 +61,10 @@ void Kissat::diversify(int seed) {
     LOGGER(_logger, V3_VERB, "Diversifying %i\n", getDiversificationIndex());
 
     // Basic configuration options for all solvers
-    kissat_set_option(solver, "quiet", 1);
+    kissat_set_option(solver, "quiet", 1); // do not log to stdout / stderr
     kissat_set_option(solver, "check", 0); // do not check model or derived clauses
-    
+    kissat_set_option(solver, "factor", 0); // do not perform bounded variable addition
+
     // Set random seed
     kissat_set_option(solver, "seed", seed);
 
@@ -90,19 +91,30 @@ void Kissat::diversify(int seed) {
             kissat_set_option(solver, "substitute", 0);
     }
 
-    if (_setup.diversifyNative) {
-        if (_setup.flavour == PortfolioSequence::SAT) {
-            switch (getDiversificationIndex() % 4) {
-                case 0: kissat_set_configuration(solver, "sat"); break;
-                case 1: /*use default*/ break;
-                case 2: kissat_set_configuration(solver, "plain"); break;
-                case 3: kissat_set_option(solver, "eliminate", 0); break;
-            }
-        } else {
-            if (_setup.flavour != PortfolioSequence::DEFAULT) {
-                LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");
-                _setup.flavour = PortfolioSequence::DEFAULT;
-            }
+    if (_setup.solverType == 'v') {
+        configureBoundedVariableAddition();
+        seedSet = true;
+        interruptionInitialized = true;
+        return;
+    }
+
+    bool ok = true;
+    if (_setup.flavour == PortfolioSequence::SAT) {
+        switch (getDiversificationIndex() % 4) {
+            case 0: ok = kissat_set_configuration(solver, "sat"); break;
+            case 1: /*use default*/ break;
+            case 2: ok = kissat_set_configuration(solver, "plain"); break;
+            case 3: kissat_set_option(solver, "eliminate", 0); break;
+        }
+    } else if (_setup.flavour == PortfolioSequence::PLAIN) {
+        LOGGER(_logger, V4_VVER, "plain\n");
+        ok = kissat_set_configuration(solver, "plain");
+    } else {
+        if (_setup.flavour != PortfolioSequence::DEFAULT) {
+            LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");
+            _setup.flavour = PortfolioSequence::DEFAULT;
+        }
+        if (_setup.diversifyNative) {
             // Base portfolio of different configurations
             switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
                 case 0: kissat_set_option(solver, "eliminate", 0); break;
@@ -110,8 +122,8 @@ void Kissat::diversify(int seed) {
                 case 2: kissat_set_option(solver, "walkinitially", 1); break;
                 case 3: kissat_set_option(solver, "restartint", 100); break;
                 case 4: kissat_set_option(solver, "sweep", 0); break;
-                case 5: kissat_set_configuration(solver, "unsat"); break;
-                case 6: kissat_set_configuration(solver, "sat"); break;
+                case 5: ok = kissat_set_configuration(solver, "unsat"); break;
+                case 6: ok = kissat_set_configuration(solver, "sat"); break;
                 case 7: kissat_set_option(solver, "probe", 0); break;
                 case 8: kissat_set_option(solver, "minimizedepth", 1e4); break;
                 case 9: kissat_set_option(solver, "reducefraction", 90); break;
@@ -119,6 +131,7 @@ void Kissat::diversify(int seed) {
             }
         }
     }
+    assert(ok);
 
     // Randomize ("jitter") certain options around their default value
     if (getDiversificationIndex() >= getNumOriginalDiversifications() && _setup.diversifyNoise) {
@@ -287,6 +300,22 @@ void Kissat::writeStatistics(SolverStatistics& stats) {
     stats.discarded = kstats.discarded;
     LOGGER(_logger, V4_VVER, "disc_reasons r_ee:%ld,r_ed:%ld,r_pb:%ld,r_ss:%ld,r_sw:%ld,r_tr:%ld,r_fx:%ld,r_ia:%ld,r_tl:%ld\n",
         kstats.r_ee, kstats.r_ed, kstats.r_pb, kstats.r_ss, kstats.r_sw, kstats.r_tr, kstats.r_fx, kstats.r_ia, kstats.r_tl);
+}
+
+void Kissat::configureBoundedVariableAddition() {
+    kissat_set_option(solver, "probe", 1);
+    kissat_set_option(solver, "preprocess", 1);
+    kissat_set_option(solver, "preprocessrounds", 1'000'000);
+    kissat_set_option(solver, "preprocessbackbone", 0);
+    kissat_set_option(solver, "preprocesscongruence", 0);
+    kissat_set_option(solver, "preprocessfactor", 1);
+    kissat_set_option(solver, "preprocessprobe", 1);
+    kissat_set_option(solver, "preprocessrounds", 0);
+    kissat_set_option(solver, "preprocessweep", 0);
+    kissat_set_option(solver, "factor", 1);
+    kissat_set_option(solver, "factoreffort", 1'000'000);
+    kissat_set_option(solver, "factoriniticks", 1'000'000);
+    kissat_set_option(solver, "factorexport", 1);
 }
 
 Kissat::~Kissat() {

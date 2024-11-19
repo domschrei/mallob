@@ -154,6 +154,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	int numCdc = 0;
 	int numMrg = 0;
 	int numKis = 0;
+	int numBVA = 0;
 
 	// Add solvers from full cycles on previous ranks
 	// and from the begun cycle on the previous rank
@@ -170,6 +171,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		case PortfolioSequence::CADICAL: solverToAdd = &numCdc; break;
 		case PortfolioSequence::MERGESAT: solverToAdd = &numMrg; break;
 		case PortfolioSequence::KISSAT: solverToAdd = &numKis; break;
+		case PortfolioSequence::VARIABLE_ADDITION: solverToAdd = &numBVA; break;
 		}
 		*solverToAdd += numFullCycles + (i < begunCyclePos);
 	}
@@ -254,6 +256,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 			case PortfolioSequence::MERGESAT: setup.diversificationIndex = numMrg++; break;
 			case PortfolioSequence::GLUCOSE: setup.diversificationIndex = numGlu++; break;
 			case PortfolioSequence::KISSAT: setup.diversificationIndex = numKis++; break;
+			case PortfolioSequence::VARIABLE_ADDITION: setup.diversificationIndex = numBVA++; break;
 			}
 			setup.diversificationIndex += divOffsetCycle;
 		}
@@ -295,9 +298,10 @@ std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSe
 		solver.reset(new Cadical(setup));
 		break;
 	case 'k':
-	//case 'K': // no support for incremental mode as of now
+	case 'v': // variable addition via Kissat
 		// Kissat
-		LOGGER(_logger, V4_VVER, "S%i : Kissat-%i\n", setup.globalId, setup.diversificationIndex);
+		LOGGER(_logger, V4_VVER, "S%i : Kissat%s-%i\n", setup.globalId, setup.solverType == 'v' ? "-BVA": "",
+			setup.diversificationIndex);
 		solver.reset(new Kissat(setup));
 		break;
 #ifdef MALLOB_USE_MERGESAT

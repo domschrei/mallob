@@ -46,7 +46,6 @@ struct SolverSetup {
 	} eliminationSetting;
 	PortfolioSequence::Flavour flavour;
 
-
 	// Clause export
 
 	bool exportClauses; // exporting clauses to other solvers?

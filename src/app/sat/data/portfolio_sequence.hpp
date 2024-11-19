@@ -12,10 +12,11 @@ struct PortfolioSequence {
         CADICAL = 'c',
         LINGELING = 'l',
         GLUCOSE = 'g',
-        MERGESAT = 'm'
+        MERGESAT = 'm',
+        VARIABLE_ADDITION = 'v'
     };
     enum Flavour {
-        DEFAULT, SAT, UNSAT
+        DEFAULT, SAT, UNSAT, PLAIN
     };
     struct Item {
         BaseSolver baseSolver;
@@ -90,6 +91,9 @@ private:
             case 'm':
                 next.baseSolver = MERGESAT;
                 break;
+            case 'v':
+                next.baseSolver = VARIABLE_ADDITION;
+                break;
             case '(': {
                 if (begun) {
                     prefix.push_back(next);
@@ -139,6 +143,10 @@ private:
             case '-':
                 // UNSAT flavour
                 next.flavour = UNSAT;
+                break;
+            case '_':
+                // "Plain" flavour
+                next.flavour = PLAIN;
                 break;
             case '!':
                 // Proof generation
