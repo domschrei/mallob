@@ -8,6 +8,7 @@
 #include "app/maxsat/maxsat_instance.hpp"
 #include "app/maxsat/maxsat_search_procedure.hpp"
 #include "app/maxsat/parse/maxsat_reader.hpp"
+#include "app/maxsat/solution_writer.hpp"
 #include "app/sat/data/definitions.hpp"
 #include "app/sat/job/sat_constants.h"
 #include "comm/mympi.hpp"
@@ -94,6 +95,9 @@ public:
 
         // holds all active streams of Mallob jobs and allows interacting with them
         std::list<std::unique_ptr<MaxSatSearchProcedure>> searches;
+        std::shared_ptr<SolutionWriter> writer;
+        if (_params.maxSatSolutionFile.isSet())
+            writer.reset(new SolutionWriter(_instance->nbVars, _params.maxSatSolutionFile()));
 
         _start_time = Timer::elapsedSeconds();
 
@@ -149,6 +153,8 @@ public:
             if (!_shared_encoder) {
                 searches.back()->setGroupId("consistent-logic-" + std::to_string(updateLayer) /*, 1, _instance->nbVars*/);
             }
+
+            if (writer) searches.back()->setSolutionWriter(writer);
         }
         assert(!searches.empty());
 
@@ -342,6 +348,7 @@ public:
             r.result = RESULT_OPTIMUM_FOUND;
             r.setSolution(std::move(_instance->bestSolution));
             LOG(V2_INFO, "MAXSAT OPTIMAL COST %lu\n", _instance->upperBound);
+            if (writer) writer->concludeOptimal();
             Logger::getMainInstance().flush();
         }
 

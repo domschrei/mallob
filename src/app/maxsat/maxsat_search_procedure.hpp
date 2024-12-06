@@ -7,6 +7,7 @@
 #include "app/maxsat/encoding/warners_adder.hpp"
 #include "app/maxsat/maxsat_instance.hpp"
 #include "app/maxsat/sat_job_stream.hpp"
+#include "app/maxsat/solution_writer.hpp"
 #include "app/sat/data/theories/integer_term.hpp"
 #include "app/sat/data/theories/theory_specification.hpp"
 #include "app/sat/job/sat_constants.h"
@@ -92,6 +93,8 @@ private:
     bool _yield_searcher {false};
     bool _finalized {false};
 
+    std::shared_ptr<SolutionWriter> _sol_writer;
+
 public:
     MaxSatSearchProcedure(const Parameters& params, APIConnector& api, JobDescription& desc,
             MaxSatInstance& instance, EncodingStrategy encStrat, SearchStrategy searchStrat, const std::string& label) :
@@ -139,6 +142,9 @@ public:
     void setSharedEncoder(const std::shared_ptr<CardinalityEncoding>& encoder) {
         assert(_shared_encoder);
         _enc = encoder;
+    }
+    void setSolutionWriter(std::shared_ptr<SolutionWriter> solutionWriter) {
+        _sol_writer = solutionWriter;
     }
 
     void appendLiterals(const std::vector<int>& litsToAdd) {
@@ -300,6 +306,7 @@ public:
             _instance.bestSolution = solution;
             LOG(V2_INFO, "MAXSAT %s Bound %lu solved with cost %lu - new bounds: (%lu,%lu)\n",
                 _label.c_str(), _current_bound, _instance.bestCost, _instance.lowerBound, _instance.upperBound);
+            if (_sol_writer) _sol_writer->appendSolution(cost, solution);
             if (_instance.intervalSearch) {
                 size_t prevBound = std::max(_current_bound, _instance.bestCost); // hardening in case of the above error
                 _instance.intervalSearch->stopTestingAndUpdateUpper(prevBound, cost==0 ? 0 : cost-1);
