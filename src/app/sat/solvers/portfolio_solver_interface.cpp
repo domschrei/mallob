@@ -71,7 +71,7 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 			// ONLY IF desired and there is no pre-created LRATConnector instance for this purpose.
 			LOGGER(_logger, V3_VERB, "Creating full LratConnector%s\n", createModelCheckingLratConn?" with checking models":"");
 			_lrat = new LratConnector(_logger, _setup.localId, _setup.numVars,
-				createModelCheckingLratConn
+				createModelCheckingLratConn, _setup.maxNumSolvers
 			);
 			if (createModelCheckingLratConn) _setup.modelCheckingLratConnector = _lrat;
 		} else {
@@ -79,7 +79,7 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 			if (createModelCheckingLratConn) {
 				LOGGER(_logger, V3_VERB, "Creating dedicated LratConnector for checking models\n");
 				_setup.modelCheckingLratConnector = new LratConnector(
-					_logger, _setup.localId, _setup.numVars, true
+					_logger, _setup.localId, _setup.numVars, true, _setup.maxNumSolvers
 				);
 				_setup.owningModelCheckingLratConnector = true;
 			}

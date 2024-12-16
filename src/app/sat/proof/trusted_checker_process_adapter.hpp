@@ -33,6 +33,7 @@ private:
     FILE* _f_feedback;
     Subprocess* _subproc;
     pid_t _child_pid {-1};
+    const int _maxNumSolvers;
 
     const int _solver_id;
     const int _nb_vars;
@@ -49,9 +50,9 @@ private:
     Mutex _mtx_model;
 
 public:
-    TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars, bool checkModel) :
+    TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars, bool checkModel, int maxNumSolvers) :
             _logger(logger), _solver_id(solverId), _nb_vars(nbVars), _op_queue(1<<14),
-            _check_model(checkModel) {}
+            _check_model(checkModel), _maxNumSolvers(maxNumSolvers) {}
 
     ~TrustedCheckerProcessAdapter() {
         if (!_f_directives) return;
@@ -78,6 +79,7 @@ public:
         Parameters params;
         params.fifoDirectives.set(_path_directives);
         params.fifoFeedback.set(_path_feedback);
+        params.numSolvers.set(_maxNumSolvers);
         std::string moreArgs = "-lenient";
         if (_check_model) moreArgs += " -check-model";
         _subproc = new Subprocess(params, "impcheck_check", moreArgs);
