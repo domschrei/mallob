@@ -28,6 +28,7 @@
 #include "util/sys/tmpdir.hpp"
 #include "data/app_configuration.hpp"
 #include "util/option.hpp"
+#include "util/sys/background_worker.hpp"
 
 bool MaxSatReader::parseInternally(JobDescription& desc) {
 
@@ -118,6 +119,27 @@ bool MaxSatReader::read(JobDescription& desc) {
 		desc.setAppConfigurationEntry("__SIG", placeholder.c_str());
 	}
 	desc.beginInitialization(desc.getRevision());
+
+	// Compressed (*.xz) input?
+	BackgroundWorker bgDecompress;
+	if (_filename.size() > 3 && _filename.substr(_filename.size()-3, 3) == ".xz") {
+		// decompress via named pipe and external program call to xz
+
+		// create named pipe
+		std::string fifo = TmpDir::getGeneralTmpDir() + "/edu.kit.iti.mallob.decompress." + std::to_string(desc.getId()) + ".pipe";
+		int res = mkfifo(fifo.c_str(), 0666);
+		assert(res == 0);
+
+		// decompress into pipe (asynchronously)
+		std::string cmdDecompress = "xz --decompress --stdout \"" + _filename + "\" > " + fifo;
+		bgDecompress.run([command = cmdDecompress]() {
+			int res = system(command.c_str());
+			assert(res == 0);
+		});
+
+		// pretend that our output pipe is actually the input problem file
+		_filename = fifo;
+	}
 
 	unsigned long lb = 0;
 	unsigned long ub = ULONG_MAX;
