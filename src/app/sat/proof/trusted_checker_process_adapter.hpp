@@ -190,6 +190,7 @@ private:
             return false;
         }
         if (readSig) {
+            //if (otfcExternalId)
             TrustedUtils::readId(op.getIdRef(), _f_feedback);
             TrustedUtils::readSignature(sig, _f_feedback);
         }
