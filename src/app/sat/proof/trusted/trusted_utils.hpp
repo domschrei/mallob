@@ -71,6 +71,12 @@ public:
         u64 nbRead = UNLOCKED_IO(fread)(outSig, sizeof(int), 4, file);
         if (nbRead < 4) doAbortEof();
     }
+
+    static void readID(u64* newID, FILE* file) {
+        u64 nbRead = UNLOCKED_IO(fread)(newID, sizeof(u64), 1, file);
+        if (nbRead < 1) doAbortEof();
+    }
+
     static void writeSignature(const u8* sig, FILE* file) {
         UNLOCKED_IO(fwrite)(sig, sizeof(int), 4, file);
     }

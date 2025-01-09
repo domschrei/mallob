@@ -135,7 +135,7 @@ public:
         bool ok = _op_queue.pollBlocking(op);
         if (!ok) return false;
         auto type = op.getType();
-        if (type == LratOp::DERIVATION) res = acceptProduceClause(sig, op.getGlue() > 0);
+        if (type == LratOp::DERIVATION) res = acceptProduceClause(sig, op);
         else if (type == LratOp::IMPORT) res = acceptImportClause();
         else if (type == LratOp::DELETION) res = acceptDeleteClauses();
         else if (type == LratOp::VALIDATION_UNSAT) res = acceptValidateUnsat();
@@ -183,12 +183,19 @@ private:
         TrustedUtils::writeUnsignedLongs(hints, nbHints, _f_directives);
         TrustedUtils::writeChar(share ? 1 : 0, _f_directives);
     }
-    inline bool acceptProduceClause(u8* sig, bool readSig) {
+    inline bool acceptProduceClause(u8* sig, LratOp& op) {
+        bool readSig = op.getGlue() > 0;
         if (!awaitResponse()) {
             handleError("Clause derivation not accepted");
             return false;
         }
-        if (readSig) TrustedUtils::readSignature(sig, _f_feedback);
+        if (readSig) {
+            u64 oldId = op.getId();
+            u64* newID = op.getIdRef();
+            TrustedUtils::readID(newID, _f_feedback);
+            //LOGGER(_logger, V2_INFO, "Got new ID %lu, old ID %lu\n", op.getId(), oldId);
+            TrustedUtils::readSignature(sig, _f_feedback);
+        }
         return true;
     }
 
