@@ -190,10 +190,7 @@ private:
             return false;
         }
         if (readSig) {
-            u64 oldId = op.getId();
-            u64* newID = op.getIdRef();
-            TrustedUtils::readID(newID, _f_feedback);
-            //LOGGER(_logger, V2_INFO, "Got new ID %lu, old ID %lu\n", op.getId(), oldId);
+            TrustedUtils::readId(op.getIdRef(), _f_feedback);
             TrustedUtils::readSignature(sig, _f_feedback);
         }
         return true;
