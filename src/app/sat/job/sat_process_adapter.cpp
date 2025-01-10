@@ -13,7 +13,7 @@
 #include "app/sat/execution/clause_pipe_defs.hpp"
 #include "app/sat/execution/solving_state.hpp"
 #include "app/sat/job/forked_sat_job.hpp"
-#include "app/sat/job/formula_shmem_cache.hpp"
+#include "util/sys/shmem_cache.hpp"
 #include "app/sat/job/inplace_sharing_aggregation.hpp"
 #include "sat_process_adapter.hpp"
 #include "../execution/engine.hpp"
@@ -423,7 +423,7 @@ void* SatProcessAdapter::createSharedMemoryBlock(std::string shmemSubId, size_t 
         return shmem;
     }
 
-    actualShmemId = FormulaSharedMemoryCache::getShmemId(descId);
+    actualShmemId = SharedMemoryCache::getShmemId(descId);
     {
         ShmemObject obj;
         auto lock = _mtx_preregistered_shmem.getLock();
@@ -437,7 +437,7 @@ void* SatProcessAdapter::createSharedMemoryBlock(std::string shmemSubId, size_t 
                 true, rev, obj.userLabel});
     }
     if (!shmem) {
-        shmem = StaticFormulaSharedMemoryCache::get().createOrAccess(descId, qualifiedShmemId, size,
+        shmem = StaticSharedMemoryCache::get().createOrAccess(descId, qualifiedShmemId, size,
             data, actualShmemId);
         _shmem.insert(ShmemObject{actualShmemId, shmem, size,
             true, rev, qualifiedShmemId});
@@ -489,7 +489,7 @@ void SatProcessAdapter::freeSharedMemory() {
             const int descId = _job->getDescription().getJobDescriptionId(shmemObj.revision);
             assert(descId > 0);
             assert(shmemObj.data);
-            StaticFormulaSharedMemoryCache::get().drop(descId, shmemObj.userLabel, shmemObj.size, shmemObj.data);
+            StaticSharedMemoryCache::get().drop(descId, shmemObj.userLabel, shmemObj.size, shmemObj.data);
         } else {
             SharedMemory::free(shmemObj.id, (char*)shmemObj.data, shmemObj.size);
         }

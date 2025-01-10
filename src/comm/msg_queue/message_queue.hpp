@@ -60,8 +60,8 @@ private:
     int _max_concurrent_sends = 16;
 
     // Garbage collection
-    std::atomic_int _num_garbage {0};
     Mutex _garbage_mutex;
+    ConditionVariable _garbage_cond_var;
     std::list<DataPtr> _garbage_queue;
 
     // Callbacks
@@ -76,6 +76,7 @@ private:
 
 public:
     MessageQueue(int maxMsgSize);
+    void close();
     ~MessageQueue();
 
     typedef std::list<MsgCallback>::iterator CallbackRef;

@@ -11,7 +11,7 @@
 
 #include "app/app_message_subscription.hpp"
 #include "app/job.hpp"
-#include "app/sat/job/formula_shmem_cache.hpp"
+#include "util/sys/shmem_cache.hpp"
 #include "util/params.hpp"
 #include "sat_process_adapter.hpp"
 #include "sat_constants.h"

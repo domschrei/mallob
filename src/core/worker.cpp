@@ -3,10 +3,9 @@
 #include <string>
 #include <vector>
 
-#include "app/sat/job/formula_shmem_cache.hpp"
+#include "util/sys/shmem_cache.hpp"
 #include "comm/host_comm.hpp"
 #include "data/job_transfer.hpp"
-#include "mpi.h"
 #include "worker.hpp"
 #include "util/sys/proc.hpp"
 #include "util/sys/timer.hpp"
@@ -79,7 +78,7 @@ void Worker::advance() {
         // Forget jobs that are old or wasting memory
         _watchdog.setActivity(Watchdog::FORGET_OLD_JOBS);
         _sched_man.forgetOldJobs();
-        FormulaSharedMemoryCache::collectGarbage();
+        SharedMemoryCache::collectGarbage();
 
         // Continue to bounce requests which were deferred earlier
         _watchdog.setActivity(Watchdog::THAW_JOB_REQUESTS);
@@ -227,9 +226,5 @@ void Worker::publishAndResetSysState() {
 }
 
 Worker::~Worker() {
-
-    _watchdog.stopWithoutWaiting();
-    Terminator::setTerminating();
-
     LOG(V4_VVER, "Destruct worker\n");
 }

@@ -44,4 +44,6 @@ public:
     static int rank(MPI_Comm comm);
 
     static MessageQueue& getMessageQueue();
+
+    static void broadcastExitSignal();
 };

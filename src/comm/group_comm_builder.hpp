@@ -7,7 +7,7 @@
 #include "core/job_registry.hpp"
 #include "data/job_transfer.hpp"
 #include "data/reduceable.hpp"
-#include "mpi.h"
+
 #include "robin_set.h"
 #include "util/periodic_event.hpp"
 #include <vector>

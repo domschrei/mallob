@@ -11,7 +11,7 @@
 #include <string>
 #include <unistd.h>
 
-class FormulaSharedMemoryCache {
+class SharedMemoryCache {
 
 private:
     struct ProcessWideOwnedShmemTable {
@@ -196,9 +196,9 @@ private:
     }
 };
 
-class StaticFormulaSharedMemoryCache {
+class StaticSharedMemoryCache {
 private:
-    static FormulaSharedMemoryCache singleton;
+    static SharedMemoryCache singleton;
 public:
-    static FormulaSharedMemoryCache& get() {return singleton;}
+    static SharedMemoryCache& get() {return singleton;}
 };

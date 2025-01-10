@@ -6,7 +6,7 @@
 #include <utility>
 
 #include "app/app_message_subscription.hpp"
-#include "app/sat/job/formula_shmem_cache.hpp"
+#include "util/sys/shmem_cache.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "forked_sat_job.hpp"
@@ -348,7 +348,7 @@ void ForkedSatJob::startDestructThreadIfNecessary() {
             for (auto& obj : _formulas_in_shmem) {
                 if (!obj.data) continue;
                 int descriptionId = getDescription().getJobDescriptionId(obj.revision);
-                StaticFormulaSharedMemoryCache::get().drop(descriptionId, obj.userLabel, obj.size, obj.data);
+                StaticSharedMemoryCache::get().drop(descriptionId, obj.userLabel, obj.size, obj.data);
                 obj.data = nullptr;
             }
             LOG(V4_VVER, "%s : FSJ mem freed\n", toStr());
@@ -372,7 +372,7 @@ bool ForkedSatJob::canHandleIncompleteRevision(int rev) {
         + std::to_string(getMyMpiRank()) + ".nopidyet"
         + std::string(toStr()) + "~" + std::to_string(_subproc_idx)
         + ".formulae." + std::to_string(rev);
-    void* shmem = StaticFormulaSharedMemoryCache::get().tryAccess(descriptionId,
+    void* shmem = StaticSharedMemoryCache::get().tryAccess(descriptionId,
         userLabel, size, shmemId);
     if (!shmem) return false;
     if (_formulas_in_shmem.size() <= rev) _formulas_in_shmem.resize(2*rev+1);

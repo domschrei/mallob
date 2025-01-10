@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
     ProcessWideThreadPool::init(1);
 
     // Initialize signal handlers
-    Process::init(rankOfParent, params.traceDirectory(), true);
+    Process::init(rankOfParent, params.traceDirectory());
 
     std::string logdir = params.logDirectory();
     std::string logFilename = "subproc" + std::string(".") + std::to_string(rankOfParent);

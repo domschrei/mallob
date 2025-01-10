@@ -11,13 +11,13 @@
 #include "proc.hpp"
 #include "util/logger.hpp"
 #include "util/sys/threading.hpp"
+#include "util/assert.hpp"
 
 int Process::_rank;
 std::string Process::_trace_dir;
 
 Mutex Process::_children_mutex;
 std::set<pid_t> Process::_children;
-std::atomic_bool Process::_leaf_process;
 long Process::_main_tid;
 
 std::atomic_bool Process::_exit_signal_caught = false;
@@ -30,43 +30,49 @@ void doNothing(int signum) {
 }
 
 void handleSignal(int signum) {
-
     // Do not recursively catch signals (if something goes wrong in here)
-    if (!Process::_exit_signal_caught) {
-        Process::_exit_signal = signum;
-        Process::_signal_tid = Proc::getTid();
-        Process::_exit_signal_caught = true;
-        if (Process::isCrash(signum)) {
-            // Try to write a trace of the concerned thread with gdb
-            Process::writeTrace(Process::_signal_tid);
-        }
-    }
-    
-    // Special handling for termination and crash signals
-    Process::handleTerminationSignal(Process::getCaughtSignal().value());
-}
+    if (Process::_exit_signal_caught) return;
 
-bool Process::isCrash(int signum) {
-    return signum == SIGABRT || signum == SIGFPE || signum == SIGSEGV || signum == SIGBUS;
-}
+    Process::_exit_signal_caught = true;
+    Process::_exit_signal = signum;
+    Process::_signal_tid = Proc::getTid();
 
-void Process::handleTerminationSignal(const SignalInfo& info) {
-    if (!Process::isLeafProcess()) Process::forwardTerminateToChildren();
+    // If crash, try to write a trace of the concerned thread with gdb
+    if (Process::isCrash(signum)) Process::writeTrace(Proc::getTid());
 
+    // Impose a hard timeout for this process' lifetime from this point,
+    // to avoid indeterminate freezes
     auto cmd = "bash scripts/kill-delayed.sh " + std::to_string(Proc::getPid());
     system(cmd.c_str());
 
-    if (isCrash(info.signum)) {
-        if (Proc::getTid() == Process::_main_tid) {
-            // Main thread: handle crash directly
-            long tid = info.tid;
-            LOG(V0_CRIT, "[ERROR] pid=%ld tid=%ld signal=%d\n", 
-                    Proc::getPid(), tid, info.signum);
-            // Try to write a trace of the concerned thread with gdb
-            Process::writeTrace(tid);
-            Process::doExit(1);
-        }
+    // Special case where we are in the main thread and a crash was noticed:
+    // normal execution cannot continue here, so we exit directly.
+    if (Process::isCrash(signum) && Process::_main_tid == Proc::getTid()) {
+        Process::reportTerminationSignal(Process::getCaughtSignal().value());
+        Process::forwardTerminateToChildren();
+        Process::doExit(signum);
     }
+}
+
+bool Process::isCrash(int signum) {
+    return signum == SIGABRT || signum == SIGFPE || signum == SIGSEGV || signum == SIGBUS || signum == SIGILL;
+}
+
+void Process::reportTerminationSignal(const SignalInfo& info) {
+    assert(Proc::getTid() == Process::_main_tid);
+
+    if (isCrash(info.signum)) {
+        LOG(V0_CRIT, "[ERROR] pid=%ld tid=%ld signal=%d\n", 
+                Proc::getPid(), info.tid, info.signum);
+    } else {
+        LOG(V3_VERB, "pid=%ld tid=%ld signal=%d\n",
+                Proc::getPid(), info.tid, info.signum);
+    }
+}
+
+void Process::removeDelayedExitWatchers() {
+    std::string cmd = "pgrep -f \"do-kill-delayed.sh " + std::to_string(Proc::getPid()) + "\" | xargs kill >/dev/null 2>&1";
+    system(cmd.c_str());
 }
 
 void Process::doExit(int retval) {
@@ -76,11 +82,10 @@ void Process::doExit(int retval) {
 }
 
 
-void Process::init(int rank, const std::string& traceDir, bool leafProcess) {
+void Process::init(int rank, const std::string& traceDir) {
     _rank = rank;
     _trace_dir = traceDir;
     _exit_signal_caught = false;
-    _leaf_process = leafProcess;
     _main_tid = Proc::getTid();
 
     signal(SIGUSR1, doNothing); // override default action (exit) on SIGUSR1
@@ -127,10 +132,6 @@ void Process::resume(pid_t childpid) {
 }
 void Process::wakeUp(pid_t childpid) {
     sendSignal(childpid, SIGUSR1);
-}
-
-bool Process::isLeafProcess() {
-    return _leaf_process;
 }
 
 void Process::forwardTerminateToChildren() { 

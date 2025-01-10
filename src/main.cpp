@@ -13,6 +13,7 @@
 #include <thread>
 #include <vector>
 
+#include "comm/distributed_termination.hpp"
 #include "comm/mympi.hpp"
 #include "interface/api/rank_specific_file_fetcher.hpp"
 #include "util/sys/subprocess.hpp"
@@ -86,10 +87,13 @@ void introduceMonoJob(Parameters& params, Client& client) {
 inline bool doTerminate(Parameters& params, int rank) {
     
     bool terminate = false;
-    if (Terminator::isTerminating(/*fromMainThread=*/true)) terminate = true;
+    if (Terminator::isTerminating(/*fromMainThread=*/true)) {
+        terminate = true;
+        MyMpi::broadcastExitSignal();
+    }
     if (monoJobDone || (params.timeLimit() > 0 && Timer::elapsedSecondsCached() > params.timeLimit())) {
         terminate = true;
-        Terminator::broadcastExitSignal();
+        MyMpi::broadcastExitSignal();
     }
     if (terminate) {
         if (rank == 0) {
@@ -103,7 +107,7 @@ inline bool doTerminate(Parameters& params, int rank) {
     return false;
 }
 
-void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& params) {
+void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& params, DistributedTermination& distTerm) {
 
     // Determine which role(s) this PE has
     bool isWorker = commWorkers != MPI_COMM_NULL;
@@ -119,19 +123,6 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     if (isWorker) worker->init();
     if (isClient) client->init();
     int myRank = MyMpi::rank(MPI_COMM_WORLD);
-    
-    // Register global callback for exiting msg (not specific to worker nor client)
-    MessageSubscription exitSubscription(MSG_DO_EXIT, [myRank](MessageHandle& h) {
-        LOG_ADD_SRC(V3_VERB, "Received exit signal", h.source);
-
-        // Forward exit signal
-        if (myRank*2+1 < MyMpi::size(MPI_COMM_WORLD))
-            MyMpi::isendCopy(myRank*2+1, MSG_DO_EXIT, h.getRecvData());
-        if (myRank*2+2 < MyMpi::size(MPI_COMM_WORLD))
-            MyMpi::isendCopy(myRank*2+2, MSG_DO_EXIT, h.getRecvData());
-
-        Terminator::setTerminating();
-    });
 
     // Deposit information to coordinate the creation of an intra-machine communicator
     HostComm hostComm(commWorkers, params);
@@ -186,9 +177,19 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
         // Advance message queue and run callbacks for done messages
         MyMpi::getMessageQueue().advance();
 
-        // Check termination, sleep, and/or yield thread
-        if (doTerminate(params, myRank)) 
+        // Check termination
+        if (distTerm.triggered())
+            Terminator::setTerminating();
+        if (monoJobDone)
+            Terminator::setTerminating();
+        if (params.timeLimit() > 0 && Timer::elapsedSecondsCached() > params.timeLimit())
+            Terminator::setTerminating();
+        if (Terminator::isTerminating(true)) {
+            distTerm.trigger(); // if not triggered already   
             break;
+        }
+
+        // Sleep and/or yield thread
         if (params.sleepMicrosecs() > 0) usleep(params.sleepMicrosecs());
         if (params.yield()) std::this_thread::yield();
     }
@@ -288,17 +289,7 @@ int main(int argc, char *argv[]) {
             LOG(V2_INFO, "Remove %s\n", fileOrDir.c_str());
             FileUtils::rmrf(fileOrDir);
         };
-
-        if (!params.proofDirectory().empty()) {
-            for (auto file : FileUtils::glob(params.proofDirectory() + "/proof#*/")) {
-                doRemove(file);
-            }
-        }
-        if (!params.extMemDiskDirectory().empty()) {
-            for (auto file : FileUtils::glob(params.extMemDiskDirectory() + "/disk.*.*")) {
-                doRemove(file);
-            }
-        }
+        for (auto cleaner : app_registry::getCleaners()) cleaner(params);
         if (!params.traceDirectory().empty()) {
             for (auto file : FileUtils::glob(params.traceDirectory() + "/mallob_thread_trace_of_*")) {
                 doRemove(file);
@@ -314,6 +305,8 @@ int main(int argc, char *argv[]) {
         MPI_Barrier(MPI_COMM_WORLD);
         LOG(V4_VVER, "Passed cleanup barrier\n");
     }
+
+    std::unique_ptr<DistributedTermination> distTerm (new DistributedTermination()); // RAII
 
     auto isWorker = [&](int rank) {
         if (params.numWorkers() == -1) return true; 
@@ -359,7 +352,7 @@ int main(int argc, char *argv[]) {
     
     // Execute main program
     try {
-        doMainProgram(workerComm, clientComm, params);
+        doMainProgram(workerComm, clientComm, params, *distTerm.get());
     } catch (const std::exception& ex) {
         LOG(V0_CRIT, "[ERROR] uncaught \"%s\"\n", ex.what());
         Process::doExit(1);
@@ -369,9 +362,14 @@ int main(int argc, char *argv[]) {
     }
 
     // Exit properly
+    MyMpi::getMessageQueue().close();
+    distTerm.reset();
     MPI_Barrier(MPI_COMM_WORLD);
+    delete &MyMpi::getMessageQueue();
+    if (clientComm != MPI_COMM_NULL) MPI_Comm_free(&clientComm);
+    if (workerComm != MPI_COMM_NULL) MPI_Comm_free(&workerComm);
     MPI_Finalize();
     TmpDir::wipe();
+    Process::removeDelayedExitWatchers();
     LOG(V2_INFO, "Exiting happily\n");
-    Process::doExit(0);
 }

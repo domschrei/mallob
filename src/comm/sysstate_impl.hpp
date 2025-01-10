@@ -3,7 +3,6 @@
 #define DOMPASCH_MALLOB_SYSSTATE_IMPL_HPP
 
 #include "util/sys/timer.hpp"
-#include "sysstate.hpp"
 
 template <int N>
 SysState<N>::SysState(MPI_Comm& comm, float period, SysStateCollective collective, MPI_Op operation): 
@@ -61,6 +60,7 @@ bool SysState<N>::aggregate(float elapsedTime) {
             MPI_Test(&_request, &flag, &status);
             if (flag) {
                 _aggregating = false;
+                _request = MPI_REQUEST_NULL;
                 return true;
             } else if (SysState_isUnresponsiveNodeCrashingEnabled()
                     && _last_aggregation > 0 && timeSinceLast > 60) {

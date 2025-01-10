@@ -86,6 +86,14 @@ MessageQueue& MyMpi::getMessageQueue() {
     return *_msg_queue;
 }
 
+void MyMpi::broadcastExitSignal() {
+    MyMpi::isend(0, MSG_DO_EXIT, std::vector<uint8_t>(1, 0));
+    do {
+        MyMpi::getMessageQueue().advance();
+    } while (MyMpi::getMessageQueue().hasOpenRecvFragments() || MyMpi::getMessageQueue().hasOpenSends());
+}
+
+
 /*
 void MyMpi::latencyMonkey() {
     if (_monkey_flags & MONKEY_LATENCY) {

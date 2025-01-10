@@ -191,11 +191,11 @@ public:
     }
 
     ~BiDirectionalAnytimePipe() {
+        const float time = Timer::elapsedSeconds();
         if (_mode == CREATE) {
             writeToPipe({}, 0, false); // "wake up", stop child reader
             // Send termination signal to child, wait for answer
             *_shmem_do_terminate = true;
-            float time = Timer::elapsedSeconds();
             while (!*_shmem_did_terminate && _child_pid!=-1 && !Process::didChildExit(_child_pid)
                     && Timer::elapsedSeconds() - time < 1.0f) // 1s grace period
                 usleep(1000);
@@ -206,8 +206,9 @@ public:
             _buf_in.markTerminated();
             _buf_out.markExhausted();
             _buf_out.markTerminated();
-            // Wait until termination signal from parent arrived
-            while (!*_shmem_do_terminate) usleep(1000);
+            // Wait until termination signal from parent arrived (5s grace period)
+            while (!*_shmem_do_terminate && Timer::elapsedSeconds() - time < 5.0f)
+                usleep(1000);
             // Join with the background threads once they are done.
             _bg_reader.stop();
             _bg_writer.stop();

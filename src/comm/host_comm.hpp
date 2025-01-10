@@ -18,7 +18,7 @@ class HostComm {
 private:
     const Parameters& _params;
     MPI_Comm _parent_comm;
-    MPI_Comm _comm;
+    MPI_Comm _comm {MPI_COMM_NULL};
 
     std::string _base_filename;
     std::string _hash_string;
@@ -39,6 +39,7 @@ public:
     HostComm(MPI_Comm parentComm, const Parameters& params) : _params(params), _parent_comm(parentComm) {}
     ~HostComm() {
         if (_sysstate != nullptr) delete _sysstate;
+        if (_comm != MPI_COMM_NULL) MPI_Comm_free(&_comm);
     }
 
     void depositInformation() {

@@ -1292,7 +1292,7 @@ SchedulingManager::~SchedulingManager() {
     // Setup a watchdog to get feedback on hanging destructors
     Watchdog watchdog(/*enabled=*/_params.watchdog(), /*checkIntervMillis=*/3, 
         Timer::elapsedSeconds());
-    watchdog.setWarningPeriod(500);
+    watchdog.setWarningPeriod(1100);
     watchdog.setAbortPeriod(10*1000);
     
     // Forget each job, move raw pointer to destruct queue

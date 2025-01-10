@@ -40,6 +40,19 @@ void register_mallob_app_sat() {
             */
             json = result.copySolution();
             return json;
+        },
+        // Resource cleaner
+        [](const Parameters& params) {
+            if (!params.proofDirectory().empty()) {
+                for (auto file : FileUtils::glob(params.proofDirectory() + "/proof#*/")) {
+                    FileUtils::rmrf(file);
+                }
+            }
+            if (!params.extMemDiskDirectory().empty()) {
+                for (auto file : FileUtils::glob(params.extMemDiskDirectory() + "/disk.*.*")) {
+                    FileUtils::rmrf(file);
+                }
+            }
         }
     );
 }

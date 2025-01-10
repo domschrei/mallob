@@ -9,7 +9,6 @@
 #include <utility>
 
 #include "serializable.hpp"
-#include "util/assert.hpp"
 
 struct JobResult : public Serializable {
 

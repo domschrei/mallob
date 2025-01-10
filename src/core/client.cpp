@@ -374,7 +374,7 @@ void Client::advance() {
         for (auto& jobname : _failed_job_queue) {
             LOG(V1_WARN, "[WARN] Rejecting submission %s - reason: Error while parsing description.\n", jobname.c_str());
             if (_params.monoFilename.isSet()) {
-                Terminator::broadcastExitSignal();
+                MyMpi::broadcastExitSignal();
             }
         }
         _failed_job_queue.clear();
@@ -439,7 +439,7 @@ void Client::advance() {
             // Job limit reached - exit
             Terminator::setTerminating();
             // Send MSG_EXIT to worker of rank 0, which will broadcast it
-            Terminator::broadcastExitSignal();
+            MyMpi::broadcastExitSignal();
             // Stop instance reader immediately
             _instance_reader.stopWithoutWaiting();
         }

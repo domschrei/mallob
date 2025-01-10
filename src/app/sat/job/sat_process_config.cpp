@@ -5,7 +5,6 @@
 
 #include "app/job.hpp"
 #include "comm/binary_tree_buffer_limit.hpp"
-#include "comm/mympi.hpp"
 #include "data/job_description.hpp"
 #include "util/logger.hpp"
 #include "util/option.hpp"

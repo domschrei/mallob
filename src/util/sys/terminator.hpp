@@ -17,24 +17,22 @@ private:
 
 public:
     static void setTerminating() {
-        _exit = true;
+        bool expected = false;
+        bool isExitNew = _exit.compare_exchange_strong(expected, true, std::memory_order_relaxed);
+        if (isExitNew) {
+            Process::forwardTerminateToChildren();
+        }
     }
     static inline bool isTerminating(bool fromMainThread = false) {
         
-        if (Process::wasSignalCaught()) {
-
+        if (!_exit && Process::wasSignalCaught()) {
             auto optSignalInfo = Process::getCaughtSignal();
             if (optSignalInfo) {
-
                 int signum = optSignalInfo.value().signum;
-                if (!_exit) LOG(V2_INFO, "Caught signal %i\n", signum);
-                setTerminating();
-
                 if (fromMainThread) {
-                    Process::handleTerminationSignal(optSignalInfo.value());
-                    broadcastExitSignal();
+                    Process::reportTerminationSignal(optSignalInfo.value());
                 }
-
+                setTerminating();
                 return true;
             }
         }
@@ -44,8 +42,6 @@ public:
     static void reset() {
         _exit = false;
     }
-
-    static void broadcastExitSignal();
 };
 
 #endif

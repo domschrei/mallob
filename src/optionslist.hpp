@@ -120,6 +120,8 @@ OPTION_GROUP(grpPerformance, "performance", "Performance")
  OPT_BOOL(regularProcessDistribution,     "rpa", "regular-process-allocation",         false,                   "Signal that processes have been allocated regularly, i.e., the i-th machine hosts ranks c*i through c*i + c-1")
  OPT_INT(sleepMicrosecs,                  "sleep", "",                                 100,  0, LARGE_INT,      "Sleep this many microseconds between loop cycles of worker main thread")
  OPT_BOOL(yield,                          "yield", "",                                 false,                   "Yield manager thread whenever there are no new messages")
+ OPT_INT(maxLiteralsPerThread,              "mlpt", "max-lits-per-thread",               50000000, 0,   MAX_INT,    
+    "If formula is larger than threshold, reduce #threads per PE until #threads=1 or until limit is met \"on average\"")
 
 ///////////////////////////////////////////////////////////////////////
 

@@ -131,6 +131,7 @@ private:
         int lastSolvedRevision = -1;
 
         int exitStatus = 0;
+        bool terminateFromParent = false;
 
         bool collectClauses = false;
         int exportLiteralLimit;
@@ -143,7 +144,11 @@ private:
             Timer::cacheElapsedSeconds();
 
             // Terminate
-            if (_hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/false)) {
+            if (_hsm->doTerminate) {
+                Terminator::setTerminating();
+                terminateFromParent = true;
+            }
+            if (Terminator::isTerminating(true)) {
                 LOGGER(_log, V4_VVER, "DO terminate\n");
                 engine.dumpStats(/*final=*/true);
                 break;
@@ -331,7 +336,7 @@ private:
         // This call ends the program.
         checkTerminate(engine, true, exitStatus, [&]() {
             // clean up bidirectional pipe - THIS BLOCKS UNTIL PARENT SENT FINAL BYTE
-            pipe.~BiDirectionalAnytimePipe();
+            if (terminateFromParent) pipe.~BiDirectionalAnytimePipe();
         });
         abort(); // should be unreachable
 
@@ -339,7 +344,7 @@ private:
     }
 
     bool checkTerminate(SatEngine& engine, bool force, int exitStatus = 0, std::function<void()> cbAtForcedExit = [](){}) {
-        bool terminate = _hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/true);
+        bool terminate = Terminator::isTerminating(true);
         if (terminate && force) {
             // clean up all resources which MUST be cleaned up (e.g., child processes)
             engine.cleanUp(true);
