@@ -82,6 +82,8 @@ struct SolverSetup {
 	bool onTheFlyChecking;
 	// If on-the-fly checking is enabled: this solver also seeks to have a found satisfying assignment checked.
 	bool onTheFlyCheckModel;
+	// If on-the-fly checking is enabled: the on-the-fly checker returns modified IDs for clause sharing.
+	bool otfcExternalId;
 	// If non-null, use this LratConnector instance for checking a model;
 	// if null && onTheFlyCheckModel, then *create* a model-checking LRAT connector instance yourself (also to use for others).
 	LratConnector* modelCheckingLratConnector {nullptr};

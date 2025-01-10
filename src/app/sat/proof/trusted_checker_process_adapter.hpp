@@ -34,6 +34,7 @@ private:
     Subprocess* _subproc;
     pid_t _child_pid {-1};
     const int _max_num_solvers;
+    const bool _otfc_external_id;
 
     const int _solver_id;
     const int _nb_vars;
@@ -50,9 +51,9 @@ private:
     Mutex _mtx_model;
 
 public:
-    TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars, bool checkModel, int maxNumSolvers) :
+    TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars, bool checkModel, int maxNumSolvers, bool otfcExternalId) :
             _logger(logger), _solver_id(solverId), _nb_vars(nbVars), _op_queue(1<<14),
-            _check_model(checkModel), _max_num_solvers(maxNumSolvers) {}
+            _check_model(checkModel), _max_num_solvers(maxNumSolvers), _otfc_external_id(otfcExternalId) {}
 
     ~TrustedCheckerProcessAdapter() {
         if (!_f_directives) return;
@@ -190,8 +191,7 @@ private:
             return false;
         }
         if (readSig) {
-            //if (otfcExternalId)
-            TrustedUtils::readId(op.getIdRef(), _f_feedback);
+            if (_otfc_external_id) TrustedUtils::readId(op.getIdRef(), _f_feedback);
             TrustedUtils::readSignature(sig, _f_feedback);
         }
         return true;
