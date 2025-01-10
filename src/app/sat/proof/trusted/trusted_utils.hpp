@@ -72,8 +72,9 @@ public:
         if (nbRead < 4) doAbortEof();
     }
 
-    static void readId(u64* newId, FILE* file) {
-        u64 nbRead = UNLOCKED_IO(fread)(newId, sizeof(u64), 1, file);
+    static void readId(u64* idLocation, FILE* file) {
+        // Do not write more than one u64!
+        u64 nbRead = UNLOCKED_IO(fread)(idLocation, sizeof(u64), 1, file); 
         if (nbRead < 1) doAbortEof();
     }
 
