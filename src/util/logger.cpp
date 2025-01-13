@@ -59,6 +59,7 @@ bool log_return_false(const char* str, ...) {
     va_start(args, str);
     Logger::getMainInstance().log(args, V0_CRIT, str);
     va_end(args);
+    Logger::getMainInstance().flush();
     return false;
 }
 

@@ -68,6 +68,7 @@ void Process::reportTerminationSignal(const SignalInfo& info) {
         LOG(V3_VERB, "pid=%ld tid=%ld signal=%d\n",
                 Proc::getPid(), info.tid, info.signum);
     }
+    Logger::getMainInstance().flush();
 }
 
 void Process::removeDelayedExitWatchers() {
