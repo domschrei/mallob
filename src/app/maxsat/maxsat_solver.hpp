@@ -314,6 +314,7 @@ public:
                 _fut_instance_update.get();
                 if (updateResult.instanceImproved) {
                     // cleanup (has to happen before update)
+                    LOG(V2_INFO, "MAXSAT improvement found by MaxPRE: restart searches\n");
                     tryStopAllSearches(searches);
                     if (!isTimeoutHit()) {
                         searches.clear();
@@ -326,11 +327,17 @@ public:
                 } else {
                     if (updateResult.boundsImproved) {
                         // update with improved bounds from preprocessing
+                        const bool lowerImproved = _instance_update.lowerBound > _instance->lowerBound;
                         _instance->lowerBound = std::max(_instance_update.lowerBound, _instance->lowerBound);
+                        const bool upperImproved = _instance_update.upperBound < _instance->upperBound;
                         _instance->upperBound = std::min(_instance_update.upperBound, _instance->upperBound);
                         if (_instance->lowerBound >= _instance->upperBound) {
                             _instance->upperBound++; // workaround to actually get a solution
                         }
+                        LOG(V2_INFO, "MAXSAT improved bounds found by MaxPRE - new bounds: (%lu,%lu)\n",
+                            _instance->lowerBound, _instance->upperBound);
+                        if (lowerImproved) _instance->intervalSearch->stopTestingAndUpdateLower(_instance->lowerBound);
+                        if (upperImproved) _instance->intervalSearch->stopTestingAndUpdateUpper(ULONG_MAX, _instance->upperBound);
                     }
                     if (updateLayer < 10 && StaticMaxSatParserStore::get(_desc.getId())->lastCallInterrupted()) {
                         // retry concurrent preprocessing with higher limit
