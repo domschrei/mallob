@@ -18,7 +18,7 @@ namespace app_registry {
     typedef std::function<bool(const Parameters&, const std::vector<std::string>&, JobDescription&)> JobReader;
     typedef std::function<Job*(const Parameters&, const Job::JobSetup&, AppMessageTable&)> JobCreator;
     typedef std::function<JobResult(const Parameters&, APIConnector&, JobDescription&)> ClientSideProgram;
-    typedef std::function<nlohmann::json(const JobResult&)> JobSolutionFormatter;
+    typedef std::function<nlohmann::json(const Parameters&, const JobResult&)> JobSolutionFormatter;
     typedef std::function<void(const Parameters&)> ResourceCleaner;
 
     void registerApplication(const std::string& key,

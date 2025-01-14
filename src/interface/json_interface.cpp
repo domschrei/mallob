@@ -264,6 +264,8 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Stat
     
     JobImage* img = _job_id_rev_to_image[std::pair<int, int>(result.id, result.revision)];
     auto& j = img->baseJson;
+    // do not include the actual job description in the result JSON since it can be huge
+    j.erase("literals");
 
     bool useSolutionFile = (_params.pipeSolutions() == MALLOB_PIPE_SOLUTIONS_ALL && result.getSolutionSize() > 0)
         || (_params.pipeSolutions() == MALLOB_PIPE_SOLUTIONS_LARGE && result.getSolutionSize() > 65536);
@@ -283,7 +285,7 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Stat
         j["result"]["solution-size"] = result.getSolutionSize();
         mkfifo(solutionFile.c_str(), 0666);
     } else {
-        j["result"]["solution"] = app_registry::getJobSolutionFormatter(applicationId)(result);
+        j["result"]["solution"] = app_registry::getJobSolutionFormatter(applicationId)(_params, result);
     }
     j["stats"] = {
         { "time", {

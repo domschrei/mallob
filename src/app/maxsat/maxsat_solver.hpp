@@ -312,6 +312,7 @@ public:
             if (_instance->lowerBound < _instance->upperBound && maxPreRunDone) {
                 maxPreRunDone = false;
                 _fut_instance_update.get();
+                LOG(V2_INFO, "MAXSAT processing MaxPRE result\n");
                 if (updateResult.instanceImproved) {
                     // cleanup (has to happen before update)
                     LOG(V2_INFO, "MAXSAT improvement found by MaxPRE: restart searches\n");

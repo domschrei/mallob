@@ -623,7 +623,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
         // Disable all watchdogs to avoid crashes while printing a huge model
         Watchdog::disableGlobally();
 
-        auto json = app_registry::getJobSolutionFormatter(desc.getApplicationId())(jobResult);
+        auto json = app_registry::getJobSolutionFormatter(desc.getApplicationId())(_params, jobResult);
         if (json.is_array() && (json.size()==0 || json[0].is_string())) {
             auto jsonArr = json.get<std::vector<std::string>>();
             for (auto&& str : jsonArr) modelStrings.push_back(std::move(str));

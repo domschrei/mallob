@@ -12,7 +12,7 @@ lib/*.zip
 lib/*.tgz
 lib/*.tar.gz
 build*/
-data/
+/data/
 bin/
 instances/*.cnf
 instances/*.cnf.xz

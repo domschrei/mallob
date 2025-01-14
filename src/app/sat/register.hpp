@@ -3,6 +3,7 @@
 
 #include "app/app_message_subscription.hpp"
 #include "app/app_registry.hpp"
+#include "app/sat/data/model_string_compressor.hpp"
 #include "job/forked_sat_job.hpp"
 #include "parse/sat_reader.hpp"
 
@@ -17,7 +18,7 @@ void register_mallob_app_sat() {
             return new ForkedSatJob(params, setup, table);
         },
         // Job solution formatter
-        [](const JobResult& result) {
+        [](const Parameters& params, const JobResult& result) {
             auto json = nlohmann::json::array();
             /*std::stringstream modelString;
             int numAdded = 0;
@@ -38,7 +39,12 @@ void register_mallob_app_sat() {
                 }
             }
             */
-            json = result.copySolution();
+            auto model = result.copySolution();
+            if (params.compressModels()) {
+                json = ModelStringCompressor::compress(model);
+            } else {
+                json = std::move(model);
+            }
             return json;
         },
         // Resource cleaner

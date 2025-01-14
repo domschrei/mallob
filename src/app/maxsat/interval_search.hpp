@@ -127,7 +127,7 @@ public:
         while (it != _current_bounds.end()) {
             SearchInterval i = *it;
             if (updateUpper && newMax <= i.ub) {
-                // the corresponding call is being stopped
+                // the upper improvement concerns this interval
                 if (newMax <= i.lb) {
                     // interval is falling out of the considered range *completely*
                     it = _current_bounds.erase(it);
@@ -138,19 +138,37 @@ public:
                         _current_bounds.pop_back();
                     }
                     // interval needs to be split so that the cutoff can be deleted
-                    auto [left, right] = _current_bounds.back().splitAt(_skew, newMax);
-                    // now erase the interval itself
+                    auto parent = _current_bounds.back();
+                    auto [left, right] = parent.splitAt(_skew, newMax);
+                    // erase the interval itself
                     _current_bounds.pop_back();
-                    if (left.size() > 0) {
-                        left.orphaned = i.ub == bound; // only mark as orphaned if this was your interval!
-                        _current_bounds.push_back(left);
-                        summedWeight += left.weight;
-                        break;
-                    }
+                    assert(left.size() > 0);
+                    // Mark the new interval as orphaned if there is no active test with its UB.
+                    // This is the case if the UB is actually "new" (was inside of an interval before)
+                    // or belonged to the test that is being stopped with this particular call
+                    // or if the parent interval was already orphaned in the first place.
+                    left.orphaned = left.ub != parent.ub || left.ub == bound || parent.orphaned;
+                    _current_bounds.push_back(left);
+                    summedWeight += left.weight;
+                    break;
                 }
-            } else if (updateLower && i.ub <= bound) {
-                // the corresponding call stops and the interval range shrinks.
-                it = _current_bounds.erase(it);
+            } else if (updateLower && i.lb < bound) {
+                if (i.ub <= bound) {
+                    // The corresponding call stops and the full interval is deleted.
+                    it = _current_bounds.erase(it);
+                } else {
+                    // A strict left-side sub-range of this interval becomes obsolete.
+                    // Interval needs to be split so that the cutoff can be deleted.
+                    auto [left, right] = i.splitAt(_skew, bound);
+                    // delete the interval itself
+                    it = _current_bounds.erase(it);
+                    // re-insert the right-side sub-range of the interval
+                    assert(right.size() > 0);
+                    right.orphaned = i.orphaned; // inherit "orphaned" status
+                    it = _current_bounds.insert(it, right);
+                    summedWeight += right.weight;
+                    ++it;
+                }
             } else if (i.ub == bound) {
                 // Call is not dominated by a lower or upper bound but still stopped:
                 // "stop" the interval *without* shrinking the interval range.

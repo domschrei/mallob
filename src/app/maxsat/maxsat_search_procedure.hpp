@@ -8,11 +8,13 @@
 #include "app/maxsat/maxsat_instance.hpp"
 #include "app/maxsat/sat_job_stream.hpp"
 #include "app/maxsat/solution_writer.hpp"
+#include "app/sat/data/model_string_compressor.hpp"
 #include "app/sat/data/theories/integer_term.hpp"
 #include "app/sat/data/theories/theory_specification.hpp"
 #include "app/sat/job/sat_constants.h"
 #include "rustsat.h"
 #include "util/logger.hpp"
+#include "util/random.hpp"
 #include "util/string_utils.hpp"
 #include "util/sys/background_worker.hpp"
 #include "util/sys/terminator.hpp"
@@ -20,6 +22,7 @@
 #include "util/sys/thread_pool.hpp"
 
 #include <climits>
+#include <fstream>
 #include <memory>
 #include <unistd.h>
 
@@ -291,7 +294,12 @@ public:
         // Formula is SATisfiable.
 
         // Retrieve the initial model and compute its cost as a first upper bound.
-        auto solution = result["result"]["solution"].get<std::vector<int>>();
+        std::vector<int> solution;
+        if (_params.compressModels()) {
+            solution = ModelStringCompressor::decompress(result["result"]["solution"].get<std::string>());
+        } else {
+            solution = result["result"]["solution"].get<std::vector<int>>();
+        }
         if (_search_strat == NAIVE_REFINEMENT) {
             // remember *any* found solution to forbid it in the next step
             _last_found_solution = solution;
@@ -323,7 +331,6 @@ public:
             //appendLiteral(0);
         }
         _assumptions_to_persist_upon_sat.clear();
-
         return RESULT_SAT;
     }
 
@@ -344,7 +351,7 @@ public:
         // Case 2: We already know of a better solution than the tested bound.
         // We allow some leniency here since it may be better to keep a job running
         // if its bound is only slightly suboptimal w.r.t. the best known bound. 
-        if (_current_bound > 1.01 * _instance.bestCost) return true;
+        if (_current_bound > 1.01 * _instance.upperBound) return true;
         // Otherwise, the solving attempt is not obsolete.
         return false;
     }

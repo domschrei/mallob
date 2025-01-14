@@ -17,7 +17,7 @@ void register_mallob_app_dummy() {
             return new DummyJob(params, setup, table);
         },
         // Job solution formatter
-        [](const JobResult& result) {
+        [](const Parameters& params, const JobResult& result) {
             // An actual application would nicely format the result here ...
             return nlohmann::json();
         }

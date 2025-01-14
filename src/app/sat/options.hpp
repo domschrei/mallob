@@ -19,6 +19,7 @@ OPTION_GROUP(grpAppSat, "app/sat", "SAT solving options")
     "Log successfully shared clauses to the provided path")
  OPT_STRING(cadicalProfilingDir,            "cpd", "cadical-profiling-dir", "", "Directory to write CaDiCaL profiling reports to")
  OPT_INT(cadicalProfilingLevel,             "cpl", "cadical-profiling-level", -1, -1, 4, "Profiling level for CaDiCaL (-1=none ... 4=all)")
+ OPT_BOOL(compressModels,                   "cm", "compress-models", false, "Compress found models into hexadecimal vector in output")
 
 OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration")
  OPT_INT(bufferedImportedClsGenerations,    "bicg", "buffered-imported-cls-generations", 4,        1,   LARGE_INT, 

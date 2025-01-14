@@ -20,7 +20,7 @@ void register_mallob_app_maxsat() {
             return solver.solve();
         },
         // Job solution formatter
-        [](const JobResult& result) {
+        [](const Parameters& params, const JobResult& result) {
             // TODO This is just the SAT model formatting so far. Anything else?
             auto json = nlohmann::json::array();
             std::stringstream modelString;
