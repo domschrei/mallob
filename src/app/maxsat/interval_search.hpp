@@ -75,7 +75,7 @@ public:
         {
             auto it = best; ++it;
             while (it != _current_bounds.end()) {
-                if (best == _current_bounds.end() // first interval
+                if (best == _current_bounds.end() // first proper interval
                         || (it->orphaned) // prefer rightmost orphaned interval
                         || (!best->orphaned &&
                             ((best->size() == 1 && it->size() > 1) // first interval of size >1

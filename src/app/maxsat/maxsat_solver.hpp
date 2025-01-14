@@ -86,6 +86,9 @@ public:
 
     ~MaxSatSolver() {
 #if MALLOB_USE_MAXPRE == 1
+        // join with background MaxPRE preprocessor 
+        if (_fut_instance_update.valid()) _fut_instance_update.get();
+        // delete MaxPRE preprocessor
         StaticMaxSatParserStore::erase(_desc.getId());
 #endif
     }
@@ -125,12 +128,6 @@ public:
             launchImprovingMaxPreRun(updateLayer, maxPreRunDone, updateResult);
         }
 #endif
-
-        // If the preprocessor found a non-trivial upper bound,
-        // we unfortunately do not know the according solution.
-        if (_instance->lowerBound == _instance->upperBound) {
-            _instance->upperBound++; // workaround: force finding a solution of the exact bound
-        }
 
         // Parse the user-provided sequence of search strategies.
         std::string searchStrats = std::string(_params.maxSatNumSearchers(), 'd');
@@ -189,7 +186,7 @@ public:
                 // the solution is already proven optimal
                 r.result = RESULT_OPTIMUM_FOUND;
                 r.setSolution(std::move(_instance->bestSolution));
-                LOG(V2_INFO, "MAXSAT OPTIMAL COST %lu\n", _instance->upperBound);
+                LOG(V2_INFO, "MAXSAT OPTIMAL COST %lu\n", _instance->bestCost);
                 Logger::getMainInstance().flush();
                 return r;
             }
@@ -235,6 +232,7 @@ public:
         while (!isTimeoutHit() && _instance->lowerBound < _instance->upperBound && !searches.empty()) {
             // Loop over all search strategies
             bool change = false;
+            bool stagnation = false;
             for (auto it = searches.begin(); it != searches.end(); ++it) {
                 auto& search = *it;
                 // In a solve call right now?
@@ -260,6 +258,11 @@ public:
                     bool goOn = search->enforceNextBound();
                     if (!goOn) {
                         // This search procedure does not want to continue: stop and remove it.
+                        // But make sure not to delete the only remaining search this way.
+                        if (searches.size() == 1) {
+                            stagnation = true;
+                            break;
+                        }
                         searchesToFinalize.emplace_back();
                         std::swap(search, searchesToFinalize.back());
                         it = searches.erase(it);
@@ -273,10 +276,12 @@ public:
                     change = true;
                 }
             }
-            if (_instance->lowerBound >= _instance->upperBound)
+            if (stagnation || _instance->lowerBound >= _instance->upperBound)
                 break;
+
             // Wait a bit if nothing changed
-            if (!change) {
+            if (change) timeOfLastChange = Timer::elapsedSeconds();
+            else {
                 usleep(1000); // 1 ms
                 if (_params.maxSatFocusPeriod() > 0 && Timer::elapsedSeconds() - timeOfLastChange > _params.maxSatFocusPeriod()
                         && searches.size() > _params.maxSatFocusMin()) {
@@ -295,7 +300,6 @@ public:
                     }
                 }
             }
-            if (change) timeOfLastChange = Timer::elapsedSeconds();
 
             // delete old searches where possible
             for (auto it = searchesToFinalize.begin(); it != searchesToFinalize.end(); ++it) {
@@ -309,10 +313,29 @@ public:
 
 #if MALLOB_USE_MAXPRE == 1
             // concurrent improving preprocessing run done?
-            if (_instance->lowerBound < _instance->upperBound && maxPreRunDone) {
+            if (maxPreRunDone) {
                 maxPreRunDone = false;
                 _fut_instance_update.get();
                 LOG(V2_INFO, "MAXSAT processing MaxPRE result\n");
+
+                // Did the preprocessor find improved bounds?
+                if (updateResult.boundsImproved) {
+                    // update bounds with preprocessing results
+                    const bool lowerImproved = _instance_update.lowerBound > _instance->lowerBound;
+                    _instance->lowerBound = std::max(_instance_update.lowerBound, _instance->lowerBound);
+                    const bool upperImproved = _instance_update.upperBound < _instance->upperBound;
+                    _instance->upperBound = std::min(_instance_update.upperBound, _instance->upperBound);
+                    LOG(V2_INFO, "MAXSAT improved bounds found by MaxPRE - new bounds: (%lu,%lu)\n",
+                        _instance->lowerBound, _instance->upperBound);
+                    if (lowerImproved) _instance->intervalSearch->stopTestingAndUpdateLower(_instance->lowerBound);
+                    if (upperImproved) _instance->intervalSearch->stopTestingAndUpdateUpper(ULONG_MAX, _instance->upperBound);
+                    if (_instance->lowerBound == _instance->upperBound) {
+                        // bounds became tight!
+                        break;
+                    }
+                }
+
+                // Did the preprocessor improve the instance itself to a notable degree?
                 if (updateResult.instanceImproved) {
                     // cleanup (has to happen before update)
                     LOG(V2_INFO, "MAXSAT improvement found by MaxPRE: restart searches\n");
@@ -323,45 +346,53 @@ public:
                         // update
                         updateInstance(_instance_update); // nukes and rewrites instance
                         // try again on updated instance
+                        // NOTE: may call launchImprovingMaxSatRun internally
                         return solve(updateLayer+1);
                     }
-                } else {
-                    if (updateResult.boundsImproved) {
-                        // update with improved bounds from preprocessing
-                        const bool lowerImproved = _instance_update.lowerBound > _instance->lowerBound;
-                        _instance->lowerBound = std::max(_instance_update.lowerBound, _instance->lowerBound);
-                        const bool upperImproved = _instance_update.upperBound < _instance->upperBound;
-                        _instance->upperBound = std::min(_instance_update.upperBound, _instance->upperBound);
-                        if (_instance->lowerBound >= _instance->upperBound) {
-                            _instance->upperBound++; // workaround to actually get a solution
-                        }
-                        LOG(V2_INFO, "MAXSAT improved bounds found by MaxPRE - new bounds: (%lu,%lu)\n",
-                            _instance->lowerBound, _instance->upperBound);
-                        if (lowerImproved) _instance->intervalSearch->stopTestingAndUpdateLower(_instance->lowerBound);
-                        if (upperImproved) _instance->intervalSearch->stopTestingAndUpdateUpper(ULONG_MAX, _instance->upperBound);
-                    }
-                    if (updateLayer < 10 && StaticMaxSatParserStore::get(_desc.getId())->lastCallInterrupted()) {
-                        // retry concurrent preprocessing with higher limit
-                        updateLayer++;
-                        launchImprovingMaxPreRun(updateLayer, maxPreRunDone, updateResult);
-                    }
+                } else if (updateLayer < 10 && StaticMaxSatParserStore::get(_desc.getId())->lastCallInterrupted()) {
+                    // not run until completion yet: retry concurrent preprocessing with higher limit
+                    updateLayer++;
+                    launchImprovingMaxPreRun(updateLayer, maxPreRunDone, updateResult);
                 }
             }
 #endif
         }
 
-        // Did we actually find an optimal result?
-        if (_instance->lowerBound >= _instance->upperBound) {
-            // construct & return final job result
-            r.result = RESULT_OPTIMUM_FOUND;
-            r.setSolution(std::move(_instance->bestSolution));
-            LOG(V2_INFO, "MAXSAT OPTIMAL COST %lu\n", _instance->upperBound);
-            if (writer) writer->concludeOptimal();
-            Logger::getMainInstance().flush();
-        }
-
         LOG(V4_VVER, "MAXSAT trying to stop all searches ...\n");
         tryStopAllSearches(searches);
+
+        // Were we able to find tight bounds?
+        if (_instance->lowerBound >= _instance->upperBound) {
+            // -- yes
+            assert(_instance->lowerBound == _instance->upperBound);
+            // Do we have an optimal solution?
+            if (_instance->bestCost > _instance->upperBound) {
+                // -- no: tight bounds are known, but we do not have a corresponding solution yet.
+                // Make one more SAT call to find such a solution.
+                LOG(V2_INFO, "MAXSAT final SAT call to find solution of optimal cost %lu ...\n", _instance->upperBound);
+                assert(!searches.empty());
+                auto& search = searches.front();
+                bool ok = search->enforceNextBound(_instance->upperBound);
+                assert(ok);
+                while (!search->isDoneEncoding()) usleep(1000);
+                int resultCode = search->solveBlocking();
+                assert(resultCode == SAT);
+            }
+            assert(_instance->bestCost == _instance->upperBound);
+            // return final, optimal job result
+            r.result = RESULT_OPTIMUM_FOUND;
+            LOG(V2_INFO, "MAXSAT OPTIMAL COST %lu\n", _instance->upperBound);
+            if (writer) writer->concludeOptimal();
+        } else {
+            // -- no
+            if (_instance->bestCost < ULONG_MAX) {
+                // we did find *some* solution.
+                r.result = RESULT_SAT;
+                LOG(V2_INFO, "MAXSAT BEST FOUND COST %lu\n", _instance->upperBound);
+            }
+        }
+        r.setSolution(std::move(_instance->bestSolution));
+        Logger::getMainInstance().flush();
 
         // Now all searches can be cleaned up by leaving this method
         return r;
@@ -446,6 +477,7 @@ private:
 
 #if MALLOB_USE_MAXPRE == 1
     void launchImprovingMaxPreRun(int updateLayer, bool& runDone, UpdateResult& res) {
+        assert(!runDone);
         _instance_update.reset(_instance->lowerBound, _instance->upperBound);
         LOG(V3_VERB, "MAXSAT calling MaxPRE concurrently\n");
         _fut_instance_update = ProcessWideThreadPool::get().addTask([&, updateLayer]() {

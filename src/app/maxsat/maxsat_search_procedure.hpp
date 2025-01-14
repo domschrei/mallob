@@ -164,38 +164,18 @@ public:
         return _is_encoding;
     }
 
-    bool enforceNextBound() {
-        if (_yield_searcher) return false;
+    bool enforceNextBound(size_t boundOverride = -1UL) {
 
         const size_t globalLowerBound = _instance.lowerBound;
         const size_t globalUpperBound = _instance.upperBound;
-        if (globalUpperBound <= globalLowerBound) return false;
 
-        if (_instance.intervalSearch) {
-            if (!_instance.intervalSearch->getNextBound(_current_bound)) return false;
+        if (boundOverride == -1UL) {
+            if (!findNextBound()) return false;
         } else {
-            switch (_search_strat) {
-            case INCREASING:
-                _current_bound = globalLowerBound;
-                break;
-            case DECREASING:
-                _current_bound = _instance.findNextPossibleLowerCost(globalUpperBound);
-                break;
-            case BISECTION:
-                _current_bound = globalLowerBound + (globalUpperBound-globalLowerBound) / 2;
-                break;
-            case NAIVE_REFINEMENT:
-                if (_last_found_solution.empty()) {
-                    // no local solution yet
-                    if (_instance.bestCost == ULONG_MAX) return true; // - solve bound-free
-                    _last_found_solution = _instance.bestSolution; // - use best solution thus far
-                }
-                LOG(V4_VVER, "MAXSAT %s Forbidding naive core of last solution ...\n", _label.c_str());
-                refineLastSolution();
-                break;
-            }
+            _current_bound = boundOverride;
         }
-        if (_encoding_strat == NONE) return true;
+        if (_encoding_strat == NONE || _search_strat == NAIVE_REFINEMENT)
+            return true;
 
         LOG(V4_VVER, "MAXSAT %s Enforcing bound %lu ...\n", _label.c_str(), _current_bound);
         // Encode any cardinality constraints that are still missing for the upcoming call.
@@ -390,6 +370,40 @@ public:
     }
 
 private:
+
+    bool findNextBound() {
+        if (_yield_searcher) return false;
+
+        const size_t globalLowerBound = _instance.lowerBound;
+        const size_t globalUpperBound = _instance.upperBound;
+        if (globalUpperBound <= globalLowerBound) return false;
+
+        if (_instance.intervalSearch) {
+            if (!_instance.intervalSearch->getNextBound(_current_bound)) return false;
+        } else {
+            switch (_search_strat) {
+            case INCREASING:
+                _current_bound = globalLowerBound;
+                break;
+            case DECREASING:
+                _current_bound = _instance.findNextPossibleLowerCost(globalUpperBound);
+                break;
+            case BISECTION:
+                _current_bound = globalLowerBound + (globalUpperBound-globalLowerBound) / 2;
+                break;
+            case NAIVE_REFINEMENT:
+                if (_last_found_solution.empty()) {
+                    // no local solution yet
+                    if (_instance.bestCost == ULONG_MAX) return true; // - solve bound-free
+                    _last_found_solution = _instance.bestSolution; // - use best solution thus far
+                }
+                LOG(V4_VVER, "MAXSAT %s Forbidding naive core of last solution ...\n", _label.c_str());
+                refineLastSolution();
+                break;
+            }
+        }
+        return true;
+    }
 
     // We use the best solution and now forbid the solver to select 
     // some (sufficient) subset of the "true" objective literals.
