@@ -35,6 +35,7 @@ private:
     pid_t _child_pid {-1};
     const int _max_num_solvers;
     const bool _otfc_external_id;
+    std::string _proof_directory;
 
     const int _solver_id;
     const int _nb_vars;
@@ -51,9 +52,9 @@ private:
     Mutex _mtx_model;
 
 public:
-    TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars, bool checkModel, int maxNumSolvers, bool otfcExternalId) :
+    TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars, bool checkModel, int maxNumSolvers, bool otfcExternalId, std::string& proofDir) :
             _logger(logger), _solver_id(solverId), _nb_vars(nbVars), _op_queue(1<<14),
-            _check_model(checkModel), _max_num_solvers(maxNumSolvers), _otfc_external_id(otfcExternalId) {}
+            _check_model(checkModel), _max_num_solvers(maxNumSolvers), _otfc_external_id(otfcExternalId),  _proof_directory(proofDir) {}
 
     ~TrustedCheckerProcessAdapter() {
         if (!_f_directives) return;
@@ -80,6 +81,7 @@ public:
         Parameters params;
         params.fifoDirectives.set(_path_directives);
         params.fifoFeedback.set(_path_feedback);
+        params.checkerOutputPath.set(_proof_directory);
         params.otfcNumSolvers.set(_max_num_solvers);
         std::string moreArgs = "-lenient";
         if (_check_model) moreArgs += " -check-model";

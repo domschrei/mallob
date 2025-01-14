@@ -97,7 +97,10 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 			// Create directory for partial proofs
 			proofDirectory = params.proofDirectory() + "/proof" + config.getJobStr();
 			FileUtils::mkdir(proofDirectory);
-		}
+		} else {
+            proofDirectory = params.proofDirectory() + "/plrat/" + std::to_string(config.getMpiRank());
+			FileUtils::mkdir(proofDirectory); 
+        }
     }
 
 	// Launched for deterministic solving?
