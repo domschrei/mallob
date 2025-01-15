@@ -91,17 +91,19 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		ClauseMetadata::enableClauseIds();
 		if (_params.onTheFlyChecking()) {
 			ClauseMetadata::enableClauseSignatures();
+
+			if (_params.otfcExternalId()) {
+				proofDirectory = params.proofDirectory() + "/plrat/" + std::to_string(config.jobid);
+				FileUtils::mkdir(proofDirectory); 
+			}
 		}
 
 		if (_params.proofOutputFile.isSet()) {
 			// Create directory for partial proofs
 			proofDirectory = params.proofDirectory() + "/proof" + config.getJobStr();
 			FileUtils::mkdir(proofDirectory);
-		} else {
-            proofDirectory = params.proofDirectory() + "/plrat/" + std::to_string(config.getMpiRank());
-			FileUtils::mkdir(proofDirectory); 
-        }
-    }
+		}
+	}
 
 	// Launched for deterministic solving?
 	if (_params.deterministicSolving()) {

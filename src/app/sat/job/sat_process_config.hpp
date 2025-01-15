@@ -69,8 +69,4 @@ struct SatProcessConfig {
     std::string getJobStr() const {
         return "#" + std::to_string(jobid);
     }
-
-    int getMpiRank() const {
-        return mpirank;
-    }
 };
