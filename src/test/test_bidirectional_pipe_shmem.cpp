@@ -26,7 +26,7 @@ const char TAG_SEND_DATA = 's';
 
 void testAnytimeChild() {
     {
-        char* shmem = (char*) SharedMemory::access("edu.kit.mallob.test.bidirpipe", 2*bufSize);
+        char* shmem = (char*) SharedMemory::access("edu.kit.iti.mallob.test.bidirpipe", 2*bufSize);
         BiDirectionalAnytimePipeShmem pipe(shmem + bufSize, bufSize, shmem, bufSize, false);
 
         LOG(V2_INFO, "[child]  wait for data ...\n");
@@ -48,7 +48,7 @@ void testAnytimeChild() {
 void testAnytime() {
 
     pid_t pid;
-    char* shmem = (char*) SharedMemory::create("edu.kit.mallob.test.bidirpipe", 2*bufSize);
+    char* shmem = (char*) SharedMemory::create("edu.kit.iti.mallob.test.bidirpipe", 2*bufSize);
     {
         BiDirectionalAnytimePipeShmem pipe(shmem, bufSize, shmem + bufSize, bufSize, true);
 
@@ -80,7 +80,7 @@ void testAnytime() {
     }
 
     LOG(V2_INFO, "[parent] child exited\n");
-    SharedMemory::free("edu.kit.mallob.test.bidirpipe", shmem, 2*bufSize);
+    SharedMemory::free("edu.kit.iti.mallob.test.bidirpipe", shmem, 2*bufSize);
 }
 
 int main(int argc, char** argv) {

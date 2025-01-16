@@ -91,9 +91,9 @@ void testBasic() {
 
 void testAnytimeChild() {
     {
-        bool* childReadyToWrite = (bool*) SharedMemory::access("edu.kit.mallob.test.bidirpipe", 1);
-        bool* terminatePipe = (bool*) SharedMemory::access("edu.kit.mallob.test.bidirpipe.close", 1);
-        bool* didTerminatePipe = (bool*) SharedMemory::access("edu.kit.mallob.test.bidirpipe.closed", 1);
+        bool* childReadyToWrite = (bool*) SharedMemory::access("edu.kit.iti.mallob.test.bidirpipe", 1);
+        bool* terminatePipe = (bool*) SharedMemory::access("edu.kit.iti.mallob.test.bidirpipe.close", 1);
+        bool* didTerminatePipe = (bool*) SharedMemory::access("edu.kit.iti.mallob.test.bidirpipe.closed", 1);
         BiDirectionalAnytimePipe pipe(BiDirectionalAnytimePipe::ACCESS, pathChildToParentAnytime, pathParentToChildAnytime, childReadyToWrite, terminatePipe, didTerminatePipe);
         pipe.open();
 
@@ -116,11 +116,11 @@ void testAnytime() {
 
     FileUtils::rm(pathParentToChildAnytime);
     FileUtils::rm(pathChildToParentAnytime);
-    FileUtils::rm("/dev/shm/edu.kit.mallob.test.bidirpipe");
+    FileUtils::rm("/dev/shm/edu.kit.iti.mallob.test.bidirpipe");
 
-    bool* childReadyToWrite = (bool*) SharedMemory::create("edu.kit.mallob.test.bidirpipe", 1);
-    bool* terminatePipe = (bool*) SharedMemory::create("edu.kit.mallob.test.bidirpipe.close", 1);
-    bool* didTerminatePipe = (bool*) SharedMemory::create("edu.kit.mallob.test.bidirpipe.closed", 1);
+    bool* childReadyToWrite = (bool*) SharedMemory::create("edu.kit.iti.mallob.test.bidirpipe", 1);
+    bool* terminatePipe = (bool*) SharedMemory::create("edu.kit.iti.mallob.test.bidirpipe.close", 1);
+    bool* didTerminatePipe = (bool*) SharedMemory::create("edu.kit.iti.mallob.test.bidirpipe.closed", 1);
     *childReadyToWrite = false;
     *terminatePipe = false;
     *didTerminatePipe = false;
@@ -158,10 +158,10 @@ void testAnytime() {
     while (!Process::didChildExit(pid)) usleep(10'000);
     LOG(V2_INFO, "[parent] child exited\n");
 
-    SharedMemory::free("edu.kit.mallob.test.bidirpipe", (char*) &childReadyToWrite, 1);
+    SharedMemory::free("edu.kit.iti.mallob.test.bidirpipe", (char*) &childReadyToWrite, 1);
     FileUtils::rm(pathParentToChildAnytime);
     FileUtils::rm(pathChildToParentAnytime);
-    FileUtils::rm("/dev/shm/edu.kit.mallob.test.bidirpipe");
+    FileUtils::rm("/dev/shm/edu.kit.iti.mallob.test.bidirpipe");
 }
 
 int main(int argc, char** argv) {

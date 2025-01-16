@@ -46,7 +46,5 @@ struct SatSharedMemory {
     int successfulSolverId {-1};
 
     // Pipe data in both directions
-    static constexpr size_t pipeBufSize {131072};
-    char pipeParentToChild[pipeBufSize];
-    char pipeChildToParent[pipeBufSize];
+    size_t pipeBufSize {131072};
 };
