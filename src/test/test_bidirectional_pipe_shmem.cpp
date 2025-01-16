@@ -20,7 +20,7 @@
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 
-constexpr size_t bufSize = 131072;
+constexpr size_t bufSize = 262144;
 
 const char TAG_HELLO = 'H';
 const char TAG_SEND_DATA = 's';
@@ -31,11 +31,14 @@ void testAnytimeChild() {
         BiDirectionalAnytimePipeShmem pipe(shmem + bufSize, bufSize, shmem, bufSize, false);
 
         // Hear hello, say hello
+        LOG(V2_INFO, "[child]  handshake in ...\n");
         char tag = TAG_HELLO;
         while (pipe.pollForData() != tag) {}
         auto ignore = pipe.readData(tag);
         assert(ignore.empty());
+        LOG(V2_INFO, "[child]  handshake out ...\n");
         pipe.writeData({}, tag);
+        LOG(V2_INFO, "[child]  handshake done\n");
 
         LOG(V2_INFO, "[child]  wait for data ...\n");
         tag = TAG_SEND_DATA;
@@ -70,11 +73,14 @@ void testAnytime() {
         pid = res;
 
         // Say hello, hear hello
+        LOG(V2_INFO, "[parent] handshake out ...\n");
         char tag = TAG_HELLO;
         pipe.writeData({}, tag);
+        LOG(V2_INFO, "[parent] handshake in ...\n");
         while (pipe.pollForData() != tag) {}
         auto ignore = pipe.readData(tag);
         assert(ignore.empty());
+        LOG(V2_INFO, "[parent] handshake done\n");
 
         // assuming 2^24 (≈ 16M) unit clauses with one literal and six ints worth of metadata each
         // -> amounts to around 470MB of data

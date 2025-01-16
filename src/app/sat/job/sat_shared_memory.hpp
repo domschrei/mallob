@@ -45,6 +45,6 @@ struct SatSharedMemory {
     SatEngine::LastAdmittedStats lastAdmittedStats;
     int successfulSolverId {-1};
 
-    // Pipe data in both directions
-    size_t pipeBufSize {131072};
+    // Pipe data buffer size for each direction
+    size_t pipeBufSize {262144};
 };

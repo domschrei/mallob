@@ -31,6 +31,11 @@ private:
     volatile size_t _nb_to_write {0};
     volatile size_t _nb_written {0};
 
+    volatile char* _data_out_left;
+    volatile char* _data_out_right;
+    volatile char* _data_in_left;
+    volatile char* _data_in_right;
+
     struct InPlaceData {
         volatile bool available;
         volatile size_t size;
@@ -38,7 +43,9 @@ private:
         volatile char tag;
         static InPlaceData* getMetadata(volatile char* buffer) {return (InPlaceData*) buffer;}
         static std::pair<volatile char*, size_t> getDataBuffer(volatile char* buffer, size_t cap) {
-            return {buffer + sizeof(InPlaceData), cap - sizeof(InPlaceData)};
+            std::pair<volatile char*, size_t> res = {buffer + sizeof(InPlaceData), cap - sizeof(InPlaceData)};
+            res.second -= (res.second % sizeof(int)); // size must be multiple of data type
+            return res;
         }
     };
 
@@ -47,46 +54,61 @@ private:
         std::vector<int> userData;
     };
 
-    Message readData(volatile char* rawData, size_t cap) {
+    Message readData(volatile char* rawDataLeft, volatile char* rawDataRight, size_t cap) {
         Message msg;
-        InPlaceData& data = *InPlaceData::getMetadata(rawData);
-        auto [buf, buflen] = InPlaceData::getDataBuffer(rawData, cap);
-        int iteration = 1;
 
-        while (!data.available && !_terminate) usleep(1000);
+        // message always begins in the left buffer
+        bool left = true;
+        InPlaceData* data = InPlaceData::getMetadata(rawDataLeft);
+        auto buf = InPlaceData::getDataBuffer(rawDataLeft, cap/2);
+
+        while (!data->available && !_terminate) usleep(1000);
         while (!_terminate) {
-            msg.tag = data.tag;
+            msg.tag = data->tag;
             size_t oldMsgSize = msg.userData.size();
-            msg.userData.resize(msg.userData.size() + data.size / sizeof(int));
-            memcpy(msg.userData.data() + oldMsgSize, (char*)buf, data.size);
-            bool tbc = data.toBeContinued;
-            data.available = false;
+            msg.userData.resize(msg.userData.size() + data->size / sizeof(int));
+            memcpy(msg.userData.data() + oldMsgSize, (char*)buf.first, data->size);
+            bool tbc = data->toBeContinued;
+            data->available = false;
 
             if (!tbc) break; // done!
-            while (!data.available && !_terminate) {} // busy waiting since the other thread is on it
+
+            // switch buffers
+            left = !left;
+            data = InPlaceData::getMetadata(left ? rawDataLeft : rawDataRight);
+            buf = InPlaceData::getDataBuffer(left ? rawDataLeft : rawDataRight, cap/2);
+
+            while (!data->available && !_terminate) {} // busy waiting since the other thread is on it
         }
         return msg;
     }
-    void writeData(volatile char* rawData, size_t cap, const Message& msg) {
+    void writeData(volatile char* rawDataLeft, volatile char* rawDataRight, size_t cap, const Message& msg) {
         size_t pos = 0;
-        InPlaceData& data = *InPlaceData::getMetadata(rawData);
-        auto [buf, buflen] = InPlaceData::getDataBuffer(rawData, cap);
-        buflen -= (buflen % sizeof(int)); // must be a multiple of the data type
-        int iteration = 1;
 
-        while (data.available && !_terminate) usleep(1000);
+        // message always begins in the left buffer
+        bool left = true;
+        InPlaceData* data = InPlaceData::getMetadata(rawDataLeft);
+        auto buf = InPlaceData::getDataBuffer(rawDataLeft, cap/2);
+
+        while (data->available && !_terminate) usleep(1000);
         while (!_terminate) {
-            data.tag = msg.tag;
-            size_t end = std::min(pos + buflen, msg.userData.size()*sizeof(int));
-            data.size = end-pos;
-            memcpy((char*)buf, msg.userData.data() + pos / sizeof(int), data.size);
+            data->tag = msg.tag;
+            size_t end = std::min(pos + buf.second, msg.userData.size()*sizeof(int));
+            data->size = end-pos;
+            memcpy((char*)buf.first, msg.userData.data() + pos / sizeof(int), data->size);
             bool tbc = (pos/sizeof(int) < msg.userData.size());
-            data.toBeContinued = tbc;
-            pos += data.size;
-            data.available = true;
+            data->toBeContinued = tbc;
+            pos += data->size;
+            data->available = true;
 
             if (!tbc) break; // done!
-            while (data.available && !_terminate) {} // busy waiting since the other thread is on it
+
+            // switch buffers
+            left = !left;
+            data = InPlaceData::getMetadata(left ? rawDataLeft : rawDataRight);
+            buf = InPlaceData::getDataBuffer(left ? rawDataLeft : rawDataRight, cap/2);
+
+            while (data->available && !_terminate) {} // busy waiting since the other thread is on it
         }
     }
 
@@ -102,16 +124,24 @@ public:
         _data_out(dataOut), _cap_out(sizeOut), _data_in(dataIn), _cap_in(sizeIn),
         _buf_in(64), _buf_out(64) {
 
+        // double buffer method
+        _data_in_left = _data_in;
+        _data_in_right = _data_in + sizeIn/2;
+        _data_out_left = _data_out;
+        _data_out_right = _data_out + sizeOut/2;
+
         if (parent) {
-            InPlaceData::getMetadata(_data_in)->available = false;
-            InPlaceData::getMetadata(_data_out)->available = false;
+            InPlaceData::getMetadata(_data_in_left)->available = false;
+            InPlaceData::getMetadata(_data_in_right)->available = false;
+            InPlaceData::getMetadata(_data_out_left)->available = false;
+            InPlaceData::getMetadata(_data_out_right)->available = false;
         }
 
         _bg_reader.run([&]() {
             Message msg;
             while (!_terminate) { // run indefinitely until you should terminate
                 // read message from the pipe - blocks until parent writes something
-                msg = readData(_data_in, _cap_in);
+                msg = readData(_data_in_left, _data_in_right, _cap_in);
                 if (msg.tag == 0) break;
                 bool success = _buf_in.pushBlocking(msg);
                 if (!success) break;
@@ -123,7 +153,7 @@ public:
                 // read message from writing queue
                 bool success = _buf_out.pollBlocking(msg);
                 if (!success) break;
-                writeData(_data_out, _cap_out, msg);
+                writeData(_data_out_left, _data_out_right, _cap_out, msg);
                 _nb_written++;
             }
         });

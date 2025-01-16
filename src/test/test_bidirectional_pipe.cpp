@@ -140,7 +140,8 @@ void testAnytime() {
         // assuming 2^24 (≈ 16M) unit clauses with one literal and six ints worth of metadata each
         // -> amounts to around 470MB of data
         const size_t dataLength = 7 * (1<<24);
-        std::vector<int> data(dataLength, 7);
+        std::vector<int> data(dataLength);
+        for (size_t i = 0; i < data.size(); i++) data[i] = i;
         LOG(V2_INFO, "[parent] writing data ...\n");
         pipe.writeData(data, TAG_SEND_DATA);
         LOG(V2_INFO, "[parent] wrote all data\n");
@@ -150,9 +151,7 @@ void testAnytime() {
         data = pipe.readData(tag);
         LOG(V2_INFO, "[parent] read all data\n");
         assert(data.size() == dataLength);
-        assert(data[0] == 8);
-        assert(data[1337] == 8);
-        assert(data.back() == 8);
+        for (size_t i = 0; i < data.size(); i++) assert(data[i] == i+1);
     }
 
     while (!Process::didChildExit(pid)) usleep(10'000);
