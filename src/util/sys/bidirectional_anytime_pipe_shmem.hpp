@@ -22,16 +22,16 @@
 class BiDirectionalAnytimePipeShmem {
 
 private:
-    char* _data_out;
+    volatile char* _data_out;
     size_t _cap_out;
-    char* _data_in;
+    volatile char* _data_in;
     size_t _cap_in;
     volatile bool _terminate {false};
     volatile size_t _nb_to_write {0};
     volatile size_t _nb_written {0};
 
     struct InPlaceData {
-        char* data;
+        volatile char* data;
         bool& available() {return * (bool*) data;}
         size_t& size() {return * (size_t*) (data + 1);}
         bool& toBeContinued() {return * (bool*) (data + 1 + sizeof(size_t));}
@@ -51,7 +51,7 @@ private:
         }
     };
 
-    Message readData(char* rawData, size_t cap) {
+    Message readData(volatile char* rawData, size_t cap) {
         Message msg;
         InPlaceData data {rawData};
         int iteration = 1;
@@ -69,7 +69,7 @@ private:
         }
         return msg;
     }
-    void writeData(char* rawData, size_t cap, const Message& msg) {
+    void writeData(volatile char* rawData, size_t cap, const Message& msg) {
         size_t pos = 0;
         InPlaceData data {rawData};
         int iteration = 1;
