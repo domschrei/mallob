@@ -62,9 +62,10 @@ private:
             size_t oldMsgSize = msg.data.size();
             msg.data.resize(msg.data.size() + data.size());
             memcpy(msg.data.data() + oldMsgSize, data.payload(), data.size());
+            bool tbc = data.toBeContinued();
             data.available() = false;
 
-            if (!data.toBeContinued()) break; // done!
+            if (!tbc) break; // done!
             while (!data.available() && !_terminate) {} // busy waiting since the other thread is on it
         }
         return msg;
@@ -80,11 +81,12 @@ private:
             size_t end = std::min(pos + cap - data.metadataSize(), msg.data.size());
             data.size() = end-pos;
             memcpy(data.payload(), msg.data.data() + pos, data.size());
-            data.toBeContinued() = (pos < msg.data.size());
-            data.available() = true;
+            bool tbc = (pos < msg.data.size());
+            data.toBeContinued() = tbc;
             pos += data.size();
+            data.available() = true;
 
-            if (!data.toBeContinued()) break; // done!
+            if (!tbc) break; // done!
             while (data.available() && !_terminate) {} // busy waiting since the other thread is on it
         }
     }
