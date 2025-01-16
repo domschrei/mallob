@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <atomic>
 #include <functional>
-#include <new>
 #include <utility>
 
 #include "app/sat/data/clause_metadata.hpp"
@@ -18,7 +17,7 @@
 #include "sat_process_adapter.hpp"
 #include "../execution/engine.hpp"
 #include "util/string_utils.hpp"
-#include "util/sys/bidirectional_anytime_pipe.hpp"
+#include "util/sys/bidirectional_anytime_pipe_shmem.hpp"
 #include "util/sys/shared_memory.hpp"
 #include "util/sys/proc.hpp"
 #include "util/sys/subprocess.hpp"
@@ -33,13 +32,11 @@
 #define MALLOB_SUBPROC_DISPATCH_PATH ""
 #endif
 
-SatProcessAdapter::SatProcessAdapter(Parameters&& params, SatProcessConfig&& config, ForkedSatJob* job,
-    size_t fSize, const int* fLits, size_t aSize, const int* aLits, 
+SatProcessAdapter::SatProcessAdapter(Parameters&& params, SatProcessConfig&& config,
+    size_t fSize, const int* fLits, size_t aSize, const int* aLits, int descId,
     std::shared_ptr<AnytimeSatClauseCommunicator>& comm) :    
-        _params(std::move(params)), _config(std::move(config)), _job(job), _clause_comm(comm),
-        _f_size(fSize), _f_lits(
-            _job->getDescription().isRevisionIncomplete(0) ? nullptr : fLits
-        ), _a_size(aSize), _a_lits(aLits) {
+        _params(std::move(params)), _config(std::move(config)), _clause_comm(comm),
+        _f_size(fSize), _f_lits(fLits), _a_size(aSize), _a_lits(aLits), _desc_id(descId) {
 
     _desired_revision = _config.firstrev;
     _shmem_id = _config.getSharedMemId(Proc::getPid());
@@ -71,7 +68,8 @@ void SatProcessAdapter::doWriteRevisions() {
             auto revStr = std::to_string(revData.revision);
             createSharedMemoryBlock("fsize."       + revStr, sizeof(size_t),              (void*)&revData.fSize);
             createSharedMemoryBlock("asize."       + revStr, sizeof(size_t),              (void*)&revData.aSize);
-            const int* fPtr = (const int*) createSharedMemoryBlock("formulae." + revStr, sizeof(int) * revData.fSize, (void*)revData.fLits, revData.revision, true);
+            const int* fPtr = (const int*) createSharedMemoryBlock("formulae." + revStr, sizeof(int) * revData.fSize,
+                (void*)revData.fLits, revData.revision, revData.descriptionId, true);
             LOG(V2_INFO, "SUMMARY %s\n", StringUtils::getSummary(fPtr, revData.fSize).c_str());
             if (revData.fSize > 0) assert(fPtr[0] != 0);
             if (revData.fSize > 0) assert(fPtr[revData.fSize-1] == 0);
@@ -109,17 +107,17 @@ void SatProcessAdapter::doInitialize() {
     _sum_of_revision_sizes += _f_size;
 
     // Allocate shared memory for formula, assumptions of initial revision
-    const int* fInShmem = (const int*) createSharedMemoryBlock("formulae.0", sizeof(int) * _f_size, (void*)_f_lits, 0, true);
+    const int* fInShmem = (const int*) createSharedMemoryBlock("formulae.0",
+        sizeof(int) * _f_size, (void*)_f_lits, 0, _desc_id, true);
     LOG(V2_INFO, "SUMMARY %s\n", StringUtils::getSummary(fInShmem, _f_size).c_str());
     if (_f_size > 0) assert(fInShmem[0] != 0);
     if (_f_size > 0) assert(fInShmem[_f_size-1] == 0);
     createSharedMemoryBlock("assumptions.0", sizeof(int) * _a_size, (void*)_a_lits);
 
     // Set up bi-directional pipe to and from the subprocess
-    _pipe.reset(new BiDirectionalAnytimePipe(BiDirectionalAnytimePipe::CREATE,
-        TmpDir::getGeneralTmpDir()+_shmem_id+".tosub.pipe",
-        TmpDir::getGeneralTmpDir()+_shmem_id+".fromsub.pipe",
-        &_hsm->pipeChildReadyToWrite, &_hsm->pipeDoTerminate, &_hsm->pipeDidTerminate));
+    _pipe.reset(new BiDirectionalAnytimePipeShmem(
+        _hsm->pipeParentToChild, _hsm->pipeBufSize,
+        _hsm->pipeChildToParent, _hsm->pipeBufSize, true));
 
     // Create SAT solving child process
     Subprocess subproc(_params, "mallob_sat_process");
@@ -127,11 +125,9 @@ void SatProcessAdapter::doInitialize() {
 
     {
         auto lock = _state_mutex.getLock();
-        _pipe->open();
         _initialized = true;
         _hsm->doBegin = true;
         _child_pid = res;
-        _pipe->setChildPid(_child_pid);
         _state = SolvingStates::ACTIVE;
         applySolvingState();
     }
@@ -311,8 +307,6 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
         }
         _child_pid = -1;
         // Notify to restart solver engine
-        auto lock = _mtx_pipe.getLock();
-        if (_pipe) _pipe->setChildPid(-1);
         return CRASHED;
     }
 
@@ -392,8 +386,6 @@ void SatProcessAdapter::waitUntilChildExited() {
         if (_child_pid == -1) return;
         if (Process::didChildExit(_child_pid)) {
             _child_pid = -1;
-            auto lock = _mtx_pipe.getLock();
-            if (_pipe) _pipe->setChildPid(-1);
             return;
         }
         lock.unlock();
@@ -401,12 +393,11 @@ void SatProcessAdapter::waitUntilChildExited() {
     }
 }
 
-void* SatProcessAdapter::createSharedMemoryBlock(std::string shmemSubId, size_t size, const void* data, int rev, bool managedInCache) {
+void* SatProcessAdapter::createSharedMemoryBlock(std::string shmemSubId, size_t size, const void* data, int rev, int descId, bool managedInCache) {
     if (size == 0) return (void*) 1;
 
     const std::string qualifiedShmemId = _shmem_id + "." + shmemSubId;
     std::string actualShmemId = qualifiedShmemId;
-    const int descId = _job->getDescription().getJobDescriptionId(rev);
 
     void* shmem {nullptr};
 
@@ -434,13 +425,13 @@ void* SatProcessAdapter::createSharedMemoryBlock(std::string shmemSubId, size_t 
         }
         if (shmem)
             _shmem.insert(ShmemObject{actualShmemId, shmem, size,
-                true, rev, obj.userLabel});
+                true, rev, obj.userLabel, descId});
     }
     if (!shmem) {
         shmem = StaticSharedMemoryCache::get().createOrAccess(descId, qualifiedShmemId, size,
             data, actualShmemId);
         _shmem.insert(ShmemObject{actualShmemId, shmem, size,
-            true, rev, qualifiedShmemId});
+            true, rev, qualifiedShmemId, descId});
     }
 
     assert(shmem);
@@ -486,7 +477,7 @@ void SatProcessAdapter::freeSharedMemory() {
     for (auto& shmemObj : _shmem) {
         //log(V4_VVER, "DBG deleting %s\n", shmemObj.id.c_str());
         if (shmemObj.managedInCache) {
-            const int descId = _job->getDescription().getJobDescriptionId(shmemObj.revision);
+            const int descId = shmemObj.descId;
             assert(descId > 0);
             assert(shmemObj.data);
             StaticSharedMemoryCache::get().drop(descId, shmemObj.userLabel, shmemObj.size, shmemObj.data);

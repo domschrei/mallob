@@ -1,25 +1,32 @@
 
 #pragma once
 
-#include <cstdio>
+#include <climits>
 #include <cstdlib>
+#include <fstream>
 #include <vector>
 #include <string>
+
+#include "util/assert.hpp"
+#include "util/logger.hpp"
+#include "util/string_utils.hpp"
 
 class ModelStringCompressor {
 
 public:
     static std::string compress(const std::vector<int>& solution) {
+
         std::string out = std::to_string(solution.size() - 1) + ":";
         size_t pos = 1;
         while (pos < solution.size()) {
-            int x = 1 * (solution[pos] > 0);
-            if (pos+1 < solution.size())
-                x += 2 * (solution[pos+1] > 0);
-            if (pos+2 < solution.size())
-                x += 4 * (solution[pos+2] > 0);
-            if (pos+3 < solution.size())
-                x += 8 * (solution[pos+3] > 0);
+            int x = 0;
+            for (int i = 0; i < 4; i++) {
+                if (pos >= solution.size()) break;
+                assert(solution[pos] == pos || solution[pos] == -pos);
+                x += (1 << i) * (solution[pos] > 0);
+                pos++;
+            }
+            assert(x >= 0 && x < 16);
             switch (x) {
             case 0: out += "0"; break;
             case 1: out += "1"; break;
@@ -38,21 +45,26 @@ public:
             case 14: out += "e"; break;
             case 15: out += "f"; break;
             }
-            pos += 4;
         }
+        //LOG(V2_INFO, "MAXSAT COMPRESS %s ==> %s\n", StringUtils::getSummary(solution, INT_MAX).c_str(), out.c_str());
         return out;
     }
 
     static std::vector<int> decompress(const std::string& packed) {
+
         char* solutionStr;
         size_t nbVars = std::strtoul(packed.c_str(), &solutionStr, 10); // reads until ":"
+        assert(solutionStr[0] == ':');
         std::vector<int> solution(nbVars+1, 0); // index 0 has a filler 0
 
         int strpos = 1; // after ":"
         int var = 1;
         while (solutionStr[strpos] != '\0') {
             char c = solutionStr[strpos];
-            int num = std::strtol(&c, nullptr, 16);
+            std::string cAsString(1, c);
+            char* endptr;
+            int num = std::strtol(cAsString.c_str(), &endptr, 16);
+            assert(endptr - cAsString.c_str() == 1); // read exactly one character!
             if (var <= nbVars) solution[var] = (num & 1) ? var : -var;
             var++;
             if (var <= nbVars) solution[var] = (num & 2) ? var : -var;
@@ -63,6 +75,7 @@ public:
             var++;
             strpos++;
         }
+        //LOG(V2_INFO, "MAXSAT DECOMPRESS %s ==> %s\n", packed.c_str(), StringUtils::getSummary(solution, INT_MAX).c_str());
 
         return solution;
     }

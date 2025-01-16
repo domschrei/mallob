@@ -13,7 +13,7 @@
 #include "util/assert.hpp"
 
 #include "util/string_utils.hpp"
-#include "util/sys/bidirectional_anytime_pipe.hpp"
+#include "util/sys/bidirectional_anytime_pipe_shmem.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
@@ -102,11 +102,9 @@ private:
     void mainProgram(SatEngine& engine) {
 
         // Set up pipe communication for clause sharing
-        BiDirectionalAnytimePipe pipe(BiDirectionalAnytimePipe::ACCESS,
-            TmpDir::getGeneralTmpDir()+_shmem_id+".fromsub.pipe",
-            TmpDir::getGeneralTmpDir()+_shmem_id+".tosub.pipe",
-            &_hsm->pipeChildReadyToWrite, &_hsm->pipeDoTerminate, &_hsm->pipeDidTerminate);
-        pipe.open();
+        BiDirectionalAnytimePipeShmem pipe(
+            _hsm->pipeChildToParent, _hsm->pipeBufSize,
+            _hsm->pipeParentToChild, _hsm->pipeBufSize, false);
         LOGGER(_log, V4_VVER, "Pipes set up\n");
 
         // Wait until everything is prepared for the solver to begin
@@ -336,7 +334,7 @@ private:
         // This call ends the program.
         checkTerminate(engine, true, exitStatus, [&]() {
             // clean up bidirectional pipe - THIS BLOCKS UNTIL PARENT SENT FINAL BYTE
-            if (terminateFromParent) pipe.~BiDirectionalAnytimePipe();
+            if (terminateFromParent) pipe.~BiDirectionalAnytimePipeShmem();
         });
         abort(); // should be unreachable
 

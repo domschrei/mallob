@@ -60,11 +60,12 @@ void ForkedSatJob::doStartSolver() {
     }
 
     _solver.reset(new SatProcessAdapter(
-        std::move(hParams), std::move(config), this,
-        dummyJob ? std::min(1ul, desc.getFormulaPayloadSize(0)) : desc.getFormulaPayloadSize(0), 
-        desc.getFormulaPayload(0), 
+        std::move(hParams), std::move(config),
+        dummyJob ? std::min(1ul, desc.getFormulaPayloadSize(0)) : desc.getFormulaPayloadSize(0),
+        desc.isRevisionIncomplete(0) ? nullptr : desc.getFormulaPayload(0),
         dummyJob ? std::min(1ul, desc.getAssumptionsSize(0)) : desc.getAssumptionsSize(0),
         desc.getAssumptionsPayload(0),
+        desc.getJobDescriptionId(0),
         _clause_comm
     ));
     loadIncrements();
@@ -99,7 +100,8 @@ void ForkedSatJob::loadIncrements() {
             numLits,
             desc.isRevisionIncomplete(_last_imported_revision) ? nullptr : desc.getFormulaPayload(_last_imported_revision),
             numAssumptions,
-            desc.getAssumptionsPayload(_last_imported_revision)
+            desc.getAssumptionsPayload(_last_imported_revision),
+            desc.getJobDescriptionId(_last_imported_revision)
         });
     }
     if (!revisions.empty()) {

@@ -40,7 +40,7 @@ void register_mallob_app_sat() {
             }
             */
             auto model = result.copySolution();
-            if (params.compressModels()) {
+            if (result.result == SAT && params.compressModels()) {
                 json = ModelStringCompressor::compress(model);
             } else {
                 json = std::move(model);

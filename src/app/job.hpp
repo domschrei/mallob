@@ -322,7 +322,6 @@ public:
     // Returns whether the job is easily and quickly destructible as of now. 
     // (calls appl_isDestructible())
     bool isDestructible();
-    void clearJobDescription() {for (size_t i = 0; i < getRevision(); i++) _description.clearPayload(i);}
     void setTimeOfFirstVolumeUpdate(float time) {_time_of_first_volume_update = time;}
     
     ctx_id_t getContextId() const {return _app_msg_subscription.getContextId();}

@@ -182,7 +182,8 @@ public:
             // Initial formula is SATisfiable.
             LOG(V2_INFO, "MAXSAT Initial model has cost %lu\n", _instance->bestCost);
 
-            if (_instance->objective.empty() || _encoding_strat == MaxSatSearchProcedure::VIRTUAL) {
+            if (_instance->objective.empty() || _encoding_strat == MaxSatSearchProcedure::VIRTUAL
+                    || _instance->lowerBound == _instance->bestCost) {
                 // the solution is already proven optimal
                 r.result = RESULT_OPTIMUM_FOUND;
                 r.setSolution(std::move(_instance->bestSolution));
@@ -302,14 +303,7 @@ public:
             }
 
             // delete old searches where possible
-            for (auto it = searchesToFinalize.begin(); it != searchesToFinalize.end(); ++it) {
-                auto& search = *it;
-                if (search->canBeFinalized()) {
-                    search->finalize();
-                    it = searchesToFinalize.erase(it);
-                    --it;
-                }
-            }
+            tryDeleteOldSearches(searchesToFinalize);
 
 #if MALLOB_USE_MAXPRE == 1
             // concurrent improving preprocessing run done?
@@ -341,8 +335,9 @@ public:
                     LOG(V2_INFO, "MAXSAT improvement found by MaxPRE: restart searches\n");
                     tryStopAllSearches(searches);
                     if (!isTimeoutHit()) {
+                        for (auto& search : searches) searchesToFinalize.push_back(std::move(search));
                         searches.clear();
-                        searchesToFinalize.clear();
+                        while (!searchesToFinalize.empty()) tryDeleteOldSearches(searchesToFinalize);
                         // update
                         updateInstance(_instance_update); // nukes and rewrites instance
                         // try again on updated instance
@@ -393,6 +388,9 @@ public:
         }
         r.setSolution(std::move(_instance->bestSolution));
         Logger::getMainInstance().flush();
+
+        // Clean up all searches with their (incremental) Mallob jobs
+        while (!searchesToFinalize.empty()) tryDeleteOldSearches(searchesToFinalize);
 
         // Now all searches can be cleaned up by leaving this method
         return r;
@@ -494,9 +492,9 @@ private:
             res.boundsImproved = (parser->get_lb() > update.lowerBound || parser->get_ub() < update.upperBound);
             update.lowerBound = parser->get_lb();
             update.upperBound = parser->get_ub();
-            res.instanceImproved = update.nbVars <= 0.99 * _instance->nbVars
-                || update.formula.size() <= 0.99 * _instance->formulaSize
-                || update.objective.size() <= 0.99 * _instance->objective.size();
+            res.instanceImproved = update.nbVars <= 0.95 * _instance->nbVars
+                || update.formula.size() <= 0.9 * _instance->formulaSize
+                || update.objective.size() <= 0.95 * _instance->objective.size();
             runDone = true;
         });
     }
@@ -588,7 +586,7 @@ private:
     }
 
     void tryStopAllSearches(std::list<std::unique_ptr<MaxSatSearchProcedure>>& searches) {
-        while (!isTimeoutHit()) {
+        while (true) {
             bool allIdle = true;
             for (auto& search : searches) {
                 if (!search->isIdle() && !search->isEncoding()) {
@@ -598,8 +596,19 @@ private:
                 if (search->isDoneEncoding()) {}
                 if (!search->isIdle()) allIdle = false;
             }
-            if (allIdle) break;
+            if (allIdle) return;
             usleep(1000 * 1); // 1 ms
+        }
+    }
+
+    void tryDeleteOldSearches(std::list<std::unique_ptr<MaxSatSearchProcedure>>& searchesToFinalize) {
+        for (auto it = searchesToFinalize.begin(); it != searchesToFinalize.end(); ++it) {
+            auto& search = *it;
+            if (search->canBeFinalized()) {
+                search->finalize();
+                it = searchesToFinalize.erase(it);
+                --it;
+            }
         }
     }
 };

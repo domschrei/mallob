@@ -70,7 +70,11 @@ endif()
 # Libraries and includes
 
 set(BASE_LIBS ${BASE_LIBS} m z rt dl CACHE INTERNAL "")
-set(BASE_INCLUDES src src/util/tsl lib CACHE INTERNAL "")
+set(BASE_INCLUDES src src/util/tsl lib
+    # We technically don't need to provide the MPI includes here,
+    # but it helps generate the correct compile commands for vscodium etc.
+    ${MPI_C_INCLUDE_PATH} ${MPI_C_INCLUDE_DIRS} ${MPI_CXX_INCLUDE_PATH} ${MPI_CXX_INCLUDE_DIRS}
+    CACHE INTERNAL "")
 set(BASE_COMPILEFLAGS CACHE INTERNAL "")
 
 
@@ -170,7 +174,7 @@ target_link_directories(mallob_core PUBLIC ${BASE_LINK_DIRS})
 
 #message("mallob_commons sources post application registration: ${BASE_SOURCES}") # Use to debug
 add_library(mallob_corepluscomm STATIC ${MALLOB_COREPLUSCOMM_SOURCES})
-target_include_directories(mallob_corepluscomm PRIVATE ${MPI_CXX_INCLUDE_PATH} ${BASE_INCLUDES})
+target_include_directories(mallob_corepluscomm PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob_corepluscomm PRIVATE ${BASE_COMPILEFLAGS})
 target_link_libraries(mallob_corepluscomm ${MPI_CXX_LIBRARIES} ${MPI_CXX_LINK_FLAGS} mallob_core ${BASE_LIBS})
 target_link_directories(mallob_corepluscomm PUBLIC ${BASE_LINK_DIRS})
@@ -180,7 +184,7 @@ target_link_directories(mallob_corepluscomm PUBLIC ${BASE_LINK_DIRS})
 
 # Mallob main executable
 add_executable(mallob src/core/client.cpp src/core/worker.cpp src/main.cpp)
-target_include_directories(mallob PRIVATE ${MPI_CXX_INCLUDE_PATH} ${BASE_INCLUDES})
+target_include_directories(mallob PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob PRIVATE ${BASE_COMPILEFLAGS})
 target_link_libraries(mallob mallob_corepluscomm)
 
@@ -201,10 +205,11 @@ SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MY_DEBUG_OPTIONS}")
 
 new_test(bitsets "${BASE_INCLUDES}" mallob_core)
 new_test(permutation "${BASE_INCLUDES}" mallob_core)
-new_test(message_queue "${BASE_INCLUDES} ${MPI_CXX_INCLUDE_PATH}" mallob_corepluscomm)
+new_test(message_queue "${BASE_INCLUDES}" mallob_corepluscomm)
 new_test(volume_calculator "${BASE_INCLUDES}" mallob_core)
 new_test(concurrent_malloc "${BASE_INCLUDES}" mallob_core)
-new_test(async_collective "${BASE_INCLUDES} ${MPI_CXX_INCLUDE_PATH}" mallob_corepluscomm)
+new_test(async_collective "${BASE_INCLUDES}" mallob_corepluscomm)
 new_test(reverse_file_reader "${BASE_INCLUDES}" mallob_core)
 new_test(categorized_external_memory "${BASE_INCLUDES}" mallob_core)
 new_test(bidirectional_pipe "${BASE_INCLUDES}" mallob_core)
+new_test(bidirectional_pipe_shmem "${BASE_INCLUDES}" mallob_core)

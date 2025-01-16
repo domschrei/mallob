@@ -14,6 +14,7 @@
 #include "util/logger.hpp"
 #include "util/robin_hood.hpp"
 #include "util/sys/bidirectional_anytime_pipe.hpp"
+#include "util/sys/bidirectional_anytime_pipe_shmem.hpp"
 #include "util/sys/threading.hpp"
 #include "util/params.hpp"
 #include "../execution/solving_state.hpp"
@@ -40,6 +41,7 @@ public:
         const int* fLits;
         size_t aSize;
         const int* aLits;
+        int descriptionId;
     };
     struct ShmemObject {
         std::string id; 
@@ -48,6 +50,7 @@ public:
         bool managedInCache {false};
         int revision {0};
         std::string userLabel;
+        int descId {0};
         bool operator==(const ShmemObject& other) const {
             return id == other.id && size == other.size;
         }
@@ -58,13 +61,13 @@ private:
     SatProcessConfig _config;
     std::shared_ptr<Logger> _log;
 
-    ForkedSatJob* _job;
     std::shared_ptr<AnytimeSatClauseCommunicator> _clause_comm;
 
     size_t _f_size;
     const int* _f_lits;
     size_t _a_size;
     const int* _a_lits;
+    int _desc_id;
 
     struct ShmemObjectHasher {
         size_t operator()(const ShmemObject& obj) const {
@@ -81,7 +84,7 @@ private:
     robin_hood::unordered_flat_map<std::string, ShmemObject> _preregistered_shmem;
 
     Mutex _mtx_pipe;
-    std::unique_ptr<BiDirectionalAnytimePipe> _pipe;
+    std::unique_ptr<BiDirectionalAnytimePipeShmem> _pipe;
 
     volatile bool _running = false;
     volatile bool _initialized = false;
@@ -121,9 +124,9 @@ private:
     JobResult _solution;
 
 public:
-    SatProcessAdapter(Parameters&& params, SatProcessConfig&& config, ForkedSatJob* job, 
+    SatProcessAdapter(Parameters&& params, SatProcessConfig&& config,
         size_t fSize, const int* fLits, size_t aSize, const int* aLits,
-        std::shared_ptr<AnytimeSatClauseCommunicator>& comm);
+        int descId, std::shared_ptr<AnytimeSatClauseCommunicator>& comm);
     ~SatProcessAdapter();
 
     void run();
@@ -171,6 +174,6 @@ private:
     
     void applySolvingState();
     void initSharedMemory(SatProcessConfig&& config);
-    void* createSharedMemoryBlock(std::string shmemSubId, size_t size, const void* data, int rev = 0, bool managedInCache = false);
+    void* createSharedMemoryBlock(std::string shmemSubId, size_t size, const void* data, int rev = 0, int descId = -1, bool managedInCache = false);
 
 };

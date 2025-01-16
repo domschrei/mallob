@@ -20,9 +20,9 @@ struct SatSharedMemory {
     bool doBegin {false};
     bool doTerminate {false};
     bool doCrash {false};
-    bool pipeChildReadyToWrite {false};
-    bool pipeDoTerminate {false};
-    bool pipeDidTerminate {false};
+    //bool pipeChildReadyToWrite {false};
+    //bool pipeDoTerminate {false};
+    //bool pipeDidTerminate {false};
 
     // Signals child->parent
     bool didBegin {false};
@@ -44,4 +44,9 @@ struct SatSharedMemory {
     Checksum exportChecksum;
     SatEngine::LastAdmittedStats lastAdmittedStats;
     int successfulSolverId {-1};
+
+    // Pipe data in both directions
+    static constexpr size_t pipeBufSize {131072};
+    char pipeParentToChild[pipeBufSize];
+    char pipeChildToParent[pipeBufSize];
 };
