@@ -44,13 +44,7 @@ private:
 
     struct Message {
         char tag {0};
-        std::vector<uint8_t> data;
-        std::vector<int> toIntVec() const {
-            return std::vector<int>((int*) data.data(), (int*) (data.data()+data.size()));
-        }
-        static std::vector<uint8_t> fromIntVec(const std::vector<int>& intvec) {
-            return std::vector<uint8_t>((uint8_t*) intvec.data(), (uint8_t*) (intvec.data()+intvec.size()));
-        }
+        std::vector<int> userData;
     };
 
     Message readData(volatile char* rawData, size_t cap) {
@@ -62,9 +56,9 @@ private:
         while (!data.available && !_terminate) usleep(1000);
         while (!_terminate) {
             msg.tag = data.tag;
-            size_t oldMsgSize = msg.data.size();
-            msg.data.resize(msg.data.size() + data.size);
-            memcpy(msg.data.data() + oldMsgSize, (char*)buf, data.size);
+            size_t oldMsgSize = msg.userData.size();
+            msg.userData.resize(msg.userData.size() + data.size / sizeof(int));
+            memcpy(msg.userData.data() + oldMsgSize, (char*)buf, data.size);
             bool tbc = data.toBeContinued;
             data.available = false;
 
@@ -77,15 +71,16 @@ private:
         size_t pos = 0;
         InPlaceData& data = *InPlaceData::getMetadata(rawData);
         auto [buf, buflen] = InPlaceData::getDataBuffer(rawData, cap);
+        buflen -= (buflen % sizeof(int)); // must be a multiple of the data type
         int iteration = 1;
 
         while (data.available && !_terminate) usleep(1000);
         while (!_terminate) {
             data.tag = msg.tag;
-            size_t end = std::min(pos + buflen, msg.data.size());
+            size_t end = std::min(pos + buflen, msg.userData.size()*sizeof(int));
             data.size = end-pos;
-            memcpy((char*)buf, msg.data.data() + pos, data.size);
-            bool tbc = (pos < msg.data.size());
+            memcpy((char*)buf, msg.userData.data() + pos / sizeof(int), data.size);
+            bool tbc = (pos/sizeof(int) < msg.userData.size());
             data.toBeContinued = tbc;
             pos += data.size;
             data.available = true;
@@ -148,22 +143,27 @@ public:
         const char expectedTag = contentTag;
         contentTag = _msg_to_read.tag;
         assert(expectedTag == contentTag);
-        return _msg_to_read.toIntVec();
+        return std::move(_msg_to_read.userData);
     }
 
     bool writeData(const std::vector<int>& data, char contentTag) {
+        return writeData(std::vector<int>(data), contentTag);
+    }
+    bool writeData(const std::vector<int>& data1, const std::vector<int>& data2, char contentTag) {
+        return writeData(std::vector<int>(data1), data2, contentTag);
+    }
+
+    bool writeData(std::vector<int>&& data, char contentTag) {
         LOG(V5_DEBG, "PIPE write %c\n", contentTag);
-        Message msg {contentTag, Message::fromIntVec(data)};
+        Message msg {contentTag, std::move(data)};
         bool success = _buf_out.pushBlocking(msg);
         if (success) _nb_to_write++;
         return success;
     }
-    bool writeData(const std::vector<int>& data1, const std::vector<int>& data2, char contentTag) {
+    bool writeData(std::vector<int>&& data1, const std::vector<int>& data2, char contentTag) {
         LOG(V5_DEBG, "PIPE write %c\n", contentTag);
-        std::vector<uint8_t> concat = Message::fromIntVec(data1);
-        concat.insert(concat.end(), (uint8_t*) data2.data(), (uint8_t*) (data2.data()+data2.size()));
-        assert(concat.size() == (data1.size()+data2.size()) * sizeof(int));
-        Message msg {contentTag, std::move(concat)};
+        data1.insert(data1.end(), data2.begin(), data2.end());
+        Message msg {contentTag, std::move(data1)};
         bool success = _buf_out.pushBlocking(msg);
         if (success) _nb_to_write++;
         return success;

@@ -202,7 +202,7 @@ private:
                     engine.setClauseBufferRevision(bufferRevision);
                     auto filter = engine.filterSharing(incomingClauses);
                     LOGGER(_log, V5_DEBG, "filter result has size %i\n", filter.size());
-                    pipe.writeData(filter, {epoch}, CLAUSE_PIPE_FILTER_IMPORT);
+                    pipe.writeData(std::move(filter), {epoch}, CLAUSE_PIPE_FILTER_IMPORT);
                     if (winningSolverId >= 0) {
                         LOGGER(_log, V4_VVER, "winning solver ID: %i\n", winningSolverId);
                         engine.setWinningSolverId(winningSolverId);
@@ -296,7 +296,7 @@ private:
                         metadata.push_back(costAsInts[i]);
                     metadata.push_back(numCollectedLits);
                     metadata.push_back(successfulSolverId);
-                    pipe.writeData(clauses, metadata, CLAUSE_PIPE_PREPARE_CLAUSES);
+                    pipe.writeData(std::move(clauses), metadata, CLAUSE_PIPE_PREPARE_CLAUSES);
                 }
                 collectClauses = false;
             }
@@ -323,7 +323,7 @@ private:
                 unsigned long globalStartOfSuccessEpoch = result.globalStartOfSuccessEpoch;
 
                 LOGGER(_log, V5_DEBG, "DO write solution (winning instance: %i)\n", winningInstance);
-                pipe.writeData(solutionVec, {
+                pipe.writeData(std::move(solutionVec), {
                     solutionRevision, winningInstance, ((int*) &globalStartOfSuccessEpoch)[0], ((int*) &globalStartOfSuccessEpoch)[1], result.result
                 }, CLAUSE_PIPE_SOLUTION);
                 lastSolvedRevision = solutionRevision;

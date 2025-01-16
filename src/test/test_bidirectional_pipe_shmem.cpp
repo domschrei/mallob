@@ -20,8 +20,9 @@
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 
-constexpr size_t bufSize = 16384;
+constexpr size_t bufSize = 131072;
 
+const char TAG_HELLO = 'H';
 const char TAG_SEND_DATA = 's';
 
 void testAnytimeChild() {
@@ -29,8 +30,15 @@ void testAnytimeChild() {
         char* shmem = (char*) SharedMemory::access("edu.kit.iti.mallob.test.bidirpipe", 2*bufSize);
         BiDirectionalAnytimePipeShmem pipe(shmem + bufSize, bufSize, shmem, bufSize, false);
 
+        // Hear hello, say hello
+        char tag = TAG_HELLO;
+        while (pipe.pollForData() != tag) {}
+        auto ignore = pipe.readData(tag);
+        assert(ignore.empty());
+        pipe.writeData({}, tag);
+
         LOG(V2_INFO, "[child]  wait for data ...\n");
-        char tag = TAG_SEND_DATA;
+        tag = TAG_SEND_DATA;
         while (pipe.pollForData() != tag) {}
         LOG(V2_INFO, "[child]  data present\n");
         std::vector<int> data = pipe.readData(tag);
@@ -38,7 +46,7 @@ void testAnytimeChild() {
         for (size_t i = 0; i < data.size(); i++) data[i]++;
         LOG(V2_INFO, "[child]  transformed data\n");
         LOG(V2_INFO, "[child]  writing data ...\n");
-        pipe.writeData(data, TAG_SEND_DATA);
+        pipe.writeData(std::move(data), TAG_SEND_DATA);
         LOG(V2_INFO, "[child]  wrote all data\n");
         pipe.flush(); // wait until output buffer is empty
     }
@@ -60,15 +68,23 @@ void testAnytime() {
 
         // [parent process]
         pid = res;
+
+        // Say hello, hear hello
+        char tag = TAG_HELLO;
+        pipe.writeData({}, tag);
+        while (pipe.pollForData() != tag) {}
+        auto ignore = pipe.readData(tag);
+        assert(ignore.empty());
+
         // assuming 2^24 (≈ 16M) unit clauses with one literal and six ints worth of metadata each
         // -> amounts to around 470MB of data
         const size_t dataLength = 7 * (1<<24);
         std::vector<int> data(dataLength);
         for (size_t i = 0; i < data.size(); i++) data[i] = i;
         LOG(V2_INFO, "[parent] writing data (len %lu) ...\n", dataLength);
-        pipe.writeData(data, TAG_SEND_DATA);
+        pipe.writeData(std::move(data), TAG_SEND_DATA);
         LOG(V2_INFO, "[parent] wrote all data\n");
-        char tag = TAG_SEND_DATA;
+        tag = TAG_SEND_DATA;
         while (pipe.pollForData() != tag) {}
         LOG(V2_INFO, "[parent] data present\n");
         data = pipe.readData(tag);
