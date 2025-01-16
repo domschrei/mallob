@@ -52,9 +52,9 @@ private:
     Mutex _mtx_model;
 
 public:
-    TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars, bool checkModel, int maxNumSolvers, bool otfcExternalId, std::string& proofDir) :
+    TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars, bool checkModel, int maxNumSolvers, bool plratProofOutput, std::string& proofDir) :
             _logger(logger), _solver_id(solverId), _nb_vars(nbVars), _op_queue(1<<14),
-            _check_model(checkModel), _max_num_solvers(maxNumSolvers), _otfc_external_id(otfcExternalId),  _proof_directory(proofDir) {}
+            _check_model(checkModel), _max_num_solvers(maxNumSolvers), _otfc_external_id(plratProofOutput),  _proof_directory(proofDir) {}
 
     ~TrustedCheckerProcessAdapter() {
         if (!_f_directives) return;

@@ -48,9 +48,9 @@ private:
     float _tampering_chance_per_mille {0};
 
 public:
-    LratConnector(Logger& logger, int localId, int nbVars, bool checkModel, int maxNumSolvers, bool otfcExternalId, std::string& proofDir) :
+    LratConnector(Logger& logger, int localId, int nbVars, bool checkModel, int maxNumSolvers, bool plratProofOutput, std::string& proofDir) :
         _logger(logger), _local_id(localId), _ringbuf(1<<14),
-        _checker(logger, _local_id, nbVars, checkModel, maxNumSolvers, otfcExternalId, proofDir) {}
+        _checker(logger, _local_id, nbVars, checkModel, maxNumSolvers, plratProofOutput, proofDir) {}
 
     inline auto& getChecker() {
         return _checker;

@@ -67,11 +67,16 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 		bool createModelCheckingLratConn = _setup.onTheFlyCheckModel && !_setup.modelCheckingLratConnector;
 		// Does this thread in particular run in certified UNSAT mode?
 		if (_setup.onTheFlyChecking) {
+			// Should it generate PLRAT proof files
+			if (_setup.plratProofOutput) {
+				_setup.proofDir += "/" + std::to_string(_setup.globalId);
+				FileUtils::mkdir(_setup.proofDir); 
+			}
 			// Yes: ALWAYS create your own LRAT connector. Have it support checking of models
 			// ONLY IF desired and there is no pre-created LRATConnector instance for this purpose.
 			LOGGER(_logger, V3_VERB, "Creating full LratConnector%s\n", createModelCheckingLratConn?" with checking models":"");
 			_lrat = new LratConnector(_logger, _setup.localId, _setup.numVars,
-				createModelCheckingLratConn, _setup.maxNumSolvers, _setup.otfcExternalId, _setup.proofDir
+				createModelCheckingLratConn, _setup.maxNumSolvers, _setup.plratProofOutput, _setup.proofDir
 			);
 			if (createModelCheckingLratConn) _setup.modelCheckingLratConnector = _lrat;
 		} else {
@@ -79,7 +84,7 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 			if (createModelCheckingLratConn) {
 				LOGGER(_logger, V3_VERB, "Creating dedicated LratConnector for checking models\n");
 				_setup.modelCheckingLratConnector = new LratConnector(
-					_logger, _setup.localId, _setup.numVars, true, _setup.maxNumSolvers, _setup.otfcExternalId, _setup.proofDir
+					_logger, _setup.localId, _setup.numVars, true, _setup.maxNumSolvers, _setup.plratProofOutput, _setup.proofDir
 				);
 				_setup.owningModelCheckingLratConnector = true;
 			}

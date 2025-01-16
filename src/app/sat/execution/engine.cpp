@@ -92,7 +92,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		if (_params.onTheFlyChecking()) {
 			ClauseMetadata::enableClauseSignatures();
 
-			if (_params.otfcExternalId()) {
+			if (_params.plratProofOutput()) {
 				proofDirectory = params.proofDirectory() + "/plrat/" + std::to_string(config.jobid);
 				FileUtils::mkdir(proofDirectory); 
 			}
@@ -103,7 +103,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 			proofDirectory = params.proofDirectory() + "/proof" + config.getJobStr();
 			FileUtils::mkdir(proofDirectory);
 		}
-	}
+    }
 
 	// Launched for deterministic solving?
 	if (_params.deterministicSolving()) {
@@ -247,7 +247,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		setup.certifiedUnsat = item.outputProof && (params.proofOutputFile.isSet() || params.onTheFlyChecking());
 		setup.onTheFlyChecking = setup.certifiedUnsat && params.onTheFlyChecking();
 		setup.onTheFlyCheckModel = params.onTheFlyChecking() && params.onTheFlyCheckModel();
-		setup.otfcExternalId = params.otfcExternalId();
+		setup.plratProofOutput = params.plratProofOutput();
 		setup.modelCheckingLratConnector = modelCheckingLratConnector;
 		setup.avoidUnsatParticipation = (params.proofOutputFile.isSet() || params.onTheFlyChecking()) && !item.outputProof;
 		setup.exportClauses = !setup.avoidUnsatParticipation;
