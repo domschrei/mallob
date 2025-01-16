@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <vector>
 #include <poll.h>
+#include <utility>
 
 #include "util/logger.hpp"
 #include "util/spsc_blocking_ringbuffer.hpp"
@@ -31,13 +32,14 @@ private:
     volatile size_t _nb_written {0};
 
     struct InPlaceData {
-        volatile char* data;
-        bool& available() {return * (bool*) data;}
-        size_t& size() {return * (size_t*) (data + 1);}
-        bool& toBeContinued() {return * (bool*) (data + 1 + sizeof(size_t));}
-        char& tag() {return * (char*) (data + 1 + sizeof(size_t) + 1);}
-        char* payload() {return (char*) (data + 1 + sizeof(size_t) + 1 + 1);}
-        size_t metadataSize() const {return 1 + sizeof(size_t) + 1 + 1;}
+        volatile bool available;
+        volatile size_t size;
+        volatile bool toBeContinued;
+        volatile char tag;
+        static InPlaceData* getMetadata(volatile char* buffer) {return (InPlaceData*) buffer;}
+        static std::pair<volatile char*, size_t> getDataBuffer(volatile char* buffer, size_t cap) {
+            return {buffer + sizeof(InPlaceData), cap - sizeof(InPlaceData)};
+        }
     };
 
     struct Message {
@@ -53,41 +55,43 @@ private:
 
     Message readData(volatile char* rawData, size_t cap) {
         Message msg;
-        InPlaceData data {rawData};
+        InPlaceData& data = *InPlaceData::getMetadata(rawData);
+        auto [buf, buflen] = InPlaceData::getDataBuffer(rawData, cap);
         int iteration = 1;
 
-        while (!data.available() && !_terminate) usleep(1000);
+        while (!data.available && !_terminate) usleep(1000);
         while (!_terminate) {
-            msg.tag = data.tag();
+            msg.tag = data.tag;
             size_t oldMsgSize = msg.data.size();
-            msg.data.resize(msg.data.size() + data.size());
-            memcpy(msg.data.data() + oldMsgSize, data.payload(), data.size());
-            bool tbc = data.toBeContinued();
-            data.available() = false;
+            msg.data.resize(msg.data.size() + data.size);
+            memcpy(msg.data.data() + oldMsgSize, (char*)buf, data.size);
+            bool tbc = data.toBeContinued;
+            data.available = false;
 
             if (!tbc) break; // done!
-            while (!data.available() && !_terminate) {} // busy waiting since the other thread is on it
+            while (!data.available && !_terminate) {} // busy waiting since the other thread is on it
         }
         return msg;
     }
     void writeData(volatile char* rawData, size_t cap, const Message& msg) {
         size_t pos = 0;
-        InPlaceData data {rawData};
+        InPlaceData& data = *InPlaceData::getMetadata(rawData);
+        auto [buf, buflen] = InPlaceData::getDataBuffer(rawData, cap);
         int iteration = 1;
 
-        while (data.available() && !_terminate) usleep(1000);
+        while (data.available && !_terminate) usleep(1000);
         while (!_terminate) {
-            data.tag() = msg.tag;
-            size_t end = std::min(pos + cap - data.metadataSize(), msg.data.size());
-            data.size() = end-pos;
-            memcpy(data.payload(), msg.data.data() + pos, data.size());
+            data.tag = msg.tag;
+            size_t end = std::min(pos + buflen, msg.data.size());
+            data.size = end-pos;
+            memcpy((char*)buf, msg.data.data() + pos, data.size);
             bool tbc = (pos < msg.data.size());
-            data.toBeContinued() = tbc;
-            pos += data.size();
-            data.available() = true;
+            data.toBeContinued = tbc;
+            pos += data.size;
+            data.available = true;
 
             if (!tbc) break; // done!
-            while (data.available() && !_terminate) {} // busy waiting since the other thread is on it
+            while (data.available && !_terminate) {} // busy waiting since the other thread is on it
         }
     }
 
@@ -104,10 +108,8 @@ public:
         _buf_in(64), _buf_out(64) {
 
         if (parent) {
-            InPlaceData in {_data_in};
-            in.available() = 0;
-            InPlaceData out {_data_out};
-            out.available() = 0;
+            InPlaceData::getMetadata(_data_in)->available = false;
+            InPlaceData::getMetadata(_data_out)->available = false;
         }
 
         _bg_reader.run([&]() {
