@@ -332,10 +332,7 @@ private:
 
         Terminator::setTerminating();
         // This call ends the program.
-        checkTerminate(engine, true, exitStatus, [&]() {
-            // clean up bidirectional pipe - THIS BLOCKS UNTIL PARENT SENT FINAL BYTE
-            if (terminateFromParent) pipe.~BiDirectionalAnytimePipeShmem();
-        });
+        checkTerminate(engine, true, exitStatus);
         abort(); // should be unreachable
 
         // Shared memory will be cleaned up by the parent process.
