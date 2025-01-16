@@ -26,9 +26,9 @@ private:
     size_t _cap_out;
     char* _data_in;
     size_t _cap_in;
-    bool _terminate {false};
-    size_t _nb_to_write {0};
-    size_t _nb_written {0};
+    volatile bool _terminate {false};
+    volatile size_t _nb_to_write {0};
+    volatile size_t _nb_written {0};
 
     struct InPlaceData {
         char* data;
