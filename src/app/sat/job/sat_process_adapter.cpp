@@ -290,7 +290,8 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
     if (!_initialized) return NORMAL;
 
     int exitStatus = 0;
-    if (!_hsm->doTerminate && _child_pid != -1 && (_hsm->didTerminate ||
+    if (!_hsm->doTerminate && !Terminator::isTerminating() && _child_pid != -1
+        && (_hsm->didTerminate ||
             (Process::didChildExit(_child_pid, &exitStatus) && exitStatus != 0))) {
         // Child has exited without being told to.
         if (exitStatus == SIGUSR2) {

@@ -253,6 +253,9 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
     metadata.dependencies = std::move(idDependencies);
     _job_callback(std::move(metadata));
 
+    // this field can get huge, so erase it immediately to ease handling this object
+    json.erase("literals");
+
     return ACCEPT;
 }
 
@@ -264,8 +267,6 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Stat
     
     JobImage* img = _job_id_rev_to_image[std::pair<int, int>(result.id, result.revision)];
     auto& j = img->baseJson;
-    // do not include the actual job description in the result JSON since it can be huge
-    j.erase("literals");
 
     bool useSolutionFile = (_params.pipeSolutions() == MALLOB_PIPE_SOLUTIONS_ALL && result.getSolutionSize() > 0)
         || (_params.pipeSolutions() == MALLOB_PIPE_SOLUTIONS_LARGE && result.getSolutionSize() > 65536);

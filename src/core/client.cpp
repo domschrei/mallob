@@ -714,7 +714,6 @@ void Client::finishJob(int jobId, bool hasIncrementalSuccessors) {
     }
 
     _incoming_job_cond_var.notify(); // waiting instance reader might be able to continue now
-    introduceNextJob();
 }
 
 Client::~Client() {

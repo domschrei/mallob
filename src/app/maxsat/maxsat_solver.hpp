@@ -365,38 +365,44 @@ public:
             // -- yes
             assert(_instance->lowerBound == _instance->upperBound);
             // Do we have an optimal solution?
-            if (_instance->bestCost > _instance->upperBound) {
+            if (_instance->bestCost == _instance->upperBound) {
+                // -- yes
+                r.result = RESULT_OPTIMUM_FOUND;
+            } else {
                 // -- no: tight bounds are known, but we do not have a corresponding solution yet.
-                // Make one more SAT call to find such a solution.
-                LOG(V2_INFO, "MAXSAT final SAT call to find solution of optimal cost %lu ...\n", _instance->upperBound);
-                assert(!searches.empty());
-                auto& search = searches.front();
-                bool ok = search->enforceNextBound(_instance->upperBound);
-                assert(ok);
-                while (!search->isDoneEncoding()) usleep(1000);
-                int resultCode = search->solveBlocking();
-                assert(resultCode == SAT);
+                if (isTimeoutHit()) {
+                    // out of time: return sub-optimal solution.
+                    r.result = RESULT_SAT;
+                } else {
+                    // Make one more SAT call to find such a solution.
+                    LOG(V2_INFO, "MAXSAT final SAT call to find solution of optimal cost %lu ...\n", _instance->upperBound);
+                    assert(!searches.empty());
+                    auto& search = searches.front();
+                    bool ok = search->enforceNextBound(_instance->upperBound);
+                    assert(ok);
+                    while (!search->isDoneEncoding()) usleep(1000);
+                    int resultCode = search->solveBlocking(); // could still be cancelled
+                    if (resultCode == SAT) {
+                        assert(_instance->bestCost == _instance->upperBound);
+                        r.result = RESULT_OPTIMUM_FOUND;
+                    } else r.result = RESULT_SAT;
+                }
             }
-            assert(_instance->bestCost == _instance->upperBound);
-            // return final, optimal job result
-            r.result = RESULT_OPTIMUM_FOUND;
-            LOG(V2_INFO, "MAXSAT OPTIMAL COST %lu\n", _instance->upperBound);
-            if (writer) writer->concludeOptimal();
-        } else {
-            // -- no
-            if (_instance->bestCost < ULONG_MAX) {
-                // we did find *some* solution.
-                r.result = RESULT_SAT;
-                LOG(V2_INFO, "MAXSAT BEST FOUND COST %lu\n", _instance->upperBound);
-            }
+        } else if (_instance->bestCost < ULONG_MAX) {
+            // we did find *some* solution.
+            r.result = RESULT_SAT;
         }
+        LOG(V2_INFO, "MAXSAT %s COST %lu\n", r.result == RESULT_OPTIMUM_FOUND ? "OPTIMAL" : "BEST KNOWN", _instance->upperBound);
         r.setSolution(std::move(_instance->bestSolution));
+        if (r.result == RESULT_OPTIMUM_FOUND && writer) writer->concludeOptimal();
         Logger::getMainInstance().flush();
 
         // Clean up all searches with their (incremental) Mallob jobs
+        LOG(V2_INFO, "MAXSAT finalizing all searches ...\n");
         while (!searchesToFinalize.empty()) tryDeleteOldSearches(searchesToFinalize);
 
         // Now all searches can be cleaned up by leaving this method
+        LOG(V2_INFO, "MAXSAT exiting\n");
         return r;
     }
 

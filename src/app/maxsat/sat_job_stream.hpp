@@ -4,6 +4,7 @@
 #include "app/maxsat/maxsat_instance.hpp"
 #include "data/job_description.hpp"
 #include "interface/api/api_connector.hpp"
+#include "interface/json_interface.hpp"
 #include "util/json.hpp"
 #include "util/logger.hpp"
 
@@ -69,10 +70,11 @@ public:
         }
         _pending = true;
         _interrupt_set = false;
-        _api.submit(copy, [&](nlohmann::json& result) {
+        auto response = _api.submit(copy, [&](nlohmann::json& result) {
             _json_result = std::move(result);
             _pending = false;
         });
+        assert(response != JsonInterface::Result::DISCARD);
     }
     bool interrupt() {
         if (!_pending || _interrupt_set) return false;

@@ -27,7 +27,7 @@ Watchdog::Watchdog(bool enabled, int checkIntervalMillis, float time) {
                         0.001*_last_reset_millis, _activity, _activity_recv_tag, _activity_send_tag);
                     Process::writeTrace(parentTid);
                     Logger::getMainInstance().flush();
-                    raise(SIGABRT);
+                    abort();
                 }
                 if (_warning_period_millis > 0 && elapsed > _warning_period_millis) {
                     LOG(V1_WARN, "[WARN] Watchdog: No reset for %i ms (activity=%i recvtag=%i sendtag=%i)\n", 
