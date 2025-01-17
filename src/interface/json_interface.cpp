@@ -31,7 +31,7 @@
 JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson, 
     std::function<void(nlohmann::json&)> feedback) {
 
-    if (Terminator::isTerminating()) return DISCARD;
+    if (!_active || Terminator::isTerminating()) return DISCARD;
 
     std::string userFile, jobName;
     int id;

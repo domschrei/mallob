@@ -114,7 +114,11 @@ public:
         _api.submit(copy, [&](nlohmann::json& result) {assert(false);});
     }
 
-    bool isPending() const {
+    bool isPending() {
+        if (_pending && !_api.active()) {
+            _rejected = true;
+            _pending = false;
+        }
         return _pending;
     }
     bool isRejected() const {

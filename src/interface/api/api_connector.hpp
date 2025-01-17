@@ -21,6 +21,7 @@ private:
     JsonInterface& _interface;
     const Parameters& _params;
     Logger _logger;
+    bool _active {true};
 
 public:
     APIConnector(JsonInterface& interface, const Parameters& params, Logger&& logger) 
@@ -46,4 +47,6 @@ public:
     If the request could not be processed properly, an empty JSON is returned.
     */
     std::promise<nlohmann::json> processAsync(nlohmann::json& input);
+
+    bool active() const {return _interface.isActive();}
 };

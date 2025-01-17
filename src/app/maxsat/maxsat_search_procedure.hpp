@@ -236,7 +236,7 @@ public:
         _desc_label_next_call = "";
         _solving = true;
     }
-    bool isNonblockingSolvePending() const {
+    bool isNonblockingSolvePending() {
         return _job_stream.isPending() && _solving;
     }
     int processNonblockingSolveResult() {

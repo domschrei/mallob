@@ -720,6 +720,8 @@ Client::~Client() {
 
     for (auto& fut : _done_job_futures) fut.get();
 
+    if (_json_interface) _json_interface->deactivate();
+
     // poke instance reader to notice termination
     _instance_reader.stopWithoutWaiting();
     {auto lock = _incoming_job_lock.getLock();}

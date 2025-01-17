@@ -59,6 +59,8 @@ private:
     robin_hood::unordered_node_map<int, int> _job_id_to_latest_rev;
     robin_hood::unordered_node_map<std::pair<int, int>, JobImage*, IntPairHasher> _job_id_rev_to_image;
 
+    bool _active {true};
+
 public:
     JsonInterface(int clientRank, const Parameters& params, Logger&& logger, 
             std::function<void(JobMetadata&&)> jobCallback, JobIdAllocator&& jobIdAllocator) : 
@@ -81,4 +83,7 @@ public:
 
     // Mallob-side events
     void handleJobDone(JobResult&& result, const JobDescription::Statistics& stats, int applicationId);
+
+    bool isActive() const {return _active;}
+    void deactivate() {_active = false;}
 };
