@@ -241,8 +241,15 @@ public:
         _solving = false;
 
         // Job is done - retrieve the result.
-        auto result = std::move(_job_stream.getResult());
-        const int resultCode = result["result"]["resultcode"];
+        int resultCode;
+        nlohmann::json result;
+        if (_job_stream.isRejected()) {
+            LOG(V2_INFO, "MAXSAT %s Call rejected\n", _label.c_str());
+            resultCode = 0; // UNKNOWN
+        } else {
+            result = std::move(_job_stream.getResult());
+            resultCode = result["result"]["resultcode"];
+        }
         if (resultCode == RESULT_UNSAT) {
             // UNSAT
             if (_search_strat == NAIVE_REFINEMENT) {

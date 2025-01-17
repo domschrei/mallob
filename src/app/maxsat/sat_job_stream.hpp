@@ -23,6 +23,7 @@ private:
     bool _pending {false};
     bool _interrupt_set {false};
     nlohmann::json _json_result;
+    bool _rejected {false};
 
 public:
     SatJobStream(const Parameters& params, APIConnector& api, JobDescription& desc,
@@ -69,12 +70,16 @@ public:
             copy["description-id"] = descriptionLabel;
         }
         _pending = true;
+        _rejected = false;
         _interrupt_set = false;
         auto response = _api.submit(copy, [&](nlohmann::json& result) {
             _json_result = std::move(result);
             _pending = false;
         });
-        assert(response != JsonInterface::Result::DISCARD);
+        if (response == JsonInterface::Result::DISCARD) {
+            _rejected = true;
+            _pending = false;
+        }
     }
     bool interrupt() {
         if (!_pending || _interrupt_set) return false;
@@ -105,6 +110,9 @@ public:
 
     bool isPending() const {
         return _pending;
+    }
+    bool isRejected() const {
+        return _rejected;
     }
     nlohmann::json& getResult() {
         assert(!_pending);
