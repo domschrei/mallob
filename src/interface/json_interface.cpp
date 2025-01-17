@@ -262,8 +262,6 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
 
 void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Statistics& stats, int applicationId) {
 
-    if (Terminator::isTerminating()) return;
-
     auto lock = _job_map_mutex.getLock();
     
     JobImage* img = _job_id_rev_to_image[std::pair<int, int>(result.id, result.revision)];

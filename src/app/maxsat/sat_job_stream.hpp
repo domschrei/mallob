@@ -95,7 +95,11 @@ public:
         };
         // In this particular case, the callback is never called.
         // Instead, the callback of the job's original submission is called.
-        _api.submit(jsonInterrupt, [&](nlohmann::json& result) {assert(false);});
+        auto response = _api.submit(jsonInterrupt, [&](nlohmann::json& result) {assert(false);});
+        if (response == JsonInterface::Result::DISCARD) {
+            _rejected = true;
+            _pending = false;
+        }
         return true;
     }
     void finalize() {

@@ -111,17 +111,19 @@ private:
     std::set<int> _client_ranks;
     SysState<5> _sys_state;
 
-    std::unique_ptr<JsonInterface> _json_interface;
-    std::vector<Connector*> _interface_connectors;
-    APIConnector* _api_connector;
-    BackgroundWorker _instance_reader;
-
     // Number of jobs with a loaded description (taking memory!)
     std::atomic_int _num_loaded_jobs = 0;
     Mutex _finished_msg_ids_mutex;
     std::vector<int> _finished_msg_ids;
 
     PeriodicEvent<50> _periodic_check_done_jobs;
+    PeriodicEvent<50> _periodic_check_client_side_jobs;
+    Mutex _client_side_jobs_mutex;
+
+    std::unique_ptr<JsonInterface> _json_interface;
+    std::vector<std::unique_ptr<Connector>> _interface_connectors;
+    APIConnector* _api_connector;
+    BackgroundWorker _instance_reader;
 
     struct ClientSideJob {
         std::unique_ptr<JobDescription> desc;
@@ -132,8 +134,6 @@ private:
         ClientSideJob(std::unique_ptr<JobDescription>&& desc) : desc(std::move(desc)) {}
     };
     std::list<ClientSideJob> _client_side_jobs;
-    PeriodicEvent<50> _periodic_check_client_side_jobs;
-    Mutex _client_side_jobs_mutex;
 
 public:
     Client(MPI_Comm comm, Parameters& params)

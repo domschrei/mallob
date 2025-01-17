@@ -274,15 +274,15 @@ void Client::init() {
             (Connector*) new InotifyFilesystemConnector(*_json_interface, _params, std::move(logger), path)
             :
             (Connector*) new NaiveFilesystemConnector(*_json_interface, _params, std::move(logger), path);
-        _interface_connectors.push_back(conn);
+        _interface_connectors.emplace_back(conn);
     }
     if (_params.useIPCSocketInterface()) {
         std::string path = getSocketPath();
         LOG(V2_INFO, "Set up IPC socket interface at %s\n", path.c_str());
-        _interface_connectors.push_back(new SocketConnector(_params, *_json_interface, path));
+        _interface_connectors.emplace_back(new SocketConnector(_params, *_json_interface, path));
     }
     _api_connector = new APIConnector(*_json_interface, _params, Logger::getMainInstance().copy("I-API", ".i.api"));
-    _interface_connectors.push_back(_api_connector);
+    _interface_connectors.emplace_back(_api_connector);
     LOG(V2_INFO, "Set up API at %s\n", "src/interface/api/api_connector.hpp");
 
     // Set up concurrent instance reader
@@ -720,15 +720,11 @@ Client::~Client() {
 
     for (auto& fut : _done_job_futures) fut.get();
 
-    for (Connector* conn : _interface_connectors) delete conn;
-
+    // poke instance reader to notice termination
     _instance_reader.stopWithoutWaiting();
     {auto lock = _incoming_job_lock.getLock();}
     _incoming_job_cond_var.notify();
     _instance_reader.stop();
-    _json_interface.reset();
-
-    FileUtils::rm(TmpDir::getGeneralTmpDir() + "/edu.kit.iti.mallob.apipath." + std::to_string(Proc::getPid()));
 
     LOG(V4_VVER, "Leaving client destructor\n");
 }
