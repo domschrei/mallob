@@ -7,6 +7,7 @@
 #include "interface/json_interface.hpp"
 #include "util/json.hpp"
 #include "util/logger.hpp"
+#include "util/static_store.hpp"
 
 class SatJobStream {
 
@@ -52,7 +53,7 @@ public:
         _json_base["configuration"]["__OBJ"] = objective;
     }
 
-    void submitNext(const std::vector<int>& newLiterals, const std::vector<int>& assumptions,
+    void submitNext(std::vector<int>&& newLiterals, const std::vector<int>& assumptions,
             const std::string& descriptionLabel = "", float priority = 0) {
         assert(!_pending);
         assert(newLiterals.empty() || newLiterals.front() != 0);
@@ -64,7 +65,8 @@ public:
         const int subjob = ++_subjob_counter;
         _json_base["name"] = _base_job_name + std::to_string(subjob);
         nlohmann::json copy(_json_base);
-        copy["literals"] = newLiterals;
+        StaticStore<std::vector<int>>::insert(_json_base["name"].get<std::string>(), std::move(newLiterals));
+        copy["internalliterals"] = _json_base["name"].get<std::string>();
         copy["assumptions"] = assumptions;
         if (!descriptionLabel.empty()) {
             copy["description-id"] = descriptionLabel;

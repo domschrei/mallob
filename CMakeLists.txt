@@ -86,7 +86,7 @@ set(MALLOB_CORE_SOURCES
     src/util/random.cpp src/util/sys/atomics.cpp src/util/sys/fileutils.cpp src/util/sys/process.cpp src/util/sys/proc.cpp 
     src/util/sys/process_dispatcher.cpp src/util/sys/shared_memory.cpp src/util/sys/tmpdir.cpp src/util/sys/terminator.cpp 
     src/util/sys/threading.cpp src/util/sys/thread_pool.cpp src/util/sys/timer.cpp src/util/sys/watchdog.cpp
-    src/util/sys/shmem_cache.cpp src/util/ringbuf/ringbuf.c 
+    src/util/sys/shmem_cache.cpp src/util/ringbuf/ringbuf.c src/util/static_store.cpp
     CACHE INTERNAL "")
 
 set(MALLOB_COREPLUSCOMM_SOURCES ${MALLOB_CORE_SOURCES}

@@ -12,6 +12,7 @@
 
 #include "json_interface.hpp"
 #include "util/logger.hpp"
+#include "util/static_store.hpp"
 #include "util/sys/terminator.hpp"
 #include "util/params.hpp"
 #include "util/random.hpp"
@@ -192,6 +193,9 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
     if (json.contains("assumptions")) {
         job->setPreloadedAssumptions(json["assumptions"].get<std::vector<int>>());
     }
+    if (json.contains("internalliterals")) {
+        job->setPreloadedLiterals(StaticStore<std::vector<int>>::extract(json["internalliterals"]));
+    }
     if (json.contains("literals")) {
         job->setPreloadedLiterals(json["literals"].get<std::vector<int>>());
     }
@@ -252,9 +256,6 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
     metadata.files = std::move(files);
     metadata.dependencies = std::move(idDependencies);
     _job_callback(std::move(metadata));
-
-    // this field can get huge, so erase it immediately to ease handling this object
-    json.erase("literals");
 
     return ACCEPT;
 }

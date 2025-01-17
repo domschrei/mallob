@@ -18,6 +18,7 @@ public:
         for (int i = 0; i < size; i++) {
             if (i >= halfwayPoint && i+(maxElems-halfwayPoint) < size) {
                 if (i == halfwayPoint) summary += "... ";
+                i = std::max(i, (int) size - (maxElems-halfwayPoint) - 1);
                 continue;
             }
             summary += std::to_string(data[i]) + " ";

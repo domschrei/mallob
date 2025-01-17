@@ -219,9 +219,11 @@ public:
         assert(!_is_encoding && !_future_encoder.valid());
         LOG(V2_INFO, "MAXSAT %s Calling SAT with bound %lu (%i new lits, %i assumptions)\n",
             _label.c_str(), _current_bound, _lits_to_add.size(), _assumptions_to_set.size());
-        LOG(V2_INFO, "MAXSAT Literals: %s\n", StringUtils::getSummary(_lits_to_add).c_str());
-        LOG(V2_INFO, "MAXSAT Assumptions: %s\n", StringUtils::getSummary(_assumptions_to_set).c_str());
-        _job_stream.submitNext(_lits_to_add, _assumptions_to_set,
+        if (_params.verbosity() >= V5_DEBG) {
+            LOG(V5_DEBG, "MAXSAT Literals: %s\n", StringUtils::getSummary(_lits_to_add).c_str());
+            LOG(V5_DEBG, "MAXSAT Assumptions: %s\n", StringUtils::getSummary(_assumptions_to_set).c_str());
+        }
+        _job_stream.submitNext(std::move(_lits_to_add), _assumptions_to_set,
             _desc_label_next_call,
             // TODO still leading to error at volume_calculator.hpp:137:
             // Let the position of the tested bound influence the job's priority
