@@ -87,7 +87,11 @@ public:
     ~MaxSatSolver() {
 #if MALLOB_USE_MAXPRE == 1
         // join with background MaxPRE preprocessor 
-        if (_fut_instance_update.valid()) _fut_instance_update.get();
+        if (_fut_instance_update.valid()) {
+            LOG(V2_INFO, "MAXSAT interrupt MaxPRE asynchronously\n");
+            StaticMaxSatParserStore::get(_desc.getId())->interruptAsynchronously();
+            _fut_instance_update.get();
+        }
         // delete MaxPRE preprocessor
         StaticMaxSatParserStore::erase(_desc.getId());
 #endif

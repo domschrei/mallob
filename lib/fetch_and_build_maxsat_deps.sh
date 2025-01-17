@@ -21,7 +21,7 @@ if [ ! -d maxpre-mallob ]; then
     # once public
     #if [ ! -f maxpre-mallob.zip ]; then
     #    # for fixing a branch instead of a commit, prepend "refs/heads/"
-    #    branchorcommit="d17de9afb0094e6b4c45308eb519961a2e6cd0b1"
+    #    branchorcommit="ef4989a17508fbef911f01e58b6ccc3c23e6ef0b"
     #    wget -nc https://github.com/domschrei/maxpre-mallob/archive/${branchorcommit}.zip -O maxpre-mallob.zip
     #fi
     #unzip maxpre-mallob.zip
@@ -30,7 +30,7 @@ if [ ! -d maxpre-mallob ]; then
     # still private
     git clone git@github.com:domschrei/maxpre-mallob.git
     cd maxpre-mallob
-    git checkout d17de9afb0094e6b4c45308eb519961a2e6cd0b1
+    git checkout ef4989a17508fbef911f01e58b6ccc3c23e6ef0b
     cd ..
 fi
 cd maxpre-mallob
