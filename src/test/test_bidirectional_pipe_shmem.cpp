@@ -25,10 +25,14 @@ constexpr size_t bufSize = 262144;
 const char TAG_HELLO = 'H';
 const char TAG_SEND_DATA = 's';
 
-void testAnytimeChild() {
+using Config = BiDirectionalAnytimePipeShmem::ChannelConfig;
+
+void testAnytimeChild(Config childOut, Config childIn) {
     {
         char* shmem = (char*) SharedMemory::access("edu.kit.iti.mallob.test.bidirpipe", 2*bufSize);
-        BiDirectionalAnytimePipeShmem pipe(shmem + bufSize, bufSize, shmem, bufSize, false);
+        childOut.data = shmem + bufSize;
+        childIn.data = shmem;
+        BiDirectionalAnytimePipeShmem pipe(childOut, childIn, false);
 
         // Hear hello, say hello
         LOG(V2_INFO, "[child]  handshake in ...\n");
@@ -56,17 +60,19 @@ void testAnytimeChild() {
     ::exit(0);
 }
 
-void testAnytime() {
+void testAnytime(Config parentOut, Config parentIn, Config childOut, Config childIn) {
 
     pid_t pid;
     char* shmem = (char*) SharedMemory::create("edu.kit.iti.mallob.test.bidirpipe", 2*bufSize);
     {
-        BiDirectionalAnytimePipeShmem pipe(shmem, bufSize, shmem + bufSize, bufSize, true);
+        parentOut.data = shmem;
+        parentIn.data = shmem + bufSize;
+        BiDirectionalAnytimePipeShmem pipe(parentOut, parentIn, true);
 
         int res = Process::createChild();
         if (res == 0) {
             // [child process]
-            testAnytimeChild(); // does not return
+            testAnytimeChild(childOut, childIn); // does not return
         }
 
         // [parent process]
@@ -114,6 +120,18 @@ int main(int argc, char** argv) {
     Process::init(0);
     ProcessWideThreadPool::init(4);
 
-    Timer::init();
-    testAnytime();
+    for (bool parOutConcurrent : {false, true}) {
+        Config parentOut {nullptr, bufSize, parOutConcurrent};
+        for (bool parInConcurrent : {false, true}) {
+            Config parentIn {nullptr, bufSize, parInConcurrent};
+            for (bool chiOutConcurrent : {false, true}) {
+                Config childOut {nullptr, bufSize, chiOutConcurrent};
+                for (bool chiInConcurrent : {false, true}) {
+                    Config childIn {nullptr, bufSize, chiInConcurrent};
+                    Timer::init();
+                    testAnytime(parentOut, parentIn, childOut, childIn);
+                }
+            }
+        }
+    }
 }

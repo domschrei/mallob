@@ -105,8 +105,9 @@ private:
         char* pipeParentToChild = (char*) accessMemory(_shmem_id + ".pipe-parenttochild", _hsm->pipeBufSize);
         char* pipeChildToParent = (char*) accessMemory(_shmem_id + ".pipe-childtoparent", _hsm->pipeBufSize);
         BiDirectionalAnytimePipeShmem pipe(
-            pipeChildToParent, _hsm->pipeBufSize,
-            pipeParentToChild, _hsm->pipeBufSize, false);
+            {pipeChildToParent, _hsm->pipeBufSize, true},
+            {pipeParentToChild, _hsm->pipeBufSize, true},
+            false);
         LOGGER(_log, V4_VVER, "Pipes set up\n");
 
         // Wait until everything is prepared for the solver to begin
