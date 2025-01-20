@@ -25,7 +25,6 @@ MGlucose::MGlucose(const SolverSetup& setup)
 	stopSolver = 0;
 	learnedClauseCallback = NULL;
 
-	suspendSolver = false;
 	maxvar = 0;
 
 	numDiversifications = 8;
@@ -183,13 +182,6 @@ void MGlucose::setSolverInterrupt() {
 void MGlucose::unsetSolverInterrupt() {
 	asynch_interrupt = false;
 }
-void MGlucose::setSolverSuspend() {
-	suspendSolver = true;
-}
-void MGlucose::unsetSolverSuspend() {
-	suspendSolver = false;
-	suspendCond.notify();
-}
 
 std::vector<int> MGlucose::getSolution() {
 	std::vector<int> result;
@@ -284,10 +276,6 @@ void MGlucose::buildFailedMap() {
 }
 
 bool MGlucose::parallelJobIsFinished() {
-	// Use (or rather abuse) this method to suspend a solver during its execution
-	if (suspendSolver) {
-		suspendCond.wait(suspendMutex, [this]{return !suspendSolver;});
-	}
 	return false;
 }
 

@@ -13,11 +13,11 @@
 struct JobResult : public Serializable {
 
     int id = 0;
-    int revision;
-    int result;
+    int revision {-1};
+    int result {0};
     enum EncodedType {INT, FLOAT} encodedType = INT;
     int winningInstanceId {-1};
-    unsigned long globalStartOfSuccessEpoch;
+    unsigned long globalStartOfSuccessEpoch {0};
 
 private:
     std::vector<int> solution;

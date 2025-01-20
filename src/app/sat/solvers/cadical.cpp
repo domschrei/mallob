@@ -27,7 +27,6 @@
 #include "app/sat/solvers/cadical_clause_import.hpp"
 #include "app/sat/solvers/cadical_terminator.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
-#include "util/sys/tmpdir.hpp"
 
 Cadical::Cadical(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup),
@@ -231,14 +230,7 @@ void Cadical::setSolverInterrupt() {
 
 void Cadical::unsetSolverInterrupt() {
 	terminator.unsetInterrupt();
-}
-
-void Cadical::setSolverSuspend() {
-    terminator.setSuspend();
-}
-
-void Cadical::unsetSolverSuspend() {
-    terminator.unsetSuspend();
+	solver->unset_terminate();
 }
 
 std::vector<int> Cadical::getSolution() {

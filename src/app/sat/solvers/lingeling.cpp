@@ -47,19 +47,6 @@ int cbCheckTerminate(void* solverPtr) {
 		LOGGER(lp->_logger, V4_VVER, "STOP (%.2fs since last cb)", elapsed);
 		return 1;
 	}
-
-    if (lp->suspendSolver) {
-        // Stay inside this function call as long as solver is suspended
-		LOGGER(lp->_logger, V4_VVER, "SUSPEND (%.2fs since last cb)", elapsed);
-
-		lp->suspendCond.wait(lp->suspendMutex, [&lp]{return !lp->suspendSolver;});
-		LOGGER(lp->_logger, V4_VVER, "RESUME");
-
-		if (lp->stopSolver) {
-			LOGGER(lp->_logger, V4_VVER, "STOP after suspension", elapsed);
-			return 1;
-		}
-    }
     
     return 0;
 }
@@ -103,7 +90,6 @@ Lingeling::Lingeling(const SolverSetup& setup)
 	sizeLimit = _setup.strictMaxLitsPerClause;
 	glueLimit = _setup.strictLbdLimit;
 
-    suspendSolver = false;
     maxvar = 0;
 
 	numDiversifications = 11;
@@ -231,13 +217,6 @@ void Lingeling::setSolverInterrupt() {
 }
 void Lingeling::unsetSolverInterrupt() {
 	stopSolver = 0;
-}
-void Lingeling::setSolverSuspend() {
-    suspendSolver = true;
-}
-void Lingeling::unsetSolverSuspend() {
-    suspendSolver = false;
-	suspendCond.notify();
 }
 
 

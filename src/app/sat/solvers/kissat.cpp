@@ -207,20 +207,7 @@ void Kissat::unsetSolverInterrupt() {
 	interrupted = false;
 }
 
-void Kissat::setSolverSuspend() {
-    suspended = true;
-}
-
-void Kissat::unsetSolverSuspend() {
-    suspended = false;
-    suspendCondVar.notify();
-}
-
 bool Kissat::shouldTerminate() {
-    while (suspended) {
-        auto lock = suspendMutex.getLock();
-        suspendCondVar.waitWithLockedMutex(lock, [this]() {return !suspended;});
-    }
     return interrupted;
 }
 

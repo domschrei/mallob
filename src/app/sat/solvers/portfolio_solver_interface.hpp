@@ -99,13 +99,6 @@ protected:
 	// Resume SAT solving after it was interrupted.
 	virtual void unsetSolverInterrupt() = 0;
 
-    // Suspend the SAT solver DURING its execution (ASYNCHRONOUSLY), 
-	// temporarily freeing up CPU for other threads
-    virtual void setSolverSuspend() = 0;
-
-	// Resume SAT solving after it was suspended.
-    virtual void unsetSolverSuspend() = 0;
-
 // ************** END OF INTERFACE TO IMPLEMENT **************
 
 
@@ -165,8 +158,6 @@ public:
 
 	void interrupt();
 	void uninterrupt();
-	void suspend();
-	void resume();
 	void setTerminate();
 
 	// Add a learned clause to the formula

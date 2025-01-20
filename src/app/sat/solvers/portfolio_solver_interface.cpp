@@ -1,6 +1,5 @@
 
 #include <assert.h>
-#include <chrono>
 #include <map>
 #include <atomic>
 #include <cmath>
@@ -121,13 +120,6 @@ void PortfolioSolverInterface::interrupt() {
 void PortfolioSolverInterface::uninterrupt() {
 	updateTimer(_job_name);
 	unsetSolverInterrupt();
-}
-void PortfolioSolverInterface::suspend() {
-	setSolverSuspend();
-}
-void PortfolioSolverInterface::resume() {
-	updateTimer(_job_name);
-	unsetSolverSuspend();
 }
 void PortfolioSolverInterface::setTerminate() {
 	_terminated = true;

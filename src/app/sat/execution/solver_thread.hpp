@@ -3,11 +3,9 @@
 
 #include <sys/types.h>
 #include <unistd.h>
-#include <random>
 #include <utility>
 #include <thread>
 #include <atomic>
-#include <list>
 #include <functional>
 #include <memory>
 #include <string>
@@ -20,8 +18,6 @@
 #include "data/job_result.hpp"
 #include "../job/sat_process_config.hpp"
 #include "../solvers/portfolio_solver_interface.hpp"
-#include "solving_state.hpp"
-#include "clause_shuffler.hpp"
 #include "variable_translator.hpp"
 #include "../parse/serialized_formula_parser.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
@@ -68,8 +64,6 @@ private:
     bool _has_pseudoincremental_solvers;
 
     std::atomic_bool _initialized = false;
-    std::atomic_bool _interrupted = false;
-    std::atomic_bool _suspended = false;
     std::atomic_bool _terminated = false;
 
     bool _found_result = false;
@@ -82,15 +76,6 @@ public:
 
     void start();
     void appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits);
-    void setSuspend(bool suspend) {
-        {
-            auto lock = _state_mutex.getLock();
-            _suspended = suspend;
-            if (_suspended) _solver.suspend();
-            else _solver.resume();
-        }
-        _state_cond.notify();
-    }
     void setTerminate(bool cleanUpAsynchronously = false) {
         {
             auto lock = _state_mutex.getLock();
@@ -141,7 +126,6 @@ private:
     void runOnce();
     
     void waitWhileSolved();
-    void waitWhileSuspended();
     void waitUntil(std::function<bool()> predicate);
     
     void reportResult(int res, int revision);

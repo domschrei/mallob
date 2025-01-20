@@ -588,20 +588,9 @@ void SatEngine::setWinningSolverId(int globalId) {
 	_winning_solver_id = globalId;
 }
 
-void SatEngine::setPaused() {
-	_state = SUSPENDED;
-	for (auto& solver : _solver_threads) solver->setSuspend(true);
-}
-
-void SatEngine::unsetPaused() {
-	_state = ACTIVE;
-	for (auto& solver : _solver_threads) solver->setSuspend(false);
-}
-
 void SatEngine::terminateSolvers(bool hardTermination) {
 	for (auto& solver : _solver_threads) {
 		solver->setTerminate(hardTermination);
-		solver->setSuspend(false);
 	}
 }
 

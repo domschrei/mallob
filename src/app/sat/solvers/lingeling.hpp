@@ -42,10 +42,6 @@ private:
 	Mallob::Clause producedClause;
 
 	unsigned long numProduced = 0;
-    
-    volatile bool suspendSolver;
-    Mutex suspendMutex;
-    ConditionVariable suspendCond;
 
 	unsigned int numDiversifications;
 	unsigned int glueLimit;
@@ -71,8 +67,6 @@ public:
 
 	void setSolverInterrupt() override;
 	void unsetSolverInterrupt() override;
-    void setSolverSuspend() override;
-    void unsetSolverSuspend() override;
 
 	std::vector<int> getSolution() override;
 	std::set<int> getFailedAssumptions() override;

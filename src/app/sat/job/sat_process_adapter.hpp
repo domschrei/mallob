@@ -152,11 +152,11 @@ public:
     void filterClauses(int epoch, const std::vector<int>& clauses);
     bool hasFilteredClauses(int epoch);
     std::vector<int> getLocalFilter(int epoch);
-    void applyFilter(int epoch, const std::vector<int>& filter);
-    void digestClausesWithoutFilter(int epoch, const std::vector<int>& clauses, bool stateless);
+    void applyFilter(int epoch, std::vector<int>& filter);
+    void digestClausesWithoutFilter(int epoch, std::vector<int>& clauses, bool stateless);
 
-    void returnClauses(const std::vector<int>& clauses);
-    void digestHistoricClauses(int epochBegin, int epochEnd, const std::vector<int>& clauses);
+    void returnClauses(std::vector<int>& clauses);
+    void digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauses);
 
     void dumpStats();
     

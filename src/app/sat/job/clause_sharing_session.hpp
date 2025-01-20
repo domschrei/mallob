@@ -184,7 +184,6 @@ public:
             // Extract and digest result
             auto filter = _allreduce_filter->extractResult();
             LOG(V5_DEBG, "%s CS digest w/ filter, size %i\n", _job->getLabel(), filter.size());
-            _job->applyFilter(_epoch, filter);
             if (_cls_history || _has_clause_listener) {
                 InplaceClauseAggregation(_broadcast_clause_buffer).stripToRawBuffer();
                 applyGlobalFilter(filter, _broadcast_clause_buffer);
@@ -195,6 +194,7 @@ public:
                 }
                 if (_has_clause_listener) _clause_listener(_broadcast_clause_buffer);
             }
+            _job->applyFilter(_epoch, filter);
 
             // Conclude this sharing epoch
             _stage = DONE;

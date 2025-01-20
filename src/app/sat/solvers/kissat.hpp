@@ -29,9 +29,6 @@ private:
 
 	bool interruptionInitialized = false;
     bool interrupted = false;
-    bool suspended = false;
-    Mutex suspendMutex;
-    ConditionVariable suspendCondVar;
     unsigned int glueLimit;
 
 	std::vector<signed char> initialVariablePhases;
@@ -55,8 +52,6 @@ public:
 
 	void setSolverInterrupt() override;
 	void unsetSolverInterrupt() override;
-    void setSolverSuspend() override;
-    void unsetSolverSuspend() override;
 
 	std::vector<int> getSolution() override;
 	std::set<int> getFailedAssumptions() override;

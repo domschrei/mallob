@@ -17,7 +17,6 @@
 #include "util/hashing.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
 #include "app/sat/data/definitions.hpp"
-#include "app/sat/execution/solving_state.hpp"
 #include "app/sat/execution/variable_translator.hpp"
 #include "app/sat/job/sat_process_config.hpp"
 #include "app/sat/parse/serialized_formula_parser.hpp"
@@ -26,8 +25,6 @@
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
 #include "util/option.hpp"
 #include "util/params.hpp"
-
-using namespace SolvingStates;
 
 SolverThread::SolverThread(const Parameters& params, const SatProcessConfig& config,
          std::shared_ptr<PortfolioSolverInterface> solver, 
@@ -99,7 +96,6 @@ void* SolverThread::run() {
 
         // Sleep and wait if the solver should not do solving right now
         waitWhileSolved();
-        waitWhileSuspended();
         if (_terminated) break;
         
         bool readingDone = readFormula();
@@ -191,7 +187,6 @@ bool SolverThread::readFormula() {
             }
 
             // Suspend and/or terminate if needed
-            waitWhileSuspended();
             if (_terminated) return false;
         }
         // Adjust _max_var according to assumptions as well
@@ -263,10 +258,7 @@ void SolverThread::appendRevision(int revision, size_t fSize, const int* fLits, 
         _found_result = false;
         assert(_latest_revision+1 == (int)_pending_formulae.size() 
             || LOG_RETURN_FALSE("%i != %i", _latest_revision+1, _pending_formulae.size()));
-        if (revision > 0) {
-            _solver.interrupt();
-            _interrupted = true;
-        }
+        if (revision > 0) _solver.interrupt();
     }
     _state_cond.notify();
 }
@@ -312,12 +304,6 @@ void SolverThread::runOnce() {
     {
         auto lock = _state_mutex.getLock();
 
-        // Last point where upcoming solving attempt may be cancelled prematurely
-        if (_suspended) return;
-
-        // Make solver ready to solve by removing suspend flag
-        _solver.resume();
-
         // Set assumptions for upcoming solving attempt, set correct revision
         auto asmpt = _pending_assumptions.back();
         aSize = asmpt.first; aLits = asmpt.second;
@@ -353,7 +339,6 @@ void SolverThread::runOnce() {
     {
         auto lock = _state_mutex.getLock();
         _solver.uninterrupt();
-        _interrupted = false;
     }
     LOGGER(_logger, V4_VVER, "ENDSOL\n");
 
@@ -373,9 +358,6 @@ void SolverThread::runOnce() {
 
 void SolverThread::waitWhileSolved() {
     waitUntil([&]{return _terminated || !_found_result;});
-}
-void SolverThread::waitWhileSuspended() {
-    waitUntil([&]{return _terminated || !_suspended;});
 }
 
 void SolverThread::waitUntil(std::function<bool()> predicate) {
