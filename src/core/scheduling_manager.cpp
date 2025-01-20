@@ -1293,7 +1293,7 @@ SchedulingManager::~SchedulingManager() {
     Watchdog watchdog(/*enabled=*/_params.watchdog(), /*checkIntervMillis=*/3, 
         Timer::elapsedSeconds());
     watchdog.setWarningPeriod(1100);
-    watchdog.setAbortPeriod(10*1000);
+    watchdog.setAbortPeriod(60*1000);
     
     // Forget each job, move raw pointer to destruct queue
     for (int jobId : _job_registry.collectAllJobs()) {
