@@ -471,6 +471,9 @@ void SatProcessAdapter::freeSharedMemory() {
     if (_bg_initializer.valid()) _bg_initializer.get();
     if (_bg_writer.valid()) _bg_writer.get();
 
+    // delete shmem-based pipe
+    _pipe.reset();
+
     // Clean up shared memory objects created here
     _hsm = nullptr;
     {

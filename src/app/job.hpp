@@ -308,7 +308,7 @@ public:
     // Elapsed seconds since the job's constructor call.
     float getAge() const {return Timer::elapsedSeconds() - _time_of_arrival;}
     // Elapsed seconds since initialization was ended.
-    float getAgeSinceActivation() const {return Timer::elapsedSeconds() - _time_of_activation;}
+    float getAgeSinceActivation() const {return Timer::elapsedSeconds() - _time_of_increment_activation;}
     // Elapsed seconds since termination of the job.
     float getAgeSinceAbort() const {return Timer::elapsedSeconds() - _time_of_abort;}
     float getLatencyOfFirstVolumeUpdate() const {return _time_of_first_volume_update < 0 ? -1 : _time_of_first_volume_update - _time_of_activation;}
