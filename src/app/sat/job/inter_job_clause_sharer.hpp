@@ -169,7 +169,7 @@ public:
         LOG(V4_VVER, "%s CROSSCOMM contrib size %i\n", _label.c_str(), _internal_shared_clauses.size());
         return _internal_shared_clauses;
     }
-    virtual void filterSharing(int epoch, std::vector<int>& clauseBuf) override {
+    virtual void filterSharing(int epoch, std::vector<int>&& clauseBuf) override {
         _cross_shared_clauses = std::move(clauseBuf);
         InplaceClauseAggregation agg(_cross_shared_clauses);
         updateBestFoundSolutionCost(agg.bestFoundSolutionCost());
@@ -186,7 +186,7 @@ public:
     }
     virtual bool hasFilteredSharing(int epoch) override {return _has_filtered_shared_clauses;}
     virtual std::vector<int> getLocalFilter(int epoch) override {_has_filtered_shared_clauses = false; return std::move(_filter_vector);}
-    virtual void applyFilter(int epoch, std::vector<int>& filter) override {
+    virtual void applyFilter(int epoch, std::vector<int>&& filter) override {
         InPlaceClauseFiltering filtering(_cs_params, _cross_shared_clauses.data(), _cross_shared_clauses.size(), filter.data(), filter.size());
         int buflen = filtering.applyAndGetNewSize();
         _cross_shared_clauses.resize(buflen);
@@ -219,14 +219,14 @@ public:
 
         _clause_filter->collectGarbage(Logger::getMainInstance());
     }
-    virtual void digestSharingWithoutFilter(int epoch, std::vector<int>& clauses, bool stateless) override {
+    virtual void digestSharingWithoutFilter(int epoch, std::vector<int>&& clauses, bool stateless) override {
         abort(); // TODO
     }
-    virtual void returnClauses(std::vector<int>& clauses) override {
+    virtual void returnClauses(std::vector<int>&& clauses) override {
         BufferReader reader = _clause_store->getBufferReader(clauses.data(), clauses.size());
         _clause_store->addClauses(reader, nullptr);
     }
-    virtual void digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauses) override {
+    virtual void digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>&& clauses) override {
         abort(); // TODO
     }
 

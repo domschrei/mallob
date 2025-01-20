@@ -221,7 +221,7 @@ void SatProcessAdapter::updateBestFoundSolutionCost(long long bestFoundSolutionC
         CLAUSE_PIPE_UPDATE_BEST_FOUND_OBJECTIVE_COST);
 }
 
-void SatProcessAdapter::filterClauses(int epoch, const std::vector<int>& clauses) {
+void SatProcessAdapter::filterClauses(int epoch, std::vector<int>&& clauses) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
     auto lock = _mtx_pipe.getLock();
     if (_pipe) _pipe->writeData(std::move(clauses), {epoch},
@@ -251,7 +251,7 @@ std::vector<int> SatProcessAdapter::getLocalFilter(int epoch) {
     return filter;
 }
 
-void SatProcessAdapter::applyFilter(int epoch, std::vector<int>& filter) {
+void SatProcessAdapter::applyFilter(int epoch, std::vector<int>&& filter) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
     if (epoch != _epoch_of_export_buffer) return; // ignore filter if the corresponding clauses are not present
     auto lock = _mtx_pipe.getLock();
@@ -259,7 +259,7 @@ void SatProcessAdapter::applyFilter(int epoch, std::vector<int>& filter) {
     if (_hsm->isInitialized && _child_pid != -1) Process::wakeUp(_child_pid);
 }
 
-void SatProcessAdapter::digestClausesWithoutFilter(int epoch, std::vector<int>& clauses, bool stateless) {
+void SatProcessAdapter::digestClausesWithoutFilter(int epoch, std::vector<int>&& clauses, bool stateless) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
     auto lock = _mtx_pipe.getLock();
     if (_pipe) _pipe->writeData(std::move(clauses), {epoch, stateless?1:0},
@@ -267,13 +267,13 @@ void SatProcessAdapter::digestClausesWithoutFilter(int epoch, std::vector<int>& 
     if (_hsm->isInitialized && _child_pid != -1) Process::wakeUp(_child_pid);
 }
 
-void SatProcessAdapter::returnClauses(std::vector<int>& clauses) {
+void SatProcessAdapter::returnClauses(std::vector<int>&& clauses) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
     auto lock = _mtx_pipe.getLock();
     if (_pipe) _pipe->writeData(std::move(clauses), {_clause_buffer_revision}, CLAUSE_PIPE_RETURN_CLAUSES);
 }
 
-void SatProcessAdapter::digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauses) {
+void SatProcessAdapter::digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>&& clauses) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
     auto lock = _mtx_pipe.getLock();
     if (_pipe) _pipe->writeData(std::move(clauses), {epochBegin, epochEnd, _clause_buffer_revision}, CLAUSE_PIPE_DIGEST_HISTORIC);

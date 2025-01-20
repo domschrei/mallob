@@ -306,9 +306,9 @@ void ForkedSatJob::updateBestFoundSolutionCost(long long bestFoundSolutionCost) 
     _solver->updateBestFoundSolutionCost(bestFoundSolutionCost);
 }
 
-void ForkedSatJob::filterSharing(int epoch, std::vector<int>& clauses) {
+void ForkedSatJob::filterSharing(int epoch, std::vector<int>&& clauses) {
     if (!isInitialized()) return;
-    _solver->filterClauses(epoch, clauses);
+    _solver->filterClauses(epoch, std::move(clauses));
 }
 bool ForkedSatJob::hasFilteredSharing(int epoch) {
     if (!isInitialized() || getState() != ACTIVE) return true;
@@ -318,25 +318,25 @@ std::vector<int> ForkedSatJob::getLocalFilter(int epoch) {
     if (!isInitialized()) return std::vector<int>(ClauseMetadata::enabled() ? 2 : 0, 0);
     return _solver->getLocalFilter(epoch);
 }
-void ForkedSatJob::applyFilter(int epoch, std::vector<int>& filter) {
+void ForkedSatJob::applyFilter(int epoch, std::vector<int>&& filter) {
     if (!isInitialized()) return;
-    _solver->applyFilter(epoch, filter);
+    _solver->applyFilter(epoch, std::move(filter));
 }
-void ForkedSatJob::digestSharingWithoutFilter(int epoch, std::vector<int>& clauses, bool stateless) {
+void ForkedSatJob::digestSharingWithoutFilter(int epoch, std::vector<int>&& clauses, bool stateless) {
     if (!isInitialized()) return;
-    _solver->digestClausesWithoutFilter(epoch, clauses, stateless);
+    _solver->digestClausesWithoutFilter(epoch, std::move(clauses), stateless);
     if (getJobTree().isRoot()) {
         LOG(V3_VERB, "%s : Digested clause buffer of size %ld\n", toStr(), clauses.size());
     }
 }
 
-void ForkedSatJob::returnClauses(std::vector<int>& clauses) {
+void ForkedSatJob::returnClauses(std::vector<int>&& clauses) {
     if (!_initialized) return;
-    _solver->returnClauses(clauses);
+    _solver->returnClauses(std::move(clauses));
 }
-void ForkedSatJob::digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauses) {
+void ForkedSatJob::digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>&& clauses) {
     if (!_initialized) return;
-    _solver->digestHistoricClauses(epochBegin, epochEnd, clauses);
+    _solver->digestHistoricClauses(epochBegin, epochEnd, std::move(clauses));
 }
 
 void ForkedSatJob::startDestructThreadIfNecessary() {

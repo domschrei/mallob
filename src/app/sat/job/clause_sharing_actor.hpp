@@ -39,13 +39,13 @@ public:
     virtual void prepareSharing() = 0;
     virtual bool hasPreparedSharing() = 0;
     virtual std::vector<int> getPreparedClauses(Checksum& checksum, int& successfulSolverId, int& numLits) = 0;
-    virtual void filterSharing(int epoch, std::vector<int>& clauses) = 0;
+    virtual void filterSharing(int epoch, std::vector<int>&& clauses) = 0;
     virtual bool hasFilteredSharing(int epoch) = 0;
     virtual std::vector<int> getLocalFilter(int epoch) = 0;
-    virtual void applyFilter(int epoch, std::vector<int>& filter) = 0;
-    virtual void digestSharingWithoutFilter(int epoch, std::vector<int>& clauses, bool stateless) = 0;
-    virtual void returnClauses(std::vector<int>& clauses) = 0;
-    virtual void digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauses) = 0;
+    virtual void applyFilter(int epoch, std::vector<int>&& filter) = 0;
+    virtual void digestSharingWithoutFilter(int epoch, std::vector<int>&& clauses, bool stateless) = 0;
+    virtual void returnClauses(std::vector<int>&& clauses) = 0;
+    virtual void digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>&& clauses) = 0;
 
     virtual int getLastAdmittedNumLits() = 0;
     virtual long long getBestFoundObjectiveCost() = 0;

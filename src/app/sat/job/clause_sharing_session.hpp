@@ -122,7 +122,7 @@ public:
             if (_excess_clauses_from_merge.size() > 4) {
                 // Add them as produced clauses to your local solver
                 // so that they can be re-exported (if they are good enough)
-                _job->returnClauses(_excess_clauses_from_merge);
+                _job->returnClauses(std::move(_excess_clauses_from_merge));
             }
 
             // Fetch initial clause buffer (result of all-reduction of clauses)
@@ -154,12 +154,12 @@ public:
             if (_allreduce_filter) {
                 // Initiate production of local filter element for 2nd all-reduction 
                 LOG(V5_DEBG, "%s CS filter\n", _job->getLabel());
-                _job->filterSharing(_epoch, _broadcast_clause_buffer);
+                _job->filterSharing(_epoch, std::vector<int>(_broadcast_clause_buffer));
                 _stage = PRODUCING_FILTER;
             } else {
                 // No distributed filtering: Sharing is done!
                 LOG(V5_DEBG, "%s CS digest w/o filter\n", _job->getLabel());
-                _job->digestSharingWithoutFilter(_epoch, _broadcast_clause_buffer, false);
+                _job->digestSharingWithoutFilter(_epoch, std::vector<int>(_broadcast_clause_buffer), false);
                 if (_cls_history) {
                     InplaceClauseAggregation(_broadcast_clause_buffer).stripToRawBuffer();
                     _cls_history->importSharing(_epoch, std::move(_broadcast_clause_buffer));
@@ -194,7 +194,7 @@ public:
                 }
                 if (_has_clause_listener) _clause_listener(_broadcast_clause_buffer);
             }
-            _job->applyFilter(_epoch, filter);
+            _job->applyFilter(_epoch, std::move(filter));
 
             // Conclude this sharing epoch
             _stage = DONE;

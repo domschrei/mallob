@@ -172,7 +172,7 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
     if (msg.tag == MSG_BROADCAST_CLAUSES_STATELESS) {
         if (_job->getState() != ACTIVE) return;
         _job->getJobTree().sendToAnyChildren(msg);
-        _job->digestSharingWithoutFilter(0, msg.payload, true);
+        _job->digestSharingWithoutFilter(0, std::move(msg.payload), true);
         return;
     }
 
