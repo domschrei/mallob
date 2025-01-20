@@ -3,7 +3,6 @@
 
 #include <bits/types/FILE.h>
 #include <cstddef>
-#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <fcntl.h>
@@ -61,31 +60,34 @@ private:
     // Uses the provided buffers, of equal provided size, for double buffering.
     // Can be configured to be blocking or non-blocking initially; however, once reading
     // the initial block of data succeeds, the call always blocks until completion.
-    bool readData(volatile char* rawDataLeft, volatile char* rawDataRight, size_t cap, bool blocking, Message& msg) {
+    bool readData(volatile char* shmemLeft, volatile char* shmemRight, size_t shmemCap, bool blocking, Message& outMsg) {
 
         // message always begins in the left buffer
         bool left = true;
-        InPlaceData* data = InPlaceData::getMetadata(rawDataLeft);
-        auto buf = InPlaceData::getDataBuffer(rawDataLeft, cap/2);
+        InPlaceData* shmemMeta = InPlaceData::getMetadata(shmemLeft);
+        auto [shmemBuf, shmemSize] = InPlaceData::getDataBuffer(shmemLeft, shmemCap/2);
 
-        if (!blocking && !data->available) return false;
-        while (!data->available && !_terminate) usleep(1000);
+        if (!blocking && !shmemMeta->available) return false;
+        while (!shmemMeta->available && !_terminate) usleep(1000);
         while (!_terminate) {
-            msg.tag = data->tag;
-            size_t oldMsgSize = msg.userData.size();
-            msg.userData.resize(msg.userData.size() + data->size / sizeof(int));
-            memcpy(msg.userData.data() + oldMsgSize, (char*)buf.first, data->size);
-            bool tbc = data->toBeContinued;
-            data->available = false;
+            outMsg.tag = shmemMeta->tag;
+            assert(shmemMeta->size <= shmemSize ||
+                log_return_false("[ERROR] prompted to read %lu bytes into buffer of length %lu!\n", shmemMeta->size, shmemSize));
+            size_t oldMsgNbInts = outMsg.userData.size();
+            outMsg.userData.resize(outMsg.userData.size() + shmemMeta->size / sizeof(int));
+            memcpy(outMsg.userData.data() + oldMsgNbInts, (char*)shmemBuf, shmemMeta->size);
+            bool tbc = shmemMeta->toBeContinued;
+            shmemMeta->available = false;
 
             if (!tbc) break; // done!
 
             // switch buffers
             left = !left;
-            data = InPlaceData::getMetadata(left ? rawDataLeft : rawDataRight);
-            buf = InPlaceData::getDataBuffer(left ? rawDataLeft : rawDataRight, cap/2);
+            shmemMeta = InPlaceData::getMetadata(left ? shmemLeft : shmemRight);
+            auto pair = InPlaceData::getDataBuffer(left ? shmemLeft : shmemRight, shmemCap/2);
+            shmemBuf = pair.first; shmemSize = pair.second;
 
-            while (!data->available && !_terminate) {} // busy waiting since the other thread is on it
+            while (!shmemMeta->available && !_terminate) {} // busy waiting since the other thread is on it
         }
         return true;
     }
@@ -93,34 +95,35 @@ private:
     // Uses the provided buffers, of equal provided size, for double buffering.
     // Can be configured to be blocking or non-blocking initially; however, once writing
     // the initial block of data succeeds, the call always blocks until completion.
-    bool writeData(volatile char* rawDataLeft, volatile char* rawDataRight, size_t cap, bool blocking, const Message& msg) {
-        size_t pos = 0;
+    bool writeData(volatile char* shmemLeft, volatile char* shmemRight, size_t shmemCap, bool blocking, const Message& inMsg) {
+        size_t posInMsg = 0;
 
         // message always begins in the left buffer
         bool left = true;
-        InPlaceData* data = InPlaceData::getMetadata(rawDataLeft);
-        auto buf = InPlaceData::getDataBuffer(rawDataLeft, cap/2);
+        InPlaceData* shmemMeta = InPlaceData::getMetadata(shmemLeft);
+        auto [shmemBuf, shmemSize] = InPlaceData::getDataBuffer(shmemLeft, shmemCap/2);
 
-        if (!blocking && data->available) return false;
-        while (data->available && !_terminate) usleep(1000);
+        if (!blocking && shmemMeta->available) return false;
+        while (shmemMeta->available && !_terminate) usleep(1000);
         while (!_terminate) {
-            data->tag = msg.tag;
-            size_t end = std::min(pos + buf.second, msg.userData.size()*sizeof(int));
-            data->size = end-pos;
-            memcpy((char*)buf.first, msg.userData.data() + pos / sizeof(int), data->size);
-            bool tbc = (pos/sizeof(int) < msg.userData.size());
-            data->toBeContinued = tbc;
-            pos += data->size;
-            data->available = true;
+            shmemMeta->tag = inMsg.tag;
+            size_t endInMsg = std::min(posInMsg + shmemSize/sizeof(int), inMsg.userData.size());
+            shmemMeta->size = (endInMsg-posInMsg) * sizeof(int);
+            memcpy((char*)shmemBuf, inMsg.userData.data() + posInMsg, shmemMeta->size);
+            bool tbc = (posInMsg < inMsg.userData.size());
+            shmemMeta->toBeContinued = tbc;
+            posInMsg += shmemMeta->size / sizeof(int);
+            shmemMeta->available = true;
 
             if (!tbc) break; // done!
 
             // switch buffers
             left = !left;
-            data = InPlaceData::getMetadata(left ? rawDataLeft : rawDataRight);
-            buf = InPlaceData::getDataBuffer(left ? rawDataLeft : rawDataRight, cap/2);
+            shmemMeta = InPlaceData::getMetadata(left ? shmemLeft : shmemRight);
+            auto pair = InPlaceData::getDataBuffer(left ? shmemLeft : shmemRight, shmemCap/2);
+            shmemBuf = pair.first; shmemSize = pair.second;
 
-            while (data->available && !_terminate) {} // busy waiting since the other thread is on it
+            while (shmemMeta->available && !_terminate) {} // busy waiting since the other thread is on it
         }
         return true;
     }
@@ -162,6 +165,7 @@ public:
         // messages runs full (in which case the user does not fetch messages with
         // appropriate frequency), which *can* cause stagnation.
         if (_in_concurrent || _out_concurrent) _bg_worker.run([&]() {
+            Proc::nameThisThread("ShmemPipeIO");
             Message msgToRead;
             Message msgToWrite;
             const bool bothConcurrent = _in_concurrent && _out_concurrent;
