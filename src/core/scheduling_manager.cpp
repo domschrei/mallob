@@ -12,6 +12,7 @@
 
 #include "comm/msg_queue/message_handle.hpp"
 #include "comm/msgtags.h"
+#include "data/job_interrupt_reason.hpp"
 #include "data/job_state.h"
 #include "data/job_transfer.hpp"
 #include "util/sys/timer.hpp"
@@ -212,7 +213,7 @@ void SchedulingManager::checkActiveJob() {
         // Timeout (CPUh or wallclock time) hit
         
         // "Virtual self message" aborting the job
-        IntVec payload({id, job.getRevision(), /*fromUser=*/0});
+        IntVec payload({id, job.getRevision(), JobInterruptReason::LIMIT});
         MessageHandle handle;
         handle.tag = MSG_NOTIFY_JOB_ABORTING;
         handle.receiveSelfMessage(payload.serialize(), MyMpi::rank(MPI_COMM_WORLD));
@@ -655,7 +656,7 @@ void SchedulingManager::handleJobInterruption(MessageHandle& handle) {
     IntVec vec = Serializable::get<IntVec>(handle.getRecvData());
     int jobId = vec[0];
     int rev = vec[1];
-    bool fromUser = vec[2] ? true : false;
+    JobInterruptReason reason = static_cast<JobInterruptReason>(vec[2]);
 
     if (!has(jobId) || get(jobId).getState() != ACTIVE) {
         // defer message until the job is ACTIVE in revision "rev"
@@ -672,7 +673,10 @@ void SchedulingManager::handleJobInterruption(MessageHandle& handle) {
         return;
     }
     LOG(V3_VERB, "Acknowledge #%i interrupt\n", jobId);
-    if (job.getJobTree().isRoot()) {
+    // Information should be sent to the client only if this process is the job's root
+    // and if it's either a one-shot job or the interruption has been an explicit event
+    // (i.e., due to a hit limit or a user interruption and not due to normal termination).
+    if (job.getJobTree().isRoot() && (!job.isIncremental() || reason == USER || reason == LIMIT)) {
         // Forward information on aborted job to client
         MyMpi::isend(job.getJobTree().getParentNodeRank(), 
             MSG_NOTIFY_CLIENT_JOB_ABORTING, handle.moveRecvData());
@@ -745,7 +749,7 @@ void SchedulingManager::handleJobResultFound(MessageHandle& handle) {
     if (get(jobId).getDescription().isIncremental()) {
         // Need to re-build the handle to feature the job ID 
         // and whether interruption came from the user (it didn't)
-        std::vector<int> dataInts {jobId, revision, /*fromUser=*/0};
+        std::vector<int> dataInts {jobId, revision, JobInterruptReason::DONE};
         std::vector<uint8_t> data(3*sizeof(int));
         memcpy(data.data(), dataInts.data(), 3*sizeof(int));
         handle.setReceive(std::move(data));
@@ -1229,7 +1233,7 @@ void SchedulingManager::interruptJob(int jobId, bool doTerminate, bool reckless)
     if (job.getJobTree().hasRightChild()) destinations.insert(job.getJobTree().getRightChildNodeRank());
     for (auto childRank : destinations) {
         if (childRank < 0) continue;
-        MyMpi::isend(childRank, msgTag, IntVec({jobId, /*fromUser=*/0}));
+        MyMpi::isend(childRank, msgTag, IntVec({jobId, JobInterruptReason::DONE}));
         LOG_ADD_DEST(V4_VVER, "Propagate interruption of %s ...", childRank, job.toStr());
     }
     if (doTerminate) job.getJobTree().getPastChildren().clear();
