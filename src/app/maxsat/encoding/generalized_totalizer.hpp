@@ -10,13 +10,17 @@
 class GeneralizedTotalizer : public CardinalityEncoding {
 private:
     RustSAT::DbGte* _enc {nullptr};
+    bool _vars_reserved {false};
 public:
     GeneralizedTotalizer(unsigned int nbVars, const std::vector<MaxSatInstance::ObjectiveTerm>& objective) : CardinalityEncoding(nbVars, objective) {
         _enc = RustSAT::gte_new();
         for (auto& term : objective) RustSAT::gte_add(_enc, term.lit, term.factor);
-        RustSAT::gte_reserve(_enc, &_nb_vars);
     }
     virtual void doEncode(size_t min, size_t ub, size_t max) override {
+        if (!_vars_reserved) {
+            RustSAT::gte_reserve(_enc, &_nb_vars);
+            _vars_reserved = true;
+        }
         RustSAT::gte_encode_ub(_enc, ub, ub, &_nb_vars,
             &cardinality_encoding_add_literal, this);
     }

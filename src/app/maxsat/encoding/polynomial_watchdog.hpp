@@ -11,15 +11,19 @@
 class PolynomialWatchdog : public CardinalityEncoding {
 private:
     RustSAT::DynamicPolyWatchdog* _enc {nullptr};
+    bool _vars_reserved {false};
 public:
     PolynomialWatchdog(unsigned int nbVars, const std::vector<MaxSatInstance::ObjectiveTerm>& objective) : CardinalityEncoding(nbVars, objective) {
         _enc = RustSAT::dpw_new();
         for (auto& term : objective) RustSAT::dpw_add(_enc, term.lit, term.factor);
-        RustSAT::dpw_reserve(_enc, &_nb_vars);
     }
     virtual void doEncode(size_t min, size_t ub, size_t max) override {
         //max = std::max(max, ub);
         assert(min <= ub && ub <= max);
+        if (!_vars_reserved) {
+            RustSAT::dpw_reserve(_enc, &_nb_vars);
+            _vars_reserved = true;
+        }
         RustSAT::dpw_limit_range(_enc, min, max,
             &cardinality_encoding_add_literal, this);
         RustSAT::dpw_encode_ub(_enc, ub, ub, &_nb_vars,

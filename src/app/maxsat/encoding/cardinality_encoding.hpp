@@ -18,10 +18,14 @@ public:
         _assumption_collector = assumptionCollector;
     }
     void encode(size_t lb, size_t ub, size_t max) {
+        int guardVar = prepareGuardVariable();
         doEncode(lb, ub, max);
+        addGuardClauseIfNeeded(guardVar);
     }
     void enforceBound(size_t bound) {
+        int guardVar = prepareGuardVariable();
         doEnforce(bound);
+        addGuardClauseIfNeeded(guardVar);
     }
     virtual ~CardinalityEncoding() {}
 protected:
@@ -30,6 +34,24 @@ protected:
     std::function<void(int)> _assumption_collector;
     virtual void doEncode(size_t min, size_t ub, size_t max) = 0;
     virtual void doEnforce(size_t bound) = 0;
+    int prepareGuardVariable() {
+        // Introduce a meaningless variable to potentially reference later.
+        _nb_vars++;
+        return _nb_vars;
+    }
+    void addGuardClauseIfNeeded(int guardVar) {
+        // Did the number of variables change since selecting the guard variable?
+        if (_nb_vars == guardVar) return;
+        // Introduce a (so far) meaningless variable that represents the max. variable.
+        _nb_vars++;
+        // Add the constraint "the prior guard var or this var is true".
+        // This can't break anything even if more variables are added later on,
+        // since the prior guard var can always be set to true, and it
+        // explicitly adds the new maximum variable to the encoding.
+        addLiteral(guardVar);
+        addLiteral(_nb_vars);
+        addLiteral(0);
+    }
 private:
     void addLiteral(int lit) {
         LOG(V6_DEBGV, "CARDI ADD %i\n", lit);
