@@ -127,10 +127,10 @@ void SatProcessAdapter::doInitialize() {
 
     {
         auto lock = _state_mutex.getLock();
-        _initialized = true;
         _hsm->doBegin = true;
         _child_pid = res;
         _state = SolvingStates::ACTIVE;
+        _initialized = true;
         applySolvingState();
     }
 }
@@ -171,15 +171,15 @@ void SatProcessAdapter::applySolvingState() {
         doTerminateInitializedProcess();
     }
     if (_state == SolvingStates::SUSPENDED || _state == SolvingStates::STANDBY) {
-        if (_child_pid != -1) Process::suspend(_child_pid); // Stop (suspend) process.
+        Process::suspend(_child_pid); // Stop (suspend) process.
     }
     if (_state == SolvingStates::ACTIVE) {
-        if (_child_pid != -1) Process::resume(_child_pid); // Continue (resume) process.
+        Process::resume(_child_pid); // Continue (resume) process.
     }
 }
 
 void SatProcessAdapter::doTerminateInitializedProcess() {
-    if (!_running || _hsm->doTerminate || _child_pid == -1) return; // running?
+    if (!_running || _hsm->doTerminate) return; // running?
     while (!_initialized) usleep(3*1000); // wait until initialized
     Process::resume(_child_pid); // Continue (resume) process.
     while (!_hsm->didBegin && !Process::didChildExit(_child_pid))
@@ -195,7 +195,7 @@ void SatProcessAdapter::collectClauses(int maxSize) {
     auto lock = _mtx_pipe.getLock();
     if (_pipe) _pipe->writeData({maxSize}, CLAUSE_PIPE_PREPARE_CLAUSES);
     _clause_collecting_stage = QUERIED;
-    if (_hsm->isInitialized && _child_pid != -1) Process::wakeUp(_child_pid);
+    if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
 bool SatProcessAdapter::hasCollectedClauses() {
     return !_initialized || _state != SolvingStates::ACTIVE || _clause_collecting_stage == RETURNED;
@@ -227,7 +227,7 @@ void SatProcessAdapter::filterClauses(int epoch, std::vector<int>&& clauses) {
     if (_pipe) _pipe->writeData(std::move(clauses), {epoch},
         CLAUSE_PIPE_FILTER_IMPORT);
     _epoch_of_export_buffer = epoch;
-    if (_hsm->isInitialized && _child_pid != -1) Process::wakeUp(_child_pid);
+    if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
 
 bool SatProcessAdapter::hasFilteredClauses(int epoch) {
@@ -256,7 +256,7 @@ void SatProcessAdapter::applyFilter(int epoch, std::vector<int>&& filter) {
     if (epoch != _epoch_of_export_buffer) return; // ignore filter if the corresponding clauses are not present
     auto lock = _mtx_pipe.getLock();
     if (_pipe) _pipe->writeData(std::move(filter), {epoch}, CLAUSE_PIPE_DIGEST_IMPORT);
-    if (_hsm->isInitialized && _child_pid != -1) Process::wakeUp(_child_pid);
+    if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
 
 void SatProcessAdapter::digestClausesWithoutFilter(int epoch, std::vector<int>&& clauses, bool stateless) {
@@ -264,7 +264,7 @@ void SatProcessAdapter::digestClausesWithoutFilter(int epoch, std::vector<int>&&
     auto lock = _mtx_pipe.getLock();
     if (_pipe) _pipe->writeData(std::move(clauses), {epoch, stateless?1:0},
         CLAUSE_PIPE_DIGEST_IMPORT_WITHOUT_FILTER);
-    if (_hsm->isInitialized && _child_pid != -1) Process::wakeUp(_child_pid);
+    if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
 
 void SatProcessAdapter::returnClauses(std::vector<int>&& clauses) {
@@ -291,7 +291,7 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
     if (!_initialized) return NORMAL;
 
     int exitStatus = 0;
-    if (!_hsm->doTerminate && !Terminator::isTerminating() && _child_pid != -1
+    if (!_hsm->doTerminate && !Terminator::isTerminating()
         && (_hsm->didTerminate ||
             (Process::didChildExit(_child_pid, &exitStatus) && exitStatus != 0))) {
         // Child has exited without being told to.
@@ -309,7 +309,6 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
             LOG(V1_WARN, "[ERROR] Child %ld exiting renders the proofs illegal - aborting\n", _child_pid);
             abort();
         }
-        _child_pid = -1;
         // Notify to restart solver engine
         return CRASHED;
     }
@@ -388,10 +387,7 @@ void SatProcessAdapter::waitUntilChildExited() {
         // Check if child exited
         auto lock = _state_mutex.getLock();
         if (_child_pid == -1) return;
-        if (Process::didChildExit(_child_pid)) {
-            _child_pid = -1;
-            return;
-        }
+        if (Process::didChildExit(_child_pid)) return;
         lock.unlock();
         usleep(1*1000); // 1ms
     }
