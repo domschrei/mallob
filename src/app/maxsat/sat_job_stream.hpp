@@ -8,6 +8,7 @@
 #include "util/json.hpp"
 #include "util/logger.hpp"
 #include "util/static_store.hpp"
+#include "util/params.hpp"
 
 class SatJobStream {
 
@@ -58,12 +59,20 @@ public:
         assert(!_pending);
         assert(newLiterals.empty() || newLiterals.front() != 0);
         assert(newLiterals.empty() || newLiterals.back() == 0);
+
         if (_incremental && _json_base.contains("name")) {
             _json_base["precursor"] = _username + std::string(".") + _json_base["name"].get<std::string>();
         }
         _json_base["priority"] = priority > 0 ? priority : 1;
-        const int subjob = ++_subjob_counter;
+        const int subjob = _subjob_counter++;
         _json_base["name"] = _base_job_name + std::to_string(subjob);
+        if (_params.maxSatWriteJobLiterals()) {
+            std::ofstream ofs(_params.logDirectory() + "/maxsat.joblits." + _json_base["name"].get<std::string>());
+            for (int lit : newLiterals) {
+                ofs << lit << " ";
+                if (lit == 0) ofs << std::endl;
+            }
+        }
         nlohmann::json copy(_json_base);
         StaticStore<std::vector<int>>::insert(_json_base["name"].get<std::string>(), std::move(newLiterals));
         copy["internalliterals"] = _json_base["name"].get<std::string>();
@@ -107,7 +116,7 @@ public:
         if (!_incremental) return;
         if (!_json_base.contains("name")) return;
         _json_base["precursor"] = _username + std::string(".") + _json_base["name"].get<std::string>();
-        _json_base["name"] = _base_job_name + std::to_string(++_subjob_counter);
+        _json_base["name"] = _base_job_name + std::to_string(_subjob_counter++);
         nlohmann::json copy(_json_base);
         copy["done"] = true;
         // The callback is never called.
@@ -127,8 +136,5 @@ public:
     nlohmann::json& getResult() {
         assert(!_pending);
         return _json_result;
-    }
-    int getSubjobCount() const {
-        return _subjob_counter;
     }
 };

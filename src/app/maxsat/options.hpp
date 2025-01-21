@@ -16,6 +16,7 @@ OPT_INT(maxSatFocusMin, "maxsat-focus-min", "", 1, 1, LARGE_INT, "Minimum number
 OPT_INT(maxSatNumSearchers, "maxsat-searchers", "", 1, 1, LARGE_INT, "Number of searchers to run in parallel")
 OPT_FLOAT(maxSatIntervalSkew, "maxsat-interval-skew", "", 0.5, 0, 1, "Skew to cut search intervals with")
 OPT_STRING(maxSatSolutionFile, "maxsat-sol-file", "", "", "Path to file to write intermediate solutions to")
+OPT_BOOL(maxSatWriteJobLiterals, "maxsat-write-job-lits", "", false, "Output all submitted jobs' literals into files for debugging")
 
 #if MALLOB_USE_MAXPRE == 1
 OPT_BOOL(maxPre, "maxpre", "", true, "true: use MaxPRE2 preprocessor library to preprocess instance; false: assume appropriately preprocessed file")
