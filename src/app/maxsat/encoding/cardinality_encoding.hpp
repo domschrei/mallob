@@ -18,14 +18,14 @@ public:
         _assumption_collector = assumptionCollector;
     }
     void encode(size_t lb, size_t ub, size_t max) {
-        int guardVar = prepareGuardVariable();
+        //int guardVar = prepareGuardVariable();
         doEncode(lb, ub, max);
-        addGuardClauseIfNeeded(guardVar);
+        //addGuardClauseIfNeeded(guardVar);
     }
     void enforceBound(size_t bound) {
-        int guardVar = prepareGuardVariable();
+        //int guardVar = prepareGuardVariable();
         doEnforce(bound);
-        addGuardClauseIfNeeded(guardVar);
+        //addGuardClauseIfNeeded(guardVar);
     }
     virtual ~CardinalityEncoding() {}
 protected:
