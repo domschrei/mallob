@@ -49,13 +49,13 @@ SharingManager::SharingManager(
 		int staticBucketSize = (2*_params.clauseBufferBaseSize())/3;
 		switch(_params.clauseStoreMode()) {
 		case MALLOB_CLAUSE_STORE_STATIC_BY_LENGTH_MIXED_LBD:
-			return new StaticClauseStoreMixedLbd(_params.strictClauseLengthLimit(),
+			return new StaticClauseStoreMixedLbd(_params.strictClauseLengthLimit()+ClauseMetadata::numInts(),
 				resetLbdAtExport, staticBucketSize);
 		case MALLOB_CLAUSE_STORE_STATIC_BY_LENGTH:
 			return new StaticClauseStore<true>(_params,
 				resetLbdAtExport, staticBucketSize, false, 0);
 		case MALLOB_CLAUSE_STORE_STATIC_BY_LBD:
-			return new StaticClauseStoreByLbd(_params.strictClauseLengthLimit(),
+			return new StaticClauseStoreByLbd(_params.strictClauseLengthLimit()+ClauseMetadata::numInts(),
 				resetLbdAtExport, staticBucketSize);
 		case MALLOB_CLAUSE_STORE_ADAPTIVE_SIMPLE:
 			return new StaticClauseStore<true>(_params,
@@ -108,6 +108,7 @@ SharingManager::SharingManager(
 	auto callback = getCallback();
 	
 	if (solvers.empty()) return;
+	_num_original_vars = solvers[0]->getSolverSetup().numVars;
 	_num_original_clauses = solvers[0]->getSolverSetup().numOriginalClauses;
 	int maxNumGlobalSolvers = solvers[0]->getSolverSetup().maxNumSolvers;
 
@@ -194,16 +195,18 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 		clauseSize -= shift;
 	}
 
+	const int effectiveClauseLength = clauseSize - ClauseMetadata::numInts();
+
     // Check maximum size of clause
-    if (clauseSize-ClauseMetadata::numInts() > _params.strictClauseLengthLimit()) {
+    if (effectiveClauseLength > _params.strictClauseLengthLimit()) {
         if (tldClauseVec) delete tldClauseVec;
         return;
     }
 
-	if (clauseSize == 1 && clause.lbd != 1) {
+	if (effectiveClauseLength == 1 && clause.lbd != 1) {
 		_logger.log(V1_WARN, "Observed unit LBD of %i\n", clause.lbd);
 	}
-	if (clauseSize-ClauseMetadata::numInts() > 1) {
+	if (effectiveClauseLength > 1) {
 		_observed_nonunit_lbd_of_zero |= clause.lbd == 0;
 		_observed_nonunit_lbd_of_one |= clause.lbd == 1;
 		_observed_nonunit_lbd_of_two |= clause.lbd == 2;
@@ -213,15 +216,28 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 
 	//log(V4_VVER, "EXPORT %s\n", clause.toStr().c_str());
 
-	if (clauseSize == 1) assert(clause.lbd == 1);
+	if (effectiveClauseLength == 1) assert(clause.lbd == 1);
 	else {
-		assert(clause.lbd >= 1 || LOG_RETURN_FALSE("[ERROR] len=%i lbd=%i!\n", clause.size, clause.lbd));
-		assert(clause.lbd <= clause.size || LOG_RETURN_FALSE("[ERROR] len=%i lbd=%i!\n", clause.size, clause.lbd));
+		assert(clause.lbd >= 1 || LOG_RETURN_FALSE("[ERROR] len=%i lbd=%i!\n", effectiveClauseLength, clause.lbd));
+		assert(clause.lbd <= effectiveClauseLength || LOG_RETURN_FALSE("[ERROR] len=%i lbd=%i!\n", effectiveClauseLength, clause.lbd));
 	}
-	int clauseLbd = clauseSize == 1 ? 1 : std::min(clauseSize, (int)std::max(2UL, clause.lbd + condLits.size()));
+	int clauseLbd = effectiveClauseLength == 1 ? 1 :
+		std::min(effectiveClauseLength, (int)std::max(2UL, clause.lbd + condLits.size()));
 
 	if (_params.resetLbd() == MALLOB_RESET_LBD_AT_PRODUCE)
-		clauseLbd = clauseSize;
+		clauseLbd = effectiveClauseLength;
+
+	if (_params.incrementalVariableDomainHeuristic()) {
+		// Rate the clause based on how many of its literals are "original",
+		// i.e., within the range of original, rev.0 variables.
+		clauseLbd = effectiveClauseLength == 1 ? 1 : 2;
+		for (int i = ClauseMetadata::numInts(); i < clauseSize; i++) {
+			// Each literal beyond the original variable range incurs a penalty.
+			clauseLbd += (std::abs(clauseBegin[i]) > _num_original_vars);
+		}
+		// Clamp the "accumulated penalty" to the maximum valid LBD value.
+		clauseLbd = std::min(clauseLbd, effectiveClauseLength);
+	}
 
 	// Add clause length to statistics
 	_hist_produced.increment(clauseSize);

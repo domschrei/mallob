@@ -152,7 +152,7 @@ public:
             // If everybody uses their own encoder, we can still put all of them in the same cross-sharing group
             // due to the consistent naming of variables across all encoders.
             if (!_shared_encoder) {
-                searches.back()->setGroupId("consistent-logic-" + std::to_string(updateLayer) /*, 1, _instance->nbVars*/);
+                searches.back()->setGroupId("consistent-logic-" + std::to_string(updateLayer), 1, _instance->nbVars);
             }
 
             if (writer) searches.back()->setSolutionWriter(writer);
@@ -519,6 +519,8 @@ private:
         _instance.reset(new MaxSatInstance(update.formula.data(), update.formula.size()));
         _instance->nbVars = update.nbVars;
         _desc.getAppConfiguration().updateFixedSizeEntry("__NV", update.nbVars);
+        _desc.getAppConfiguration().updateFixedSizeEntry("__NC", update.nbReadClauses);
+        _desc.getAppConfiguration().updateFixedSizeEntry("__NO", (int)update.objective.size());
         _instance->lowerBound = std::max(update.lowerBound, lb);
         _instance->upperBound = std::min(update.upperBound, ub);
         tsl::robin_set<size_t> uniqueFactors;

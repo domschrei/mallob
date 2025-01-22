@@ -51,6 +51,8 @@ private:
     bool _has_clause_listener {false};
     std::function<void(std::vector<int>&)> _clause_listener;
 
+    std::unique_ptr<StaticClauseStore<false>> _merge_store;
+
 public:
     ClauseSharingSession(const Parameters& params, ClauseSharingActor* actor, const JobTreeSnapshot& snapshot,
             HistoricClauseStorage* clsHistory, int epoch, float compensationFactor) : 
@@ -282,8 +284,10 @@ private:
         const int maxEffectiveClsLen = _params.strictClauseLengthLimit()+ClauseMetadata::numInts();
         const int maxFreeEffectiveClsLen = _params.freeClauseLengthLimit()+ClauseMetadata::numInts();
         if (_params.priorityBasedBufferMerging()) {
-            StaticClauseStore<false> _merge_store(_params, false, 1000, true, INT32_MAX);
-            auto merger = BufferMerger(&_merge_store, buflim, maxEffectiveClsLen, maxFreeEffectiveClsLen, false);
+            if (!_merge_store) {
+                _merge_store.reset(new StaticClauseStore<false>(_params, false, 256, true, INT32_MAX));
+            }
+            auto merger = BufferMerger(_merge_store.get(), buflim, maxEffectiveClsLen, maxFreeEffectiveClsLen, false);
             for (auto& elem : elems) {
                 merger.add(BufferReader(elem.data(), elem.size(), maxEffectiveClsLen, false));
             }

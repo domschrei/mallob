@@ -113,7 +113,7 @@ public:
             _export_manager->produce(clause.begin, clause.size, clause.lbd, 0, _epoch);
             nbAdded++;
         }
-        LOG(V4_VVER, "CROSSCOMM added %lu/%lu int. shared cls\n", nbAdded, nbAdded+nbBlocked);
+        LOG(V4_VVER, "CROSSCOMM added %lu/%lu ITCS clauses\n", nbAdded, nbAdded+nbBlocked);
     }
 
     void updateBestFoundSolutionCost(long long cost) override {

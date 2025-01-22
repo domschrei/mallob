@@ -46,7 +46,7 @@ AnytimeSatClauseCommunicator::AnytimeSatClauseCommunicator(const Parameters& par
     _cls_history(!params.collectClauseHistory() ? nullptr :
         new HistoricClauseStorage([&]() {
             AdaptiveClauseStore::Setup setup;
-            setup.maxEffectiveClauseLength = _params.strictClauseLengthLimit()+ClauseMetadata::numInts();
+            setup.maxEffectiveClauseLength = _params.strictClauseLengthLimit();
             setup.maxLbdPartitionedSize = _params.maxLbdPartitioningSize();
             setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
             setup.numLiterals = _job->getBufferLimit(MyMpi::size(MPI_COMM_WORLD), false);
@@ -361,6 +361,8 @@ void AnytimeSatClauseCommunicator::feedLocalClausesIntoCrossSharing(std::vector<
             // initiate!
             _job->getJobTree().sendToSelf(msg);
         }
+    } else if (comm.getCommSize() == 0) {
+        LOG(V4_VVER, "CROSSCOMM communicator not ready yet\n");
     }
 }
 

@@ -71,6 +71,7 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
  OPT_BOOL(noImport,                         "no-import", "",                             false, "Turn off solvers importing clauses (for comparison purposes)")
  OPT_BOOL(scrambleLbdScores,                "scramble-lbds", "",                         false, "For each clause length, randomly reassign the present LBD values to the present shared clauses")
  OPT_BOOL(priorityBasedBufferMerging, "pbbm", "priority-based-buffer-merging", false, "Use a more sophisticated and expensive merge procedure that adopts the prioritization of csm=3")
+ OPT_BOOL(incrementalVariableDomainHeuristic, "ivdh", "incremental-variable-domain-heuristic", false, "Replace LBD values with a rating based on how many clause literals are in the original (0th increment) variable range")
 
 OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversification options")
  OPT_FLOAT(inputShuffleProbability,         "isp", "input-shuffle-probability",          0,        0,   1,

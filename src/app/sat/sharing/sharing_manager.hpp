@@ -77,6 +77,7 @@ protected:
 	SharingStatistics _stats;
 	std::vector<SolverStatistics*> _solver_stats;
 
+	int _num_original_vars;
 	int _num_original_clauses;
 
 	int _imported_revision = -1;

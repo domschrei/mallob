@@ -41,8 +41,6 @@ public:
             {"application", "SAT"}
         };
         _json_base["files"] = std::vector<std::string>();
-        for (auto key : {"__NV", "__NC", "__NO", "__XL", "__XU"})
-            _json_base["configuration"][key] = desc.getAppConfiguration().map.at(key);
     }
 
     void setGroupId(const std::string& groupId, int minVar = -1, int maxVar = -1) {
@@ -59,6 +57,9 @@ public:
         assert(!_pending);
         assert(newLiterals.empty() || newLiterals.front() != 0);
         assert(newLiterals.empty() || newLiterals.back() == 0);
+
+        for (auto key : {"__NV", "__NC", "__NO"})
+            _json_base["configuration"][key] = _desc.getAppConfiguration().map.at(key);
 
         if (_incremental && _json_base.contains("name")) {
             _json_base["precursor"] = _username + std::string(".") + _json_base["name"].get<std::string>();
