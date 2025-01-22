@@ -199,10 +199,12 @@ SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 
 	// set the assumptions
 	this->assumptions.clear();
+	clearConditionalLits();
 	for (size_t i = 0; i < numAssumptions; i++) {
 		int lit = assumptions[i];
 		solver->assume(lit);
 		this->assumptions.push_back(lit);
+		addConditionalLit(-lit);
 	}
 
 	// start solving

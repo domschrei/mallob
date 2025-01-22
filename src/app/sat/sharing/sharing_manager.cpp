@@ -1,4 +1,5 @@
 
+#include <climits>
 #include <signal.h>
 #include <assert.h>
 #include <ext/alloc_traits.h>
@@ -27,6 +28,7 @@
 #include "app/sat/sharing/filter/importing_solver.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
 #include "util/logger.hpp"
+#include "util/string_utils.hpp"
 #include "util/sys/timer.hpp"
 #include "util/random.hpp"
 #include "filter/in_place_clause_filtering.hpp"
@@ -127,7 +129,7 @@ SharingManager::SharingManager(
 
 	if (_params.deterministicSolving()) {
 		_det_sync.reset(new DeterministicClauseSynchronizer(_solvers, _num_original_clauses, [&](auto call) {
-			onProduceClause(call.solverId, call.solverRevision, call.clause, call.condVarOrZero, true);
+			onProduceClause(call.solverId, call.solverRevision, call.clause, call.condLits, true);
 		}));
 	}
 
@@ -136,11 +138,11 @@ SharingManager::SharingManager(
 	}
 }
 
-void SharingManager::onProduceClause(int solverId, int solverRevision, const Clause& clause, int condVarOrZero, bool recursiveCall) {
+void SharingManager::onProduceClause(int solverId, int solverRevision, const Clause& clause, const std::vector<int>& condLits, bool recursiveCall) {
 
 	if (!recursiveCall && _det_sync) {
 		// Deterministic solving!
-		_det_sync->insertBlocking(solverId, solverRevision, clause, condVarOrZero);
+		_det_sync->insertBlocking(solverId, solverRevision, clause, condLits);
 		return;
 	}
 
@@ -164,13 +166,33 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 	// This effectively renders the found conflict relative to the assumptions
 	// which were added not as assumptions but as permanent unit clauses.
 	std::vector<int>* tldClauseVec = nullptr;
-	if (condVarOrZero != 0) {
-		tldClauseVec = new std::vector<int>(clause.size+1);
+	if (!condLits.empty()) {
+		tldClauseVec = new std::vector<int>(clause.size+condLits.size());
 		for (int i = 0; i < clause.size; i++) tldClauseVec->at(i) = clause.begin[i];
-		tldClauseVec->at(clause.size) = -condVarOrZero;
+		for (int i = clause.size; i < tldClauseVec->size(); i++)
+			tldClauseVec->at(i) = condLits[i - clause.size];
 		clauseBegin = tldClauseVec->data();
-		clauseSize++;
+		clauseSize = tldClauseVec->size();
     }
+
+	if (!_params.onTheFlyChecking()) { // otherwise already sorted
+		// Sort literals in clause (not the metadata!)
+		std::sort(clauseBegin+ClauseMetadata::numInts(), clauseBegin+clauseSize);
+	}
+
+	if (tldClauseVec) {
+		// Check that the clause is sorted, remove duplicate lits
+		int lit = INT_MIN;
+		int shift = 0;
+		for (int i = ClauseMetadata::numInts(); i < clauseSize; i++) {
+			assert(clauseBegin[i] != 0);
+			assert(clauseBegin[i] >= lit || log_return_false("[ERROR] Clause not sorted: %s\n", clause.toStr().c_str()));
+			if (clauseBegin[i] == lit) shift++; // duplicate literal
+			lit = clauseBegin[i];
+			clauseBegin[i-shift] = lit;
+		}
+		clauseSize -= shift;
+	}
 
     // Check maximum size of clause
     if (clauseSize-ClauseMetadata::numInts() > _params.strictClauseLengthLimit()) {
@@ -196,7 +218,7 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 		assert(clause.lbd >= 1 || LOG_RETURN_FALSE("[ERROR] len=%i lbd=%i!\n", clause.size, clause.lbd));
 		assert(clause.lbd <= clause.size || LOG_RETURN_FALSE("[ERROR] len=%i lbd=%i!\n", clause.size, clause.lbd));
 	}
-	int clauseLbd = clauseSize == 1 ? 1 : std::max(2, clause.lbd + (condVarOrZero == 0 ? 0 : 1));
+	int clauseLbd = clauseSize == 1 ? 1 : std::min(clauseSize, (int)std::max(2UL, clause.lbd + condLits.size()));
 
 	if (_params.resetLbd() == MALLOB_RESET_LBD_AT_PRODUCE)
 		clauseLbd = clauseSize;
@@ -208,18 +230,6 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 		solverStats->producedClauses++;
 		solverStats->histProduced->increment(clause.size);
 	}
-
-	if (!_params.onTheFlyChecking()) {
-		// Sort literals in clause (not the metadata!)
-		std::sort(clauseBegin+ClauseMetadata::numInts(), clauseBegin+clauseSize);
-	}
-
-	// Check that the clause is sorted
-	//int lit = INT_MIN;
-	//for (int i = ClauseMetadata::numInts(); i < clauseSize; i++) {
-	//	assert(clauseBegin[i] > lit || log_return_false("[ERROR] Clause not sorted: %s\n", clause.toStr().c_str()));
-	//	lit = clauseBegin[i];
-	//}
 
 	_export_buffer->produce(clauseBegin, clauseSize, clauseLbd, solverId, _internal_epoch);
 	//log(V6_DEBGV, "%i : PRODUCED %s\n", solverId, tldClause.toStr().c_str());

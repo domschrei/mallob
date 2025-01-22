@@ -142,11 +142,11 @@ private:
 
 	void applyFilterToBuffer(std::vector<int>& clauseBuf, std::vector<int>* filter);
 
-	void onProduceClause(int solverId, int solverRevision, const Mallob::Clause& clause, int condVarOrZero, bool recursiveCall = false);
+	void onProduceClause(int solverId, int solverRevision, const Mallob::Clause& clause, const std::vector<int>& condLits, bool recursiveCall = false);
 
 	ExtLearnedClauseCallback getCallback() {
-		return [this](const Mallob::Clause& c, int solverId, int solverRevision, int condVarOrZero) {
-			onProduceClause(solverId, solverRevision, c, condVarOrZero);
+		return [this](const Mallob::Clause& c, int solverId, int solverRevision, const std::vector<int>& condLits) {
+			onProduceClause(solverId, solverRevision, c, condLits);
 		};
 	};
 

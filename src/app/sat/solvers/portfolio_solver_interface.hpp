@@ -137,7 +137,8 @@ public:
 		return !_clause_sharing_disabled;
 	}
 
-	void setCurrentCondVarOrZero(int condVarOrZero) {_current_cond_var_or_zero = condVarOrZero;}
+	void addConditionalLit(int condLit) {assert(condLit != 0); _conditional_lits.push_back(condLit);}
+	void clearConditionalLits() {_conditional_lits.clear();}
 	void setExtLearnedClauseCallback(const ExtLearnedClauseCallback& callback);
 	void setExtProbingLearnedClauseCallback(const ProbingLearnedClauseCallback& callback);
 
@@ -193,7 +194,7 @@ private:
 	int _local_id;
 	int _diversification_index;
 	bool _clause_sharing_disabled = false;
-	std::atomic_int _current_cond_var_or_zero = 0;
+	std::vector<int> _conditional_lits; // to append to each exported clause to make it global
 	std::atomic_bool _terminated = false;
 
 	SolverStatistics _stats;

@@ -11,5 +11,5 @@ enum SatResult {
 };
 
 typedef std::function<void(const Mallob::Clause&, int)> LearnedClauseCallback;
-typedef std::function<void(const Mallob::Clause&, int, int, int)> ExtLearnedClauseCallback;
+typedef std::function<void(const Mallob::Clause&, int, int, const std::vector<int>&)> ExtLearnedClauseCallback;
 typedef std::function<bool(int)> ProbingLearnedClauseCallback;

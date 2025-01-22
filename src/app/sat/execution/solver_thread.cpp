@@ -209,7 +209,7 @@ bool SolverThread::readFormula() {
                 // Make clause exporter append this condition
                 // to each clause this solver exports
                 if (_solver.exportsConditionalClauses() || !_solver.getSolverSetup().doIncrementalSolving)
-                    _solver.setCurrentCondVarOrZero(aSize > 0 ? aEquivVar : 0);
+                    _solver.addConditionalLit(aSize > 0 ? -aEquivVar : 0);
                 
                 if (aSize > 0) {
                     // If all assumptions hold, then aEquivVar holds
