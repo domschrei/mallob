@@ -44,12 +44,12 @@ protected:
         if (_nb_vars == guardVar) return;
         // Introduce a (so far) meaningless variable that represents the max. variable.
         _nb_vars++;
-        // Add the constraint "the prior guard var or this var is true".
+        // Add the constraint "the prior guard var or ... or the last var is true".
         // This can't break anything even if more variables are added later on,
         // since the prior guard var can always be set to true, and it
-        // explicitly adds the new maximum variable to the encoding.
-        addLiteral(guardVar);
-        addLiteral(_nb_vars);
+        // explicitly adds all variables to the encoding.
+        for (int lit = guardVar; lit <= _nb_vars; lit++)
+            addLiteral(lit);
         addLiteral(0);
     }
 private:

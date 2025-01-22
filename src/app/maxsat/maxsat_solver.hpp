@@ -518,6 +518,7 @@ private:
         // construct new instance object
         _instance.reset(new MaxSatInstance(update.formula.data(), update.formula.size()));
         _instance->nbVars = update.nbVars;
+        _desc.getAppConfiguration().updateFixedSizeEntry("__NV", update.nbVars);
         _instance->lowerBound = std::max(update.lowerBound, lb);
         _instance->upperBound = std::min(update.upperBound, ub);
         tsl::robin_set<size_t> uniqueFactors;
