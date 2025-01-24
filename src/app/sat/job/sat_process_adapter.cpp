@@ -46,10 +46,10 @@ SatProcessAdapter::SatProcessAdapter(Parameters&& params, SatProcessConfig&& con
 void SatProcessAdapter::doWriteRevisions() {
 
     if (_num_revisions_to_write.load(std::memory_order_relaxed) == 0) return;
-    if (!_initialized || _hsm->doTerminate || !_revisions_mutex.tryLock()) return;
+    if (!_initialized || _hsm->doTerminate || !_mtx_revisions.tryLock()) return;
 
     if (_bg_writer_running) {
-        _revisions_mutex.unlock();
+        _mtx_revisions.unlock();
         return;
     }
     if (_bg_writer.valid()) _bg_writer.get();
@@ -58,7 +58,7 @@ void SatProcessAdapter::doWriteRevisions() {
         while (!_terminate && _num_revisions_to_write > 0) {
             RevisionData revData;
             {
-                auto lock = _revisions_mutex.getLock();
+                auto lock = _mtx_revisions.getLock();
                 if (_revisions_to_write.empty()) break;
                 revData = _revisions_to_write.front();
                 _revisions_to_write.erase(_revisions_to_write.begin());
@@ -78,12 +78,12 @@ void SatProcessAdapter::doWriteRevisions() {
             _written_revision = revData.revision;
             LOG(V4_VVER, "DBG Done writing next revision %i\n", revData.revision);
         }
-        auto lock = _revisions_mutex.getLock();
+        auto lock = _mtx_revisions.getLock();
         _bg_writer_running = false;
     });
 
     _bg_writer_running = true;
-    _revisions_mutex.unlock();
+    _mtx_revisions.unlock();
 }
 
 void SatProcessAdapter::run() {
@@ -126,7 +126,7 @@ void SatProcessAdapter::doInitialize() {
     pid_t res = subproc.start();
 
     {
-        auto lock = _state_mutex.getLock();
+        auto lock = _mtx_state.getLock();
         _hsm->doBegin = true;
         _child_pid = res;
         _state = SolvingStates::ACTIVE;
@@ -141,7 +141,7 @@ bool SatProcessAdapter::isFullyInitialized() {
 
 void SatProcessAdapter::appendRevisions(const std::vector<RevisionData>& revisions, int desiredRevision, int nbThreads) {
     {
-        auto lock = _revisions_mutex.getLock();
+        auto lock = _mtx_revisions.getLock();
         _revisions_to_write.insert(_revisions_to_write.end(), revisions.begin(), revisions.end());
         _desired_revision = std::max(_desired_revision, desiredRevision);
         _num_revisions_to_write += revisions.size();
@@ -159,7 +159,7 @@ void SatProcessAdapter::preregisterShmemObject(ShmemObject&& obj) {
 }
 
 void SatProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
-    auto lock = _state_mutex.getLock();
+    auto lock = _mtx_state.getLock();
     _state = state;
     if (!_initialized) return;
     applySolvingState();
@@ -384,13 +384,12 @@ JobResult& SatProcessAdapter::getSolution() {
 
 void SatProcessAdapter::waitUntilChildExited() {
     doTerminateInitializedProcess(); // make sure that the process receives a terminate signal
+    if (!_running) return;
     while (true) {
         // Check if child exited
-        auto lock = _state_mutex.getLock();
-        if (_child_pid == -1) return;
         if (Process::didChildExit(_child_pid)) return;
-        lock.unlock();
-        usleep(1*1000); // 1ms
+        Process::resume(_child_pid);
+        usleep(10*1000); // 10ms
     }
 }
 

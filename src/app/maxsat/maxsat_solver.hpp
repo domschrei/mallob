@@ -69,8 +69,9 @@ private:
         }
     } _instance_update;
     struct UpdateResult {
-        bool boundsImproved;
-        bool instanceImproved;
+        bool boundsImproved {false};
+        bool instanceImproved {false};
+        bool error {false};
     };
     std::future<void> _fut_instance_update;
 
@@ -348,7 +349,7 @@ public:
                         // NOTE: may call launchImprovingMaxSatRun internally
                         return solve(updateLayer+1);
                     }
-                } else if (updateLayer < 10 && StaticMaxSatParserStore::get(_desc.getId())->lastCallInterrupted()) {
+                } else if (!updateResult.error && updateLayer < 10 && StaticMaxSatParserStore::get(_desc.getId())->lastCallInterrupted()) {
                     // not run until completion yet: retry concurrent preprocessing with higher limit
                     updateLayer++;
                     launchImprovingMaxPreRun(updateLayer, maxPreRunDone, updateResult);
@@ -499,6 +500,12 @@ private:
                 update.formula.size(), update.nbVars, update.nbReadClauses, update.objective.size(),
                 parser->get_lb(), parser->get_ub());
             LOG(V3_VERB, "MAXSAT MaxPRE' time preprocess:%.3f\n", timePreprocess);
+            if (update.formula.size() == 0 && update.nbVars == 0) {
+                // Error in MaxPRE
+                res.error = true;
+                runDone = true;
+                return;
+            }
             res.boundsImproved = (parser->get_lb() > update.lowerBound || parser->get_ub() < update.upperBound);
             update.lowerBound = parser->get_lb();
             update.upperBound = parser->get_ub();

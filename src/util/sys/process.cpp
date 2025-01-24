@@ -1,4 +1,6 @@
 
+#include <csignal>
+#include <pthread.h>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/prctl.h>
@@ -149,6 +151,13 @@ void Process::sendSignal(pid_t childpid, int signum) {
     if (result == -1) {
         LOG(V1_WARN, "[WARN] kill -%i %i returned -1\n", signum, childpid);
     }
+}
+
+pthread_t Process::getPthreadId() {
+    return pthread_self();
+}
+void Process::wakeUpThread(pthread_t pthreadId) {
+    pthread_kill(pthreadId, SIGUSR1);
 }
 
 bool Process::didChildExit(pid_t childpid, int* exitStatusOut) {

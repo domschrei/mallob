@@ -114,8 +114,8 @@ private:
 
     std::atomic_int _num_revisions_to_write = 0;
     std::list<RevisionData> _revisions_to_write;
-    Mutex _revisions_mutex;
-    Mutex _state_mutex;
+    Mutex _mtx_revisions;
+    Mutex _mtx_state;
     unsigned long _sum_of_revision_sizes {0};
 
     bool _thread_count_update {false};

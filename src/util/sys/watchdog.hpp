@@ -23,8 +23,6 @@ public:
     };
 
 private:
-    BackgroundWorker _worker;
-
     Activity _activity = Activity::IDLE_OR_HANDLING_MSG;
     int _activity_recv_tag = 0;
     int _activity_send_tag = 0;
@@ -35,8 +33,12 @@ private:
 
     static std::atomic_bool _globally_enabled;
 
+    BackgroundWorker _worker;
+    pthread_t _worker_pthread_id {0};
+
 public:
     Watchdog(bool enabled, int checkIntervalMillis, float time = Timer::elapsedSeconds());
+    ~Watchdog();
     void setWarningPeriod(int periodMillis);
     void setAbortPeriod(int periodMillis);
     void reset(float time = Timer::elapsedSeconds());

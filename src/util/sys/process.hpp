@@ -2,6 +2,7 @@
 #ifndef DOMPASCH_MALLOB_FORK_H
 #define DOMPASCH_MALLOB_FORK_H
 
+#include <pthread.h>
 #include <sys/types.h>
 #include <set>
 #include <atomic>
@@ -39,6 +40,9 @@ public:
     static void wakeUp(pid_t childpid);
 
     static void sendSignal(pid_t childpid, int signum);
+
+    static pthread_t getPthreadId();
+    static void wakeUpThread(pthread_t pthreadId);
 
     static void forwardTerminateToChildren();
 

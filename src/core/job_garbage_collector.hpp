@@ -7,6 +7,7 @@
 #include "util/sys/threading.hpp"
 #include "util/sys/background_worker.hpp"
 #include "util/logger.hpp"
+#include "util/sys/watchdog.hpp"
 
 class JobGarbageCollector {
 
@@ -18,12 +19,16 @@ private:
     ConditionVariable _cond_var;
     std::atomic_int _num_stored_jobs = 0;
 
+    Watchdog _watchdog;
+
 public:
-    JobGarbageCollector() {
+    JobGarbageCollector() : _watchdog(true, 1'000) {
         _worker.run([&]() {
             Proc::nameThisThread("JobJanitor");
             run();
         });
+        _watchdog.setWarningPeriod(1'000);
+        _watchdog.setAbortPeriod(10'000);
     }
 
     void orderDeletion(Job* jobPtr) {
@@ -69,7 +74,9 @@ private:
         LOGGER(lg, V3_VERB, "tid=%lu\n", Proc::getTid());
         
         while (_worker.continueRunning() || _num_stored_jobs > 0) {
-        
+
+            _watchdog.reset();
+
             std::list<Job*> copy;
             {
                 // Try to fetch the current jobs to free

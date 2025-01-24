@@ -14,7 +14,7 @@ private:
     std::vector<ctx_id_t> _ctx_ids;
 
     ctx_id_t _my_ctx_id;
-    int _my_local_rank;
+    int _my_local_rank {-1};
 
 public:
     GroupComm() {}

@@ -93,7 +93,7 @@ public:
         if (best->orphaned) {
             best->orphaned = false;
             b = best->ub;
-        } else if (best->size() == 1) {
+        } else if (best->size() <= 1) {
             // nothing to split left
             return false;
         } else {

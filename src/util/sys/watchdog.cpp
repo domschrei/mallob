@@ -1,6 +1,7 @@
 
 #include "watchdog.hpp"
 
+#include <cerrno>
 #include <unistd.h>
 #include <signal.h>
 
@@ -17,6 +18,7 @@ Watchdog::Watchdog(bool enabled, int checkIntervalMillis, float time) {
 
     _worker.run([&, parentTid, checkIntervalMillis]() {
         Proc::nameThisThread("Watchdog");
+        _worker_pthread_id = Process::getPthreadId();
 
         while (_worker.continueRunning()) {
             int timeMillis = (int) (1000*Timer::elapsedSeconds());
@@ -34,9 +36,18 @@ Watchdog::Watchdog(bool enabled, int checkIntervalMillis, float time) {
                         elapsed, _activity, _activity_recv_tag, _activity_send_tag);
                 }
             }
-            usleep(1000 * checkIntervalMillis);
+            int res = usleep(1000 * checkIntervalMillis);
+            if (res == -1 && errno == EINTR) {
+                LOG(V4_VVER, "Watchdog sleep interrupted by signal\n");
+            }
         }
     });
+}
+
+Watchdog::~Watchdog() {
+    stopWithoutWaiting();
+    if (_worker_pthread_id != 0)
+        Process::wakeUpThread(_worker_pthread_id);
 }
 
 void Watchdog::setWarningPeriod(int periodMillis) {
