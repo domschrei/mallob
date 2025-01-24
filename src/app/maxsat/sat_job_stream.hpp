@@ -41,12 +41,14 @@ public:
             {"application", "SAT"}
         };
         _json_base["files"] = std::vector<std::string>();
+        _json_base["configuration"]["__XL"] = -1;
+        _json_base["configuration"]["__XU"] = -1;
     }
 
     void setGroupId(const std::string& groupId, int minVar = -1, int maxVar = -1) {
         _json_base["group-id"] = groupId;
-        if (minVar >= 0) _json_base["configuration"]["__XL"] = std::to_string(minVar);
-        if (maxVar >= 0) _json_base["configuration"]["__XU"] = std::to_string(maxVar);
+        _json_base["configuration"]["__XL"] = std::to_string(minVar);
+        _json_base["configuration"]["__XU"] = std::to_string(maxVar);
     }
     void setInnerObjective(const std::string& objective) {
         _json_base["configuration"]["__OBJ"] = objective;

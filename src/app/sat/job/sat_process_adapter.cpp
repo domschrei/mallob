@@ -181,9 +181,10 @@ void SatProcessAdapter::applySolvingState() {
 void SatProcessAdapter::doTerminateInitializedProcess() {
     if (!_running || _hsm->doTerminate) return; // running?
     while (!_initialized) usleep(3*1000); // wait until initialized
-    Process::resume(_child_pid); // Continue (resume) process.
-    while (!_hsm->didBegin && !Process::didChildExit(_child_pid))
+    while (!_hsm->didBegin && !Process::didChildExit(_child_pid)) {
+        Process::resume(_child_pid); // Continue (resume) process.
         usleep(3*1000); // wait until child is actually in the main loop
+    }
     _hsm->doTerminate = true; // Kindly ask child process to terminate.
     auto lock = _mtx_pipe.getLock();
     _pipe.reset(); // clean up bidirectional pipe
