@@ -27,16 +27,18 @@ private:
         bool orphaned {false};
         SearchInterval(size_t lb, size_t ub, double weight) : lb(lb), ub(ub), weight(weight) {}
         size_t size() const {return ub-lb;}
-        std::pair<SearchInterval, SearchInterval> split(float skew) const {
+        std::pair<SearchInterval, SearchInterval> split(double skew) const {
             assert(size() >= 1);
             if (skew <= 0 || skew >= 1) skew = 0.5;
             size_t mid = lb + (ub-lb) * skew;
+            // failsafe to mitigate floating-point issues for very large bounds
+            if (mid <= lb || mid >= ub) mid = lb + (ub-lb)/2;
             SearchInterval left {lb, mid, 0.5*weight};
             SearchInterval right {mid, ub, 0.5*weight};
             assert(left.size() > 0 || right.size() > 0);
             return {left, right};
         }
-        std::pair<SearchInterval, SearchInterval> splitAt(float skew, size_t mid) const {
+        std::pair<SearchInterval, SearchInterval> splitAt(double skew, size_t mid) const {
             double absRatio = (mid - lb) / (double)(ub - lb);
             double weightRatio = std::pow(skew, std::log(absRatio) / std::log(0.5));
             SearchInterval left {lb, mid, weightRatio * weight};
@@ -49,12 +51,12 @@ private:
     // the interval's upper bound is the search call's upper bound, EXCEPT for
     // intervals in which "orphaned" is set.
     std::list<SearchInterval> _current_bounds;
-    float _skew {0.9};
+    double _skew {0.9};
 
     std::list<size_t> _bounds_to_replay; // for debugging
 
 public:
-    IntervalSearch(float skew) : _skew(skew) {}
+    IntervalSearch(double skew) : _skew(skew) {}
 
     void init(size_t min, size_t max) {
         // Create first interval with full weight

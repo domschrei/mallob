@@ -349,7 +349,7 @@ public:
         assert(_solving);
         if (terminate) _yield_searcher = true;
         if (_job_stream.interrupt())
-            LOG(V2_INFO, "MAXSAT %s Interrupt solving with bound %i\n", _label.c_str(), _current_bound);
+            LOG(V2_INFO, "MAXSAT %s Interrupt solving with bound %lu\n", _label.c_str(), _current_bound);
     }
 
     void setDescriptionLabelForNextCall(const std::string& label) {
