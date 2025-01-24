@@ -75,15 +75,16 @@ private:
         
         while (_worker.continueRunning() || _num_stored_jobs > 0) {
 
-            _watchdog.reset();
-
             std::list<Job*> copy;
             {
                 // Try to fetch the current jobs to free
+                _watchdog.setActive(false);
                 auto lock = _mtx.getLock();
                 _cond_var.waitWithLockedMutex(lock, [&]() {
                     return !_worker.continueRunning() || !_jobs_to_free.empty();
                 });
+                _watchdog.reset();
+                _watchdog.setActive(true);
                 if (!_worker.continueRunning() && _jobs_to_free.empty() && _num_stored_jobs == 0)
                     break;
                 

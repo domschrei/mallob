@@ -23,7 +23,7 @@ Watchdog::Watchdog(bool enabled, int checkIntervalMillis, float time) {
         while (_worker.continueRunning()) {
             int timeMillis = (int) (1000*Timer::elapsedSeconds());
             auto elapsed = timeMillis - _last_reset_millis;
-            if (_globally_enabled.load(std::memory_order_relaxed)) {
+            if (_globally_enabled.load(std::memory_order_relaxed) && _active) {
                 if (_abort_period_millis > 0 && elapsed > _abort_period_millis) {   
                     LOG(V0_CRIT, "[ERROR] Watchdog: TIMEOUT (last=%.3f activity=%i recvtag=%i sendtag=%i)\n", 
                         0.001*_last_reset_millis, _activity, _activity_recv_tag, _activity_send_tag);

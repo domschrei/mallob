@@ -32,6 +32,7 @@ private:
     std::atomic_int _abort_period_millis = 0;
 
     static std::atomic_bool _globally_enabled;
+    bool _active {true};
 
     BackgroundWorker _worker;
     pthread_t _worker_pthread_id {0};
@@ -42,6 +43,7 @@ public:
     void setWarningPeriod(int periodMillis);
     void setAbortPeriod(int periodMillis);
     void reset(float time = Timer::elapsedSeconds());
+    void setActive(bool active) {_active = active;}
     inline void setActivity(Activity a) {
         _activity = a;
     }
