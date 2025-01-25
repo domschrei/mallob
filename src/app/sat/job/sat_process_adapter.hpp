@@ -80,11 +80,8 @@ private:
     robin_hood::unordered_flat_set<ShmemObject, ShmemObjectHasher> _shmem;
     std::string _shmem_id;
     SatSharedMemory* _hsm = nullptr;
-    Mutex _mtx_preregistered_shmem;
-    robin_hood::unordered_flat_map<std::string, ShmemObject> _preregistered_shmem;
-
-    Mutex _mtx_pipe;
-    std::unique_ptr<BiDirectionalAnytimePipeShmem> _pipe;
+    GuardedData<robin_hood::unordered_flat_map<std::string, ShmemObject>> _guard_prereg_shmem;
+    GuardedData<std::unique_ptr<BiDirectionalAnytimePipeShmem>> _guard_pipe;
 
     volatile bool _running = false;
     volatile bool _initialized = false;

@@ -117,9 +117,12 @@ void SatProcessAdapter::doInitialize() {
     // Set up bi-directional pipe to and from the subprocess
     char* pipeParentToChild = (char*) createSharedMemoryBlock("pipe-parenttochild", _hsm->pipeBufSize, nullptr);
     char* pipeChildToParent = (char*) createSharedMemoryBlock("pipe-childtoparent", _hsm->pipeBufSize, nullptr);
-    _pipe.reset(new BiDirectionalAnytimePipeShmem(
-        {pipeParentToChild, _hsm->pipeBufSize, true},
-        {pipeChildToParent, _hsm->pipeBufSize, true}, true));
+    {
+        auto pipe = _guard_pipe.lock();
+        pipe->reset(new BiDirectionalAnytimePipeShmem(
+            {pipeParentToChild, _hsm->pipeBufSize, true},
+            {pipeChildToParent, _hsm->pipeBufSize, true}, true));
+    }
 
     // Create SAT solving child process
     Subprocess subproc(_params, "mallob_sat_process");
@@ -154,8 +157,7 @@ void SatProcessAdapter::appendRevisions(const std::vector<RevisionData>& revisio
 
 void SatProcessAdapter::preregisterShmemObject(ShmemObject&& obj) {
     std::string shmemId = obj.id;
-    auto lock = _mtx_preregistered_shmem.getLock();
-    _preregistered_shmem[shmemId] = std::move(obj);
+    _guard_prereg_shmem.lock().get()[shmemId] = std::move(obj);
 }
 
 void SatProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
@@ -186,15 +188,16 @@ void SatProcessAdapter::doTerminateInitializedProcess() {
         usleep(3*1000); // wait until child is actually in the main loop
     }
     _hsm->doTerminate = true; // Kindly ask child process to terminate.
-    auto lock = _mtx_pipe.getLock();
-    _pipe.reset(); // clean up bidirectional pipe
+    _guard_pipe.lock()->reset(); // clean up bidirectional pipe
 }
 
 void SatProcessAdapter::collectClauses(int maxSize) {
     if (!_initialized || _state != SolvingStates::ACTIVE || _clause_collecting_stage != NONE)
         return;
-    auto lock = _mtx_pipe.getLock();
-    if (_pipe) _pipe->writeData({maxSize}, CLAUSE_PIPE_PREPARE_CLAUSES);
+    {
+        auto pipe = _guard_pipe.lock();
+        if (*pipe) pipe.get()->writeData({maxSize}, CLAUSE_PIPE_PREPARE_CLAUSES);
+    }
     _clause_collecting_stage = QUERIED;
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
@@ -216,16 +219,16 @@ long long SatProcessAdapter::getBestFoundObjectiveCost() const {
 }
 void SatProcessAdapter::updateBestFoundSolutionCost(long long bestFoundSolutionCost) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
-    auto lock = _mtx_pipe.getLock();
-    if (_pipe) _pipe->writeData(
+    auto pipe = _guard_pipe.lock();
+    if (*pipe) pipe.get()->writeData(
         {(int*) &bestFoundSolutionCost, (int*) ((&bestFoundSolutionCost)+1)},
         CLAUSE_PIPE_UPDATE_BEST_FOUND_OBJECTIVE_COST);
 }
 
 void SatProcessAdapter::filterClauses(int epoch, std::vector<int>&& clauses) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
-    auto lock = _mtx_pipe.getLock();
-    if (_pipe) _pipe->writeData(std::move(clauses), {epoch},
+    auto pipe = _guard_pipe.lock();
+    if (*pipe) pipe.get()->writeData(std::move(clauses), {epoch},
         CLAUSE_PIPE_FILTER_IMPORT);
     _epoch_of_export_buffer = epoch;
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
@@ -255,36 +258,36 @@ std::vector<int> SatProcessAdapter::getLocalFilter(int epoch) {
 void SatProcessAdapter::applyFilter(int epoch, std::vector<int>&& filter) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
     if (epoch != _epoch_of_export_buffer) return; // ignore filter if the corresponding clauses are not present
-    auto lock = _mtx_pipe.getLock();
-    if (_pipe) _pipe->writeData(std::move(filter), {epoch}, CLAUSE_PIPE_DIGEST_IMPORT);
+    auto pipe = _guard_pipe.lock();
+    if (*pipe) pipe.get()->writeData(std::move(filter), {epoch}, CLAUSE_PIPE_DIGEST_IMPORT);
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
 
 void SatProcessAdapter::digestClausesWithoutFilter(int epoch, std::vector<int>&& clauses, bool stateless) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
-    auto lock = _mtx_pipe.getLock();
-    if (_pipe) _pipe->writeData(std::move(clauses), {epoch, stateless?1:0},
+    auto pipe = _guard_pipe.lock();
+    if (*pipe) pipe.get()->writeData(std::move(clauses), {epoch, stateless?1:0},
         CLAUSE_PIPE_DIGEST_IMPORT_WITHOUT_FILTER);
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
 
 void SatProcessAdapter::returnClauses(std::vector<int>&& clauses) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
-    auto lock = _mtx_pipe.getLock();
-    if (_pipe) _pipe->writeData(std::move(clauses), {_clause_buffer_revision}, CLAUSE_PIPE_RETURN_CLAUSES);
+    auto pipe = _guard_pipe.lock();
+    if (*pipe) pipe.get()->writeData(std::move(clauses), {_clause_buffer_revision}, CLAUSE_PIPE_RETURN_CLAUSES);
 }
 
 void SatProcessAdapter::digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>&& clauses) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
-    auto lock = _mtx_pipe.getLock();
-    if (_pipe) _pipe->writeData(std::move(clauses), {epochBegin, epochEnd, _clause_buffer_revision}, CLAUSE_PIPE_DIGEST_HISTORIC);
+    auto pipe = _guard_pipe.lock();
+    if (*pipe) pipe.get()->writeData(std::move(clauses), {epochBegin, epochEnd, _clause_buffer_revision}, CLAUSE_PIPE_DIGEST_HISTORIC);
 }
 
 
 void SatProcessAdapter::dumpStats() {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
-    auto lock = _mtx_pipe.getLock();
-    if (_pipe) _pipe->writeData({}, CLAUSE_PIPE_DUMP_STATS);
+    auto pipe = _guard_pipe.lock();
+    if (*pipe) pipe.get()->writeData({}, CLAUSE_PIPE_DUMP_STATS);
     // No hard need to wake up immediately
 }
 
@@ -318,11 +321,11 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
 
     if (_state != SolvingStates::ACTIVE) return NORMAL;
 
-    auto lock = _mtx_pipe.getLock();
-    if (!_pipe) return NORMAL;
-    char c = _pipe->pollForData();
+    auto pipe = _guard_pipe.lock();
+    if (!*pipe) return NORMAL;
+    char c = pipe.get()->pollForData();
     if (c == CLAUSE_PIPE_PREPARE_CLAUSES) {
-        _collected_clauses = _pipe->readData(c);
+        _collected_clauses = pipe.get()->readData(c);
 
         _successful_solver_id = _collected_clauses.back(); _collected_clauses.pop_back();
         _nb_incoming_lits = _collected_clauses.back(); _collected_clauses.pop_back();
@@ -339,14 +342,14 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
         _clause_collecting_stage = RETURNED;
         LOG(V4_VVER, "collected clauses from subprocess\n");
     } else if (c == CLAUSE_PIPE_FILTER_IMPORT) {
-        std::vector<int> filter = _pipe->readData(c);
+        std::vector<int> filter = pipe.get()->readData(c);
         int epoch = filter.back(); filter.pop_back();
         _filters_by_epoch[epoch] = std::move(filter);
     } else if (c == CLAUSE_PIPE_DIGEST_IMPORT) {
-        _last_admitted_nb_lits = _pipe->readData(c).front();
+        _last_admitted_nb_lits = pipe.get()->readData(c).front();
     } else if (c == CLAUSE_PIPE_SOLUTION) {
-        std::vector<int> solution = _pipe->readData(c);
-        lock.unlock();
+        std::vector<int> solution = pipe.get()->readData(c);
+        pipe.unlock();
         const int resultCode = solution.back(); solution.pop_back();
         const unsigned long globalStartOfSuccessEpoch = * (unsigned long*) (solution.data()+solution.size()-2);
         solution.pop_back(); solution.pop_back();
@@ -361,17 +364,17 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
             return FOUND_RESULT;
         }
     }
-    using namespace std;  lock.~unique_lock<std::mutex>();
+    pipe.unlock();
 
     if (_published_revision < _written_revision) {
         _published_revision = _written_revision;
-        auto lock = _mtx_pipe.getLock();
-        if (_pipe) _pipe->writeData({_desired_revision, _published_revision}, CLAUSE_PIPE_START_NEXT_REVISION);
+        auto pipe = _guard_pipe.lock();
+        if (*pipe) pipe.get()->writeData({_desired_revision, _published_revision}, CLAUSE_PIPE_START_NEXT_REVISION);
     }
 
     if (_thread_count_update) {
-        auto lock = _mtx_pipe.getLock();
-        if (_pipe) _pipe->writeData({_nb_threads}, CLAUSE_PIPE_SET_THREAD_COUNT);
+        auto pipe = _guard_pipe.lock();
+        if (*pipe) pipe.get()->writeData({_nb_threads}, CLAUSE_PIPE_SET_THREAD_COUNT);
         _thread_count_update = false;
     }
 
@@ -417,11 +420,11 @@ void* SatProcessAdapter::createSharedMemoryBlock(std::string shmemSubId, size_t 
     actualShmemId = SharedMemoryCache::getShmemId(descId);
     {
         ShmemObject obj;
-        auto lock = _mtx_preregistered_shmem.getLock();
-        if (_preregistered_shmem.contains(actualShmemId)) {
-            obj = std::move(_preregistered_shmem[actualShmemId]);
+        auto preregShmem = _guard_prereg_shmem.lock();
+        if (preregShmem->contains(actualShmemId)) {
+            obj = std::move(preregShmem.get()[actualShmemId]);
             shmem = obj.data;
-            _preregistered_shmem.erase(actualShmemId);
+            preregShmem->erase(actualShmemId);
         }
         if (shmem)
             _shmem.insert(ShmemObject{actualShmemId, shmem, size,
@@ -447,8 +450,8 @@ void SatProcessAdapter::crash() {
 
 void SatProcessAdapter::reduceThreadCount() {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
-    auto lock = _mtx_pipe.getLock();
-    if (_pipe) _pipe->writeData({}, CLAUSE_PIPE_REDUCE_THREAD_COUNT);
+    auto pipe = _guard_pipe.lock();
+    if (*pipe) pipe.get()->writeData({}, CLAUSE_PIPE_REDUCE_THREAD_COUNT);
 }
 
 SatProcessAdapter::~SatProcessAdapter() {
@@ -468,14 +471,14 @@ void SatProcessAdapter::freeSharedMemory() {
     if (_bg_writer.valid()) _bg_writer.get();
 
     // delete shmem-based pipe
-    _pipe.reset();
+    _guard_pipe.lock()->reset();
 
     // Clean up shared memory objects created here
     _hsm = nullptr;
     {
-        auto lock = _mtx_preregistered_shmem.getLock();
-        for (auto& [id, obj] : _preregistered_shmem) _shmem.insert(std::move(obj));
-        _preregistered_shmem.clear();
+        auto preregShmem = _guard_prereg_shmem.lock();
+        for (auto& [id, obj] : preregShmem.get()) _shmem.insert(std::move(obj));
+        preregShmem->clear();
     }
     for (auto& shmemObj : _shmem) {
         //log(V4_VVER, "DBG deleting %s\n", shmemObj.id.c_str());

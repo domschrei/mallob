@@ -22,7 +22,7 @@ private:
     Watchdog _watchdog;
 
 public:
-    JobGarbageCollector() : _watchdog(true, 1'000) {
+    JobGarbageCollector() : _watchdog(false, 1'000) {
         _worker.run([&]() {
             Proc::nameThisThread("JobJanitor");
             run();
