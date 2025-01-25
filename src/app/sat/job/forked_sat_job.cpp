@@ -27,6 +27,7 @@
 #include "data/job_transfer.hpp"
 #include "util/option.hpp"
 #include "util/params.hpp"
+#include "util/sys/watchdog.hpp"
 
 std::atomic_int ForkedSatJob::_static_subprocess_index = 1;
 
@@ -345,8 +346,13 @@ void ForkedSatJob::startDestructThreadIfNecessary() {
     if (!_destruction.valid() && !_shmem_freed) {
         LOG(V4_VVER, "%s : FSJ freeing mem\n", toStr());
         _destruction = ProcessWideThreadPool::get().addTask([this]() {
+            Watchdog watchdog(true, 1'000);
+            watchdog.setWarningPeriod(1'000);
+            watchdog.setAbortPeriod(5'000);
             _solver->waitUntilChildExited();
+            watchdog.reset();
             _solver->freeSharedMemory();
+            watchdog.reset();
             // manually clean up formulas in shared memory which haven't been forwarded yet
             for (auto& obj : _formulas_in_shmem) {
                 if (!obj.data) continue;
