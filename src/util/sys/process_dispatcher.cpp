@@ -9,7 +9,6 @@
 #include <string>
 
 #include "util/sys/proc.hpp"
-#include "util/logger.hpp"
 #include "util/sys/fileutils.hpp"
 
 void ProcessDispatcher::dispatch() {
@@ -57,6 +56,6 @@ void ProcessDispatcher::dispatch() {
     int result = execv(argv[0], argv);
     
     // If this is reached, something went wrong with execvp
-    LOG(V0_CRIT, "[ERROR] execv returned %i with errno %i\n", result, (int)errno);
+    printf("[ERROR] execv returned %i with errno %i\n", result, (int)errno);
     usleep(1000 * 500); // sleep 0.5s
 }

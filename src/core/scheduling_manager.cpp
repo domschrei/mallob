@@ -1294,8 +1294,7 @@ SchedulingManager::~SchedulingManager() {
         setLoad(0, _job_registry.getActive().getId());
 
     // Setup a watchdog to get feedback on hanging destructors
-    Watchdog watchdog(/*enabled=*/_params.watchdog(), /*checkIntervMillis=*/3, 
-        Timer::elapsedSeconds());
+    Watchdog watchdog(/*enabled=*/_params.watchdog(), /*checkIntervMillis=*/300, false);
     watchdog.setWarningPeriod(1100);
     watchdog.setAbortPeriod(60*1000);
     
@@ -1319,6 +1318,4 @@ SchedulingManager::~SchedulingManager() {
         usleep(1*1000); // 1 ms
     }
     LOG(V4_VVER, "all jobs deleted\n");
-
-    watchdog.stop();
 }

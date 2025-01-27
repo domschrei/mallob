@@ -3,6 +3,7 @@
 #define DOMPASCH_MALLOB_WATCHDOG_HPP
 
 #include <atomic>
+#include <future>
 
 #include "timer.hpp"
 #include "threading.hpp"
@@ -35,10 +36,11 @@ private:
     bool _active {true};
 
     BackgroundWorker _worker;
+    std::future<void> _fut_thread_pool;
     pthread_t _worker_pthread_id {0};
 
 public:
-    Watchdog(bool enabled, int checkIntervalMillis, float time = Timer::elapsedSeconds());
+    Watchdog(bool enabled, int checkIntervalMillis, bool useThreadPool = false);
     ~Watchdog();
     void setWarningPeriod(int periodMillis);
     void setAbortPeriod(int periodMillis);

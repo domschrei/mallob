@@ -8,16 +8,17 @@
 #include "util/logger.hpp"
 #include "util/sys/proc.hpp"
 #include "util/sys/process.hpp"
+#include "util/sys/thread_pool.hpp"
 #include "util/sys/timer.hpp"
 
-Watchdog::Watchdog(bool enabled, int checkIntervalMillis, float time) {
+Watchdog::Watchdog(bool enabled, int checkIntervalMillis, bool useThreadPool) {
     if (!enabled) return;
 
-    reset(time);
+    reset(Timer::elapsedSeconds());
     auto parentTid = Proc::getTid();
 
-    _worker.run([&, parentTid, checkIntervalMillis]() {
-        Proc::nameThisThread("Watchdog");
+    auto runnable = [&, useThreadPool, parentTid, checkIntervalMillis]() {
+        if (!useThreadPool) Proc::nameThisThread("Watchdog");
         _worker_pthread_id = Process::getPthreadId();
 
         while (_worker.continueRunning()) {
@@ -41,13 +42,20 @@ Watchdog::Watchdog(bool enabled, int checkIntervalMillis, float time) {
                 LOG(V4_VVER, "Watchdog sleep interrupted by signal\n");
             }
         }
-    });
+    };
+
+    if (useThreadPool) {
+        _fut_thread_pool = ProcessWideThreadPool::get().addTask(std::move(runnable));
+    } else {
+        _worker.run(std::move(runnable));
+    }
 }
 
 Watchdog::~Watchdog() {
     stopWithoutWaiting();
     if (_worker_pthread_id != 0)
         Process::wakeUpThread(_worker_pthread_id);
+    if (_fut_thread_pool.valid()) _fut_thread_pool.get();
 }
 
 void Watchdog::setWarningPeriod(int periodMillis) {

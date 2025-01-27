@@ -16,6 +16,7 @@
 #include "comm/distributed_termination.hpp"
 #include "comm/mympi.hpp"
 #include "interface/api/rank_specific_file_fetcher.hpp"
+#include "util/periodic_event.hpp"
 #include "util/sys/subprocess.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
@@ -165,6 +166,7 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     }
 
     // Main loop
+    PeriodicEvent<500> threadPoolCheck;
     while (true) {
 
         // update cached timing
@@ -176,6 +178,10 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
 
         // Advance message queue and run callbacks for done messages
         MyMpi::getMessageQueue().advance();
+
+        // Check for congestion in the thread pool
+        if (threadPoolCheck.ready(Timer::elapsedSecondsCached()))
+            ProcessWideThreadPool::get().resizeIfNeeded();
 
         // Check termination
         if (distTerm.triggered())
@@ -328,7 +334,7 @@ int main(int argc, char *argv[]) {
     if (rank == 0) LOG(V3_VERB, "%i workers, %i clients\n", workerRanks.size(), clientRanks.size());
 
     // Initialize thread pool
-    int threadPoolSize = std::max(4, 2*params.numThreadsPerProcess());
+    int threadPoolSize = 4;
     if (isClient(rank) && isWorker(rank)) threadPoolSize *= 2;
     ProcessWideThreadPool::init(threadPoolSize);
     

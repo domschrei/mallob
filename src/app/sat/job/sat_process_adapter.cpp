@@ -27,6 +27,7 @@
 #include "app/sat/job/sat_shared_memory.hpp"
 #include "util/option.hpp"
 #include "util/sys/tmpdir.hpp"
+#include "util/sys/watchdog.hpp"
 
 #ifndef MALLOB_SUBPROC_DISPATCH_PATH
 #define MALLOB_SUBPROC_DISPATCH_PATH ""
@@ -106,6 +107,10 @@ void SatProcessAdapter::run() {
 
 void SatProcessAdapter::doInitialize() {
 
+    Watchdog watchdog(true, 200, true);
+    watchdog.setWarningPeriod(200);
+    watchdog.setAbortPeriod(5'000);
+
     // Allocate shared memory for formula, assumptions of initial revision
     const int* fInShmem = (const int*) createSharedMemoryBlock("formulae.0",
         sizeof(int) * _f_size, (void*)_f_lits, 0, _desc_id, true);
@@ -125,13 +130,16 @@ void SatProcessAdapter::doInitialize() {
     Subprocess subproc(_params, "mallob_sat_process");
     pid_t res = subproc.start();
 
-    {
-        auto lock = _mtx_state.getLock();
-        _child_pid = res;
-        _state = SolvingStates::ACTIVE;
-        _initialized = true;
-        applySolvingState();
-    }
+    // Wait until the process is properly initialized
+    while (!_hsm->didStart && !Process::didChildExit(res))
+        usleep(1000 * 10); // 10 ms
+
+    // Change adapter state
+    auto lock = _mtx_state.getLock();
+    _child_pid = res;
+    _state = SolvingStates::ACTIVE;
+    _initialized = true;
+    applySolvingState();
 }
 
 bool SatProcessAdapter::isFullyInitialized() {

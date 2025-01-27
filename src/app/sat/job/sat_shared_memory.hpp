@@ -17,17 +17,18 @@ struct SatSharedMemory {
     int aSize;
 
     // Signals parent->child
-    bool doTerminate {false};
-    bool doCrash {false};
+    volatile bool doTerminate {false};
+    volatile bool doCrash {false};
     //bool pipeChildReadyToWrite {false};
     //bool pipeDoTerminate {false};
     //bool pipeDidTerminate {false};
 
     // Signals child->parent
-    bool didTerminate {false};
+    volatile bool didStart {false};
+    volatile bool didTerminate {false};
     
     // State alerts child->parent
-    bool isInitialized {false};
+    volatile bool isInitialized {false};
     
     // Clause buffers: parent->child
     int importBufferRevision {-1};

@@ -75,11 +75,15 @@ public:
             abort();
         }
         auto f = fopen(commandOutfile.c_str(), "w");
+        assert(f);
         const int size = command.size();
-        fwrite(&size, sizeof(int), 1, f);
-        fwrite(command.c_str(), 1, command.size(), f);
+        int nbWritten = fwrite(&size, sizeof(int), 1, f);
+        assert(nbWritten == 1);
+        nbWritten = fwrite(command.c_str(), 1, command.size(), f);
+        assert(nbWritten == command.size());
         fflush(f);
-        fclose(f);
+        retval = fclose(f);
+        assert(retval != EOF);
         return res;
     }
 };

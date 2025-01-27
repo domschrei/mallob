@@ -110,6 +110,8 @@ private:
             false);
         LOGGER(_log, V4_VVER, "Pipes set up\n");
 
+        _hsm->didStart = true; // signal to parent: I started properly (signal handlers etc.)
+
         // Terminate directly?
         if (checkTerminate(engine, false)) return;
 
