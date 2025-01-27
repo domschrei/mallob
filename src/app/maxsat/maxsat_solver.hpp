@@ -153,7 +153,7 @@ public:
             // If everybody uses their own encoder, we can still put all of them in the same cross-sharing group
             // due to the consistent naming of variables across all encoders.
             if (!_shared_encoder) {
-                searches.back()->setGroupId("consistent-logic-" + std::to_string(updateLayer)/*, 1, _instance->nbVars*/);
+                searches.back()->setGroupId("consistent-logic-" + std::to_string(updateLayer), 1, _instance->nbVars);
             }
 
             if (writer) searches.back()->setSolutionWriter(writer);
