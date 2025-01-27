@@ -346,11 +346,12 @@ private:
         if (terminate && force) {
             // clean up all resources which MUST be cleaned up (e.g., child processes)
             engine.cleanUp(true);
-            _log.flush();
             cbAtForcedExit();
             _hsm->didTerminate = true;
             // terminate yourself
+            assert(exitStatus != 9); // not hard-killed - wouldn't make sense
             LOGGER(_log, V4_VVER, "Exiting\n");
+            _log.flush();
             Process::doExit(exitStatus);
         }
         return terminate;
