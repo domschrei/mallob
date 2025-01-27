@@ -41,6 +41,17 @@ SatProcessAdapter::SatProcessAdapter(Parameters&& params, SatProcessConfig&& con
     _desired_revision = _config.firstrev;
     _shmem_id = _config.getSharedMemId(Proc::getPid());
     assert(_clause_comm);
+
+    // Initialize "management" shared memory
+    //log(V4_VVER, "Setup base shmem: %s\n", _shmem_id.c_str());
+    void* mainShmem = SharedMemory::create(_shmem_id, sizeof(SatSharedMemory));
+    _shmem.insert(ShmemObject{_shmem_id, mainShmem, sizeof(SatSharedMemory)});
+    // "placement new" operator: construct object not in the heap but in the provided chunk of memory
+    _hsm = new ((char*)mainShmem) SatSharedMemory();
+    _hsm->fSize = _f_size;
+    _hsm->aSize = _a_size;
+    _hsm->config = _config;
+    _sum_of_revision_sizes += _f_size;
 }
 
 void SatProcessAdapter::doWriteRevisions() {
@@ -95,17 +106,6 @@ void SatProcessAdapter::run() {
 
 void SatProcessAdapter::doInitialize() {
 
-    // Initialize "management" shared memory
-    //log(V4_VVER, "Setup base shmem: %s\n", _shmem_id.c_str());
-    void* mainShmem = SharedMemory::create(_shmem_id, sizeof(SatSharedMemory));
-    _shmem.insert(ShmemObject{_shmem_id, mainShmem, sizeof(SatSharedMemory)});
-    // "placement new" operator: construct object not in the heap but in the provided chunk of memory
-    _hsm = new ((char*)mainShmem) SatSharedMemory();
-    _hsm->fSize = _f_size;
-    _hsm->aSize = _a_size;
-    _hsm->config = _config;
-    _sum_of_revision_sizes += _f_size;
-
     // Allocate shared memory for formula, assumptions of initial revision
     const int* fInShmem = (const int*) createSharedMemoryBlock("formulae.0",
         sizeof(int) * _f_size, (void*)_f_lits, 0, _desc_id, true);
@@ -117,12 +117,9 @@ void SatProcessAdapter::doInitialize() {
     // Set up bi-directional pipe to and from the subprocess
     char* pipeParentToChild = (char*) createSharedMemoryBlock("pipe-parenttochild", _hsm->pipeBufSize, nullptr);
     char* pipeChildToParent = (char*) createSharedMemoryBlock("pipe-childtoparent", _hsm->pipeBufSize, nullptr);
-    {
-        auto pipe = _guard_pipe.lock();
-        pipe->reset(new BiDirectionalAnytimePipeShmem(
-            {pipeParentToChild, _hsm->pipeBufSize, true},
-            {pipeChildToParent, _hsm->pipeBufSize, true}, true));
-    }
+    _guard_pipe.lock()->reset(new BiDirectionalAnytimePipeShmem(
+        {pipeParentToChild, _hsm->pipeBufSize, true},
+        {pipeChildToParent, _hsm->pipeBufSize, true}, true));
 
     // Create SAT solving child process
     Subprocess subproc(_params, "mallob_sat_process");
@@ -130,7 +127,6 @@ void SatProcessAdapter::doInitialize() {
 
     {
         auto lock = _mtx_state.getLock();
-        _hsm->doBegin = true;
         _child_pid = res;
         _state = SolvingStates::ACTIVE;
         _initialized = true;
@@ -181,23 +177,13 @@ void SatProcessAdapter::applySolvingState() {
 }
 
 void SatProcessAdapter::doTerminateInitializedProcess() {
-    if (!_running || _hsm->doTerminate) return; // running?
-    while (!_initialized) usleep(3*1000); // wait until initialized
-    while (!_hsm->didBegin && !Process::didChildExit(_child_pid)) {
-        Process::resume(_child_pid); // Continue (resume) process.
-        usleep(3*1000); // wait until child is actually in the main loop
-    }
     _hsm->doTerminate = true; // Kindly ask child process to terminate.
-    _guard_pipe.lock()->reset(); // clean up bidirectional pipe
 }
 
 void SatProcessAdapter::collectClauses(int maxSize) {
     if (!_initialized || _state != SolvingStates::ACTIVE || _clause_collecting_stage != NONE)
         return;
-    {
-        auto pipe = _guard_pipe.lock();
-        if (*pipe) pipe.get()->writeData({maxSize}, CLAUSE_PIPE_PREPARE_CLAUSES);
-    }
+    _guard_pipe.lock().get()->writeData({maxSize}, CLAUSE_PIPE_PREPARE_CLAUSES);
     _clause_collecting_stage = QUERIED;
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
@@ -219,16 +205,14 @@ long long SatProcessAdapter::getBestFoundObjectiveCost() const {
 }
 void SatProcessAdapter::updateBestFoundSolutionCost(long long bestFoundSolutionCost) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
-    auto pipe = _guard_pipe.lock();
-    if (*pipe) pipe.get()->writeData(
+    _guard_pipe.lock().get()->writeData(
         {(int*) &bestFoundSolutionCost, (int*) ((&bestFoundSolutionCost)+1)},
         CLAUSE_PIPE_UPDATE_BEST_FOUND_OBJECTIVE_COST);
 }
 
 void SatProcessAdapter::filterClauses(int epoch, std::vector<int>&& clauses) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
-    auto pipe = _guard_pipe.lock();
-    if (*pipe) pipe.get()->writeData(std::move(clauses), {epoch},
+    _guard_pipe.lock().get()->writeData(std::move(clauses), {epoch},
         CLAUSE_PIPE_FILTER_IMPORT);
     _epoch_of_export_buffer = epoch;
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
@@ -265,29 +249,25 @@ void SatProcessAdapter::applyFilter(int epoch, std::vector<int>&& filter) {
 
 void SatProcessAdapter::digestClausesWithoutFilter(int epoch, std::vector<int>&& clauses, bool stateless) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
-    auto pipe = _guard_pipe.lock();
-    if (*pipe) pipe.get()->writeData(std::move(clauses), {epoch, stateless?1:0},
+    _guard_pipe.lock().get()->writeData(std::move(clauses), {epoch, stateless?1:0},
         CLAUSE_PIPE_DIGEST_IMPORT_WITHOUT_FILTER);
     if (_hsm->isInitialized) Process::wakeUp(_child_pid);
 }
 
 void SatProcessAdapter::returnClauses(std::vector<int>&& clauses) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
-    auto pipe = _guard_pipe.lock();
-    if (*pipe) pipe.get()->writeData(std::move(clauses), {_clause_buffer_revision}, CLAUSE_PIPE_RETURN_CLAUSES);
+    _guard_pipe.lock().get()->writeData(std::move(clauses), {_clause_buffer_revision}, CLAUSE_PIPE_RETURN_CLAUSES);
 }
 
 void SatProcessAdapter::digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>&& clauses) {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
-    auto pipe = _guard_pipe.lock();
-    if (*pipe) pipe.get()->writeData(std::move(clauses), {epochBegin, epochEnd, _clause_buffer_revision}, CLAUSE_PIPE_DIGEST_HISTORIC);
+    _guard_pipe.lock().get()->writeData(std::move(clauses), {epochBegin, epochEnd, _clause_buffer_revision}, CLAUSE_PIPE_DIGEST_HISTORIC);
 }
 
 
 void SatProcessAdapter::dumpStats() {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
-    auto pipe = _guard_pipe.lock();
-    if (*pipe) pipe.get()->writeData({}, CLAUSE_PIPE_DUMP_STATS);
+    _guard_pipe.lock().get()->writeData({}, CLAUSE_PIPE_DUMP_STATS);
     // No hard need to wake up immediately
 }
 
@@ -322,7 +302,6 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
     if (_state != SolvingStates::ACTIVE) return NORMAL;
 
     auto pipe = _guard_pipe.lock();
-    if (!*pipe) return NORMAL;
     char c = pipe.get()->pollForData();
     if (c == CLAUSE_PIPE_PREPARE_CLAUSES) {
         _collected_clauses = pipe.get()->readData(c);
@@ -368,13 +347,11 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
 
     if (_published_revision < _written_revision) {
         _published_revision = _written_revision;
-        auto pipe = _guard_pipe.lock();
-        if (*pipe) pipe.get()->writeData({_desired_revision, _published_revision}, CLAUSE_PIPE_START_NEXT_REVISION);
+        _guard_pipe.lock().get()->writeData({_desired_revision, _published_revision}, CLAUSE_PIPE_START_NEXT_REVISION);
     }
 
     if (_thread_count_update) {
-        auto pipe = _guard_pipe.lock();
-        if (*pipe) pipe.get()->writeData({_nb_threads}, CLAUSE_PIPE_SET_THREAD_COUNT);
+        _guard_pipe.lock().get()->writeData({_nb_threads}, CLAUSE_PIPE_SET_THREAD_COUNT);
         _thread_count_update = false;
     }
 
@@ -386,12 +363,13 @@ JobResult& SatProcessAdapter::getSolution() {
 }
 
 void SatProcessAdapter::waitUntilChildExited() {
-    doTerminateInitializedProcess(); // make sure that the process receives a terminate signal
     if (!_running) return;
-    while (true) {
-        // Check if child exited
-        if (Process::didChildExit(_child_pid)) return;
-        Process::resume(_child_pid);
+    while (!_initialized) { // make sure that there is a process to exit
+        usleep(10*1000); // 10 ms
+    }
+    doTerminateInitializedProcess(); // make sure that the process receives a terminate signal
+    while (!Process::didChildExit(_child_pid)) {
+        Process::resume(_child_pid); // make sure that the process isn't frozen
         usleep(10*1000); // 10ms
     }
 }
@@ -450,8 +428,7 @@ void SatProcessAdapter::crash() {
 
 void SatProcessAdapter::reduceThreadCount() {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
-    auto pipe = _guard_pipe.lock();
-    if (*pipe) pipe.get()->writeData({}, CLAUSE_PIPE_REDUCE_THREAD_COUNT);
+    _guard_pipe.lock().get()->writeData({}, CLAUSE_PIPE_REDUCE_THREAD_COUNT);
 }
 
 SatProcessAdapter::~SatProcessAdapter() {

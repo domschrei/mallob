@@ -25,10 +25,7 @@ private:
         }
     } _solver;
     std::vector<int> _lits;
-    std::vector<size_t> _weights;    
-
-    size_t _enforced_ub;
-    openwbo::Adder::vec<openwbo::Lit> _enforcing_assumptions;
+    std::vector<size_t> _weights;
 
 public:
     WarnersAdder(unsigned int nbVars, const std::vector<MaxSatInstance::ObjectiveTerm>& objective) : CardinalityEncoding(nbVars, objective),
@@ -41,17 +38,13 @@ public:
     virtual void doEncode(size_t min, size_t ub, size_t max) override {
         if (_enc.hasCreatedEncoding()) return;
         auto internalLits = _enc.convertLiterals(_lits);
-        _enc.encodeInc(&_solver, internalLits, _weights, max, _enforcing_assumptions);
-        _enforced_ub = max;
+        _enc.encode(&_solver, internalLits, _weights, max);
     }
     virtual void doEnforce(size_t bound) override {
         assert(_enc.hasCreatedEncoding());
-        if (_enforced_ub != bound) {
-            _enforcing_assumptions.clear();
-            _enc.updateInc(&_solver, bound, _enforcing_assumptions);
-            _enforced_ub = bound;
-        }
-        for (auto a : _enforcing_assumptions)
+        openwbo::Adder::vec<openwbo::Lit> assumptions;
+        _enc.updateInc(&_solver, bound, assumptions);
+        for (auto a : assumptions)
             cardinality_encoding_add_assumption(openwbo::toExternalLit(a), this);
     }
     virtual ~WarnersAdder() {}

@@ -52,7 +52,7 @@ private:
     MaxSatSearchProcedure::EncodingStrategy _encoding_strat;
     std::vector<int> _shared_lits_to_add;
 
-    float _start_time;
+    float _start_time = -1;
 
     struct InstanceUpdate {
         std::vector<int> formula;
@@ -107,7 +107,7 @@ public:
         if (_params.maxSatSolutionFile.isSet())
             writer.reset(new SolutionWriter(_instance->nbVars, _params.maxSatSolutionFile()));
 
-        _start_time = Timer::elapsedSeconds();
+        if (_start_time < 0) _start_time = Timer::elapsedSeconds();
 
         // Template for the result we will return in the end
         JobResult r;

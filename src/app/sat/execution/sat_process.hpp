@@ -110,10 +110,6 @@ private:
             false);
         LOGGER(_log, V4_VVER, "Pipes set up\n");
 
-        // Wait until everything is prepared for the solver to begin
-        while (!_hsm->doBegin) doSleep();
-        _hsm->didBegin = true;
-
         // Terminate directly?
         if (checkTerminate(engine, false)) return;
 
@@ -132,7 +128,6 @@ private:
         int lastSolvedRevision = -1;
 
         int exitStatus = 0;
-        bool terminateFromParent = false;
 
         bool collectClauses = false;
         int exportLiteralLimit;
@@ -147,7 +142,6 @@ private:
             // Terminate
             if (_hsm->doTerminate) {
                 Terminator::setTerminating();
-                terminateFromParent = true;
             }
             if (Terminator::isTerminating(true)) {
                 LOGGER(_log, V4_VVER, "DO terminate\n");
