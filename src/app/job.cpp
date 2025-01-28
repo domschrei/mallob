@@ -116,7 +116,7 @@ void Job::resume() {
     _state = ACTIVE;
     _time_of_increment_activation = Timer::elapsedSecondsCached();
     appl_resume();
-    LOG(V4_VVER, "%s : resumed solving threads\n", toStr());
+    LOG(V4_VVER, "%s : resumed solver\n", toStr());
     _time_of_last_limit_check = Timer::elapsedSecondsCached();
 }
 

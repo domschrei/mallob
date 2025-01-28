@@ -147,9 +147,10 @@ void Process::forwardTerminateToChildren() {
 }
 
 void Process::sendSignal(pid_t childpid, int signum) {
+    assert(childpid > 0);
     int result = kill(childpid, signum);
     if (result == -1) {
-        LOG(V1_WARN, "[WARN] kill -%i %i returned -1\n", signum, childpid);
+        LOG(V1_WARN, "[WARN] kill -%i %i returned errno %i\n", signum, childpid, errno);
     }
 }
 

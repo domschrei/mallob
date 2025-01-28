@@ -55,6 +55,7 @@ public:
         _shmem_id = _config.getSharedMemId(Proc::getParentPid());
         LOGGER(log, V4_VVER, "Access base shmem: %s\n", _shmem_id.c_str());
         _hsm = (SatSharedMemory*) accessMemory(_shmem_id, sizeof(SatSharedMemory));
+        _hsm->didStart = true; // signal to parent: I started properly (signal handlers etc.)
         
         _checksum = params.useChecksums() ? new Checksum() : nullptr;
 
@@ -109,8 +110,6 @@ private:
             {pipeParentToChild, _hsm->pipeBufSize, true},
             false);
         LOGGER(_log, V4_VVER, "Pipes set up\n");
-
-        _hsm->didStart = true; // signal to parent: I started properly (signal handlers etc.)
 
         // Terminate directly?
         if (checkTerminate(engine, false)) return;

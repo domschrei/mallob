@@ -65,6 +65,8 @@ private:
 
     std::atomic_bool _initialized = false;
     std::atomic_bool _terminated = false;
+    bool _in_solve_call = false;
+    int _revision_being_solved = -1;
 
     bool _found_result = false;
     JobResult _result;

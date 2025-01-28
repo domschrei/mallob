@@ -131,15 +131,16 @@ void SatProcessAdapter::doInitialize() {
     pid_t res = subproc.start();
 
     // Wait until the process is properly initialized
-    while (!_hsm->didStart && !Process::didChildExit(res))
+    while (!_hsm->didStart && !Process::didChildExit(res)) {
+        Process::resume(res);
         usleep(1000 * 10); // 10 ms
+    }
 
     // Change adapter state
     auto lock = _mtx_state.getLock();
     _child_pid = res;
     _state = SolvingStates::ACTIVE;
-    _initialized = true;
-    applySolvingState();
+    applySolvingState(true);
 }
 
 bool SatProcessAdapter::isFullyInitialized() {
@@ -171,8 +172,8 @@ void SatProcessAdapter::setSolvingState(SolvingStates::SolvingState state) {
     applySolvingState();
 
 }
-void SatProcessAdapter::applySolvingState() {
-    assert(_initialized);
+void SatProcessAdapter::applySolvingState(bool initialize) {
+    if (!initialize) assert(_initialized);
     if (_state == SolvingStates::ABORTING) {
         doTerminateInitializedProcess();
     }
@@ -182,6 +183,7 @@ void SatProcessAdapter::applySolvingState() {
     if (_state == SolvingStates::ACTIVE) {
         Process::resume(_child_pid); // Continue (resume) process.
     }
+    if (initialize) _initialized.store(true, std::memory_order_release);
 }
 
 void SatProcessAdapter::doTerminateInitializedProcess() {

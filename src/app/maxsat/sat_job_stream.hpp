@@ -26,6 +26,7 @@ private:
     bool _interrupt_set {false};
     nlohmann::json _json_result;
     bool _rejected {false};
+    std::string _expected_result_job_name;
 
 public:
     SatJobStream(const Parameters& params, APIConnector& api, JobDescription& desc,
@@ -83,10 +84,16 @@ public:
         if (!descriptionLabel.empty()) {
             copy["description-id"] = descriptionLabel;
         }
+        _expected_result_job_name = copy["name"].get<std::string>();
         _pending = true;
         _rejected = false;
         _interrupt_set = false;
         auto response = _api.submit(copy, [&](nlohmann::json& result) {
+            if (result["name"].get<std::string>() != _expected_result_job_name) {
+                LOG(V0_CRIT, "[ERROR] MAXSAT Result for unexpected job \"%s\" (expected: %s)!\n",
+                    result["name"].get<std::string>().c_str(), _expected_result_job_name.c_str());
+                abort();
+            }
             _json_result = std::move(result);
             _pending = false;
         });

@@ -84,8 +84,8 @@ private:
     GuardedData<std::unique_ptr<BiDirectionalAnytimePipeShmem>> _guard_pipe;
 
     volatile bool _running = false;
-    volatile bool _initialized = false;
     volatile bool _bg_writer_running = false;
+    std::atomic_bool _initialized {false};
     std::atomic_bool _terminate {false};
     volatile bool _destructed {false};
 
@@ -169,7 +169,7 @@ private:
     void doWriteRevisions();
     void doTerminateInitializedProcess();
     
-    void applySolvingState();
+    void applySolvingState(bool initialize = false);
     void initSharedMemory(SatProcessConfig&& config);
     void* createSharedMemoryBlock(std::string shmemSubId, size_t size, const void* data, int rev = 0, int descId = -1, bool managedInCache = false);
 
