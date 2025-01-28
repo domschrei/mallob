@@ -3,6 +3,8 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <fstream>
+#include <iterator>
 #include <unistd.h>
 #include <cstdlib>
 #include <cstdio>
@@ -20,15 +22,11 @@ void ProcessDispatcher::dispatch() {
     while (!FileUtils::exists(commandOutfile)) {
         usleep(1000);
     }
-    const auto f = fopen(commandOutfile.c_str(), "r");
-    int size;
-    fread(&size, sizeof(int), 1, f);
-    char str[size];
-    fread(str, 1, size, f);
-    fclose(f);
+    std::ifstream ifs(commandOutfile);
+    std::string command((std::istreambuf_iterator<char>(ifs)),
+                       (std::istreambuf_iterator<char>()));
+    ifs.close();
     FileUtils::rm(commandOutfile); // clean up immediately
-
-    std::string command(str, size);
 
     // Assemble arguments list
     int numArgs = 0;

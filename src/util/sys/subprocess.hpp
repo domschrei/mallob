@@ -69,21 +69,12 @@ public:
 
         // Write command to tmp file (to be read by child process)
         const std::string commandOutfile = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob.subproc_cmd_" + std::to_string(res);
-        int retval = mkfifo(commandOutfile.c_str(), 0666);
-        if (retval != 0) {
-            LOG(V0_CRIT, "[ERROR] mkfifo returned errno %i\n", (int)errno);
-            abort();
-        }
-        auto f = fopen(commandOutfile.c_str(), "w");
-        assert(f);
-        const int size = command.size();
-        int nbWritten = fwrite(&size, sizeof(int), 1, f);
-        assert(nbWritten == 1);
-        nbWritten = fwrite(command.c_str(), 1, command.size(), f);
-        assert(nbWritten == command.size());
-        fflush(f);
-        retval = fclose(f);
-        assert(retval != EOF);
+        const std::string tmpFile = commandOutfile + "~";
+        std::ofstream ofs(tmpFile);
+        ofs << command;
+        ofs.close();
+        ::rename(tmpFile.c_str(), commandOutfile.c_str());
+
         return res;
     }
 };
