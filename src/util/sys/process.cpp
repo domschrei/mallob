@@ -128,7 +128,7 @@ void Process::hardkill(pid_t childpid) {
     sendSignal(childpid, SIGKILL);
 }
 void Process::suspend(pid_t childpid) {
-    sendSignal(childpid, SIGTSTP);
+    sendSignal(childpid, SIGSTOP);
 }
 void Process::resume(pid_t childpid) {
     sendSignal(childpid, SIGCONT);

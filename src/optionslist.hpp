@@ -68,6 +68,7 @@ OPTION_GROUP(grpOutput, "output", "Output")
  OPT_STRING(solutionToFile,               "s2f", "solution-to-file",                   "",                      "Write solutions to file with provided base name + job ID")
  OPT_INT(verbosity,                       "v", "verbosity",                            2,    0, 6,              "Logging verbosity: 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB 5=DEBG")
  OPT_BOOL(zeroOnlyLogging,                "0o", "zero-only-logging",                   false,                   "Only PE of rank zero does logging")
+ OPT_STRING(tmpDirectory,                 "tmp", "tmp-directory",                      "/tmp",                  "General temporary directory to write working files into")
 
 ///////////////////////////////////////////////////////////////////////
 

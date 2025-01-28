@@ -10,15 +10,13 @@
 
 #include "util/sys/proc.hpp"
 #include "util/sys/fileutils.hpp"
+#include "util/sys/tmpdir.hpp"
 
 void ProcessDispatcher::dispatch() {
 
-    const char* tmpdirCStr = std::getenv("MALLOB_TMP_DIR");
-    const std::string tmpdir = tmpdirCStr ? tmpdirCStr : "/tmp";
-
     // Read command from tmp file
     const pid_t myPid = Proc::getPid();
-    const std::string commandOutfile = tmpdir + "/edu.kit.iti.mallob.subproc_cmd_" + std::to_string(myPid);
+    const std::string commandOutfile = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob.subproc_cmd_" + std::to_string(myPid);
     while (!FileUtils::exists(commandOutfile)) {
         usleep(1000);
     }

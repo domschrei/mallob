@@ -126,7 +126,7 @@ bool MaxSatReader::read(JobDescription& desc) {
 		// decompress via named pipe and external program call to xz
 
 		// create named pipe
-		std::string fifo = TmpDir::getGeneralTmpDir() + "/edu.kit.iti.mallob.decompress." + std::to_string(desc.getId()) + ".pipe";
+		std::string fifo = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob.decompress." + std::to_string(desc.getId()) + ".pipe";
 		int res = mkfifo(fifo.c_str(), 0666);
 		assert(res == 0);
 

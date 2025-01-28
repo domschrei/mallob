@@ -230,7 +230,7 @@ int main(int argc, char *argv[]) {
 
     // Initialize bookkeeping of child processes and signals
     Process::init(rank, params.traceDirectory());
-    TmpDir::init(rank);
+    TmpDir::init(rank, params.tmpDirectory());
 
     longStartupWarnMsg(rank, "Init'd process");
 
