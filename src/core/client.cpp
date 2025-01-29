@@ -636,7 +636,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     }
     if (_params.solutionToFile.isSet()) {
         std::ofstream file;
-        file.open(_params.solutionToFile() + "." + std::to_string(jobId), std::ofstream::out);
+        file.open(_params.solutionToFile() + "." + std::to_string(jobId) + "." + std::to_string(revision), std::ofstream::out);
         if (!file.is_open()) {
             LOG(V0_CRIT, "[ERROR] Could not open solution file\n");
         } else {
