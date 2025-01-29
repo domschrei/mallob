@@ -118,7 +118,7 @@ public:
         r.result = RESULT_UNKNOWN;
 
         // Just for debugging
-        _instance->print();
+        _instance->print(updateLayer);
 
         bool maxPreRunDone = false;
         UpdateResult updateResult;

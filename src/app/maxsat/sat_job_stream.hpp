@@ -76,6 +76,10 @@ public:
                 ofs << lit << " ";
                 if (lit == 0) ofs << std::endl;
             }
+            ofs = std::ofstream(_params.logDirectory() + "/maxsat.jobassumptions." + _json_base["name"].get<std::string>());
+            for (int lit : assumptions) {
+                ofs << lit << " 0" << std::endl;
+            }
         }
         nlohmann::json copy(_json_base);
         StaticStore<std::vector<int>>::insert(_json_base["name"].get<std::string>(), std::move(newLiterals));

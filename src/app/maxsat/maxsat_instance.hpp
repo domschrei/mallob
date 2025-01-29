@@ -41,9 +41,9 @@ struct MaxSatInstance {
     MaxSatInstance(const int* formulaData, size_t formulaSize) : formulaData(formulaData), formulaSize(formulaSize) {}
 
     // Print some nice-to-know diagnostics.
-    void print() const {
-        LOG(V2_INFO, "MAXSAT lits=%lu #o=%lu sow=%lu #uniq=%lu lb=%lu ub=%lu\n",
-            formulaSize, objective.size(), sumOfWeights, nbUniqueWeights, lowerBound, upperBound);
+    void print(int updateLayer = 0) const {
+        LOG(V2_INFO, "MAXSAT instance layer=%i lits=%lu #o=%lu sow=%lu #uniq=%lu lb=%lu ub=%lu\n",
+            updateLayer, formulaSize, objective.size(), sumOfWeights, nbUniqueWeights, lowerBound, upperBound);
         std::string o;
         for (size_t i = 0; i < objective.size(); i++) {
 

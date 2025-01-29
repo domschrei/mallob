@@ -153,9 +153,6 @@ public:
     void appendLiterals(const std::vector<int>& litsToAdd) {
         _lits_to_add.insert(_lits_to_add.end(), litsToAdd.begin(), litsToAdd.end());
     }
-    void appendAssumptions(const std::vector<int>& assumptions) {
-        _assumptions_to_set.insert(_assumptions_to_set.end(), assumptions.begin(), assumptions.end());
-    }
 
     bool isIdle() const {
         return !_solving && !_is_encoding;
@@ -299,6 +296,11 @@ public:
             {
                 std::ofstream ofs(reportFilename);
                 ofs << "MaxSAT searcher " << _label << std::endl;
+                ofs << "Internal job ID: #" << result["internal_id"].get<int>() << std::endl;
+                ofs << "Job literals: perhaps present at " << _params.logDirectory() + "/maxsat.joblits." + result["name"].get<std::string>() << std::endl;
+                ofs << "Job assumptions: perhaps present at " << _params.logDirectory() + "/maxsat.jobassumptions." + result["name"].get<std::string>() << std::endl;
+                ofs << "Found model: perhaps present at " << _params.solutionToFile() + "." + std::to_string(result["internal_id"].get<int>())
+                    + "." + std::to_string(result["internal_revision"].get<int>()) << std::endl;
                 ofs << "Enforced cost: " << _current_bound << " or lower" << std::endl;
                 ofs << "Cost obtained from model: " << cost << std::endl;
                 for (auto& term : _instance.objective) {
