@@ -295,7 +295,26 @@ public:
         }
         const size_t cost = _instance.getCostOfModel(solution);
         if (cost > _current_bound) {
-            LOG(V0_CRIT, "[ERROR] MAXSAT Returned solution for bound %lu has cost %lu! Continuing still ...\n", _current_bound, cost);
+            std::string reportFilename = _params.logDirectory() + "/erroneous-maxsat-model." + result["name"].get<std::string>();
+            {
+                std::ofstream ofs(reportFilename);
+                ofs << "MaxSAT searcher " << _label << std::endl;
+                ofs << "Enforced cost: " << _current_bound << " or lower" << std::endl;
+                ofs << "Cost obtained from model: " << cost << std::endl;
+                for (auto& term : _instance.objective) {
+                    const int termLit = term.lit;
+                    assert(std::abs(termLit) < solution.size());
+                    const int modelLit = solution[std::abs(termLit)];
+                    assert(termLit == modelLit || termLit == -modelLit);
+                    if (modelLit == termLit) {
+                        ofs << "  model literal " << modelLit << " : cost " << term.factor << " incurred" << std::endl;
+                    } else {
+                        ofs << "  model literal " << modelLit << " : no cost (" << term.factor << ") incurred" << std::endl;
+                    }
+                }
+            }
+            LOG(V0_CRIT, "[ERROR] MAXSAT Model for bound %lu has cost %lu - report written to %s - continuing ...\n",
+                _current_bound, cost, reportFilename.c_str());
         }
         if (cost < _instance.bestCost) {
             _instance.upperBound = std::min(_instance.upperBound, cost);

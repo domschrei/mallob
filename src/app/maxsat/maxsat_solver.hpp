@@ -57,13 +57,15 @@ private:
     struct InstanceUpdate {
         std::vector<int> formula;
         std::vector<std::pair<uint64_t, int>> objective;
-        int nbVars;
-        int nbReadClauses;
+        int nbVars {0};
+        int nbReadClauses {0};
         unsigned long lowerBound;
         unsigned long upperBound;
         void reset(unsigned long lowerBound, unsigned long upperBound) {
             formula.clear();
             objective.clear();
+            nbVars = 0;
+            nbReadClauses = 0;
             this->lowerBound = lowerBound;
             this->upperBound = upperBound;
         }
