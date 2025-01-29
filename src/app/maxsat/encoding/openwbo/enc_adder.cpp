@@ -28,10 +28,8 @@
  */
 
 #include <algorithm>
-#include <numeric>
 
 #include "enc_adder.hpp"
-#include "util/assert.hpp"
 
 using namespace openwbo;
 

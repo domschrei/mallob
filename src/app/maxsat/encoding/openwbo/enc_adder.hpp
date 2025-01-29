@@ -32,9 +32,7 @@
 
 #include <cmath>
 #include <cstdint>
-#include <map>
 #include <queue>
-#include <utility>
 #include <vector>
 
 #include "util/assert.hpp"

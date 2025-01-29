@@ -259,7 +259,7 @@ void SolverThread::appendRevision(int revision, size_t fSize, const int* fLits, 
         assert(_latest_revision+1 == (int)_pending_formulae.size() 
             || LOG_RETURN_FALSE("%i != %i", _latest_revision+1, _pending_formulae.size()));
         if (_in_solve_call) {
-            assert(revision > _revision_being_solved);
+            assert(revision > _active_revision);
             _solver.interrupt();
         }
     }
@@ -312,8 +312,9 @@ void SolverThread::runOnce() {
         auto asmpt = _pending_assumptions.at(revision);
         aSize = asmpt.first; aLits = asmpt.second;
         _in_solve_call = true;
-        _revision_being_solved = revision;
-        _solver.uninterrupt();
+        if (revision < _latest_revision)
+            _solver.interrupt(); // revision obsolete: stop solving immediately
+        else _solver.uninterrupt(); // make sure solver isn't in an interrupted state
     }
 
     // If necessary, translate assumption literals
@@ -345,7 +346,6 @@ void SolverThread::runOnce() {
     {
         auto lock = _state_mutex.getLock();
         _in_solve_call = false;
-        _revision_being_solved = -1;
         _solver.uninterrupt();
     }
     LOGGER(_logger, V4_VVER, "ENDSOL\n");
