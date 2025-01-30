@@ -521,6 +521,8 @@ private:
         // re-apply best known bounds from any prior attempts
         auto lb = _instance->lowerBound;
         auto ub = _instance->upperBound;
+        auto bestCost = _instance->bestCost;
+        auto bestSolution = std::move(_instance->bestSolution);
 
         // construct new instance object
         _instance.reset(new MaxSatInstance(update.formula.data(), update.formula.size()));
@@ -530,6 +532,8 @@ private:
         _desc.getAppConfiguration().updateFixedSizeEntry("__NO", (int)update.objective.size());
         _instance->lowerBound = std::max(update.lowerBound, lb);
         _instance->upperBound = std::min(update.upperBound, ub);
+        _instance->bestCost = bestCost;
+        _instance->bestSolution = std::move(bestSolution);
         tsl::robin_set<size_t> uniqueFactors;
         for (auto [weight, lit] : update.objective) {
             _instance->objective.push_back({weight, lit});
