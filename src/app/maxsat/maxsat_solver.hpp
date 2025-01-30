@@ -162,13 +162,11 @@ public:
         }
         assert(!searches.empty());
 
-        // If the best known upper bound is trivial, we first perform a solving attempt
-        // without encoding any constraints. If we know a non-trivial bound from preprocessing,
-        // we skip this and instead begin encoding it right away.
-        const bool solveWithoutBounds = _instance->upperBound == _instance->sumOfWeights
-            || _instance->objective.empty()
-            || _encoding_strat == MaxSatSearchProcedure::VIRTUAL;
-        if (solveWithoutBounds) {
+        // In some cases, it makes sense to first perform a solving attempt without constraints.
+        const bool noSolutionPresent = _instance->bestCost == ULONG_MAX;
+        const bool firstSolveWithoutBounds = _encoding_strat == MaxSatSearchProcedure::VIRTUAL
+            || _instance->objective.empty() || noSolutionPresent;
+        if (firstSolveWithoutBounds) {
             // Initial SAT call: just solve the hard clauses.
             // We just use the first specified search strategy for this task.
             MaxSatSearchProcedure* search = searches.front().get();
@@ -202,7 +200,7 @@ public:
 
         // Run the initial formula revision through ALL searches, so that everyone has the same one.
         if (searches.size() > 1) for (auto& search : searches) {
-            if (solveWithoutBounds && search == searches.front())
+            if (firstSolveWithoutBounds && search == searches.front())
                 continue; // this search has already been run once
             search->solveNonblocking();
             search->interrupt();
@@ -547,7 +545,6 @@ private:
         _instance->sumOfWeights = 0;
         for (auto term : _instance->objective) _instance->sumOfWeights += term.factor;
         _instance->upperBound = std::min(_instance->upperBound, _instance->sumOfWeights);
-        _instance->bestCost = ULONG_MAX;
         _instance->intervalSearch.reset(new IntervalSearch(_params.maxSatIntervalSkew()));
         pickEncodingStrategy();
     }

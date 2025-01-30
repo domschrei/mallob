@@ -11,13 +11,16 @@
 #include "util/sys/thread_pool.hpp"
 #include "util/sys/timer.hpp"
 
-Watchdog::Watchdog(bool enabled, int checkIntervalMillis, bool useThreadPool) {
+Watchdog::Watchdog(bool enabled, int checkIntervalMillis, bool useThreadPool, std::function<void()> customAbortFunction) {
     if (!enabled) return;
 
     reset(Timer::elapsedSeconds());
     auto parentTid = Proc::getTid();
 
-    auto runnable = [&, useThreadPool, parentTid, checkIntervalMillis]() {
+    _abort_function = [parentTid]() {Process::writeTrace(parentTid);};
+    if (customAbortFunction) _abort_function = customAbortFunction;
+
+    auto runnable = [&, useThreadPool, checkIntervalMillis]() {
         if (!useThreadPool) Proc::nameThisThread("Watchdog");
         _worker_pthread_id = Process::getPthreadId();
 
@@ -28,7 +31,7 @@ Watchdog::Watchdog(bool enabled, int checkIntervalMillis, bool useThreadPool) {
                 if (_abort_period_millis > 0 && elapsed > _abort_period_millis) {   
                     LOG(V0_CRIT, "[ERROR] Watchdog: TIMEOUT (last=%.3f activity=%i recvtag=%i sendtag=%i)\n", 
                         0.001*_last_reset_millis, _activity, _activity_recv_tag, _activity_send_tag);
-                    Process::writeTrace(parentTid);
+                    _abort_function();
                     Logger::getMainInstance().flush();
                     abort();
                 }

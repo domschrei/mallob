@@ -39,8 +39,11 @@ private:
     std::future<void> _fut_thread_pool;
     pthread_t _worker_pthread_id {0};
 
+    std::function<void()> _abort_function;
+
 public:
-    Watchdog(bool enabled, int checkIntervalMillis, bool useThreadPool = false);
+    Watchdog(bool enabled, int checkIntervalMillis, bool useThreadPool = false,
+        std::function<void()> customAbortFunction = std::function<void()>());
     ~Watchdog();
     void setWarningPeriod(int periodMillis);
     void setAbortPeriod(int periodMillis);

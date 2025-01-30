@@ -107,10 +107,6 @@ void SatProcessAdapter::run() {
 
 void SatProcessAdapter::doInitialize() {
 
-    Watchdog watchdog(true, 200, true);
-    watchdog.setWarningPeriod(200);
-    watchdog.setAbortPeriod(5'000);
-
     // Allocate shared memory for formula, assumptions of initial revision
     const int* fInShmem = (const int*) createSharedMemoryBlock("formulae.0",
         sizeof(int) * _f_size, (void*)_f_lits, 0, _desc_id, true);
@@ -129,6 +125,15 @@ void SatProcessAdapter::doInitialize() {
     // Create SAT solving child process
     Subprocess subproc(_params, "mallob_sat_process");
     pid_t res = subproc.start();
+
+    // Set up a watchdog
+    auto thisTid = Proc::getTid();
+    Watchdog watchdog(true, 500, true, [&, childPid=res]() {
+        // In case of a freeze, trace the child process itself
+        Process::writeTrace(childPid);
+    });
+    watchdog.setWarningPeriod(500);
+    watchdog.setAbortPeriod(10'000);
 
     // Wait until the process is properly initialized
     while (!_hsm->didStart && !Process::didChildExit(res)) {

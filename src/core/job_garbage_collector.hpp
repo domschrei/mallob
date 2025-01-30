@@ -62,9 +62,11 @@ public:
     }
 
     ~JobGarbageCollector() {
-        _worker.stopWithoutWaiting();
+        {
+            auto lock = _mtx.getLock();
+            _worker.stopWithoutWaiting();
+        }
         _cond_var.notify();
-        _worker.stop();
     }
 
 private:

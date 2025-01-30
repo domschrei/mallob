@@ -650,7 +650,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
             for (auto& modelString : modelStrings)
                 LOG_OMIT_PREFIX(V0_CRIT, modelString.c_str());
         }
-        {
+        if (_params.proofOutputFile.isSet()) {
             std::ofstream resultFile(".mallob_result");
             std::string resultCodeStr = std::to_string(resultCode);
             if (resultFile.is_open()) resultFile.write(resultCodeStr.c_str(), resultCodeStr.size());
