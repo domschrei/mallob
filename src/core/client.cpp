@@ -618,11 +618,19 @@ void Client::handleSendJobResult(MessageHandle& handle) {
 
     std::string resultString = "s " + resultCodeString + "\n";
     std::vector<std::string> modelStrings;
-    if ((_params.solutionToFile.isSet() || (_params.monoFilename.isSet() && !_params.omitSolution() && jobId==_mono_job_id)) 
-            && (resultCode == RESULT_SAT || resultCode == RESULT_OPTIMUM_FOUND)) {
+    // Decide whether we need to construct a string representing a solution.
+    // - In "mono" mode of operation, we only want the original job, not a secondary one.
+    bool primaryJob = !_params.monoFilename.isSet() || jobId == _mono_job_id;
+    bool constructSolutionStrings = primaryJob;
+    // - Only if the result actually encompasses a solution.
+    constructSolutionStrings &= resultCode == RESULT_SAT || resultCode == RESULT_OPTIMUM_FOUND;
+    // - Some sort of output is in fact desired by the user.
+    constructSolutionStrings &= _params.solutionToFile.isSet() || (jobId == _mono_job_id && !_params.omitSolution());
+    if (constructSolutionStrings) {
 
         // Disable all watchdogs to avoid crashes while printing a huge model
-        Watchdog::disableGlobally();
+        if (jobResult.getSolutionSize() > 1'000'000)
+            Watchdog::disableGlobally();
 
         auto json = app_registry::getJobSolutionFormatter(desc.getApplicationId())(_params, jobResult);
         if (json.is_array() && (json.size()==0 || json[0].is_string())) {
@@ -634,7 +642,8 @@ void Client::handleSendJobResult(MessageHandle& handle) {
             modelStrings.push_back(json.dump()+"\n");
         }
     }
-    if (_params.solutionToFile.isSet()) {
+    if (constructSolutionStrings && _params.solutionToFile.isSet()) {
+        // Write solution to file
         std::ofstream file;
         file.open(_params.solutionToFile() + "." + std::to_string(jobId) + "." + std::to_string(revision), std::ofstream::out);
         if (!file.is_open()) {
@@ -644,9 +653,10 @@ void Client::handleSendJobResult(MessageHandle& handle) {
             for (auto& modelString : modelStrings) file << modelString;
             file.close();
         }
-    } else if (_params.monoFilename.isSet() && jobId==_mono_job_id) {
+    } else if (jobId == _mono_job_id) {
+        // Mono job: log solution to stdout, write result hint if doing proof production
         LOG_OMIT_PREFIX(V0_CRIT, resultString.c_str());
-        if (!_params.omitSolution()) {
+        if (constructSolutionStrings) {
             for (auto& modelString : modelStrings)
                 LOG_OMIT_PREFIX(V0_CRIT, modelString.c_str());
         }

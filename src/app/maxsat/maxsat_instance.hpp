@@ -19,6 +19,7 @@ struct MaxSatInstance {
         size_t factor;
         int lit;
     };
+    int preprocessLayer;
     // objective function as a linear combination of literals
     std::vector<ObjectiveTerm> objective;
     // size of the raw C array _f_data
@@ -33,6 +34,7 @@ struct MaxSatInstance {
 
     // the best found satisfying assignment so far
     std::vector<int> bestSolution;
+    int bestSolutionPreprocessLayer = -1;
     // the cost associated with the best found satisfying assignment so far
     size_t bestCost;
 

@@ -59,15 +59,17 @@ private:
         std::vector<std::pair<uint64_t, int>> objective;
         int nbVars {0};
         int nbReadClauses {0};
+        int preprocessLayer {0};
         unsigned long lowerBound;
         unsigned long upperBound;
-        void reset(unsigned long lowerBound, unsigned long upperBound) {
+        void prepareForNext(unsigned long lowerBound, unsigned long upperBound) {
             formula.clear();
             objective.clear();
             nbVars = 0;
             nbReadClauses = 0;
             this->lowerBound = lowerBound;
             this->upperBound = upperBound;
+            preprocessLayer++;
         }
     } _instance_update;
     struct UpdateResult {
@@ -191,7 +193,7 @@ public:
                     || _instance->lowerBound == _instance->bestCost) {
                 // the solution is already proven optimal
                 r.result = RESULT_OPTIMUM_FOUND;
-                r.setSolution(std::move(_instance->bestSolution));
+                r.setSolution(getSolutionToOriginalProblem());
                 LOG(V2_INFO, "MAXSAT OPTIMAL COST %lu\n", _instance->bestCost);
                 Logger::getMainInstance().flush();
                 return r;
@@ -387,6 +389,8 @@ public:
                         assert(_instance->bestCost == _instance->upperBound);
                         r.result = RESULT_OPTIMUM_FOUND;
                     } else r.result = RESULT_SAT;
+                    LOG(V4_VVER, "MAXSAT once again trying to stop all searches ...\n");
+                    tryStopAllSearches(searches);
                 }
             }
         } else if (_instance->bestCost < ULONG_MAX) {
@@ -394,7 +398,7 @@ public:
             r.result = RESULT_SAT;
         }
         LOG(V2_INFO, "MAXSAT %s COST %lu\n", r.result == RESULT_OPTIMUM_FOUND ? "OPTIMAL" : "BEST KNOWN", _instance->upperBound);
-        r.setSolution(std::move(_instance->bestSolution));
+        r.setSolution(getSolutionToOriginalProblem());
         if (r.result == RESULT_OPTIMUM_FOUND && writer) writer->concludeOptimal();
         Logger::getMainInstance().flush();
 
@@ -487,7 +491,8 @@ private:
 #if MALLOB_USE_MAXPRE == 1
     void launchImprovingMaxPreRun(int updateLayer, bool& runDone, UpdateResult& res) {
         assert(!runDone);
-        _instance_update.reset(_instance->lowerBound, _instance->upperBound);
+
+        _instance_update.prepareForNext(_instance->lowerBound, _instance->upperBound);
         LOG(V3_VERB, "MAXSAT calling MaxPRE concurrently\n");
         _fut_instance_update = ProcessWideThreadPool::get().addTask([&, updateLayer]() {
             auto& update = _instance_update;
@@ -496,9 +501,9 @@ private:
             parser->preprocess(_params.maxPreTechniquesPost(), 0, _params.maxPreTimeoutPost() * std::pow(2, updateLayer));
             const float timePreprocess = Timer::elapsedSeconds() - time;
             parser->getInstance(update.formula, update.objective, update.nbVars, update.nbReadClauses);
-            LOG(V3_VERB, "MAXSAT MaxPRE' stat lits:%i vars:%i cls:%i obj:%lu lb:%lu ub:%lu\n",
-                update.formula.size(), update.nbVars, update.nbReadClauses, update.objective.size(),
-                parser->get_lb(), parser->get_ub());
+            LOG(V3_VERB, "MAXSAT MaxPRE layer=%i stat lits:%i vars:%i cls:%i obj:%lu lb:%lu ub:%lu\n",
+                update.preprocessLayer, update.formula.size(), update.nbVars, update.nbReadClauses,
+                update.objective.size(), parser->get_lb(), parser->get_ub());
             LOG(V3_VERB, "MAXSAT MaxPRE' time preprocess:%.3f\n", timePreprocess);
             if (update.formula.size() == 0 && update.nbVars == 0) {
                 // Error in MaxPRE
@@ -518,11 +523,12 @@ private:
 
     void updateInstance(InstanceUpdate& update) {
 
-        // re-apply best known bounds from any prior attempts
+        // remember important fields from any prior attempts
         auto lb = _instance->lowerBound;
         auto ub = _instance->upperBound;
         auto bestCost = _instance->bestCost;
         auto bestSolution = std::move(_instance->bestSolution);
+        int preprocessorLayerOfBestSolution = _instance->bestSolutionPreprocessLayer;
 
         // construct new instance object
         _instance.reset(new MaxSatInstance(update.formula.data(), update.formula.size()));
@@ -532,8 +538,10 @@ private:
         _desc.getAppConfiguration().updateFixedSizeEntry("__NO", (int)update.objective.size());
         _instance->lowerBound = std::max(update.lowerBound, lb);
         _instance->upperBound = std::min(update.upperBound, ub);
+        _instance->preprocessLayer = update.preprocessLayer;
         _instance->bestCost = bestCost;
         _instance->bestSolution = std::move(bestSolution);
+        _instance->bestSolutionPreprocessLayer = preprocessorLayerOfBestSolution;
         tsl::robin_set<size_t> uniqueFactors;
         for (auto [weight, lit] : update.objective) {
             _instance->objective.push_back({weight, lit});
@@ -633,5 +641,19 @@ private:
                 --it;
             }
         }
+    }
+
+    std::vector<int> getSolutionToOriginalProblem() {
+#if MALLOB_USE_MAXPRE == 1
+        auto parser = StaticMaxSatParserStore::get(_desc.getId());
+        std::vector<int> sol = parser->reconstruct(_instance->bestSolution,
+            _instance->bestSolutionPreprocessLayer, true, 1);
+#else
+        std::vector<int> sol = _instance->bestSolution;
+#endif
+        sol[0] = sol.size();
+        sol.resize(sol.size() + 2);
+        * (unsigned long*) (sol.data()+sol.size()-2) = _instance->bestCost;
+        return sol;
     }
 };

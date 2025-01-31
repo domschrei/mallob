@@ -322,6 +322,7 @@ public:
             _instance.upperBound = std::min(_instance.upperBound, cost);
             _instance.bestCost = cost;
             _instance.bestSolution = solution;
+            _instance.bestSolutionPreprocessLayer = _instance.preprocessLayer;
             LOG(V2_INFO, "MAXSAT %s Bound %lu solved with cost %lu - new bounds: (%lu,%lu)\n",
                 _label.c_str(), _current_bound, _instance.bestCost, _instance.lowerBound, _instance.upperBound);
             if (_sol_writer) _sol_writer->appendSolution(cost, solution);

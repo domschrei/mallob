@@ -21,26 +21,22 @@ void register_mallob_app_maxsat() {
         },
         // Job solution formatter
         [](const Parameters& params, const JobResult& result) {
-            // TODO This is just the SAT model formatting so far. Anything else?
             auto json = nlohmann::json::array();
             std::stringstream modelString;
-            int numAdded = 0;
             auto solSize = result.getSolutionSize();
-            for (size_t x = 1; x < solSize; x++) {
-                if (numAdded == 0) {
-                    modelString << "v ";
-                }
-                modelString << std::to_string(result.getSolution(x)) << " ";
-                numAdded++;
-                bool done = x+1 == solSize;
-                if (numAdded == 20 || done) {
-                    if (done) modelString << "0";
-                    modelString << "\n";
-                    json.push_back(modelString.str());
-                    modelString = std::stringstream();
-                    numAdded = 0;
-                }
+            int modelSize = result.getSolution(0);
+            assert(modelSize > 0);
+            assert(solSize == modelSize + 2);
+            int costAsTwoInts[2] = {result.getSolution(modelSize), result.getSolution(modelSize+1)};
+            unsigned long cost = * (unsigned long*) costAsTwoInts;
+            modelString << "o " << cost << "\nv ";
+            for (size_t x = 1; x < modelSize; x++) {
+                int lit = result.getSolution(x);
+                assert(std::abs(lit) == x);
+                modelString << std::to_string(lit > 0 ? 1 : 0);
             }
+            modelString << "\n";
+            json.push_back(modelString.str());
             return json;
         }
     );
