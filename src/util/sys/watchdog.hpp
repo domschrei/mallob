@@ -33,7 +33,9 @@ private:
     std::atomic_int _abort_period_millis = 0;
 
     static std::atomic_bool _globally_enabled;
-    bool _active {true};
+    volatile bool _active {true};
+    volatile bool _running {false};
+    volatile bool _initialized {false};
 
     BackgroundWorker _worker;
     std::future<void> _fut_thread_pool;

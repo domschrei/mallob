@@ -13,7 +13,7 @@
 class BackgroundWorker {
 
 private:
-    bool _terminate = false;
+    volatile bool _terminate = false;
     std::thread _thread;
 
 public:

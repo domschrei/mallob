@@ -93,9 +93,11 @@ public:
 #if MALLOB_USE_MAXPRE == 1
         // join with background MaxPRE preprocessor 
         if (_fut_instance_update.valid()) {
-            LOG(V2_INFO, "MAXSAT interrupt MaxPRE asynchronously\n");
-            StaticMaxSatParserStore::get(_desc.getId())->interruptAsynchronously();
+            int jobId = _desc.getId();
+            LOG(V2_INFO, "MAXSAT interrupt MaxPRE of #%i asynchronously\n", jobId);
+            StaticMaxSatParserStore::get(jobId)->interruptAsynchronously();
             _fut_instance_update.get();
+            LOG(V2_INFO, "MAXSAT MaxPRE stopped\n");
         }
         // delete MaxPRE preprocessor
         StaticMaxSatParserStore::erase(_desc.getId());
@@ -397,7 +399,7 @@ public:
             // we did find *some* solution.
             r.result = RESULT_SAT;
         }
-        LOG(V2_INFO, "MAXSAT %s COST %lu\n", r.result == RESULT_OPTIMUM_FOUND ? "OPTIMAL" : "BEST KNOWN", _instance->upperBound);
+        LOG(V2_INFO, "MAXSAT %s COST %lu\n", r.result == RESULT_OPTIMUM_FOUND ? "OPTIMAL" : "BEST FOUND", _instance->bestCost);
         r.setSolution(getSolutionToOriginalProblem());
         if (r.result == RESULT_OPTIMUM_FOUND && writer) writer->concludeOptimal();
         Logger::getMainInstance().flush();

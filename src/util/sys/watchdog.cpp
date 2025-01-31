@@ -23,6 +23,7 @@ Watchdog::Watchdog(bool enabled, int checkIntervalMillis, bool useThreadPool, st
     auto runnable = [&, useThreadPool, checkIntervalMillis]() {
         if (!useThreadPool) Proc::nameThisThread("Watchdog");
         _worker_pthread_id = Process::getPthreadId();
+        _initialized = true;
 
         while (_worker.continueRunning()) {
             int timeMillis = (int) (1000*Timer::elapsedSeconds());
@@ -47,6 +48,7 @@ Watchdog::Watchdog(bool enabled, int checkIntervalMillis, bool useThreadPool, st
         }
     };
 
+    _running = true;
     if (useThreadPool) {
         _fut_thread_pool = ProcessWideThreadPool::get().addTask(std::move(runnable));
     } else {
@@ -55,9 +57,10 @@ Watchdog::Watchdog(bool enabled, int checkIntervalMillis, bool useThreadPool, st
 }
 
 Watchdog::~Watchdog() {
+    if (!_running) return;
     stopWithoutWaiting();
-    if (_worker_pthread_id != 0)
-        Process::wakeUpThread(_worker_pthread_id);
+    while (!_initialized) usleep(1000);
+    Process::wakeUpThread(_worker_pthread_id);
     if (_fut_thread_pool.valid()) _fut_thread_pool.get();
 }
 

@@ -166,7 +166,6 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     }
 
     // Main loop
-    PeriodicEvent<500> threadPoolCheck;
     while (true) {
 
         // update cached timing
@@ -178,10 +177,6 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
 
         // Advance message queue and run callbacks for done messages
         MyMpi::getMessageQueue().advance();
-
-        // Check for congestion in the thread pool
-        if (threadPoolCheck.ready(Timer::elapsedSecondsCached()))
-            ProcessWideThreadPool::get().resizeIfNeeded();
 
         // Check termination
         if (distTerm.triggered())

@@ -100,8 +100,9 @@ private:
             // Free each job
             for (Job* job : copy) {
                 int id = job->getId();
-                LOGGER(lg, V4_VVER, "DELETE #%i\n", id);
+                LOGGER(lg, V5_DEBG, "DELETE #%i\n", id);
                 delete job;
+                LOGGER(lg, V4_VVER, "DELETED #%i\n", id);
                 Logger::getMainInstance().mergeJobLogs(id);
                 _num_stored_jobs--;
             }
