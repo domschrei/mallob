@@ -653,10 +653,11 @@ void Client::handleSendJobResult(MessageHandle& handle) {
             for (auto& modelString : modelStrings) file << modelString;
             file.close();
         }
-    } else if (jobId == _mono_job_id) {
+    }
+    if (jobId == _mono_job_id) {
         // Mono job: log solution to stdout, write result hint if doing proof production
         LOG_OMIT_PREFIX(V0_CRIT, resultString.c_str());
-        if (constructSolutionStrings) {
+        if (constructSolutionStrings && !_params.solutionToFile.isSet()) {
             for (auto& modelString : modelStrings)
                 LOG_OMIT_PREFIX(V0_CRIT, modelString.c_str());
         }
