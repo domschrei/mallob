@@ -195,7 +195,7 @@ public:
                     || _instance->lowerBound == _instance->bestCost) {
                 // the solution is already proven optimal
                 r.result = RESULT_OPTIMUM_FOUND;
-                r.setSolution(getSolutionToOriginalProblem());
+                r.setSolution(getSolutionToOriginalProblem(false));
                 LOG(V2_INFO, "MAXSAT OPTIMAL COST %lu\n", _instance->bestCost);
                 Logger::getMainInstance().flush();
                 return r;
@@ -400,7 +400,7 @@ public:
             r.result = RESULT_SAT;
         }
         LOG(V2_INFO, "MAXSAT %s COST %lu\n", r.result == RESULT_OPTIMUM_FOUND ? "OPTIMAL" : "BEST FOUND", _instance->bestCost);
-        r.setSolution(getSolutionToOriginalProblem());
+        r.setSolution(getSolutionToOriginalProblem(r.result != RESULT_OPTIMUM_FOUND));
         if (r.result == RESULT_OPTIMUM_FOUND && writer) writer->concludeOptimal();
         Logger::getMainInstance().flush();
 
@@ -645,17 +645,22 @@ private:
         }
     }
 
-    std::vector<int> getSolutionToOriginalProblem() {
+    std::vector<int> getSolutionToOriginalProblem(bool recountCost) {
 #if MALLOB_USE_MAXPRE == 1
         auto parser = StaticMaxSatParserStore::get(_desc.getId());
+        size_t cost = _instance->bestCost;
         std::vector<int> sol = parser->reconstruct(_instance->bestSolution,
+            recountCost ? &cost : nullptr,
             _instance->bestSolutionPreprocessLayer, true, 1);
+        if (recountCost)
+            LOG(V2_INFO, "MAXSAT final cost recount: %lu -> %lu\n", _instance->bestCost, cost);
 #else
         std::vector<int> sol = _instance->bestSolution;
+        size_t cost = _instance->bestCost;
 #endif
         sol[0] = sol.size();
         sol.resize(sol.size() + 2);
-        * (unsigned long*) (sol.data()+sol.size()-2) = _instance->bestCost;
+        * (unsigned long*) (sol.data()+sol.size()-2) = cost;
         return sol;
     }
 };

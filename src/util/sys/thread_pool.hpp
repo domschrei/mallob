@@ -38,8 +38,7 @@ private:
     ConditionVariable _job_queue_cond_var;
     volatile bool _terminate = false;
 
-    std::atomic_int _nb_pending_tasks {0};
-    float _last_enqueue {0};
+    std::atomic_int _nb_idle_threads {0};
 
 public:
     ThreadPool(size_t size) : _threads(size) {
@@ -49,9 +48,13 @@ public:
         _checker_thread = std::thread([&]() {
             _checker_thread_tid = Process::getPthreadId();
             while (!_terminate) {
-                if (_nb_pending_tasks.load(std::memory_order_relaxed) > 0)
-                    resizeIfNeeded();
-                usleep(1000*100); // will be interrupted as needed
+                usleep(1000*500); // will be interrupted as needed
+                bool allBusy;
+                {
+                    auto lock = _job_queue_mutex.getLock();
+                    allBusy = _nb_idle_threads.load(std::memory_order_relaxed) == 0;
+                }
+                if (allBusy) increaseSize();
             }
         });
         while (_checker_thread_tid == 0) {} // wait until initialized
@@ -71,24 +74,21 @@ public:
             auto lock = _job_queue_mutex.getLock();
             _job_queue.push_back(std::move(r));
             future = _job_queue.back().promise.get_future();
-            _last_enqueue = Timer::elapsedSeconds();
-            _nb_pending_tasks++;
         }
         _job_queue_cond_var.notify();
-        Process::wakeUpThread(_checker_thread_tid);
+        if (_nb_idle_threads.load(std::memory_order_relaxed) <= 1)
+            Process::wakeUpThread(_checker_thread_tid);
         return future;
     }
 
-    void resizeIfNeeded() {
-        auto lock = _job_queue_mutex.getLock();
-        if (_job_queue.empty()) return;
-        if (Timer::elapsedSeconds()-_last_enqueue < 0.1f) return;
-        // a task has been pending for at least 0.1s
+    void increaseSize() {
         int priorSize = _threads.size();
         int newSize = std::max(priorSize+1, (int) (priorSize*1.25));
         LOG(V4_VVER, "Grow thread pool (%i -> %i)\n", priorSize, newSize);
-        while (_threads.size() < newSize)
+        while (_threads.size() < newSize) {
+            auto lock = _job_queue_mutex.getLock();
             _threads.emplace_back([&, i=_threads.size()]() {runThread(i);});
+        }
     }
 
 private:
@@ -100,10 +100,11 @@ private:
         while (!_terminate) {
             {
                 auto lock = _job_queue_mutex.getLock();
+                _nb_idle_threads++;
                 _job_queue_cond_var.waitWithLockedMutex(lock, [&]() {return !_job_queue.empty();});
+                _nb_idle_threads--;
                 r = std::move(_job_queue.front());
                 _job_queue.pop_front();
-                _nb_pending_tasks--;
             }
             r.function();
             r.promise.set_value();
