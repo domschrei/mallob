@@ -147,6 +147,7 @@ bool MaxSatReader::read(JobDescription& desc) {
 	std::shared_ptr<maxPreprocessor::ParserInterface> parser;
 	if (_params.maxPre()) {
 		parser = StaticMaxSatParserStore::get(desc.getId());
+		parser->setTmpDirectory(_params.logDirectory());
 		std::ifstream ifs {_filename};
 		float time = Timer::elapsedSeconds();
 		int res = parser->read_file_init_interface(ifs);

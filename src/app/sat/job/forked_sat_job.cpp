@@ -348,7 +348,7 @@ void ForkedSatJob::startDestructThreadIfNecessary() {
         _destruction = ProcessWideThreadPool::get().addTask([this]() {
             Watchdog watchdog(true, 1'000, true);
             watchdog.setWarningPeriod(1'000);
-            watchdog.setAbortPeriod(5'000);
+            watchdog.setAbortPeriod(30'000);
             _solver->waitUntilChildExited();
             watchdog.reset();
             _solver->freeSharedMemory();
