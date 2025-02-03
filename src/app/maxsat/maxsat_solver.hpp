@@ -159,7 +159,7 @@ public:
             // If everybody uses their own encoder, we can still put all of them in the same cross-sharing group
             // due to the consistent naming of variables across all encoders.
             if (!_shared_encoder) {
-                searches.back()->setGroupId("consistent-logic-" + std::to_string(updateLayer), 1, _instance->nbVars);
+                searches.back()->setGroupId("consistent-logic-" + std::to_string(updateLayer)/*, 1, _instance->nbVars*/);
             }
 
             if (writer) searches.back()->setSolutionWriter(writer);
@@ -195,10 +195,13 @@ public:
                     || _instance->lowerBound == _instance->bestCost) {
                 // the solution is already proven optimal
                 r.result = RESULT_OPTIMUM_FOUND;
-                r.setSolution(getSolutionToOriginalProblem(false));
+                r.setSolution(reconstructSolutionToOriginalProblem(false));
                 LOG(V2_INFO, "MAXSAT OPTIMAL COST %lu\n", _instance->bestCost);
                 Logger::getMainInstance().flush();
                 return r;
+            } else {
+                // Recount the solution cost to get the most accurate possible bound
+                (void) reconstructSolutionToOriginalProblem(true);
             }
         }
 
@@ -399,8 +402,8 @@ public:
             // we did find *some* solution.
             r.result = RESULT_SAT;
         }
+        r.setSolution(reconstructSolutionToOriginalProblem(r.result != RESULT_OPTIMUM_FOUND));
         LOG(V2_INFO, "MAXSAT %s COST %lu\n", r.result == RESULT_OPTIMUM_FOUND ? "OPTIMAL" : "BEST FOUND", _instance->bestCost);
-        r.setSolution(getSolutionToOriginalProblem(r.result != RESULT_OPTIMUM_FOUND));
         if (r.result == RESULT_OPTIMUM_FOUND && writer) writer->concludeOptimal();
         Logger::getMainInstance().flush();
 
@@ -645,15 +648,18 @@ private:
         }
     }
 
-    std::vector<int> getSolutionToOriginalProblem(bool recountCost) {
+    std::vector<int> reconstructSolutionToOriginalProblem(bool recountCost) {
 #if MALLOB_USE_MAXPRE == 1
         auto parser = StaticMaxSatParserStore::get(_desc.getId());
         size_t cost = _instance->bestCost;
         std::vector<int> sol = parser->reconstruct(_instance->bestSolution,
             recountCost ? &cost : nullptr,
             _instance->bestSolutionPreprocessLayer, true, 1);
-        if (recountCost)
-            LOG(V2_INFO, "MAXSAT final cost recount: %lu -> %lu\n", _instance->bestCost, cost);
+        if (recountCost) {
+            LOG(V2_INFO, "MAXSAT MAXPRE cost recount: %lu -> %lu\n", _instance->bestCost, cost);
+            _instance->bestCost = cost;
+            _instance->upperBound = std::min(_instance->upperBound, cost);
+        }
 #else
         std::vector<int> sol = _instance->bestSolution;
         size_t cost = _instance->bestCost;
