@@ -301,6 +301,109 @@ void Adder::encodeInc(Solver *SC, vec<Lit> &lits, vec<uint64_t> &coeffs,
   hasEncoding = true;
 }
 
+
+void Adder::encodeBitwiseAssumableBoundConstraint(Solver *SC, vec<Lit> &bitLitsOfCountedBound, vec<Lit> &bitLitsOfEnforcedBound) {
+  assert(bitLitsOfCountedBound.size() == bitLitsOfEnforcedBound.size());
+  assert(bitLitsOfCountedBound.size() == _buckets.size());
+
+  // Encode equality variables for each bit position
+  vec<Lit> equalityLits;
+  for (int bitPos = 0; bitPos < bitLitsOfCountedBound.size(); ++bitPos) {
+    // If the corresponding literal is undefined, we skip the bit position.
+    if (bitLitsOfCountedBound[bitPos] == lit_Undef) {
+      equalityLits.push_back(lit_Undef);
+      continue;
+    }
+    assert(bitLitsOfEnforcedBound[bitPos] != lit_Undef);
+
+    Lit litCounted = bitLitsOfCountedBound[bitPos];
+    Lit litEnforced = bitLitsOfEnforcedBound[bitPos];
+
+    // Define the variable saying that "the counted bit equals the enforced one"
+    // (actually we only need the necessary conditions, not the sufficient ones)
+    Lit litEqualBits = mkLit(SC->freshVariable() - 1, false);
+    addTernaryClause(SC, litCounted, litEnforced, litEqualBits);
+    addTernaryClause(SC, ~litCounted, ~litEnforced, litEqualBits);
+    //addTernaryClause(SC, ~litEqualBits, litCounted, ~litEnforced);
+    //addTernaryClause(SC, ~litEqualBits, ~litCounted, litEnforced);
+    equalityLits.push_back(litEqualBits);
+  }
+
+  // Encode the actual "less than or equals" w.r.t. the bitwise assumable bound.
+  for (int bitPos = 0; bitPos < bitLitsOfCountedBound.size(); ++bitPos) {
+    // If the corresponding literal is undefined, we skip the bit position.
+    if (bitLitsOfCountedBound[bitPos] == lit_Undef) {
+      equalityLits.push_back(lit_Undef);
+      continue;
+    }
+
+    vec<Lit> clauseToAdd;
+
+    // "If the enforced bit at this position is 0 ..."
+    clauseToAdd.push_back(bitLitsOfEnforcedBound[bitPos]);
+
+    // For each larger (i.e., more significant) bit position:
+    for (int otherBitPos = bitPos + 1; otherBitPos < bitLitsOfCountedBound.size(); ++otherBitPos) {
+      // Undefined literal at the larger position?
+      if (bitLitsOfCountedBound[otherBitPos] == lit_Undef) {
+        continue;
+      }
+      // "And if the counted and the enforced bit at that larger position are the same ..."
+      clauseToAdd.push_back(~equalityLits[otherBitPos]);
+    }
+
+    // "... then the counted bit at this position must be 0."
+    clauseToAdd.push_back(~bitLitsOfCountedBound[bitPos]);
+
+    addClause(SC, clauseToAdd);
+  }
+}
+
+void Adder::encodeWithBitwiseAssumableBounds(Solver *SC, const vec<Lit> &lits, const vec<uint64_t> &coeffs) {
+
+  _output.clear();
+
+  // Maximum: sum of weights.
+  uint64_t rhs = 0;
+  for (auto coeff : coeffs) rhs += coeff;
+
+  uint64_t nb = ld64(rhs); // number of bits
+  Lit u = lit_Undef;
+
+  // Build adder, with the output bits set in _output.
+  for (int iBit = 0; iBit < nb; ++iBit) {
+    _buckets.push_back(std::queue<Lit>());
+    _output.push_back(u);
+    for (int iVar = 0; iVar < lits.size(); ++iVar) {
+      if (((((int64_t)1) << iBit) & coeffs[iVar]) != 0)
+        _buckets.back().push(lits[iVar]);
+    }
+  }
+  adderTree(SC, _buckets, _output);
+
+  // Introduce new variables to later enforce the bits of the counted cost.
+  _enforced_bound_lits.clear();
+  for (int pos = 0; pos < _buckets.size(); ++pos)
+    _enforced_bound_lits.push_back(mkLit(SC->freshVariable() - 1, false));
+
+  // Encode the bound constraint relative to the new variables, which can be assumed by the user.
+  encodeBitwiseAssumableBoundConstraint(SC, _output, _enforced_bound_lits);
+  hasEncoding = true;
+}
+
+std::vector<Lit> Adder::enforceBoundBitwise(Solver *SC, uint64_t ub) {
+  std::vector<Lit> assumptions;
+  // Get bit representation of the bound
+  std::vector<uint64_t> bits;
+  numToBits(bits, _buckets.size(), ub);
+  // Enforce the bits as individual assumptions
+  for (int bitPos = 0; bitPos < _buckets.size(); ++bitPos) {
+    if (bits[bitPos]) continue; // actually don't need to enforce the "1" bits
+    assumptions.push_back(~_enforced_bound_lits[bitPos]);
+  }
+  return assumptions;
+}
+
 void Adder::updateInc(Solver *SC, uint64_t rhs, vec<Lit> &assumptions) {
 
   std::vector<uint64_t> kBits;

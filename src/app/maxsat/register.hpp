@@ -4,6 +4,7 @@
 #include "app/app_message_subscription.hpp"
 #include "app/app_registry.hpp"
 #include "app/maxsat/maxsat_solver.hpp"
+#include "app/sat/job/sat_constants.h"
 #include "data/job_description.hpp"
 #include "interface/api/api_connector.hpp"
 #include "parse/maxsat_reader.hpp"
@@ -22,8 +23,11 @@ void register_mallob_app_maxsat() {
         // Job solution formatter
         [](const Parameters& params, const JobResult& result) {
             auto json = nlohmann::json::array();
+            if (result.result != RESULT_SAT && result.result != RESULT_OPTIMUM_FOUND)
+                return json;
             std::stringstream modelString;
             auto solSize = result.getSolutionSize();
+            assert(solSize > 0);
             int modelSize = result.getSolution(0);
             assert(modelSize > 0);
             assert(solSize == modelSize + 2);

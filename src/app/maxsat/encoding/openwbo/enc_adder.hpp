@@ -163,8 +163,17 @@ public:
                  uint64_t rhs, vec<Lit> &assumptions);
   void updateInc(Solver *SC, uint64_t rhs, vec<Lit> &assumptions);
 
+  // Encode constraint so that any valid bound can later be enforced via Adder::enforceBoundBitwise
+  // with assumptions only, i.e., without adding new clauses to the problem.
+  void encodeWithBitwiseAssumableBounds(Solver *SC, const vec<Lit> &lits, const vec<uint64_t> &coeffs);
+  // Only works together with Adder::encodeWithBitwiseAssumableBounds.
+  // Returns a set of assumptions that must be set to enforce that the cost
+  // doesn't exceed the provided bound. Does *not* add new clauses to the problem.
+  vec<Lit> enforceBoundBitwise(Solver *SC, uint64_t ub);
+
 protected:
   vec<Lit> _output;
+  vec<Lit> _enforced_bound_lits;
   vec<Lit> clause;
   std::vector<std::queue<Lit>> _buckets;
 
@@ -181,6 +190,9 @@ protected:
 
   void lessThanOrEqualInc(Solver *SC, vec<Lit> &xs, std::vector<uint64_t> &ys,
                           vec<Lit> &assumptions);
+
+  void encodeBitwiseAssumableBoundConstraint(Solver *SC,
+    vec<Lit> &bitLitsOfCountedBound, vec<Lit> &bitLitsOfEnforcedBound);
 };
 } // namespace openwbo
 
