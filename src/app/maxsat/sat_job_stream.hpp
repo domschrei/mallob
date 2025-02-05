@@ -47,6 +47,7 @@ public:
     }
 
     void setGroupId(const std::string& groupId, int minVar = -1, int maxVar = -1) {
+        LOG(V2_INFO, "MAXSAT %s group ID %s V=[%i,%i]\n", _base_job_name.c_str(), groupId.c_str(), minVar, maxVar);
         _json_base["group-id"] = groupId;
         _json_base["configuration"]["__XL"] = std::to_string(minVar);
         _json_base["configuration"]["__XU"] = std::to_string(maxVar);
