@@ -38,10 +38,13 @@ private:
     ConditionVariable _job_queue_cond_var;
     volatile bool _terminate = false;
 
-    std::atomic_int _nb_idle_threads {0};
+    // Number of threads *not* busy with some task.
+    // Needs to be incremented *before* adding another thread to the pool.
+    std::atomic_int _nb_idle_threads;
 
 public:
     ThreadPool(size_t size) : _threads(size) {
+        _nb_idle_threads.store(size);
         for (size_t i = 0; i < size; i++) {
             _threads.emplace_back([&, i]() {runThread(i);});
         }
@@ -70,14 +73,15 @@ public:
         Runnable r;
         r.function = std::move(function);
         std::future<void> future;
+        bool allBusy;
         {
             auto lock = _job_queue_mutex.getLock();
             _job_queue.push_back(std::move(r));
             future = _job_queue.back().promise.get_future();
+            allBusy = _nb_idle_threads.load(std::memory_order_relaxed) == 0;
         }
         _job_queue_cond_var.notify();
-        if (_nb_idle_threads.load(std::memory_order_relaxed) <= 1)
-            Process::wakeUpThread(_checker_thread_tid);
+        if (allBusy) Process::wakeUpThread(_checker_thread_tid);
         return future;
     }
 
@@ -87,6 +91,7 @@ public:
         LOG(V4_VVER, "Grow thread pool (%i -> %i)\n", priorSize, newSize);
         while (_threads.size() < newSize) {
             auto lock = _job_queue_mutex.getLock();
+            _nb_idle_threads++;
             _threads.emplace_back([&, i=_threads.size()]() {runThread(i);});
         }
     }
@@ -97,10 +102,13 @@ private:
         Proc::nameThisThread(threadName.c_str());
 
         Runnable r;
+        bool firstIteration = true;
         while (!_terminate) {
             {
                 auto lock = _job_queue_mutex.getLock();
-                _nb_idle_threads++;
+                // A thread is initially counted as "idle" until it has fetched its 1st task.
+                if (firstIteration) firstIteration = false;
+                else _nb_idle_threads++;
                 _job_queue_cond_var.waitWithLockedMutex(lock, [&]() {return !_job_queue.empty();});
                 _nb_idle_threads--;
                 r = std::move(_job_queue.front());

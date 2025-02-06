@@ -15,7 +15,9 @@
     #endif
 #else
     // Disable all assertions
+    #ifndef assert
     #define assert(expr) (void)0
+    #endif
     #define assert_heavy(expr) (void)0
 #endif
 

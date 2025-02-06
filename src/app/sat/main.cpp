@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
 
     Random::init(params.seed(), rankOfParent);
 
-    ProcessWideThreadPool::init(1);
+    ProcessWideThreadPool::init(2);
 
     // Initialize signal handlers
     Process::init(rankOfParent, params.traceDirectory());

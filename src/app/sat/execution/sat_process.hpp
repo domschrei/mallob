@@ -26,6 +26,7 @@
 
 #include "engine.hpp"
 #include "../job/sat_shared_memory.hpp"
+#include "util/sys/watchdog.hpp"
 
 class SatProcess {
 
@@ -134,11 +135,16 @@ private:
         int exportLiteralLimit;
         std::vector<int> incomingClauses;
 
+        Watchdog watchdog(_params.watchdog(), 1000, true);
+        watchdog.setWarningPeriod(1000);
+        watchdog.setAbortPeriod(_params.watchdogAbortMillis());
+
         // Main loop
         while (true) {
 
             doSleep();
             Timer::cacheElapsedSeconds();
+            watchdog.reset(Timer::elapsedSecondsCached());
 
             // Terminate
             if (_hsm->doTerminate) {
