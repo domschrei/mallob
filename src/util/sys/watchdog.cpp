@@ -29,7 +29,14 @@ Watchdog::Watchdog(bool enabled, int checkIntervalMillis, bool useThreadPool, st
             int timeMillis = (int) (1000*Timer::elapsedSeconds());
             auto elapsed = timeMillis - _last_reset_millis;
             if (_globally_enabled.load(std::memory_order_relaxed) && _active) {
-                if (_abort_period_millis > 0 && elapsed > _abort_period_millis) {   
+                bool doAbort = false;
+                if (_abort_period_millis > 0 && elapsed > _abort_period_millis) {
+                    doAbort = true;
+                } else if (_abort_ticks > 0) {
+                    _ticks++;
+                    if (_ticks == _abort_ticks) doAbort = true;
+                }
+                if (doAbort) {
                     LOG(V0_CRIT, "[ERROR] Watchdog: TIMEOUT (last=%.3f activity=%i recvtag=%i sendtag=%i)\n", 
                         0.001*_last_reset_millis, _activity, _activity_recv_tag, _activity_send_tag);
                     _abort_function();
@@ -70,9 +77,14 @@ void Watchdog::setWarningPeriod(int periodMillis) {
 void Watchdog::setAbortPeriod(int periodMillis) {
     _abort_period_millis = periodMillis;
 }
+void Watchdog::setAbortTicks(int nbTicks) {
+    _ticks = 0;
+    _abort_ticks = nbTicks;
+}
 
 void Watchdog::reset(float time) {
     _last_reset_millis = (int) (1000*time);
+    _ticks = 0;
 }
 
 void Watchdog::stop() {

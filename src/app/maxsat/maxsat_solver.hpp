@@ -190,19 +190,19 @@ public:
             }
             // Initial formula is SATisfiable.
             LOG(V2_INFO, "MAXSAT Initial model has cost %lu\n", _instance->bestCost);
+        }
 
-            if (_instance->objective.empty() || _encoding_strat == MaxSatSearchProcedure::VIRTUAL
-                    || _instance->lowerBound == _instance->bestCost) {
-                // the solution is already proven optimal
-                r.result = RESULT_OPTIMUM_FOUND;
-                r.setSolution(reconstructSolutionToOriginalProblem(false));
-                LOG(V2_INFO, "MAXSAT OPTIMAL COST %lu\n", _instance->bestCost);
-                Logger::getMainInstance().flush();
-                return r;
-            } else {
-                // Recount the solution cost to get the most accurate possible bound
-                (void) reconstructSolutionToOriginalProblem(true);
-            }
+        if (_instance->objective.empty() || _encoding_strat == MaxSatSearchProcedure::VIRTUAL
+                || _instance->lowerBound == _instance->bestCost) {
+            // the solution is already proven optimal
+            r.result = RESULT_OPTIMUM_FOUND;
+            r.setSolution(reconstructSolutionToOriginalProblem(false));
+            LOG(V2_INFO, "MAXSAT OPTIMAL COST %lu\n", _instance->bestCost);
+            Logger::getMainInstance().flush();
+            return r;
+        } else if (firstSolveWithoutBounds) {
+            // Recount the solution cost to get the most accurate possible bound
+            (void) reconstructSolutionToOriginalProblem(true);
         }
 
         // Run the initial formula revision through ALL searches, so that everyone has the same one.
@@ -214,8 +214,12 @@ public:
         }
 
         // Initialize interval search if needed
-        if (_instance->intervalSearch)
-            _instance->intervalSearch->init(_instance->lowerBound, _instance->upperBound);
+        if (_instance->intervalSearch) {
+            // As the "max cost to test", use either the best known upper bound or,
+            // if we have a "constructive" upper bound, the best known cost minus one
+            _instance->intervalSearch->init(_instance->lowerBound,
+                std::min(_instance->upperBound, _instance->bestCost-1));
+        }
 
         if (_shared_encoder) {
             // Initialize cardinality constraint encoder.
@@ -242,7 +246,7 @@ public:
         // Main loop for solution improving search.
         std::list<std::unique_ptr<MaxSatSearchProcedure>> searchesToFinalize;
         float timeOfLastChange = Timer::elapsedSeconds();
-        while (!isTimeoutHit() && _instance->lowerBound < _instance->upperBound && !searches.empty()) {
+        while (!isTimeoutHit() && _instance->lowerBound < _instance->bestCost && !searches.empty()) {
             // Loop over all search strategies
             bool change = false;
             bool stagnation = false;
@@ -255,7 +259,7 @@ public:
                         // apply the result to the MaxSAT instance
                         (void) search->processNonblockingSolveResult();
                         change = true;
-                        if (_instance->lowerBound >= _instance->upperBound)
+                        if (_instance->lowerBound >= _instance->bestCost)
                             break;
                     } else if (search->isSolvingAttemptObsolete()) {
                         // The current bounds have made this solve call obsolete:
@@ -289,7 +293,7 @@ public:
                     change = true;
                 }
             }
-            if (stagnation || _instance->lowerBound >= _instance->upperBound)
+            if (stagnation || _instance->lowerBound >= _instance->bestCost)
                 break;
 
             // Wait a bit if nothing changed
@@ -334,10 +338,10 @@ public:
                     LOG(V2_INFO, "MAXSAT improved bounds found by MaxPRE - new bounds: (%lu,%lu)\n",
                         _instance->lowerBound, _instance->upperBound);
                     if (lowerImproved) _instance->intervalSearch->stopTestingAndUpdateLower(_instance->lowerBound);
-                    if (upperImproved) _instance->intervalSearch->stopTestingAndUpdateUpper(ULONG_MAX, _instance->upperBound);
-                    if (_instance->lowerBound == _instance->upperBound) {
-                        // bounds became tight!
-                        break;
+                    if (upperImproved) {
+                        // The new upper bound is not "constructive", so we should add 1
+                        // to get the hypothetical "best known cost" for interval search
+                        _instance->intervalSearch->stopTestingAndUpdateUpper(ULONG_MAX, _instance->upperBound+1);
                     }
                 }
 
@@ -368,44 +372,43 @@ public:
         LOG(V4_VVER, "MAXSAT trying to stop all searches ...\n");
         tryStopAllSearches(searches);
 
+        // Did we find *some* solution?
+        if (_instance->bestCost < ULONG_MAX) {
+            r.result = RESULT_SAT;
+        }
         // Were we able to find tight bounds?
         if (_instance->lowerBound >= _instance->upperBound) {
             // -- yes
             assert(_instance->lowerBound == _instance->upperBound);
-            // Do we have an optimal solution?
+            // Do we have an *optimal* solution?
             if (_instance->bestCost == _instance->upperBound) {
                 // -- yes
                 r.result = RESULT_OPTIMUM_FOUND;
-            } else {
+            } else if (!isTimeoutHit()) {
                 // -- no: tight bounds are known, but we do not have a corresponding solution yet.
-                if (isTimeoutHit()) {
-                    // out of time: return sub-optimal solution.
-                    r.result = RESULT_SAT;
-                } else {
-                    // Make one more SAT call to find such a solution.
-                    LOG(V2_INFO, "MAXSAT final SAT call to find solution of optimal cost %lu ...\n", _instance->upperBound);
-                    assert(!searches.empty());
-                    auto& search = searches.front();
-                    bool ok = search->enforceNextBound(_instance->upperBound);
-                    assert(ok);
-                    while (!search->isDoneEncoding()) usleep(1000);
-                    int resultCode = search->solveBlocking(); // could still be cancelled
-                    if (resultCode == SAT) {
-                        assert(_instance->bestCost == _instance->upperBound);
-                        r.result = RESULT_OPTIMUM_FOUND;
-                    } else r.result = RESULT_SAT;
-                    LOG(V4_VVER, "MAXSAT once again trying to stop all searches ...\n");
-                    tryStopAllSearches(searches);
+                // Make one more SAT call to find such a solution.
+                LOG(V2_INFO, "MAXSAT final SAT call to find solution of optimal cost %lu ...\n", _instance->upperBound);
+                assert(!searches.empty());
+                auto& search = searches.front();
+                bool ok = search->enforceNextBound(_instance->upperBound);
+                assert(ok);
+                while (!search->isDoneEncoding()) usleep(1000);
+                int resultCode = search->solveBlocking(); // could still be cancelled
+                if (resultCode == SAT) {
+                    assert(_instance->bestCost == _instance->upperBound);
+                    r.result = RESULT_OPTIMUM_FOUND;
                 }
+                LOG(V4_VVER, "MAXSAT once again trying to stop all searches ...\n");
+                tryStopAllSearches(searches);
             }
-        } else if (_instance->bestCost < ULONG_MAX) {
-            // we did find *some* solution.
-            r.result = RESULT_SAT;
         }
-        r.setSolution(reconstructSolutionToOriginalProblem(r.result != RESULT_OPTIMUM_FOUND));
-        LOG(V2_INFO, "MAXSAT %s COST %lu\n", r.result == RESULT_OPTIMUM_FOUND ? "OPTIMAL" : "BEST FOUND", _instance->bestCost);
-        if (r.result == RESULT_OPTIMUM_FOUND && writer) writer->concludeOptimal();
-        Logger::getMainInstance().flush();
+        // Report the found solution.
+        if (_instance->bestCost < ULONG_MAX) {
+            r.setSolution(reconstructSolutionToOriginalProblem(r.result != RESULT_OPTIMUM_FOUND));
+            LOG(V2_INFO, "MAXSAT %s COST %lu\n", r.result == RESULT_OPTIMUM_FOUND ? "OPTIMAL" : "BEST FOUND", _instance->bestCost);
+            if (r.result == RESULT_OPTIMUM_FOUND && writer) writer->concludeOptimal();
+            Logger::getMainInstance().flush();
+        }
 
         // Clean up all searches with their (incremental) Mallob jobs
         LOG(V2_INFO, "MAXSAT finalizing all searches ...\n");

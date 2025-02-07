@@ -31,6 +31,8 @@ private:
     std::atomic_int _last_reset_millis = 0;
     std::atomic_int _warning_period_millis = 0;
     std::atomic_int _abort_period_millis = 0;
+    std::atomic_int _abort_ticks = 0;
+    std::atomic_int _ticks = 0;
 
     static std::atomic_bool _globally_enabled;
     volatile bool _active {true};
@@ -49,6 +51,7 @@ public:
     ~Watchdog();
     void setWarningPeriod(int periodMillis);
     void setAbortPeriod(int periodMillis);
+    void setAbortTicks(int nbTicks);
     void reset(float time = Timer::elapsedSeconds());
     void setActive(bool active) {_active = active;}
     inline void setActivity(Activity a) {

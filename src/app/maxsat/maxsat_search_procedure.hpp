@@ -315,8 +315,9 @@ public:
                     }
                 }
             }
-            LOG(V0_CRIT, "[ERROR] MAXSAT Model for bound %lu has cost %lu - report written to %s - continuing ...\n",
+            LOG(V0_CRIT, "[ERROR] MAXSAT Model for bound %lu has cost %lu - report written to %s\n",
                 _current_bound, cost, reportFilename.c_str());
+            abort();
         }
         if (cost < _instance.bestCost) {
             _instance.upperBound = std::min(_instance.upperBound, cost);
@@ -328,7 +329,7 @@ public:
             if (_sol_writer) _sol_writer->appendSolution(cost, solution);
             if (_instance.intervalSearch) {
                 size_t prevBound = std::max(_current_bound, _instance.bestCost); // hardening in case of the above error
-                _instance.intervalSearch->stopTestingAndUpdateUpper(prevBound, cost==0 ? 0 : cost-1);
+                _instance.intervalSearch->stopTestingAndUpdateUpper(prevBound, cost);
             }
         } else {
             LOG(V2_INFO, "MAXSAT %s Bound %lu solved with cost %lu - bounds unchanged\n",
@@ -361,8 +362,8 @@ public:
         if (_current_bound < _instance.lowerBound) return true;
         // Case 2: We already know of a better solution than the tested bound.
         // We allow some leniency here since it may be better to keep a job running
-        // if its bound is only slightly suboptimal w.r.t. the best known bound. 
-        if (_current_bound > 1.01 * _instance.upperBound) return true;
+        // if its bound is only slightly suboptimal w.r.t. the best known cost.
+        if (_current_bound > 1.01 * _instance.bestCost) return true;
         // Otherwise, the solving attempt is not obsolete.
         return false;
     }
