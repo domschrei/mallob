@@ -304,7 +304,7 @@ public:
             } else {
                 usleep(1000); // 1 ms
                 if (_params.maxSatFocusPeriod() > 0 && Timer::elapsedSeconds() - timeOfLastChange > _params.maxSatFocusPeriod()
-                        && changeSinceLastFocus) {
+                        && searches.size() > _params.maxSatFocusMin() && changeSinceLastFocus) {
                     // cancel the searcher at the lowest bound
                     MaxSatSearchProcedure* lowest {nullptr};
                     for (auto& search : searches) {
