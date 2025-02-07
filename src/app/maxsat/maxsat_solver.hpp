@@ -580,12 +580,16 @@ private:
     // Obtained by a mix of educated guesses and 1-minute runs on MaxSAT Eval'23 instances.
     MaxSatSearchProcedure::EncodingStrategy pickCardinalityEncoding(bool allowGte) {
 
-        // Large objective function or very large sum of weights: Fallback to Adder.
-        if (_instance->objective.size() > 10'000 || _instance->sumOfWeights > 1'000'000'000'000UL)
+        // Large objective function or very large sum of weights
+        // or very large base formula with decently large objective: Fallback to Adder.
+        if (_instance->objective.size() > 10'000 || _instance->sumOfWeights > 1'000'000'000'000UL
+                || (_instance->formulaSize > 10'000'000 && _instance->objective.size() > 5'000))
             return MaxSatSearchProcedure::WARNERS_ADDER;
 
-        // Very small sum of weights and few unique weights: GTE can be used.
-        if (allowGte && _instance->sumOfWeights <= 100 && _instance->nbUniqueWeights <= 20)
+        // Very small sum of weights, few unique weights, and a not too large problem
+        // in terms of literals or objective terms: GTE can be used.
+        if (allowGte && _instance->sumOfWeights <= 100 && _instance->nbUniqueWeights <= 20
+                && (_instance->formulaSize <= 10'000'000 || _instance->objective.size() <= 25))
             return MaxSatSearchProcedure::GENERALIZED_TOTALIZER;
 
         // Otherwise, default case of DPW.
