@@ -245,6 +245,7 @@ public:
 
         // Main loop for solution improving search.
         std::list<std::unique_ptr<MaxSatSearchProcedure>> searchesToFinalize;
+        bool changeSinceLastFocus = true;
         float timeOfLastChange = Timer::elapsedSeconds();
         while (!isTimeoutHit() && _instance->lowerBound < _instance->bestCost && !searches.empty()) {
             // Loop over all search strategies
@@ -297,11 +298,13 @@ public:
                 break;
 
             // Wait a bit if nothing changed
-            if (change) timeOfLastChange = Timer::elapsedSeconds();
-            else {
+            if (change) {
+                changeSinceLastFocus = true;
+                timeOfLastChange = Timer::elapsedSeconds();
+            } else {
                 usleep(1000); // 1 ms
                 if (_params.maxSatFocusPeriod() > 0 && Timer::elapsedSeconds() - timeOfLastChange > _params.maxSatFocusPeriod()
-                        && searches.size() > _params.maxSatFocusMin()) {
+                        && changeSinceLastFocus) {
                     // cancel the searcher at the lowest bound
                     MaxSatSearchProcedure* lowest {nullptr};
                     for (auto& search : searches) {
@@ -313,7 +316,10 @@ public:
                     if (lowest) {
                         LOG(V2_INFO, "MAXSAT focus: cancel search at bound %lu\n", lowest->getCurrentBound());
                         lowest->interrupt(true);
-                        change = true;
+                        // make sure that some time elapses AND some change was observed (interrupt!)
+                        // before allowing for the next focusing
+                        changeSinceLastFocus = false;
+                        timeOfLastChange = Timer::elapsedSeconds();
                     }
                 }
             }
