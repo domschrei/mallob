@@ -528,9 +528,9 @@ private:
             res.boundsImproved = (parser->get_lb() > update.lowerBound || parser->get_ub() < update.upperBound);
             update.lowerBound = parser->get_lb();
             update.upperBound = parser->get_ub();
-            res.instanceImproved = update.nbVars <= 0.9 * _instance->nbVars
-                || update.formula.size() <= 0.9 * _instance->formulaSize
-                || update.objective.size() <= 0.9 * _instance->objective.size();
+            res.instanceImproved = update.nbVars <= 0.5 * _instance->nbVars
+                || update.formula.size() <= 0.5 * _instance->formulaSize
+                || update.objective.size() <= 0.5 * _instance->objective.size();
             runDone = true;
         });
     }
