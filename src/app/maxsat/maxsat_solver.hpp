@@ -141,7 +141,8 @@ public:
 #endif
 
         // Parse the user-provided sequence of search strategies.
-        std::string searchStrats = std::string(_params.maxSatNumSearchers(), 'd');
+        size_t nbSearchers = std::min((size_t)_params.maxSatNumSearchers(), (_instance->upperBound - _instance->lowerBound) + 1);
+        std::string searchStrats = std::string(nbSearchers, 'd');
         const int nbWorkers = _params.numWorkers() == -1 ? MyMpi::size(MPI_COMM_WORLD) : _params.numWorkers();
         // Loop over each specified search strategy
         for (int i = 0; i < searchStrats.size(); i++) {
@@ -528,9 +529,9 @@ private:
             res.boundsImproved = (parser->get_lb() > update.lowerBound || parser->get_ub() < update.upperBound);
             update.lowerBound = parser->get_lb();
             update.upperBound = parser->get_ub();
-            res.instanceImproved = update.nbVars <= 0.5 * _instance->nbVars
-                || update.formula.size() <= 0.5 * _instance->formulaSize
-                || update.objective.size() <= 0.5 * _instance->objective.size();
+            res.instanceImproved = update.nbVars <= 0.9 * _instance->nbVars
+                || update.formula.size() <= 0.9 * _instance->formulaSize
+                || update.objective.size() <= 0.9 * _instance->objective.size();
             runDone = true;
         });
     }
