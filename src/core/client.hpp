@@ -118,7 +118,7 @@ private:
     std::vector<int> _finished_msg_ids;
 
     PeriodicEvent<50> _periodic_check_done_jobs;
-    PeriodicEvent<50> _periodic_check_client_side_jobs;
+    PeriodicEvent<10> _periodic_check_client_side_jobs;
     Mutex _client_side_jobs_mutex;
 
     std::unique_ptr<JsonInterface> _json_interface;

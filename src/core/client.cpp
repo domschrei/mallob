@@ -769,6 +769,10 @@ JobDescription* Client::getActiveJob(int jobId) {
 
 Client::~Client() {
 
+    Watchdog watchdog(_params.watchdog(), 1'000, true);
+    watchdog.setWarningPeriod(1'000);
+    watchdog.setAbortPeriod(10'000);
+
     for (auto& fut : _done_job_futures) fut.get();
 
     if (_json_interface) _json_interface->deactivate();
@@ -781,6 +785,7 @@ Client::~Client() {
 
     for (auto& j : _client_side_jobs) j.thread->join();
     _client_side_jobs.clear();
+    _done_client_side_jobs.clear();
 
     LOG(V4_VVER, "Leaving client destructor\n");
 }
