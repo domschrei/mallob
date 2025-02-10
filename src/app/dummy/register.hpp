@@ -3,6 +3,7 @@
 
 #include "app/app_message_subscription.hpp"
 #include "app/app_registry.hpp"
+#include "data/job_processing_statistics.hpp"
 #include "dummy_job.hpp"
 #include "dummy_reader.hpp"
 
@@ -17,7 +18,7 @@ void register_mallob_app_dummy() {
             return new DummyJob(params, setup, table);
         },
         // Job solution formatter
-        [](const Parameters& params, const JobResult& result) {
+        [](const Parameters& params, const JobResult& result, const JobProcessingStatistics& stat) {
             // An actual application would nicely format the result here ...
             return nlohmann::json();
         }

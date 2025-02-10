@@ -18,7 +18,7 @@ namespace app_registry {
             JobReader reader;
             bool isClientSide {false};
             JobCreator creator;
-            ClientSideProgram clientSideProgram;
+            ClientSideProgramCreator clientSideProgramCreator;
             JobSolutionFormatter solutionFormatter;
             ResourceCleaner cleaner;
         };
@@ -53,7 +53,7 @@ namespace app_registry {
 
     void registerClientSideApplication(const std::string& key,
         JobReader reader,
-        ClientSideProgram program,
+        ClientSideProgramCreator programCreator,
         JobSolutionFormatter solutionFormatter,
         ResourceCleaner cleaner
     ) {
@@ -65,7 +65,7 @@ namespace app_registry {
         entry.key = key;
         entry.reader = reader;
         entry.isClientSide = true;
-        entry.clientSideProgram = program;
+        entry.clientSideProgramCreator = programCreator;
         entry.solutionFormatter = solutionFormatter;
         entry.cleaner = cleaner;
         _app_entries.push_back(std::move(entry));
@@ -102,9 +102,9 @@ namespace app_registry {
         getAppKey(appId); // check existence
         return _app_entries.at(appId).creator;
     }
-    ClientSideProgram getClientSideProgram(int appId) {
+    ClientSideProgramCreator getClientSideProgramCreator(int appId) {
         getAppKey(appId); // check existence
-        return _app_entries.at(appId).clientSideProgram;
+        return _app_entries.at(appId).clientSideProgramCreator;
     }
 
     std::vector<ResourceCleaner> getCleaners() {

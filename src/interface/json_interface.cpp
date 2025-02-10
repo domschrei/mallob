@@ -260,7 +260,7 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
     return ACCEPT;
 }
 
-void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Statistics& stats, int applicationId) {
+void JsonInterface::handleJobDone(JobResult&& result, const JobProcessingStatistics& stats, int applicationId) {
 
     auto lock = _job_map_mutex.getLock();
     
@@ -285,7 +285,7 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobDescription::Stat
         j["result"]["solution-size"] = result.getSolutionSize();
         mkfifo(solutionFile.c_str(), 0666);
     } else {
-        j["result"]["solution"] = app_registry::getJobSolutionFormatter(applicationId)(_params, result);
+        j["result"]["solution"] = app_registry::getJobSolutionFormatter(applicationId)(_params, result, stats);
     }
     j["stats"] = {
         { "time", {

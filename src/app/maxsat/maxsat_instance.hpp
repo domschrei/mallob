@@ -19,7 +19,7 @@ struct MaxSatInstance {
         size_t factor;
         int lit;
     };
-    int preprocessLayer;
+    int preprocessLayer {0};
     // objective function as a linear combination of literals
     std::vector<ObjectiveTerm> objective;
     // size of the raw C array _f_data

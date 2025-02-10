@@ -37,6 +37,12 @@ Mallob processes have an in-built mechanism to catch and process signals like SI
 
 The directory where these files are written to can be changed with run time option `-trace-dir`.
 
+### Thread Naming
+
+Each thread running in Mallob is usually given a name via `Proc::nameThisThread(name)`. This name can be seen in tools like `htop` to diagnose unusual behavior.
+
+If, for instance, you observe a crash signal (SIGSEGV / SIGABRT / SIGPIPE / ...) and you are not sure where it's coming from (and trace files don't help for whichever reason), then you can name your own threads as well and then adjust `Proc::nameThisThread` to output each TID-to-name mapping. This allows you to convert the crashing TID to an actual role in the program.
+
 ### Watchdogs
 
 Since Mallob as a platform is designed for latencies in the realm of milliseconds, it is essential that the threads which advance the scheduling – in particular the main thread – do not get stuck in a computation or some wait that takes several milliseconds. To diagnose such behavior, Mallob features a watchdog mechanism for selected threads and tasks: A separate thread (the "watchdog") is pet periodically by the watched thread. If such a pet does not occur for an extended period, the watchdog will begin barking to signal that something is not right. If this period gets too long, the watchdog triggers a crash of the program. 
@@ -54,6 +60,17 @@ A watchdog triggering a crash looks like this:
 The value of `last` indicates the point in time where the watchdog was pet for the last time. In addition, a thread trace file is created which features the location in the code where the watched thread got stuck.
 
 There are many possible causes for a barking watchdog. For instance, if you decide to assign each MPI process to a single core or even a single hardware thread, or if you use even more MPI processes with ``--oversubscribe``, then the machine is likely to experience very busy process / thread scheduling and it becomes more likely that a crucial thread is not scheduled for several milliseconds. Likewise, limited I/O bandwidth can become a problem if many processes write to the same (network?) file system.
+
+If a certain thread hangs indeterminately and you don't know why, you can add your own watchdog like this: 
+```c++
+// Set up a watchdog
+Watchdog watchdog(/*enabled?=*/true, /*checkIntervalMs=*/500, /*useThreadPool=*/true);
+watchdog.setWarningPeriod(500); // print a warning after x*500ms (x>=1) without reset()
+watchdog.setAbortPeriod(10'000); // trace the thread and abort() after 10s
+// ... now do the computation which hangs ...
+watchdog.reset(); // call reset() in between the heavy lifting where the thread can hang
+// ... watchdog is RAII, so if it goes out of scope it will be joined properly
+```
 
 ### Detection of Unresponsive MPI Processes
 

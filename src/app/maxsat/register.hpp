@@ -6,8 +6,18 @@
 #include "app/maxsat/maxsat_solver.hpp"
 #include "app/sat/job/sat_constants.h"
 #include "data/job_description.hpp"
+#include "data/job_processing_statistics.hpp"
 #include "interface/api/api_connector.hpp"
 #include "parse/maxsat_reader.hpp"
+
+struct ClientSideMaxsatProgram : public app_registry::ClientSideProgram {
+    std::unique_ptr<MaxSatSolver> solver;
+    ClientSideMaxsatProgram(const Parameters& params, APIConnector& api, JobDescription& desc) :
+        app_registry::ClientSideProgram(), solver(new MaxSatSolver(params, api, desc)) {
+        function = [&]() {return solver->solve();};
+    }
+    virtual ~ClientSideMaxsatProgram() {}
+};
 
 void register_mallob_app_maxsat() {
     app_registry::registerClientSideApplication("MAXSAT",
@@ -16,16 +26,18 @@ void register_mallob_app_maxsat() {
             return MaxSatReader(params, files.front()).read(desc);
         },
         // Client-side program
-        [](const Parameters& params, APIConnector& api, JobDescription& desc) -> JobResult {
-            MaxSatSolver solver(params, api, desc);
-            return solver.solve();
+        [](const Parameters& params, APIConnector& api, JobDescription& desc) {
+            return new ClientSideMaxsatProgram(params, api, desc);
         },
         // Job solution formatter
-        [](const Parameters& params, const JobResult& result) {
+        [](const Parameters& params, const JobResult& result, const JobProcessingStatistics& stat) {
             auto json = nlohmann::json::array();
             if (result.result != RESULT_SAT && result.result != RESULT_OPTIMUM_FOUND)
                 return json;
             std::stringstream modelString;
+            modelString << "c parse_time " << stat.parseTime << "\n";
+            modelString << "c process_time " << stat.processingTime << "\n";
+            modelString << "c total_response_time " << stat.totalResponseTime << "\n";
             auto solSize = result.getSolutionSize();
             assert(solSize > 0);
             int modelSize = result.getSolution(0);

@@ -4,6 +4,7 @@
 #include "app/app_message_subscription.hpp"
 #include "app/app_registry.hpp"
 #include "app/sat/data/model_string_compressor.hpp"
+#include "data/job_processing_statistics.hpp"
 #include "job/forked_sat_job.hpp"
 #include "parse/sat_reader.hpp"
 
@@ -18,7 +19,7 @@ void register_mallob_app_sat() {
             return new ForkedSatJob(params, setup, table);
         },
         // Job solution formatter
-        [](const Parameters& params, const JobResult& result) {
+        [](const Parameters& params, const JobResult& result, const JobProcessingStatistics& stat) {
             auto json = nlohmann::json::array();
             /*std::stringstream modelString;
             int numAdded = 0;

@@ -137,10 +137,6 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     hostComm.create();
     if (isWorker) worker->setHostComm(hostComm);
 
-    // If mono solving mode is enabled, introduce the singular job to solve
-    if (params.monoFilename.isSet() && isClient && MyMpi::rank(commClients) == 0)
-        introduceMonoJob(params, *client);
-
     // If job streaming is enabled, initialize a corresponding job streamer
     JobStreamer* streamer = nullptr;
     if (params.jobTemplate.isSet() && isClient) {
@@ -164,6 +160,10 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
             });
         }
     }
+
+    // If mono solving mode is enabled, introduce the singular job to solve
+    if (params.monoFilename.isSet() && isClient && MyMpi::rank(commClients) == 0)
+        introduceMonoJob(params, *client);
 
     // Main loop
     while (true) {

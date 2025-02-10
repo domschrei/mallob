@@ -2,14 +2,12 @@
 #pragma once
 
 #include <functional>
-#include <atomic>
 #include <string>
 #include <utility>
 
 #include "interface/api/job_description_id_allocator.hpp"
 #include "util/logger.hpp"
 #include "util/hashing.hpp"
-#include "data/job_description.hpp"
 #include "data/job_result.hpp"
 #include "data/job_metadata.hpp"
 #include "util/json.hpp"
@@ -19,6 +17,7 @@
 #include "api/job_id_allocator.hpp"
 #include "util/sys/tmpdir.hpp"
 #include "util/robin_hood.hpp"
+#include "data/job_processing_statistics.hpp"
 
 class Parameters; // fwd declaration
 struct IntPairHasher;
@@ -82,7 +81,7 @@ public:
     Result handle(nlohmann::json& json, std::function<void(nlohmann::json&)> feedback);
 
     // Mallob-side events
-    void handleJobDone(JobResult&& result, const JobDescription::Statistics& stats, int applicationId);
+    void handleJobDone(JobResult&& result, const JobProcessingStatistics& stats, int applicationId);
 
     bool isActive() const {return _active;}
     void deactivate() {_active = false;}

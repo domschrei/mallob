@@ -44,8 +44,8 @@ void handleSignal(int signum) {
 
     // Impose a hard timeout for this process' lifetime from this point,
     // to avoid indeterminate freezes
-    auto cmd = "bash scripts/kill-delayed.sh " + std::to_string(Proc::getPid());
-    system(cmd.c_str());
+    //auto cmd = "bash scripts/kill-delayed.sh " + std::to_string(Proc::getPid());
+    //system(cmd.c_str());
 
     // Special case where we are in the main thread and a crash was noticed:
     // normal execution cannot continue here, so we exit directly.
@@ -74,8 +74,8 @@ void Process::reportTerminationSignal(const SignalInfo& info) {
 }
 
 void Process::removeDelayedExitWatchers() {
-    std::string cmd = "pgrep -f \"do-kill-delayed.sh " + std::to_string(Proc::getPid()) + "\" | xargs kill >/dev/null 2>&1";
-    system(cmd.c_str());
+    //std::string cmd = "pgrep -f \"do-kill-delayed.sh " + std::to_string(Proc::getPid()) + "\" | xargs kill >/dev/null 2>&1";
+    //system(cmd.c_str());
 }
 
 void Process::doExit(int retval) {

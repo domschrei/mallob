@@ -15,6 +15,7 @@
 #include "data/serializable.hpp"
 #include "data/checksum.hpp"
 #include "data/app_configuration.hpp"
+#include "data/job_processing_statistics.hpp"
 
 typedef std::shared_ptr<std::vector<int>> VecPtr;
 
@@ -22,17 +23,6 @@ typedef std::shared_ptr<std::vector<int>> VecPtr;
  * The actual job structure, containing the full description.
  */
 class JobDescription : public Serializable {
-
-public:
-    struct Statistics {
-        float timeOfScheduling;
-        float parseTime;
-        float schedulingTime;
-        float processingTime;
-        float usedWallclockSeconds;
-        float usedCpuSeconds;
-        float latencyOf1stVolumeUpdate;
-    };
 
 private:
 
@@ -82,7 +72,7 @@ private:
     std::vector<int> _preloaded_assumptions;
 
     // just for scheduling
-    Statistics* _stats = nullptr;
+    JobProcessingStatistics* _stats = nullptr;
 
 private:
     template <typename T>
@@ -245,8 +235,8 @@ public:
     
     static int readRevisionIndex(const std::vector<uint8_t>& serialized);
 
-    Statistics& getStatistics() {
-        if (_stats == nullptr) _stats = new Statistics();
+    JobProcessingStatistics& getStatistics() {
+        if (_stats == nullptr) _stats = new JobProcessingStatistics();
         return *_stats;
     }
 

@@ -76,7 +76,8 @@ private:
         bool boundsImproved {false};
         bool instanceImproved {false};
         bool error {false};
-    };
+    } _update_result;
+    bool _maxpre_run_done {false};
     std::future<void> _fut_instance_update;
 
 public:
@@ -88,7 +89,7 @@ public:
         parseFormula();
         pickEncodingStrategy();
     }
-
+    MaxSatSolver(MaxSatSolver&& other) = delete;
     ~MaxSatSolver() {
 #if MALLOB_USE_MAXPRE == 1
         // join with background MaxPRE preprocessor 
@@ -124,8 +125,7 @@ public:
         // Just for debugging
         _instance->print(updateLayer);
 
-        bool maxPreRunDone = false;
-        UpdateResult updateResult;
+        _maxpre_run_done = false;
 #if MALLOB_USE_MAXPRE == 1
         auto parser = StaticMaxSatParserStore::get(_desc.getId());
         // Conditions for running a concurrent preprocessing:
@@ -136,7 +136,7 @@ public:
         if (updateLayer < 10 && _params.maxPreTimeoutPost() > 0
             && (_params.maxPreTechniques() != _params.maxPreTechniquesPost()
                 || parser->lastCallInterrupted())) {
-            launchImprovingMaxPreRun(updateLayer, maxPreRunDone, updateResult);
+            launchImprovingMaxPreRun(updateLayer);
         }
 #endif
 
@@ -330,13 +330,13 @@ public:
 
 #if MALLOB_USE_MAXPRE == 1
             // concurrent improving preprocessing run done?
-            if (maxPreRunDone) {
-                maxPreRunDone = false;
+            if (_maxpre_run_done) {
+                _maxpre_run_done = false;
                 _fut_instance_update.get();
                 LOG(V2_INFO, "MAXSAT processing MaxPRE result\n");
 
                 // Did the preprocessor find improved bounds?
-                if (updateResult.boundsImproved) {
+                if (_update_result.boundsImproved) {
                     // update bounds with preprocessing results
                     const bool lowerImproved = _instance_update.lowerBound > _instance->lowerBound;
                     _instance->lowerBound = std::max(_instance_update.lowerBound, _instance->lowerBound);
@@ -353,7 +353,7 @@ public:
                 }
 
                 // Did the preprocessor improve the instance itself to a notable degree?
-                if (updateResult.instanceImproved) {
+                if (_update_result.instanceImproved) {
                     // cleanup (has to happen before update)
                     LOG(V2_INFO, "MAXSAT improvement found by MaxPRE: restart searches\n");
                     tryStopAllSearches(searches);
@@ -367,10 +367,10 @@ public:
                         // NOTE: may call launchImprovingMaxSatRun internally
                         return solve(updateLayer+1);
                     }
-                } else if (!updateResult.error && updateLayer < 10 && StaticMaxSatParserStore::get(_desc.getId())->lastCallInterrupted()) {
+                } else if (!_update_result.error && updateLayer < 10 && StaticMaxSatParserStore::get(_desc.getId())->lastCallInterrupted()) {
                     // not run until completion yet: retry concurrent preprocessing with higher limit
                     updateLayer++;
-                    launchImprovingMaxPreRun(updateLayer, maxPreRunDone, updateResult);
+                    launchImprovingMaxPreRun(updateLayer);
                 }
             }
 #endif
@@ -504,12 +504,12 @@ private:
     }
 
 #if MALLOB_USE_MAXPRE == 1
-    void launchImprovingMaxPreRun(int updateLayer, bool& runDone, UpdateResult& res) {
-        assert(!runDone);
+    void launchImprovingMaxPreRun(int updateLayer) {
+        assert(!_maxpre_run_done);
 
         _instance_update.prepareForNext(_instance->lowerBound, _instance->upperBound);
         LOG(V3_VERB, "MAXSAT calling MaxPRE concurrently\n");
-        _fut_instance_update = ProcessWideThreadPool::get().addTask([&, updateLayer]() {
+        _fut_instance_update = ProcessWideThreadPool::get().addTask([this, updateLayer]() {
             auto& update = _instance_update;
             auto parser = StaticMaxSatParserStore::get(_desc.getId());
             float time = Timer::elapsedSeconds();
@@ -522,17 +522,17 @@ private:
             LOG(V3_VERB, "MAXSAT MaxPRE' time preprocess:%.3f\n", timePreprocess);
             if (update.formula.size() == 0 && update.nbVars == 0) {
                 // Error in MaxPRE
-                res.error = true;
-                runDone = true;
+                _update_result.error = true;
+                _maxpre_run_done = true;
                 return;
             }
-            res.boundsImproved = (parser->get_lb() > update.lowerBound || parser->get_ub() < update.upperBound);
+            _update_result.boundsImproved = (parser->get_lb() > update.lowerBound || parser->get_ub() < update.upperBound);
             update.lowerBound = parser->get_lb();
             update.upperBound = parser->get_ub();
-            res.instanceImproved = update.nbVars <= 0.9 * _instance->nbVars
+            _update_result.instanceImproved = update.nbVars <= 0.9 * _instance->nbVars
                 || update.formula.size() <= 0.9 * _instance->formulaSize
                 || update.objective.size() <= 0.9 * _instance->objective.size();
-            runDone = true;
+            _maxpre_run_done = true;
         });
     }
 

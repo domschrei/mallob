@@ -12,6 +12,7 @@
 #include <memory>
 #include <vector>
 
+#include "app/app_registry.hpp"
 #include "comm/mympi.hpp"
 #include "util/params.hpp"
 #include "data/job_description.hpp"
@@ -127,13 +128,15 @@ private:
 
     struct ClientSideJob {
         std::unique_ptr<JobDescription> desc;
+        std::unique_ptr<app_registry::ClientSideProgram> program;
         JobResult result;
         bool done {false};
-        BackgroundWorker thread;
-        ClientSideJob() {}
-        ClientSideJob(std::unique_ptr<JobDescription>&& desc) : desc(std::move(desc)) {}
+        std::unique_ptr<BackgroundWorker> thread;
+        ClientSideJob() {thread.reset(new BackgroundWorker());}
+        ClientSideJob(std::unique_ptr<JobDescription>&& desc) : desc(std::move(desc)) {thread.reset(new BackgroundWorker());}
     };
     std::list<ClientSideJob> _client_side_jobs;
+    std::list<ClientSideJob> _done_client_side_jobs;
 
 public:
     Client(MPI_Comm comm, Parameters& params)
@@ -165,7 +168,8 @@ private:
     int getMaxNumParallelJobs();
     void introduceNextJob();
     void finishJob(int jobId, bool hasIncrementalSuccessors);
-    
+
+    JobDescription* getActiveJob(int jobId);
 };
 
 #endif
