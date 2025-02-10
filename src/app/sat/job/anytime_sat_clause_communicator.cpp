@@ -95,14 +95,16 @@ void AnytimeSatClauseCommunicator::communicate() {
         _cross_job_clause_sharer->setClauseBufferRevision(_job->getClausesRevision());
         _cross_sharing_session->advanceSharing();
         if (_cross_sharing_session->isDone()) {
-            assert(_cross_job_clause_sharer->hasClausesToBroadcastInternally());
-            JobMessage msg;
-            msg.payload = _cross_job_clause_sharer->getClausesToBroadcastInternally();
-            InplaceClauseAggregation agg(msg.payload);
-            agg.maxRevision() = _job->getRevisionToReachForGroupId();
-            msg.treeIndexOfDestination = msg.treeIndexOfSender = 0;
-            msg.contextIdOfDestination = msg.contextIdOfSender = _job->getActorContextId();
-            advanceCollective(_job, msg, MSG_BROADCAST_CLAUSES_STATELESS);
+            if (_job->getState() != PAST) {
+                assert(_cross_job_clause_sharer->hasClausesToBroadcastInternally());
+                JobMessage msg;
+                msg.payload = _cross_job_clause_sharer->getClausesToBroadcastInternally();
+                InplaceClauseAggregation agg(msg.payload);
+                agg.maxRevision() = _job->getRevisionToReachForGroupId();
+                msg.treeIndexOfDestination = msg.treeIndexOfSender = 0;
+                msg.contextIdOfDestination = msg.contextIdOfSender = _job->getActorContextId();
+                advanceCollective(_job, msg, MSG_BROADCAST_CLAUSES_STATELESS);
+            }
             _cancelled_sessions.emplace_back(_cross_sharing_session.release());
         }
     }
@@ -347,7 +349,7 @@ void AnytimeSatClauseCommunicator::feedLocalClausesIntoCrossSharing(std::vector<
     _cross_job_clause_sharer->addInternalSharedClauses(clauses);
     _cross_job_clause_sharer->updateBestFoundSolutionCost(session->getBestFoundSolutionCost());
     auto& comm = _job->getGroupComm();
-    if (comm.getCommSize() > 1 && comm.getMyLocalRank() == 0) {
+    if (comm.getCommSize() > 1 && comm.getMyLocalRank() == 0 && _job->getState() == ACTIVE) {
         // build a cross-job clause sharing initiation message
         JobMessage msg;
         msg.tag = MSG_INITIATE_CROSS_JOB_CLAUSE_SHARING;
@@ -372,6 +374,12 @@ void AnytimeSatClauseCommunicator::initiateCrossSharing(JobMessage& msg, int sou
             (!fromDeferredQueue && !_deferred_cross_sharing_initiation_msgs.empty())) {
         LOG(V3_VERB, "%s CROSSCOMM deferring initiation\n", _job->toStr());
         _deferred_cross_sharing_initiation_msgs.push_back(msg);
+        return;
+    }
+
+    // reject the cross-sharing initiation if you are not active right now
+    if (_job->getState() != ACTIVE) {
+        msg.returnToSender(source, MSG_SEND_APPLICATION_MESSAGE);
         return;
     }
 
