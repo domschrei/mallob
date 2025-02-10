@@ -377,8 +377,8 @@ void AnytimeSatClauseCommunicator::initiateCrossSharing(JobMessage& msg, int sou
         return;
     }
 
-    // reject the cross-sharing initiation if you are not active right now
-    if (_job->getState() != ACTIVE) {
+    // reject the cross-sharing initiation if the job is already terminated
+    if (_job->getState() == PAST) {
         msg.returnToSender(source, MSG_SEND_APPLICATION_MESSAGE);
         return;
     }
