@@ -356,13 +356,7 @@ void AnytimeSatClauseCommunicator::feedLocalClausesIntoCrossSharing(std::vector<
         auto packedComm = comm.serialize();
         msg.payload.resize(packedComm.size() / sizeof(int));
         memcpy(msg.payload.data(), packedComm.data(), packedComm.size());
-        if (_cross_sharing_session) {
-            // some cross-sharing session is still ongoing - defer
-            _deferred_cross_sharing_initiation_msgs.push_back(std::move(msg));
-        } else {
-            // initiate!
-            _job->getJobTree().sendToSelf(msg);
-        }
+        _job->getJobTree().sendToSelf(msg); // will be deferred if cross-comm is already ongoing
     } else if (comm.getCommSize() == 0) {
         LOG(V4_VVER, "CROSSCOMM communicator not ready yet\n");
     }
