@@ -495,9 +495,8 @@ private:
         case 0: {_encoding_strat = MaxSatSearchProcedure::WARNERS_ADDER; break;}
         case 1: {_encoding_strat = MaxSatSearchProcedure::DYNAMIC_POLYNOMIAL_WATCHDOG; break;}
         case 2: {_encoding_strat = MaxSatSearchProcedure::GENERALIZED_TOTALIZER; break;}
-        case 3: {_encoding_strat = pickCardinalityEncoding(true); break;}
+        case 3: {_encoding_strat = pickCardinalityEncoding(); break;}
         case 4: {_encoding_strat = MaxSatSearchProcedure::VIRTUAL; break;}
-        case 5: {_encoding_strat = pickCardinalityEncoding(false); break;}
         default: {_encoding_strat = MaxSatSearchProcedure::NONE; break;}
         }
         LOG(V2_INFO, "MAXSAT Using cardinality encoding %i\n", _encoding_strat);
@@ -579,7 +578,10 @@ private:
 
     // Heuristic picking a suitable cardinality encoding based on the objective function's properties.
     // Obtained by a mix of educated guesses and 1-minute runs on MaxSAT Eval'23 instances.
-    MaxSatSearchProcedure::EncodingStrategy pickCardinalityEncoding(bool allowGte) {
+    MaxSatSearchProcedure::EncodingStrategy pickCardinalityEncoding() {
+
+        // For really tiny objective functions, GTE should always be the cheapest and most direct option.
+        if (_instance->objective.size() <= 5) return MaxSatSearchProcedure::GENERALIZED_TOTALIZER;
 
         // Large objective function or very large sum of weights
         // or very large base formula with decently large objective: Fallback to Adder.
@@ -589,7 +591,7 @@ private:
 
         // Very small sum of weights, few unique weights, and a not too large problem
         // in terms of literals or objective terms: GTE can be used.
-        if (allowGte && _instance->sumOfWeights <= 100 && _instance->nbUniqueWeights <= 20
+        if (_instance->sumOfWeights <= 100 && _instance->nbUniqueWeights <= 20
                 && (_instance->formulaSize <= 10'000'000 || _instance->objective.size() <= 25))
             return MaxSatSearchProcedure::GENERALIZED_TOTALIZER;
 

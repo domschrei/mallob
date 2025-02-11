@@ -5,7 +5,7 @@ set -e
 if [ ! -d rustsat ]; then
     if [ ! -f rustsat.zip ]; then
         # for fixing a branch instead of a commit, prepend "refs/heads/"
-        branchorcommit="f78f9d7a007a00538253dc376696dd39a06d0498"
+        branchorcommit="17a79f5f6d2d11dc415c943c21f238c9d984bda9"
         wget -nc https://github.com/domschrei/rustsat/archive/${branchorcommit}.zip -O rustsat.zip
     fi
     unzip rustsat.zip
