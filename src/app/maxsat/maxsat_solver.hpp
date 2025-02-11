@@ -511,14 +511,28 @@ private:
         _fut_instance_update = ProcessWideThreadPool::get().addTask([this, updateLayer]() {
             auto& update = _instance_update;
             auto parser = StaticMaxSatParserStore::get(_desc.getId());
+
+            // Decide on time limit based on the current preprocessing layer
+            // and time remaining until external (job-specific and global) time limits are hit
             float time = Timer::elapsedSeconds();
-            parser->preprocess(_params.maxPreTechniquesPost(), 0, _params.maxPreTimeoutPost() * std::pow(2, updateLayer));
+            float timeLimit = _params.maxPreTimeoutPost() * std::pow(2, updateLayer);
+            if (_desc.getWallclockLimit() > 0)
+                timeLimit = std::min(timeLimit, std::max(0.01f, _desc.getWallclockLimit() - (time - _start_time)));
+            if (_params.timeLimit() > 0)
+                timeLimit = std::min(timeLimit, std::max(0.01f, _params.timeLimit() - time));
+
+            // Perform actual preprocessing
+            parser->preprocess(_params.maxPreTechniquesPost(), 0, timeLimit);
+
+            // Report finished MaxPRE run
             const float timePreprocess = Timer::elapsedSeconds() - time;
             parser->getInstance(update.formula, update.objective, update.nbVars, update.nbReadClauses);
-            LOG(V3_VERB, "MAXSAT MaxPRE layer=%i stat lits:%i vars:%i cls:%i obj:%lu lb:%lu ub:%lu\n",
+            LOG(V3_VERB, "MAXSAT MaxPRE layer=%i stat lits:%i vars:%i cls:%i obj:%lu lb:%lu ub:%lu timegranted:%.4f timetaken:%.4f\n",
                 update.preprocessLayer, update.formula.size(), update.nbVars, update.nbReadClauses,
-                update.objective.size(), parser->get_lb(), parser->get_ub());
-            LOG(V3_VERB, "MAXSAT MaxPRE' time preprocess:%.3f\n", timePreprocess);
+                update.objective.size(), parser->get_lb(), parser->get_ub(),
+                timeLimit, timePreprocess);
+
+            // Assess result
             if (update.formula.size() == 0 && update.nbVars == 0) {
                 // Error in MaxPRE
                 _update_result.error = true;

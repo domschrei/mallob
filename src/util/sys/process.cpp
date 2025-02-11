@@ -158,7 +158,10 @@ pthread_t Process::getPthreadId() {
     return pthread_self();
 }
 void Process::wakeUpThread(pthread_t pthreadId) {
-    pthread_kill(pthreadId, SIGUSR1);
+    sendPthreadSignal(pthreadId, SIGUSR1);
+}
+void Process::sendPthreadSignal(pthread_t pthreadId, int sig) {
+    pthread_kill(pthreadId, sig);
 }
 
 bool Process::didChildExit(pid_t childpid, int* exitStatusOut) {

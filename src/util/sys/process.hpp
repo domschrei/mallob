@@ -43,6 +43,7 @@ public:
 
     static pthread_t getPthreadId();
     static void wakeUpThread(pthread_t pthreadId);
+    static void sendPthreadSignal(pthread_t pthreadId, int sig);
 
     static void forwardTerminateToChildren();
 
