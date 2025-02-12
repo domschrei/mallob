@@ -346,7 +346,7 @@ void ForkedSatJob::startDestructThreadIfNecessary() {
     if (!_destruction.valid() && !_shmem_freed) {
         LOG(V4_VVER, "%s : FSJ freeing mem\n", toStr());
         _destruction = ProcessWideThreadPool::get().addTask([this]() {
-            Watchdog watchdog(true, 1'000, true);
+            Watchdog watchdog(_params.watchdog(), 1'000, true);
             watchdog.setWarningPeriod(1'000);
             watchdog.setAbortPeriod(30'000);
             _solver->waitUntilChildExited();

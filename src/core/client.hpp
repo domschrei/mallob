@@ -101,8 +101,11 @@ private:
     // Safeguards _done_jobs.
     Mutex _done_job_lock; 
 
-    std::list<std::future<void>> _done_job_futures;
-    std::list<bool> _done_job_futures_finished;
+    struct PendingSubtask {
+        std::future<void> future;
+        bool done {false};
+    };
+    std::list<PendingSubtask> _pending_subtasks;
 
     std::atomic_int _num_jobs_to_interrupt = 0;
     std::list<std::pair<int, int>> _jobs_to_interrupt; // job id, revision

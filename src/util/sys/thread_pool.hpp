@@ -49,6 +49,7 @@ public:
             _threads.emplace_back([&, i]() {runThread(i);});
         }
         _checker_thread = std::thread([&]() {
+            Proc::nameThisThread("PoolWatcher");
             _checker_thread_tid = Process::getPthreadId();
             while (!_terminate) {
                 usleep(1000*500); // will be interrupted as needed

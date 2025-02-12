@@ -128,7 +128,7 @@ void SatProcessAdapter::doInitialize() {
 
     // Set up a watchdog
     auto thisTid = Proc::getTid();
-    Watchdog watchdog(true, 500, true, [&, childPid=res]() {
+    Watchdog watchdog(_params.watchdog(), 500, true, [&, childPid=res]() {
         // In case of a freeze, trace the child process itself
         Process::writeTrace(childPid);
     });

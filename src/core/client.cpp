@@ -430,7 +430,7 @@ void Client::advance() {
     }
 
     // Any "done job" processings still pending?
-    if (_done_job_futures.empty()) {
+    if (_pending_subtasks.empty()) {
         // -- no: check if job limit has been reached
 
         bool jobLimitReached = false;
@@ -451,10 +451,9 @@ void Client::advance() {
         }
     } else {
         // processings pending - try to join done tasks
-        while (!_done_job_futures_finished.empty() && _done_job_futures_finished.front()) {
-            _done_job_futures.front().get();
-            _done_job_futures.pop_front();
-            _done_job_futures_finished.pop_front();
+        while (!_pending_subtasks.empty() && _pending_subtasks.front().done) {
+            _pending_subtasks.front().future.get();
+            _pending_subtasks.pop_front();
         }
     }
 }
@@ -639,8 +638,8 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     if (constructSolutionStrings) {
 
         // Disable all watchdogs to avoid crashes while printing a huge model
-        if (jobResult.getSolutionSize() > 1'000'000)
-            Watchdog::disableGlobally();
+        // if (jobResult.getSolutionSize() > 1'000'000)
+        //     Watchdog::disableGlobally();
 
         auto json = app_registry::getJobSolutionFormatter(desc.getApplicationId())(
             _params, jobResult, desc.getStatistics());
@@ -681,9 +680,9 @@ void Client::handleSendJobResult(MessageHandle& handle) {
 
     if (_json_interface) {
         JobResult* resultPtr = new JobResult(std::move(jobResult));
-        _done_job_futures_finished.push_back(false);
-        bool* futFinished = &_done_job_futures_finished.back();
-        auto fut = ProcessWideThreadPool::get().addTask(
+        _pending_subtasks.emplace_back();
+        bool* futFinished = &_pending_subtasks.back().done;
+        _pending_subtasks.back().future = ProcessWideThreadPool::get().addTask(
             [interface = _json_interface.get(), 
             result = resultPtr, 
             stats = desc.getStatistics(),
@@ -694,7 +693,6 @@ void Client::handleSendJobResult(MessageHandle& handle) {
             delete result;
             *futFinished = true;
         });
-        _done_job_futures.push_back(std::move(fut));
     }
 
     Logger::getMainInstance().flush();
@@ -736,13 +734,13 @@ void Client::finishJob(int jobId, bool hasIncrementalSuccessors) {
             _done_jobs[jobId] = DoneInfo{j.desc->getRevision(), j.desc->getChecksum()};
             if (hasIncrementalSuccessors) break;
             // delete resources (ClientSideJob and its JobDescription) concurrently
-            _done_job_futures_finished.push_back(false);
-            bool* futDone = &_done_job_futures_finished.back();
-            _done_job_futures.push_back(ProcessWideThreadPool::get().addTask(
+            _pending_subtasks.emplace_back();
+            bool* futDone = &_pending_subtasks.back().done;
+            _pending_subtasks.back().future = ProcessWideThreadPool::get().addTask(
                 [&, futDone, j = new ClientSideJob(std::move(j))]() {
                 delete j;
                 *futDone = true;
-            }));
+            });
             _done_client_side_jobs.erase(it);
             break;
         }
@@ -771,9 +769,9 @@ Client::~Client() {
 
     Watchdog watchdog(_params.watchdog(), 1'000, true);
     watchdog.setWarningPeriod(1'000);
-    watchdog.setAbortPeriod(10'000);
+    watchdog.setAbortPeriod(20'000);
 
-    for (auto& fut : _done_job_futures) fut.get();
+    for (auto& pending : _pending_subtasks) pending.future.get();
 
     if (_json_interface) _json_interface->deactivate();
 

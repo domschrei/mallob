@@ -27,6 +27,7 @@
 #include "util/string_utils.hpp"
 #include "util/sys/terminator.hpp"
 #include "util/params.hpp"
+#include "util/sys/watchdog.hpp"
 #if MALLOB_USE_MAXPRE == 1
 #include "parse/static_maxsat_parser_store.hpp"
 #endif
@@ -79,6 +80,7 @@ private:
     } _update_result;
     bool _maxpre_run_done {false};
     std::future<void> _fut_instance_update;
+    std::atomic_long _maxpre_tid;
 
 public:
     // Initializes the solver instance and parses the description's formula.
@@ -94,6 +96,9 @@ public:
 #if MALLOB_USE_MAXPRE == 1
         // join with background MaxPRE preprocessor 
         if (_fut_instance_update.valid()) {
+            while (_maxpre_tid == 0) {usleep(1000);}
+            Watchdog watchdog(_params.watchdog(), 1000, true, [tid = _maxpre_tid.load()]() {Process::writeTrace(tid);});
+            watchdog.setAbortPeriod(15'000);
             int jobId = _desc.getId();
             LOG(V2_INFO, "MAXSAT interrupt MaxPRE of #%i asynchronously\n", jobId);
             StaticMaxSatParserStore::get(jobId)->interruptAsynchronously();
@@ -333,6 +338,7 @@ public:
             if (_maxpre_run_done) {
                 _maxpre_run_done = false;
                 _fut_instance_update.get();
+                _maxpre_tid = 0;
                 LOG(V2_INFO, "MAXSAT processing MaxPRE result\n");
 
                 // Did the preprocessor find improved bounds?
@@ -509,6 +515,7 @@ private:
         _instance_update.prepareForNext(_instance->lowerBound, _instance->upperBound);
         LOG(V3_VERB, "MAXSAT calling MaxPRE concurrently\n");
         _fut_instance_update = ProcessWideThreadPool::get().addTask([this, updateLayer]() {
+            _maxpre_tid = Proc::getTid();
             auto& update = _instance_update;
             auto parser = StaticMaxSatParserStore::get(_desc.getId());
 
