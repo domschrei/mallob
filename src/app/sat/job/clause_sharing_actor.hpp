@@ -52,6 +52,8 @@ public:
     virtual void setClauseBufferRevision(int revision) = 0;
     virtual void updateBestFoundSolutionCost(long long bestFoundSolutionCost) = 0;
 
+    virtual Parameters getClauseStoreParams() const = 0;
+
     float updateSharingCompensationFactor() {
 
         int nbAdmittedLits = getLastAdmittedNumLits();

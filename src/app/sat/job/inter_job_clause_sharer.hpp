@@ -63,6 +63,7 @@ private:
     size_t _last_num_cross_cls_to_import {0};
     size_t _last_num_admitted_cross_cls_to_import {0};
 
+    int _nb_orig_variables {0};
     int _min_admissible_var {-1};
     int _max_admissible_var {INT32_MAX};
 
@@ -72,7 +73,7 @@ public:
     InterJobClauseSharer(const Parameters& params, int groupId, ctx_id_t contextId, const std::string& label) :
         ClauseSharingActor(params), _group_id(groupId), _context_id(contextId), _label(label),
         _single_buf_lim(std::max(100'000, (int)params.clauseBufferLimitParam())),
-        _clause_store(new StaticClauseStore<false>(params,
+        _clause_store(new StaticClauseStore<false>(getClauseStoreParams(),
                     false, 256, true,
                     _single_buf_lim*params.numExportChunks())),
         _clause_filter(new ExactClauseFilter(*_clause_store, params.clauseFilterClearInterval(), params.strictClauseLengthLimit()+ClauseMetadata::numInts())),
@@ -85,21 +86,26 @@ public:
         _comm_rank = commRank;
     }
 
+    void setOriginalNbVariables(int nbVars) {
+        _nb_orig_variables = nbVars;
+        LOG(V4_VVER, "XTCS %i orig vars\n", _nb_orig_variables);
+    }
     void setAdmissibleVariableRange(int minVar, int maxVar) {
         _min_admissible_var = std::max(0, minVar);
         _max_admissible_var = maxVar < 0 ? INT_MAX : maxVar;
-        LOG(V4_VVER, "CROSSCOMM limit var interval to [%i,%i]\n", _min_admissible_var, _max_admissible_var);
+        LOG(V4_VVER, "XTCS limit var interval to [%i,%i]\n", _min_admissible_var, _max_admissible_var);
     }
 
     void addInternalSharedClauses(std::vector<int>& clauses) {
         BufferReader reader = _clause_store->getBufferReader(clauses.data(), clauses.size());
         size_t nbAdded = 0;
+        size_t nbOriginal = 0; // # added clauses that only have original problem variables
         size_t nbBlocked = 0;
         while (true) {
             Mallob::Clause clause = reader.getNextIncomingClause();
             if (!clause.begin) break;
 
-            // block clauses featuring non-admissible variables
+            // Block clauses featuring non-admissible variables
             for (int i = ClauseMetadata::numInts(); i < clause.size; i++) {
                 const int v = std::abs(clause.begin[i]);
                 if (v < _min_admissible_var || v > _max_admissible_var) {
@@ -110,10 +116,30 @@ public:
             }
             if (!clause.begin) continue;
 
-            _export_manager->produce(clause.begin, clause.size, clause.lbd, 0, _epoch);
+            // Adjust LBD value according to incremental variable domain heuristic
+            int clauseLbd = clause.lbd;
+            if (_cs_params.incrementalVariableDomainHeuristic() >= 1) {
+                clauseLbd = clause.size-ClauseMetadata::numInts() == 1 ? 1 : 2;
+                bool original = true;
+                for (int i = ClauseMetadata::numInts(); i < clause.size; i++) {
+                    // Each literal beyond the original variable range incurs a penalty.
+                    if (std::abs(clause.begin[i]) > _nb_orig_variables) {
+                        clauseLbd++;
+                        original = false;
+                    }
+                }
+                // Clamp the "accumulated penalty" to the maximum valid LBD value.
+                clauseLbd = std::min(clauseLbd, clause.size-ClauseMetadata::numInts());
+                nbOriginal += original;
+            }
+
+            _export_manager->produce(clause.begin, clause.size, clauseLbd, 0, _epoch);
             nbAdded++;
         }
-        LOG(V4_VVER, "CROSSCOMM added %lu/%lu ITCS clauses\n", nbAdded, nbAdded+nbBlocked);
+        if (_cs_params.incrementalVariableDomainHeuristic() >= 1)
+            LOG(V4_VVER, "XTCS added %lu/%lu ITCS clauses (%lu original)\n", nbAdded, nbAdded+nbBlocked, nbOriginal);
+        else
+            LOG(V4_VVER, "XTCS added %lu/%lu ITCS clauses\n", nbAdded, nbAdded+nbBlocked);
     }
 
     void updateBestFoundSolutionCost(long long cost) override {
@@ -151,6 +177,18 @@ public:
         return _comm_size;
     }
 
+    virtual Parameters getClauseStoreParams() const override {
+        Parameters params = _cs_params;
+        if (params.incrementalVariableDomainHeuristic() >= 1) {
+            // Prioritize all clauses by heuristic first, length second.
+            params.lbdPriorityInner.set(true);
+            params.lbdPriorityOuter.set(true);
+            // Enable priority-based buffer merging to really enforce the heuristic-first concept.
+            params.priorityBasedBufferMerging.set(true);
+        }
+        return params;
+    }
+
     virtual void prepareSharing() override {
         if (_has_prepared_internal_shared_clauses) return;
         const int size = getBufferLimit(1, true);
@@ -166,7 +204,7 @@ public:
         successfulSolverId = -1;
         numLits = _nb_internal_shared_lits;
         _has_prepared_internal_shared_clauses = false;
-        LOG(V4_VVER, "%s CROSSCOMM contrib size %i\n", _label.c_str(), _internal_shared_clauses.size());
+        LOG(V4_VVER, "%s XTCS contrib size %i\n", _label.c_str(), _internal_shared_clauses.size());
         return _internal_shared_clauses;
     }
     virtual void filterSharing(int epoch, std::vector<int>&& clauseBuf) override {
@@ -213,7 +251,7 @@ public:
             if (builder.append(clause)) hist.increment(clause.size);
         }
 
-        LOG(V4_VVER, "%s CROSSCOMM digest %s\n", _label.c_str(), hist.getReport().c_str());
+        LOG(V4_VVER, "%s XTCS digest %s\n", _label.c_str(), hist.getReport().c_str());
         std::vector<int> output = std::move(builder.extractBuffer());
         broadcastCrossSharedClauses(output, builder.getNumAddedLits());
 

@@ -112,4 +112,5 @@ public:
     virtual int getClausesRevision() const override {return getRevision();}
     virtual const char* getLabel() override {return toStr();}
     virtual int getNbSharingParticipants() const override {return getVolume();}
+    Parameters getClauseStoreParams() const override {return _params;}
 };

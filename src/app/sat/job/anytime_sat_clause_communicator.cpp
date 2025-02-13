@@ -62,8 +62,10 @@ AnytimeSatClauseCommunicator::AnytimeSatClauseCommunicator(const Parameters& par
 }
 
 void AnytimeSatClauseCommunicator::initCrossSharer() {
+    int nbOrigVars = _job->getDescription().getAppConfiguration().fixedSizeEntryToInt("__NV");
     int minVar = _job->getDescription().getAppConfiguration().fixedSizeEntryToInt("__XL");
     int maxVar = _job->getDescription().getAppConfiguration().fixedSizeEntryToInt("__XU");
+    _cross_job_clause_sharer->setOriginalNbVariables(nbOrigVars);
     _cross_job_clause_sharer->setAdmissibleVariableRange(minVar, maxVar);
 }
 
@@ -346,8 +348,9 @@ void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg, int so
 }
 
 void AnytimeSatClauseCommunicator::feedLocalClausesIntoCrossSharing(std::vector<int>& clauses, ClauseSharingSession* session) {
-    _cross_job_clause_sharer->addInternalSharedClauses(clauses);
     _cross_job_clause_sharer->updateBestFoundSolutionCost(session->getBestFoundSolutionCost());
+    if (!_params.crossJobCommunication()) return;
+    _cross_job_clause_sharer->addInternalSharedClauses(clauses);
     auto& comm = _job->getGroupComm();
     if (comm.getCommSize() > 1 && comm.getMyLocalRank() == 0 && _job->getState() == ACTIVE) {
         // build a cross-job clause sharing initiation message
@@ -358,7 +361,7 @@ void AnytimeSatClauseCommunicator::feedLocalClausesIntoCrossSharing(std::vector<
         memcpy(msg.payload.data(), packedComm.data(), packedComm.size());
         _job->getJobTree().sendToSelf(msg); // will be deferred if cross-comm is already ongoing
     } else if (comm.getCommSize() == 0) {
-        LOG(V4_VVER, "CROSSCOMM communicator not ready yet\n");
+        LOG(V4_VVER, "XTCS communicator not ready yet\n");
     }
 }
 
@@ -366,7 +369,7 @@ void AnytimeSatClauseCommunicator::initiateCrossSharing(JobMessage& msg, int sou
 
     if (_cross_sharing_session || !_cross_job_clause_sharer ||
             (!fromDeferredQueue && !_deferred_cross_sharing_initiation_msgs.empty())) {
-        LOG(V3_VERB, "%s CROSSCOMM deferring initiation\n", _job->toStr());
+        LOG(V3_VERB, "%s XTCS deferring initiation\n", _job->toStr());
         _deferred_cross_sharing_initiation_msgs.push_back(msg);
         return;
     }
@@ -383,7 +386,7 @@ void AnytimeSatClauseCommunicator::initiateCrossSharing(JobMessage& msg, int sou
     auto comm = Serializable::get<GroupComm>(bytesOfComm);
     comm.localize(_job->getActorContextId());
     JobTreeSnapshot snapshot = comm.getTreeSnapshot();
-    LOG(V4_VVER, "CROSSCOMM init: %s\n", comm.toStr().c_str());
+    LOG(V4_VVER, "XTCS init: %s\n", comm.toStr().c_str());
     _cross_job_clause_sharer->updateCommunicator(comm.getCommSize(), comm.getMyLocalRank());
     _cross_sharing_session.reset(
         new ClauseSharingSession(_params, _cross_job_clause_sharer.get(), snapshot, nullptr, 0, 1)

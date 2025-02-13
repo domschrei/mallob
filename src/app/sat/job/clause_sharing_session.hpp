@@ -52,6 +52,7 @@ private:
     std::function<void(std::vector<int>&)> _clause_listener;
 
     std::unique_ptr<StaticClauseStore<false>> _merge_store;
+    bool _priority_based_buffer_merging = false;
 
 public:
     ClauseSharingSession(const Parameters& params, ClauseSharingActor* actor, const JobTreeSnapshot& snapshot,
@@ -135,10 +136,9 @@ public:
             if (_params.scrambleLbdScores()) {
                 float time = Timer::elapsedSeconds();
                 // 1. Create reader for shared clause buffer
-                BufferReader reader(_broadcast_clause_buffer.data(),
-                    _broadcast_clause_buffer.size() - aggregation.numMetadataInts(),
-                    _params.strictClauseLengthLimit()+ClauseMetadata::numInts(),
-                    false);
+                initMergeClauseStore();
+                BufferReader reader = _merge_store->getBufferReader(_broadcast_clause_buffer.data(),
+                    _broadcast_clause_buffer.size() - aggregation.numMetadataInts());
                 // 2. Scramble clauses within each clause length w.r.t. LBD scores
                 ClauseBufferLbdScrambler scrambler(_params, reader);
                 auto modifiedClauseBuffer = scrambler.scrambleLbdScores();
@@ -283,19 +283,17 @@ private:
         float time = Timer::elapsedSeconds();
         const int maxEffectiveClsLen = _params.strictClauseLengthLimit()+ClauseMetadata::numInts();
         const int maxFreeEffectiveClsLen = _params.freeClauseLengthLimit()+ClauseMetadata::numInts();
-        if (_params.priorityBasedBufferMerging()) {
-            if (!_merge_store) {
-                _merge_store.reset(new StaticClauseStore<false>(_params, false, 256, true, INT32_MAX));
-            }
+        initMergeClauseStore();
+        if (_priority_based_buffer_merging /*initialized by initMergeClauseStore()!*/) {
             auto merger = BufferMerger(_merge_store.get(), buflim, maxEffectiveClsLen, maxFreeEffectiveClsLen, false);
             for (auto& elem : elems) {
-                merger.add(BufferReader(elem.data(), elem.size(), maxEffectiveClsLen, false));
+                merger.add(_merge_store->getBufferReader(elem.data(), elem.size()));
             }
             merged = merger.mergePriorityBased(_params, _excess_clauses_from_merge, _rng);
         } else {
             auto merger = BufferMerger(buflim, maxEffectiveClsLen, maxFreeEffectiveClsLen, false);
             for (auto& elem : elems) {
-                merger.add(BufferReader(elem.data(), elem.size(), maxEffectiveClsLen, false));
+                merger.add(_merge_store->getBufferReader(elem.data(), elem.size()));
             }
             merged = merger.mergePreservingExcessWithRandomTieBreaking(_excess_clauses_from_merge, _rng);
         }
@@ -338,5 +336,12 @@ private:
         }
 
         return filter;
+    }
+
+    void initMergeClauseStore() {
+        if (_merge_store) return;
+        auto params = _job->getClauseStoreParams();
+        _merge_store.reset(new StaticClauseStore<false>(params, false, 256, true, INT32_MAX));
+        _priority_based_buffer_merging = params.priorityBasedBufferMerging();
     }
 };

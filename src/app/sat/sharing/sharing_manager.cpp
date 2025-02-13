@@ -227,7 +227,7 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 	if (_params.resetLbd() == MALLOB_RESET_LBD_AT_PRODUCE)
 		clauseLbd = effectiveClauseLength;
 
-	if (_params.incrementalVariableDomainHeuristic()) {
+	if (_params.incrementalVariableDomainHeuristic() >= 2) {
 		// Rate the clause based on how many of its literals are "original",
 		// i.e., within the range of original, rev.0 variables.
 		clauseLbd = effectiveClauseLength == 1 ? 1 : 2;
