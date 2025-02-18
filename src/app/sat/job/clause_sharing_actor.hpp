@@ -61,6 +61,7 @@ public:
             _cs_params.clauseBufferBaseSize(), _cs_params.clauseBufferLimitParam(),
             BinaryTreeBufferLimit::BufferQueryMode(_cs_params.clauseBufferLimitMode()));
         float priorCompensationFactor = _compensation_factor;
+        int priorLimit = (int)std::ceil(priorCompensationFactor*defaultBuflim);
 
         if (_cs_params.compensateUnusedSharingVolume()) {
 
@@ -71,9 +72,10 @@ public:
                 // update internal state
                 _accumulated_shared_lits = 0.9f * _accumulated_shared_lits + nbAdmittedLits;
                 _accumulated_desired_lits = std::max(1.f, 0.9f * _accumulated_desired_lits
-                    // as target sharing volume, we want the base, default buffer limit
-                    // but only as far as the number of input literals can actually fill it
-                    + std::min(_last_num_input_lits, (int)defaultBuflim));
+                    // As target sharing volume, we want the base, default buffer limit
+                    // but only as far as the number of input literals can actually fill it.
+                    // To gauge this, we use the ratio between the last incoming lits and the last limit.
+                    + std::min(defaultBuflim * _last_num_input_lits / priorLimit, defaultBuflim));
                 _estimate_incoming_lits = 0.6 * _estimate_incoming_lits + 0.4 * (_last_num_input_lits / _compensation_factor);
                 _estimate_shared_lits = 0.6 * _estimate_shared_lits + 0.4 * (nbAdmittedLits / _compensation_factor);
                 // just for stats
@@ -85,15 +87,16 @@ public:
 
             _compensation_factor = _estimate_shared_lits <= 0 ? 1.0 :
                 (_accumulated_desired_lits - _accumulated_shared_lits + _estimate_incoming_lits) / _estimate_shared_lits;
+            _compensation_factor = 0.2 * priorCompensationFactor + 0.8 * _compensation_factor; // elastic update
         } else {
             _compensation_factor = 1;
         }
 
-        _compensation_factor = std::max(0.1f, std::min((float)_cs_params.maxSharingCompensationFactor(), _compensation_factor));
+        _compensation_factor = std::max(1.0f / _cs_params.maxSharingCompensationFactor(),
+            std::min(_cs_params.maxSharingCompensationFactor(), _compensation_factor));
 
         LOG(V3_VERB, "CS last sharing: %i/%i/%i globally passed ~> c=%.3f\n",
-            nbAdmittedLits, _last_num_input_lits, (int)std::ceil(priorCompensationFactor*defaultBuflim),
-            _compensation_factor);
+            nbAdmittedLits, _last_num_input_lits, priorLimit, _compensation_factor);
 
         return _compensation_factor;
     }
