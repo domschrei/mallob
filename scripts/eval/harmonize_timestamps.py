@@ -16,16 +16,17 @@ for arg in sys.argv[1:]:
         line = line.rstrip()
         if "warmup msg" not in line:
             continue
-        
+
         # 0.655 2 Received warmup msg <= [4]
         #print(line)
         words = line.split(" ")
+        offset = 1 if words[0] == "c" else 0
         try:
-            time = float(words[0])
-            rank = int(words[1])
-            otherRankStr = words[6]
+            time = float(words[offset+0])
+            rank = int(words[offset+1])
+            otherRankStr = words[offset+6]
             otherRank = int(otherRankStr[1:len(otherRankStr)-1])
-            received = words[2] == "Received"
+            received = words[offset+2] == "Received"
 
             recvRank = rank if received else otherRank
             sendRank = otherRank if received else rank
@@ -114,17 +115,18 @@ for arg in sys.argv[1:]:
         line = line.rstrip()
 
         words = line.split(" ")
-        if len(words) < 2:
+        offset = 1 if words[0] == "c" else 0
+        if len(words) < offset+2:
             continue
 
         try:
-            t = float(words[0])
-            r = int(words[1])
+            t = float(words[offset+0])
+            r = int(words[offset+1])
         except ValueError:
             continue
 
         if r in offsets:
-            words[0] = "%.4f" % (t + offsets[r])
+            words[offset+0] = "%.4f" % (t + offsets[r])
             fOut.write(" ".join(words) + "\n")
     fOut.close()
     print("Wrote to", arg + ".harmonized")
