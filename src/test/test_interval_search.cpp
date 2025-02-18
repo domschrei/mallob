@@ -38,6 +38,57 @@ void test() {
     ok = s.getNextBound(bound); assert(ok); LOG(V2_INFO, "Bound %lu\n", bound);
 }
 
+void testIllustrativeExample() {
+    IntervalSearch s(0.5);
+    s.init(0, 199);
+    size_t bound {-1UL};
+    bool ok;
+
+    ok = s.getNextBound(bound); assert(ok); assert(bound == 199 || log_return_false("ERROR: unexpected bound %lu\n", bound));
+    ok = s.getNextBound(bound); assert(ok); assert(bound == 99 || log_return_false("ERROR: unexpected bound %lu\n", bound));
+    ok = s.getNextBound(bound); assert(ok); assert(bound == 149 || log_return_false("ERROR: unexpected bound %lu\n", bound));
+
+    s.stopTestingAndUpdateUpper(149, 120);
+
+    ok = s.getNextBound(bound); assert(ok); assert(bound == 119 || log_return_false("ERROR: unexpected bound %lu\n", bound));
+    ok = s.getNextBound(bound); assert(ok); assert(bound == 49 || log_return_false("ERROR: unexpected bound %lu\n", bound));
+
+    s.stopTestingAndUpdateLower(99);
+
+    ok = s.getNextBound(bound); assert(ok); assert(bound == 109 || log_return_false("ERROR: unexpected bound %lu\n", bound));
+    ok = s.getNextBound(bound); assert(ok); assert(bound == 114 || log_return_false("ERROR: unexpected bound %lu\n", bound));
+}
+
+void testIllustrativeExampleScaled() {
+    IntervalSearch s(0.5);
+    s.init(0, 31);
+    size_t bound {-1UL};
+    bool ok;
+
+    ok = s.getNextBound(bound); assert(ok); assert(bound == 31 || log_return_false("ERROR: unexpected bound %lu\n", bound));
+    LOG(V2_INFO, "S1: %lu\n", bound);
+    ok = s.getNextBound(bound); assert(ok); assert(bound == 15 || log_return_false("ERROR: unexpected bound %lu\n", bound));
+    LOG(V2_INFO, "S2: %lu\n", bound);
+    ok = s.getNextBound(bound); assert(ok); assert(bound == 23 || log_return_false("ERROR: unexpected bound %lu\n", bound));
+    LOG(V2_INFO, "S3: %lu\n", bound);
+
+    // S3 --> stops S1
+    s.stopTestingAndUpdateUpper(23, 20);
+
+    ok = s.getNextBound(bound); assert(ok); assert(bound == 19 || log_return_false("ERROR: unexpected bound %lu\n", bound));
+    LOG(V2_INFO, "S3: %lu\n", bound);
+    ok = s.getNextBound(bound); assert(ok); assert(bound == 7 || log_return_false("ERROR: unexpected bound %lu\n", bound));
+    LOG(V2_INFO, "S1: %lu\n", bound);
+
+    // S2 --> stops S1
+    s.stopTestingAndUpdateLower(15);
+
+    ok = s.getNextBound(bound); assert(ok); assert(bound == 17 || log_return_false("ERROR: unexpected bound %lu\n", bound));
+    LOG(V2_INFO, "S2: %lu\n", bound);
+    ok = s.getNextBound(bound); assert(ok); assert(bound == 18 || log_return_false("ERROR: unexpected bound %lu\n", bound));
+    LOG(V2_INFO, "S1: %lu\n", bound);
+}
+
 void testExhaustive() {
     IntervalSearch s(0.9);
     s.init(0, 1'000'000);
@@ -76,5 +127,6 @@ int main() {
     Logger::init(0, V5_DEBG);
     Process::init(0);
 
-    for (int i=1; i<100; i++) testExhaustive();
+    testIllustrativeExampleScaled();
+    //for (int i=1; i<100; i++) testExhaustive();
 }
