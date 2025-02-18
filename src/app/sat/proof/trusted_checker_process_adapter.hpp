@@ -34,6 +34,7 @@ private:
     Subprocess* _subproc;
     pid_t _child_pid {-1};
     const int _max_num_solvers;
+    const int _global_solver_id;
     const bool _otfc_external_id;
     std::string _proof_directory;
 
@@ -52,9 +53,9 @@ private:
     Mutex _mtx_model;
 
 public:
-    TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars, bool checkModel, int maxNumSolvers, bool plratProofOutput, std::string& proofDir) :
+    TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars, bool checkModel, int maxNumSolvers, int globalSolverId, bool plratProofOutput, std::string& proofDir) :
             _logger(logger), _solver_id(solverId), _nb_vars(nbVars), _op_queue(1<<14),
-            _check_model(checkModel), _max_num_solvers(maxNumSolvers), _otfc_external_id(plratProofOutput),  _proof_directory(proofDir) {}
+            _check_model(checkModel), _max_num_solvers(maxNumSolvers), _global_solver_id(globalSolverId), _otfc_external_id(plratProofOutput),  _proof_directory(proofDir) {}
 
     ~TrustedCheckerProcessAdapter() {
         if (!_f_directives) return;
@@ -83,6 +84,7 @@ public:
         params.fifoFeedback.set(_path_feedback);
         params.checkerOutputPath.set(_proof_directory);
         params.otfcNumSolvers.set(_max_num_solvers);
+        params.otfcSolverId.set(_global_solver_id);
         std::string moreArgs = "-lenient";
         if (_check_model) moreArgs += " -check-model";
         _subproc = new Subprocess(params, "impcheck_check", moreArgs);
