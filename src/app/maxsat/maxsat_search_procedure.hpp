@@ -71,7 +71,7 @@ private:
     std::vector<int> _lits_to_add;
     // vector of assumption literals for the next SAT call
     std::vector<int> _assumptions_to_set;
-    size_t _current_bound;
+    size_t _current_bound {ULONG_MAX};
     bool _solving {false};
     // holds the assumptions which should be added as permanent units
     // if the result is "satisfiable"
@@ -105,7 +105,7 @@ public:
         _username("maxsat#" + std::to_string(_desc.getId())),
         _job_stream(_params, _api, _desc, _running_stream_id++, true),
         _lits_to_add(_instance.formulaData, _instance.formulaData+_instance.formulaSize),
-        _current_bound(_instance.upperBound), _encoding_strat(encStrat), _search_strat(searchStrat), _label(label) {
+        _current_bound(ULONG_MAX), _encoding_strat(encStrat), _search_strat(searchStrat), _label(label) {
 
         _shared_encoder = _params.maxSatSharedEncoder();
         if (!_shared_encoder) {
@@ -171,7 +171,7 @@ public:
         } else {
             _current_bound = boundOverride;
         }
-        if (_encoding_strat == NONE || _search_strat == NAIVE_REFINEMENT)
+        if (_encoding_strat == NONE || _search_strat == NAIVE_REFINEMENT || _current_bound == ULONG_MAX)
             return true;
 
         LOG(V4_VVER, "MAXSAT %s Enforcing bound %lu ...\n", _label.c_str(), _current_bound);
@@ -214,8 +214,9 @@ public:
 
     void solveNonblocking() {
         assert(!_is_encoding && !_future_encoder.valid());
-        LOG(V2_INFO, "MAXSAT %s Calling SAT with bound %lu (%i new lits, %i assumptions)\n",
-            _label.c_str(), _current_bound, _lits_to_add.size(), _assumptions_to_set.size());
+        LOG(V2_INFO, "MAXSAT %s Calling SAT %s (%i new lits, %i assumptions)\n",
+            _label.c_str(), _current_bound==ULONG_MAX ? "bound-free" : ("with bound " + std::to_string(_current_bound)).c_str(),
+            _lits_to_add.size(), _assumptions_to_set.size());
         if (_params.verbosity() >= V5_DEBG) {
             LOG(V5_DEBG, "MAXSAT Literals: %s\n", StringUtils::getSummary(_lits_to_add).c_str());
             LOG(V5_DEBG, "MAXSAT Assumptions: %s\n", StringUtils::getSummary(_assumptions_to_set).c_str());
@@ -268,6 +269,7 @@ public:
                 if (_instance.intervalSearch)
                     _instance.intervalSearch->stopTestingWithoutUpdates(_current_bound);
             }
+            _current_bound = ULONG_MAX;
             return RESULT_UNSAT;
         }
         if (resultCode != RESULT_SAT) {
@@ -275,6 +277,7 @@ public:
             LOG(V2_INFO, "MAXSAT %s Call returned UNKNOWN\n", _label.c_str(), _current_bound);
             if (_instance.intervalSearch)
                 _instance.intervalSearch->stopTestingWithoutUpdates(_current_bound);
+            _current_bound = ULONG_MAX;
             return RESULT_UNKNOWN;
         }
         // Formula is SATisfiable.
@@ -328,8 +331,7 @@ public:
                 _label.c_str(), _current_bound, _instance.bestCost, _instance.lowerBound, _instance.upperBound);
             if (_sol_writer) _sol_writer->appendSolution(cost, solution);
             if (_instance.intervalSearch) {
-                size_t prevBound = std::max(_current_bound, _instance.bestCost); // hardening in case of the above error
-                _instance.intervalSearch->stopTestingAndUpdateUpper(prevBound, cost);
+                _instance.intervalSearch->stopTestingAndUpdateUpper(_current_bound, cost);
             }
         } else {
             LOG(V2_INFO, "MAXSAT %s Bound %lu solved with cost %lu - bounds unchanged\n",
@@ -337,12 +339,8 @@ public:
             if (_instance.intervalSearch)
                 _instance.intervalSearch->stopTestingWithoutUpdates(_current_bound);
         }
-        // Since we found SAT, add assumptions as permanent unit clauses where possible.
-        for (int asmpt : _assumptions_to_persist_upon_sat) {
-            //appendLiteral(asmpt);
-            //appendLiteral(0);
-        }
         _assumptions_to_persist_upon_sat.clear();
+        _current_bound = ULONG_MAX;
         return RESULT_SAT;
     }
 
@@ -371,8 +369,12 @@ public:
     void interrupt(bool terminate = false) {
         assert(_solving);
         if (terminate) _yield_searcher = true;
-        if (_job_stream.interrupt())
-            LOG(V2_INFO, "MAXSAT %s Interrupt solving with bound %lu\n", _label.c_str(), _current_bound);
+        if (_job_stream.interrupt()) {
+            if (_current_bound == ULONG_MAX)
+                LOG(V2_INFO, "MAXSAT %s Interrupt bound-free solving\n", _label.c_str());
+            else
+                LOG(V2_INFO, "MAXSAT %s Interrupt solving with bound %lu\n", _label.c_str(), _current_bound);
+        }
     }
 
     void setDescriptionLabelForNextCall(const std::string& label) {
