@@ -78,14 +78,17 @@ public:
             } else {
                 // Update desire with last sharing results: reduces last desire by under-produced literals
                 int minLimit = std::min((float)_last_global_buffer_limit, priorCompensationFactor*_last_global_buffer_limit);
-                if (_last_num_input_lits < minLimit) _accumulated_desired_lits += _last_num_input_lits - minLimit;
+                if (_last_num_input_lits < minLimit) {
+                    _accumulated_desired_lits += _last_num_input_lits - minLimit;
+                    _total_desired += _last_num_input_lits - minLimit; // just for stats
+                }
                 // update internal state
                 _accumulated_desired_lits = std::max(1.f, accumulationDecay * _accumulated_desired_lits + defaultBuflim);
                 _accumulated_shared_lits = accumulationDecay * _accumulated_shared_lits + nbAdmittedLits;
                 _estimate_incoming_lits = estimateRatio * _estimate_incoming_lits + (1-estimateRatio) * (_last_num_input_lits / _compensation_factor);
                 _estimate_shared_lits = estimateRatio * _estimate_shared_lits + (1-estimateRatio) * (nbAdmittedLits / _compensation_factor);
                 // just for stats
-                _total_desired += _last_num_input_lits - priorCompensationFactor*_last_global_buffer_limit + defaultBuflim;
+                _total_desired += defaultBuflim;
                 _total_shared += nbAdmittedLits;
             }
             LOG(V4_VVER, "CS estinc=%.1f estshr=%.1f accdes=%.1f accshr=%.1f totdes=%lu totshr=%lu\n",
