@@ -214,6 +214,8 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
     job->setArrival(arrival);
     std::vector<std::string> files = json.contains("files") ? 
         json["files"].get<std::vector<std::string>>() : std::vector<std::string>();
+    if (json.contains("checksum"))
+        job->setChecksum({json["checksum"][0], json["checksum"][1]});
 
     // Application-specific configuration
     AppConfiguration config;

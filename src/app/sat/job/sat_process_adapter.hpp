@@ -114,6 +114,7 @@ private:
     Mutex _mtx_revisions;
     Mutex _mtx_state;
     unsigned long _sum_of_revision_sizes {0};
+    Checksum _chksum;
 
     bool _thread_count_update {false};
     int _nb_threads {0};
@@ -122,7 +123,7 @@ private:
 
 public:
     SatProcessAdapter(Parameters&& params, SatProcessConfig&& config,
-        size_t fSize, const int* fLits, size_t aSize, const int* aLits,
+        size_t fSize, const int* fLits, size_t aSize, const int* aLits, Checksum chksum,
         int descId, std::shared_ptr<AnytimeSatClauseCommunicator>& comm);
     ~SatProcessAdapter();
 

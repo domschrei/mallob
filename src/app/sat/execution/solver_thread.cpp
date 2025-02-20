@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <set>
 
+#include "app/sat/data/revision_data.hpp"
 #include "app/sat/job/sat_constants.h"
 #include "solver_thread.hpp"
 #include "util/logger.hpp"
@@ -27,9 +28,7 @@
 #include "util/params.hpp"
 
 SolverThread::SolverThread(const Parameters& params, const SatProcessConfig& config,
-         std::shared_ptr<PortfolioSolverInterface> solver, 
-        size_t fSize, const int* fLits, size_t aSize, const int* aLits,
-        int localId) : 
+         std::shared_ptr<PortfolioSolverInterface> solver, RevisionData firstRevision, int localId) : 
     _params(params), _solver_ptr(solver), _solver(*solver), 
     _logger(_solver.getLogger()),
     _lrat(_solver.getSolverSetup().onTheFlyChecking ? _solver.getLratConnector() : nullptr),
@@ -40,7 +39,7 @@ SolverThread::SolverThread(const Parameters& params, const SatProcessConfig& con
     _portfolio_size = config.mpisize;
     _local_solvers_count = config.threads;
 
-    appendRevision(0, fSize, fLits, aSize, aLits);
+    appendRevision(0, firstRevision);
     _result.result = UNKNOWN;
 
     if (_lrat && _params.derivationErrorChancePerMille() > 0) {
@@ -178,6 +177,7 @@ bool SolverThread::readFormula() {
                     abort();
                 }
                 _solver.addLiteral(_vt.getTldLit(lit));
+                if (_params.useChecksums()) _running_chksum.combine(_vt.getTldLit(lit));
                 _max_var = std::max(_max_var, std::abs(lit));
                 _last_read_lit_zero = lit == 0;
                 //_dbg_lits += std::to_string(lit]) + " ";
@@ -242,19 +242,20 @@ bool SolverThread::readFormula() {
     }
 }
 
-void SolverThread::appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits) {
+void SolverThread::appendRevision(int revision, RevisionData data) {
     {
         auto lock = _state_mutex.getLock();
         _pending_formulae.emplace_back(
             new SerializedFormulaParser(
-                _logger, fSize, fLits,
+                _logger, data.fSize, data.fLits,
                 revision == 0 ? _solver.getSolverSetup().numOriginalClauses : 0
             )
         );
-        LOGGER(_logger, V4_VVER, "Received %i literals: %s\n", fSize, StringUtils::getSummary(fLits, fSize).c_str());
-        _pending_assumptions.emplace_back(aSize, aLits);
-        LOGGER(_logger, V4_VVER, "Received %i assumptions: %s\n", aSize, StringUtils::getSummary(aLits, aSize).c_str());
+        LOGGER(_logger, V4_VVER, "Received %i literals: %s\n", data.fSize, StringUtils::getSummary(data.fLits, data.fSize).c_str());
+        _pending_assumptions.emplace_back(data.aSize, data.aLits);
+        LOGGER(_logger, V4_VVER, "Received %i assumptions: %s\n", data.aSize, StringUtils::getSummary(data.aLits, data.aSize).c_str());
         _latest_revision = revision;
+        _latest_checksum = data.chksum;
         _found_result = false;
         assert(_latest_revision+1 == (int)_pending_formulae.size() 
             || LOG_RETURN_FALSE("%i != %i", _latest_revision+1, _pending_formulae.size()));
@@ -304,6 +305,8 @@ void SolverThread::runOnce() {
     size_t aSize;
     const int* aLits;
     int revision;
+    Checksum chksum {};
+    bool performSolving = true;
     {
         auto lock = _state_mutex.getLock();
 
@@ -312,9 +315,13 @@ void SolverThread::runOnce() {
         auto asmpt = _pending_assumptions.at(revision);
         aSize = asmpt.first; aLits = asmpt.second;
         _in_solve_call = true;
-        if (revision < _latest_revision)
+        if (revision < _latest_revision) {
             _solver.interrupt(); // revision obsolete: stop solving immediately
-        else _solver.uninterrupt(); // make sure solver isn't in an interrupted state
+            performSolving = false; // actually just "pretend" to solve ...
+        } else {
+            _solver.uninterrupt(); // make sure solver isn't in an interrupted state
+            chksum = _latest_checksum; // this checksum belongs to _latest_revision.
+        }
     }
 
     // If necessary, translate assumption literals
@@ -326,21 +333,33 @@ void SolverThread::runOnce() {
         aLits = tldAssumptions.data();
     }
 
+    // append assumption literals to formula hash
+    auto hash = _running_chksum;
+    if (_params.useChecksums()) for (int i = 0; i < aSize; i++) hash.combine(aLits[i]);
+
+    // Ensure that the checksums match (except if we're not in the latest revision)
+    if (chksum.count() > 0 && chksum != hash) {
+        LOGGER(_logger, V0_CRIT, "[ERROR] Checksum fail: expected %lu,%x - computed %lu,%x\n",
+            chksum.count(), chksum.get(), hash.count(), hash.get());
+        abort();
+    }
+
     // Perform solving (blocking)
-    LOGGER(_logger, V4_VVER, "BEGSOL rev. %i (%i assumptions): %s\n", revision, aSize, StringUtils::getSummary(aLits, aSize).c_str());
+    LOGGER(_logger, V4_VVER, "BEGSOL rev. %i (chk %lu,%x, %i assumptions): %s\n", revision, hash.count(), hash.get(),
+        aSize, StringUtils::getSummary(aLits, aSize).c_str());
     //std::ofstream ofs("DBG_" + std::to_string(_solver.getGlobalId()) + "_" + std::to_string(_active_revision));
     //ofs << _dbg_lits << "\n";
     //ofs.close();
     SatResult res;
     if (_solver.supportsIncrementalSat()) {
-        res = _solver.solve(aSize, aLits);
+        res = performSolving ? _solver.solve(aSize, aLits) : UNKNOWN;
     } else {
         // Add assumptions as permanent unit clauses
         for (const int* aLit = aLits; aLit != aLits+aSize; aLit++) {
             _solver.addLiteral(*aLit);
             _solver.addLiteral(0);
         }
-        res = _solver.solve(0, nullptr);
+        res = performSolving ? _solver.solve(0, nullptr) : UNKNOWN;
     }
     // Uninterrupt solver (if it was interrupted)
     {

@@ -230,6 +230,7 @@ public:
     size_t getAssumptionsSize(int revision) const;
     const int* getAssumptionsPayload(int revision) const;
     int getJobDescriptionId(int revision) const;
+    Checksum getChecksum(int revision) const;
 
     size_t getTransferSize(int revision) const;
     

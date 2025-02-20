@@ -34,10 +34,10 @@
 #endif
 
 SatProcessAdapter::SatProcessAdapter(Parameters&& params, SatProcessConfig&& config,
-    size_t fSize, const int* fLits, size_t aSize, const int* aLits, int descId,
-    std::shared_ptr<AnytimeSatClauseCommunicator>& comm) :    
+    size_t fSize, const int* fLits, size_t aSize, const int* aLits, Checksum chksum,
+    int descId, std::shared_ptr<AnytimeSatClauseCommunicator>& comm) :    
         _params(std::move(params)), _config(std::move(config)), _clause_comm(comm),
-        _f_size(fSize), _f_lits(fLits), _a_size(aSize), _a_lits(aLits), _desc_id(descId) {
+        _f_size(fSize), _f_lits(fLits), _a_size(aSize), _a_lits(aLits), _desc_id(descId), _chksum(chksum) {
 
     _desired_revision = _config.firstrev;
     _shmem_id = _config.getSharedMemId(Proc::getPid());
@@ -51,6 +51,7 @@ SatProcessAdapter::SatProcessAdapter(Parameters&& params, SatProcessConfig&& con
     _hsm = new ((char*)mainShmem) SatSharedMemory();
     _hsm->fSize = _f_size;
     _hsm->aSize = _a_size;
+    _hsm->chksum = _chksum;
     _hsm->config = _config;
     _sum_of_revision_sizes += _f_size;
 }

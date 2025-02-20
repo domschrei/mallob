@@ -4,6 +4,7 @@
 #include "../sharing/sharing_manager.hpp"
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/data/portfolio_sequence.hpp"
+#include "app/sat/data/revision_data.hpp"
 #include "app/sat/data/theories/theory_specification.hpp"
 #include "util/logger.hpp"
 #include "util/sys/fileutils.hpp"
@@ -330,24 +331,24 @@ std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSe
 	return solver;
 }
 
-void SatEngine::appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits, bool lastRevisionForNow) {
+void SatEngine::appendRevision(int revision, RevisionData data, bool lastRevisionForNow) {
 	
-	LOGGER(_logger, V4_VVER, "Import rev. %i: %i lits, %i assumptions\n", revision, fSize, aSize);
+	LOGGER(_logger, V4_VVER, "Import rev. %i: %i lits, %i assumptions\n", revision, data.fSize, data.aSize);
 	assert(_revision+1 == revision);
-	_revision_data.push_back(RevisionData{fSize, fLits, aSize, aLits});
+	_revision_data.push_back(data);
 	_sharing_manager->setImportedRevision(revision);
 	
 	for (size_t i = 0; i < _num_active_solvers; i++) {
 		if (revision == 0) {
 			// Initialize solver thread
 			_solver_threads.emplace_back(new SolverThread(
-				_params, _config, _solver_interfaces[i], fSize, fLits, aSize, aLits, i
+				_params, _config, _solver_interfaces[i], data, i
 			));
 		} else {
 			if (_solver_interfaces[i]->getSolverSetup().doIncrementalSolving) {
 				LOGGER(_logger, V4_VVER, "Solver %i is incremental: forward next revision\n", i);
 				// True incremental SAT solving
-				_solver_threads[i]->appendRevision(revision, fSize, fLits, aSize, aLits);
+				_solver_threads[i]->appendRevision(revision, data);
 			} else {
 				LOGGER(_logger, V4_VVER, "Solver %i is non-incremental: phase out\n", i);
 				if (!lastRevisionForNow) {
@@ -372,17 +373,12 @@ void SatEngine::appendRevision(int revision, size_t fSize, const int* fLits, siz
 				s.solverRevision++;
 				_solver_interfaces[i] = createSolver(s);
 				_solver_threads[i] = std::shared_ptr<SolverThread>(new SolverThread(
-					_params, _config, _solver_interfaces[i], 
-					_revision_data[0].fSize, _revision_data[0].fLits, 
-					_revision_data[0].aSize, _revision_data[0].aLits, 
-					i
+					_params, _config, _solver_interfaces[i], _revision_data[0], i
 				));
 				// Load entire formula 
 				for (int importedRevision = 1; importedRevision <= revision; importedRevision++) {
 					auto data = _revision_data[importedRevision];
-					_solver_threads[i]->appendRevision(importedRevision, 
-						data.fSize, data.fLits, data.aSize, data.aLits
-					);
+					_solver_threads[i]->appendRevision(importedRevision, data);
 				}
 				_sharing_manager->continueClauseImport(i);
 				if (_solvers_started) _solver_threads[i]->start();
@@ -530,8 +526,7 @@ void SatEngine::setActiveThreadCount(int nbThreads) {
 		_solver_interfaces[i] = createSolver(s);
 		auto movedThread = std::move(_solver_threads[i]);
 		_solver_threads[i] = std::shared_ptr<SolverThread>(new SolverThread(
-			_params, _config, _solver_interfaces[i],
-			0, 0, 0, 0, i
+			_params, _config, _solver_interfaces[i], {}, i
 		));
 		_solver_threads[i]->setTerminate();
 		_num_active_solvers--;

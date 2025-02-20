@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "app/sat/data/revision_data.hpp"
 #include "util/params.hpp"
 #include "util/random.hpp"
 #include "util/sys/threading.hpp"
@@ -56,10 +57,12 @@ private:
     ConditionVariable _state_cond;
 
     std::atomic_int _latest_revision = 0;
+    Checksum _latest_checksum;
     std::atomic_int _active_revision = 0;
     unsigned long _imported_lits_curr_revision = 0;
     bool _last_read_lit_zero = true;
     int _max_var = 0;
+    Checksum _running_chksum;
     VariableTranslator _vt;
     bool _has_pseudoincremental_solvers;
 
@@ -72,11 +75,11 @@ private:
 
 public:
     SolverThread(const Parameters& params, const SatProcessConfig& config, std::shared_ptr<PortfolioSolverInterface> solver, 
-                size_t fSize, const int* fLits, size_t aSize, const int* aLits, int localId);
+                RevisionData firstRevision, int localId);
     ~SolverThread();
 
     void start();
-    void appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits);
+    void appendRevision(int revision, RevisionData data);
     void setTerminate(bool cleanUpAsynchronously = false) {
         {
             auto lock = _state_mutex.getLock();

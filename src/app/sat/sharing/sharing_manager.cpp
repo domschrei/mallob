@@ -247,6 +247,20 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 		solverStats->histProduced->increment(clause.size);
 	}
 
+	if (!_groundtruth_model.empty()) {
+		// Check whether the produced clause is satisfied by the ground truth
+		for (int i = ClauseMetadata::numInts(); i < clauseSize; i++) {
+			int lit = clauseBegin[i];
+			int var = std::abs(lit);
+			if (var >= _groundtruth_model.size()) {
+				// TODO error
+			}
+			if (_groundtruth_model[var] != lit) {
+				// TODO error
+			}
+		} 
+	}
+
 	_export_buffer->produce(clauseBegin, clauseSize, clauseLbd, solverId, _internal_epoch);
 	//log(V6_DEBGV, "%i : PRODUCED %s\n", solverId, tldClause.toStr().c_str());
 

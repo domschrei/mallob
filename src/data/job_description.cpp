@@ -95,6 +95,16 @@ int JobDescription::getJobDescriptionId(int revision) const {
     return id;
 }
 
+Checksum JobDescription::getChecksum(int revision) const {
+    Checksum chksum;
+    memcpy(&chksum, getRevisionData(revision)->data()
+           +10*sizeof(int)
+           +2*sizeof(size_t)
+           +3*sizeof(float)
+           +sizeof(bool), sizeof(Checksum));
+    return chksum;
+}
+
 const int* JobDescription::getFormulaPayload(int revision) const {
     size_t pos = getMetadataSize();
     return (const int*) (getRevisionData(revision)->data()+pos);

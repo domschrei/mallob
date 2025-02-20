@@ -66,6 +66,7 @@ void ForkedSatJob::doStartSolver() {
         desc.isRevisionIncomplete(0) ? nullptr : desc.getFormulaPayload(0),
         dummyJob ? std::min(1ul, desc.getAssumptionsSize(0)) : desc.getAssumptionsSize(0),
         desc.getAssumptionsPayload(0),
+        desc.getChecksum(0),
         desc.getJobDescriptionId(0),
         _clause_comm
     ));
@@ -97,7 +98,7 @@ void ForkedSatJob::loadIncrements() {
         }
         revisions.emplace_back(SatProcessAdapter::RevisionData {
             _last_imported_revision,
-            _last_imported_revision == lastRev ? desc.getChecksum() : Checksum(),
+            desc.getChecksum(_last_imported_revision),
             numLits,
             desc.isRevisionIncomplete(_last_imported_revision) ? nullptr : desc.getFormulaPayload(_last_imported_revision),
             numAssumptions,

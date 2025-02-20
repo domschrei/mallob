@@ -71,6 +71,7 @@ private:
     std::vector<int> _lits_to_add;
     // vector of assumption literals for the next SAT call
     std::vector<int> _assumptions_to_set;
+    Checksum _chksum; // for debugging
     size_t _current_bound {ULONG_MAX};
     bool _solving {false};
     // holds the assumptions which should be added as permanent units
@@ -214,13 +215,18 @@ public:
 
     void solveNonblocking() {
         assert(!_is_encoding && !_future_encoder.valid());
-        LOG(V2_INFO, "MAXSAT %s Calling SAT %s (%i new lits, %i assumptions)\n",
+
+        if (_params.useChecksums()) for (int l : _lits_to_add) _chksum.combine(l);
+        auto hash = _chksum;
+        if (_params.useChecksums()) for (int a : _assumptions_to_set) hash.combine(a);
+        LOG(V2_INFO, "MAXSAT %s Calling SAT %s (%i new lits, %i assumptions, chk %lu,%x)\n",
             _label.c_str(), _current_bound==ULONG_MAX ? "bound-free" : ("with bound " + std::to_string(_current_bound)).c_str(),
-            _lits_to_add.size(), _assumptions_to_set.size());
+            _lits_to_add.size(), _assumptions_to_set.size(), hash.count(), hash.get());
         if (_params.verbosity() >= V5_DEBG) {
             LOG(V5_DEBG, "MAXSAT Literals: %s\n", StringUtils::getSummary(_lits_to_add).c_str());
             LOG(V5_DEBG, "MAXSAT Assumptions: %s\n", StringUtils::getSummary(_assumptions_to_set).c_str());
         }
+
         _job_stream.submitNext(std::move(_lits_to_add), _assumptions_to_set,
             _desc_label_next_call,
             // TODO still leading to error at volume_calculator.hpp:137:
@@ -228,7 +234,7 @@ public:
             // as a tie-breaker for the scheduler - considering the highest bounds
             // as the most useful to give resources to.
             // 1.0f + 0.01f * (_current_bound - _instance.lowerBound) / (float) (_instance.upperBound - _instance.lowerBound));
-            0);
+            0, hash);
         _lits_to_add.clear();
         _assumptions_to_set.clear();
         _desc_label_next_call = "";

@@ -2,6 +2,7 @@
 #pragma once
 
 #include "app/maxsat/maxsat_instance.hpp"
+#include "data/checksum.hpp"
 #include "data/job_description.hpp"
 #include "interface/api/api_connector.hpp"
 #include "interface/json_interface.hpp"
@@ -57,13 +58,14 @@ public:
     }
 
     void submitNext(std::vector<int>&& newLiterals, const std::vector<int>& assumptions,
-            const std::string& descriptionLabel = "", float priority = 0) {
+            const std::string& descriptionLabel = "", float priority = 0, Checksum chksum = {}) {
         assert(!_pending);
         assert(newLiterals.empty() || newLiterals.front() != 0);
         assert(newLiterals.empty() || newLiterals.back() == 0);
 
         for (auto key : {"__NV", "__NC", "__NO"})
             _json_base["configuration"][key] = _desc.getAppConfiguration().map.at(key);
+        if (_params.useChecksums()) _json_base["checksum"] = {chksum.count(), chksum.get()};
 
         if (_incremental && _json_base.contains("name")) {
             _json_base["precursor"] = _username + std::string(".") + _json_base["name"].get<std::string>();

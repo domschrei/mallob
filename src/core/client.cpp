@@ -96,9 +96,6 @@ void Client::readIncomingJobs() {
                         dependenciesSatisfied = false; // no job with this ID is done yet
                     else if (data.description->getRevision() != _done_jobs[data.description->getId()].revision+1)
                         dependenciesSatisfied = false; // job with correct revision not done yet
-                    else {
-                        data.description->setChecksum(_done_jobs[data.description->getId()].lastChecksum);
-                    }
                 }
             }
             if (!dependenciesSatisfied) {

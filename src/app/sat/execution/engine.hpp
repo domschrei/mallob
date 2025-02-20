@@ -9,6 +9,7 @@
 #include <vector>
 #include <memory>
 
+#include "app/sat/data/revision_data.hpp"
 #include "app/sat/data/theories/integer_rule.hpp"
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
@@ -43,12 +44,6 @@ private:
 	std::vector<std::shared_ptr<SolverThread>> _obsolete_solver_threads;
 	std::list<std::future<void>> _solver_thread_cleanups;
 
-	struct RevisionData {
-		size_t fSize;
-		const int* fLits;
-		size_t aSize;
-		const int* aLits;
-	};
 	std::vector<RevisionData> _revision_data;
 	
 	bool _solvers_started = false;
@@ -69,8 +64,7 @@ public:
 
 	void solve();
 	void setClauseBufferRevision(int revision);
-	void appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits, 
-		bool lastRevisionForNow = true);
+	void appendRevision(int revision, RevisionData data, bool lastRevisionForNow = true);
 
 	bool isFullyInitialized();
 	int solveLoop();

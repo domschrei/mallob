@@ -99,6 +99,8 @@ protected:
 
 	std::unique_ptr<ClauseLogger> _clause_logger;
 
+	std::vector<int> _groundtruth_model;
+
 public:
 	SharingManager(std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
 			const Parameters& params, const Logger& logger, size_t maxDeferredLitsPerSolver,
