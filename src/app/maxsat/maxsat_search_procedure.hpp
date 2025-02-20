@@ -63,6 +63,7 @@ private:
     APIConnector& _api; // for submitting jobs to Mallob
     JobDescription& _desc; // contains our instance to solve and all metadata
     MaxSatInstance& _instance;
+    int _nb_orig_vars;
 
     std::string _username;
     SatJobStream _job_stream;
@@ -107,6 +108,8 @@ public:
         _job_stream(_params, _api, _desc, _running_stream_id++, true),
         _lits_to_add(_instance.formulaData, _instance.formulaData+_instance.formulaSize),
         _current_bound(ULONG_MAX), _encoding_strat(encStrat), _search_strat(searchStrat), _label(label) {
+
+        _nb_orig_vars = _instance.nbVars; // before cardinality constraint encodings!
 
         _shared_encoder = _params.maxSatSharedEncoder();
         if (!_shared_encoder) {
@@ -332,6 +335,7 @@ public:
             _instance.upperBound = std::min(_instance.upperBound, cost);
             _instance.bestCost = cost;
             _instance.bestSolution = solution;
+            _instance.bestSolution.resize(_nb_orig_vars+1); // truncate to original variables
             _instance.bestSolutionPreprocessLayer = _instance.preprocessLayer;
             LOG(V2_INFO, "MAXSAT %s Bound %lu solved with cost %lu - new bounds: (%lu,%lu)\n",
                 _label.c_str(), _current_bound, _instance.bestCost, _instance.lowerBound, _instance.upperBound);

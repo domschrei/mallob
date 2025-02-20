@@ -117,7 +117,7 @@ public:
         std::list<std::unique_ptr<MaxSatSearchProcedure>> searches;
         std::shared_ptr<SolutionWriter> writer;
         if (_params.maxSatSolutionFile.isSet())
-            writer.reset(new SolutionWriter(_instance->nbVars, _params.maxSatSolutionFile()));
+            writer.reset(new SolutionWriter(_instance->nbVars, _params.maxSatSolutionFile(), _params.compressModels()));
 
         if (_start_time < 0) _start_time = Timer::elapsedSeconds();
 

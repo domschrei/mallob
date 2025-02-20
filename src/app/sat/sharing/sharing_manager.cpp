@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <utility>
 
+#include "app/sat/data/model_string_compressor.hpp"
 #include "app/sat/sharing/clause_logger.hpp"
 #include "app/sat/sharing/filter/clause_buffer_lbd_scrambler.hpp"
 #include "app/sat/sharing/filter/filter_vector_builder.hpp"
@@ -137,6 +138,13 @@ SharingManager::SharingManager(
 	if (_job_index == 0 && _params.clauseLog.isSet()) {
 		_clause_logger.reset(new ClauseLogger(_params.clauseLog()));
 	}
+
+	if (_params.groundTruthModel.isSet()) {
+		std::ifstream ifs(_params.groundTruthModel());
+		std::string modelStr;
+		ifs >> modelStr;
+		_groundtruth_model = ModelStringCompressor::decompress(modelStr);
+	}
 }
 
 void SharingManager::onProduceClause(int solverId, int solverRevision, const Clause& clause, const std::vector<int>& condLits, bool recursiveCall) {
@@ -249,16 +257,20 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 
 	if (!_groundtruth_model.empty()) {
 		// Check whether the produced clause is satisfied by the ground truth
+		bool ok = false;
 		for (int i = ClauseMetadata::numInts(); i < clauseSize; i++) {
 			int lit = clauseBegin[i];
 			int var = std::abs(lit);
-			if (var >= _groundtruth_model.size()) {
-				// TODO error
-			}
-			if (_groundtruth_model[var] != lit) {
-				// TODO error
+			if (var < _groundtruth_model.size() && _groundtruth_model[var] == lit) {
+				ok = true;
+				break;
 			}
 		} 
+		if (!ok) {
+			LOGGER(_logger, V0_CRIT, "[ERROR] Unable to satisfy learned clause %s with ground truth model!\n",
+				Mallob::Clause(clauseBegin, clauseSize, clauseLbd).toStr().c_str());
+			abort();
+		}
 	}
 
 	_export_buffer->produce(clauseBegin, clauseSize, clauseLbd, solverId, _internal_epoch);
