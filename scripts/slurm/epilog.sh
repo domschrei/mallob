@@ -1,0 +1,42 @@
+#!/bin/bash
+
+build=$MALLOB_BUILDDIR
+globallogdir=$MALLOB_GLOBALLOGDIR
+localtmpdir=$MALLOB_LOCALTMPDIR
+outputlogdir=$MALLOB_OUTPUTLOGDIR
+numnodes=$MALLOB_NUMNODES
+
+# Only a single process on each node gets to run this cleanup script
+if ! mkdir /tmp/.epilog.lock 2>/dev/null ; then exit ; fi
+
+# Assemble destination directory path, exit if everything's already done
+dest="$outputlogdir/$(basename $globallogdir)"
+if [ -f "$dest/.alldone" ]; then exit ; fi
+
+>&2 echo "$(date) EPILOG $(hostname): $build $globallogdir $localtmpdir $outputlogdir"
+
+if [ -d "$globallogdir/0" ] ; then
+    # this is the *globally* unique invocation moving directory "0" to the destination:
+    # also output the "instance.txt" file.
+    grep -m 1 "Program options" "$globallogdir/0/log.0" | grep -oP "mono=.*? " | sed 's/mono=//g' | awk '{print $1}' > "$dest/instance.txt" || :
+fi
+
+# move global log dir to output log dir
+prevdir=$(pwd)
+cd $globallogdir
+for x in * ; do
+    if [ -d $x ]; then mv $x/* "$dest/$x/"; fi
+    if [ -f $x ]; then mv $x "$dest/"; fi
+done
+cd $prevdir
+
+# Barrier across hosts (note that we clean up the lock directory afterwards)
+touch "$dest/.done.$(hostname)"
+while [ $(ls $dest/.done.* | wc -l) -lt $numnodes ]; do sleep 1; done
+touch "$dest/.alldone"
+
+# Clean up orphaned processes and tmp directory
+killall -9 $build/mallob $build/mallob_sat_process $build/mallob_process_dispatcher 2>/dev/null || :
+rm -rf ${localtmpdir} /dev/shm/edu.kit.iti.mallob.* /tmp/.epilog.lock 2>/dev/null || :
+
+>&2 echo "$(date) END EPILOG $(hostname)"

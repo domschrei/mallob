@@ -3,9 +3,35 @@
 
 This documentation explains how to run Mallob on commodity clusters / supercomputers with the example of SuperMUC-NG.
 
-## Preparations
+## Fetching Dependencies
 
-Some clusters like SuperMUC-NG do not allow internet access on their login nodes. To fetch and build Mallob and its dependencies, we need to use SSHFS (= SSH File System). At your local login point, execute these commands:
+Some clusters like SuperMUC-NG do not allow internet access on their login nodes. Here's two options for how you can still transfer the needed dependencies to the cluster.
+
+### Internet via Proxy
+
+After setting up a SOCKS5 proxy at your host, e.g., via [proxychains](https://github.com/haad/proxychains), you can connect to the cluster as in this example (with port 1537):
+
+    ssh -R 1537:localhost:1537 $ACCTNAME@skx.supermuc.lrz.de
+
+At the destination, append the following to your `~/.bashrc`:
+
+    export http_proxy="localhost:1537"
+    export https_proxy="localhost:1537"
+    export HTTP_PROXY="localhost:1537"
+    export HTTPS_PROXY="localhost:1537"
+
+and the following to `~/.gitconfig`:
+
+    [https]
+        proxy = https://localhost:1537
+    [http]
+        proxy = http://localhost:1537
+
+Commands like `git`, `wget`, and `curl` should now be able to download content over the proxy, which should be sufficient for setting up Mallob and its dependencies.
+
+### SSHFS
+
+Alternatively, you can use SSHFS (= SSH File System). At your local login point, execute these commands:
 
     mkdir cluster
     sshfs USERNAME@skx.supermuc.lrz.de:. cluster
@@ -27,13 +53,11 @@ If you are done with the `cluster` directory, do not forget to unmount:
 
 Login to the cluster. First load the modules necessary for building, like this:
 
-    module load slurm_setup
-    module unload devEnv/Intel/2019 intel-mpi
-    module load gcc/9 intel-mpi/2019-gcc cmake/3.14.5 gdb
+    module load slurm_setup; module unload devEnv/Intel/2019 intel-mpi; module load gcc/11 intel-mpi/2019-gcc cmake/3.21.4 gdb valgrind
 
 In the `mallob` directory with all dependencies fetched, you can build Mallob like this:
 
-    ( cd lib && bash fetch_and_build_sat_solvers.sh kclyg )
+    ( cd lib && bash fetch_and_build_sat_solvers.sh kcly )
     mkdir -p build
     cd build
     CC=$(which mpicc) CXX=$(which mpicxx) cmake -DMALLOB_USE_JEMALLOC=0 ${OPTIONS} ..
@@ -46,7 +70,28 @@ You should now have functional Mallob binaries on the cluster's login node.
 
 ## Submitting a Job
 
-Job submission on most clusters, including SuperMUC-NG, involves the SLURM scheduling system. To request the scheduling of a job, you need to submit an `sbatch` file which contains all relevant metadata of your job as well as its actual execution. 
+Job submission on most clusters, including SuperMUC-NG, involves the SLURM scheduling system. To request the scheduling of a job, you need to submit an `sbatch` file which contains all relevant metadata of your job as well as its actual execution.
+
+### Option A: Job Chaining
+
+Under `scripts/slurm/`, you find some scripts allowing to chain jobs together. Essentially, you create one `sbatch` file for every single `-mono` run of Mallob (i.e., for each input instance) and then just submit a few of them initially, but each `sbatch` file features logic to submit the next un-submitted job as soon as it is done. The advantage of this approach is that every single job is very short, which allows the cluster's scheduler to squeeze them in its schedule, reducing waiting times. Also, the approach is robust w.r.t. crashes in individual runs. A downside is that job chaining requires several rounds of waiting in the job queue (as many as the chains' "depth").
+
+The workflow is as follows:
+
+* Adjust the files `scripts/slurm/run-sat-chained.sh` and `scripts/slurm/postrun.sh` to your liking, especially at the places marked with `TODO`.
+
+* Generate the sbatch files as in the following example command (the last argument is the number of concurrent chains and must be smaller than the maximum number of allowed concurrent jobs per user at your cluster):
+
+    DS_NODES=4 DS_RUNTIME=360 DS_PARTITION=micro DS_SECONDSPERJOB=300 scripts/slurm/generate-job-chain.sh \
+    sat-profiling-newplain-4nodes scripts/slurm/run-sat-chained.sh 1 500 45
+
+* Execute the command output by the previous command, then wait until all jobs have been executed.
+
+* Execute `scripts/slurm/postrun.sh` to merge together all log directories into a single lob directory.
+
+* Postprocess the logs in the output destination directory to your liking.
+
+### Option B: Monolithic sbatch file
 
 Here is an example for an sbatch file `myjob.sh` which describes a job spanning about half an hour on 17 compute nodes (= 816 cores).
 Remember to adjust the `#SBATCH` directives according to your job and to edit the places marked with `TODO`.
