@@ -105,12 +105,16 @@ void Kissat::diversify(int seed) {
         switch (getDiversificationIndex() % 4) {
             case 0: ok = kissat_set_configuration(solver, "sat"); break;
             case 1: /*use default*/ break;
-            case 2: ok = kissat_set_configuration(solver, "plain"); break;
+            case 2:
+                ok = kissat_set_option(solver, "preprocess", 0); assert(ok);
+                ok = kissat_set_option(solver, "simplify", 0); assert(ok);
+                break;
             case 3: kissat_set_option(solver, "eliminate", 0); break;
         }
     } else if (_setup.flavour == PortfolioSequence::PLAIN) {
         LOGGER(_logger, V4_VVER, "plain\n");
-        ok = kissat_set_configuration(solver, "plain");
+        ok = kissat_set_option(solver, "preprocess", 0); assert(ok);
+        ok = kissat_set_option(solver, "simplify", 0); assert(ok);
     } else {
         if (_setup.flavour != PortfolioSequence::DEFAULT) {
             LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");
