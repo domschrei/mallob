@@ -53,7 +53,7 @@ if echo $solvers|grep -q "k"; then
     if [ ! -d kissat ]; then
         if [ ! -f kissat.zip ]; then
             # for fixing a branch instead of a commit, prepend "refs/heads/"
-            branchorcommit="684d210ddf6d66ded6276910e5678a32704bcaff" # updated from A. Biere's 2024 state
+            branchorcommit="1d4d6772519d0a01810ccef3f9ad25533a8b502e" # updated from A. Biere's 2024 state
             wget -nc https://github.com/domschrei/kissat/archive/${branchorcommit}.zip -O kissat.zip
         fi
         unzip kissat.zip

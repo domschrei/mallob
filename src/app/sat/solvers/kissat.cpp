@@ -65,6 +65,8 @@ void Kissat::diversify(int seed) {
     kissat_set_option(solver, "check", 0); // do not check model or derived clauses
     kissat_set_option(solver, "factor", 0); // do not perform bounded variable addition
 
+    kissat_set_option(solver, "profile", _setup.profilingLevel);
+
     // Set random seed
     kissat_set_option(solver, "seed", seed);
 
@@ -211,7 +213,15 @@ bool Kissat::shouldTerminate() {
     return interrupted;
 }
 
-void Kissat::cleanUp() {}
+void Kissat::cleanUp() {
+    if (_setup.profilingLevel > 0) {
+        auto profileFileString = _setup.profilingBaseDir + "/profile." + _setup.jobname
+            + "." + std::to_string(_setup.globalId);
+		LOGGER(_logger, V4_VVER, "Writing profile ...\n");
+		kissat_write_profile(solver, profileFileString.c_str());
+		LOGGER(_logger, V4_VVER, "Profile written\n");
+	}
+}
 
 std::vector<int> Kissat::getSolution() {
 	std::vector<int> result = {0};

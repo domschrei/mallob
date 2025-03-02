@@ -227,11 +227,12 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.sigFormula = appConfig.map["__SIG"];
 	LratConnector* modelCheckingLratConnector {nullptr};
 	setup.nbSkippedIdEpochs = config.nbPreviousBalancingEpochs;
-	if (params.cadicalProfilingLevel() >= 0) {
-		setup.profilingBaseDir = params.cadicalProfilingDir();
+	if (params.satProfilingLevel() >= 0) {
+		setup.profilingBaseDir = params.satProfilingDir();
 		if (setup.profilingBaseDir.empty()) setup.profilingBaseDir = TmpDir::getGeneralTmpDir();
 		setup.profilingBaseDir += "/" + std::to_string(appRank) + "/";
-		setup.profilingLevel = params.cadicalProfilingLevel();
+		FileUtils::mkdir(setup.profilingBaseDir);
+		setup.profilingLevel = params.satProfilingLevel();
 	}
 	setup.objectiveFunction = _objective;
 

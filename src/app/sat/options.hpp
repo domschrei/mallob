@@ -17,8 +17,8 @@ OPTION_GROUP(grpAppSat, "app/sat", "SAT solving options")
     "Copy each formula + assumptions from shared memory to local memory before launching solvers")
  OPT_STRING(clauseLog,                      "clause-log", "",                            "",
     "Log successfully shared clauses to the provided path")
- OPT_STRING(cadicalProfilingDir,            "cpd", "cadical-profiling-dir", "", "Directory to write CaDiCaL profiling reports to")
- OPT_INT(cadicalProfilingLevel,             "cpl", "cadical-profiling-level", -1, -1, 4, "Profiling level for CaDiCaL (-1=none ... 4=all)")
+ OPT_STRING(satProfilingDir,            "spd", "sat-profiling-dir", "", "Directory to write SAT thread profiling reports to")
+ OPT_INT(satProfilingLevel,             "spl", "sat-profiling-level", -1, -1, 4, "Profiling level for SAT solvers (-1=none ... 4=all)")
  OPT_BOOL(compressModels,                   "cm", "compress-models", false, "Compress found models into hexadecimal vector in output")
  OPT_STRING(groundTruthModel,               "gtm", "", "", "Ground truth model to test learned clauses against")
 
