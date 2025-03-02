@@ -86,7 +86,7 @@ if echo $solvers|grep -q "k" && [ ! -f kissat/libkissat.a ]; then
     echo "Building Kissat ..."
 
     cd kissat
-    ./configure --quiet --no-proofs
+    ./configure --no-proofs
     make
     cp build/libkissat.a .
     cd ..
