@@ -65,7 +65,7 @@ private:
         bool begun = false;
         while (i < descriptor.size()) {
             char c = descriptor[i];
-            bool newSolver = std::isalpha(c);
+            bool newSolver = std::isalpha(c) && c!='w';
             if (newSolver) {
                 if (begun) {
                     prefix.push_back(next);
@@ -94,7 +94,7 @@ private:
             case 'v':
                 next.baseSolver = VARIABLE_ADDITION;
                 break;
-            case '(': {
+            case '(': case '[': {
                 if (begun) {
                     prefix.push_back(next);
                     next = Item();
@@ -105,8 +105,8 @@ private:
                 const auto start = i; // position after opening "("
                 int nbOpen = 1;
                 while (i < descriptor.size() && nbOpen > 0) {
-                    if (descriptor[i] == '(') nbOpen++;
-                    if (descriptor[i] == ')') nbOpen--;
+                    if (descriptor[i] == '(' || descriptor[i] == '[') nbOpen++;
+                    if (descriptor[i] == ')' || descriptor[i] == ']') nbOpen--;
                     i++;
                 }
                 const auto end = i-1; // position of closing ")"
@@ -122,7 +122,7 @@ private:
                         i++;
                     }
                     //printf("%i\n", nbReps);
-                } else if (i < descriptor.size() && descriptor[i] == '*') {
+                } else if (i < descriptor.size() && (descriptor[i] == '*' || descriptor[i] == 'w')) {
                     if (!cycle.empty()) return false;
                     isCycle = true;
                 } else return false;
@@ -152,7 +152,7 @@ private:
                 // Proof generation
                 next.outputProof = true;
                 break;
-            case '*':
+            case '*': case 'w':
                 // Last item is the cycle
                 if (!begun) return false;
                 if (!cycle.empty()) return false;
