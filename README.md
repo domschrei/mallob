@@ -164,14 +164,15 @@ where `X` is either 10 (for SAT) or 20 (for UNSAT), and `SIG` is the reported si
 
 ### Portfolio Tweaking
 
-Mallob allows to customize the employed SAT solver backends and some of their flavors. This is done with the `-satsolver` option, which expects a string representing the solver backends to cycle over. The option also allows for a limited set of regular expression symbols. Here are some examples:
+Mallob allows to customize the employed SAT solver backends and some of their flavors. This is done with the `-satsolver` option, which expects a string representing the solver backends to cycle over. The option also allows to specify a "lasso word", i.e., a regex-like expression that consists of a finite prefix followed by an infinitely looping sequence. Here are some examples:
 ```bash
 ... -satsolver='c' # CaDiCaL only.
 ... -satsolver='kcl' # Kissat, CaDiCaL, Lingeling, Kissat, CaDiCaL, Lingeling, Kissat, ...
-... -satsolver='k(c)*' # One Kissat, then only CaDiCaL (always put brackets around the argument of '*')
+... -satsolver='k(c_)*' # One Kissat, then only plain (_) CaDiCaL. Always put brackets around the argument of '*'!
 ... -satsolver='kCLCLcl' # Capital letters indicate using truly incremental SAT solving for incremental jobs
 ... -satsolver='l+(c!){37}' # One Lingeling configured for satisfiable instances (+), then 37 LRAT-producing (!) CaDiCaLs, repeat
 ... -satsolver='(c!){37}k+((c!){37}l+)*' # As above, but replacing the 1st Lingeling with Kissat
+... -satsolver=(c!){37}k+[[c!]{37}l+]w # Alternative notation with squared brackets and automaton-style "omega" (w) to avoid issues with bash
 ```
 
 ## MaxSAT Solving
