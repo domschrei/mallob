@@ -90,6 +90,17 @@ OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversificati
     "Diversify solvers by cycling through sequence of solver-specific configurations")
  OPT_BOOL(diversifyNoise,                   "div-noise",  "",                            false,
     "Diversify solvers by adding Gaussian noise on top of numeric parameters")
+
+ OPT_INT(decayMean,                       "div-noise-max",  "",                       50,     1,   1000,
+  "The mean sampled decay value (used if div-noise=1)")
+ OPT_INT(decayStddev,                       "div-noise-max",  "",                     3,      1,   1000,
+  "The standard deviation for the sampled decay value (used if div-noise=1)")
+ OPT_INT(decayMin,                       "div-noise-min",  "",                        1,      1,   1000,
+    "The minimum allowed sampled decay value (used if div-noise=1)")
+ OPT_INT(decayMax,                       "div-noise-max",  "",                        200,    1,   1000,
+    "The maximum allowed sampled decay value (used if div-noise=1)")
+
+
  OPT_BOOL(diversifySeeds,                   "div-seeds", "",                             true,
     "Diversify solvers with different random seeds")
  OPT_STRING(satSolverSequence,              "satsolver",  "",                            "C",

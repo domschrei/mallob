@@ -218,7 +218,7 @@ CMAKE_TAPI:FILEPATH=CMAKE_TAPI-NOTFOUND
 CMAKE_VERBOSE_MAKEFILE:BOOL=FALSE
 
 //Executable for running MPI programs.
-MPIEXEC_EXECUTABLE:FILEPATH=MPIEXEC_EXECUTABLE-NOTFOUND
+MPIEXEC_EXECUTABLE:FILEPATH=/usr/bin/mpiexec
 
 //Maximum number of processors available to run MPI applications.
 MPIEXEC_MAX_NUMPROCS:STRING=14
@@ -238,22 +238,22 @@ MPIEXEC_PREFLAGS:STRING=
 MPI_CXX_ADDITIONAL_INCLUDE_DIRS:STRING=
 
 //MPI compiler for CXX
-MPI_CXX_COMPILER:FILEPATH=MPI_CXX_COMPILER-NOTFOUND
+MPI_CXX_COMPILER:FILEPATH=/usr/bin/mpicxx
 
 //MPI CXX compiler wrapper include directories
-MPI_CXX_COMPILER_INCLUDE_DIRS:STRING=
+MPI_CXX_COMPILER_INCLUDE_DIRS:STRING=/usr/lib/x86_64-linux-gnu/openmpi/include;/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi
 
 //MPI CXX compilation definitions
 MPI_CXX_COMPILE_DEFINITIONS:STRING=
 
-//MPI CXX compilation flags
+//MPI CXX compilation options
 MPI_CXX_COMPILE_OPTIONS:STRING=
 
 //Path to a file.
-MPI_CXX_HEADER_DIR:PATH=MPI_CXX_HEADER_DIR-NOTFOUND
+MPI_CXX_HEADER_DIR:PATH=/usr/lib/x86_64-linux-gnu/openmpi/include
 
 //MPI CXX libraries to link against
-MPI_CXX_LIB_NAMES:STRING=
+MPI_CXX_LIB_NAMES:STRING=mpi_cxx;mpi
 
 //MPI CXX linker flags
 MPI_CXX_LINK_FLAGS:STRING=
@@ -265,25 +265,31 @@ MPI_CXX_SKIP_MPICXX:BOOL=OFF
 MPI_C_ADDITIONAL_INCLUDE_DIRS:STRING=
 
 //MPI compiler for C
-MPI_C_COMPILER:FILEPATH=MPI_C_COMPILER-NOTFOUND
+MPI_C_COMPILER:FILEPATH=/usr/bin/mpicc
 
 //MPI C compiler wrapper include directories
-MPI_C_COMPILER_INCLUDE_DIRS:STRING=
+MPI_C_COMPILER_INCLUDE_DIRS:STRING=/usr/lib/x86_64-linux-gnu/openmpi/include;/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi
 
 //MPI C compilation definitions
 MPI_C_COMPILE_DEFINITIONS:STRING=
 
-//MPI C compilation flags
+//MPI C compilation options
 MPI_C_COMPILE_OPTIONS:STRING=
 
 //Path to a file.
-MPI_C_HEADER_DIR:PATH=MPI_C_HEADER_DIR-NOTFOUND
+MPI_C_HEADER_DIR:PATH=/usr/lib/x86_64-linux-gnu/openmpi/include
 
 //MPI C libraries to link against
-MPI_C_LIB_NAMES:STRING=
+MPI_C_LIB_NAMES:STRING=mpi
 
 //MPI C linker flags
 MPI_C_LINK_FLAGS:STRING=
+
+//Location of the mpi library for MPI
+MPI_mpi_LIBRARY:FILEPATH=/usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so
+
+//Location of the mpi_cxx library for MPI
+MPI_mpi_cxx_LIBRARY:FILEPATH=/usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so
 
 //Arguments to supply to pkg-config
 PKG_CONFIG_ARGN:STRING=
@@ -300,11 +306,24 @@ mallob_IS_TOP_LEVEL:STATIC=ON
 //Value Computed by CMake
 mallob_SOURCE_DIR:STATIC=/home/nicco/Documents/PhD/mallob
 
+//Dependencies for the target
+mallob_core_LIB_DEPENDS:STATIC=general;m;general;z;general;rt;general;dl;general;lgl;general;yals;general;cadical;general;kissat;
+
+//Dependencies for the target
+mallob_corepluscomm_LIB_DEPENDS:STATIC=general;/usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so;general;/usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so;general;mallob_core;general;m;general;z;general;rt;general;dl;general;lgl;general;yals;general;cadical;general;kissat;
+
+//Dependencies for the target
+mallob_sat_subproc_LIB_DEPENDS:STATIC=general;m;general;z;general;rt;general;dl;general;lgl;general;yals;general;cadical;general;kissat;general;mallob_core;
+
 
 ########################
 # INTERNAL cache entries
 ########################
 
+BASE_COMPILEFLAGS:INTERNAL=
+BASE_INCLUDES:INTERNAL=src;src/util/tsl;lib;/usr/lib/x86_64-linux-gnu/openmpi/include;/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi;/usr/lib/x86_64-linux-gnu/openmpi/include;/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi;/usr/lib/x86_64-linux-gnu/openmpi/include;/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi;/usr/lib/x86_64-linux-gnu/openmpi/include;/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi;lib
+BASE_LIBS:INTERNAL=Threads::Threads;m;z;rt;dl;lgl;yals;cadical;kissat
+BASE_LINK_DIRS:INTERNAL=lib/lingeling;lib/yalsat;lib/cadical;lib/kissat
 //ADVANCED property for variable: CMAKE_ADDR2LINE
 CMAKE_ADDR2LINE-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_AR
@@ -385,6 +404,8 @@ CMAKE_GENERATOR_INSTANCE:INTERNAL=
 CMAKE_GENERATOR_PLATFORM:INTERNAL=
 //Name of generator toolset.
 CMAKE_GENERATOR_TOOLSET:INTERNAL=
+//Test CMAKE_HAVE_LIBC_PTHREAD
+CMAKE_HAVE_LIBC_PTHREAD:INTERNAL=1
 //Source directory with the top level CMakeLists.txt file for this
 // project
 CMAKE_HOME_DIRECTORY:INTERNAL=/home/nicco/Documents/PhD/mallob
@@ -450,6 +471,16 @@ CMAKE_TAPI-ADVANCED:INTERNAL=1
 CMAKE_UNAME:INTERNAL=/usr/bin/uname
 //ADVANCED property for variable: CMAKE_VERBOSE_MAKEFILE
 CMAKE_VERBOSE_MAKEFILE-ADVANCED:INTERNAL=1
+//Details about finding MPI
+FIND_PACKAGE_MESSAGE_DETAILS_MPI:INTERNAL=[TRUE][TRUE][c ][v3.1()]
+//Details about finding MPI_C
+FIND_PACKAGE_MESSAGE_DETAILS_MPI_C:INTERNAL=[/usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so][mpi][/usr/lib/x86_64-linux-gnu/openmpi/include][TRUE][v3.1()]
+//Details about finding MPI_CXX
+FIND_PACKAGE_MESSAGE_DETAILS_MPI_CXX:INTERNAL=[/usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so][/usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so][mpi_cxx;mpi][/usr/lib/x86_64-linux-gnu/openmpi/include][TRUE][v3.1()]
+//Details about finding Threads
+FIND_PACKAGE_MESSAGE_DETAILS_Threads:INTERNAL=[TRUE][v()]
+MALLOB_COREPLUSCOMM_SOURCES:INTERNAL=src/data/app_configuration.cpp;src/data/job_description.cpp;src/data/job_result.cpp;src/interface/json_interface.cpp;src/interface/api/api_connector.cpp;src/util/logger.cpp;src/util/option.cpp;src/util/params.cpp;src/util/permutation.cpp;src/util/random.cpp;src/util/sys/atomics.cpp;src/util/sys/fileutils.cpp;src/util/sys/process.cpp;src/util/sys/proc.cpp;src/util/sys/process_dispatcher.cpp;src/util/sys/shared_memory.cpp;src/util/sys/tmpdir.cpp;src/util/sys/terminator.cpp;src/util/sys/threading.cpp;src/util/sys/thread_pool.cpp;src/util/sys/timer.cpp;src/util/sys/watchdog.cpp;src/util/sys/shmem_cache.cpp;src/util/ringbuf/ringbuf.c;src/util/static_store.cpp;src/app/job.cpp;src/app/app_registry.cpp;src/app/app_message_subscription.cpp;src/balancing/event_driven_balancer.cpp;src/balancing/request_matcher.cpp;src/balancing/routing_tree_request_matcher.cpp;src/comm/msg_queue/message_queue.cpp;src/comm/mpi_base.cpp;src/comm/mympi.cpp;src/comm/sysstate_unresponsive_crash.cpp;src/core/scheduling_manager.cpp;src/data/job_transfer.cpp;src/scheduling/job_scheduling_update.cpp;src/app/dummy/dummy_reader.cpp;src/app/sat/parse/sat_reader.cpp;src/app/sat/execution/solving_state.cpp;src/app/sat/job/anytime_sat_clause_communicator.cpp;src/app/sat/job/forked_sat_job.cpp;src/app/sat/job/sat_process_adapter.cpp;src/app/sat/job/sat_process_config.cpp;src/app/sat/job/historic_clause_storage.cpp;src/app/sat/sharing/buffer/buffer_merger.cpp;src/app/sat/sharing/buffer/buffer_reader.cpp;src/app/sat/sharing/filter/clause_buffer_lbd_scrambler.cpp;src/app/sat/data/clause_metadata.cpp;src/app/sat/proof/lrat_utils.cpp
+MALLOB_CORE_SOURCES:INTERNAL=src/data/app_configuration.cpp;src/data/job_description.cpp;src/data/job_result.cpp;src/interface/json_interface.cpp;src/interface/api/api_connector.cpp;src/util/logger.cpp;src/util/option.cpp;src/util/params.cpp;src/util/permutation.cpp;src/util/random.cpp;src/util/sys/atomics.cpp;src/util/sys/fileutils.cpp;src/util/sys/process.cpp;src/util/sys/proc.cpp;src/util/sys/process_dispatcher.cpp;src/util/sys/shared_memory.cpp;src/util/sys/tmpdir.cpp;src/util/sys/terminator.cpp;src/util/sys/threading.cpp;src/util/sys/thread_pool.cpp;src/util/sys/timer.cpp;src/util/sys/watchdog.cpp;src/util/sys/shmem_cache.cpp;src/util/ringbuf/ringbuf.c;src/util/static_store.cpp
 //ADVANCED property for variable: MPIEXEC_EXECUTABLE
 MPIEXEC_EXECUTABLE-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: MPIEXEC_MAX_NUMPROCS
@@ -476,31 +507,6 @@ MPI_CXX_HEADER_DIR-ADVANCED:INTERNAL=1
 MPI_CXX_LIB_NAMES-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: MPI_CXX_LINK_FLAGS
 MPI_CXX_LINK_FLAGS-ADVANCED:INTERNAL=1
-MPI_CXX_PKG_CFLAGS:INTERNAL=
-MPI_CXX_PKG_CFLAGS_I:INTERNAL=
-MPI_CXX_PKG_CFLAGS_OTHER:INTERNAL=
-MPI_CXX_PKG_FOUND:INTERNAL=
-MPI_CXX_PKG_INCLUDEDIR:INTERNAL=
-MPI_CXX_PKG_LIBDIR:INTERNAL=
-MPI_CXX_PKG_LIBS:INTERNAL=
-MPI_CXX_PKG_LIBS_L:INTERNAL=
-MPI_CXX_PKG_LIBS_OTHER:INTERNAL=
-MPI_CXX_PKG_LIBS_PATHS:INTERNAL=
-MPI_CXX_PKG_MODULE_NAME:INTERNAL=
-MPI_CXX_PKG_PREFIX:INTERNAL=
-MPI_CXX_PKG_STATIC_CFLAGS:INTERNAL=
-MPI_CXX_PKG_STATIC_CFLAGS_I:INTERNAL=
-MPI_CXX_PKG_STATIC_CFLAGS_OTHER:INTERNAL=
-MPI_CXX_PKG_STATIC_LIBDIR:INTERNAL=
-MPI_CXX_PKG_STATIC_LIBS:INTERNAL=
-MPI_CXX_PKG_STATIC_LIBS_L:INTERNAL=
-MPI_CXX_PKG_STATIC_LIBS_OTHER:INTERNAL=
-MPI_CXX_PKG_STATIC_LIBS_PATHS:INTERNAL=
-MPI_CXX_PKG_VERSION:INTERNAL=
-MPI_CXX_PKG_mpi-cxx_INCLUDEDIR:INTERNAL=
-MPI_CXX_PKG_mpi-cxx_LIBDIR:INTERNAL=
-MPI_CXX_PKG_mpi-cxx_PREFIX:INTERNAL=
-MPI_CXX_PKG_mpi-cxx_VERSION:INTERNAL=
 //ADVANCED property for variable: MPI_CXX_SKIP_MPICXX
 MPI_CXX_SKIP_MPICXX-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: MPI_C_ADDITIONAL_INCLUDE_DIRS
@@ -519,41 +525,21 @@ MPI_C_HEADER_DIR-ADVANCED:INTERNAL=1
 MPI_C_LIB_NAMES-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: MPI_C_LINK_FLAGS
 MPI_C_LINK_FLAGS-ADVANCED:INTERNAL=1
-MPI_C_PKG_CFLAGS:INTERNAL=
-MPI_C_PKG_CFLAGS_I:INTERNAL=
-MPI_C_PKG_CFLAGS_OTHER:INTERNAL=
-MPI_C_PKG_FOUND:INTERNAL=
-MPI_C_PKG_INCLUDEDIR:INTERNAL=
-MPI_C_PKG_LIBDIR:INTERNAL=
-MPI_C_PKG_LIBS:INTERNAL=
-MPI_C_PKG_LIBS_L:INTERNAL=
-MPI_C_PKG_LIBS_OTHER:INTERNAL=
-MPI_C_PKG_LIBS_PATHS:INTERNAL=
-MPI_C_PKG_MODULE_NAME:INTERNAL=
-MPI_C_PKG_PREFIX:INTERNAL=
-MPI_C_PKG_STATIC_CFLAGS:INTERNAL=
-MPI_C_PKG_STATIC_CFLAGS_I:INTERNAL=
-MPI_C_PKG_STATIC_CFLAGS_OTHER:INTERNAL=
-MPI_C_PKG_STATIC_LIBDIR:INTERNAL=
-MPI_C_PKG_STATIC_LIBS:INTERNAL=
-MPI_C_PKG_STATIC_LIBS_L:INTERNAL=
-MPI_C_PKG_STATIC_LIBS_OTHER:INTERNAL=
-MPI_C_PKG_STATIC_LIBS_PATHS:INTERNAL=
-MPI_C_PKG_VERSION:INTERNAL=
-MPI_C_PKG_mpi-c_INCLUDEDIR:INTERNAL=
-MPI_C_PKG_mpi-c_LIBDIR:INTERNAL=
-MPI_C_PKG_mpi-c_PREFIX:INTERNAL=
-MPI_C_PKG_mpi-c_VERSION:INTERNAL=
 //Result of TRY_COMPILE
-MPI_RESULT_CXX_test_mpi_normal:INTERNAL=FALSE
+MPI_RESULT_CXX_test_mpi_MPICXX:INTERNAL=TRUE
 //Result of TRY_COMPILE
-MPI_RESULT_C_test_mpi_normal:INTERNAL=FALSE
+MPI_RESULT_CXX_test_mpi_normal:INTERNAL=TRUE
+//Result of TRY_COMPILE
+MPI_RESULT_C_test_mpi_normal:INTERNAL=TRUE
+//ADVANCED property for variable: MPI_mpi_LIBRARY
+MPI_mpi_LIBRARY-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: MPI_mpi_cxx_LIBRARY
+MPI_mpi_cxx_LIBRARY-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: PKG_CONFIG_ARGN
 PKG_CONFIG_ARGN-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: PKG_CONFIG_EXECUTABLE
 PKG_CONFIG_EXECUTABLE-ADVANCED:INTERNAL=1
+SAT_SUBPROC_SOURCES:INTERNAL=src/app/sat/execution/engine.cpp;src/app/sat/execution/solver_thread.cpp;src/app/sat/execution/solving_state.cpp;src/app/sat/job/sat_process_config.cpp;src/app/sat/sharing/buffer/buffer_merger.cpp;src/app/sat/sharing/buffer/buffer_reader.cpp;src/app/sat/sharing/filter/clause_buffer_lbd_scrambler.cpp;src/app/sat/sharing/sharing_manager.cpp;src/app/sat/solvers/cadical.cpp;src/app/sat/solvers/kissat.cpp;src/app/sat/solvers/lingeling.cpp;src/app/sat/solvers/portfolio_solver_interface.cpp;src/app/sat/data/clause_metadata.cpp;src/app/sat/proof/lrat_utils.cpp
 //linker supports push/pop state
 _CMAKE_LINKER_PUSHPOP_STATE_SUPPORTED:INTERNAL=TRUE
-__pkg_config_checked_MPI_CXX_PKG:INTERNAL=1
-__pkg_config_checked_MPI_C_PKG:INTERNAL=1
 

@@ -212,7 +212,7 @@ int main(int argc, char *argv[]) {
     Timer::init();
     Proc::nameThisThread("MainThread");
 
-    cout << "\n\n\nExperimental 2 Branch Nicco\n\n\n" << endl;
+    cout << "Ex 2 Branch" << endl;
 
     int numNodes = MyMpi::size(MPI_COMM_WORLD);
     int rank = MyMpi::rank(MPI_COMM_WORLD);

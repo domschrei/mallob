@@ -156,7 +156,7 @@ void Kissat::diversify(int seed) {
         // Randomize score decay
         double meanDecay = kissat_get_option(solver, "decay");
         distribution.configure(Distribution::NORMAL, std::vector<double>{
-            /*mean=*/meanDecay, /*stddev=*/3, /*min=*/1, /*max=*/200
+            /*mean=*/(double)_setup.decayMean, /*stddev=*/(double)_setup.decayStddev, /*min=*/(double)_setup.decayMin, /*max=*/(double)_setup.decayMax
         });
         int decay = (int) std::round(distribution.sample());
         kissat_set_option(solver, "decay", decay);
