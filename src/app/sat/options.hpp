@@ -88,23 +88,14 @@ OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversificati
     "Diversify solvers based on random sparse variable phases in addition to native diversification")
  OPT_BOOL(diversifyNative,                 "div-native",  "",                            true,
     "Diversify solvers by cycling through sequence of solver-specific configurations")
- OPT_BOOL(diversifyNoise,                   "div-noise",  "",                            false,
-    "Diversify solvers by adding Gaussian noise on top of numeric parameters")
-
- OPT_INT(decayMean,                       "div-noise-max",  "",                       50,     1,   1000,
-  "The mean sampled decay value (used if div-noise=1)")
- OPT_INT(decayStddev,                       "div-noise-max",  "",                     3,      1,   1000,
-  "The standard deviation for the sampled decay value (used if div-noise=1)")
- OPT_INT(decayMin,                       "div-noise-min",  "",                        1,      1,   1000,
-    "The minimum allowed sampled decay value (used if div-noise=1)")
- OPT_INT(decayMax,                       "div-noise-max",  "",                        200,    1,   1000,
-    "The maximum allowed sampled decay value (used if div-noise=1)")
-
-
- OPT_BOOL(diversifySeeds,                   "div-seeds", "",                             true,
-    "Diversify solvers with different random seeds")
+ OPT_BOOL(diversifyNoise,                  "div-noise",  "",                            false,             "Diversify solvers by adding Gaussian noise on top of numeric parameters")
+ OPT_INT(decayMean,                        "decayMean",  "",                       50,     1,   1000,    "The mean for sampling the decay value                (used for div-noise=1)")
+ OPT_INT(decayStddev,                      "decayStddev",  "",                     3,      1,   1000,    "The standard deviation for sampling the decay value  (used for div-noise=1)")
+ OPT_INT(decayMin,                         "decayMin",  "",                        1,      1,   1000,    "The minimum cutoff for sampling a decay value        (used for div-noise=1)")
+ OPT_INT(decayMax,                         "decayMax",  "",                        200,    1,   1000,    "The maximum cutoff for sampling a decay value        (used for div-noise=1)")
+ OPT_BOOL(diversifySeeds,                   "div-seeds", "",                             true,              "Diversify solvers with different random seeds")
  OPT_STRING(satSolverSequence,              "satsolver",  "",                            "C",
-    "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")
+ "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")
 
 OPTION_GROUP(grpAppSatProof, "app/sat/proof", "Production of UNSAT proofs")
  OPT_STRING(proofDirectory,               "proof-dir", "",                             "",                      "Directory to write partial proofs into (default: -log option")
