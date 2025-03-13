@@ -154,6 +154,7 @@ void Kissat::diversify(int seed) {
         kissat_set_option(solver, "restartint", restartFrequency);
 
         // Randomize score decay
+        int decay = kissat_get_option(solver, "decay");
 
         //Sample from Gaussian
         if(_setup.decayDistribution==0) {
@@ -161,7 +162,7 @@ void Kissat::diversify(int seed) {
             distribution.configure(Distribution::NORMAL, std::vector<double>{
                 /*mean=*/(double)_setup.decayMean, /*stddev=*/(double)_setup.decayStddev, /*min=*/(double)_setup.decayMin, /*max=*/(double)_setup.decayMax
             });
-            int decay = (int) std::round(distribution.sample());
+            decay = (int) std::round(distribution.sample());
             kissat_set_option(solver, "decay", decay);
         }
         //Sample from Uniform
@@ -169,7 +170,7 @@ void Kissat::diversify(int seed) {
             distribution.configure(Distribution::UNIFORM, std::vector<double>{
                 /*min=*/(double)_setup.decayMin, /*max=*/(double)_setup.decayMax
             });
-            int decay = (int) std::round(distribution.sample());
+            decay = (int) std::round(distribution.sample());
             kissat_set_option(solver, "decay", decay);
         }
 
