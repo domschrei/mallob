@@ -93,7 +93,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 			ClauseMetadata::enableClauseSignatures();
 
 			if (_params.plratProofOutput()) {
-				proofDirectory = params.proofDirectory() + "/plrat/" + std::to_string(config.jobid);
+				// proofDirectory = params.proofDirectory() + "/plrat/" + std::to_string(config.jobid); // bad for testing
+				proofDirectory = params.proofDirectory(); 
 				FileUtils::mkdir(proofDirectory); 
 			}
 		}
