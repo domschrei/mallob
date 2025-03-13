@@ -33,6 +33,10 @@ private:
     FILE* _f_feedback;
     Subprocess* _subproc;
     pid_t _child_pid {-1};
+    const int _max_num_solvers;
+    const int _global_solver_id;
+    const bool _otfc_external_id;
+    std::string _proof_directory;
 
     const int _solver_id;
     const int _nb_vars;
@@ -49,9 +53,9 @@ private:
     Mutex _mtx_model;
 
 public:
-    TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars, bool checkModel) :
+    TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars, bool checkModel, int maxNumSolvers, int globalSolverId, bool plratProofOutput, std::string& proofDir) :
             _logger(logger), _solver_id(solverId), _nb_vars(nbVars), _op_queue(1<<14),
-            _check_model(checkModel) {}
+            _check_model(checkModel), _max_num_solvers(maxNumSolvers), _global_solver_id(globalSolverId), _otfc_external_id(plratProofOutput),  _proof_directory(proofDir) {}
 
     ~TrustedCheckerProcessAdapter() {
         if (!_f_directives) return;
@@ -78,6 +82,9 @@ public:
         Parameters params;
         params.fifoDirectives.set(_path_directives);
         params.fifoFeedback.set(_path_feedback);
+        params.checkerOutputPath.set(_proof_directory);
+        params.otfcNumSolvers.set(_max_num_solvers);
+        params.otfcSolverId.set(_global_solver_id);
         std::string moreArgs = "-lenient";
         if (_check_model) moreArgs += " -check-model";
         _subproc = new Subprocess(params, "impcheck_check", moreArgs);
@@ -133,7 +140,7 @@ public:
         bool ok = _op_queue.pollBlocking(op);
         if (!ok) return false;
         auto type = op.getType();
-        if (type == LratOp::DERIVATION) res = acceptProduceClause(sig, op.getGlue() > 0);
+        if (type == LratOp::DERIVATION) res = acceptProduceClause(sig, op);
         else if (type == LratOp::IMPORT) res = acceptImportClause();
         else if (type == LratOp::DELETION) res = acceptDeleteClauses();
         else if (type == LratOp::VALIDATION_UNSAT) res = acceptValidateUnsat();
@@ -181,12 +188,16 @@ private:
         TrustedUtils::writeUnsignedLongs(hints, nbHints, _f_directives);
         TrustedUtils::writeChar(share ? 1 : 0, _f_directives);
     }
-    inline bool acceptProduceClause(u8* sig, bool readSig) {
+    inline bool acceptProduceClause(u8* sig, LratOp& op) {
+        bool readSig = op.getGlue() > 0;
         if (!awaitResponse()) {
             handleError("Clause derivation not accepted");
             return false;
         }
-        if (readSig) TrustedUtils::readSignature(sig, _f_feedback);
+        if (readSig) {
+            if (_otfc_external_id) TrustedUtils::readId(op.getIdRef(), _f_feedback);
+            TrustedUtils::readSignature(sig, _f_feedback);
+        }
         return true;
     }
 
