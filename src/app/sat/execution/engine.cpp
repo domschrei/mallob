@@ -203,6 +203,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.skipClauseSharingDiagonally = params.skipClauseSharingDiagonally();
 	setup.diversifyNoise = params.diversifyNoise();
 
+	setup.decayDistribution = params.decayDistribution();
 	setup.decayMean = params.decayMean();
 	setup.decayStddev = params.decayStddev();
 	setup.decayMin = params.decayMin();

@@ -154,13 +154,27 @@ void Kissat::diversify(int seed) {
         kissat_set_option(solver, "restartint", restartFrequency);
 
         // Randomize score decay
-        double meanDecay = kissat_get_option(solver, "decay");
-        distribution.configure(Distribution::NORMAL, std::vector<double>{
-            /*mean=*/(double)_setup.decayMean, /*stddev=*/(double)_setup.decayStddev, /*min=*/(double)_setup.decayMin, /*max=*/(double)_setup.decayMax
-        });
-        int decay = (int) std::round(distribution.sample());
-        kissat_set_option(solver, "decay", decay);
-        
+
+        //Sample from Gaussian
+        if(_setup.decayDistribution==0) {
+            double meanDecay = kissat_get_option(solver, "decay");
+            distribution.configure(Distribution::NORMAL, std::vector<double>{
+                /*mean=*/(double)_setup.decayMean, /*stddev=*/(double)_setup.decayStddev, /*min=*/(double)_setup.decayMin, /*max=*/(double)_setup.decayMax
+            });
+            int decay = (int) std::round(distribution.sample());
+            kissat_set_option(solver, "decay", decay);
+        }
+        //Sample from Uniform
+        else if(_setup.decayDistribution==1) {
+            distribution.configure(Distribution::UNIFORM, std::vector<double>{
+                /*min=*/(double)_setup.decayMin, /*max=*/(double)_setup.decayMax
+            });
+            int decay = (int) std::round(distribution.sample());
+            kissat_set_option(solver, "decay", decay);
+        }
+
+        LOGGER(_logger, V3_VERB, "\nDecay Sampling Distribution type=%i\n", _setup.decayDistribution);
+        LOGGER(_logger, V3_VERB, "mean=%i stddev=%i min=%i max=%i \n", _setup.decayMean, _setup.decayStddev, _setup.decayMin, _setup.decayMax);
         LOGGER(_logger, V3_VERB, "Sampled restartint=%i decay=%i\n", restartFrequency, decay);
     }
 
