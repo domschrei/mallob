@@ -94,7 +94,8 @@ OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversificati
  OPT_INT(decayStddev,                      "decay-stddev",  "",                           3,      0,   1000,    "The standard deviation for sampling the decay value  (used for div-noise=1)")
  OPT_INT(decayMin,                         "decay-min",  "",                              1,      1,    200,    "The minimum cutoff for sampling a decay value        (used for div-noise=1)")
  OPT_INT(decayMax,                         "decay-max",  "",                              200,    1,    200,    "The maximum cutoff for sampling a decay value        (used for div-noise=1)")
-
+ OPT_INT(reduceLow,                        "reduce-low",  "",                             500,    0,    1000,    "Minimium percentage of Clauses that periodically get thrown away, in per mille")
+ OPT_INT(reduceHigh,                       "reduce-high",  "",                            900,    0,    1000,    "Maximum percentage of Clauses that periodically get thrown away, in per mille")
  OPT_BOOL(diversifySeeds,                   "div-seeds", "",                             true,              "Diversify solvers with different random seeds")
  OPT_STRING(satSolverSequence,              "satsolver",  "",                            "C",
  "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")

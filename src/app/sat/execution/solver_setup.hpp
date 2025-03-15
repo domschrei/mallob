@@ -44,6 +44,9 @@ struct SolverSetup {
 	int decayMin;
 	int decayMax;
 
+	int reduceLow;
+	int reduceHigh;
+
 	bool diversifyNative;
 	bool diversifyFanOut;
 	bool diversifyInitShuffle;

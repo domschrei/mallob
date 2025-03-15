@@ -209,6 +209,9 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.decayMin = params.decayMin();
 	setup.decayMax = params.decayMax();
 
+	setup.reduceLow = params.reduceLow();
+	setup.reduceHigh = params.reduceHigh();
+
 	setup.diversifyNative = params.diversifyNative();
 	setup.diversifyFanOut = params.diversifyFanOut();
 	setup.diversifyInitShuffle = params.diversifyInitShuffle();

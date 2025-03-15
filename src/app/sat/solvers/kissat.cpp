@@ -155,8 +155,6 @@ void Kissat::diversify(int seed) {
 
         // Randomize score decay
         int decay = kissat_get_option(solver, "decay");
-
-        //Sample from Gaussian
         if(_setup.decayDistribution==0) {
             double meanDecay = kissat_get_option(solver, "decay");
             distribution.configure(Distribution::NORMAL, std::vector<double>{
@@ -165,7 +163,6 @@ void Kissat::diversify(int seed) {
             decay = (int) std::round(distribution.sample());
             kissat_set_option(solver, "decay", decay);
         }
-        //Sample from Uniform
         else if(_setup.decayDistribution==1) {
             distribution.configure(Distribution::UNIFORM, std::vector<double>{
                 /*min=*/(double)_setup.decayMin, /*max=*/(double)_setup.decayMax
@@ -177,6 +174,17 @@ void Kissat::diversify(int seed) {
         LOGGER(_logger, V3_VERB, "\nDecay Sampling Distribution type=%i\n", _setup.decayDistribution);
         LOGGER(_logger, V3_VERB, "mean=%i stddev=%i min=%i max=%i \n", _setup.decayMean, _setup.decayStddev, _setup.decayMin, _setup.decayMax);
         LOGGER(_logger, V3_VERB, "Sampled restartint=%i decay=%i\n", restartFrequency, decay);
+
+
+        // //Set reducelow and reducehigh to a common value, which is sampled from [reduceLow,reduceHigh]
+        // distribution.configure(Distribution::UNIFORM, std::vector<double>{
+        //         /*min=*/(double)_setup.reduceLow, /*max=*/(double)_setup.reduceHigh
+        // });
+        // int reduce_common = (int) std::round(distribution.sample());
+        // kissat_set_option(solver, "reducelow", reduce_common);
+        // kissat_set_option(solver, "reducehigh", reduce_common);
+        // LOGGER(_logger, V3_VERB, "Sampled reduce_common=%i\n", reduce_common);
+
     }
 
     seedSet = true;

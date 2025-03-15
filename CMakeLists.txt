@@ -9,6 +9,12 @@ find_package(Threads REQUIRED)
 set(CMAKE_CXX_STANDARD 17)
 
 
+
+
+
+#Testing if march=native helps, but at least in quick laptop test, no, no change
+#add_compile_options(-march=native)
+
 # Build-specific compile options
 
 set(BASE_LIBS Threads::Threads)
