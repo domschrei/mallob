@@ -176,14 +176,14 @@ void Kissat::diversify(int seed) {
         LOGGER(_logger, V3_VERB, "Sampled restartint=%i decay=%i\n", restartFrequency, decay);
 
 
-        // //Set reducelow and reducehigh to a common value, which is sampled from [reduceLow,reduceHigh]
-        // distribution.configure(Distribution::UNIFORM, std::vector<double>{
-        //         /*min=*/(double)_setup.reduceLow, /*max=*/(double)_setup.reduceHigh
-        // });
-        // int reduce_common = (int) std::round(distribution.sample());
-        // kissat_set_option(solver, "reducelow", reduce_common);
-        // kissat_set_option(solver, "reducehigh", reduce_common);
-        // LOGGER(_logger, V3_VERB, "Sampled reduce_common=%i\n", reduce_common);
+        //Set reducelow and reducehigh to a common value, which is sampled from [reduceLow,reduceHigh]
+        distribution.configure(Distribution::UNIFORM, std::vector<double>{
+                /*min=*/(double)_setup.reduceLow, /*max=*/(double)_setup.reduceHigh
+        });
+        int reduce_common = (int) std::round(distribution.sample());
+        kissat_set_option(solver, "reducelow", reduce_common);
+        kissat_set_option(solver, "reducehigh", reduce_common);
+        LOGGER(_logger, V3_VERB, "Sampled reduce_common=%i\n", reduce_common);
 
     }
 
