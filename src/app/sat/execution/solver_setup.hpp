@@ -37,6 +37,7 @@ struct SolverSetup {
 	char solverType;
 	bool doIncrementalSolving;
 	int diversificationIndex;
+
 	bool diversifyNoise;
 	int decayDistribution;
 	int decayMean;
@@ -44,8 +45,10 @@ struct SolverSetup {
 	int decayMin;
 	int decayMax;
 
+	int diversifyReduce;
 	int reduceLow;
 	int reduceHigh;
+	int reduceDelta;
 
 	bool diversifyNative;
 	bool diversifyFanOut;

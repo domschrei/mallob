@@ -153,17 +153,18 @@ void Kissat::diversify(int seed) {
         int restartFrequency = (int) std::round(distribution.sample());
         kissat_set_option(solver, "restartint", restartFrequency);
 
+
         // Randomize score decay
         int decay = kissat_get_option(solver, "decay");
-        if(_setup.decayDistribution==0) {
-            double meanDecay = kissat_get_option(solver, "decay");
+        if(_setup.decayDistribution==1) { //Gaussian
+            //double meanDecay = kissat_get_option(solver, "decay");
             distribution.configure(Distribution::NORMAL, std::vector<double>{
                 /*mean=*/(double)_setup.decayMean, /*stddev=*/(double)_setup.decayStddev, /*min=*/(double)_setup.decayMin, /*max=*/(double)_setup.decayMax
             });
             decay = (int) std::round(distribution.sample());
             kissat_set_option(solver, "decay", decay);
         }
-        else if(_setup.decayDistribution==1) {
+        else if(_setup.decayDistribution==2) { //Normal
             distribution.configure(Distribution::UNIFORM, std::vector<double>{
                 /*min=*/(double)_setup.decayMin, /*max=*/(double)_setup.decayMax
             });
@@ -171,20 +172,31 @@ void Kissat::diversify(int seed) {
             kissat_set_option(solver, "decay", decay);
         }
 
-        LOGGER(_logger, V3_VERB, "\nDecay Sampling Distribution type=%i\n", _setup.decayDistribution);
+        LOGGER(_logger, V3_VERB, "--");
+        LOGGER(_logger, V3_VERB, "Decay Sampling Distribution type=%i\n", _setup.decayDistribution);
         LOGGER(_logger, V3_VERB, "mean=%i stddev=%i min=%i max=%i \n", _setup.decayMean, _setup.decayStddev, _setup.decayMin, _setup.decayMax);
         LOGGER(_logger, V3_VERB, "Sampled restartint=%i decay=%i\n", restartFrequency, decay);
+    }
 
 
-        //Set reducelow and reducehigh to a common value, which is sampled from [reduceLow,reduceHigh]
+    //Randomize reduce bounds
+    if (getDiversificationIndex() >= getNumOriginalDiversifications() && (_setup.diversifyReduce > 0)) {
+        std::mt19937 rng(seed);
+        Distribution distribution(rng);
+
+        //Give each Kissat instances a randomized reduce-range, such that some keep most clauses while other kick most clauses
         distribution.configure(Distribution::UNIFORM, std::vector<double>{
-                /*min=*/(double)_setup.reduceLow, /*max=*/(double)_setup.reduceHigh
+                /*min=*/(double)(_setup.reduceLow - _setup.reduceDelta), /*max=*/(double) (_setup.reduceHigh + _setup.reduceHigh)
         });
-        int reduce_common = (int) std::round(distribution.sample());
-        kissat_set_option(solver, "reducelow", reduce_common);
-        kissat_set_option(solver, "reducehigh", reduce_common);
-        LOGGER(_logger, V3_VERB, "Sampled reduce_common=%i\n", reduce_common);
-
+        int reduce_center = (int) std::round(distribution.sample());
+        int reduce_low  = std::max(0, reduce_center - _setup.reduceDelta);
+        int reduce_high = std::min(1000, reduce_center + _setup.reduceDelta);
+        kissat_set_option(solver, "reducelow", reduce_low);
+        kissat_set_option(solver, "reducehigh", reduce_high);
+        LOGGER(_logger, V3_VERB, "Given diversifyReduce=%i, reduceLow=%i, reduceHigh=%i, reduceDelta=%i\n", _setup.diversifyReduce, _setup.reduceLow, _setup.reduceHigh, _setup.reduceDelta);
+        LOGGER(_logger, V3_VERB, "Sampled reduce_center=%i\n", reduce_center);
+        LOGGER(_logger, V3_VERB, "Sampled reducelow    =%i\n", reduce_low);
+        LOGGER(_logger, V3_VERB, "Sampled reducehigh   =%i\n", reduce_high);
     }
 
     seedSet = true;
