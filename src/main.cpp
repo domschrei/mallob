@@ -69,6 +69,7 @@ void introduceMonoJob(Parameters& params, Client& client) {
         {"priority", 1.000},
         {"application", app}
     };
+    if (params.crossJobCommunication()) json["group-id"] = "1";
     if (params.jobWallclockLimit() > 0)
         json["wallclock-limit"] = std::to_string(params.jobWallclockLimit()) + "s";
     if (params.jobCpuLimit() > 0) {

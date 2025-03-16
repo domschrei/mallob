@@ -49,6 +49,10 @@ private:
 
     int _subproc_idx;
 
+    float _time_of_retraction_start = -1;
+    float _time_of_retraction_end = -1;
+    float _retraction_round_duration = 0;
+
 public:
 
     ForkedSatJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table);
@@ -69,8 +73,9 @@ public:
     bool appl_isDestructible() override;
     void appl_memoryPanic() override;
 
+    int getDemand() const override;
+
     // Methods that are not overridden, but use the default implementation:
-    // int getDemand(int prevVolume) const override;
     // bool wantsToCommunicate() const override;
     
     // Methods from BaseSatJob:

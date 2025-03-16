@@ -676,7 +676,8 @@ void SchedulingManager::handleJobInterruption(MessageHandle& handle) {
     // Information should be sent to the client only if this process is the job's root
     // and if it's either a one-shot job or the interruption has been an explicit event
     // (i.e., due to a hit limit or a user interruption and not due to normal termination).
-    if (job.getJobTree().isRoot() && (!job.isIncremental() || reason == USER || reason == LIMIT)) {
+    if (job.getJobTree().isRoot() && reason != SILENT_YIELD
+            && (!job.isIncremental() || reason == USER || reason == LIMIT)) {
         // Forward information on aborted job to client
         MyMpi::isend(job.getJobTree().getParentNodeRank(), 
             MSG_NOTIFY_CLIENT_JOB_ABORTING, handle.moveRecvData());

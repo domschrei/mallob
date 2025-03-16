@@ -180,6 +180,18 @@ public:
 		_cb_result_found(_local_id);
 	}
 
+	bool _has_preprocessed_formula {false};
+	std::vector<int> _preprocessed_formula;
+	void setPreprocessedFormula(std::vector<int>&& vec) {
+		_preprocessed_formula = std::move(vec);
+		_has_preprocessed_formula = true;
+	}
+	bool hasPreprocessedFormula() const {return _has_preprocessed_formula;}
+	std::vector<int>&& extractPreprocessedFormula() {
+		_has_preprocessed_formula = false;
+		return std::move(_preprocessed_formula);
+	}
+
 	LratConnector* getLratConnector() {
 		return _lrat;
 	}

@@ -358,6 +358,10 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
             _solution.setSolutionToSerialize(solution.empty() ? nullptr : solution.data(), solution.size());
             return FOUND_RESULT;
         }
+    } else if (c == CLAUSE_PIPE_SUBMIT_PREPROCESSED_FORMULA) {
+        _preprocessed_formula = pipe.get()->readData(c);
+        pipe.unlock();
+        return FOUND_PREPROCESSED_FORMULA;
     }
     pipe.unlock();
 

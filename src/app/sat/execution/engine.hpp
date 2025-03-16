@@ -57,6 +57,8 @@ private:
 
 	std::vector<std::pair<long, int>> _objective;
 
+	std::vector<int> _preprocessed_formula;
+
 public:
 
     SatEngine(const Parameters& params, const SatProcessConfig& config, Logger& loggingInterface);
@@ -69,6 +71,7 @@ public:
 	bool isFullyInitialized();
 	int solveLoop();
 	JobResult& getResult() {return _result;}
+	std::vector<int>&& getPreprocessedFormula() {return std::move(_preprocessed_formula);}
 
 	bool isReadyToPrepareSharing() const;
 	std::vector<int> prepareSharing(int literalLimit, int& outSuccessfulSolverId, int& outNbLits);

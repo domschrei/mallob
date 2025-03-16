@@ -301,8 +301,11 @@ std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSe
 		break;
 	case 'k':
 	case 'v': // variable addition via Kissat
+	case 'p': // preprocessing via Kissat
 		// Kissat
-		LOGGER(_logger, V4_VVER, "S%i : Kissat%s-%i\n", setup.globalId, setup.solverType == 'v' ? "-BVA": "",
+		LOGGER(_logger, V4_VVER, "S%i : Kissat%s%s-%i\n", setup.globalId,
+			setup.solverType == 'v' ? "-BVA": "",
+			setup.solverType == 'p' ? "-pre": "",
 			setup.diversificationIndex);
 		solver.reset(new Kissat(setup));
 		break;
@@ -419,6 +422,7 @@ int SatEngine::solveLoop() {
 
     // Solving done?
 	bool done = false;
+	bool preprocessingResult = false;
 	for (size_t i = 0; i < std::min(_num_active_solvers, _solver_threads.size()); i++) {
 		if (_solver_threads[i]->hasFoundResult(_revision)) {
 
@@ -434,12 +438,16 @@ int SatEngine::solveLoop() {
 				break;
 			}
 		}
+		if (!preprocessingResult && _solver_threads[i]->hasPreprocessedFormula()) {
+			_preprocessed_formula = std::move(_solver_threads[i]->extractPreprocessedFormula());
+			preprocessingResult = true;
+		}
 	}
 
 	if (done) {
 		LOGGER(_logger, V6_DEBGV, "Returning result\n");
 		return _result.result;
-	}
+	} else if (preprocessingResult) return 99;
     return -1; // no result yet
 }
 

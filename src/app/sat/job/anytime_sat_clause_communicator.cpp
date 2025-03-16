@@ -63,8 +63,12 @@ AnytimeSatClauseCommunicator::AnytimeSatClauseCommunicator(const Parameters& par
 
 void AnytimeSatClauseCommunicator::initCrossSharer() {
     int nbOrigVars = _job->getDescription().getAppConfiguration().fixedSizeEntryToInt("__NV");
-    int minVar = _job->getDescription().getAppConfiguration().fixedSizeEntryToInt("__XL");
-    int maxVar = _job->getDescription().getAppConfiguration().fixedSizeEntryToInt("__XU");
+    int minVar = -1;
+    if (_job->getDescription().getAppConfiguration().map.count("__XL"))
+        minVar = _job->getDescription().getAppConfiguration().fixedSizeEntryToInt("__XL");
+    int maxVar = -1;
+    if (_job->getDescription().getAppConfiguration().map.count("__XU"))
+        maxVar = _job->getDescription().getAppConfiguration().fixedSizeEntryToInt("__XU");
     _cross_job_clause_sharer->setOriginalNbVariables(nbOrigVars);
     _cross_job_clause_sharer->setAdmissibleVariableRange(minVar, maxVar);
 }

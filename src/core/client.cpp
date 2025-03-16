@@ -13,6 +13,7 @@
 #include "comm/msg_queue/message_handle.hpp"
 #include "comm/msgtags.h"
 #include "data/job_interrupt_reason.hpp"
+#include "interface/api/api_registry.hpp"
 #include "util/string_utils.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
@@ -285,6 +286,7 @@ void Client::init() {
         _interface_connectors.emplace_back(new SocketConnector(_params, *_json_interface, path));
     }
     _api_connector = new APIConnector(*_json_interface, _params, Logger::getMainInstance().copy("I-API", ".i.api"));
+    APIRegistry::put(_api_connector);
     _interface_connectors.emplace_back(_api_connector);
     LOG(V2_INFO, "Set up API at %s\n", "src/interface/api/api_connector.hpp");
 
@@ -594,7 +596,7 @@ void Client::handleJobDone(MessageHandle& handle) {
 void Client::handleSendJobResult(MessageHandle& handle) {
 
     JobResult jobResult(handle.moveRecvData());
-    int jobId = jobResult.id;
+    int& jobId = jobResult.id;
     int resultCode = jobResult.result;
     int revision = jobResult.revision;
 
@@ -602,11 +604,20 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     if (!descPtr) return; // user-side terminated in the meantime?
     JobDescription& desc = *descPtr;
     if (desc.getRevision() > revision) return; // revision obsolete!
+    int surrogateId = desc.getAppConfiguration().map.count("__surrogate") ?
+        desc.getAppConfiguration().fixedSizeEntryToInt("__surrogate") : 0;
+    float timeOfParentTask = 0;
+    if (surrogateId != 0) {
+        LOG_ADD_SRC(V4_VVER, "Result of job #%i is surrogate for #%i", handle.source, jobId, surrogateId);
+        jobId = surrogateId;
+        // need to add time spent by parent task
+        timeOfParentTask = atof(desc.getAppConfiguration().map["__spentwcsecs"].c_str());
+    }
 
     LOG_ADD_SRC(V4_VVER, "Received result of job #%i rev. %i, code: %i", handle.source, jobId, revision, resultCode);
     const float now = Timer::elapsedSeconds();
-    desc.getStatistics().processingTime = now - desc.getStatistics().timeOfScheduling;
-    desc.getStatistics().totalResponseTime = now - desc.getStatistics().timeOfSubmission;
+    desc.getStatistics().processingTime = now - desc.getStatistics().timeOfScheduling + timeOfParentTask;
+    desc.getStatistics().totalResponseTime = now - desc.getStatistics().timeOfSubmission + timeOfParentTask;
 
     std::string resultCodeString = "UNKNOWN";
     if (resultCode == RESULT_SAT) resultCodeString = "SATISFIABLE";
@@ -703,6 +714,13 @@ void Client::handleAbort(MessageHandle& handle) {
     int rev = request[1];
     auto desc = getActiveJob(jobId);
     if (rev < desc->getRevision()) return;
+
+    int surrogateId = desc->getAppConfiguration().map.count("__surrogate") ?
+        desc->getAppConfiguration().fixedSizeEntryToInt("__surrogate") : 0;
+    if (surrogateId != 0) {
+        LOG_ADD_SRC(V4_VVER, "Result of job #%i is surrogate for #%i", handle.source, jobId, surrogateId);
+        jobId = surrogateId;
+    }
 
     LOG_ADD_SRC(V2_INFO, "TIMEOUT/UNKNOWN #%i rev. %i %.6f", handle.source, jobId,
         rev, Timer::elapsedSeconds() - desc->getArrival());
