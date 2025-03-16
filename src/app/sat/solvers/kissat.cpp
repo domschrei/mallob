@@ -172,7 +172,7 @@ void Kissat::diversify(int seed) {
             kissat_set_option(solver, "decay", decay);
         }
 
-        LOGGER(_logger, V3_VERB, "--");
+        LOGGER(_logger, V3_VERB, "--\n");
         LOGGER(_logger, V3_VERB, "Decay Sampling Distribution type=%i\n", _setup.decayDistribution);
         LOGGER(_logger, V3_VERB, "mean=%i stddev=%i min=%i max=%i \n", _setup.decayMean, _setup.decayStddev, _setup.decayMin, _setup.decayMax);
         LOGGER(_logger, V3_VERB, "Sampled restartint=%i decay=%i\n", restartFrequency, decay);
@@ -184,30 +184,42 @@ void Kissat::diversify(int seed) {
         std::mt19937 rng(seed);
         Distribution distribution(rng);
 
-        LOGGER(_logger, V3_VERB, "Given diversifyReduce=%i, reduceLow=%i, reduceHigh=%i, reduceDelta=%i\n", _setup.diversifyReduce, _setup.reduceLow, _setup.reduceHigh, _setup.reduceDelta);
-
         //Give each Kissat solver a randomized reduce-range, such that some solvers keep most clauses and other solvers other kick most clauses
         int reduce_low;
         int reduce_high;
+        LOGGER(_logger, V3_VERB, "--\n");
 
-        //Uniform distribution of range values
+        //Reduce==1: Uniform distribution of range values
         if(_setup.diversifyReduce==1) {
             distribution.configure(Distribution::UNIFORM, std::vector<double>{
-                    /*min=*/(double)(_setup.reduceLow - _setup.reduceDelta), /*max=*/(double) (_setup.reduceHigh + _setup.reduceHigh)
+                    /*min=*/(double)(_setup.reduceMin - _setup.reduceDelta), /*max=*/(double) (_setup.reduceMax + _setup.reduceMax)
             });
             int reduce_center = (int) std::round(distribution.sample());
             reduce_low  = std::max(0, reduce_center - _setup.reduceDelta);
             reduce_high = std::min(1000, reduce_center + _setup.reduceDelta);
+            LOGGER(_logger, V3_VERB, "Given diversifyReduce=%i, reduceMin=%i, reduceMax=%i, reduceDelta=%i\n", _setup.diversifyReduce, _setup.reduceMin, _setup.reduceMax, _setup.reduceDelta);
             LOGGER(_logger, V3_VERB, "Sampled reduce_center=%i\n", reduce_center);
         }
 
-        //More extreme range values, 80% of solvers are either full-keep or full-kick, only 20% of solvers are moderate with keep half
+        //Reduce==2: More extreme range values, 80% of solvers are either full-keep or full-kick, only 20% of solvers are moderate with keep half
         else if(_setup.diversifyReduce==2) {
             distribution.configure(Distribution::UNIFORM, std::vector<double>{0,1});
             double random_selector = distribution.sample();
             if      (random_selector<0.4) reduce_low = reduce_high = 0;
             else if (random_selector<0.6) reduce_low = reduce_high = 500;
             else                          reduce_low = reduce_high = 1000;
+            LOGGER(_logger, V3_VERB, "Given diversifyReduce=%i, reduceDelta=%i\n", _setup.diversifyReduce, _setup.reduceDelta);
+        }
+        //Reduce==3: Gaussian Distribution
+        else if(_setup.diversifyReduce==3) {
+            distribution.configure(Distribution::NORMAL, std::vector<double>{
+                /*mean=*/(double)_setup.reduceMean, /*stddev=*/(double)_setup.reduceStddev, /*min=*/(double)_setup.reduceMin, /*max=*/(double)_setup.reduceMax
+            });
+            int reduce_fixed = (int) std::round(distribution.sample());
+            reduce_low  = reduce_fixed;
+            reduce_high = reduce_fixed;
+            LOGGER(_logger, V3_VERB, "Given diversifyReduce=%i, reduceMin=%i, reduceMax=%i, reduceMean=%i, reduceStddev=%i \n",
+                _setup.diversifyReduce, _setup.reduceMin, _setup.reduceMax, _setup.reduceMean, _setup.reduceStddev);
         }
         else {
             cout << "Error: div-reduce="<<_setup.diversifyReduce<<" is not a valid flag" << endl;

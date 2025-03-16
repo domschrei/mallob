@@ -94,10 +94,13 @@ OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversificati
  OPT_INT(decayStddev,                      "decay-stddev",  "",                           3,      0,   1000,    "The standard deviation for sampling the decay value  (used for div-noise=1)")
  OPT_INT(decayMin,                         "decay-min",  "",                              1,      1,    200,    "The minimum cutoff for sampling a decay value        (used for div-noise=1)")
  OPT_INT(decayMax,                         "decay-max",  "",                              200,    1,    200,    "The maximum cutoff for sampling a decay value        (used for div-noise=1)")
- OPT_INT(diversifyReduce,                  "div-reduce",  "",                             0,      0,      2,     "Toggle to diversify the reduce parameters. 0=Dont diversify. 1=Sample one common value. 2=Sample two bounds")
- OPT_INT(reduceLow,                        "reduce-low",  "",                             500,    0,    1000,    "Minimium percentage of Clauses that periodically get thrown away, in per mille")
- OPT_INT(reduceHigh,                       "reduce-high",  "",                            900,    0,    1000,    "Maximum percentage of Clauses that periodically get thrown away, in per mille")
- OPT_INT(reduceDelta,                      "reduce-delta", "",                            0,      0,    1000,    "Split up a sampled reduce value r by the given delta d such that kissat receives reducelow=r-d and reducehigh=r+d")
+ OPT_INT(diversifyReduce,                  "div-reduce",  "",                             0,      0,      3,    "Toggle to diversify the reduce parameters. 0=Dont diversify. 1=Sample uniform delta-range, 2=Sample extremes, 3=Sample Gaussian")
+ OPT_INT(reduceMin,                        "reduce-min",  "",                             300,    0,    1000,    "The minimium reduce value, in per mille")
+ OPT_INT(reduceMax,                        "reduce-max",  "",                             980,    0,    1000,    "The maximum reduce value, in per mille")
+ OPT_INT(reduceDelta,                      "reduce-delta", "",                            100,    0,    1000,    "For div-reduce=1: Samples a center reduce value r and give Kissat reducelow=r-delta and reducehigh=r+delta")
+ OPT_INT(reduceMean,                       "reduce-mean", "",                             700,    0,    1000,    "For div-reduce=3: The mean reduce value")
+ OPT_INT(reduceStddev,                     "reduce-stddev", "",                           150,    0,    1000,    "For div-reduce=3: The stddev of the Gaussian sampled reduce value")
+
  OPT_BOOL(diversifySeeds,                   "div-seeds", "",                             true,              "Diversify solvers with different random seeds")
  OPT_STRING(satSolverSequence,              "satsolver",  "",                            "C",
  "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")

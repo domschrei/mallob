@@ -46,9 +46,11 @@ struct SolverSetup {
 	int decayMax;
 
 	int diversifyReduce;
-	int reduceLow;
-	int reduceHigh;
+	int reduceMin;
+	int reduceMax;
 	int reduceDelta;
+	int reduceMean;
+	int reduceStddev;
 
 	bool diversifyNative;
 	bool diversifyFanOut;
