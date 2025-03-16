@@ -156,6 +156,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	int numMrg = 0;
 	int numKis = 0;
 	int numBVA = 0;
+	int numPre = 0;
 
 	// Add solvers from full cycles on previous ranks
 	// and from the begun cycle on the previous rank
@@ -173,6 +174,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		case PortfolioSequence::MERGESAT: solverToAdd = &numMrg; break;
 		case PortfolioSequence::KISSAT: solverToAdd = &numKis; break;
 		case PortfolioSequence::VARIABLE_ADDITION: solverToAdd = &numBVA; break;
+		case PortfolioSequence::PREPROCESSOR: solverToAdd = &numPre; break;
 		}
 		*solverToAdd += numFullCycles + (i < begunCyclePos);
 	}
@@ -259,6 +261,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 			case PortfolioSequence::GLUCOSE: setup.diversificationIndex = numGlu++; break;
 			case PortfolioSequence::KISSAT: setup.diversificationIndex = numKis++; break;
 			case PortfolioSequence::VARIABLE_ADDITION: setup.diversificationIndex = numBVA++; break;
+			case PortfolioSequence::PREPROCESSOR: setup.diversificationIndex = numPre++; break;
 			}
 			setup.diversificationIndex += divOffsetCycle;
 		}
