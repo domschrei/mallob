@@ -115,7 +115,7 @@ void Kissat::diversify(int seed) {
         kissat_set_preprocessing_report_callback(solver, this,
             begin_formula_report, report_preprocessed_lit);
         kissat_set_option(solver, "factor", 1); // do perform bounded variable addition
-        kissat_set_option(solver, "luckyearly", 0); // lucky before preprocess can take very long
+        //kissat_set_option(solver, "luckyearly", 0); // lucky before preprocess can take very long
         return;
     }
 
