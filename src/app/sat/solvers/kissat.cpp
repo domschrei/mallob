@@ -230,6 +230,9 @@ void Kissat::diversify(int seed) {
         LOGGER(_logger, V3_VERB, "Sampled reducehigh   =%i\n", reduce_high);
     }
 
+    //case 5: ok = kissat_set_configuration(solver, "unsat"); break;
+    //case 6: ok = kissat_set_configuration(solver, "sat"); break;
+
     seedSet = true;
     setClauseSharing(getNumOriginalDiversifications());
 

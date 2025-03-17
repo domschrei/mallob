@@ -97,15 +97,37 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 			c.lbd = 1;
 			return;
 		}
-		if (_setup.randomizeLbdBeforeImport) {
+		if (_setup.randomizeLbdBeforeImport==1) {
+			//Uniform sample
 			// Workaround to get "uniform" drawing of numbers from [2, c.size]
 			c.lbd = (int) std::round(_rng.randomInRange(2 - 0.49999, c.size-ClauseMetadata::numInts() + 0.49999));
 			assert(c.lbd >= 2);
 			assert(c.lbd <= c.size-ClauseMetadata::numInts());
 		}
+		else if (_setup.randomizeLbdBeforeImport==2) {
+			//Triangle sample 
+			int truesize = c.size - ClauseMetadata::numInts();
+			//If the clause size is 2 or 3 we dont have options, we always assign at least lbd 3
+			int lbd_options= std::max(1,truesize-2);
+			//For larger clauses we use a triangular distribution to more weight to higher lbd values
+			//We sample from a triangle by stacking two triangles (one flipped), sampling a column i from the resulting 2D grid and a row j, and mirror the column if the (i,j)-cell is within the flipped triangle
+			//sample i from [0,lbd_options-1]
+			//sample j from [0,lbd_option]
+			int i = (int) std::round(_rng.randomInRange(0 - 0.49999,(lbd_options-1) + 0.49999));
+			int j = (int) std::round(_rng.randomInRange(0 - 0.49999, lbd_options    + 0.49999));
+			if(i<=j) i = lbd_options - i;
+			int lbd_choice = i;
+			c.lbd = 2 + lbd_choice; //undo the -2 from lbd_options shift
+			//cout <<" size="<<truesize<<" i="<<i<<" j="<<j;
+			//cout << " lbd="<<c.lbd<<endl;
+		}
+
 		if (_setup.incrementLbdBeforeImport && c.lbd < c.size-ClauseMetadata::numInts())
 			c.lbd++;
 		if (_setup.resetLbdBeforeImport) c.lbd = c.size-ClauseMetadata::numInts();
+
+
+
 	});
 
 	if (!_setup.objectiveFunction.empty()) {

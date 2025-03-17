@@ -68,7 +68,7 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
  OPT_BOOL(backlogExportManager,             "bem", "backlog-export-manager",             true, "Use sequentialized export manager with backlogs instead of simple HordeSat-style export")
  OPT_BOOL(adaptiveImportManager,            "aim", "adaptive-import-manager",            true, "Use adaptive clause store for each solver's import buffer instead of lock-free ring buffers")
  OPT_BOOL(incrementLbd,                     "ilbd", "increment-lbd-at-import",           true, "Increment LBD value of each clause before import")
- OPT_BOOL(randomizeLbd,                     "randlbd", "reset-lbd-at-import",            false, "Randomize (uniformly) LBD value of each clause before import - can be combined with -ilbd afterwards")
+  OPT_INT(randomizeLbd,                     "randlbd", "reset-lbd-at-import",            0,       0,      2, "Randomize the LBD value of each clause before import. 0=Dont. 1=Uniform sample. 2=Triangle sample. - can be combined with -ilbd afterwards")
  OPT_BOOL(noImport,                         "no-import", "",                             false, "Turn off solvers importing clauses (for comparison purposes)")
  OPT_BOOL(scrambleLbdScores,                "scramble-lbds", "",                         false, "For each clause length, randomly reassign the present LBD values to the present shared clauses")
  OPT_BOOL(priorityBasedBufferMerging, "pbbm", "priority-based-buffer-merging", false, "Use a more sophisticated and expensive merge procedure that adopts the prioritization of csm=3")
@@ -100,7 +100,6 @@ OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversificati
  OPT_INT(reduceDelta,                      "reduce-delta", "",                            100,    0,    1000,    "For div-reduce=1: Samples a center reduce value r and give Kissat reducelow=r-delta and reducehigh=r+delta")
  OPT_INT(reduceMean,                       "reduce-mean", "",                             700,    0,    1000,    "For div-reduce=3: The mean reduce value")
  OPT_INT(reduceStddev,                     "reduce-stddev", "",                           150,    0,    1000,    "For div-reduce=3: The stddev of the Gaussian sampled reduce value")
-
  OPT_BOOL(diversifySeeds,                   "div-seeds", "",                             true,              "Diversify solvers with different random seeds")
  OPT_STRING(satSolverSequence,              "satsolver",  "",                            "C",
  "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")
