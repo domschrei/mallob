@@ -2,14 +2,16 @@
 #pragma once
 
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
+#include "util/logger.hpp"
 
 class FilterVectorBuilder {
 
 private:
     size_t _header;
+    bool _verb;
 
 public:
-    FilterVectorBuilder(size_t header, int epoch) : _header(header) {}
+    FilterVectorBuilder(size_t header, int epoch, bool verbose) : _header(header), _verb(verbose) {}
 
     std::vector<int> build(BufferReader& reader, std::function<bool(Mallob::Clause&)> accept,
         std::function<void(int)> lock = [](int) {}, std::function<void(int)> unlock = [](int) {}) {
@@ -57,7 +59,10 @@ public:
         }
         if (filterSizeBeingLocked != -1) unlock(filterSizeBeingLocked);
 
-        LOG(V4_VVER, "filtered %i/%i\n", nbFiltered, nbTotal);
+        if (_verb)
+            LOG(V4_VVER, "filtered %i/%i\n", nbFiltered, nbTotal);
+        else
+            LOG(V5_DEBG, "filtered %i/%i\n", nbFiltered, nbTotal);
         return result;
     }
 };

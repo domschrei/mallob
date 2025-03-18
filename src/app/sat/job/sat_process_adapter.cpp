@@ -332,10 +332,11 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
             _collected_clauses.pop_back();
         }
         _best_found_objective_cost = * (long long*) costAsInts;
-        LOG(V4_VVER, "best found objective cost: %lld\n", _best_found_objective_cost);
+        if (_best_found_objective_cost != LLONG_MAX)
+            LOG(V4_VVER, "best found objective cost: %lld\n", _best_found_objective_cost);
 
         _clause_collecting_stage = RETURNED;
-        LOG(V4_VVER, "collected clauses from subprocess\n");
+        LOG(V5_DEBG, "collected clauses from subprocess\n");
     } else if (c == CLAUSE_PIPE_FILTER_IMPORT) {
         std::vector<int> filter = pipe.get()->readData(c);
         int epoch = filter.back(); filter.pop_back();

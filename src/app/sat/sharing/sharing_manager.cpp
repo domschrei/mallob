@@ -382,7 +382,7 @@ std::vector<int> SharingManager::filterSharing(std::vector<int>& clauseBuf) {
 
 	auto reader = _clause_store->getBufferReader(clauseBuf.data(), clauseBuf.size());
 	auto id = _id_alignment ? _id_alignment->contributeFirstClauseIdOfEpoch() : 0UL;
-	return FilterVectorBuilder(id, _internal_epoch).build(reader, [&](Mallob::Clause& clause) {
+	return FilterVectorBuilder(id, _internal_epoch, _job_index==0).build(reader, [&](Mallob::Clause& clause) {
 		return _clause_filter->admitSharing(clause, _internal_epoch);
 	}, [&](int len) {
 		_clause_filter->acquireLock(len);
@@ -551,7 +551,7 @@ bool SharingManager::syncDeterministicSolvingAndCheckForWinningSolver() {
 
 SharingStatistics SharingManager::getStatistics() {
 
-	_logger.log(V2_INFO, "Observed non-unit LBDs: 0:%i 1:%i 2:%i len-1:%i len:%i\n", 
+	_logger.log(V5_DEBG, "Observed non-unit LBDs: 0:%i 1:%i 2:%i len-1:%i len:%i\n", 
 		_observed_nonunit_lbd_of_zero, 
 		_observed_nonunit_lbd_of_one, 
 		_observed_nonunit_lbd_of_two, 

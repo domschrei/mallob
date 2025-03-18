@@ -24,6 +24,7 @@
 #include "app/sat/job/sat_process_config.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
 #include "util/option.hpp"
+#include <climits>
 
 class LratConnector;
 #if MALLOB_USE_MERGESAT
@@ -468,7 +469,8 @@ void SatEngine::setClauseBufferRevision(int revision) {
 
 void SatEngine::updateBestFoundObjectiveCost(long long bestFoundObjectiveCost) {
 	if (isCleanedUp()) return;
-	LOGGER(_logger, V4_VVER, "update best found objective cost: %lld\n", bestFoundObjectiveCost);
+	if (bestFoundObjectiveCost != LLONG_MAX)
+		LOGGER(_logger, V4_VVER, "update best found objective cost: %lld\n", bestFoundObjectiveCost);
 	for (size_t i = 0; i < _num_active_solvers; i++) {
 		if (_solver_interfaces[i] && _solver_interfaces[i]->getOptimizer())
 			_solver_interfaces[i]->getOptimizer()->update_best_found_objective_cost(bestFoundObjectiveCost);

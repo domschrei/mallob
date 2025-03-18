@@ -55,7 +55,7 @@ public:
 
     void processAppMessage(int source, int mpiTag, JobMessage& msg) {
 
-        LOG(V4_VVER, "APPMSG RECV %lu <~ %lu [%i]\n", msg.contextIdOfDestination, msg.contextIdOfSender, source);
+        LOG(V5_DEBG, "APPMSG RECV %lu <~ %lu [%i]\n", msg.contextIdOfDestination, msg.contextIdOfSender, source);
 
         auto it = _app_msg_table.find(msg.contextIdOfDestination);
         if (it == _app_msg_table.end()) {
