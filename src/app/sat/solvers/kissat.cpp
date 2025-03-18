@@ -116,6 +116,8 @@ void Kissat::diversify(int seed) {
             begin_formula_report, report_preprocessed_lit);
         kissat_set_option(solver, "factor", 1); // do perform bounded variable addition
         //kissat_set_option(solver, "luckyearly", 0); // lucky before preprocess can take very long
+        seedSet = true;
+        interruptionInitialized = true;
         return;
     }
 
@@ -373,6 +375,7 @@ void Kissat::addLiteralFromPreprocessing(int lit) {
         preprocessedFormula.push_back(nbPreprocessedVariables);
         preprocessedFormula.push_back(nbPreprocessedClausesReceived);
         setPreprocessedFormula(std::move(preprocessedFormula));
+        setSolverInterrupt();
     }
 }
 

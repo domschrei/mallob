@@ -14,9 +14,9 @@ struct SolverSetup {
 
 	// General important fields
 
-	Logger* logger;
-	int globalId;
-	int localId; 
+	Logger* logger {nullptr};
+	int globalId {0};
+	int localId {0}; 
 	std::string jobname;
 	std::string profilingBaseDir; 
 	int profilingLevel {-1};
@@ -24,70 +24,70 @@ struct SolverSetup {
 
 	// Properties of the SAT problem
 
-	int numVars;
-	int numOriginalClauses;
-	int maxNumSolvers;
-	bool isJobIncremental;
-	bool hasPseudoincrementalSolvers;
-	int solverRevision;
+	int numVars {0};
+	int numOriginalClauses {0};
+	int maxNumSolvers {1};
+	bool isJobIncremental {false};
+	bool hasPseudoincrementalSolvers {false};
+	int solverRevision {0};
 
 
 	// Solver configuration and diversification
 
 	char solverType;
-	bool doIncrementalSolving;
-	int diversificationIndex;
-	bool diversifyNoise;
-	bool diversifyNative;
-	bool diversifyFanOut;
-	bool diversifyInitShuffle;
+	bool doIncrementalSolving {false};
+	int diversificationIndex {0};
+	bool diversifyNoise {false};
+	bool diversifyNative {false};
+	bool diversifyFanOut {false};
+	bool diversifyInitShuffle {false};
 	enum EliminationSetting {
 		ALLOW_ALL, DISABLE_SOME, DISABLE_MOST, DISABLE_ALL
-	} eliminationSetting;
-	PortfolioSequence::Flavour flavour;
+	} eliminationSetting {ALLOW_ALL};
+	PortfolioSequence::Flavour flavour {PortfolioSequence::DEFAULT};
 
 	// Clause export
 
-	bool exportClauses; // exporting clauses to other solvers?
-	bool skipClauseSharingDiagonally;
+	bool exportClauses {true}; // exporting clauses to other solvers?
+	bool skipClauseSharingDiagonally {false};
 	// In any case, these bounds MUST be fulfilled for a clause to be exported
-	unsigned int strictMaxLitsPerClause;
-	unsigned int strictLbdLimit;
+	unsigned int strictMaxLitsPerClause {255};
+	unsigned int strictLbdLimit {255};
 	// These bounds must be fulfilled for a clause to be considered "high quality".
 	// Depending on the solver, this may imply that such a clause is exported
 	// while others are not. 
-	unsigned int qualityMaxLitsPerClause;
-	unsigned int qualityLbdLimit;
-	unsigned int freeMaxLitsPerClause;
-	size_t clauseBaseBufferSize;
+	unsigned int qualityMaxLitsPerClause {255};
+	unsigned int qualityLbdLimit {255};
+	unsigned int freeMaxLitsPerClause {255};
+	size_t clauseBaseBufferSize {1000};
 
 
 	// Clause import
 
-	int minImportChunksPerSolver;
-	int numBufferedClsGenerations;
-	size_t anticipatedLitsToImportPerCycle;
+	int minImportChunksPerSolver {10};
+	int numBufferedClsGenerations {10};
+	size_t anticipatedLitsToImportPerCycle {1000};
 	bool resetLbdBeforeImport {false};
 	bool incrementLbdBeforeImport {false};
 	bool randomizeLbdBeforeImport {false};
-	bool adaptiveImportManager;
+	bool adaptiveImportManager {true};
 
 
 	// Certified UNSAT and proof production
 
 	// This solver emits proof information, either for on-the-fly checking or for proof production.
-	bool certifiedUnsat;
+	bool certifiedUnsat {false};
 	// This solver's proof information is checked on-the-fly.
-	bool onTheFlyChecking;
+	bool onTheFlyChecking {false};
 	// If on-the-fly checking is enabled: this solver also seeks to have a found satisfying assignment checked.
-	bool onTheFlyCheckModel;
+	bool onTheFlyCheckModel {false};
 	// If non-null, use this LratConnector instance for checking a model;
 	// if null && onTheFlyCheckModel, then *create* a model-checking LRAT connector instance yourself (also to use for others).
 	LratConnector* modelCheckingLratConnector {nullptr};
 	bool owningModelCheckingLratConnector {false};
 	// This solver is NOT allowed to participate in UNSAT solving by exporting clauses or reporting UNSAT,
 	// usually because it does not emit proof information while other solvers do.
-	bool avoidUnsatParticipation;
+	bool avoidUnsatParticipation {false};
 	// Directory to write proofs to
 	std::string proofDir;
 	// Signature of the formula to process - to be validated by the on-the-fly checker
