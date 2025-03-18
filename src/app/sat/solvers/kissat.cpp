@@ -361,7 +361,7 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
     if (accept) {
         nbPreprocessedVariables = nbVars;
         nbPreprocessedClausesAdvertised = nbClauses;
-    }
+    } else setSolverInterrupt();
     return accept;
 }
 

@@ -83,8 +83,9 @@ public:
             }
             if (_solver_done) {
                 // Preprocess solver terminated.
-                LOG(V3_VERB, "SATWP local solver thread done\n");
+                LOG(V3_VERB, "SATWP preprocessor done\n");
                 if (_solver_result != 0) {
+                    LOG(V3_VERB, "SATWP preprocessor reported result %i\n", _solver_result);
                     res.result = _solver_result;
                     res.setSolution(_solver->getSolution());
                     break;
@@ -109,6 +110,7 @@ public:
             interrupt(_prepro_job_submission, _prepro_job_done);
             while (!_prepro_job_done) usleep(5*1000);
         }
+        _solver->interrupt();
 
         LOG(V3_VERB, "SATWP returning result %i\n", res.result);
         return res;
