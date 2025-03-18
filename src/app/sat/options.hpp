@@ -94,7 +94,7 @@ OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversificati
  OPT_INT(decayStddev,                      "decay-stddev",  "",                           3,      0,   1000,    "The standard deviation for sampling the decay value  (used for div-noise=1)")
  OPT_INT(decayMin,                         "decay-min",  "",                              1,      1,    200,    "The minimum cutoff for sampling a decay value        (used for div-noise=1)")
  OPT_INT(decayMax,                         "decay-max",  "",                              200,    1,    200,    "The maximum cutoff for sampling a decay value        (used for div-noise=1)")
- OPT_INT(diversifyReduce,                  "div-reduce",  "",                             0,      0,      3,    "Toggle to diversify the reduce parameters. 0=Dont diversify. 1=Sample uniform delta-range, 2=Sample extremes, 3=Sample Gaussian")
+ OPT_INT(diversifyReduce,                  "div-reduce",  "",                             0,      0,      3,    "Toggle to diversify the reduce parameters. 0=Dont, 1=Uniform(with delta optional), 2=Extremes, 3=Gaussian")
  OPT_INT(reduceMin,                        "reduce-min",  "",                             300,    0,    1000,    "The minimium reduce value, in per mille")
  OPT_INT(reduceMax,                        "reduce-max",  "",                             980,    0,    1000,    "The maximum reduce value, in per mille")
  OPT_INT(reduceDelta,                      "reduce-delta", "",                            100,    0,    1000,    "For div-reduce=1: Samples a center reduce value r and give Kissat reducelow=r-delta and reducehigh=r+delta")

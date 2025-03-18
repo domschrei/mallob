@@ -35,26 +35,26 @@ struct SolverSetup {
 	// Solver configuration and diversification
 
 	char solverType;
-	bool doIncrementalSolving;
-	int diversificationIndex;
+	bool doIncrementalSolving {false};
+	int diversificationIndex {0};
 
-	bool diversifyNoise;
-	int decayDistribution;
-	int decayMean;
-	int decayStddev;
-	int decayMin;
-	int decayMax;
+	bool diversifyNoise {false};
+	int decayDistribution {0};
+	int decayMean {50};
+	int decayStddev {3};
+	int decayMin {1};
+	int decayMax {200};
 
-	int diversifyReduce;
-	int reduceMin;
-	int reduceMax;
-	int reduceDelta;
-	int reduceMean;
-	int reduceStddev;
+	int diversifyReduce {0};
+	int reduceMin {300};
+	int reduceMax {980};
+	int reduceDelta {100};
+	int reduceMean {700};
+	int reduceStddev {150};
 
-	bool diversifyNative;
-	bool diversifyFanOut;
-	bool diversifyInitShuffle;
+	bool diversifyNative {false};
+	bool diversifyFanOut {false};
+	bool diversifyInitShuffle {false};
 	enum EliminationSetting {
 		ALLOW_ALL, DISABLE_SOME, DISABLE_MOST, DISABLE_ALL
 	} eliminationSetting {ALLOW_ALL};
