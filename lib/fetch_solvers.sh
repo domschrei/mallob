@@ -16,7 +16,7 @@ fi
 # Glucose
 if echo $solvers|grep -q "g"; then
     if [ ! -d glucose ]; then
-        if [ ! -f glucose-syrup-4.1.tgz ]; then	
+        if [ ! -f glucose-syrup-4.1.tgz ]; then
             curl -O https://www.labri.fr/perso/lsimon/downloads/softwares/glucose-syrup-4.1.tgz
             #wget -nc https://www.labri.fr/perso/lsimon/downloads/softwares/glucose-syrup-4.1.tgz
         fi
@@ -74,8 +74,7 @@ if echo $solvers|grep -q "c"; then
         if [ ! -f cadical.zip ]; then
             # for fixing a branch instead of a commit, prepend "refs/heads/"
             branchorcommit="6cc6ad0de76cbad1ec04ad4f9ec22bcf1e4b02d0"
-            # wget -nc https://github.com/domschrei/cadical/archive/${branchorcommit}.zip -O cadical.zip
-		curl -L -o cadical.zip https://github.com/domschrei/cadical/archive/${branchorcommit}.zip
+            wget -nc https://github.com/domschrei/cadical/archive/${branchorcommit}.zip -O cadical.zip
         fi
         unzip cadical.zip
         mv cadical-* cadical

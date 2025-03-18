@@ -241,7 +241,7 @@ void BufferMerger::redistributeBorderBucketClausesRandomly(std::vector<int>& res
     std::vector<int> clausesForResultBuffer;
     std::vector<int> clausesForExcessBuffer;
 
-    LOG(V4_VVER, "bucket (%i,%i): re-select %i clauses in result, %i clauses in excess\n", 
+    LOG(V5_DEBG, "bucket (%i,%i): re-select %i clauses in result, %i clauses in excess\n",
         clslen, failedInfo.failedBucket.lbd, nbClausesResult, nbClausesExcess);
 
     // Iterate over all n clauses (first k from main, then n-k from excess)

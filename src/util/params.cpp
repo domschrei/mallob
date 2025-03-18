@@ -86,6 +86,7 @@ void Parameters::expand() {
         numWorkers.set(-1); // all workers
         loadFactor.set(1); // full load factor
         maxDemand.set(0); // no limit of max. demand
+        jobCacheSize.set(1); // only remember a single job desc. at a time
     }
 }
 

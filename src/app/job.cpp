@@ -1,5 +1,6 @@
 
 #include <cmath>
+#include <cstdlib>
 #include <limits>
 
 #include "app/job.hpp"
@@ -83,6 +84,9 @@ void Job::pushRevision(const std::shared_ptr<std::vector<uint8_t>>& data) {
 
     _has_description = true;
     _result.reset();
+    if (getDescription().getAppConfiguration().map.count("__growprd")) {
+        _growth_period = atof(getDescription().getAppConfiguration().map.at("__growprd").c_str());
+    }
 }
 
 void Job::start() {
@@ -176,7 +180,10 @@ int Job::getDemand() const {
                 demand = std::min(commSize, demand);
             } else {
                 // d(0) := 1; d := 2d+1 every <growthPeriod> seconds
-                demand = std::min(commSize, (int)std::pow(2, numPeriods + 1) - 1);
+                //demand = std::min(commSize, (int)std::pow(2, numPeriods + 1) - 1);
+                // quadratic growth
+                demand = std::min(commSize, std::max(1,
+                    (int) std::round((t*t) / (_growth_period*_growth_period))));
             }
         }
     }

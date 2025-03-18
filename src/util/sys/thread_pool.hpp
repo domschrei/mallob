@@ -51,12 +51,15 @@ public:
         _checker_thread = std::thread([&]() {
             Proc::nameThisThread("PoolWatcher");
             _checker_thread_tid = Process::getPthreadId();
-            while (!_terminate) {
-                usleep(1000*500); // will be interrupted as needed
+            while (true) {
+                usleep(1000*200); // will be interrupted as needed
                 bool allBusy;
                 {
                     auto lock = _job_queue_mutex.getLock();
-                    allBusy = _nb_idle_threads.load(std::memory_order_relaxed) == 0;
+                    int nbIdle = _nb_idle_threads.load(std::memory_order_relaxed);
+                    // Termination condition
+                    if (nbIdle == _threads.size() && _terminate) break;
+                    allBusy = nbIdle == 0;
                 }
                 if (allBusy) increaseSize();
             }

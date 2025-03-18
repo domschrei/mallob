@@ -37,6 +37,15 @@ int terminate_callback(void* state) {
     return ((Kissat*) state)->shouldTerminate() ? 1 : 0;
 }
 
+bool begin_formula_report(void* state, int vars, int cls) {
+    return ((Kissat*) state)->isPreprocessingAcceptable(vars, cls);
+}
+
+void report_preprocessed_lit(void* state, int lit) {
+    ((Kissat*) state)->addLiteralFromPreprocessing(lit);
+}
+
+
 
 
 
@@ -100,6 +109,18 @@ void Kissat::diversify(int seed) {
         return;
     }
 
+    if (_setup.solverType == 'p') {
+        LOGGER(_logger, V3_VERB, "Formula before preprocessing: %i vars, %i clauses\n",
+            _setup.numVars, _setup.numOriginalClauses);
+        kissat_set_preprocessing_report_callback(solver, this,
+            begin_formula_report, report_preprocessed_lit);
+        kissat_set_option(solver, "factor", 1); // do perform bounded variable addition
+        //kissat_set_option(solver, "luckyearly", 0); // lucky before preprocess can take very long
+        seedSet = true;
+        interruptionInitialized = true;
+        return;
+    }
+
     bool ok = true;
     if (_setup.flavour == PortfolioSequence::SAT) {
         switch (getDiversificationIndex() % 4) {
@@ -113,8 +134,24 @@ void Kissat::diversify(int seed) {
         }
     } else if (_setup.flavour == PortfolioSequence::PLAIN) {
         LOGGER(_logger, V4_VVER, "plain\n");
+        bool partitionedVivification = false;
+        ok = kissat_set_option(solver, "lucky", 0); assert(ok);
         ok = kissat_set_option(solver, "preprocess", 0); assert(ok);
-        ok = kissat_set_option(solver, "simplify", 0); assert(ok);
+        ok = kissat_set_option(solver, "simplify", partitionedVivification); assert(ok);
+        ok = kissat_set_option(solver, "probe", 0);
+        if (partitionedVivification) {
+            // need to keep simplify (and probe) enabled for vivification
+            // -- disable everything else tied to simplify (and probe)
+            ok = kissat_set_option(solver, "congruence", 0); assert(ok);
+            ok = kissat_set_option(solver, "substitute", 0); assert(ok);
+            ok = kissat_set_option(solver, "backbone", 0); assert(ok);
+            ok = kissat_set_option(solver, "eliminate", 0); assert(ok);
+            ok = kissat_set_option(solver, "sweep", 0); assert(ok);
+            ok = kissat_set_option(solver, "transitive", 0); assert(ok);
+            //kissat_set_option(solver, "groupindex", _setup.globalId);
+            //kissat_set_option(solver, "groupsize", _setup.maxNumSolvers);
+        }
+
     } else {
         if (_setup.flavour != PortfolioSequence::DEFAULT) {
             LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");
@@ -383,6 +420,29 @@ void Kissat::configureBoundedVariableAddition() {
     kissat_set_option(solver, "factoreffort", 1'000'000);
     kissat_set_option(solver, "factoriniticks", 1'000'000);
     kissat_set_option(solver, "factorexport", 1);
+}
+
+bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
+    bool accept = nbVars != _setup.numVars || nbClauses != _setup.numOriginalClauses;
+    if (accept) {
+        nbPreprocessedVariables = nbVars;
+        nbPreprocessedClausesAdvertised = nbClauses;
+    }
+    return accept;
+}
+
+void Kissat::addLiteralFromPreprocessing(int lit) {
+    preprocessedFormula.push_back(lit);
+    if (lit == 0) nbPreprocessedClausesReceived++;
+    if (nbPreprocessedClausesReceived == nbPreprocessedClausesAdvertised) {
+        // Full preprocessed formula received
+        LOGGER(_logger, V3_VERB, "Received preprocessed formula: %i vars, %i clauses\n",
+            nbPreprocessedVariables, nbPreprocessedClausesReceived);
+        preprocessedFormula.push_back(nbPreprocessedVariables);
+        preprocessedFormula.push_back(nbPreprocessedClausesReceived);
+        setPreprocessedFormula(std::move(preprocessedFormula));
+        setSolverInterrupt();
+    }
 }
 
 Kissat::~Kissat() {

@@ -308,7 +308,12 @@ private:
 
             // Check solved state
             int resultCode = engine.solveLoop();
-            if (resultCode >= 0 && !_has_solution) {
+            if (resultCode == 99) {
+                // Preprocessing result found
+                std::vector<int> fPre = std::move(engine.getPreprocessedFormula());
+                pipe.writeData(std::move(fPre), CLAUSE_PIPE_SUBMIT_PREPROCESSED_FORMULA);
+
+            } else if (resultCode >= 0 && !_has_solution) {
                 // Solution found!
                 auto& result = engine.getResult();
                 result.id = _config.jobid;

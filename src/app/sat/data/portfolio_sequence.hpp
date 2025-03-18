@@ -13,6 +13,7 @@ struct PortfolioSequence {
         LINGELING = 'l',
         GLUCOSE = 'g',
         MERGESAT = 'm',
+        PREPROCESSOR = 'p',
         VARIABLE_ADDITION = 'v'
     };
     enum Flavour {
@@ -93,6 +94,9 @@ private:
                 break;
             case 'v':
                 next.baseSolver = VARIABLE_ADDITION;
+                break;
+            case 'p':
+                next.baseSolver = PREPROCESSOR;
                 break;
             case '(': case '[': {
                 if (begun) {

@@ -213,7 +213,7 @@ public:
         updateBestFoundSolutionCost(agg.bestFoundSolutionCost());
         agg.stripToRawBuffer();
         auto reader = _clause_store->getBufferReader(_cross_shared_clauses.data(), _cross_shared_clauses.size());
-        _filter_vector = FilterVectorBuilder(0UL, _epoch).build(reader, [&](Mallob::Clause& clause) {
+        _filter_vector = FilterVectorBuilder(0UL, _epoch, true).build(reader, [&](Mallob::Clause& clause) {
             return _clause_filter->admitSharing(clause, _epoch);
         }, [&](int len) {
             _clause_filter->acquireLock(len);

@@ -24,6 +24,7 @@
 #include "app/sat/job/sat_process_config.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
 #include "util/option.hpp"
+#include <climits>
 
 class LratConnector;
 #if MALLOB_USE_MERGESAT
@@ -156,6 +157,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	int numMrg = 0;
 	int numKis = 0;
 	int numBVA = 0;
+	int numPre = 0;
 
 	// Add solvers from full cycles on previous ranks
 	// and from the begun cycle on the previous rank
@@ -173,6 +175,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		case PortfolioSequence::MERGESAT: solverToAdd = &numMrg; break;
 		case PortfolioSequence::KISSAT: solverToAdd = &numKis; break;
 		case PortfolioSequence::VARIABLE_ADDITION: solverToAdd = &numBVA; break;
+		case PortfolioSequence::PREPROCESSOR: solverToAdd = &numPre; break;
 		}
 		*solverToAdd += numFullCycles + (i < begunCyclePos);
 	}
@@ -273,6 +276,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 			case PortfolioSequence::GLUCOSE: setup.diversificationIndex = numGlu++; break;
 			case PortfolioSequence::KISSAT: setup.diversificationIndex = numKis++; break;
 			case PortfolioSequence::VARIABLE_ADDITION: setup.diversificationIndex = numBVA++; break;
+			case PortfolioSequence::PREPROCESSOR: setup.diversificationIndex = numPre++; break;
 			}
 			setup.diversificationIndex += divOffsetCycle;
 		}
@@ -315,8 +319,11 @@ std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSe
 		break;
 	case 'k':
 	case 'v': // variable addition via Kissat
+	case 'p': // preprocessing via Kissat
 		// Kissat
-		LOGGER(_logger, V4_VVER, "S%i : Kissat%s-%i\n", setup.globalId, setup.solverType == 'v' ? "-BVA": "",
+		LOGGER(_logger, V4_VVER, "S%i : Kissat%s%s-%i\n", setup.globalId,
+			setup.solverType == 'v' ? "-BVA": "",
+			setup.solverType == 'p' ? "-pre": "",
 			setup.diversificationIndex);
 		solver.reset(new Kissat(setup));
 		break;
@@ -433,6 +440,7 @@ int SatEngine::solveLoop() {
 
     // Solving done?
 	bool done = false;
+	bool preprocessingResult = false;
 	for (size_t i = 0; i < std::min(_num_active_solvers, _solver_threads.size()); i++) {
 		if (_solver_threads[i]->hasFoundResult(_revision)) {
 
@@ -448,12 +456,16 @@ int SatEngine::solveLoop() {
 				break;
 			}
 		}
+		if (!preprocessingResult && _solver_threads[i]->hasPreprocessedFormula()) {
+			_preprocessed_formula = std::move(_solver_threads[i]->extractPreprocessedFormula());
+			preprocessingResult = true;
+		}
 	}
 
 	if (done) {
 		LOGGER(_logger, V6_DEBGV, "Returning result\n");
 		return _result.result;
-	}
+	} else if (preprocessingResult) return 99;
     return -1; // no result yet
 }
 
@@ -471,7 +483,8 @@ void SatEngine::setClauseBufferRevision(int revision) {
 
 void SatEngine::updateBestFoundObjectiveCost(long long bestFoundObjectiveCost) {
 	if (isCleanedUp()) return;
-	LOGGER(_logger, V4_VVER, "update best found objective cost: %lld\n", bestFoundObjectiveCost);
+	if (bestFoundObjectiveCost != LLONG_MAX)
+		LOGGER(_logger, V4_VVER, "update best found objective cost: %lld\n", bestFoundObjectiveCost);
 	for (size_t i = 0; i < _num_active_solvers; i++) {
 		if (_solver_interfaces[i] && _solver_interfaces[i]->getOptimizer())
 			_solver_interfaces[i]->getOptimizer()->update_best_found_objective_cost(bestFoundObjectiveCost);

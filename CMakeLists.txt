@@ -88,7 +88,7 @@ set(BASE_COMPILEFLAGS CACHE INTERNAL "")
 
 set(MALLOB_CORE_SOURCES
     src/data/app_configuration.cpp src/data/job_description.cpp src/data/job_result.cpp src/interface/json_interface.cpp
-    src/interface/api/api_connector.cpp src/util/logger.cpp src/util/option.cpp src/util/params.cpp src/util/permutation.cpp 
+    src/interface/api/api_connector.cpp src/interface/api/api_registry.cpp src/util/logger.cpp src/util/option.cpp src/util/params.cpp src/util/permutation.cpp 
     src/util/random.cpp src/util/sys/atomics.cpp src/util/sys/fileutils.cpp src/util/sys/process.cpp src/util/sys/proc.cpp 
     src/util/sys/process_dispatcher.cpp src/util/sys/shared_memory.cpp src/util/sys/tmpdir.cpp src/util/sys/terminator.cpp 
     src/util/sys/threading.cpp src/util/sys/thread_pool.cpp src/util/sys/timer.cpp src/util/sys/watchdog.cpp
@@ -157,6 +157,9 @@ if(MALLOB_APP_SAT)
 endif()
 if(MALLOB_APP_KMEANS)
     register_mallob_app("kmeans")
+endif()
+if(MALLOB_APP_SATWITHPRE)
+    register_mallob_app("satwithpre")
 endif()
 # Include further applications here:
 #if(MALLOB_APP_YOURAPP)

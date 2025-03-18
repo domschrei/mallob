@@ -1,11 +1,16 @@
 
 #include <assert.h>
 #include <atomic>
+#include <cmath>
 #include <string.h>
 #include <algorithm>
 #include <utility>
 
 #include "app/app_message_subscription.hpp"
+#include "app/sat/data/definitions.hpp"
+#include "data/job_interrupt_reason.hpp"
+#include "interface/api/api_registry.hpp"
+#include "util/static_store.hpp"
 #include "util/sys/shmem_cache.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
@@ -49,6 +54,12 @@ void ForkedSatJob::doStartSolver() {
     Parameters hParams(_params);
     hParams.satEngineConfig.set(config.toString());
     hParams.applicationConfiguration.set(getDescription().getAppConfiguration().serialize());
+    if (getDescription().getAppConfiguration().map.count("__surrogate")) {
+        // already is a surrogate for another job: turn off any further preprocessing
+        auto seq = hParams.satSolverSequence();
+        seq.erase(std::remove(seq.begin(), seq.end(), 'p'), seq.end());
+        hParams.satSolverSequence.set(seq);
+    }
     if (_params.verbosity() >= V5_DEBG) LOG(V5_DEBG, "Program options: %s\n", hParams.getParamsAsString().c_str());
     _last_imported_revision = 0;
 
@@ -177,10 +188,73 @@ int ForkedSatJob::appl_solved() {
             return -1;
         }
 
+    } else if (status == SatProcessAdapter::FOUND_PREPROCESSED_FORMULA) {
+
+        // Prepare preprocessed formula data
+        auto fPre = std::move(_solver->getPreprocessedFormula());
+        assert(fPre.size() > 2);
+        int nbClauses = fPre.back(); fPre.pop_back();
+        int nbVars = fPre.back(); fPre.pop_back();
+        size_t preprocessedSize = fPre.size();
+
+        // Prepare job submission data
+        nlohmann::json json = {
+            {"user", "sat-" + std::string(toStr())},
+            {"name", "mono-job"},
+            {"priority", 0.01}, // very low priority initially
+            {"application", "SAT"},
+        };
+        if (_params.crossJobCommunication()) json["group-id"] = getDescription().getGroupId();
+        StaticStore<std::vector<int>>::insert(json["name"].get<std::string>(), fPre);
+        json["internalliterals"] = json["name"].get<std::string>();
+        json["configuration"]["__NV"] = std::to_string(nbVars);
+        json["configuration"]["__NC"] = std::to_string(nbClauses);
+        // Make the submitted job report results in the name of *this* job
+        json["configuration"]["__surrogate"] = std::to_string(getDescription().getId());
+        json["configuration"]["__spentwcsecs"] = std::to_string(getAgeSinceActivation());
+        if (getDescription().getWallclockLimit() > 0)
+            json["wallclock-limit"] = std::to_string(
+                getDescription().getWallclockLimit() - getAgeSinceActivation()) + "s";
+        if (getDescription().getCpuLimit() > 0)
+            json["cpu-limit"] = std::to_string(
+                getDescription().getCpuLimit() - getUsedCpuSeconds()) + "s";
+
+        // Obtain API and submit the job
+        auto api = APIRegistry::get();
+        assert(api);
+        auto retcode = api->submit(json, [&](auto result) {
+            // Do nothing - result must get reported back directly
+        });
+        if (retcode == JsonInterface::ACCEPT) {
+            // begin successively retracting this job
+            _time_of_retraction_start = Timer::elapsedSeconds();
+            // We want the job to retract over sqrt(p) rounds
+            // with a total duration of the job's wallclock time so far.
+            float totalRetractionDuration = std::min(10.f, getAgeSinceActivation());
+            // If this preprocessing result could be critical in terms of RAM usage,
+            // perform the retraction essentially immediately.
+            size_t currentSize = getDescription().getFormulaPayloadSize(getRevision());
+            if (currentSize > 100'000'000 && preprocessedSize/(double)currentSize < 0.75)
+                totalRetractionDuration = 0.01;
+            _retraction_round_duration = totalRetractionDuration / std::sqrt(getGlobalNumWorkers());
+            LOG(V3_VERB, "%s : Retracting over ~%.3fs\n", toStr(), totalRetractionDuration);
+        }
+
     } else if (status == SatProcessAdapter::CRASHED) {
         // Subprocess crashed for whatever reason: try to recover
         handleSolverCrash();
     }
+
+    // Handle successive retraction of this job if a preprocessed surrogate is running
+    if (_time_of_retraction_start >= 0 && _time_of_retraction_end < 0 && getDemand() == 1)
+        _time_of_retraction_end = Timer::elapsedSeconds();
+    if (_time_of_retraction_end >= 0 && Timer::elapsedSeconds() - _time_of_retraction_end > _retraction_round_duration) {
+        // Abort this job silently (i.e., without reporting something or informing the client)
+        MyMpi::isend(getMyMpiRank(), MSG_NOTIFY_JOB_ABORTING,
+            IntVec({getId(), getRevision(), JobInterruptReason::SILENT_YIELD}));
+        _time_of_retraction_end = -1;
+    }
+
     return result;
 }
 
@@ -388,6 +462,18 @@ bool ForkedSatJob::canHandleIncompleteRevision(int rev) {
     if (_formulas_in_shmem.size() <= rev) _formulas_in_shmem.resize(2*rev+1);
     _formulas_in_shmem[rev] = {std::move(shmemId), shmem, size, true, rev, std::move(userLabel)};
     return true;
+}
+
+int ForkedSatJob::getDemand() const {
+    int demand = BaseSatJob::getDemand();
+    if (_time_of_retraction_start < 0) {
+        return demand;
+    }
+    float now = Timer::elapsedSeconds();
+    float elapsedSecs = now - _time_of_retraction_start;
+    int retractionRounds = std::floor(elapsedSecs / _retraction_round_duration);
+    demand = std::max(1, demand - retractionRounds * retractionRounds);
+    return demand;
 }
 
 ForkedSatJob::~ForkedSatJob() {

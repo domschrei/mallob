@@ -120,6 +120,7 @@ private:
     int _nb_threads {0};
 
     JobResult _solution;
+    std::vector<int> _preprocessed_formula;
 
 public:
     SatProcessAdapter(Parameters&& params, SatProcessConfig&& config,
@@ -158,9 +159,10 @@ public:
 
     void dumpStats();
     
-    enum SubprocessStatus {NORMAL, FOUND_RESULT, CRASHED};
+    enum SubprocessStatus {NORMAL, FOUND_RESULT, FOUND_PREPROCESSED_FORMULA, CRASHED};
     SubprocessStatus check();
     JobResult& getSolution();
+    std::vector<int>&& getPreprocessedFormula() {return std::move(_preprocessed_formula);}
 
     void waitUntilChildExited();
     void freeSharedMemory();

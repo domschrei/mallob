@@ -114,6 +114,12 @@ public:
     JobResult& getSatResult() {
         return _result;
     }
+    bool hasPreprocessedFormula() {
+        return _solver.hasPreprocessedFormula();
+    }
+    std::vector<int>&& extractPreprocessedFormula() {
+        return std::move(_solver.extractPreprocessedFormula());
+    }
 
     int getActiveRevision() const {return _active_revision;}
 
