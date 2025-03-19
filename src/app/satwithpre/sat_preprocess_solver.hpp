@@ -253,7 +253,7 @@ private:
         if (result == JsonInterface::Result::DISCARD) doneFlag = true;
     }
 
-    JobResult jsonToJobResult(nlohmann::json& json, bool convert) const {
+    JobResult jsonToJobResult(nlohmann::json& json, bool convert) {
         LOG(V3_VERB, "SATWP Extract result of %s\n", json["name"].get<std::string>().c_str());
         JobResult res;
         res.id = _desc.getId();
@@ -269,6 +269,7 @@ private:
         if (convert && res.result == RESULT_SAT) {
             LOG(V3_VERB, "SATWP reconstruct original solution\n");
             assert(solution.size() >= 1 && solution[0] == 0);
+            if (_fut_solver.valid()) _fut_solver.get(); // wait for solver thread to return
             _solver->reconstructSolutionFromPreprocessing(solution);
             LOG(V3_VERB, "SATWP original solution reconstructed\n");
         }
