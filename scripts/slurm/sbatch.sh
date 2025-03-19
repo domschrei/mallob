@@ -125,10 +125,10 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
     echo "$(date) JOB $i LAUNCHING"
 
     echo $mpicall $cmd
-    $mpicall bash -c "sbatch/prolog.sh ; $cmd"
+    $mpicall bash -c "scripts/slurm/prolog.sh ; $cmd"
 
     sleep 5 # avoid "nodes are still busy" issue?
-    $mpicall sbatch/epilog.sh
+    $mpicall scripts/slurm/epilog.sh
 
     echo "$(date) JOB $i FINISHED"
 
