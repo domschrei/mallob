@@ -36,7 +36,7 @@ private:
     nlohmann::json _base_job_submission;
     nlohmann::json _base_job_response;
 
-    std::unique_ptr<PortfolioSolverInterface> _solver;
+    std::unique_ptr<Kissat> _solver;
     std::future<void> _fut_solver;
     int _solver_result {0};
     volatile bool _solver_done {false};
@@ -71,13 +71,13 @@ public:
         while (!isTimeoutHit()) {
             if (_base_job_done && !_base_job_digested) {
                 LOG(V3_VERB, "SATWP base done\n");
-                res = jsonToJobResult(_base_job_response);
+                res = jsonToJobResult(_base_job_response, false);
                 _base_job_digested = true;
                 if (res.result != 0) break;
             }
             if (_prepro_job_done && !_prepro_job_digested) {
                 LOG(V3_VERB, "SATWP prepro done\n");
-                res = jsonToJobResult(_prepro_job_response);
+                res = jsonToJobResult(_prepro_job_response, true);
                 _prepro_job_digested = true;
                 if (res.result != 0) break;
             }
@@ -253,7 +253,7 @@ private:
         if (result == JsonInterface::Result::DISCARD) doneFlag = true;
     }
 
-    JobResult jsonToJobResult(nlohmann::json& json) const {
+    JobResult jsonToJobResult(nlohmann::json& json, bool convert) const {
         LOG(V3_VERB, "SATWP Extract result of %s\n", json["name"].get<std::string>().c_str());
         JobResult res;
         res.id = _desc.getId();
@@ -265,6 +265,12 @@ private:
             solution = ModelStringCompressor::decompress(json["result"]["solution"].get<std::string>());
         } else {
             solution = json["result"]["solution"].get<std::vector<int>>();
+        }
+        if (convert && res.result == RESULT_SAT) {
+            LOG(V3_VERB, "SATWP reconstruct original solution\n");
+            assert(solution.size() >= 1 && solution[0] == 0);
+            _solver->reconstructSolutionFromPreprocessing(solution);
+            LOG(V3_VERB, "SATWP original solution reconstructed\n");
         }
         res.setSolution(std::move(solution));
         LOG(V3_VERB, "SATWP %s extracted\n", json["name"].get<std::string>().c_str());

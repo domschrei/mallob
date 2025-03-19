@@ -79,6 +79,8 @@ public:
 
 	void cleanUp() override;
 
+	void reconstructSolutionFromPreprocessing(std::vector<int>& model);
+
     friend void produce_clause(void* state, int size, int glue);
     friend void consume_clause(void* state, int** clause, int* size, int* lbd);
     friend bool begin_formula_report(void* state, int vars, int cls);
