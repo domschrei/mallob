@@ -112,7 +112,7 @@ void Kissat::diversify(int seed) {
     if (_setup.solverType == 'p') {
         LOGGER(_logger, V3_VERB, "Formula before preprocessing: %i vars, %i clauses\n",
             _setup.numVars, _setup.numOriginalClauses);
-        kissat_set_preprocessing_report_callback(solver, this,
+            kissat_set_preprocessing_report_callback(solver, this,
             begin_formula_report, report_preprocessed_lit);
         kissat_set_option(solver, "factor", 1); // do perform bounded variable addition
         //kissat_set_option(solver, "luckyearly", 0); // lucky before preprocess can take very long
