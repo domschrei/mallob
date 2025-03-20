@@ -6,8 +6,7 @@ solvers=$1
 if echo $solvers|grep -q "m"; then
     if [ ! -d mergesat ]; then
         if [ ! -f mergesat-patched.tar.gz ]; then
-           #wget -nc https://dominikschreiber.de/mergesat-patched.tar.gz
-	   curl -O https://dominikschreiber.de/mergesat-patched.tar.gz
+            wget -nc https://dominikschreiber.de/mergesat-patched.tar.gz
         fi
         tar xzvf mergesat-patched.tar.gz
     fi
@@ -17,8 +16,7 @@ fi
 if echo $solvers|grep -q "g"; then
     if [ ! -d glucose ]; then
         if [ ! -f glucose-syrup-4.1.tgz ]; then
-            curl -O https://www.labri.fr/perso/lsimon/downloads/softwares/glucose-syrup-4.1.tgz
-            #wget -nc https://www.labri.fr/perso/lsimon/downloads/softwares/glucose-syrup-4.1.tgz
+            wget -nc https://www.labri.fr/perso/lsimon/downloads/softwares/glucose-syrup-4.1.tgz
         fi
         tar xzvf glucose-syrup-4.1.tgz
         rm ._glucose-syrup-4.1
@@ -30,10 +28,7 @@ fi
 if echo $solvers|grep -q "y"; then
     if [ ! -d yalsat ]; then
         if [ ! -f yalsat-03v.zip ]; then
-		curl -L -o yalsat-03v.zip -C - http://fmv.jku.at/yalsat/yalsat-03v.zip
-               #curl -L -o yalsat-03v.zip -C - http://fmv.jku.at/yalsat/yalsat-03v.zip
-               #curl -O http://fmv.jku.at/yalsat/yalsat-03v.zip
-	       #wget -nc http://fmv.jku.at/yalsat/yalsat-03v.zip
+            wget -nc http://fmv.jku.at/yalsat/yalsat-03v.zip
         fi
         unzip yalsat-03v.zip
         mv yalsat-03v yalsat
@@ -46,8 +41,7 @@ if echo $solvers|grep -q "l"; then
         if [ ! -f lingeling.zip ]; then
             # for fixing a branch instead of a commit, prepend "refs/heads/"
 	    branchorcommit="89a167d0d2efe98d983c87b5b84175b40ea55842" # version 1.0.0, March 2024
-            #wget -nc https://github.com/arminbiere/lingeling/archive/${branchorcommit}.zip -O lingeling.zip
-	    curl -L -o lingeling.zip https://github.com/arminbiere/lingeling/archive/${branchorcommit}.zip
+            wget -nc https://github.com/arminbiere/lingeling/archive/${branchorcommit}.zip -O lingeling.zip
         fi
         unzip lingeling.zip
         mv lingeling-* lingeling
@@ -59,9 +53,8 @@ if echo $solvers|grep -q "k"; then
     if [ ! -d kissat ]; then
         if [ ! -f kissat.zip ]; then
             # for fixing a branch instead of a commit, prepend "refs/heads/"
-            branchorcommit="1d4d6772519d0a01810ccef3f9ad25533a8b502e" # updated from A. Biere's 2024 state
-            #wget -nc https://github.com/domschrei/kissat/archive/${branchorcommit}.zip -O kissat.zip
-		curl -L -o kissat.zip https://github.com/domschrei/kissat/archive/${branchorcommit}.zip
+            branchorcommit="5e9e9b1e1342781b75b0b751eb70c3636f6e3af7" # updated from A. Biere's 2024 state
+            wget -nc https://github.com/domschrei/kissat/archive/${branchorcommit}.zip -O kissat.zip
         fi
         unzip kissat.zip
         mv kissat-* kissat

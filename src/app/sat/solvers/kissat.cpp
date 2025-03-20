@@ -344,6 +344,15 @@ std::vector<int> Kissat::getSolution() {
 	return result;
 }
 
+void Kissat::reconstructSolutionFromPreprocessing(std::vector<int>& model) {
+    kissat_import_model(solver, model.data(), model.size());
+    model.resize(_setup.numVars+1);
+    for (int v = 1; v <= _setup.numVars; v++) {
+        model[v] = kissat_value(solver, v);
+        assert(std::abs(model[v]) == v);
+    }
+}
+
 std::set<int> Kissat::getFailedAssumptions() {
 	// TODO ?
     return std::set<int>();
@@ -427,7 +436,7 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
     if (accept) {
         nbPreprocessedVariables = nbVars;
         nbPreprocessedClausesAdvertised = nbClauses;
-    }
+    } else setSolverInterrupt();
     return accept;
 }
 
