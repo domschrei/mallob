@@ -30,7 +30,7 @@ Now you can activate the proxy. Your local username and computername are the one
     
     ssh -D 1537 -N -f <local_username>@<local_computername>
 
-To test if the proxy exists and works, try any or all of these commands. They should all return something. The last command should ideally also point out the exact location of the detected proxychains.conf file. 
+To test if the proxy exists and works try any of these commands, they should all return something meaningful. The last command should ideally also point out the exact location of the detected proxychains.conf file. 
 
     netstat -tulnp | grep :1537
     ps aux | grep "ssh -D"
