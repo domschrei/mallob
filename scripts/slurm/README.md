@@ -13,6 +13,10 @@ This directory contains the following files (in chronological order w.r.t. the u
 
 Fill in your project name and user name.
 
+### `build.sh`
+
+Example script for building Mallob. Read and follow the instructions (complementing the information in the base README).
+
 ### `prolog.sh`, `epilog.sh`
 
 Scripts that are executed before and after a Mallob run respectively. As long as you follow the default setup, you shouldn't need to make any changes in there.
