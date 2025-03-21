@@ -29,6 +29,19 @@ and the following to `~/.gitconfig`:
 
 Commands like `git`, `wget`, and `curl` should now be able to download content over the proxy, which should be sufficient for setting up Mallob and its dependencies.
 
+In case the above doesn't work, an attempt can be to explicitly demand the SOCKS5 standard. In this case, downloads might only still work with curl, but not wget.
+    
+    export HTTP_PROXY="socks5://localhost:1537"
+    export http_proxy="socks5://localhost:1537"
+    export HTTPS_PROXY="socks5://localhost:1537"
+    export https_proxy="socks5://localhost:1537"
+and
+
+    [https]
+        proxy = socks5h://localhost:1537
+    [http]
+        proxy = socks5h://localhost:1537
+
 ### SSHFS
 
 Alternatively, you can use SSHFS (= SSH File System). At your local login point, execute these commands:
