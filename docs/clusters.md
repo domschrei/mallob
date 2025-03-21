@@ -37,6 +37,9 @@ To test if the proxy exists and works, try any or all of these commands. They sh
     curl --socks5 127.0.0.1:1537 https://ipinfo.io
     proxychains curl ipinfo.io
 
+(In case you want to deactive the proxies again, or check if activating/deactivating them changes the behaviour of the test commands, get the PIDs via ``ps aux | grep "ssh -D"`` and then run ``kill <PID1> <PID2> ...``.)
+
+
 Now everything is set up locally and you can connect to the cluster
 
     ssh -R 1537:localhost:1537 $ACCTNAME@skx.supermuc.lrz.de
