@@ -29,6 +29,19 @@ and the following to `~/.gitconfig`:
 
 Commands like `git`, `wget`, and `curl` should now be able to download content over the proxy, which should be sufficient for setting up Mallob and its dependencies.
 
+In case the above doesn't work, an attempt can be to explicitly demand the SOCKS5 standard. In this case, downloads might only be possible via curl.
+    
+    export HTTP_PROXY="socks5://localhost:1537"
+    export http_proxy="socks5://localhost:1537"
+    export HTTPS_PROXY="socks5://localhost:1537"
+    export https_proxy="socks5://localhost:1537"
+and
+
+    [https]
+        proxy = socks5h://localhost:1537
+    [http]
+        proxy = socks5h://localhost:1537
+
 ### SSHFS
 
 Alternatively, you can use SSHFS (= SSH File System). At your local login point, execute these commands:
@@ -57,7 +70,7 @@ Login to the cluster. First load the modules necessary for building, like this:
 
 In the `mallob` directory with all dependencies fetched, you can build Mallob like this:
 
-    ( cd lib && bash fetch_and_build_sat_solvers.sh kcly )
+    ( cd lib && bash fetch_and_build_solvers.sh kcly )
     mkdir -p build
     cd build
     CC=$(which mpicc) CXX=$(which mpicxx) cmake -DMALLOB_USE_JEMALLOC=0 ${OPTIONS} ..
