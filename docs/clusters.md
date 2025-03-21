@@ -8,8 +8,36 @@ This documentation explains how to run Mallob on commodity clusters / supercompu
 Some clusters like SuperMUC-NG do not allow internet access on their login nodes. Here's two options for how you can still transfer the needed dependencies to the cluster.
 
 ### Internet via Proxy
+First you need to set up a SOCKS5 proxy at your local host. Here we show an example with [proxychains](https://github.com/haad/proxychains) for setting up the port 1537. On Debian/Ubuntu proxychains might already be installed per default, or available via apt. You might also need openssh-server later.
+    
+    apt install proxychains openssh-sever
 
-After setting up a SOCKS5 proxy at your host, e.g., via [proxychains](https://github.com/haad/proxychains), you can connect to the cluster as in this example (with port 1537):
+Next locate the proxychains.conf file, usually in /etc/proxychains.conf or /usr/local/proxychains.conf, and add "socks5  127.0.0.1       1537" as a new line
+
+    [ProxyList]
+    # add proxy here ...
+    # meanwhile
+    # defaults set to "tor"
+    #socks4         127.0.0.1 9050 
+    socks5  127.0.0.1       1537   
+
+To be extra sure, now explicitly activate ssh
+
+    sudo systemctl start ssh
+    sudo systemctl enable ssh
+
+Now you can activate the proxy. Your local user- and computer-name are the ones shown in your terminal.
+    
+    ssh -D 1537 -N -f <your_local_username>@<your_local_computer_name>
+
+To test if the proxy exists and works, try these, they should all return something. The last command should ideally also point out the location of the detected proxychains.conf file. 
+
+    netstat -tulnp | grep :1537
+    ps aux | grep "ssh -D"
+    curl --socks5 127.0.0.1:1537 https://ipinfo.io
+    proxychains curl ipinfo.io
+
+Now you can connect to the cluster.
 
     ssh -R 1537:localhost:1537 $ACCTNAME@skx.supermuc.lrz.de
 
