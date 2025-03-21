@@ -125,8 +125,8 @@ private:
     Mutex _client_side_jobs_mutex;
 
     std::unique_ptr<JsonInterface> _json_interface;
-    std::vector<std::unique_ptr<Connector>> _interface_connectors;
-    APIConnector* _api_connector;
+    std::vector<std::shared_ptr<Connector>> _interface_connectors;
+    std::shared_ptr<APIConnector> _api_connector;
     BackgroundWorker _instance_reader;
 
     struct ClientSideJob {
