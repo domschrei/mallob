@@ -8,7 +8,7 @@ This documentation explains how to run Mallob on commodity clusters / supercompu
 Some clusters like SuperMUC-NG do not allow internet access on their login nodes. Here's two options for how you can still transfer the needed dependencies to the cluster.
 
 ### Internet via Proxy
-First you need to set up a SOCKS5 proxy at your local host. Here we show an example using [proxychains](https://github.com/haad/proxychains) and the port 1537. On Debian/Ubuntu proxychains might already be installed per default or available via apt. You might also need to install openssh-server.
+First you need to set up a SOCKS5 proxy at your local host. Here we show an example using [proxychains](https://github.com/haad/proxychains) and the port 1537. It should work equally well with the similar package [proxychains-ng](https://github.com/rofl0r/proxychains-ng), in case you have easier access to that one. On Debian/Ubuntu, proxychains might already be installed per default or available via apt. You might also need to install openssh-server.
     
     apt install proxychains openssh-sever
 
