@@ -12,7 +12,7 @@ First you need to set up a SOCKS5 proxy at your local host. Here we show an exam
     
     apt install proxychains openssh-sever
 
-Next locate the proxychains.conf file and add "socks5  127.0.0.1       1537" as a new line. It is usually located at either ``/etc/proxychains.conf`` or ``/usr/local/proxychains.conf``.
+Next locate the proxychains.conf file and add ``socks5  127.0.0.1       1537`` as a new line. It is usually located at either ``/etc/proxychains.conf`` or ``/usr/local/proxychains.conf``.
 
     [ProxyList]
     # add proxy here ...
