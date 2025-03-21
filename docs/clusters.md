@@ -29,11 +29,11 @@ Login to the cluster. First load the modules necessary for building, like this:
 
     module load slurm_setup
     module unload devEnv/Intel/2019 intel-mpi
-    module load gcc/9 intel-mpi/2019-gcc cmake/3.14.5 gdb
+    module load gcc/9 intel-mpi/2019-gcc cmake/3.21.4 gdb
 
 In the `mallob` directory with all dependencies fetched, you can build Mallob like this:
 
-    ( cd lib && bash fetch_and_build_sat_solvers.sh kclyg )
+    ( cd lib && bash fetch_and_build_solvers.sh kclyg )
     mkdir -p build
     cd build
     CC=$(which mpicc) CXX=$(which mpicxx) cmake -DMALLOB_USE_JEMALLOC=0 ${OPTIONS} ..
@@ -71,7 +71,7 @@ Remember to adjust the `#SBATCH` directives according to your job and to edit th
 # Load the same modules to compile Mallob
 module load slurm_setup
 module unload devEnv/Intel/2019 intel-mpi
-module load gcc/9 intel-mpi/2019-gcc cmake/3.14.5 gdb
+module load gcc/9 intel-mpi/2019-gcc cmake/3.21.4 gdb
 
 # Some output for debugging
 module list
