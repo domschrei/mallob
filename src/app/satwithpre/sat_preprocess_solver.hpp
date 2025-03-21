@@ -31,6 +31,7 @@ private:
     float _time_of_retraction_end {0};
     float _retraction_round_duration;
 
+    bool _base_job_submitted {false};
     volatile bool _base_job_done {false};
     bool _base_job_digested {false};
     nlohmann::json _base_job_submission;
@@ -60,7 +61,7 @@ public:
     JobResult solve() {
         _time_of_activation = Timer::elapsedSeconds();
 
-        submitBaseJob();
+        if (_params.preprocessBalancing() >= 0) submitBaseJob();
         launchPreprocessor();
 
         JobResult res;
@@ -102,7 +103,7 @@ public:
         }
 
         // Terminate sub-jobs
-        if (!_base_job_done) {
+        if (_base_job_submitted && !_base_job_done) {
             interrupt(_base_job_submission, _base_job_done);
             while (!_base_job_done) usleep(5*1000);
         }
@@ -157,6 +158,8 @@ private:
             LOG(V0_CRIT, "[ERROR] Cannot introduce mono job!\n");
             abort();
         }
+
+        _base_job_submitted = true;
     }
 
     void submitPreprocessedJob(std::vector<int>&& fPre) {

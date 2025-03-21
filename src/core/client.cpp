@@ -285,7 +285,7 @@ void Client::init() {
         LOG(V2_INFO, "Set up IPC socket interface at %s\n", path.c_str());
         _interface_connectors.emplace_back(new SocketConnector(_params, *_json_interface, path));
     }
-    _api_connector = new APIConnector(*_json_interface, _params, Logger::getMainInstance().copy("I-API", ".i.api"));
+    _api_connector.reset(new APIConnector(*_json_interface, _params, Logger::getMainInstance().copy("I-API", ".i.api")));
     APIRegistry::put(_api_connector);
     _interface_connectors.emplace_back(_api_connector);
     LOG(V2_INFO, "Set up API at %s\n", "src/interface/api/api_connector.hpp");

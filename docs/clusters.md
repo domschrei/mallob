@@ -8,8 +8,39 @@ This documentation explains how to run Mallob on commodity clusters / supercompu
 Some clusters like SuperMUC-NG do not allow internet access on their login nodes. Here's two options for how you can still transfer the needed dependencies to the cluster.
 
 ### Internet via Proxy
+First you need to set up a SOCKS5 proxy at your local host. Here we show an example using [proxychains](https://github.com/haad/proxychains) and the port 1537. It should work equally well with the similar package [proxychains-ng](https://github.com/rofl0r/proxychains-ng), in case you have easier access to that one. On Debian/Ubuntu, proxychains might already be installed, or is available via apt. You might also need to install openssh-server.
+    
+    apt install proxychains openssh-sever
 
-After setting up a SOCKS5 proxy at your host, e.g., via [proxychains](https://github.com/haad/proxychains), you can connect to the cluster as in this example (with port 1537):
+Next locate the proxychains.conf file and add ``socks5  127.0.0.1       1537`` as a new line. It is usually located at either ``/etc/proxychains.conf`` or ``/usr/local/proxychains.conf``.
+
+    [ProxyList]
+    # add proxy here ...
+    # meanwhile
+    # defaults set to "tor"
+    #socks4         127.0.0.1 9050 
+    socks5  127.0.0.1       1537   
+
+To be extra sure also explicitly activate ssh
+
+    sudo systemctl start ssh
+    sudo systemctl enable ssh
+
+Now you can activate the proxy. Your local username and computername are the ones also shown in your terminal.
+    
+    ssh -D 1537 -N -f <local_username>@<local_computername>
+
+To test if the proxy exists and works try any of these commands, they should all return something meaningful. The last command should ideally also point out the exact location of the detected proxychains.conf file. 
+
+    netstat -tulnp | grep :1537
+    ps aux | grep "ssh -D"
+    curl --socks5 127.0.0.1:1537 https://ipinfo.io
+    proxychains curl ipinfo.io
+
+(In case you want to deactive the proxies again, or check if activating/deactivating them changes the behaviour of the test commands, get the PIDs via ``ps aux | grep "ssh -D"`` and then run ``kill <PID1> <PID2> ...``.)
+
+
+Now everything is set up locally and you can connect to the cluster
 
     ssh -R 1537:localhost:1537 $ACCTNAME@skx.supermuc.lrz.de
 
@@ -28,6 +59,19 @@ and the following to `~/.gitconfig`:
         proxy = http://localhost:1537
 
 Commands like `git`, `wget`, and `curl` should now be able to download content over the proxy, which should be sufficient for setting up Mallob and its dependencies.
+
+In case the above http(s) entries dont work, an attempt can be to explicitly include the SOCKS5 standard. Most probably wget will no longer work with this more explicit naming, but curl should still work.
+    
+    export HTTP_PROXY="socks5://localhost:1537"
+    export http_proxy="socks5://localhost:1537"
+    export HTTPS_PROXY="socks5://localhost:1537"
+    export https_proxy="socks5://localhost:1537"
+and
+
+    [https]
+        proxy = socks5h://localhost:1537
+    [http]
+        proxy = socks5h://localhost:1537
 
 ### SSHFS
 
@@ -57,7 +101,7 @@ Login to the cluster. First load the modules necessary for building, like this:
 
 In the `mallob` directory with all dependencies fetched, you can build Mallob like this:
 
-    ( cd lib && bash fetch_and_build_sat_solvers.sh kcly )
+    ( cd lib && bash fetch_and_build_solvers.sh kcly )
     mkdir -p build
     cd build
     CC=$(which mpicc) CXX=$(which mpicxx) cmake -DMALLOB_USE_JEMALLOC=0 ${OPTIONS} ..
