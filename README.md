@@ -27,7 +27,7 @@ Note that we only support Linux as an operating system.
 ```bash
 # Only needed if building with -DMALLOB_APP_SAT=1 (enabled by default).
 # For non-x86-64 architectures (ARM, POWER9, etc.), prepend `DISABLE_FPU=1` to "bash".
-( cd lib && bash fetch_and_build_sat_solvers.sh )
+( cd lib && bash fetch_and_build_solvers.sh )
 
 # Only needed if building with -DMALLOB_APP_MAXSAT=1.
 ( cd lib && bash fetch_and_build_maxsat_deps.sh )
