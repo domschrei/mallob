@@ -12,7 +12,7 @@ First you need to set up a SOCKS5 proxy at your local host. Here we show an exam
     
     apt install proxychains openssh-sever
 
-Next locate the proxychains.conf file, usually in /etc/proxychains.conf or /usr/local/proxychains.conf, and add "socks5  127.0.0.1       1537" as a new line
+Next locate the proxychains.conf file and add "socks5  127.0.0.1       1537" as a new line. It is usually located at either ``/etc/proxychains.conf`` or ``/usr/local/proxychains.conf``.
 
     [ProxyList]
     # add proxy here ...
@@ -21,23 +21,23 @@ Next locate the proxychains.conf file, usually in /etc/proxychains.conf or /usr/
     #socks4         127.0.0.1 9050 
     socks5  127.0.0.1       1537   
 
-To be extra sure, now explicitly activate ssh
+To be extra sure also explicitly activate ssh
 
     sudo systemctl start ssh
     sudo systemctl enable ssh
 
-Now you can activate the proxy. Your local user- and computer-name are the ones shown in your terminal.
+Now you can activate the proxy. The local user- and computer-name are the ones also shown in your terminal.
     
     ssh -D 1537 -N -f <your_local_username>@<your_local_computer_name>
 
-To test if the proxy exists and works, try these, they should all return something. The last command should ideally also point out the location of the detected proxychains.conf file. 
+To test if the proxy exists and works, try any or all of these commands. They should all return something. The last command should ideally also point out the exact location of the detected proxychains.conf file. 
 
     netstat -tulnp | grep :1537
     ps aux | grep "ssh -D"
     curl --socks5 127.0.0.1:1537 https://ipinfo.io
     proxychains curl ipinfo.io
 
-Now you can connect to the cluster.
+Now everything is set up locally and you can connect to the cluster
 
     ssh -R 1537:localhost:1537 $ACCTNAME@skx.supermuc.lrz.de
 
@@ -57,7 +57,7 @@ and the following to `~/.gitconfig`:
 
 Commands like `git`, `wget`, and `curl` should now be able to download content over the proxy, which should be sufficient for setting up Mallob and its dependencies.
 
-In case the above doesn't work, an attempt can be to explicitly demand the SOCKS5 standard. In this case, downloads might only be possible via curl.
+In case the above http(s) entries dont work, an attempt can be to explicitly include the SOCKS5 standard. With this, downloads might now only be possible via curl.
     
     export HTTP_PROXY="socks5://localhost:1537"
     export http_proxy="socks5://localhost:1537"
