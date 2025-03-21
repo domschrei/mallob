@@ -26,9 +26,9 @@ To be extra sure also explicitly activate ssh
     sudo systemctl start ssh
     sudo systemctl enable ssh
 
-Now you can activate the proxy. The local user- and computer-name are the ones also shown in your terminal.
+Now you can activate the proxy. Your local username and computername are the ones also shown in your terminal.
     
-    ssh -D 1537 -N -f <your_local_username>@<your_local_computer_name>
+    ssh -D 1537 -N -f <local_username>@<local_computername>
 
 To test if the proxy exists and works, try any or all of these commands. They should all return something. The last command should ideally also point out the exact location of the detected proxychains.conf file. 
 
