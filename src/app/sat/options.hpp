@@ -88,8 +88,9 @@ OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversificati
     "Diversify solvers based on random sparse variable phases in addition to native diversification")
  OPT_BOOL(diversifyNative,                 "div-native",  "",                            true,
     "Diversify solvers by cycling through sequence of solver-specific configurations")
- OPT_BOOL(diversifyNoise,                  "div-noise",  "",                            false,             "Diversify solvers by adding Gaussian noise on top of numeric parameters")
- OPT_INT(decayDistribution,                "decay-distr",  "",                             1,    1,       2,    "The type of the decay sampling distribution. 1=Gaussian, 2=Uniform     (used for div-noise=1)")
+ OPT_INT(plainAddSpecific,                 "plain-add-specific", "",                       0,     0,      1,    "Add specific single options to plain. 0=Nothing. 1=Sweep")
+ OPT_BOOL(diversifyNoise,                  "div-noise",  "",                            false,                  "Diversify solvers by adding Gaussian noise on top of numeric parameters")
+ OPT_INT(decayDistribution,                "decay-distr",  "",                             1,     1,      2,    "The type of the decay sampling distribution. 1=Gaussian, 2=Uniform     (used for div-noise=1)")
  OPT_INT(decayMean,                        "decay-mean",  "",                             50,     1,    200,    "The mean for sampling the decay value                (used for div-noise=1)")
  OPT_INT(decayStddev,                      "decay-stddev",  "",                           3,      0,   1000,    "The standard deviation for sampling the decay value  (used for div-noise=1)")
  OPT_INT(decayMin,                         "decay-min",  "",                              1,      1,    200,    "The minimum cutoff for sampling a decay value        (used for div-noise=1)")

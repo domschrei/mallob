@@ -152,6 +152,21 @@ void Kissat::diversify(int seed) {
             //kissat_set_option(solver, "groupsize", _setup.maxNumSolvers);
         }
 
+        if (_setup.plainAddSpecific==1) {
+            //Add sweep to half of the solvers
+            if (getDiversificationIndex()%2==0) {
+                ok = kissat_set_option(solver, "sweep", 1); assert(ok);
+                //Since sweep activates probe, and probe actives further default options, we need to disable them explicitly
+                ok = kissat_set_option(solver, "congruence", 0); assert(ok);
+                ok = kissat_set_option(solver, "substitute", 0); assert(ok);
+                ok = kissat_set_option(solver, "backbone", 0); assert(ok);
+                ok = kissat_set_option(solver, "eliminate", 0); assert(ok);
+                ok = kissat_set_option(solver, "transitive", 0); assert(ok);
+                ok = kissat_set_option(solver, "factor", 0); assert(ok);
+                ok = kissat_set_option(solver, "vivify", 0); assert(ok);
+            }
+        }
+
     } else {
         if (_setup.flavour != PortfolioSequence::DEFAULT) {
             LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");
