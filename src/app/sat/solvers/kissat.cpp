@@ -162,7 +162,7 @@ void Kissat::diversify(int seed) {
                 ok = kissat_set_option(solver, "backbone", 0); assert(ok);
                 ok = kissat_set_option(solver, "eliminate", 0); assert(ok);
                 ok = kissat_set_option(solver, "transitive", 0); assert(ok);
-                ok = kissat_set_option(solver, "factor", 0); assert(ok);
+                //ok = kissat_set_option(solver, "factor", 0); assert(ok); assertion failed...
                 ok = kissat_set_option(solver, "vivify", 0); assert(ok);
             }
         }
