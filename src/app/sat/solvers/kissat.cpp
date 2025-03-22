@@ -153,8 +153,8 @@ void Kissat::diversify(int seed) {
         }
 
         if (_setup.plainAddSpecific==1) {
-            //Add sweep to half of the solvers
-            if (getDiversificationIndex()%2==0) {
+            //Add sweep to some solvers
+            if (getDiversificationIndex()%20==0) {
                 ok = kissat_set_option(solver, "sweep", 1); assert(ok);
                 //Since sweep activates probe, and probe actives further default options, we need to disable them explicitly
                 ok = kissat_set_option(solver, "congruence", 0); assert(ok);
