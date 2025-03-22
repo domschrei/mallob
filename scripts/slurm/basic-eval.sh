@@ -4,11 +4,11 @@ basedir="$1"
 
 for d in $basedir/*/; do
     if [ ! -f $d/instance.txt ]; then continue; fi
+    if ! grep -qE "SOLUTION #.*SATISFIABLE" $d/0/log.0 ; then continue; fi
     instance="$(basename $(cat $d/instance.txt))"
 
-    id=$(grep -oE "to internal ID #[0-9]+" $d/0/log.0.i|head -1|grep -oE "[0-9]+")
-    sol=$(cat $d/0/log.0|grep -oE "SOLUTION #$id [A-Z]+"|awk '{print $NF}')
-    time=$(grep "RESPONSE_TIME #$id" $d/0/log.0|tail -1|awk '{print $6}')
+    sol=$(cat $d/0/log.0|grep -oE "SOLUTION #[0-9]+ (UN)?SATISFIABLE"|tail -1|awk '{print $NF}')
+    time=$(grep -oE "0 RESPONSE_TIME #[0-9]+ [0-9\.]+ rev" $d/0/log.0|awk '{print $4}'|sort -g|tail -1)
 
     echo "$instance $sol $time"
 
