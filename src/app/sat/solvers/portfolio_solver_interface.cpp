@@ -107,19 +107,22 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 		else if (_setup.randomizeLbdBeforeImport==2) {
 			//Triangle sample 
 			int truesize = c.size - ClauseMetadata::numInts();
-			//If the clause size is 2 or 3 we dont have options, we always assign at least lbd 3
+			//If the clause size is 1, 2 or 3 we dont have options, we always assign at least lbd 3
 			int lbd_options= std::max(1,truesize-2);
 			//For larger clauses we use a triangular distribution to more weight to higher lbd values
-			//We sample from a triangle by stacking two triangles (one flipped), sampling a column i from the resulting 2D grid and a row j, and mirror the column if the (i,j)-cell is within the flipped triangle
-			//sample i from [0,lbd_options-1]
-			//sample j from [0,lbd_option]
-			int i = (int) std::round(_rng.randomInRange(0 - 0.49999,(lbd_options-1) + 0.49999));
-			int j = (int) std::round(_rng.randomInRange(0 - 0.49999, lbd_options    + 0.49999));
-			if(i<=j) i = lbd_options - i;
-			int lbd_choice = i;
-			c.lbd = 2 + lbd_choice; //undo the -2 from lbd_options shift
-			//cout <<" size="<<truesize<<" i="<<i<<" j="<<j;
-			//cout << " lbd="<<c.lbd<<endl;
+			//We sample from a rectangle by stacking two triangles above each other (one flippe)
+			// lbd_start: the "column" of the rectangle, range [0,lbd_options-1]
+			// flip:	  the "row" of the rectangle,    range [0,lbd_option]
+			//if flip lands in the "flipped" triangle region, we mirror the lbd around the center
+			//This works because each pair of columns (mirrored around the center) have the same summed weight
+			int lbd_column = (int) std::round(_rng.randomInRange(0 - 0.49999,(lbd_options-1) + 0.49999));
+			int flip = (int) std::round(_rng.randomInRange(0 - 0.49999, lbd_options    + 0.49999));
+			//A large enough j "mirrors" the lbd to the other end of the triangle distribution
+			if(lbd_column <= flip) lbd_column = (lbd_options-1) - lbd_column;
+			//Our distribution was calculated the range [0,...] so now we transform it into [3,...] for have always lbd=>3
+			c.lbd = lbd_column+3;
+			//cout << "eff_size="<<(c.size-ClauseMetadata::numInts())<<endl;
+			//cout <<" trig_lbd="<<c.lbd<<endl;
 		}
 
 		if (_setup.incrementLbdBeforeImport && c.lbd < c.size-ClauseMetadata::numInts())
