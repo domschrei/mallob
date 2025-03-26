@@ -205,6 +205,21 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.numBufferedClsGenerations = params.bufferedImportedClsGenerations();
 	setup.skipClauseSharingDiagonally = params.skipClauseSharingDiagonally();
 	setup.diversifyNoise = params.diversifyNoise();
+
+	setup.decayDistribution = params.decayDistribution();
+	setup.decayMean = params.decayMean();
+	setup.decayStddev = params.decayStddev();
+	setup.decayMin = params.decayMin();
+	setup.decayMax = params.decayMax();
+
+	setup.diversifyReduce = params.diversifyReduce();
+	setup.reduceMin = params.reduceMin();
+	setup.reduceMax = params.reduceMax();
+	setup.reduceMean = params.reduceMean();
+	setup.reduceStddev = params.reduceStddev();
+	setup.reduceDelta = params.reduceDelta();
+
+	setup.plainAddSpecific = params.plainAddSpecific();
 	setup.diversifyNative = params.diversifyNative();
 	setup.diversifyFanOut = params.diversifyFanOut();
 	setup.diversifyInitShuffle = params.diversifyInitShuffle();

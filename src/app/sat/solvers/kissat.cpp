@@ -112,7 +112,7 @@ void Kissat::diversify(int seed) {
     if (_setup.solverType == 'p') {
         LOGGER(_logger, V3_VERB, "Formula before preprocessing: %i vars, %i clauses\n",
             _setup.numVars, _setup.numOriginalClauses);
-        kissat_set_preprocessing_report_callback(solver, this,
+            kissat_set_preprocessing_report_callback(solver, this,
             begin_formula_report, report_preprocessed_lit);
         kissat_set_option(solver, "factor", 1); // do perform bounded variable addition
         //kissat_set_option(solver, "luckyearly", 0); // lucky before preprocess can take very long
@@ -150,6 +150,20 @@ void Kissat::diversify(int seed) {
             ok = kissat_set_option(solver, "transitive", 0); assert(ok);
             //kissat_set_option(solver, "groupindex", _setup.globalId);
             //kissat_set_option(solver, "groupsize", _setup.maxNumSolvers);
+        }
+
+        if (_setup.plainAddSpecific==1) { //Add just sweep to some solvers, but didnt work, need to understand how preprocessing techniques are intertangled
+            if (getDiversificationIndex()%20==0) {
+                ok = kissat_set_option(solver, "sweep", 1); assert(ok);
+                //Since sweep activates probe, and probe actives further default options, we need to disable them explicitly
+                ok = kissat_set_option(solver, "congruence", 0); assert(ok);
+                ok = kissat_set_option(solver, "substitute", 0); assert(ok);
+                ok = kissat_set_option(solver, "backbone", 0); assert(ok);
+                ok = kissat_set_option(solver, "eliminate", 0); assert(ok);
+                ok = kissat_set_option(solver, "transitive", 0); assert(ok);
+                //ok = kissat_set_option(solver, "factor", 0); assert(ok); assertion failed...
+                ok = kissat_set_option(solver, "vivify", 0); assert(ok);
+            }
         }
 
     } else {
@@ -190,15 +204,81 @@ void Kissat::diversify(int seed) {
         int restartFrequency = (int) std::round(distribution.sample());
         kissat_set_option(solver, "restartint", restartFrequency);
 
+
         // Randomize score decay
-        double meanDecay = kissat_get_option(solver, "decay");
-        distribution.configure(Distribution::NORMAL, std::vector<double>{
-            /*mean=*/meanDecay, /*stddev=*/3, /*min=*/1, /*max=*/200
-        });
-        int decay = (int) std::round(distribution.sample());
-        kissat_set_option(solver, "decay", decay);
-        
+        int decay = kissat_get_option(solver, "decay");
+        if(_setup.decayDistribution==1) { //Gaussian
+            //double meanDecay = kissat_get_option(solver, "decay");
+            distribution.configure(Distribution::NORMAL, std::vector<double>{
+                /*mean=*/(double)_setup.decayMean, /*stddev=*/(double)_setup.decayStddev, /*min=*/(double)_setup.decayMin, /*max=*/(double)_setup.decayMax
+            });
+            decay = (int) std::round(distribution.sample());
+            kissat_set_option(solver, "decay", decay);
+        }
+        else if(_setup.decayDistribution==2) { //Normal
+            distribution.configure(Distribution::UNIFORM, std::vector<double>{
+                /*min=*/(double)_setup.decayMin, /*max=*/(double)_setup.decayMax
+            });
+            decay = (int) std::round(distribution.sample());
+            kissat_set_option(solver, "decay", decay);
+        }
+
+        LOGGER(_logger, V3_VERB, "--\n");
+        LOGGER(_logger, V3_VERB, "Decay Sampling Distribution type=%i\n", _setup.decayDistribution);
+        LOGGER(_logger, V3_VERB, "mean=%i stddev=%i min=%i max=%i \n", _setup.decayMean, _setup.decayStddev, _setup.decayMin, _setup.decayMax);
         LOGGER(_logger, V3_VERB, "Sampled restartint=%i decay=%i\n", restartFrequency, decay);
+    }
+
+
+    //Randomize reduce bounds
+    if (getDiversificationIndex() >= getNumOriginalDiversifications() && (_setup.diversifyReduce > 0)) {
+        std::mt19937 rng(seed);
+        Distribution distribution(rng);
+
+        //Give each Kissat solver a randomized reduce-range, such that some solvers keep most clauses and other solvers other kick most clauses
+        int reduce_low;
+        int reduce_high;
+        LOGGER(_logger, V3_VERB, "--\n");
+
+        //Reduce==1: Uniform distribution of range values
+        if(_setup.diversifyReduce==1) {
+            distribution.configure(Distribution::UNIFORM, std::vector<double>{
+                    /*min=*/(double)(_setup.reduceMin - _setup.reduceDelta), /*max=*/(double) (_setup.reduceMax + _setup.reduceMax)
+            });
+            int reduce_center = (int) std::round(distribution.sample());
+            reduce_low  = std::max(0, reduce_center - _setup.reduceDelta);
+            reduce_high = std::min(1000, reduce_center + _setup.reduceDelta);
+            LOGGER(_logger, V3_VERB, "Given diversifyReduce=%i, reduceMin=%i, reduceMax=%i, reduceDelta=%i\n", _setup.diversifyReduce, _setup.reduceMin, _setup.reduceMax, _setup.reduceDelta);
+            LOGGER(_logger, V3_VERB, "Sampled reduce_center=%i\n", reduce_center);
+        }
+
+        //Reduce==2: More extreme range values, 80% of solvers are either full-keep or full-kick, only 20% of solvers are moderate with keep half
+        else if(_setup.diversifyReduce==2) {
+            distribution.configure(Distribution::UNIFORM, std::vector<double>{0,1});
+            double random_selector = distribution.sample();
+            if      (random_selector<0.4) reduce_low = reduce_high = 0;
+            else if (random_selector<0.6) reduce_low = reduce_high = 500;
+            else                          reduce_low = reduce_high = 1000;
+            LOGGER(_logger, V3_VERB, "Given diversifyReduce=%i, reduceDelta=%i\n", _setup.diversifyReduce, _setup.reduceDelta);
+        }
+        //Reduce==3: Gaussian Distribution
+        else if(_setup.diversifyReduce==3) {
+            distribution.configure(Distribution::NORMAL, std::vector<double>{
+                /*mean=*/(double)_setup.reduceMean, /*stddev=*/(double)_setup.reduceStddev, /*min=*/(double)_setup.reduceMin, /*max=*/(double)_setup.reduceMax
+            });
+            int reduce_fixed = (int) std::round(distribution.sample());
+            reduce_low  = reduce_fixed;
+            reduce_high = reduce_fixed;
+            LOGGER(_logger, V3_VERB, "Given diversifyReduce=%i, reduceMin=%i, reduceMax=%i, reduceMean=%i, reduceStddev=%i \n",
+                _setup.diversifyReduce, _setup.reduceMin, _setup.reduceMax, _setup.reduceMean, _setup.reduceStddev);
+        }
+        else {
+            cout << "Error: div-reduce="<<_setup.diversifyReduce<<" is not a valid flag" << endl;
+        }
+        kissat_set_option(solver, "reducelow", reduce_low);
+        kissat_set_option(solver, "reducehigh", reduce_high);
+        LOGGER(_logger, V3_VERB, "Sampled reducelow    =%i\n", reduce_low);
+        LOGGER(_logger, V3_VERB, "Sampled reducehigh   =%i\n", reduce_high);
     }
 
     seedSet = true;

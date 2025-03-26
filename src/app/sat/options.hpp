@@ -56,7 +56,7 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "-1 = static by length w/ mixed LBD, 0 = static by length, 1 = static by LBD, 2 = adaptive by length + -mlbdps option, 3 = simplified adaptive")
  OPT_BOOL(lbdPriorityInner, "lbdpi", "lbd-priority-inner", false, "Whether LBD should be used as primary quality metric in the inner buckets (bound by \"quality\" limits)")
  OPT_BOOL(lbdPriorityOuter, "lbdpo", "lbd-priority-outer", false, "Whether LBD should be used as primary quality metric in the outer buckets (bound by \"strict\" limits)")
- OPT_INT(resetLbd,                          "rlbd", "reset-lbd-at-import",                0,        0,   3,
+ OPT_INT(resetLbd,                          "rlbd", "reset-lbd"          ,                0,        0,   3,
     "Reset each clause's LBD to its length 0=never; 1=at import; 2=at export; 3=at production")
  OPT_INT(strictClauseLengthLimit,           "scll", "strict-clause-length-limit",        60,       0,   255,
     "Only clauses up to this length will be shared")
@@ -68,7 +68,7 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
  OPT_BOOL(backlogExportManager,             "bem", "backlog-export-manager",             true, "Use sequentialized export manager with backlogs instead of simple HordeSat-style export")
  OPT_BOOL(adaptiveImportManager,            "aim", "adaptive-import-manager",            true, "Use adaptive clause store for each solver's import buffer instead of lock-free ring buffers")
  OPT_BOOL(incrementLbd,                     "ilbd", "increment-lbd-at-import",           true, "Increment LBD value of each clause before import")
- OPT_BOOL(randomizeLbd,                     "randlbd", "reset-lbd-at-import",            false, "Randomize (uniformly) LBD value of each clause before import - can be combined with -ilbd afterwards")
+  OPT_INT(randomizeLbd,                     "randlbd", "randomize-lbd-at-import",        0,       0,      2, "Randomize the LBD value of each clause before import. 0=Never. 1=Uniformly. 2=Triangle-distribution. - can be combined with -ilbd afterwards")
  OPT_BOOL(noImport,                         "no-import", "",                             false, "Turn off solvers importing clauses (for comparison purposes)")
  OPT_BOOL(scrambleLbdScores,                "scramble-lbds", "",                         false, "For each clause length, randomly reassign the present LBD values to the present shared clauses")
  OPT_BOOL(priorityBasedBufferMerging, "pbbm", "priority-based-buffer-merging", false, "Use a more sophisticated and expensive merge procedure that adopts the prioritization of csm=3")
@@ -88,12 +88,22 @@ OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversificati
     "Diversify solvers based on random sparse variable phases in addition to native diversification")
  OPT_BOOL(diversifyNative,                 "div-native",  "",                            true,
     "Diversify solvers by cycling through sequence of solver-specific configurations")
- OPT_BOOL(diversifyNoise,                   "div-noise",  "",                            false,
-    "Diversify solvers by adding Gaussian noise on top of numeric parameters")
- OPT_BOOL(diversifySeeds,                   "div-seeds", "",                             true,
-    "Diversify solvers with different random seeds")
+ OPT_INT(plainAddSpecific,                 "plain-add-specific", "",                       0,     0,      1,    "Add specific single options to plain. 0=Nothing. 1=Sweep")
+ OPT_BOOL(diversifyNoise,                  "div-noise",  "",                            false,                  "Diversify solvers by adding Gaussian noise on top of numeric parameters")
+ OPT_INT(decayDistribution,                "decay-distr",  "",                             1,     1,      2,    "The type of the decay sampling distribution. 1=Gaussian, 2=Uniform     (used for div-noise=1)")
+ OPT_INT(decayMean,                        "decay-mean",  "",                             50,     1,    200,    "The mean for sampling the decay value                (used for div-noise=1)")
+ OPT_INT(decayStddev,                      "decay-stddev",  "",                           3,      0,   1000,    "The standard deviation for sampling the decay value  (used for div-noise=1)")
+ OPT_INT(decayMin,                         "decay-min",  "",                              1,      1,    200,    "The minimum cutoff for sampling a decay value        (used for div-noise=1)")
+ OPT_INT(decayMax,                         "decay-max",  "",                              200,    1,    200,    "The maximum cutoff for sampling a decay value        (used for div-noise=1)")
+ OPT_INT(diversifyReduce,                  "div-reduce",  "",                             0,      0,      3,    "Toggle to diversify the reduce parameters. 0=Dont, 1=Uniform(with delta optional), 2=Extremes, 3=Gaussian")
+ OPT_INT(reduceMin,                        "reduce-min",  "",                             300,    0,    1000,    "The minimium reduce value, in per mille")
+ OPT_INT(reduceMax,                        "reduce-max",  "",                             980,    0,    1000,    "The maximum reduce value, in per mille")
+ OPT_INT(reduceDelta,                      "reduce-delta", "",                            100,    0,    1000,    "For div-reduce=1: Samples a center reduce value r and give Kissat reducelow=r-delta and reducehigh=r+delta")
+ OPT_INT(reduceMean,                       "reduce-mean", "",                             700,    0,    1000,    "For div-reduce=3: The mean reduce value")
+ OPT_INT(reduceStddev,                     "reduce-stddev", "",                           150,    0,    1000,    "For div-reduce=3: The stddev of the Gaussian sampled reduce value")
+ OPT_BOOL(diversifySeeds,                   "div-seeds", "",                             true,              "Diversify solvers with different random seeds")
  OPT_STRING(satSolverSequence,              "satsolver",  "",                            "C",
-    "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")
+ "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")
 
 OPTION_GROUP(grpAppSatProof, "app/sat/proof", "Production of UNSAT proofs")
  OPT_STRING(proofDirectory,               "proof-dir", "",                             "",                      "Directory to write partial proofs into (default: -log option")
