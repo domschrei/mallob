@@ -152,8 +152,7 @@ void Kissat::diversify(int seed) {
             //kissat_set_option(solver, "groupsize", _setup.maxNumSolvers);
         }
 
-        if (_setup.plainAddSpecific==1) {
-            //Add sweep to some solvers
+        if (_setup.plainAddSpecific==1) { //Add just sweep to some solvers, but didnt work, need to understand how preprocessing techniques are intertangled
             if (getDiversificationIndex()%20==0) {
                 ok = kissat_set_option(solver, "sweep", 1); assert(ok);
                 //Since sweep activates probe, and probe actives further default options, we need to disable them explicitly
