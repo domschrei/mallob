@@ -18,6 +18,7 @@
 
 extern "C" {
 #include "kissat/src/kissat.h"
+#include "kissat/src/bump.h"
 }
 #include "kissat.hpp"
 #include "util/distribution.hpp"
@@ -403,11 +404,14 @@ void Kissat::consumeClause(int** clause, int* size, int* lbd) {
         *lbd = c.lbd;
 
         // Print the clause literals
-        std::cout << "Clause literals: ";
+        //std::cout << "Clause literals: ";
         for (int i = 0; i < *size; i++) {
-            std::cout << (*clause)[i] << " ";
+            unsigned var = std::abs((*clause)[i]);
+            kissat_bump_variable(solver, var);
+            kissat_bump_variable(solver, var);
+            //std::cout << (*clause)[i] << " ";
         }
-        std::cout << std::endl;
+        //std::cout << std::endl;
 
     } else {
         *clause = 0;
