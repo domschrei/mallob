@@ -401,6 +401,14 @@ void Kissat::consumeClause(int** clause, int* size, int* lbd) {
         memcpy(producedClause.data(), c.begin+ClauseMetadata::numInts(), *size*sizeof(int));
         *clause = producedClause.data();
         *lbd = c.lbd;
+
+        // Print the clause literals
+        std::cout << "Clause literals: ";
+        for (int i = 0; i < *size; i++) {
+            std::cout << (*clause)[i] << " ";
+        }
+        std::cout << std::endl;
+
     } else {
         *clause = 0;
         *size = 0;
