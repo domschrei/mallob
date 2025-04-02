@@ -17,6 +17,7 @@
 #include "app/sat/solvers/optimizing_propagator.hpp"
 #include "util/random.hpp"
 #include "util/logger.hpp"
+#include "util/string_utils.hpp"
 
 class BufferReader;
 namespace Mallob {
@@ -184,6 +185,7 @@ public:
 	std::vector<int> _preprocessed_formula;
 	void setPreprocessedFormula(std::vector<int>&& vec) {
 		_preprocessed_formula = std::move(vec);
+		LOGGER(_logger, V4_VVER, "Set preprocessed formula: %s\n", StringUtils::getSummary(_preprocessed_formula, 20).c_str());
 		_has_preprocessed_formula = true;
 	}
 	bool hasPreprocessedFormula() const {return _has_preprocessed_formula;}
