@@ -16,7 +16,7 @@ struct SolverSetup {
 
 	Logger* logger {nullptr};
 	int globalId {0};
-	int localId {0}; 
+	int localId {0};
 	std::string jobname;
 	std::string profilingBaseDir; 
 	int profilingLevel {-1};
@@ -37,7 +37,23 @@ struct SolverSetup {
 	char solverType;
 	bool doIncrementalSolving {false};
 	int diversificationIndex {0};
+
+
 	bool diversifyNoise {false};
+	int decayDistribution {0};
+	int decayMean {50};
+	int decayStddev {3};
+	int decayMin {1};
+	int decayMax {200};
+
+	int diversifyReduce {0};
+	int reduceMin {300};
+	int reduceMax {980};
+	int reduceDelta {100};
+	int reduceMean {700};
+	int reduceStddev {150};
+
+	int plainAddSpecific{0};
 	bool diversifyNative {false};
 	bool diversifyFanOut {false};
 	bool diversifyInitShuffle {false};
@@ -69,8 +85,8 @@ struct SolverSetup {
 	size_t anticipatedLitsToImportPerCycle {1000};
 	bool resetLbdBeforeImport {false};
 	bool incrementLbdBeforeImport {false};
-	bool randomizeLbdBeforeImport {false};
-	bool adaptiveImportManager {true};
+	int randomizeLbdBeforeImport;
+	bool adaptiveImportManager;
 
 
 	// Certified UNSAT and proof production
