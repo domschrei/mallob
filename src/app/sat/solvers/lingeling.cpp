@@ -122,7 +122,7 @@ void Lingeling::diversify(int seed) {
 	lglsetopt(solver, "classify", 0);
 	if (_setup.flavour == PortfolioSequence::SAT) {
 		// sat preset: just run YalSAT
-		lglsetopt (solver, "plain", rank % 2 == 0);
+		lglsetopt (solver, "plain", true);
 		lglsetopt (solver, "locs", -1);
 		lglsetopt (solver, "locsrtc", 1);
 		lglsetopt (solver, "locswait", 0);
