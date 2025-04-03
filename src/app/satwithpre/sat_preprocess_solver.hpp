@@ -4,6 +4,7 @@
 #include "app/sat/data/model_string_compressor.hpp"
 #include "app/sat/job/sat_constants.h"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
+#include "app/satwithpre/sat_preprocessor.hpp"
 #include "comm/mympi.hpp"
 #include "data/job_description.hpp"
 #include "data/job_result.hpp"
@@ -37,32 +38,24 @@ private:
     nlohmann::json _base_job_submission;
     nlohmann::json _base_job_response;
 
-    std::unique_ptr<Kissat> _solver;
-    std::future<void> _fut_solver;
-    int _solver_result {0};
-    volatile bool _solver_done {false};
-
     bool _prepro_job_submitted {false};
     volatile bool _prepro_job_done {false};
     bool _prepro_job_digested {false};
     nlohmann::json _prepro_job_submission;
     nlohmann::json _prepro_job_response;
 
+    SatPreprocessor _prepro;
+
 public:
     SatPreprocessSolver(const Parameters& params, APIConnector& api, JobDescription& desc) :
-        _params(params), _api(api), _desc(desc), _jobstr("#" + std::to_string(desc.getId())) {}
-    ~SatPreprocessSolver() {
-        LOG(V3_VERB, "SATWP enter destructor\n");
-        if (_fut_solver.valid()) _fut_solver.get();
-        _solver->cleanUp();
-        LOG(V3_VERB, "SATWP leave destructor\n");
-    }
+        _params(params), _api(api), _desc(desc), _jobstr("#" + std::to_string(desc.getId())),
+        _prepro(desc, _params.preprocessLingeling()) {}
 
     JobResult solve() {
         _time_of_activation = Timer::elapsedSeconds();
 
         if (_params.preprocessBalancing() >= 0) submitBaseJob();
-        launchPreprocessor();
+        _prepro.init();
 
         JobResult res;
         res.id = _desc.getId();
@@ -82,20 +75,19 @@ public:
                 _prepro_job_digested = true;
                 if (res.result != 0) break;
             }
-            if (_solver_done) {
+            if (_prepro.done()) {
                 // Preprocess solver terminated.
                 LOG(V3_VERB, "SATWP preprocessor done\n");
-                if (_solver_result != 0) {
-                    LOG(V3_VERB, "SATWP preprocessor reported result %i\n", _solver_result);
-                    res.result = _solver_result;
-                    res.setSolution(_solver->getSolution());
+                if (_prepro.getResultCode() != 0) {
+                    LOG(V3_VERB, "SATWP preprocessor reported result %i\n", _prepro.getResultCode());
+                    res.result = _prepro.getResultCode();
+                    res.setSolution(std::move(_prepro.getSolution()));
                     break;
                 }
-                _solver_done = false;
             }
-            if (_solver->hasPreprocessedFormula()) {
+            if (_prepro.hasPreprocessedFormula()) {
                 LOG(V3_VERB, "SATWP submit preprocessed task\n");
-                submitPreprocessedJob(std::move(_solver->extractPreprocessedFormula()));
+                submitPreprocessedJob(_prepro.extractPreprocessedFormula());
             }
             if (!_base_job_done && _time_of_retraction_end > 0 && Timer::elapsedSeconds() >= _time_of_retraction_end)
                 interrupt(_base_job_submission, _base_job_done);
@@ -111,7 +103,7 @@ public:
             interrupt(_prepro_job_submission, _prepro_job_done);
             while (!_prepro_job_done) usleep(5*1000);
         }
-        _solver->interrupt();
+        _prepro.interrupt();
 
         LOG(V3_VERB, "SATWP returning result %i\n", res.result);
         return res;
@@ -169,6 +161,21 @@ private:
         int nbVars = fPre.back(); fPre.pop_back();
         size_t preprocessedSize = fPre.size();
 
+        /*
+        // Just for checking whether Kissat actually returns units
+        assert(fPre[fPre.size()-1] == 0);
+        for (int i = fPre.size()-2; i >= 1; i-=2) {
+            if (fPre[i-1]==0 && fPre[i]!=0 && fPre[i+1]==0) {
+                // unit clause at the end
+                for (int lit : {fPre[i], -1*fPre[i]}) {
+                    auto it = std::find(fPre.begin(), fPre.begin()+i, lit);
+                    if (it != fPre.begin()+i)
+                        LOG(V0_CRIT, "Unit %i (pos %i) occurs in formula (pos %lu)\n", fPre[i], i, it - fPre.begin());
+                }
+            } else break;
+        }
+        */
+
         // begin successively retracting this job
         _time_of_retraction_start = Timer::elapsedSeconds();
         // We want the job to retract over sqrt(p) rounds
@@ -225,22 +232,6 @@ private:
         _prepro_job_submitted = true;
     }
 
-    void launchPreprocessor() {
-        SolverSetup setup;
-        setup.logger = &Logger::getMainInstance();
-        setup.solverType = 'p';
-        _solver.reset(new Kissat(setup));
-        _fut_solver = ProcessWideThreadPool::get().addTask([&]() {
-            const int* lits = _desc.getFormulaPayload(0);
-            for (int i = 0; i < _desc.getFormulaPayloadSize(0); i++) {
-                _solver->addLiteral(lits[i]);
-            }
-            _solver->diversify(0);
-            _solver_result = _solver->solve(0, nullptr);
-            _solver_done = true;
-        });
-    }
-
     void interrupt(nlohmann::json& json, volatile bool& doneFlag) {
         LOG(V3_VERB, "SATWP Interrupt %s\n", json["name"].get<std::string>().c_str());
         nlohmann::json jsonInterrupt {
@@ -272,8 +263,8 @@ private:
         if (convert && res.result == RESULT_SAT) {
             LOG(V3_VERB, "SATWP reconstruct original solution\n");
             assert(solution.size() >= 1 && solution[0] == 0);
-            if (_fut_solver.valid()) _fut_solver.get(); // wait for solver thread to return
-            _solver->reconstructSolutionFromPreprocessing(solution);
+            _prepro.join();
+            _prepro.reconstructSolution(solution);
             LOG(V3_VERB, "SATWP original solution reconstructed\n");
         }
         res.setSolution(std::move(solution));

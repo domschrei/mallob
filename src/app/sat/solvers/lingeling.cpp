@@ -130,6 +130,12 @@ void Lingeling::diversify(int seed) {
 	} else if (_setup.flavour == PortfolioSequence::PLAIN) {
 		LOGGER(_logger, V4_VVER, "plain\n");
 		lglsetopt (solver, "plain", 1);
+	} else if (_setup.flavour == PortfolioSequence::PREPROCESS) {
+		LOGGER(_logger, V4_VVER, "preprocess\n");
+		lglsetopt (solver, "dlim", 0);
+		lglsetopt (solver, "clim", 0);
+		lglsetopt (solver, "sweep", 0);
+		lglsetopt (solver, "gausswait", 0);
 	} else {
 		if (_setup.flavour != PortfolioSequence::DEFAULT) {
 			LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");
