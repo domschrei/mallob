@@ -164,14 +164,14 @@ int Job::getDemand() const {
     int demand; 
     if (_growth_period <= 0) {
         // Immediate growth
-        demand = _job_tree.getCommSize();
+        demand = commSize;
     } else {
         if (_time_of_increment_activation <= 0) demand = 1;
         else {
-            float t = Timer::elapsedSecondsCached()-_time_of_increment_activation;
+            double t = Timer::elapsedSecondsCached()-_time_of_increment_activation;
             
             // Continuous growth
-            float numPeriods = std::min(t/_growth_period, 28.f); // overflow protection
+            double numPeriods = std::min(t/_growth_period, 28.0); // overflow protection
             if (!_continuous_growth) {
                 // Discrete periodic growth
                 int intPeriods = std::floor(numPeriods);
@@ -182,8 +182,9 @@ int Job::getDemand() const {
                 // d(0) := 1; d := 2d+1 every <growthPeriod> seconds
                 //demand = std::min(commSize, (int)std::pow(2, numPeriods + 1) - 1);
                 // quadratic growth
-                demand = std::min(commSize, std::max(1,
-                    (int) std::round((t*t) / (_growth_period*_growth_period))));
+                if (t / _growth_period >= 1000) demand = commSize;
+                else demand = std::min(commSize, std::max(1,
+                    (int) std::round((t/_growth_period) * (t/_growth_period))));
             }
         }
     }

@@ -187,7 +187,7 @@ private:
             _time_of_retraction_end = _time_of_retraction_start;
         } else {
             // replace original gradually, scaled by task age so far and expansion factor
-            totalRetractionDuration = getAgeSinceActivation() * _params.preprocessExpansionFactor();
+            totalRetractionDuration = std::max(0.001f, getAgeSinceActivation() * _params.preprocessExpansionFactor());
         }
         // If this preprocessing result could be critical in terms of RAM usage,
         // perform the retraction essentially immediately.
