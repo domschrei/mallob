@@ -1,9 +1,25 @@
 
-# Debugging Mallob
+# Development with Mallob
+
+## Programming Interfaces
+
+The following list shows a few examples for how Mallob can be extended:
+
+* New options for Mallob can be added in `src/optionslist.hpp`.
+    - Options which are specific to a certain application can be found and edited in `src/app/$APPKEY/options.hpp`.
+* To add a new SAT solver to be used in a SAT solver engine, do the following:
+    - Add a subclass of `PortfolioSolverInterface`. (You can use the existing implementation for any of the existing solvers and adapt it to your solver.)
+    - Add your solver to the portfolio initialization in `src/app/sat/execution/engine.cpp`.
+* To extend Mallob by adding another kind of application (like combinatorial search, planning, SMT, ...), please read [application_engines.md](application_engines.md).
+* To add a unit test, create a class `test_*.cpp` in `src/test` and then add the test case to the bottom of `CMakeLists.txt`.
+* To add a system test, consult the files `scripts/systest_commons.sh` and/or `scripts/systest.sh`.
+
+
+## Debugging Mallob
 
 Debugging of distributed applications can be difficult, especially in Mallob's case where message passing goes hand in hand with multithreading and inter-process communication. Here are some notes on how Mallob runs can be diagnosed and debugged appropriately.
 
-## Build Options
+### Build Options
 
 For debugging purposes, the following build switches are useful:
 
@@ -11,11 +27,11 @@ For debugging purposes, the following build switches are useful:
 * `-DMALLOB_LOG_VERBOSITY=5`: This static verbosity level (together with run time option `-v=5`) logs every single message that is being sent or received, among many other things.
 * `-DMALLOB_USE_ASAN=1`: Build sources with AddressSanitizer. This can help find illegal states in the code, especially invalid memory accesses.
 
-## In-built Debugging Features
+### In-built Debugging Features
 
 Get acquainted with the debugging features Mallob offers by itself.
 
-### Consulting Logs
+#### Consulting Logs
 
 In general, taking a quick look at the logs a run outputs is never wrong. For small to medium size runs, you can use this command to take a look at Mallob's entire output, sorted consistently, given a log directory LOG:
 
@@ -31,13 +47,13 @@ To further diagnose a Mallob run, `grep` in the log files for the following logg
 * Log lines containing `[WARN]` _may_ indicate undesired behavior, such as the main thread getting stuck in a computation for some time or an unexpected message arriving at a process. Relevant warnings which should be investigated include watchdog barks (see below) and the rejection of an incoming job, perhaps because its JSON was malformed.
 * Log lines containing `sysstate` should be output each second and provide basic information on the system state, such as the number of entered/parsed/introduced/finished jobs, the global memory usage, and the ratio of busy processes. If this `busyratio` is less than 1.000 for multiple seconds in a row, this usually means one of two things: Either not enough demand for resources is present in the system to utilize all processes, or (this is the bad option) something went wrong with Mallob's scheduling leading to some remaining idle processes. The latter case needs to be debugged separately, and if you notice this behavior without changing anything about Mallob's scheduling, please contact <dominik.schreiber@kit.edu>.
 
-### Thread Trace Files
+#### Thread Trace Files
 
 Mallob processes have an in-built mechanism to catch and process signals like SIGSEGV, SIGBUS or SIGABRT which are thrown if something goes wrong (like an invalid memory access, no memory left, or a failed assertion). If such a signal is caught, the process will execute `gdb` on itself to retrieve the current location in the code from where the signal was thrown. The resulting stack trace is written to a file `mallob_thread_trace_of_TRACEDTID_by_TRACINGTID` where `TRACEDTID` is the thread ID of the thread being traced and `TRACINGID` is the thread ID of the thread tracing the other one. Consult these files if Mallob crashes! They usually contain helpful information on what might have gone wrong.
 
 The directory where these files are written to can be changed with run time option `-trace-dir`.
 
-### Thread Naming
+#### Thread Naming
 
 Each thread running in Mallob is usually given a name via `Proc::nameThisThread(name)`. This name can be seen in tools like `htop` to diagnose unusual behavior.
 
@@ -72,7 +88,7 @@ watchdog.reset(); // call reset() in between the heavy lifting where the thread 
 // ... watchdog is RAII, so if it goes out of scope it will be joined properly
 ```
 
-### Detection of Unresponsive MPI Processes
+#### Detection of Unresponsive MPI Processes
 
 If one or multiple MPI processes, perhaps on a different compute node, stop responding to the other processes, this will be recognized, and after 60s without a response the program will crash with this error message:
 
@@ -80,7 +96,7 @@ If one or multiple MPI processes, perhaps on a different compute node, stop resp
 
 If you receive this message, it might be a node failure in your distributed system or the communication between processes not working correctly.
 
-## Valgrind
+### Valgrind
 
 Mallob processes can be executed via `valgrind` to detect errors or to profile performance or memory usage. In your call to Mallob, just replace 
 
