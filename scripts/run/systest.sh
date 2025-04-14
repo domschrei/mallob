@@ -99,7 +99,7 @@ function test_oscillating() {
     arrival=15 application=$app priority=0.3 introduce_job unsat-main-2 instances/r3unsat_300.cnf
     arrival=30 application=$app priority=0.2 introduce_job sat-main-3 instances/r3sat_300.cnf
     arrival=45 application=$app priority=0.1 introduce_job sat-main-4 instances/r3sat_300.cnf
-    test 16 -t=1 -c=1 -J=$((n+4)) -satsolver=kcl${glucose} -checkjsonresults -otfc=1 $@
+    test 16 -t=1 -c=1 -J=$((n+4)) -satsolver=kcl${glucose} -checkjsonresults $@
 }
 
 function test_oscillating_ontheflycheck() {
