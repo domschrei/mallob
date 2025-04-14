@@ -1,6 +1,7 @@
 [![status](https://joss.theoj.org/papers/700e9010c4080ffe8ae4df21cf1cc899/status.svg)](https://joss.theoj.org/papers/700e9010c4080ffe8ae4df21cf1cc899)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6890239.svg)](https://doi.org/10.5281/zenodo.6890239)
 [![RSD - /software/mallob](https://img.shields.io/badge/RSD-%2Fsoftware%2Fmallob-002864)](https://helmholtz.software/software/mallob)
+[![Max. tested scale - 6400 cores](https://img.shields.io/badge/Max._tested_scale-6400_cores-red)](https://jair.org/index.php/jair/article/view/15827)
 
 # Mallob
 
@@ -57,7 +58,7 @@ The source code of Mallob can be used, changed and redistributed under the terms
 
 The used versions of Lingeling, YalSAT, CaDiCaL, and Kissat are MIT-licensed, as is HordeSat (the massively parallel solver system our SAT engine was based on) and the proof-related tools which are included and/or fetched in the `tools/` directory.
 
-The Glucose interface of Mallob, unfortunately, is non-free software due to the [non-free license of (parallel-ready) Glucose](https://github.com/mi-ki/glucose-syrup/blob/master/LICENCE). Notably, its usage in competitive events is restricted. So when compiling Mallob with `-DMALLOB_USE_GLUCOSE=1` make sure that you have read and understood these restrictions.
+The Glucose interface of Mallob (only included when explicitly compiled with `-DMALLOB_USE_GLUCOSE=1`) is subject to the [non-free license of (parallel-ready) Glucose](https://github.com/mi-ki/glucose-syrup/blob/master/LICENCE). Notably, its usage in competitive events is restricted.
 
 Within our codebase we make thankful use of the following liberally licensed projects:
 
