@@ -39,6 +39,9 @@ private:
 	int nbPreprocessedClausesReceived {0};
 	int nbPreprocessedClausesAdvertised {0};
 
+	Mutex mtxVotedVars;
+	std::vector<int> votedVars;
+
 public:
 	Kissat(const SolverSetup& setup);
 	 ~Kissat();
@@ -77,6 +80,12 @@ public:
 	bool supportsIncrementalSat() override {return false;}
 	bool exportsConditionalClauses() override {return false;}
 
+	std::vector<int> getVariableVoting() override {
+		auto lock = mtxVotedVars.getLock();
+		return votedVars;
+	}
+	void forceCube(const std::vector<int>& cube) override;
+
 	void cleanUp() override;
 
 	void reconstructSolutionFromPreprocessing(std::vector<int>& model);
@@ -85,6 +94,7 @@ public:
     friend void consume_clause(void* state, int** clause, int* size, int* lbd);
     friend bool begin_formula_report(void* state, int vars, int cls);
     friend void report_preprocessed_lit(void* state, int lit);
+    friend void report_variable_voting(void* state, int* vars, unsigned size);
     friend int terminate_callback(void* state);
 
 private:
@@ -93,6 +103,7 @@ private:
 
     bool isPreprocessingAcceptable(int vars, int cls);
     void addLiteralFromPreprocessing(int lit);
+	void reportVariableVoting(int* vars, unsigned size);
 
     bool shouldTerminate();
 

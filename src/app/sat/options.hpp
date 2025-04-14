@@ -101,9 +101,11 @@ OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversificati
  OPT_INT(reduceDelta,                      "reduce-delta", "",                            100,    0,    1000,    "For div-reduce=1: Samples a center reduce value r and give Kissat reducelow=r-delta and reducehigh=r+delta")
  OPT_INT(reduceMean,                       "reduce-mean", "",                             700,    0,    1000,    "For div-reduce=3: The mean reduce value")
  OPT_INT(reduceStddev,                     "reduce-stddev", "",                           150,    0,    1000,    "For div-reduce=3: The stddev of the Gaussian sampled reduce value")
- OPT_BOOL(diversifySeeds,                   "div-seeds", "",                             true,              "Diversify solvers with different random seeds")
- OPT_STRING(satSolverSequence,              "satsolver",  "",                            "C",
+ OPT_BOOL(diversifySeeds,                  "div-seeds", "",                             true,              "Diversify solvers with different random seeds")
+ OPT_STRING(satSolverSequence,             "satsolver",  "",                            "C",
  "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")
+ OPT_INT(vitalVariableVotingSize,          "vvv-size", "", 0, 0, LARGE_INT, "Max. # variables each solver thread should vote for (0: disabled)")
+ OPT_INT(vitalVariableVotingMinVotes,      "vvv-minvotes", "", 1, 1, LARGE_INT, "Minimum votes for a variable to be eligible for search space splitting")
 
 OPTION_GROUP(grpAppSatProof, "app/sat/proof", "Production of UNSAT proofs")
  OPT_STRING(proofDirectory,               "proof-dir", "",                             "",                      "Directory to write partial proofs into (default: -log option")
@@ -125,3 +127,4 @@ OPTION_GROUP(grpAppSatProof, "app/sat/proof", "Production of UNSAT proofs")
  OPT_STRING(fifoFeedback, "fifo-feedback", "", "", "For internal use only")
  OPT_STRING(fifoParsedFormula, "fifo-parsed-formula", "", "", "For internal use only")
  OPT_STRING(formulaInput, "formula-input", "", "", "For internal use only")
+

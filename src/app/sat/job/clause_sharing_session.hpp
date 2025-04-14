@@ -3,6 +3,7 @@
 
 #include "app/job_tree.hpp"
 #include "app/sat/data/clause_metadata.hpp"
+#include "app/sat/data/variable_voting.hpp"
 #include "app/sat/job/clause_sharing_actor.hpp"
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
 #include "app/sat/sharing/filter/clause_buffer_lbd_scrambler.hpp"
@@ -130,15 +131,16 @@ public:
 
             // Fetch initial clause buffer (result of all-reduction of clauses)
             _broadcast_clause_buffer = _allreduce_clauses.extractResult();
-            auto aggregation = InplaceClauseAggregation(_broadcast_clause_buffer);
+            InplaceClauseAggregation aggregation(_broadcast_clause_buffer);
             _best_found_solution_cost = aggregation.bestFoundSolutionCost();
             // If desired, scramble the LBD scores of featured clauses
             if (_params.scrambleLbdScores()) {
                 float time = Timer::elapsedSeconds();
                 // 1. Create reader for shared clause buffer
                 initMergeClauseStore();
-                BufferReader reader = _merge_store->getBufferReader(_broadcast_clause_buffer.data(),
-                    _broadcast_clause_buffer.size() - aggregation.numMetadataInts());
+                auto [clausesData, clausesSize] = aggregation.getClauseBuffer();
+                BufferReader reader = _merge_store->getBufferReader(clausesData,
+                    clausesSize - aggregation.numMetadataInts());
                 // 2. Scramble clauses within each clause length w.r.t. LBD scores
                 ClauseBufferLbdScrambler scrambler(_params, reader);
                 auto modifiedClauseBuffer = scrambler.scrambleLbdScores();
@@ -262,10 +264,11 @@ private:
         int numInputLits = 0;
         int successfulSolverId = -1;
         long long bestFoundSolutionCost = LLONG_MAX;
+        VariableVoting vv;
         for (auto& elem : elems) {
             assert(elem.size() >= InplaceClauseAggregation::numMetadataInts()
                 || log_return_false("[ERROR] Clause buffer has size %ld!\n", elem.size()));
-            auto agg = InplaceClauseAggregation(elem);
+            InplaceClauseAggregation agg(elem);
             if (agg.successfulSolver() != -1 && (successfulSolverId == -1 || successfulSolverId > agg.successfulSolver())) {
                 successfulSolverId = agg.successfulSolver();
             }
@@ -274,6 +277,7 @@ private:
             maxRevision = std::max(maxRevision, agg.maxRevision());
             bestFoundSolutionCost = std::min(bestFoundSolutionCost, agg.bestFoundSolutionCost());
             agg.stripToRawBuffer();
+            if (!elem.empty()) vv.merge(agg.getVariableVoting());
         }
         int buflim = _job->getBufferLimit(numAggregated, false);
         numInputLits = std::min(numInputLits, buflim);
@@ -287,14 +291,18 @@ private:
         if (_priority_based_buffer_merging /*initialized by initMergeClauseStore()!*/) {
             auto merger = BufferMerger(_merge_store.get(), buflim, maxEffectiveClsLen, maxFreeEffectiveClsLen, false);
             for (auto& elem : elems) {
-                merger.add(_merge_store->getBufferReader(elem.data(), elem.size()));
+                auto [data, size] = InplaceClauseAggregation(elem).getClauseBuffer();
+                merger.add(_merge_store->getBufferReader(data, size));
             }
+            merger.setPrefix(vv.serialize());
             merged = merger.mergePriorityBased(_params, _excess_clauses_from_merge, _rng);
         } else {
             auto merger = BufferMerger(buflim, maxEffectiveClsLen, maxFreeEffectiveClsLen, false);
             for (auto& elem : elems) {
-                merger.add(_merge_store->getBufferReader(elem.data(), elem.size()));
+                auto [data, size] = InplaceClauseAggregation(elem).getClauseBuffer();
+                merger.add(_merge_store->getBufferReader(data, size));
             }
+            merger.setPrefix(vv.serialize());
             merged = merger.mergePreservingExcessWithRandomTieBreaking(_excess_clauses_from_merge, _rng);
         }
         time = Timer::elapsedSeconds() - time;

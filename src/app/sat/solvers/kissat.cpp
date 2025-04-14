@@ -45,6 +45,10 @@ void report_preprocessed_lit(void* state, int lit) {
     ((Kissat*) state)->addLiteralFromPreprocessing(lit);
 }
 
+void report_variable_voting(void* state, int* vars, unsigned size) {
+    ((Kissat*) state)->reportVariableVoting(vars, size);
+}
+
 
 
 
@@ -100,6 +104,11 @@ void Kissat::diversify(int seed) {
             kissat_set_option(solver, "eliminate", 0);
         if (divIdx % 4 < 2)
             kissat_set_option(solver, "substitute", 0);
+    }
+
+    if (_setup.vitalVariableVotingSize > 0) {
+        LOGGER(_logger, V5_DEBG, "VVV enable max=%i\n", _setup.vitalVariableVotingSize);
+        kissat_set_vital_variables_callback(solver, _setup.vitalVariableVotingSize, this, report_variable_voting);
     }
 
     if (_setup.solverType == 'v') {
@@ -466,6 +475,17 @@ void Kissat::addLiteralFromPreprocessing(int lit) {
         setPreprocessedFormula(std::move(preprocessedFormula));
         setSolverInterrupt();
     }
+}
+
+void Kissat::reportVariableVoting(int* vars, unsigned size) {
+    LOGGER(_logger, V5_DEBG, "VVV VOTE %s\n", StringUtils::getSummary(vars, size, 10).c_str());
+    auto lock = mtxVotedVars.getLock();
+    votedVars = std::vector<int>(vars, vars+size);
+}
+
+void Kissat::forceCube(const std::vector<int>& cube) {
+    LOGGER(_logger, V5_DEBG, "VVV FORCE_CUBE %s\n", StringUtils::getSummary(cube, 10).c_str());
+    kissat_force_cube(solver, cube.data(), cube.size());
 }
 
 Kissat::~Kissat() {

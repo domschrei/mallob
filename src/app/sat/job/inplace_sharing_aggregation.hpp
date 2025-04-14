@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include "app/sat/data/variable_voting.hpp"
 #include "util/logger.hpp"
 #include <cassert>
 #include <cstddef>
@@ -20,6 +21,16 @@ struct InplaceClauseAggregation {
     int& numAggregatedNodes() {return buffer[buffer.size()-2];}
     int& successfulSolver() {return buffer[buffer.size()-1];}
 
+    VariableVoting getVariableVoting() {
+        VariableVoting v;
+        v.deserialize(buffer);
+        return v;
+    }
+    std::pair<int*, size_t> getClauseBuffer() {
+        size_t offset = VariableVoting::getSerializedSize(buffer);
+        return {buffer.data()+offset, buffer.size()-offset};
+    }
+
     void stripToRawBuffer() {
         buffer.pop_back();
         buffer.pop_back();
@@ -29,9 +40,9 @@ struct InplaceClauseAggregation {
     }
 
     void replaceClauses(const std::vector<int>& clauses) {
-        assert(clauses.size() == buffer.size() - numMetadataInts() || log_return_false("[ERROR] %lu vs. %lu\n", clauses.size(), buffer.size()));
+        size_t offset = VariableVoting::getSerializedSize(buffer);
         for (size_t i = 0; i < clauses.size(); i++) {
-            buffer[i] = clauses[i];
+            buffer[offset+i] = clauses[i];
         }
     }
 

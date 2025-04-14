@@ -54,6 +54,9 @@ public:
 	// Get a variable suitable for search splitting
 	virtual int getSplittingVariable() = 0;
 
+	virtual std::vector<int> getVariableVoting() {return std::vector<int>();}
+	virtual void forceCube(const std::vector<int>& cube) {}
+
 	// Set initial phase for a given variable
 	// Used only for diversification of the portfolio
 	virtual void setPhase(const int var, const bool phase) = 0;

@@ -41,11 +41,12 @@ public:
             _owning_vector = true;
         }
 
+        auto prevSize = _out->size();
         for (int i = 0; i < sizeof(size_t)/sizeof(int); i++) _out->push_back(0);
-        *((size_t*) _out->data()) = 1;
+        *((size_t*) (_out->data()+prevSize)) = 1;
         _counter_position = _out->size();
         _out->push_back(0); // counter for the first group
-        if (totalLiteralLimit > 0) _out->reserve(totalLiteralLimit);
+        if (totalLiteralLimit > 0) _out->reserve(prevSize + totalLiteralLimit);
     }
     ~BufferBuilder() {
         if (_owning_vector && _out != nullptr) delete _out;

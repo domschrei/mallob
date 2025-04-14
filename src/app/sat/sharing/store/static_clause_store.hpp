@@ -397,8 +397,8 @@ public:
         return BufferReader(data, buflen, _max_eff_clause_length, false, useChecksums);
     }
 
-    BufferBuilder getBufferBuilder(int limit) const {
-        BufferBuilder builder(limit, _max_eff_clause_length, false);
+    BufferBuilder getBufferBuilder(int limit, std::vector<int>* out = nullptr) const {
+        BufferBuilder builder(limit, _max_eff_clause_length, false, out);
         builder.setFreeClauseLengthLimit(_max_nb_free_lits);
         return builder;
     }

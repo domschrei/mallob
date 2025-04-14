@@ -153,6 +153,7 @@ std::vector<T> random_choice_k_from_n(const T* array, size_t arraySize, int k,
 
     int numRemainingElems = arraySize;
     int numToSelect = k;
+    if (numToSelect >= numRemainingElems) return std::vector<T>(array, array+arraySize);
 
     std::vector<T> selectedElems;
 

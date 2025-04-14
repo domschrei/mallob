@@ -55,7 +55,7 @@ std::vector<int> BufferMerger::mergePriorityBased(const Parameters& params, std:
     std::vector<int> storeOutput = _merge_store->exportBuffer(INT32_MAX, nbExportedCls, nbExportedLits, GenericClauseStore::ANY, false);
 
     // Filter duplicates and split output into a main and an excess output
-    BufferBuilder mainBuilder = _merge_store->getBufferBuilder(_size_limit);
+    BufferBuilder mainBuilder = _merge_store->getBufferBuilder(_size_limit, &_out);
     BufferBuilder excessBuilder = _merge_store->getBufferBuilder(INT32_MAX);
     tsl::robin_set<Mallob::Clause, Mallob::NonCommutativeClauseHasher, Mallob::SortedClauseExactEquals> mergedClauseSet;
     BufferReader storeOutputReader = _merge_store->getBufferReader(storeOutput.data(), storeOutput.size());
@@ -126,7 +126,7 @@ std::vector<int> BufferMerger::merge(std::vector<int>* excessClauses, SplitMix64
     }
 
     // Setup builders for main buffer and excess clauses buffer
-    BufferBuilder mainBuilder(_size_limit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
+    BufferBuilder mainBuilder(_size_limit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd, &_out);
     mainBuilder.setFreeClauseLengthLimit(_max_free_eff_clause_length - ClauseMetadata::numInts());
     BufferBuilder* excessBuilder {nullptr};
     if (excessClauses != nullptr) {

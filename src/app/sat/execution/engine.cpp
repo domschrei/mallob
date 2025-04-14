@@ -6,6 +6,7 @@
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "app/sat/data/revision_data.hpp"
 #include "app/sat/data/theories/theory_specification.hpp"
+#include "app/sat/data/variable_voting.hpp"
 #include "util/logger.hpp"
 #include "util/sys/fileutils.hpp"
 #include "util/sys/thread_pool.hpp"
@@ -290,6 +291,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		setup.modelCheckingLratConnector = modelCheckingLratConnector;
 		setup.avoidUnsatParticipation = (params.proofOutputFile.isSet() || params.onTheFlyChecking()) && !item.outputProof;
 		setup.exportClauses = !setup.avoidUnsatParticipation;
+		setup.vitalVariableVotingSize = params.vitalVariableVotingSize();
 
 		_solver_interfaces.push_back(createSolver(setup));
 		cyclePos = (cyclePos+1) % portfolio.cycle.size();
@@ -498,9 +500,9 @@ std::vector<int> SatEngine::prepareSharing(int literalLimit, int& outSuccessfulS
 	return _sharing_manager->prepareSharing(literalLimit, outSuccessfulSolverId, outNbLits);
 }
 
-std::vector<int> SatEngine::filterSharing(std::vector<int>& clauseBuf) {
+std::vector<int> SatEngine::filterSharing(int* data, size_t size) {
 	if (isCleanedUp()) return std::vector<int>();
-	return _sharing_manager->filterSharing(clauseBuf);
+	return _sharing_manager->filterSharing(data, size);
 }
 
 void SatEngine::addSharingEpoch(int epoch) {
@@ -508,14 +510,14 @@ void SatEngine::addSharingEpoch(int epoch) {
 	_sharing_manager->addSharingEpoch(epoch);
 }
 
-void SatEngine::digestSharingWithFilter(std::vector<int>& clauseBuf, std::vector<int>& filter) {
+void SatEngine::digestSharingWithFilter(int* data, size_t size, std::vector<int>& filter) {
 	if (isCleanedUp()) return;
-	_sharing_manager->digestSharingWithFilter(clauseBuf, &filter);
+	_sharing_manager->digestSharingWithFilter(data, size, &filter);
 }
 
-void SatEngine::digestSharingWithoutFilter(std::vector<int>& clauseBuf, bool stateless) {
+void SatEngine::digestSharingWithoutFilter(int* data, size_t size, bool stateless) {
 	if (isCleanedUp()) return;
-	_sharing_manager->digestSharingWithoutFilter(clauseBuf, stateless);
+	_sharing_manager->digestSharingWithoutFilter(data, size, stateless);
 }
 
 void SatEngine::returnClauses(std::vector<int>& clauseBuf) {
@@ -526,6 +528,35 @@ void SatEngine::returnClauses(std::vector<int>& clauseBuf) {
 void SatEngine::digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauseBuf) {
 	if (isCleanedUp()) return;
 	_sharing_manager->digestHistoricClauses(epochBegin, epochEnd, clauseBuf);
+}
+
+VariableVoting SatEngine::getVitalVariablesVoting() {
+	tsl::robin_map<int, int> votesMap;
+	for (size_t i = 0; i < _solver_interfaces.size(); i++) {
+		auto& solver = _solver_interfaces[i];
+		if (!solver) continue; // solver was cleaned up
+		auto vv = solver->getVariableVoting();
+		LOGGER(_logger, V5_DEBG, "VVV %i size %lu\n", i, vv.size());
+		for (int v : vv) {
+			votesMap[v] += 1;
+		}
+	}
+	VariableVoting v(votesMap);
+	LOGGER(_logger, V5_DEBG, "VVV %s\n", v.toStr().c_str());
+	return v;
+}
+
+void SatEngine::forceCubes(const std::vector<int>& vitalVariables) {
+	auto cube = vitalVariables;
+	for (size_t i = 0; i < _solver_interfaces.size(); i++) {
+		auto& solver = _solver_interfaces[i];
+		if (!solver) continue; // solver was cleaned up
+		int globalId = solver->getGlobalId();
+		for (size_t ii = 0; ii < cube.size(); ii++) {
+			cube[ii] = ( ((globalId >> ii) & 1) ? 1 : -1 ) * std::abs(cube[ii]);
+		}
+		solver->forceCube(cube);
+	}
 }
 
 void SatEngine::syncDeterministicSolvingAndCheckForLocalWinner() {

@@ -1,5 +1,6 @@
 
 #include <climits>
+#include <map>
 #include <signal.h>
 #include <assert.h>
 #include <ext/alloc_traits.h>
@@ -7,6 +8,7 @@
 #include <utility>
 
 #include "app/sat/data/model_string_compressor.hpp"
+#include "app/sat/data/variable_voting.hpp"
 #include "app/sat/sharing/clause_logger.hpp"
 #include "app/sat/sharing/filter/clause_buffer_lbd_scrambler.hpp"
 #include "app/sat/sharing/filter/filter_vector_builder.hpp"
@@ -28,6 +30,7 @@
 #include "app/sat/sharing/clause_id_alignment.hpp"
 #include "app/sat/sharing/filter/importing_solver.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
+#include "robin_map.h"
 #include "util/logger.hpp"
 #include "util/string_utils.hpp"
 #include "util/sys/timer.hpp"
@@ -378,9 +381,9 @@ void SharingManager::returnClauses(std::vector<int>& clauseBuf) {
 	_clause_filter->releaseAllLocks(); // release filter locks again
 }
 
-std::vector<int> SharingManager::filterSharing(std::vector<int>& clauseBuf) {
+std::vector<int> SharingManager::filterSharing(int* data, size_t size) {
 
-	auto reader = _clause_store->getBufferReader(clauseBuf.data(), clauseBuf.size());
+	auto reader = _clause_store->getBufferReader(data, size);
 	auto id = _id_alignment ? _id_alignment->contributeFirstClauseIdOfEpoch() : 0UL;
 	return FilterVectorBuilder(id, _internal_epoch, _job_index==0).build(reader, [&](Mallob::Clause& clause) {
 		return _clause_filter->admitSharing(clause, _internal_epoch);
@@ -392,12 +395,14 @@ std::vector<int> SharingManager::filterSharing(std::vector<int>& clauseBuf) {
 }
 
 void SharingManager::digestSharingWithFilter(std::vector<int>& clauseBuf, std::vector<int>* filter) {
+}
+void SharingManager::digestSharingWithFilter(int* inputData, size_t inputSize, std::vector<int>* filter) {
 	int verb = _job_index == 0 ? V3_VERB : V5_DEBG;
 
 	float time = Timer::elapsedSeconds();
 	ClauseHistogram hist(_params.strictClauseLengthLimit()+ClauseMetadata::numInts());
 
-	_logger.log(verb, "digesting len=%ld\n", clauseBuf.size());
+	_logger.log(verb, "digesting len=%ld\n", inputSize);
 
 	std::vector<ImportingSolver> importingSolvers;
 	for (size_t i = 0; i < _solvers.size(); i++) {
@@ -420,9 +425,9 @@ void SharingManager::digestSharingWithFilter(std::vector<int>& clauseBuf, std::v
 	}
 
 	// Apply provided global filter to buffer (in-place operation)
-	applyFilterToBuffer(clauseBuf, filter);
+	applyFilterToBuffer(inputData, inputSize, filter);
 
-	auto reader = _clause_store->getBufferReader(clauseBuf.data(), clauseBuf.size());
+	auto reader = _clause_store->getBufferReader(inputData, inputSize);
 
 	_logger.log(verb+2, "DG import\n");
 
@@ -473,7 +478,7 @@ void SharingManager::digestSharingWithFilter(std::vector<int>& clauseBuf, std::v
 
 	if (!_params.noImport()) {
 		for (auto& slv : importingSolvers) {
-			BufferReader reader = _clause_store->getBufferReader(clauseBuf.data(), clauseBuf.size());
+			BufferReader reader = _clause_store->getBufferReader(inputData, inputSize);
 			reader.setFilterBitset(slv.filter);
 			_solvers[slv.localId]->addLearnedClauses(reader, _imported_revision);
 		}
@@ -490,7 +495,7 @@ void SharingManager::digestSharingWithFilter(std::vector<int>& clauseBuf, std::v
 	if (_clause_logger) _clause_logger->publish();
 }
 
-void SharingManager::applyFilterToBuffer(std::vector<int>& clauseBuf, std::vector<int>* filter) {
+void SharingManager::applyFilterToBuffer(int* inputData, size_t& inputSize, std::vector<int>* filter) {
 	if (!filter) return;
 	int verb = _job_index == 0 ? V3_VERB : V5_DEBG;
 
@@ -503,16 +508,16 @@ void SharingManager::applyFilterToBuffer(std::vector<int>& clauseBuf, std::vecto
 		_id_alignment->beginNextEpoch(filter->data());
 	}
 
-	InPlaceClauseFiltering filtering(_params, clauseBuf.data(), clauseBuf.size(), filter->data(), filter->size());
+	InPlaceClauseFiltering filtering(_params, inputData, inputSize, filter->data(), filter->size());
 	int buflen = filtering.applyAndGetNewSize();
-	clauseBuf.resize(buflen);
+	inputSize = buflen;
 	_last_num_cls_to_import += filtering.getNumClauses();
 	_last_num_admitted_cls_to_import += filtering.getNumAdmittedClauses();
 }
 
-void SharingManager::digestSharingWithoutFilter(std::vector<int>& clauseBuf, bool stateless) {
+void SharingManager::digestSharingWithoutFilter(int* data, size_t size, bool stateless) {
 	bool sharingOpOngoing = _sharing_op_ongoing;
-	digestSharingWithFilter(clauseBuf, nullptr);
+	digestSharingWithFilter(data, size, nullptr);
 	if (stateless) _sharing_op_ongoing = sharingOpOngoing;
 }
 
@@ -526,7 +531,7 @@ void SharingManager::digestHistoricClauses(int epochBegin, int epochEnd, std::ve
 		// More than half of the historic epochs are missing: do import.
 		_logger.log(V2_INFO, "Import historic cls [%i,%i) (missing %i/%i)\n", 
 			epochBegin, epochEnd, numUnknown, epochEnd-epochBegin);
-		digestSharingWithoutFilter(clauseBuf, true);
+		digestSharingWithoutFilter(clauseBuf.data(), clauseBuf.size(), true);
 		for (int e = epochBegin; e < epochEnd; e++) addSharingEpoch(e);
 	}
 }

@@ -75,12 +75,14 @@ public:
 
 	bool isReadyToPrepareSharing() const;
 	std::vector<int> prepareSharing(int literalLimit, int& outSuccessfulSolverId, int& outNbLits);
-	std::vector<int> filterSharing(std::vector<int>& clauseBuf);
+	std::vector<int> filterSharing(int* data, size_t size);
 	void addSharingEpoch(int epoch);
-	void digestSharingWithFilter(std::vector<int>& clauseBuf, std::vector<int>& filter);
-	void digestSharingWithoutFilter(std::vector<int>& clauseBuf, bool stateless);
+	void digestSharingWithFilter(int* data, size_t size, std::vector<int>& filter);
+	void digestSharingWithoutFilter(int* data, size_t size, bool stateless);
 	void returnClauses(std::vector<int>& clauseBuf);
 	void digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauseBuf);
+	VariableVoting getVitalVariablesVoting();
+	void forceCubes(const std::vector<int>& vitalVariables);
 
 	struct LastAdmittedStats {
 		int nbAdmittedCls;

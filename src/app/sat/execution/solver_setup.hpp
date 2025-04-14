@@ -76,6 +76,7 @@ struct SolverSetup {
 	unsigned int qualityLbdLimit {255};
 	unsigned int freeMaxLitsPerClause {255};
 	size_t clauseBaseBufferSize {1000};
+	int vitalVariableVotingSize {0};
 
 
 	// Clause import

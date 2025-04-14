@@ -9,6 +9,7 @@
 #include <vector>
 #include <memory>
 #include "app/sat/data/clause_metadata.hpp"
+#include "app/sat/data/variable_voting.hpp"
 #include "app/sat/job/inplace_sharing_aggregation.hpp"
 #include "util/assert.hpp"
 
@@ -82,10 +83,11 @@ private:
         LOGGER(_log, V5_DEBG, "DO import clauses rev=%i\n", revision);
         // Write imported clauses from shared memory into vector
         if (revision >= 0) engine.setClauseBufferRevision(revision);
+        auto [clausesData, clausesSize] = InplaceClauseAggregation(incomingClauses).getClauseBuffer();
         if (filterOrNull) {
-            engine.digestSharingWithFilter(incomingClauses, *filterOrNull);
+            engine.digestSharingWithFilter(clausesData, clausesSize, *filterOrNull);
         } else {
-            engine.digestSharingWithoutFilter(incomingClauses, stateless);
+            engine.digestSharingWithoutFilter(clausesData, clausesSize, stateless);
         }
         engine.addSharingEpoch(epoch);
         engine.syncDeterministicSolvingAndCheckForLocalWinner();
@@ -199,9 +201,18 @@ private:
                     int winningSolverId = agg.successfulSolver();
                     int bufferRevision = agg.maxRevision();
                     agg.stripToRawBuffer();
+
+                    VariableVoting vv = agg.getVariableVoting();
+                    int cubeDepth = std::ceil(std::log2(_config.mpisize * _config.threads));
+                    if (_config.mpirank == 0)
+                        LOG(V4_VVER, "VVV RESULT %s\n", vv.toStr(cubeDepth+1).c_str());
+                    auto winners = vv.getWinners(cubeDepth, _params.vitalVariableVotingMinVotes());
+                    engine.forceCubes(winners);
+
+                    auto [clausesData, clausesSize] = agg.getClauseBuffer();
                     LOGGER(_log, V5_DEBG, "DO filter clauses\n");
                     engine.setClauseBufferRevision(bufferRevision);
-                    auto filter = engine.filterSharing(incomingClauses);
+                    auto filter = engine.filterSharing(clausesData, clausesSize);
                     LOGGER(_log, V5_DEBG, "filter result has size %i\n", filter.size());
                     pipe.writeData(std::move(filter), {epoch}, CLAUSE_PIPE_FILTER_IMPORT);
                     if (winningSolverId >= 0) {
@@ -288,7 +299,9 @@ private:
                 int successfulSolverId = -1;
                 int numCollectedLits;
                 auto clauses = engine.prepareSharing(exportLiteralLimit, successfulSolverId, numCollectedLits);
-                if (!clauses.empty()) {
+                auto fullSerialization = engine.getVitalVariablesVoting().serialize();
+                fullSerialization.insert(fullSerialization.end(), clauses.begin(), clauses.end());
+                if (!fullSerialization.empty()) {
                     long long bestFoundObjectiveCost = engine.getBestFoundObjectiveCost();
                     int costAsInts[sizeof(long long)/sizeof(int)];
                     memcpy(costAsInts, &bestFoundObjectiveCost, sizeof(long long));
@@ -297,7 +310,7 @@ private:
                         metadata.push_back(costAsInts[i]);
                     metadata.push_back(numCollectedLits);
                     metadata.push_back(successfulSolverId);
-                    pipe.writeData(std::move(clauses), metadata, CLAUSE_PIPE_PREPARE_CLAUSES);
+                    pipe.writeData(std::move(fullSerialization), metadata, CLAUSE_PIPE_PREPARE_CLAUSES);
                 }
                 collectClauses = false;
             }

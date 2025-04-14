@@ -14,6 +14,7 @@
 #include "app/sat/data/clause_histogram.hpp"        // for ClauseHistogram
 #include "app/sat/data/definitions.hpp"             // for ExtLearnedClauseC...
 #include "app/sat/data/solver_statistics.hpp"       // for SolverStatistics
+#include "app/sat/data/variable_voting.hpp"
 #include "app/sat/sharing/clause_id_alignment.hpp"  // for ClauseIdAlignment
 #include "util/tsl/robin_hash.h"                    // for robin_hash<>::buc...
 #include "util/tsl/robin_set.h"                     // for robin_set
@@ -109,9 +110,10 @@ public:
 
 	void addSharingEpoch(int epoch) {_digested_epochs.insert(epoch);}
 	std::vector<int> prepareSharing(int totalLiteralLimit, int& outSuccessfulSolverId, int& outNbLits);
-	std::vector<int> filterSharing(std::vector<int>& clauseBuf);
+	std::vector<int> filterSharing(int* data, size_t size);
 	void digestSharingWithFilter(std::vector<int>& clauseBuf, std::vector<int>* filter);
-	void digestSharingWithoutFilter(std::vector<int>& clauseBuf, bool stateless);
+	void digestSharingWithFilter(int* data, size_t size, std::vector<int>* filter);
+	void digestSharingWithoutFilter(int* data, size_t size, bool stateless);
 	void returnClauses(std::vector<int>& clauseBuf);
 	void digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauseBuf);
 	void collectGarbageInFilter();
@@ -143,7 +145,7 @@ public:
 
 private:
 
-	void applyFilterToBuffer(std::vector<int>& clauseBuf, std::vector<int>* filter);
+	void applyFilterToBuffer(int* inputData, size_t& inputSize, std::vector<int>* filter);
 
 	void onProduceClause(int solverId, int solverRevision, const Mallob::Clause& clause, const std::vector<int>& condLits, bool recursiveCall = false);
 

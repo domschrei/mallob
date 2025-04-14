@@ -134,7 +134,7 @@ void SatProcessAdapter::doInitialize() {
         Process::writeTrace(childPid);
     });
     watchdog.setWarningPeriod(500);
-    watchdog.setAbortPeriod(10'000);
+    watchdog.setAbortPeriod(_params.watchdogAbortMillis());
 
     // Wait until the process is properly initialized
     while (!_hsm->didStart && !Process::didChildExit(res)) {

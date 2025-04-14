@@ -40,10 +40,14 @@ private:
     std::forward_list<InputClause> _merger;
     StaticClauseStore<false>* _merge_store {nullptr};
 
+    std::vector<int> _out;
+
 public:
     BufferMerger(int sizeLimit, int maxEffClauseLength, int maxFreeEffClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum = false);
     BufferMerger(StaticClauseStore<false>* mergeStore, int sizeLimit, int maxEffClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum = false);
     void add(BufferReader&& reader);
+
+    void setPrefix(std::vector<int>&& prefix) {_out = std::move(prefix);}
 
     std::vector<int> mergeDiscardingExcess();
     std::vector<int> mergePreservingExcess(std::vector<int>& excessOut);
