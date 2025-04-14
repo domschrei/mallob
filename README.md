@@ -1,5 +1,6 @@
 [![status](https://joss.theoj.org/papers/700e9010c4080ffe8ae4df21cf1cc899/status.svg)](https://joss.theoj.org/papers/700e9010c4080ffe8ae4df21cf1cc899)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6890239.svg)](https://doi.org/10.5281/zenodo.6890239)
+[![RSD - /software/mallob](https://img.shields.io/badge/RSD-%2Fsoftware%2Fmallob-002864)](https://helmholtz.software/software/mallob)
 
 # Mallob
 
