@@ -63,6 +63,8 @@ if [ $ndone -ge $ntotal ]; then exit; fi
 echo "I" >> sbatch/generated/$DS_JOBNAME/.ticks
 if [ $(cat sbatch/generated/$DS_JOBNAME/.ticks|wc -l) -gt $ntotal ]; then exit; fi
 
+change=false # track if this task makes any progress and should hence start another task
+
 # MAIN LOOP over benchmark instances (shuffled differently for each execution)
 for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 
@@ -77,6 +79,8 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
     fi
     # unable to get a reservation? -> skip
     if ! mkdir sbatch/generated/$DS_JOBNAME/.reserved.$i 2> /dev/null ; then continue; fi
+
+    change=true
 
     # Benchmark file
     f=$(cat $benchmarkfile|sed $i'q;d')
@@ -121,7 +125,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
     echo $mpicall $cmd
     $mpicall bash -c "scripts/slurm/prolog.sh ; $cmd"
 
-    sleep 5 # avoid "nodes are still busy" issue?
+    sleep 3 # avoid "nodes are still busy" issue?
     $mpicall scripts/slurm/epilog.sh
 
     echo "$(date) JOB $i FINISHED"
@@ -132,6 +136,9 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
     sleep 3 # maybe a means to avoid "nodes are still busy" srun error?
 
 done # END OF MAIN LOOP
+
+# No progress made? => The chain is (about to be) done, so don't submit another task
+if ! $change; then exit; fi
 
 # Submit next instance, to begin after this job is done (do nothing if it fails)
 sbatch --begin=now`#+$(($DS_RUNTIME+30))` sbatch/generated/$DS_JOBNAME/sbatch.sh

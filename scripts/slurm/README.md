@@ -43,7 +43,7 @@ DS_NODES=1 DS_RUNTIME=720 DS_PARTITION=micro DS_SECONDSPERJOB=300 scripts/slurm/
 * 4th argument: The index of the last instance to solve.
 * 5th argument: The number of SBATCH jobs that should run concurrently. Beware user job limits, e.g., 50 for SuperMUC, which can break a chain in the submission. Especially when running several meta-jobs at once, you should leave sufficient room for the chained jobs (e.g., 2x15 concurrent jobs at a limit of 50 jobs). As long as a single SBATCH job chain survives, your meta-job will eventually complete.
 
-The script tells you what to execute to submit your meta-job.
+The script's output indicates what to execute to submit your meta-job.
 
 ### `postrun.sh`
 
@@ -52,4 +52,3 @@ Execute with your job name as the only argument (e.g., `scripts/slurm/postrun.sh
 ### `basic-eval.sh`
 
 Provide the directory produced by `postrun.sh` as the only argument. Creates a file `qtimes.txt` ("qualified running times") within that directory that features basic by-instance results.
-

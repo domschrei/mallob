@@ -4,13 +4,20 @@
 Mallob can perform malleable job scheduling and load balancing for any kind of application that implements its interfaces.
 In the following we explain which steps need to be performed and how exactly the Job interface works.
 
+## Types of Application Engines
+
+Mallob supports two kinds of application engines:
+
+* **Regular application engines** are fully decentralized. Only the parsing of the job description (if at all needed) is performed by a single client process. All other application-specific logic applies uniformly to all processes where a job is scheduled. Examples are `dummy`, `kmeans`, and `sat`.
+* **Client-side application engines** only consist of a single head program, which is executed directly at the client process receiving a job submission. Such a job is thus not distributed in and of itself. However, the head program can submit regular application tasks to Mallob (e.g., SAT solving sub-tasks) to exploit distributed computing. Examples are `maxsat` and `satwithpre`.
+
 ## Overview
 
 To integrate your application into Mallob, create a subdirectory `app/yourappkey` where `yourappkey` is an all lower case identifier for your application within Mallob (e.g., `kmeans` or `smt`). In that directory, the following files are strictly required - each is explained in more detail further below.
 
 * `setup.cmake`: Define the build process for your application.
 * `options.hpp`: Define custom, application-specific program options.
-* `register.hpp`: Define a global method `void register_mallob_app_yourappkey()` (replace "yourappkey" accordingly) where you define three particular lambda functions for your app within the `app_registry`. This bit of code programmatically connects your application code with Mallob's program flow.
+* `register.hpp`: Define a global method `void register_mallob_app_yourappkey()` (replace "yourappkey" accordingly) where you define a bit of glue code for your app within the `app_registry`. This programmatically connects your application code with Mallob's program flow.
 
 After all of this is set up, register your application within Mallob's build process by adding the following code to `CMakeLists.txt` below the line `# Include further applications here:`.
 ```cmake
@@ -22,7 +29,7 @@ You can then build Mallob with CMake option `-DMALLOB_APP_YOURAPPKEY=1` to inclu
 
 ## `setup.cmake`
 
-The CMake file `app/yourappkey/setup.cmake` must contain all directives necessary to build and include your application in Mallob. In principle, if your code only consists of header files transitively included by a single entry point `register.hpp` and if no additional libraries are required, this file may be completely empty. Otherwise, you should define the compilation units (.cpp files) of your application, add additional include directories and libraries as necessary, and define any external executables your application calls. Please take a look at `app/dummy/setup.cmake` for a simple example which only adds additional compilation units and `app/sat/setup.cmake` for a reasonably complex example featuring external libraries and a separate subprocess executable.
+The CMake file `app/yourappkey/setup.cmake` must contain all directives necessary to build and include your application in Mallob. In principle, if your code only consists of header files transitively included by a single entry point `register.hpp` and if no additional libraries are required, this file may be completely empty. Otherwise, you should define the compilation units (.cpp files) of your application, add additional include directories and libraries as necessary, and define any external executables your application calls. Please take a look at `app/dummy/setup.cmake` for a simple example which only adds additional compilation units, `app/sat/` for a reasonably complex example featuring external libraries and a separate subprocess executable, and `app/maxsat/` for a client-side application example.
 
 ## `options.hpp`
 
@@ -42,6 +49,10 @@ A typical `register.hpp` looks as follows:
 // further #includes as needed
 
 void register_mallob_app_yourappkey() {
+    // You need to call either app_registry::registerApplication or app_registry::registerClientSideApplication,
+    // depending on whether you want to register a regular or a client-side application.
+    // The latter expects a ClientSideProgramCreator instead of a JobCreator.
+    // See `src/app/app_registry.hpp` for details.
     app_registry::registerApplication(
         // your key in all caps goes here
         "YOURAPPKEY", 
@@ -49,7 +60,7 @@ void register_mallob_app_yourappkey() {
         // Job reader: Given a number of input files and a JobDescription instance,
         // read the files into the JobDescription and return true iff everything went well.
         [](const std::vector<std::string>& files, JobDescription& desc) -> bool {
-            // TODO perform parsing, write via desc.add{Permanent,Transient}Data()
+            // TODO If needed, perform parsing, write via desc.add{Permanent,Transient}Data()
             return true;
         },
 
@@ -68,6 +79,10 @@ void register_mallob_app_yourappkey() {
             }
             return json;
         }
+
+        // Optional: Specify a resource cleaner which cleans up any system-level resources
+        // (files, shared-memory, ...) in between Mallob executions.
+        //, [](const Parameters& params) {}
     );
 }
 ```
@@ -84,4 +99,5 @@ Your job reading should return with a `bool` which expresses whether the parsing
 
 ## Job engine
 
-The core part of adding a new application engine to Mallob is to create a custom subclass of `Job` (see `src/app/job.hpp`) and to implement all of its pure virtual methods. (More documentation coming soon.)
+The core part of adding a new application engine to Mallob is to create a custom subclass of `Job` (see `src/app/job.hpp`) and to implement all of its pure virtual methods. The `dummy` application serves as a basic skeleton and starting point. The application SAT serves as a full-featured example, including non-trivial communication across processes; note however that its job logic is relatively complex due to sub-processing.
+We intend to provide a simplistic, educative and yet well-tested and well-documented example application in the near future.
