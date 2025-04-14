@@ -1,14 +1,16 @@
-[![status](https://joss.theoj.org/papers/700e9010c4080ffe8ae4df21cf1cc899/status.svg)](https://joss.theoj.org/papers/700e9010c4080ffe8ae4df21cf1cc899)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6890239.svg)](https://doi.org/10.5281/zenodo.6890239)
+
+[![KIT - SAtRes group](https://img.shields.io/badge/KIT-SAtRes_group-009682)](https://satres.kikit.kit.edu/research/mallob/)
 [![RSD - /software/mallob](https://img.shields.io/badge/RSD-%2Fsoftware%2Fmallob-002864)](https://helmholtz.software/software/mallob)
+[![Zenodo](https://zenodo.org/badge/DOI/10.5281/zenodo.6890239.svg)](https://doi.org/10.5281/zenodo.6890239)
+[![JOSS](https://joss.theoj.org/papers/700e9010c4080ffe8ae4df21cf1cc899/status.svg)](https://joss.theoj.org/papers/700e9010c4080ffe8ae4df21cf1cc899)
 [![Max. tested scale - 6400 cores](https://img.shields.io/badge/Max._tested_scale-6400_cores-red)](https://jair.org/index.php/jair/article/view/15827)
 
 # Mallob
 
-**Mallob** (**Mal**leable **Lo**ad **B**alancer, or **Ma**ssively P**a**ra**ll**el **Lo**gic **B**ackend) is a distributed platform for processing automated reasoning tasks in modern large-scale HPC and cloud environments. Mallob primarily solves instances of the NP-complete _propositional satisfiability_ (SAT) problem – an essential building block at the core of automated reasoning and Symbolic AI. Mallob's flexible and decentralized approach to job scheduling allows to concurrently process many tasks of varying priority by different users. As such, Mallob can drastically improve your academic or industrial workflows tied to automated reasoning.
+**Mallob** (**Mal**leable **Lo**ad **B**alancer, or **Ma**ssively P**a**ra**ll**el **Lo**gic **B**ackend) is a distributed platform for automated reasoning in modern large-scale HPC and cloud environments. Mallob primarily solves instances of _propositional satisfiability_ (SAT) – an essential building block at the core of Symbolic AI. Mallob's flexible and decentralized approach to job scheduling allows to concurrently process many tasks of varying priority by different users. As such, Mallob can be used to scale up academic or industrial workflows tied to automated reasoning.
 
-Mallob's tightly integrated distributed general-purpose SAT solving engine, **MallobSat**, has received a large amount of attention, five gold medals of the International SAT Competition's Cloud Track in a row, and Amazon's proposition that our system is, "by a _wide_ margin, the most powerful SAT solver on the planet" ([Amazon Science 2021](https://www.amazon.science/blog/automated-reasonings-scientific-frontiers)).
-Mallob is the first distributed system that supports _incremental SAT solving_, i.e., interactive solving procedures over evolving formulas, and the first system transferring _proof technology_ to parallel and distributed SAT solving in a scalable manner.
+Mallob and its tightly integrated distributed general-purpose SAT solving engine, **MallobSat**, received a large amount of attention, including five gold medals in the [International SAT Competition](https://satcompetition.github.io/)'s Cloud Track in a row, [high-profile scientific awards](https://www.informatik.kit.edu/english/11147_14198.php), and a [remark on Amazon Science](https://www.amazon.science/blog/automated-reasonings-scientific-frontiers) that our system is, "by a _wide_ margin, the most powerful SAT solver on the planet".
+Mallob is the first distributed system that supports _incremental SAT solving_, i.e., interactive solving procedures over evolving formulas, and is also the first system transferring _proof technology_ to parallel and distributed SAT solving in a scalable manner.
 
 
 ## Setup
