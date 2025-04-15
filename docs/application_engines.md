@@ -99,5 +99,11 @@ Your job reading should return with a `bool` which expresses whether the parsing
 
 ## Job engine
 
-The core part of adding a new application engine to Mallob is to create a custom subclass of `Job` (see `src/app/job.hpp`) and to implement all of its pure virtual methods. The `dummy` application serves as a basic skeleton and starting point. The application SAT serves as a full-featured example, including non-trivial communication across processes; note however that its job logic is relatively complex due to sub-processing.
+For regular application engines, the core part is to create a custom subclass of `Job` (see `src/app/job.hpp`) and to implement all of its pure virtual methods. The `dummy` application serves as a basic skeleton and starting point. The application SAT serves as a full-featured example, including non-trivial communication across processes; note however that its job logic is relatively complex due to sub-processing.
 We intend to provide a simplistic, educative and yet well-tested and well-documented example application in the near future.
+
+## Client-side program
+
+For client-side application engines, your application logic is provided via the client-side program. This program may spawn side threads (e.g., via `ProcessWideThreadPool::get().addTask(...)`).
+It can also submit tasks to Mallob, by using the `APIConnector` instance provided in the constructor or by fetching it from anywhere via `APIRegistry::get()`.
+See [src/app/satwithpre/sat_preprocess_solver.hpp](/src/app/satwithpre/sat_preprocess_solver.hpp) for an example.
