@@ -1,5 +1,5 @@
 
-# Running Mallob on Commodity Clusters
+# Running Mallob on HPC Clusters
 
 This documentation explains how to run Mallob on commodity clusters / supercomputers with the example of SuperMUC-NG.
 

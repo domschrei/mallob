@@ -1,5 +1,5 @@
 
-# Building Mallob
+# Setting up Mallob
 
 This page explains how to build and set up Mallob.
 
