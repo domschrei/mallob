@@ -686,6 +686,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
         }
     }
 
+    int permanentId = jobId; // need to copy since jobId can get invalidated below
     if (_json_interface) {
         JobResult* resultPtr = new JobResult(std::move(jobResult));
         _pending_subtasks.emplace_back();
@@ -704,7 +705,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     }
 
     Logger::getMainInstance().flush();
-    finishJob(jobId, /*hasIncrementalSuccessors=*/desc.isIncremental());
+    finishJob(permanentId, /*hasIncrementalSuccessors=*/desc.isIncremental());
 }
 
 void Client::handleAbort(MessageHandle& handle) {
