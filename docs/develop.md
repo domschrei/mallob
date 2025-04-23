@@ -1,6 +1,14 @@
 
 # Development with Mallob
 
+
+## General
+
+If you change or replace individual libraries under `lib/`, you'll need to rebuild parts of Mallob for it to reflect the changes.
+We advise to just remove the Mallob binaries in the build directory (`rm build/*mallob*`) and then re-build with the usual commands.
+This should then only recreate the missing binaries.
+
+
 ## Programming Interfaces
 
 The following list shows a few examples for how Mallob can be extended:
