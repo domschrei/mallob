@@ -16,8 +16,8 @@
 #include "util/option.hpp"
 #include "util/robin_hood.hpp"
 
-const char* BANNER = "\nMallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving\nDesigned by P. Sanders and D. Schreiber 2018-2022\nDeveloped by D. Schreiber 2019-2022\n";
-const char* BANNER_C_PREFIXED = "c \nc Mallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving\nc Designed by P. Sanders and D. Schreiber 2018-2022\nc Developed by D. Schreiber 2019-2022\nc ";
+const char* BANNER = "\nMallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving\nCopyright (C) 2019-2025 Dominik Schreiber, Karlsruhe Institute of Technology, Germany\n";
+const char* BANNER_C_PREFIXED = "c \nc Mallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving\nc Copyright (C) 2019-2025 Dominik Schreiber, Karlsruhe Institute of Technology, Germany\nc ";
 const char* USAGE = "Usage: [mpiexec -np <num-mpi-processes> [mpi-options]] mallob [options]\n";
 
 Parameters::Parameters(const Parameters& other) {
