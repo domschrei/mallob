@@ -8,6 +8,8 @@
 #include <vector>
 
 #include "app/maxsat/interval_search.hpp"
+#include "data/job_description.hpp"
+#include "robin_set.h"
 #include "util/assert.hpp"
 #include "util/logger.hpp"
 
@@ -41,6 +43,67 @@ struct MaxSatInstance {
     std::unique_ptr<IntervalSearch> intervalSearch;
 
     MaxSatInstance(const int* formulaData, size_t formulaSize) : formulaData(formulaData), formulaSize(formulaSize) {}
+    MaxSatInstance(JobDescription& _desc, bool fromMaxPre, float intervalSkew) {
+
+        // Fetch serialized WCNF description
+        const int* fPtr = _desc.getFormulaPayload(0);
+        const size_t fSize = _desc.getFormulaPayloadSize(0);
+
+        // Traverse the objective function from back to front until you find the beginning
+        assert(fSize >= 1);
+        size_t pos = fSize;
+        pos -= 2;
+        unsigned long ub = * (unsigned long*) (fPtr + pos);
+        pos -= 2;
+        unsigned long lb = * (unsigned long*) (fPtr + pos);
+        pos--;
+        const int nbObjectiveTerms = fPtr[pos];
+        pos -= 3*nbObjectiveTerms;
+        LOG(V2_INFO, "MAXSAT lb=%lu ub=%lu o=%i\n", lb, ub, nbObjectiveTerms);
+        Logger::getMainInstance().flush();
+        assert(nbObjectiveTerms >= 0);
+        pos--;
+        assert(fPtr[pos] == 0);
+        // pos now points at the separation zero right before the objective
+        // hard clauses end at the separation zero to the objective
+        formulaData = fPtr;
+        formulaSize = pos;
+        lowerBound = lb;
+        upperBound = ub;
+
+        // Now actually parse the objective function
+        ++pos;
+        tsl::robin_set<size_t> uniqueFactors;
+        while (objective.size() < nbObjectiveTerms) {
+            size_t factor = * (size_t*) (fPtr+pos);
+            // MaxPRE already flips the literals' polarity
+#if MALLOB_USE_MAXPRE == 1
+            int lit = (fromMaxPre ? 1 : -1) * fPtr[pos+2];
+#else
+            int lit = -1 * fPtr[pos+2];
+#endif
+            assert(factor != 0);
+            assert(lit != 0);
+            objective.push_back({factor, lit});
+            uniqueFactors.insert(factor);
+            pos += 3;
+        }
+        nbUniqueWeights = uniqueFactors.size();
+        // Sort the objective terms by weight in increasing order
+        // (may help to find the required steps to take in solution-improving search)
+        std::sort(objective.begin(), objective.end(),
+            [&](const MaxSatInstance::ObjectiveTerm& termLeft, const MaxSatInstance::ObjectiveTerm& termRight) {
+            return termLeft.factor < termRight.factor;
+        });
+
+        nbVars = _desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
+        sumOfWeights = 0;
+        for (auto term : objective) sumOfWeights += term.factor;
+        upperBound = std::min(upperBound, sumOfWeights);
+        bestCost = ULONG_MAX;
+
+        intervalSearch.reset(new IntervalSearch(intervalSkew));
+    }
 
     // Print some nice-to-know diagnostics.
     void print(int updateLayer = 0) const {

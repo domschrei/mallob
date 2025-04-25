@@ -21,6 +21,7 @@ endif()
 # Add unit tests: for each $arg there must be a standalone cpp file under "test/test_${arg}.cpp".
 new_test(rustsat_encoders "${BASE_INCLUDES}" mallob_core)
 new_test(interval_search "${BASE_INCLUDES}" mallob_core)
+new_test(cardinality_encoding "${BASE_INCLUDES}" mallob_corepluscomm)
 if(MALLOB_USE_MAXPRE)
     new_test(maxpre "${BASE_INCLUDES}" mallob_core)
 endif()

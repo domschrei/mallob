@@ -22,8 +22,8 @@ public:
         assert(min <= ub && ub <= max);
         if (!_vars_reserved) {
             RustSAT::dpw_reserve(_enc, &_nb_vars);
-            RustSAT::dpw_limit_range(_enc, min, max,
-                &cardinality_encoding_add_literal, this);
+            //RustSAT::dpw_limit_range(_enc, min, max,
+            //    &cardinality_encoding_add_literal, this);
             _vars_reserved = true;
         }
         RustSAT::dpw_encode_ub(_enc, ub, ub, &_nb_vars,

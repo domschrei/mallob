@@ -27,6 +27,7 @@ public:
         doEnforce(bound);
         //addGuardClauseIfNeeded(guardVar);
     }
+    int getNbVars() const {return _nb_vars;}
     virtual ~CardinalityEncoding() {}
 protected:
     unsigned int _nb_vars;
