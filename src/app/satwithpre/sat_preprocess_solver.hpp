@@ -105,7 +105,7 @@ public:
         }
         _prepro.interrupt();
 
-        LOG(V3_VERB, "SATWP returning result %i\n", res.result);
+        LOG(V2_INFO, "#%i SATWP RES ~%i~\n", _desc.getId(), res.result);
         return res;
     }
 
