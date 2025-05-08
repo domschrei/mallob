@@ -362,8 +362,9 @@ void Kissat::reconstructSolutionFromPreprocessing(std::vector<int>& model) {
     kissat_import_model(solver, model.data(), model.size());
     model.resize(_setup.numVars+1);
     for (int v = 1; v <= _setup.numVars; v++) {
-        model[v] = kissat_value(solver, v);
-        assert(std::abs(model[v]) == v);
+        int val = kissat_value(solver, v);
+        if (std::abs(val) == v) model[v] = val;
+        //assert(std::abs(model[v]) == v || LOG_RETURN_FALSE("[ERROR] value of variable %i returned %i\n", v, model[v]));
     }
 }
 

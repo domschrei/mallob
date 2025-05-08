@@ -266,7 +266,7 @@ private:
         if (convert && res.result == RESULT_SAT) {
             LOG(V3_VERB, "SATWP reconstruct original solution\n");
             assert(solution.size() >= 1 && solution[0] == 0);
-            _prepro.join();
+            _prepro.join(true);
             _prepro.reconstructSolution(solution);
             LOG(V3_VERB, "SATWP original solution reconstructed\n");
         }

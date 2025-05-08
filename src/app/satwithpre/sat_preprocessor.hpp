@@ -28,7 +28,7 @@ private:
 public:
     SatPreprocessor(JobDescription& desc, bool runLingeling) : _desc(desc), _run_lingeling(runLingeling) {}
     ~SatPreprocessor() {
-        join();
+        join(false);
         if (_kissat) _kissat->cleanUp();
         if (_lingeling) _lingeling->cleanUp();
     }
@@ -36,6 +36,7 @@ public:
     void init() {
         SolverSetup setup;
         setup.logger = &Logger::getMainInstance();
+        setup.numVars = _desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
         setup.solverType = 'p';
         _kissat.reset(new Kissat(setup));
         _fut_kissat = ProcessWideThreadPool::get().addTask([&]() {
@@ -94,8 +95,8 @@ public:
         _kissat->interrupt();
         if (_lingeling) _lingeling->interrupt();
     }
-    void join() {
-        if (_fut_lingeling.valid()) _fut_lingeling.get(); // wait for solver thread to return
+    void join(bool onlyWaitForModel) {
+        if (!onlyWaitForModel && _fut_lingeling.valid()) _fut_lingeling.get(); // wait for solver thread to return
         if (_fut_kissat.valid()) _fut_kissat.get(); // wait for solver thread to return
     }
 
