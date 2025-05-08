@@ -79,7 +79,6 @@ void introduceMonoJob(Parameters& params, Client& client) {
     auto result = client.getAPI().submit(json, [&](nlohmann::json& response) {
         // Job done? => Terminate all processes
         monoJobDone = true;
-        if (params.terminateAbruptly()) exit(0);
     });
     if (result != JsonInterface::Result::ACCEPT) {
         LOG(V0_CRIT, "[ERROR] Cannot introduce mono job!\n");

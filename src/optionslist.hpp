@@ -123,7 +123,6 @@ OPTION_GROUP(grpPerformance, "performance", "Performance")
  OPT_BOOL(yield,                          "yield", "",                                 false,                   "Yield manager thread whenever there are no new messages")
  OPT_INT(maxLiteralsPerThread,              "mlpt", "max-lits-per-thread",               50000000, 0,   MAX_INT,    
     "If formula is larger than threshold, reduce #threads per PE until #threads=1 or until limit is met \"on average\"")
- OPT_BOOL(terminateAbruptly, "terminate-abruptly", "", false, "exit(0) as soon as the \"mono\" job's solution has arrived")
 
 ///////////////////////////////////////////////////////////////////////
 

@@ -44,12 +44,15 @@ private:
     nlohmann::json _prepro_job_submission;
     nlohmann::json _prepro_job_response;
 
-    SatPreprocessor _prepro;
+    SatPreprocessor& _prepro;
 
 public:
     SatPreprocessSolver(const Parameters& params, APIConnector& api, JobDescription& desc) :
         _params(params), _api(api), _desc(desc), _jobstr("#" + std::to_string(desc.getId())),
-        _prepro(desc, _params.preprocessLingeling()) {}
+        _prepro(*(new SatPreprocessor(desc, _params.preprocessLingeling()))) {}
+    ~SatPreprocessSolver() {
+        if (!_params.terminateAbruptly()) delete &_prepro;
+    }
 
     JobResult solve() {
         _time_of_activation = Timer::elapsedSeconds();
