@@ -51,6 +51,7 @@
 #if __cplusplus >= 201703L
 #    include <string_view>
 #endif
+#include <cstdint>
 
 // #define ROBIN_HOOD_LOG_ENABLED
 #ifdef ROBIN_HOOD_LOG_ENABLED
