@@ -11,6 +11,7 @@
 #include "interface/api/api_connector.hpp"
 #include "interface/json_interface.hpp"
 #include "mpi.h"
+#include "scheduling/core_allocator.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
 
@@ -26,6 +27,7 @@ private:
     const Parameters& _params; // configuration, cmd line arguments
     APIConnector& _api; // for submitting jobs to Mallob
     JobDescription& _desc; // contains our instance to solve and all metadata
+    int _cores_allocated {0};
 
     float _time_of_activation {0};
     float _time_of_retraction_start {0};
@@ -51,11 +53,13 @@ public:
         _params(params), _api(api), _desc(desc), _jobstr("#" + std::to_string(desc.getId())),
         _prepro(*(new SatPreprocessor(desc, _params.preprocessLingeling()))) {}
     ~SatPreprocessSolver() {
+        ProcessWideCoreAllocator::get().returnCores(_cores_allocated);
         if (!_params.terminateAbruptly()) delete &_prepro;
     }
 
     JobResult solve() {
         _time_of_activation = Timer::elapsedSeconds();
+        _cores_allocated = ProcessWideCoreAllocator::get().requestCores(1);
 
         if (_params.preprocessBalancing() >= 0) submitBaseJob();
         _prepro.init();
@@ -81,6 +85,8 @@ public:
             if (_prepro.done()) {
                 // Preprocess solver terminated.
                 LOG(V3_VERB, "SATWP preprocessor done\n");
+                ProcessWideCoreAllocator::get().returnCores(_cores_allocated);
+                _cores_allocated = 0;
                 if (_prepro.getResultCode() != 0) {
                     LOG(V3_VERB, "SATWP preprocessor reported result %i\n", _prepro.getResultCode());
                     res.result = _prepro.getResultCode();

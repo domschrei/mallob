@@ -16,6 +16,7 @@
 #include "comm/distributed_termination.hpp"
 #include "comm/mympi.hpp"
 #include "interface/api/rank_specific_file_fetcher.hpp"
+#include "scheduling/core_allocator.hpp"
 #include "util/periodic_event.hpp"
 #include "util/sys/subprocess.hpp"
 #include "util/sys/timer.hpp"
@@ -335,7 +336,8 @@ int main(int argc, char *argv[]) {
     int threadPoolSize = 4;
     if (isClient(rank) && isWorker(rank)) threadPoolSize *= 2;
     ProcessWideThreadPool::init(threadPoolSize);
-    
+    ProcessWideCoreAllocator::init(params.numThreadsPerProcess());
+
     MPI_Comm clientComm, workerComm;
     {
         MPI_Group worldGroup;

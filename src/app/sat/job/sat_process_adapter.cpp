@@ -451,6 +451,10 @@ void SatProcessAdapter::reduceThreadCount() {
     if (!_initialized || _state != SolvingStates::ACTIVE) return;
     _guard_pipe.lock().get()->writeData({}, CLAUSE_PIPE_REDUCE_THREAD_COUNT);
 }
+void SatProcessAdapter::setThreadCount(int nbThreads) {
+    if (!_initialized || _state != SolvingStates::ACTIVE) return;
+    _guard_pipe.lock().get()->writeData({nbThreads}, CLAUSE_PIPE_SET_THREAD_COUNT);
+}
 
 SatProcessAdapter::~SatProcessAdapter() {
     freeSharedMemory();

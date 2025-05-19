@@ -9,6 +9,7 @@
 #include "data/job_description.hpp"
 #include "util/logger.hpp"
 #include "util/sys/thread_pool.hpp"
+#include <atomic>
 #include <future>
 
 class SatPreprocessor {
@@ -22,7 +23,7 @@ private:
     std::future<void> _fut_lingeling;
     std::future<void> _fut_kissat;
     std::atomic_int _solver_result {0};
-    volatile bool _solver_done {false};
+    std::atomic_int _nb_running {0};
     std::vector<int> _solution;
 
 public:
@@ -39,6 +40,7 @@ public:
         setup.numVars = _desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
         setup.solverType = 'p';
         _kissat.reset(new Kissat(setup));
+        _nb_running++;
         _fut_kissat = ProcessWideThreadPool::get().addTask([&]() {
             loadFormulaToSolver(_kissat.get());
             LOG(V2_INFO, "PREPRO running Kissat\n");
@@ -50,12 +52,13 @@ public:
                     if (_solver_result == RESULT_SAT) _solution = _kissat->getSolution();
                 }
             }
-            _solver_done = true;
+            _nb_running--;
         });
         if (_run_lingeling) {
             setup.solverType = 'l';
             setup.flavour = PortfolioSequence::PREPROCESS;
             _lingeling.reset(new Lingeling(setup));
+            _nb_running++;
             _fut_lingeling = ProcessWideThreadPool::get().addTask([&]() {
                 loadFormulaToSolver(_lingeling.get());
                 LOG(V2_INFO, "PREPRO running Lingeling\n");
@@ -67,13 +70,14 @@ public:
                         if (_solver_result == RESULT_SAT) _solution = _lingeling->getSolution();
                     }
                 }
+                _nb_running--;
             });
         }
     }
 
     bool done() {
-        bool done = _solver_done;
-        if (done) _solver_done = false;
+        bool done = _nb_running.load(std::memory_order_relaxed) == 0;
+        if (done) _nb_running.store(-1, std::memory_order_relaxed);
         return done;
     }
     int getResultCode() const {

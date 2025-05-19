@@ -10,6 +10,7 @@
 #include "app/sat/data/definitions.hpp"
 #include "data/job_interrupt_reason.hpp"
 #include "interface/api/api_registry.hpp"
+#include "scheduling/core_allocator.hpp"
 #include "util/static_store.hpp"
 #include "util/sys/shmem_cache.hpp"
 #include "util/logger.hpp"
@@ -43,6 +44,8 @@ ForkedSatJob::ForkedSatJob(const Parameters& params, const JobSetup& setup, AppM
 
 void ForkedSatJob::appl_start() {
     assert(!_initialized);
+    _cores_allocated = ProcessWideCoreAllocator::get().requestCores(getNumThreads());
+    setNumThreads(_cores_allocated);
     doStartSolver();
     _time_of_start_solving = Timer::elapsedSeconds();
     _initialized = true;
@@ -126,12 +129,22 @@ void ForkedSatJob::loadIncrements() {
 
 void ForkedSatJob::appl_suspend() {
     if (!_initialized) return;
+
+    ProcessWideCoreAllocator::get().returnCores(_cores_allocated);
+    _cores_allocated = 0;
+
     _solver->setSolvingState(SolvingStates::SUSPENDED);
     _clause_comm->communicate();
 }
 
 void ForkedSatJob::appl_resume() {
     if (!_initialized) return;
+
+    if (_cores_allocated == 0) {
+        _cores_allocated = ProcessWideCoreAllocator::get().requestCores(getNumThreads());
+        setNumThreads(_cores_allocated);
+    }
+
     _solver->setSolvingState(SolvingStates::ACTIVE);
     loadIncrements();
     _clause_comm->communicate();
@@ -139,6 +152,10 @@ void ForkedSatJob::appl_resume() {
 
 void ForkedSatJob::appl_terminate() {
     if (!_initialized) return;
+
+    ProcessWideCoreAllocator::get().returnCores(_cores_allocated);
+    _cores_allocated = 0;
+
     _solver->setSolvingState(SolvingStates::ABORTING);
 }
 
@@ -152,6 +169,14 @@ int ForkedSatJob::appl_solved() {
             return _internal_result.result;
         }
         return result;
+    }
+
+    if (getNumThreads() < _cores_allocated) {
+        // Number of desired / acceptable threads became less than currently running threads:
+        // reduce thread count
+        ProcessWideCoreAllocator::get().returnCores(_cores_allocated - getNumThreads());
+        _cores_allocated = getNumThreads();
+        _solver->setThreadCount(getNumThreads());
     }
 
     // Did a solver find a result?
@@ -302,13 +327,14 @@ bool ForkedSatJob::appl_isDestructible() {
 
 void ForkedSatJob::appl_memoryPanic() {
     if (!_initialized) return;
-    int nbThreads = getNumThreads();
-    if (nbThreads > 0 && _solver->getStartedNumThreads() == nbThreads) 
-        setNumThreads(nbThreads-1);
+    if (getNumThreads() <= 1) return; // no threads left to reduce except the last one (which we'll always keep)
+
+    // New reduced thread count: subtract at least one, at most ~10% of threads
+    int nbThreads = (int)getNumThreads() - (int)std::max(1UL, (size_t)std::round(0.1*getNumThreads()));
 
     // Gently ask the solver process to reduce its number of solvers
     LOG(V1_WARN, "[WARN] %s : memory panic triggered - reducing thread count\n", toStr());
-    _solver->reduceThreadCount();
+    setNumThreads(nbThreads);
 
     // Straight up crash the solver process, restart with reduced # solvers
     //LOG(V1_WARN, "[WARN] %s : memory panic triggered - restarting solver with %i threads\n", toStr(), getNumThreads());

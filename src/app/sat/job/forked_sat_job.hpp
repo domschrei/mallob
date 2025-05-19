@@ -30,6 +30,7 @@ private:
     static std::atomic_int _static_subprocess_index;
     
     std::atomic_bool _initialized = false;
+    int _cores_allocated {0};
 
     std::unique_ptr<SatProcessAdapter> _solver;
     int _last_imported_revision = 0;

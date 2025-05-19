@@ -135,6 +135,7 @@ public:
     void preregisterShmemObject(ShmemObject&& obj);
     void crash();
     void reduceThreadCount();
+    void setThreadCount(int nbThreads);
 
     void setSolvingState(SolvingStates::SolvingState state);
     void setClauseBufferRevision(int revision) {_clause_buffer_revision = std::max(_clause_buffer_revision, revision);}
