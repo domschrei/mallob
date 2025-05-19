@@ -20,12 +20,13 @@ public:
             nbGranted = nbRequested;
             _nb_available -= nbRequested;
         }
-        LOG(V2_INFO, "COREALLOC req %i -> granted %i, available %i\n", nbRequested, nbGranted, _nb_available);
+        LOG(V4_VVER, "corealloc req %i -> %i granted, %i free\n", nbRequested, nbGranted, _nb_available);
         return nbGranted;
     }
     void returnCores(int nbReturned) {
+        if (nbReturned == 0) return;
         _nb_available += nbReturned;
-        LOG(V2_INFO, "COREALLOC ret %i -> available %i\n", nbReturned, _nb_available);
+        LOG(V2_INFO, "corealloc ret %i -> %i free\n", nbReturned, _nb_available);
     }
 };
 
