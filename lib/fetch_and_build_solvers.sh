@@ -17,8 +17,22 @@ else
     solvers="$1"
 fi
 
+switch_to_sweep_kissat=$2
+# if [ $switch_to_sweep_kissat=""]; then
+#     switch_to_sweep_kissat="0"
+# fi
+
+# if [ -z $2 ]; then
+#     switch_to_sweep_kissat="0"
+# else
+#     switch_to_sweep_kissat="1"
+#     echo "Use equivalence sweep forked kissat"
+# fi
+
+echo "switch to sweep kissat" $switch_to_sweep_kissat
+
 #bash fetch_solvers.sh $solvers
-bash fetch_solvers_with_curl.sh $solvers
+bash fetch_solvers_with_curl.sh $solvers $switch_to_sweep_kissat
 
 # MergeSAT
 if echo $solvers|grep -q "m" && [ ! -f mergesat/libmergesat.a ]; then
@@ -88,7 +102,7 @@ if echo $solvers|grep -q "k" && [ ! -f kissat/libkissat.a ]; then
 
     cd kissat
     ./configure --no-proofs
-    make
+    make -j 16
     cp build/libkissat.a .
     cd ..
 fi

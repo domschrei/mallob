@@ -1,6 +1,7 @@
 #!/bin/bash
 
 solvers=$1
+switch_to_sweep_kissat=$2
 
 # MergeSAT
 if echo $solvers|grep -q "m"; then
@@ -52,14 +53,21 @@ if echo $solvers|grep -q "l"; then
     fi
 fi
 
+
 # Kissat
 if echo $solvers|grep -q "k"; then
     if [ ! -d kissat ]; then
         if [ ! -f kissat.zip ]; then
             # for fixing a branch instead of a commit, prepend "refs/heads/"
-            branchorcommit="53b0ce61b0ce8b1d91e5c302d8060f8597364137" # updated 2024-04-02
-            curl -L -o kissat.zip https://github.com/domschrei/kissat/archive/${branchorcommit}.zip
+            echo "switch to sweep kissat " $switch_to_sweep_kissat
+            if [ $switch_to_sweep_kissat="1" ]; then
+                curl -L -o kissat.zip https://github.com/nrilu/kissat/archive/refs/heads/update24.zip
+                echo "Downloading Nicco's Kissat Fork for Equivalence Sweeping"
+            else
+                branchorcommit="53b0ce61b0ce8b1d91e5c302d8060f8597364137" # updated 2024-04-02
+                curl -L -o kissat.zip https://github.com/domschrei/kissat/archive/${branchorcommit}.zip
             #wget -nc https://github.com/domschrei/kissat/archive/${branchorcommit}.zip -O kissat.zip
+            fi
 		fi
         unzip kissat.zip
         mv kissat-* kissat
