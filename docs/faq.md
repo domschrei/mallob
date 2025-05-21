@@ -43,8 +43,7 @@ As of yet, no.
 
 #### Mallob doesn't solve my problem, it runs indefinitely or crashes.
 
-* Look out for log messages including `[ERROR]`.
-* Make sure that you execute Mallob from the correct directory. In particular, Mallob needs to find the sub-process executables (`mallob_process_dispatcher`, `mallob_sat_process`, etc.) at the (relative) path provided via the build option `-DMALLOB_SUBPROC_PATH`.
+* `[ERROR] execl returned errno 2`: Mallob was (most probably) not executed from it's home directory. In particular, Mallob needs to find the sub-process executables (`mallob_process_dispatcher`, `mallob_sat_process`, etc.) at the (relative) path provided via the build option `-DMALLOB_SUBPROC_PATH`. For most robust results, execute Mallob from it's home directory. Alternatively, you can set the path to these sub-processes explictly.
 * Make sure that the problem instance path you handed to Mallob exists; otherwise, Mallob may wait indefinitely for such a file to appear.
 
 #### Mallob performs badly and does not scale at all.
