@@ -39,7 +39,7 @@ You should now be able to autocomplete program options by pressing TAB once or t
 Run `build/mallob --help` for an overview of all Mallob options.
 E.g., to run MallobSat with a single (MPI) process with twelve Kissat threads, execute `build/mallob -mono=path/to/problem.cnf -t=12 -satsolver=k`. Make sure to execute Mallob from it's home directory, otherwise some relative paths might not work per default.
 
-For trouble-shooting error messages, also see [FAQ:Execution](docs/faq.md#execution).
+For trouble-shooting, also see [FAQ:Execution](docs/faq.md#execution).
 
 For multi-process and distributed execution, prepend the command by `mpirun` or `mpiexec` followed by appropriate MPI options.
 E.g., using Open MPI, the following command runs Mallob as a service (taking JSON job submissions on demand at `.api/jobs.0/`) with a total of eight processes à four threads.
