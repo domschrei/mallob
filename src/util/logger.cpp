@@ -228,8 +228,9 @@ void Logger::log(va_list& args, unsigned int options, const char* str) const {
     }
     */
 
-    int verbosity = options & 7;
-    if (verbosity > _verbosity) return;
+    int verbosity = options & (LOG_BINARYFLAGS_START-1);
+    //Skip if the verbosity is too high and if the verbosity-integer doesnt encode a custom log class
+    if (verbosity > _verbosity and verbosity < LOG_CUSTOM_CLASSES_START) return;
     bool prefix = (options & LOG_NO_PREFIX) == 0;
     bool withDestRank = (options & LOG_ADD_DESTRANK) != 0;
     bool withSrcRank = (options & LOG_ADD_SRCRANK) != 0;
@@ -251,8 +252,12 @@ void Logger::log(va_list& args, unsigned int options, const char* str) const {
             std::cout << Modifier(Code::FG_BLUE);
         } else if (verbosity == V4_VVER) {
             std::cout << Modifier(Code::FG_MAGENTA);
-        } else if (verbosity >= V5_DEBG) {
+        } else if (verbosity == V5_DEBG) {
             std::cout << Modifier(Code::FG_DARK_GRAY);
+        } else if (verbosity == V6_DEBGV) {
+            std::cout << Modifier(Code::FG_DARK_GRAY);
+        } else if (verbosity == V_SWEEPING) {
+            std::cout << Modifier(Code::FG_GREEN);
         }
     }
 

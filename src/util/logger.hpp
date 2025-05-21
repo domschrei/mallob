@@ -16,10 +16,16 @@
 #define V5_DEBG 5
 #define V6_DEBGV 6
 
-#define LOG_ADD_DESTRANK 8
-#define LOG_ADD_SRCRANK 16
+#define LOG_ADD_DESTRANK (1<<7)
+#define LOG_ADD_SRCRANK  (1<<8)
+#define LOG_NO_PREFIX    (1<<9)
+#define LOG_BINARYFLAGS_START   LOG_ADD_DESTRANK
 
-#define LOG_NO_PREFIX 32
+//Define custom logging groups orthogonal to the verbosities 0..6 in the integer space 10..127
+#define LOG_CUSTOM_CLASSES_START 10
+#define V_SWEEPING 10
+
+
 
 class Logger {
 
