@@ -31,9 +31,9 @@ private:
 
 public:
     SatJobStream(const Parameters& params, APIConnector& api, JobDescription& desc,
-            int streamId, bool incremental) :
+            const std::string& baseUserName, int streamId, bool incremental) :
         _params(params), _api(api), _desc(desc), _incremental(incremental), 
-        _username("maxsat#" + std::to_string(_desc.getId())) {
+        _username(baseUserName + "#" + std::to_string(_desc.getId())) {
 
         _base_job_name = "satjob-" + std::to_string(streamId) + "-rev-";
         _json_base = nlohmann::json {
@@ -43,8 +43,8 @@ public:
             {"application", "SAT"}
         };
         _json_base["files"] = std::vector<std::string>();
-        _json_base["configuration"]["__XL"] = -1;
-        _json_base["configuration"]["__XU"] = -1;
+        _json_base["configuration"]["__XL"] = "-1";
+        _json_base["configuration"]["__XU"] = "-1";
     }
 
     void setGroupId(const std::string& groupId, int minVar = -1, int maxVar = -1) {
@@ -63,8 +63,10 @@ public:
         assert(newLiterals.empty() || newLiterals.front() != 0);
         assert(newLiterals.empty() || newLiterals.back() == 0);
 
-        for (auto key : {"__NV", "__NC", "__NO"})
-            _json_base["configuration"][key] = _desc.getAppConfiguration().map.at(key);
+        for (auto key : {"__NV", "__NC", "__NO"}) {
+            if (_desc.getAppConfiguration().map.count(key))
+                _json_base["configuration"][key] = _desc.getAppConfiguration().map.at(key);
+        }
         if (_params.useChecksums()) _json_base["checksum"] = {chksum.count(), chksum.get()};
 
         if (_incremental && _json_base.contains("name")) {
@@ -153,5 +155,11 @@ public:
     nlohmann::json& getResult() {
         assert(!_pending);
         return _json_result;
+    }
+    std::string getUserName() const {
+        return _username;
+    }
+    int getRevision() const {
+        return _subjob_counter;
     }
 };

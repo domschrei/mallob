@@ -65,7 +65,6 @@ private:
     MaxSatInstance& _instance;
     int _nb_orig_vars;
 
-    std::string _username;
     SatJobStream _job_stream;
 
     // vector of 0-separated (hard) clauses to add in the next SAT call
@@ -104,8 +103,7 @@ public:
     MaxSatSearchProcedure(const Parameters& params, APIConnector& api, JobDescription& desc,
             MaxSatInstance& instance, EncodingStrategy encStrat, SearchStrategy searchStrat, const std::string& label) :
         _params(params), _api(api), _desc(desc), _instance(instance),
-        _username("maxsat#" + std::to_string(_desc.getId())),
-        _job_stream(_params, _api, _desc, _running_stream_id++, true),
+        _job_stream(_params, _api, _desc, "maxsat", _running_stream_id++, true),
         _lits_to_add(_instance.formulaData, _instance.formulaData+_instance.formulaSize),
         _current_bound(ULONG_MAX), _encoding_strat(encStrat), _search_strat(searchStrat), _label(label) {
 

@@ -129,7 +129,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		while (str[str.size()-1] == '.') 
 			str.resize(str.size()-1);
 		*out = atoi(str.c_str());
-		assert(*out > 0 || log_return_false("[ERROR] illegal argument for app config key %s\n", id.c_str()));
+		assert(*out >= 0 || log_return_false("[ERROR] illegal argument for app config key %s\n", id.c_str()));
 	}
 
 	if (appConfig.map.count("__OBJ")) {

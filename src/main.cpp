@@ -300,9 +300,8 @@ int main(int argc, char *argv[]) {
                 doRemove(file);
             }
         }
-        for (auto file : FileUtils::glob("/dev/shm/edu.kit.iti.mallob.*")) {
-            doRemove(file);
-        }
+        std::string cmd = "find /dev/shm/ -name 'edu.kit.iti.mallob.*' -print0 | xargs -0 rm 2>/dev/null";
+        (void) system(cmd.c_str());
         TmpDir::wipe();
 
         // Wait for all processes to have cleaned up before proceeding

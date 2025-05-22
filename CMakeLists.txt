@@ -150,6 +150,9 @@ endfunction()
 
 # Include applications
 register_mallob_app("dummy") # always register the "no-op" application
+if(MALLOB_APP_SMT)
+    register_mallob_app("smt")
+endif()
 if(MALLOB_APP_MAXSAT)
     register_mallob_app("maxsat")
 endif()
