@@ -304,7 +304,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 }
 
 std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSetup& setup) {
-	LOGGER_CUSTOM(_logger, V_SWEEPING,"creating new solver\n");
+	LOGGER_CUSTOM(_logger, V_SWEEPING,"creating new solver nr. %i \n", setup.globalId);
 	std::shared_ptr<PortfolioSolverInterface> solver;
 	switch (setup.solverType) {
 	case 'l':

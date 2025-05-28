@@ -76,6 +76,9 @@ void Kissat::diversify(int seed) {
 
     kissat_set_option(solver, "profile", _setup.profilingLevel);
 
+    //For Equivalence Sweeping: Tell each kissat instance it's unique global ID
+    kissat_set_option(solver, "globalId", _setup.globalId);
+
     // Set random seed
     kissat_set_option(solver, "seed", seed);
 
@@ -236,8 +239,8 @@ void Kissat::diversify(int seed) {
         Distribution distribution(rng);
 
         //Give each Kissat solver a randomized reduce-range, such that some solvers keep most clauses and other solvers other kick most clauses
-        int reduce_low;
-        int reduce_high;
+        int reduce_low{500};
+        int reduce_high{900};
         LOGGER(_logger, V3_VERB, "--\n");
 
         //Reduce==1: Uniform distribution of range values

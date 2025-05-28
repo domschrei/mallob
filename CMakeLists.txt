@@ -162,11 +162,19 @@ endif()
 if(MALLOB_APP_SATWITHPRE)
     register_mallob_app("satwithpre")
 endif()
+
 # Include further applications here:
 #if(MALLOB_APP_YOURAPP)
 #    register_mallob_app("yourapp")
 #endif()
 # ...
+
+if(MALLOB_APP_SWEEP)
+    register_mallob_app("sweep")
+endif()
+
+
+
 publish_app_registry_changes()
 
 
