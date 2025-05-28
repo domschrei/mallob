@@ -58,6 +58,7 @@ public:
     }
 
     JobResult solve() {
+        printf("Starting SATWITHPRE app");
         _time_of_activation = Timer::elapsedSeconds();
         _cores_allocated = ProcessWideCoreAllocator::get().requestCores(1);
 

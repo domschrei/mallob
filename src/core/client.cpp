@@ -321,7 +321,7 @@ APIConnector& Client::getAPI() {
 }
 
 void Client::advance() {
-    
+    LOG(V2_INFO, "ßß Adv. client\n");
     auto time = Timer::elapsedSecondsCached();
 
     // Send notification messages for recently done jobs

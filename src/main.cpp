@@ -145,9 +145,12 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
         streamer = new JobStreamer(params, client->getAPI(), client->getInternalRank());
     }
 
+    printf("Checking for client application\n");
+
     // If a client application is provided, run this application in (a) separate thread(s)
     std::list<BackgroundWorker> clientAppWorkers;
     if (params.clientApplication.isSet() && isClient) {
+        printf("Found client application\n");
         int internalClientRank = MyMpi::rank(commClients);
         int nbThreads = params.clientAppThreads();
         for (size_t i = internalClientRank*nbThreads; i < (internalClientRank+1)*nbThreads; ++i) {
@@ -173,6 +176,8 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
         // update cached timing
         Timer::cacheElapsedSeconds();
 
+
+        LOG(V2_INFO, "ß loop\n");
         // Advance worker and client logic
         if (isWorker) worker->advance();
         if (isClient) client->advance();
