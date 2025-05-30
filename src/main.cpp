@@ -58,6 +58,9 @@ bool monoJobDone = false;
 void introduceMonoJob(Parameters& params, Client& client) {
 
     // Parse application name
+     /*
+      *  -mono-app=SWEEP to side-step the SAT-app and have this mono-job only execute the Sweep-App
+      */
     auto app = params.monoApplication();
     std::transform(app.begin(), app.end(), app.begin(), ::toupper);
     LOG(V2_INFO, "Assuming application \"%s\" for mono job\n", app.c_str());
@@ -77,15 +80,41 @@ void introduceMonoJob(Parameters& params, Client& client) {
         json["cpu-limit"] = std::to_string(params.jobCpuLimit()) + "s";
     }
 
+    printf("ß introduceMonoJob :: submitting json\n");
+
     auto result = client.getAPI().submit(json, [&](nlohmann::json& response) {
         // Job done? => Terminate all processes
         monoJobDone = true;
     });
+    printf("ß introduceMonoJob :: finished submitting json\n");
+
     if (result != JsonInterface::Result::ACCEPT) {
         LOG(V0_CRIT, "[ERROR] Cannot introduce mono job!\n");
         abort();
     }
 }
+
+bool sweepJobDone = false;
+void introduceSweepJob(Parameters& params, Client& client) {
+    nlohmann::json json = {
+        {"user", "admin"},
+        {"name", "sweep-job"},
+        {"files", {params.monoFilename()}},
+        {"priority", 1.000},
+        {"application", "SWEEP"}
+    };
+    auto result = client.getAPI().submit(json, [&](nlohmann::json& response) {
+        // Job done? => Terminate all processes
+        sweepJobDone = true;
+    });
+
+    if (result != JsonInterface::Result::ACCEPT) {
+        LOG(V0_CRIT, "[ERROR] Cannot introduce sweep job!\n");
+        abort();
+    }
+}
+
+
 
 inline bool doTerminate(Parameters& params, int rank) {
     
@@ -170,6 +199,9 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     if (params.monoFilename.isSet() && isClient && MyMpi::rank(commClients) == 0)
         introduceMonoJob(params, *client);
 
+
+
+    printf("ß Starting main loop\n");
     // Main loop
     while (true) {
 
@@ -177,7 +209,7 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
         Timer::cacheElapsedSeconds();
 
 
-        LOG(V2_INFO, "ß loop\n");
+        // LOG(V2_INFO, "ß loop\n");
         // Advance worker and client logic
         if (isWorker) worker->advance();
         if (isClient) client->advance();

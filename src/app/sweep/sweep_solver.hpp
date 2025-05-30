@@ -21,7 +21,7 @@ public:
 	SweepSolver(const Parameters& params, APIConnector& api, JobDescription& desc) :
 		_params(params), _api(api), _desc(desc) {
 
-		LOG(V2_INFO, "Mallob client-side parallel Kissat-Equivalence-Sweeping, by Niccolò Rigi-Luperti & Dominik Schreiber\n");
+		LOG(V2_INFO, "In sweep solver Initialization\n");
 		//do things...
 	}
 
@@ -29,6 +29,7 @@ public:
     JobResult solve() {
 		JobResult r;
 		//do things...
+		LOG(V2_INFO, "In sweep solver solve()\n");
 		return r;
 	}
 };

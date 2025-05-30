@@ -50,6 +50,7 @@ void Client::readIncomingJobs() {
     std::vector<std::future<void>> taskFutures;
     std::set<std::pair<int, int>> unreadyJobs;
 
+    printf("ß start looping to read incoming jobs\n");
     while (true) {
         // Wait for a nonempty incoming job queue
         _incoming_job_cond_var.wait(_incoming_job_lock, [&]() {
@@ -74,7 +75,8 @@ void Client::readIncomingJobs() {
         // Find a single job eligible for parsing
         bool foundAJob = false;
         for (auto& data : _incoming_job_queue) {
-            
+
+            printf("ß looping through incoming job queue\n");
             // Jobs are sorted by arrival:
             // If this job has not arrived yet, then none have arrived yet
             if (time < data.description->getArrival()) {
@@ -162,8 +164,10 @@ void Client::readIncomingJobs() {
                     foundJob.description->getStatistics().parseTime = time;
 
                     const int appId = foundJob.description->getApplicationId();
+                    printf("ß found job with app id %i\n", appId);
                     if (app_registry::isClientSide(appId)) {
                         // Launch client-side program
+                        printf("ß Launching client-side program\n");
                         auto lock = _client_side_jobs_mutex.getLock();
                         _client_side_jobs.emplace_back(std::move(foundJob.description));
                         _sys_state.addLocal(SYSSTATE_SCHEDULED_JOBS, 1);
@@ -209,6 +213,10 @@ void Client::readIncomingJobs() {
     log.flush();
 }
 
+ /*
+  * Client::init() passes this function to the JsonInterface where it is stored as _job_callback
+  * When _job_callback(...) is called, we land here
+  */
 void Client::handleNewJob(JobMetadata&& data) {
 
     if (data.done) {
@@ -231,6 +239,8 @@ void Client::handleNewJob(JobMetadata&& data) {
     }
 
     // Introduce new job into "incoming" queue
+    printf("ß Client::handleNewJob: enqueuing new job\n");
+    printf("ß Client::handleNewJob: jobName=%s\n", data.jobName.c_str());
     data.description->setClientRank(_world_rank);
     {
         auto lock = _arrival_times_lock.getLock();
@@ -321,7 +331,7 @@ APIConnector& Client::getAPI() {
 }
 
 void Client::advance() {
-    LOG(V2_INFO, "ßß Adv. client\n");
+    // LOG(V2_INFO, "ßß Adv. client\n");
     auto time = Timer::elapsedSecondsCached();
 
     // Send notification messages for recently done jobs
@@ -464,6 +474,7 @@ int Client::getMaxNumParallelJobs() {
 
 void Client::introduceNextJob() {
 
+    // printf("ßß Client checks whether to introduce a next job");
     if (Terminator::isTerminating(/*fromMainThread=*/true)) 
         return;
 

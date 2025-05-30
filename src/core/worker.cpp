@@ -48,7 +48,7 @@ void Worker::init() {
 }
 
 void Worker::advance() {
-    LOG(V2_INFO, "ßß Adv. worker\n");
+    // LOG(V2_INFO, "ßß Adv. worker\n");
     auto time = Timer::elapsedSecondsCached();
 
     // Reset watchdog
