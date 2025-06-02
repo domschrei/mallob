@@ -8,6 +8,7 @@
 
 #include "app/app_message_subscription.hpp"
 #include "app/sat/data/definitions.hpp"
+#include "app/sat/job/sat_process_config_builder.hpp"
 #include "data/job_interrupt_reason.hpp"
 #include "interface/api/api_registry.hpp"
 #include "scheduling/core_allocator.hpp"
@@ -44,8 +45,8 @@ ForkedSatJob::ForkedSatJob(const Parameters& params, const JobSetup& setup, AppM
 
 void ForkedSatJob::appl_start() {
     assert(!_initialized);
-    _cores_allocated = ProcessWideCoreAllocator::get().requestCores(getNumThreads());
-    setNumThreads(_cores_allocated);
+    _core_alloc.requestCores(getNumThreads());
+    setNumThreads(_core_alloc.getNbAllocated());
     doStartSolver();
     _time_of_start_solving = Timer::elapsedSeconds();
     _initialized = true;
@@ -53,7 +54,7 @@ void ForkedSatJob::appl_start() {
 
 void ForkedSatJob::doStartSolver() {
 
-    SatProcessConfig config(_params, *this, _subproc_idx);
+    SatProcessConfig config = SatProcessConfigBuilder::get(_params, *this, _subproc_idx);
     Parameters hParams(_params);
     hParams.satEngineConfig.set(config.toString());
     hParams.applicationConfiguration.set(getDescription().getAppConfiguration().serialize());
@@ -130,8 +131,7 @@ void ForkedSatJob::loadIncrements() {
 void ForkedSatJob::appl_suspend() {
     if (!_initialized) return;
 
-    ProcessWideCoreAllocator::get().returnCores(_cores_allocated);
-    _cores_allocated = 0;
+    _core_alloc.returnAllCores();
 
     _solver->setSolvingState(SolvingStates::SUSPENDED);
     _clause_comm->communicate();
@@ -140,9 +140,9 @@ void ForkedSatJob::appl_suspend() {
 void ForkedSatJob::appl_resume() {
     if (!_initialized) return;
 
-    if (_cores_allocated == 0) {
-        _cores_allocated = ProcessWideCoreAllocator::get().requestCores(getNumThreads());
-        setNumThreads(_cores_allocated);
+    if (_core_alloc.empty()) {
+        _core_alloc.requestCores(getNumThreads());
+        setNumThreads(_core_alloc.getNbAllocated());
     }
 
     _solver->setSolvingState(SolvingStates::ACTIVE);
@@ -153,9 +153,7 @@ void ForkedSatJob::appl_resume() {
 void ForkedSatJob::appl_terminate() {
     if (!_initialized) return;
 
-    ProcessWideCoreAllocator::get().returnCores(_cores_allocated);
-    _cores_allocated = 0;
-
+    _core_alloc.returnAllCores();
     _solver->setSolvingState(SolvingStates::ABORTING);
 }
 
@@ -171,12 +169,11 @@ int ForkedSatJob::appl_solved() {
         return result;
     }
 
-    if (getNumThreads() < _cores_allocated) {
+    if (getNumThreads() < _core_alloc.getNbAllocated()) {
         // Number of desired / acceptable threads became less than currently running threads:
         // reduce thread count
-        ProcessWideCoreAllocator::get().returnCores(_cores_allocated - getNumThreads());
-        _cores_allocated = getNumThreads();
-        _solver->setThreadCount(getNumThreads());
+        _core_alloc.returnCores(_core_alloc.getNbAllocated() - getNumThreads());
+        _solver->setThreadCount(_core_alloc.getNbAllocated());
     }
 
     // Did a solver find a result?

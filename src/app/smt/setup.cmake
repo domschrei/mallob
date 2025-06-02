@@ -1,6 +1,6 @@
 
 # Add MaxSAT-specific sources to main Mallob executable
-set(SMT_MALLOB_SOURCES )
+set(SMT_MALLOB_SOURCES src/app/sat/solvers/cadical.cpp)
 set(MALLOB_COREPLUSCOMM_SOURCES ${MALLOB_COREPLUSCOMM_SOURCES} ${SMT_MALLOB_SOURCES} CACHE INTERNAL "")
 
 # Include Bitwuzla as external library (Mallob-side interfaces are part of SMT_SOURCES)

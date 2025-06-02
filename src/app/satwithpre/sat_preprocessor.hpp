@@ -7,6 +7,7 @@
 #include "app/sat/solvers/lingeling.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
 #include "data/job_description.hpp"
+#include "scheduling/core_allocator.hpp"
 #include "util/logger.hpp"
 #include "util/sys/thread_pool.hpp"
 #include <atomic>
@@ -17,6 +18,7 @@ class SatPreprocessor {
 private:
     const JobDescription& _desc;
     bool _run_lingeling {false};
+    CoreAllocator::Allocation _core_alloc;
 
     std::unique_ptr<Lingeling> _lingeling;
     std::unique_ptr<Kissat> _kissat;
@@ -27,7 +29,8 @@ private:
     std::vector<int> _solution;
 
 public:
-    SatPreprocessor(JobDescription& desc, bool runLingeling) : _desc(desc), _run_lingeling(runLingeling) {}
+    SatPreprocessor(JobDescription& desc, bool runLingeling) : _desc(desc), _run_lingeling(runLingeling),
+        _core_alloc(1 + _run_lingeling) {}
     ~SatPreprocessor() {
         join(false);
         if (_kissat) _kissat->cleanUp();
@@ -76,7 +79,10 @@ public:
     }
 
     bool done() {
-        bool done = _nb_running.load(std::memory_order_relaxed) == 0;
+        int nbRunning = _nb_running.load(std::memory_order_relaxed);
+        if (nbRunning < _core_alloc.getNbAllocated())
+            _core_alloc.returnCores(_core_alloc.getNbAllocated() - nbRunning);
+        bool done = nbRunning == 0;
         if (done) _nb_running.store(-1, std::memory_order_relaxed);
         return done;
     }

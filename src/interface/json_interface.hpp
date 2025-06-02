@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "interface/api/job_description_id_allocator.hpp"
+#include "robin_map.h"
 #include "util/logger.hpp"
 #include "util/hashing.hpp"
 #include "data/job_result.hpp"
@@ -54,9 +55,9 @@ private:
 
     std::function<void(JobMetadata&&)> _job_callback;
     
-    robin_hood::unordered_node_map<std::string, std::pair<int, int>> _job_name_to_id_rev;
-    robin_hood::unordered_node_map<int, int> _job_id_to_latest_rev;
-    robin_hood::unordered_node_map<std::pair<int, int>, JobImage*, IntPairHasher> _job_id_rev_to_image;
+    tsl::robin_map<std::string, std::pair<int, int>> _job_name_to_id_rev;
+    tsl::robin_map<int, int> _job_id_to_latest_rev;
+    tsl::robin_map<int, JobImage*> _job_id_to_image;
 
     bool _active {true};
 

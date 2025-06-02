@@ -1,10 +1,11 @@
 
 #pragma once
 
-#include "app/smt/smt_internal_sat_solver.hpp"
+#include "app/smt/bitwuzla_sat_connector.hpp"
 #include "data/job_description.hpp"
 #include "data/job_result.hpp"
 #include "interface/api/api_connector.hpp"
+#include "scheduling/core_allocator.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
 
@@ -19,16 +20,20 @@ private:
     const Parameters& _params;
     JobDescription& _desc;
     std::string _problem_file;
+    CoreAllocator::Allocation _core_alloc;
+
+    std::string _name;
 
 public:
     BitwuzlaSolver(const Parameters& params, APIConnector& api, JobDescription& desc, const std::string& problemFile) :
-            _params(params), _desc(desc), _problem_file(problemFile) {
+            _params(params), _desc(desc), _problem_file(problemFile), _core_alloc(1),
+            _name("#" + std::to_string(desc.getId()) + "(SMT)") {
 
-        LOG(V2_INFO,"SMT Bitwuzla+Mallob #%i\n", desc.getId());
+        LOG(V2_INFO,"SMT Bitwuzla+Mallob %s\n", _name.c_str());
 
         // This instruction replaces the internal SAT solver of Bitwuzla with a Mallob-connected solver.
-        bzla::sat::ExternalSatSolver::new_sat_solver = [&]() {
-            return new SmtInternalSatSolver(params, api, desc); // cleaned up by Bitwuzla
+        bzla::sat::ExternalSatSolver::new_sat_solver = [&, name=_name]() {
+            return new BitwuzlaSatConnector(params, api, desc, name); // cleaned up by Bitwuzla
         };
     }
     ~BitwuzlaSolver() {
@@ -111,6 +116,9 @@ public:
             } else {
                 bzla::main::Error() << e.msg();
             }
+        } catch (...) {
+            LOG(V0_CRIT, "[ERROR] uncaught exception in Bitwuzla program\n");
+            abort();
         }
 
         if (_params.solutionToFile.isSet()) {

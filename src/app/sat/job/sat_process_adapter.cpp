@@ -111,7 +111,7 @@ void SatProcessAdapter::doInitialize() {
     // Allocate shared memory for formula, assumptions of initial revision
     const int* fInShmem = (const int*) createSharedMemoryBlock("formulae.0",
         sizeof(int) * _f_size, (void*)_f_lits, 0, _desc_id, true);
-    LOG(V2_INFO, "SUMMARY %s\n", StringUtils::getSummary(fInShmem, _f_size).c_str());
+    LOG(V2_INFO, "SUMMARY %i %s\n", _f_size, StringUtils::getSummary(fInShmem, _f_size).c_str());
     if (_f_size > 0) assert(fInShmem[0] != 0);
     if (_f_size > 0) assert(fInShmem[_f_size-1] == 0);
     createSharedMemoryBlock("assumptions.0", sizeof(int) * _a_size, (void*)_a_lits);

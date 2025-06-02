@@ -4,6 +4,7 @@
 #include <list>
 
 #include "app/job.hpp"
+#include "util/sys/proc.hpp"
 #include "util/sys/threading.hpp"
 #include "util/sys/background_worker.hpp"
 #include "util/logger.hpp"

@@ -1,20 +1,29 @@
 
 #pragma once
 
+#include <algorithm>
+#include <cmath>
+#include <csignal>
 #include <cstdint>
+#include <cstdlib>
+#include <pthread.h>
 #include <string>
 #include <unistd.h>
+#include <vector>
 
+#include "app/maxsat/internal_sat_job_stream_processor.hpp"
+#include "app/maxsat/mallob_sat_job_stream_processor.hpp"
 #include "app/maxsat/sat_job_stream.hpp"
-#include "app/sat/data/model_string_compressor.hpp"
 #include "bitwuzla/cpp/sat_solver.h"
 #include "data/job_description.hpp"
 #include "interface/api/api_connector.hpp"
 #include "robin_set.h"
+#include "util/assert.hpp"
 #include "util/logger.hpp"
 #include "util/sys/terminator.hpp"
+#include "util/sys/timer.hpp"
 
-class SmtInternalSatSolver : public bzla::sat::SatSolver {
+class BitwuzlaSatConnector : public bzla::sat::SatSolver {
 
 private:
     const Parameters& _params;
@@ -24,16 +33,17 @@ private:
         static int _stream_id = 1;
         return _stream_id++;
     }
-    static std::string getNextUserName() {
-        static int nameCounter = 1;
-        return "__smt-u" + std::to_string(nameCounter++);
-    }
-    SatJobStream _job;
+    int _stream_id;
+    std::string _name;
+
+    SatJobStream _job_stream;
+    MallobSatJobStreamProcessor* _mallob_processor {nullptr};
 
     std::vector<int> _lits;
     std::vector<int> _assumptions;
     int _nb_vars {0};
     int _nb_clauses {0};
+    int _revision {-1};
 
     bzla::Terminator* _terminator {nullptr};
 
@@ -43,16 +53,24 @@ private:
     float _start_time {0};
 
 public:
-    SmtInternalSatSolver(const Parameters& params, APIConnector& api, JobDescription& desc) :
-        bzla::sat::SatSolver(), _params(params), _desc(desc),
-        _job(params, api, desc, getNextUserName(), getNextStreamId(), true) {
-        LOG(V2_INFO, "Create SMT-internal SAT solver %s\n", _job.getUserName().c_str());
+    BitwuzlaSatConnector(const Parameters& params, APIConnector& api, JobDescription& desc, const std::string& name) :
+        bzla::sat::SatSolver(), _params(params), _desc(desc), _stream_id(getNextStreamId()),
+        _name(name + ":" + std::to_string(_stream_id) + "(SAT)"), _job_stream(_name) {
+
+        _mallob_processor = new MallobSatJobStreamProcessor(params, api, desc,
+            _name, _stream_id, true, _job_stream.getSynchronizer());
+        _job_stream.addProcessor(_mallob_processor);
+        LOG(V2_INFO, "New: %s\n", _name.c_str());
+
+        auto internalProcessor = new InternalSatJobStreamProcessor(true, _job_stream.getSynchronizer());
+        _job_stream.addProcessor(internalProcessor);
+
         _start_time = Timer::elapsedSeconds();
     }
-    virtual ~SmtInternalSatSolver() {
-        LOG(V2_INFO, "Delete SMT-internal SAT solver %s\n", _job.getUserName().c_str());
-        _job.interrupt();
-        _job.finalize();
+    virtual ~BitwuzlaSatConnector() {
+        LOG(V2_INFO, "Done: %s\n", _name.c_str());
+        _job_stream.interrupt();
+        _job_stream.finalize();
     }
 
     virtual const char* get_name() const override {return "MallobSat-internal";}
@@ -72,53 +90,31 @@ public:
     }
 
     virtual bzla::Result solve() override {
+        _job_stream.setTerminator([&]() {return isTimeoutHit();});
 
-        if (_job.getRevision() == 0) {
-            // Specify # variables and # clauses only for first increment of the job
-            _desc.getAppConfiguration().updateFixedSizeEntry("__NV", _nb_vars);
-            _desc.getAppConfiguration().updateFixedSizeEntry("__NC", _nb_clauses);
+        _revision++;
+        if (_revision == 0 && _mallob_processor) {
+            _mallob_processor->setInitialSize(_nb_vars, _nb_clauses);
         }
+        auto time = Timer::elapsedSeconds();
+        LOG(V2_INFO, "%s submit rev. %i (%i lits)\n", _name.c_str(), _revision, _lits.size());
 
-        LOG(V2_INFO, "SMT %s submit rev. %i (%i total cls)\n", _job.getUserName().c_str(), _job.getRevision(), _nb_clauses);
-        _job.submitNext(std::move(_lits), _assumptions);
+        auto [resultCode, solution] = _job_stream.solve(std::move(_lits), _assumptions);
         _lits.clear();
         _assumptions.clear();
 
-        bool interrupted = false;
-        unsigned long sleepInterval {1};
-        while (_job.isPending()) {
-            usleep(sleepInterval);
-            if (isTimeoutHit()) {
-                _job.interrupt();
-                interrupted = true;
-            }
-            sleepInterval = std::max(2500UL, 2*sleepInterval);
-        }
-
         bzla::Result bzlaResult = bzla::Result::UNKNOWN;
-        nlohmann::json result;
-        if (interrupted || _job.isRejected()) {
-            LOG(V2_INFO, "SMT %s interrupted / rejected\n", _job.getUserName().c_str());
-        } else {
-            result = std::move(_job.getResult());
-            int resultCode = result["result"]["resultcode"];
-            LOG(V2_INFO, "SMT %s done, res=%i\n", _job.getUserName().c_str(), resultCode);
-            if (resultCode == 10) bzlaResult = bzla::Result::SAT;
-            if (resultCode == 20) bzlaResult = bzla::Result::UNSAT;
-        }
+        time = Timer::elapsedSeconds() - time;
+        LOG(V2_INFO, "%s rev. %i done - time=%.3fs res=%i\n", _name.c_str(), _revision, time, resultCode);
+        if (resultCode == 10) bzlaResult = bzla::Result::SAT;
+        if (resultCode == 20) bzlaResult = bzla::Result::UNSAT;
 
         if (bzlaResult == bzla::Result::SAT) {
-            if (_params.compressModels()) {
-                _solution = ModelStringCompressor::decompress(result["result"]["solution"].get<std::string>());
-            } else {
-                _solution = result["result"]["solution"].get<std::vector<int>>();
-            }
+            _solution = std::move(solution);
         }
         if (bzlaResult == bzla::Result::UNSAT) {
             _failed_lits.clear();
-            for (int lit : result["result"]["solution"].get<std::vector<int>>()) {
-                _failed_lits.insert(lit);
-            }
+            for (int lit : solution) _failed_lits.insert(lit);
         }
 
         return bzlaResult;
@@ -126,7 +122,7 @@ public:
 
     virtual int32_t value(int32_t lit) override {
         int var = std::abs(lit);
-        assert(var < _solution.size());
+        assert(var < _solution.size() || log_return_false("[ERROR] Solution has size %lu - variable %i queried!\n", _solution.size(), var));
         int val = _solution[var];
         assert(std::abs(val) == var);
         if (val > 0) return 1;

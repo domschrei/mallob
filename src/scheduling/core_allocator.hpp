@@ -6,6 +6,19 @@
 
 class CoreAllocator {
 
+public:
+    class Allocation {
+        int granted {0};
+    public:
+        Allocation(int nbRequested = 0);
+        ~Allocation();
+        int requestCores(int nbRequested);
+        void returnCores(int nbReturned);
+        void returnAllCores();
+        int getNbAllocated() const {return granted;}
+        bool empty() const {return granted == 0;}
+    };
+
 private:
     int _nb_available {0};
 

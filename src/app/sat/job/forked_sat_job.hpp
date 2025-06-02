@@ -11,6 +11,7 @@
 
 #include "app/app_message_subscription.hpp"
 #include "app/job.hpp"
+#include "scheduling/core_allocator.hpp"
 #include "util/sys/shmem_cache.hpp"
 #include "util/params.hpp"
 #include "sat_process_adapter.hpp"
@@ -30,7 +31,7 @@ private:
     static std::atomic_int _static_subprocess_index;
     
     std::atomic_bool _initialized = false;
-    int _cores_allocated {0};
+    CoreAllocator::Allocation _core_alloc;
 
     std::unique_ptr<SatProcessAdapter> _solver;
     int _last_imported_revision = 0;

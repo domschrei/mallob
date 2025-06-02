@@ -11,6 +11,7 @@
 #include "data/serializable.hpp"
 #include "util/params.hpp"
 #include "util/sys/fileutils.hpp"
+#include "util/sys/terminator.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"

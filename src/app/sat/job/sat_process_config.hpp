@@ -4,12 +4,8 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sstream>
-#include <iostream>
 #include <string>
 
-#include "util/params.hpp"
-
-class Job; // forward definition
 class Parameters;
 
 struct SatProcessConfig {
@@ -29,7 +25,6 @@ struct SatProcessConfig {
     int nbPreviousBalancingEpochs;
 
     SatProcessConfig() {}
-    SatProcessConfig(const Parameters& params, const Job& job, int recoveryIndex);
     SatProcessConfig(const std::string& packed) {
         std::stringstream s_stream(packed);
         std::string substr;
@@ -47,7 +42,11 @@ struct SatProcessConfig {
         getline(s_stream, substr, ','); nbPreviousBalancingEpochs = atoi(substr.c_str());
     }
 
-    std::string getSharedMemId(pid_t pid) const;
+    std::string getSharedMemId(pid_t pid) const {
+        return  "/edu.kit.iti.mallob." + std::to_string(pid) + "." 
+            + std::to_string(mpirank) + ".#" + std::to_string(jobid) 
+            + (recoveryIndex == 0 ? std::string() : "~" + std::to_string(recoveryIndex));
+    }
 
     std::string toString() const {
         std::string out = "";

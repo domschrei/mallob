@@ -18,7 +18,7 @@ struct CadicalTerminator : public CaDiCaL::Terminator {
         double elapsed = time - _lastTermCallbackTime;
         _lastTermCallbackTime = time;
 
-        if (_stop) {
+        if (_stop || (_ext_terminator && _ext_terminator())) {
             LOGGER(_logger, V4_VVER, "STOP (%.2fs since last cb)\n", elapsed);
             return true;
         }
@@ -32,8 +32,13 @@ struct CadicalTerminator : public CaDiCaL::Terminator {
         _stop = 0;
     }
 
+    void setExternalTerminator(const std::function<bool(void)>& ext) {
+        _ext_terminator = ext;
+    }
+
 private:
     Logger &_logger;
     double _lastTermCallbackTime;
     int _stop = 0;
+    std::function<bool(void)> _ext_terminator;
 };

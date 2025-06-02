@@ -18,6 +18,7 @@
 #include "util/spsc_blocking_ringbuffer.hpp"
 #include "util/sys/background_worker.hpp"
 #include "util/assert.hpp"
+#include "util/sys/proc.hpp"
 
 class BiDirectionalAnytimePipeShmem {
 

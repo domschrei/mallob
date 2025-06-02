@@ -85,8 +85,8 @@ struct SolverSetup {
 	size_t anticipatedLitsToImportPerCycle {1000};
 	bool resetLbdBeforeImport {false};
 	bool incrementLbdBeforeImport {false};
-	int randomizeLbdBeforeImport;
-	bool adaptiveImportManager;
+	int randomizeLbdBeforeImport {false};
+	bool adaptiveImportManager {true};
 
 
 	// Certified UNSAT and proof production
