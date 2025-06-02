@@ -11,9 +11,9 @@
 #include <unistd.h>
 #include <vector>
 
-#include "app/maxsat/internal_sat_job_stream_processor.hpp"
-#include "app/maxsat/mallob_sat_job_stream_processor.hpp"
-#include "app/maxsat/sat_job_stream.hpp"
+#include "app/sat/stream/internal_sat_job_stream_processor.hpp"
+#include "app/sat/stream/mallob_sat_job_stream_processor.hpp"
+#include "app/sat/stream/sat_job_stream.hpp"
 #include "bitwuzla/cpp/sat_solver.h"
 #include "data/job_description.hpp"
 #include "interface/api/api_connector.hpp"

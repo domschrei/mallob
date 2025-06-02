@@ -4,8 +4,6 @@
 #include <algorithm>
 #include <cstdlib>
 #include <stdlib.h>
-#include <fstream>
-#include <ostream>
 #include <string>
 #include <unistd.h>
 #include <utility>

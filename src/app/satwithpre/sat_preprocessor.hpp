@@ -80,7 +80,7 @@ public:
 
     bool done() {
         int nbRunning = _nb_running.load(std::memory_order_relaxed);
-        if (nbRunning < _core_alloc.getNbAllocated())
+        if (nbRunning >= 0 && nbRunning < _core_alloc.getNbAllocated())
             _core_alloc.returnCores(_core_alloc.getNbAllocated() - nbRunning);
         bool done = nbRunning == 0;
         if (done) _nb_running.store(-1, std::memory_order_relaxed);

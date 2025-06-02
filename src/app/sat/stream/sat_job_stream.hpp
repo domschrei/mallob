@@ -8,7 +8,7 @@
 #include <utility>
 #include <vector>
 
-#include "app/maxsat/sat_job_stream_processor.hpp"
+#include "sat_job_stream_processor.hpp"
 #include "data/checksum.hpp"
 #include "util/assert.hpp"
 #include "util/sys/background_worker.hpp"

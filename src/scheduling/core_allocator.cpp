@@ -12,6 +12,7 @@ int CoreAllocator::Allocation::requestCores(int nbRequested) {
     return nbGranted;
 }
 void CoreAllocator::Allocation::returnCores(int nbReturned) {
+    assert(nbReturned <= granted);
     ProcessWideCoreAllocator::get().returnCores(nbReturned);
     granted -= nbReturned;
 }

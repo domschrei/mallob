@@ -5,12 +5,11 @@
 #include "app/maxsat/encoding/generalized_totalizer.hpp"
 #include "app/maxsat/encoding/polynomial_watchdog.hpp"
 #include "app/maxsat/encoding/warners_adder.hpp"
-#include "app/maxsat/internal_sat_job_stream_processor.hpp"
-#include "app/maxsat/mallob_sat_job_stream_processor.hpp"
+#include "app/sat/stream/internal_sat_job_stream_processor.hpp"
+#include "app/sat/stream/mallob_sat_job_stream_processor.hpp"
 #include "app/maxsat/maxsat_instance.hpp"
-#include "app/maxsat/sat_job_stream.hpp"
+#include "app/sat/stream/sat_job_stream.hpp"
 #include "app/maxsat/solution_writer.hpp"
-#include "app/sat/data/model_string_compressor.hpp"
 #include "app/sat/data/theories/integer_term.hpp"
 #include "app/sat/data/theories/theory_specification.hpp"
 #include "app/sat/job/sat_constants.h"
@@ -22,7 +21,6 @@
 #include "util/sys/thread_pool.hpp"
 
 #include <climits>
-#include <fstream>
 #include <memory>
 #include <unistd.h>
 
