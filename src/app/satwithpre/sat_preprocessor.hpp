@@ -76,6 +76,9 @@ public:
     }
 
     bool done() {
+        // Did we already find a result?
+        if (_solver_result.load(std::memory_order_relaxed) != 0)
+            return true;
         bool done = _nb_running.load(std::memory_order_relaxed) == 0;
         if (done) _nb_running.store(-1, std::memory_order_relaxed);
         return done;
