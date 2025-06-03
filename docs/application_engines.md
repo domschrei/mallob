@@ -41,7 +41,7 @@ All options defined after this definition and before the next group definition a
 
 ## `register.hpp`
 
-A typical `register.hpp` looks as follows:
+A typical `register.hpp` for a **regular** application engine looks as follows:
 
 ```C++
 #pragma once
@@ -54,7 +54,7 @@ void register_mallob_app_yourappkey() {
     // The latter expects a ClientSideProgramCreator instead of a JobCreator.
     // See `src/app/app_registry.hpp` for details.
     app_registry::registerApplication(
-        // your key in all caps goes here
+        // your key in all caps (!) goes here
         "YOURAPPKEY", 
 
         // Job reader: Given a number of input files and a JobDescription instance,
@@ -100,7 +100,32 @@ Your job reading should return with a `bool` which expresses whether the parsing
 ## Job engine
 
 For regular application engines, the core part is to create a custom subclass of `Job` (see `src/app/job.hpp`) and to implement all of its pure virtual methods. The `dummy` application serves as a basic skeleton and starting point. The application SAT serves as a full-featured example, including non-trivial communication across processes; note however that its job logic is relatively complex due to sub-processing.
-We intend to provide a simplistic, educative and yet well-tested and well-documented example application in the near future.
+
+### Core principles
+
+* Your subclass defines the logic that is being executed _at every process_ allotted for one of your application tasks.
+* The important methods to override begin with `appl_*`. For Mallob's scheduling to remain interactive, these methods should not perform any heavy lifting; they should return within a millisecond or less.
+* The actual execution of a task begins with `appl_start`. In this method, you can assume that the complete job description is present (unless you modified the method `canHandleIncompleteRevision`). Separate threads should be launched to participate in processing the respective task.
+* Communication across processes within a distributed task takes place via the two methods named `appl_communicate`. For outgoing communication, the method without any parameters is called periodically by the MPI process' main thread; here, you can send messages to other processes. For incoming communication, the method with several parameters is called whenever a message arrives that matches the current application context.
+* You may modify the method `getDemand` to have your application signify how many workers it can currently handle. For instance, if your computation is in a stage where only a single worker can be used effectively, the method should return 1. For the default case, you should still call the superclass method `(Job::getDemand)`.
+
+### Communication
+
+The following communication options are available:
+
+* `getJobTree()` returns the primary communication structure of your distributed task, the binary tree of workers. Use this object to find out the current job context's role (e.g., `getJobTree().getIndex()` for this worker's position in the job tree) and to send messages quickly and easily (e.g., `getJobTree().sendToParent()`).
+* For aggregations like MPI all-reduction or all-gather operations, you can create a `JobTreeAllReduction` instance, which provides the logic for a single generic aggregation along the job tree followed by a broadcast of the result.
+* For arbitrary point-to-point messages within your task, you can use the communication structure `getJobComm()` and the rank list provided within to send custom messages via `MyMpi::isend`. Note that this communicator needs to be activated explicitly via `-jcup=<non-zero update interval>` and only represents a snapshot of a task's workers.
+
+Notable details:
+
+* Define your own custom and fresh message tags (integers) for all of your application-specific messages; they are central for the correct and unambiguous dispatching of messages.
+* You may need to explicitly handle messages that your logic previously sent but that turned out to be undeliverable. Such a situation presents itself via an incoming message with the `returnedToSender` flag set.
+
+### Multi-threading
+
+* You can use one or several instances of `BackgroundWorker` to perform long-term background tasks. Mind this object's life time! The destructor joins the associated background thread, but you need to make sure that the background tasks actually gets the memo to terminate (periodically check `worker.continueRunning()` in the background task of `worker`).
+* You can concurrently perform a task by using Mallob's thread pool (`ProcessWideThreadPool::get().addTask`), which also comes with lowered overhead compared to a `BackgroundWorker` if an idle thread is available immediately. Use the `std::future` object returned by the thread pool method to wait for the task to finish (and to ensure that associated resources can be cleaned up).
 
 ## Client-side program
 
