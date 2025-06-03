@@ -94,28 +94,6 @@ void introduceMonoJob(Parameters& params, Client& client) {
     }
 }
 
-bool sweepJobDone = false;
-void introduceSweepJob(Parameters& params, Client& client) {
-    nlohmann::json json = {
-        {"user", "admin"},
-        {"name", "sweep-job"},
-        {"files", {params.monoFilename()}},
-        {"priority", 1.000},
-        {"application", "SWEEP"}
-    };
-    auto result = client.getAPI().submit(json, [&](nlohmann::json& response) {
-        // Job done? => Terminate all processes
-        sweepJobDone = true;
-    });
-
-    if (result != JsonInterface::Result::ACCEPT) {
-        LOG(V0_CRIT, "[ERROR] Cannot introduce sweep job!\n");
-        abort();
-    }
-}
-
-
-
 inline bool doTerminate(Parameters& params, int rank) {
     
     bool terminate = false;
@@ -173,8 +151,6 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     if (params.jobTemplate.isSet() && isClient) {
         streamer = new JobStreamer(params, client->getAPI(), client->getInternalRank());
     }
-
-    printf("Checking for client application\n");
 
     // If a client application is provided, run this application in (a) separate thread(s)
     std::list<BackgroundWorker> clientAppWorkers;

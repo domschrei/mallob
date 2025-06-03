@@ -41,7 +41,7 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
     JobImage* img = nullptr;
 
 
-    printf("ß JsonInterface::handle\n");
+    // printf("ß JsonInterface::handle\n");
 
     auto baseErrorMsg = "[WARN] Rejecting submission %s - reason: %s\n";
 
@@ -261,12 +261,11 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
     metadata.files = std::move(files);
     metadata.dependencies = std::move(idDependencies);
      /*
-      * _job_callback is a function, and is set to be Client::handleNewJob(metadata)
-      * (because it was passed through this way in Client::init())
+      *This now calls
+      *   Client::handleNewJob(metadata) !
       *
-      * Thus, we now call Clien::handleNewJob(metadata)
+      * Because _job_callback was set to be Client::handleNewJob(metadata) by Client::init()
       */
-    printf("ß _job_callback(metadata)\n");
     _job_callback(std::move(metadata));
 
     return ACCEPT;

@@ -178,15 +178,20 @@ void Client::readIncomingJobs() {
                         // store "original" arrival time value as the job's submission time
                         desc->getStatistics().timeOfSubmission = desc->getArrival();
                         desc->getStatistics().timeOfScheduling = Timer::elapsedSeconds();
+                        printf("ß Client Side Job reset\n");
+                        //Set the program
                         clientSideJob.program.reset(
                             app_registry::getClientSideProgramCreator(appId)(_params, getAPI(), *desc)
                         );
+                        printf("ß Client Side Job run\n");
+                        //Run the program
                         clientSideJob.thread->run([&, prog = clientSideJob.program.get(), done, res]() {
                             *res = prog->function();
                             *done = true;
                         });
                     } else {
                         // Enqueue in ready jobs to be scheduled properly
+                        printf("ß Enqueueing new regular job\n");
                         auto lock = _ready_job_lock.getLock();
                         _ready_job_queue.push_back(std::move(foundJob.description));
                         atomics::incrementRelaxed(_num_ready_jobs);
@@ -240,7 +245,8 @@ void Client::handleNewJob(JobMetadata&& data) {
 
     // Introduce new job into "incoming" queue
     printf("ß Client::handleNewJob: enqueuing new job\n");
-    printf("ß Client::handleNewJob: jobName=%s\n", data.jobName.c_str());
+    printf("ß Client::handleNewJob: jobName: %s\n", data.jobName.c_str());
+    printf("ß Client::handleNewJob: app id : %i\n", data.description->getApplicationId());
     data.description->setClientRank(_world_rank);
     {
         auto lock = _arrival_times_lock.getLock();

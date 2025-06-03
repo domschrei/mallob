@@ -17,6 +17,7 @@ struct JobResult;
 namespace app_registry {
 
     struct ClientSideProgram {
+        //function is often mapped to solver->solve()
         std::function<JobResult()> function;
         virtual ~ClientSideProgram() {}
     };

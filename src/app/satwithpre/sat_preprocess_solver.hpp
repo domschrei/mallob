@@ -63,6 +63,10 @@ public:
         _cores_allocated = ProcessWideCoreAllocator::get().requestCores(1);
 
         if (_params.preprocessBalancing() >= 0) submitBaseJob();
+
+         /*
+          *Starts the Kissat & Lingeling preprocessing
+          */
         _prepro.init();
 
         JobResult res;
@@ -70,6 +74,9 @@ public:
         res.revision = 0;
         res.result = RESULT_UNKNOWN;
 
+         /*
+          *Waits for the preprocessing results
+          */
         while (!isTimeoutHit()) {
             if (_base_job_done && !_base_job_digested) {
                 LOG(V3_VERB, "SATWP base done\n");
@@ -285,8 +292,11 @@ private:
     float getAgeSinceActivation() const {
         return Timer::elapsedSeconds() - _time_of_activation;
     }
+
+
     std::string _jobstr;
     const char* toStr() const {
         return _jobstr.c_str();
     }
+
 };
