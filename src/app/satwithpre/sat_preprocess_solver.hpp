@@ -79,7 +79,7 @@ public:
                 if (res.result != 0) break;
             }
             if (_prepro.done()) {
-                // Preprocess solver terminated.
+                // Preprocess solver(s) terminated.
                 LOG(V3_VERB, "SATWP preprocessor done\n");
                 if (_prepro.getResultCode() != 0) {
                     LOG(V3_VERB, "SATWP preprocessor reported result %i\n", _prepro.getResultCode());

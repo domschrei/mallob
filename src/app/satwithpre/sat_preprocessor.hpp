@@ -79,6 +79,10 @@ public:
     }
 
     bool done() {
+        // Did we already find a result?
+        if (_solver_result.load(std::memory_order_relaxed) != 0)
+            return true;
+        // Is every individual solver done?
         int nbRunning = _nb_running.load(std::memory_order_relaxed);
         if (nbRunning >= 0 && nbRunning < _core_alloc.getNbAllocated())
             _core_alloc.returnCores(_core_alloc.getNbAllocated() - nbRunning);
