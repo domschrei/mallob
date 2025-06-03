@@ -13,10 +13,16 @@ class SweepJob : public Job {
 private:
     JobResult _result;
 
+
+    int _my_rank{0};
+    int _my_index{0};
+    bool _is_root{false};
+
+
 public:
-    SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table)
-        : Job(params, setup, table) {}
-    void appl_start() override {}
+    SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table);
+        // : Job(params, setup, table) {}
+    void appl_start() override;
     void appl_suspend() override {}
     void appl_resume() override {}
     void appl_terminate() override {}

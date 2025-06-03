@@ -16,6 +16,8 @@
 #include "util/sys/process.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "util/sys/timer.hpp"
+
+
 KMeansJob::KMeansJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table)
     : Job(params, setup, table) {
 }
