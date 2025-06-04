@@ -10,35 +10,35 @@
 // arrives, the supplied callback is called for each active subscription.
 // The subscription is cleared upon destruction of the MessageSubscription 
 // object.
-class MessageSubscription {
+class CondMessageSubscription {
 
 private:
     int _tag {-1};
-    MessageQueue::CallbackRef _cb_ref;
+    MessageQueue::CondCallbackRef _cb_ref;
 
 public:
     // @param tag the message tag to listen to (see msgtags.h)
     // @param callback the function to call whenever a message with the
     // supplied tag arrives
-    MessageSubscription(int tag, MessageQueue::MsgCallback callback) : _tag(tag) {
-        _cb_ref = MyMpi::getMessageQueue().registerCallback(tag, callback);
+    CondMessageSubscription(int tag, MessageQueue::ConditionalMsgCallback callback) : _tag(tag) {
+        _cb_ref = MyMpi::getMessageQueue().registerConditionalCallback(tag, callback);
     }
     
     // @param tag the message tag to listen to (see msgtags.h)
     // @param callback the function to call whenever a message with the
     // supplied tag arrives
-    MessageSubscription(int tag, void (*callback)(MessageHandle&)) : _tag(tag) {
-        _cb_ref = MyMpi::getMessageQueue().registerCallback(tag, [&, callback](auto& h) {
-            callback(h);
+    CondMessageSubscription(int tag, bool (*callback)(MessageHandle&)) : _tag(tag) {
+        _cb_ref = MyMpi::getMessageQueue().registerConditionalCallback(tag, [&, callback](auto& h) {
+            return callback(h);
         });
     }
     
-    MessageSubscription(MessageSubscription&& moved) {
+    CondMessageSubscription(CondMessageSubscription&& moved) {
         _tag = moved._tag;
         _cb_ref = std::move(moved._cb_ref);
         moved._tag = -1;
     }
-    MessageSubscription& operator=(MessageSubscription&& moved) {
+    CondMessageSubscription& operator=(CondMessageSubscription&& moved) {
         _tag = moved._tag;
         _cb_ref = std::move(moved._cb_ref);
         moved._tag = -1;
@@ -47,11 +47,11 @@ public:
 
     void reset() {
         if (_tag != -1)
-            MyMpi::getMessageQueue().clearCallback(_tag, _cb_ref);
+            MyMpi::getMessageQueue().clearConditionalCallback(_tag, _cb_ref);
         _tag = -1;
     }
 
-    ~MessageSubscription() {
+    ~CondMessageSubscription() {
         reset();
     }
 };

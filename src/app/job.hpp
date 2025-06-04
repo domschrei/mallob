@@ -336,6 +336,17 @@ public:
     void setGroupComm(GroupComm&& comm) {_group_comm = std::move(comm);}
     const GroupComm& getGroupComm() const {return _group_comm;}
 
+    JobMessage getMessageTemplate() const {
+        JobMessage msg;
+        msg.jobId = getId();
+        msg.revision = getRevision();
+        msg.epoch = 0;
+        msg.treeIndexOfSender = getIndex();
+        msg.contextIdOfSender = getContextId();
+        msg.returnedToSender = false;
+        return msg;
+    }
+
     void updateJobBalancingEpoch(int latestEpoch) {
         _latest_balancing_epoch = std::max(_latest_balancing_epoch, latestEpoch);
         if (getJobTree().isRoot() && hasDescription() && getDescription().getFirstBalancingEpoch() < 0) {

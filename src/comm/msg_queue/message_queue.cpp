@@ -93,6 +93,34 @@ MessageQueue::CallbackRef MessageQueue::registerCallback(int tag, const MsgCallb
     return it;
 }
 
+void MessageQueue::initializeConditionalCallbacks(int tag) {
+    // "macro" callback
+    registerCallback(tag, [this](MessageHandle& h) {
+        assert(!h.getRecvData().empty());
+        bool returnedToSender = h.getRecvData().back() != 0;
+        bool accepted {false};
+        for (auto& f : _cond_callbacks.at(h.tag)) {
+            MessageHandle copy(h);
+            if (f(copy)) accepted = true;
+        }
+        if (!accepted && !returnedToSender) {
+            LOG_ADD_DEST(V2_INFO, "[msqq] tag %i : return to sender", h.source, h.tag);
+            h.getRecvData().back() = 1; // returning-to-sender bit
+            MyMpi::isend(h.source, h.tag, h.moveRecvData());
+        }
+    });
+    _cond_callbacks[tag]; // initialize empty list of conditional callbacks
+}
+
+MessageQueue::CondCallbackRef MessageQueue::registerConditionalCallback(int tag, const ConditionalMsgCallback& cb) {
+    assert(_cond_callbacks.count(tag) || log_return_false("[ERROR] Conditional callbacks not initialized for tag %i"
+        " - did you call initializeConditionalCallbacks(tag) before?\n", tag));
+    _cond_callbacks.at(tag).push_back(cb);
+    auto it = _cond_callbacks[tag].end();
+    --it;
+    return it;
+}
+
 void MessageQueue::registerSentCallback(int tag, const SendDoneCallback& cb) {
     if (_send_done_callbacks.count(tag)) {
         LOG(V0_CRIT, "More than one callback for tag %i!\n", tag);
@@ -108,6 +136,9 @@ void MessageQueue::clearCallbacks() {
 
 void MessageQueue::clearCallback(int tag, const CallbackRef& ref) {
     _callbacks[tag].erase(ref);
+}
+void MessageQueue::clearConditionalCallback(int tag, const CondCallbackRef& ref) {
+    _cond_callbacks[tag].erase(ref);
 }
 
 int MessageQueue::send(const DataPtr& data, int dest, int tag) {

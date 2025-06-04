@@ -25,6 +25,7 @@ class MessageQueue {
 
 public:
     typedef std::function<void(MessageHandle&)> MsgCallback;
+    typedef std::function<bool(MessageHandle&)> ConditionalMsgCallback;
     typedef std::function<void(int)> SendDoneCallback;
 
 private:
@@ -70,6 +71,7 @@ private:
     int _default_tag_var = 0;
     int* _current_recv_tag = nullptr;
     int* _current_send_tag = nullptr;
+    robin_hood::unordered_map<int, std::list<ConditionalMsgCallback>> _cond_callbacks;
 
     BackgroundWorker _batch_assembler;
     BackgroundWorker _gc;
@@ -80,10 +82,14 @@ public:
     ~MessageQueue();
 
     typedef std::list<MsgCallback>::iterator CallbackRef;
+    typedef std::list<ConditionalMsgCallback>::iterator CondCallbackRef;
+    void initializeConditionalCallbacks(int tag);
     CallbackRef registerCallback(int tag, const MsgCallback& cb);
+    CondCallbackRef registerConditionalCallback(int tag, const ConditionalMsgCallback& cb);
     void registerSentCallback(int tag, const SendDoneCallback& cb);
     void clearCallbacks();
     void clearCallback(int tag, const CallbackRef& ref);
+    void clearConditionalCallback(int tag, const CondCallbackRef& ref);
     void setCurrentTagPointers(int* recvTag, int* sendTag) {
         _current_recv_tag = recvTag;
         _current_send_tag = sendTag;

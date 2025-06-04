@@ -5,6 +5,7 @@
 #include <functional>
 #include <mutex>
 #include <condition_variable>
+#include <future>
 
 #include "util/assert.hpp"
 
@@ -54,6 +55,19 @@ public:
 	GuardedData(T&& obj) : _obj(std::move(obj)) {}
 	[[nodiscard]] MutexLockedData<T> lock() {
 		return MutexLockedData<T>(_obj, _mtx);
+	}
+};
+
+class Future {
+public:
+	template <typename T>
+	static bool isValidAndReady(std::future<T>& fut) {
+		if (!fut.valid()) return false;
+		return fut.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
+	}
+	template <typename T>
+	static bool isPending(std::future<T>& fut) {
+		return !isValidAndReady(fut);
 	}
 };
 

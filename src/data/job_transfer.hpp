@@ -225,6 +225,8 @@ public:
     std::vector<uint8_t> serialize() const override;
     JobMessage& deserialize(const std::vector<uint8_t>& packed) override;
 
+    void swapSenderReceiver();
+
     void returnToSender(int senderRank, int mpiTag);
 };
 
