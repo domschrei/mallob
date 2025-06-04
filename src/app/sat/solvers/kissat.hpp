@@ -87,6 +87,13 @@ public:
     friend void report_preprocessed_lit(void* state, int lit);
     friend int terminate_callback(void* state);
 
+
+	//Pass-through to access kissat_set_option
+	void set_option_externally(const std::string &option_name, int value);
+
+
+
+
 private:
     void produceClause(int size, int lbd);
     void consumeClause(int** clause, int* size, int* lbd);

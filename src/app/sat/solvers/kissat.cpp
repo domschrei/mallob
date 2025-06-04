@@ -62,6 +62,12 @@ void Kissat::addLiteral(int lit) {
     numVars = std::max(numVars, std::abs(lit));
 }
 
+//Pass-through
+void Kissat::set_option_externally(const std::string &option_name, int value) {
+    kissat_set_option(solver, option_name.c_str(), value);
+}
+
+
 void Kissat::diversify(int seed) {
 
     if (seedSet) return;

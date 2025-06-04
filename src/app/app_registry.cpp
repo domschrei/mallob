@@ -59,7 +59,7 @@ namespace app_registry {
     ) {
         int appId = _app_entries.size();
         _app_key_to_app_id[key] = appId;
-        std::cout << "Registered application id=" << appId << " key=" << key << std::endl;
+        // std::cout << "Registered application id=" << appId << " key=" << key << std::endl;
 
         AppEntry entry;
         entry.key = key;

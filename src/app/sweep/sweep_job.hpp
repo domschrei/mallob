@@ -3,8 +3,7 @@
 #define DOMPASCH_MALLOB_SWEEP_JOB_HPP
 
 #include "app/job.hpp"
-
-
+#include "../sat/solvers/kissat.hpp"
 
 
 
@@ -17,6 +16,9 @@ private:
     int _my_rank{0};
     int _my_index{0};
     bool _is_root{false};
+
+    uint8_t* _data;
+	std::shared_ptr<Kissat> _swissat;
 
 
 public:

@@ -489,6 +489,8 @@ void SchedulingManager::handleRejectionOfDirectedRequest(MessageHandle& handle) 
 
 void SchedulingManager::handleAnswerToAdoptionOffer(MessageHandle& handle) {
 
+    printf("ß in Scheduling Manager: handle Answer\n");
+
     IntVec vec = Serializable::get<IntVec>(handle.getRecvData());
     int jobId = vec[0];
     int requestedNodeIndex = vec[1];

@@ -76,7 +76,7 @@ void Client::readIncomingJobs() {
         bool foundAJob = false;
         for (auto& data : _incoming_job_queue) {
 
-            printf("ß looping through incoming job queue\n");
+            // printf("ß looping through incoming job queue\n");
             // Jobs are sorted by arrival:
             // If this job has not arrived yet, then none have arrived yet
             if (time < data.description->getArrival()) {
@@ -244,9 +244,10 @@ void Client::handleNewJob(JobMetadata&& data) {
     }
 
     // Introduce new job into "incoming" queue
-    printf("ß Client::handleNewJob: enqueuing new job\n");
-    printf("ß Client::handleNewJob: jobName: %s\n", data.jobName.c_str());
-    printf("ß Client::handleNewJob: app id : %i\n", data.description->getApplicationId());
+    // printf("ß Client::handleNewJob: enqueuing new job\n");
+    // printf("ß Client::handleNewJob: jobName: %s\n", data.jobName.c_str());
+    // printf("ß Client::handleNewJob: app id : %i\n", data.description->getApplicationId());
+
     data.description->setClientRank(_world_rank);
     {
         auto lock = _arrival_times_lock.getLock();

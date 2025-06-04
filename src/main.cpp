@@ -80,13 +80,13 @@ void introduceMonoJob(Parameters& params, Client& client) {
         json["cpu-limit"] = std::to_string(params.jobCpuLimit()) + "s";
     }
 
-    printf("ß introduceMonoJob :: submitting json\n");
+    // printf("ß introduceMonoJob :: submitting json\n");
 
     auto result = client.getAPI().submit(json, [&](nlohmann::json& response) {
         // Job done? => Terminate all processes
         monoJobDone = true;
     });
-    printf("ß introduceMonoJob :: finished submitting json\n");
+    // printf("ß introduceMonoJob :: finished submitting json\n");
 
     if (result != JsonInterface::Result::ACCEPT) {
         LOG(V0_CRIT, "[ERROR] Cannot introduce mono job!\n");
@@ -177,7 +177,7 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
 
 
 
-    printf("ß Starting main loop\n");
+    // printf("ß Starting main loop\n");
     // Main loop
     while (true) {
 
