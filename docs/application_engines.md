@@ -91,9 +91,52 @@ In the following sections we shed more light on how to properly realize the job 
 
 ## Job reader
 
-Given a number of input files and a mutable JobDescription instance, parse the files and serialize the job described by the files. A serialization of a job in Mallob is a flat sequence of 32-bit integer or float numbers which describe the job's entire payload. Push individual numbers to this serialization using `desc.addPermanentData()`.
+Given a number of input files and a mutable JobDescription instance, parse the files and serialize the job described by the files. Here is a simple parsing example:
+```C++
+bool MyNewReader::read(const std::vector<std::string>& filenames, JobDescription& desc) {
+    std::ifstream ifile(filenames[0].c_str(), std::ios::in);
+    std::string line;
+    int variables = 0;
+    int clauses = 0;
+    //Read header
+    while (std::getline(ifile, line)) {
+        if (line.empty()) continue;
+        if (line[0] == 'c') continue;
+        if (line[0] == 'p') {
+            std::istringstream iss(line);
+            std::string tmp;
+            iss >> tmp;
+            iss >> tmp;
+            iss >> variables;
+            iss >> clauses;
+            break;
+        }
+    }
+    //Store header information
+    auto& config = desc.getAppConfiguration();
+    config.updateFixedSizeEntry("__NC", clauses);
+    config.updateFixedSizeEntry("__NV", variables);
+
+    //Parse the formula
+    desc.beginInitialization(0);
+    int lit;
+    while (ifile >> lit) {
+        desc.addPermanentData(lit);
+    }
+    //Parsing finished
+    desc.endInitialization();
+    ifile.close();
+
+    //read was successful
+    return true;
+}
+```
+
+A serialization of a job in Mallob is a flat sequence of 32-bit integer or float numbers which describe the job's entire payload. Push individual numbers to this serialization using `desc.addPermanentData()`. This parsing needs to be initiated with `desc.beginInitialization(0)` and finished with `desc.endInitialization()`.
 
 For incremental jobs, there is a second kind of serialization for each job revision introduced, which can be pushed to via `desc.addTransientData()`. The purpose of this serialization is to describe parts of the job payload which are to be acknowledged only for this very revision whereas data pushed via `addPermanentData()` is a fixed part of all subsequent revisions as well. This subdivision into two different serializations is purely for convenience; you may completely ignore this second kind of serialization and encode everything via `addPermanentData()`.
+
+Some global parameters can be stored seperately in the AppConfiguration via `config.updateFixedSizeEntry()`. Such stores need to be done **before** calling `desc.beginInitialization(0)`, otherwise the Job might not be scheduled correctly (as then the AppConfiguration and serialized data are no longer clearly separated).
 
 Your job reading should return with a `bool` which expresses whether the parsing was successful. In case of returning false, please log some warning or error message describing what happened.
 
