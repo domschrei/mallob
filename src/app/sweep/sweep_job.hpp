@@ -10,8 +10,7 @@
 class SweepJob : public Job {
 
 private:
-    JobResult _result;
-
+    JobResult _internal_result;
 
     int _my_rank{0};
     int _my_index{0};
@@ -20,6 +19,7 @@ private:
     uint8_t* _data;
 	std::shared_ptr<Kissat> _swissat;
 
+    int _solved_status{-1};
 
 public:
     SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table);
@@ -28,8 +28,8 @@ public:
     void appl_suspend() override {}
     void appl_resume() override {}
     void appl_terminate() override {}
-    int appl_solved() override {return -1;}
-    JobResult&& appl_getResult() override {return std::move(_result);}
+    int appl_solved() override {return _solved_status;}
+    JobResult&& appl_getResult() override {return std::move(_internal_result);}
     void appl_communicate() override {}
     void appl_communicate(int source, int mpiTag, JobMessage& msg) override {}
     void appl_dumpStats() override {}

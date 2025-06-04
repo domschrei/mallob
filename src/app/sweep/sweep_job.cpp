@@ -10,8 +10,6 @@
 
 SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table)
     : Job(params, setup, table) {
-
-	printf("ß sanity\n");
 }
 
 
@@ -33,11 +31,12 @@ void SweepJob::appl_start() {
 	setup.numVars = desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
 	setup.numOriginalClauses = desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
 	// setup.numOriginalClauses = desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
-	printf("Payload: %i vars, %i clauses \n", setup.numVars, setup.numOriginalClauses);
+	printf("ß [%i] Payload: %i vars, %i clauses \n", _my_index, setup.numVars, setup.numOriginalClauses);
 
 	_swissat.reset(new Kissat(setup));
 
 	_swissat->set_option_externally("globalId", _my_index);
+	_swissat->set_option_externally("globalNumSolvers", 4); //hardcoded 4 solvers for now
 	_swissat->set_option_externally("quiet", 1);
 
 	const int* lits = getDescription().getFormulaPayload(0);
@@ -46,5 +45,15 @@ void SweepJob::appl_start() {
 		_swissat->addLiteral(lits[i]);
 	}
 	int res = _swissat->solve(0, nullptr);
-	printf("Swissat result: %i\n", res);
+	printf("ß [%i] Swissat result: %i\n", _my_index, res);
+
+	// sleep(20);
+	// printf("ß [%i] Swissat result written internally\n", _my_index);
+	// _solved_status = 1;
+	_internal_result.id = getId();
+    _internal_result.revision = getRevision();
+    _internal_result.result=res;
+	auto dummy_solution = std::vector<int>(1,0);
+	_internal_result.setSolutionToSerialize((int*)(dummy_solution.data()), dummy_solution.size());
 }
+
