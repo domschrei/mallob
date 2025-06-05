@@ -92,14 +92,20 @@ In the following sections we shed more light on how to properly realize the job 
 ## Job reader
 
 Given a number of input files and a mutable JobDescription instance, parse the files and serialize the job described by the files. A serialization of a job in Mallob is a flat sequence of 32-bit integer or float numbers which describe the job's entire payload. Push individual numbers to this serialization using `desc.addPermanentData()`.
-
-For incremental jobs, there is a second kind of serialization for each job revision introduced, which can be pushed to via `desc.addTransientData()`. The purpose of this serialization is to describe parts of the job payload which are to be acknowledged only for this very revision whereas data pushed via `addPermanentData()` is a fixed part of all subsequent revisions as well. This subdivision into two different serializations is purely for convenience; you may completely ignore this second kind of serialization and encode everything via `addPermanentData()`.
+For the exact sequence of statements needed, please take a quick look at [dummy_reader.cpp](/src/app/dummy/dummy_reader.cpp).
 
 Your job reading should return with a `bool` which expresses whether the parsing was successful. In case of returning false, please log some warning or error message describing what happened.
 
 ## Job engine
 
-For regular application engines, the core part is to create a custom subclass of `Job` (see `src/app/job.hpp`) and to implement all of its pure virtual methods. The `dummy` application serves as a basic skeleton and starting point. The application SAT serves as a full-featured example, including non-trivial communication across processes; note however that its job logic is relatively complex due to sub-processing.
+For regular application engines, the core part is to create a custom subclass of `Job` (see `src/app/job.hpp`) and to implement all of its pure virtual methods.
+
+The `dummy` application serves as an educative starting point - please take a look at the example implementations in `src/app/dummy/*_example_job.hpp`, which highlight different kinds of job-internal communication. You can run these examples by modifying the job creator in `src/app/dummy/register.hpp` accordingly.
+
+* [pointtopoint_example_job.hpp](/src/app/dummy/pointtopoint_example_job.hpp): A simple example for point-to-point messaging, setting a job's desired resources, and waiting for sufficient resources to become active.
+* [collectives_example_job.hpp](/src/app/dummy/collectives_example_job.hpp): An example for collective operations (broadcast, all-reduction), background computations, and how to properly clean everything up.
+
+The `SAT` application is a more involved example for a full-featured application; its job logic is relatively complex due to sub-processing.
 
 ### Core principles
 
@@ -119,7 +125,7 @@ The following communication options are available:
 
 Notable details:
 
-* Define your own custom and fresh message tags (integers) for all of your application-specific messages; they are central for the correct and unambiguous dispatching of messages.
+* Application-specific messages are represented by instances of `JobMessage`. A message's payload must be given as a vector of integers; serialize your particular data accordingly. Define your own custom and fresh message tags (integers) for all of your application-specific messages; they are central for correct and unambiguous dispatching.
 * You may need to explicitly handle messages that your logic previously sent but that turned out to be undeliverable. Such a situation presents itself via an incoming message with the `returnedToSender` flag set.
 
 ### Multi-threading
