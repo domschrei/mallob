@@ -92,9 +92,53 @@ In the following sections we shed more light on how to properly realize the job 
 ## Job reader
 
 Given a number of input files and a mutable JobDescription instance, parse the files and serialize the job described by the files. A serialization of a job in Mallob is a flat sequence of 32-bit integer or float numbers which describe the job's entire payload. Push individual numbers to this serialization using `desc.addPermanentData()`.
-For the exact sequence of statements needed, please take a quick look at [dummy_reader.cpp](/src/app/dummy/dummy_reader.cpp).
+
+Some global parameters can be stored seperately in the AppConfiguration via `desc.getAppConfiguration().updateFixedSizeEntry()`. Such stores need to be done **before** calling `desc.beginInitialization(0)`, otherwise the Job might not be scheduled correctly (as then the AppConfiguration and serialized data are no longer clearly separated).
 
 Your job reading should return with a `bool` which expresses whether the parsing was successful. In case of returning false, please log some warning or error message describing what happened.
+
+For the exact sequence of statements needed, please take a quick look at [dummy_reader.cpp](/src/app/dummy/dummy_reader.cpp) or at the following example:
+
+```C++
+bool MyNewReader::read(const std::vector<std::string>& filenames, JobDescription& desc) {
+    // Parse header
+    std::ifstream ifile(filenames[0].c_str(), std::ios::in);
+    std::string line;
+    int variables = 0;
+    int clauses = 0;
+    while (std::getline(ifile, line)) {
+        if (line.empty()) continue;
+        if (line[0] == 'c') continue;
+        if (line[0] == 'p') {
+            std::istringstream iss(line);
+            std::string tmp;
+            iss >> tmp;
+            iss >> tmp;
+            iss >> variables;
+            iss >> clauses;
+            break;
+        }
+    }
+    // Store header information - must be done **before** desc.beginInitialization !
+    auto& config = desc.getAppConfiguration();
+    config.updateFixedSizeEntry("__NC", clauses);
+    config.updateFixedSizeEntry("__NV", variables);
+
+    // Parse the formula
+    desc.beginInitialization(0);
+    int lit;
+    while (ifile >> lit) {
+        desc.addPermanentData(lit);
+    }
+
+    // Conclude parsing
+    desc.endInitialization();
+    ifile.close();
+
+    // read was successful
+    return true;
+}
+```
 
 ## Job engine
 
