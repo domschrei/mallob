@@ -99,12 +99,15 @@ void MessageQueue::initializeConditionalCallbacks(int tag) {
         assert(!h.getRecvData().empty());
         bool returnedToSender = h.getRecvData().back() != 0;
         bool accepted {false};
-        for (auto& f : _cond_callbacks.at(h.tag)) {
+        std::vector<ConditionalMsgCallback> callbacks(_cond_callbacks.at(h.tag).begin(),
+            _cond_callbacks.at(h.tag).end());
+        for (auto& f : callbacks) {
+            LOG(V5_DEBG, "[msgq] try cb for tag=%i\n", h.tag);
             MessageHandle copy(h);
             if (f(copy)) accepted = true;
         }
         if (!accepted && !returnedToSender) {
-            LOG_ADD_DEST(V2_INFO, "[msqq] tag %i : return to sender", h.source, h.tag);
+            LOG_ADD_DEST(V5_DEBG, "[msqq] tag %i : return to sender", h.source, h.tag);
             h.getRecvData().back() = 1; // returning-to-sender bit
             MyMpi::isend(h.source, h.tag, h.moveRecvData());
         }

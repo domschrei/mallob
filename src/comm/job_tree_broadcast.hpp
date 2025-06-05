@@ -12,24 +12,27 @@ class JobTreeBroadcast {
 
 private:
     const int _job_id;
-    const JobTree& _tree;
+    JobTreeSnapshot _tree;
     int _internal_msg_tag;
     CondMessageSubscription _sub_broadcast;
 
     bool _received_broadcast {false};
     JobMessage _msg;
-    JobTreeSnapshot _snapshot;
     bool _received_response_left {false};
     bool _received_response_right {false};
     bool _result_extracted {false};
+
+    std::function<void()> _cb;
 
 public:
     // jobId : Job ID this broadcast is associated with
     // tree : JobTree instance of the associated worker
     // internalMsgTag: positive integer that must be consistent across all participating workers,
     //   or alternatively -1 (default) to match *any* broadcast going on in this job.
-    JobTreeBroadcast(int jobId, JobTree& tree, int internalMsgTag = -1) : _job_id(jobId), _tree(tree), _internal_msg_tag(internalMsgTag),
-        _sub_broadcast(MSG_JOB_TREE_ISOLATED_BROADCAST, [&](MessageHandle& h) {return receiveMessage(h);}) {
+    JobTreeBroadcast(int jobId, const JobTreeSnapshot& tree, std::function<void()> callback = []() {}, int internalMsgTag = -1) :
+        _job_id(jobId), _tree(tree), _internal_msg_tag(internalMsgTag),
+        _sub_broadcast(MSG_JOB_TREE_MODULAR_BROADCAST, [&](MessageHandle& h) {return receiveMessage(h);}) {
+        _cb = callback;
     }
 
     void broadcast(JobMessage&& msg, bool rootOfBcast = true) {
@@ -42,13 +45,12 @@ public:
 
         LOG(V2_INFO, "received broadcast\n");
         _received_broadcast = true;
-        _snapshot = _tree.getSnapshot();
 
         assert(!_msg.returnedToSender);
-        _tree.sendToAnyChildren(_msg, MSG_JOB_TREE_ISOLATED_BROADCAST);
+        _tree.sendToAnyChildren(_msg, MSG_JOB_TREE_MODULAR_BROADCAST);
 
-        if (_snapshot.leftChildNodeRank < 0) _received_response_left = true;
-        if (_snapshot.rightChildNodeRank < 0) _received_response_right = true;
+        if (_tree.leftChildNodeRank < 0) _received_response_left = true;
+        if (_tree.rightChildNodeRank < 0) _received_response_right = true;
 
         if (!rootOfBcast) {
             // Create response message without copying the original message's payload
@@ -56,8 +58,15 @@ public:
             JobMessage response(_msg);
             _msg.payload = std::move(payload);
 
-            _tree.sendToParent(_msg, MSG_JOB_TREE_ISOLATED_BROADCAST);
+            _tree.sendToParent(_msg, MSG_JOB_TREE_MODULAR_BROADCAST);
         }
+
+        if (hasResult()) _cb(); // callback
+    }
+
+    void updateJobTree(const JobTree& tree) {
+        if (_received_broadcast) return;
+        _tree = tree.getSnapshot();
     }
 
     bool hasResult() {
@@ -69,8 +78,7 @@ public:
         return std::move(_msg);
     }
     const JobTreeSnapshot& getJobTreeSnapshot() {
-        assert(hasResult());
-        return _snapshot;
+        return _tree;
     }
 
     int getMessageTag() const {
@@ -88,24 +96,27 @@ private:
         // Undeliverable message being returned?
         if (msg.returnedToSender) {
             // prune child
-            if (h.source == _snapshot.leftChildNodeRank) {
-                _snapshot.leftChildNodeRank = -1;
+            if (h.source == _tree.leftChildNodeRank) {
+                _tree.leftChildNodeRank = -1;
                 _received_response_left = true;
             }
-            if (h.source == _snapshot.rightChildNodeRank) {
-                _snapshot.rightChildNodeRank = -1;
+            if (h.source == _tree.rightChildNodeRank) {
+                _tree.rightChildNodeRank = -1;
                 _received_response_right = true;
             }
+            if (hasResult()) _cb(); // callback
             return true;
         }
 
         // Response from child?
-        if (_received_broadcast && h.source == _snapshot.leftChildNodeRank) {
+        if (_received_broadcast && h.source == _tree.leftChildNodeRank) {
             _received_response_left = true;
+            if (hasResult()) _cb(); // callback
             return true;
         }
-        if (_received_broadcast && h.source == _snapshot.rightChildNodeRank) {
+        if (_received_broadcast && h.source == _tree.rightChildNodeRank) {
             _received_response_right = true;
+            if (hasResult()) _cb(); // callback
             return true;
         }
 

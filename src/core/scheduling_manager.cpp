@@ -139,7 +139,8 @@ SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm,
     _subscriptions.emplace_back(MSG_SCHED_RETURN_NODES, localSchedulerCb);
 
     // Initialize conditional callbacks
-    MyMpi::getMessageQueue().initializeConditionalCallbacks(MSG_JOB_TREE_ISOLATED_BROADCAST);
+    MyMpi::getMessageQueue().initializeConditionalCallbacks(MSG_JOB_TREE_MODULAR_REDUCE);
+    MyMpi::getMessageQueue().initializeConditionalCallbacks(MSG_JOB_TREE_MODULAR_BROADCAST);
 }
 
 RequestMatcher* SchedulingManager::createRequestMatcher() {
