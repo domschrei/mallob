@@ -367,13 +367,13 @@ public:
         return snapshot;
     }
 
-private:
     void send(int dest, int mpiTag, JobMessage& msg) const {
         msg.treeIndexOfSender = getIndex();
         msg.contextIdOfSender = _ctx_id;
         MyMpi::isend(dest, mpiTag, msg);
     }
 
+private:
     void setDesire(float& member, float time) {
         if (member == -1) {
             // new desire

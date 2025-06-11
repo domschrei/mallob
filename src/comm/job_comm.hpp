@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "data/job_transfer.hpp"
+#include "util/logger.hpp"
 #include "util/sys/timer.hpp"
 #include "app/job_tree.hpp"
 #include "comm/msgtags.h"
@@ -38,6 +39,7 @@ public:
                 ctx_id_t ctxId;
                 memcpy(&ctxId, packed.data()+i+1, sizeof(ctx_id_t));
                 list.push_back({rank, ctxId});
+                i += 3;
             }
             return *this;
         }
@@ -164,7 +166,6 @@ public:
     }
 
     bool handle(JobMessage& msg) {
-
         if (msg.returnedToSender) return false;
 
         if (msg.tag == MSG_AGGREGATE_RANKLIST) {

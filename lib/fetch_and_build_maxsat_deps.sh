@@ -18,20 +18,13 @@ cp target/release/librustsat_capi.a librustsat.a
 cd ..
 
 if [ ! -d maxpre-mallob ]; then
-    # once public
-    #if [ ! -f maxpre-mallob.zip ]; then
-    #    # for fixing a branch instead of a commit, prepend "refs/heads/"
-    #    branchorcommit="791ab9de0169d379c41de2b76282eda405d1b9c8"
-    #    wget -nc https://github.com/domschrei/maxpre-mallob/archive/${branchorcommit}.zip -O maxpre-mallob.zip
-    #fi
-    #unzip maxpre-mallob.zip
-    #mv maxpre-mallob-* maxpre-mallob
-
-    # still private
-    git clone git@github.com:domschrei/maxpre-mallob.git
-    cd maxpre-mallob
-    git checkout 791ab9de0169d379c41de2b76282eda405d1b9c8
-    cd ..
+    if [ ! -f maxpre-mallob.zip ]; then
+        # for fixing a branch instead of a commit, prepend "refs/heads/"
+        branchorcommit="ccd759aab16dae3d8e74f021d0955d17c424ed38"
+        wget -nc https://github.com/jezberg/maxpre-mallob/archive/${branchorcommit}.zip -O maxpre-mallob.zip
+    fi
+    unzip maxpre-mallob.zip
+    mv maxpre-mallob-* maxpre-mallob
 fi
 cd maxpre-mallob
 make lib with_zlib=false

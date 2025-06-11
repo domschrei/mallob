@@ -41,7 +41,7 @@ All options defined after this definition and before the next group definition a
 
 ## `register.hpp`
 
-A typical `register.hpp` looks as follows:
+A typical `register.hpp` for a **regular** application engine looks as follows:
 
 ```C++
 #pragma once
@@ -54,7 +54,7 @@ void register_mallob_app_yourappkey() {
     // The latter expects a ClientSideProgramCreator instead of a JobCreator.
     // See `src/app/app_registry.hpp` for details.
     app_registry::registerApplication(
-        // your key in all caps goes here
+        // your key in all caps (!) goes here
         "YOURAPPKEY", 
 
         // Job reader: Given a number of input files and a JobDescription instance,
@@ -93,14 +93,89 @@ In the following sections we shed more light on how to properly realize the job 
 
 Given a number of input files and a mutable JobDescription instance, parse the files and serialize the job described by the files. A serialization of a job in Mallob is a flat sequence of 32-bit integer or float numbers which describe the job's entire payload. Push individual numbers to this serialization using `desc.addPermanentData()`.
 
-For incremental jobs, there is a second kind of serialization for each job revision introduced, which can be pushed to via `desc.addTransientData()`. The purpose of this serialization is to describe parts of the job payload which are to be acknowledged only for this very revision whereas data pushed via `addPermanentData()` is a fixed part of all subsequent revisions as well. This subdivision into two different serializations is purely for convenience; you may completely ignore this second kind of serialization and encode everything via `addPermanentData()`.
+Some global parameters can be stored seperately in the AppConfiguration via `desc.getAppConfiguration().updateFixedSizeEntry()`. Such stores need to be done **before** calling `desc.beginInitialization(0)`, otherwise the Job might not be scheduled correctly (as then the AppConfiguration and serialized data are no longer clearly separated).
 
 Your job reading should return with a `bool` which expresses whether the parsing was successful. In case of returning false, please log some warning or error message describing what happened.
 
+For the exact sequence of statements needed, please take a quick look at [dummy_reader.cpp](/src/app/dummy/dummy_reader.cpp) or at the following example:
+
+```C++
+bool MyNewReader::read(const std::vector<std::string>& filenames, JobDescription& desc) {
+    // Parse header
+    std::ifstream ifile(filenames[0].c_str(), std::ios::in);
+    std::string line;
+    int variables = 0;
+    int clauses = 0;
+    while (std::getline(ifile, line)) {
+        if (line.empty()) continue;
+        if (line[0] == 'c') continue;
+        if (line[0] == 'p') {
+            std::istringstream iss(line);
+            std::string tmp;
+            iss >> tmp;
+            iss >> tmp;
+            iss >> variables;
+            iss >> clauses;
+            break;
+        }
+    }
+    // Store header information - must be done **before** desc.beginInitialization !
+    auto& config = desc.getAppConfiguration();
+    config.updateFixedSizeEntry("__NC", clauses);
+    config.updateFixedSizeEntry("__NV", variables);
+
+    // Parse the formula
+    desc.beginInitialization(0);
+    int lit;
+    while (ifile >> lit) {
+        desc.addPermanentData(lit);
+    }
+
+    // Conclude parsing
+    desc.endInitialization();
+    ifile.close();
+
+    // read was successful
+    return true;
+}
+```
+
 ## Job engine
 
-For regular application engines, the core part is to create a custom subclass of `Job` (see `src/app/job.hpp`) and to implement all of its pure virtual methods. The `dummy` application serves as a basic skeleton and starting point. The application SAT serves as a full-featured example, including non-trivial communication across processes; note however that its job logic is relatively complex due to sub-processing.
-We intend to provide a simplistic, educative and yet well-tested and well-documented example application in the near future.
+For regular application engines, the core part is to create a custom subclass of `Job` (see `src/app/job.hpp`) and to implement all of its pure virtual methods.
+
+The `dummy` application serves as an educative starting point - please take a look at the example implementations in `src/app/dummy/*_example_job.hpp`, which highlight different kinds of job-internal communication. You can run these examples by modifying the job creator in `src/app/dummy/register.hpp` accordingly.
+
+* [pointtopoint_example_job.hpp](/src/app/dummy/pointtopoint_example_job.hpp): A simple example for point-to-point messaging, setting a job's desired resources, and waiting for sufficient resources to become active.
+* [collectives_example_job.hpp](/src/app/dummy/collectives_example_job.hpp): An example for collective operations (broadcast, all-reduction), background computations, and how to properly clean everything up.
+
+The `SAT` application is a more involved example for a full-featured application; its job logic is relatively complex due to sub-processing.
+
+### Core principles
+
+* Your subclass defines the logic that is being executed _at every process_ allotted for one of your application tasks.
+* The important methods to override begin with `appl_*`. For Mallob's scheduling to remain interactive, these methods should not perform any heavy lifting; they should return within a millisecond or less.
+* The actual execution of a task begins with `appl_start`. In this method, you can assume that the complete job description is present (unless you modified the method `canHandleIncompleteRevision`). Separate threads should be launched to participate in processing the respective task.
+* Communication across processes within a distributed task takes place via the two methods named `appl_communicate`. For outgoing communication, the method without any parameters is called periodically by the MPI process' main thread; here, you can send messages to other processes. For incoming communication, the method with several parameters is called whenever a message arrives that matches the current application context.
+* You may modify the method `getDemand` to have your application signify how many workers it can currently handle. For instance, if your computation is in a stage where only a single worker can be used effectively, the method should return 1. For the default case, you should still call the superclass method `(Job::getDemand)`.
+
+### Communication
+
+The following communication options are available:
+
+* `getJobTree()` returns the primary communication structure of your distributed task, the binary tree of workers. Use this object to find out the current job context's role (e.g., `getJobTree().getIndex()` for this worker's position in the job tree) and to send messages quickly and easily (e.g., `getJobTree().sendToParent()`).
+* For aggregations like MPI all-reduction or all-gather operations, you can create a `JobTreeAllReduction` instance, which provides the logic for a single generic aggregation along the job tree followed by a broadcast of the result.
+* For arbitrary point-to-point messages within your task, you can use the communication structure `getJobComm()` and the rank list provided within to send custom messages via `MyMpi::isend`. Note that this communicator needs to be activated explicitly via `-jcup=<non-zero update interval>` and only represents a snapshot of a task's workers.
+
+Notable details:
+
+* Application-specific messages are represented by instances of `JobMessage`. A message's payload must be given as a vector of integers; serialize your particular data accordingly. Define your own custom and fresh message tags (integers) for all of your application-specific messages; they are central for correct and unambiguous dispatching.
+* You may need to explicitly handle messages that your logic previously sent but that turned out to be undeliverable. Such a situation presents itself via an incoming message with the `returnedToSender` flag set.
+
+### Multi-threading
+
+* You can use one or several instances of `BackgroundWorker` to perform long-term background tasks. Mind this object's life time! The destructor joins the associated background thread, but you need to make sure that the background tasks actually gets the memo to terminate (periodically check `worker.continueRunning()` in the background task of `worker`).
+* You can concurrently perform a task by using Mallob's thread pool (`ProcessWideThreadPool::get().addTask`), which also comes with lowered overhead compared to a `BackgroundWorker` if an idle thread is available immediately. Use the `std::future` object returned by the thread pool method to wait for the task to finish (and to ensure that associated resources can be cleaned up).
 
 ## Client-side program
 

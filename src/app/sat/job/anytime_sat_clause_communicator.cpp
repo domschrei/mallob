@@ -153,6 +153,8 @@ void AnytimeSatClauseCommunicator::communicate() {
 void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& msg) {
 
     if (msg.returnedToSender) {
+        msg.swapSenderReceiver(); // align metadata with the message being a returned one
+
         // Message was sent by myself but was then returned.
         // Handle individual cases.
         LOG(V1_WARN, "%s : msg returned to sender\n", _job->toStr());

@@ -138,9 +138,9 @@ std::vector<uint8_t> JobMessage::serialize() const {
     n = sizeof(int); memcpy(packed.data()+i, &revision, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &tag, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &epoch, n); i += n;
-    n = sizeof(bool); memcpy(packed.data()+i, &returnedToSender, n); i += n;
     n = sizeof(Checksum); memcpy(packed.data()+i, &checksum, n); i += n;
     n = payload.size()*sizeof(int); memcpy(packed.data()+i, payload.data(), n); i += n;
+    n = sizeof(bool); memcpy(packed.data()+i, &returnedToSender, n); i += n;
     return packed;
 }
 
@@ -154,18 +154,22 @@ JobMessage& JobMessage::deserialize(const std::vector<uint8_t>& packed) {
     n = sizeof(int); memcpy(&revision, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&tag, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&epoch, packed.data()+i, n); i += n;
-    n = sizeof(bool); memcpy(&returnedToSender, packed.data()+i, n); i += n;
     n = sizeof(Checksum); memcpy(&checksum, packed.data()+i, n); i += n;
-    n = packed.size()-i; payload.resize(n/sizeof(int)); 
+    n = packed.size()-i-1; payload.resize(n/sizeof(int));
     memcpy(payload.data(), packed.data()+i, n); i += n;
+    n = sizeof(bool); memcpy(&returnedToSender, packed.data()+i, n); i += n;
     return *this;
+}
+
+void JobMessage::swapSenderReceiver() {
+    std::swap(contextIdOfSender, contextIdOfDestination);
+    std::swap(treeIndexOfSender, treeIndexOfDestination);
 }
 
 void JobMessage::returnToSender(int senderRank, int mpiTag) {
     if (returnedToSender) return;
     returnedToSender = true;
-    std::swap(contextIdOfSender, contextIdOfDestination);
-    std::swap(treeIndexOfSender, treeIndexOfDestination);
+    // Do not swap the metadata, since an internal redirection of messages doesn't either
     MyMpi::isend(senderRank, mpiTag, *this);
 }
 
