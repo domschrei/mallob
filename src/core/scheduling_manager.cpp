@@ -207,6 +207,8 @@ void SchedulingManager::handleDemandUpdate(Job& job, int demand) {
 
 void SchedulingManager::checkActiveJob() {
 
+    printf("ß SchedMan Check Active Job\n");
+
     Job &job = _job_registry.getActive();
     int id = job.getId();
     bool isRoot = job.getJobTree().isRoot();
@@ -393,6 +395,8 @@ void SchedulingManager::handleIncomingJobRequest(MessageHandle& handle, JobReque
 }
 
 void SchedulingManager::handleAdoptionOffer(MessageHandle& handle) {
+
+    // printf("ß Handle Adoption Offer\n");
 
     JobAdoptionOffer offer = Serializable::get<JobAdoptionOffer>(handle.getRecvData());
     auto& req = offer.request;

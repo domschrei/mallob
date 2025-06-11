@@ -129,6 +129,11 @@ public:
     }
 
     TreeRelative setChild(int rank, int index, ctx_id_t contextId) {
+        // printf("ß setChild rank %i index %i\n", rank, index);
+        // printf("ß _index %i\n", _index);
+        // printf("ß getLeftChildIndex() %i\n", getLeftChildIndex());
+        // printf("ß getRightChildIndex() %i\n", getRightChildIndex());
+
         assert(rank >= 0);
         if (index == getLeftChildIndex()) {
             setLeftChild(rank, contextId);
