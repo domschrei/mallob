@@ -35,8 +35,8 @@ void SweepJob::appl_start() {
 
 	_swissat.reset(new Kissat(setup));
 
-	_swissat->set_option_externally("globalId", _my_index);
-	_swissat->set_option_externally("globalNumSolvers", 4); //hardcoded 4 solvers for now
+	_swissat->set_option_externally("mallob_solver_id", _my_index);
+	_swissat->set_option_externally("mallob_solver_count", 4); //hardcode 4 solvers for now
 	_swissat->set_option_externally("quiet", 1);
 
 	const int* lits = getDescription().getFormulaPayload(0);
