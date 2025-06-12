@@ -19,7 +19,8 @@ private:
 
     std::shared_ptr<Kissat> _swissat;
     std::future<void> _fut_swissat;
-    std::atomic_int _swissat_running {0};
+    std::atomic_int _swissat_running_count {0};
+
 
 
     static const int MSG_SWEEP = 100; // internal message tag

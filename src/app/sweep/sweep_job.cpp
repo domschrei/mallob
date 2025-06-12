@@ -34,11 +34,12 @@ void SweepJob::appl_start() {
 	_swissat.reset(new Kissat(setup));
 	_swissat->set_option_externally("mallob_solver_id", _my_index);
 	_swissat->set_option_externally("mallob_solver_count", NUM_WORKERS);
-	_swissat->set_option_externally("mallob_custom_verbosity", 0);
+	_swissat->set_option_externally("mallob_custom_sweep_verbosity", 0); //0: No messages. 1: Verbose Messaged.
 	_swissat->set_option_externally("quiet", 1);
 	_swissat->activateLearnedEquivalenceCallback();
-		
-	_swissat_running++;
+
+
+	_swissat_running_count++;
 	_fut_swissat = ProcessWideThreadPool::get().addTask([&]() {
 		LOG(V2_INFO, "Process loading formula  %i \n", _my_index);
 		loadFormulaToSwissat();
@@ -50,7 +51,7 @@ void SweepJob::appl_start() {
 		_internal_result.result=res;
 		auto dummy_solution = std::vector<int>(1,0);
 		_internal_result.setSolutionToSerialize((int*)(dummy_solution.data()), dummy_solution.size());
-		_swissat_running--;
+		_swissat_running_count--;
 	});
 
 
@@ -66,9 +67,6 @@ void SweepJob::appl_start() {
 // Called periodically by the main thread to allow the worker to emit messages.
 void SweepJob::appl_communicate() {
 	// Not enough workers available?
-
-	// printf("ß appl_communicate() %i \n", _my_index);
-
 	if (getJobTree().isRoot() && getVolume() < NUM_WORKERS) {
 		if (getAgeSinceActivation() < 1) return; // wait for up to 1s after appl_start
 		LOG(V2_INFO, "[sweep] Unable to get %i workers within 1 second - giving up\n", NUM_WORKERS);
@@ -78,20 +76,14 @@ void SweepJob::appl_communicate() {
 		return;
 	}
 
-	printf("ß appl_communicate() %i \n",_my_index);
-	// printf("ß rank(0) = %i \n", getJobComm().getWorldRankOrMinusOne(0));
-	// printf("ß rank(1) = %i \n", getJobComm().getWorldRankOrMinusOne(1));
-	// printf("ß rank(2) = %i \n", getJobComm().getWorldRankOrMinusOne(2));
-	// printf("ß rank(3) = %i \n", getJobComm().getWorldRankOrMinusOne(3));
-
+	// LOG(V2_INFO, "[sweep] Equivalences to share: %i \n", _swissat->stored_equivalences.size()/2);
 
 	// Workers available and valid job communicator present?
 	if (getJobTree().isRoot() && getVolume() == NUM_WORKERS && getJobComm().getWorldRankOrMinusOne(NUM_WORKERS-1) >= 0) {
 		// craft a message to initiate sweep communication
 		JobMessage msg = getMessageTemplate();
 		msg.tag = MSG_SWEEP;
-		msg.payload = {0}; // indicates the number of bounces so far
-		// LOG(V2_INFO, "[sweep-%i] starting chain\n", _my_index);
+		msg.payload.clear();
 		advanceSweepMessage(msg);
 	}
 }
@@ -99,11 +91,9 @@ void SweepJob::appl_communicate() {
 
 // React to an incoming message. (This becomes relevant only if you send custom messages)
 void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
-	int bounces = msg.payload[0];
-	// LOG(V2_INFO, "[sweep-%i] read msg: %i bounces\n", _my_index, bounces);
-	if (bounces == NUM_WORKERS-1) {
-		LOG(V2_INFO, "[sweep-%i] chain stopped\n", _my_index);
-		// insertResult(10, std::vector<int>(msg.payload.begin()+1, msg.payload.end()));
+	LOG(V2_INFO, "[sweep] Got %i Equivalences   (%i,%i)...(%i,%i)  \n", msg.payload.size()/2, msg.payload[0], msg.payload[1], msg.payload.end()[-2], msg.payload.end()[-1]);
+	if (_my_index == 0) {
+		LOG(V2_INFO, "[sweep] Chain ended, arrived back to root\n \n");
 	} else {
 		advanceSweepMessage(msg);
 	}
@@ -111,15 +101,22 @@ void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 
 
 void SweepJob::advanceSweepMessage(JobMessage& msg) {
-	int bounces = msg.payload[0];
-	int receiver_index = bounces + 1;
+
+	//Transfer local data to the message
+	LOG(V2_INFO, "[sweep] Add: %i \n", _swissat->stored_equivalences.size()/2);
+	auto &local_eqs = _swissat->stored_equivalences;
+	msg.payload.reserve(msg.payload.size() + local_eqs.size());
+	msg.payload.insert(msg.payload.end(), local_eqs.begin(), local_eqs.end());
+
+	//Now we can delete the equivalences locally, to make place for new ones
+	_swissat->stored_equivalences.clear();
+
+	//Sending data in a circle, in order of the indices
+	int receiver_index = (_my_index + 1) % NUM_WORKERS;
 	int receiver_rank = getJobComm().getWorldRankOrMinusOne(receiver_index);
-	LOG(V2_INFO, "[sweep-%i] send to (%i, %i)\n", _my_index, receiver_index, receiver_rank);
-	msg.payload[0]++;
 	msg.treeIndexOfDestination = receiver_index;
 	msg.contextIdOfDestination = getJobComm().getContextIdOrZero(receiver_index);
 	assert(msg.contextIdOfDestination != 0);
-	// Send
 	getJobTree().send(receiver_rank, MSG_SEND_APPLICATION_MESSAGE, msg);
 }
 

@@ -58,7 +58,7 @@ Kissat::Kissat(const SolverSetup& setup)
         learntClauseBuffer(_setup.strictMaxLitsPerClause+ClauseMetadata::numInts()),
         learntEquivalenceBuffer(10) //Reserve 2 slots for the literals and 8 slots for potential metadata
 {
-
+    stored_equivalences.reserve(MAX_STORED_EQUIVALENCES_SIZE);
     kissat_set_terminate(solver, this, &terminate_callback);
     glueLimit = _setup.strictLbdLimit;
 }
@@ -431,9 +431,15 @@ void Kissat::consumeClause(int** clause, int* size, int* lbd) {
 }
 
 void Kissat::produceEquivalence() {
-    uint lit1 = learntEquivalenceBuffer[0];
-    uint lit2 = learntEquivalenceBuffer[1];
-    printf("ß Exported Equiv. (e%i, e%i)\n", lit1, lit2);
+    int lit1 = learntEquivalenceBuffer[0];
+    int lit2 = learntEquivalenceBuffer[1];
+    if (stored_equivalences.size() < MAX_STORED_EQUIVALENCES_SIZE) {
+        stored_equivalences.push_back(lit1);
+        stored_equivalences.push_back(lit2);
+        // printf("ß Stored Eq (%i, %i) \n", lit1, lit2);
+    } else  {
+        printf("ß Not enough space to store Eq (%i, %i)\n", lit1, lit2);
+    }
 }
 
 

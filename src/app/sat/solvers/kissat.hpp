@@ -27,9 +27,12 @@ private:
 	Mallob::Clause learntClause;
     std::vector<int> producedClause;
 
-	//For parallel sweeping
-	std::vector<int> learntEquivalenceBuffer;
-
+	//For shared sweeping
+	std::vector<int> learntEquivalenceBuffer; //transfer a single equivalence from kissat to Kissat
+    std::vector<int> stored_equivalences; //accumulate equivalences for the next sharing
+	const int MAX_STORED_EQUIVALENCES = 1000;
+	const int MAX_STORED_EQUIVALENCES_SIZE = MAX_STORED_EQUIVALENCES * 2;
+	friend class SweepJob;
 
 	bool interruptionInitialized = false;
     bool interrupted = false;
@@ -69,7 +72,6 @@ public:
 
 	// Set a function that should be called for each learned equivalence by sweeping
 	void activateLearnedEquivalenceCallback();
-
 
 	
 	// Get the number of variables of the formula
