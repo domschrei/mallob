@@ -171,19 +171,19 @@ void Worker::checkJobs() {
     if (!_job_registry.hasActiveJob()) {
         if (_job_registry.isBusyOrCommitted()) {
             // PE is committed but not active
-            printf("ß // PE is committed but not active\n");
+            // printf("ß // PE is committed but not active\n");
             _sys_state.setLocal(SYSSTATE_BUSYRATIO, 1.0f); // busy nodes
             _sys_state.setLocal(SYSSTATE_COMMITTEDRATIO, 1.0f); // committed nodes
         } else {
             // PE is completely idle
-            printf("ß // PE is completely idle (world rank %i).  ", _world_rank);
-            printf("ß load %i, has comittment %i\n", _job_registry.getLoad(), _job_registry.committed());
+            // printf("ß // PE is completely idle (world rank %i).  ", _world_rank);
+            // printf("ß load %i, has comittment %i\n", _job_registry.getLoad(), _job_registry.committed());
             _sys_state.setLocal(SYSSTATE_BUSYRATIO, 0.0f); // busy nodes
             _sys_state.setLocal(SYSSTATE_COMMITTEDRATIO, 0.0f); // committed nodes
         }
         _sys_state.setLocal(SYSSTATE_NUMJOBS, 0.0f); // active jobs
     } else {
-        printf("ß Worker Checking for active Jobb, world rank %i\n", _world_rank);
+        // printf("ß Worker Checking for active Jobb, world rank %i\n", _world_rank);
         checkActiveJob();
     }
     _sched_man.checkSuspendedJobs();

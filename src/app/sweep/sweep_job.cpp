@@ -16,11 +16,10 @@ SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTa
 
 
 void SweepJob::appl_start() {
-	printf("ß appl_start\n");
 	_my_rank = getJobTree().getRank();
 	_my_index = getJobTree().getIndex();
 	_is_root = getJobTree().isRoot();
-	printf("ß Rank %i, Index %i, is root? %i, Parent-Index %i\n", _my_rank, _my_index, _is_root, getJobTree().getParentIndex());
+	printf("ß Appl_start(): is root? %i, Parent-Index %i, Rank %i, Index %i, \n",  _is_root, getJobTree().getParentIndex(), _my_rank, _my_index);
     _metadata = getSerializedDescription(0)->data();
 
 	const JobDescription& desc = getDescription();
@@ -30,7 +29,7 @@ void SweepJob::appl_start() {
 	setup.jobname = "swissat-"+to_string(_my_index);
 	setup.numVars = desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
 	setup.numOriginalClauses = desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
-	printf("ß [%i] Payload: %i vars, %i clauses \n", _my_index, setup.numVars, setup.numOriginalClauses);
+	// printf("ß [%i] Payload: %i vars, %i clauses \n", _my_index, setup.numVars, setup.numOriginalClauses);
 
 	_swissat.reset(new Kissat(setup));
 	_swissat->set_option_externally("mallob_solver_id", _my_index);
@@ -38,23 +37,28 @@ void SweepJob::appl_start() {
 	_swissat->set_option_externally("mallob_custom_verbosity", 0);
 	_swissat->set_option_externally("quiet", 1);
 
-	const int* lits = getDescription().getFormulaPayload(0);
-	const int payload_size = getDescription().getFormulaPayloadSize(0);
-	for (int i = 0; i < payload_size ; i++) {
-		_swissat->addLiteral(lits[i]);
-	}
-	int res = _swissat->solve(0, nullptr);
-	printf("ß [%i] Swissat result: %i\n", _my_index, res);
+
+	_swissat_running++;
+	_fut_swissat = ProcessWideThreadPool::get().addTask([&]() {
+		LOG(V2_INFO, "Process loading formula  %i \n", _my_index);
+		loadFormulaToSwissat();
+		LOG(V2_INFO, "Process starting Swissat %i \n", _my_index);
+		int res = _swissat->solve(0, nullptr);
+		LOG(V2_INFO, "Process finished Swissat %i, result %i\n", _my_index, res);
+		_internal_result.id = getId();
+		_internal_result.revision = getRevision();
+		_internal_result.result=res;
+		auto dummy_solution = std::vector<int>(1,0);
+		_internal_result.setSolutionToSerialize((int*)(dummy_solution.data()), dummy_solution.size());
+		_swissat_running--;
+	});
+
+
 
 	// sleep(20);
 	// printf("ß [%i] Swissat result written internally\n", _my_index);
 	// printf("ß [%i] Swissat stopped end sleep \n", _my_index);
 	// _solved_status = 1;
-	_internal_result.id = getId();
-    _internal_result.revision = getRevision();
-    _internal_result.result=res;
-	auto dummy_solution = std::vector<int>(1,0);
-	_internal_result.setSolutionToSerialize((int*)(dummy_solution.data()), dummy_solution.size());
 }
 
 
@@ -74,8 +78,7 @@ void SweepJob::appl_communicate() {
 		return;
 	}
 
-	// printf("ß appl_communicate() %i ready for starting (isRoot=%i), Volume=%i, Children %i \n",
-		// _my_index, getJobTree().isRoot(), getVolume(), getJobTree().getNumChildren());
+	printf("ß appl_communicate() %i \n",_my_index);
 	// printf("ß rank(0) = %i \n", getJobComm().getWorldRankOrMinusOne(0));
 	// printf("ß rank(1) = %i \n", getJobComm().getWorldRankOrMinusOne(1));
 	// printf("ß rank(2) = %i \n", getJobComm().getWorldRankOrMinusOne(2));
@@ -121,7 +124,13 @@ void SweepJob::advanceSweepMessage(JobMessage& msg) {
 }
 
 
-
+void SweepJob::loadFormulaToSwissat() {
+	const int* lits = getDescription().getFormulaPayload(0);
+	const int payload_size = getDescription().getFormulaPayloadSize(0);
+	for (int i = 0; i < payload_size ; i++) {
+		_swissat->addLiteral(lits[i]);
+	}
+}
 
 
 

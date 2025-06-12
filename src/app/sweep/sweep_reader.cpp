@@ -8,11 +8,10 @@ class JobDescription;
 
 bool SweepReader::read(const std::vector<std::string>& filenames, JobDescription& desc) {
 
-    printf("ß In Sweep reader\n");
-    // read the description and write serialized data 
+    // read the description and write serialized data
     // using desc.addPermanentData and desc.addTransientData
     std::string filename = filenames[0];
-    std::cout << "Sweep reader reading: " << filename << std::endl;
+    std::cout << "[Sweep] reading: " << filename << std::endl;
     std::ifstream ifile(filename.c_str(), std::ios::in);
     if (!ifile.is_open()) {
         std::cerr << "There was a problem opening the input file!\n";
@@ -39,7 +38,7 @@ bool SweepReader::read(const std::vector<std::string>& filenames, JobDescription
 	auto& config = desc.getAppConfiguration();
 	config.updateFixedSizeEntry("__NC", clauses);
 	config.updateFixedSizeEntry("__NV", variables);
-    printf("Reading: %i variables, %i clauses\n",variables, clauses);
+    printf("[Sweep] reading: %i variables, %i clauses\n",variables, clauses);
     // desc.getAppConfiguration().updateFixedSizeEntry()
 	// desc.setAppConfigurationEntry("__NV", std::to_string(variables));
 	// desc.setAppConfigurationEntry("__NC", std::to_string(clauses));
@@ -53,7 +52,7 @@ bool SweepReader::read(const std::vector<std::string>& filenames, JobDescription
         desc.addPermanentData(lit);
         if (lit==0) seen_clauses++;
     }
-    if (seen_clauses == clauses) printf("Finished reading %i clauses\n", clauses);
+    if (seen_clauses == clauses) printf("[Sweep] reading: finished\n");
     else printf("\n \nWarning! SweepReader did not read the expected number of clauses. Read: %i, Expected: %i \n \n", seen_clauses, clauses);
 
     ifile.close();

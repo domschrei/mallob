@@ -18,9 +18,11 @@ private:
     uint8_t* _metadata; //serialized description
 
     std::shared_ptr<Kissat> _swissat;
+    std::future<void> _fut_swissat;
+    std::atomic_int _swissat_running {0};
 
 
-    static const int MSG_SWEEP = 1; // internal message tag
+    static const int MSG_SWEEP = 100; // internal message tag
     static const int NUM_WORKERS = 4; // # workers we request and require, hardcoded 4 for now
 
 
@@ -42,6 +44,7 @@ public:
 
 private:
     void advanceSweepMessage(JobMessage& msg);
+    void loadFormulaToSwissat();
 
 };
 
