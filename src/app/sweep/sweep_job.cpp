@@ -36,8 +36,8 @@ void SweepJob::appl_start() {
 	_swissat->set_option_externally("mallob_solver_count", NUM_WORKERS);
 	_swissat->set_option_externally("mallob_custom_verbosity", 0);
 	_swissat->set_option_externally("quiet", 1);
-
-
+	_swissat->activateLearnedEquivalenceCallback();
+		
 	_swissat_running++;
 	_fut_swissat = ProcessWideThreadPool::get().addTask([&]() {
 		LOG(V2_INFO, "Process loading formula  %i \n", _my_index);

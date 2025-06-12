@@ -27,6 +27,10 @@ private:
 	Mallob::Clause learntClause;
     std::vector<int> producedClause;
 
+	//For parallel sweeping
+	std::vector<int> learntEquivalenceBuffer;
+
+
 	bool interruptionInitialized = false;
     bool interrupted = false;
     unsigned int glueLimit;
@@ -62,6 +66,11 @@ public:
 
 	// Set a function that should be called for each learned clause
 	void setLearnedClauseCallback(const LearnedClauseCallback& callback) override;
+
+	// Set a function that should be called for each learned equivalence by sweeping
+	void activateLearnedEquivalenceCallback();
+
+
 	
 	// Get the number of variables of the formula
 	int getVariablesCount() override;
@@ -87,6 +96,7 @@ public:
     friend void report_preprocessed_lit(void* state, int lit);
     friend int terminate_callback(void* state);
 
+	friend void produce_equivalence(void *state);
 
 	//Pass-through to access kissat_set_option
 	void set_option_externally(const std::string &option_name, int value);
@@ -97,6 +107,8 @@ public:
 private:
     void produceClause(int size, int lbd);
     void consumeClause(int** clause, int* size, int* lbd);
+
+	void produceEquivalence();
 
     bool isPreprocessingAcceptable(int vars, int cls);
     void addLiteralFromPreprocessing(int lit);

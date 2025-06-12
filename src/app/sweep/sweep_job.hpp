@@ -32,7 +32,7 @@ public:
     void appl_communicate() override;
     void appl_communicate(int source, int mpiTag, JobMessage& msg) override;
 
-    int appl_solved() override {return _solved_status;}
+    int appl_solved() override            {return _solved_status;}
     JobResult&& appl_getResult() override {return std::move(_internal_result);}
 
     void appl_suspend() override {}

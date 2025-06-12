@@ -29,6 +29,10 @@ void produce_clause(void* state, int size, int glue) {
     ((Kissat*) state)->produceClause(size, glue);
 }
 
+void produce_equivalence(void *state) {
+    ((Kissat*) state)->produceEquivalence();
+}
+
 void consume_clause(void* state, int** clause, int* size, int* glue) {
     ((Kissat*) state)->consumeClause(clause, size, glue);
 }
@@ -51,7 +55,9 @@ void report_preprocessed_lit(void* state, int lit) {
 
 Kissat::Kissat(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup), solver(kissat_init()),
-        learntClauseBuffer(_setup.strictMaxLitsPerClause+ClauseMetadata::numInts()) {
+        learntClauseBuffer(_setup.strictMaxLitsPerClause+ClauseMetadata::numInts()),
+        learntEquivalenceBuffer(10) //Reserve 2 slots for the literals and 8 slots for potential metadata
+{
 
     kissat_set_terminate(solver, this, &terminate_callback);
     glueLimit = _setup.strictLbdLimit;
@@ -388,6 +394,13 @@ void Kissat::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
     kissat_set_clause_import_callback(solver, this, &consume_clause);
 }
 
+
+void Kissat::activateLearnedEquivalenceCallback() {
+    swissat_set_equivalence_export_callback(solver, this, learntEquivalenceBuffer.data(), &produce_equivalence);
+}
+
+
+
 void Kissat::produceClause(int size, int lbd) {
     interruptionInitialized = true;
     if (size > _setup.strictMaxLitsPerClause) return;
@@ -416,6 +429,14 @@ void Kissat::consumeClause(int** clause, int* size, int* lbd) {
         *size = 0;
     }
 }
+
+void Kissat::produceEquivalence() {
+    uint lit1 = learntEquivalenceBuffer[0];
+    uint lit2 = learntEquivalenceBuffer[1];
+    printf("ß Exported Equiv. (e%i, e%i)\n", lit1, lit2);
+}
+
+
 
 int Kissat::getVariablesCount() {
 	return numVars;
