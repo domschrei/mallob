@@ -110,7 +110,7 @@ void SweepJob::appl_communicate() {
 
 // React to an incoming message. (This becomes relevant only if you send custom messages)
 void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
-	LOG(V2_INFO, "[sweep] Got:  %i (%i,%i)...(%i,%i)  \n", msg.payload.size()/2, msg.payload[0], msg.payload[1], msg.payload.end()[-2], msg.payload.end()[-1]);
+	LOG(V2_INFO, "[sweep] Got:  %i \n", msg.payload.size()/2);
 	if (_my_index == 0) {
 		LOG(V2_INFO, "[sweep] Chain ended, arrived back to root\n \n");
 	} else {
