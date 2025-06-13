@@ -101,7 +101,7 @@ public:
 	friend void produce_equivalence(void *state);
 
 	//Pass-through to access kissat_set_option
-	void set_option_externally(const std::string &option_name, int value);
+	void set_option(const std::string &option_name, int value);
 
 
 

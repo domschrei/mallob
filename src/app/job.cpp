@@ -231,13 +231,16 @@ JobResult& Job::getResult() {
 }
 
 void Job::communicate() {
+    // LOG(V2_INFO, "%s : send-communicate()\n", toStr());
     if (_state == ACTIVE && _comm.wantsToAggregate() && _comm.isAggregating())
         _comm.beginAggregation();
     appl_communicate();
 }
 
 void Job::communicate(int source, int mpiTag, JobMessage& msg) {
+    // LOG(V2_INFO, "%s : receive \n", toStr());
     if (_state == ACTIVE && _comm.handle(msg)) {
+        // LOG(V2_INFO, "state ACTIVE && _comm.handle \n");
         if (msg.tag == MSG_BROADCAST_RANKLIST && _job_tree.isRoot()) {
             // Check size of job comm compared to scheduler's job volume
             if (_comm.size() != getVolume()) {
@@ -245,6 +248,7 @@ void Job::communicate(int source, int mpiTag, JobMessage& msg) {
             }
         }
     } else {
+        // LOG(V2_INFO, "%s : receive appl. source=%i, mpiTag=%i\n", toStr(), source, mpiTag);
         appl_communicate(source, mpiTag, msg);
     }
 }

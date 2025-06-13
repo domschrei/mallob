@@ -69,7 +69,7 @@ void Kissat::addLiteral(int lit) {
 }
 
 //Pass-through
-void Kissat::set_option_externally(const std::string &option_name, int value) {
+void Kissat::set_option(const std::string &option_name, int value) {
     kissat_set_option(solver, option_name.c_str(), value);
 }
 
@@ -89,7 +89,7 @@ void Kissat::diversify(int seed) {
     kissat_set_option(solver, "profile", _setup.profilingLevel);
 
     //For Equivalence Sweeping: Tell each kissat instance it's unique global ID
-    kissat_set_option(solver, "globalId", _setup.globalId);
+    // kissat_set_option(solver, "globalId", _setup.globalId);
 
     // Set random seed
     kissat_set_option(solver, "seed", seed);

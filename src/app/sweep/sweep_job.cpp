@@ -32,12 +32,30 @@ void SweepJob::appl_start() {
 	// printf("ß [%i] Payload: %i vars, %i clauses \n", _my_index, setup.numVars, setup.numOriginalClauses);
 
 	_swissat.reset(new Kissat(setup));
-	_swissat->set_option_externally("mallob_solver_id", _my_index);
-	_swissat->set_option_externally("mallob_solver_count", NUM_WORKERS);
-	_swissat->set_option_externally("mallob_custom_sweep_verbosity", 0); //0: No messages. 1: Verbose Messaged.
-	_swissat->set_option_externally("quiet", 1);
+	_swissat->set_option("mallob_solver_id", _my_index);
+	_swissat->set_option("mallob_solver_count", NUM_WORKERS);
+	_swissat->set_option("mallob_custom_sweep_verbosity", 1); //0: No messages. 1: Some. 2: Verbose
 	_swissat->activateLearnedEquivalenceCallback();
 
+    // Basic configuration options for all solvers
+    _swissat->set_option("quiet", 1); // do not log to stdout / stderr
+    _swissat->set_option("check", 0); // do not check model or derived clauses
+    _swissat->set_option("factor", 0); // do not perform bounded variable addition
+    _swissat->set_option("profile",3);
+	_swissat->set_option("seed", 0);
+
+	_swissat->set_option("sweep", 1); //We want sweeping
+	_swissat->set_option("simplify", 1); //If we deactivate simplify, then sweep is scheduled muss less somehow. To see much sweeping, keep simplify for now.
+
+	_swissat->set_option("eliminate", 0); //No BVE
+	_swissat->set_option("substitute", 0);
+
+	_swissat->set_option("lucky", 0); //For less noise/simplicity during development, also deactivate all these
+	_swissat->set_option("congruence", 0);
+	_swissat->set_option("substitute", 0);
+	_swissat->set_option("backbone", 0);
+	_swissat->set_option("eliminate", 0);
+	_swissat->set_option("transitive", 0);
 
 	_swissat_running_count++;
 	_fut_swissat = ProcessWideThreadPool::get().addTask([&]() {
@@ -53,6 +71,7 @@ void SweepJob::appl_start() {
 		_internal_result.setSolutionToSerialize((int*)(dummy_solution.data()), dummy_solution.size());
 		_swissat_running_count--;
 	});
+
 
 
 
@@ -76,7 +95,7 @@ void SweepJob::appl_communicate() {
 		return;
 	}
 
-	// LOG(V2_INFO, "[sweep] Equivalences to share: %i \n", _swissat->stored_equivalences.size()/2);
+	// LOG(V2_INFO, "[sweep] Ready: %i \n", _swissat->stored_equivalences.size()/2);
 
 	// Workers available and valid job communicator present?
 	if (getJobTree().isRoot() && getVolume() == NUM_WORKERS && getJobComm().getWorldRankOrMinusOne(NUM_WORKERS-1) >= 0) {
@@ -91,7 +110,7 @@ void SweepJob::appl_communicate() {
 
 // React to an incoming message. (This becomes relevant only if you send custom messages)
 void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
-	LOG(V2_INFO, "[sweep] Got %i Equivalences   (%i,%i)...(%i,%i)  \n", msg.payload.size()/2, msg.payload[0], msg.payload[1], msg.payload.end()[-2], msg.payload.end()[-1]);
+	LOG(V2_INFO, "[sweep] Got:  %i (%i,%i)...(%i,%i)  \n", msg.payload.size()/2, msg.payload[0], msg.payload[1], msg.payload.end()[-2], msg.payload.end()[-1]);
 	if (_my_index == 0) {
 		LOG(V2_INFO, "[sweep] Chain ended, arrived back to root\n \n");
 	} else {
@@ -103,7 +122,7 @@ void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 void SweepJob::advanceSweepMessage(JobMessage& msg) {
 
 	//Transfer local data to the message
-	LOG(V2_INFO, "[sweep] Add: %i \n", _swissat->stored_equivalences.size()/2);
+	// LOG(V2_INFO, "[sweep] Add : %i \n", _swissat->stored_equivalences.size()/2);
 	auto &local_eqs = _swissat->stored_equivalences;
 	msg.payload.reserve(msg.payload.size() + local_eqs.size());
 	msg.payload.insert(msg.payload.end(), local_eqs.begin(), local_eqs.end());
@@ -117,6 +136,8 @@ void SweepJob::advanceSweepMessage(JobMessage& msg) {
 	msg.treeIndexOfDestination = receiver_index;
 	msg.contextIdOfDestination = getJobComm().getContextIdOrZero(receiver_index);
 	assert(msg.contextIdOfDestination != 0);
+
+	LOG(V2_INFO, "[sweep] Send: %i  (to rank %i) \n", msg.payload.size()/2, receiver_rank);
 	getJobTree().send(receiver_rank, MSG_SEND_APPLICATION_MESSAGE, msg);
 }
 
