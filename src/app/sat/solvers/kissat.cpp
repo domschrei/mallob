@@ -28,14 +28,20 @@ extern "C" {
 void produce_clause(void* state, int size, int glue) {
     ((Kissat*) state)->produceClause(size, glue);
 }
-
 void produce_equivalence(void *state) {
     ((Kissat*) state)->produceEquivalence();
 }
 
+
+
 void consume_clause(void* state, int** clause, int* size, int* glue) {
     ((Kissat*) state)->consumeClause(clause, size, glue);
 }
+void consume_equivalence(void* state, int** equivalence) {
+    ((Kissat*) state)->consumeEquivalence(equivalence);
+}
+
+
 
 int terminate_callback(void* state) {
     return ((Kissat*) state)->shouldTerminate() ? 1 : 0;
@@ -56,9 +62,11 @@ void report_preprocessed_lit(void* state, int lit) {
 Kissat::Kissat(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup), solver(kissat_init()),
         learntClauseBuffer(_setup.strictMaxLitsPerClause+ClauseMetadata::numInts()),
-        learntEquivalenceBuffer(10) //Reserve 2 slots for the literals and 8 slots for potential metadata
+        learntEquivalenceBuffer(2),  //pass two literals
+        producedEquivalenceBuffer(2) //pass two literals
 {
-    stored_equivalences.reserve(MAX_STORED_EQUIVALENCES_SIZE);
+    stored_equivalences_to_share.reserve(MAX_STORED_EQUIVALENCES_SIZE);
+    stored_equivalences_to_import.reserve(MAX_STORED_EQUIVALENCES_SIZE);
     kissat_set_terminate(solver, this, &terminate_callback);
     glueLimit = _setup.strictLbdLimit;
 }
@@ -395,8 +403,9 @@ void Kissat::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
 }
 
 
-void Kissat::activateLearnedEquivalenceCallback() {
+void Kissat::activateLearnedEquivalenceCallbacks() {
     swissat_set_equivalence_export_callback(solver, this, learntEquivalenceBuffer.data(), &produce_equivalence);
+    swissat_set_equivalence_import_callback(solver, this, &consume_equivalence);
 }
 
 
@@ -411,6 +420,18 @@ void Kissat::produceClause(int size, int lbd) {
     if (learntClause.lbd > _setup.strictLbdLimit) return;
     learntClause.begin = learntClauseBuffer.data();
     callback(learntClause, _setup.localId);
+}
+
+void Kissat::produceEquivalence() {
+    int lit1 = learntEquivalenceBuffer[0];
+    int lit2 = learntEquivalenceBuffer[1];
+    if (stored_equivalences_to_share.size() < MAX_STORED_EQUIVALENCES_SIZE) {
+        stored_equivalences_to_share.push_back(lit1);
+        stored_equivalences_to_share.push_back(lit2);
+        // printf("ß Stored Eq (%i, %i) \n", lit1, lit2);
+    } else  {
+        printf("ß Not enough space to store Eq (%i, %i)\n", lit1, lit2);
+    }
 }
 
 void Kissat::consumeClause(int** clause, int* size, int* lbd) {
@@ -430,15 +451,14 @@ void Kissat::consumeClause(int** clause, int* size, int* lbd) {
     }
 }
 
-void Kissat::produceEquivalence() {
-    int lit1 = learntEquivalenceBuffer[0];
-    int lit2 = learntEquivalenceBuffer[1];
-    if (stored_equivalences.size() < MAX_STORED_EQUIVALENCES_SIZE) {
-        stored_equivalences.push_back(lit1);
-        stored_equivalences.push_back(lit2);
-        // printf("ß Stored Eq (%i, %i) \n", lit1, lit2);
-    } else  {
-        printf("ß Not enough space to store Eq (%i, %i)\n", lit1, lit2);
+
+void Kissat::consumeEquivalence(int **equivalence) {
+    if (stored_equivalences_to_import.empty()) {
+       *equivalence = 0;
+    } else {
+        producedEquivalenceBuffer[0] = stored_equivalences_to_import.back(); stored_equivalences_to_import.pop_back();
+        producedEquivalenceBuffer[1] = stored_equivalences_to_import.back(); stored_equivalences_to_import.pop_back();
+        *equivalence = producedEquivalenceBuffer.data();
     }
 }
 

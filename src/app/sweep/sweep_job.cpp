@@ -35,7 +35,7 @@ void SweepJob::appl_start() {
 	_swissat->set_option("mallob_solver_id", _my_index);
 	_swissat->set_option("mallob_solver_count", NUM_WORKERS);
 	_swissat->set_option("mallob_custom_sweep_verbosity", 1); //0: No messages. 1: Some. 2: Verbose
-	_swissat->activateLearnedEquivalenceCallback();
+	_swissat->activateLearnedEquivalenceCallbacks();
 
     // Basic configuration options for all solvers
     _swissat->set_option("quiet", 1); // do not log to stdout / stderr
@@ -45,7 +45,7 @@ void SweepJob::appl_start() {
 	_swissat->set_option("seed", 0);
 
 	_swissat->set_option("sweep", 1); //We want sweeping
-	_swissat->set_option("simplify", 1); //If we deactivate simplify, then sweep is scheduled muss less somehow. To see much sweeping, keep simplify for now.
+	_swissat->set_option("simplify", 0); //If we deactivate simplify, then sweep is scheduled muss less somehow. To see much sweeping, keep simplify for now.
 
 	_swissat->set_option("eliminate", 0); //No BVE
 	_swissat->set_option("substitute", 0);
@@ -110,9 +110,14 @@ void SweepJob::appl_communicate() {
 
 // React to an incoming message. (This becomes relevant only if you send custom messages)
 void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
-	LOG(V2_INFO, "[sweep] Got:  %i \n", msg.payload.size()/2);
+
+	//locally store equivalences received from sharing, for kissat to import them at will
+	auto &local_store = _swissat->stored_equivalences_to_import;
+	local_store.reserve(local_store.size() + msg.payload.size());
+	local_store.insert(local_store.end(), msg.payload.begin(), msg.payload.end());
+
 	if (_my_index == 0) {
-		LOG(V2_INFO, "[sweep] Chain ended, arrived back to root\n \n");
+		LOG(V2_INFO, "[sweep] Rec %i  Chain ended, arrived back to root\n \n", msg.payload.size()/2);
 	} else {
 		advanceSweepMessage(msg);
 	}
@@ -121,14 +126,15 @@ void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 
 void SweepJob::advanceSweepMessage(JobMessage& msg) {
 
+	int incoming_eqs = msg.payload.size()/2;
 	//Transfer local data to the message
-	// LOG(V2_INFO, "[sweep] Add : %i \n", _swissat->stored_equivalences.size()/2);
-	auto &local_eqs = _swissat->stored_equivalences;
+	auto &local_eqs = _swissat->stored_equivalences_to_share;
 	msg.payload.reserve(msg.payload.size() + local_eqs.size());
 	msg.payload.insert(msg.payload.end(), local_eqs.begin(), local_eqs.end());
 
 	//Now we can delete the equivalences locally, to make place for new ones
-	_swissat->stored_equivalences.clear();
+	int added_eqs = _swissat->stored_equivalences_to_share.size()/2;
+	_swissat->stored_equivalences_to_share.clear();
 
 	//Sending data in a circle, in order of the indices
 	int receiver_index = (_my_index + 1) % NUM_WORKERS;
@@ -137,7 +143,7 @@ void SweepJob::advanceSweepMessage(JobMessage& msg) {
 	msg.contextIdOfDestination = getJobComm().getContextIdOrZero(receiver_index);
 	assert(msg.contextIdOfDestination != 0);
 
-	LOG(V2_INFO, "[sweep] Send: %i  (to rank %i) \n", msg.payload.size()/2, receiver_rank);
+	LOG(V2_INFO, "[sweep] Rec %i   Add %i    Send %i  (to rank %i) \n", incoming_eqs, added_eqs, msg.payload.size()/2, receiver_rank);
 	getJobTree().send(receiver_rank, MSG_SEND_APPLICATION_MESSAGE, msg);
 }
 
