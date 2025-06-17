@@ -11,6 +11,7 @@
 
 #include "app/sat/data/revision_data.hpp"
 #include "app/sat/data/theories/integer_rule.hpp"
+#include "app/sat/sharing/filter/clause_prefilter.hpp"
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
 #include "../sharing/sharing_manager.hpp"
@@ -39,6 +40,8 @@ private:
 	size_t _num_active_solvers;
 	
 	std::unique_ptr<SharingManager> _sharing_manager;
+	ClausePrefilter _prefilter;
+
 	std::vector<std::shared_ptr<PortfolioSolverInterface>> _solver_interfaces;
 	std::vector<std::shared_ptr<SolverThread>> _solver_threads;
 	std::vector<std::shared_ptr<SolverThread>> _obsolete_solver_threads;
