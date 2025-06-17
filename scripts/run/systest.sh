@@ -3,6 +3,8 @@
 set -e
 
 testcount=1
+#MPIOPTS="--oversubscribe"
+
 source $(dirname "$0")/systest_commons.sh
 
 mkdir -p .api/jobs.0/
@@ -103,6 +105,10 @@ function test_oscillating() {
 }
 
 function test_oscillating_ontheflycheck() {
+    if [ ! -f build/impcheck_parse -o ! -f build/impcheck_check -o ! -f build/impcheck_confirm ]; then
+        error "ImpCheck executable(s) not present at ./build/ - cannot run this test."
+    fi
+
     # Generate periodic "disturbance" jobs
     t=4
     n=0
@@ -137,7 +143,10 @@ function test_certified_unsat() {
 }
 
 function test_ontheflycheck() {
-    
+    if [ ! -f build/impcheck_parse -o ! -f build/impcheck_check -o ! -f build/impcheck_confirm ]; then
+        error "ImpCheck executable(s) not present at ./build/ - cannot run this test."
+    fi
+
     instancefile="instances/r3sat_200.cnf"
     test 1 -t=1 -mono=$instancefile -otfc=1 -assertresult=VSAT $@
     test 1 -t=8 -mono=$instancefile -otfc=1 -satsolver='ck+l+(c)*' -assertresult=VSAT $@

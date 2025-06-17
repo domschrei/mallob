@@ -13,7 +13,7 @@
 #include "util/hashing.hpp"
 #include "data/job_transfer.hpp"
 #include "app/job.hpp"
-#include "comm/job_tree_all_reduction.hpp"
+#include "comm/job_tree_basic_all_reduction.hpp"
 #include "clause_sharing_session.hpp"
 #include "app/sat/proof/proof_producer.hpp"
 #include "app/sat/job/historic_clause_storage.hpp"

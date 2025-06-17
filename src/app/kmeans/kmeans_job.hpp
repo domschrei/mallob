@@ -9,7 +9,7 @@
 
 #include "app/job.hpp"
 #include "app/sat/job/sat_constants.h"
-#include "comm/job_tree_all_reduction.hpp"
+#include "comm/job_tree_basic_all_reduction.hpp"
 #include "kmeans_utils.hpp"
 #include "util/params.hpp"
 
@@ -53,7 +53,7 @@ class KMeansJob : public Job {
     int _num_curr_workers;
     JobMessage _base_msg;
     JobResult _internal_result;
-    std::unique_ptr<JobTreeAllReduction> _reducer;
+    std::unique_ptr<JobTreeBasicAllReduction> _reducer;
 
     const std::function<float(const float* p1, const float* p2, const size_t dim)> metric =
         [&](const float* p1, const float* p2, const size_t dim) {

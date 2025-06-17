@@ -3,7 +3,7 @@
 
 #include "app/job.hpp"
 #include "comm/job_tree_broadcast.hpp"
-#include "comm/job_tree_all_reduction_modular.hpp"
+#include "comm/job_tree_all_reduction.hpp"
 #include "data/job_state.h"
 #include "data/job_transfer.hpp"
 #include "util/logger.hpp"

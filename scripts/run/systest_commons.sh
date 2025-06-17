@@ -58,7 +58,7 @@ function run() {
     shift 1
     echo "ARGS: $@" > _systest
     if echo "$@"|grep -q "incrementaltest"; then
-        RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $np --oversubscribe build/mallob $@ 2>&1 >> _systest &
+        RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $np $MPIOPTS build/mallob $@ 2>&1 >> _systest &
         waitpids=$!
         for f in _incremental_jobs-* ; do
             run_incremental "$f" &
@@ -70,8 +70,8 @@ function run() {
             echo "Wait for $pid done"
         done
     else
-        RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $np --oversubscribe build/mallob $@ 2>&1 >> _systest
-        #RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $np --oversubscribe build/mallob $@ 2>&1 |grep -B10 -A10 "No such file"
+        RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $np $MPIOPTS build/mallob $@ 2>&1 >> _systest
+        #RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $np $MPIOPTS build/mallob $@ 2>&1 |grep -B10 -A10 "No such file"
     fi
 }
 
