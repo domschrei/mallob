@@ -19,6 +19,7 @@ function print_separator() {
 
 function run_incremental() {
     echo "$BASHPID: Reading incremental job from $1"
+    set +e
     while read line; do
                 
         file=$(echo $line|awk '{print $1}')
@@ -49,7 +50,8 @@ function run_incremental() {
         fi
         rm $donefile
     done < $1
-    echo "$BASHPID: Done." 
+    echo "$BASHPID: Done."
+    set -e
 }
 
 function run() {
@@ -60,6 +62,7 @@ function run() {
     if echo "$@"|grep -q "incrementaltest"; then
         RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $np $MPIOPTS build/mallob $@ 2>&1 >> _systest &
         waitpids=$!
+        set +e
         for f in _incremental_jobs-* ; do
             run_incremental "$f" &
             newpid=$!
@@ -69,6 +72,7 @@ function run() {
             wait $pid
             echo "Wait for $pid done"
         done
+        set -e
     else
         RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $np $MPIOPTS build/mallob $@ 2>&1 >> _systest
         #RDMAV_FORK_SAFE=1 PATH=build/:$PATH mpirun -np $np $MPIOPTS build/mallob $@ 2>&1 |grep -B10 -A10 "No such file"

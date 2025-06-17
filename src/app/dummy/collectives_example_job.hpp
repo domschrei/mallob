@@ -11,7 +11,7 @@
 #include "util/sys/threading.hpp"
 #include <future>
 
-// This job does some internal compucation at the root worker,
+// This job does some internal computation at the root worker,
 // then broadcasts the result to every worker currently in the tree,
 // then performs an all-reduction across these workers where each worker
 // contributes a value based on the original broadcasted value,
@@ -112,10 +112,10 @@ public:
     // In our case, this is the case when no background task is pending.
     // Note that, as long as this returns false, 
     bool appl_isDestructible() override {
-        if (_bcast) return false;
         // you can, and need to, advance communication at this point
         // so that everything that is still going on can conclude nicely
-        if (_red) appl_communicate();
+        appl_communicate();
+        if (_bcast) return false;
         if (_red) return false;
         return true; // all communication and background computation concluded
     }
