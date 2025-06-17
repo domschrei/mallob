@@ -252,6 +252,7 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 		if (tldClauseVec) delete tldClauseVec;
         return;
 	}
+	assert(effectiveClauseLength == 1 || (clauseLbd >= 2 && clauseLbd <= effectiveClauseLength));
 	clauseLbd = c.lbd; // update LBD from pre-filter
 
 	// Add clause length to statistics
