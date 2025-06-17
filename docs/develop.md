@@ -20,7 +20,7 @@ The following list shows a few examples for how Mallob can be extended:
     - Add your solver to the portfolio initialization in `src/app/sat/execution/engine.cpp`.
 * To extend Mallob by adding another kind of application (like combinatorial search, planning, SMT, ...), please read [application_engines.md](application_engines.md).
 * To add a unit test, create a class `test_*.cpp` in `src/test` and then add the test case to the bottom of `CMakeLists.txt`.
-* To add a system test, consult the files `scripts/systest_commons.sh` and/or `scripts/systest.sh`.
+* To add a system test, see the file `scripts/systest.sh` (which includes definitions from `scripts/systest_commons.sh`).
 
 
 ## Debugging Mallob

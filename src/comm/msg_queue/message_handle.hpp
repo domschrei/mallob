@@ -37,6 +37,7 @@ public:
         return *this;
     }
 
+    std::vector<uint8_t>& getRecvData() { return data;}
     const std::vector<uint8_t>& getRecvData() const { return data;}
     std::vector<uint8_t>&& moveRecvData() { return std::move(data);}
 

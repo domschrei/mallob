@@ -3,6 +3,12 @@
 set -e
 
 testcount=1
+
+MPIOPTS="--oversubscribe" # for OpenMPI, by default
+if [ ! -z "$mpiimpl" ] && [ "$mpiimpl" != "openmpi" ]; then
+    MPIOPTS="" # for other MPI implementations
+fi
+
 source $(dirname "$0")/systest_commons.sh
 
 mkdir -p .api/jobs.0/
@@ -14,7 +20,15 @@ if [ x$GLUCOSE == x1 ]; then
     glucose="g"
 fi
 
+function announce_suite() {
+    echo ""
+    print_separator
+    echo "\"$1\" test suite"
+}
+
 function test_mono() {
+    announce_suite mono
+
     for slv in kcl${glucose} ; do
 
         instancefile="instances/r3unsat_250.cnf"
@@ -33,6 +47,8 @@ function test_mono() {
 }
 
 function test_scheduling() {
+    announce_suite sched
+
     for lbc in 4 8; do
         for slv in l${glucose}ck; do
             # 8 jobs (4 SAT, 4 UNSAT)
@@ -46,6 +62,8 @@ function test_scheduling() {
 }
 
 function test_dry_scheduling() {
+    announce_suite drysched
+
     t=1
     for i in {1..400}; do
         # wallclock limit, arrival, dependencies, application
@@ -53,10 +71,12 @@ function test_dry_scheduling() {
         t=$(echo "$t+0.1"|bc -l)
     done
     echo "400 jobs set up."
-    test 32 -c=1 -J=400 $@
+    test 32 -c=1 -J=400 -v=4 $@
 }
 
 function test_job_streamer() {
+    announce_suite stream
+
     > .job-desc-template
     for f in instances/r3{sat,unsat}_{200,300}.cnf; do
         echo $f >> .job-desc-template
@@ -68,6 +88,8 @@ function test_job_streamer() {
 }
 
 function test_incremental() {
+    announce_suite inc
+
     for test in entertainment08 roverg10 transportg29 ; do
         introduce_incremental_job $test 
         test 2 -c=1 -t=2 -satsolver=CL -J=1 -incrementaltest $@
@@ -75,6 +97,8 @@ function test_incremental() {
 }
 
 function test_many_incremental() {
+    announce_suite manyinc
+
     for i in {1..10}; do
         introduce_incremental_job entertainment08
     done
@@ -82,6 +106,8 @@ function test_many_incremental() {
 }
 
 function test_oscillating() {
+    announce_suite osc
+
     # Generate periodic "disturbance" jobs
     t=4
     n=0
@@ -103,6 +129,12 @@ function test_oscillating() {
 }
 
 function test_oscillating_ontheflycheck() {
+    announce_suite oscontheflycheck
+
+    if [ ! -f build/impcheck_parse -o ! -f build/impcheck_check -o ! -f build/impcheck_confirm ]; then
+        error "ImpCheck executable(s) not present at ./build/ - cannot run this test."
+    fi
+
     # Generate periodic "disturbance" jobs
     t=4
     n=0
@@ -124,6 +156,8 @@ function test_oscillating_ontheflycheck() {
 }
 
 function test_incremental_scheduling() {
+    announce_suite incsched
+
     for test in entertainment08 roverg10 transportg29 towers05 ; do
         introduce_incremental_job $test
     done
@@ -131,13 +165,20 @@ function test_incremental_scheduling() {
 }
 
 function test_certified_unsat() {
+    announce_suite certunsat
+
     test_cert_unsat 2 instances/r3unsat_200.cnf -assertresult=UNSAT $@
     test_cert_unsat 2 instances/r3sat_200.cnf -assertresult=SAT $@
     test_cert_unsat 8 instances/r3unsat_250.cnf -assertresult=UNSAT -t=2 $@
 }
 
 function test_ontheflycheck() {
-    
+    announce_suite ontheflycheck
+
+    if [ ! -f build/impcheck_parse -o ! -f build/impcheck_check -o ! -f build/impcheck_confirm ]; then
+        error "ImpCheck executable(s) not present at ./build/ - cannot run this test."
+    fi
+
     instancefile="instances/r3sat_200.cnf"
     test 1 -t=1 -mono=$instancefile -otfc=1 -assertresult=VSAT $@
     test 1 -t=8 -mono=$instancefile -otfc=1 -satsolver='ck+l+(c)*' -assertresult=VSAT $@
@@ -152,7 +193,7 @@ function test_ontheflycheck() {
 
 
 if [ -z "$1" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
-    echo "Usage: [nocleanup=1] $0 [<mallob-option-overrides>] <test case> [<more test cases> ...]"
+    echo "Usage: [nocleanup=1] [mpiimpl=<openmpi|mpich|...>] $0 [<mallob-option-overrides>] <test case> [<more test cases> ...]"
     echo "Possible test cases: mono drysched sched osc stream inc manyinc incsched certunsat ontheflycheck oscontheflycheck all"
     exit 0
 fi

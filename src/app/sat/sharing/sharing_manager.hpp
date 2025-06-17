@@ -15,6 +15,7 @@
 #include "app/sat/data/definitions.hpp"             // for ExtLearnedClauseC...
 #include "app/sat/data/solver_statistics.hpp"       // for SolverStatistics
 #include "app/sat/sharing/clause_id_alignment.hpp"  // for ClauseIdAlignment
+#include "app/sat/sharing/filter/clause_prefilter.hpp"
 #include "util/tsl/robin_hash.h"                    // for robin_hash<>::buc...
 #include "util/tsl/robin_set.h"                     // for robin_set
 
@@ -101,11 +102,14 @@ protected:
 
 	std::vector<int> _groundtruth_model;
 
+	ClausePrefilter* _prefilter {nullptr};
+
 public:
 	SharingManager(std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
 			const Parameters& params, const Logger& logger, size_t maxDeferredLitsPerSolver,
 			int jobIndex);
 	~SharingManager();
+	void setClausePrefilter(ClausePrefilter& prefilter) {_prefilter = &prefilter;}
 
 	void addSharingEpoch(int epoch) {_digested_epochs.insert(epoch);}
 	std::vector<int> prepareSharing(int totalLiteralLimit, int& outSuccessfulSolverId, int& outNbLits);

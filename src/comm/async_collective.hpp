@@ -164,7 +164,7 @@ public:
     // ranking of MPI processes in comm.
     // @param msqQ The message queue which distributes incoming messages.
     // @param instanceId The ID of this instance across all participating processes. 
-    AsyncCollective<T>(MPI_Comm comm, MessageQueue& msgQ, int instanceId) : 
+    AsyncCollective(MPI_Comm comm, MessageQueue& msgQ, int instanceId) : 
             _comm(comm), _msg_q(msgQ), _instance_id(instanceId) {
 
         // Initialize communication structure

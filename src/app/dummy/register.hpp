@@ -3,8 +3,9 @@
 
 #include "app/app_message_subscription.hpp"
 #include "app/app_registry.hpp"
+#include "app/dummy/collectives_example_job.hpp"
+#include "app/dummy/pointtopoint_example_job.hpp"
 #include "data/job_processing_statistics.hpp"
-#include "dummy_job.hpp"
 #include "dummy_reader.hpp"
 
 void register_mallob_app_dummy() {
@@ -15,12 +16,13 @@ void register_mallob_app_dummy() {
         },
         // Job creator
         [](const Parameters& params, const Job::JobSetup& setup, AppMessageTable& table) -> Job* {
-            return new DummyJob(params, setup, table);
+            return new CollectivesExampleJob(params, setup, table);
+            //return new PointToPointExampleJob(params, setup, table);
         },
         // Job solution formatter
         [](const Parameters& params, const JobResult& result, const JobProcessingStatistics& stat) {
-            // An actual application would nicely format the result here ...
-            return nlohmann::json();
+            nlohmann::json j = result.copySolution();
+            return j;
         }
     );
 }
