@@ -5,7 +5,11 @@ This page explains how to execute Mallob in general, with different applications
 
 ## General
 
-Given a single machine with two hardware threads per core, the following command executed in Mallob's base directory assigns one MPI process to each set of four physical cores (eight hardware threads) and then runs four solver threads on each MPI process.
+### Starting Mallob
+
+Mallob is an MPI application and should therefore usually be executed via `mpirun`, `mpiexec` or something similar.
+
+For example, given a single machine with two hardware threads per core, the following command executed in Mallob's base directory assigns one MPI process to each set of four physical cores (eight hardware threads) and then runs four solver threads on each MPI process.
 
 ```
 RDMAV_FORK_SAFE=1; NPROCS="$(($(nproc)/8))"; mpirun -np $NPROCS --bind-to core --map-by ppr:${NPROCS}:node:pe=4 build/mallob -t=4 $MALLOB_OPTIONS
@@ -20,15 +24,23 @@ RDMAV_FORK_SAFE=1; mpirun -np 1 --bind-to hwthread --map-by ppr:1:node:pe=$((2*$
 
 In this case, only executing `build/mallob -t=$nthreads $MALLOB_OPTIONS` (without `mpirun` and MPI options) works as well.
 
+For running Mallob on distributed clusters, please also consult [our quickstart guide for clusters](clusters.md) and, in particular, [our SLURM scripting setup](../scripts/slurm/README.md).
+
+### Terminating Mallob
+
+In some modes of operation, Mallob stops on its own, e.g., after an instance has been solved (see "Mono mode of operation" below).
 You can always stop Mallob via Ctrl+C (interrupt signal) or by executing `killall mpirun` (or `killall build/mallob`). 
-You can also specify the number of jobs to process (with `-J=$NUM_JOBS`) and/or the time to pass (with `-T=$TIME_LIMIT_SECS`) before Mallob terminates on its own.
+Alternatively, you can specify the number of jobs to process (with `-J=$NUM_JOBS`) and/or the time to pass (with `-T=$TIME_LIMIT_SECS`) before Mallob terminates on its own.
+
+### Program options and output
+
+You can find **all program options of Mallob** by executing Mallob with the `-h` option. (This also works without the `mpirun` prefix.)
 
 For exact and clean logging, specify a logging directory with `-log=<log-dir>` where separate sub-directories and files will be created for each worker / thread. 
 This can be combined with the `-q` option to suppress Mallob's output to STDOUT. 
 Verbosity of logging can be set with the `-v` option (as long as Mallob was compiled with the respective verbosity or higher, see the `-DMALLOB_LOG_VERBOSITY` build option).
-All further options of Mallob can be seen by executing Mallob with the `-h` option. (This also works without the `mpirun` prefix.)
 
-For running Mallob on distributed clusters, please also consult [our quickstart guide for clusters](clusters.md) and, in particular, [our SLURM scripting setup](../scripts/slurm/README.md).
+### Mono mode of operation
 
 In order to let Mallob process only a single instance, use option `-mono=$PROBLEM_FILE` where `$PROBLEM_FILE` is the path and file name of the problem to solve. Specify the application of this instance with `-mono-app=APPKEY`, where APPKEY can be SAT, KMEANS, MAXSAT, etc.
 In this mode, all processes participate in solving, overhead is minimal, and Mallob terminates immediately after the job has been processed.
