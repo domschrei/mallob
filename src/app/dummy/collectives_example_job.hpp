@@ -11,7 +11,7 @@
 #include "util/sys/threading.hpp"
 #include <future>
 
-// This job does some internal compucation at the root worker,
+// This job does some internal computation at the root worker,
 // then broadcasts the result to every worker currently in the tree,
 // then performs an all-reduction across these workers where each worker
 // contributes a value based on the original broadcasted value,

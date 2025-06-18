@@ -4,9 +4,10 @@
 
 #include "app/job.hpp"
 #include "app/job_tree.hpp"
-#include "comm/job_tree_all_reduction.hpp"
+//#include "comm/job_tree_all_reduction.hpp"
 #include "util/logger.hpp"
 
+#define SWEEP_COMM_TYPE 2
 
 SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table)
     : Job(params, setup, table) {
@@ -34,7 +35,7 @@ void SweepJob::appl_start() {
 	_swissat.reset(new Kissat(setup));
 	_swissat->set_option("mallob_solver_id", _my_index);
 	_swissat->set_option("mallob_solver_count", NUM_WORKERS);
-	_swissat->set_option("mallob_custom_sweep_verbosity", 1); //0: No messages. 1: Some. 2: Verbose
+	_swissat->set_option("mallob_custom_sweep_verbosity", 0); //0: No messages. 1: Some. 2: Verbose
 	_swissat->activateLearnedEquivalenceCallbacks();
 
     // Basic configuration options for all solvers
@@ -57,6 +58,7 @@ void SweepJob::appl_start() {
 	_swissat->set_option("eliminate", 0);
 	_swissat->set_option("transitive", 0);
 
+
 	_swissat_running_count++;
 	_fut_swissat = ProcessWideThreadPool::get().addTask([&]() {
 		LOG(V2_INFO, "Process loading formula  %i \n", _my_index);
@@ -73,18 +75,14 @@ void SweepJob::appl_start() {
 	});
 
 
-
-
-	// sleep(20);
-	// printf("ß [%i] Swissat result written internally\n", _my_index);
-	// printf("ß [%i] Swissat stopped end sleep \n", _my_index);
-	// _solved_status = 1;
 }
 
 
 
 // Called periodically by the main thread to allow the worker to emit messages.
 void SweepJob::appl_communicate() {
+
+	#if SWEEP_COMM_TYPE == 1
 	// Not enough workers available?
 	if (getJobTree().isRoot() && getVolume() < NUM_WORKERS) {
 		if (getAgeSinceActivation() < 1) return; // wait for up to 1s after appl_start
@@ -95,8 +93,6 @@ void SweepJob::appl_communicate() {
 		return;
 	}
 
-	// LOG(V2_INFO, "[sweep] Ready: %i \n", _swissat->stored_equivalences.size()/2);
-
 	// Workers available and valid job communicator present?
 	if (getJobTree().isRoot() && getVolume() == NUM_WORKERS && getJobComm().getWorldRankOrMinusOne(NUM_WORKERS-1) >= 0) {
 		// craft a message to initiate sweep communication
@@ -105,12 +101,33 @@ void SweepJob::appl_communicate() {
 		msg.payload.clear();
 		advanceSweepMessage(msg);
 	}
+	#else
+
+	if (_red && getJobTree().isRoot() && _red->hasResult()) {
+		std::vector<int> result = _red->extractResult();
+		for (int i : result) {
+			printf("All-reduction got: %i\n", i);
+		}
+	}
+
+	auto snapshot = getJobTree().getSnapshot();
+	JobMessage baseMsg = getMessageTemplate();
+	baseMsg.tag = ALLRED;
+	_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateContributions));
+	_red->disableBroadcast();
+	// }
+
+	// if (_red) {
+	_red->contribute({_my_index}); //add my local equivalences here
+	_red->advance();
+
+	#endif
 }
 
 
 // React to an incoming message. (This becomes relevant only if you send custom messages)
 void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
-
+#if SWEEP_COMM_TYPE == 1
 	//locally store equivalences received from sharing, for kissat to import them at will
 	auto &local_store = _swissat->stored_equivalences_to_import;
 	local_store.reserve(local_store.size() + msg.payload.size());
@@ -121,11 +138,23 @@ void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 	} else {
 		advanceSweepMessage(msg);
 	}
+#endif
+}
+
+std::vector<int> SweepJob::aggregateContributions(std::list<std::vector<int>> &contribs) {
+    size_t totalSize = 0;
+    for (const auto& vec : contribs) totalSize += vec.size();
+    std::vector<int> aggregated;
+    aggregated.reserve(totalSize);
+    for (const auto& contrib : contribs) {
+        aggregated.insert(aggregated.end(), contrib.begin(), contrib.end());
+    }
+    return aggregated;
 }
 
 
 void SweepJob::advanceSweepMessage(JobMessage& msg) {
-
+#if SWEEP_COMM_TYPE == 1
 	int incoming_eqs = msg.payload.size()/2;
 	//Transfer local data to the message
 	auto &local_eqs = _swissat->stored_equivalences_to_share;
@@ -145,6 +174,7 @@ void SweepJob::advanceSweepMessage(JobMessage& msg) {
 
 	LOG(V2_INFO, "[sweep] Rec %i   Add %i    Send %i  (to rank %i) \n", incoming_eqs, added_eqs, msg.payload.size()/2, receiver_rank);
 	getJobTree().send(receiver_rank, MSG_SEND_APPLICATION_MESSAGE, msg);
+#endif
 }
 
 

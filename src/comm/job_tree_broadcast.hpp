@@ -22,6 +22,7 @@ private:
     bool _received_response_right {false};
     bool _result_extracted {false};
 
+    //The default callback is digestBroadcast()
     std::function<void()> _cb;
 
 public:
@@ -33,6 +34,7 @@ public:
         _job_id(jobId), _tree(tree), _internal_msg_tag(internalMsgTag),
         _sub_broadcast(MSG_JOB_TREE_MODULAR_BROADCAST, [&](MessageHandle& h) {return receiveMessage(h);}) {
         _cb = callback;
+        //The default callback is digestBroadcast()
     }
 
     void broadcast(JobMessage&& msg, bool rootOfBcast = true) {
@@ -61,7 +63,7 @@ public:
             _tree.sendToParent(_msg, MSG_JOB_TREE_MODULAR_BROADCAST);
         }
 
-        if (hasResult()) _cb(); // callback
+        if (hasResult()) _cb(); // callback, per default to digestBroadcast()
     }
 
     void updateJobTree(const JobTree& tree) {

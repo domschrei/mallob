@@ -5,6 +5,7 @@
 #include "app/job.hpp"
 #include "../sat/solvers/kissat.hpp"
 
+#include "comm/job_tree_all_reduction_modular.hpp"
 
 
 class SweepJob : public Job {
@@ -22,6 +23,9 @@ private:
     std::atomic_int _swissat_running_count {0};
 
 
+    std::unique_ptr<JobTreeAllReduction> _red;
+    bool _have_new_data_to_contribute{true};
+    static const int ALLRED {2};
 
     static const int MSG_SWEEP = 100; // internal message tag
     static const int NUM_WORKERS = 4; // # workers we request and require, hardcoded 4 for now
@@ -45,6 +49,7 @@ public:
 
 private:
     void advanceSweepMessage(JobMessage& msg);
+    static std::vector<int> aggregateContributions(std::list<std::vector<int>> &contribs);
     void loadFormulaToSwissat();
 
 };
