@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <climits>
 #include <cstring>
 #include <algorithm>
 
@@ -12,7 +13,7 @@ struct LratOp {
     size_t datalen {0};
     u8* data {nullptr};
 
-    // Derivation / production / addition
+    // LRAT-style derivation / production / addition
     LratOp(u64 id, const int* lits, int nbLits, const u64* hints, int nbHints, int glue) :
             datalen(sizeof(nbLits) + sizeof(nbHints) + sizeof(id) 
                     + nbLits*sizeof(int) + nbHints*sizeof(u64) + sizeof(int)),
@@ -24,6 +25,22 @@ struct LratOp {
         n = sizeof(id);          memcpy(data+i, &id, n);      i += n;
         n = sizeof(int)*nbLits;  memcpy(data+i, lits, n);     i += n;
         n = sizeof(u64)*nbHints; memcpy(data+i, hints, n);    i += n;
+        n = sizeof(glue);        memcpy(data+i, &glue, n);    i += n;
+        //assert(isDerivation());
+    }
+    // DRAT-style derivation / production / addition
+    LratOp(const int* lits, int nbLits, int glue) :
+            datalen(2*sizeof(int) + sizeof(u64) + nbLits*sizeof(int) + sizeof(int)),
+            data((u8*) malloc(datalen)) {
+        size_t i = 0, n;
+        const u64 id = ULONG_MAX;
+        const int nbHints = 0;
+        assert(glue >= 0);
+        n = sizeof(nbLits);      memcpy(data+i, &nbLits, n);  i += n;
+        n = sizeof(nbHints);     memcpy(data+i, &nbHints, n); i += n;
+        n = sizeof(id);          memcpy(data+i, &id, n);      i += n;
+        n = sizeof(int)*nbLits;  memcpy(data+i, lits, n);     i += n;
+        //n = sizeof(u64)*nbHints; memcpy(data+i, hints, n);    i += n; // always zero
         n = sizeof(glue);        memcpy(data+i, &glue, n);    i += n;
         //assert(isDerivation());
     }
@@ -42,7 +59,7 @@ struct LratOp {
         n = sizeof(glue);        memcpy(data+i, &glue, n);    i += n;
         //assert(isImport());
     }
-    // Deletion
+    // LRAT-style deletion (list of hints)
     LratOp(const u64* hints, int nbHints) :
             datalen(2*sizeof(int) + sizeof(u64) + nbHints*sizeof(u64)),
             data((u8*) malloc(datalen)) {
@@ -54,6 +71,18 @@ struct LratOp {
         n = sizeof(id);          memcpy(data+i, &id, n);      i += n;
         n = sizeof(u64)*nbHints; memcpy(data+i, hints, n);    i += n;
         //assert(isDeletion());
+    }
+    // DRAT-style deletion (list of clause literals)
+    LratOp(const int* lits, int nbLits) :
+            datalen(2*sizeof(int) + sizeof(u64) + nbLits*sizeof(int)),
+            data((u8*) malloc(datalen)) {
+        size_t i = 0, n;
+        const int nbHints = 0;
+        const u64 id = 0;
+        n = sizeof(nbLits);      memcpy(data+i, &nbLits, n);  i += n;
+        n = sizeof(nbHints);     memcpy(data+i, &nbHints, n); i += n;
+        n = sizeof(id);          memcpy(data+i, &id, n);      i += n;
+        n = sizeof(int)*nbLits;  memcpy(data+i, lits, n);     i += n;
     }
     // UNSAT Validation (20) or termination (0)
     LratOp(char x) : datalen(1), data((u8*) malloc(1)) {
@@ -101,6 +130,14 @@ struct LratOp {
         if (getId() == 0) return DELETION;
         if (getGlue() < 0) return IMPORT;
         return DERIVATION;
+    }
+    bool isDratDerivation() const {
+        if (!isDerivation()) return false;
+        return getId() == ULONG_MAX && getNbHints() == 0;
+    }
+    bool isDratDeletion() const {
+        if (!isDeletion()) return false;
+        return getNbLits() > 0 && getNbHints() == 0;
     }
 
     int getNbLits() const {return *(u64*) (data);}

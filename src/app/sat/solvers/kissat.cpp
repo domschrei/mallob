@@ -9,6 +9,7 @@
 #include <random>
 
 #include "app/sat/data/clause_metadata.hpp"
+#include "app/sat/proof/lrat_connector.hpp"
 #include "util/logger.hpp"
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "app/sat/data/solver_statistics.hpp"
@@ -29,8 +30,8 @@ void produce_clause(void* state, int size, int glue) {
     ((Kissat*) state)->produceClause(size, glue);
 }
 
-void consume_clause(void* state, int** clause, int* size, int* glue) {
-    ((Kissat*) state)->consumeClause(clause, size, glue);
+void consume_clause(void* state, int** clause, int* size, int* glue, unsigned long* id, unsigned char* sig) {
+    ((Kissat*) state)->consumeClause(clause, size, glue, id, sig);
 }
 
 int terminate_callback(void* state) {
@@ -45,6 +46,18 @@ void report_preprocessed_lit(void* state, int lit) {
     ((Kissat*) state)->addLiteralFromPreprocessing(lit);
 }
 
+void on_drup_derivation(void* state, const int* lits, int nbLits, int glue) {
+    ((Kissat*) state)->processProofLine(LratOp(lits, nbLits, glue));
+}
+
+void on_lrup_import(void* state, unsigned long id, const int* lits, int nbLits, const uint8_t* sigData) {
+    ((Kissat*) state)->processProofLine(LratOp(id, lits, nbLits, sigData));
+}
+
+void on_drup_deletion(void* state, const int* lits, int nbLits) {
+    ((Kissat*) state)->processProofLine(LratOp(lits, nbLits));
+}
+
 
 
 
@@ -55,6 +68,21 @@ Kissat::Kissat(const SolverSetup& setup)
 
     kissat_set_terminate(solver, this, &terminate_callback);
     glueLimit = _setup.strictLbdLimit;
+
+    if (setup.certifiedUnsat) {
+        assert(_lrat); // needs to be real-time checking setup for Kissat
+
+        int solverRank = setup.globalId;
+		int maxNumSolvers = setup.maxNumSolvers;
+
+		auto descriptor = _lrat ? "on-the-fly checking" : "proof production";
+		LOGGER(_logger, V3_VERB, "Initializing rank=%i size=%i DI=%i #C=%ld IDskips=%i with %s\n",
+			solverRank, maxNumSolvers, getDiversificationIndex(), setup.numOriginalClauses, setup.nbSkippedIdEpochs,
+			descriptor);
+
+        // set Kissat's internal proof tracing mode
+        kissat_trace_proof_internally(solver, this, &on_drup_derivation, &on_lrup_import, &on_drup_deletion);
+    }
 }
 
 void Kissat::addLiteral(int lit) {
@@ -391,12 +419,18 @@ void Kissat::produceClause(int size, int lbd) {
     callback(learntClause, _setup.localId);
 }
 
-void Kissat::consumeClause(int** clause, int* size, int* lbd) {
+void Kissat::consumeClause(int** clause, int* size, int* lbd, unsigned long* id, unsigned char* sig) {
     Mallob::Clause c;
     bool success = fetchLearnedClause(c, GenericClauseStore::ANY);
     if (success) {
         assert(c.begin != nullptr);
         assert(c.size >= 1);
+        if (ClauseMetadata::enabled()) {
+            *id = ClauseMetadata::readUnsignedLong(c.begin);
+            if (ClauseMetadata::numInts() > 2) {
+                memcpy(sig, c.begin+2, sizeof(int) * (ClauseMetadata::numInts()-2));
+            }
+        }
         *size = c.size - ClauseMetadata::numInts();
         producedClause.resize(*size);
         memcpy(producedClause.data(), c.begin+ClauseMetadata::numInts(), *size*sizeof(int));
@@ -406,6 +440,10 @@ void Kissat::consumeClause(int** clause, int* size, int* lbd) {
         *clause = 0;
         *size = 0;
     }
+}
+
+void Kissat::processProofLine(LratOp&& op) {
+    _lrat->push(std::move(op));
 }
 
 int Kissat::getVariablesCount() {
