@@ -102,7 +102,7 @@ public:
     void contribute(AllReduceElement&& localProducer) {
         assert(!_contributed);
         _contributed = true;
-        LOG(V3_VERB, "ß storing %i\n", localProducer.at(0));
+        LOG(V3_VERB, "ß store \n");
         _local_elem = std::move(localProducer);
     }
 
@@ -155,9 +155,9 @@ private:
             if (!accept) return false;
             
             // message accepted: store and check off
-            LOG(V3_VERB, "ß storing message of length %i from source %i\n", msg.payload.size(), source);
+            // LOG(V3_VERB, "ß storing message of length %i from source %i\n", msg.payload.size(), source);
             _child_elems.insert({source, std::move(msg.payload)});
-            LOG(V3_VERB, "ß Now having %i child elements\n", _child_elems.size());
+            // LOG(V3_VERB, "ß Now having %i child elements\n", _child_elems.size());
             if (fromLeftChild) _received_child_elems.first = true;
             if (fromRightChild) _received_child_elems.second = true;
             LOG_ADD_SRC(V5_DEBG, "CS got %i/%i elems", source, _child_elems.size(), _num_expected_child_elems);
@@ -183,7 +183,7 @@ public:
             _child_elems.insert({-1, std::move(_local_elem.value())});
             _local_elem.reset();
 
-            LOG(V3_VERB, "ß Combined element size %i \n", _child_elems.size());
+            // LOG(V3_VERB, "ß Combined element size %i \n", _child_elems.size());
 
             assert(!_future_aggregate.valid());
             _aggregating = true;
@@ -192,11 +192,11 @@ public:
                 for (auto& childElem : _child_elems) elemsList.push_back(std::move(childElem.elem));
                 _aggregated_elem = _aggregator(elemsList);
                 _aggregating = false;
-                LOG(V3_VERB, "ß Aggregate element size %i \n", _aggregated_elem->size());
+                LOG(V3_VERB, "ß Aggregated %i \n", _aggregated_elem->size());
             });
         }
 
-        LOG(V3_VERB, "ß Could send now to %i, agg=%i, valid=%i \n", _parent_index, _aggregating, _future_aggregate.valid());
+        // LOG(V3_VERB, "ß Could send now to %i, agg=%i, valid=%i \n", _parent_index, _aggregating, _future_aggregate.valid());
 
         if (!_aggregating && _future_aggregate.valid()) {
             // Aggregation done
@@ -218,7 +218,7 @@ public:
                 }
             } else {
                 // Send to parent
-                LOG(V3_VERB, "ß sending to parent %i\n", _parent_index);
+                LOG(V3_VERB, "ß sending %i to parent %i\n", _aggregated_elem->size(), _parent_index);
 
                 _base_msg.payload = std::move(_aggregated_elem.value());
                 _base_msg.treeIndexOfDestination = _parent_index;

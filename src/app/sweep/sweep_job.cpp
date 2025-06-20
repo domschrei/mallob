@@ -110,18 +110,18 @@ void SweepJob::appl_communicate() {
 		}
 	}
 
-	auto snapshot = getJobTree().getSnapshot();
-	JobMessage baseMsg = getMessageTemplate();
-	baseMsg.tag = ALLRED;
-	_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateContributions));
-	_red->disableBroadcast();
-	// }
-
-	// if (_red) {
-	_red->contribute({_my_index}); //add my local equivalences here
-	_red->advance();
-
-	#endif
+	if (getVolume() == NUM_WORKERS && getJobComm().getWorldRankOrMinusOne(NUM_WORKERS-1) >= 0) {
+		if (!_red || !_red->hasContribution()) {
+			auto snapshot = getJobTree().getSnapshot();
+			JobMessage baseMsg = getMessageTemplate();
+			baseMsg.tag = ALLRED;
+			_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateContributions));
+			_red->disableBroadcast();
+			_red->contribute({_my_index}); //add my local equivalences here
+		}
+		_red->advance();
+#endif
+	}
 }
 
 
