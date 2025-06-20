@@ -103,24 +103,34 @@ void SweepJob::appl_communicate() {
 	}
 	#else
 
-	if (_red && getJobTree().isRoot() && _red->hasResult()) {
-		std::vector<int> result = _red->extractResult();
-		for (int i : result) {
-			printf("All-reduction got: %i\n", i);
-		}
-	}
-
 	if (getVolume() == NUM_WORKERS && getJobComm().getWorldRankOrMinusOne(NUM_WORKERS-1) >= 0) {
-		if (!_red || !_red->hasContribution()) {
+		if (_red && _red->hasResult()) {
+			//store the received equivalences such that the local solver than eventually import them
+			auto share_received = _red->extractResult();
+			auto& local_store = _swissat->stored_equivalences_to_import;
+			local_store.reserve(local_store.size() + share_received.size());
+			local_store.insert(
+				local_store.end(),
+				std::make_move_iterator(share_received.begin()),
+				std::make_move_iterator(share_received.end())
+			);
+			LOG(V3_VERB, "ß Storing %i for local solver\n", local_store.size());
+		}
+
+		bool reset_red = _red && !_red->isValid() && _red->isDestructible();
+
+
+		if (!_red || !_red->hasContribution() || reset_red) {
 			auto snapshot = getJobTree().getSnapshot();
 			JobMessage baseMsg = getMessageTemplate();
 			baseMsg.tag = ALLRED;
+			LOG(V3_VERB, "ß new \n");
 			_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateContributions));
-			_red->disableBroadcast();
-			_red->contribute({_my_index}); //add my local equivalences here
+			LOG(V3_VERB, "ß contributing %i\n", _swissat->stored_equivalences_to_share.size());
+			_red->contribute(std::move(_swissat->stored_equivalences_to_share));
 		}
 		_red->advance();
-#endif
+	#endif
 	}
 }
 
@@ -149,6 +159,7 @@ std::vector<int> SweepJob::aggregateContributions(std::list<std::vector<int>> &c
     for (const auto& contrib : contribs) {
         aggregated.insert(aggregated.end(), contrib.begin(), contrib.end());
     }
+	LOG(V3_VERB, "ß Aggregated %i \n", totalSize);
     return aggregated;
 }
 

@@ -76,6 +76,8 @@ public:
             return receive(h.source, h.tag, msg);
         }) {
 
+        LOG(V3_VERB, "ß neww \n");
+
         int leftRank = _tree.leftChildNodeRank;
         int rightRank = _tree.rightChildNodeRank;
         _expected_child_ranks = IntPair(leftRank, rightRank);
@@ -102,7 +104,6 @@ public:
     void contribute(AllReduceElement&& localProducer) {
         assert(!_contributed);
         _contributed = true;
-        LOG(V3_VERB, "ß store \n");
         _local_elem = std::move(localProducer);
     }
 
@@ -143,7 +144,7 @@ private:
 
         if (tag == MSG_JOB_TREE_MODULAR_REDUCE) {
             LOG(V2_INFO, "REDUCE\n");
-            LOG(V3_VERB, "ß received message of length %i from source %i\n", msg.payload.size(), source);
+            LOG(V3_VERB, "ß received %i from %i\n", msg.payload.size(), source);
 
             if (_aggregating || _future_aggregate.valid() || _reduction_locally_done) 
                 return false; // already internally aggregating elements (or already done)!
@@ -165,6 +166,7 @@ private:
         }
         if (tag == MSG_JOB_TREE_MODULAR_BROADCAST && _broadcast_enabled) {
             LOG(V2_INFO, "BROADCAST\n");
+            LOG(V3_VERB, "ß bcast from %i\n", source);
             receiveAndForwardFinalElem(std::move(msg.payload));
         }
         return true;
@@ -192,7 +194,7 @@ public:
                 for (auto& childElem : _child_elems) elemsList.push_back(std::move(childElem.elem));
                 _aggregated_elem = _aggregator(elemsList);
                 _aggregating = false;
-                LOG(V3_VERB, "ß Aggregated %i \n", _aggregated_elem->size());
+                // LOG(V3_VERB, "ß Aggregated %i \n", _aggregated_elem->size());
             });
         }
 
@@ -218,7 +220,7 @@ public:
                 }
             } else {
                 // Send to parent
-                LOG(V3_VERB, "ß sending %i to parent %i\n", _aggregated_elem->size(), _parent_index);
+                LOG(V3_VERB, "ß sending %i to %i\n", _aggregated_elem->size(), _parent_index);
 
                 _base_msg.payload = std::move(_aggregated_elem.value());
                 _base_msg.treeIndexOfDestination = _parent_index;
@@ -272,18 +274,22 @@ public:
     }
 
     ~JobTreeAllReduction() {
+        LOG(V3_VERB, "destroy\n");
         destroy();
+        LOG(V3_VERB, "destroyed\n");
     }
 
 private:
     void receiveFinalElem(AllReduceElement&& elem) {
-        LOG(V3_VERB, " -- storing final element -- \n");
+        LOG(V3_VERB, "ß -- received all elements -- \n");
         _finished = true;
         _base_msg.payload = std::move(elem);
     }
 
     void receiveAndForwardFinalElem(AllReduceElement&& elem) {
+        //put the full reduced data into _base_msg
         receiveFinalElem(std::move(elem));
+        //share with children
         if (_expected_child_ranks.first >= 0) {
             _base_msg.treeIndexOfDestination = _expected_child_indices.first;
             _base_msg.contextIdOfDestination = _expected_child_ctx_ids.first;

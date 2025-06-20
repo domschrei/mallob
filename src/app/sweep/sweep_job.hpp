@@ -24,7 +24,7 @@ private:
 
 
     std::unique_ptr<JobTreeAllReduction> _red;
-    bool _have_new_data_to_contribute{true};
+    // bool _have_new_data_to_contribute{true};
     static const int ALLRED {2};
 
     static const int MSG_SWEEP = 100; // internal message tag

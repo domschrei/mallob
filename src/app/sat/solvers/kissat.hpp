@@ -28,10 +28,10 @@ private:
     std::vector<int> producedClause;
 
 	//For shared equivalence sweeping
-	std::vector<int> learntEquivalenceBuffer;    //transfer a single equivalence from kissat to Mallob::Kissat
-    std::vector<int> producedEquivalenceBuffer;  //transfer a single equivalence from Mallob::Kissat to kissat
-    std::vector<int> stored_equivalences_to_share; //accumulate equivalences from export for the next sharing
-    std::vector<int> stored_equivalences_to_import; //accumulate equivalences from sharing for the next import
+	std::vector<int> learntEquivalenceBuffer;    //transfer a single equivalence up (from kissat to Mallob::Kissat)
+    std::vector<int> producedEquivalenceBuffer;  //transfer a single equivalence down (from Mallob::Kissat to kissat)
+    std::vector<int> stored_equivalences_to_share; //accumulate exported equivalences from local solver, to share
+    std::vector<int> stored_equivalences_to_import; //accumulate share-received equivalences, to import in local solver
 	const int MAX_STORED_EQUIVALENCES = 1000;
 	const int MAX_STORED_EQUIVALENCES_SIZE = MAX_STORED_EQUIVALENCES * 2;
 	friend class SweepJob;
