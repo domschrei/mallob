@@ -119,9 +119,19 @@ public:
 
     inline void submit(LratOp& op) {
         auto type = op.getType();
-        if (type == LratOp::DERIVATION) submitProduceClause(op.getId(), op.getLits(), op.getNbLits(), op.getHints(), op.getNbHints(), op.getGlue() > 0);
+        if (type == LratOp::DERIVATION) {
+            if (op.isDratDerivation())
+                submitProduceDRUPClause(op.getLits(), op.getNbLits(), op.getGlue() > 0);
+            else
+                submitProduceLRUPClause(op.getId(), op.getLits(), op.getNbLits(), op.getHints(), op.getNbHints(), op.getGlue() > 0);
+        }
         else if (type == LratOp::IMPORT) submitImportClause(op.getId(), op.getLits(), op.getNbLits(), op.getSignature());
-        else if (type == LratOp::DELETION) submitDeleteClauses(op.getHints(), op.getNbHints());
+        else if (type == LratOp::DELETION) {
+            if (op.isDratDeletion())
+                submitDeleteDRUPClause(op.getLits(), op.getNbLits());
+            else
+                submitDeleteLRUPClauses(op.getHints(), op.getNbHints());
+        }
         else if (type == LratOp::VALIDATION_UNSAT) submitValidateUnsat();
         else if (type == LratOp::VALIDATION_SAT) submitValidateSat();
         else if (type == LratOp::TERMINATION) submitTerminate();
@@ -132,9 +142,19 @@ public:
         bool ok = _op_queue.pollBlocking(op);
         if (!ok) return false;
         auto type = op.getType();
-        if (type == LratOp::DERIVATION) res = acceptProduceClause(sig, op.getGlue() > 0);
+        if (type == LratOp::DERIVATION) {
+            if (op.isDratDerivation())
+                res = acceptProduceDRUPClause(&op.getId(), sig, op.getGlue() > 0);
+            else
+                res = acceptProduceLRUPClause(&op.getId(), sig, op.getGlue() > 0);
+        }
         else if (type == LratOp::IMPORT) res = acceptImportClause();
-        else if (type == LratOp::DELETION) res = acceptDeleteClauses();
+        else if (type == LratOp::DELETION) {
+            if (op.isDratDeletion())
+                res = acceptDeleteDRUPClause();
+            else
+                res = acceptDeleteLRUPClauses();
+        }
         else if (type == LratOp::VALIDATION_UNSAT) res = acceptValidateUnsat();
         else if (type == LratOp::VALIDATION_SAT) res = acceptValidateSat();
         else if (type == LratOp::TERMINATION) res = acceptTerminate();
@@ -169,7 +189,7 @@ private:
         _error_reported = true;
     }
 
-    inline void submitProduceClause(unsigned long id, const int* literals, int nbLiterals,
+    inline void submitProduceLRUPClause(unsigned long id, const int* literals, int nbLiterals,
         const unsigned long* hints, int nbHints, bool share) {
 
         writeDirectiveType(TRUSTED_CHK_CLS_PRODUCE);
@@ -180,12 +200,34 @@ private:
         TrustedUtils::writeUnsignedLongs(hints, nbHints, _f_directives);
         TrustedUtils::writeChar(share ? 1 : 0, _f_directives);
     }
-    inline bool acceptProduceClause(u8* sig, bool readSig) {
+    inline bool acceptProduceLRUPClause(unsigned long* id, u8* sig, bool readSig) {
         if (!awaitResponse()) {
             handleError("Clause derivation not accepted");
             return false;
         }
+        // Read the computed signature from the checker
+        // TODO also read an (adjusted) ID back from the checker into *id?
         if (readSig) TrustedUtils::readSignature(sig, _f_feedback);
+        return true;
+    }
+
+    inline void submitProduceDRUPClause(const int* literals, int nbLiterals, bool share) {
+
+        writeDirectiveType(TRUSTED_CHK_CLS_PRODUCE);
+        TrustedUtils::writeInt(nbLiterals, _f_directives);
+        TrustedUtils::writeInts(literals, nbLiterals, _f_directives);
+        TrustedUtils::writeChar(share ? 1 : 0, _f_directives);
+    }
+    inline bool acceptProduceDRUPClause(unsigned long* id, u8* sig, bool readSig) {
+        if (!awaitResponse()) {
+            handleError("Clause derivation not accepted");
+            return false;
+        }
+        if (readSig) {
+            // Read the inferred LRUP ID and the computed signature from the checker
+            *id = TrustedUtils::readUnsignedLong(_f_feedback);
+            TrustedUtils::readSignature(sig, _f_feedback);
+        }
         return true;
     }
 
@@ -206,13 +248,27 @@ private:
         return true;
     }
 
-    inline void submitDeleteClauses(const unsigned long* ids, int nbIds) {
+    inline void submitDeleteLRUPClauses(const unsigned long* ids, int nbIds) {
 
         writeDirectiveType(TRUSTED_CHK_CLS_DELETE);
         TrustedUtils::writeInt(nbIds, _f_directives);
         TrustedUtils::writeUnsignedLongs(ids, nbIds, _f_directives);
     }
-    inline bool acceptDeleteClauses() {
+    inline bool acceptDeleteLRUPClauses() {
+        if (!awaitResponse()) {
+            handleError("Error in deletion of clauses");
+            return false;
+        }
+        return true;
+    }
+
+    inline void submitDeleteDRUPClause(const int* lits, int nbLits) {
+
+        writeDirectiveType(TRUSTED_CHK_CLS_DELETE);
+        TrustedUtils::writeInt(nbLits, _f_directives);
+        TrustedUtils::writeInts(lits, nbLits, _f_directives);
+    }
+    inline bool acceptDeleteDRUPClause() {
         if (!awaitResponse()) {
             handleError("Error in deletion of clauses");
             return false;

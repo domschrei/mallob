@@ -83,7 +83,7 @@ public:
                 _printer.printEndLoadingDirective();
                 sayWithFlush(_ts->endLoading());
 
-            } else if (c == TRUSTED_CHK_CLS_PRODUCE) {
+            } else if (c == TRUSTED_CHK_CLS_PRODUCE_LRUP) {
 
                 // parse
                 const unsigned long id = readId();
@@ -115,7 +115,7 @@ public:
                 say(res);
                 nbImported++;
 
-            } else if (c == TRUSTED_CHK_CLS_DELETE) {
+            } else if (c == TRUSTED_CHK_CLS_DELETE_LRUP) {
                 
                 // parse
                 int nbHints = TrustedUtils::readInt(_input);
