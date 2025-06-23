@@ -456,6 +456,7 @@ void Kissat::consumeEquivalence(int **equivalence) {
     if (stored_equivalences_to_import.empty()) {
        *equivalence = 0;
     } else {
+        printf("ß polling eq storage %lu\n", stored_equivalences_to_import.size());
         producedEquivalenceBuffer[0] = stored_equivalences_to_import.back(); stored_equivalences_to_import.pop_back();
         producedEquivalenceBuffer[1] = stored_equivalences_to_import.back(); stored_equivalences_to_import.pop_back();
         *equivalence = producedEquivalenceBuffer.data();

@@ -4,8 +4,7 @@
 
 #include "app/job.hpp"
 #include "../sat/solvers/kissat.hpp"
-
-#include "comm/job_tree_all_reduction_modular.hpp"
+#include "comm/job_tree_all_reduction.hpp"
 
 
 class SweepJob : public Job {

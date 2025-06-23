@@ -4,7 +4,7 @@
 
 #include "app/job.hpp"
 #include "app/job_tree.hpp"
-//#include "comm/job_tree_all_reduction_mo.hpp"
+// #include "comm/job_tree_all_reduction.hpp"
 #include "util/logger.hpp"
 
 #define SWEEP_COMM_TYPE 2
@@ -35,28 +35,27 @@ void SweepJob::appl_start() {
 	_swissat.reset(new Kissat(setup));
 	_swissat->set_option("mallob_solver_id", _my_index);
 	_swissat->set_option("mallob_solver_count", NUM_WORKERS);
-	_swissat->set_option("mallob_custom_sweep_verbosity", 0); //0: No messages. 1: Some. 2: Verbose
+	_swissat->set_option("mallob_custom_sweep_verbosity", 0); //0: No custom messages. 1: Some. 2: Verbose
 	_swissat->activateLearnedEquivalenceCallbacks();
 
     // Basic configuration options for all solvers
-    _swissat->set_option("quiet", 1); // do not log to stdout / stderr
+    _swissat->set_option("quiet", 0); // do not log to stdout / stderr
     _swissat->set_option("check", 0); // do not check model or derived clauses
-    _swissat->set_option("factor", 0); // do not perform bounded variable addition
-    _swissat->set_option("profile",3);
-	_swissat->set_option("seed", 0);
+    _swissat->set_option("profile",3); // do detailed profiling how much time we spent where
+	_swissat->set_option("seed", 0);   // always start with the same seed
 
 	_swissat->set_option("sweep", 1); //We want sweeping
-	_swissat->set_option("simplify", 0); //If we deactivate simplify, then sweep is scheduled muss less somehow. To see much sweeping, keep simplify for now.
+	_swissat->set_option("simplify", 0); //Not sure whether we should keep simplify during testing
 
-	_swissat->set_option("eliminate", 0); //No BVE
-	_swissat->set_option("substitute", 0);
+    _swissat->set_option("factor", 0); // do not perform bounded variable addition
+	_swissat->set_option("eliminate", 0); //No Bounded Variable Elimination
+	_swissat->set_option("substitute", 0); //No equivalent literal substitution (both obstruct import)
 
 	_swissat->set_option("lucky", 0); //For less noise/simplicity during development, also deactivate all these
-	_swissat->set_option("congruence", 0);
-	_swissat->set_option("substitute", 0);
-	_swissat->set_option("backbone", 0);
-	_swissat->set_option("eliminate", 0);
-	_swissat->set_option("transitive", 0);
+	_swissat->set_option("congruence", 1);
+	_swissat->set_option("backbone", 1);
+	_swissat->set_option("transitive", 1);
+	_swissat->set_option("vivify", 1);
 
 
 	_swissat_running_count++;
@@ -107,6 +106,7 @@ void SweepJob::appl_communicate() {
 		if (_red && _red->hasResult()) {
 			//store the received equivalences such that the local solver than eventually import them
 			auto share_received = _red->extractResult();
+			LOG(V3_VERB, "ß Received Broadcast. Size %i \n", share_received.size());
 			auto& local_store = _swissat->stored_equivalences_to_import;
 			local_store.reserve(local_store.size() + share_received.size());
 			local_store.insert(
@@ -114,7 +114,7 @@ void SweepJob::appl_communicate() {
 				std::make_move_iterator(share_received.begin()),
 				std::make_move_iterator(share_received.end())
 			);
-			LOG(V3_VERB, "ß Storing %i for local solver\n", local_store.size());
+			LOG(V3_VERB, "ß Total local storage size      %i \n", local_store.size());
 		}
 
 		bool reset_red = _red && !_red->isValid() && _red->isDestructible();
@@ -124,7 +124,7 @@ void SweepJob::appl_communicate() {
 			auto snapshot = getJobTree().getSnapshot();
 			JobMessage baseMsg = getMessageTemplate();
 			baseMsg.tag = ALLRED;
-			LOG(V3_VERB, "ß new \n");
+			// LOG(V3_VERB, "ß new \n");
 			_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateContributions));
 			LOG(V3_VERB, "ß contributing %i\n", _swissat->stored_equivalences_to_share.size());
 			_red->contribute(std::move(_swissat->stored_equivalences_to_share));
