@@ -6,7 +6,7 @@
 
 #include "app/job.hpp"
 #include "app/job_tree.hpp"
-#include "comm/job_tree_all_reduction.hpp"
+#include "comm/job_tree_basic_all_reduction.hpp"
 #include "comm/msgtags.h"
 #include "comm/mympi.hpp"
 #include "kmeans_utils.hpp"
@@ -16,7 +16,6 @@
 #include "util/sys/process.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "util/sys/timer.hpp"
-
 
 KMeansJob::KMeansJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table)
     : Job(params, setup, table) {
@@ -96,7 +95,7 @@ void KMeansJob::initReducer(JobMessage& msg) {
     // msg.payload = clusterCentersToBroadcast(clusterCenters);
     // msg.payload.push_back(countCurrentWorkers);
 
-    _reducer.reset(new JobTreeAllReduction(tempJobTree,
+    _reducer.reset(new JobTreeBasicAllReduction(tempJobTree.getSnapshot(),
                                           JobMessage(getId(), getContextId(),
                                                      getRevision(),
                                                      1,

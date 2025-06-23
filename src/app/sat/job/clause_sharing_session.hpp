@@ -1,7 +1,6 @@
 
 #pragma once
 
-#include "app/job_tree.hpp"
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/job/clause_sharing_actor.hpp"
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
@@ -13,8 +12,7 @@
 #include "data/job_transfer.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
-#include "base_sat_job.hpp"
-#include "comm/job_tree_all_reduction.hpp"
+#include "comm/job_tree_basic_all_reduction.hpp"
 #include "historic_clause_storage.hpp"
 #include "app/sat/sharing/filter/in_place_clause_filtering.hpp"
 #include "util/random.hpp"
@@ -43,8 +41,8 @@ private:
     int _num_admitted_clauses;
     long long _best_found_solution_cost;
 
-    JobTreeAllReduction _allreduce_clauses;
-    std::optional<JobTreeAllReduction> _allreduce_filter;
+    JobTreeBasicAllReduction _allreduce_clauses;
+    std::optional<JobTreeBasicAllReduction> _allreduce_filter;
 
     SplitMix64Rng _rng;
 

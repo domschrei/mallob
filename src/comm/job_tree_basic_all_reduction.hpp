@@ -4,24 +4,21 @@
 #include <list>
 #include <set>
 
+#include "app/job_tree.hpp"
 #include "comm/job_tree_snapshot.hpp"
-#include "comm/msg_queue/cond_message_subscription.hpp"
-#include "comm/msgtags.h"
-#include "data/serializable.hpp"
 #include "util/logger.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "data/job_transfer.hpp"
 
-class JobTreeAllReduction {
+class JobTreeBasicAllReduction {
 
 public:
     typedef std::vector<int> AllReduceElement;
 
 private:
-    JobTreeSnapshot _tree;
     JobMessage _base_msg;
     AllReduceElement _neutral_elem;
-
+    
     std::optional<AllReduceElement> _local_elem;
 
     // Sort arrived child elems by source rank
@@ -53,30 +50,17 @@ private:
     bool _has_transformation_at_root = false;
     std::function<AllReduceElement(const AllReduceElement&)> _transformation_at_root;
 
-    bool _contributed = false;
+    bool _has_contributed = false;
     bool _reduction_locally_done = false;
     bool _finished = false;
     bool _valid = true;
     bool _broadcast_enabled = true;
 
-    CondMessageSubscription _sub_aggregate;
-    CondMessageSubscription _sub_broadcast;
-
 public:
-    JobTreeAllReduction(const JobTreeSnapshot& tree, JobMessage baseMsg, AllReduceElement&& neutralElem, 
+    JobTreeBasicAllReduction(const JobTreeSnapshot& _tree, JobMessage baseMsg, AllReduceElement&& neutralElem, 
             std::function<AllReduceElement(std::list<AllReduceElement>&)> aggregator) :
-        _tree(tree), _base_msg(baseMsg), _neutral_elem(std::move(neutralElem)),
-        _num_expected_child_elems(_tree.nbChildren), _aggregator(aggregator),
-        _sub_aggregate(MSG_JOB_TREE_MODULAR_REDUCE, [this](MessageHandle& h) {
-            JobMessage msg = Serializable::get<JobMessage>(h.getRecvData());
-            return receive(h.source, h.tag, msg);
-        }), _sub_broadcast(MSG_JOB_TREE_MODULAR_BROADCAST, [this](MessageHandle& h) {
-            LOG(V2_INFO, "BROADCAST\n");
-            JobMessage msg = Serializable::get<JobMessage>(h.getRecvData());
-            return receive(h.source, h.tag, msg);
-        }) {
-
-        LOG(V3_VERB, "ß neww \n");
+        _base_msg(baseMsg), _neutral_elem(std::move(neutralElem)), 
+        _num_expected_child_elems(_tree.nbChildren), _aggregator(aggregator) {
 
         int leftRank = _tree.leftChildNodeRank;
         int rightRank = _tree.rightChildNodeRank;
@@ -100,11 +84,26 @@ public:
         _base_msg.contextIdOfSender = _tree.contextId;
     }
 
-    // Contribute to the all-reduction.
-    void contribute(AllReduceElement&& localProducer) {
-        assert(!_contributed);
-        _contributed = true;
-        _local_elem = std::move(localProducer);
+    void pruneChild(int rank) {
+        assert(rank >= 0);
+        bool left = rank == _expected_child_ranks.first;
+        bool right = rank == _expected_child_ranks.second;
+        if (left && !_received_child_elems.first) {
+            _expected_child_ranks.first = -1;
+            _num_expected_child_elems--;
+        }
+        if (right && !_received_child_elems.second) {
+            _expected_child_ranks.second = -1;
+            _num_expected_child_elems--;
+        }
+    }
+
+    // Set the function to compute the local contribution for the all-reduction.
+    // This function is invoked immediately
+    void produce(std::function<AllReduceElement()> localProducer) {
+        assert(!_has_contributed);
+        _has_contributed = true;
+        _local_elem = localProducer();
     }
 
     void setTransformationOfElementAtRoot(std::function<AllReduceElement(const AllReduceElement&)> transformation) {
@@ -115,36 +114,22 @@ public:
     void enableBroadcast() {
         _broadcast_enabled = true;
     }
+
     void disableBroadcast() {
         _broadcast_enabled = false;
     }
 
-    const JobTreeSnapshot& getJobTreeSnapshot() const {
-        return _tree;
-    }
-
-private:
     // Process an incoming message and advance the all-reduction accordingly. 
     bool receive(int source, int tag, JobMessage& msg) {
 
-        assert(tag == MSG_JOB_TREE_MODULAR_REDUCE || tag == MSG_JOB_TREE_MODULAR_BROADCAST);
-
-        LOG(V2_INFO, "TRY REDUCE %i %i %i %i %i\n", tag, msg.epoch, _base_msg.epoch, msg.tag, _base_msg.tag);
+        assert(tag == MSG_JOB_TREE_REDUCTION || tag == MSG_JOB_TREE_BROADCAST);
 
         bool accept = msg.epoch == _base_msg.epoch 
                     //&& msg.revision == _base_msg.revision 
                     && msg.tag == _base_msg.tag;
         if (!accept) return false;
 
-        if (msg.returnedToSender) {
-            LOG(V2_INFO, "REDUCE returnedToSender\n");
-            msg.swapSenderReceiver();
-            return true;
-        }
-
-        if (tag == MSG_JOB_TREE_MODULAR_REDUCE) {
-            LOG(V2_INFO, "REDUCE\n");
-            LOG(V3_VERB, "ß received %i from %i\n", msg.payload.size(), source);
+        if (tag == MSG_JOB_TREE_REDUCTION) {
 
             if (_aggregating || _future_aggregate.valid() || _reduction_locally_done) 
                 return false; // already internally aggregating elements (or already done)!
@@ -156,36 +141,28 @@ private:
             if (!accept) return false;
             
             // message accepted: store and check off
-            // LOG(V3_VERB, "ß storing message of length %i from source %i\n", msg.payload.size(), source);
             _child_elems.insert({source, std::move(msg.payload)});
-            // LOG(V3_VERB, "ß Now having %i child elements\n", _child_elems.size());
             if (fromLeftChild) _received_child_elems.first = true;
             if (fromRightChild) _received_child_elems.second = true;
             LOG_ADD_SRC(V5_DEBG, "CS got %i/%i elems", source, _child_elems.size(), _num_expected_child_elems);
             advance();
         }
-        if (tag == MSG_JOB_TREE_MODULAR_BROADCAST && _broadcast_enabled) {
-            LOG(V2_INFO, "BROADCAST\n");
-            LOG(V3_VERB, "ß bcast from %i\n", source);
+        if (tag == MSG_JOB_TREE_BROADCAST && _broadcast_enabled) {
             receiveAndForwardFinalElem(std::move(msg.payload));
         }
         return true;
     }
 
-public:
     // Advances the all-reduction, e.g., because the local producer finished
     // or the aggregation function finished. No-op if getResult() was already called.
-    JobTreeAllReduction& advance() {
+    JobTreeBasicAllReduction& advance() {
 
-        // LOG(V3_VERB, "ß advance()\n");
         if (_finished) return *this;
 
         if (_child_elems.size() == _num_expected_child_elems && _local_elem.has_value()) {
              
             _child_elems.insert({-1, std::move(_local_elem.value())});
             _local_elem.reset();
-
-            // LOG(V3_VERB, "ß Combined element size %i \n", _child_elems.size());
 
             assert(!_future_aggregate.valid());
             _aggregating = true;
@@ -194,11 +171,8 @@ public:
                 for (auto& childElem : _child_elems) elemsList.push_back(std::move(childElem.elem));
                 _aggregated_elem = _aggregator(elemsList);
                 _aggregating = false;
-                // LOG(V3_VERB, "ß Aggregated %i \n", _aggregated_elem->size());
             });
         }
-
-        // LOG(V3_VERB, "ß Could send now to %i, agg=%i, valid=%i \n", _parent_index, _aggregating, _future_aggregate.valid());
 
         if (!_aggregating && _future_aggregate.valid()) {
             // Aggregation done
@@ -220,12 +194,10 @@ public:
                 }
             } else {
                 // Send to parent
-                LOG(V3_VERB, "ß sending %i to %i\n", _aggregated_elem->size(), _parent_index);
-
                 _base_msg.payload = std::move(_aggregated_elem.value());
                 _base_msg.treeIndexOfDestination = _parent_index;
                 _base_msg.contextIdOfDestination = _parent_ctx_id;
-                MyMpi::isend(_parent_rank, MSG_JOB_TREE_MODULAR_REDUCE, _base_msg);
+                MyMpi::isend(_parent_rank, MSG_JOB_TREE_REDUCTION, _base_msg);
             }
         }
 
@@ -241,14 +213,14 @@ public:
             _base_msg.payload = _neutral_elem;
             _base_msg.treeIndexOfDestination = _parent_index;
             _base_msg.contextIdOfDestination = _parent_ctx_id;
-            MyMpi::isend(_parent_rank, MSG_JOB_TREE_MODULAR_REDUCE, _base_msg);
+            MyMpi::isend(_parent_rank, MSG_JOB_TREE_REDUCTION, _base_msg);
         }
         // finished but not valid
         _finished = true;
         _valid = false;
     }
 
-    bool hasContribution() const {return _contributed;}
+    bool hasProducer() const {return _has_contributed;}
     bool isValid() const {return _valid;}
 
     // Whether the final result to the all-reduction is present.
@@ -270,37 +242,30 @@ public:
     }
 
     void destroy() {
-        //TODO: Crashes here when we destroy this object, due to .get()
-        //Don't destroy the object?
         if (_future_aggregate.valid()) _future_aggregate.get();
     }
 
-    ~JobTreeAllReduction() {
-        LOG(V3_VERB, "destroy\n");
+    ~JobTreeBasicAllReduction() {
         destroy();
-        LOG(V3_VERB, "destroyed\n");
     }
 
 private:
     void receiveFinalElem(AllReduceElement&& elem) {
-        LOG(V3_VERB, "ß -- received all elements -- \n");
         _finished = true;
         _base_msg.payload = std::move(elem);
     }
 
     void receiveAndForwardFinalElem(AllReduceElement&& elem) {
-        //put the full reduced data into _base_msg
         receiveFinalElem(std::move(elem));
-        //share with children
         if (_expected_child_ranks.first >= 0) {
             _base_msg.treeIndexOfDestination = _expected_child_indices.first;
             _base_msg.contextIdOfDestination = _expected_child_ctx_ids.first;
-            MyMpi::isend(_expected_child_ranks.first, MSG_JOB_TREE_MODULAR_BROADCAST, _base_msg);
+            MyMpi::isend(_expected_child_ranks.first, MSG_JOB_TREE_BROADCAST, _base_msg);
         }
         if (_expected_child_ranks.second >= 0) {
             _base_msg.treeIndexOfDestination = _expected_child_indices.second;
             _base_msg.contextIdOfDestination = _expected_child_ctx_ids.second;
-            MyMpi::isend(_expected_child_ranks.second, MSG_JOB_TREE_MODULAR_BROADCAST, _base_msg);
+            MyMpi::isend(_expected_child_ranks.second, MSG_JOB_TREE_BROADCAST, _base_msg);
         }
     }
 };

@@ -59,7 +59,7 @@ In the `cmake` call, you can use the following Mallob-specific build options:
 
 ## Testing
 
-**Note:** In its current state, the test suite expects that Mallob is built and run with OpenMPI, i.e., that `mpicc` and `mpicxx` (for building) and `mpirun` (for execution) link to OpenMPI executables on your system. For other MPI implementations, you may still be able to run the tests by removing or replacing the option `--oversubscribe` from the function `run()` in `scripts/run/systest_commons.sh`.
+**Note:** By default, the test suite expects that Mallob is built and run with OpenMPI, i.e., that `mpirun` links to an OpenMPI executable on your system. For deviating MPI implementations, e.g., MPICH, try to prepend `mpiimpl=mpich` to the call `bash scripts/run/systest_commons.sh`.
 
 In order to test that the system has been built and set up correctly, run the following command.
 ```
@@ -69,3 +69,4 @@ This will locally run a suite of automated tests which cover the basic functiona
 To include Glucose in the tests, prepend the above command with "GLUCOSE=1".
 Running the tests takes a few minutes and in the end "All tests done." should be output.
 In case of problems, you can consult [develop.md -> Debugging Mallob](develop.md#debugging-mallob) for some notes on how Mallob runs can be diagnosed and debugged appropriately.
+You can also prepend `nocleanup=1` to the call of the script in order to keep all log and trace files so that you can examine them.

@@ -16,8 +16,8 @@ void register_mallob_app_dummy() {
         },
         // Job creator
         [](const Parameters& params, const Job::JobSetup& setup, AppMessageTable& table) -> Job* {
-            //return new CollectivesExampleJob(params, setup, table);
-            return new PointToPointExampleJob(params, setup, table);
+            return new CollectivesExampleJob(params, setup, table);
+            //return new PointToPointExampleJob(params, setup, table);
         },
         // Job solution formatter
         [](const Parameters& params, const JobResult& result, const JobProcessingStatistics& stat) {

@@ -3,7 +3,7 @@
 
 #include "app/job.hpp"
 #include "comm/job_tree_broadcast.hpp"
-#include "comm/job_tree_all_reduction_modular.hpp"
+#include "comm/job_tree_all_reduction.hpp"
 #include "data/job_state.h"
 #include "data/job_transfer.hpp"
 #include "util/logger.hpp"
@@ -112,10 +112,10 @@ public:
     // In our case, this is the case when no background task is pending.
     // Note that, as long as this returns false, 
     bool appl_isDestructible() override {
-        if (_bcast) return false;
         // you can, and need to, advance communication at this point
         // so that everything that is still going on can conclude nicely
-        if (_red) appl_communicate();
+        appl_communicate();
+        if (_bcast) return false;
         if (_red) return false;
         return true; // all communication and background computation concluded
     }

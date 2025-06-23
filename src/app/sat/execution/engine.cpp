@@ -48,7 +48,7 @@ class LratConnector;
 using namespace SolvingStates;
 
 SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, Logger& loggingInterface) : 
-			_params(params), _config(config), _logger(loggingInterface), _state(INITIALIZING) {
+			_params(params), _config(config), _logger(loggingInterface), _prefilter(params), _state(INITIALIZING) {
 
     int appRank = config.apprank;
 
@@ -299,8 +299,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 
 	_sharing_manager.reset(new SharingManager(_solver_interfaces, _params, _logger, 
 		/*max. deferred literals per solver=*/5*config.maxBroadcastedLitsPerCycle, config.apprank));
+	_sharing_manager->setClausePrefilter(_prefilter);
 	LOGGER(_logger, V5_DEBG, "initialized\n");
-
 }
 
 std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSetup& setup) {
@@ -362,6 +362,7 @@ void SatEngine::appendRevision(int revision, RevisionData data, bool lastRevisio
 	assert(_revision+1 == revision);
 	_revision_data.push_back(data);
 	_sharing_manager->setImportedRevision(revision);
+	_prefilter.notifyFormula(data.fLits, data.fSize);
 	
 	for (size_t i = 0; i < _num_active_solvers; i++) {
 		if (revision == 0) {
