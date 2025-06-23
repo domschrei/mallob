@@ -430,7 +430,7 @@ void Kissat::produceEquivalence() {
         stored_equivalences_to_share.push_back(lit2);
         // printf("ß Stored Eq (%i, %i) \n", lit1, lit2);
     } else  {
-        printf("ß Not enough space to store Eq (%i, %i)\n", lit1, lit2);
+        printf("ß Not enough space to store Eq for sharing, reached limit %lu \n",stored_equivalences_to_share.size());
     }
 }
 
@@ -456,7 +456,9 @@ void Kissat::consumeEquivalence(int **equivalence) {
     if (stored_equivalences_to_import.empty()) {
        *equivalence = 0;
     } else {
-        printf("ß polling eq storage %lu\n", stored_equivalences_to_import.size());
+        if (stored_equivalences_to_import.size()%100==0) {
+            printf("ß polling eq storage %lu\n", stored_equivalences_to_import.size());
+        }
         producedEquivalenceBuffer[0] = stored_equivalences_to_import.back(); stored_equivalences_to_import.pop_back();
         producedEquivalenceBuffer[1] = stored_equivalences_to_import.back(); stored_equivalences_to_import.pop_back();
         *equivalence = producedEquivalenceBuffer.data();

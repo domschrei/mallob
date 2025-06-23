@@ -45,17 +45,17 @@ void SweepJob::appl_start() {
 	_swissat->set_option("seed", 0);   // always start with the same seed
 
 	_swissat->set_option("sweep", 1); //We want sweeping
-	_swissat->set_option("simplify", 0); //Not sure whether we should keep simplify during testing
+	_swissat->set_option("simplify", 1); //Activating simplify extremely boosts the frequency that sweep is scheduled, so we take it
 
     _swissat->set_option("factor", 0); // do not perform bounded variable addition
 	_swissat->set_option("eliminate", 0); //No Bounded Variable Elimination
 	_swissat->set_option("substitute", 0); //No equivalent literal substitution (both obstruct import)
 
-	_swissat->set_option("lucky", 0); //For less noise/simplicity during development, also deactivate all these
-	_swissat->set_option("congruence", 1);
-	_swissat->set_option("backbone", 1);
-	_swissat->set_option("transitive", 1);
-	_swissat->set_option("vivify", 1);
+	_swissat->set_option("lucky", 0);     //These operations do not obstruct sweep, but to keep everything simple we deactivate them for now
+	_swissat->set_option("congruence", 0);
+	_swissat->set_option("backbone", 0);
+	_swissat->set_option("transitive", 0);
+	_swissat->set_option("vivify", 0);
 
 
 	_swissat_running_count++;
@@ -64,7 +64,7 @@ void SweepJob::appl_start() {
 		loadFormulaToSwissat();
 		LOG(V2_INFO, "Process starting Swissat %i \n", _my_index);
 		int res = _swissat->solve(0, nullptr);
-		LOG(V2_INFO, "Process finished Swissat %i, result %i\n", _my_index, res);
+		LOG(V2_INFO, "\n \n \n Process finished Swissat %i, result %i\n\n\n", _my_index, res);
 		_internal_result.id = getId();
 		_internal_result.revision = getRevision();
 		_internal_result.result=res;
@@ -103,6 +103,7 @@ void SweepJob::appl_communicate() {
 	#else
 
 	if (getVolume() == NUM_WORKERS && getJobComm().getWorldRankOrMinusOne(NUM_WORKERS-1) >= 0) {
+		LOG(V3_VERB, "ß comm. have %i \n", _swissat->stored_equivalences_to_share.size());
 		if (_red && _red->hasResult()) {
 			//store the received equivalences such that the local solver than eventually import them
 			auto share_received = _red->extractResult();
@@ -119,6 +120,9 @@ void SweepJob::appl_communicate() {
 
 		bool reset_red = _red && !_red->isValid() && _red->isDestructible();
 
+		if (_red) {
+			LOG(V3_VERB, "_red status: %b %b %b \n", _red->hasContribution(), _red->isValid(), _red->isDestructible());
+		}
 
 		if (!_red || !_red->hasContribution() || reset_red) {
 			auto snapshot = getJobTree().getSnapshot();

@@ -173,6 +173,11 @@ public:
 
         if (_finished) return *this;
 
+        LOG(V3_VERB, "local elem exist: %i \n ",  _local_elem.has_value());
+        LOG(V3_VERB, "child elem count: %i \n ", _child_elems.size());
+        LOG(V3_VERB, "child elem expec: %i \n ", _num_expected_child_elems);
+
+
         if (_child_elems.size() == _num_expected_child_elems && _local_elem.has_value()) {
              
             _child_elems.insert({-1, std::move(_local_elem.value())});
@@ -187,6 +192,8 @@ public:
                 _aggregating = false;
             });
         }
+
+        LOG(V3_VERB, "adv status: %i %i \n ", _aggregating, _future_aggregate.valid());
 
         if (!_aggregating && _future_aggregate.valid()) {
             // Aggregation done

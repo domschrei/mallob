@@ -32,7 +32,7 @@ private:
     std::vector<int> producedEquivalenceBuffer;  //transfer a single equivalence down (from Mallob::Kissat to kissat)
     std::vector<int> stored_equivalences_to_share; //accumulate exported equivalences from local solver, to share
     std::vector<int> stored_equivalences_to_import; //accumulate share-received equivalences, to import in local solver
-	const int MAX_STORED_EQUIVALENCES = 1000;
+	const int MAX_STORED_EQUIVALENCES = 10000;
 	const int MAX_STORED_EQUIVALENCES_SIZE = MAX_STORED_EQUIVALENCES * 2;
 	friend class SweepJob;
 
