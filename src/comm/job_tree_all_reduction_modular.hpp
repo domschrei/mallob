@@ -270,6 +270,8 @@ public:
     }
 
     void destroy() {
+        //TODO: Crashes here when we destroy this object, due to .get()
+        //Don't destroy the object?
         if (_future_aggregate.valid()) _future_aggregate.get();
     }
 
