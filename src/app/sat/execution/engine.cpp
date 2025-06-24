@@ -95,6 +95,9 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		ClauseMetadata::enableClauseIds();
 		if (_params.onTheFlyChecking()) {
 			ClauseMetadata::enableClauseSignatures();
+			if (_params.produceParallelProof()) {
+				FileUtils::mkdir(_params.proofDirectory());
+			}
 		}
 
 		if (_params.proofOutputFile.isSet()) {
@@ -287,6 +290,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		setup.certifiedUnsat = item.outputProof && (params.proofOutputFile.isSet() || params.onTheFlyChecking());
 		setup.onTheFlyChecking = setup.certifiedUnsat && params.onTheFlyChecking();
 		setup.onTheFlyCheckModel = params.onTheFlyChecking() && params.onTheFlyCheckModel();
+		setup.produceParallelProof = params.onTheFlyChecking() && params.produceParallelProof();
 		setup.modelCheckingLratConnector = modelCheckingLratConnector;
 		setup.avoidUnsatParticipation = (params.proofOutputFile.isSet() || params.onTheFlyChecking()) && !item.outputProof;
 		setup.exportClauses = !setup.avoidUnsatParticipation;

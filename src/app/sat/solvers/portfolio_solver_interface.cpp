@@ -72,6 +72,13 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 			_lrat = new LratConnector(_logger, _setup.localId, _setup.numVars,
 				createModelCheckingLratConn
 			);
+			// Do we use the ImpCheck mode that produces a parallel proof?
+			if (_setup.produceParallelProof) {
+				// Yes: mkdir and set the according option for the LRAT connector
+				std::string prepareDir = _setup.proofDir + "/" + std::to_string(_setup.globalId);
+				FileUtils::mkdir(prepareDir);
+				_lrat->getChecker().setProduceParallelProof(_setup.maxNumSolvers, _setup.globalId, _setup.proofDir);
+			}
 			if (createModelCheckingLratConn) _setup.modelCheckingLratConnector = _lrat;
 		} else {
 			// No: only create a model-checking LRATConnector if it is not precreated yet.

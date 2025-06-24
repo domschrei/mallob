@@ -48,6 +48,12 @@ private:
     std::vector<int> _model;
     Mutex _mtx_model;
 
+    // produce-parallel-proof parameters
+    bool _produce_parallel_proof {false};
+    int _max_num_solvers;
+    int _global_solver_id;
+    std::string _proof_directory;
+
 public:
     TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars, bool checkModel) :
             _logger(logger), _solver_id(solverId), _nb_vars(nbVars), _check_model(checkModel), _op_queue(1<<14) {}
@@ -60,6 +66,13 @@ public:
         FileUtils::rm(_path_feedback);
         FileUtils::rm(_path_directives);
         delete _subproc;
+    }
+
+    void setProduceParallelProof(int nbSolvers, int globalId, const std::string& proofDirectory) {
+        _produce_parallel_proof = true;
+        _max_num_solvers = nbSolvers;
+        _global_solver_id = globalId;
+        _proof_directory = proofDirectory;
     }
 
     void init(const u8* formulaSignature) {
@@ -79,6 +92,11 @@ public:
         params.fifoFeedback.set(_path_feedback);
         std::string moreArgs = "-lenient";
         if (_check_model) moreArgs += " -check-model";
+        if (_produce_parallel_proof) {
+            moreArgs += " -output-path=" + _proof_directory
+                + " -num-solvers=" + std::to_string(_max_num_solvers)
+                + " -solver-id=" + std::to_string(_global_solver_id);
+        }
         _subproc = new Subprocess(params, "impcheck_check", moreArgs);
         _child_pid = _subproc->start();
 
@@ -143,18 +161,10 @@ public:
         if (!ok) return false;
         auto type = op.getType();
         if (type == LratOp::DERIVATION) {
-            if (op.isDratDerivation())
-                res = acceptProduceDRUPClause(&op.getId(), sig, op.getGlue() > 0);
-            else
-                res = acceptProduceLRUPClause(&op.getId(), sig, op.getGlue() > 0);
+            res = acceptProduceClause(&op.getId(), sig, op.getGlue() > 0);
         }
         else if (type == LratOp::IMPORT) res = acceptImportClause();
-        else if (type == LratOp::DELETION) {
-            if (op.isDratDeletion())
-                res = acceptDeleteDRUPClause();
-            else
-                res = acceptDeleteLRUPClauses();
-        }
+        else if (type == LratOp::DELETION) res = acceptDeleteClause();
         else if (type == LratOp::VALIDATION_UNSAT) res = acceptValidateUnsat();
         else if (type == LratOp::VALIDATION_SAT) res = acceptValidateSat();
         else if (type == LratOp::TERMINATION) res = acceptTerminate();
@@ -200,17 +210,6 @@ private:
         TrustedUtils::writeUnsignedLongs(hints, nbHints, _f_directives);
         TrustedUtils::writeChar(share ? 1 : 0, _f_directives);
     }
-    inline bool acceptProduceLRUPClause(unsigned long* id, u8* sig, bool readSig) {
-        if (!awaitResponse()) {
-            handleError("Clause derivation not accepted");
-            return false;
-        }
-        // Read the computed signature from the checker
-        // TODO also read an (adjusted) ID back from the checker into *id?
-        if (readSig) TrustedUtils::readSignature(sig, _f_feedback);
-        return true;
-    }
-
     inline void submitProduceDRUPClause(const int* literals, int nbLiterals, bool share) {
 
         writeDirectiveType(TRUSTED_CHK_CLS_PRODUCE);
@@ -218,14 +217,14 @@ private:
         TrustedUtils::writeInts(literals, nbLiterals, _f_directives);
         TrustedUtils::writeChar(share ? 1 : 0, _f_directives);
     }
-    inline bool acceptProduceDRUPClause(unsigned long* id, u8* sig, bool readSig) {
+    inline bool acceptProduceClause(unsigned long* id, u8* sig, bool readSig) {
         if (!awaitResponse()) {
             handleError("Clause derivation not accepted");
             return false;
         }
         if (readSig) {
             // Read the inferred LRUP ID and the computed signature from the checker
-            *id = TrustedUtils::readUnsignedLong(_f_feedback);
+            if (_produce_parallel_proof) *id = TrustedUtils::readUnsignedLong(_f_feedback);
             TrustedUtils::readSignature(sig, _f_feedback);
         }
         return true;
@@ -254,27 +253,20 @@ private:
         TrustedUtils::writeInt(nbIds, _f_directives);
         TrustedUtils::writeUnsignedLongs(ids, nbIds, _f_directives);
     }
-    inline bool acceptDeleteLRUPClauses() {
-        if (!awaitResponse()) {
-            handleError("Error in deletion of clauses");
-            return false;
-        }
-        return true;
-    }
-
     inline void submitDeleteDRUPClause(const int* lits, int nbLits) {
 
         writeDirectiveType(TRUSTED_CHK_CLS_DELETE);
         TrustedUtils::writeInt(nbLits, _f_directives);
         TrustedUtils::writeInts(lits, nbLits, _f_directives);
     }
-    inline bool acceptDeleteDRUPClause() {
+    inline bool acceptDeleteClause() {
         if (!awaitResponse()) {
             handleError("Error in deletion of clauses");
             return false;
         }
         return true;
     }
+
 
     inline void submitValidateUnsat() {
         writeDirectiveType(TRUSTED_CHK_VALIDATE_UNSAT);
