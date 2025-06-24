@@ -14,6 +14,7 @@ MallobSat is the name of the distributed and malleable SAT solving engine that i
 
 MallobSat can (currently) only be executed by executing Mallob and then spawning or submitting one or several SAT solving tasks to Mallob.
 Option `-mono` is the seamless way to do this automatically for a single, specified SAT instance and then shut down Mallob as soon as the task is done.
+The involved initial overhead of scheduling the instance onto all available processing units is negligible.
 
 #### Do I need to obey the LGPL license?
 

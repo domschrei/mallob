@@ -27,6 +27,8 @@ The following list shows a few examples for how Mallob can be extended:
 
 Debugging of distributed applications can be difficult, especially in Mallob's case where message passing goes hand in hand with multithreading and inter-process communication. Here are some notes on how Mallob runs can be diagnosed and debugged appropriately.
 
+See also our [Frequently Asked Questions](faq.md) for some common issues.
+
 ### Build Options
 
 For debugging purposes, the following build switches are useful:
