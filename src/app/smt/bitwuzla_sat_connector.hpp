@@ -51,6 +51,8 @@ private:
     tsl::robin_set<int> _failed_lits;
 
     float _start_time {0};
+    bool _in_solved_state {false};
+    bzla::Result _result;
 
 public:
     BitwuzlaSatConnector(const Parameters& params, APIConnector& api, JobDescription& desc, const std::string& name) :
@@ -77,11 +79,13 @@ public:
     virtual const char* get_version() const override {return "N/A";}
 
     virtual void add(int32_t lit) override {
+        _in_solved_state = false;
         _lits.push_back(lit);
         _nb_vars = std::max(_nb_vars, std::abs(lit));
         _nb_clauses += lit == 0;
     }
     virtual void assume(int32_t lit) override {
+        _in_solved_state = false;
         _assumptions.push_back(lit);
     }
 
@@ -90,6 +94,8 @@ public:
     }
 
     virtual bzla::Result solve() override {
+        if (_in_solved_state) return _result;
+
         _job_stream.setTerminator([&]() {return isTimeoutHit();});
 
         _revision++;
@@ -117,7 +123,9 @@ public:
             for (int lit : solution) _failed_lits.insert(lit);
         }
 
-        return bzlaResult;
+        _in_solved_state = true;
+        _result = bzlaResult;
+        return _result;
     }
 
     virtual int32_t value(int32_t lit) override {
@@ -135,8 +143,7 @@ public:
     }
     virtual int32_t fixed(int32_t lit) override {
         // TODO
-        //assert(false);
-        return 0;
+        return 0; // -1: not implied, 1: implied, 0: unknown
     }
 
 private:
