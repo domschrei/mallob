@@ -32,9 +32,9 @@ void SweepJob::appl_start() {
 	// printf("ß [%i] Payload: %i vars, %i clauses \n", _my_index, setup.numVars, setup.numOriginalClauses);
 
 	_swissat.reset(new Kissat(setup));
-	_swissat->set_option("mallob_solver_id", _my_index);
-	_swissat->set_option("mallob_solver_count", NUM_WORKERS);
 	_swissat->set_option("mallob_custom_sweep_verbosity", 0); //0: No custom messages. 1: Some. 2: Verbose
+	_swissat->set_option("mallob_solver_count", NUM_WORKERS);
+	_swissat->set_option("mallob_solver_id", _my_index);
 	_swissat->activateLearnedEquivalenceCallbacks();
 
     // Basic configuration options for all solvers
