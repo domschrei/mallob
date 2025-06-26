@@ -1,8 +1,12 @@
 #!/bin/bash
 
-echo "Copying local sweep-kissat into mallob lib"
-# ( cd lib && bash fetch_and_build_solvers.sh kcly )
 KISSAT_SWEEP=$HOME/PhD/ksst-sweep/kissat/
 MALLOB_LIB=$HOME/PhD/mallob/lib/
-cp -r $KISSAT_SWEEP/src $MALLOB_LIB/kissat
-cp $KISSAT_SWEEP/build/libkissat.a $MALLOB_LIB/kissat/libkissat.a
+
+if cmp --silent -- "$KISSAT_SWEEP/build/libkissat.a" "$MALLOB_LIB/kissat/libkissat.a"; then
+  echo "Mallob lib: libkissat.a is already up to date. No Change"
+else
+  echo "Mallob lib: Updating libkissat.a via local source"
+  cp -r $KISSAT_SWEEP/src $MALLOB_LIB/kissat
+  cp $KISSAT_SWEEP/build/libkissat.a $MALLOB_LIB/kissat/libkissat.a
+fi

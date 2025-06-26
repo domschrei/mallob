@@ -58,6 +58,7 @@ private:
     bool _finished = false;
     bool _valid = true;
     bool _broadcast_enabled = true;
+    bool _parent_is_ready = false;
 
     CondMessageSubscription _sub_aggregate;
     CondMessageSubscription _sub_broadcast;
@@ -96,6 +97,9 @@ public:
         _is_root = _tree.index == 0;
         _base_msg.treeIndexOfSender = _tree.index;
         _base_msg.contextIdOfSender = _tree.contextId;
+        if (_is_root) {
+            _parent_is_ready = true; //root doesnt have any parents to wait for
+        }
     }
 
     // Contribute to the all-reduction.
@@ -115,6 +119,10 @@ public:
     }
     void disableBroadcast() {
         _broadcast_enabled = false;
+    }
+
+    void initializeReadyParent() {
+        _parent_is_ready = true;
     }
 
     const JobTreeSnapshot& getJobTreeSnapshot() const {
@@ -157,11 +165,17 @@ private:
             if (fromLeftChild) _received_child_elems.first = true;
             if (fromRightChild) _received_child_elems.second = true;
             LOG_ADD_SRC(V5_DEBG, "CS got %i/%i elems", source, _child_elems.size(), _num_expected_child_elems);
+            LOG(V3_VERB, "      Received from child %i \n", source);
             advance();
         }
         if (tag == MSG_JOB_TREE_MODULAR_BROADCAST && _broadcast_enabled) {
             LOG(V2_INFO, "BROADCAST\n");
             receiveAndForwardFinalElem(std::move(msg.payload));
+        }
+        if (tag == MSG_JOB_TREE_PARENT_IS_READY) {
+            LOG(V3_VERB, "      Learnt that parent is ready\n");
+            _parent_is_ready = true;
+            advance();
         }
         return true;
     }
@@ -173,9 +187,9 @@ public:
 
         if (_finished) return *this;
 
-        LOG(V3_VERB, "local elem exist: %i \n ",  _local_elem.has_value());
-        LOG(V3_VERB, "child elem count: %i \n ", _child_elems.size());
-        LOG(V3_VERB, "child elem expec: %i \n ", _num_expected_child_elems);
+        // LOG(V3_VERB, "local elem exist: %i \n ",  _local_elem.has_value());
+        // LOG(V3_VERB, "child elem count: %i \n ", _child_elems.size());
+        // LOG(V3_VERB, "child elem expec: %i \n ", _num_expected_child_elems);
 
 
         if (_child_elems.size() == _num_expected_child_elems && _local_elem.has_value()) {
@@ -193,9 +207,12 @@ public:
             });
         }
 
-        LOG(V3_VERB, "adv status: %i %i \n ", _aggregating, _future_aggregate.valid());
+        LOG(V3_VERB, "              adv status: _aggregating    = %i \n ", _aggregating);
+        LOG(V3_VERB, "              adv status: _future.valid() = %i \n ", _future_aggregate.valid());
+        LOG(V3_VERB, "              adv status: _child_elems    = %i \n ", _child_elems.size());
+        LOG(V3_VERB, "              adv status: _parent_is_ready= %i \n ", _parent_is_ready);
 
-        if (!_aggregating && _future_aggregate.valid()) {
+        if (!_aggregating && _future_aggregate.valid() && _parent_is_ready) {
             // Aggregation done
             LOG(V5_DEBG, "CS got aggregation\n");
 
@@ -209,6 +226,8 @@ public:
                 }
 
                 if (_broadcast_enabled) {// receive final elem and begin broadcast
+
+                    LOG(V3_VERB, "      root got all elements. broadcast \n ");
                     receiveAndForwardFinalElem(std::move(_aggregated_elem.value()));
                 } else { // only receive final elem
                     receiveFinalElem(std::move(_aggregated_elem.value()));
@@ -218,7 +237,9 @@ public:
                 _base_msg.payload = std::move(_aggregated_elem.value());
                 _base_msg.treeIndexOfDestination = _parent_index;
                 _base_msg.contextIdOfDestination = _parent_ctx_id;
+                LOG(V3_VERB, "      sending to parent %i \n ", _parent_index);
                 MyMpi::isend(_parent_rank, MSG_JOB_TREE_MODULAR_REDUCE, _base_msg);
+                _parent_is_ready = false;
             }
         }
 
@@ -252,7 +273,11 @@ public:
     AllReduceElement extractResult() {
         assert(hasResult());
         _valid = false;
-        return std::move(_base_msg.payload);
+        auto result = std::move(_base_msg.payload); //moving the payload now out of the base_msg
+                                                    //such that the base_msg is just a lightweight dummy when now messaging the children
+        LOG(V3_VERB, "tell children parent is ready\n");
+        tell_children_parent_is_ready();
+        return result;
     }
 
     // Whether this object can be destructed at this point in time 
@@ -287,6 +312,19 @@ private:
             _base_msg.treeIndexOfDestination = _expected_child_indices.second;
             _base_msg.contextIdOfDestination = _expected_child_ctx_ids.second;
             MyMpi::isend(_expected_child_ranks.second, MSG_JOB_TREE_MODULAR_BROADCAST, _base_msg);
+        }
+    }
+
+    void tell_children_parent_is_ready() {
+        if (_expected_child_ranks.first >= 0) {
+            _base_msg.treeIndexOfDestination = _expected_child_indices.first;
+            _base_msg.contextIdOfDestination = _expected_child_ctx_ids.first;
+            MyMpi::isend(_expected_child_ranks.first, MSG_JOB_TREE_PARENT_IS_READY, _base_msg);
+        }
+        if (_expected_child_ranks.second >= 0) {
+            _base_msg.treeIndexOfDestination = _expected_child_indices.second;
+            _base_msg.contextIdOfDestination = _expected_child_ctx_ids.second;
+            MyMpi::isend(_expected_child_ranks.second, MSG_JOB_TREE_PARENT_IS_READY, _base_msg);
         }
     }
 };

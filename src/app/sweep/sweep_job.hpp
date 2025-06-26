@@ -24,7 +24,8 @@ private:
 
     std::unique_ptr<JobTreeAllReduction> _red;
     // bool _have_new_data_to_contribute{true};
-    static const int ALLRED {2};
+    int ALLRED {2};
+    bool eq_sharing_started = false;
 
     static const int MSG_SWEEP = 100; // internal message tag
     static const int NUM_WORKERS = 4; // # workers we request and require, hardcoded 4 for now
