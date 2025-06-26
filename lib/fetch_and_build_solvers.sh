@@ -29,7 +29,7 @@ switch_to_sweep_kissat=$2
 #     echo "Use equivalence sweep forked kissat"
 # fi
 
-echo "switch to sweep kissat" $switch_to_sweep_kissat
+echo "fetching of solvers switches to sweep kissat" $switch_to_sweep_kissat
 
 #bash fetch_solvers.sh $solvers
 bash fetch_solvers_with_curl.sh $solvers $switch_to_sweep_kissat

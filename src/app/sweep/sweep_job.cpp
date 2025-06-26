@@ -1,7 +1,6 @@
 
 #include "sweep_job.hpp"
 
-
 #include "app/job.hpp"
 #include "app/job_tree.hpp"
 // #include "comm/job_tree_all_reduction.hpp"
