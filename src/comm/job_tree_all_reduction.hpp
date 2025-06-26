@@ -136,7 +136,6 @@ private:
 
         if (msg.returnedToSender) {
             LOG(V2_INFO, "REDUCE returnedToSender\n");
-            msg.swapSenderReceiver();
             return true;
         }
 

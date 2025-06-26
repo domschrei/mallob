@@ -57,6 +57,10 @@ public:
 
         LOG(V5_DEBG, "APPMSG RECV %lu <~ %lu [%i]\n", msg.contextIdOfDestination, msg.contextIdOfSender, source);
 
+        // A return-to-sender is always performed *without* adjusting any meta data in the message.
+        // So we need to swap the sender and receiver data now, on the receiving side.
+        if (msg.returnedToSender) msg.swapSenderReceiver();
+
         auto it = _app_msg_table.find(msg.contextIdOfDestination);
         if (it == _app_msg_table.end()) {
             LOG(V1_WARN, "[WARN] Job message for unregistered job #%i\n", msg.jobId);
