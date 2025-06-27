@@ -359,6 +359,7 @@ void ForkedSatJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
         return;
     }
     if (!_initialized) {
+        LOG(V1_WARN, " [WARN] Return to sender: ForkedSatJob::appl_communicate(): not initialized! \n");
         msg.returnToSender(source, mpiTag);
         return;
     }

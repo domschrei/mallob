@@ -455,9 +455,10 @@ void Kissat::consumeClause(int** clause, int* size, int* lbd) {
 void Kissat::consumeEquivalence(int **equivalence) {
     if (stored_equivalences_to_import.empty()) {
        *equivalence = 0;
+        // LOGGER(_logger, V3_VERB, "polling ended \n ");
     } else {
         if (stored_equivalences_to_import.size()%100==0) {
-            printf("ß polling eq storage %lu\n", stored_equivalences_to_import.size());
+            LOGGER(_logger, V3_VERB, "polling eq storeage %lu\n ", stored_equivalences_to_import.size());
         }
         producedEquivalenceBuffer[0] = stored_equivalences_to_import.back(); stored_equivalences_to_import.pop_back();
         producedEquivalenceBuffer[1] = stored_equivalences_to_import.back(); stored_equivalences_to_import.pop_back();

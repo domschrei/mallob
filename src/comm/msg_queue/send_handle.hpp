@@ -96,6 +96,9 @@ struct SendHandle {
 
     void sendNext(int sizePerBatch) {
 
+
+        LOG(V4_VVER, " ßß MPI sendNext: enter \n");
+
         assert(valid());
         assert(!isFinished() || LOG_RETURN_FALSE("Handle (n=%i) already finished!\n", sentBatches));
         auto& data = *dataPtr;
@@ -103,6 +106,7 @@ struct SendHandle {
         if (!isBatched()) {
             // Send first and only message
             //log(V5_DEBG, "MQ SEND SINGLE id=%i\n", id);
+            LOG(V4_VVER, " ßß MPI sendNext: sending to dest %i \n", dest);
             MPI_Isend(data.data(), data.size(), MPI_BYTE, dest, tag, MPI_COMM_WORLD, &request);
             sentBatches = 1;
             return;
@@ -135,7 +139,8 @@ struct SendHandle {
         memcpy(tempStorage.data()+(end-begin)+sizeof(int), &sentBatches, sizeof(int));
         memcpy(tempStorage.data()+(end-begin)+2*sizeof(int), &totalNumBatches, sizeof(int));
 
-        MPI_Isend(tempStorage.data(), msglen, MPI_BYTE, dest, 
+
+        MPI_Isend(tempStorage.data(), msglen, MPI_BYTE, dest,
                 tag+MSG_OFFSET_BATCHED, MPI_COMM_WORLD, &request);
 
         sentBatches++;

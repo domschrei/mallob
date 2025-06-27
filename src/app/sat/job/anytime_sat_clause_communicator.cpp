@@ -312,6 +312,7 @@ void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg, int so
 
     // reject the clause sharing initiation if you are not active right now
     if (_job->getState() != ACTIVE && !_job->getJobTree().isRoot()) {
+        LOG(V1_WARN, " [WARN] Return to sender: AnytimeSatClauseCommunicator::initiateClauseSharing: (State != active && not root) \n");
         msg.returnToSender(source, MSG_SEND_APPLICATION_MESSAGE);
         return;
     }
@@ -382,6 +383,7 @@ void AnytimeSatClauseCommunicator::initiateCrossSharing(JobMessage& msg, int sou
 
     // reject the cross-sharing initiation if the job is already terminated
     if (_job->getState() == PAST) {
+        LOG(V1_WARN, " [WARN] Return to sender: AnytimeSatClauseCommunicator::initiateCrossSharing: (State == PAST) \n");
         msg.returnToSender(source, MSG_SEND_APPLICATION_MESSAGE);
         return;
     }

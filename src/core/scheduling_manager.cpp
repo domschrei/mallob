@@ -141,6 +141,7 @@ SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm,
     // Initialize conditional callbacks
     MyMpi::getMessageQueue().initializeConditionalCallbacks(MSG_JOB_TREE_MODULAR_REDUCE);
     MyMpi::getMessageQueue().initializeConditionalCallbacks(MSG_JOB_TREE_MODULAR_BROADCAST);
+    MyMpi::getMessageQueue().initializeConditionalCallbacks(MSG_JOB_TREE_PARENT_IS_READY); //ßß
 }
 
 RequestMatcher* SchedulingManager::createRequestMatcher() {

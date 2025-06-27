@@ -32,7 +32,7 @@ void SweepJob::appl_start() {
 	// printf("ß [%i] Payload: %i vars, %i clauses \n", _my_index, setup.numVars, setup.numOriginalClauses);
 
 	_swissat.reset(new Kissat(setup));
-	_swissat->set_option("mallob_custom_sweep_verbosity", 0); //0: No custom messages. 1: Some. 2: Verbose
+	_swissat->set_option("mallob_custom_sweep_verbosity", 2); //0: No custom messages. 1: Some. 2: Verbose
 	_swissat->set_option("mallob_solver_count", NUM_WORKERS);
 	_swissat->set_option("mallob_solver_id", _my_index);
 	_swissat->activateLearnedEquivalenceCallbacks();
@@ -72,6 +72,7 @@ void SweepJob::appl_start() {
 		_swissat_running_count--;
 	});
 
+	LOG(V3_VERB, "ß finished appl_start\n");
 
 }
 
@@ -101,9 +102,19 @@ void SweepJob::appl_communicate() {
 	}
 	#else
 
+	// auto list = getJobComm().getAddressList();
+	// for (auto &l : list) {
+	// 	LOG(V3_VERB, "list has %i \n", l.rank);
+	// }
+	LOG(V3_VERB, "ß appl_communicate \n");
+
 	if (getVolume() == NUM_WORKERS && getJobComm().getWorldRankOrMinusOne(NUM_WORKERS-1) >= 0) {
+
+		// LOG(V3_VERB, "ß appl_communicate full volume \n");
+
 		LOG(V3_VERB, "ß have %i \n", _swissat->stored_equivalences_to_share.size());
 		bool reset_red = false;
+		bool parent_ready = false;
 		if (_red && _red->hasResult()) {
 			//store the received equivalences such that the local solver than eventually import them
 			auto share_received = _red->extractResult();
@@ -116,31 +127,33 @@ void SweepJob::appl_communicate() {
 				std::make_move_iterator(share_received.end())
 			);
 			reset_red = true;
-			// LOG(V3_VERB, "ß Total local storage size      %i \n", local_store.size());
+			parent_ready = _red->isParentReady();
+			LOG(V3_VERB, "ß Storing %i equivalences for local solver to import \n", local_store.size());
 		}
 
-		// bool reset_red = _red && !_red->isValid() && _red->isDestructible();
+		if (!_red) { //triggers the very first construction
+			reset_red = true;
+			parent_ready = true;
+		}
 
-		// if (_red) {
-			// LOG(V3_VERB, "_red status: %b %b %b \n", _red->hasContribution(), _red->isValid(), _red->isDestructible());
-		// }
 
-		if (!_red || reset_red) {
+		if (reset_red) {
 			auto snapshot = getJobTree().getSnapshot();
 			JobMessage baseMsg = getMessageTemplate();
-			baseMsg.tag = ALLRED;
+			baseMsg.tag = ALLRED++;
 			// LOG(V3_VERB, "ß new \n");
 			_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateContributions));
 			LOG(V3_VERB, "ß contributing %i\n", _swissat->stored_equivalences_to_share.size());
-			if (!eq_sharing_started) {
-				eq_sharing_started = true;
-				_red->initializeReadyParent();
+			if (parent_ready) {
+				_red->enableParentIsReady();
 			}
 			_red->contribute(std::move(_swissat->stored_equivalences_to_share));
 		}
 		_red->advance();
 	#endif
 	}
+	// LOG(V3_VERB, "ß appl_communicate end \n");
+
 }
 
 

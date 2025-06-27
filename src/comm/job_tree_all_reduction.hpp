@@ -62,6 +62,7 @@ private:
 
     CondMessageSubscription _sub_aggregate;
     CondMessageSubscription _sub_broadcast;
+    CondMessageSubscription _sub_parent_update;
 
 public:
     JobTreeAllReduction(const JobTreeSnapshot& tree, JobMessage baseMsg, AllReduceElement&& neutralElem, 
@@ -71,11 +72,17 @@ public:
         _sub_aggregate(MSG_JOB_TREE_MODULAR_REDUCE, [this](MessageHandle& h) {
             JobMessage msg = Serializable::get<JobMessage>(h.getRecvData());
             return receive(h.source, h.tag, msg);
-        }), _sub_broadcast(MSG_JOB_TREE_MODULAR_BROADCAST, [this](MessageHandle& h) {
+        }),
+        _sub_broadcast(MSG_JOB_TREE_MODULAR_BROADCAST, [this](MessageHandle& h) {
             LOG(V2_INFO, "BROADCAST\n");
             JobMessage msg = Serializable::get<JobMessage>(h.getRecvData());
             return receive(h.source, h.tag, msg);
-        }) {
+        }),
+        _sub_parent_update(MSG_JOB_TREE_PARENT_IS_READY, [this](MessageHandle& h) {
+            JobMessage msg = Serializable::get<JobMessage>(h.getRecvData());
+            return receive(h.source, h.tag, msg);
+        })
+    {
 
         int leftRank = _tree.leftChildNodeRank;
         int rightRank = _tree.rightChildNodeRank;
@@ -121,9 +128,14 @@ public:
         _broadcast_enabled = false;
     }
 
-    void initializeReadyParent() {
+    void enableParentIsReady() {
         _parent_is_ready = true;
     }
+
+    bool isParentReady() const {
+        return _parent_is_ready;
+    }
+
 
     const JobTreeSnapshot& getJobTreeSnapshot() const {
         return _tree;
@@ -133,7 +145,11 @@ private:
     // Process an incoming message and advance the all-reduction accordingly. 
     bool receive(int source, int tag, JobMessage& msg) {
 
-        assert(tag == MSG_JOB_TREE_MODULAR_REDUCE || tag == MSG_JOB_TREE_MODULAR_BROADCAST);
+        LOG(V3_VERB, "      received tag %i from %i\n", tag, source);
+
+        // Forgot to add PARENT_IS_READY to this assertion! ß
+        assert(tag == MSG_JOB_TREE_MODULAR_REDUCE || tag == MSG_JOB_TREE_MODULAR_BROADCAST || tag == MSG_JOB_TREE_PARENT_IS_READY);
+        // assert(tag == MSG_JOB_TREE_MODULAR_REDUCE || tag == MSG_JOB_TREE_MODULAR_BROADCAST);
 
         LOG(V2_INFO, "TRY REDUCE %i %i %i %i %i\n", tag, msg.epoch, _base_msg.epoch, msg.tag, _base_msg.tag);
 
@@ -273,9 +289,11 @@ public:
     AllReduceElement extractResult() {
         assert(hasResult());
         _valid = false;
+        LOG(V3_VERB, "Extracting result\n");
         auto result = std::move(_base_msg.payload); //moving the payload now out of the base_msg
                                                     //such that the base_msg is just a lightweight dummy when now messaging the children
-        LOG(V3_VERB, "tell children parent is ready\n");
+        _base_msg.payload = {}; //set dummy array to be sure that it is at least initialized
+        LOG(V3_VERB, "tell children I am ready\n");
         tell_children_parent_is_ready();
         return result;
     }
@@ -288,6 +306,7 @@ public:
     }
 
     void destroy() {
+        LOG(V3_VERB, " ## Destroy ## tag %i \n", _base_msg.tag);
         if (_future_aggregate.valid()) _future_aggregate.get();
     }
 
@@ -319,11 +338,13 @@ private:
         if (_expected_child_ranks.first >= 0) {
             _base_msg.treeIndexOfDestination = _expected_child_indices.first;
             _base_msg.contextIdOfDestination = _expected_child_ctx_ids.first;
+            LOG(V3_VERB, " tell child %i \n", _expected_child_indices.first);
             MyMpi::isend(_expected_child_ranks.first, MSG_JOB_TREE_PARENT_IS_READY, _base_msg);
         }
         if (_expected_child_ranks.second >= 0) {
             _base_msg.treeIndexOfDestination = _expected_child_indices.second;
             _base_msg.contextIdOfDestination = _expected_child_ctx_ids.second;
+            LOG(V3_VERB, " tell child %i \n", _expected_child_indices.second);
             MyMpi::isend(_expected_child_ranks.second, MSG_JOB_TREE_PARENT_IS_READY, _base_msg);
         }
     }
