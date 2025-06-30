@@ -22,7 +22,7 @@ private:
     bool _received_response_right {false};
     bool _result_extracted {false};
 
-    //The default callback is digestBroadcast()
+    //The default callback, to be set when Object is initialized
     std::function<void()> _cb;
 
 public:
@@ -63,7 +63,7 @@ public:
             _tree.sendToParent(_msg, MSG_JOB_TREE_MODULAR_BROADCAST);
         }
 
-        if (hasResult()) _cb(); // callback, per default to digestBroadcast()
+        if (hasResult()) _cb(); // execute the provided callback. In case of SweepJob it's actOnBroadcastPing()
     }
 
     void updateJobTree(const JobTree& tree) {

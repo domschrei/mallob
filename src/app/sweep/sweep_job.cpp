@@ -3,7 +3,6 @@
 
 #include "app/job.hpp"
 #include "app/job_tree.hpp"
-// #include "comm/job_tree_all_reduction.hpp"
 #include "util/logger.hpp"
 
 #define SWEEP_COMM_TYPE 2
@@ -20,6 +19,7 @@ void SweepJob::appl_start() {
 	_my_index = getJobTree().getIndex();
 	_is_root = getJobTree().isRoot();
 	printf("ß Appl_start(): is root? %i, Parent-Index %i, Rank %i, Index %i, \n",  _is_root, getJobTree().getParentIndex(), _my_rank, _my_index);
+	printf("ß			  : num children %i", getJobTree().getNumChildren());
     _metadata = getSerializedDescription(0)->data();
 
 	const JobDescription& desc = getDescription();
@@ -32,7 +32,7 @@ void SweepJob::appl_start() {
 	// printf("ß [%i] Payload: %i vars, %i clauses \n", _my_index, setup.numVars, setup.numOriginalClauses);
 
 	_swissat.reset(new Kissat(setup));
-	_swissat->set_option("mallob_custom_sweep_verbosity", 2); //0: No custom messages. 1: Some. 2: Verbose
+	_swissat->set_option("mallob_custom_sweep_verbosity", 1); //0: No custom messages. 1: Some. 2: Verbose
 	_swissat->set_option("mallob_solver_count", NUM_WORKERS);
 	_swissat->set_option("mallob_solver_id", _my_index);
 	_swissat->activateLearnedEquivalenceCallbacks();
@@ -56,6 +56,10 @@ void SweepJob::appl_start() {
 	_swissat->set_option("transitive", 0);
 	_swissat->set_option("vivify", 0);
 
+	JobMessage baseMsg = getMessageTemplate();
+	baseMsg.tag = ALLRED;
+	//Initialize _red already here, to make sure that it exits in case a child sends very early a first message
+	_red.reset(new JobTreeAllReduction(getJobTree().getSnapshot(), baseMsg, std::vector<int>(), aggregateContributions));
 
 	_swissat_running_count++;
 	_fut_swissat = ProcessWideThreadPool::get().addTask([&]() {
@@ -100,7 +104,7 @@ void SweepJob::appl_communicate() {
 		msg.payload.clear();
 		advanceSweepMessage(msg);
 	}
-	#else
+	#elif SWEEP_COMM_TYPE == 2
 
 	// auto list = getJobComm().getAddressList();
 	// for (auto &l : list) {
@@ -114,7 +118,7 @@ void SweepJob::appl_communicate() {
 
 		LOG(V3_VERB, "ß have %i \n", _swissat->stored_equivalences_to_share.size());
 		bool reset_red = false;
-		bool parent_ready = false;
+		bool parent_is_ready = false;
 		if (_red && _red->hasResult()) {
 			//store the received equivalences such that the local solver than eventually import them
 			auto share_received = _red->extractResult();
@@ -127,34 +131,46 @@ void SweepJob::appl_communicate() {
 				std::make_move_iterator(share_received.end())
 			);
 			reset_red = true;
-			parent_ready = _red->isParentReady();
+			parent_is_ready = _red->isParentReady();
 			LOG(V3_VERB, "ß Storing %i equivalences for local solver to import \n", local_store.size());
 		}
 
-		if (!_red) { //triggers the very first construction
+		if (!started_sharing) { //triggers the very first construction
 			reset_red = true;
-			parent_ready = true;
+			parent_is_ready = true;
+			started_sharing = true;
 		}
 
 
 		if (reset_red) {
 			auto snapshot = getJobTree().getSnapshot();
 			JobMessage baseMsg = getMessageTemplate();
-			baseMsg.tag = ALLRED++;
-			// LOG(V3_VERB, "ß new \n");
+			baseMsg.tag = ALLRED;
 			_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateContributions));
+			_red->careAboutParentStatus();
 			LOG(V3_VERB, "ß contributing %i\n", _swissat->stored_equivalences_to_share.size());
-			if (parent_ready) {
+			_red->contribute(std::move(_swissat->stored_equivalences_to_share));
+			if (parent_is_ready) {
 				_red->enableParentIsReady();
 			}
-			_red->contribute(std::move(_swissat->stored_equivalences_to_share));
 		}
 		_red->advance();
-	#endif
 	}
+	#elif SWEEP_COMM_TYPE == 3
+
+
+	if (getVolume() == NUM_WORKERS && getJobComm().getWorldRankOrMinusOne(NUM_WORKERS-1) >= 0) {
+		if (_is_root) {
+			if (!_red || _red->finishedAndNoLongerValid()) {
+				tryBeginBroadcastPing();
+			}
+		}
+		tryExtractResult();
+	}
+	#endif
+}
 	// LOG(V3_VERB, "ß appl_communicate end \n");
 
-}
 
 
 // React to an incoming message. (This becomes relevant only if you send custom messages)
@@ -172,6 +188,55 @@ void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 	}
 #endif
 }
+
+
+
+void SweepJob::tryBeginBroadcastPing() {
+	if (!_bcast) return;
+	// Broadcast a message to all workers in your (sub) tree
+	JobMessage msg = getMessageTemplate();
+	msg.tag = _bcast->getMessageTag();
+	msg.payload = {};
+	_bcast->broadcast(std::move(msg));
+}
+
+void SweepJob::callback_for_broadcast_ping() {
+	assert(_bcast);
+	assert(_bcast->hasResult());
+
+	auto snapshot = _bcast->getJobTreeSnapshot();
+	// _bcast.reset();
+
+	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {callback_for_broadcast_ping();}, BCAST_INIT));
+
+	JobMessage baseMsg = getMessageTemplate();
+	baseMsg.tag = ALLRED;
+	_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateContributions));
+	_red->contribute(std::move(_swissat->stored_equivalences_to_share));
+}
+
+
+// void SweepJob::tryExtractResult() {
+// 	if (!_red) return;
+// 	_red->advance();
+// 	if (!_red.hasResult()) return;
+//
+// 	auto received_reduction = _red->extractResult();
+// 	LOG(V3_VERB, "ß --- Received global Reduction Result, Extracted Size %i --- \n", received_reduction.size());
+// 	auto& local_store = _swissat->stored_equivalences_to_import;
+// 	local_store.reserve(local_store.size() + received_reduction.size());
+// 	local_store.insert(
+// 		local_store.end(),
+// 		std::make_move_iterator(received_reduction.begin()),
+// 		std::make_move_iterator(received_reduction.end())
+// 	);
+//
+// 	LOG(V3_VERB, "ß Storing %i equivalences for local solver to import \n", local_store.size());
+// 	// _red.reset();
+// 	//here is the logical point to reset _red and contribute again
+// 	//use broadcast only to communicate parent_is_ready
+// 	//but: parent_is_ready can't just be forwarded also by the children, because they themselves might not yet be ready...
+// }
 
 std::vector<int> SweepJob::aggregateContributions(std::list<std::vector<int>> &contribs) {
     size_t totalSize = 0;

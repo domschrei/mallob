@@ -5,6 +5,7 @@
 #include "app/job.hpp"
 #include "../sat/solvers/kissat.hpp"
 #include "comm/job_tree_all_reduction.hpp"
+#include "comm/job_tree_broadcast.hpp"
 
 
 class SweepJob : public Job {
@@ -22,14 +23,15 @@ private:
     std::atomic_int _swissat_running_count {0};
 
 
+    std::unique_ptr<JobTreeBroadcast> _bcast;
     std::unique_ptr<JobTreeAllReduction> _red;
-    // bool _have_new_data_to_contribute{true};
-    int ALLRED {2};
-    bool started_eq_sharing = false;
+	bool started_sharing = false;
+
+    const int BCAST_INIT{1};
+    const int ALLRED{2};
 
     static const int MSG_SWEEP = 100; // internal message tag
     static const int NUM_WORKERS = 4; // # workers we request and require, hardcoded 4 for now
-
 
 public:
     SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table);
@@ -51,6 +53,11 @@ private:
     void advanceSweepMessage(JobMessage& msg);
     static std::vector<int> aggregateContributions(std::list<std::vector<int>> &contribs);
     void loadFormulaToSwissat();
+
+
+    void tryBeginBroadcastPing();
+    void callback_for_broadcast_ping();
+    void tryExtractResult();
 
 };
 
