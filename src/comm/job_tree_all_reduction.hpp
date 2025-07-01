@@ -216,13 +216,14 @@ public:
             });
         }
 
-        LOG(V3_VERB, "      adv status: contributed      %i\n", _contributed);
-        LOG(V3_VERB, "      adv status: _childs size     %i\n", _child_elems.size());
-        // LOG(V3_VERB, "      adv status: _expected childs %i\n",  _num_expected_child_elems);
-        // LOG(V3_VERB, "      adv status: _future.valid()  %i\n", _future_aggregate.valid());
-        LOG(V3_VERB, "      adv status: _parent_is_rdy   %i\n", _parent_is_ready);
-        LOG(V3_VERB, "      adv status: _aggregating     %i\n", _aggregating);
-        LOG(V3_VERB, "      adv status: _aggregated size %i\n", _aggregated_elem->size());
+        LOG(V3_VERB, "      : contributed      %i\n", _contributed);
+        LOG(V3_VERB, "      : local elem size  %u\n", _local_elem->size());
+        LOG(V3_VERB, "      : _childs elems    %u\n", _child_elems.size());
+        // LOG(V3_VERB, "   : _expected childs %i\n",  _num_expected_child_elems);
+        LOG(V3_VERB, "      : _parent_is_rdy   %i\n", _parent_is_ready);
+        LOG(V3_VERB, "      : _aggregating     %i\n", _aggregating);
+        LOG(V3_VERB, "      : _future.valid()  %i\n", _future_aggregate.valid());
+        // LOG(V3_VERB, "      : _aggregated size %u\n", _aggregated_elem->size());
 
         if (!_aggregating && _future_aggregate.valid() && _parent_is_ready) {
             // Aggregation done
