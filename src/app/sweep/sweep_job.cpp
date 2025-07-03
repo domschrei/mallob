@@ -44,7 +44,7 @@ void SweepJob::appl_start() {
 	_swissat->set_option("seed", 0);   // always start with the same seed
 
 	_swissat->set_option("sweep", 1); //We want sweeping
-	_swissat->set_option("simplify", 1); //Activating simplify extremely boosts the frequency that sweep is scheduled, so we take it
+	_swissat->set_option("simplify", 1); //Activating simplify extremely boosts the frequency that sweep is scheduled, take it for now
 
     _swissat->set_option("factor", 0); // do not perform bounded variable addition
 	_swissat->set_option("eliminate", 0); //No Bounded Variable Elimination
@@ -67,7 +67,7 @@ void SweepJob::appl_start() {
 		loadFormulaToSwissat();
 		LOG(V2_INFO, "Process starting Swissat %i \n", _my_index);
 		int res = _swissat->solve(0, nullptr);
-		LOG(V2_INFO, "\n \n \n Process finished Swissat %i, result %i\n\n\n", _my_index, res);
+		LOG(V2_INFO, "\n # \n # \n Process finished Swissat %i, result %i \n # \n # \n", _my_index, res);
 		_internal_result.id = getId();
 		_internal_result.revision = getRevision();
 		_internal_result.result=res;

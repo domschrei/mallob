@@ -158,6 +158,8 @@ private:
 
         if (msg.returnedToSender) {
             LOG(V2_INFO, "REDUCE returnedToSender\n");
+            // LOG(V3_VERB, "  reset parent_is_ready to true, to allow next send attempt\n");
+            // _parent_is_ready = true;
             msg.swapSenderReceiver();
             return true;
         }
