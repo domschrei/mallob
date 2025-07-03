@@ -80,7 +80,7 @@ void Parameters::init(int argc, char** argv) {
 void Parameters::expand() {
     if (monoFilename.isSet()) {
         // Single instance solving
-        numClients.set(1); // 1 client
+        //numClients.set(1); // 1 client
         useFilesystemInterface.set(false); // no fs interface
         useIPCSocketInterface.set(false); // no socket interface
         numWorkers.set(-1); // all workers
