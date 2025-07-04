@@ -300,6 +300,7 @@ public:
     }
 
     void destroy() {
+        LOG(V3_VERB, "      -- destroy --\n");
         if (_future_aggregate.valid()) _future_aggregate.get();
     }
 

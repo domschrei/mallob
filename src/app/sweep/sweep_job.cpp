@@ -39,16 +39,21 @@ void SweepJob::appl_start() {
 
     // Basic configuration options for all solvers
     _swissat->set_option("quiet", 1); // suppress any standard kissat output
+    _swissat->set_option("verbose", 0); // set the native kissat verbosity
     _swissat->set_option("check", 0); // do not check model or derived clauses
     _swissat->set_option("profile",3); // do detailed profiling how much time we spent where
 	_swissat->set_option("seed", 0);   // always start with the same seed
 
-	_swissat->set_option("sweep", 1); //We want sweeping
+	_swissat->set_option("sweep", 1); //We obviously want sweeping
 	_swissat->set_option("simplify", 1); //Activating simplify extremely boosts the frequency that sweep is scheduled, take it for now
 
-    _swissat->set_option("factor", 0); // do not perform bounded variable addition
+    _swissat->set_option("factor", 0); //No bounded variable addition
 	_swissat->set_option("eliminate", 0); //No Bounded Variable Elimination
 	_swissat->set_option("substitute", 0); //No equivalent literal substitution (both obstruct import)
+
+	_swissat->set_option("fastel", 0); //No fast elimination. Fast elimination sets import->eliminated = true, which interrupts further equivalence imports
+	//Technically, we could instead maybe also not interrupt the external-to-internal literal import,
+	//since it is anyways only an intermediate state and followed right up with sweeper->repr[..], which should bring us back to a valid active literal...
 
 	_swissat->set_option("lucky", 0);     //These operations do not obstruct sweep, but to keep everything simple we deactivate them for now
 	_swissat->set_option("congruence", 0);
