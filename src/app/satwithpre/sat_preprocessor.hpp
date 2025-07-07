@@ -38,6 +38,7 @@ public:
         SolverSetup setup;
         setup.logger = &Logger::getMainInstance();
         setup.numVars = _desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
+        setup.numOriginalClauses = _desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
         setup.solverType = 'p';
         _kissat.reset(new Kissat(setup));
         _nb_running++;
