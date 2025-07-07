@@ -133,7 +133,7 @@ public:
         if (!_is_root) {
             _parent_is_ready = false;
         }
-        tellChildrenParentIsReady();
+        // tellChildrenParentIsReady();
     }
 
     void enableParentIsReady() {
@@ -275,6 +275,23 @@ public:
         _valid = false;
     }
 
+    void tellChildrenParentIsReady() {
+        if (_expected_child_ranks.first >= 0) {
+            _base_msg.treeIndexOfDestination = _expected_child_indices.first;
+            _base_msg.contextIdOfDestination = _expected_child_ctx_ids.first;
+            LOG(V3_VERB, "      tell child %i I'm ready\n", _expected_child_indices.first);
+            MyMpi::isend(_expected_child_ranks.first, MSG_JOB_TREE_PARENT_IS_READY, _base_msg);
+
+        }
+        if (_expected_child_ranks.second >= 0) {
+            _base_msg.treeIndexOfDestination = _expected_child_indices.second;
+            _base_msg.contextIdOfDestination = _expected_child_ctx_ids.second;
+            LOG(V3_VERB, "      tell child %i I'm ready \n", _expected_child_indices.second);
+            MyMpi::isend(_expected_child_ranks.second, MSG_JOB_TREE_PARENT_IS_READY, _base_msg);
+        }
+    }
+
+
     bool hasContribution() const {return _contributed;}
     bool isValid() const {return _valid;}
     bool isParentReady() const {return _parent_is_ready;}
@@ -328,19 +345,4 @@ private:
         }
     }
 
-    void tellChildrenParentIsReady() {
-        if (_expected_child_ranks.first >= 0) {
-            _base_msg.treeIndexOfDestination = _expected_child_indices.first;
-            _base_msg.contextIdOfDestination = _expected_child_ctx_ids.first;
-            LOG(V3_VERB, "      tell child %i I'm ready\n", _expected_child_indices.first);
-            MyMpi::isend(_expected_child_ranks.first, MSG_JOB_TREE_PARENT_IS_READY, _base_msg);
-
-        }
-        if (_expected_child_ranks.second >= 0) {
-            _base_msg.treeIndexOfDestination = _expected_child_indices.second;
-            _base_msg.contextIdOfDestination = _expected_child_ctx_ids.second;
-            LOG(V3_VERB, "      tell child %i I'm ready \n", _expected_child_indices.second);
-            MyMpi::isend(_expected_child_ranks.second, MSG_JOB_TREE_PARENT_IS_READY, _base_msg);
-        }
-    }
 };

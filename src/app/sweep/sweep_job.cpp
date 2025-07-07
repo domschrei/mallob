@@ -32,7 +32,7 @@ void SweepJob::appl_start() {
 	// printf("ß [%i] Payload: %i vars, %i clauses \n", _my_index, setup.numVars, setup.numOriginalClauses);
 
 	_swissat.reset(new Kissat(setup));
-	_swissat->set_option("mallob_custom_sweep_verbosity", 2); //0: No custom messages. 1: Some. 2: Verbose
+	_swissat->set_option("mallob_custom_sweep_verbosity", 1); //0: No custom messages. 1: Some. 2: Verbose
 	_swissat->set_option("mallob_solver_count", NUM_WORKERS);
 	_swissat->set_option("mallob_solver_id", _my_index);
 	_swissat->activateLearnedEquivalenceCallbacks();
@@ -52,8 +52,9 @@ void SweepJob::appl_start() {
 	_swissat->set_option("substitute", 0); //No equivalent literal substitution (both obstruct import)
 
 	_swissat->set_option("fastel", 0); //No fast elimination. Fast elimination sets import->eliminated = true, which interrupts further equivalence imports
-	//Technically, we could instead maybe also not interrupt the external-to-internal literal import,
-	//since it is anyways only an intermediate state and followed right up with sweeper->repr[..], which should bring us back to a valid active literal...
+	//Technically, we could instead maybe also follow through with the eternal-to-internal literal import, and ignore the eliminated-flag
+	//since we then anyways translate that intermediate literal again via sweeper->repr[..] to a (hopefully) valid literal
+	//so temporarily having an eliminated literal might be ok if we only use it to index its valid representative literal...
 
 	_swissat->set_option("lucky", 0);     //These operations do not obstruct sweep, but to keep everything simple we deactivate them for now
 	_swissat->set_option("congruence", 0);
@@ -61,10 +62,11 @@ void SweepJob::appl_start() {
 	_swissat->set_option("transitive", 0);
 	_swissat->set_option("vivify", 0);
 
+	//Initialize _red already here, to make sure that all processes have a valid reduction object
 	JobMessage baseMsg = getMessageTemplate();
 	baseMsg.tag = ALLRED;
-	//Initialize _red already here, to make sure that it exits in case a child sends very early a first message
 	_red.reset(new JobTreeAllReduction(getJobTree().getSnapshot(), baseMsg, std::vector<int>(), aggregateContributions));
+	_red->careAboutParentStatus();
 
 	_swissat_running_count++;
 	_fut_swissat = ProcessWideThreadPool::get().addTask([&]() {
@@ -119,11 +121,11 @@ void SweepJob::appl_communicate() {
 
 	if (getVolume() == NUM_WORKERS && getJobComm().getWorldRankOrMinusOne(NUM_WORKERS-1) >= 0) {
 
+
 		// LOG(V3_VERB, "ß appl_communicate full volume \n");
 
 		LOG(V3_VERB, "ß have %i \n", _swissat->stored_equivalences_to_share.size());
 		bool reset_red = false;
-		bool parent_is_ready = false;
 		if (_red && _red->hasResult()) {
 			//store the received equivalences such that the local solver than eventually import them
 			auto share_received = _red->extractResult();
@@ -136,13 +138,13 @@ void SweepJob::appl_communicate() {
 				std::make_move_iterator(share_received.end())
 			);
 			reset_red = true;
-			parent_is_ready = _red->isParentReady();
+			// parent_is_ready = _red->isParentReady();
 			LOG(V3_VERB, "ß Storing %i equivalences for local solver to import \n", local_store.size());
 		}
 
 		if (!started_sharing) { //triggers the very first construction
 			reset_red = true;
-			parent_is_ready = true;
+			// parent_is_ready = true;
 			started_sharing = true;
 		}
 
@@ -151,11 +153,13 @@ void SweepJob::appl_communicate() {
 			auto snapshot = getJobTree().getSnapshot();
 			JobMessage baseMsg = getMessageTemplate();
 			baseMsg.tag = ALLRED;
+			bool parent_was_ready = _red->isParentReady();
 			_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateContributions));
 			_red->careAboutParentStatus();
+			_red->tellChildrenParentIsReady();
 			LOG(V3_VERB, "ß contributing %i\n", _swissat->stored_equivalences_to_share.size());
 			_red->contribute(std::move(_swissat->stored_equivalences_to_share));
-			if (parent_is_ready) {
+			if (parent_was_ready) {
 				_red->enableParentIsReady();
 			}
 		}

@@ -457,8 +457,8 @@ void Kissat::consumeEquivalence(int **equivalence) {
        *equivalence = 0;
         // LOGGER(_logger, V3_VERB, "polling ended \n ");
     } else {
-        if (stored_equivalences_to_import.size()%100==0) {
-            LOGGER(_logger, V3_VERB, "polling eq storeage %lu\n ", stored_equivalences_to_import.size());
+        if (stored_equivalences_to_import.size()%200==0) {
+            LOGGER(_logger, V3_VERB, "importing equivalences, remain %lu\n ", stored_equivalences_to_import.size()/2);
         }
         producedEquivalenceBuffer[0] = stored_equivalences_to_import.back(); stored_equivalences_to_import.pop_back();
         producedEquivalenceBuffer[1] = stored_equivalences_to_import.back(); stored_equivalences_to_import.pop_back();
