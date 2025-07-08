@@ -16,6 +16,7 @@ CC=$(which mpicc) CXX=$(which mpicxx) cmake -DCMAKE_BUILD_TYPE=RELEASE \
   -DMALLOB_USE_JEMALLOC=1 \
   -DMALLOB_ASSERT=1 \
   -DMALLOB_ASSERT_HEAVY=0 \
+  -DMALLOB_USE_ASAN=0 \
   -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\" ..
 
 # make clean

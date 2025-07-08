@@ -14,7 +14,7 @@ MALLOB_OPTIONS=" \
   -mono-app=SWEEP \
   -satsolver=k \
   -colors \
-  -v=4 \
+  -v=2 \
   -jcup=0.05 \
   -trace-dir=$OUT_DIR/traces/ \
   -log=$OUT_DIR/logs/ \

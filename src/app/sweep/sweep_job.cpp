@@ -44,8 +44,8 @@ void SweepJob::appl_start() {
     _swissat->set_option("profile",3); // do detailed profiling how much time we spent where
 	_swissat->set_option("seed", 0);   // always start with the same seed
 
-	_swissat->set_option("sweep", 1); //We obviously want sweeping
-	_swissat->set_option("simplify", 1); //Activating simplify extremely boosts the frequency that sweep is scheduled, take it for now
+	_swissat->set_option("sweep", 1); //We want sweeping
+	_swissat->set_option("simplify", 1); //Activates probing, of which sweeping is a part of
 
     _swissat->set_option("factor", 0); //No bounded variable addition
 	_swissat->set_option("eliminate", 0); //No Bounded Variable Elimination
@@ -118,10 +118,11 @@ void SweepJob::appl_communicate() {
 	// 	LOG(V3_VERB, "list has %i \n", l.rank);
 	// }
 	LOG(V3_VERB, "ß appl_communicate \n");
+	double elapsed_time = Timer::elapsedSeconds();
+	double wait_time = 0.001;
+	bool can_start = elapsed_time > wait_time;
 
-	if (getVolume() == NUM_WORKERS && getJobComm().getWorldRankOrMinusOne(NUM_WORKERS-1) >= 0) {
-
-
+	if (can_start && getVolume() == NUM_WORKERS && getJobComm().getWorldRankOrMinusOne(NUM_WORKERS-1) >= 0) {
 		// LOG(V3_VERB, "ß appl_communicate full volume \n");
 
 		LOG(V3_VERB, "ß have %i \n", _swissat->stored_equivalences_to_share.size());

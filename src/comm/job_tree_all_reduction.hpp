@@ -150,7 +150,8 @@ private:
 
         assert(tag == MSG_JOB_TREE_MODULAR_REDUCE || tag == MSG_JOB_TREE_MODULAR_BROADCAST || tag == MSG_JOB_TREE_PARENT_IS_READY || printf("Assertion Error in job_tree_all_reduction: Unexpected tag %i \n", tag));
 
-        LOG(V2_INFO, "TRY REDUCE %i %i %i %i %i\n", tag, msg.epoch, _base_msg.epoch, msg.tag, _base_msg.tag);
+        if (!_care_about_parent_status)
+            LOG(V2_INFO, "TRY REDUCE %i %i %i %i %i\n", tag, msg.epoch, _base_msg.epoch, msg.tag, _base_msg.tag);
 
         bool accept = msg.epoch == _base_msg.epoch
                     //&& msg.revision == _base_msg.revision
