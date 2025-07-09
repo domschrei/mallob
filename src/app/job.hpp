@@ -289,8 +289,6 @@ public:
         // Prepare serialization of the desired revision
         // with the formula data itself "cut out"
         std::vector<uint8_t> out {_description.getRevisionData(revision)->data(), (uint8_t*)_description.getFormulaPayload(revision)};
-        const int* aPtr = _description.getAssumptionsPayload(revision);
-        out.insert(out.end(), (uint8_t*)aPtr, (uint8_t*)(aPtr+getDescription().getAssumptionsSize(revision)));
         return out;
     }
     bool hasCommitment() const {return _commitment.has_value();}

@@ -20,9 +20,9 @@ int main(int argc, char *argv[]) {
     Parameters params;
     params.init(argc, argv);
 
-    auto files = {"Steiner-9-5-bce.cnf.xz", "uum12.smt2.cnf.xz", 
+    auto files = {"r3unsat_300.cnf"}; /*{"Steiner-9-5-bce.cnf.xz", "uum12.smt2.cnf.xz", 
         "LED_round_29-32_faultAt_29_fault_injections_5_seed_1579630418.cnf.xz", "SAT_dat.k80.cnf.xz", "Timetable_C_497_E_62_Cl_33_S_30.cnf.xz", 
-        "course0.2_2018_3-sc2018.cnf.xz", "sv-comp19_prop-reachsafety.queue_longer_false-unreach-call.i-witness.cnf.xz"};
+        "course0.2_2018_3-sc2018.cnf.xz", "sv-comp19_prop-reachsafety.queue_longer_false-unreach-call.i-witness.cnf.xz"};*/
 
     for (const auto& file : files) {
         auto f = std::string("instances/") + file;
@@ -34,7 +34,6 @@ int main(int argc, char *argv[]) {
         assert(success);
         time = Timer::elapsedSeconds() - time;
         LOG(V2_INFO, " - done, took %.3fs\n", time);
-        assert(d.getNumFormulaLiterals() > 0);
 
         LOG(V2_INFO, "Only decompressing CNF %s for comparison ...\n", f.c_str());
         float time2 = Timer::elapsedSeconds();

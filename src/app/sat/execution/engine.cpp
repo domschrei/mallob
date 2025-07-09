@@ -74,11 +74,6 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 
 	// Launched in some certified UNSAT mode?
     if (_params.proofOutputFile.isSet() || _params.onTheFlyChecking()) {
-		
-		if (_params.inputShuffleProbability() > 0) {
-			LOG(V3_VERB, "Certified UNSAT mode: Disabling input shuffling\n");
-			_params.inputShuffleProbability.set(0);
-		}
 
 		// Override options
 		if (!portfolio.featuresProofOutput()) {
@@ -356,7 +351,7 @@ std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSe
 
 void SatEngine::appendRevision(int revision, RevisionData data, bool lastRevisionForNow) {
 	
-	LOGGER(_logger, V4_VVER, "Import rev. %i: %i lits, %i assumptions\n", revision, data.fSize, data.aSize);
+	LOGGER(_logger, V4_VVER, "Import rev. %i: size %lu\n", revision, data.fSize);
 	assert(_revision+1 == revision);
 	_revision_data.push_back(data);
 	_sharing_manager->setImportedRevision(revision);

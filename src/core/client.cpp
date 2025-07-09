@@ -156,9 +156,8 @@ void Client::readIncomingJobs() {
                     atomics::incrementRelaxed(_num_failed_jobs);
                 } else {
                     time = Timer::elapsedSeconds() - time;
-                    LOGGER(log, V3_VERB, "[T] Initialized job #%i %s in %.3fs: %ld lits w/ separators, %ld assumptions\n", 
-                            id, filesList.c_str(), time, foundJob.description->getNumFormulaLiterals(), 
-                            foundJob.description->getNumAssumptionLiterals());
+                    LOGGER(log, V3_VERB, "[T] Initialized job #%i %s in %.3fs: size %ld\n", 
+                            id, filesList.c_str(), time, foundJob.description->getFSize());
                     foundJob.description->getStatistics().parseTime = time;
 
                     const int appId = foundJob.description->getApplicationId();

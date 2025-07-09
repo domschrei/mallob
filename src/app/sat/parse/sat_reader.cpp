@@ -13,9 +13,11 @@
 #include <utility>
 #include <vector>
 
+#include "app/sat/data/formula_compressor.hpp"
 #include "app/sat/proof/trusted/trusted_utils.hpp"
 #include "app/sat/proof/trusted_parser_process_adapter.hpp"
 #include "sat_reader.hpp"
+#include "data/job_description.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
 #include "util/sys/terminator.hpp"
@@ -52,6 +54,19 @@ bool SatReader::parseWithTrustedParser(JobDescription& desc) {
 	_input_invalid = false;
 	desc.setFSize(tp.getFSize());
 	return true;
+}
+
+bool SatReader::parseAndCompress(JobDescription& desc) {
+	FormulaCompressor c;
+	auto vec = desc.getRevisionData(desc.getRevision()).get();
+	auto outSizeBytesBefore = vec->size();
+	FormulaCompressor::VectorFormulaOutput out(vec);
+	_input_invalid = !c.readAndCompress(_filename.c_str(), out);
+	_input_finished = true;
+	desc.setFSize((out.vec->size() - outSizeBytesBefore) / sizeof(int));
+	_max_var = out.maxVar;
+	_num_read_clauses = out.nbClauses;
+	return !_input_invalid;
 }
 
 bool SatReader::parseInternally(JobDescription& desc) {
@@ -200,6 +215,8 @@ bool SatReader::read(JobDescription& desc) {
 
 	if (_params.onTheFlyChecking()) {
 		if (!parseWithTrustedParser(desc)) return false;
+	} else if (_params.compressFormula()) {
+		if (!parseAndCompress(desc)) return false;
 	} else {
 		if (!parseInternally(desc)) return false;
 	}

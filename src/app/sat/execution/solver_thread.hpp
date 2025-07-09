@@ -19,7 +19,6 @@
 #include "data/job_result.hpp"
 #include "../job/sat_process_config.hpp"
 #include "../solvers/portfolio_solver_interface.hpp"
-#include "variable_translator.hpp"
 #include "../parse/serialized_formula_parser.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
 #include "app/sat/execution/solver_setup.hpp"
@@ -40,7 +39,7 @@ private:
     std::thread _thread;
 
     std::vector<std::unique_ptr<SerializedFormulaParser>> _pending_formulae;
-    std::vector<std::pair<size_t, const int*>> _pending_assumptions;
+    std::vector<int> _pending_assumptions;
 
     SplitMix64Rng _rng;
 
@@ -63,7 +62,6 @@ private:
     bool _last_read_lit_zero = true;
     int _max_var = 0;
     Checksum _running_chksum;
-    VariableTranslator _vt;
     bool _has_pseudoincremental_solvers;
 
     std::atomic_bool _initialized = false;

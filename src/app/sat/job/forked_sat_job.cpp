@@ -7,7 +7,6 @@
 #include <utility>
 
 #include "app/app_message_subscription.hpp"
-#include "app/sat/data/definitions.hpp"
 #include "app/sat/job/sat_process_config_builder.hpp"
 #include "data/job_interrupt_reason.hpp"
 #include "interface/api/api_registry.hpp"
@@ -79,8 +78,6 @@ void ForkedSatJob::doStartSolver() {
         std::move(hParams), std::move(config),
         dummyJob ? std::min(1ul, desc.getFormulaPayloadSize(0)) : desc.getFormulaPayloadSize(0),
         desc.isRevisionIncomplete(0) ? nullptr : desc.getFormulaPayload(0),
-        dummyJob ? std::min(1ul, desc.getAssumptionsSize(0)) : desc.getAssumptionsSize(0),
-        desc.getAssumptionsPayload(0),
         desc.getChecksum(0),
         desc.getJobDescriptionId(0),
         _clause_comm
@@ -101,9 +98,8 @@ void ForkedSatJob::loadIncrements() {
             break;
         _last_imported_revision++;
         size_t numLits = desc.getFormulaPayloadSize(_last_imported_revision);
-        size_t numAssumptions = desc.getAssumptionsSize(_last_imported_revision);
-        LOG(V4_VVER, "%s : Forward rev. %i : %i lits, %i assumptions\n", toStr(), 
-                _last_imported_revision, numLits, numAssumptions);
+        LOG(V4_VVER, "%s : Forward rev. %i : size %lu\n", toStr(), 
+                _last_imported_revision, numLits);
         if (desc.isRevisionIncomplete(_last_imported_revision) && numLits > 0) {
             assert(_last_imported_revision < _formulas_in_shmem.size() && _formulas_in_shmem[_last_imported_revision].data);
             // there is a shared memory segment
@@ -116,8 +112,6 @@ void ForkedSatJob::loadIncrements() {
             desc.getChecksum(_last_imported_revision),
             numLits,
             desc.isRevisionIncomplete(_last_imported_revision) ? nullptr : desc.getFormulaPayload(_last_imported_revision),
-            numAssumptions,
-            desc.getAssumptionsPayload(_last_imported_revision),
             desc.getJobDescriptionId(_last_imported_revision)
         });
     }

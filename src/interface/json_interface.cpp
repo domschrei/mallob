@@ -188,9 +188,6 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
         job->setMaxDemand(maxDemand);
         LOGGER(_logger, V4_VVER, "Job #%i : max demand %i\n", id, maxDemand);
     }
-    if (json.contains("assumptions")) {
-        job->setPreloadedAssumptions(json["assumptions"].get<std::vector<int>>());
-    }
     if (json.contains("internalliterals")) {
         job->setPreloadedLiterals(StaticStore<std::vector<int>>::extract(json["internalliterals"]));
     }

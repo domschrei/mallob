@@ -1,5 +1,10 @@
 #!/bin/bash
 
+MPIOPTS="--oversubscribe" # for OpenMPI, by default
+if [ ! -z "$mpiimpl" ] && [ "$mpiimpl" != "openmpi" ]; then
+    MPIOPTS="" # for other MPI implementations
+fi
+
 if [ -z $1 ]; then
     echo "Usage: $0 [--no-cleanup|--np <num-procs>] <cnf-input> [<mallob-options>]"
 fi
@@ -68,7 +73,7 @@ rm .mallob_result proof.lrat .timing.* 2>/dev/null
 
 # Stage I: Run Mallob
 logdir="certunsattest-$(date +%s)"
-exec_and_measure_time "mallob" mpirun -np $numprocs --oversubscribe build/mallob -t=2 -mono=$input_cnf -log=$logdir -v=3 -proof=$p_mallob_proof -proof-dir=$logdir -uninvert-proof=0 $fwd_args
+exec_and_measure_time "mallob" mpirun -np $numprocs $MPIOPTS build/mallob -t=2 -mono=$input_cnf -log=$logdir -v=3 -proof=$p_mallob_proof -proof-dir=$logdir -uninvert-proof=0 $fwd_args
 
 # Extract Mallob's result from a file it wrote.
 result=$(cat .mallob_result 2>/dev/null || echo "0")

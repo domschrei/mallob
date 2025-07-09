@@ -19,6 +19,7 @@ OPTION_GROUP(grpAppSat, "app/sat", "SAT solving options")
     "Log successfully shared clauses to the provided path")
  OPT_STRING(satProfilingDir,            "spd", "sat-profiling-dir", "", "Directory to write SAT thread profiling reports to")
  OPT_INT(satProfilingLevel,             "spl", "sat-profiling-level", -1, -1, 4, "Profiling level for SAT solvers (-1=none ... 4=all)")
+ OPT_BOOL(compressFormula,                  "cf", "compress-formula", false, "Compress formula serialization (reorders clauses and literals in clauses)")
  OPT_BOOL(compressModels,                   "cm", "compress-models", false, "Compress found models into hexadecimal vector in output")
  OPT_STRING(groundTruthModel,               "gtm", "", "", "Ground truth model to test learned clauses against")
 
@@ -31,7 +32,7 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "Mode for computing clause buffer limit w.r.t. worker count (0: unlimited growth based on levels of binary tree, 1: limited growth based on exponential function")
  OPT_FLOAT(clauseBufferLimitParam,          "cblp", "clause-buffer-limit-param",         250'000,  0,   MAX_INT,
     "Clause buffer discount factor: reduce buffer size per PE by <factor> each depth")
- OPT_FLOAT(clauseFilterClearInterval,       "cfci", "clause-filter-clear-interval",      15,       -1,  LARGE_INT,
+ OPT_FLOAT(clauseFilterClearInterval,       "cfci", "clause-filter-clear-interval",      10,       -1,  LARGE_INT,
     "Set clear interval of clauses in solver filters (-1: never clear, 0: always clear")
  OPT_BOOL(collectClauseHistory,           "ch", "collect-clause-history",                false,
     "Employ clause history collection mechanism")
@@ -42,9 +43,9 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "Group and prioritize clauses in buffers by the sum of clause length and LBD score")
  OPT_INT(maxLbdPartitioningSize,            "mlbdps", "max-lbd-partition-size",          2,        1,   LARGE_INT,
     "Store clauses with up to this LBD in separate buckets")
- OPT_INT(minNumChunksForImportPerSolver,    "mcips", "min-import-chunks-per-solver",     10,       1,   LARGE_INT,      
+ OPT_INT(minNumChunksForImportPerSolver,    "mcips", "min-import-chunks-per-solver",     5,       1,   LARGE_INT,      
     "Min. number of cbbs-sized chunks for buffering incoming clauses for import per solver")
- OPT_INT(numExportChunks,                   "nec", "export-chunks",                      10,       1,   LARGE_INT,
+ OPT_INT(numExportChunks,                   "nec", "export-chunks",                      5,       1,   LARGE_INT,
     "Number of cbbs-sized chunks for buffering produced clauses for export")
  OPT_INT(qualityClauseLengthLimit,          "qcll", "quality-clause-length-limit",       8,        0,   255,
     "Clauses up to this length are considered \"high quality\"")
@@ -77,8 +78,6 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
    ">=1 also overrides -lbdpi=1 -lbdpo=1 -pbbm=1 for cross-sharing ONLY.")
 
 OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversification options")
- OPT_FLOAT(inputShuffleProbability,         "isp", "input-shuffle-probability",          0,        0,   1,
-    "Probability for a solver (never the 1st one of a kind) to shuffle the order of clauses in the input to some degree")
  OPT_INT(diversifyElimination,              "div-elim", "",                              0,        0,   3,
     "0=normal diversification, 1/2/3=disable some/most/all variable elimination")
  OPT_BOOL(diversifyFanOut,                  "div-fanout", "",                            false,
