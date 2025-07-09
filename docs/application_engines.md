@@ -60,7 +60,7 @@ void register_mallob_app_yourappkey() {
         // Job reader: Given a number of input files and a JobDescription instance,
         // read the files into the JobDescription and return true iff everything went well.
         [](const std::vector<std::string>& files, JobDescription& desc) -> bool {
-            // TODO If needed, perform parsing, write via desc.add{Permanent,Transient}Data()
+            // TODO If needed, perform parsing, write via desc.addData()
             return true;
         },
 
@@ -91,7 +91,7 @@ In the following sections we shed more light on how to properly realize the job 
 
 ## Job reader
 
-Given a number of input files and a mutable JobDescription instance, parse the files and serialize the job described by the files. A serialization of a job in Mallob is a flat sequence of 32-bit integer or float numbers which describe the job's entire payload. Push individual numbers to this serialization using `desc.addPermanentData()`.
+Given a number of input files and a mutable JobDescription instance, parse the files and serialize the job described by the files. A serialization of a job in Mallob is a flat sequence of 32-bit integer or float numbers which describe the job's entire payload. Push individual numbers to this serialization using `desc.addData()`.
 
 Some global parameters can be stored seperately in the AppConfiguration via `desc.getAppConfiguration().updateFixedSizeEntry()`. Such stores need to be done **before** calling `desc.beginInitialization(0)`, otherwise the Job might not be scheduled correctly (as then the AppConfiguration and serialized data are no longer clearly separated).
 
@@ -128,7 +128,7 @@ bool MyNewReader::read(const std::vector<std::string>& filenames, JobDescription
     desc.beginInitialization(0);
     int lit;
     while (ifile >> lit) {
-        desc.addPermanentData(lit);
+        desc.addData(lit);
     }
 
     // Conclude parsing

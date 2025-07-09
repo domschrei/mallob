@@ -404,6 +404,7 @@ private:
         // shrink-to-fit output vector
         if (!out.resize(out.size)) return false;
 
+        LOG(V2_INFO, "Compressed formula to %lu bytes\n", out.size);
         return true;
     }
 

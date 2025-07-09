@@ -51,7 +51,13 @@ Afterwards, we explain Mallob's other modes of operation (solving multiple insta
 
 ## SAT Solving
 
-For the application of (basic) SAT solving, Mallob expects a single input in DIMACS CNF format, possibly with .xz or .lzma compression.
+### Input Formats
+
+The input can be provided (a) as a plain DIMACS CNF text file, (b) as a compressed (.lzma / .xz) DIMACS CNF file, or (c) as a compact binary file.
+CNF files may contain a single line of the form `a <lit1> <lit2> ... 0` where `<lit1>`, `<lit2>` etc. are assumption literals for incremental solving.
+For binary files, Mallob reads clauses as integer sequences with separation zeroes in between; the special integer INT32_MAX (2147483647) separates the clause literals from the sequence of assumption integers, and then another zero signals that the description is complete. This integer sequence is also how the field "literals" should be used.
+
+For all three kinds of inputs, note that you can also use UNIX named pipes (`mkfifo`) to replace disk operations with direct inter-process communication (see also below at [Introducing a job](#introducing-a-job)).
 
 ### Producing Monolithic Proofs of Unsatisfiability
 
@@ -113,9 +119,9 @@ mpirun -np 4 --oversubscribe build/mallob -mono-app=MAXSAT -mono=instances/wcnf/
 
 ## Solve multiple instances in an orchestrated manner
 
-If you want to solve a fixed set of $n$ formulae or wish to evaluate Mallob's scheduling behavior with simulated jobs, follow these steps:
+If you want to solve a fixed set of $n$ jobs or wish to evaluate Mallob's scheduling behavior with simulated jobs, follow these steps:
 
-* Write the set of formulae into a text file `$INSTANCE_FILE` (one line per path).
+* Write the set of jobs into a text file `$INSTANCE_FILE` (one line per path).
 * Configure the base properties of a job with a JSON file `$JOB_TEMPLATE`. For a plain job with default properties you can use `templates/job-template.json`.
 * Configure the behavior of each job-introducing process ("client") with a JSON file `$CLIENT_TEMPLATE`. You can find the simplest possible configuration in `templates/client-template.json` and a more complex randomized configuration in `templates/client-template-random.json`. Both files contain all necessary documentation to adjust them as desired.
 
@@ -123,12 +129,12 @@ Then use these Mallob options:
 ```
 -c=1 -ajpc=$MAX_PAR_JOBS -ljpc=$((2*$MAX_PAR_JOBS)) -J=$NUM_JOBS -job-desc-template=$INSTANCE_FILE -job-template=$JOB_TEMPLATE -client-template=$CLIENT_TEMPLATE -pls=0
 ```
-where `$NUM_JOBS` is set to $n$ (if it is larger than $n$, a client cycles through the provided job descriptions indefinitely). You can set `-sjd=1` to shuffle the provided job descriptions. You can also increase the number of client processes introducing jobs by increasing the value of `-c`. However, note that the provided configuration for active jobs in the system is applied to each of the clients independently, hence the formulae provided in the instance file are not split up among the clients but rather duplicated.
+where `$NUM_JOBS` is set to $n$ (if it is larger than $n$, a client cycles through the provided job descriptions indefinitely). You can set `-sjd=1` to shuffle the provided job descriptions. You can also increase the number of client processes introducing jobs by increasing the value of `-c`. However, note that the provided configuration for active jobs in the system is applied to each of the clients independently, hence the inputs provided in the instance file are not split up among the clients but rather duplicated.
 
 ## Process jobs on demand
 
 This is the default and most general configuration of Mallob, i.e., without `-mono` or `-job-template` options.
-You can manually set the number of worker processes (`-w`) and the number of client processes introducing jobs (`-c`). By default, all processes are workers (`-w=-1`) and a single process is additionally a client (`-c=1`). The $k$ client processes are always the $k$ processes of the highest ranks, and they open up file system interfaces for introducing jobs and retrieving results at the directories `.api/jobs.0/` through `.api/jobs.`$k-1$`/`.
+You can manually set the number of worker processes (`-w`) and the number of client processes introducing jobs (`-c`). By default, all processes are workers (`-w=-1`) and a single process is additionally a client (`-c=1`). The $k$ client processes are the $k$ processes of the highest ranks, and they open up file system interfaces for introducing jobs and retrieving results at the directories `.api/jobs.0/` through `.api/jobs.`$k-1$`/`.
 
 ### Introducing a Job
 
@@ -154,9 +160,9 @@ Here is a brief overview of all required and optional fields in the JSON API:
 | ----------------- | :-------: | -----------: | -------------------------------------------------------------------------------------------------------------- |
 | user              | **yes**   | String       | A string specifying the user who is submitting the job                                                         |
 | name              | **yes**   | String       | A user-unique name for this job (increment)                                                                    |
-| files             | **yes***  | String array | File paths of the input to solve. For SAT, this must be a single (text file or compressed file or named pipe). |
+| files             | **yes***  | String array | File path(s) of the input(s) to solve                                                                          |
 | priority          | **yes***  | Float > 0    | Priority of the job (higher is more important)                                                                 |
-| application       | **yes**   | String       | Which kind of problem is being solved; currently either of "SAT" or "DUMMY" (default: DUMMY)                   |
+| application       | **yes**   | String       | Which kind of problem is being solved; SAT, SATWITHPRE, MAXSAT, DUMMY, ...                                     |
 | wallclock-limit   | no        | String       | Job wallclock limit: combination of a number and a unit (ms/s/m/h/d)                                           |
 | cpu-limit         | no        | String       | Job CPU time limit: combination of a number and a unit (ms/s/m/h/d)                                            |
 | arrival           | no        | Float >= 0   | Job's arrival time (seconds) since program start; ignore job until then                                        |
@@ -164,23 +170,15 @@ Here is a brief overview of all required and optional fields in the JSON API:
 | dependencies      | no        | String array | User-qualified job names (using "." as a separator) which must exit **before** this job is introduced          |
 | interrupt         | no        | Bool         | If `true`, the job given by "user" and "name" is interrupted (for incremental jobs, just the current revision).|
 | incremental       | no        | Bool         | Whether this job has multiple _increments_ / _revisions_ and should be treated as such                         |
-| literals          | no        | Int array    | You can specify the set of SAT literals (for this increment) directly in the JSON.                             |
+| literals          | no        | Int array    | Instead of "files", you can alternatively specify the SAT formula (for this increment) directly in the JSON.   |
 | precursor         | no        | String       | _(Only for incremental jobs)_ User-qualified job name (`<user>.<jobname>`) of this job's previous increment    |
-| assumptions       | no        | Int array    | _(Only for incremental jobs)_ You can specify the set of assumptions for this increment directly in the JSON.  |
 | done              | no        | Bool         | _(Only for incremental jobs)_ If `true`, the incremental job given by "precursor" is finalized and cleaned up. |
 
 *) Not needed if `done` is set to `true`.
 
 In the above example, a job is introduced with priority 0.7, with a wallclock limit of five minutes and a CPU limit of 10 CPUh.
 
-For SAT solving, the input can be provided (a) as a plain file, (b) as a compressed (.lzma / .xz) file, or (c) as a named (UNIX) pipe.
-In each case, you have the option of providing the payload (i) in text form (i.e., a valid CNF description), or, with field `content-mode: "raw"`, in binary form (i.e., a sequence of bytes representing integers).  
-For text files, Mallob uses the common iCNF extension for incremental formulae: The file may contain a single line of the form `a <lit1> <lit2> ... 0` where `<lit1>`, `<lit2>` etc. are assumption literals.   
-For binary files, Mallob reads clauses as integer sequences with separation zeroes in between.
-Two zeroes in a row (i.e., an "empty clause") signal the end of clause literals, after which a number of assumption integers may be specified. Another zero signals that the description is complete.  
-If providing a named pipe, make sure that (a) the named pipe is already created when submitting the job and (b) your application pipes the formula _after_ submitting the job (else it will hang indefinitely except if this is done in a separate thread).
-
-Assumptions can also be specified directly in the JSON describing the job via the `assumptions` field (without any trailing zero). This way, an incremental application could maintain a single text file with a monotonically growing set of clauses.
+If you provide named pipes as special input files via `"files"`, make sure that (a) the named pipe is already created when submitting the job and (b) your application writes the formula to the pipe _after_ submitting the job (else it will hang indefinitely except if this is done in a separate thread).
 
 The "arrival" and "dependencies" fields are useful to test a particular preset scenario of jobs: The "arrival" field ensures that the job will be scheduled only after Mallob ran for the specified amount of seconds. The "dependencies" field ensures that the job is scheduled only if all specified other jobs are already processed.
 
