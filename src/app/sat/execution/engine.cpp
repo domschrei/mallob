@@ -189,7 +189,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.qualityMaxLitsPerClause = params.qualityClauseLengthLimit();
 	setup.qualityLbdLimit = params.qualityLbdLimit();
 	setup.freeMaxLitsPerClause = params.freeClauseLengthLimit();
-	setup.clauseBaseBufferSize = params.clauseBufferBaseSize();
+	setup.clauseBaseBufferSize = params.exportVolumePerThread() * _num_solvers;
 	setup.anticipatedLitsToImportPerCycle = config.maxBroadcastedLitsPerCycle;
 	setup.resetLbdBeforeImport = params.resetLbd() == MALLOB_RESET_LBD_AT_IMPORT;
 	setup.incrementLbdBeforeImport = params.incrementLbd();

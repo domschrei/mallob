@@ -23,7 +23,8 @@ public:
         conf.firstrev = job.getDesiredRevision();
         conf.threads = job.getNumThreads();
         conf.maxBroadcastedLitsPerCycle = params.maxSharingCompensationFactor() *
-        BinaryTreeBufferLimit::getLimit(job.getGlobalNumWorkers(), params.clauseBufferBaseSize(), params.clauseBufferLimitParam(), BinaryTreeBufferLimit::BufferQueryMode(params.clauseBufferLimitMode()));
+        BinaryTreeBufferLimit::getLimit(job.getGlobalNumWorkers(), params.exportVolumePerThread()*conf.threads,
+            params.clauseBufferLimitParam(), BinaryTreeBufferLimit::BufferQueryMode(params.clauseBufferLimitMode()));
         conf.recoveryIndex = recoveryIndex;
         conf.nbPreviousBalancingEpochs = job.getLatestJobBalancingEpoch() - job.getDescription().getFirstBalancingEpoch() - 1;
         LOG(V5_DEBG, "#%i:%i : Job balancing epochs: %i (first: %i)\n", job.getId(), job.getIndex(),

@@ -47,7 +47,7 @@ SharingManager::SharingManager(
 	: _solvers(solvers), _params(params), _logger(logger), _job_index(jobIndex),
 	_clause_store([&]() -> GenericClauseStore* {
 		bool resetLbdAtExport = _params.resetLbd() == MALLOB_RESET_LBD_AT_EXPORT;
-		int staticBucketSize = (2*_params.clauseBufferBaseSize())/3;
+		int staticBucketSize = (2*_params.exportVolumePerThread()*_solvers.size())/3;
 		switch(_params.clauseStoreMode()) {
 		case MALLOB_CLAUSE_STORE_STATIC_BY_LENGTH_MIXED_LBD:
 			return new StaticClauseStoreMixedLbd(_params.strictClauseLengthLimit()+ClauseMetadata::numInts(),
@@ -61,13 +61,13 @@ SharingManager::SharingManager(
 		case MALLOB_CLAUSE_STORE_ADAPTIVE_SIMPLE:
 			return new StaticClauseStore<true>(_params,
 				resetLbdAtExport, 256, true,
-				_params.clauseBufferBaseSize()*_params.numExportChunks());
+				_params.exportVolumePerThread()*_solvers.size()*_params.numExportChunks());
 		case MALLOB_CLAUSE_STORE_ADAPTIVE:
 		default:
 			AdaptiveClauseStore::Setup setup;
 			setup.maxEffectiveClauseLength = _params.strictClauseLengthLimit()+ClauseMetadata::numInts();
 			setup.maxLbdPartitionedSize = _params.maxLbdPartitioningSize();
-			setup.numLiterals = _params.clauseBufferBaseSize()*_params.numExportChunks();
+			setup.numLiterals = _params.exportVolumePerThread()*_solvers.size()*_params.numExportChunks();
 			setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
 			setup.resetLbdAtExport = resetLbdAtExport;
 			return new AdaptiveClauseStore(setup);
