@@ -2,6 +2,7 @@
 #pragma once
 
 #include "app/maxsat/maxsat_instance.hpp"
+#include "app/sat/data/formula_compressor.hpp"
 #include "data/checksum.hpp"
 #include "data/job_description.hpp"
 #include "interface/api/api_connector.hpp"
@@ -10,6 +11,7 @@
 #include "util/logger.hpp"
 #include "util/static_store.hpp"
 #include "util/params.hpp"
+#include <cstdint>
 
 class SatJobStream {
 
@@ -85,9 +87,17 @@ public:
             }
         }
         nlohmann::json copy(_json_base);
+        if (_params.compressFormula()) {
+            auto out = FormulaCompressor::compress(newLiterals.data(), newLiterals.size(),
+                assumptions.data(), assumptions.size());
+            newLiterals = std::move(*out.vec);
+        } else {
+            newLiterals.push_back(INT32_MAX);
+            for (int a : assumptions) newLiterals.push_back(a);
+            newLiterals.push_back(0);
+        }
         StaticStore<std::vector<int>>::insert(_json_base["name"].get<std::string>(), std::move(newLiterals));
         copy["internalliterals"] = _json_base["name"].get<std::string>();
-        copy["assumptions"] = assumptions;
         if (!descriptionLabel.empty()) {
             copy["description-id"] = descriptionLabel;
         }

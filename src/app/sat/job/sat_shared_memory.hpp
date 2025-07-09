@@ -14,7 +14,6 @@ struct SatSharedMemory {
 
     // Meta data parent->child
     int fSize;
-    int aSize;
     Checksum chksum;
 
     // Signals parent->child

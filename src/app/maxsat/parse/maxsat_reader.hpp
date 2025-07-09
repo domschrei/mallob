@@ -63,7 +63,7 @@ public:
                 }
                 if (!_assumption) {
                     if (_hard_clause) {
-                        desc.addPermanentData(0);
+                        desc.addData(0);
                         _num_read_clauses++;
                     } else {
                         // soft clause
@@ -94,7 +94,7 @@ public:
                     int lit = _sign * (int)_num;
                     if (_hard_clause) {
                         _max_var = std::max(_max_var, std::abs(lit));
-                        desc.addPermanentData(lit);
+                        desc.addData(lit);
                     } else if (_num != 0) {
                         // soft unit clause
                         if (_current_soft_unit.first == 0) {
@@ -111,7 +111,7 @@ public:
                     }
                     _last_added_lit_was_zero = lit == 0;
                 } else if (_num != 0) {
-                    desc.addTransientData(_sign * (int)_num);
+                    desc.addData(_sign * (int)_num);
                 }
                 _num = 0;
                 _began_num = false;
@@ -131,15 +131,15 @@ public:
     }
 
     void finalize(JobDescription& desc) {
-        desc.addPermanentData(0);
+        desc.addData(0);
         for (auto& softUnit : _objective) {
             // Need to write each weight, which could be 64-bit, as two 32-bit integers ...
             const int* weightAsTwoInts = (int*) &softUnit.first;
-            desc.addPermanentData(weightAsTwoInts[0]);
-            desc.addPermanentData(weightAsTwoInts[1]);
-            desc.addPermanentData(softUnit.second);
+            desc.addData(weightAsTwoInts[0]);
+            desc.addData(weightAsTwoInts[1]);
+            desc.addData(softUnit.second);
         }
-        desc.addPermanentData((int) _objective.size());
+        desc.addData((int) _objective.size());
     }
 
     bool isValidInput() const {

@@ -261,4 +261,5 @@ while [ ! -z "$1" ]; do
     shift 1
 done
 
+print_separator
 echo "All tests done."

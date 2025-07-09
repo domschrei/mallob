@@ -1,7 +1,6 @@
 
 #include <assert.h>
 #include <cstdint>
-#include <type_traits>
 
 #include "job_description.hpp"
 #include "util/logger.hpp"
@@ -13,7 +12,6 @@ void JobDescription::beginInitialization(int revision) {
         getMetadataSize()
     ));
     _f_size = 0;
-    _a_size = 0;
 }
 
 void JobDescription::reserveSize(size_t size) {
@@ -22,11 +20,8 @@ void JobDescription::reserveSize(size_t size) {
 
 void JobDescription::endInitialization() {
     // Add preloaded literals and assumptions (if any)
-    for (int l : _preloaded_literals) addPermanentData(l);
-    for (int a : _preloaded_assumptions) addTransientData(a);
+    for (int x : _preloaded_literals) addData(x);
     _preloaded_literals.clear();
-    _preloaded_assumptions.clear();
-
     writeMetadata();
 }
 
@@ -40,7 +35,6 @@ void JobDescription::writeMetadata() {
     n = sizeof(int);         memcpy(data->data()+i, &_revision, n); i += n;
     n = sizeof(int);         memcpy(data->data()+i, &_client_rank, n); i += n;
     n = sizeof(size_t);      memcpy(data->data()+i, &_f_size, n); i += n;
-    n = sizeof(size_t);      memcpy(data->data()+i, &_a_size, n); i += n;
     n = sizeof(int);         memcpy(data->data()+i, &_root_rank, n); i += n;
     n = sizeof(float);       memcpy(data->data()+i, &_priority, n); i += n;
     n = sizeof(int);         memcpy(data->data()+i, &_num_vars, n); i += n;
@@ -79,17 +73,11 @@ size_t JobDescription::getFormulaPayloadSize(int revision) const {
     return fSize;
 }
 
-size_t JobDescription::getAssumptionsSize(int revision) const {
-    size_t aSize;
-    memcpy(&aSize, getRevisionData(revision)->data()+3*sizeof(int)+sizeof(size_t), sizeof(size_t));
-    return aSize;
-}
-
 int JobDescription::getJobDescriptionId(int revision) const {
     int id;
     memcpy(&id, getRevisionData(revision)->data()
            +8*sizeof(int)
-           +2*sizeof(size_t)
+           +1*sizeof(size_t)
            +3*sizeof(float)
            +sizeof(bool), sizeof(int));
     return id;
@@ -99,7 +87,7 @@ Checksum JobDescription::getChecksum(int revision) const {
     Checksum chksum;
     memcpy(&chksum, getRevisionData(revision)->data()
            +10*sizeof(int)
-           +2*sizeof(size_t)
+           +1*sizeof(size_t)
            +3*sizeof(float)
            +sizeof(bool), sizeof(Checksum));
     return chksum;
@@ -110,10 +98,6 @@ const int* JobDescription::getFormulaPayload(int revision) const {
     return (const int*) (getRevisionData(revision)->data()+pos);
 }
 
-const int* JobDescription::getAssumptionsPayload(int revision) const {
-    return (const int*) (getRevisionData(revision)->data() + getRevisionData(revision)->size() - sizeof(int)*getAssumptionsSize(revision));
-}
-
 size_t JobDescription::getTransferSize(int revision) const {
     return getRevisionData(revision)->size();
 }
@@ -122,7 +106,7 @@ size_t JobDescription::getTransferSize(int revision) const {
 
 int JobDescription::getMetadataSize() const {
     return 10*sizeof(int)
-           +2*sizeof(size_t)
+           +1*sizeof(size_t)
            +3*sizeof(float)
            +sizeof(bool)
            +sizeof(Checksum)
@@ -132,7 +116,7 @@ int JobDescription::getMetadataSize() const {
 
 
 int JobDescription::readRevisionIndex(const std::vector<uint8_t>& serialized) {
-    assert(serialized.size() >= 3*sizeof(int)+2*sizeof(size_t));
+    assert(serialized.size() >= 3*sizeof(int)+1*sizeof(size_t));
     int revision;
     memcpy(&revision, serialized.data()+sizeof(int), sizeof(int));
     assert(revision >= 0);
@@ -176,7 +160,6 @@ void JobDescription::deserialize() {
     n = sizeof(int);         memcpy(&_revision, latestData->data()+i, n);        i += n;
     n = sizeof(int);         memcpy(&_client_rank, latestData->data()+i, n);     i += n;
     n = sizeof(size_t);      memcpy(&_f_size, latestData->data()+i, n);          i += n;
-    n = sizeof(size_t);      memcpy(&_a_size, latestData->data()+i, n);          i += n;
     n = sizeof(int);         memcpy(&_root_rank, latestData->data()+i, n);       i += n;
     n = sizeof(float);       memcpy(&_priority, latestData->data()+i, n);        i += n;
     n = sizeof(int);         memcpy(&_num_vars, latestData->data()+i, n);        i += n;

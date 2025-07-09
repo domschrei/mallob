@@ -47,7 +47,7 @@ if(MALLOB_BUILD_LRAT_MODULES)
     add_executable(standalone_lrat_checker src/app/sat/proof/standalone_checker.cpp)
     target_include_directories(standalone_lrat_checker PRIVATE ${BASE_INCLUDES})
     target_compile_options(standalone_lrat_checker PRIVATE ${BASE_COMPILEFLAGS})
-    target_link_libraries(standalone_lrat_checker mallob_sat_subproc)
+    target_link_libraries(standalone_lrat_checker mallob_corepluscomm)
 endif()
 
 # Add unit tests
@@ -67,3 +67,4 @@ new_test(lrat_checker "${BASE_INCLUDES}" mallob_sat_subproc)
 new_test(portfolio_sequence "${BASE_INCLUDES}" mallob_sat_subproc)
 new_test(theory_specification "${BASE_INCLUDES}" mallob_sat_subproc)
 new_test(model_string_compressor "${BASE_INCLUDES}" mallob_sat_subproc)
+new_test(formula_compressor "${BASE_INCLUDES}" mallob_corepluscomm)

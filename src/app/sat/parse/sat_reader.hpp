@@ -2,6 +2,7 @@
 #ifndef MALLOB_SAT_READER_H
 #define MALLOB_SAT_READER_H
 
+#include <cstdint>
 #include <stdio.h>
 #include <bits/std_abs.h>
 #include <stdlib.h>
@@ -46,6 +47,7 @@ public:
     bool read(JobDescription& desc);
     bool parseInternally(JobDescription& desc);
     bool parseWithTrustedParser(JobDescription& desc);
+    bool parseAndCompress(JobDescription& desc);
 
     inline void processInt(int x, JobDescription& desc) {
         
@@ -57,24 +59,23 @@ public:
             return;
         }
 
-        if (_empty_clause && x == 0) {
-            // Received an "empty clause" (zero without a preceding non-zero literal)
-            if (_traversing_clauses) {
-                // switch to assumptions
-                _traversing_clauses = false;
-                _traversing_assumptions = true;
-            } else if (_traversing_assumptions) {
-                // End of assumptions: done.
-                _input_finished = true;
-            }
+        if (x == INT32_MAX && _traversing_clauses) {
+            // switch to assumptions
+            _traversing_clauses = false;
+            _traversing_assumptions = true;
+            desc.addData(x);
             return;
         }
-        
-        if (_traversing_clauses) {
-            desc.addPermanentData(x);
-            if (x == 0) _num_read_clauses++;
+
+        if (_traversing_assumptions && x == 0) {
+            // End of assumptions: done.
+            _input_finished = true;
+            desc.addData(x);
+            return;
         }
-        else desc.addTransientData(x);
+
+        desc.addData(x);
+        if (_traversing_clauses && x == 0) _num_read_clauses++;
 
         _max_var = std::max(_max_var, std::abs(x));
         _empty_clause = _traversing_assumptions || (x == 0);
@@ -87,6 +88,7 @@ public:
         signed char uc = *((signed char*) &c);
         switch (uc) {
         case EOF:
+            if (_assumption) desc.addData(0);
             _input_finished = true;
         case '\n':
         case '\r':
@@ -97,20 +99,20 @@ public:
                     return;
                 }
                 if (!_assumption) {
-                    desc.addPermanentData(0);
+                    desc.addData(0);
                     if (_last_added_lit_was_zero) _contains_empty_clause = true;
                     _last_added_lit_was_zero = true;
                     _num_read_clauses++;
                 }
                 _began_num = false;
             }
-            _assumption = false;
             break;
         case 'p':
         case 'c':
             _comment = true;
             break;
         case 'a':
+            if (!_assumption) desc.addData(INT32_MAX); // separator to begin assumptions
             _assumption = true;
             break;
         case ' ':
@@ -118,14 +120,14 @@ public:
                 _max_var = std::max(_max_var, _num);
                 if (!_assumption) {
                     int lit = _sign * _num;
-                    desc.addPermanentData(lit);
+                    desc.addData(lit);
                     if (lit == 0) {
                         if (_last_added_lit_was_zero) _contains_empty_clause = true;
                         _num_read_clauses++;
                     }
                     _last_added_lit_was_zero = lit == 0;
                 } else if (_num != 0) {
-                    desc.addTransientData(_sign * _num);
+                    desc.addData(_sign * _num);
                 }
                 _num = 0;
                 _began_num = false;

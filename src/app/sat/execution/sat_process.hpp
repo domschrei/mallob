@@ -43,7 +43,6 @@ private:
     int _desired_revision;
 
     std::vector<std::vector<int>> _read_formulae;
-    std::vector<std::vector<int>> _read_assumptions;
 
     bool _has_solution {false};
 
@@ -366,18 +365,15 @@ private:
 
         float time = Timer::elapsedSeconds();
 
-        size_t fSize, aSize;
+        size_t fSize;
         Checksum checksum;
         if (revision == 0) {
             fSize = _hsm->fSize;
-            aSize = _hsm->aSize;
             checksum = _hsm->chksum;
         } else {
             size_t* fSizePtr = (size_t*) accessMemory(_shmem_id + ".fsize." + std::to_string(revision), sizeof(size_t));
-            size_t* aSizePtr = (size_t*) accessMemory(_shmem_id + ".asize." + std::to_string(revision), sizeof(size_t));
             Checksum* chk = (Checksum*) accessMemory(_shmem_id + ".checksum." + std::to_string(revision), sizeof(Checksum));
             fSize = *fSizePtr;
-            aSize = *aSizePtr;
             checksum = *chk;
         }
 
@@ -391,37 +387,23 @@ private:
 
         const int* fPtr = (const int*) accessMemory(formulaShmemId,
             sizeof(int) * fSize, SharedMemory::READONLY);
-        const int* aPtr = (const int*) accessMemory(_shmem_id + ".assumptions." + std::to_string(revision),
-            sizeof(int) * aSize, SharedMemory::READONLY);
 
         LOGGER(_log, V5_DEBG, "FORMULA rev. %i : %s\n", revision, StringUtils::getSummary(fPtr, fSize).c_str());
-        if (fSize > 0 && (fPtr[0] == 0)) {
-            LOGGER(_log, V0_CRIT, "[ERROR] rev. %i begins with a zero\n", revision);  
-            _log.flush();
-            abort();
-        }
-        if (fSize > 0 && (fPtr[fSize-1] != 0)) {
-            LOGGER(_log, V0_CRIT, "[ERROR] rev. %i does not end with a zero\n", revision);  
-            _log.flush();
-            abort();
-        }
-        LOGGER(_log, V5_DEBG, "ASSUMPTIONS rev. %i : %s\n", revision, StringUtils::getSummary(aPtr, aSize).c_str());
 
         if (_params.copyFormulaeFromSharedMem()) {
             // Copy formula and assumptions to your own local memory
             _read_formulae.emplace_back(fPtr, fPtr+fSize);
-            _read_assumptions.emplace_back(aPtr, aPtr+aSize);
 
             // Reference the according positions in local memory when forwarding the data
-            engine.appendRevision(revision, {fSize, _read_formulae.back().data(),
-                aSize, _read_assumptions.back().data(), checksum}, revision == _desired_revision);
+            engine.appendRevision(revision, {fSize, _read_formulae.back().data(), checksum},
+                revision == _desired_revision);
         } else {
             // Let the solvers read from shared memory directly
-            engine.appendRevision(revision, {fSize, fPtr, aSize, aPtr, checksum}, revision == _desired_revision);
+            engine.appendRevision(revision, {fSize, fPtr, checksum}, revision == _desired_revision);
         }
 
         time = Timer::elapsedSeconds() - time;
-        LOGGER(_log, V3_VERB, "Read formula rev. %i (size:%lu,%lu, chk:%lu,%x) from shared memory in %.4fs\n", revision, fSize, aSize,
+        LOGGER(_log, V3_VERB, "Read formula rev. %i (size:%lu, chk:%lu,%x) from shared memory in %.4fs\n", revision, fSize,
             checksum.count(), checksum.get(), time);
     }
 

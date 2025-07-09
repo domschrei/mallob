@@ -70,7 +70,7 @@ void encode(Parameters& params, const std::string& path, const std::string& file
     MaxSatReader reader(params, path + "/" + filename);
     bool ok = reader.read(desc);
     assert(ok);
-    LOG(V2_INFO, "Formula has %i literals, %i variables, %i clauses\n", desc.getNumFormulaLiterals(), reader.getNbVars(), reader.getNbClauses());
+    LOG(V2_INFO, "Formula has size %i, %i variables, %i clauses\n", desc.getFSize(), reader.getNbVars(), reader.getNbClauses());
 
     // Re-map variables in-place to a compact domain from 1 to |O|
     int nbBaseVars = 0;

@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include "app/sat/data/formula_compressor.hpp"
 #include "app/sat/data/model_string_compressor.hpp"
 #include "app/sat/job/sat_constants.h"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
@@ -50,8 +51,9 @@ private:
 
 public:
     SatPreprocessSolver(const Parameters& params, APIConnector& api, JobDescription& desc) :
-        _params(params), _api(api), _desc(desc), _jobstr("#" + std::to_string(desc.getId())),
-        _prepro(*(new SatPreprocessor(desc, _params.preprocessLingeling()))) {}
+        _params(params), _api(api), _desc(desc),
+        _prepro(*(new SatPreprocessor(_params, desc, _params.preprocessLingeling()))),
+        _jobstr("#" + std::to_string(desc.getId())) {}
     ~SatPreprocessSolver() {
         ProcessWideCoreAllocator::get().returnCores(_cores_allocated);
         if (!_params.terminateAbruptly()) delete &_prepro;
@@ -170,20 +172,10 @@ private:
         int nbVars = fPre.back(); fPre.pop_back();
         size_t preprocessedSize = fPre.size();
 
-        /*
-        // Just for checking whether Kissat actually returns units
-        assert(fPre[fPre.size()-1] == 0);
-        for (int i = fPre.size()-2; i >= 1; i-=2) {
-            if (fPre[i-1]==0 && fPre[i]!=0 && fPre[i+1]==0) {
-                // unit clause at the end
-                for (int lit : {fPre[i], -1*fPre[i]}) {
-                    auto it = std::find(fPre.begin(), fPre.begin()+i, lit);
-                    if (it != fPre.begin()+i)
-                        LOG(V0_CRIT, "Unit %i (pos %i) occurs in formula (pos %lu)\n", fPre[i], i, it - fPre.begin());
-                }
-            } else break;
+        if (_params.compressFormula()) {
+            auto out = FormulaCompressor::compress(fPre.data(), fPre.size(), 0, 0);
+            fPre = std::move(*out.vec);
         }
-        */
 
         // begin successively retracting this job
         _time_of_retraction_start = Timer::elapsedSeconds();

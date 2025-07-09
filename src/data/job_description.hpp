@@ -53,7 +53,6 @@ private:
     int _num_vars = -1;
     
     size_t _f_size;
-    size_t _a_size;
     
     // For each revision, the shared_ptr contains the full serialization
     // of this revision including all meta data of this object.
@@ -69,7 +68,6 @@ private:
 
     // just for parsing
     std::vector<int> _preloaded_literals;
-    std::vector<int> _preloaded_assumptions;
 
     // just for scheduling
     JobProcessingStatistics* _stats = nullptr;
@@ -113,10 +111,8 @@ public:
         _app_config = std::move(other._app_config);
         _num_vars = std::move(other._num_vars);
         _f_size = std::move(other._f_size);
-        _a_size = std::move(other._a_size);
         _data_per_revision = std::move(other._data_per_revision);
         _preloaded_literals = std::move(other._preloaded_literals);
-        _preloaded_assumptions = std::move(other._preloaded_assumptions);
         _stats = std::move(other._stats);
         other._id = -1;
         other._data_per_revision.clear();
@@ -136,23 +132,17 @@ public:
 
     void beginInitialization(int revision);
     void reserveSize(size_t size);
-    inline void addPermanentData(int lit) {
+    inline void addData(int lit) {
         // Push literal to raw data, update counter
         push_obj<int>(_data_per_revision[_revision], lit);
         _f_size++;
         if (_use_checksums) _checksum.combine(lit);
     }
-    inline void addPermanentData(float data) {
+    inline void addData(float data) {
         static_assert(sizeof(float) == sizeof(int));
         push_obj<float>(_data_per_revision[_revision], data);
         _f_size++;
         if (_use_checksums) _checksum.combine(data);
-    }
-    inline void addTransientData(int lit) {
-        // Push literal to raw data, update counter
-        push_obj<int>(_data_per_revision[_revision], lit);
-        _a_size++;
-        if (_use_checksums) _checksum.combine(-lit);
     }
     void setFSize(int fSize) {_f_size = fSize;}
     void endInitialization();
@@ -168,7 +158,6 @@ public:
 
     bool isRevisionIncomplete(int rev) const {
         return getRevisionData(rev)->size() < getMetadataSize()
-            + getAssumptionsSize(rev) * sizeof(int)
             + getFormulaPayloadSize(rev) * sizeof(int);
     }
 
@@ -193,6 +182,7 @@ public:
     
     size_t getFullNonincrementalTransferSize() const {return _data_per_revision[0]->size();}
     int getNumVars() {return _num_vars;}
+    std::vector<int>& getPreloadedLiterals() {return _preloaded_literals;}
 
     void setRootRank(int rootRank) {_root_rank = rootRank;}
     void setRevision(int revision) {_revision = revision;}
@@ -204,7 +194,6 @@ public:
     void setArrival(float arrival) {_arrival = arrival;};
     void setAppConfiguration(AppConfiguration&& appConfig) {_app_config = std::move(appConfig);}
     void setPreloadedLiterals(std::vector<int>&& lits) {_preloaded_literals = std::move(lits);}
-    void setPreloadedAssumptions(std::vector<int>&& asmpt) {_preloaded_assumptions = std::move(asmpt);}
     void setAppConfigurationEntry(const std::string& key, const std::string& val) {_app_config.map[key] = val;}
     void setGroupId(int groupId) {_group_id = groupId;}
     void setJobDescriptionId(int descId) {_description_id = descId;}
@@ -222,13 +211,10 @@ public:
 
     int getMaxConsecutiveRevision() const;
 
-    size_t getNumFormulaLiterals() const {return _f_size;}
-    size_t getNumAssumptionLiterals() const {return _a_size;}
+    size_t getFSize() const {return _f_size;}
 
     size_t getFormulaPayloadSize(int revision) const;
     const int* getFormulaPayload(int revision) const;
-    size_t getAssumptionsSize(int revision) const;
-    const int* getAssumptionsPayload(int revision) const;
     int getJobDescriptionId(int revision) const;
     Checksum getChecksum(int revision) const;
 
