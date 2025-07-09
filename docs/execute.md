@@ -46,6 +46,8 @@ In order to let Mallob process only a single instance, use option `-mono=$PROBLE
 In this mode, all processes participate in solving, overhead is minimal, and Mallob terminates immediately after the job has been processed.
 Use option `-s2f=path/to/output.txt` ("solution to file") to write the result and (if applicable) the found satisfying assignment to a text file.
 
+In terms of file inputs and outputs, note that you can also use UNIX named pipes to replace disk operations with direct inter-process communication: Create the input file(s) and/or the solution output file in advance via `mkfifo` and make sure to write/read the respective contents to/from the pipes concurrently so that no thread blocks indefinitely.
+
 In the following, we explain how to use Mallob with different applications while mostly focusing on this "mono" mode of operation.
 Afterwards, we explain Mallob's other modes of operation (solving multiple instances in an orchestrated manner, and processing jobs on demand).
 
@@ -55,9 +57,7 @@ Afterwards, we explain Mallob's other modes of operation (solving multiple insta
 
 The input can be provided (a) as a plain DIMACS CNF text file, (b) as a compressed (.lzma / .xz) DIMACS CNF file, or (c) as a compact binary file.
 CNF files may contain a single line of the form `a <lit1> <lit2> ... 0` **after all regular clauses**, where `<lit1>`, `<lit2>` etc. are assumption literals for incremental solving.
-For binary files, Mallob reads clauses as integer sequences with separation zeroes in between; the special integer INT32_MAX (2147483647) separates the clause literals from the sequence of assumption integers, and then another zero signals that the description is complete. This integer sequence is also how the field "literals" should be used.
-
-For all three kinds of inputs, note that you can also use UNIX named pipes (`mkfifo`) to replace disk operations with direct inter-process communication (see also below at [Introducing a job](#introducing-a-job)).
+For binary files, Mallob reads clauses as integer sequences with separation zeroes in between; the special integer INT32_MAX (2147483647) separates the clause literals from the sequence of assumption integers, and then another zero signals that the description is complete. This integer sequence is also how the field "literals" in manual job submission JSONs should be used (see below at [Introducing a job](#introducing-a-job)).
 
 ### Producing Monolithic Proofs of Unsatisfiability
 
