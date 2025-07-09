@@ -54,7 +54,7 @@ Afterwards, we explain Mallob's other modes of operation (solving multiple insta
 ### Input Formats
 
 The input can be provided (a) as a plain DIMACS CNF text file, (b) as a compressed (.lzma / .xz) DIMACS CNF file, or (c) as a compact binary file.
-CNF files may contain a single line of the form `a <lit1> <lit2> ... 0` where `<lit1>`, `<lit2>` etc. are assumption literals for incremental solving.
+CNF files may contain a single line of the form `a <lit1> <lit2> ... 0` **after all regular clauses**, where `<lit1>`, `<lit2>` etc. are assumption literals for incremental solving.
 For binary files, Mallob reads clauses as integer sequences with separation zeroes in between; the special integer INT32_MAX (2147483647) separates the clause literals from the sequence of assumption integers, and then another zero signals that the description is complete. This integer sequence is also how the field "literals" should be used.
 
 For all three kinds of inputs, note that you can also use UNIX named pipes (`mkfifo`) to replace disk operations with direct inter-process communication (see also below at [Introducing a job](#introducing-a-job)).
