@@ -49,6 +49,13 @@ As of yet, no.
 
 * `[ERROR] execl returned errno 2`: Mallob was (most probably) not executed from it's home directory. In particular, Mallob needs to find the sub-process executables (`mallob_process_dispatcher`, `mallob_sat_process`, etc.) at the (relative) path provided via the build option `-DMALLOB_SUBPROC_PATH`. For most robust results, execute Mallob from its home directory. Alternatively, you can set the path to these sub-processes explictly.
 * Make sure that the problem instance path you handed to Mallob exists; otherwise, Mallob may wait indefinitely for such a file to appear.
+* For RAM related issues, see the next question.
+
+#### Mallob uses too much RAM / I'm getting SIGBUS errors / The OOM Killer strikes.
+
+* Kissat is generally the most RAM efficient SAT solver backend.
+* You can gauge Mallob's RAM hungriness with the `-mlpt` ("max literals per thread") option – decrease it to have Mallob spawn fewer threads per process for accordingly large inputs.
+* If this does not help, consider launching fewer MPI processes per node and/or fewer threads per MPI process.
 
 #### I try running $t$ solver threads per Mallob process and get an error "Option t: $t$ > 32(max)!"
 
