@@ -27,7 +27,7 @@ public:
         conf.recoveryIndex = recoveryIndex;
         conf.nbPreviousBalancingEpochs = job.getLatestJobBalancingEpoch() - job.getDescription().getFirstBalancingEpoch() - 1;
         LOG(V5_DEBG, "#%i:%i : Job balancing epochs: %i (first: %i)\n", job.getId(), job.getIndex(),
-            nbPreviousBalancingEpochs, job.getDescription().getFirstBalancingEpoch());
+            conf.nbPreviousBalancingEpochs, job.getDescription().getFirstBalancingEpoch());
         return conf;
     }
 };
