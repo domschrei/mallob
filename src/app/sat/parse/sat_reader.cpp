@@ -42,17 +42,32 @@ bool SatReader::parseWithTrustedParser(JobDescription& desc) {
 	// Parse and sign in a separate subprocess
 	TrustedParserProcessAdapter tp(desc.getId());
 	uint8_t* sig;
-	bool ok = tp.parseAndSign(_filename.c_str(), *desc.getRevisionData(desc.getRevision()).get(), sig);
+	std::vector<unsigned char> plain;
+	std::vector<unsigned char>* out;
+	if (_params.compressFormula()) out = &plain;
+	else out = desc.getRevisionData(desc.getRevision()).get();
+
+	bool ok = tp.parseAndSign(_filename.c_str(), *out, sig);
 	if (!ok) return false;
+
 	std::string sigStr = Logger::dataToHexStr(sig, SIG_SIZE_BYTES);
 	assert(desc.getAppConfiguration().map.at("__SIG").size() == sigStr.size());
 	desc.setAppConfigurationEntry("__SIG", sigStr);
 	_max_var = tp.getNbVars();
 	_num_read_clauses = tp.getNbClauses();
+	desc.setFSize(tp.getFSize());
 	LOG(V2_INFO, "TRUSTED parser read %i vars, %i cls - sig %s\n", _max_var, _num_read_clauses, sigStr.c_str());
+
+	if (_params.compressFormula()) {
+		auto vec = desc.getRevisionData(desc.getRevision()).get();
+		auto outSizeBytesBefore = vec->size();
+		FormulaCompressor::VectorFormulaOutput cOut(vec);
+		FormulaCompressor::compress((const int*) out->data(), out->size() / sizeof(int), 0, 0, cOut);
+		desc.setFSize((cOut.vec->size() - outSizeBytesBefore) / sizeof(int));
+	}
+
 	_input_finished = true;
 	_input_invalid = false;
-	desc.setFSize(tp.getFSize());
 	return true;
 }
 

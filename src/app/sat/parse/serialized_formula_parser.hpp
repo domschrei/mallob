@@ -35,6 +35,9 @@ public:
         _compr_view = FormulaCompressor::getView((const unsigned char*) _payload, sizeof(int) * _size);
         _compressed = true;
     }
+    bool isCompressed() const {
+        return _compressed;
+    }
 
     bool getNextLiteral(int& lit) {
 

@@ -124,12 +124,10 @@ bool SolverThread::readFormula() {
 
         // Forward raw formula data to LRAT connectors
         if (_lrat) {
-            assert(!_params.compressFormula());
-            _lrat->launch(fParser->getRawPayload(), fParser->getPayloadSize());
+            _lrat->launch(*fParser);
         }
         if (_solver.getSolverSetup().owningModelCheckingLratConnector) {
-            assert(!_params.compressFormula());
-            _solver.getSolverSetup().modelCheckingLratConnector->launch(fParser->getRawPayload(), fParser->getPayloadSize());
+            _solver.getSolverSetup().modelCheckingLratConnector->launch(*fParser);
         }
 
         LOGGER(_logger, V4_VVER, "Reading rev. %i, start %i\n", (int)_active_revision, (int)_imported_lits_curr_revision);

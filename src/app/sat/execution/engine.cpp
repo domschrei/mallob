@@ -96,6 +96,11 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 			// Create directory for partial proofs
 			proofDirectory = params.proofDirectory() + "/proof" + config.getJobStr();
 			FileUtils::mkdir(proofDirectory);
+			if (_params.compressFormula()) {
+				LOG(V1_WARN, "[WARN] Using proof production (-proof) combined with formula compression (-cf): "
+					"Irredundant clause IDs in the produced proof will be ordered differently (by clause length). "
+					"Running a vanilla LRUP checker on the input CNF and the produced proof will fail!\n");
+			}
 		}
     }
 
