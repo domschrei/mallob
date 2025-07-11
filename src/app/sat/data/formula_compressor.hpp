@@ -7,6 +7,7 @@
 #include "util/logger.hpp"
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <fstream>
 #include <sstream>
@@ -16,9 +17,10 @@ class FormulaCompressor {
 
 public:
     struct CompressionInput {
-        tsl::robin_map<int, std::vector<int>> table;
-        int maxClauseLength {0};
-        std::vector<int> assumptions;
+        tsl::robin_map<unsigned int, std::vector<unsigned int>> table;
+        unsigned int maxClauseLength {0};
+        std::vector<unsigned int> assumptions;
+        size_t uncompressedSize {0};
     };
 
     struct FormulaOutput {
@@ -90,16 +92,16 @@ public:
 
         size_t pos {0};
 
-        int maxClauseLength {0};
+        unsigned int maxClauseLength {0};
         int clauseLength {0};
 
-        int nbClauses {0};
+        unsigned int nbClauses {0};
         int cpos {0};
 
         int lpos {0};
         int lastLit {0};
 
-        int nbAssumptions {-1};
+        unsigned int nbAssumptions {0};
         int apos {0};
 
         bool hasLitToExport {false};
@@ -138,7 +140,7 @@ public:
 
             // assumptions
             if (cpos == nbClauses && clauseLength == maxClauseLength && pos < size) {
-                if (nbAssumptions < 0) {
+                if (!exportingAsmpt) {
                     // read padding to next word
                     while (pos % 4 != 0) {
                         int zero;
@@ -147,11 +149,12 @@ public:
                     }
 
                     pos += readVariableLengthUnsigned(data+pos, nbAssumptions);
-                    LOG(V2_INFO, "reading %i assumptions\n", nbAssumptions);
+                    LOG(V5_DEBG, "[compr] read %i assumptions\n", nbAssumptions);
                     lastLit = 0;
+                    exportingAsmpt = true;
                 }
                 if (apos < nbAssumptions) {
-                    int ilit;
+                    unsigned int ilit;
                     pos += readVariableLengthUnsigned(data+pos, ilit);
                     ilit += lastLit;
                     lastLit = ilit;
@@ -183,7 +186,7 @@ public:
                 pos += readVariableLengthUnsigned(data+pos, nbClauses);
                 nbClauses -= 4;
                 assert(nbClauses > 0);
-                LOG(V2_INFO, "reading %i clauses of len %i\n", nbClauses, clauseLength);
+                LOG(V5_DEBG, "[compr] read %i clauses of len %i\n", nbClauses, clauseLength);
                 cpos = 0;
                 lpos = 0;
                 lastLit = 0;
@@ -203,7 +206,7 @@ public:
 
             // next literal of current clause
             if (lpos < clauseLength) {
-                int ilit;
+                unsigned int ilit;
                 pos += readVariableLengthUnsigned(data+pos, ilit);
                 ilit += lastLit;
                 lastLit = ilit;
@@ -238,8 +241,8 @@ public:
         CompressionInput in;
 
         std::string line;
-        std::vector<int> cls;
         bool assumptions = false;
+        std::vector<unsigned int> cls;
         while (getline(file, line)) {
             if (line.empty() || line[0] == 'c') {
                 continue; // Skip comments and empty lines
@@ -254,27 +257,27 @@ public:
                 std::string a; iss >> a;
                 assumptions = true;
             }
-            int literal;
-            while (iss >> literal) {
-                if (literal == 0) break; // End of clause
-                if (assumptions) in.assumptions.push_back(literal);
-                else cls.push_back(literal);
+            int lit;
+            unsigned int clauseLength = 0;
+            while (iss >> lit) {
+                in.uncompressedSize++;
+                if (lit == 0) break; // End of clause / assumptions line
+                clauseLength++;
+                out.maxVar = std::max(out.maxVar, std::abs(lit));
+                if (assumptions) in.assumptions.push_back(compressLiteral(lit));
+                else cls.push_back(compressLiteral(lit));
             }
             if (!assumptions) {
-                int clauseLength = cls.size();
                 auto& tableEntry = in.table[clauseLength];
-                for (int lit : cls) {
-                    out.maxVar = std::max(out.maxVar, std::abs(lit));
-                    tableEntry.push_back(compressLiteral(lit));
-                }
-                std::sort(tableEntry.end() - clauseLength, tableEntry.end());
+                std::sort(cls.begin(), cls.end());
+                tableEntry.insert(tableEntry.end(), cls.begin(), cls.end());
                 in.maxClauseLength = std::max(in.maxClauseLength, clauseLength);
                 out.nbClauses++;
                 cls.clear();
             }
         }
+        std::sort(in.assumptions.begin(), in.assumptions.end());
 
-        LOG(V2_INFO, "Compressing clause table ...\n");
         compressInput(in, out);
         return true;
     }
@@ -313,14 +316,18 @@ private:
         in.maxClauseLength = 0;
         bool assumptions = false;
         for (size_t i = 0; i < size; i++) {
-            if (data[i] != 0) continue;
-            size_t clauseEnd = i;
-            int clauseLength = clauseEnd - clauseStart;
-            if (clauseLength == 0) {
+            if (data[i] == INT32_MAX) {
                 // separator for assumptions!
                 assumptions = true;
+                continue;
             }
-            //LOG(V2_INFO, "+ clause of length %i, %i bytes per lit\n", clauseLength, bytesPerLitInClause);
+            if (data[i] != 0) continue;
+            size_t clauseEnd = i;
+            unsigned int clauseLength = clauseEnd - clauseStart;
+            if (clauseLength == 0) {
+                // separator for assumptions! (legacy)
+                assumptions = true;
+            }
             if (assumptions) {
                 for (int i = 0; i < clauseLength; i++) {
                     in.assumptions.push_back(compressLiteral(*(data+clauseStart+i)));
@@ -339,6 +346,7 @@ private:
             for (int i = 0; i < aSize; i++) in.assumptions.push_back(compressLiteral(aData[i]));
         }
         std::sort(in.assumptions.begin(), in.assumptions.end());
+        in.uncompressedSize = size + aSize;
         return in;
     }
 
@@ -364,15 +372,15 @@ private:
                 }
                 nbEmptySlots = 0;
             }
-            int nbClauses = entry.size() / len;
-            LOG(V2_INFO, "writing %i clauses of len %i\n", nbClauses, len);
+            unsigned int nbClauses = entry.size() / len;
+            LOG(V5_DEBG, "[compr] write %i clauses of len %i\n", nbClauses, len);
             if (!writeVariableLengthUnsigned(4+nbClauses, out)) return false;
             int eIdx = 0;
             for (int cIdx = 0; cIdx < nbClauses; cIdx++) {
-                int lastLit = 0;
+                unsigned int lastLit = 0;
                 for (int lIdx = 0; lIdx < len; lIdx++) {
-                    int lit = entry[eIdx++];
-                    assert(lit-lastLit >= 0);
+                    unsigned int lit = entry[eIdx++];
+                    assert(lit == 0 || lit > lastLit);
                     if (!writeVariableLengthUnsigned(lit-lastLit, out)) return false;
                     lastLit = lit;
                 }
@@ -386,10 +394,11 @@ private:
         out.fSize = out.size;
 
         // Compress assumptions
-        LOG(V2_INFO, "writing %i assumptions\n", in.assumptions.size());
+        LOG(V5_DEBG, "[compr] write %i assumptions\n", in.assumptions.size());
         if (!writeVariableLengthUnsigned(in.assumptions.size(), out)) return false;
-        int lastAsmpt = 0;
-        for (int asmpt : in.assumptions) {
+        unsigned int lastAsmpt = 0;
+        for (unsigned int asmpt : in.assumptions) {
+            assert(asmpt == 0 || asmpt > lastAsmpt);
             if (!writeVariableLengthUnsigned(asmpt-lastAsmpt, out)) return false;
             lastAsmpt = asmpt;
         }
@@ -404,21 +413,20 @@ private:
         // shrink-to-fit output vector
         if (!out.resize(out.size)) return false;
 
-        LOG(V2_INFO, "Compressed formula to %lu bytes\n", out.size);
+        size_t nbUncompressedBytes = sizeof(int)*in.uncompressedSize;
+        LOG(V4_VVER, "[compr] %lu -> %lu bytes (ratio %.3f)\n", nbUncompressedBytes, out.size,
+            nbUncompressedBytes / (double) out.size);
         return true;
     }
 
-    static int compressLiteral(int elit) {
-        // -1 -> 0
-        // 1  -> 1
-        // -2 -> 2
-        // 2  -> 3
-        // -3 -> 4
-        // ...
+    // -1 1  -2 2 -3  3 -4  4 -5  5 ...
+    // v  v  v  v  v  v  v  v  v  v ...
+    // 0  1  2  3  4  5  6  7  8  9 ...
+    static unsigned int compressLiteral(int elit) {
         return 2 * std::abs(elit) - 1 - (elit < 0);
     }
-    static int decompressLiteral(int ilit) {
-        return (1 + ilit / 2) * (ilit % 2 == 1 ? 1 : -1);
+    static int decompressLiteral(unsigned int ilit) {
+        return (1 + ilit / 2) * (2 * (ilit & 1) - 1);
     }
 
     static unsigned char nbNeededBytes(int x) {
@@ -444,8 +452,7 @@ private:
         return nbBytes;
     }
 
-
-    static bool writeVariableLengthUnsigned(int n, FormulaOutput& out) {
+    static bool writeVariableLengthUnsigned(unsigned int n, FormulaOutput& out) {
         if (n == 0) return out.push(0);
         unsigned char ch;
         while (n & ~0x7f) {
@@ -456,7 +463,7 @@ private:
         ch = n;
         return out.push(ch);
     }
-    static int readVariableLengthUnsigned(const unsigned char* inData, int& n) {
+    static int readVariableLengthUnsigned(const unsigned char* inData, unsigned int& n) {
         int offset = 0;
         n = 0;
         int32_t coefficient = 1;
