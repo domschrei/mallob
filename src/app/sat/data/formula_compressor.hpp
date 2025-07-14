@@ -1,17 +1,19 @@
 
 #pragma once
 
-#include "global.hpp"
 #include "robin_map.h"
-#include "util/assert.hpp"
 #include "util/logger.hpp"
+#include "util/string_utils.hpp"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <sstream>
 #include <vector>
+
+int compare_compressed_lits(const void* a, const void* b);
 
 class FormulaCompressor {
 
@@ -21,6 +23,34 @@ public:
         unsigned int maxClauseLength {0};
         std::vector<unsigned int> assumptions;
         size_t uncompressedSize {0};
+        bool preSorted {false};
+        void sort() {
+            if (preSorted) return;
+            for (auto it = table.begin(); it != table.end(); ++it) {
+                unsigned int len = it.key();
+                auto& clauses = it.value();
+                unsigned int nbCls = clauses.size() / len;
+                for (unsigned int i = 0; i < nbCls; i++) {
+                    std::sort(clauses.data() + i * len, clauses.data() + (i+1) * len);
+                }
+                qsort(clauses.data(), nbCls, len*sizeof(int), compare_compressed_lits);
+            }
+            std::sort(assumptions.begin(), assumptions.end());
+            preSorted = true;
+        }
+        std::string print() {
+            std::string out;
+            for (auto it = table.begin(); it != table.end(); ++it) {
+                unsigned int len = it.key();
+                auto& clauses = it.value();
+                unsigned int nbCls = clauses.size() / len;
+                out += std::to_string(len) + ":" + std::to_string(nbCls) + " "
+                    + StringUtils::getSummary(clauses.data(), clauses.size(), INT32_MAX);
+            }
+            out += "a:" + std::to_string(assumptions.size()) + " "
+                + StringUtils::getSummary(assumptions.data(), assumptions.size(), INT32_MAX);
+            return out;
+        }
     };
 
     struct FormulaOutput {
@@ -100,6 +130,7 @@ public:
 
         int lpos {0};
         int lastLit {0};
+        int lastClsHeader {0};
 
         unsigned int nbAssumptions {0};
         int apos {0};
@@ -190,6 +221,7 @@ public:
                 cpos = 0;
                 lpos = 0;
                 lastLit = 0;
+                lastClsHeader = 0;
             }
 
             // done
@@ -197,7 +229,7 @@ public:
 
             // end clause of current block
             if (lpos == clauseLength && cpos < nbClauses) {
-                lastLit = 0;
+                lastLit = lastClsHeader;
                 lpos = 0;
                 cpos++;
                 res = 0;
@@ -206,10 +238,11 @@ public:
 
             // next literal of current clause
             if (lpos < clauseLength) {
-                unsigned int ilit;
-                pos += readVariableLengthUnsigned(data+pos, ilit);
-                ilit += lastLit;
+                unsigned int diff;
+                pos += readVariableLengthUnsigned(data+pos, diff);
+                unsigned int ilit = lastLit + diff;
                 lastLit = ilit;
+                if (lpos == 0) lastClsHeader = ilit;
 
                 int elit = decompressLiteral(ilit);
                 lpos++;
@@ -222,14 +255,14 @@ public:
     };
 
 public:
-    static VectorFormulaOutput<int> compress(const int* data, size_t size, const int* aData, size_t aSize) {
+    static VectorFormulaOutput<int> compress(const int* data, size_t size, const int* aData, size_t aSize, bool preSorted = false) {
         VectorFormulaOutput<int> out;
-        size_t outBytes = compress(data, size, aData, aSize, out);
+        size_t outBytes = compress(data, size, aData, aSize, out, preSorted);
         return out;
     }
-    static size_t compress(const int* data, size_t size, const int* aData, size_t aSize, FormulaOutput& out) {
+    static size_t compress(const int* data, size_t size, const int* aData, size_t aSize, FormulaOutput& out, bool preSorted = false) {
         int maxClauseLength;
-        auto in = normalizeInput(data, size, aData, aSize);
+        auto in = normalizeInput(data, size, aData, aSize, preSorted);
         return compressInput(in, out);   
     }
     static bool readAndCompress(const std::string& cnfPath, FormulaOutput& out) {
@@ -269,17 +302,15 @@ public:
             }
             if (!assumptions) {
                 auto& tableEntry = in.table[clauseLength];
-                std::sort(cls.begin(), cls.end());
                 tableEntry.insert(tableEntry.end(), cls.begin(), cls.end());
                 in.maxClauseLength = std::max(in.maxClauseLength, clauseLength);
                 out.nbClauses++;
                 cls.clear();
             }
         }
-        std::sort(in.assumptions.begin(), in.assumptions.end());
 
-        compressInput(in, out);
-        return true;
+        in.sort();
+        return compressInput(in, out);
     }
 
     static CompressedFormulaView getView(const unsigned char* data, size_t size) {
@@ -310,10 +341,11 @@ public:
     }
 
 private:
-    static CompressionInput normalizeInput(const int* data, size_t size, const int* aData, size_t aSize) {
+    static CompressionInput normalizeInput(const int* data, size_t size, const int* aData, size_t aSize, bool preSorted = false) {
         CompressionInput in;
         size_t clauseStart {0};
         in.maxClauseLength = 0;
+        in.preSorted = preSorted;
         bool assumptions = false;
         for (size_t i = 0; i < size; i++) {
             if (data[i] == INT32_MAX) {
@@ -337,7 +369,6 @@ private:
                 for (int i = 0; i < clauseLength; i++) {
                     lits.push_back(compressLiteral(*(data+clauseStart+i)));
                 }
-                std::sort(lits.end() - clauseLength, lits.end());
                 in.maxClauseLength = std::max(in.maxClauseLength, clauseLength);
             }
             clauseStart = i+1;
@@ -345,8 +376,8 @@ private:
         if (aData) {
             for (int i = 0; i < aSize; i++) in.assumptions.push_back(compressLiteral(aData[i]));
         }
-        std::sort(in.assumptions.begin(), in.assumptions.end());
         in.uncompressedSize = size + aSize;
+        in.sort();
         return in;
     }
 
@@ -355,14 +386,16 @@ private:
         // Header: max clause length
         if (!writeVariableLengthUnsigned(in.maxClauseLength, out)) return false;
 
+        std::vector<unsigned int> lengths;
+        for (auto it = in.table.begin(); it != in.table.end(); ++it) lengths.push_back(it->first);
+        std::sort(lengths.begin(), lengths.end());
+
         // Compress clauses
-        int nbEmptySlots = 0;
-        for (size_t len = 1; len <= in.maxClauseLength; len++) {
+        int lastNonemptyLen = 0;
+        for (unsigned int len : lengths) {
             auto& entry = in.table[len];
-            if (entry.empty()) {
-                nbEmptySlots++;
-                continue;
-            }
+            if (entry.empty()) continue;
+            auto nbEmptySlots = len - lastNonemptyLen - 1;
             if (nbEmptySlots > 0) {
                 if (nbEmptySlots == 1) {
                     if (!out.push(0)) return false;
@@ -372,15 +405,18 @@ private:
                 }
                 nbEmptySlots = 0;
             }
+            lastNonemptyLen = len;
             unsigned int nbClauses = entry.size() / len;
             LOG(V5_DEBG, "[compr] write %i clauses of len %i\n", nbClauses, len);
             if (!writeVariableLengthUnsigned(4+nbClauses, out)) return false;
             int eIdx = 0;
+            unsigned int lastClsHeader = 0;
             for (int cIdx = 0; cIdx < nbClauses; cIdx++) {
-                unsigned int lastLit = 0;
+                unsigned int lastLit = lastClsHeader;
+                lastClsHeader = entry[eIdx];
                 for (int lIdx = 0; lIdx < len; lIdx++) {
                     unsigned int lit = entry[eIdx++];
-                    assert(lit == 0 || lit > lastLit);
+                    assert(lit >= lastLit);
                     if (!writeVariableLengthUnsigned(lit-lastLit, out)) return false;
                     lastLit = lit;
                 }
@@ -425,6 +461,7 @@ private:
     static unsigned int compressLiteral(int elit) {
         return 2 * std::abs(elit) - 1 - (elit < 0);
     }
+    friend int compare_uncompressed_lits(const void* a, const void* b);
     static int decompressLiteral(unsigned int ilit) {
         return (1 + ilit / 2) * (2 * (ilit & 1) - 1);
     }

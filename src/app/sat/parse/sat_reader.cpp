@@ -62,7 +62,7 @@ bool SatReader::parseWithTrustedParser(JobDescription& desc) {
 		auto vec = desc.getRevisionData(desc.getRevision()).get();
 		auto outSizeBytesBefore = vec->size();
 		FormulaCompressor::VectorFormulaOutput cOut(vec);
-		FormulaCompressor::compress((const int*) out->data(), out->size() / sizeof(int), 0, 0, cOut);
+		FormulaCompressor::compress((const int*) out->data(), out->size() / sizeof(int), 0, 0, cOut, true);
 		desc.setFSize((cOut.vec->size() - outSizeBytesBefore) / sizeof(int));
 	}
 

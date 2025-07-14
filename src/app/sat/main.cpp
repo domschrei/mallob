@@ -41,6 +41,7 @@ int main(int argc, char *argv[]) {
 
     // Initialize signal handlers
     Process::init(rankOfParent, params.traceDirectory());
+    Terminator::setForwardTerminateToChildren(false);
 
     std::string logdir = params.logDirectory();
     std::string logFilename = "subproc" + std::string(".") + std::to_string(rankOfParent);
