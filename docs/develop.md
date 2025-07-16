@@ -8,19 +8,24 @@ If you change or replace individual libraries under `lib/`, you'll need to rebui
 We advise to just remove the Mallob binaries in the build directory (`rm build/*mallob*`) and then re-build with the usual commands.
 This should then only recreate the missing binaries.
 
-
-## Programming Interfaces
-
 The following list shows a few examples for how Mallob can be extended:
 
-* New options for Mallob can be added in `src/optionslist.hpp`.
-    - Options which are specific to a certain application can be found and edited in `src/app/$APPKEY/options.hpp`.
 * To add a new SAT solver to be used in a SAT solver engine, do the following:
     - Add a subclass of `PortfolioSolverInterface`. (You can use the existing implementation for any of the existing solvers and adapt it to your solver.)
     - Add your solver to the portfolio initialization in `src/app/sat/execution/engine.cpp`.
-* To extend Mallob by adding another kind of application (like combinatorial search, planning, SMT, ...), please read [application_engines.md](application_engines.md).
+* To extend Mallob by adding another kind of application (e.g., automated planning, ILP, ...), find detailed instructions at [application_engines.md](application_engines.md).
 * To add a unit test, create a class `test_*.cpp` in `src/test` and then add the test case to the bottom of `CMakeLists.txt`.
 * To add a system test, see the file `scripts/systest.sh` (which includes definitions from `scripts/systest_commons.sh`).
+
+
+## Important Interfaces
+
+* Add new options for Mallob easily by extending `src/optionslist.hpp`.
+    - Options which are specific to a certain application can be found and edited in `src/app/$APPKEY/options.hpp`.
+* Use the `LOG()` macro to log messages. For thread-safe logging and clean outputs in the directory provided via `-log=`, each non main thread should have its own instance of `Logger` (obtained via `Logger::copy` from the parent thread's logger) and use the `LOGGER(logger, ...)` macro. (Note that this "safe" logging is not yet fully implemented across all modules of Mallob.)
+* Use `ProcessWideThreadPool::addTask` or `BackgroundWorker` to perform background tasks in other threads. For multi-threading utilities, `src/util/sys/threading.hpp` features an easy-to-use `Mutex` class with RAII functionality as well as a corresponding `ConditionVariable` class and some utilities for `std::future` objects.
+* Send messages across different Mallob MPI processes via `MyMpi::isend` for global (Mallob-level) messages and via `getJobTree().send*` for job-/application-specific messages. Receive messages by simply creating an RAII-style instance of `MessageSubscription` or `CondMessageSubscription` (_conditional_, if you need the option to "decline" an incoming message and leave it to some other module instead); the callback you provide in the constructor will be executed whenever an according message arrives. Accordingly extend `src/comm/msgtags.h` by your new, **fresh** message tags. For application-specific message passing, find some more information at [application_engines.md](application_engines.md).
+Note that such communication **may only be performed by each MPI process' main thread**.
 
 
 ## Debugging Mallob
@@ -33,7 +38,7 @@ See also our [Frequently Asked Questions](faq.md) for some common issues.
 
 For debugging purposes, the following build switches are useful:
 
-* `-DCMAKE_BUILD_TYPE=DEBUG`: Leads to a build with full debug information. Therefore, in thread trace files and in the output of valgrind tools, there will be more specific information on functions and line numbers. Assertions are always included in DEBUG builds.
+* `-DCMAKE_BUILD_TYPE=DEBUG`: Produces a build with full debug information: In thread trace files and in the output of valgrind tools, there will be more specific information on functions and line numbers. Assertions are always included in DEBUG builds.
 * `-DMALLOB_LOG_VERBOSITY=5`: This static verbosity level (together with run time option `-v=5`) logs every single message that is being sent or received, among many other things.
 * `-DMALLOB_USE_ASAN=1`: Build sources with AddressSanitizer. This can help find illegal states in the code, especially invalid memory accesses.
 
