@@ -15,6 +15,7 @@
 
 #include "comm/distributed_termination.hpp"
 #include "comm/mympi.hpp"
+#include "interface/api/api_registry.hpp"
 #include "interface/api/rank_specific_file_fetcher.hpp"
 #include "scheduling/core_allocator.hpp"
 #include "util/periodic_event.hpp"
@@ -77,7 +78,7 @@ void introduceMonoJob(Parameters& params, Client& client) {
         json["cpu-limit"] = std::to_string(params.jobCpuLimit()) + "s";
     }
 
-    auto result = client.getAPI().submit(json, [&](nlohmann::json& response) {
+    auto result = APIRegistry::get().submit(json, [&](nlohmann::json& response) {
         // Job done? => Terminate all processes
         monoJobDone = true;
     });
@@ -142,7 +143,7 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     // If job streaming is enabled, initialize a corresponding job streamer
     JobStreamer* streamer = nullptr;
     if (params.jobTemplate.isSet() && isClient) {
-        streamer = new JobStreamer(params, client->getAPI(), client->getInternalRank());
+        streamer = new JobStreamer(params, APIRegistry::get(), client->getInternalRank());
     }
 
     // If a client application is provided, run this application in (a) separate thread(s)

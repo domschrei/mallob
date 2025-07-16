@@ -4,7 +4,6 @@
 #include "app/maxsat/encoding/polynomial_watchdog.hpp"
 #include "app/maxsat/encoding/warners_adder.hpp"
 #include "app/maxsat/maxsat_instance.hpp"
-#include "app/maxsat/maxsat_solver.hpp"
 #include "app/maxsat/parse/maxsat_reader.hpp"
 #include "app/sat/parse/sat_reader.hpp"
 #include "app/sat/solvers/kissat.hpp"
@@ -21,7 +20,6 @@
 #include <cstdint>
 #include <fstream>
 #include <initializer_list>
-#include <memory>
 #include <vector>
 
 int newVar(int& nbVars) {
@@ -74,7 +72,7 @@ void encode(Parameters& params, const std::string& path, const std::string& file
 
     // Re-map variables in-place to a compact domain from 1 to |O|
     int nbBaseVars = 0;
-    MaxSatInstance instance(desc, params.maxPre(), params.maxSatIntervalSkew());
+    MaxSatInstance instance(desc, false, params.maxSatIntervalSkew());
     for (auto& [weight, lit] : instance.objective) {
         lit = (lit>0 ? 1 : -1) * newVar(nbBaseVars);
     }
@@ -272,7 +270,9 @@ int main() {
     Process::init(0);
     ProcessWideThreadPool::init(4);
     Parameters params;
+#if MALLOB_USE_MAXPRE == 1
     params.maxPre.set(false);
+#endif
 
     FileUtils::mkdir(".tmp");
 

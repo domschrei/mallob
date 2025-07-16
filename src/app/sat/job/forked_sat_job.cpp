@@ -236,9 +236,8 @@ int ForkedSatJob::appl_solved() {
                 getDescription().getCpuLimit() - getUsedCpuSeconds()) + "s";
 
         // Obtain API and submit the job
-        auto api = APIRegistry::get();
-        assert(api);
-        auto retcode = api->submit(json, [&](auto result) {
+        auto& api = APIRegistry::get();
+        auto retcode = api.submit(json, [&](auto result) {
             // Do nothing - result must get reported back directly
         });
         if (retcode == JsonInterface::ACCEPT) {

@@ -174,7 +174,7 @@ void Client::readIncomingJobs() {
                         desc->getStatistics().timeOfSubmission = desc->getArrival();
                         desc->getStatistics().timeOfScheduling = Timer::elapsedSeconds();
                         clientSideJob.program.reset(
-                            app_registry::getClientSideProgramCreator(appId)(_params, getAPI(), *desc)
+                            app_registry::getClientSideProgramCreator(appId)(_params, APIRegistry::get(), *desc)
                         );
                         clientSideJob.thread->run([&, prog = clientSideJob.program.get(), done, res]() {
                             *res = prog->function();
@@ -285,10 +285,8 @@ void Client::init() {
         LOG(V2_INFO, "Set up IPC socket interface at %s\n", path.c_str());
         _interface_connectors.emplace_back(new SocketConnector(_params, *_json_interface, path));
     }
-    _api_connector.reset(new APIConnector(*_json_interface, _params, Logger::getMainInstance().copy("I-API", ".i.api")));
-    APIRegistry::put(_api_connector);
-    _interface_connectors.emplace_back(_api_connector);
-    LOG(V2_INFO, "Set up API at %s\n", "src/interface/api/api_connector.hpp");
+    APIRegistry::put(new APIConnector(*_json_interface, _params, Logger::getMainInstance().copy("I-API", ".i.api")));
+    LOG(V2_INFO, "Set up API connector\n");
 
     // Set up concurrent instance reader
     _instance_reader.run([this]() {
@@ -314,10 +312,6 @@ std::string Client::getFilesystemInterfacePath() {
 std::string Client::getSocketPath() {
     return TmpDir::getGeneralTmpDir() + "/edu.kit.iti.mallob." + std::to_string(Proc::getPid()) + "." + std::to_string(getInternalRank()) + ".sk";
 } 
-
-APIConnector& Client::getAPI() {
-    return *_api_connector;
-}
 
 void Client::advance() {
     
