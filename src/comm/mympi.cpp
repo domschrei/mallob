@@ -33,17 +33,17 @@ void MyMpi::setOptions(const Parameters& params) {
     _msg_queue = new MessageQueue(params.messageBatchingThreshold());
 }
 
-int MyMpi::isend(int recvRank, int tag, const Serializable& object) {
-    return _msg_queue->send(DataPtr(new std::vector<uint8_t>(object.serialize())), recvRank, tag);
+int MyMpi::isend(int recvRank, int tag, const Serializable& object, bool fromMainThread) {
+    return _msg_queue->send(DataPtr(new std::vector<uint8_t>(object.serialize())), recvRank, tag, fromMainThread);
 }
-int MyMpi::isend(int recvRank, int tag, std::vector<uint8_t>&& object) {
-    return _msg_queue->send(DataPtr(new std::vector<uint8_t>(std::move(object))), recvRank, tag);
+int MyMpi::isend(int recvRank, int tag, std::vector<uint8_t>&& object, bool fromMainThread) {
+    return _msg_queue->send(DataPtr(new std::vector<uint8_t>(std::move(object))), recvRank, tag, fromMainThread);
 }
-int MyMpi::isend(int recvRank, int tag, const DataPtr& object) {
-    return _msg_queue->send(object, recvRank, tag);
+int MyMpi::isend(int recvRank, int tag, const DataPtr& object, bool fromMainThread) {
+    return _msg_queue->send(object, recvRank, tag, fromMainThread);
 }
-int MyMpi::isendCopy(int recvRank, int tag, const std::vector<uint8_t>& object) {
-    return _msg_queue->send(DataPtr(new std::vector<uint8_t>(object)), recvRank, tag);
+int MyMpi::isendCopy(int recvRank, int tag, const std::vector<uint8_t>& object, bool fromMainThread) {
+    return _msg_queue->send(DataPtr(new std::vector<uint8_t>(object)), recvRank, tag, fromMainThread);
 }
 
 MPI_Request MyMpi::iallreduce(MPI_Comm communicator, float* contribution, float* result, MPI_Op operation) {

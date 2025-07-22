@@ -28,7 +28,7 @@ private:
             jobUserNameToCallback[jobIdentifier] = callback;
 
             auto packed = nlohmann::json::to_msgpack(json);
-            MyMpi::isend(recvRank, MSG_SUBMIT_JOB_TO_CLIENT, std::move(packed));
+            MyMpi::isend(recvRank, MSG_SUBMIT_JOB_TO_CLIENT, std::move(packed), false);
 
             if (!sub) sub.reset(new MessageSubscription(MSG_RESPOND_TO_JOB_SUBMISSION, [this](MessageHandle& h) {
                 LOG(V2_INFO, "MAXSAT RECEIVED JOB RESPONSE\n");

@@ -59,6 +59,14 @@ private:
     int _running_send_id = 1;
     int _num_concurrent_sends = 0;
     int _max_concurrent_sends = 16;
+    Mutex _mtx_out_msgs;
+    struct OutgoingMessage {
+        const DataPtr data;
+        int dest;
+        int tag;
+    };
+    std::list<OutgoingMessage> _out_msgs;
+    volatile bool _check_out_msgs {false};
 
     // Garbage collection
     Mutex _garbage_mutex;
@@ -95,7 +103,7 @@ public:
         _current_send_tag = sendTag;
     }
 
-    int send(const DataPtr& data, int dest, int tag);
+    int send(const DataPtr& data, int dest, int tag, bool fromMainThread = true);
     void cancelSend(int sendId);
     void advance();
 

@@ -144,7 +144,14 @@ void MessageQueue::clearConditionalCallback(int tag, const CondCallbackRef& ref)
     _cond_callbacks[tag].erase(ref);
 }
 
-int MessageQueue::send(const DataPtr& data, int dest, int tag) {
+int MessageQueue::send(const DataPtr& data, int dest, int tag, bool fromMainThread) {
+
+    if (!fromMainThread) {
+        auto lock = _mtx_out_msgs.getLock();
+        _out_msgs.push_back({data, dest, tag});
+        _check_out_msgs = true;
+        return 0;
+    }
 
     *_current_send_tag = tag;
 
@@ -182,6 +189,16 @@ void MessageQueue::cancelSend(int sendId) {
 
 void MessageQueue::advance() {
     //log(V5_DEBG, "BEGADV\n");
+
+    // Prepare sending outgoing messages from other (non main) threads
+    if (_check_out_msgs && _mtx_out_msgs.tryLock()) {
+        while (!_out_msgs.empty()) {
+            auto outMsg = _out_msgs.front(); _out_msgs.pop_front();
+            send(outMsg.data, outMsg.dest, outMsg.tag);
+        }
+        _mtx_out_msgs.unlock();
+    }
+
     _iteration++;
     processReceived();
     processSelfReceived();
