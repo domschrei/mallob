@@ -5,6 +5,7 @@
 #include <string>
 #include <sys/stat.h>
 
+#include "app/sat/proof/impcheck.hpp"
 #include "trusted/trusted_utils.hpp"
 #include "util/sys/fileutils.hpp"
 #include "util/sys/proc.hpp"
@@ -14,6 +15,8 @@
 class TrustedParserProcessAdapter {
 
 private:
+    int _base_seed;
+
     int _id;
     FILE* _f_parsed_formula;
     Subprocess* _subproc {nullptr};
@@ -25,7 +28,7 @@ private:
     unsigned long _f_size {0};
 
 public:
-    TrustedParserProcessAdapter(int id) : _id(id) {}
+    TrustedParserProcessAdapter(int baseSeed, int id) : _base_seed(baseSeed), _id(id) {}
     ~TrustedParserProcessAdapter() {
         if (_subproc) delete _subproc;
     }
@@ -40,7 +43,11 @@ public:
         Parameters params;
         params.formulaInput.set(source);
         params.fifoParsedFormula.set(pathParsedFormula);
-        _subproc = new Subprocess(params, "impcheck_parse");
+
+        unsigned long keySeed = ImpCheck::getKeySeed(_base_seed);
+        std::string moreArgs = "-key-seed=" + std::to_string(keySeed);
+
+        _subproc = new Subprocess(params, "impcheck_parse", moreArgs);
         _child_pid = _subproc->start();
 
         _f_parsed_formula = fopen(pathParsedFormula.c_str(), "r");

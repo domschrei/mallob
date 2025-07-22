@@ -9,6 +9,7 @@
 
 #include "app/sat/data/clause.hpp"
 #include "app/sat/parse/serialized_formula_parser.hpp"
+#include "app/sat/proof/impcheck.hpp"
 #include "app/sat/proof/lrat_op_tamperer.hpp"
 #include "app/sat/proof/trusted_checker_process_adapter.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
@@ -23,6 +24,7 @@ class LratConnector {
 
 private:
     Logger& _logger;
+    const int _base_seed;
     const int _local_id;
     SPSCBlockingRingbuffer<LratOp> _ringbuf;
 
@@ -48,9 +50,9 @@ private:
     float _tampering_chance_per_mille {0};
 
 public:
-    LratConnector(Logger& logger, int localId, int nbVars, bool checkModel) :
-        _logger(logger), _local_id(localId), _ringbuf(1<<14),
-        _checker(logger, _local_id, nbVars, checkModel) {}
+    LratConnector(Logger& logger, int baseSeed, int localId, int nbVars, bool checkModel) :
+        _logger(logger), _base_seed(baseSeed), _local_id(localId), _ringbuf(1<<14),
+        _checker(logger, baseSeed, _local_id, nbVars, checkModel) {}
 
     inline auto& getChecker() {
         return _checker;
@@ -224,6 +226,8 @@ private:
                 }
             } else if (op.isUnsatValidation()) {
                 _unsat_validated = true;
+                LOGGER(_logger, V2_INFO, "Use impcheck_confirm -key-seed=%lu to confirm the fingerprint\n",
+                    ImpCheck::getKeySeed(_base_seed));
             } else if (op.isSatValidation()) {
                 _sat_validated = true;
             } else if (op.isTermination()) {

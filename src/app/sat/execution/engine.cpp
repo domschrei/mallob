@@ -188,6 +188,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	SolverSetup setup;
 	setup.logger = &_logger;
 	setup.jobname = config.getJobStr();
+	setup.baseSeed = params.seed();
 	setup.isJobIncremental = config.incremental;
 	setup.strictMaxLitsPerClause = params.strictClauseLengthLimit();
 	setup.strictLbdLimit = params.strictLbdLimit();

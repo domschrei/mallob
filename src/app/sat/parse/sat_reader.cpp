@@ -40,7 +40,7 @@ void handleUnsat(const Parameters& _params) {
 
 bool SatReader::parseWithTrustedParser(JobDescription& desc) {
 	// Parse and sign in a separate subprocess
-	TrustedParserProcessAdapter tp(desc.getId());
+	TrustedParserProcessAdapter tp(_params.seed(), desc.getId());
 	uint8_t* sig;
 	std::vector<unsigned char> plain;
 	std::vector<unsigned char>* out;
@@ -56,7 +56,8 @@ bool SatReader::parseWithTrustedParser(JobDescription& desc) {
 	_max_var = tp.getNbVars();
 	_num_read_clauses = tp.getNbClauses();
 	desc.setFSize(tp.getFSize());
-	LOG(V2_INFO, "TRUSTED parser read %i vars, %i cls - sig %s\n", _max_var, _num_read_clauses, sigStr.c_str());
+	LOG(V2_INFO, "TRUSTED parser -key-seed=%lu read %i vars, %i cls - sig %s\n",
+		ImpCheck::getKeySeed(_params.seed()), _max_var, _num_read_clauses, sigStr.c_str());
 
 	if (_params.compressFormula()) {
 		auto vec = desc.getRevisionData(desc.getRevision()).get();
