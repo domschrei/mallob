@@ -56,7 +56,7 @@ bool SatReader::parseWithTrustedParser(JobDescription& desc) {
 	_max_var = tp.getNbVars();
 	_num_read_clauses = tp.getNbClauses();
 	desc.setFSize(tp.getFSize());
-	LOG(V2_INFO, "TRUSTED parser -key-seed=%lu read %i vars, %i cls - sig %s\n",
+	LOG(V2_INFO, "IMPCHK parser -key-seed=%lu read %i vars, %i cls - sig %s\n",
 		ImpCheck::getKeySeed(_params.seed()), _max_var, _num_read_clauses, sigStr.c_str());
 
 	if (_params.compressFormula()) {

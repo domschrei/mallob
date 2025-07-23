@@ -172,7 +172,7 @@ public:
 private:
     void handleError(const std::string& errMsg) {
         if (_error_reported) return;
-        LOGGER(_logger, V0_CRIT, "[ERROR] Checker module rejected operation: %s\n", errMsg.c_str());
+        LOGGER(_logger, V0_CRIT, "[ERROR] IMPCHK rejected operation: %s\n", errMsg.c_str());
         Terminator::setTerminating();
         _error_reported = true;
     }
@@ -240,7 +240,7 @@ private:
         signature sig;
         TrustedUtils::readSignature(sig, _f_feedback);
         auto str = Logger::dataToHexStr(sig, SIG_SIZE_BYTES);
-        LOGGER(_logger, V2_INFO, "TRUSTED checker reported UNSAT - sig %s\n", str.c_str());
+        LOGGER(_logger, V2_INFO, "IMPCHK reported UNSAT - sig %s\n", str.c_str());
         return true;
     }
 
@@ -259,7 +259,7 @@ private:
         signature sig;
         TrustedUtils::readSignature(sig, _f_feedback);
         auto str = Logger::dataToHexStr(sig, SIG_SIZE_BYTES);
-        LOGGER(_logger, V2_INFO, "TRUSTED checker reported SAT - sig %s\n", str.c_str());
+        LOGGER(_logger, V2_INFO, "IMPCHK reported SAT - sig %s\n", str.c_str());
         return true;
     }
 
