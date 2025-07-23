@@ -1,9 +1,12 @@
 
 #pragma once
 
+#include "comm/mympi.hpp"
 #include "robin_map.h"
 #include "util/logger.hpp"
 #include "util/string_utils.hpp"
+#include "util/sys/thread_pool.hpp"
+#include "util/sys/tmpdir.hpp"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -28,6 +31,7 @@ public:
             if (preSorted) return;
             for (auto it = table.begin(); it != table.end(); ++it) {
                 unsigned int len = it.key();
+                if (len == 0) continue;
                 auto& clauses = it.value();
                 unsigned int nbCls = clauses.size() / len;
                 for (unsigned int i = 0; i < nbCls; i++) {
@@ -42,6 +46,7 @@ public:
             std::string out;
             for (auto it = table.begin(); it != table.end(); ++it) {
                 unsigned int len = it.key();
+                if (len == 0) continue;
                 auto& clauses = it.value();
                 unsigned int nbCls = clauses.size() / len;
                 out += std::to_string(len) + ":" + std::to_string(nbCls) + " "
@@ -266,7 +271,28 @@ public:
         return compressInput(in, out);   
     }
     static bool readAndCompress(const std::string& cnfPath, FormulaOutput& out) {
-        std::ifstream file(cnfPath);
+        static std::atomic_int pipeCount = 1;
+
+        std::string inputPath = cnfPath;
+        if ((inputPath.size() > 3 && inputPath.substr(inputPath.size()-3, 3) == ".xz")
+            || (inputPath.size() > 5 && inputPath.substr(inputPath.size()-5, 5) == ".lzma")) {
+            // Decompress, read output
+            auto pipeFilePath = TmpDir::getMachineLocalTmpDir()
+                + "/edu.kit.iti.mallob.decompresspipe."
+                + std::to_string(MyMpi::rank(MPI_COMM_WORLD))
+                + "." + std::to_string(pipeCount++) + ".cnf";
+            std::string cmd = "mkfifo " + pipeFilePath;
+            int res = system(cmd.c_str());
+            assert(res == 0);
+            cmd = "xz -c -d " + inputPath + " > " + pipeFilePath;
+            ProcessWideThreadPool::get().addTask([cmd]() {
+                int res = system(cmd.c_str());
+                assert(res == 0);
+            });
+            inputPath = pipeFilePath;
+        }
+
+        std::ifstream file(inputPath);
         if (!file.is_open()) return false;
 
         int nbVars;
