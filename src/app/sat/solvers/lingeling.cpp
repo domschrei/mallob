@@ -90,7 +90,7 @@ Lingeling::Lingeling(const SolverSetup& setup)
 	sizeLimit = _setup.strictMaxLitsPerClause;
 	glueLimit = _setup.strictLbdLimit;
 
-    maxvar = 0;
+    maxvar = setup.numVars;
 
 	numDiversifications = 11;
 }
