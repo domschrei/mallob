@@ -805,5 +805,6 @@ Client::~Client() {
     _client_side_jobs.clear();
     _done_client_side_jobs.clear();
 
+    APIRegistry::close();
     LOG(V4_VVER, "Leaving client destructor\n");
 }

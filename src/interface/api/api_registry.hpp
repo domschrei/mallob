@@ -58,4 +58,7 @@ public:
     static void sendJobSubmissionToRank(int recvRank, nlohmann::json& json, std::function<void (JsonInterface::Result, nlohmann::json &)> callback) {
         _ext_connector.submit(recvRank, json, callback);
     }
+    static void close() {
+        _connector.reset();
+    }
 };
