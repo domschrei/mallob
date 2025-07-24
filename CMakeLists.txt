@@ -218,7 +218,6 @@ SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MY_DEBUG_OPTIONS}")
 
 # Tests
 
-new_test(bitsets "${BASE_INCLUDES}" mallob_core)
 new_test(permutation "${BASE_INCLUDES}" mallob_core)
 new_test(message_queue "${BASE_INCLUDES}" mallob_corepluscomm)
 new_test(volume_calculator "${BASE_INCLUDES}" mallob_core)

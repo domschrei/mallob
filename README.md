@@ -61,18 +61,18 @@ RDMAV_FORK_SAFE=1; mpirun -np 8 --bind-to core --map-by ppr:1:node:pe=4 build/ma
 The source code of Mallob can be used, changed and redistributed under the terms of the **Lesser General Public License (LGPLv3)**, one exception being the Glucose interface which is excluded from compilation by default (see below).
 **Please approach us if you require a deviating license.**
 
-The used versions of Lingeling, YalSAT, CaDiCaL, and Kissat are MIT-licensed, as is HordeSat (the massively parallel solver system our SAT engine was based on) and the proof-related tools which are included and/or fetched in the `tools/` directory.
+The used versions of Lingeling, YalSAT, CaDiCaL, and Kissat are MIT-licensed, as is HordeSat (the massively parallel solver system our SAT engine was based on).
 
 The Glucose interface of Mallob (only included when explicitly compiled with `-DMALLOB_USE_GLUCOSE=1`) is subject to the [non-free license of (parallel-ready) Glucose](https://github.com/mi-ki/glucose-syrup/blob/master/LICENCE). Notably, its usage in competitive events is restricted.
 
 Within our codebase we make thankful use of the following liberally licensed projects:
 
-* [robin-map](https://github.com/Tessil/robin-map) by Thibaut Goetghebuer-Planchon, for efficient unordered maps and sets
-* [libcuckoo](https://github.com/efficient/libcuckoo) by Manu Goyal et al., for concurrent hash tables
-* [JSON for Modern C++](https://github.com/nlohmann/json) by Niels Lohmann, for reading and writing JSON files
 * [Compile Time Regular Expressions](https://github.com/hanickadot/compile-time-regular-expressions) by Hana Dusíková, for matching particular user inputs
+* [JSON for Modern C++](https://github.com/nlohmann/json) by Niels Lohmann, for reading and writing JSON files
+* [ringbuf](https://github.com/rmind/ringbuf) by Mindaugas Rasiukevicius, for efficient ring buffers
 * [robin_hood hashing](https://github.com/martinus/robin-hood-hashing) by Martin Ankerl, for efficient unordered maps and sets
-
+* [robin-map](https://github.com/Tessil/robin-map) by Thibaut Goetghebuer-Planchon, for efficient unordered maps and sets
+* [SipHash C reference implementation](https://github.com/veorq/SipHash) by Jean-Philippe Aumasson, for Message Authentication during trusted distributed clause-sharing solving
 
 ## Bibliography
 
