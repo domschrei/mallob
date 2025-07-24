@@ -2,6 +2,7 @@
 #ifndef DOMPASCH_MALLOB_FORK_H
 #define DOMPASCH_MALLOB_FORK_H
 
+#include <pthread.h>
 #include <sys/types.h>
 #include <set>
 #include <atomic>
@@ -21,7 +22,6 @@ public:
 
     static Mutex _children_mutex;
     static std::set<pid_t> _children;
-    static std::atomic_bool _leaf_process;
     static long _main_tid;
 
     static std::atomic_bool _exit_signal_caught;
@@ -29,7 +29,7 @@ public:
     static std::atomic_long _signal_tid;
     static std::atomic_bool _exit_signal_digested;
 
-    static void init(int rank, const std::string& traceDir = ".", bool leafProcess = false);
+    static void init(int rank, const std::string& traceDir = ".");
     
     static int createChild();
     
@@ -41,7 +41,10 @@ public:
 
     static void sendSignal(pid_t childpid, int signum);
 
-    static bool isLeafProcess();
+    static pthread_t getPthreadId();
+    static void wakeUpThread(pthread_t pthreadId);
+    static void sendPthreadSignal(pthread_t pthreadId, int sig);
+
     static void forwardTerminateToChildren();
 
     /* 0: running, -1: error, childpid: exited */
@@ -55,9 +58,11 @@ public:
     };
     static std::optional<SignalInfo> getCaughtSignal();
     static bool isCrash(int signum);
-    static void handleTerminationSignal(const SignalInfo& info);
+    static void reportTerminationSignal(const SignalInfo& info);
 
     static void writeTrace(long tid);
+
+    static void removeDelayedExitWatchers();
 
     static void doExit(int retval);
 };

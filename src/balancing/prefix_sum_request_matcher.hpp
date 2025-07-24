@@ -66,7 +66,7 @@ private:
 public:
     PrefixSumRequestMatcher(JobRegistry& jobRegistry, MPI_Comm comm, 
             std::function<void(const JobRequest&, int)> localRequestCallback) :
-        _comm(comm), RequestMatcher(jobRegistry, comm, localRequestCallback),
+        RequestMatcher(jobRegistry, comm, localRequestCallback), _comm(comm),
         _collective(comm, MyMpi::getMessageQueue(), COLLECTIVE_ID_SPARSE_PREFIX_SUM) {
 
         _collective.initializeSparsePrefixSum(CALL_ID_REQUESTS, 

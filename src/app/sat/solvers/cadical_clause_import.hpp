@@ -30,7 +30,6 @@ public:
     ~CadicalClauseImport() { }
 
     bool hasNextClause() override {
-        
         auto clause = _clause_fetcher();
         if (clause.begin == nullptr) return false;
         

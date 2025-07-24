@@ -72,6 +72,13 @@ struct SendHandle {
         return *this;
     }
 
+    ~SendHandle() {
+        if (request != MPI_REQUEST_NULL) {
+            MPI_Cancel(&request);
+            MPI_Request_free(&request);
+        }
+    }
+
     bool isInitiated() {
         return sentBatches > 0;
     }
@@ -81,6 +88,7 @@ struct SendHandle {
         assert(request != MPI_REQUEST_NULL);
         int flag = false;
         MPI_Test(&request, &flag, MPI_STATUS_IGNORE);
+        if (flag) request = MPI_REQUEST_NULL;
         return flag;
     }
 

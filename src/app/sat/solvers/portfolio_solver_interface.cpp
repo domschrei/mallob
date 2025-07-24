@@ -1,6 +1,5 @@
 
 #include <assert.h>
-#include <chrono>
 #include <map>
 #include <atomic>
 #include <cmath>
@@ -70,7 +69,7 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 			// Yes: ALWAYS create your own LRAT connector. Have it support checking of models
 			// ONLY IF desired and there is no pre-created LRATConnector instance for this purpose.
 			LOGGER(_logger, V3_VERB, "Creating full LratConnector%s\n", createModelCheckingLratConn?" with checking models":"");
-			_lrat = new LratConnector(_logger, _setup.localId, _setup.numVars,
+			_lrat = new LratConnector(_logger, _setup.baseSeed, _setup.localId, _setup.numVars,
 				createModelCheckingLratConn
 			);
 			if (createModelCheckingLratConn) _setup.modelCheckingLratConnector = _lrat;
@@ -79,7 +78,7 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 			if (createModelCheckingLratConn) {
 				LOGGER(_logger, V3_VERB, "Creating dedicated LratConnector for checking models\n");
 				_setup.modelCheckingLratConnector = new LratConnector(
-					_logger, _setup.localId, _setup.numVars, true
+					_logger, _setup.baseSeed, _setup.localId, _setup.numVars, true
 				);
 				_setup.owningModelCheckingLratConnector = true;
 			}
@@ -98,16 +97,54 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 			c.lbd = 1;
 			return;
 		}
-		if (_setup.randomizeLbdBeforeImport) {
+		if (_setup.randomizeLbdBeforeImport==1) {
+			//Uniform sample
 			// Workaround to get "uniform" drawing of numbers from [2, c.size]
 			c.lbd = (int) std::round(_rng.randomInRange(2 - 0.49999, c.size-ClauseMetadata::numInts() + 0.49999));
 			assert(c.lbd >= 2);
 			assert(c.lbd <= c.size-ClauseMetadata::numInts());
 		}
+		else if (_setup.randomizeLbdBeforeImport==2) {
+			//Triangle sample
+			int truesize = c.size - ClauseMetadata::numInts();
+			//Special cases:
+			//Size=1: Unit clause, want to keep lbd=1
+			//Size=2: Set lbd=2, otherwise lbd=3 would cause assertion failure
+			//Size=3: Set lbd=3, because we want to bump all lbds (if possible) to at least 3
+			if(truesize<=3) {
+				c.lbd=truesize;
+			}
+			else {
+				//Sizes >=4: Choose a random lbd from [3,..,size], sapled form a triangular distribution, i.e. higher lbds are more likely
+				int lbd_options= std::max(1,truesize-2);
+				//For larger clauses we use a triangular distribution to more weight to higher lbd values
+				//We sample from a rectangle by stacking two triangles above each other (one flippe)
+				// lbd_start: the "column" of the rectangle, range [0,lbd_options-1]
+				// flip:      the "row" of the rectangle,    range [0,lbd_option]
+				//if flip lands in the "flipped" triangle region, we mirror the lbd around the center
+				//This works because each pair of columns (mirrored around the center) have the same summed weight
+				int lbd_column = (int) std::round(_rng.randomInRange(0 - 0.49999,(lbd_options-1) + 0.49999));
+				int flip = (int) std::round(_rng.randomInRange(0 - 0.49999, lbd_options    + 0.49999));
+				//A large enough j "mirrors" the lbd to the other end of the triangle distribution
+				if(lbd_column <= flip) lbd_column = (lbd_options-1) - lbd_column;
+				//Our distribution was calculated the range [0,...] so now we transform it into [3,...] for have always lbd=>3
+				c.lbd = lbd_column+3;
+				//cout << "eff_size="<<(c.size-ClauseMetadata::numInts())<<endl;
+				//cout <<" trig_lbd="<<c.lbd<<endl;
+			}
+		}
+
 		if (_setup.incrementLbdBeforeImport && c.lbd < c.size-ClauseMetadata::numInts())
 			c.lbd++;
 		if (_setup.resetLbdBeforeImport) c.lbd = c.size-ClauseMetadata::numInts();
+
+
+
 	});
+
+	if (!_setup.objectiveFunction.empty()) {
+		_optimizer.reset(new OptimizingPropagator(_setup.objectiveFunction, _setup.numVars));
+	}
 }
 
 void PortfolioSolverInterface::interrupt() {
@@ -118,13 +155,6 @@ void PortfolioSolverInterface::uninterrupt() {
 	updateTimer(_job_name);
 	unsetSolverInterrupt();
 }
-void PortfolioSolverInterface::suspend() {
-	setSolverSuspend();
-}
-void PortfolioSolverInterface::resume() {
-	updateTimer(_job_name);
-	unsetSolverSuspend();
-}
 void PortfolioSolverInterface::setTerminate() {
 	_terminated = true;
 	interrupt();
@@ -133,9 +163,7 @@ void PortfolioSolverInterface::setTerminate() {
 void PortfolioSolverInterface::setExtLearnedClauseCallback(const ExtLearnedClauseCallback& callback) {
 	auto cb = ([callback, this](const Mallob::Clause& c, int solverId) {
 		if (_terminated || !_setup.exportClauses) return;
-		int condVar = _current_cond_var_or_zero;
-		assert(condVar >= 0);
-		callback(c, solverId, getSolverSetup().solverRevision, condVar);
+		callback(c, solverId, getSolverSetup().solverRevision, _conditional_lits);
 	});
 	setLearnedClauseCallback(cb);
 	if (_lrat) _lrat->setLearnedClauseCallback(cb);

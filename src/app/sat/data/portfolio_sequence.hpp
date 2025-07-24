@@ -12,10 +12,12 @@ struct PortfolioSequence {
         CADICAL = 'c',
         LINGELING = 'l',
         GLUCOSE = 'g',
-        MERGESAT = 'm'
+        MERGESAT = 'm',
+        PREPROCESSOR = 'p',
+        VARIABLE_ADDITION = 'v'
     };
     enum Flavour {
-        DEFAULT, SAT, UNSAT
+        DEFAULT, SAT, UNSAT, PLAIN, PREPROCESS
     };
     struct Item {
         BaseSolver baseSolver;
@@ -64,15 +66,15 @@ private:
         bool begun = false;
         while (i < descriptor.size()) {
             char c = descriptor[i];
-            bool newSolver = std::isalpha(c);
+            bool newSolver = std::isalpha(c) && c!='w';
             if (newSolver) {
                 if (begun) {
                     prefix.push_back(next);
                     next = Item();
                 }
                 begun = true;
+                next.incremental = std::isupper(c);
             }
-            next.incremental = std::isupper(c);
             c = std::tolower(c);
             switch (c) {
             case 'k':
@@ -90,7 +92,13 @@ private:
             case 'm':
                 next.baseSolver = MERGESAT;
                 break;
-            case '(': {
+            case 'v':
+                next.baseSolver = VARIABLE_ADDITION;
+                break;
+            case 'p':
+                next.baseSolver = PREPROCESSOR;
+                break;
+            case '(': case '[': {
                 if (begun) {
                     prefix.push_back(next);
                     next = Item();
@@ -101,8 +109,8 @@ private:
                 const auto start = i; // position after opening "("
                 int nbOpen = 1;
                 while (i < descriptor.size() && nbOpen > 0) {
-                    if (descriptor[i] == '(') nbOpen++;
-                    if (descriptor[i] == ')') nbOpen--;
+                    if (descriptor[i] == '(' || descriptor[i] == '[') nbOpen++;
+                    if (descriptor[i] == ')' || descriptor[i] == ']') nbOpen--;
                     i++;
                 }
                 const auto end = i-1; // position of closing ")"
@@ -118,7 +126,7 @@ private:
                         i++;
                     }
                     //printf("%i\n", nbReps);
-                } else if (i < descriptor.size() && descriptor[i] == '*') {
+                } else if (i < descriptor.size() && (descriptor[i] == '*' || descriptor[i] == 'w')) {
                     if (!cycle.empty()) return false;
                     isCycle = true;
                 } else return false;
@@ -140,11 +148,19 @@ private:
                 // UNSAT flavour
                 next.flavour = UNSAT;
                 break;
+            case '_':
+                // "Plain" flavour
+                next.flavour = PLAIN;
+                break;
+            case '0':
+                // "Preprocess" flavour
+                next.flavour = PREPROCESS;
+                break;
             case '!':
                 // Proof generation
                 next.outputProof = true;
                 break;
-            case '*':
+            case '*': case 'w':
                 // Last item is the cycle
                 if (!begun) return false;
                 if (!cycle.empty()) return false;

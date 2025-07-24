@@ -72,14 +72,14 @@ void RoutingTreeRequestMatcher::deserialize(const std::vector<uint8_t>& packed, 
         size_t i = 1;
         while (i < packed.size()) {
             // Extract request
-            std::vector<uint8_t> data(packed.data()+i, packed.data()+i+JobRequest::getMaxTransferSize());
+            std::vector<uint8_t> data(packed.data()+i, packed.data()+i+JobRequest::getTransferSize());
             JobRequest req = Serializable::get<JobRequest>(data);
             // Accept or discard request
             if (req.balancingEpoch >= _epoch || req.requestedNodeIndex == 0) {
                 req.numHops++;
-                LOG_ADD_SRC(V4_VVER, "[CA] got %s", source, req.toStr().c_str());
+                LOG_ADD_SRC(V5_DEBG, "[CA] got %s", source, req.toStr().c_str());
                 _request_list.insert(req);
-            } else LOG_ADD_SRC(V4_VVER, "[CA] DISCARD %s", source, req.toStr().c_str());
+            } else LOG_ADD_SRC(V5_DEBG, "[CA] DISCARD %s", source, req.toStr().c_str());
             // Go to next request
             i += req.getTransferSize();
         }
@@ -145,10 +145,10 @@ void RoutingTreeRequestMatcher::resolveRequests() {
             // Fit found: send to respective child
             // Update status
             if (destination == MyMpi::rank(MPI_COMM_WORLD)) {
-                LOG(V4_VVER, "[CA] Digest %s locally\n", req.toStr().c_str());
+                LOG(V5_DEBG, "[CA] Digest %s locally\n", req.toStr().c_str());
                 _local_request_callback(req, destination);
             } else {
-                LOG_ADD_DEST(V4_VVER, "[CA] Send %s to dest.", destination, 
+                LOG_ADD_DEST(V5_DEBG, "[CA] Send %s to dest.", destination, 
                     req.toStr().c_str());
                 requestsPerDestination[destination].push_back(req);
                 _child_statuses[destination].numIdle--;
@@ -199,7 +199,7 @@ void RoutingTreeRequestMatcher::advance(int epoch) {
     if (_status_dirty) {
         auto status = getAggregatedStatus();
         if (MyMpi::rank(MPI_COMM_WORLD) == _tree.getCurrentRoot()) {
-            LOG(V3_VERB, "[CA] Root: %i requests, %i idle (epoch=%i)\n", _request_list.size(), status.numIdle, _epoch);
+            LOG(V4_VVER, "[CA] Root: %i requests, %i idle (epoch=%i)\n", _request_list.size(), status.numIdle, _epoch);
         } else {
             auto packedStatus = serialize(status);
             LOG_ADD_DEST(V5_DEBG, "[CA] Prop. status: %i idle (epoch=%i)", _tree.getCurrentParent(), status.numIdle, _epoch);

@@ -9,9 +9,11 @@
 #include <unistd.h>
 #include <signal.h>
 
+#include "app/sat/proof/impcheck.hpp"
 #include "app/sat/proof/lrat_op.hpp"
 #include "trusted/trusted_utils.hpp"
 #include "trusted/trusted_checker_defs.hpp"
+#include "util/hashing.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
 #include "util/spsc_blocking_ringbuffer.hpp"
@@ -26,6 +28,7 @@
 class TrustedCheckerProcessAdapter {
 
 private:
+    int _base_seed;
     Logger& _logger;
     std::string _path_directives;
     std::string _path_feedback;
@@ -49,9 +52,9 @@ private:
     Mutex _mtx_model;
 
 public:
-    TrustedCheckerProcessAdapter(Logger& logger, int solverId, int nbVars, bool checkModel) :
-            _logger(logger), _solver_id(solverId), _nb_vars(nbVars), _op_queue(1<<14),
-            _check_model(checkModel) {}
+    TrustedCheckerProcessAdapter(Logger& logger, int baseSeed, int solverId, int nbVars, bool checkModel) :
+            _base_seed(baseSeed), _logger(logger), _solver_id(solverId), _nb_vars(nbVars),
+            _check_model(checkModel), _op_queue(1<<14) {}
 
     ~TrustedCheckerProcessAdapter() {
         if (!_f_directives) return;
@@ -65,7 +68,7 @@ public:
 
     void init(const u8* formulaSignature) {
 
-        auto basePath = TmpDir::get() + "/mallob." + std::to_string(Proc::getPid()) + ".slv"
+        auto basePath = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob." + std::to_string(Proc::getPid()) + ".slv"
             + std::to_string(_solver_id) + ".ts.";
         _path_directives = basePath + "directives";
         _path_feedback = basePath + "feedback";
@@ -80,6 +83,10 @@ public:
         params.fifoFeedback.set(_path_feedback);
         std::string moreArgs = "-lenient";
         if (_check_model) moreArgs += " -check-model";
+
+        unsigned long keySeed = ImpCheck::getKeySeed(_base_seed);
+        moreArgs += " -key-seed=" + std::to_string(keySeed);
+
         _subproc = new Subprocess(params, "impcheck_check", moreArgs);
         _child_pid = _subproc->start();
 
@@ -165,7 +172,7 @@ public:
 private:
     void handleError(const std::string& errMsg) {
         if (_error_reported) return;
-        LOGGER(_logger, V0_CRIT, "[ERROR] Checker module rejected operation: %s\n", errMsg.c_str());
+        LOGGER(_logger, V0_CRIT, "[ERROR] IMPCHK rejected operation: %s\n", errMsg.c_str());
         Terminator::setTerminating();
         _error_reported = true;
     }
@@ -233,7 +240,7 @@ private:
         signature sig;
         TrustedUtils::readSignature(sig, _f_feedback);
         auto str = Logger::dataToHexStr(sig, SIG_SIZE_BYTES);
-        LOGGER(_logger, V2_INFO, "TRUSTED checker reported UNSAT - sig %s\n", str.c_str());
+        LOGGER(_logger, V2_INFO, "IMPCHK reported UNSAT - sig %s\n", str.c_str());
         return true;
     }
 
@@ -252,7 +259,7 @@ private:
         signature sig;
         TrustedUtils::readSignature(sig, _f_feedback);
         auto str = Logger::dataToHexStr(sig, SIG_SIZE_BYTES);
-        LOGGER(_logger, V2_INFO, "TRUSTED checker reported SAT - sig %s\n", str.c_str());
+        LOGGER(_logger, V2_INFO, "IMPCHK reported SAT - sig %s\n", str.c_str());
         return true;
     }
 

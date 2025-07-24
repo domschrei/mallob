@@ -3,16 +3,15 @@
 
 #include <sys/types.h>
 #include <unistd.h>
-#include <random>
 #include <utility>
 #include <thread>
 #include <atomic>
-#include <list>
 #include <functional>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include "app/sat/data/revision_data.hpp"
 #include "util/params.hpp"
 #include "util/random.hpp"
 #include "util/sys/threading.hpp"
@@ -20,9 +19,6 @@
 #include "data/job_result.hpp"
 #include "../job/sat_process_config.hpp"
 #include "../solvers/portfolio_solver_interface.hpp"
-#include "solving_state.hpp"
-#include "clause_shuffler.hpp"
-#include "variable_translator.hpp"
 #include "../parse/serialized_formula_parser.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
 #include "app/sat/execution/solver_setup.hpp"
@@ -43,7 +39,7 @@ private:
     std::thread _thread;
 
     std::vector<std::unique_ptr<SerializedFormulaParser>> _pending_formulae;
-    std::vector<std::pair<size_t, const int*>> _pending_assumptions;
+    std::vector<int> _pending_assumptions;
 
     SplitMix64Rng _rng;
 
@@ -60,37 +56,28 @@ private:
     ConditionVariable _state_cond;
 
     std::atomic_int _latest_revision = 0;
+    Checksum _latest_checksum;
     std::atomic_int _active_revision = 0;
     unsigned long _imported_lits_curr_revision = 0;
     bool _last_read_lit_zero = true;
     int _max_var = 0;
-    VariableTranslator _vt;
+    Checksum _running_chksum;
     bool _has_pseudoincremental_solvers;
 
     std::atomic_bool _initialized = false;
-    std::atomic_bool _interrupted = false;
-    std::atomic_bool _suspended = false;
     std::atomic_bool _terminated = false;
+    bool _in_solve_call = false;
 
     bool _found_result = false;
     JobResult _result;
 
 public:
     SolverThread(const Parameters& params, const SatProcessConfig& config, std::shared_ptr<PortfolioSolverInterface> solver, 
-                size_t fSize, const int* fLits, size_t aSize, const int* aLits, int localId);
+                RevisionData firstRevision, int localId);
     ~SolverThread();
 
     void start();
-    void appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits);
-    void setSuspend(bool suspend) {
-        {
-            auto lock = _state_mutex.getLock();
-            _suspended = suspend;
-            if (_suspended) _solver.suspend();
-            else _solver.resume();
-        }
-        _state_cond.notify();
-    }
+    void appendRevision(int revision, RevisionData data);
     void setTerminate(bool cleanUpAsynchronously = false) {
         {
             auto lock = _state_mutex.getLock();
@@ -125,6 +112,12 @@ public:
     JobResult& getSatResult() {
         return _result;
     }
+    bool hasPreprocessedFormula() {
+        return _solver.hasPreprocessedFormula();
+    }
+    std::vector<int>&& extractPreprocessedFormula() {
+        return std::move(_solver.extractPreprocessedFormula());
+    }
 
     int getActiveRevision() const {return _active_revision;}
 
@@ -141,7 +134,6 @@ private:
     void runOnce();
     
     void waitWhileSolved();
-    void waitWhileSuspended();
     void waitUntil(std::function<bool()> predicate);
     
     void reportResult(int res, int revision);

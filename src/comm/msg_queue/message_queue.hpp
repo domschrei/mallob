@@ -25,6 +25,7 @@ class MessageQueue {
 
 public:
     typedef std::function<void(MessageHandle&)> MsgCallback;
+    typedef std::function<bool(MessageHandle&)> ConditionalMsgCallback;
     typedef std::function<void(int)> SendDoneCallback;
 
 private:
@@ -58,10 +59,18 @@ private:
     int _running_send_id = 1;
     int _num_concurrent_sends = 0;
     int _max_concurrent_sends = 16;
+    Mutex _mtx_out_msgs;
+    struct OutgoingMessage {
+        const DataPtr data;
+        int dest;
+        int tag;
+    };
+    std::list<OutgoingMessage> _out_msgs;
+    volatile bool _check_out_msgs {false};
 
     // Garbage collection
-    std::atomic_int _num_garbage {0};
     Mutex _garbage_mutex;
+    ConditionVariable _garbage_cond_var;
     std::list<DataPtr> _garbage_queue;
 
     // Callbacks
@@ -70,25 +79,31 @@ private:
     int _default_tag_var = 0;
     int* _current_recv_tag = nullptr;
     int* _current_send_tag = nullptr;
+    robin_hood::unordered_map<int, std::list<ConditionalMsgCallback>> _cond_callbacks;
 
     BackgroundWorker _batch_assembler;
     BackgroundWorker _gc;
 
 public:
     MessageQueue(int maxMsgSize);
+    void close();
     ~MessageQueue();
 
     typedef std::list<MsgCallback>::iterator CallbackRef;
+    typedef std::list<ConditionalMsgCallback>::iterator CondCallbackRef;
+    void initializeConditionalCallbacks(int tag);
     CallbackRef registerCallback(int tag, const MsgCallback& cb);
+    CondCallbackRef registerConditionalCallback(int tag, const ConditionalMsgCallback& cb);
     void registerSentCallback(int tag, const SendDoneCallback& cb);
     void clearCallbacks();
     void clearCallback(int tag, const CallbackRef& ref);
+    void clearConditionalCallback(int tag, const CondCallbackRef& ref);
     void setCurrentTagPointers(int* recvTag, int* sendTag) {
         _current_recv_tag = recvTag;
         _current_send_tag = sendTag;
     }
 
-    int send(const DataPtr& data, int dest, int tag);
+    int send(const DataPtr& data, int dest, int tag, bool fromMainThread = true);
     void cancelSend(int sendId);
     void advance();
 

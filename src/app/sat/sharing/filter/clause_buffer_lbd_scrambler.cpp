@@ -17,16 +17,23 @@
 ClauseBufferLbdScrambler::ClauseBufferLbdScrambler(const Parameters& params, BufferReader& reader) : _params(params), _reader(reader) {}
 
 std::vector<int> ClauseBufferLbdScrambler::scrambleLbdScores() {
+    std::vector<int> outbuf;
+    outbuf.reserve(_reader.getBufferSize());
     BufferBuilder builder(-1, _params.strictClauseLengthLimit()+ClauseMetadata::numInts(),
-        false);
+        false, &outbuf);
 
     std::vector<int*> clausePtrs;
-    int clauseLength = 1;
+    int clauseLength = 2;
     tsl::robin_map<int, int> lbdToNbOccs;
     Mallob::Clause c;
     while (true) {
 
         c = _reader.getNextIncomingClause();
+        // skip unit clauses (nothing to shuffle)
+        if (c.begin != nullptr && c.size < clauseLength) {
+            builder.append(c);
+            continue;
+        }
         if (c.begin == nullptr || c.size > clauseLength) {
             // flush clauses of prior clause length
             // 1. shuffle clauses

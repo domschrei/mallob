@@ -4,8 +4,11 @@
 #include "../sharing/sharing_manager.hpp"
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/data/portfolio_sequence.hpp"
+#include "app/sat/data/revision_data.hpp"
+#include "app/sat/data/theories/theory_specification.hpp"
 #include "util/logger.hpp"
 #include "util/sys/fileutils.hpp"
+#include "util/sys/thread_pool.hpp"
 #include "util/sys/timer.hpp"
 #include "data/app_configuration.hpp"
 #include "../solvers/cadical.hpp"
@@ -21,6 +24,7 @@
 #include "app/sat/job/sat_process_config.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
 #include "util/option.hpp"
+#include <climits>
 
 class LratConnector;
 #if MALLOB_USE_MERGESAT
@@ -44,7 +48,7 @@ class LratConnector;
 using namespace SolvingStates;
 
 SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, Logger& loggingInterface) : 
-			_params(params), _config(config), _logger(loggingInterface), _state(INITIALIZING) {
+			_params(params), _config(config), _logger(loggingInterface), _prefilter(params), _state(INITIALIZING) {
 
     int appRank = config.apprank;
 
@@ -70,11 +74,6 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 
 	// Launched in some certified UNSAT mode?
     if (_params.proofOutputFile.isSet() || _params.onTheFlyChecking()) {
-		
-		if (_params.inputShuffleProbability() > 0) {
-			LOG(V3_VERB, "Certified UNSAT mode: Disabling input shuffling\n");
-			_params.inputShuffleProbability.set(0);
-		}
 
 		// Override options
 		if (!portfolio.featuresProofOutput()) {
@@ -97,6 +96,11 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 			// Create directory for partial proofs
 			proofDirectory = params.proofDirectory() + "/proof" + config.getJobStr();
 			FileUtils::mkdir(proofDirectory);
+			if (_params.compressFormula()) {
+				LOG(V1_WARN, "[WARN] Using proof production (-proof) combined with formula compression (-cf): "
+					"Irredundant clause IDs in the produced proof will be ordered differently (by clause length). "
+					"Running a vanilla LRUP checker on the input CNF and the produced proof will fail!\n");
+			}
 		}
     }
 
@@ -125,15 +129,35 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		while (str[str.size()-1] == '.') 
 			str.resize(str.size()-1);
 		*out = atoi(str.c_str());
-		assert(*out > 0);
+		assert(*out >= 0 || log_return_false("[ERROR] illegal argument for app config key %s\n", id.c_str()));
 	}
-	
+
+	if (appConfig.map.count("__OBJ")) {
+		TheorySpecification spec(appConfig.map.at("__OBJ"));
+		assert(spec.getRuleset().size() == 1);
+		assert(spec.getRuleset()[0].type == IntegerRule::MINIMIZE);
+		const IntegerTerm& sum = spec.getRuleset()[0].term1;
+		assert(sum.type == IntegerTerm::ADD || sum.type == IntegerTerm::BIG_ADD);
+		for (auto& prod : sum.children()) {
+			assert(prod.type == IntegerTerm::MULTIPLY);
+			assert(prod.children().size() == 2);
+			assert(prod.children()[0].type == IntegerTerm::CONSTANT);
+			long weight = prod.children()[0].inner();
+			assert(prod.children()[1].type == IntegerTerm::LITERAL);
+			int literal = prod.children()[1].inner();
+			_objective.push_back({weight, literal});
+		}
+		LOGGER(_logger, V4_VVER, "Parsed objective\n");
+	}
+
 	// These numbers become the diversifier indices of the solvers on this node
 	int numLgl = 0;
 	int numGlu = 0;
 	int numCdc = 0;
 	int numMrg = 0;
 	int numKis = 0;
+	int numBVA = 0;
+	int numPre = 0;
 
 	// Add solvers from full cycles on previous ranks
 	// and from the begun cycle on the previous rank
@@ -150,6 +174,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		case PortfolioSequence::CADICAL: solverToAdd = &numCdc; break;
 		case PortfolioSequence::MERGESAT: solverToAdd = &numMrg; break;
 		case PortfolioSequence::KISSAT: solverToAdd = &numKis; break;
+		case PortfolioSequence::VARIABLE_ADDITION: solverToAdd = &numBVA; break;
+		case PortfolioSequence::PREPROCESSOR: solverToAdd = &numPre; break;
 		}
 		*solverToAdd += numFullCycles + (i < begunCyclePos);
 	}
@@ -162,13 +188,14 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	SolverSetup setup;
 	setup.logger = &_logger;
 	setup.jobname = config.getJobStr();
+	setup.baseSeed = params.seed();
 	setup.isJobIncremental = config.incremental;
 	setup.strictMaxLitsPerClause = params.strictClauseLengthLimit();
 	setup.strictLbdLimit = params.strictLbdLimit();
 	setup.qualityMaxLitsPerClause = params.qualityClauseLengthLimit();
 	setup.qualityLbdLimit = params.qualityLbdLimit();
 	setup.freeMaxLitsPerClause = params.freeClauseLengthLimit();
-	setup.clauseBaseBufferSize = params.clauseBufferBaseSize();
+	setup.clauseBaseBufferSize = params.exportVolumePerThread() * _num_solvers;
 	setup.anticipatedLitsToImportPerCycle = config.maxBroadcastedLitsPerCycle;
 	setup.resetLbdBeforeImport = params.resetLbd() == MALLOB_RESET_LBD_AT_IMPORT;
 	setup.incrementLbdBeforeImport = params.incrementLbd();
@@ -179,6 +206,21 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.numBufferedClsGenerations = params.bufferedImportedClsGenerations();
 	setup.skipClauseSharingDiagonally = params.skipClauseSharingDiagonally();
 	setup.diversifyNoise = params.diversifyNoise();
+
+	setup.decayDistribution = params.decayDistribution();
+	setup.decayMean = params.decayMean();
+	setup.decayStddev = params.decayStddev();
+	setup.decayMin = params.decayMin();
+	setup.decayMax = params.decayMax();
+
+	setup.diversifyReduce = params.diversifyReduce();
+	setup.reduceMin = params.reduceMin();
+	setup.reduceMax = params.reduceMax();
+	setup.reduceMean = params.reduceMean();
+	setup.reduceStddev = params.reduceStddev();
+	setup.reduceDelta = params.reduceDelta();
+
+	setup.plainAddSpecific = params.plainAddSpecific();
 	setup.diversifyNative = params.diversifyNative();
 	setup.diversifyFanOut = params.diversifyFanOut();
 	setup.diversifyInitShuffle = params.diversifyInitShuffle();
@@ -204,12 +246,14 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.sigFormula = appConfig.map["__SIG"];
 	LratConnector* modelCheckingLratConnector {nullptr};
 	setup.nbSkippedIdEpochs = config.nbPreviousBalancingEpochs;
-	if (params.cadicalProfilingLevel() >= 0) {
-		setup.profilingBaseDir = params.cadicalProfilingDir();
-		if (setup.profilingBaseDir.empty()) setup.profilingBaseDir = TmpDir::get();
+	if (params.satProfilingLevel() >= 0) {
+		setup.profilingBaseDir = params.satProfilingDir();
+		if (setup.profilingBaseDir.empty()) setup.profilingBaseDir = TmpDir::getGeneralTmpDir();
 		setup.profilingBaseDir += "/" + std::to_string(appRank) + "/";
-		setup.profilingLevel = params.cadicalProfilingLevel();
+		FileUtils::mkdir(setup.profilingBaseDir);
+		setup.profilingLevel = params.satProfilingLevel();
 	}
+	setup.objectiveFunction = _objective;
 
 	// Instantiate solvers according to the global solver IDs and diversification indices
 	int cyclePos = begunCyclePos;
@@ -233,6 +277,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 			case PortfolioSequence::MERGESAT: setup.diversificationIndex = numMrg++; break;
 			case PortfolioSequence::GLUCOSE: setup.diversificationIndex = numGlu++; break;
 			case PortfolioSequence::KISSAT: setup.diversificationIndex = numKis++; break;
+			case PortfolioSequence::VARIABLE_ADDITION: setup.diversificationIndex = numBVA++; break;
+			case PortfolioSequence::PREPROCESSOR: setup.diversificationIndex = numPre++; break;
 			}
 			setup.diversificationIndex += divOffsetCycle;
 		}
@@ -254,8 +300,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 
 	_sharing_manager.reset(new SharingManager(_solver_interfaces, _params, _logger, 
 		/*max. deferred literals per solver=*/5*config.maxBroadcastedLitsPerCycle, config.apprank));
+	_sharing_manager->setClausePrefilter(_prefilter);
 	LOGGER(_logger, V5_DEBG, "initialized\n");
-
 }
 
 std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSetup& setup) {
@@ -274,9 +320,13 @@ std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSe
 		solver.reset(new Cadical(setup));
 		break;
 	case 'k':
-	//case 'K': // no support for incremental mode as of now
+	case 'v': // variable addition via Kissat
+	case 'p': // preprocessing via Kissat
 		// Kissat
-		LOGGER(_logger, V4_VVER, "S%i : Kissat-%i\n", setup.globalId, setup.diversificationIndex);
+		LOGGER(_logger, V4_VVER, "S%i : Kissat%s%s-%i\n", setup.globalId,
+			setup.solverType == 'v' ? "-BVA": "",
+			setup.solverType == 'p' ? "-pre": "",
+			setup.diversificationIndex);
 		solver.reset(new Kissat(setup));
 		break;
 #ifdef MALLOB_USE_MERGESAT
@@ -305,24 +355,25 @@ std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSe
 	return solver;
 }
 
-void SatEngine::appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits, bool lastRevisionForNow) {
+void SatEngine::appendRevision(int revision, RevisionData data, bool lastRevisionForNow) {
 	
-	LOGGER(_logger, V4_VVER, "Import rev. %i: %i lits, %i assumptions\n", revision, fSize, aSize);
+	LOGGER(_logger, V4_VVER, "Import rev. %i: size %lu\n", revision, data.fSize);
 	assert(_revision+1 == revision);
-	_revision_data.push_back(RevisionData{fSize, fLits, aSize, aLits});
+	_revision_data.push_back(data);
 	_sharing_manager->setImportedRevision(revision);
+	_prefilter.notifyFormula(data.fLits, data.fSize);
 	
-	for (size_t i = 0; i < _num_solvers; i++) {
+	for (size_t i = 0; i < _num_active_solvers; i++) {
 		if (revision == 0) {
 			// Initialize solver thread
 			_solver_threads.emplace_back(new SolverThread(
-				_params, _config, _solver_interfaces[i], fSize, fLits, aSize, aLits, i
+				_params, _config, _solver_interfaces[i], data, i
 			));
 		} else {
 			if (_solver_interfaces[i]->getSolverSetup().doIncrementalSolving) {
 				LOGGER(_logger, V4_VVER, "Solver %i is incremental: forward next revision\n", i);
 				// True incremental SAT solving
-				_solver_threads[i]->appendRevision(revision, fSize, fLits, aSize, aLits);
+				_solver_threads[i]->appendRevision(revision, data);
 			} else {
 				LOGGER(_logger, V4_VVER, "Solver %i is non-incremental: phase out\n", i);
 				if (!lastRevisionForNow) {
@@ -347,17 +398,12 @@ void SatEngine::appendRevision(int revision, size_t fSize, const int* fLits, siz
 				s.solverRevision++;
 				_solver_interfaces[i] = createSolver(s);
 				_solver_threads[i] = std::shared_ptr<SolverThread>(new SolverThread(
-					_params, _config, _solver_interfaces[i], 
-					_revision_data[0].fSize, _revision_data[0].fLits, 
-					_revision_data[0].aSize, _revision_data[0].aLits, 
-					i
+					_params, _config, _solver_interfaces[i], _revision_data[0], i
 				));
 				// Load entire formula 
 				for (int importedRevision = 1; importedRevision <= revision; importedRevision++) {
 					auto data = _revision_data[importedRevision];
-					_solver_threads[i]->appendRevision(importedRevision, 
-						data.fSize, data.fLits, data.aSize, data.aLits
-					);
+					_solver_threads[i]->appendRevision(importedRevision, data);
 				}
 				_sharing_manager->continueClauseImport(i);
 				if (_solvers_started) _solver_threads[i]->start();
@@ -373,7 +419,8 @@ void SatEngine::solve() {
 	if (!_solvers_started) {
 		// Need to start threads
 		LOGGER(_logger, V4_VVER, "starting threads\n");
-		for (auto& thread : _solver_threads) thread->start();
+		for (size_t i = 0; i < std::min(_num_active_solvers, _solver_threads.size()); i++)
+			_solver_threads[i]->start();
 		_solvers_started = true;
 	}
 	_state = ACTIVE;
@@ -381,7 +428,7 @@ void SatEngine::solve() {
 
 bool SatEngine::isFullyInitialized() {
 	if (_state == INITIALIZING) return false;
-	for (size_t i = 0; i < _solver_threads.size(); i++) {
+	for (size_t i = 0; i < std::min(_num_active_solvers, _solver_threads.size()); i++) {
 		if (!_solver_threads[i]->isInitialized()) return false;
 	}
 	return true;
@@ -396,7 +443,8 @@ int SatEngine::solveLoop() {
 
     // Solving done?
 	bool done = false;
-	for (size_t i = 0; i < _solver_threads.size(); i++) {
+	bool preprocessingResult = false;
+	for (size_t i = 0; i < std::min(_num_active_solvers, _solver_threads.size()); i++) {
 		if (_solver_threads[i]->hasFoundResult(_revision)) {
 
 			if (_params.deterministicSolving() && _solver_interfaces[i]->getGlobalId() != _winning_solver_id)
@@ -411,12 +459,16 @@ int SatEngine::solveLoop() {
 				break;
 			}
 		}
+		if (!preprocessingResult && _solver_threads[i]->hasPreprocessedFormula()) {
+			_preprocessed_formula = std::move(_solver_threads[i]->extractPreprocessedFormula());
+			preprocessingResult = true;
+		}
 	}
 
 	if (done) {
-		LOGGER(_logger, V5_DEBG, "Returning result\n");
+		LOGGER(_logger, V6_DEBGV, "Returning result\n");
 		return _result.result;
-	}
+	} else if (preprocessingResult) return 99;
     return -1; // no result yet
 }
 
@@ -430,6 +482,16 @@ void SatEngine::setClauseBufferRevision(int revision) {
 	if (isCleanedUp()) return;
  	LOGGER(_logger, V5_DEBG, "set clause rev=%i\n", revision);
 	_sharing_manager->setImportedRevision(revision);
+}
+
+void SatEngine::updateBestFoundObjectiveCost(long long bestFoundObjectiveCost) {
+	if (isCleanedUp()) return;
+	if (bestFoundObjectiveCost != LLONG_MAX)
+		LOGGER(_logger, V4_VVER, "update best found objective cost: %lld\n", bestFoundObjectiveCost);
+	for (size_t i = 0; i < _num_active_solvers; i++) {
+		if (_solver_interfaces[i] && _solver_interfaces[i]->getOptimizer())
+			_solver_interfaces[i]->getOptimizer()->update_best_found_objective_cost(bestFoundObjectiveCost);
+	}
 }
 
 std::vector<int> SatEngine::prepareSharing(int literalLimit, int& outSuccessfulSolverId, int& outNbLits) {
@@ -453,9 +515,9 @@ void SatEngine::digestSharingWithFilter(std::vector<int>& clauseBuf, std::vector
 	_sharing_manager->digestSharingWithFilter(clauseBuf, &filter);
 }
 
-void SatEngine::digestSharingWithoutFilter(std::vector<int>& clauseBuf) {
+void SatEngine::digestSharingWithoutFilter(std::vector<int>& clauseBuf, bool stateless) {
 	if (isCleanedUp()) return;
-	_sharing_manager->digestSharingWithoutFilter(clauseBuf);
+	_sharing_manager->digestSharingWithoutFilter(clauseBuf, stateless);
 }
 
 void SatEngine::returnClauses(std::vector<int>& clauseBuf) {
@@ -475,17 +537,35 @@ void SatEngine::syncDeterministicSolvingAndCheckForLocalWinner() {
 }
 
 void SatEngine::reduceActiveThreadCount() {
-	if (_num_active_solvers <= 1) return;
-
 	// Reduce thread count by 10% (but at least one thread)
-	size_t nbThreadsToTerminate = std::max(1UL, (size_t)std::round(0.1*_num_active_solvers));
+	int nbThreads = (int)_num_active_solvers - (int)std::max(1UL, (size_t)std::round(0.1*_num_active_solvers));
+	setActiveThreadCount(nbThreads);
+}
 
+void SatEngine::setActiveThreadCount(int nbThreads) {
+	if (nbThreads < 1) return;
+	int nbThreadsToTerminate = (int)_num_active_solvers - nbThreads;
+	if (nbThreadsToTerminate <= 0) return;
 	for (int termIdx = 0; termIdx < nbThreadsToTerminate; termIdx++) {
 		size_t i = _num_active_solvers-1;
 		LOGGER(_logger, V3_VERB, "Terminating %lu-th solver to reduce thread count\n", i);
 		_sharing_manager->stopClauseImport(i);
+		SolverSetup s = _solver_interfaces[i]->getSolverSetup();
+		s.solverRevision++;
 		_solver_threads[i]->setTerminate(true);
+		auto movedSolver = std::move(_solver_interfaces[i]);
+		_solver_interfaces[i] = createSolver(s);
+		auto movedThread = std::move(_solver_threads[i]);
+		_solver_threads[i] = std::shared_ptr<SolverThread>(new SolverThread(
+			_params, _config, _solver_interfaces[i], {}, i
+		));
+		_solver_threads[i]->setTerminate();
 		_num_active_solvers--;
+		_solver_thread_cleanups.push_back(ProcessWideThreadPool::get().addTask([thread = std::move(movedThread), solver = std::move(movedSolver)]() mutable {
+			thread->tryJoin();
+			thread.reset();
+			solver.reset();
+		}));
 	}
 }
 
@@ -534,20 +614,9 @@ void SatEngine::setWinningSolverId(int globalId) {
 	_winning_solver_id = globalId;
 }
 
-void SatEngine::setPaused() {
-	_state = SUSPENDED;
-	for (auto& solver : _solver_threads) solver->setSuspend(true);
-}
-
-void SatEngine::unsetPaused() {
-	_state = ACTIVE;
-	for (auto& solver : _solver_threads) solver->setSuspend(false);
-}
-
 void SatEngine::terminateSolvers(bool hardTermination) {
 	for (auto& solver : _solver_threads) {
 		solver->setTerminate(hardTermination);
-		solver->setSuspend(false);
 	}
 }
 
@@ -557,6 +626,15 @@ SatEngine::LastAdmittedStats SatEngine::getLastAdmittedClauseShare() {
 		_sharing_manager->getLastNumClausesToImport(),
 		_sharing_manager->getLastNumAdmittedLitsToImport()
 	};
+}
+
+long long SatEngine::getBestFoundObjectiveCost() const {
+	long long best {LLONG_MAX};
+	for (size_t i = 0; i < _num_active_solvers; i++) {
+		if (_solver_interfaces[i] && _solver_interfaces[i]->getOptimizer())
+			best = std::min(best, _solver_interfaces[i]->getOptimizer()->best_objective_found_so_far());
+	}
+	return best;
 }
 
 void SatEngine::writeClauseEpochs() {
@@ -585,6 +663,8 @@ void SatEngine::cleanUp(bool hardTermination) {
 	for (auto& thread : _obsolete_solver_threads) thread->tryJoin();
 	_solver_threads.clear();
 	_obsolete_solver_threads.clear();
+	for (auto& fut : _solver_thread_cleanups) fut.get(); // wait for cleanups
+	_solver_thread_cleanups.clear();
 
 	LOGGER(_logger, V5_DEBG, "[engine-cleanup] joined threads\n");
 

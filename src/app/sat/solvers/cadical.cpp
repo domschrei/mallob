@@ -27,7 +27,6 @@
 #include "app/sat/solvers/cadical_clause_import.hpp"
 #include "app/sat/solvers/cadical_terminator.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
-#include "util/sys/tmpdir.hpp"
 
 Cadical::Cadical(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup),
@@ -90,6 +89,12 @@ Cadical::Cadical(const SolverSetup& setup)
 			okay = solver->trace_proof(proofFileString.c_str()); assert(okay);
 		}
 	}
+
+	if (_optimizer) {
+		solver->connect_external_propagator(_optimizer.get());
+		for (auto [weight, lit] : _setup.objectiveFunction)
+			solver->add_observed_var(std::abs(lit));
+	}
 }
 
 void Cadical::addLiteral(int lit) {
@@ -136,20 +141,23 @@ void Cadical::diversify(int seed) {
 		okay = solver->set("fanout", 1); assert(okay);
 	}
 
-	if (_setup.diversifyNative) {
-		if (_setup.flavour == PortfolioSequence::SAT) {
-			switch (getDiversificationIndex() % 3) {
-			case 0: okay = solver->configure("sat"); break;
-			case 1: /*default configuration*/ break;
-			case 2: okay = solver->set("inprocessing", 0); break;
-			}
-		} else {
-			if (_setup.flavour != PortfolioSequence::DEFAULT) {
-				LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");
-				_setup.flavour = PortfolioSequence::DEFAULT;
-			}
+	if (_setup.flavour == PortfolioSequence::SAT) {
+		switch (getDiversificationIndex() % 3) {
+		case 0: okay = solver->configure("sat"); break;
+		case 1: /*default configuration*/ break;
+		case 2: okay = solver->set("inprocessing", 0); break;
+		}
+	} else if (_setup.flavour == PortfolioSequence::PLAIN) {
+		LOGGER(_logger, V4_VVER, "plain\n");
+		okay = solver->configure("plain");
+	} else {
+		if (_setup.flavour != PortfolioSequence::DEFAULT) {
+			LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");
+			_setup.flavour = PortfolioSequence::DEFAULT;
+		}
+		if (_setup.diversifyNative) {
 			switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
-			// Greedy 10-portfolio according to tests of the above configurations on SAT2020 instances
+			// Greedy 10-portfolio according to tests on SAT2020 instances
 			case 0: okay = solver->set("phase", 0); break;
 			case 1: okay = solver->configure("sat"); break;
 			case 2: okay = solver->set("elim", 0); break;
@@ -162,8 +170,8 @@ void Cadical::diversify(int seed) {
 			case 9: okay = solver->set("inprocessing", 0); break;
 			}
 		}
-		assert(okay);
 	}
+	assert(okay);
 }
 
 int Cadical::getNumOriginalDiversifications() {
@@ -191,10 +199,12 @@ SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 
 	// set the assumptions
 	this->assumptions.clear();
+	//clearConditionalLits();
 	for (size_t i = 0; i < numAssumptions; i++) {
 		int lit = assumptions[i];
 		solver->assume(lit);
 		this->assumptions.push_back(lit);
+		//addConditionalLit(-lit);
 	}
 
 	// start solving
@@ -222,14 +232,7 @@ void Cadical::setSolverInterrupt() {
 
 void Cadical::unsetSolverInterrupt() {
 	terminator.unsetInterrupt();
-}
-
-void Cadical::setSolverSuspend() {
-    terminator.setSuspend();
-}
-
-void Cadical::unsetSolverSuspend() {
-    terminator.unsetSuspend();
+	solver->unset_terminate();
 }
 
 std::vector<int> Cadical::getSolution() {

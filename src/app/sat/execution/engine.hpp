@@ -2,11 +2,16 @@
 #pragma once
 
 #include <ext/alloc_traits.h>
+#include <future>
+#include <list>
 #include <stddef.h>
 #include <atomic>
 #include <vector>
 #include <memory>
 
+#include "app/sat/data/revision_data.hpp"
+#include "app/sat/data/theories/integer_rule.hpp"
+#include "app/sat/sharing/filter/clause_prefilter.hpp"
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
 #include "../sharing/sharing_manager.hpp"
@@ -35,16 +40,13 @@ private:
 	size_t _num_active_solvers;
 	
 	std::unique_ptr<SharingManager> _sharing_manager;
+	ClausePrefilter _prefilter;
+
 	std::vector<std::shared_ptr<PortfolioSolverInterface>> _solver_interfaces;
 	std::vector<std::shared_ptr<SolverThread>> _solver_threads;
 	std::vector<std::shared_ptr<SolverThread>> _obsolete_solver_threads;
+	std::list<std::future<void>> _solver_thread_cleanups;
 
-	struct RevisionData {
-		size_t fSize;
-		const int* fLits;
-		size_t aSize;
-		const int* aLits;
-	};
 	std::vector<RevisionData> _revision_data;
 	
 	bool _solvers_started = false;
@@ -56,6 +58,10 @@ private:
 	bool _block_result {false};
 	int _winning_solver_id {-1};
 
+	std::vector<std::pair<long, int>> _objective;
+
+	std::vector<int> _preprocessed_formula;
+
 public:
 
     SatEngine(const Parameters& params, const SatProcessConfig& config, Logger& loggingInterface);
@@ -63,19 +69,19 @@ public:
 
 	void solve();
 	void setClauseBufferRevision(int revision);
-	void appendRevision(int revision, size_t fSize, const int* fLits, size_t aSize, const int* aLits, 
-		bool lastRevisionForNow = true);
+	void appendRevision(int revision, RevisionData data, bool lastRevisionForNow = true);
 
 	bool isFullyInitialized();
 	int solveLoop();
 	JobResult& getResult() {return _result;}
+	std::vector<int>&& getPreprocessedFormula() {return std::move(_preprocessed_formula);}
 
 	bool isReadyToPrepareSharing() const;
 	std::vector<int> prepareSharing(int literalLimit, int& outSuccessfulSolverId, int& outNbLits);
 	std::vector<int> filterSharing(std::vector<int>& clauseBuf);
 	void addSharingEpoch(int epoch);
 	void digestSharingWithFilter(std::vector<int>& clauseBuf, std::vector<int>& filter);
-	void digestSharingWithoutFilter(std::vector<int>& clauseBuf);
+	void digestSharingWithoutFilter(std::vector<int>& clauseBuf, bool stateless);
 	void returnClauses(std::vector<int>& clauseBuf);
 	void digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauseBuf);
 
@@ -85,11 +91,14 @@ public:
 		int nbAdmittedLits;
 	};
 	LastAdmittedStats getLastAdmittedClauseShare();
+	long long getBestFoundObjectiveCost() const;
+	void updateBestFoundObjectiveCost(long long bestFoundObjectiveCost);
 
 	void setWinningSolverId(int globalId);
 	void syncDeterministicSolvingAndCheckForLocalWinner();
 
 	void reduceActiveThreadCount();
+	void setActiveThreadCount(int nbThreads);
 
     void setPaused();
     void unsetPaused();

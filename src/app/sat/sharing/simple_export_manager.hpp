@@ -29,7 +29,6 @@ public:
         auto result = _filter.tryRegisterAndInsert(std::move(pcc));
         _filter.releaseLock(size);
 
-        auto solverStats = _solver_stats.at(producerId);
         handleResult(producerId, result, size);
     }
 };

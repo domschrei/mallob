@@ -17,7 +17,8 @@ else
     solvers="$1"
 fi
 
-bash fetch_solvers.sh $solvers
+#bash fetch_solvers.sh $solvers
+bash fetch_solvers_with_curl.sh $solvers
 
 # MergeSAT
 if echo $solvers|grep -q "m" && [ ! -f mergesat/libmergesat.a ]; then
@@ -86,13 +87,13 @@ if echo $solvers|grep -q "k" && [ ! -f kissat/libkissat.a ]; then
     echo "Building Kissat ..."
 
     cd kissat
-    ./configure --quiet --no-proofs
+    ./configure --no-proofs
     make
     cp build/libkissat.a .
     cd ..
 fi
 
-# Normal (non-LRAT) CaDiCaL
+# CaDiCaL
 if echo $solvers|grep -q "c" && [ ! -f cadical/libcadical.a ]; then
     echo "Building CaDiCaL ..."
 

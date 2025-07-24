@@ -7,14 +7,15 @@
 
 struct ImportingSolver {
 
-    PortfolioSolverInterface* solver;
+    const int globalId;
+    const int localId;
     SolverStatistics* solverStats;
     std::vector<bool> filter;
 
     ClauseIdAlignment* _id_alignment {nullptr};
     
-    ImportingSolver(PortfolioSolverInterface* solver, SolverStatistics* stats, ClauseIdAlignment* idAlignment) : 
-        solver(solver), solverStats(stats), _id_alignment(idAlignment) {}
+    ImportingSolver(int globalId, int localId, SolverStatistics* stats, ClauseIdAlignment* idAlignment) : 
+        globalId(globalId), localId(localId), solverStats(stats), _id_alignment(idAlignment) {}
 
     void appendCandidate(const Mallob::Clause& clause, cls_producers_bitset producers) {
         filter.push_back(filterClause(clause, producers));
@@ -23,20 +24,19 @@ struct ImportingSolver {
 private:
     bool filterClause(const Mallob::Clause& clause, cls_producers_bitset producers) {
 
-        int sid = solver->getLocalId();
         solverStats->receivedClauses++;
         //if (remainingBudget < clause.size) {
         //    // No import budget left
         //    solverStats->receivedClausesDropped++;
         //    return;
         //}
-        cls_producers_bitset producerFlag = 1 << sid;
+        cls_producers_bitset producerFlag = 1 << localId;
         if ((producers & producerFlag) != 0) {
             // filtered by solver filter
             solverStats->receivedClausesFiltered++;
             return true;
         }
-        if (_id_alignment && !_id_alignment->checkClauseToImport(solver, clause)) {
+        if (_id_alignment && !_id_alignment->checkClauseToImport(globalId, localId, clause)) {
             // filtered by having an ID produced by this solver itself
             solverStats->receivedClausesFiltered++;
             return true;

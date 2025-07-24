@@ -4,6 +4,7 @@
 
 #include <set>
 #include <list>
+#include "comm/job_tree_snapshot.hpp"
 #include "comm/msg_queue/message_queue.hpp"
 #include "comm/msgtags.h"
 #include "util/assert.hpp"
@@ -128,6 +129,7 @@ public:
     }
 
     TreeRelative setChild(int rank, int index, ctx_id_t contextId) {
+        assert(rank >= 0);
         if (index == getLeftChildIndex()) {
             setLeftChild(rank, contextId);
             return LEFT_CHILD;
@@ -254,6 +256,8 @@ public:
         _job_node_ranks.clear(getRightChildIndex());
     }
     void update(int index, int rootRank, ctx_id_t rootContextId, int parentRank, ctx_id_t parentContextId) {    
+        if (hasLeftChild()) unsetLeftChild();
+        if (hasRightChild()) unsetRightChild();
         _index = index;
         if (index == 0 || rootRank < 0) rootRank = _rank; // this is the root node
         updateJobNode(0, rootRank);
@@ -345,13 +349,31 @@ public:
         return numChildren;
     }
 
-private:
+    JobTreeSnapshot getSnapshot() const {
+        JobTreeSnapshot snapshot;
+        snapshot.nodeRank = getRank();
+        snapshot.index = getIndex();
+        snapshot.contextId = getContextId();
+        snapshot.nbChildren = getNumChildren();
+        snapshot.leftChildNodeRank = hasLeftChild() ? getLeftChildNodeRank() : -1;
+        snapshot.leftChildIndex = hasLeftChild() ? getLeftChildIndex() : -1;
+        snapshot.leftChildContextId = hasLeftChild() ? getLeftChildContextId() : 0;
+        snapshot.rightChildNodeRank = hasRightChild() ? getRightChildNodeRank() : -1;
+        snapshot.rightChildIndex = hasRightChild() ? getRightChildIndex() : -1;
+        snapshot.rightChildContextId = hasRightChild() ? getRightChildContextId() : 0;
+        snapshot.parentNodeRank = getParentNodeRank();
+        snapshot.parentIndex = getParentIndex();
+        snapshot.parentContextId = getParentContextId();
+        return snapshot;
+    }
+
     void send(int dest, int mpiTag, JobMessage& msg) const {
         msg.treeIndexOfSender = getIndex();
         msg.contextIdOfSender = _ctx_id;
         MyMpi::isend(dest, mpiTag, msg);
     }
 
+private:
     void setDesire(float& member, float time) {
         if (member == -1) {
             // new desire

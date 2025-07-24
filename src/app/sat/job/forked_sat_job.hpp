@@ -11,6 +11,8 @@
 
 #include "app/app_message_subscription.hpp"
 #include "app/job.hpp"
+#include "scheduling/core_allocator.hpp"
+#include "util/sys/shmem_cache.hpp"
 #include "util/params.hpp"
 #include "sat_process_adapter.hpp"
 #include "sat_constants.h"
@@ -29,9 +31,11 @@ private:
     static std::atomic_int _static_subprocess_index;
     
     std::atomic_bool _initialized = false;
+    CoreAllocator::Allocation _core_alloc;
 
     std::unique_ptr<SatProcessAdapter> _solver;
     int _last_imported_revision = 0;
+    std::vector<SatProcessAdapter::ShmemObject> _formulas_in_shmem;
 
     std::future<void> _destruction;
     std::atomic_bool _shmem_freed = false;
@@ -44,6 +48,12 @@ private:
     JobResult _internal_result;
 
     int _sharing_max_size {0};
+
+    int _subproc_idx;
+
+    float _time_of_retraction_start = -1;
+    float _time_of_retraction_end = -1;
+    float _retraction_round_duration = 0;
 
 public:
 
@@ -65,8 +75,9 @@ public:
     bool appl_isDestructible() override;
     void appl_memoryPanic() override;
 
+    int getDemand() const override;
+
     // Methods that are not overridden, but use the default implementation:
-    // int getDemand(int prevVolume) const override;
     // bool wantsToCommunicate() const override;
     
     // Methods from BaseSatJob:
@@ -76,16 +87,20 @@ public:
     bool hasPreparedSharing() override;
     std::vector<int> getPreparedClauses(Checksum& checksum, int& successfulSolverId, int& numLits) override;
     int getLastAdmittedNumLits() override;
+    long long getBestFoundObjectiveCost() override;
     virtual void setClauseBufferRevision(int revision) override;
+    virtual void updateBestFoundSolutionCost(long long bestFoundSolutionCost) override;
 
-    virtual void filterSharing(int epoch, std::vector<int>& clauses) override;
+    virtual void filterSharing(int epoch, std::vector<int>&& clauses) override;
     virtual bool hasFilteredSharing(int epoch) override;
     virtual std::vector<int> getLocalFilter(int epoch) override;
-    virtual void applyFilter(int epoch, std::vector<int>& filter) override;
-    virtual void digestSharingWithoutFilter(int epoch, std::vector<int>& clauses) override;
+    virtual void applyFilter(int epoch, std::vector<int>&& filter) override;
+    virtual void digestSharingWithoutFilter(int epoch, std::vector<int>&& clauses, bool stateless) override;
     
-    virtual void returnClauses(std::vector<int>& clauses) override;
-    virtual void digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauses) override;
+    virtual void returnClauses(std::vector<int>&& clauses) override;
+    virtual void digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>&& clauses) override;
+
+    virtual bool canHandleIncompleteRevision(int rev) override;
 
 private:
     void doStartSolver();

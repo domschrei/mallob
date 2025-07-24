@@ -13,8 +13,12 @@
 #include <thread>
 #include <vector>
 
+#include "comm/distributed_termination.hpp"
 #include "comm/mympi.hpp"
+#include "interface/api/api_registry.hpp"
 #include "interface/api/rank_specific_file_fetcher.hpp"
+#include "scheduling/core_allocator.hpp"
+#include "util/periodic_event.hpp"
 #include "util/sys/subprocess.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
@@ -67,13 +71,14 @@ void introduceMonoJob(Parameters& params, Client& client) {
         {"priority", 1.000},
         {"application", app}
     };
+    if (params.crossJobCommunication()) json["group-id"] = "1";
     if (params.jobWallclockLimit() > 0)
         json["wallclock-limit"] = std::to_string(params.jobWallclockLimit()) + "s";
     if (params.jobCpuLimit() > 0) {
         json["cpu-limit"] = std::to_string(params.jobCpuLimit()) + "s";
     }
 
-    auto result = client.getAPI().submit(json, [&](nlohmann::json& response) {
+    auto result = APIRegistry::get().submit(json, [&](nlohmann::json& response) {
         // Job done? => Terminate all processes
         monoJobDone = true;
     });
@@ -86,9 +91,13 @@ void introduceMonoJob(Parameters& params, Client& client) {
 inline bool doTerminate(Parameters& params, int rank) {
     
     bool terminate = false;
-    if (Terminator::isTerminating(/*fromMainThread=*/true)) terminate = true;
-    if (params.timeLimit() > 0 && Timer::elapsedSecondsCached() > params.timeLimit()) {
+    if (Terminator::isTerminating(/*fromMainThread=*/true)) {
         terminate = true;
+        MyMpi::broadcastExitSignal();
+    }
+    if (monoJobDone || (params.timeLimit() > 0 && Timer::elapsedSecondsCached() > params.timeLimit())) {
+        terminate = true;
+        MyMpi::broadcastExitSignal();
     }
     if (terminate) {
         if (rank == 0) {
@@ -102,7 +111,7 @@ inline bool doTerminate(Parameters& params, int rank) {
     return false;
 }
 
-void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& params) {
+void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& params, DistributedTermination& distTerm) {
 
     // Determine which role(s) this PE has
     bool isWorker = commWorkers != MPI_COMM_NULL;
@@ -118,19 +127,6 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     if (isWorker) worker->init();
     if (isClient) client->init();
     int myRank = MyMpi::rank(MPI_COMM_WORLD);
-    
-    // Register global callback for exiting msg (not specific to worker nor client)
-    MessageSubscription exitSubscription(MSG_DO_EXIT, [myRank](MessageHandle& h) {
-        LOG_ADD_SRC(V3_VERB, "Received exit signal", h.source);
-
-        // Forward exit signal
-        if (myRank*2+1 < MyMpi::size(MPI_COMM_WORLD))
-            MyMpi::isendCopy(myRank*2+1, MSG_DO_EXIT, h.getRecvData());
-        if (myRank*2+2 < MyMpi::size(MPI_COMM_WORLD))
-            MyMpi::isendCopy(myRank*2+2, MSG_DO_EXIT, h.getRecvData());
-
-        Terminator::setTerminating();
-    });
 
     // Deposit information to coordinate the creation of an intra-machine communicator
     HostComm hostComm(commWorkers, params);
@@ -144,14 +140,10 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     hostComm.create();
     if (isWorker) worker->setHostComm(hostComm);
 
-    // If mono solving mode is enabled, introduce the singular job to solve
-    if (params.monoFilename.isSet() && isClient && MyMpi::rank(commClients) == 0)
-        introduceMonoJob(params, *client);
-
     // If job streaming is enabled, initialize a corresponding job streamer
     JobStreamer* streamer = nullptr;
     if (params.jobTemplate.isSet() && isClient) {
-        streamer = new JobStreamer(params, client->getAPI(), client->getInternalRank());
+        streamer = new JobStreamer(params, APIRegistry::get(), client->getInternalRank());
     }
 
     // If a client application is provided, run this application in (a) separate thread(s)
@@ -172,6 +164,10 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
         }
     }
 
+    // If mono solving mode is enabled, introduce the singular job to solve
+    if (params.monoFilename.isSet() && isClient && MyMpi::rank(commClients) == 0)
+        introduceMonoJob(params, *client);
+
     // Main loop
     while (true) {
 
@@ -185,19 +181,25 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
         // Advance message queue and run callbacks for done messages
         MyMpi::getMessageQueue().advance();
 
-        // Check termination, sleep, and/or yield thread
-        if (doTerminate(params, myRank)) 
+        // Check termination
+        if (distTerm.triggered())
+            Terminator::setTerminating();
+        if (monoJobDone)
+            Terminator::setTerminating();
+        if (params.timeLimit() > 0 && Timer::elapsedSecondsCached() > params.timeLimit())
+            Terminator::setTerminating();
+        if (Terminator::isTerminating(true)) {
+            distTerm.trigger(); // if not triggered already   
             break;
+        }
+
+        // Sleep and/or yield thread
         if (params.sleepMicrosecs() > 0) usleep(params.sleepMicrosecs());
         if (params.yield()) std::this_thread::yield();
-        if (monoJobDone) {
-            // Terminate all processes
-            MyMpi::isend(0, MSG_DO_EXIT, IntVec({0}));
-        }
     }
 
     // Clean up
-    if (streamer != nullptr) delete streamer;
+    if (streamer) delete streamer;
     if (isWorker) delete worker;
     if (isClient) delete client;
 }
@@ -213,6 +215,8 @@ int main(int argc, char *argv[]) {
     Timer::init();
     Proc::nameThisThread("MainThread");
 
+    // cout << "Ex 2 Branch" << endl;
+
     int numNodes = MyMpi::size(MPI_COMM_WORLD);
     int rank = MyMpi::rank(MPI_COMM_WORLD);
 
@@ -226,7 +230,7 @@ int main(int argc, char *argv[]) {
 
     // Initialize bookkeeping of child processes and signals
     Process::init(rank, params.traceDirectory());
-    TmpDir::init(rank);
+    TmpDir::init(rank, params.tmpDirectory());
 
     longStartupWarnMsg(rank, "Init'd process");
 
@@ -276,7 +280,7 @@ int main(int argc, char *argv[]) {
     if (params.preCleanup()) {
         LOG(V2_INFO, "Cleaning up pre-execution\n");
 
-        for (const std::string& subprocName : {
+        for (std::string subprocName : {
             MALLOB_SUBPROC_DISPATCH_PATH"mallob_sat_process",
             MALLOB_SUBPROC_DISPATCH_PATH"impcheck_parse",
             MALLOB_SUBPROC_DISPATCH_PATH"impcheck_check",
@@ -291,28 +295,15 @@ int main(int argc, char *argv[]) {
             LOG(V2_INFO, "Remove %s\n", fileOrDir.c_str());
             FileUtils::rmrf(fileOrDir);
         };
-
-        if (!params.proofDirectory().empty()) {
-            for (auto file : FileUtils::glob(params.proofDirectory() + "/proof#*/")) {
-                doRemove(file);
-            }
-        }
-        if (!params.extMemDiskDirectory().empty()) {
-            for (auto file : FileUtils::glob(params.extMemDiskDirectory() + "/disk.*.*")) {
-                doRemove(file);
-            }
-        }
+        for (auto cleaner : app_registry::getCleaners()) cleaner(params);
         if (!params.traceDirectory().empty()) {
             for (auto file : FileUtils::glob(params.traceDirectory() + "/mallob_thread_trace_of_*")) {
                 doRemove(file);
             }
         }
-        for (auto file : FileUtils::glob("/dev/shm/edu.kit.iti.mallob.*")) {
-            doRemove(file);
-        }
-        for (auto file : FileUtils::glob(TmpDir::get() + "/mallob.*")) {
-            doRemove(file);
-        }
+        std::string cmd = "find /dev/shm/ -name 'edu.kit.iti.mallob.*' -print0 | xargs -0 rm 2>/dev/null";
+        (void) system(cmd.c_str());
+        TmpDir::wipe();
 
         // Wait for all processes to have cleaned up before proceeding
         // (creating new files which shouldn't be cleaned up!)
@@ -320,13 +311,15 @@ int main(int argc, char *argv[]) {
         LOG(V4_VVER, "Passed cleanup barrier\n");
     }
 
+    std::unique_ptr<DistributedTermination> distTerm (new DistributedTermination()); // RAII
+
     auto isWorker = [&](int rank) {
         if (params.numWorkers() == -1) return true; 
         return rank < params.numWorkers();
     };
     auto isClient = [&](int rank) {
-        if (params.monoFilename.isSet()) return rank == 0;
         if (params.numClients() == -1) return true;
+        if (params.monoFilename.isSet()) return rank < params.numClients();
         return rank >= numNodes - params.numClients();
     };
 
@@ -340,10 +333,11 @@ int main(int argc, char *argv[]) {
     if (rank == 0) LOG(V3_VERB, "%i workers, %i clients\n", workerRanks.size(), clientRanks.size());
 
     // Initialize thread pool
-    int threadPoolSize = std::max(4, 2*params.numThreadsPerProcess());
+    int threadPoolSize = 4;
     if (isClient(rank) && isWorker(rank)) threadPoolSize *= 2;
     ProcessWideThreadPool::init(threadPoolSize);
-    
+    ProcessWideCoreAllocator::init(params.numThreadsPerProcess());
+
     MPI_Comm clientComm, workerComm;
     {
         MPI_Group worldGroup;
@@ -364,7 +358,7 @@ int main(int argc, char *argv[]) {
     
     // Execute main program
     try {
-        doMainProgram(workerComm, clientComm, params);
+        doMainProgram(workerComm, clientComm, params, *distTerm.get());
     } catch (const std::exception& ex) {
         LOG(V0_CRIT, "[ERROR] uncaught \"%s\"\n", ex.what());
         Process::doExit(1);
@@ -374,8 +368,14 @@ int main(int argc, char *argv[]) {
     }
 
     // Exit properly
+    MyMpi::getMessageQueue().close();
+    distTerm.reset();
     MPI_Barrier(MPI_COMM_WORLD);
+    delete &MyMpi::getMessageQueue();
+    if (clientComm != MPI_COMM_NULL) MPI_Comm_free(&clientComm);
+    if (workerComm != MPI_COMM_NULL) MPI_Comm_free(&workerComm);
     MPI_Finalize();
+    TmpDir::wipe();
+    Process::removeDelayedExitWatchers();
     LOG(V2_INFO, "Exiting happily\n");
-    Process::doExit(0);
 }

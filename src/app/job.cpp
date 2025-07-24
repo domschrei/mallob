@@ -1,5 +1,6 @@
 
 #include <cmath>
+#include <cstdlib>
 #include <limits>
 
 #include "app/job.hpp"
@@ -16,7 +17,7 @@ Job::Job(const Parameters& params, const JobSetup& setup, AppMessageTable& appMs
             _incremental(setup.incremental),
             _time_of_arrival(Timer::elapsedSeconds()), 
             _state(INACTIVE),
-            _app_msg_subscription(appMsgTable, setup.jobId, this),
+            _app_msg_subscription(appMsgTable, this),
             _job_tree(setup.commSize, setup.worldRank, _app_msg_subscription.getContextId(), 
                 setup.jobId, params.useDormantChildren()), 
             _comm(_id, _job_tree, params.jobCommUpdatePeriod()) {
@@ -53,6 +54,7 @@ std::optional<JobRequest> Job::uncommit() {
 
 void Job::pushRevision(const std::shared_ptr<std::vector<uint8_t>>& data) {
 
+    const int prevGroupId = _description.getGroupId();
     _description.deserialize(data);
     _priority = _description.getPriority();
     if (_description.getMaxDemand() > 0) {
@@ -62,18 +64,29 @@ void Job::pushRevision(const std::shared_ptr<std::vector<uint8_t>>& data) {
             _description.getMaxDemand() // no global max. demand defined
             : std::min(_max_demand, _description.getMaxDemand()); // both limits defined
     }
-    
-    if (_params.maxLiteralsPerThread() > 0 && _description.getNumFormulaLiterals() > _params.maxLiteralsPerThread()) {
+
+    _sum_of_description_sizes += data->size() / sizeof(int);
+    if (_params.maxLiteralsPerThread() > 0 && _sum_of_description_sizes > _params.maxLiteralsPerThread()) {
         
         // Solver literal threshold exceeded: reduce number of solvers for this job
         long maxAllowedLiterals = _threads_per_job * (long)_params.maxLiteralsPerThread();
-        int optNumThreads = std::floor(((double)maxAllowedLiterals) / _description.getNumFormulaLiterals());
+        int optNumThreads = std::floor(((double)maxAllowedLiterals) / _sum_of_description_sizes);
         _threads_per_job = std::max(1, optNumThreads);
         LOG(V3_VERB, "%s : literal threshold exceeded - cut down #threads to %i\n", toStr(), _threads_per_job);
     }
 
+    if (_description.getGroupId() != prevGroupId) {
+        assert(prevGroupId == 0 || log_return_false("[ERROR] Trying to change group ID %i => %i: "
+            "Only a single group ID is allowed throughout all revisions of an incremental job!\n",
+            prevGroupId, _description.getGroupId()));
+        _rev_to_reach_for_group_id = _description.getRevision();
+    }
+
     _has_description = true;
     _result.reset();
+    if (getDescription().getAppConfiguration().map.count("__growprd")) {
+        _growth_period = atof(getDescription().getAppConfiguration().map.at("__growprd").c_str());
+    }
 }
 
 void Job::start() {
@@ -107,7 +120,7 @@ void Job::resume() {
     _state = ACTIVE;
     _time_of_increment_activation = Timer::elapsedSecondsCached();
     appl_resume();
-    LOG(V4_VVER, "%s : resumed solving threads\n", toStr());
+    LOG(V4_VVER, "%s : resumed solver\n", toStr());
     _time_of_last_limit_check = Timer::elapsedSecondsCached();
 }
 
@@ -151,14 +164,14 @@ int Job::getDemand() const {
     int demand; 
     if (_growth_period <= 0) {
         // Immediate growth
-        demand = _job_tree.getCommSize();
+        demand = commSize;
     } else {
         if (_time_of_increment_activation <= 0) demand = 1;
         else {
-            float t = Timer::elapsedSecondsCached()-_time_of_increment_activation;
+            double t = Timer::elapsedSecondsCached()-_time_of_increment_activation;
             
             // Continuous growth
-            float numPeriods = std::min(t/_growth_period, 28.f); // overflow protection
+            double numPeriods = std::min(t/_growth_period, 28.0); // overflow protection
             if (!_continuous_growth) {
                 // Discrete periodic growth
                 int intPeriods = std::floor(numPeriods);
@@ -167,7 +180,11 @@ int Job::getDemand() const {
                 demand = std::min(commSize, demand);
             } else {
                 // d(0) := 1; d := 2d+1 every <growthPeriod> seconds
-                demand = std::min(commSize, (int)std::pow(2, numPeriods + 1) - 1);
+                //demand = std::min(commSize, (int)std::pow(2, numPeriods + 1) - 1);
+                // quadratic growth
+                if (t / _growth_period >= 1000) demand = commSize;
+                else demand = std::min(commSize, std::max(1,
+                    (int) std::round((t/_growth_period) * (t/_growth_period))));
             }
         }
     }
@@ -230,4 +247,26 @@ void Job::communicate(int source, int mpiTag, JobMessage& msg) {
     } else {
         appl_communicate(source, mpiTag, msg);
     }
+}
+
+bool Job::hasAllDescriptionsForSolving(int& missingOrIncompleteRevIdx) {
+    if (!hasDescription()) {
+        missingOrIncompleteRevIdx = 0;
+        return false;
+    }
+    for (int r = _last_usable_revision+1; r <= getRevision(); r++) {
+        if (getDescription().isRevisionIncomplete(r)) {
+            if (canHandleIncompleteRevision(r)) {
+                _last_usable_revision = r;
+                continue;
+            }
+            missingOrIncompleteRevIdx = r;
+            return false;
+        }
+    }
+    if (getRevision() < getDesiredRevision()) {
+        missingOrIncompleteRevIdx = getRevision()+1;
+        return false;
+    }
+    return true;
 }

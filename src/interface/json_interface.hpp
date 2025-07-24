@@ -2,13 +2,13 @@
 #pragma once
 
 #include <functional>
-#include <atomic>
 #include <string>
 #include <utility>
 
+#include "interface/api/job_description_id_allocator.hpp"
+#include "robin_map.h"
 #include "util/logger.hpp"
 #include "util/hashing.hpp"
-#include "data/job_description.hpp"
 #include "data/job_result.hpp"
 #include "data/job_metadata.hpp"
 #include "util/json.hpp"
@@ -18,6 +18,7 @@
 #include "api/job_id_allocator.hpp"
 #include "util/sys/tmpdir.hpp"
 #include "util/robin_hood.hpp"
+#include "data/job_processing_statistics.hpp"
 
 class Parameters; // fwd declaration
 struct IntPairHasher;
@@ -50,21 +51,25 @@ private:
 
     Mutex _job_map_mutex;
     JobIdAllocator _job_id_allocator;
+    JobDescriptionIdAllocator _job_desc_id_allocator;
 
     std::function<void(JobMetadata&&)> _job_callback;
     
-    robin_hood::unordered_node_map<std::string, std::pair<int, int>> _job_name_to_id_rev;
-    robin_hood::unordered_node_map<int, int> _job_id_to_latest_rev;
-    robin_hood::unordered_node_map<std::pair<int, int>, JobImage*, IntPairHasher> _job_id_rev_to_image;
+    tsl::robin_map<std::string, std::pair<int, int>> _job_name_to_id_rev;
+    tsl::robin_map<int, int> _job_id_to_latest_rev;
+    tsl::robin_map<int, JobImage*> _job_id_to_image;
+
+    bool _active {true};
 
 public:
     JsonInterface(int clientRank, const Parameters& params, Logger&& logger, 
             std::function<void(JobMetadata&&)> jobCallback, JobIdAllocator&& jobIdAllocator) : 
         _params(params),
         _logger(std::move(logger)),
-        _output_dir(TmpDir::get()),
+        _output_dir(TmpDir::getGeneralTmpDir()),
         _job_map_mutex(),
         _job_id_allocator(std::move(jobIdAllocator)),
+        _job_desc_id_allocator(clientRank, _job_id_allocator.getNbClients()),
         _job_callback(jobCallback) {}
     ~JsonInterface() {}
 
@@ -77,5 +82,8 @@ public:
     Result handle(nlohmann::json& json, std::function<void(nlohmann::json&)> feedback);
 
     // Mallob-side events
-    void handleJobDone(JobResult&& result, const JobDescription::Statistics& stats, int applicationId);
+    void handleJobDone(JobResult&& result, const JobProcessingStatistics& stats, int applicationId);
+
+    bool isActive() const {return _active;}
+    void deactivate() {_active = false;}
 };

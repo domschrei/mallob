@@ -2,7 +2,6 @@
 #pragma once
 
 #include "util/logger.hpp"
-#include "util/sys/threading.hpp"
 #include "util/sys/timer.hpp"
 
 #include "cadical/src/cadical.hpp"
@@ -15,31 +14,14 @@ struct CadicalTerminator : public CaDiCaL::Terminator {
 
     bool terminate() override {
 
-        _is_in_callback = true;
         double time = Timer::elapsedSeconds();
         double elapsed = time - _lastTermCallbackTime;
         _lastTermCallbackTime = time;
 
-        if (_stop) {
-            LOGGER(_logger, V3_VERB, "STOP (%.2fs since last cb)\n", elapsed);
-            _is_in_callback = false;
+        if (_stop || (_ext_terminator && _ext_terminator())) {
+            LOGGER(_logger, V4_VVER, "STOP (%.2fs since last cb)\n", elapsed);
             return true;
         }
-
-        if (_suspend) {
-            // Stay inside this function call as long as solver is suspended
-            LOGGER(_logger, V3_VERB, "SUSPEND (%.2fs since last cb)\n", elapsed);
-
-            _suspendCond.wait(_suspendMutex, [this] { return !_suspend; });
-            LOGGER(_logger, V4_VVER, "RESUME\n");
-
-            if (_stop) {
-                LOGGER(_logger, V4_VVER, "STOP after suspension\n", elapsed);
-                _is_in_callback = false;
-                return true;
-            }
-        }
-        _is_in_callback = false;
         return false;
     }
 
@@ -49,28 +31,14 @@ struct CadicalTerminator : public CaDiCaL::Terminator {
     void unsetInterrupt() {
         _stop = 0;
     }
-    void setSuspend() {
-        _suspend = true;
-    }
-    void unsetSuspend() {
-        {
-            auto lock = _suspendMutex.getLock();
-            _suspend = false;
-        }
-        _suspendCond.notify();
-    }
-    bool isThreadInCallback() const {
-        return _is_in_callback;
+
+    void setExternalTerminator(const std::function<bool(void)>& ext) {
+        _ext_terminator = ext;
     }
 
 private:
     Logger &_logger;
     double _lastTermCallbackTime;
-
     int _stop = 0;
-    volatile bool _suspend = false;
-    volatile bool _is_in_callback = false;
-
-    Mutex _suspendMutex;
-    ConditionVariable _suspendCond;
+    std::function<bool(void)> _ext_terminator;
 };

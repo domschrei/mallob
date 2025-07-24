@@ -44,22 +44,9 @@ int cbCheckTerminate(void* solverPtr) {
 	lp->lastTermCallbackTime = Timer::elapsedSeconds();
     
 	if (lp->stopSolver) {
-		LOGGER(lp->_logger, V3_VERB, "STOP (%.2fs since last cb)", elapsed);
+		LOGGER(lp->_logger, V4_VVER, "STOP (%.2fs since last cb)", elapsed);
 		return 1;
 	}
-
-    if (lp->suspendSolver) {
-        // Stay inside this function call as long as solver is suspended
-		LOGGER(lp->_logger, V3_VERB, "SUSPEND (%.2fs since last cb)", elapsed);
-
-		lp->suspendCond.wait(lp->suspendMutex, [&lp]{return !lp->suspendSolver;});
-		LOGGER(lp->_logger, V4_VVER, "RESUME");
-
-		if (lp->stopSolver) {
-			LOGGER(lp->_logger, V4_VVER, "STOP after suspension", elapsed);
-			return 1;
-		}
-    }
     
     return 0;
 }
@@ -103,8 +90,7 @@ Lingeling::Lingeling(const SolverSetup& setup)
 	sizeLimit = _setup.strictMaxLitsPerClause;
 	glueLimit = _setup.strictLbdLimit;
 
-    suspendSolver = false;
-    maxvar = 0;
+    maxvar = setup.numVars;
 
 	numDiversifications = 11;
 }
@@ -132,22 +118,31 @@ void Lingeling::diversify(int seed) {
 	lglsetopt(solver, "seed", seed);
 	int rank = getDiversificationIndex();
 
-	if (_setup.flavour == PortfolioSequence::UNSAT) {
-		LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");
-		_setup.flavour = PortfolioSequence::DEFAULT;
-	}
-
 	// This portfolio is based on Plingeling (mix of ayv and bcj)
 	lglsetopt(solver, "classify", 0);
-	if (_setup.diversifyNative) {
-		if (_setup.flavour == PortfolioSequence::SAT) {
-			// sat preset: just run YalSAT
-			lglsetopt (solver, "plain", rank % 2 == 0);
-			lglsetopt (solver, "locs", -1);
-			lglsetopt (solver, "locsrtc", 1);
-			lglsetopt (solver, "locswait", 0);
-			lglsetopt (solver, "locsclim", (1<<24));
-		} else switch (rank % numDiversifications) {
+	if (_setup.flavour == PortfolioSequence::SAT) {
+		// sat preset: just run YalSAT
+		lglsetopt (solver, "plain", true);
+		lglsetopt (solver, "locs", -1);
+		lglsetopt (solver, "locsrtc", 1);
+		lglsetopt (solver, "locswait", 0);
+		lglsetopt (solver, "locsclim", (1<<24));
+	} else if (_setup.flavour == PortfolioSequence::PLAIN) {
+		LOGGER(_logger, V4_VVER, "plain\n");
+		lglsetopt (solver, "plain", 1);
+	} else if (_setup.flavour == PortfolioSequence::PREPROCESS) {
+		LOGGER(_logger, V4_VVER, "preprocess\n");
+		lglsetopt (solver, "dlim", 0);
+		lglsetopt (solver, "clim", 0);
+		lglsetopt (solver, "sweep", 0);
+		lglsetopt (solver, "gausswait", 0);
+	} else {
+		if (_setup.flavour != PortfolioSequence::DEFAULT) {
+			LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");
+			_setup.flavour = PortfolioSequence::DEFAULT;
+		}
+		if (_setup.diversifyNative) {
+			switch (rank % numDiversifications) {
 			case 0: lglsetopt (solver, "gluescale", 5); break; // from 3 (value "ld" moved)
 			case 1: 
 				lglsetopt (solver, "plain", 1);
@@ -171,6 +166,7 @@ void Lingeling::diversify(int seed) {
 				lglsetopt (solver, "block", 0); 
 				lglsetopt (solver, "cce", 0); 
 				break;
+			}
 		}
 	}
 
@@ -227,13 +223,6 @@ void Lingeling::setSolverInterrupt() {
 }
 void Lingeling::unsetSolverInterrupt() {
 	stopSolver = 0;
-}
-void Lingeling::setSolverSuspend() {
-    suspendSolver = true;
-}
-void Lingeling::unsetSolverSuspend() {
-    suspendSolver = false;
-	suspendCond.notify();
 }
 
 

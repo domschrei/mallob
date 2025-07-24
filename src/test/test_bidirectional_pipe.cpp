@@ -91,8 +91,10 @@ void testBasic() {
 
 void testAnytimeChild() {
     {
-        bool* childReadyToWrite = (bool*) SharedMemory::access("edu.kit.mallob.test.bidirpipe", 1);
-        BiDirectionalAnytimePipe pipe(BiDirectionalAnytimePipe::ACCESS, pathChildToParentAnytime, pathParentToChildAnytime, childReadyToWrite);
+        bool* childReadyToWrite = (bool*) SharedMemory::access("edu.kit.iti.mallob.test.bidirpipe", 1);
+        bool* terminatePipe = (bool*) SharedMemory::access("edu.kit.iti.mallob.test.bidirpipe.close", 1);
+        bool* didTerminatePipe = (bool*) SharedMemory::access("edu.kit.iti.mallob.test.bidirpipe.closed", 1);
+        BiDirectionalAnytimePipe pipe(BiDirectionalAnytimePipe::ACCESS, pathChildToParentAnytime, pathParentToChildAnytime, childReadyToWrite, terminatePipe, didTerminatePipe);
         pipe.open();
 
         LOG(V2_INFO, "[child]  wait for data ...\n");
@@ -114,13 +116,17 @@ void testAnytime() {
 
     FileUtils::rm(pathParentToChildAnytime);
     FileUtils::rm(pathChildToParentAnytime);
-    FileUtils::rm("/dev/shm/edu.kit.mallob.test.bidirpipe");
+    FileUtils::rm("/dev/shm/edu.kit.iti.mallob.test.bidirpipe");
 
-    bool* childReadyToWrite = (bool*) SharedMemory::create("edu.kit.mallob.test.bidirpipe", 1);
+    bool* childReadyToWrite = (bool*) SharedMemory::create("edu.kit.iti.mallob.test.bidirpipe", 1);
+    bool* terminatePipe = (bool*) SharedMemory::create("edu.kit.iti.mallob.test.bidirpipe.close", 1);
+    bool* didTerminatePipe = (bool*) SharedMemory::create("edu.kit.iti.mallob.test.bidirpipe.closed", 1);
     *childReadyToWrite = false;
+    *terminatePipe = false;
+    *didTerminatePipe = false;
     pid_t pid;
     {
-        BiDirectionalAnytimePipe pipe(BiDirectionalAnytimePipe::CREATE, pathParentToChildAnytime, pathChildToParentAnytime, childReadyToWrite);
+        BiDirectionalAnytimePipe pipe(BiDirectionalAnytimePipe::CREATE, pathParentToChildAnytime, pathChildToParentAnytime, childReadyToWrite, terminatePipe, didTerminatePipe);
 
         int res = Process::createChild();
         if (res == 0) {
@@ -134,7 +140,8 @@ void testAnytime() {
         // assuming 2^24 (≈ 16M) unit clauses with one literal and six ints worth of metadata each
         // -> amounts to around 470MB of data
         const size_t dataLength = 7 * (1<<24);
-        std::vector<int> data(dataLength, 7);
+        std::vector<int> data(dataLength);
+        for (size_t i = 0; i < data.size(); i++) data[i] = i;
         LOG(V2_INFO, "[parent] writing data ...\n");
         pipe.writeData(data, TAG_SEND_DATA);
         LOG(V2_INFO, "[parent] wrote all data\n");
@@ -144,18 +151,16 @@ void testAnytime() {
         data = pipe.readData(tag);
         LOG(V2_INFO, "[parent] read all data\n");
         assert(data.size() == dataLength);
-        assert(data[0] == 8);
-        assert(data[1337] == 8);
-        assert(data.back() == 8);
+        for (size_t i = 0; i < data.size(); i++) assert(data[i] == i+1);
     }
 
     while (!Process::didChildExit(pid)) usleep(10'000);
     LOG(V2_INFO, "[parent] child exited\n");
 
-    SharedMemory::free("edu.kit.mallob.test.bidirpipe", (char*) &childReadyToWrite, 1);
+    SharedMemory::free("edu.kit.iti.mallob.test.bidirpipe", (char*) &childReadyToWrite, 1);
     FileUtils::rm(pathParentToChildAnytime);
     FileUtils::rm(pathChildToParentAnytime);
-    FileUtils::rm("/dev/shm/edu.kit.mallob.test.bidirpipe");
+    FileUtils::rm("/dev/shm/edu.kit.iti.mallob.test.bidirpipe");
 }
 
 int main(int argc, char** argv) {

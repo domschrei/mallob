@@ -3,35 +3,30 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <fstream>
+#include <iterator>
 #include <unistd.h>
 #include <cstdlib>
 #include <cstdio>
 #include <string>
 
 #include "util/sys/proc.hpp"
-#include "util/logger.hpp"
 #include "util/sys/fileutils.hpp"
+#include "util/sys/tmpdir.hpp"
 
 void ProcessDispatcher::dispatch() {
 
-    const char* tmpdirCStr = std::getenv("MALLOB_TMP_DIR");
-    const std::string tmpdir = tmpdirCStr ? tmpdirCStr : "/tmp";
-
     // Read command from tmp file
     const pid_t myPid = Proc::getPid();
-    const std::string commandOutfile = tmpdir + "/mallob_subproc_cmd_" + std::to_string(myPid);
+    const std::string commandOutfile = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob.subproc_cmd_" + std::to_string(myPid);
     while (!FileUtils::exists(commandOutfile)) {
         usleep(1000);
     }
-    const auto f = fopen(commandOutfile.c_str(), "r");
-    int size;
-    fread(&size, sizeof(int), 1, f);
-    char str[size];
-    fread(str, 1, size, f);
-    fclose(f);
+    std::ifstream ifs(commandOutfile);
+    std::string command((std::istreambuf_iterator<char>(ifs)),
+                       (std::istreambuf_iterator<char>()));
+    ifs.close();
     FileUtils::rm(commandOutfile); // clean up immediately
-
-    std::string command(str, size);
 
     // Assemble arguments list
     int numArgs = 0;
@@ -57,6 +52,6 @@ void ProcessDispatcher::dispatch() {
     int result = execv(argv[0], argv);
     
     // If this is reached, something went wrong with execvp
-    LOG(V0_CRIT, "[ERROR] execv returned %i with errno %i\n", result, (int)errno);
+    printf("[ERROR] execv returned %i with errno %i\n", result, (int)errno);
     usleep(1000 * 500); // sleep 0.5s
 }

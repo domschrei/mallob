@@ -5,7 +5,7 @@
 #include "merging/distributed_proof_merger.hpp"
 #include "merging/proof_merge_connector.hpp"
 #include "util/small_merger.hpp"
-#include "comm/job_tree_all_reduction.hpp"
+#include "comm/job_tree_basic_all_reduction.hpp"
 #include "app/sat/proof/merging/proof_merge_file_input.hpp"
 #include "comm/msg_queue/message_subscription.hpp"
 
@@ -32,7 +32,7 @@ private:
     JobTree& _job_tree;
 
     std::unique_ptr<ProofAssembler> _proof_assembler;
-    std::optional<JobTreeAllReduction> _proof_all_reduction;
+    std::optional<JobTreeBasicAllReduction> _proof_all_reduction;
     bool _done_assembling_proof = false;
     std::vector<int> _proof_all_reduction_result;
 
@@ -90,7 +90,7 @@ public:
 
         if ((!_proof_all_reduction.has_value() || !_proof_all_reduction->hasProducer()) 
                 && _proof_assembler->canEmitClauseIds()) {
-            // Export clause IDs via JobTreeAllReduction instance
+            // Export clause IDs via JobTreeBasicAllReduction instance
             auto clauseIds = _proof_assembler->emitClauseIds();
             std::vector<int> clauseIdsIntVec((int*)clauseIds.data(), ((int*)clauseIds.data())+clauseIds.size()*2);
             _proof_all_reduction->produce([&]() {return clauseIdsIntVec;});
@@ -179,7 +179,7 @@ private:
         JobMessage baseMsg(_setup.jobId, 0, _setup.revision, 
             _proof_assembler->getEpoch(), MSG_ALLREDUCE_PROOF_RELEVANT_CLAUSES);
 
-        _proof_all_reduction.emplace(_job_tree, baseMsg, std::vector<int>(), [&](auto& list) {
+        _proof_all_reduction.emplace(_job_tree.getSnapshot(), baseMsg, std::vector<int>(), [&](auto& list) {
             
             std::list<std::pair<LratClauseId*, size_t>> idArrays;
             for (auto& vec : list) {

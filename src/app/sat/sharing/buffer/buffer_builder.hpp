@@ -26,7 +26,7 @@ private:
     int _num_added_clauses = 0;
     int _num_added_lits = 0;
 
-    int _free_clause_length_limit;
+    int _max_nb_free_lits;
 
     FailedInsertion _failed_insertion;
 
@@ -52,13 +52,13 @@ public:
     }
 
     void setFreeClauseLengthLimit(int fcll) {
-        _free_clause_length_limit = fcll;
+        _max_nb_free_lits = fcll;
     }
 
     bool append(const Mallob::Clause& c) {
 
         if (_total_literal_limit >= 0
-                && c.size-ClauseMetadata::numInts() > _free_clause_length_limit
+                && c.size-ClauseMetadata::numInts() > _max_nb_free_lits
                 && _num_added_lits + c.size-ClauseMetadata::numInts() > _total_literal_limit) {
             // Buffer is full!
             // Assemble some information on the fail
@@ -86,7 +86,7 @@ public:
         (*_out)[_counter_position]++;
         assert(c.begin != nullptr);
         _out->insert(_out->end(), c.begin, c.begin+c.size);
-        if (c.size-ClauseMetadata::numInts() > _free_clause_length_limit)
+        if (c.size-ClauseMetadata::numInts() > _max_nb_free_lits)
             _num_added_lits += c.size - ClauseMetadata::numInts();
         _num_added_clauses++;
         return true;

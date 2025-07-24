@@ -8,6 +8,8 @@
 #include <unistd.h>
 
 #include "app/sat/data/clause.hpp"
+#include "app/sat/parse/serialized_formula_parser.hpp"
+#include "app/sat/proof/impcheck.hpp"
 #include "app/sat/proof/lrat_op_tamperer.hpp"
 #include "app/sat/proof/trusted_checker_process_adapter.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
@@ -22,6 +24,7 @@ class LratConnector {
 
 private:
     Logger& _logger;
+    const int _base_seed;
     const int _local_id;
     SPSCBlockingRingbuffer<LratOp> _ringbuf;
 
@@ -42,15 +45,14 @@ private:
     int _clause_lits[MAX_CLAUSE_LENGTH];
     Mallob::Clause _clause {_clause_lits, 0, 0};
 
-    const int* _f_data;
-    size_t _f_size;
+    std::unique_ptr<SerializedFormulaParser> _f_parser;
 
     float _tampering_chance_per_mille {0};
 
 public:
-    LratConnector(Logger& logger, int localId, int nbVars, bool checkModel) :
-        _logger(logger), _local_id(localId), _ringbuf(1<<14),
-        _checker(logger, _local_id, nbVars, checkModel) {}
+    LratConnector(Logger& logger, int baseSeed, int localId, int nbVars, bool checkModel) :
+        _logger(logger), _base_seed(baseSeed), _local_id(localId), _ringbuf(1<<14),
+        _checker(logger, baseSeed, _local_id, nbVars, checkModel) {}
 
     inline auto& getChecker() {
         return _checker;
@@ -62,12 +64,11 @@ public:
         _tampering_chance_per_mille = chance;
     }
 
-    void launch(const int* fData, size_t fSize) {
+    void launch(SerializedFormulaParser& fParser) {
+        _f_parser.reset(new SerializedFormulaParser(fParser));
+
         if (_launched) return;
         _launched = true;
-
-        _f_data = fData;
-        _f_size = fSize;
 
         // summary of formula for debugging
         //std::string summary;
@@ -158,16 +159,30 @@ private:
         Proc::nameThisThread("LRATEmitter");
 
         // Load formula
-        size_t offset = 0;
-        while (_bg_emitter.continueRunning() && offset < _f_size) {
-            size_t nbInts = std::min(1UL<<14, _f_size-offset);
-            _checker.load(_f_data+offset, nbInts);
-            offset += nbInts;
+        if (_f_parser->isCompressed()) {
+            int lit;
+            std::vector<int> buf;
+            while (_f_parser->getNextLiteral(lit)) {
+                do {
+                    buf.push_back(lit);
+                } while (buf.size() < (1UL<<14) && _f_parser->getNextLiteral(lit));
+                _checker.load(buf.data(), buf.size());
+                buf.clear();
+            }
+        } else {
+            size_t offset = 0;
+            size_t fSize = _f_parser->getPayloadSize();
+            const int* fData = _f_parser->getRawPayload();
+            while (_bg_emitter.continueRunning() && offset < fSize) {
+                size_t nbInts = std::min(1UL<<14, fSize-offset);
+                _checker.load(fData+offset, nbInts);
+                offset += nbInts;
+            }
+            assert(offset == fSize);
         }
         if (_bg_emitter.continueRunning()) {
 
             // End loading, check signature
-            assert(offset == _f_size);
             bool ok = _checker.endLoading();
             if (!ok) abort();
         }
@@ -211,6 +226,8 @@ private:
                 }
             } else if (op.isUnsatValidation()) {
                 _unsat_validated = true;
+                LOGGER(_logger, V2_INFO, "Use impcheck_confirm -key-seed=%lu to confirm the fingerprint\n",
+                    ImpCheck::getKeySeed(_base_seed));
             } else if (op.isSatValidation()) {
                 _sat_validated = true;
             } else if (op.isTermination()) {

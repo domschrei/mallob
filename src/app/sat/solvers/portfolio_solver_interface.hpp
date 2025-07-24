@@ -14,8 +14,10 @@
 #include "app/sat/execution/solver_setup.hpp"
 #include "app/sat/sharing/generic_import_manager.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
+#include "app/sat/solvers/optimizing_propagator.hpp"
 #include "util/random.hpp"
 #include "util/logger.hpp"
+#include "util/string_utils.hpp"
 
 class BufferReader;
 namespace Mallob {
@@ -35,6 +37,7 @@ protected:
 	Logger _logger;
 	SolverSetup _setup;
 	LratConnector* _lrat {nullptr};
+	std::unique_ptr<OptimizingPropagator> _optimizer;
 
 // ************** INTERFACE TO IMPLEMENT **************
 
@@ -97,13 +100,6 @@ protected:
 	// Resume SAT solving after it was interrupted.
 	virtual void unsetSolverInterrupt() = 0;
 
-    // Suspend the SAT solver DURING its execution (ASYNCHRONOUSLY), 
-	// temporarily freeing up CPU for other threads
-    virtual void setSolverSuspend() = 0;
-
-	// Resume SAT solving after it was suspended.
-    virtual void unsetSolverSuspend() = 0;
-
 // ************** END OF INTERFACE TO IMPLEMENT **************
 
 
@@ -142,7 +138,8 @@ public:
 		return !_clause_sharing_disabled;
 	}
 
-	void setCurrentCondVarOrZero(int condVarOrZero) {_current_cond_var_or_zero = condVarOrZero;}
+	void addConditionalLit(int condLit) {assert(condLit != 0); _conditional_lits.push_back(condLit);}
+	void clearConditionalLits() {_conditional_lits.clear();}
 	void setExtLearnedClauseCallback(const ExtLearnedClauseCallback& callback);
 	void setExtProbingLearnedClauseCallback(const ProbingLearnedClauseCallback& callback);
 
@@ -163,8 +160,6 @@ public:
 
 	void interrupt();
 	void uninterrupt();
-	void suspend();
-	void resume();
 	void setTerminate();
 
 	// Add a learned clause to the formula
@@ -186,8 +181,24 @@ public:
 		_cb_result_found(_local_id);
 	}
 
+	bool _has_preprocessed_formula {false};
+	std::vector<int> _preprocessed_formula;
+	void setPreprocessedFormula(std::vector<int>&& vec) {
+		_preprocessed_formula = std::move(vec);
+		LOGGER(_logger, V4_VVER, "Set preprocessed formula: %s\n", StringUtils::getSummary(_preprocessed_formula, 20).c_str());
+		_has_preprocessed_formula = true;
+	}
+	bool hasPreprocessedFormula() const {return _has_preprocessed_formula;}
+	std::vector<int>&& extractPreprocessedFormula() {
+		_has_preprocessed_formula = false;
+		return std::move(_preprocessed_formula);
+	}
+
 	LratConnector* getLratConnector() {
 		return _lrat;
+	}
+	OptimizingPropagator* getOptimizer() {
+		return _optimizer.get();
 	}
 
 private:
@@ -197,7 +208,7 @@ private:
 	int _local_id;
 	int _diversification_index;
 	bool _clause_sharing_disabled = false;
-	std::atomic_int _current_cond_var_or_zero = 0;
+	std::vector<int> _conditional_lits; // to append to each exported clause to make it global
 	std::atomic_bool _terminated = false;
 
 	SolverStatistics _stats;

@@ -417,7 +417,7 @@ public:
             }
             if (task.type == BackgroundTask::INSERT_AND_IMPORT) {
                 LOG(V4_VVER, "HCS digest historic clauses, buflen=%i\n", task.clauses.size());
-                _job->digestHistoricClauses(task.epochBegin, task.epochEnd, task.clauses);
+                _job->digestHistoricClauses(task.epochBegin, task.epochEnd, std::move(task.clauses));
             }
             LOG(V4_VVER, "HCS %i cls / %i lits, layout %s\n",
                 task.storageDiagnostics.numClausesInStorage, task.storageDiagnostics.numLitsInStorage, 

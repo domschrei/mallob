@@ -4,9 +4,11 @@
 #include <list>
 
 #include "app/job.hpp"
+#include "util/sys/proc.hpp"
 #include "util/sys/threading.hpp"
 #include "util/sys/background_worker.hpp"
 #include "util/logger.hpp"
+#include "util/sys/watchdog.hpp"
 
 class JobGarbageCollector {
 
@@ -18,12 +20,16 @@ private:
     ConditionVariable _cond_var;
     std::atomic_int _num_stored_jobs = 0;
 
+    Watchdog _watchdog;
+
 public:
-    JobGarbageCollector() {
+    JobGarbageCollector() : _watchdog(false, 1'000) {
         _worker.run([&]() {
             Proc::nameThisThread("JobJanitor");
             run();
         });
+        _watchdog.setWarningPeriod(1'000);
+        _watchdog.setAbortPeriod(10'000);
     }
 
     void orderDeletion(Job* jobPtr) {
@@ -57,9 +63,11 @@ public:
     }
 
     ~JobGarbageCollector() {
-        _worker.stopWithoutWaiting();
+        {
+            auto lock = _mtx.getLock();
+            _worker.stopWithoutWaiting();
+        }
         _cond_var.notify();
-        _worker.stop();
     }
 
 private:
@@ -69,14 +77,17 @@ private:
         LOGGER(lg, V3_VERB, "tid=%lu\n", Proc::getTid());
         
         while (_worker.continueRunning() || _num_stored_jobs > 0) {
-        
+
             std::list<Job*> copy;
             {
                 // Try to fetch the current jobs to free
+                _watchdog.setActive(false);
                 auto lock = _mtx.getLock();
                 _cond_var.waitWithLockedMutex(lock, [&]() {
                     return !_worker.continueRunning() || !_jobs_to_free.empty();
                 });
+                _watchdog.reset();
+                _watchdog.setActive(true);
                 if (!_worker.continueRunning() && _jobs_to_free.empty() && _num_stored_jobs == 0)
                     break;
                 
@@ -90,13 +101,14 @@ private:
             // Free each job
             for (Job* job : copy) {
                 int id = job->getId();
-                LOGGER(lg, V4_VVER, "DELETE #%i\n", id);
+                LOGGER(lg, V5_DEBG, "DELETE #%i\n", id);
                 delete job;
+                LOGGER(lg, V4_VVER, "DELETED #%i\n", id);
                 Logger::getMainInstance().mergeJobLogs(id);
                 _num_stored_jobs--;
             }
 
-            if (!_worker.continueRunning()) usleep(100 * 1000); // wait for last jobs to finish
+            if (!_worker.continueRunning()) usleep(1000); // wait for last jobs to finish
         }
     }
 };

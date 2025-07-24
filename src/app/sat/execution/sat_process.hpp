@@ -12,7 +12,8 @@
 #include "app/sat/job/inplace_sharing_aggregation.hpp"
 #include "util/assert.hpp"
 
-#include "util/sys/bidirectional_anytime_pipe.hpp"
+#include "util/string_utils.hpp"
+#include "util/sys/bidirectional_anytime_pipe_shmem.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
@@ -25,6 +26,7 @@
 
 #include "engine.hpp"
 #include "../job/sat_shared_memory.hpp"
+#include "util/sys/watchdog.hpp"
 
 class SatProcess {
 
@@ -39,10 +41,10 @@ private:
     int _last_imported_revision;
     int _last_present_revision;
     int _desired_revision;
-    Checksum* _checksum;
 
     std::vector<std::vector<int>> _read_formulae;
-    std::vector<std::vector<int>> _read_assumptions;
+
+    bool _has_solution {false};
 
 public:
     SatProcess(const Parameters& params, const SatProcessConfig& config, Logger& log) 
@@ -52,13 +54,12 @@ public:
         _shmem_id = _config.getSharedMemId(Proc::getParentPid());
         LOGGER(log, V4_VVER, "Access base shmem: %s\n", _shmem_id.c_str());
         _hsm = (SatSharedMemory*) accessMemory(_shmem_id, sizeof(SatSharedMemory));
-        
-        _checksum = params.useChecksums() ? new Checksum() : nullptr;
+        _hsm->didStart = true; // signal to parent: I started properly (signal handlers etc.)
 
         // Adjust OOM killer score to make this process the first to be killed
         // (always better than touching an MPI process, which would crash everything)
         std::ofstream oomOfs("/proc/self/oom_score_adj");
-        oomOfs << "1000";
+        oomOfs << "150"; // maximum: 1000
         oomOfs.close();
     }
 
@@ -76,14 +77,14 @@ public:
     }
 
 private:
-    void doImportClauses(SatEngine& engine, std::vector<int>& incomingClauses, std::vector<int>* filterOrNull, int revision, int epoch) {
+    void doImportClauses(SatEngine& engine, std::vector<int>& incomingClauses, std::vector<int>* filterOrNull, int revision, int epoch, bool stateless = false) {
         LOGGER(_log, V5_DEBG, "DO import clauses rev=%i\n", revision);
         // Write imported clauses from shared memory into vector
         if (revision >= 0) engine.setClauseBufferRevision(revision);
         if (filterOrNull) {
             engine.digestSharingWithFilter(incomingClauses, *filterOrNull);
         } else {
-            engine.digestSharingWithoutFilter(incomingClauses);
+            engine.digestSharingWithoutFilter(incomingClauses, stateless);
         }
         engine.addSharingEpoch(epoch);
         engine.syncDeterministicSolvingAndCheckForLocalWinner();
@@ -99,16 +100,14 @@ private:
     void mainProgram(SatEngine& engine) {
 
         // Set up pipe communication for clause sharing
-        BiDirectionalAnytimePipe pipe(BiDirectionalAnytimePipe::ACCESS,
-            TmpDir::get()+_shmem_id+".fromsub.pipe",
-            TmpDir::get()+_shmem_id+".tosub.pipe",
-            &_hsm->childReadyToWrite);
-        pipe.open();
+        char* pipeParentToChild = (char*) accessMemory(_shmem_id + ".pipe-parenttochild", _hsm->pipeBufSize);
+        char* pipeChildToParent = (char*) accessMemory(_shmem_id + ".pipe-childtoparent", _hsm->pipeBufSize);
+        BiDirectionalAnytimePipeShmem pipe(
+            {pipeChildToParent, _hsm->pipeBufSize, true},
+            {pipeParentToChild, _hsm->pipeBufSize, true},
+            false);
         LOGGER(_log, V4_VVER, "Pipes set up\n");
 
-        // Wait until everything is prepared for the solver to begin
-        while (!_hsm->doBegin) doSleep();
-        
         // Terminate directly?
         if (checkTerminate(engine, false)) return;
 
@@ -124,10 +123,6 @@ private:
         // Start solver threads
         engine.solve();
         
-        std::vector<int> solutionVec;
-        std::string solutionShmemId = "";
-        char* solutionShmem;
-        int solutionShmemSize = 0;
         int lastSolvedRevision = -1;
 
         int exitStatus = 0;
@@ -136,14 +131,24 @@ private:
         int exportLiteralLimit;
         std::vector<int> incomingClauses;
 
+        Watchdog watchdog(_params.watchdog(), 1000, true);
+        watchdog.setWarningPeriod(1000);
+        // Need to decide on aborting based on warning ticks instead of realtime
+        // because this process can be suspended for an indeterminate amount of time.
+        watchdog.setAbortTicks(1 + _params.watchdogAbortMillis() / 1000);
+
         // Main loop
         while (true) {
 
             doSleep();
             Timer::cacheElapsedSeconds();
+            watchdog.reset(Timer::elapsedSecondsCached());
 
             // Terminate
-            if (_hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/false)) {
+            if (_hsm->doTerminate) {
+                Terminator::setTerminating();
+            }
+            if (Terminator::isTerminating(true)) {
                 LOGGER(_log, V4_VVER, "DO terminate\n");
                 engine.dumpStats(/*final=*/true);
                 break;
@@ -197,7 +202,7 @@ private:
                     engine.setClauseBufferRevision(bufferRevision);
                     auto filter = engine.filterSharing(incomingClauses);
                     LOGGER(_log, V5_DEBG, "filter result has size %i\n", filter.size());
-                    pipe.writeData(filter, {epoch}, CLAUSE_PIPE_FILTER_IMPORT);
+                    pipe.writeData(std::move(filter), {epoch}, CLAUSE_PIPE_FILTER_IMPORT);
                     if (winningSolverId >= 0) {
                         LOGGER(_log, V4_VVER, "winning solver ID: %i\n", winningSolverId);
                         engine.setWinningSolverId(winningSolverId);
@@ -211,11 +216,12 @@ private:
 
                 } else if (c == CLAUSE_PIPE_DIGEST_IMPORT_WITHOUT_FILTER) {
                     incomingClauses = pipe.readData(c);
+                    bool stateless = popLast(incomingClauses)==1;
                     int epoch = popLast(incomingClauses);
                     InplaceClauseAggregation agg(incomingClauses);
                     int bufferRevision = agg.maxRevision();
                     agg.stripToRawBuffer();
-                    doImportClauses(engine, incomingClauses, nullptr, bufferRevision, epoch);
+                    doImportClauses(engine, incomingClauses, nullptr, bufferRevision, epoch, stateless);
 
                 } else if (c == CLAUSE_PIPE_RETURN_CLAUSES) {
                     LOGGER(_log, V5_DEBG, "DO return clauses\n");
@@ -238,11 +244,22 @@ private:
                     pipe.readData(c);
                     engine.reduceActiveThreadCount();
 
+                } else if (c == CLAUSE_PIPE_SET_THREAD_COUNT) {
+                    LOGGER(_log, V3_VERB, "DO set thread count\n");
+                    int nbThreads = pipe.readData(c)[0];
+                    engine.setActiveThreadCount(nbThreads);
+
                 } else if (c == CLAUSE_PIPE_START_NEXT_REVISION) {
                     LOGGER(_log, V5_DEBG, "DO start next revision\n");
                     auto data = pipe.readData(c);
                     _last_present_revision = popLast(data);
                     _desired_revision = popLast(data);
+
+                } else if (c == CLAUSE_PIPE_UPDATE_BEST_FOUND_OBJECTIVE_COST) {
+                    LOGGER(_log, V5_DEBG, "DO update best found objective cost\n");
+                    auto data = pipe.readData(c);
+                    long long bestCost = * (long long*) data.data();
+                    engine.updateBestFoundObjectiveCost(bestCost);
 
                 } else {
                     LOGGER(_log, V0_CRIT, "[ERROR] Unknown pipe directive \"%c\"!\n", c);
@@ -271,7 +288,15 @@ private:
                 int numCollectedLits;
                 auto clauses = engine.prepareSharing(exportLiteralLimit, successfulSolverId, numCollectedLits);
                 if (!clauses.empty()) {
-                    pipe.writeData(clauses, {numCollectedLits, successfulSolverId}, CLAUSE_PIPE_PREPARE_CLAUSES);
+                    long long bestFoundObjectiveCost = engine.getBestFoundObjectiveCost();
+                    int costAsInts[sizeof(long long)/sizeof(int)];
+                    memcpy(costAsInts, &bestFoundObjectiveCost, sizeof(long long));
+                    std::vector<int> metadata;
+                    for (int i = 0; i < sizeof(long long)/sizeof(int); i++)
+                        metadata.push_back(costAsInts[i]);
+                    metadata.push_back(numCollectedLits);
+                    metadata.push_back(successfulSolverId);
+                    pipe.writeData(std::move(clauses), metadata, CLAUSE_PIPE_PREPARE_CLAUSES);
                 }
                 collectClauses = false;
             }
@@ -282,7 +307,12 @@ private:
 
             // Check solved state
             int resultCode = engine.solveLoop();
-            if (resultCode >= 0 && !_hsm->hasSolution) {
+            if (resultCode == 99) {
+                // Preprocessing result found
+                std::vector<int> fPre = std::move(engine.getPreprocessedFormula());
+                pipe.writeData(std::move(fPre), CLAUSE_PIPE_SUBMIT_PREPROCESSED_FORMULA);
+
+            } else if (resultCode >= 0 && !_has_solution) {
                 // Solution found!
                 auto& result = engine.getResult();
                 result.id = _config.jobid;
@@ -292,47 +322,40 @@ private:
                 }
                 assert(result.revision == _last_imported_revision);
 
-                solutionVec = result.extractSolution();
-                _hsm->solutionRevision = result.revision;
-                _hsm->winningInstance = result.winningInstanceId;
-                _hsm->globalStartOfSuccessEpoch = result.globalStartOfSuccessEpoch;
-                LOGGER(_log, V5_DEBG, "DO write solution (winning instance: %i)\n", _hsm->winningInstance);
-                _hsm->result = SatResult(result.result);
-                size_t* solutionSize = (size_t*) SharedMemory::create(_shmem_id + ".solutionsize." + std::to_string(_hsm->solutionRevision), sizeof(size_t));
-                *solutionSize = solutionVec.size();
-                // Write solution
-                if (*solutionSize > 0) {
-                    solutionShmemId = _shmem_id + ".solution." + std::to_string(_hsm->solutionRevision);
-                    solutionShmemSize =  *solutionSize*sizeof(int);
-                    solutionShmem = (char*) SharedMemory::create(solutionShmemId, solutionShmemSize);
-                    memcpy(solutionShmem, solutionVec.data(), solutionShmemSize);
-                }
-                lastSolvedRevision = result.revision;
+                std::vector<int> solutionVec = result.extractSolution();
+                int solutionRevision = result.revision;
+                int winningInstance = result.winningInstanceId;
+                unsigned long globalStartOfSuccessEpoch = result.globalStartOfSuccessEpoch;
+
+                LOGGER(_log, V5_DEBG, "DO write solution (winning instance: %i)\n", winningInstance);
+                pipe.writeData(std::move(solutionVec), {
+                    solutionRevision, winningInstance, ((int*) &globalStartOfSuccessEpoch)[0], ((int*) &globalStartOfSuccessEpoch)[1], result.result
+                }, CLAUSE_PIPE_SOLUTION);
+                lastSolvedRevision = solutionRevision;
                 LOGGER(_log, V5_DEBG, "DONE write solution\n");
-                _hsm->hasSolution = true;
+                _has_solution = true;
             }
         }
 
         Terminator::setTerminating();
         // This call ends the program.
-        checkTerminate(engine, true, exitStatus, [&]() {
-            // clean up bidirectional pipe - THIS BLOCKS UNTIL PARENT SENT FINAL BYTE
-            pipe.~BiDirectionalAnytimePipe();
-        });
+        checkTerminate(engine, true, exitStatus);
         abort(); // should be unreachable
 
         // Shared memory will be cleaned up by the parent process.
     }
 
     bool checkTerminate(SatEngine& engine, bool force, int exitStatus = 0, std::function<void()> cbAtForcedExit = [](){}) {
-        bool terminate = _hsm->doTerminate || Terminator::isTerminating(/*fromMainThread=*/true);
+        bool terminate = Terminator::isTerminating(true);
         if (terminate && force) {
             // clean up all resources which MUST be cleaned up (e.g., child processes)
             engine.cleanUp(true);
-            _log.flush();
             cbAtForcedExit();
             _hsm->didTerminate = true;
             // terminate yourself
+            assert(exitStatus != 9); // not hard-killed - wouldn't make sense
+            LOGGER(_log, V4_VVER, "Exiting\n");
+            _log.flush();
             Process::doExit(exitStatus);
         }
         return terminate;
@@ -342,65 +365,55 @@ private:
 
         float time = Timer::elapsedSeconds();
 
-        size_t fSize, aSize;
+        size_t fSize;
+        Checksum checksum;
         if (revision == 0) {
             fSize = _hsm->fSize;
-            aSize = _hsm->aSize;
+            checksum = _hsm->chksum;
         } else {
             size_t* fSizePtr = (size_t*) accessMemory(_shmem_id + ".fsize." + std::to_string(revision), sizeof(size_t));
-            size_t* aSizePtr = (size_t*) accessMemory(_shmem_id + ".asize." + std::to_string(revision), sizeof(size_t));
+            Checksum* chk = (Checksum*) accessMemory(_shmem_id + ".checksum." + std::to_string(revision), sizeof(Checksum));
             fSize = *fSizePtr;
-            aSize = *aSizePtr;
+            checksum = *chk;
         }
 
-        const int* fPtr = (const int*) accessMemory(_shmem_id + ".formulae." + std::to_string(revision),
+        std::string formulaShmemId = _shmem_id + ".formulae." + std::to_string(revision);
+        int* descIdPtr = (int*) accessMemory(_shmem_id + ".descid." + std::to_string(revision),
+            sizeof(int), SharedMemory::ARBITRARY, false);
+        if (descIdPtr) {
+            const int descId = *descIdPtr;
+            formulaShmemId = "/edu.kit.iti.mallob.jobdesc." + std::to_string(descId);
+        }
+
+        const int* fPtr = (const int*) accessMemory(formulaShmemId,
             sizeof(int) * fSize, SharedMemory::READONLY);
-        const int* aPtr = (const int*) accessMemory(_shmem_id + ".assumptions." + std::to_string(revision),
-            sizeof(int) * aSize, SharedMemory::READONLY);
+
+        LOGGER(_log, V5_DEBG, "FORMULA rev. %i : %s\n", revision, StringUtils::getSummary(fPtr, fSize).c_str());
 
         if (_params.copyFormulaeFromSharedMem()) {
             // Copy formula and assumptions to your own local memory
             _read_formulae.emplace_back(fPtr, fPtr+fSize);
-            _read_assumptions.emplace_back(aPtr, aPtr+aSize);
 
             // Reference the according positions in local memory when forwarding the data
-            engine.appendRevision(revision, fSize, _read_formulae.back().data(),
-                aSize, _read_assumptions.back().data(), revision == _desired_revision);
-            updateChecksum(_read_formulae.back().data(), fSize);
+            engine.appendRevision(revision, {fSize, _read_formulae.back().data(), checksum},
+                revision == _desired_revision);
         } else {
             // Let the solvers read from shared memory directly
-            engine.appendRevision(revision, fSize, fPtr, aSize, aPtr, revision == _desired_revision);
-            updateChecksum(fPtr, fSize);
-        }
-
-        if (revision > 0) {
-            // Access checksum from outside
-            Checksum* chk = (Checksum*) accessMemory(_shmem_id + ".checksum." + std::to_string(revision), sizeof(Checksum));
-            if (chk->count() > 0) {
-                // Check checksum
-                if (_checksum->get() != chk->get()) {
-                    LOGGER(_log, V0_CRIT, "[ERROR] Checksum fail at rev. %i. Incoming count: %ld ; local count: %ld\n", revision, chk->count(), _checksum->count());
-                    abort();
-                }
-            }
+            engine.appendRevision(revision, {fSize, fPtr, checksum}, revision == _desired_revision);
         }
 
         time = Timer::elapsedSeconds() - time;
-        LOGGER(_log, V3_VERB, "Read formula rev. %i (size:%lu,%lu) from shared memory in %.4fs\n", revision, fSize, aSize, time);
+        LOGGER(_log, V3_VERB, "Read formula rev. %i (size:%lu, chk:%lu,%x) from shared memory in %.4fs\n", revision, fSize,
+            checksum.count(), checksum.get(), time);
     }
 
-    void* accessMemory(const std::string& shmemId, size_t size, SharedMemory::AccessMode accessMode = SharedMemory::ARBITRARY) {
+    void* accessMemory(const std::string& shmemId, size_t size, SharedMemory::AccessMode accessMode = SharedMemory::ARBITRARY, bool abortOnFailure = true) {
         void* ptr = SharedMemory::access(shmemId, size, accessMode);
-        if (ptr == nullptr) {
+        if (abortOnFailure && ptr == nullptr) {
             LOGGER(_log, V0_CRIT, "[ERROR] Could not access shmem %s\n", shmemId.c_str());  
             abort();
         }
         return ptr;
-    }
-
-    void updateChecksum(const int* ptr, size_t size) {
-        if (_checksum == nullptr) return;
-        for (size_t i = 0; i < size; i++) _checksum->combine(ptr[i]);
     }
 
     void importRevisions(SatEngine& engine) {
@@ -408,7 +421,7 @@ private:
             if (checkTerminate(engine, false)) return;
             _last_imported_revision++;
             readFormulaAndAssumptionsFromSharedMem(engine, _last_imported_revision);
-            _hsm->hasSolution = false;
+            _has_solution = false;
         }
     }
 

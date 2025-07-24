@@ -15,6 +15,7 @@
 
 #include "app/sat/proof/trusted/trusted_solving.hpp"
 #include "app/sat/proof/trusted_checker_process_adapter.hpp"
+#include "app/sat/solvers/optimizing_propagator.hpp"
 #include "portfolio_solver_interface.hpp"
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
@@ -47,6 +48,8 @@ private:
 	std::string proofFileString;
 	std::string profileFileString;
 
+	std::unique_ptr<OptimizingPropagator> optimizer;
+
 public:
 	Cadical(const SolverSetup& setup);
 
@@ -61,8 +64,6 @@ public:
 
 	void setSolverInterrupt() override;
 	void unsetSolverInterrupt() override;
-    void setSolverSuspend() override;
-    void unsetSolverSuspend() override;
 
 	std::vector<int> getSolution() override;
 	std::set<int> getFailedAssumptions() override;
@@ -86,4 +87,6 @@ public:
 	bool exportsConditionalClauses() override {return false;}
 
 	void cleanUp() override;
+
+	CadicalTerminator getTerminator() {return terminator;}
 };

@@ -2,16 +2,17 @@
 #pragma once
 
 #include "app/sat/data/clause_metadata.hpp"
+#include "app/sat/job/clause_sharing_actor.hpp"
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
 #include "app/sat/sharing/filter/clause_buffer_lbd_scrambler.hpp"
 #include "app/sat/sharing/filter/generic_clause_filter.hpp"
 #include "app/sat/sharing/store/static_clause_store.hpp"
+#include "comm/job_tree_snapshot.hpp"
 #include "comm/msgtags.h"
 #include "data/job_transfer.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
-#include "base_sat_job.hpp"
-#include "comm/job_tree_all_reduction.hpp"
+#include "comm/job_tree_basic_all_reduction.hpp"
 #include "historic_clause_storage.hpp"
 #include "app/sat/sharing/filter/in_place_clause_filtering.hpp"
 #include "util/random.hpp"
@@ -22,7 +23,7 @@ class ClauseSharingSession {
 
 private:
     const Parameters& _params;
-    BaseSatJob* _job;
+    ClauseSharingActor* _job;
     HistoricClauseStorage* _cls_history;
     int _epoch;
     enum Stage {
@@ -38,20 +39,27 @@ private:
     int _local_export_limit;
     int _num_broadcast_clauses;
     int _num_admitted_clauses;
+    long long _best_found_solution_cost;
 
-    JobTreeAllReduction _allreduce_clauses;
-    std::optional<JobTreeAllReduction> _allreduce_filter;
+    JobTreeBasicAllReduction _allreduce_clauses;
+    std::optional<JobTreeBasicAllReduction> _allreduce_filter;
 
     SplitMix64Rng _rng;
 
+    bool _has_clause_listener {false};
+    std::function<void(std::vector<int>&)> _clause_listener;
+
+    std::unique_ptr<StaticClauseStore<false>> _merge_store;
+    bool _priority_based_buffer_merging = false;
+
 public:
-    ClauseSharingSession(const Parameters& params, BaseSatJob* job,
+    ClauseSharingSession(const Parameters& params, ClauseSharingActor* actor, const JobTreeSnapshot& snapshot,
             HistoricClauseStorage* clsHistory, int epoch, float compensationFactor) : 
-        _params(params), _job(job), _cls_history(clsHistory), _epoch(epoch),
+        _params(params), _job(actor), _cls_history(clsHistory), _epoch(epoch),
         _allreduce_clauses(
-            job->getJobTree(),
+            snapshot,
             // Base message 
-            JobMessage(_job->getId(), _job->getContextId(), _job->getRevision(), epoch, MSG_ALLREDUCE_CLAUSES),
+            JobMessage(_job->getActorJobId(), _job->getActorContextId(), _job->getClausesRevision(), epoch, MSG_ALLREDUCE_CLAUSES),
             // Neutral element
             InplaceClauseAggregation::neutralElem(),
             // Aggregator for local + incoming elements
@@ -62,9 +70,9 @@ public:
 
         if (_params.clauseFilterMode() == MALLOB_CLAUSE_FILTER_EXACT_DISTRIBUTED) {
             _allreduce_filter.emplace(
-                job->getJobTree(), 
+                snapshot, 
                 // Base message
-                JobMessage(_job->getId(), _job->getContextId(), _job->getRevision(), epoch, MSG_ALLREDUCE_FILTER),
+                JobMessage(_job->getActorJobId(), _job->getActorContextId(), _job->getClausesRevision(), epoch, MSG_ALLREDUCE_FILTER),
                 // Neutral element
                 std::vector<int>(ClauseMetadata::enabled() ? 2 : 0, 0),
                 // Aggregator for local + incoming elements
@@ -74,7 +82,7 @@ public:
             );
         }
 
-        LOG(V5_DEBG, "%s CS OPEN e=%i\n", _job->toStr(), _epoch);
+        LOG(V5_DEBG, "%s CS OPEN e=%i\n", _job->getLabel(), _epoch);
         _local_export_limit = _job->setSharingCompensationFactorAndUpdateExportLimit(compensationFactor);
         if (!_job->hasPreparedSharing()) _job->prepareSharing();
     }
@@ -82,6 +90,11 @@ public:
     void pruneChild(int rank) {
         _allreduce_clauses.pruneChild(rank);
         if (_allreduce_filter) _allreduce_filter->pruneChild(rank);
+    }
+
+    void setAdditionalClauseListener(std::function<void(std::vector<int>&)> cb) {
+        _has_clause_listener = true;
+        _clause_listener = cb;
     }
 
     void advanceSharing() {
@@ -94,9 +107,10 @@ public:
                 int successfulSolverId;
                 int numLits;
                 auto clauses = _job->getPreparedClauses(checksum, successfulSolverId, numLits);
-                LOG(V4_VVER, "%s CS produced cls size=%lu lits=%i/%i\n", _job->toStr(), clauses.size(), numLits, _local_export_limit);
-                InplaceClauseAggregation::prepareRawBuffer(clauses,
-                    _job->getDesiredRevision(), numLits, 1, successfulSolverId);
+                LOG(V4_VVER, "%s CS produced cls size=%lu lits=%i/%i\n", _job->getLabel(), clauses.size(), numLits, _local_export_limit);
+                auto agg = InplaceClauseAggregation::prepareRawBuffer(clauses,
+                    _job->getClausesRevision(), numLits, 1, successfulSolverId,
+                    _job->getBestFoundObjectiveCost());
                 return clauses;
             });
 
@@ -109,42 +123,43 @@ public:
             if (_excess_clauses_from_merge.size() > 4) {
                 // Add them as produced clauses to your local solver
                 // so that they can be re-exported (if they are good enough)
-                _job->returnClauses(_excess_clauses_from_merge);
+                _job->returnClauses(std::move(_excess_clauses_from_merge));
             }
 
             // Fetch initial clause buffer (result of all-reduction of clauses)
             _broadcast_clause_buffer = _allreduce_clauses.extractResult();
             auto aggregation = InplaceClauseAggregation(_broadcast_clause_buffer);
+            _best_found_solution_cost = aggregation.bestFoundSolutionCost();
             // If desired, scramble the LBD scores of featured clauses
             if (_params.scrambleLbdScores()) {
                 float time = Timer::elapsedSeconds();
                 // 1. Create reader for shared clause buffer
-                BufferReader reader(_broadcast_clause_buffer.data(),
-                    _broadcast_clause_buffer.size() - aggregation.numMetadataInts(),
-                    _params.strictClauseLengthLimit()+ClauseMetadata::numInts(),
-                    false);
+                initMergeClauseStore();
+                BufferReader reader = _merge_store->getBufferReader(_broadcast_clause_buffer.data(),
+                    _broadcast_clause_buffer.size() - aggregation.numMetadataInts());
                 // 2. Scramble clauses within each clause length w.r.t. LBD scores
                 ClauseBufferLbdScrambler scrambler(_params, reader);
                 auto modifiedClauseBuffer = scrambler.scrambleLbdScores();
                 // 3. Overwrite clause buffer within our aggregation buffer
                 aggregation.replaceClauses(modifiedClauseBuffer);
                 time = Timer::elapsedSeconds() - time;
-                LOG(V4_VVER, "%s scrambled LBDs in %.4fs\n", _job->toStr(), time);
+                LOG(V4_VVER, "%s scrambled LBDs in %.4fs\n", _job->getLabel(), time);
             }
             int winningSolverId = aggregation.successfulSolver();
             assert(winningSolverId >= -1 || log_return_false("Winning solver ID = %i\n", winningSolverId));
             _job->setNumInputLitsOfLastSharing(aggregation.numInputLiterals());
             _job->setClauseBufferRevision(aggregation.maxRevision());
+            _job->updateBestFoundSolutionCost(_best_found_solution_cost);
 
             if (_allreduce_filter) {
                 // Initiate production of local filter element for 2nd all-reduction 
-                LOG(V5_DEBG, "%s CS filter\n", _job->toStr());
-                _job->filterSharing(_epoch, _broadcast_clause_buffer);
+                LOG(V5_DEBG, "%s CS filter\n", _job->getLabel());
+                _job->filterSharing(_epoch, std::vector<int>(_broadcast_clause_buffer));
                 _stage = PRODUCING_FILTER;
             } else {
                 // No distributed filtering: Sharing is done!
-                LOG(V5_DEBG, "%s CS digest w/o filter\n", _job->toStr());
-                _job->digestSharingWithoutFilter(_epoch, _broadcast_clause_buffer);
+                LOG(V5_DEBG, "%s CS digest w/o filter\n", _job->getLabel());
+                _job->digestSharingWithoutFilter(_epoch, std::vector<int>(_broadcast_clause_buffer), false);
                 if (_cls_history) {
                     InplaceClauseAggregation(_broadcast_clause_buffer).stripToRawBuffer();
                     _cls_history->importSharing(_epoch, std::move(_broadcast_clause_buffer));
@@ -157,7 +172,7 @@ public:
 
             _allreduce_filter->produce([&]() {
                 auto f = _job->getLocalFilter(_epoch);
-                LOG(V5_DEBG, "%s CS produced filter, size %i\n", _job->toStr(), f.size());
+                LOG(V5_DEBG, "%s CS produced filter, size %i\n", _job->getLabel(), f.size());
                 return f;
             });
             _stage = AGGREGATING_FILTER;
@@ -168,14 +183,18 @@ public:
 
             // Extract and digest result
             auto filter = _allreduce_filter->extractResult();
-            LOG(V5_DEBG, "%s CS digest w/ filter, size %i\n", _job->toStr(), filter.size());
-            _job->applyFilter(_epoch, filter);
-            if (_cls_history) {
+            LOG(V5_DEBG, "%s CS digest w/ filter, size %i\n", _job->getLabel(), filter.size());
+            if (_cls_history || _has_clause_listener) {
                 InplaceClauseAggregation(_broadcast_clause_buffer).stripToRawBuffer();
                 applyGlobalFilter(filter, _broadcast_clause_buffer);
-                // Add clause batch to history
-                _cls_history->importSharing(_epoch, std::move(_broadcast_clause_buffer));
+                if (_cls_history) {
+                    // Add clause batch to history
+                    std::vector<int> copy(_broadcast_clause_buffer);
+                    _cls_history->importSharing(_epoch, std::move(copy));
+                }
+                if (_has_clause_listener) _clause_listener(_broadcast_clause_buffer);
             }
+            _job->applyFilter(_epoch, std::move(filter));
 
             // Conclude this sharing epoch
             _stage = DONE;
@@ -184,6 +203,7 @@ public:
 
     bool advanceClauseAggregation(int source, int mpiTag, JobMessage& msg) {
         bool success = false;
+        if (msg.contextIdOfDestination != _job->getActorContextId()) return success;
         if (msg.tag == MSG_ALLREDUCE_CLAUSES && _allreduce_clauses.isValid()) {
             success = _allreduce_clauses.receive(source, mpiTag, msg);
             advanceSharing();
@@ -192,6 +212,7 @@ public:
     }
     bool advanceFilterAggregation(int source, int mpiTag, JobMessage& msg) {
         bool success = false;
+        if (msg.contextIdOfDestination != _job->getActorContextId()) return success;
         if (msg.tag == MSG_ALLREDUCE_FILTER && _allreduce_filter->isValid()) {
             success = _allreduce_filter->receive(source, mpiTag, msg);
             advanceSharing();
@@ -208,8 +229,12 @@ public:
             (!_allreduce_filter || _allreduce_filter->isDestructible());
     }
 
+    long long getBestFoundSolutionCost() const {
+        return _best_found_solution_cost;
+    }
+
     ~ClauseSharingSession() {
-        LOG(V5_DEBG, "%s CS CLOSE e=%i\n", _job->toStr(), _epoch);
+        LOG(V5_DEBG, "%s CS CLOSE e=%i\n", _job->getLabel(), _epoch);
         // If not done producing, will send empty clause buffer upwards
         _allreduce_clauses.cancel();
         // If not done producing, will send empty filter upwards
@@ -228,12 +253,16 @@ private:
     }
     
     std::vector<int> mergeClauseBuffersDuringAggregation(std::list<std::vector<int>>& elems) {
+
+        // aggregate metadata
         int maxRevision = -1;
         int numAggregated = 0;
         int numInputLits = 0;
         int successfulSolverId = -1;
+        long long bestFoundSolutionCost = LLONG_MAX;
         for (auto& elem : elems) {
-            assert(elem.size() >= 4 || log_return_false("[ERROR] Clause buffer has size %ld!\n", elem.size()));
+            assert(elem.size() >= InplaceClauseAggregation::numMetadataInts()
+                || log_return_false("[ERROR] Clause buffer has size %ld!\n", elem.size()));
             auto agg = InplaceClauseAggregation(elem);
             if (agg.successfulSolver() != -1 && (successfulSolverId == -1 || successfulSolverId > agg.successfulSolver())) {
                 successfulSolverId = agg.successfulSolver();
@@ -241,6 +270,7 @@ private:
             numAggregated += agg.numAggregatedNodes();
             numInputLits += agg.numInputLiterals();
             maxRevision = std::max(maxRevision, agg.maxRevision());
+            bestFoundSolutionCost = std::min(bestFoundSolutionCost, agg.bestFoundSolutionCost());
             agg.stripToRawBuffer();
         }
         int buflim = _job->getBufferLimit(numAggregated, false);
@@ -251,26 +281,27 @@ private:
         float time = Timer::elapsedSeconds();
         const int maxEffectiveClsLen = _params.strictClauseLengthLimit()+ClauseMetadata::numInts();
         const int maxFreeEffectiveClsLen = _params.freeClauseLengthLimit()+ClauseMetadata::numInts();
-        if (_params.priorityBasedBufferMerging()) {
-            StaticClauseStore<false> _merge_store(_params, false, 1000, true, INT32_MAX);
-            auto merger = BufferMerger(&_merge_store, buflim, maxEffectiveClsLen, maxFreeEffectiveClsLen, false);
+        initMergeClauseStore();
+        if (_priority_based_buffer_merging /*initialized by initMergeClauseStore()!*/) {
+            auto merger = BufferMerger(_merge_store.get(), buflim, maxEffectiveClsLen, maxFreeEffectiveClsLen, false);
             for (auto& elem : elems) {
-                merger.add(BufferReader(elem.data(), elem.size(), maxEffectiveClsLen, false));
+                merger.add(_merge_store->getBufferReader(elem.data(), elem.size()));
             }
             merged = merger.mergePriorityBased(_params, _excess_clauses_from_merge, _rng);
         } else {
             auto merger = BufferMerger(buflim, maxEffectiveClsLen, maxFreeEffectiveClsLen, false);
             for (auto& elem : elems) {
-                merger.add(BufferReader(elem.data(), elem.size(), maxEffectiveClsLen, false));
+                merger.add(_merge_store->getBufferReader(elem.data(), elem.size()));
             }
             merged = merger.mergePreservingExcessWithRandomTieBreaking(_excess_clauses_from_merge, _rng);
         }
         time = Timer::elapsedSeconds() - time;
     
         LOG(V4_VVER, "%s : merged %i contribs rev=%i (inp=%i, t=%.4fs) ~> len=%i\n",
-            _job->toStr(), numAggregated, maxRevision, numInputLits, time, merged.size());
+            _job->getLabel(), numAggregated, maxRevision, numInputLits, time, merged.size());
         InplaceClauseAggregation::prepareRawBuffer(merged,
-            maxRevision, numInputLits, numAggregated, successfulSolverId);
+            maxRevision, numInputLits, numAggregated, successfulSolverId,
+            bestFoundSolutionCost);
         return merged;
     }
 
@@ -303,5 +334,12 @@ private:
         }
 
         return filter;
+    }
+
+    void initMergeClauseStore() {
+        if (_merge_store) return;
+        auto params = _job->getClauseStoreParams();
+        _merge_store.reset(new StaticClauseStore<false>(params, false, 256, true, INT32_MAX));
+        _priority_based_buffer_merging = params.priorityBasedBufferMerging();
     }
 };

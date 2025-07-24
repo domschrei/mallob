@@ -14,6 +14,7 @@
 #include "job_description_interface.hpp"
 #include "balancing/event_driven_balancer.hpp"
 #include "comm/mpi_base.hpp"
+#include "robin_map.h"
 
 // forward declarations
 class RandomizedRoutingTree;
@@ -47,6 +48,8 @@ private:
     ResultStore _result_store;
 
     std::list<MessageSubscription> _subscriptions;
+
+    tsl::robin_map<int, std::list<std::function<void()>>> _job_execution_hooks;
 
 public:
     SchedulingManager(Parameters& params, MPI_Comm& comm, RandomizedRoutingTree& routingTree, 

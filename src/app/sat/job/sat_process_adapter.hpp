@@ -14,6 +14,7 @@
 #include "util/logger.hpp"
 #include "util/robin_hood.hpp"
 #include "util/sys/bidirectional_anytime_pipe.hpp"
+#include "util/sys/bidirectional_anytime_pipe_shmem.hpp"
 #include "util/sys/threading.hpp"
 #include "util/params.hpp"
 #include "../execution/solving_state.hpp"
@@ -38,8 +39,19 @@ public:
         Checksum checksum;
         size_t fSize;
         const int* fLits;
-        size_t aSize;
-        const int* aLits;
+        int descriptionId;
+    };
+    struct ShmemObject {
+        std::string id; 
+        void* data {nullptr}; 
+        size_t size;
+        bool managedInCache {false};
+        int revision {0};
+        std::string userLabel;
+        int descId {0};
+        bool operator==(const ShmemObject& other) const {
+            return id == other.id && size == other.size;
+        }
     };
 
 private:
@@ -47,22 +59,12 @@ private:
     SatProcessConfig _config;
     std::shared_ptr<Logger> _log;
 
-    ForkedSatJob* _job;
     std::shared_ptr<AnytimeSatClauseCommunicator> _clause_comm;
 
     size_t _f_size;
     const int* _f_lits;
-    size_t _a_size;
-    const int* _a_lits;
-    
-    struct ShmemObject {
-        std::string id; 
-        void* data; 
-        size_t size;
-        bool operator==(const ShmemObject& other) const {
-            return id == other.id && size == other.size;
-        }
-    };
+    int _desc_id;
+
     struct ShmemObjectHasher {
         size_t operator()(const ShmemObject& obj) const {
             size_t hash = 1;
@@ -74,13 +76,14 @@ private:
     robin_hood::unordered_flat_set<ShmemObject, ShmemObjectHasher> _shmem;
     std::string _shmem_id;
     SatSharedMemory* _hsm = nullptr;
-
-    std::unique_ptr<BiDirectionalAnytimePipe> _pipe;
+    GuardedData<robin_hood::unordered_flat_map<std::string, ShmemObject>> _guard_prereg_shmem;
+    GuardedData<std::unique_ptr<BiDirectionalAnytimePipeShmem>> _guard_pipe;
 
     volatile bool _running = false;
-    volatile bool _initialized = false;
-    volatile bool _terminate = false;
     volatile bool _bg_writer_running = false;
+    std::atomic_bool _initialized {false};
+    std::atomic_bool _terminate {false};
+    volatile bool _destructed {false};
 
     std::future<void> _bg_initializer;
     std::future<void> _bg_writer;
@@ -92,6 +95,7 @@ private:
     std::vector<int> _collected_clauses;
     tsl::robin_map<int, std::vector<int>> _filters_by_epoch;
     int _epoch_of_export_buffer {-1};
+    long long _best_found_objective_cost {LLONG_MAX};
 
     pid_t _child_pid = -1;
     SolvingStates::SolvingState _state = SolvingStates::INITIALIZING;
@@ -103,29 +107,35 @@ private:
 
     std::atomic_int _num_revisions_to_write = 0;
     std::list<RevisionData> _revisions_to_write;
-    Mutex _revisions_mutex;
-    Mutex _state_mutex;
+    Mutex _mtx_revisions;
+    Mutex _mtx_state;
     unsigned long _sum_of_revision_sizes {0};
+    Checksum _chksum;
 
-    bool _solution_in_preparation = false;
-    int _solution_revision_in_preparation = -1;
+    bool _thread_count_update {false};
+    int _nb_threads {0};
+
     JobResult _solution;
-    std::future<void> _solution_prepare_future;
+    std::vector<int> _preprocessed_formula;
 
 public:
-    SatProcessAdapter(Parameters&& params, SatProcessConfig&& config, ForkedSatJob* job, 
-        size_t fSize, const int* fLits, size_t aSize, const int* aLits,
-        std::shared_ptr<AnytimeSatClauseCommunicator>& comm);
+    SatProcessAdapter(Parameters&& params, SatProcessConfig&& config,
+        size_t fSize, const int* fLits, Checksum chksum,
+        int descId, std::shared_ptr<AnytimeSatClauseCommunicator>& comm);
     ~SatProcessAdapter();
 
     void run();
     bool isFullyInitialized();
-    void appendRevisions(const std::vector<RevisionData>& revisions, int desiredRevision);
+    void appendRevisions(const std::vector<RevisionData>& revisions, int desiredRevision, int nbThreads);
+    void setDesiredRevision(int desiredRevision) {_desired_revision = desiredRevision;}
+    void preregisterShmemObject(ShmemObject&& obj);
     void crash();
     void reduceThreadCount();
+    void setThreadCount(int nbThreads);
 
     void setSolvingState(SolvingStates::SolvingState state);
     void setClauseBufferRevision(int revision) {_clause_buffer_revision = std::max(_clause_buffer_revision, revision);}
+    void updateBestFoundSolutionCost(long long bestFoundSolutionCost);
 
     int getStartedNumThreads() const {return _config.threads;}
 
@@ -133,21 +143,23 @@ public:
     bool hasCollectedClauses();
     std::vector<int> getCollectedClauses(int& successfulSolverId, int& numLits);
     int getLastAdmittedNumLits();
+    long long getBestFoundObjectiveCost() const;
 
-    void filterClauses(int epoch, const std::vector<int>& clauses);
+    void filterClauses(int epoch, std::vector<int>&& clauses);
     bool hasFilteredClauses(int epoch);
     std::vector<int> getLocalFilter(int epoch);
-    void applyFilter(int epoch, const std::vector<int>& filter);
-    void digestClausesWithoutFilter(int epoch, const std::vector<int>& clauses);
+    void applyFilter(int epoch, std::vector<int>&& filter);
+    void digestClausesWithoutFilter(int epoch, std::vector<int>&& clauses, bool stateless);
 
-    void returnClauses(const std::vector<int>& clauses);
-    void digestHistoricClauses(int epochBegin, int epochEnd, const std::vector<int>& clauses);
+    void returnClauses(std::vector<int>&& clauses);
+    void digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>&& clauses);
 
     void dumpStats();
     
-    enum SubprocessStatus {NORMAL, FOUND_RESULT, CRASHED};
+    enum SubprocessStatus {NORMAL, FOUND_RESULT, FOUND_PREPROCESSED_FORMULA, CRASHED};
     SubprocessStatus check();
     JobResult& getSolution();
+    std::vector<int>&& getPreprocessedFormula() {return std::move(_preprocessed_formula);}
 
     void waitUntilChildExited();
     void freeSharedMemory();
@@ -155,11 +167,10 @@ public:
 private:
     void doInitialize();
     void doWriteRevisions();
-    void doPrepareSolution();
     void doTerminateInitializedProcess();
     
-    void applySolvingState();
+    void applySolvingState(bool initialize = false);
     void initSharedMemory(SatProcessConfig&& config);
-    void* createSharedMemoryBlock(std::string shmemSubId, size_t size, void* data);
+    void* createSharedMemoryBlock(std::string shmemSubId, size_t size, const void* data, int rev = 0, int descId = -1, bool managedInCache = false);
 
 };

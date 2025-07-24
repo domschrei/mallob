@@ -97,16 +97,16 @@ public:
 		}
     }
 
-    bool checkClauseToImport(PortfolioSolverInterface* solver, const Mallob::Clause& clause) {
+    bool checkClauseToImport(int globalId, int localId, const Mallob::Clause& clause) {
         // check via clause ID whether this solver produced this clause
         unsigned long clauseId = ClauseMetadata::readUnsignedLong(clause.begin);
-        if (getProducingInstanceId(clauseId) == solver->getGlobalId()) {
+        if (getProducingInstanceId(clauseId) == globalId) {
             // This solver produced this clause! Do not import.
             return false;
         }
         // Important invariant: incoming clauses must be from EARLIER epochs
         // than your current epoch.
-        int i = solver->getLocalId();
+        int i = localId;
         int epoch = _min_epoch_ids_per_solver[i].size()-1;
         int clauseEpoch = ClauseMetadata::getEpoch(clauseId, _global_epoch_ids);
         if (clauseEpoch >= epoch) {
@@ -137,7 +137,7 @@ public:
 
 		// take the offset that belongs to the clause's epoch!
 		int epoch = getEpochOfUnalignedSelfClause(clauseId);
-		assert(epoch >= 0 && epoch < _id_offsets_per_solver[localSolverId].size() 
+		assert((epoch >= 0 && epoch < _id_offsets_per_solver[localSolverId].size())
 			|| log_return_false("Invalid epoch %i found for clause ID %lu\n", epoch, clauseId));
 		auto offset = _id_offsets_per_solver[localSolverId][epoch];
 		unsigned long alignedClauseId = clauseId + offset;
@@ -156,7 +156,7 @@ public:
 		int localSolverId = getProducingLocalSolverIndex(clauseId);
 
 		int epoch = getEpochOfAlignedSelfClause(clauseId);
-		assert(epoch >= 0 && epoch < _id_offsets_per_solver[localSolverId].size() 
+		assert((epoch >= 0 && epoch < _id_offsets_per_solver[localSolverId].size())
 			|| log_return_false("Invalid epoch %i found for clause ID %lu\n", epoch, clauseId));
 		auto offset = _id_offsets_per_solver[localSolverId][epoch];
 		unsigned long unalignedClauseId = clauseId - offset;

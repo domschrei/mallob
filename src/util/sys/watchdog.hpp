@@ -3,6 +3,7 @@
 #define DOMPASCH_MALLOB_WATCHDOG_HPP
 
 #include <atomic>
+#include <future>
 
 #include "timer.hpp"
 #include "threading.hpp"
@@ -23,8 +24,6 @@ public:
     };
 
 private:
-    BackgroundWorker _worker;
-
     Activity _activity = Activity::IDLE_OR_HANDLING_MSG;
     int _activity_recv_tag = 0;
     int _activity_send_tag = 0;
@@ -32,20 +31,36 @@ private:
     std::atomic_int _last_reset_millis = 0;
     std::atomic_int _warning_period_millis = 0;
     std::atomic_int _abort_period_millis = 0;
+    std::atomic_int _abort_ticks = 0;
+    std::atomic_int _ticks = 0;
 
     static std::atomic_bool _globally_enabled;
+    volatile bool _active {true};
+    volatile bool _running {false};
+    volatile bool _initialized {false};
+
+    BackgroundWorker _worker;
+    std::future<void> _fut_thread_pool;
+    pthread_t _worker_pthread_id {0};
+
+    std::function<void()> _abort_function;
 
 public:
-    Watchdog(bool enabled, int checkIntervalMillis, float time = Timer::elapsedSeconds());
+    Watchdog(bool enabled, int checkIntervalMillis, bool useThreadPool = false,
+        std::function<void()> customAbortFunction = std::function<void()>());
+    ~Watchdog();
     void setWarningPeriod(int periodMillis);
     void setAbortPeriod(int periodMillis);
+    void setAbortTicks(int nbTicks);
     void reset(float time = Timer::elapsedSeconds());
+    void setActive(bool active) {_active = active;}
     inline void setActivity(Activity a) {
         _activity = a;
     }
     int* activityRecvTag() {return &_activity_recv_tag;}
     int* activitySendTag() {return &_activity_send_tag;}
     void stop();
+    void stopWithoutWaiting();
 
     static void disableGlobally();
 };

@@ -168,8 +168,9 @@ public:
         // Get random choice from bounce alternatives
         int nextRank = _routing_tree.getRandomNeighbor();
         if (_routing_tree.getNumNeighbors() > 2) {
-            // ... if possible while skipping the requesting node and the sender
-            while (nextRank == request.requestingNodeRank || nextRank == senderRank) {
+            // ... if possible while skipping the requesting node (if non-root request) and the sender
+            while ((request.requestedNodeIndex > 0 && nextRank == request.requestingNodeRank)
+                    || nextRank == senderRank) {
                 nextRank = _routing_tree.getRandomNeighbor();
             }
         }

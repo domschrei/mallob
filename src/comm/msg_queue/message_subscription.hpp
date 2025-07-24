@@ -45,8 +45,13 @@ public:
         return *this;
     }
 
-    ~MessageSubscription() {
+    void reset() {
         if (_tag != -1)
             MyMpi::getMessageQueue().clearCallback(_tag, _cb_ref);
+        _tag = -1;
+    }
+
+    ~MessageSubscription() {
+        reset();
     }
 };

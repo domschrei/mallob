@@ -307,11 +307,21 @@ private:
     }
 
     std::unique_ptr<ChildInterface>& getSessionByChildIndex(int childIndex) {
+        if (_sessions[0] && _sessions[1] && _sessions[0]->getChildIndex() == _sessions[1]->getChildIndex()
+                && childIndex == _sessions[0]->getChildIndex()) {
+            if (_sessions[0]->doesChildHaveNodes()) return _sessions[0];
+            else return _sessions[1];
+        }
         if (_sessions[0] && childIndex == _sessions[0]->getChildIndex()) return _sessions[0];
         if (_sessions[1] && childIndex == _sessions[1]->getChildIndex()) return _sessions[1];
         return _empty_session;
     }
     std::unique_ptr<ChildInterface>& getSessionByChildRank(int childRank) {
+        if (_sessions[0] && _sessions[1] && _sessions[0]->getChildRank() == _sessions[1]->getChildRank()
+                && childRank == _sessions[0]->getChildRank()) {
+            if (_sessions[0]->doesChildHaveNodes()) return _sessions[0];
+            else return _sessions[1];
+        }
         if (_sessions[0] && childRank == _sessions[0]->getChildRank()) return _sessions[0];
         if (_sessions[1] && childRank == _sessions[1]->getChildRank()) return _sessions[1];
         return _empty_session;

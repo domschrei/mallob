@@ -171,7 +171,7 @@ private:
         LOG(V2_INFO, "PrAs Waiting for clause epochs file \"%s\" ...\n", filename.c_str());
         std::ifstream ifs(filename);
         while (!ifs.is_open()) {
-            usleep(1000 * 30); // 30 ms
+            usleep(1000 * 5); // 5 ms
             ifs.open(filename);
         }
 

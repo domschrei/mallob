@@ -40,6 +40,7 @@ struct Option {
     virtual void setValAsString(const std::string& valStr) = 0;
     virtual void copyValue(const Option& other) = 0;
     virtual const char* getTypeString() const = 0;
+    void throwError(const std::string& specifics);
 };
 
 struct BoolOption : public Option {

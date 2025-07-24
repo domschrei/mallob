@@ -28,10 +28,6 @@ private:
 	unsigned char * fmap = 0; 
 	bool nomodel = true;
 	unsigned long long calls = 0;
-        
-    volatile bool suspendSolver;
-    Mutex suspendMutex;
-    ConditionVariable suspendCond;
 
 	int numDiversifications;
 
@@ -53,8 +49,6 @@ public:
 
 	void setSolverInterrupt() override;
 	void unsetSolverInterrupt() override;
-    void setSolverSuspend() override;
-    void unsetSolverSuspend() override;
 
 	std::vector<int> getSolution() override;
 	std::set<int> getFailedAssumptions() override;

@@ -14,6 +14,7 @@
 #include "comm/msg_queue/receive_fragment.hpp"  // for ReceiveFragment
 #include "comm/msg_queue/send_handle.hpp"       // for SendHandle, DataPtr
 #include "comm/msgtags.h"                       // for MSG_OFFSET_BATCHED
+#include "comm/mympi.hpp"
 #include "util/logger.hpp"                      // for LOG, LOGGER_LOG_V5
 #include "util/sys/atomics.hpp"                 // for incrementRelaxed, dec...
 #include "util/sys/background_worker.hpp"       // for BackgroundWorker
@@ -42,19 +43,40 @@ MessageQueue::MessageQueue(int maxMsgSize) : _max_msg_size(maxMsgSize) {
     });
 }
 
-MessageQueue::~MessageQueue() {
+void MessageQueue::close() {
+
     // Cancel batched send messages
-    for (auto& h : _send_queue) {
-        h.cancel();
+    for (auto& h : _send_queue) h.cancel();
+    // Advance until all outgoing messages have been processed
+    while (hasOpenSends()) advance();
+    // Make sure that all sent handles are also processed at the receiver side
+    for (int i = 0; i < 1 + (MyMpi::size(MPI_COMM_WORLD) * _max_concurrent_sends) / _base_num_receives_per_loop; i++)
+        advance();
+
+    // Notify background threads to stop and wake them up
+    _batch_assembler.stopWithoutWaiting();
+    {
+        auto lock = _fragmented_mutex.getLock();
+        _fragmented_queue.push_back(ReceiveFragment());
     }
-    // Advance until all send handles have been processed
-    while (hasOpenSends() || hasOpenRecvFragments()) advance();
-    // Stop background threads
+    _fragmented_cond_var.notify();
+    _gc.stopWithoutWaiting();
+    {
+        auto lock = _garbage_mutex.getLock();
+        _garbage_queue.push_back(DataPtr());
+    }
+    _garbage_cond_var.notify();
+
+    // Join background threads
     _batch_assembler.stop();
     _gc.stop();
-    // Cancel receive request to safely free buffer
+}
+
+MessageQueue::~MessageQueue() {
+    // Cancel final open receive request
     if (_recv_request != MPI_REQUEST_NULL) {
         MPI_Cancel(&_recv_request);
+        MPI_Request_free(&_recv_request);
     }
     // Free receive buffers
     free(_recv_data_1);
@@ -67,6 +89,37 @@ MessageQueue::CallbackRef MessageQueue::registerCallback(int tag, const MsgCallb
     }
     _callbacks[tag].push_back(cb);
     auto it = _callbacks[tag].end();
+    --it;
+    return it;
+}
+
+void MessageQueue::initializeConditionalCallbacks(int tag) {
+    // "macro" callback
+    registerCallback(tag, [this](MessageHandle& h) {
+        assert(!h.getRecvData().empty());
+        bool returnedToSender = h.getRecvData().back() != 0;
+        bool accepted {false};
+        std::vector<ConditionalMsgCallback> callbacks(_cond_callbacks.at(h.tag).begin(),
+            _cond_callbacks.at(h.tag).end());
+        for (auto& f : callbacks) {
+            LOG(V5_DEBG, "[msgq] try cb for tag=%i\n", h.tag);
+            MessageHandle copy(h);
+            if (f(copy)) accepted = true;
+        }
+        if (!accepted && !returnedToSender) {
+            LOG_ADD_DEST(V5_DEBG, "[msqq] tag %i : return to sender", h.source, h.tag);
+            h.getRecvData().back() = 1; // returning-to-sender bit
+            MyMpi::isend(h.source, h.tag, h.moveRecvData());
+        }
+    });
+    _cond_callbacks[tag]; // initialize empty list of conditional callbacks
+}
+
+MessageQueue::CondCallbackRef MessageQueue::registerConditionalCallback(int tag, const ConditionalMsgCallback& cb) {
+    assert(_cond_callbacks.count(tag) || log_return_false("[ERROR] Conditional callbacks not initialized for tag %i"
+        " - did you call initializeConditionalCallbacks(tag) before?\n", tag));
+    _cond_callbacks.at(tag).push_back(cb);
+    auto it = _cond_callbacks[tag].end();
     --it;
     return it;
 }
@@ -87,8 +140,18 @@ void MessageQueue::clearCallbacks() {
 void MessageQueue::clearCallback(int tag, const CallbackRef& ref) {
     _callbacks[tag].erase(ref);
 }
+void MessageQueue::clearConditionalCallback(int tag, const CondCallbackRef& ref) {
+    _cond_callbacks[tag].erase(ref);
+}
 
-int MessageQueue::send(const DataPtr& data, int dest, int tag) {
+int MessageQueue::send(const DataPtr& data, int dest, int tag, bool fromMainThread) {
+
+    if (!fromMainThread) {
+        auto lock = _mtx_out_msgs.getLock();
+        _out_msgs.push_back({data, dest, tag});
+        _check_out_msgs = true;
+        return 0;
+    }
 
     *_current_send_tag = tag;
 
@@ -126,6 +189,16 @@ void MessageQueue::cancelSend(int sendId) {
 
 void MessageQueue::advance() {
     //log(V5_DEBG, "BEGADV\n");
+
+    // Prepare sending outgoing messages from other (non main) threads
+    if (_check_out_msgs && _mtx_out_msgs.tryLock()) {
+        while (!_out_msgs.empty()) {
+            auto outMsg = _out_msgs.front(); _out_msgs.pop_front();
+            send(outMsg.data, outMsg.dest, outMsg.tag);
+        }
+        _mtx_out_msgs.unlock();
+    }
+
     _iteration++;
     processReceived();
     processSelfReceived();
@@ -164,13 +237,15 @@ void MessageQueue::runFragmentedMessageAssembler() {
         if (data.isCancelled()) {
             // Receive message was cancelled in between batches: 
             // concurrently clean up any fragments already received
-            auto lock = _garbage_mutex.getLock();
             int numFragments = 0;
-            for (auto& frag : data.dataFragments) if (frag) {
-                _garbage_queue.emplace_back(std::move(frag));
-                atomics::incrementRelaxed(_num_garbage);
-                numFragments++;
+            {
+                auto lock = _garbage_mutex.getLock();
+                for (auto& frag : data.dataFragments) if (frag) {
+                    _garbage_queue.emplace_back(std::move(frag));
+                    numFragments++;
+                }
             }
+            _garbage_cond_var.notify();
             LOG(V4_VVER, "MSG id=%i cancelled (%i fragments)\n", data.id, numFragments);
             continue;
         }
@@ -205,17 +280,11 @@ void MessageQueue::runGarbageCollector() {
 
     DataPtr dataPtr;
     while (_gc.continueRunning()) {
-        usleep(1000*1000); // 1s
-        while (_num_garbage > 0) {
-            {
-                auto lock = _garbage_mutex.getLock();
-                dataPtr = std::move(_garbage_queue.front());
-                _garbage_queue.pop_front();
-            }
-            //if (dataPtr.use_count() > 0) {
-            //    LOG(V4_VVER, "GC %p : use count %i\n", dataPtr.get(), dataPtr.use_count());
-            //}
-            atomics::decrementRelaxed(_num_garbage);
+        _garbage_cond_var.wait(_garbage_mutex, [&]() {return !_garbage_queue.empty();});
+        {
+            auto lock = _garbage_mutex.getLock();
+            dataPtr = std::move(_garbage_queue.front());
+            _garbage_queue.pop_front();
         }
         dataPtr.reset();
     }
@@ -351,9 +420,11 @@ void MessageQueue::processAssembledReceived() {
             
             if (h.getRecvData().size() > _max_msg_size) {
                 // Concurrent deallocation of large chunk of data
-                auto lock = _garbage_mutex.getLock();
-                _garbage_queue.emplace_back(new std::vector<uint8_t>(h.moveRecvData()));
-                atomics::incrementRelaxed(_num_garbage);
+                {
+                    auto lock = _garbage_mutex.getLock();
+                    _garbage_queue.emplace_back(new std::vector<uint8_t>(h.moveRecvData()));
+                }
+                _garbage_cond_var.notify();
             }
             _fused_queue.pop_front();
             atomics::decrementRelaxed(_num_fused);
@@ -414,9 +485,11 @@ void MessageQueue::processSent() {
 
             if (h.dataPtr->size() > _max_msg_size) {
                 // Concurrent deallocation of SendHandle's large chunk of data
-                auto lock = _garbage_mutex.getLock();
-                _garbage_queue.emplace_back(std::move(h.dataPtr));
-                atomics::incrementRelaxed(_num_garbage);
+                {
+                    auto lock = _garbage_mutex.getLock();
+                    _garbage_queue.emplace_back(std::move(h.dataPtr));
+                }
+                _garbage_cond_var.notify();
             }
             
             // Remove handle

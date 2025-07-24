@@ -33,14 +33,15 @@ int main(int argc, char *argv[]) {
     Timer::init(t);
 
     int rankOfParent = config.mpirank;
-    TmpDir::init(rankOfParent);
+    TmpDir::init(rankOfParent, params.tmpDirectory());
 
     Random::init(params.seed(), rankOfParent);
 
-    ProcessWideThreadPool::init(1);
+    ProcessWideThreadPool::init(2);
 
     // Initialize signal handlers
-    Process::init(rankOfParent, params.traceDirectory(), true);
+    Process::init(rankOfParent, params.traceDirectory());
+    Terminator::setForwardTerminateToChildren(false);
 
     std::string logdir = params.logDirectory();
     std::string logFilename = "subproc" + std::string(".") + std::to_string(rankOfParent);

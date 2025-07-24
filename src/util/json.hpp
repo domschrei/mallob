@@ -2122,7 +2122,7 @@ JSON_HEDLEY_DIAGNOSTIC_POP
 
 // allow to disable exceptions
 #if (defined(__cpp_exceptions) || defined(__EXCEPTIONS) || defined(_CPPUNWIND)) && !defined(JSON_NOEXCEPTION)
-    #define JSON_THROW(exception) throw exception
+    #define JSON_THROW(exception) do {printf("JSON ERROR: %s\n", exception.what()); abort();} while (0)
     #define JSON_TRY try
     #define JSON_CATCH(exception) catch(exception)
     #define JSON_INTERNAL_CATCH(exception) catch(exception)
@@ -16532,7 +16532,8 @@ template <class Key, class T, class IgnoredLess = std::less<Key>,
             }
         }
 
-        JSON_THROW(std::out_of_range("key not found"));
+        //JSON_THROW(std::out_of_range("key not found"));
+        abort();
     }
 
     const T& at(const Key& key) const
@@ -16545,7 +16546,8 @@ template <class Key, class T, class IgnoredLess = std::less<Key>,
             }
         }
 
-        JSON_THROW(std::out_of_range("key not found"));
+        //JSON_THROW(std::out_of_range("key not found"));
+        abort();
     }
 
     size_type erase(const Key& key)

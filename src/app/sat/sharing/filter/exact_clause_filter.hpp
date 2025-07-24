@@ -65,7 +65,7 @@ private:
     struct Slot {
         Mutex _mtx_map;
         ProducedMap _map;
-        Slot(GenericClauseStore& clauseStore, int clauseLength) : _map(32'768) {}
+        Slot(GenericClauseStore& clauseStore, int clauseLength) {}
     };
     std::vector<std::unique_ptr<Slot>> _slots;
     
@@ -227,7 +227,7 @@ public:
 
 private:
     Slot& getSlot(int clauseLength) const {
-        assert(clauseLength-1 >= 0 && clauseLength-1 < _slots.size()
+        assert((clauseLength-1 >= 0 && clauseLength-1 < _slots.size())
             || log_return_false("[ERROR] Invalid clause length %i\n", clauseLength));
         return *_slots.at(clauseLength-1);
     }

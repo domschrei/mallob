@@ -962,7 +962,8 @@ class robin_hash : private Hash, private KeyEqual, private GrowthPolicy {
     if (it != cend()) {
       return it.value();
     } else {
-      TSL_RH_THROW_OR_TERMINATE(std::out_of_range, "Couldn't find key.");
+      //TSL_RH_THROW_OR_TERMINATE(std::out_of_range, "Couldn't find key.");
+      abort();
     }
   }
 

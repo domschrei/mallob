@@ -14,24 +14,21 @@ struct SatSharedMemory {
 
     // Meta data parent->child
     int fSize;
-    int aSize;
+    Checksum chksum;
 
     // Signals parent->child
-    bool doBegin {false};
-    bool doTerminate {false};
-    bool doCrash {false};
-    bool childReadyToWrite {false};
+    volatile bool doTerminate {false};
+    volatile bool doCrash {false};
+    //bool pipeChildReadyToWrite {false};
+    //bool pipeDoTerminate {false};
+    //bool pipeDidTerminate {false};
 
     // Signals child->parent
-    bool didTerminate {false};
+    volatile bool didStart {false};
+    volatile bool didTerminate {false};
     
     // State alerts child->parent
-    bool isInitialized {false};
-    bool hasSolution {false};
-    SatResult result {UNKNOWN};
-    int solutionRevision {-1};
-    int winningInstance {-1};
-    unsigned long globalStartOfSuccessEpoch;
+    volatile bool isInitialized {false};
     
     // Clause buffers: parent->child
     int importBufferRevision {-1};
@@ -46,4 +43,7 @@ struct SatSharedMemory {
     Checksum exportChecksum;
     SatEngine::LastAdmittedStats lastAdmittedStats;
     int successfulSolverId {-1};
+
+    // Pipe data buffer size for each direction
+    size_t pipeBufSize {262144};
 };

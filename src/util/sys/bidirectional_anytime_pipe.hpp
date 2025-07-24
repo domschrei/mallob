@@ -9,6 +9,7 @@
 #include <string>
 #include <sys/poll.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <vector>
 #include <poll.h>
@@ -19,6 +20,8 @@
 #include "util/spsc_blocking_ringbuffer.hpp"
 #include "util/sys/background_worker.hpp"
 #include "util/sys/fileutils.hpp"
+#include "util/sys/process.hpp"
+#include "util/sys/timer.hpp"
 
 class BiDirectionalAnytimePipe {
 
@@ -34,9 +37,11 @@ private:
 
     BackgroundWorker _bg_reader;
     BackgroundWorker _bg_writer;
-    volatile bool* volatile _child_ready_to_write;
+    volatile bool* volatile _shmem_child_ready_to_write;
+    volatile bool* volatile _shmem_do_terminate;
+    volatile bool* volatile _shmem_did_terminate;
     struct Message {
-        char tag;
+        char tag = 0;
         std::vector<int> data;
     };
     SPSCBlockingRingbuffer<Message> _buf_in;
@@ -46,11 +51,12 @@ private:
     Message _read_msg;
 
     bool _failed {false};
+    pid_t _child_pid {-1};
 
 public:
-    BiDirectionalAnytimePipe(InitializationMode mode, const std::string& fifoOut, const std::string& fifoIn, bool* shmemReadFlag) :
-        _mode(mode), _path_out(fifoOut), _path_in(fifoIn), _child_ready_to_write(shmemReadFlag),
-        _buf_in(128), _buf_out(128) {
+    BiDirectionalAnytimePipe(InitializationMode mode, const std::string& fifoOut, const std::string& fifoIn, bool* shmemReadFlag, bool* shmemDoTerminate, bool* shmemDidTerminate) :
+        _mode(mode), _path_out(fifoOut), _path_in(fifoIn), _shmem_child_ready_to_write(shmemReadFlag), _shmem_do_terminate(shmemDoTerminate),
+        _shmem_did_terminate(shmemDidTerminate), _buf_in(128), _buf_out(128) {
 
         if (_mode == CREATE) {
             int res;
@@ -58,7 +64,9 @@ public:
             assert(res == 0);
             res = mkfifo(_path_in.c_str(), 0666);
             assert(res == 0);
-            *_child_ready_to_write = false;
+            *_shmem_child_ready_to_write = false;
+            *_shmem_do_terminate = false;
+            *_shmem_did_terminate = false;
         }
     }
 
@@ -78,10 +86,10 @@ public:
             // ensuring that the parent process never needs to block
             _bg_reader.run([&]() {
                 Message msg;
-                while (true) { // run indefinitely until the pipe is closed!
+                while (!*_shmem_do_terminate) { // run indefinitely until you should terminate
                     // read message from the pipe - blocks until parent writes something
                     doReadFromPipe(&msg.tag, 1, 1, false);
-                    if (msg.tag == 0 || _failed) break;
+                    if (_failed || msg.tag == 0) break;
                     //printf("READING %c FROM PIPE\n", msg.tag);
                     msg.data = readFromPipe(false);
                     if (_failed) break;
@@ -99,10 +107,11 @@ public:
                     bool success = _buf_out.pollBlocking(msg);
                     if (!success) break;
                     // wait until the previous message has been read by the parent
-                    while (*_child_ready_to_write) {usleep(1);}
+                    while (!*_shmem_do_terminate && *_shmem_child_ready_to_write) {usleep(1);}
+                    if (*_shmem_do_terminate) break;
                     //printf("CAN WRITE FROM QUEUE TO PIPE\n");
                     // signal to the parent that new message is available
-                    *_child_ready_to_write = true;
+                    *_shmem_child_ready_to_write = true;
                     // write message to the pipe - may block until parent reads it
                     writeToPipe(msg.data, msg.tag, false);
                     if (_failed) break;
@@ -116,9 +125,9 @@ public:
         if (_read_tag != 0) return _read_tag;
         if (_mode == CREATE) {
             // parent process checks if there is in fact some data ready to be read
-            if (*_child_ready_to_write) {
+            if (*_shmem_child_ready_to_write) {
                 doReadFromPipe(&_read_tag, 1, 1, abortAtFailure);
-                *_child_ready_to_write = false;
+                *_shmem_child_ready_to_write = false;
             }
         } else {
             // child process works via dedicated reading queue and side thread
@@ -179,25 +188,34 @@ public:
         }
     }
 
+    void setChildPid(pid_t pid) {
+        _child_pid = pid;
+    }
+
     ~BiDirectionalAnytimePipe() {
+        const float time = Timer::elapsedSeconds();
         if (_mode == CREATE) {
-            // Parent: Send a signal to the child process that we close the pipes.
-            writeToPipe({}, 0, false);
-            // Finish reading whatever the child process has sent in the meantime.
-            while (!_failed) {
-                char tag = pollForData(false);
-                if (_failed) break;
-                (void) readFromPipe(false);
-            }
+            writeToPipe({}, 0, false); // "wake up", stop child reader
+            // Send termination signal to child, wait for answer
+            *_shmem_do_terminate = true;
+            while (!*_shmem_did_terminate && _child_pid!=-1 && !Process::didChildExit(_child_pid)
+                    && Timer::elapsedSeconds() - time < 1.0f) // 1s grace period
+                usleep(1000);
         } else {
             // Child: stop taking data from the buffers.
+            _bg_writer.stopWithoutWaiting();
             _buf_in.markExhausted();
             _buf_in.markTerminated();
             _buf_out.markExhausted();
             _buf_out.markTerminated();
+            // Wait until termination signal from parent arrived (5s grace period)
+            while (!*_shmem_do_terminate && Timer::elapsedSeconds() - time < 5.0f)
+                usleep(1000);
             // Join with the background threads once they are done.
             _bg_reader.stop();
             _bg_writer.stop();
+            // Return termination signal to parent
+            *_shmem_did_terminate = true;
         }
         fclose(_pipe_out);
         fclose(_pipe_in);

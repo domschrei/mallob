@@ -5,6 +5,7 @@
 #include <atomic>
 #include <list>
 
+#include "comm/group_comm_builder.hpp"
 #include "core/scheduling_manager.hpp"
 #include "data/worker_sysstate.hpp"
 #include "util/periodic_event.hpp"
@@ -28,12 +29,15 @@ private:
     int _world_rank;
     Parameters& _params;
 
+    Watchdog _watchdog;
+
     std::list<MessageSubscription> _subscriptions;
 
     WorkerSysState _sys_state;
     JobRegistry _job_registry;
     RandomizedRoutingTree _routing_tree;
     SchedulingManager _sched_man;
+    GroupCommBuilder _group_comm_builder;
 
     long long _iteration = 0;
     PeriodicEvent<1000> _periodic_stats_check;
@@ -41,7 +45,6 @@ private:
     PeriodicEvent<10, 1> _periodic_job_check;
     PeriodicEvent<1> _periodic_balance_check;
     PeriodicEvent<1000> _periodic_maintenance;
-    Watchdog _watchdog;
     bool _job_active {false};
 
     std::atomic_bool _node_stats_calculated = true;

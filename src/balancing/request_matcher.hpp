@@ -26,6 +26,7 @@ protected:
 public:
     RequestMatcher(JobRegistry& jobRegistry, MPI_Comm workersComm, std::function<void(const JobRequest&, int)> localRequestCallback) : 
         _job_registry(&jobRegistry), _local_request_callback(localRequestCallback), _num_workers(MyMpi::size(workersComm)) {}
+    virtual ~RequestMatcher() {}
 
     virtual void handle(MessageHandle& handle) = 0;
     virtual void advance(int epoch) = 0;

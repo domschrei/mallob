@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include "app/sat/data/clause_metadata.hpp"
 #include "util/assert.hpp"
 
 struct BufferIterator {
@@ -87,9 +88,10 @@ void nextLengthLbdGroup() {
     }
 
     // Order clauses by size primary, by LBD secondary
-    if (lbd == clauseLength) {
+    const int effectiveClauseLength = clauseLength - ClauseMetadata::numInts();
+    if (lbd == std::max(1, effectiveClauseLength)) {
         clauseLength++;
-        lbd = 2;
+        lbd = effectiveClauseLength+1 <= 1 ? 1 : 2;
     } else {
         lbd++;
     }

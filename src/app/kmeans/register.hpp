@@ -18,7 +18,7 @@ void register_mallob_app_kmeans() {
             return new KMeansJob(params, setup, table);
         },
         // Job solution formatter
-        [](const JobResult& result) {
+        [](const Parameters& params, const JobResult& result, const JobProcessingStatistics& stat) {
             // An actual application would nicely format the result here ...
             auto json = nlohmann::json::array();
             std::stringstream modelString;

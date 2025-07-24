@@ -3,7 +3,9 @@
 #include <string>
 #include <vector>
 
+#include "util/sys/shmem_cache.hpp"
 #include "comm/host_comm.hpp"
+#include "data/job_transfer.hpp"
 #include "worker.hpp"
 #include "util/sys/proc.hpp"
 #include "util/sys/timer.hpp"
@@ -24,10 +26,11 @@
 
 Worker::Worker(MPI_Comm comm, Parameters& params) :
     _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 
-    _params(params), _job_registry(_params, _comm), _routing_tree(_params, _comm), 
-    _sys_state(_comm, params.sysstatePeriod(), SysState<9>::ALLREDUCE), 
-    _sched_man(_params, _comm, _routing_tree, _job_registry, _sys_state), 
-    _watchdog(/*enabled=*/_params.watchdog(), /*checkIntervMillis=*/100, Timer::elapsedSeconds())
+    _params(params), _watchdog(/*enabled=*/_params.watchdog(), /*checkIntervMillis=*/100, Timer::elapsedSeconds()),
+    _sys_state(_comm, params.sysstatePeriod(), SysState<9>::ALLREDUCE),
+    _job_registry(_params, _comm), _routing_tree(_params, _comm),
+    _sched_man(_params, _comm, _routing_tree, _job_registry, _sys_state),
+    _group_comm_builder(_comm, _job_registry)
 {
     _watchdog.setWarningPeriod(50); // warn after 50ms without a reset
     _watchdog.setAbortPeriod(_params.watchdogAbortMillis()); // abort after X ms without a reset
@@ -75,6 +78,7 @@ void Worker::advance() {
         // Forget jobs that are old or wasting memory
         _watchdog.setActivity(Watchdog::FORGET_OLD_JOBS);
         _sched_man.forgetOldJobs();
+        SharedMemoryCache::collectGarbage();
 
         // Continue to bounce requests which were deferred earlier
         _watchdog.setActivity(Watchdog::THAW_JOB_REQUESTS);
@@ -86,6 +90,8 @@ void Worker::advance() {
         _watchdog.setActivity(Watchdog::CHECK_JOBS);
         checkJobs();
     }
+
+    if (_params.crossJobCommunication()) _group_comm_builder.advance(time);
 
     // Advance an all-reduction of the current system state
     if (_sys_state.aggregate(time)) {
@@ -220,9 +226,5 @@ void Worker::publishAndResetSysState() {
 }
 
 Worker::~Worker() {
-
-    _watchdog.stop();
-    Terminator::setTerminating();
-
     LOG(V4_VVER, "Destruct worker\n");
 }

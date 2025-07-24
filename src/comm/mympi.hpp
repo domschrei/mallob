@@ -29,10 +29,10 @@ public:
     static void init();
     static void setOptions(const Parameters& params);
 
-    static int isend(int recvRank, int tag, const Serializable& object);
-    static int isend(int recvRank, int tag, std::vector<uint8_t>&& object);
-    static int isend(int recvRank, int tag, const DataPtr& object);
-    static int isendCopy(int recvRank, int tag, const std::vector<uint8_t>& object);
+    static int isend(int recvRank, int tag, const Serializable& object, bool fromMainThread = true);
+    static int isend(int recvRank, int tag, std::vector<uint8_t>&& object, bool fromMainThread = true);
+    static int isend(int recvRank, int tag, const DataPtr& object, bool fromMainThread = true);
+    static int isendCopy(int recvRank, int tag, const std::vector<uint8_t>& object, bool fromMainThread = true);
     
     static MPI_Request    ireduce(MPI_Comm communicator, float* contribution, float* result, int rootRank, MPI_Op operation = MPI_SUM);
     static MPI_Request iallreduce(MPI_Comm communicator, float* contribution, float* result, MPI_Op operation = MPI_SUM);
@@ -40,11 +40,10 @@ public:
 
     static MPI_Request iallgather(MPI_Comm communicator, float* contribution, float* result, int numFloats);
 
-    enum BufferQueryMode {LEVEL=0, LIMITED=1};
-    static size_t getBinaryTreeBufferLimit(int numWorkers, int baseSize, float functionParam, BufferQueryMode mode);
-
     static int size(MPI_Comm comm);
     static int rank(MPI_Comm comm);
 
     static MessageQueue& getMessageQueue();
+
+    static void broadcastExitSignal();
 };

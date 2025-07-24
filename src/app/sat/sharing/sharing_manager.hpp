@@ -15,6 +15,7 @@
 #include "app/sat/data/definitions.hpp"             // for ExtLearnedClauseC...
 #include "app/sat/data/solver_statistics.hpp"       // for SolverStatistics
 #include "app/sat/sharing/clause_id_alignment.hpp"  // for ClauseIdAlignment
+#include "app/sat/sharing/filter/clause_prefilter.hpp"
 #include "util/tsl/robin_hash.h"                    // for robin_hash<>::buc...
 #include "util/tsl/robin_set.h"                     // for robin_set
 
@@ -77,6 +78,7 @@ protected:
 	SharingStatistics _stats;
 	std::vector<SolverStatistics*> _solver_stats;
 
+	int _num_original_vars;
 	int _num_original_clauses;
 
 	int _imported_revision = -1;
@@ -98,17 +100,22 @@ protected:
 
 	std::unique_ptr<ClauseLogger> _clause_logger;
 
+	std::vector<int> _groundtruth_model;
+
+	ClausePrefilter* _prefilter {nullptr};
+
 public:
 	SharingManager(std::vector<std::shared_ptr<PortfolioSolverInterface>>& solvers,
 			const Parameters& params, const Logger& logger, size_t maxDeferredLitsPerSolver,
 			int jobIndex);
 	~SharingManager();
+	void setClausePrefilter(ClausePrefilter& prefilter) {_prefilter = &prefilter;}
 
 	void addSharingEpoch(int epoch) {_digested_epochs.insert(epoch);}
 	std::vector<int> prepareSharing(int totalLiteralLimit, int& outSuccessfulSolverId, int& outNbLits);
 	std::vector<int> filterSharing(std::vector<int>& clauseBuf);
 	void digestSharingWithFilter(std::vector<int>& clauseBuf, std::vector<int>* filter);
-	void digestSharingWithoutFilter(std::vector<int>& clauseBuf);
+	void digestSharingWithoutFilter(std::vector<int>& clauseBuf, bool stateless);
 	void returnClauses(std::vector<int>& clauseBuf);
 	void digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauseBuf);
 	void collectGarbageInFilter();
@@ -142,11 +149,11 @@ private:
 
 	void applyFilterToBuffer(std::vector<int>& clauseBuf, std::vector<int>* filter);
 
-	void onProduceClause(int solverId, int solverRevision, const Mallob::Clause& clause, int condVarOrZero, bool recursiveCall = false);
+	void onProduceClause(int solverId, int solverRevision, const Mallob::Clause& clause, const std::vector<int>& condLits, bool recursiveCall = false);
 
 	ExtLearnedClauseCallback getCallback() {
-		return [this](const Mallob::Clause& c, int solverId, int solverRevision, int condVarOrZero) {
-			onProduceClause(solverId, solverRevision, c, condVarOrZero);
+		return [this](const Mallob::Clause& c, int solverId, int solverRevision, const std::vector<int>& condLits) {
+			onProduceClause(solverId, solverRevision, c, condLits);
 		};
 	};
 

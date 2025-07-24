@@ -12,6 +12,7 @@
 #include <memory>
 #include <vector>
 
+#include "app/app_registry.hpp"
 #include "comm/mympi.hpp"
 #include "util/params.hpp"
 #include "data/job_description.hpp"
@@ -70,7 +71,9 @@ private:
     // Safeguards _incoming_job_queue.
     Mutex _incoming_job_lock;
     ConditionVariable _incoming_job_cond_var;
-    
+
+    int _mono_job_id {-1};
+
     std::atomic_long _next_arrival_time_millis = -1;
     std::set<float> _arrival_times;
     Mutex _arrival_times_lock;
@@ -98,28 +101,44 @@ private:
     // Safeguards _done_jobs.
     Mutex _done_job_lock; 
 
-    std::list<std::future<void>> _done_job_futures;
-    std::list<bool> _done_job_futures_finished;
+    struct PendingSubtask {
+        std::future<void> future;
+        bool done {false};
+    };
+    std::list<PendingSubtask> _pending_subtasks;
 
     std::atomic_int _num_jobs_to_interrupt = 0;
-    robin_hood::unordered_set<int> _jobs_to_interrupt;
+    std::list<std::pair<int, int>> _jobs_to_interrupt; // job id, revision
     Mutex _jobs_to_interrupt_lock;
 
     std::map<int, int> _root_nodes;
     std::set<int> _client_ranks;
     SysState<5> _sys_state;
 
-    std::unique_ptr<JsonInterface> _json_interface;
-    std::vector<Connector*> _interface_connectors;
-    APIConnector* _api_connector;
-    BackgroundWorker _instance_reader;
-
     // Number of jobs with a loaded description (taking memory!)
     std::atomic_int _num_loaded_jobs = 0;
     Mutex _finished_msg_ids_mutex;
     std::vector<int> _finished_msg_ids;
 
-    PeriodicEvent<100> _periodic_check_done_jobs;
+    PeriodicEvent<50> _periodic_check_done_jobs;
+    PeriodicEvent<10> _periodic_check_client_side_jobs;
+    Mutex _client_side_jobs_mutex;
+
+    std::unique_ptr<JsonInterface> _json_interface;
+    std::vector<std::shared_ptr<Connector>> _interface_connectors;
+    BackgroundWorker _instance_reader;
+
+    struct ClientSideJob {
+        std::unique_ptr<JobDescription> desc;
+        std::unique_ptr<app_registry::ClientSideProgram> program;
+        JobResult result;
+        bool done {false};
+        std::unique_ptr<BackgroundWorker> thread;
+        ClientSideJob() {thread.reset(new BackgroundWorker());}
+        ClientSideJob(std::unique_ptr<JobDescription>&& desc) : desc(std::move(desc)) {thread.reset(new BackgroundWorker());}
+    };
+    std::list<ClientSideJob> _client_side_jobs;
+    std::list<ClientSideJob> _done_client_side_jobs;
 
 public:
     Client(MPI_Comm comm, Parameters& params)
@@ -135,7 +154,6 @@ public:
     int getInternalRank();
     std::string getFilesystemInterfacePath();
     std::string getSocketPath();
-    APIConnector& getAPI();
 
 private:
     void readIncomingJobs();
@@ -147,12 +165,12 @@ private:
     void handleAbort(MessageHandle& handle);
     void handleSendJobResult(MessageHandle& handle);
     void handleClientFinished(MessageHandle& handle);
-    void handleExit(MessageHandle& handle);
 
     int getMaxNumParallelJobs();
     void introduceNextJob();
     void finishJob(int jobId, bool hasIncrementalSuccessors);
-    
+
+    JobDescription* getActiveJob(int jobId);
 };
 
 #endif

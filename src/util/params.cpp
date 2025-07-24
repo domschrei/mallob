@@ -16,8 +16,8 @@
 #include "util/option.hpp"
 #include "util/robin_hood.hpp"
 
-const char* BANNER = "\nMallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving\nDesigned by P. Sanders and D. Schreiber 2018-2022\nDeveloped by D. Schreiber 2019-2022\n";
-const char* BANNER_C_PREFIXED = "c \nc Mallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving\nc Designed by P. Sanders and D. Schreiber 2018-2022\nc Developed by D. Schreiber 2019-2022\nc ";
+const char* BANNER = "\nMallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving\nCopyright (C) 2019-2025 Dominik Schreiber, Karlsruhe Institute of Technology, Germany\n";
+const char* BANNER_C_PREFIXED = "c \nc Mallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving\nc Copyright (C) 2019-2025 Dominik Schreiber, Karlsruhe Institute of Technology, Germany\nc ";
 const char* USAGE = "Usage: [mpiexec -np <num-mpi-processes> [mpi-options]] mallob [options]\n";
 
 Parameters::Parameters(const Parameters& other) {
@@ -80,21 +80,13 @@ void Parameters::init(int argc, char** argv) {
 void Parameters::expand() {
     if (monoFilename.isSet()) {
         // Single instance solving
-        hopsUntilCollectiveAssignment.set(-1); // no collective assignments
-        numClients.set(1); // 1 client
+        //numClients.set(1); // 1 client
         useFilesystemInterface.set(false); // no fs interface
         useIPCSocketInterface.set(false); // no socket interface
         numWorkers.set(-1); // all workers
-        growthPeriod.set(0); // instantaneous growth of job demand
         loadFactor.set(1); // full load factor
         maxDemand.set(0); // no limit of max. demand
-        balancingPeriod.set(0.01); // low balancing delay to immediately get full demand
-        numJobs.set(1); // one job to process
-        
-        // Disable detection of unresponsive nodes since printing a huge model
-        // may lead to such timeouts. 
-        // TODO Fix the underlying issue, or move to a nicer place.
-        SysState_disableUnresponsiveNodeCrashing();
+        jobCacheSize.set(1); // only remember a single job desc. at a time
     }
 }
 

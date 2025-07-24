@@ -1,4 +1,6 @@
 
+#include <csignal>
+#include <pthread.h>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/prctl.h>
@@ -11,13 +13,13 @@
 #include "proc.hpp"
 #include "util/logger.hpp"
 #include "util/sys/threading.hpp"
+#include "util/assert.hpp"
 
 int Process::_rank;
 std::string Process::_trace_dir;
 
 Mutex Process::_children_mutex;
 std::set<pid_t> Process::_children;
-std::atomic_bool Process::_leaf_process;
 long Process::_main_tid;
 
 std::atomic_bool Process::_exit_signal_caught = false;
@@ -30,43 +32,50 @@ void doNothing(int signum) {
 }
 
 void handleSignal(int signum) {
-
     // Do not recursively catch signals (if something goes wrong in here)
-    if (!Process::_exit_signal_caught) {
-        Process::_exit_signal = signum;
-        Process::_signal_tid = Proc::getTid();
-        Process::_exit_signal_caught = true;
-        if (Process::isCrash(signum)) {
-            // Try to write a trace of the concerned thread with gdb
-            Process::writeTrace(Process::_signal_tid);
-        }
+    if (Process::_exit_signal_caught) return;
+
+    Process::_exit_signal_caught = true;
+    Process::_exit_signal = signum;
+    Process::_signal_tid = Proc::getTid();
+
+    // If crash, try to write a trace of the concerned thread with gdb
+    if (Process::isCrash(signum)) Process::writeTrace(Proc::getTid());
+
+    // Impose a hard timeout for this process' lifetime from this point,
+    // to avoid indeterminate freezes
+    //auto cmd = "bash scripts/kill-delayed.sh " + std::to_string(Proc::getPid());
+    //system(cmd.c_str());
+
+    // Special case where we are in the main thread and a crash was noticed:
+    // normal execution cannot continue here, so we exit directly.
+    if (Process::isCrash(signum) && Process::_main_tid == Proc::getTid()) {
+        Process::reportTerminationSignal(Process::getCaughtSignal().value());
+        Process::forwardTerminateToChildren();
+        Process::doExit(signum);
     }
-    
-    // Special handling for termination and crash signals
-    Process::handleTerminationSignal(Process::getCaughtSignal().value());
 }
 
 bool Process::isCrash(int signum) {
-    return signum == SIGABRT || signum == SIGFPE || signum == SIGSEGV || signum == SIGBUS || signum == SIGPIPE;
+    return signum == SIGABRT || signum == SIGFPE || signum == SIGSEGV || signum == SIGBUS || signum == SIGILL;
 }
 
-void Process::handleTerminationSignal(const SignalInfo& info) {
-    if (!Process::isLeafProcess()) Process::forwardTerminateToChildren();
+void Process::reportTerminationSignal(const SignalInfo& info) {
+    assert(Proc::getTid() == Process::_main_tid);
 
     if (isCrash(info.signum)) {
-        if (Proc::getTid() == Process::_main_tid) {
-            // Main thread: handle crash directly
-            long tid = info.tid;
-            LOG(V0_CRIT, "[ERROR] pid=%ld tid=%ld signal=%d\n", 
-                    Proc::getPid(), tid, info.signum);
-            // Try to write a trace of the concerned thread with gdb
-            Process::writeTrace(tid);
-            Process::doExit(1);
-        } else {
-            // Sleep indefinitely until killed by main thread
-            while (true) {}
-        }
+        LOG(V0_CRIT, "[ERROR] pid=%ld tid=%ld signal=%d\n", 
+                Proc::getPid(), info.tid, info.signum);
+    } else {
+        LOG(V3_VERB, "pid=%ld tid=%ld signal=%d\n",
+                Proc::getPid(), info.tid, info.signum);
     }
+    Logger::getMainInstance().flush();
+}
+
+void Process::removeDelayedExitWatchers() {
+    //std::string cmd = "pgrep -f \"do-kill-delayed.sh " + std::to_string(Proc::getPid()) + "\" | xargs kill >/dev/null 2>&1";
+    //system(cmd.c_str());
 }
 
 void Process::doExit(int retval) {
@@ -76,11 +85,10 @@ void Process::doExit(int retval) {
 }
 
 
-void Process::init(int rank, const std::string& traceDir, bool leafProcess) {
+void Process::init(int rank, const std::string& traceDir) {
     _rank = rank;
     _trace_dir = traceDir;
     _exit_signal_caught = false;
-    _leaf_process = leafProcess;
     _main_tid = Proc::getTid();
 
     signal(SIGUSR1, doNothing); // override default action (exit) on SIGUSR1
@@ -90,7 +98,7 @@ void Process::init(int rank, const std::string& traceDir, bool leafProcess) {
     signal(SIGBUS, handleSignal);
     signal(SIGTERM, handleSignal);
     signal(SIGINT,  handleSignal);
-    signal(SIGPIPE, handleSignal);
+    signal(SIGPIPE, SIG_IGN);
 
     // Allow any other process/thread to ptrace this process
     // (used for debugging of crashes via external gdb call)
@@ -120,17 +128,13 @@ void Process::hardkill(pid_t childpid) {
     sendSignal(childpid, SIGKILL);
 }
 void Process::suspend(pid_t childpid) {
-    sendSignal(childpid, SIGTSTP);
+    sendSignal(childpid, SIGSTOP);
 }
 void Process::resume(pid_t childpid) {
     sendSignal(childpid, SIGCONT);
 }
 void Process::wakeUp(pid_t childpid) {
     sendSignal(childpid, SIGUSR1);
-}
-
-bool Process::isLeafProcess() {
-    return _leaf_process;
 }
 
 void Process::forwardTerminateToChildren() { 
@@ -143,10 +147,21 @@ void Process::forwardTerminateToChildren() {
 }
 
 void Process::sendSignal(pid_t childpid, int signum) {
+    assert(childpid > 0);
     int result = kill(childpid, signum);
     if (result == -1) {
-        LOG(V1_WARN, "[WARN] kill -%i %i returned -1\n", signum, childpid);
+        LOG(V1_WARN, "[WARN] kill -%i %i returned errno %i\n", signum, childpid, errno);
     }
+}
+
+pthread_t Process::getPthreadId() {
+    return pthread_self();
+}
+void Process::wakeUpThread(pthread_t pthreadId) {
+    sendPthreadSignal(pthreadId, SIGUSR1);
+}
+void Process::sendPthreadSignal(pthread_t pthreadId, int sig) {
+    pthread_kill(pthreadId, sig);
 }
 
 bool Process::didChildExit(pid_t childpid, int* exitStatusOut) {
@@ -179,11 +194,11 @@ std::optional<Process::SignalInfo> Process::getCaughtSignal() {
 
 void Process::writeTrace(long tid) {
     long callingTid = Proc::getTid();
-    std::string command = "kill -20 " + std::to_string(tid) 
-            + " && gdb --q --n --ex bt --batch --pid " + std::to_string(tid) 
-            + " > " + _trace_dir + "/mallob_thread_trace_of_" + std::to_string(tid) 
+    std::string command = "kill -20 " + std::to_string(tid)
+            + " ; gdb --q --n --ex bt --batch --pid " + std::to_string(tid)
+            + " > " + _trace_dir + "/mallob_thread_trace_of_" + std::to_string(tid)
             + "_from_" + std::to_string(callingTid) + " 2>&1"
-            + " && kill -18 " + std::to_string(tid);
+            + " ; kill -18 " + std::to_string(tid);
     // Execute GDB in separate thread to avoid self-tracing
     std::thread thread([&]() {
         (void) system(command.c_str());

@@ -8,14 +8,8 @@
 #include "job_transfer.hpp"
 #include "comm/mympi.hpp"
 
-/*static!*/ size_t JobRequest::getMaxTransferSize() {
-    return 8*sizeof(int)+2*(sizeof(ctx_id_t))+sizeof(float)+sizeof(bool)
-        +4*sizeof(int);
-}
-
-size_t JobRequest::getTransferSize() const {
-    return 8*sizeof(int)+2*(sizeof(ctx_id_t))+sizeof(float)+sizeof(bool)
-        +(multiplicity == 1 ? 2 : 4)*sizeof(int);
+/*static!*/ size_t JobRequest::getTransferSize() {
+    return 12*sizeof(int)+2*sizeof(ctx_id_t)+sizeof(float)+sizeof(bool);
 }
 
 std::vector<uint8_t> JobRequest::serialize() const {
@@ -36,7 +30,6 @@ std::vector<uint8_t> JobRequest::serialize() const {
     n = sizeof(bool); memcpy(packed.data()+i, &incremental, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &multiBaseId, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &multiplicity, n); i += n;
-    if (multiplicity == 1) return packed;
     n = sizeof(int); memcpy(packed.data()+i, &multiBegin, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &multiEnd, n); i += n;
     return packed;
@@ -58,7 +51,6 @@ JobRequest& JobRequest::deserialize(const std::vector<uint8_t> &packed) {
     n = sizeof(bool); memcpy(&incremental, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&multiBaseId, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&multiplicity, packed.data()+i, n); i += n;
-    if (multiplicity == 1) return *this;
     n = sizeof(int); memcpy(&multiBegin, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&multiEnd, packed.data()+i, n); i += n;
     return *this;
@@ -146,9 +138,9 @@ std::vector<uint8_t> JobMessage::serialize() const {
     n = sizeof(int); memcpy(packed.data()+i, &revision, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &tag, n); i += n;
     n = sizeof(int); memcpy(packed.data()+i, &epoch, n); i += n;
-    n = sizeof(bool); memcpy(packed.data()+i, &returnedToSender, n); i += n;
     n = sizeof(Checksum); memcpy(packed.data()+i, &checksum, n); i += n;
     n = payload.size()*sizeof(int); memcpy(packed.data()+i, payload.data(), n); i += n;
+    n = sizeof(bool); memcpy(packed.data()+i, &returnedToSender, n); i += n;
     return packed;
 }
 
@@ -162,18 +154,22 @@ JobMessage& JobMessage::deserialize(const std::vector<uint8_t>& packed) {
     n = sizeof(int); memcpy(&revision, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&tag, packed.data()+i, n); i += n;
     n = sizeof(int); memcpy(&epoch, packed.data()+i, n); i += n;
-    n = sizeof(bool); memcpy(&returnedToSender, packed.data()+i, n); i += n;
     n = sizeof(Checksum); memcpy(&checksum, packed.data()+i, n); i += n;
-    n = packed.size()-i; payload.resize(n/sizeof(int)); 
+    n = packed.size()-i-1; payload.resize(n/sizeof(int));
     memcpy(payload.data(), packed.data()+i, n); i += n;
+    n = sizeof(bool); memcpy(&returnedToSender, packed.data()+i, n); i += n;
     return *this;
+}
+
+void JobMessage::swapSenderReceiver() {
+    std::swap(contextIdOfSender, contextIdOfDestination);
+    std::swap(treeIndexOfSender, treeIndexOfDestination);
 }
 
 void JobMessage::returnToSender(int senderRank, int mpiTag) {
     if (returnedToSender) return;
     returnedToSender = true;
-    std::swap(contextIdOfSender, contextIdOfDestination);
-    std::swap(treeIndexOfSender, treeIndexOfDestination);
+    // Do not swap the metadata, since an internal redirection of messages doesn't either
     MyMpi::isend(senderRank, mpiTag, *this);
 }
 

@@ -15,6 +15,8 @@
 #include <utility>
 #include <vector>
 
+#include "comm/group_comm.hpp"
+#include "util/hashing.hpp"
 #include "util/sys/threading.hpp"
 #include "util/params.hpp"
 #include "data/job_description.hpp"
@@ -33,7 +35,7 @@ struct IntPairHasher;
 
 typedef std::function<void(JobRequest& req, int tag, bool left, int dest)> EmitDirectedJobRequestCallback;
 
-class Job {
+class Job : public AppMessageListener {
 
 // Protected fields, may be accessed by your application code.
 protected:
@@ -161,6 +163,9 @@ private:
     JobDescription _description;
     int _desired_revision = 0;
     int _last_solved_revision = -1;
+    // highest revision confirmed to be "sufficiently present" for solving, i.e.,
+    // either completely present or its skeleton is enough for the job
+    int _last_usable_revision = -1; 
 
     float _time_of_arrival;
     float _time_of_activation = 0;
@@ -184,7 +189,26 @@ private:
     int _balancing_epoch_of_last_commitment = -1;
     int _latest_balancing_epoch {0};
     std::optional<JobResult> _result;
-    robin_hood::unordered_node_set<std::pair<int, int>, IntPairHasher> _waiting_rank_revision_pairs;
+    struct ChildWaitingForDescription {
+        int rank;
+        int revision;
+        bool sendSkeletonOnly;
+        bool directChild {true};
+        bool operator==(const ChildWaitingForDescription& other) const {
+            return rank == other.rank && revision == other.revision && sendSkeletonOnly == other.sendSkeletonOnly
+                && directChild == other.directChild;
+        }
+    };
+    struct ChildWaitingForDescriptionHasher {
+        size_t operator()(const ChildWaitingForDescription& o) const {
+            size_t h = 1;
+            hash_combine(h, o.rank);
+            hash_combine(h, o.revision);
+            hash_combine(h, o.sendSkeletonOnly);
+            return h;
+        }
+    };
+    robin_hood::unordered_node_set<ChildWaitingForDescription, ChildWaitingForDescriptionHasher> _children_waiting_for_description;
 
     AppMessageSubscription _app_msg_subscription;
     JobTree _job_tree;
@@ -198,6 +222,11 @@ private:
 
     std::optional<JobRequest> _request_to_multiply_left;
     std::optional<JobRequest> _request_to_multiply_right;
+
+    GroupComm _group_comm;
+    int _rev_to_reach_for_group_id {0};
+
+    int _sum_of_description_sizes {0};
 
 // Public methods.
 public:
@@ -232,7 +261,7 @@ public:
 
     // Initiate a communication with other nodes in the associated job tree.
     void communicate(); // outgoing
-    void communicate(int source, int mpiTag, JobMessage& msg); // incoming (+ outgoing)
+    void communicate(int source, int mpiTag, JobMessage& msg) override; // incoming (+ outgoing)
 
     // Interrupt the execution of solvers and withdraw the associated solvers 
     // and the job's payload. Only leaves behind the job's meta data.
@@ -256,18 +285,28 @@ public:
     bool hasDescription() const {return _has_description;};
     const JobDescription& getDescription() const {assert(hasDescription()); return _description;};
     const std::shared_ptr<std::vector<uint8_t>>& getSerializedDescription(int revision) {return _description.getSerialization(revision);};
+    std::vector<uint8_t> getSerializedDescriptionSkeleton(int revision) {
+        // Prepare serialization of the desired revision
+        // with the formula data itself "cut out"
+        std::vector<uint8_t> out {_description.getRevisionData(revision)->data(), (uint8_t*)_description.getFormulaPayload(revision)};
+        return out;
+    }
     bool hasCommitment() const {return _commitment.has_value();}
     const JobRequest& getCommitment() const {assert(hasCommitment()); return _commitment.value();}
-    int getId() const {return _id;};
+    int getId() const override {return _id;};
     int getIndex() const {return _job_tree.getIndex();};
     int getRevision() const {return !hasDescription() ? -1 : getDescription().getRevision();};
     int getMaxConsecutiveRevision() const {return !hasDescription() ? -1 : getDescription().getMaxConsecutiveRevision();};
     int getDesiredRevision() const {return _desired_revision;}
+    int getRevisionToReachForGroupId() const {return _rev_to_reach_for_group_id;}
+    // Returns true if the present job description revisions are sufficient to begin solving.
+    // Returns false and the 1st missing or incomplete revision index otherwise.
+    bool hasAllDescriptionsForSolving(int& missingOrIncompleteRevIdx);
     JobResult& getResult();
     // Elapsed seconds since the job's constructor call.
     float getAge() const {return Timer::elapsedSeconds() - _time_of_arrival;}
     // Elapsed seconds since initialization was ended.
-    float getAgeSinceActivation() const {return Timer::elapsedSeconds() - _time_of_activation;}
+    float getAgeSinceActivation() const {return Timer::elapsedSeconds() - _time_of_increment_activation;}
     // Elapsed seconds since termination of the job.
     float getAgeSinceAbort() const {return Timer::elapsedSeconds() - _time_of_abort;}
     float getLatencyOfFirstVolumeUpdate() const {return _time_of_first_volume_update < 0 ? -1 : _time_of_first_volume_update - _time_of_activation;}
@@ -281,7 +320,6 @@ public:
     // Returns whether the job is easily and quickly destructible as of now. 
     // (calls appl_isDestructible())
     bool isDestructible();
-    void clearJobDescription() {for (size_t i = 0; i < getRevision(); i++) _description.clearPayload(i);}
     void setTimeOfFirstVolumeUpdate(float time) {_time_of_first_volume_update = time;}
     
     ctx_id_t getContextId() const {return _app_msg_subscription.getContextId();}
@@ -290,8 +328,21 @@ public:
     JobTree& getJobTree() {return _job_tree;}
     const JobTree& getJobTree() const {return _job_tree;}
     const JobComm& getJobComm() const {return _comm;}
-    robin_hood::unordered_node_set<std::pair<int, int>, IntPairHasher>& getWaitingRankRevisionPairs() {
-        return _waiting_rank_revision_pairs;
+    robin_hood::unordered_node_set<ChildWaitingForDescription, ChildWaitingForDescriptionHasher>& getChildrenWaitingForDescription() {
+        return _children_waiting_for_description;
+    }
+    void setGroupComm(GroupComm&& comm) {_group_comm = std::move(comm);}
+    const GroupComm& getGroupComm() const {return _group_comm;}
+
+    JobMessage getMessageTemplate() const {
+        JobMessage msg;
+        msg.jobId = getId();
+        msg.revision = getRevision();
+        msg.epoch = 0;
+        msg.treeIndexOfSender = getIndex();
+        msg.contextIdOfSender = getContextId();
+        msg.returnedToSender = false;
+        return msg;
     }
 
     void updateJobBalancingEpoch(int latestEpoch) {
@@ -345,9 +396,11 @@ public:
         return false;
     }
 
+    virtual bool canHandleIncompleteRevision(int rev) {return false;}
+
     // Marks the job to be indestructible as long as pending is true.
-    void addChildWaitingForRevision(int rank, int revision) {_waiting_rank_revision_pairs.insert(std::pair<int, int>(rank, revision));}
-    void setDesiredRevision(int revision) {_desired_revision = revision;}
+    void addChildWaitingForRevision(int rank, int revision, bool sendSkeletonOnly, bool directChild = true) {_children_waiting_for_description.insert({rank, revision, sendSkeletonOnly, directChild});}
+    void setDesiredRevision(int revision) {_desired_revision = std::max(_desired_revision, revision);}
     bool isRevisionSolved(int revision) {return _last_solved_revision >= revision;}
     void setRevisionSolved(int revision) {_last_solved_revision = revision;}
 

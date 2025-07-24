@@ -16,7 +16,7 @@ public:
         int solverId;
         int solverRevision;
         Mallob::Clause clause;
-        int condVarOrZero;
+        std::vector<int> condLits;
     };
     typedef std::function<void(const ClauseInsertionCall&)> CbAdmitClause;
 
@@ -49,7 +49,7 @@ public:
         if (isWaitingForSync()) syncAndCheckForLocalWinner(-1);
     }
 
-    void insertBlocking(int solverId, int solverRevision, const Mallob::Clause& clause, int condVarOrZero) {
+    void insertBlocking(int solverId, int solverRevision, const Mallob::Clause& clause, const std::vector<int>& condLits) {
         
         waitForSync(solverId);
 
@@ -58,7 +58,7 @@ public:
 
             auto& q = _admission_queues.at(solverId);
             bool emptyBefore = q.queue.empty();
-            q.queue.push_back(ClauseInsertionCall {solverId, solverRevision, clause.copy(), condVarOrZero});
+            q.queue.push_back(ClauseInsertionCall {solverId, solverRevision, clause.copy(), condLits});
             q.numInserted++;
 
             if (emptyBefore) {
@@ -134,7 +134,6 @@ public:
                 if (_solvers[i]->getGlobalId() == globalWinningId) {
                     hasWinningSolver = true;
                 }
-                if (globalWinningId >= 0) _solvers[i]->suspend();
                 q.waiting = false;
             }
             _nb_waiting_for_sync = 0;

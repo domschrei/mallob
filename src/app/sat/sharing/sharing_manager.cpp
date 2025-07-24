@@ -1,12 +1,15 @@
 
+#include <climits>
 #include <signal.h>
 #include <assert.h>
 #include <ext/alloc_traits.h>
 #include <algorithm>
 #include <utility>
 
+#include "app/sat/data/model_string_compressor.hpp"
 #include "app/sat/sharing/clause_logger.hpp"
 #include "app/sat/sharing/filter/clause_buffer_lbd_scrambler.hpp"
+#include "app/sat/sharing/filter/filter_vector_builder.hpp"
 #include "app/sat/sharing/filter/generic_clause_filter.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
 #include "app/sat/sharing/store/static_clause_store_by_lbd.hpp"
@@ -26,6 +29,7 @@
 #include "app/sat/sharing/filter/importing_solver.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
 #include "util/logger.hpp"
+#include "util/string_utils.hpp"
 #include "util/sys/timer.hpp"
 #include "util/random.hpp"
 #include "filter/in_place_clause_filtering.hpp"
@@ -43,27 +47,27 @@ SharingManager::SharingManager(
 	: _solvers(solvers), _params(params), _logger(logger), _job_index(jobIndex),
 	_clause_store([&]() -> GenericClauseStore* {
 		bool resetLbdAtExport = _params.resetLbd() == MALLOB_RESET_LBD_AT_EXPORT;
-		int staticBucketSize = (2*_params.clauseBufferBaseSize())/3;
+		int staticBucketSize = (2*_params.exportVolumePerThread()*_solvers.size())/3;
 		switch(_params.clauseStoreMode()) {
 		case MALLOB_CLAUSE_STORE_STATIC_BY_LENGTH_MIXED_LBD:
-			return new StaticClauseStoreMixedLbd(_params.strictClauseLengthLimit(),
+			return new StaticClauseStoreMixedLbd(_params.strictClauseLengthLimit()+ClauseMetadata::numInts(),
 				resetLbdAtExport, staticBucketSize);
 		case MALLOB_CLAUSE_STORE_STATIC_BY_LENGTH:
 			return new StaticClauseStore<true>(_params,
 				resetLbdAtExport, staticBucketSize, false, 0);
 		case MALLOB_CLAUSE_STORE_STATIC_BY_LBD:
-			return new StaticClauseStoreByLbd(_params.strictClauseLengthLimit(),
+			return new StaticClauseStoreByLbd(_params.strictClauseLengthLimit()+ClauseMetadata::numInts(),
 				resetLbdAtExport, staticBucketSize);
 		case MALLOB_CLAUSE_STORE_ADAPTIVE_SIMPLE:
 			return new StaticClauseStore<true>(_params,
 				resetLbdAtExport, 256, true,
-				_params.clauseBufferBaseSize()*_params.numExportChunks());
+				_params.exportVolumePerThread()*_solvers.size()*_params.numExportChunks());
 		case MALLOB_CLAUSE_STORE_ADAPTIVE:
 		default:
 			AdaptiveClauseStore::Setup setup;
 			setup.maxEffectiveClauseLength = _params.strictClauseLengthLimit()+ClauseMetadata::numInts();
 			setup.maxLbdPartitionedSize = _params.maxLbdPartitioningSize();
-			setup.numLiterals = _params.clauseBufferBaseSize()*_params.numExportChunks();
+			setup.numLiterals = _params.exportVolumePerThread()*_solvers.size()*_params.numExportChunks();
 			setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
 			setup.resetLbdAtExport = resetLbdAtExport;
 			return new AdaptiveClauseStore(setup);
@@ -105,6 +109,7 @@ SharingManager::SharingManager(
 	auto callback = getCallback();
 	
 	if (solvers.empty()) return;
+	_num_original_vars = solvers[0]->getSolverSetup().numVars;
 	_num_original_clauses = solvers[0]->getSolverSetup().numOriginalClauses;
 	int maxNumGlobalSolvers = solvers[0]->getSolverSetup().maxNumSolvers;
 
@@ -126,20 +131,27 @@ SharingManager::SharingManager(
 
 	if (_params.deterministicSolving()) {
 		_det_sync.reset(new DeterministicClauseSynchronizer(_solvers, _num_original_clauses, [&](auto call) {
-			onProduceClause(call.solverId, call.solverRevision, call.clause, call.condVarOrZero, true);
+			onProduceClause(call.solverId, call.solverRevision, call.clause, call.condLits, true);
 		}));
 	}
 
 	if (_job_index == 0 && _params.clauseLog.isSet()) {
 		_clause_logger.reset(new ClauseLogger(_params.clauseLog()));
 	}
+
+	if (_params.groundTruthModel.isSet()) {
+		std::ifstream ifs(_params.groundTruthModel());
+		std::string modelStr;
+		ifs >> modelStr;
+		_groundtruth_model = ModelStringCompressor::decompress(modelStr);
+	}
 }
 
-void SharingManager::onProduceClause(int solverId, int solverRevision, const Clause& clause, int condVarOrZero, bool recursiveCall) {
+void SharingManager::onProduceClause(int solverId, int solverRevision, const Clause& clause, const std::vector<int>& condLits, bool recursiveCall) {
 
 	if (!recursiveCall && _det_sync) {
 		// Deterministic solving!
-		_det_sync->insertBlocking(solverId, solverRevision, clause, condVarOrZero);
+		_det_sync->insertBlocking(solverId, solverRevision, clause, condLits);
 		return;
 	}
 
@@ -163,24 +175,46 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 	// This effectively renders the found conflict relative to the assumptions
 	// which were added not as assumptions but as permanent unit clauses.
 	std::vector<int>* tldClauseVec = nullptr;
-	if (condVarOrZero != 0) {
-		tldClauseVec = new std::vector<int>(clause.size+1);
+	if (!condLits.empty()) {
+		tldClauseVec = new std::vector<int>(clause.size+condLits.size());
 		for (int i = 0; i < clause.size; i++) tldClauseVec->at(i) = clause.begin[i];
-		tldClauseVec->at(clause.size) = -condVarOrZero;
+		for (int i = clause.size; i < tldClauseVec->size(); i++)
+			tldClauseVec->at(i) = condLits[i - clause.size];
 		clauseBegin = tldClauseVec->data();
-		clauseSize++;
+		clauseSize = tldClauseVec->size();
     }
 
+	if (!_params.onTheFlyChecking()) { // otherwise already sorted
+		// Sort literals in clause (not the metadata!)
+		std::sort(clauseBegin+ClauseMetadata::numInts(), clauseBegin+clauseSize);
+	}
+
+	if (tldClauseVec) {
+		// Check that the clause is sorted, remove duplicate lits
+		int lit = INT_MIN;
+		int shift = 0;
+		for (int i = ClauseMetadata::numInts(); i < clauseSize; i++) {
+			assert(clauseBegin[i] != 0);
+			assert(clauseBegin[i] >= lit || log_return_false("[ERROR] Clause not sorted: %s\n", clause.toStr().c_str()));
+			if (clauseBegin[i] == lit) shift++; // duplicate literal
+			lit = clauseBegin[i];
+			clauseBegin[i-shift] = lit;
+		}
+		clauseSize -= shift;
+	}
+
+	const int effectiveClauseLength = clauseSize - ClauseMetadata::numInts();
+
     // Check maximum size of clause
-    if (clauseSize-ClauseMetadata::numInts() > _params.strictClauseLengthLimit()) {
+    if (effectiveClauseLength > _params.strictClauseLengthLimit()) {
         if (tldClauseVec) delete tldClauseVec;
         return;
     }
 
-	if (clauseSize == 1 && clause.lbd != 1) {
+	if (effectiveClauseLength == 1 && clause.lbd != 1) {
 		_logger.log(V1_WARN, "Observed unit LBD of %i\n", clause.lbd);
 	}
-	if (clauseSize-ClauseMetadata::numInts() > 1) {
+	if (effectiveClauseLength > 1) {
 		_observed_nonunit_lbd_of_zero |= clause.lbd == 0;
 		_observed_nonunit_lbd_of_one |= clause.lbd == 1;
 		_observed_nonunit_lbd_of_two |= clause.lbd == 2;
@@ -190,15 +224,36 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 
 	//log(V4_VVER, "EXPORT %s\n", clause.toStr().c_str());
 
-	if (clauseSize == 1) assert(clause.lbd == 1);
+	if (effectiveClauseLength == 1) assert(clause.lbd == 1);
 	else {
-		assert(clause.lbd >= 1 || LOG_RETURN_FALSE("[ERROR] len=%i lbd=%i!\n", clause.size, clause.lbd));
-		assert(clause.lbd <= clause.size || LOG_RETURN_FALSE("[ERROR] len=%i lbd=%i!\n", clause.size, clause.lbd));
+		assert(clause.lbd >= 1 || LOG_RETURN_FALSE("[ERROR] len=%i lbd=%i!\n", effectiveClauseLength, clause.lbd));
+		assert(clause.lbd <= effectiveClauseLength || LOG_RETURN_FALSE("[ERROR] len=%i lbd=%i!\n", effectiveClauseLength, clause.lbd));
 	}
-	int clauseLbd = clauseSize == 1 ? 1 : std::max(2, clause.lbd + (condVarOrZero == 0 ? 0 : 1));
+	int clauseLbd = effectiveClauseLength == 1 ? 1 :
+		std::min(effectiveClauseLength, (int)std::max(2UL, clause.lbd + condLits.size()));
 
 	if (_params.resetLbd() == MALLOB_RESET_LBD_AT_PRODUCE)
-		clauseLbd = clauseSize;
+		clauseLbd = effectiveClauseLength;
+
+	if (_params.incrementalVariableDomainHeuristic() >= 2) {
+		// Rate the clause based on how many of its literals are "original",
+		// i.e., within the range of original, rev.0 variables.
+		clauseLbd = effectiveClauseLength == 1 ? 1 : 2;
+		for (int i = ClauseMetadata::numInts(); i < clauseSize; i++) {
+			// Each literal beyond the original variable range incurs a penalty.
+			clauseLbd += (std::abs(clauseBegin[i]) > _num_original_vars);
+		}
+		// Clamp the "accumulated penalty" to the maximum valid LBD value.
+		clauseLbd = std::min(clauseLbd, effectiveClauseLength);
+	}
+
+	Mallob::Clause c {clauseBegin, clauseSize, clauseLbd};
+	if (_prefilter && !_prefilter->prefilterClause(c)) {
+		if (tldClauseVec) delete tldClauseVec;
+        return;
+	}
+	assert(effectiveClauseLength == 1 || (clauseLbd >= 2 && clauseLbd <= effectiveClauseLength));
+	clauseLbd = c.lbd; // update LBD from pre-filter
 
 	// Add clause length to statistics
 	_hist_produced.increment(clauseSize);
@@ -208,17 +263,23 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 		solverStats->histProduced->increment(clause.size);
 	}
 
-	if (!_params.onTheFlyChecking()) {
-		// Sort literals in clause (not the metadata!)
-		std::sort(clauseBegin+ClauseMetadata::numInts(), clauseBegin+clauseSize);
+	if (!_groundtruth_model.empty()) {
+		// Check whether the produced clause is satisfied by the ground truth
+		bool ok = false;
+		for (int i = ClauseMetadata::numInts(); i < clauseSize; i++) {
+			int lit = clauseBegin[i];
+			int var = std::abs(lit);
+			if (var < _groundtruth_model.size() && _groundtruth_model[var] == lit) {
+				ok = true;
+				break;
+			}
+		} 
+		if (!ok) {
+			LOGGER(_logger, V0_CRIT, "[ERROR] Unable to satisfy learned clause %s with ground truth model!\n",
+				Mallob::Clause(clauseBegin, clauseSize, clauseLbd).toStr().c_str());
+			abort();
+		}
 	}
-
-	// Check that the clause is sorted
-	//int lit = INT_MIN;
-	//for (int i = ClauseMetadata::numInts(); i < clauseSize; i++) {
-	//	assert(clauseBegin[i] > lit || log_return_false("[ERROR] Clause not sorted: %s\n", clause.toStr().c_str()));
-	//	lit = clauseBegin[i];
-	//}
 
 	_export_buffer->produce(clauseBegin, clauseSize, clauseLbd, solverId, _internal_epoch);
 	//log(V6_DEBGV, "%i : PRODUCED %s\n", solverId, tldClause.toStr().c_str());
@@ -328,52 +389,14 @@ void SharingManager::returnClauses(std::vector<int>& clauseBuf) {
 std::vector<int> SharingManager::filterSharing(std::vector<int>& clauseBuf) {
 
 	auto reader = _clause_store->getBufferReader(clauseBuf.data(), clauseBuf.size());
-	
-	constexpr auto bitsPerElem = 8*sizeof(int);
-	int shift = bitsPerElem;
-	auto clause = reader.getNextIncomingClause();
-	int filterPos = -1 + (ClauseMetadata::enabled() ? 2 : 0);
-	int nbFiltered = 0;
-	int nbTotal = 0;
-
-	std::vector<int> result;
-
-	if (ClauseMetadata::enabled()) {
-		auto id = _id_alignment ? _id_alignment->contributeFirstClauseIdOfEpoch() : 0UL;
-		result.resize(sizeof(unsigned long) / sizeof(int));
-		memcpy(result.data(), &id, sizeof(unsigned long));
-	}
-
-	int filterSizeBeingLocked = -1;
-	while (clause.begin != nullptr) {
-		++nbTotal;
-
-		if (filterSizeBeingLocked != clause.size) {
-			if (filterSizeBeingLocked != -1) _clause_filter->releaseLock(filterSizeBeingLocked);
-			filterSizeBeingLocked = clause.size;
-			_clause_filter->acquireLock(filterSizeBeingLocked);
-		}
-
-		if (shift == bitsPerElem) {
-			++filterPos;
-			result.push_back(0);
-			shift = 0;
-		}
-		
-		if (!_clause_filter->admitSharing(clause, _internal_epoch)) {
-			// filtered!
-			auto bitFiltered = 1 << shift;
-			result[filterPos] |= bitFiltered;
-			++nbFiltered;
-		}
-		
-		++shift;
-		clause = reader.getNextIncomingClause();
-	}
-	if (filterSizeBeingLocked != -1) _clause_filter->releaseLock(filterSizeBeingLocked);
-
-	_logger.log(V4_VVER, "filtered %i/%i\n", nbFiltered, nbTotal);
-	return result;
+	auto id = _id_alignment ? _id_alignment->contributeFirstClauseIdOfEpoch() : 0UL;
+	return FilterVectorBuilder(id, _internal_epoch, _job_index==0).build(reader, [&](Mallob::Clause& clause) {
+		return _clause_filter->admitSharing(clause, _internal_epoch);
+	}, [&](int len) {
+		_clause_filter->acquireLock(len);
+	}, [&](int len) {
+		_clause_filter->releaseLock(len);
+	});
 }
 
 void SharingManager::digestSharingWithFilter(std::vector<int>& clauseBuf, std::vector<int>* filter) {
@@ -389,7 +412,8 @@ void SharingManager::digestSharingWithFilter(std::vector<int>& clauseBuf, std::v
 		auto& solver = _solvers[i];
 		if (!solver || !_solver_stats[i]) continue; // solver was cleaned up
 		if (!solver->isClauseSharingEnabled()) continue;
-		importingSolvers.emplace_back(solver.get(), _solver_stats[i], _id_alignment.get());
+		assert(i == solver->getLocalId());
+		importingSolvers.emplace_back(solver->getGlobalId(), solver->getLocalId(), _solver_stats[i], _id_alignment.get());
 	}
 
 	_last_num_cls_to_import = 0;
@@ -459,7 +483,7 @@ void SharingManager::digestSharingWithFilter(std::vector<int>& clauseBuf, std::v
 		for (auto& slv : importingSolvers) {
 			BufferReader reader = _clause_store->getBufferReader(clauseBuf.data(), clauseBuf.size());
 			reader.setFilterBitset(slv.filter);
-			slv.solver->addLearnedClauses(reader, _imported_revision);
+			_solvers[slv.localId]->addLearnedClauses(reader, _imported_revision);
 		}
 	}
 	
@@ -494,8 +518,10 @@ void SharingManager::applyFilterToBuffer(std::vector<int>& clauseBuf, std::vecto
 	_last_num_admitted_cls_to_import += filtering.getNumAdmittedClauses();
 }
 
-void SharingManager::digestSharingWithoutFilter(std::vector<int>& clauseBuf) {
+void SharingManager::digestSharingWithoutFilter(std::vector<int>& clauseBuf, bool stateless) {
+	bool sharingOpOngoing = _sharing_op_ongoing;
 	digestSharingWithFilter(clauseBuf, nullptr);
+	if (stateless) _sharing_op_ongoing = sharingOpOngoing;
 }
 
 void SharingManager::digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauseBuf) {
@@ -508,7 +534,7 @@ void SharingManager::digestHistoricClauses(int epochBegin, int epochEnd, std::ve
 		// More than half of the historic epochs are missing: do import.
 		_logger.log(V2_INFO, "Import historic cls [%i,%i) (missing %i/%i)\n", 
 			epochBegin, epochEnd, numUnknown, epochEnd-epochBegin);
-		digestSharingWithoutFilter(clauseBuf);
+		digestSharingWithoutFilter(clauseBuf, true);
 		for (int e = epochBegin; e < epochEnd; e++) addSharingEpoch(e);
 	}
 }
@@ -533,7 +559,7 @@ bool SharingManager::syncDeterministicSolvingAndCheckForWinningSolver() {
 
 SharingStatistics SharingManager::getStatistics() {
 
-	_logger.log(V2_INFO, "Observed non-unit LBDs: 0:%i 1:%i 2:%i len-1:%i len:%i\n", 
+	_logger.log(V5_DEBG, "Observed non-unit LBDs: 0:%i 1:%i 2:%i len-1:%i len:%i\n", 
 		_observed_nonunit_lbd_of_zero, 
 		_observed_nonunit_lbd_of_one, 
 		_observed_nonunit_lbd_of_two, 

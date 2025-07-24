@@ -14,26 +14,27 @@ class Terminator {
 
 private:
     static std::atomic_bool _exit;
+    static bool _forward_terminate_to_children;
 
 public:
+    static void setForwardTerminateToChildren(bool forward) {_forward_terminate_to_children = forward;}
     static void setTerminating() {
-        _exit = true;
+        bool expected = false;
+        bool isExitNew = _exit.compare_exchange_strong(expected, true, std::memory_order_relaxed);
+        if (isExitNew && _forward_terminate_to_children) {
+            Process::forwardTerminateToChildren();
+        }
     }
     static inline bool isTerminating(bool fromMainThread = false) {
         
-        if (Process::wasSignalCaught()) {
-
+        if (!_exit && Process::wasSignalCaught()) {
             auto optSignalInfo = Process::getCaughtSignal();
             if (optSignalInfo) {
-
                 int signum = optSignalInfo.value().signum;
-                if (!_exit) LOG(V2_INFO, "Caught signal %i\n", signum);
-                setTerminating();
-
                 if (fromMainThread) {
-                    Process::handleTerminationSignal(optSignalInfo.value());
+                    Process::reportTerminationSignal(optSignalInfo.value());
                 }
-
+                setTerminating();
                 return true;
             }
         }
@@ -43,8 +44,6 @@ public:
     static void reset() {
         _exit = false;
     }
-
-    static void broadcastExitSignal();
 };
 
 #endif

@@ -13,6 +13,11 @@ Option::Option(OptMap& map, GroupedOptionsList& groupedOpts, const std::string& 
 bool Option::hasLongOption() const {
     return !longid.empty();
 }
+void Option::throwError(const std::string& specifics) {
+    std::cout << "ERROR for option \"" << id << "\": " << specifics << std::endl;
+    std::cout << "Description of \"" << id << "\": " << desc << std::endl;
+    abort();
+}
 
 bool BoolOption::operator()() const {return val;}
 void BoolOption::set(bool val) {this->val = val;}
@@ -23,14 +28,8 @@ const char* BoolOption::getTypeString() const {return "bool";}
 
 int IntOption::operator()() const {return val;}
 void IntOption::set(int val) {
-    if (val < min) {
-        std::cout << "Option " << id << ": " << val << " < " << min << "(min)!" << std::endl;
-        abort();
-    }
-    if (val > max) {
-        std::cout << "Option " << id << ": " << val << " > " << max << "(max)!" << std::endl;
-        abort();
-    }
+    if (val < min) throwError(std::to_string(val) + " < " + std::to_string(min) + "(min)!");
+    if (val > max) throwError(std::to_string(val) + " > " + std::to_string(max) + "(max)!");
     this->val = val;
 }
 bool IntOption::isNonzero() const {return val != 0;}
@@ -41,14 +40,8 @@ const char* IntOption::getTypeString() const {return "int";}
 
 float FloatOption::operator()() const {return val;}
 void FloatOption::set(float val) {
-    if (val < min) {
-        std::cout << "Option " << id << ": " << val << " < " << min << "(min)!" << std::endl;
-        abort();
-    }
-    if (val > max) {
-        std::cout << "Option " << id << ": " << val << " > " << max << "(max)!" << std::endl;
-        abort();
-    }
+    if (val < min) throwError(std::to_string(val) + " < " + std::to_string(min) + "(min)!");
+    if (val > max) throwError(std::to_string(val) + " > " + std::to_string(max) + "(max)!");
     this->val = val;
 }
 bool FloatOption::isNonzero() const {return val != 0;}

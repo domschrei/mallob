@@ -16,8 +16,11 @@ namespace app_registry {
         struct AppEntry {
             std::string key;
             JobReader reader;
+            bool isClientSide {false};
             JobCreator creator;
+            ClientSideProgramCreator clientSideProgramCreator;
             JobSolutionFormatter solutionFormatter;
+            ResourceCleaner cleaner;
         };
 
         std::vector<AppEntry> _app_entries;
@@ -31,8 +34,9 @@ namespace app_registry {
     // solutionFormatter: a lambda which transforms a found job result into 
     void registerApplication(const std::string& key,
         JobReader reader, 
-        JobCreator creator, 
-        JobSolutionFormatter solutionFormatter
+        JobCreator creator,
+        JobSolutionFormatter solutionFormatter,
+        ResourceCleaner cleaner
     ) {
         int appId = _app_entries.size();
         _app_key_to_app_id[key] = appId;
@@ -43,6 +47,27 @@ namespace app_registry {
         entry.reader = reader;
         entry.creator = creator;
         entry.solutionFormatter = solutionFormatter;
+        entry.cleaner = cleaner;
+        _app_entries.push_back(std::move(entry));
+    }
+
+    void registerClientSideApplication(const std::string& key,
+        JobReader reader,
+        ClientSideProgramCreator programCreator,
+        JobSolutionFormatter solutionFormatter,
+        ResourceCleaner cleaner
+    ) {
+        int appId = _app_entries.size();
+        _app_key_to_app_id[key] = appId;
+        //std::cout << "Registered application id=" << appId << " key=" << key << std::endl;
+
+        AppEntry entry;
+        entry.key = key;
+        entry.reader = reader;
+        entry.isClientSide = true;
+        entry.clientSideProgramCreator = programCreator;
+        entry.solutionFormatter = solutionFormatter;
+        entry.cleaner = cleaner;
         _app_entries.push_back(std::move(entry));
     }
 
@@ -64,13 +89,28 @@ namespace app_registry {
         getAppKey(appId); // check existence
         return _app_entries.at(appId).reader;
     }
+    JobSolutionFormatter getJobSolutionFormatter(int appId) {
+        getAppKey(appId); // check existence
+        return _app_entries.at(appId).solutionFormatter;
+    }
+
+    bool isClientSide(int appId) {
+        getAppKey(appId); // check existence
+        return _app_entries.at(appId).isClientSide;
+    }
     JobCreator getJobCreator(int appId) {
         getAppKey(appId); // check existence
         return _app_entries.at(appId).creator;
     }
-    JobSolutionFormatter getJobSolutionFormatter(int appId) {
+    ClientSideProgramCreator getClientSideProgramCreator(int appId) {
         getAppKey(appId); // check existence
-        return _app_entries.at(appId).solutionFormatter;
+        return _app_entries.at(appId).clientSideProgramCreator;
+    }
+
+    std::vector<ResourceCleaner> getCleaners() {
+        std::vector<ResourceCleaner> cleaners;
+        for (auto& entry : _app_entries) cleaners.push_back(entry.cleaner);
+        return cleaners;
     }
 }
 

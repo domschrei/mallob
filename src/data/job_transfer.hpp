@@ -110,8 +110,7 @@ public:
         *this = std::move(other);
     }
 
-    static size_t getMaxTransferSize();
-    size_t getTransferSize() const;
+    static size_t getTransferSize();
     std::vector<uint8_t> serialize() const override;
     JobRequest& deserialize(const std::vector<uint8_t> &packed) override;
     std::string toStr() const;
@@ -210,7 +209,7 @@ struct JobMessage : public Serializable {
     ctx_id_t contextIdOfSender {0};
     ctx_id_t contextIdOfDestination {0};
     int revision;
-    int tag;
+    int tag {0};
     int epoch;
     bool returnedToSender = false;
     Checksum checksum;
@@ -225,6 +224,8 @@ public:
 
     std::vector<uint8_t> serialize() const override;
     JobMessage& deserialize(const std::vector<uint8_t>& packed) override;
+
+    void swapSenderReceiver();
 
     void returnToSender(int senderRank, int mpiTag);
 };

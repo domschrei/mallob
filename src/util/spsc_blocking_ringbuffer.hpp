@@ -72,6 +72,10 @@ public:
         return pollBlocking(out, false);
     }
 
+    bool pollNonblocking(T& out) {
+        return pollBlocking(out, true);
+    }
+
     inline bool pollBlocking(T& out, bool returnIfEmpty) {
 
         if (empty()) {

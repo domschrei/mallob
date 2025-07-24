@@ -12,11 +12,15 @@ lib/*.zip
 lib/*.tgz
 lib/*.tar.gz
 build*/
-data/
+/data/
+/errors/
+/testlogdir*/
 bin/
 instances/*.cnf
 instances/*.cnf.xz
 instances/*.uri
+instances/wcnf/*.wcnf
+instances/wcnf/*.wcnf.xz
 upload.sh
 download.sh
 .unused/
@@ -24,3 +28,5 @@ download.sh
 callgrind.out.*
 nohup.out
 directives.*.impcheck
+compile_commands.json
+cmake-build-debug/

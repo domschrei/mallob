@@ -9,16 +9,15 @@
 #include <utility>
 
 #include "serializable.hpp"
-#include "util/assert.hpp"
 
 struct JobResult : public Serializable {
 
     int id = 0;
-    int revision;
-    int result;
+    int revision {-1};
+    int result {0};
     enum EncodedType {INT, FLOAT} encodedType = INT;
-    int winningInstanceId;
-    unsigned long globalStartOfSuccessEpoch;
+    int winningInstanceId {-1};
+    unsigned long globalStartOfSuccessEpoch {0};
 
 private:
     std::vector<int> solution;
@@ -27,6 +26,7 @@ private:
 public:
     JobResult() {}
     JobResult(std::vector<uint8_t>&& packedData);
+    virtual ~JobResult() {}
 
     JobResult(JobResult&& other) {
         *this = std::move(other);
@@ -69,6 +69,7 @@ public:
     }
 
     std::vector<int> extractSolution();
+    std::vector<int> copySolution() const;
 };
 
 #endif

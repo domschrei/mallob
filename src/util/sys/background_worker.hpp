@@ -4,16 +4,11 @@
 
 #include <thread>
 #include <functional>
-#include <signal.h>
-
-#include "util/sys/terminator.hpp"
-#include "util/logger.hpp"
-#include "util/sys/timer.hpp"
 
 class BackgroundWorker {
 
 private:
-    bool _terminate = false;
+    volatile bool _terminate = false;
     std::thread _thread;
 
 public:
@@ -23,7 +18,7 @@ public:
         _thread = std::thread(runnable);
     }
     bool continueRunning() const {
-        return !Terminator::isTerminating() && !_terminate;
+        return !_terminate;
     }
     bool isRunning() const {
         return _thread.joinable();

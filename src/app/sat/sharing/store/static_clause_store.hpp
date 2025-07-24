@@ -32,7 +32,7 @@ private:
     // Whether buckets are expanded and shrunk dynamically (true)
     // or remain of a fixed, static size (false).
     const bool _expand_buckets;
-    const int _free_clause_length_limit;
+    const int _max_nb_free_lits;
 
     // Size of each bucket (in literals) if buckets are not expanded.
     const int _bucket_size;
@@ -126,7 +126,7 @@ public:
 
     StaticClauseStore(const Parameters& params, bool resetLbdAtExport, int bucketSize, bool expandBuckets, int totalCapacity) :
         GenericClauseStore(params.strictClauseLengthLimit()+ClauseMetadata::numInts(), resetLbdAtExport), _expand_buckets(expandBuckets),
-            _free_clause_length_limit(params.freeClauseLengthLimit()), _bucket_size(bucketSize), _total_capacity(totalCapacity) {
+            _max_nb_free_lits(params.freeClauseLengthLimit()), _bucket_size(bucketSize), _total_capacity(totalCapacity) {
 
         // Build bijection between (physical) bucket index and priority index
         // (i.e., in which order the buckets are being sweeped)
@@ -224,8 +224,7 @@ public:
             std::function<void(int*)> clauseDataConverter = [](int*){}) override {
 
         // Builder object for our output
-        BufferBuilder builder(limit, _max_eff_clause_length, false);
-        builder.setFreeClauseLengthLimit(_free_clause_length_limit);
+        BufferBuilder builder = getBufferBuilder(limit);
 
         // lock clause adding
         if (Concurrent) addClauseLock.lock();
@@ -259,7 +258,7 @@ public:
             // Check admissible literals bounds?
             if (_expand_buckets && nbRemainingAdmissibleLits < INT32_MAX) {
                 // Not yet in cleaning up stage
-                if (!cleaningUp && clause.size-ClauseMetadata::numInts() > _free_clause_length_limit) {
+                if (!cleaningUp && clause.size-ClauseMetadata::numInts() > _max_nb_free_lits) {
                     // Check if this bucket, together with its "shadow insertions"
                     // tracked by the touchCount, exceed our capacity
                     int effectiveSize = b->size + b->clauseLength * touchCount;
@@ -297,12 +296,12 @@ public:
 
             // write clauses into export buffer
             const int nbLitsInClause = clause.size-ClauseMetadata::numInts();
-            while (b->size > 0 && (nbLitsInClause <= _free_clause_length_limit || nbRemainingLits >= nbLitsInClause)) {
+            while (b->size > 0 && (nbLitsInClause <= _max_nb_free_lits || nbRemainingLits >= nbLitsInClause)) {
                 assert(b->size - clause.size >= 0);
                 clause.begin = b->data + b->size - clause.size;
                 clauseDataConverter(clause.begin);
                 clauses.push_back(clause);
-                if (nbLitsInClause > _free_clause_length_limit)
+                if (nbLitsInClause > _max_nb_free_lits)
                     nbRemainingLits -= clause.size-ClauseMetadata::numInts();
                 b->size -= clause.size;
             }
@@ -347,8 +346,7 @@ public:
     std::vector<int> readBuffer() override {
 
         // Builder object for our output
-        BufferBuilder builder(INT_MAX, _max_eff_clause_length, false);
-        builder.setFreeClauseLengthLimit(_free_clause_length_limit);
+        BufferBuilder builder = getBufferBuilder(INT_MAX);
 
         // lock clause adding
         if (Concurrent) addClauseLock.lock();
@@ -397,6 +395,12 @@ public:
 
     BufferReader getBufferReader(int* data, size_t buflen, bool useChecksums = false) const override {
         return BufferReader(data, buflen, _max_eff_clause_length, false, useChecksums);
+    }
+
+    BufferBuilder getBufferBuilder(int limit) const {
+        BufferBuilder builder(limit, _max_eff_clause_length, false);
+        builder.setFreeClauseLengthLimit(_max_nb_free_lits);
+        return builder;
     }
 
     virtual int getMaxAdmissibleEffectiveClauseLength() const override {

@@ -1,21 +1,52 @@
 
-# Debugging Mallob
+# Development with Mallob
+
+
+## General
+
+If you change or replace individual libraries under `lib/`, you'll need to rebuild parts of Mallob for it to reflect the changes.
+We advise to just remove the Mallob binaries in the build directory (`rm build/*mallob*`) and then re-build with the usual commands.
+This should then only recreate the missing binaries.
+
+The following list shows a few examples for how Mallob can be extended:
+
+* To add a new SAT solver to be used in a SAT solver engine, do the following:
+    - Add a subclass of `PortfolioSolverInterface`. (You can use the existing implementation for any of the existing solvers and adapt it to your solver.)
+    - Add your solver to the portfolio initialization in `src/app/sat/execution/engine.cpp`.
+* To extend Mallob by adding another kind of application (e.g., automated planning, ILP, ...), find detailed instructions at [application_engines.md](application_engines.md).
+* To add a unit test, create a class `test_*.cpp` in `src/test` and then add the test case to the bottom of `CMakeLists.txt`.
+* To add a system test, see the file `scripts/systest.sh` (which includes definitions from `scripts/systest_commons.sh`).
+
+
+## Important Interfaces
+
+* Add new options for Mallob easily by extending `src/optionslist.hpp`.
+    - Options which are specific to a certain application can be found and edited in `src/app/$APPKEY/options.hpp`.
+* Use the `LOG()` macro to log messages. For thread-safe logging and clean outputs in the directory provided via `-log=`, each non main thread should have its own instance of `Logger` (obtained via `Logger::copy` from the parent thread's logger) and use the `LOGGER(logger, ...)` macro. (Note that this "safe" logging is not yet fully implemented across all modules of Mallob.)
+* Use `ProcessWideThreadPool::addTask` or `BackgroundWorker` to perform background tasks in other threads. For multi-threading utilities, `src/util/sys/threading.hpp` features an easy-to-use `Mutex` class with RAII functionality as well as a corresponding `ConditionVariable` class and some utilities for `std::future` objects.
+* Send messages across different Mallob MPI processes via `MyMpi::isend` for global (Mallob-level) messages and via `getJobTree().send*` for job-/application-specific messages. Receive messages by simply creating an RAII-style instance of `MessageSubscription` or `CondMessageSubscription` (_conditional_, if you need the option to "decline" an incoming message and leave it to some other module instead); the callback you provide in the constructor will be executed whenever an according message arrives. Accordingly extend `src/comm/msgtags.h` by your new, **fresh** message tags. For application-specific message passing, find some more information at [application_engines.md](application_engines.md).
+Note that such communication **may only be performed by each MPI process' main thread**.
+
+
+## Debugging Mallob
 
 Debugging of distributed applications can be difficult, especially in Mallob's case where message passing goes hand in hand with multithreading and inter-process communication. Here are some notes on how Mallob runs can be diagnosed and debugged appropriately.
 
-## Build Options
+See also our [Frequently Asked Questions](faq.md) for some common issues.
+
+### Build Options
 
 For debugging purposes, the following build switches are useful:
 
-* `-DCMAKE_BUILD_TYPE=DEBUG`: Leads to a build with full debug information. Therefore, in thread trace files and in the output of valgrind tools, there will be more specific information on functions and line numbers. Assertions are always included in DEBUG builds.
+* `-DCMAKE_BUILD_TYPE=DEBUG`: Produces a build with full debug information: In thread trace files and in the output of valgrind tools, there will be more specific information on functions and line numbers. Assertions are always included in DEBUG builds.
 * `-DMALLOB_LOG_VERBOSITY=5`: This static verbosity level (together with run time option `-v=5`) logs every single message that is being sent or received, among many other things.
 * `-DMALLOB_USE_ASAN=1`: Build sources with AddressSanitizer. This can help find illegal states in the code, especially invalid memory accesses.
 
-## In-built Debugging Features
+### In-built Debugging Features
 
 Get acquainted with the debugging features Mallob offers by itself.
 
-### Consulting Logs
+#### Consulting Logs
 
 In general, taking a quick look at the logs a run outputs is never wrong. For small to medium size runs, you can use this command to take a look at Mallob's entire output, sorted consistently, given a log directory LOG:
 
@@ -31,11 +62,17 @@ To further diagnose a Mallob run, `grep` in the log files for the following logg
 * Log lines containing `[WARN]` _may_ indicate undesired behavior, such as the main thread getting stuck in a computation for some time or an unexpected message arriving at a process. Relevant warnings which should be investigated include watchdog barks (see below) and the rejection of an incoming job, perhaps because its JSON was malformed.
 * Log lines containing `sysstate` should be output each second and provide basic information on the system state, such as the number of entered/parsed/introduced/finished jobs, the global memory usage, and the ratio of busy processes. If this `busyratio` is less than 1.000 for multiple seconds in a row, this usually means one of two things: Either not enough demand for resources is present in the system to utilize all processes, or (this is the bad option) something went wrong with Mallob's scheduling leading to some remaining idle processes. The latter case needs to be debugged separately, and if you notice this behavior without changing anything about Mallob's scheduling, please contact <dominik.schreiber@kit.edu>.
 
-### Thread Trace Files
+#### Thread Trace Files
 
 Mallob processes have an in-built mechanism to catch and process signals like SIGSEGV, SIGBUS or SIGABRT which are thrown if something goes wrong (like an invalid memory access, no memory left, or a failed assertion). If such a signal is caught, the process will execute `gdb` on itself to retrieve the current location in the code from where the signal was thrown. The resulting stack trace is written to a file `mallob_thread_trace_of_TRACEDTID_by_TRACINGTID` where `TRACEDTID` is the thread ID of the thread being traced and `TRACINGID` is the thread ID of the thread tracing the other one. Consult these files if Mallob crashes! They usually contain helpful information on what might have gone wrong.
 
 The directory where these files are written to can be changed with run time option `-trace-dir`.
+
+#### Thread Naming
+
+Each thread running in Mallob is usually given a name via `Proc::nameThisThread(name)`. This name can be seen in tools like `htop` to diagnose unusual behavior.
+
+If, for instance, you observe a crash signal (SIGSEGV / SIGABRT / SIGPIPE / ...) and you are not sure where it's coming from (and trace files don't help for whichever reason), then you can name your own threads as well and then adjust `Proc::nameThisThread` to output each TID-to-name mapping. This allows you to convert the crashing TID to an actual role in the program.
 
 ### Watchdogs
 
@@ -55,7 +92,18 @@ The value of `last` indicates the point in time where the watchdog was pet for t
 
 There are many possible causes for a barking watchdog. For instance, if you decide to assign each MPI process to a single core or even a single hardware thread, or if you use even more MPI processes with ``--oversubscribe``, then the machine is likely to experience very busy process / thread scheduling and it becomes more likely that a crucial thread is not scheduled for several milliseconds. Likewise, limited I/O bandwidth can become a problem if many processes write to the same (network?) file system.
 
-### Detection of Unresponsive MPI Processes
+If a certain thread hangs indeterminately and you don't know why, you can add your own watchdog like this: 
+```c++
+// Set up a watchdog
+Watchdog watchdog(/*enabled?=*/true, /*checkIntervalMs=*/500, /*useThreadPool=*/true);
+watchdog.setWarningPeriod(500); // print a warning after x*500ms (x>=1) without reset()
+watchdog.setAbortPeriod(10'000); // trace the thread and abort() after 10s
+// ... now do the computation which hangs ...
+watchdog.reset(); // call reset() in between the heavy lifting where the thread can hang
+// ... watchdog is RAII, so if it goes out of scope it will be joined properly
+```
+
+#### Detection of Unresponsive MPI Processes
 
 If one or multiple MPI processes, perhaps on a different compute node, stop responding to the other processes, this will be recognized, and after 60s without a response the program will crash with this error message:
 
@@ -63,7 +111,7 @@ If one or multiple MPI processes, perhaps on a different compute node, stop resp
 
 If you receive this message, it might be a node failure in your distributed system or the communication between processes not working correctly.
 
-## Valgrind
+### Valgrind
 
 Mallob processes can be executed via `valgrind` to detect errors or to profile performance or memory usage. In your call to Mallob, just replace 
 

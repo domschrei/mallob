@@ -23,8 +23,8 @@ BufferMerger::BufferMerger(int sizeLimit, int maxEffClauseLength, int maxFreeEff
     _slots_for_sum_of_length_and_lbd(slotsForSumOfLengthAndLbd), _use_checksum(useChecksum) {}
 
 BufferMerger::BufferMerger(StaticClauseStore<false>* mergeStore, int sizeLimit, int maxEffClauseLength, bool slotsForSumOfLengthAndLbd, bool useChecksum) :
-    _merge_store(mergeStore), _size_limit(sizeLimit), _max_eff_clause_length(maxEffClauseLength),
-    _slots_for_sum_of_length_and_lbd(slotsForSumOfLengthAndLbd), _use_checksum(useChecksum) {}
+    _size_limit(sizeLimit), _max_eff_clause_length(maxEffClauseLength),
+    _slots_for_sum_of_length_and_lbd(slotsForSumOfLengthAndLbd), _use_checksum(useChecksum), _merge_store(mergeStore) {}
 
 void BufferMerger::add(BufferReader&& reader) {_readers.push_back(std::move(reader));}
 
@@ -55,11 +55,10 @@ std::vector<int> BufferMerger::mergePriorityBased(const Parameters& params, std:
     std::vector<int> storeOutput = _merge_store->exportBuffer(INT32_MAX, nbExportedCls, nbExportedLits, GenericClauseStore::ANY, false);
 
     // Filter duplicates and split output into a main and an excess output
-    BufferBuilder mainBuilder(_size_limit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
-    BufferBuilder excessBuilder(INT32_MAX, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
-    mainBuilder.setFreeClauseLengthLimit(_max_free_eff_clause_length - ClauseMetadata::numInts());
+    BufferBuilder mainBuilder = _merge_store->getBufferBuilder(_size_limit);
+    BufferBuilder excessBuilder = _merge_store->getBufferBuilder(INT32_MAX);
     tsl::robin_set<Mallob::Clause, Mallob::NonCommutativeClauseHasher, Mallob::SortedClauseExactEquals> mergedClauseSet;
-    BufferReader storeOutputReader(storeOutput.data(), storeOutput.size(), _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
+    BufferReader storeOutputReader = _merge_store->getBufferReader(storeOutput.data(), storeOutput.size());
     BufferBuilder* currentBuilder = &mainBuilder;
     int excessFirstCounterPosition = -1;
     while (true) {
@@ -129,7 +128,7 @@ std::vector<int> BufferMerger::merge(std::vector<int>* excessClauses, SplitMix64
     // Setup builders for main buffer and excess clauses buffer
     BufferBuilder mainBuilder(_size_limit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
     mainBuilder.setFreeClauseLengthLimit(_max_free_eff_clause_length - ClauseMetadata::numInts());
-    BufferBuilder* excessBuilder;
+    BufferBuilder* excessBuilder {nullptr};
     if (excessClauses != nullptr) {
         excessBuilder = new BufferBuilder(_size_limit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
     }
@@ -165,6 +164,7 @@ std::vector<int> BufferMerger::merge(std::vector<int>* excessClauses, SplitMix64
             bool success = currentBuilder->append(lastSeenClause);
             if (!success && currentBuilder == &mainBuilder) {
                 // Switch from normal output to excess clauses output
+                assert(excessBuilder);
                 currentBuilder = excessBuilder;
                 success = currentBuilder->append(lastSeenClause);
                 if (success) excessFirstCounterPosition = currentBuilder->getCurrentCounterPosition();
@@ -241,7 +241,7 @@ void BufferMerger::redistributeBorderBucketClausesRandomly(std::vector<int>& res
     std::vector<int> clausesForResultBuffer;
     std::vector<int> clausesForExcessBuffer;
 
-    LOG(V4_VVER, "bucket (%i,%i): re-select %i clauses in result, %i clauses in excess\n", 
+    LOG(V5_DEBG, "bucket (%i,%i): re-select %i clauses in result, %i clauses in excess\n",
         clslen, failedInfo.failedBucket.lbd, nbClausesResult, nbClausesExcess);
 
     // Iterate over all n clauses (first k from main, then n-k from excess)

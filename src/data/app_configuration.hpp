@@ -13,6 +13,9 @@ Introduce new fields here and properly set them in JsonInterface::handle.
 */
 struct AppConfiguration {
 
+static const std::string FIXED_STRING_DEFAULT_VAL_INT;
+static const std::string FIXED_STRING_DEFAULT_VAL_LONG;
+
 std::map<std::string, std::string> map;
 
 int getSerializedSize() const {
@@ -55,6 +58,33 @@ void deserialize(const std::string& packed) {
 
         getline(s_stream, substr, ';');     
     }
+}
+
+void updateFixedSizeEntry(const char* key, int val) {
+    std::string nbStr = std::to_string(val);
+    assert(nbStr.size() < FIXED_STRING_DEFAULT_VAL_INT.size());
+    while (nbStr.size() < FIXED_STRING_DEFAULT_VAL_INT.size())
+        nbStr += ".";
+    map[key] = nbStr;
+}
+void updateFixedSizeEntry(const char* key, long val) {
+    std::string nbStr = std::to_string(val);
+    assert(nbStr.size() < FIXED_STRING_DEFAULT_VAL_LONG.size());
+    while (nbStr.size() < FIXED_STRING_DEFAULT_VAL_LONG.size())
+        nbStr += ".";
+    map[key] = nbStr;
+}
+int fixedSizeEntryToInt(const char* key) const {
+    std::string nbVarsString = map.at(key);
+    while (nbVarsString[nbVarsString.size()-1] == '.')
+        nbVarsString.resize(nbVarsString.size()-1);
+    return atoi(nbVarsString.c_str());
+}
+long fixedSizeEntryToLong(const char* key) const {
+    std::string nbVarsString = map.at(key);
+    while (nbVarsString[nbVarsString.size()-1] == '.')
+        nbVarsString.resize(nbVarsString.size()-1);
+    return atol(nbVarsString.c_str());
 }
 
 };

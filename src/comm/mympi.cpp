@@ -28,35 +28,22 @@ void MyMpi::init() {
     }
 }
 
-size_t MyMpi::getBinaryTreeBufferLimit(int numWorkers, int baseSize, float functionParam, BufferQueryMode mode) {
-    if (mode == LEVEL) {
-        float limit = baseSize * std::pow(functionParam, std::log2(numWorkers+1)-1);
-        return std::ceil(numWorkers * limit);
-    }
-    if (mode == LIMITED) {
-        float upperBound = functionParam;
-        auto buflim = upperBound - (upperBound - baseSize) * std::exp((baseSize / (baseSize - upperBound)) * (numWorkers-1));
-        return std::ceil(buflim);
-    }
-    return 0;
-}
-
 void MyMpi::setOptions(const Parameters& params) {
     int verb = MyMpi::rank(MPI_COMM_WORLD) == 0 ? V2_INFO : V4_VVER;
     _msg_queue = new MessageQueue(params.messageBatchingThreshold());
 }
 
-int MyMpi::isend(int recvRank, int tag, const Serializable& object) {
-    return _msg_queue->send(DataPtr(new std::vector<uint8_t>(object.serialize())), recvRank, tag);
+int MyMpi::isend(int recvRank, int tag, const Serializable& object, bool fromMainThread) {
+    return _msg_queue->send(DataPtr(new std::vector<uint8_t>(object.serialize())), recvRank, tag, fromMainThread);
 }
-int MyMpi::isend(int recvRank, int tag, std::vector<uint8_t>&& object) {
-    return _msg_queue->send(DataPtr(new std::vector<uint8_t>(std::move(object))), recvRank, tag);
+int MyMpi::isend(int recvRank, int tag, std::vector<uint8_t>&& object, bool fromMainThread) {
+    return _msg_queue->send(DataPtr(new std::vector<uint8_t>(std::move(object))), recvRank, tag, fromMainThread);
 }
-int MyMpi::isend(int recvRank, int tag, const DataPtr& object) {
-    return _msg_queue->send(object, recvRank, tag);
+int MyMpi::isend(int recvRank, int tag, const DataPtr& object, bool fromMainThread) {
+    return _msg_queue->send(object, recvRank, tag, fromMainThread);
 }
-int MyMpi::isendCopy(int recvRank, int tag, const std::vector<uint8_t>& object) {
-    return _msg_queue->send(DataPtr(new std::vector<uint8_t>(object)), recvRank, tag);
+int MyMpi::isendCopy(int recvRank, int tag, const std::vector<uint8_t>& object, bool fromMainThread) {
+    return _msg_queue->send(DataPtr(new std::vector<uint8_t>(object)), recvRank, tag, fromMainThread);
 }
 
 MPI_Request MyMpi::iallreduce(MPI_Comm communicator, float* contribution, float* result, MPI_Op operation) {
@@ -98,6 +85,14 @@ int MyMpi::rank(MPI_Comm comm) {
 MessageQueue& MyMpi::getMessageQueue() {
     return *_msg_queue;
 }
+
+void MyMpi::broadcastExitSignal() {
+    MyMpi::isend(0, MSG_DO_EXIT, std::vector<uint8_t>(1, 0));
+    do {
+        MyMpi::getMessageQueue().advance();
+    } while (MyMpi::getMessageQueue().hasOpenRecvFragments() || MyMpi::getMessageQueue().hasOpenSends());
+}
+
 
 /*
 void MyMpi::latencyMonkey() {

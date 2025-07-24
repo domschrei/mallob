@@ -68,6 +68,7 @@ OPTION_GROUP(grpOutput, "output", "Output")
  OPT_STRING(solutionToFile,               "s2f", "solution-to-file",                   "",                      "Write solutions to file with provided base name + job ID")
  OPT_INT(verbosity,                       "v", "verbosity",                            2,    0, 6,              "Logging verbosity: 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB 5=DEBG")
  OPT_BOOL(zeroOnlyLogging,                "0o", "zero-only-logging",                   false,                   "Only PE of rank zero does logging")
+ OPT_STRING(tmpDirectory,                 "tmp", "tmp-directory",                      "/tmp",                  "General temporary directory to write working files into")
 
 ///////////////////////////////////////////////////////////////////////
 
@@ -99,7 +100,10 @@ OPTION_GROUP(grpJob, "job", "Global configuration of jobs")
  OPT_FLOAT(jobCpuLimit,                   "jcl", "job-cpu-limit",                      0,    0, LARGE_INT,      "Timeout an instance after x cpu seconds")
  OPT_FLOAT(jobWallclockLimit,             "jwl", "job-wallclock-limit",                0,    0, LARGE_INT,      "Timeout an instance after x seconds wall clock time")
  OPT_INT(maxDemand,                       "md", "max-demand",                          0,    0, LARGE_INT,      "Limit any job's demand to this value")
- OPT_INT(numThreadsPerProcess,            "t", "threads-per-process",                  1,    1, MALLOB_MAX_N_APPTHREADS_PER_PROCESS,      "Number of application worker threads per MPI process")
+ OPT_INT(numThreadsPerProcess,            "t", "threads-per-process",                  1,    1, MALLOB_MAX_N_APPTHREADS_PER_PROCESS,
+    "Number of application worker threads per MPI process; maximum value configurable at compile time via -DMALLOB_MAX_N_APPTHREADS_PER_PROCESS")
+ OPT_BOOL(aggressiveDescriptionCaching, "adc", "aggressive-desc-caching", false, "Try to reuse cached job descriptions by only transferring them when not repairable without them")
+ OPT_BOOL(crossJobCommunication, "cjc", "cross-job-communication", false, "Enable communication across jobs, such as cross-problem clause sharing, within user-specified job groups")
 
 ///////////////////////////////////////////////////////////////////////
 
@@ -118,6 +122,8 @@ OPTION_GROUP(grpPerformance, "performance", "Performance")
  OPT_BOOL(regularProcessDistribution,     "rpa", "regular-process-allocation",         false,                   "Signal that processes have been allocated regularly, i.e., the i-th machine hosts ranks c*i through c*i + c-1")
  OPT_INT(sleepMicrosecs,                  "sleep", "",                                 100,  0, LARGE_INT,      "Sleep this many microseconds between loop cycles of worker main thread")
  OPT_BOOL(yield,                          "yield", "",                                 false,                   "Yield manager thread whenever there are no new messages")
+ OPT_INT(maxLiteralsPerThread,              "mlpt", "max-lits-per-thread",               50000000, 0,   MAX_INT,    
+    "If formula is larger than threshold, reduce #threads per PE until #threads=1 or until limit is met \"on average\"")
 
 ///////////////////////////////////////////////////////////////////////
 

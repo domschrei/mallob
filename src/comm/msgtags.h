@@ -26,6 +26,8 @@ const int MSG_OFFER_ADOPTION = 4;
 const int MSG_ANSWER_ADOPTION_OFFER = 5;
 
 const int MSG_QUERY_JOB_DESCRIPTION = 6;
+const int MSG_QUERY_JOB_DESCRIPTION_SKELETON = 600;
+const int MSG_QUERY_JOB_DESCRIPTION_BY_PROXY = 601;
 
 /*
 The sender propagates a job's volume update to the receiver.
@@ -38,6 +40,7 @@ Data type: JobDescription
 Warning: Length may exceed the default maximum message length.
 */
 const int MSG_SEND_JOB_DESCRIPTION = 9;
+const int MSG_SEND_JOB_DESCRIPTION_SKELETON = 99;
 /*
 The sender informs the receiver that a solution was found for the job
 of the specified ID.
@@ -151,8 +154,10 @@ const int MSG_SCHED_NODE_FREED = 54;
 
 const int MSG_JOB_TREE_REDUCTION = 61;
 const int MSG_JOB_TREE_BROADCAST = 62;
+const int MSG_JOB_TREE_MODULAR_REDUCE = 63;
+const int MSG_JOB_TREE_MODULAR_BROADCAST = 64;
 
-const int MSG_ADVANCE_DISTRIBUTED_FILE_MERGE = 63;
+const int MSG_ADVANCE_DISTRIBUTED_FILE_MERGE = 69;
 
 const int MSG_ASYNC_COLLECTIVE_UP = 71;
 const int MSG_ASYNC_COLLECTIVE_DOWN = 72;
@@ -166,6 +171,9 @@ const int MSG_MATCHING_REQUEST_CANCELLED = 84;
 
 const int MSG_DEPLOY_NEW_REVISION = 85;
 
+const int MSG_SUBMIT_JOB_TO_CLIENT = 90;
+const int MSG_RESPOND_TO_JOB_SUBMISSION = 91;
+
 const int MSG_OFFSET_BATCHED = 10000;
 
 
@@ -175,6 +183,8 @@ const int MSG_OFFSET_BATCHED = 10000;
 const int MSG_INITIATE_CLAUSE_SHARING = 416;
 const int MSG_ALLREDUCE_CLAUSES = 417;
 const int MSG_ALLREDUCE_FILTER = 418;
+const int MSG_INITIATE_CROSS_JOB_CLAUSE_SHARING = 4160;
+const int MSG_BROADCAST_CLAUSES_STATELESS = 4180;
 
 const int MSG_AGGREGATE_RANKLIST = 419;
 const int MSG_BROADCAST_RANKLIST = 420; // blaze it
