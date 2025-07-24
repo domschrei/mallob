@@ -96,7 +96,7 @@ set(MALLOB_CORE_SOURCES
     src/util/sys/shmem_cache.cpp src/util/ringbuf/ringbuf.c src/util/static_store.cpp
     CACHE INTERNAL "")
 
-set(MALLOB_COREPLUSCOMM_SOURCES ${MALLOB_CORE_SOURCES}
+set(MALLOB_MAINAPP_SOURCES
     src/app/job.cpp src/app/app_registry.cpp src/app/app_message_subscription.cpp src/balancing/event_driven_balancer.cpp 
     src/balancing/request_matcher.cpp src/balancing/routing_tree_request_matcher.cpp src/comm/msg_queue/message_queue.cpp 
     src/comm/mpi_base.cpp src/comm/mympi.cpp src/comm/sysstate_unresponsive_crash.cpp src/core/scheduling_manager.cpp 
@@ -105,7 +105,7 @@ set(MALLOB_COREPLUSCOMM_SOURCES ${MALLOB_CORE_SOURCES}
 
 # Use to debug
 #message("mallob CORE sources pre application registration: ${MALLOB_CORE_SOURCES}")
-#message("mallob CORE+COMM sources pre application registration: ${MALLOB_COREPLUSCOMM_SOURCES}")
+#message("mallob CORE+COMM sources pre application registration: ${MALLOB_MAINAPP_SOURCES}")
 
 
 # Define test function
@@ -188,7 +188,7 @@ target_link_directories(mallob_core PUBLIC ${BASE_LINK_DIRS})
 # Library of Mallob's CORE+COMM sources
 
 #message("mallob_commons sources post application registration: ${BASE_SOURCES}") # Use to debug
-add_library(mallob_corepluscomm STATIC ${MALLOB_COREPLUSCOMM_SOURCES})
+add_library(mallob_corepluscomm STATIC ${MALLOB_MAINAPP_SOURCES})
 target_include_directories(mallob_corepluscomm PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob_corepluscomm PRIVATE ${BASE_COMPILEFLAGS})
 target_link_libraries(mallob_corepluscomm ${MPI_CXX_LIBRARIES} ${MPI_CXX_LINK_FLAGS} mallob_core ${BASE_LIBS})
@@ -204,10 +204,12 @@ target_compile_options(mallob PRIVATE ${BASE_COMPILEFLAGS})
 target_link_libraries(mallob mallob_corepluscomm)
 
 # Mallob process dispatcher
-add_executable(mallob_process_dispatcher src/app/sat/main_dispatch.cpp)
+add_executable(mallob_process_dispatcher src/app/sat/main_dispatch.cpp
+    src/util/sys/proc.cpp src/util/sys/process.cpp src/util/sys/timer.cpp
+    src/util/logger.cpp src/util/sys/fileutils.cpp src/util/sys/threading.cpp
+    src/util/sys/process_dispatcher.cpp)
 target_include_directories(mallob_process_dispatcher PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob_process_dispatcher PRIVATE ${BASE_COMPILEFLAGS})
-target_link_libraries(mallob_process_dispatcher mallob_core)
 
 
 # Debug flags to find line numbers in stack traces etc.
