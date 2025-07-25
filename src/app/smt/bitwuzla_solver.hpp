@@ -18,6 +18,7 @@ class BitwuzlaSolver {
 
 private:
     const Parameters& _params;
+    APIConnector& _api;
     JobDescription& _desc;
     std::string _problem_file;
     CoreAllocator::Allocation _core_alloc;
@@ -26,15 +27,10 @@ private:
 
 public:
     BitwuzlaSolver(const Parameters& params, APIConnector& api, JobDescription& desc, const std::string& problemFile) :
-            _params(params), _desc(desc), _problem_file(problemFile), _core_alloc(1),
+            _params(params), _api(api), _desc(desc), _problem_file(problemFile), _core_alloc(1),
             _name("#" + std::to_string(desc.getId()) + "(SMT)") {
 
         LOG(V2_INFO,"SMT Bitwuzla+Mallob %s\n", _name.c_str());
-
-        // This instruction replaces the internal SAT solver of Bitwuzla with a Mallob-connected solver.
-        bzla::sat::ExternalSatSolver::new_sat_solver = [&, name=_name]() {
-            return new BitwuzlaSatConnector(params, api, desc, name); // cleaned up by Bitwuzla
-        };
     }
     ~BitwuzlaSolver() {
         LOG(V2_INFO, "Deleting SMT Bitwuzla+Mallob #%i\n", _desc.getId());
@@ -49,6 +45,7 @@ public:
         argVec.push_back("./bitwuzla");
         argVec.push_back((char*) _problem_file.c_str());
         argVec.push_back("--print-model");
+        argVec.push_back("-v");
         int argc = argVec.size();
         char** argv = argVec.data();
 
@@ -60,6 +57,13 @@ public:
         if (_params.solutionToFile.isSet()) {
             out = new std::ofstream(_params.solutionToFile());
         }
+
+        // This instruction replaces the internal SAT solver of Bitwuzla with a Mallob-connected solver.
+        bzla::sat::ExternalSatSolver::new_sat_solver = [&, out, name=_name]() {
+            auto sat = new BitwuzlaSatConnector(_params, _api, _desc, name); // cleaned up by Bitwuzla
+            //sat->outputModels(out); // for debugging
+            return sat;
+        };
 
         try {
             bzla::main::set_time_limit(main_options.time_limit);

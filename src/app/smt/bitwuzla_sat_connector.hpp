@@ -6,6 +6,7 @@
 #include <csignal>
 #include <cstdint>
 #include <cstdlib>
+#include <ostream>
 #include <pthread.h>
 #include <string>
 #include <unistd.h>
@@ -54,6 +55,8 @@ private:
     bool _in_solved_state {false};
     bzla::Result _result;
 
+    std::ostream* _out_stream {nullptr};
+
 public:
     BitwuzlaSatConnector(const Parameters& params, APIConnector& api, JobDescription& desc, const std::string& name) :
         bzla::sat::SatSolver(), _params(params), _desc(desc), _stream_id(getNextStreamId()),
@@ -73,6 +76,10 @@ public:
         LOG(V2_INFO, "Done: %s\n", _name.c_str());
         _job_stream.interrupt();
         _job_stream.finalize();
+    }
+
+    void outputModels(std::ostream* os) {
+        _out_stream = os;
     }
 
     virtual const char* get_name() const override {return "MallobSat-internal";}
@@ -117,6 +124,14 @@ public:
 
         if (bzlaResult == bzla::Result::SAT) {
             _solution = std::move(solution);
+            if (_out_stream) {
+                *_out_stream << _name << " : MODEL " << _revision << " : ";
+                for (int v = 1; v < _solution.size(); v++) {
+                    assert(std::abs(_solution[v]) == v);
+                    *_out_stream << (_solution[v] > 0 ? 1 : 0);
+                }
+                *_out_stream << std::endl;
+            }
         }
         if (bzlaResult == bzla::Result::UNSAT) {
             _failed_lits.clear();
