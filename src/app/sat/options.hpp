@@ -27,7 +27,7 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
  OPT_INT(bufferedImportedClsGenerations,    "bicg", "buffered-imported-cls-generations", 4,        1,   LARGE_INT, 
     "Number of subsequent full clause sharings to fit in each solver's import buffer")
  OPT_INT(clauseBufferBaseSize,              "cbbs", "clause-buffer-base-size",           0,     0,   0,   
-    "DISCONTINUED - use exportVolumePerThread (-evpt) instead")
+    "DISCONTINUED - use exportVolumePerThread (-evpt) instead, which is supposed to have a one-size-fits-all default")
  OPT_INT(exportVolumePerThread,             "evpt", "export-volume-per-thread",          350,   0,   LARGE_INT,   
     "Max. number of clause literals to export per thread per sharing operation")
  OPT_INT(clauseBufferLimitMode,             "cblm", "clause-buffer-limit-mode",          1,        0,   1,
@@ -46,9 +46,9 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
  OPT_INT(maxLbdPartitioningSize,            "mlbdps", "max-lbd-partition-size",          2,        1,   LARGE_INT,
     "Store clauses with up to this LBD in separate buckets")
  OPT_INT(minNumChunksForImportPerSolver,    "mcips", "min-import-chunks-per-solver",     5,       1,   LARGE_INT,      
-    "Min. number of cbbs-sized chunks for buffering incoming clauses for import per solver")
+    "Min. number of single-export-sized chunks for buffering incoming clauses for import per solver")
  OPT_INT(numExportChunks,                   "nec", "export-chunks",                      5,       1,   LARGE_INT,
-    "Number of cbbs-sized chunks for buffering produced clauses for export")
+    "Number of single-export-sized chunks for buffering produced clauses for export")
  OPT_INT(qualityClauseLengthLimit,          "qcll", "quality-clause-length-limit",       8,        0,   255,
     "Clauses up to this length are considered \"high quality\"")
  OPT_INT(qualityLbdLimit,                   "qlbdl", "quality-lbd-limit",                2,        0,   255,

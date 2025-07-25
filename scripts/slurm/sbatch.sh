@@ -92,15 +92,12 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
     echo "logdir: $globallogdir , localtmp: $localtmpdir , output: $outputlogdir"
 
     # TODO Configure Mallob
-    cbbs=$(echo "1500*${SLURM_CPUS_PER_TASK}/4"|bc -l)
-    cbbs=${cbbs%.*}
     timeout=$DS_SECONDSPERJOB
     cmd="$build/mallob -mono-app=SATWITHPRE -pb=1 -pjp=999999 -pef=1 -mono=$f -jwl=$timeout -T=$(($timeout+30)) -wam=60``000 -pre-cleanup=1 \
     -q=1 -log=$globallogdir -tmp=$localtmpdir -comment-outputlogdir=$outputlogdir -sro=${globallogdir}/processed-jobs.out -trace-dir=${globallogdir}/ -os=1 -v=4 -iff=0 -s2f=${globallogdir}/model -cm=0 \
     -rpa=1 -pph=${SLURM_NTASKS_PER_NODE} -mlpt=50``000``000 -t=$((${SLURM_CPUS_PER_TASK} / 2)) \
     -satsolver=[k_]w -isp=0 -div-phases=1 -div-noise=0 -div-seeds=1 -div-elim=0 -div-native=0 -scsd=0 \
     -scll=60 -slbdl=60 -qcll=60 -qlbdl=60 -csm=3 -cfm=3 -cfci=30 -mscf=5 -bem=1 -aim=1 -rlbd=0 -ilbd=1 -randlbd=0 -scramble-lbds=0 \
-    -s=0.5 -cbbs=$cbbs -cblm=1 -cblp=250``000 -cusv=1 \
     -seed=0 \
     -spd=${globallogdir}/ -spl=3"
 
