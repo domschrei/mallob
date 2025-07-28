@@ -4,36 +4,36 @@ set(SAT_SUBPROC_SOURCES src/app/sat/execution/engine.cpp src/app/sat/execution/s
 
 # Add SAT-specific sources to main Mallob executable
 set(SAT_MALLOB_SOURCES src/app/sat/data/formula_compressor.cpp src/app/sat/parse/sat_reader.cpp src/app/sat/execution/solving_state.cpp src/app/sat/job/anytime_sat_clause_communicator.cpp src/app/sat/job/forked_sat_job.cpp src/app/sat/job/sat_process_adapter.cpp src/app/sat/job/historic_clause_storage.cpp src/app/sat/sharing/buffer/buffer_merger.cpp src/app/sat/sharing/buffer/buffer_reader.cpp src/app/sat/sharing/filter/clause_buffer_lbd_scrambler.cpp src/app/sat/data/clause_metadata.cpp src/app/sat/proof/lrat_utils.cpp)
-set(MALLOB_MAINAPP_SOURCES ${MALLOB_MAINAPP_SOURCES} ${SAT_MALLOB_SOURCES} CACHE INTERNAL "")
+set(MALLOB_COREPLUSCOMM_SOURCES ${MALLOB_COREPLUSCOMM_SOURCES} ${SAT_MALLOB_SOURCES} CACHE INTERNAL "")
 
 #message("commons+SAT sources: ${BASE_SOURCES}") # Use to debug
 
 # Include default SAT solvers as external libraries (their Mallob-side interfaces are part of SAT_SOURCES)
 set(BASE_LINK_DIRS ${BASE_LINK_DIRS} lib/lingeling lib/yalsat lib/cadical lib/kissat CACHE INTERNAL "")
-set(SUBPROC_LIBS lgl yals cadical kissat CACHE INTERNAL "")
+set(BASE_LIBS ${BASE_LIBS} lgl yals cadical kissat CACHE INTERNAL "")
 set(BASE_INCLUDES ${BASE_INCLUDES} lib CACHE INTERNAL "") # need to include some solver code
 
 # Add new non-default solvers here
 if(MALLOB_USE_GLUCOSE)
     set(BASE_LINK_DIRS ${BASE_LINK_DIRS} lib/glucose CACHE INTERNAL "")
     set(SAT_SUBPROC_SOURCES ${SAT_SUBPROC_SOURCES} src/app/sat/solvers/glucose.cpp CACHE INTERNAL "")
-    set(SUBPROC_LIBS ${SUBPROC_LIBS} glucose CACHE INTERNAL "")
+    set(BASE_LIBS ${BASE_LIBS} glucose CACHE INTERNAL "")
     set(BASE_INCLUDES ${BASE_INCLUDES} lib/glucose CACHE INTERNAL "")
     add_definitions(-DMALLOB_USE_GLUCOSE)
 endif()    
 if(MALLOB_USE_MERGESAT)
     set(BASE_LINK_DIRS ${BASE_LINK_DIRS} lib/mergesat CACHE INTERNAL "")
     set(SAT_SUBPROC_SOURCES ${SAT_SUBPROC_SOURCES} src/app/sat/solvers/mergesat.cpp CACHE INTERNAL "")
-    set(SUBPROC_LIBS ${SUBPROC_LIBS} mergesat CACHE INTERNAL "")
+    set(BASE_LIBS ${BASE_LIBS} mergesat CACHE INTERNAL "")
     add_definitions(-DMALLOB_USE_MERGESAT)
 endif()
 # Further solvers here ...
 
 # Library of SAT subprocess
-add_library(mallob_sat_subproc STATIC ${MALLOB_CORE_SOURCES} ${SAT_SUBPROC_SOURCES})
+add_library(mallob_sat_subproc STATIC ${SAT_SUBPROC_SOURCES})
 target_include_directories(mallob_sat_subproc PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob_sat_subproc PRIVATE ${BASE_COMPILEFLAGS})
-target_link_libraries(mallob_sat_subproc ${SUBPROC_LIBS})
+target_link_libraries(mallob_sat_subproc ${BASE_LIBS} mallob_core)
 target_link_directories(mallob_sat_subproc PUBLIC ${BASE_LINK_DIRS})
 
 # Executable of SAT subprocess
