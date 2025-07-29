@@ -16,17 +16,15 @@
 
 #include "app/sat/stream/internal_sat_job_stream_processor.hpp"
 #include "app/sat/stream/mallob_sat_job_stream_processor.hpp"
-#include "app/sat/stream/sat_job_stream.hpp"
+#include "app/sat/stream/sat_job_stream_garbage_collector.hpp"
+#include "app/sat/stream/wrapped_sat_job_stream.hpp"
 #include "bitwuzla/cpp/sat_solver.h"
 #include "data/job_description.hpp"
 #include "interface/api/api_connector.hpp"
 #include "robin_set.h"
-#include "util/assert.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
 #include "util/sys/terminator.hpp"
-#include "util/sys/thread_pool.hpp"
-#include "util/sys/threading.hpp"
 #include "util/sys/timer.hpp"
 
 class BitwuzlaSatConnector : public bzla::sat::SatSolver {
@@ -57,52 +55,7 @@ private:
 
     std::ostream* _out_stream {nullptr};
 
-    struct WrappedSatJobStream {
-        SatJobStream stream;
-        MallobSatJobStreamProcessor* mallobProcessor {nullptr};
-        std::atomic<bzla::Terminator*> bzlaTerminator {nullptr};
-        WrappedSatJobStream(const std::string& name) : stream(name) {}
-    };
     std::unique_ptr<WrappedSatJobStream> _stream_wrapper;
-
-    struct GarbageCollector {
-        Mutex mtxGarbage;
-        ConditionVariable condVarGarbage;
-        std::list<std::unique_ptr<WrappedSatJobStream>> garbage;
-        volatile bool stop {false};
-        std::thread bgThread;
-        GarbageCollector() {
-            bgThread = std::thread([this]() {run();});
-        }
-        void run() {
-            while (true) {
-                std::unique_ptr<WrappedSatJobStream> item;
-                {
-                    auto lock = mtxGarbage.getLock();
-                    condVarGarbage.waitWithLockedMutex(lock, [&]() {
-                        return !garbage.empty() || stop;
-                    });
-                    if (garbage.empty()) break;
-                    item = std::move(garbage.front());
-                    garbage.pop_front();
-                }
-                item.reset(); // delete garbage
-            }
-        }
-        void add(std::unique_ptr<WrappedSatJobStream>&& item) {
-            {
-                auto lock = mtxGarbage.getLock();
-                garbage.push_back(std::move(item));
-            }
-            condVarGarbage.notify();
-        }
-        ~GarbageCollector() {
-            stop = true;
-            add({});
-            bgThread.join();
-        }
-    };
-    static GarbageCollector* _gc;
 
 public:
     BitwuzlaSatConnector(const Parameters& params, APIConnector& api, JobDescription& desc, const std::string& name) :
@@ -121,7 +74,7 @@ public:
 
         _stream_wrapper->stream.setTerminator([&, wrapper=_stream_wrapper.get(), params=&_params, desc=&_desc, startTime=_start_time]() {
             if (wrapper->stream.finalizing()) return true;
-            auto bzlaTerm = wrapper->bzlaTerminator.load(std::memory_order_relaxed);
+            bzla::Terminator* bzlaTerm = (bzla::Terminator*) wrapper->innerTerminator.load(std::memory_order_relaxed);
             if (bzlaTerm && bzlaTerm->terminate()) return true;
             return isTimeoutHit(params, desc, startTime);
         });
@@ -130,7 +83,7 @@ public:
     }
     virtual ~BitwuzlaSatConnector() {
         LOG(V2_INFO, "Done: %s\n", _name.c_str());
-        _gc->add(std::move(_stream_wrapper));
+        SatJobStreamGarbageCollector::get().add(std::move(_stream_wrapper));
     }
 
     void outputModels(std::ostream* os) {
@@ -152,7 +105,7 @@ public:
     }
 
     virtual void configure_terminator(bzla::Terminator* terminator) override {
-        _stream_wrapper->bzlaTerminator.store(terminator, std::memory_order_relaxed);
+        _stream_wrapper->innerTerminator.store(terminator, std::memory_order_relaxed);
     }
 
     virtual bzla::Result solve() override {

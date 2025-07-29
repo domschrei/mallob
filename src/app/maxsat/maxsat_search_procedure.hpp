@@ -13,6 +13,8 @@
 #include "app/sat/data/theories/integer_term.hpp"
 #include "app/sat/data/theories/theory_specification.hpp"
 #include "app/sat/job/sat_constants.h"
+#include "app/sat/stream/sat_job_stream_garbage_collector.hpp"
+#include "app/sat/stream/wrapped_sat_job_stream.hpp"
 #include "interface/api/api_connector.hpp"
 #include "rustsat.h"
 #include "scheduling/core_allocator.hpp"
@@ -64,8 +66,7 @@ private:
     CoreAllocator::Allocation _core_alloc;
     int _nb_orig_vars;
 
-    SatJobStream _job_stream;
-    MallobSatJobStreamProcessor* _mallob_processor;
+    std::unique_ptr<WrappedSatJobStream> _stream_wrapper;
 
     // vector of 0-separated (hard) clauses to add in the next SAT call
     std::vector<int> _lits_to_add;
@@ -104,16 +105,17 @@ public:
     MaxSatSearchProcedure(const Parameters& params, APIConnector& api, JobDescription& desc,
             MaxSatInstance& instance, EncodingStrategy encStrat, SearchStrategy searchStrat, const std::string& label) :
         _params(params), _api(api), _desc(desc), _instance(instance), _core_alloc(1),
-        _job_stream("#" + std::to_string(desc.getId()) + "(Max)"),
         _lits_to_add(_instance.formulaData, _instance.formulaData+_instance.formulaSize),
         _current_bound(ULONG_MAX), _encoding_strat(encStrat), _search_strat(searchStrat), _label(label) {
 
-        _mallob_processor = new MallobSatJobStreamProcessor(_params, _api, _desc,
-            "maxsat", _running_stream_id++, true, _job_stream.getSynchronizer());
-        _job_stream.addProcessor(_mallob_processor);
-        auto internalProcessor = new InternalSatJobStreamProcessor(true, _job_stream.getSynchronizer());
-        _job_stream.addProcessor(internalProcessor);
-        _job_stream.setTerminator([&]() {return false;});
+        _stream_wrapper.reset(new WrappedSatJobStream("#" + std::to_string(desc.getId()) + "(Max)"));
+
+        _stream_wrapper->mallobProcessor = new MallobSatJobStreamProcessor(_params, _api, _desc,
+            "maxsat", _running_stream_id++, true, _stream_wrapper->stream.getSynchronizer());
+        _stream_wrapper->stream.addProcessor(_stream_wrapper->mallobProcessor);
+        auto internalProcessor = new InternalSatJobStreamProcessor(true, _stream_wrapper->stream.getSynchronizer());
+        _stream_wrapper->stream.addProcessor(internalProcessor);
+        _stream_wrapper->stream.setTerminator([&]() {return false;});
 
         _nb_orig_vars = _instance.nbVars; // before cardinality constraint encodings!
 
@@ -148,7 +150,7 @@ public:
             TheorySpecification spec({std::move(rule)});
             std::string specStr = spec.toStr();
             specStr.erase(std::remove_if(specStr.begin(), specStr.end(), ::isspace), specStr.end());
-            _mallob_processor->setInnerObjective(specStr);
+            _stream_wrapper->mallobProcessor->setInnerObjective(specStr);
         }
     }
 
@@ -236,14 +238,14 @@ public:
             LOG(V4_VVER, "MAXSAT Assumptions: %s\n", StringUtils::getSummary(_assumptions_to_set).c_str());
         }
 
-        if (!_initialized && _mallob_processor) {
-            _mallob_processor->setInitialSize(
+        if (!_initialized && _stream_wrapper->mallobProcessor) {
+            _stream_wrapper->mallobProcessor->setInitialSize(
                 _instance.nbVars,
                 _desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
             _initialized = true;
         }
 
-        _job_stream.solveNonblocking(std::move(_lits_to_add), _assumptions_to_set,
+        _stream_wrapper->stream.solveNonblocking(std::move(_lits_to_add), _assumptions_to_set,
             _desc_label_next_call,
             // TODO still leading to error at volume_calculator.hpp:137:
             // Let the position of the tested bound influence the job's priority
@@ -257,13 +259,13 @@ public:
         _solving = true;
     }
     bool isNonblockingSolvePending() {
-        return _job_stream.isNonblockingSolvePending() && _solving;
+        return _stream_wrapper->stream.isNonblockingSolvePending() && _solving;
     }
     int processNonblockingSolveResult() {
         _solving = false;
 
         // Job is done - retrieve the result.
-        auto [resultCode, solution] = _job_stream.getNonblockingSolveResult();
+        auto [resultCode, solution] = _stream_wrapper->stream.getNonblockingSolveResult();
         if (resultCode == RESULT_UNSAT) {
             // UNSAT
             if (_search_strat == NAIVE_REFINEMENT) {
@@ -381,7 +383,7 @@ public:
     void interrupt(bool terminate = false) {
         assert(_solving);
         if (terminate) _yield_searcher = true;
-        if (_job_stream.interrupt()) {
+        if (_stream_wrapper->stream.interrupt()) {
             if (_current_bound == ULONG_MAX)
                 LOG(V2_INFO, "MAXSAT %s Interrupt bound-free solving\n", _label.c_str());
             else
@@ -394,7 +396,7 @@ public:
     }
 
     void setGroupId(const std::string& groupId, int minVar = -1, int maxVar = -1) {
-        _mallob_processor->setGroupId(groupId, minVar, maxVar);
+        _stream_wrapper->mallobProcessor->setGroupId(groupId, minVar, maxVar);
     }
 
     size_t getCurrentBound() const {
@@ -406,8 +408,8 @@ public:
     }
     void finalize() {
         if (_finalized) return;
-        _job_stream.finalize();
         _finalized = true;
+        SatJobStreamGarbageCollector::get().add(std::move(_stream_wrapper));
     }
 
     ~MaxSatSearchProcedure() {
