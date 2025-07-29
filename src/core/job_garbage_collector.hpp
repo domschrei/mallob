@@ -68,6 +68,7 @@ public:
             _worker.stopWithoutWaiting();
         }
         _cond_var.notify();
+        _worker.join();
     }
 
 private:
