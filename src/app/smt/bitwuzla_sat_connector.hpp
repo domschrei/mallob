@@ -2,10 +2,12 @@
 #pragma once
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <csignal>
 #include <cstdint>
 #include <cstdlib>
+#include <memory>
 #include <ostream>
 #include <pthread.h>
 #include <string>
@@ -21,7 +23,10 @@
 #include "robin_set.h"
 #include "util/assert.hpp"
 #include "util/logger.hpp"
+#include "util/params.hpp"
 #include "util/sys/terminator.hpp"
+#include "util/sys/thread_pool.hpp"
+#include "util/sys/threading.hpp"
 #include "util/sys/timer.hpp"
 
 class BitwuzlaSatConnector : public bzla::sat::SatSolver {
@@ -37,16 +42,11 @@ private:
     int _stream_id;
     std::string _name;
 
-    SatJobStream _job_stream;
-    MallobSatJobStreamProcessor* _mallob_processor {nullptr};
-
     std::vector<int> _lits;
     std::vector<int> _assumptions;
     int _nb_vars {0};
     int _nb_clauses {0};
     int _revision {-1};
-
-    bzla::Terminator* _terminator {nullptr};
 
     std::vector<int> _solution;
     tsl::robin_set<int> _failed_lits;
@@ -57,25 +57,80 @@ private:
 
     std::ostream* _out_stream {nullptr};
 
+    struct WrappedSatJobStream {
+        SatJobStream stream;
+        MallobSatJobStreamProcessor* mallobProcessor {nullptr};
+        std::atomic<bzla::Terminator*> bzlaTerminator {nullptr};
+        WrappedSatJobStream(const std::string& name) : stream(name) {}
+    };
+    std::unique_ptr<WrappedSatJobStream> _stream_wrapper;
+
+    struct GarbageCollector {
+        Mutex mtxGarbage;
+        ConditionVariable condVarGarbage;
+        std::list<std::unique_ptr<WrappedSatJobStream>> garbage;
+        volatile bool stop {false};
+        std::thread bgThread;
+        GarbageCollector() {
+            bgThread = std::thread([this]() {run();});
+        }
+        void run() {
+            while (true) {
+                std::unique_ptr<WrappedSatJobStream> item;
+                {
+                    auto lock = mtxGarbage.getLock();
+                    condVarGarbage.waitWithLockedMutex(lock, [&]() {
+                        return !garbage.empty() || stop;
+                    });
+                    if (garbage.empty()) break;
+                    item = std::move(garbage.front());
+                    garbage.pop_front();
+                }
+                item.reset(); // delete garbage
+            }
+        }
+        void add(std::unique_ptr<WrappedSatJobStream>&& item) {
+            {
+                auto lock = mtxGarbage.getLock();
+                garbage.push_back(std::move(item));
+            }
+            condVarGarbage.notify();
+        }
+        ~GarbageCollector() {
+            stop = true;
+            add({});
+            bgThread.join();
+        }
+    };
+    static GarbageCollector* _gc;
+
 public:
     BitwuzlaSatConnector(const Parameters& params, APIConnector& api, JobDescription& desc, const std::string& name) :
         bzla::sat::SatSolver(), _params(params), _desc(desc), _stream_id(getNextStreamId()),
-        _name(name + ":" + std::to_string(_stream_id) + "(SAT)"), _job_stream(_name) {
+        _name(name + ":" + std::to_string(_stream_id) + "(SAT)") {
 
-        _mallob_processor = new MallobSatJobStreamProcessor(params, api, desc,
-            _name, _stream_id, true, _job_stream.getSynchronizer());
-        _job_stream.addProcessor(_mallob_processor);
+        _stream_wrapper.reset(new WrappedSatJobStream(_name));
+
+        _stream_wrapper->mallobProcessor = new MallobSatJobStreamProcessor(params, api, desc,
+            _name, _stream_id, true, _stream_wrapper->stream.getSynchronizer());
+        _stream_wrapper->stream.addProcessor(_stream_wrapper->mallobProcessor);
         LOG(V2_INFO, "New: %s\n", _name.c_str());
 
-        auto internalProcessor = new InternalSatJobStreamProcessor(true, _job_stream.getSynchronizer());
-        _job_stream.addProcessor(internalProcessor);
+        auto internalProcessor = new InternalSatJobStreamProcessor(true, _stream_wrapper->stream.getSynchronizer());
+        _stream_wrapper->stream.addProcessor(internalProcessor);
+
+        _stream_wrapper->stream.setTerminator([&, wrapper=_stream_wrapper.get(), params=&_params, desc=&_desc, startTime=_start_time]() {
+            if (wrapper->stream.finalizing()) return true;
+            auto bzlaTerm = wrapper->bzlaTerminator.load(std::memory_order_relaxed);
+            if (bzlaTerm && bzlaTerm->terminate()) return true;
+            return isTimeoutHit(params, desc, startTime);
+        });
 
         _start_time = Timer::elapsedSeconds();
     }
     virtual ~BitwuzlaSatConnector() {
         LOG(V2_INFO, "Done: %s\n", _name.c_str());
-        _job_stream.interrupt();
-        _job_stream.finalize();
+        _gc->add(std::move(_stream_wrapper));
     }
 
     void outputModels(std::ostream* os) {
@@ -97,22 +152,20 @@ public:
     }
 
     virtual void configure_terminator(bzla::Terminator* terminator) override {
-        this->_terminator = terminator;
+        _stream_wrapper->bzlaTerminator.store(terminator, std::memory_order_relaxed);
     }
 
     virtual bzla::Result solve() override {
         if (_in_solved_state) return _result;
 
-        _job_stream.setTerminator([&]() {return isTimeoutHit();});
-
         _revision++;
-        if (_revision == 0 && _mallob_processor) {
-            _mallob_processor->setInitialSize(_nb_vars, _nb_clauses);
+        if (_revision == 0 && _stream_wrapper->mallobProcessor) {
+            _stream_wrapper->mallobProcessor->setInitialSize(_nb_vars, _nb_clauses);
         }
         auto time = Timer::elapsedSeconds();
         LOG(V2_INFO, "%s submit rev. %i (%i lits)\n", _name.c_str(), _revision, _lits.size());
 
-        auto [resultCode, solution] = _job_stream.solve(std::move(_lits), _assumptions);
+        auto [resultCode, solution] = _stream_wrapper->stream.solve(std::move(_lits), _assumptions);
         _lits.clear();
         _assumptions.clear();
 
@@ -161,15 +214,12 @@ public:
         return 0; // -1: not implied, 1: implied, 0: unknown
     }
 
-private:
-    bool isTimeoutHit() const {
-        if (_terminator && _terminator->terminate())
-            return true;
-        if (_params.timeLimit() > 0 && Timer::elapsedSeconds() >= _params.timeLimit())
-            return true;
-        if (_desc.getWallclockLimit() > 0 && (Timer::elapsedSeconds() - _start_time) >= _desc.getWallclockLimit())
-            return true;
+    bool isTimeoutHit(const Parameters* params, JobDescription* desc, float startTime) const {
         if (Terminator::isTerminating())
+            return true;
+        if (params->timeLimit() > 0 && Timer::elapsedSeconds() >= params->timeLimit())
+            return true;
+        if (desc->getWallclockLimit() > 0 && (Timer::elapsedSeconds() - startTime) >= desc->getWallclockLimit())
             return true;
         return false;
     }

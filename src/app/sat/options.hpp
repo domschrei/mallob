@@ -28,7 +28,7 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "Number of subsequent full clause sharings to fit in each solver's import buffer")
  OPT_INT(clauseBufferBaseSize,              "cbbs", "clause-buffer-base-size",           0,     0,   0,   
     "DISCONTINUED - use exportVolumePerThread (-evpt) instead, which is supposed to have a one-size-fits-all default")
- OPT_INT(exportVolumePerThread,             "evpt", "export-volume-per-thread",          350,   0,   LARGE_INT,   
+ OPT_INT(exportVolumePerThread,             "evpt", "export-volume-per-thread",          500,   0,   LARGE_INT,
     "Max. number of clause literals to export per thread per sharing operation")
  OPT_INT(clauseBufferLimitMode,             "cblm", "clause-buffer-limit-mode",          1,        0,   1,
     "Mode for computing clause buffer limit w.r.t. worker count (0: unlimited growth based on levels of binary tree, 1: limited growth based on exponential function")
@@ -47,7 +47,7 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "Store clauses with up to this LBD in separate buckets")
  OPT_INT(minNumChunksForImportPerSolver,    "mcips", "min-import-chunks-per-solver",     5,       1,   LARGE_INT,      
     "Min. number of single-export-sized chunks for buffering incoming clauses for import per solver")
- OPT_INT(numExportChunks,                   "nec", "export-chunks",                      5,       1,   LARGE_INT,
+ OPT_INT(numExportChunks,                   "nec", "export-chunks",                      10,       1,   LARGE_INT,
     "Number of single-export-sized chunks for buffering produced clauses for export")
  OPT_INT(qualityClauseLengthLimit,          "qcll", "quality-clause-length-limit",       8,        0,   255,
     "Clauses up to this length are considered \"high quality\"")

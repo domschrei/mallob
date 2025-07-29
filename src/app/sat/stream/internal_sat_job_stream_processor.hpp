@@ -18,7 +18,6 @@ private:
     std::unique_ptr<Cadical> _solver;
     int _current_rev {-1};
     volatile bool _pending {false};
-    volatile bool _interrupted {false};
 
 public:
     InternalSatJobStreamProcessor(bool incremental, Synchronizer& sync) :
@@ -34,7 +33,10 @@ public:
         _solver->getTerminator().setExternalTerminator([&]() {return _terminator(_current_rev);});
     }
 
-    ~InternalSatJobStreamProcessor() override {}
+    ~InternalSatJobStreamProcessor() override {
+        finalize();
+        while (_pending) {usleep(1000);}
+    }
 
     virtual void setName(const std::string& baseName) override {
         _name = baseName + ":seq";
@@ -42,7 +44,6 @@ public:
 
     virtual void process(SatTask& task) override {
         _current_rev = task.rev;
-        _interrupted = false;
         _pending = true;
         for (int lit : task.lits) _solver->addLiteral(lit);
         _solver->unsetSolverInterrupt();
@@ -58,6 +59,5 @@ public:
     virtual void finalize() override {
         SatJobStreamProcessor::finalize();
         _solver->setSolverInterrupt();
-        while (_pending) {usleep(1000);}
     }
 };

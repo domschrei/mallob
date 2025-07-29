@@ -21,6 +21,7 @@ private:
     SatJobStreamProcessor::Synchronizer _sync;
     typedef std::pair<std::unique_ptr<SatJobStreamProcessor>, std::unique_ptr<BackgroundWorker>> Processor;
     std::vector<Processor> _processors;
+    volatile bool _finalizing {false};
 
 public:
     SatJobStream(const std::string& baseName) : _name(baseName) {}
@@ -87,7 +88,7 @@ public:
         return {result.resultCode, std::move(result.solution)};
     }
 
-    void setTerminator(const std::function<bool(void)>& terminator) {
+    void setTerminator(const std::function<bool()>& terminator) {
         for (auto& [proc, worker] : _processors)
             proc->setTerminator([&, terminator](int rev) {
                 if (terminator() || rev <= _sync.lastEndedRev.load(std::memory_order_relaxed)) {
@@ -104,6 +105,11 @@ public:
     }
 
     void finalize() {
+        _finalizing = true;
         for (auto& [proc, worker] : _processors) proc->finalize();
+    }
+
+    bool finalizing() const {
+        return _finalizing;
     }
 };

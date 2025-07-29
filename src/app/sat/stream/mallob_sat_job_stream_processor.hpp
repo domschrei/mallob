@@ -208,7 +208,7 @@ public:
     }
 
 private:
-        bool checkTaskPending(int rev) {
+    bool checkTaskPending(int rev) {
         if (!_task_pending) return false;
         if (_pending_task_interrupted) return true;
         if (!_terminator(rev)) return true;
