@@ -67,11 +67,11 @@ function test_dry_scheduling() {
     t=1
     for i in {1..400}; do
         # wallclock limit, arrival, dependencies, application
-        wclimit=1.5s arrival=$t application=DUMMY introduce_job dummy-$i instances/r3sat_300.cnf
+        wclimit=1.5s arrival=$t application=SAT introduce_job dummy-$i instances/r3sat_200.cnf
         t=$(echo "$t+0.1"|bc -l)
     done
     echo "400 jobs set up."
-    test 32 -c=1 -J=400 -v=4 $@
+    test 32 -c=1 -J=400 -v=4 -t=1 $@
 }
 
 function test_job_streamer() {
