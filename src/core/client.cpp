@@ -633,8 +633,6 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     // - In "mono" mode of operation, we only want the original job, not a secondary one.
     bool primaryJob = !_params.monoFilename.isSet() || jobId == _mono_job_id;
     bool constructSolutionStrings = primaryJob;
-    // - Only if the result actually encompasses a solution.
-    constructSolutionStrings &= resultCode == RESULT_SAT || resultCode == RESULT_OPTIMUM_FOUND;
     // - Some sort of output is in fact desired by the user.
     constructSolutionStrings &= _params.solutionToFile.isSet() || (jobId == _mono_job_id && !_params.omitSolution());
     if (constructSolutionStrings) {
