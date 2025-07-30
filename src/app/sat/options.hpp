@@ -45,13 +45,13 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "Group and prioritize clauses in buffers by the sum of clause length and LBD score")
  OPT_INT(maxLbdPartitioningSize,            "mlbdps", "max-lbd-partition-size",          2,        1,   LARGE_INT,
     "Store clauses with up to this LBD in separate buckets")
- OPT_INT(minNumChunksForImportPerSolver,    "mcips", "min-import-chunks-per-solver",     5,       1,   LARGE_INT,      
+ OPT_INT(minNumChunksForImportPerSolver,    "mcips", "min-import-chunks-per-solver",     10,       1,   LARGE_INT,
     "Min. number of single-export-sized chunks for buffering incoming clauses for import per solver")
  OPT_INT(numExportChunks,                   "nec", "export-chunks",                      10,       1,   LARGE_INT,
     "Number of single-export-sized chunks for buffering produced clauses for export")
- OPT_INT(qualityClauseLengthLimit,          "qcll", "quality-clause-length-limit",       8,        0,   255,
+ OPT_INT(qualityClauseLengthLimit,          "qcll", "quality-clause-length-limit",       60,        0,   255,
     "Clauses up to this length are considered \"high quality\"")
- OPT_INT(qualityLbdLimit,                   "qlbdl", "quality-lbd-limit",                2,        0,   255,
+ OPT_INT(qualityLbdLimit,                   "qlbdl", "quality-lbd-limit",                60,        0,   255,
     "Clauses with an LBD score up to this value are considered \"high quality\"")
  OPT_INT(clauseFilterMode,                  "cfm", "clause-filter-mode",                 3,        0,   3, 
     "0 = no filtering, 1 = bloom filters, 2 = exact filters, 3 = exact filters with distributed filtering in a 2nd all-reduction")
