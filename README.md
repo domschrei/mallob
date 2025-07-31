@@ -58,10 +58,11 @@ RDMAV_FORK_SAFE=1; mpirun -np 8 --bind-to core --map-by ppr:1:node:pe=4 build/ma
 
 ## Licensing
 
-The source code of Mallob can be used, changed and redistributed under the terms of the **Lesser General Public License (LGPLv3)**, one exception being the Glucose interface which is excluded from compilation by default (see below).
-**Please approach us if you require a deviating license.**
+First of all, **please let us know if you make use of Mallob!** We like to hear about it and depend on it for continued support and further development.
 
-The used versions of Lingeling, YalSAT, CaDiCaL, and Kissat are MIT-licensed, as is HordeSat (the massively parallel solver system our SAT engine was based on).
+Mallob and its source code can be used, changed and redistributed under the terms of the [**MIT License**](/LICENSE_MIT) _or_ the [**Lesser General Public License (LGPLv3)**](/LICENSE_LGPL). One exception is the Glucose interface which is excluded from compilation by default (see below).
+
+The used versions of Lingeling, YalSAT, CaDiCaL, and Kissat are MIT-licensed, as is HordeSat (the massively parallel solver system our SAT engine was based on) and other statically linked libraries (RustSAT, Bitwuzla, and MaxPRE).
 
 The Glucose interface of Mallob (only included when explicitly compiled with `-DMALLOB_USE_GLUCOSE=1`) is subject to the [non-free license of (parallel-ready) Glucose](https://github.com/mi-ki/glucose-syrup/blob/master/LICENCE). Notably, its usage in competitive events is restricted.
 
@@ -76,9 +77,9 @@ Within our codebase we make thankful use of the following liberally licensed pro
 
 ## Bibliography
 
-If you make use of Mallob in an academic setting or in a competitive event, please cite the most relevant among the following publications.
+If you make use of Mallob in an academic / scientific setting or in a competitive event, please cite the most relevant among the following publications (all Open Access).
 
-#### JAIR'24: Focus on SAT Solving
+#### Focus on SAT Solving (JAIR'24)
 ```bibtex
 @article{schreiber2024mallobsat,
 	title={{MallobSat}: Scalable {SAT} Solving by Clause Sharing},
@@ -90,7 +91,7 @@ If you make use of Mallob in an academic setting or in a competitive event, plea
 	doi={10.1613/jair.1.15827},
 }
 ```
-#### Euro-Par'22: Focus on job scheduling
+#### Focus on job scheduling (Euro-Par'22)
 ```bibtex
 @inproceedings{sanders2022decentralized,
   title={Decentralized Online Scheduling of Malleable {NP}-hard Jobs},
@@ -102,19 +103,19 @@ If you make use of Mallob in an academic setting or in a competitive event, plea
   doi={10.1007/978-3-031-12597-3_8}
 }
 ```
-#### TACAS'23: Proofs of unsatisfiability
+#### Monolithic proofs of unsatisfiability (JAR'25)
 ```bibtex
-@InProceedings{michaelson2023unsatisfiability,
-  author={Michaelson, Dawn and Schreiber, Dominik and Heule, Marijn J. H. and Kiesl-Reiter, Benjamin and Whalen, Michael W.},
-  title={Unsatisfiability proofs for distributed clause-sharing SAT solvers},
-  booktitle={Tools and Algorithms for the Construction and Analysis of Systems (TACAS)},
-  year={2023},
-  organization={Springer},
-  pages={348--366},
-  doi={10.1007/978-3-031-30823-9_18},
+@article{michaelson2025producing,
+	author={Michaelson, Dawn and Schreiber, Dominik and Heule, Marijn J. H. and Kiesl-Reiter, Benjamin and Whalen, Michael W.},
+	title={Producing Proofs of Unsatisfiability with Distributed Clause-Sharing {SAT} Solvers},
+	journal={Journal of Automated Reasoning (JAR)},
+	year={2025},
+	organization={Springer},
+	volume={69},
+	doi={10.1007/s10817-025-09725-w},
 }
 ```
-#### SAT'24: Real-time proof checking with MallobSat + ImpCheck
+#### Real-time proof checking (SAT'24)
 ```bibtex
 @inproceedings{schreiber2024trusted,
 	title={Trusted Scalable {SAT} Solving with on-the-fly {LRAT} Checking},
@@ -126,7 +127,20 @@ If you make use of Mallob in an academic setting or in a competitive event, plea
 	doi={10.4230/LIPIcs.SAT.2024.25},
 }
 ```
-#### Most recent SAT Competition TR
+#### MaxSAT Solving (SoCS'25)
+```bibtex
+@inproceedings{schreiber2025from,
+	author={Schreiber, Dominik and Jabs, Christoph and Berg, Jeremias},
+	title={From Scalable {SAT} to {MaxSAT}: Massively parallel Solution Improving Search},
+	booktitle={Symposium on Combinatorial Search (SoCS)},
+	year={2025},
+	doi={10.1609/socs.v18i1.35984},
+	volume={18},
+	number={1},
+	pages={127--135},
+}
+```
+#### Most recent SAT Competition solver description (TR)
 ```bibtex
 @inproceedings{schreiber2024mallob,
 	title={{MallobSat} and {MallobSat-ImpCheck} in the {SAT} Competition 2024},
@@ -134,17 +148,19 @@ If you make use of Mallob in an academic setting or in a competitive event, plea
 	booktitle={SAT Competition 2024: Solver, Benchmark and Proof Checker Descriptions},
 	year={2024},
 	pages={21--22},
-	note={\url{http://hdl.handle.net/10138/584822}},
+	url={http://hdl.handle.net/10138/584822},
 }
 ```
-#### Doctoral thesis (1st presentation of Incremental Distributed SAT)
+#### Distributed Incremental SAT Solving (TR)
 ```bibtex
-@phdthesis{schreiber2023scalable,
-  author={Dominik Schreiber},
-  title={Scalable {SAT} Solving and its Application},
-  year={2023},
-  school={Karlsruhe Institute of Technology},
-  doi={10.5445/IR/1000165224}
+@misc{schreiber2025distributed,
+	title={Distributed Incremental {SAT} Solving with {Mallob}: Report and Case Study with Hierarchical Planning},
+	author={Dominik Schreiber},
+	year={2025},
+	eprint={2505.18836},
+	archivePrefix={arXiv},
+	primaryClass={cs.DC},
+	url={https://arxiv.org/abs/2505.18836},
 }
 ```
 
