@@ -4,7 +4,7 @@
 [![Zenodo](https://zenodo.org/badge/DOI/10.5281/zenodo.6890239.svg)](https://doi.org/10.5281/zenodo.6890239)
 [![JOSS](https://joss.theoj.org/papers/700e9010c4080ffe8ae4df21cf1cc899/status.svg)](https://joss.theoj.org/papers/700e9010c4080ffe8ae4df21cf1cc899)
 [![Max. tested scale - 6400 cores](https://img.shields.io/badge/Max._tested_scale-6400_cores-red)](https://jair.org/index.php/jair/article/view/15827)
-[![License - LGPL (or ask us)](https://img.shields.io/badge/License-LGPL_(or_ask_us)-ffffbb)](#Licensing)
+[![License - MIT or LGPL](https://img.shields.io/badge/License-MIT_or_LGPL-ffffbb)](#Licensing)
 
 # Mallob
 
