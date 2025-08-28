@@ -62,26 +62,9 @@ void SolverThread::init() {
     _active_revision = 0;
     _imported_lits_curr_revision = 0;
 
-    if (_lrat || _solver.getSolverSetup().owningModelCheckingLratConnector) {
-        // Convert hex string back to byte array
-        signature target;
-        {
-            std::string sigStr = _solver.getSolverSetup().sigFormula;
-            const char* src = sigStr.c_str();
-            uint8_t* dest = target;
-            while(*src && src[1]) {
-                char c1 = src[0];
-                int i1 = (c1 >= '0' && c1 <= '9') ? (c1 - '0') : (c1 - 'a' + 10);
-                char c2 = src[1];
-                int i2 = (c2 >= '0' && c2 <= '9') ? (c2 - '0') : (c2 - 'a' + 10);
-                *(dest++) = i1*16 + i2;
-                src += 2;
-            }
-        }
-        if (_lrat) _lrat->getChecker().init(target);
-        if (_solver.getSolverSetup().owningModelCheckingLratConnector)
-            _solver.getSolverSetup().modelCheckingLratConnector->getChecker().init(target);
-    }
+    if (_lrat) _lrat->getChecker().init();
+    if (_solver.getSolverSetup().owningModelCheckingLratConnector)
+        _solver.getSolverSetup().modelCheckingLratConnector->getChecker().init();
 
     _initialized = true;
 }
@@ -124,10 +107,10 @@ bool SolverThread::readFormula() {
 
         // Forward raw formula data to LRAT connectors
         if (_lrat) {
-            _lrat->launch(*fParser);
+            _lrat->initiateRevision(*fParser);
         }
         if (_solver.getSolverSetup().owningModelCheckingLratConnector) {
-            _solver.getSolverSetup().modelCheckingLratConnector->launch(*fParser);
+            _solver.getSolverSetup().modelCheckingLratConnector->initiateRevision(*fParser);
         }
 
         LOGGER(_logger, V4_VVER, "Reading rev. %i, start %i\n", (int)_active_revision, (int)_imported_lits_curr_revision);
@@ -139,11 +122,13 @@ bool SolverThread::readFormula() {
             if (std::abs(lit) > (1<<30)) {
                 LOGGER(_logger, V0_CRIT, "[ERROR] Invalid literal %i at rev. %i pos. %ld/%ld.\n",
                     lit, (int)_active_revision, _imported_lits_curr_revision, fParser->getPayloadSize());
+                _logger.flush();
                 abort();
             }
             if (lit == 0 && _last_read_lit_zero) {
                 LOGGER(_logger, V0_CRIT, "[ERROR] Empty clause at rev. %i pos. %ld/%ld.\n", 
                     (int)_active_revision, _imported_lits_curr_revision, fParser->getPayloadSize());
+                _logger.flush();
                 abort();
             }
             _solver.addLiteral(lit);
@@ -190,7 +175,7 @@ void SolverThread::appendRevision(int revision, RevisionData data) {
     {
         auto lock = _state_mutex.getLock();
         _pending_formulae.emplace_back(
-            new SerializedFormulaParser(_logger, data.fLits, data.fSize)
+            new SerializedFormulaParser(_logger, data.fLits, data.fSize, _solver.getSolverSetup().onTheFlyChecking)
         );
         if (_params.compressFormula()) {
             _pending_formulae.back()->setCompressed();
@@ -354,21 +339,21 @@ void SolverThread::reportResult(int res, int revision) {
         if (lrat) {
             LOGGER(_logger, V3_VERB, "Validating SAT ...\n");
             // omit first "0" in solution vector
-            lrat->setSolution(solution.data()+1, solution.size()-1);
+            lrat->push(LratOp(solution.data()+1, solution.size()-1));
             // Whether or not this was successful (another thread might have been earlier),
             // wait until SAT was validated.
-            lrat->waitForSatValidation();
+            lrat->waitForValidation();
         }
         _state_mutex.lock();
         _result.setSolutionToSerialize(solution.data(), solution.size());
     } else {
-        if (_lrat) {
-            LOGGER(_logger, V3_VERB, "Validating UNSAT ...\n");
-            _lrat->push({20});
-            _lrat->waitForUnsatValidation();
-        }
         auto failed = _solver.getFailedAssumptions();
         auto failedVec = std::vector<int>(failed.begin(), failed.end());
+        if (_lrat) {
+            LOGGER(_logger, V3_VERB, "Validating UNSAT ...\n");
+            _lrat->push(LratOp(_solver.getUnsatConclusionId(), failedVec.data(), failedVec.size()));
+            _lrat->waitForValidation();
+        }
         _state_mutex.lock();
         _result.setSolutionToSerialize(failedVec.data(), failedVec.size());
     }

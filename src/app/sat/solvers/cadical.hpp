@@ -38,6 +38,7 @@ private:
 
 	std::vector<std::vector<int>> learnedClauses;
 	std::vector<int> assumptions;
+	unsigned long unsatConclusionId;
 
 	CadicalTerminator terminator;
 	CadicalClauseExport learner;
@@ -67,6 +68,7 @@ public:
 
 	std::vector<int> getSolution() override;
 	std::set<int> getFailedAssumptions() override;
+	unsigned long getUnsatConclusionId() const override {return unsatConclusionId;}
 
 	// Set a function that should be called for each learned clause
 	void setLearnedClauseCallback(const LearnedClauseCallback& callback) override;

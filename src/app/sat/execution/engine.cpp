@@ -90,6 +90,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		ClauseMetadata::enableClauseIds();
 		if (_params.onTheFlyChecking()) {
 			ClauseMetadata::enableClauseSignatures();
+			ClauseMetadata::enableIncrementalSignatures();
 		}
 
 		if (_params.proofOutputFile.isSet()) {
@@ -243,7 +244,6 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.numVars = numVars;
 	setup.numOriginalClauses = numClauses;
 	setup.proofDir = proofDirectory;
-	setup.sigFormula = appConfig.map["__SIG"];
 	LratConnector* modelCheckingLratConnector {nullptr};
 	setup.nbSkippedIdEpochs = config.nbPreviousBalancingEpochs;
 	if (params.satProfilingLevel() >= 0) {

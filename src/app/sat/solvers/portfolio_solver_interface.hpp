@@ -66,6 +66,7 @@ public:
 
 	// Get a set of failed assumptions
 	virtual std::set<int> getFailedAssumptions() = 0;
+	virtual unsigned long getUnsatConclusionId() const {return 0;}
 
 	// Add a permanent literal to the formula (zero for clause separator)
 	virtual void addLiteral(int lit) = 0;

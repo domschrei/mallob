@@ -35,12 +35,12 @@ void handleSignal(int signum) {
     // Do not recursively catch signals (if something goes wrong in here)
     if (Process::_exit_signal_caught) return;
 
+    // If crash, try to write a trace of the concerned thread with gdb
+    if (Process::isCrash(signum)) Process::writeTrace(Proc::getTid());
+
     Process::_exit_signal_caught = true;
     Process::_exit_signal = signum;
     Process::_signal_tid = Proc::getTid();
-
-    // If crash, try to write a trace of the concerned thread with gdb
-    if (Process::isCrash(signum)) Process::writeTrace(Proc::getTid());
 
     // Impose a hard timeout for this process' lifetime from this point,
     // to avoid indeterminate freezes

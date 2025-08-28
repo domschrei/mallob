@@ -1,8 +1,10 @@
 
 #pragma once
 
+#include <cassert>
 #include <cstdlib> // exit
 #include <stdio.h> // file I/O
+#include <string>
 #include <unistd.h> // getpid
 
 #ifdef _MSC_VER
@@ -112,5 +114,30 @@ public:
     }
     static void writeChar(char c, FILE* file) {
         UNLOCKED_IO(fputc)(c, file);
+    }
+
+    static std::string sigToStr(const u8* sig) {
+        std::string out(2*SIG_SIZE_BYTES, '0');
+        for (int charpos = 0; charpos < SIG_SIZE_BYTES; charpos++) {
+            char val1 = (sig[charpos] >> 4) & 0x0f;
+            char val2 = sig[charpos] & 0x0f;
+            assert(val1 >= 0 && val1 < 16);
+            assert(val2 >= 0 && val2 < 16);
+            out[2*charpos+0] = val1>=10 ? 'a'+val1-10 : '0'+val1;
+            out[2*charpos+1] = val2>=10 ? 'a'+val2-10 : '0'+val2;
+        }
+        return out;
+    }
+
+    static bool strToSig(const std::string& str, u8* out) {
+        for (int bytepos = 0; bytepos < SIG_SIZE_BYTES; bytepos++) {
+            const char* hex_pair = str.data() + bytepos*2;
+            char hex1 = hex_pair[0]; char hex2 = hex_pair[1];
+            int byte = 16 * (hex1 >= '0' && hex1 <= '9' ? hex1-'0' : 10+hex1-'a')
+                        + (hex2 >= '0' && hex2 <= '9' ? hex2-'0' : 10+hex2-'a');
+            if (byte < 0 || byte >= 256) return false;
+            out[bytepos] = (u8) byte;
+        }
+        return true;
     }
 };

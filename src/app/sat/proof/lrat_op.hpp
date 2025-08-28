@@ -1,140 +1,189 @@
 
 #pragma once
 
+#include <cstdlib>
 #include <cstring>
 #include <algorithm>
 
+#include "app/sat/proof/trusted/trusted_checker_defs.hpp"
 #include "util/logger.hpp"
 #include "util/assert.hpp"
 #include "trusted/trusted_utils.hpp"
 
 struct LratOp {
-    size_t datalen {0};
-    u8* data {nullptr};
+    char type = '\0';
+    union LratOpData {
+        struct LratOpDataBeginLoad {
+            u8 sig[SIG_SIZE_BYTES];
+        } beginLoad;
+        struct LratOpDataLoad {
+            int* lits;
+            int nbLits;
+        } load;
+        struct LratOpDataEndLoad {
+            int* assumptions;
+            int nbAssumptions;
+        } endLoad;
+        struct LratOpDataProduce {
+            u64 id;
+            int* lits;
+            int nbLits;
+            u64* hints;
+            int nbHints;
+            int glue;
+        } produce;
+        struct LratOpDataImport {
+            u64 id;
+            int* lits;
+            int nbLits;
+            u8 sig[SIG_SIZE_BYTES];
+            int rev;
+        } import;
+        struct LratOpDataRemove {
+            u64* hints;
+            int nbHints;
+        } remove;
+        struct LratOpDataConcludeSat {
+            int* model;
+            int modelSize;
+        } concludeSat;
+        struct LratOpDataConcludeUnsat {
+            u64 id;
+            int* failed;
+            int nbFailed;
+        } concludeUnsat;
+        struct LratOpDataTerminate {} terminate;
+    } data;
 
     // Derivation / production / addition
-    LratOp(u64 id, const int* lits, int nbLits, const u64* hints, int nbHints, int glue) :
-            datalen(sizeof(nbLits) + sizeof(nbHints) + sizeof(id) 
-                    + nbLits*sizeof(int) + nbHints*sizeof(u64) + sizeof(int)),
-            data((u8*) malloc(datalen)) {
-        size_t i = 0, n;
-        assert(glue >= 0);
-        n = sizeof(nbLits);      memcpy(data+i, &nbLits, n);  i += n;
-        n = sizeof(nbHints);     memcpy(data+i, &nbHints, n); i += n;
-        n = sizeof(id);          memcpy(data+i, &id, n);      i += n;
-        n = sizeof(int)*nbLits;  memcpy(data+i, lits, n);     i += n;
-        n = sizeof(u64)*nbHints; memcpy(data+i, hints, n);    i += n;
-        n = sizeof(glue);        memcpy(data+i, &glue, n);    i += n;
-        //assert(isDerivation());
+    LratOp(u64 id, const int* lits, int nbLits, const u64* hints, int nbHints, int glue) {
+        type = TRUSTED_CHK_CLS_PRODUCE;
+        data.produce.id = id;
+        data.produce.nbLits = nbLits;
+        data.produce.nbHints = nbHints;
+        data.produce.glue = glue;
+
+        u8* litsAndHints = (u8*) malloc(sizeof(int) * nbLits + sizeof(u64) * nbHints);
+        memcpy(litsAndHints, lits, sizeof(int) * nbLits);
+        memcpy(litsAndHints + sizeof(int) * nbLits, hints, sizeof(u64) * nbHints);
+        data.produce.lits = (int*) litsAndHints;
+        data.produce.hints = (u64*) (litsAndHints + sizeof(int) * nbLits);
     }
     // Import
-    LratOp(u64 id, const int* lits, int nbLits, const u8* sig) :
-            datalen(2*sizeof(int) + sizeof(id) + nbLits*sizeof(int) + SIG_SIZE_BYTES + sizeof(int)),
-            data((u8*) malloc(datalen)) {
-        size_t i = 0, n;
-        const int nbHints = SIG_SIZE_BYTES / sizeof(u64);
-        const int glue = -1;
-        n = sizeof(nbLits);      memcpy(data+i, &nbLits, n);  i += n;
-        n = sizeof(nbHints);     memcpy(data+i, &nbHints, n); i += n;
-        n = sizeof(id);          memcpy(data+i, &id, n);      i += n;
-        n = sizeof(int)*nbLits;  memcpy(data+i, lits, n);     i += n;
-        n = sizeof(u64)*nbHints; memcpy(data+i, sig, n);      i += n;
-        n = sizeof(glue);        memcpy(data+i, &glue, n);    i += n;
-        //assert(isImport());
+    LratOp(u64 id, const int* lits, int nbLits, const u8* sig, int rev) {
+        type = TRUSTED_CHK_CLS_IMPORT;
+        data.import.id = id;
+        data.import.nbLits = nbLits;
+        data.import.rev = rev;
+        memcpy(data.import.sig, sig, SIG_SIZE_BYTES);
+
+        data.import.lits = (int*) malloc(sizeof(int) * nbLits);
+        memcpy(data.import.lits, lits, sizeof(int) * nbLits);
     }
     // Deletion
-    LratOp(const u64* hints, int nbHints) :
-            datalen(2*sizeof(int) + sizeof(u64) + nbHints*sizeof(u64)),
-            data((u8*) malloc(datalen)) {
-        size_t i = 0, n;
-        const int nbLits = 0;
-        const u64 id = 0;
-        n = sizeof(nbLits);      memcpy(data+i, &nbLits, n);  i += n;
-        n = sizeof(nbHints);     memcpy(data+i, &nbHints, n); i += n;
-        n = sizeof(id);          memcpy(data+i, &id, n);      i += n;
-        n = sizeof(u64)*nbHints; memcpy(data+i, hints, n);    i += n;
-        //assert(isDeletion());
+    LratOp(const u64* hints, int nbHints) {
+        type = TRUSTED_CHK_CLS_DELETE;
+        data.remove.nbHints = nbHints;
+
+        data.remove.hints = (u64*) malloc(sizeof(u64) * nbHints);
+        memcpy(data.remove.hints, hints, sizeof(u64) * nbHints);
     }
-    // UNSAT Validation (20) or termination (0)
-    LratOp(char x) : datalen(1), data((u8*) malloc(1)) {
-        data[0] = x;
+    // Begin load
+    LratOp(const u8* sig) {
+        type = TRUSTED_CHK_BEGIN_LOAD;
+        memcpy(data.beginLoad.sig, sig, SIG_SIZE_BYTES);
+    }
+    // Load and end-load
+    LratOp(char c, const int* lits, int nbLits) {
+        type = c;
+        if (type == TRUSTED_CHK_LOAD) {
+            data.load.nbLits = nbLits;
+            data.load.lits = (int*) malloc(sizeof(int) * nbLits);
+            memcpy(data.load.lits, lits, sizeof(int) * nbLits);
+        } else if (type == TRUSTED_CHK_END_LOAD) {
+            data.endLoad.nbAssumptions = nbLits;
+            data.endLoad.assumptions = (int*) malloc(sizeof(int) * nbLits);
+            memcpy(data.endLoad.assumptions, lits, sizeof(int) * nbLits);
+        }
+    }
+    // Terminate
+    LratOp(char x) {
+        type = x;
+        assert(type == TRUSTED_CHK_TERMINATE);
+    }
+    // SAT Validation (10)
+    LratOp(int* model, int modelSize) {
+        type = TRUSTED_CHK_VALIDATE_SAT;
+        data.concludeSat.modelSize = modelSize;
+
+        data.concludeSat.model = (int*) malloc(sizeof(int) * modelSize);
+        memcpy(data.concludeSat.model, model, sizeof(int) * modelSize);
+    }
+    // UNSAT Validation (20)
+    LratOp(u64 id, const int* failed, int nbFailed) {
+        type = TRUSTED_CHK_VALIDATE_UNSAT;
+        data.concludeUnsat.id = id;
+        data.concludeUnsat.nbFailed = nbFailed;
+
+        data.concludeUnsat.failed = (int*) malloc(sizeof(int) * nbFailed);
+        memcpy(data.concludeUnsat.failed, failed, sizeof(int) * nbFailed);
     }
     LratOp() {}
-    LratOp(LratOp&& moved) : datalen(moved.datalen), data(moved.data) {
-        moved.datalen = 0;
-        moved.data = nullptr;
+    LratOp(LratOp&& moved) {
+        *this = std::move(moved);
     }
     LratOp& operator=(LratOp&& moved) {
-        this->datalen = moved.datalen;
-        this->data = moved.data;
-        moved.datalen = 0;
-        moved.data = nullptr;
+        type = moved.type;
+        data = std::move(moved.data);
+        moved.type = '\0';
         return *this;
     }
+    LratOp(const LratOp&) = delete;
+    LratOp& operator=(const LratOp&) = delete;
 
     void sortLiterals() {
-        auto lits = getLits();
-        std::sort(lits, lits+getNbLits());
+        assert(isDerivation());
+        auto lits = data.produce.lits;
+        std::sort(lits, lits+data.produce.nbLits);
     }
 
-    bool isDerivation() const {return getType() == DERIVATION;}
-    bool isImport() const {return getType() == IMPORT;}
-    bool isDeletion() const {return getType() == DELETION;}
-    bool isUnsatValidation() const {return getType() == VALIDATION_UNSAT;}
-    bool isSatValidation() const {return getType() == VALIDATION_SAT;}
-    bool isTermination() const {return getType() == TERMINATION;}
-
-    enum Type {DERIVATION, IMPORT, DELETION, VALIDATION_SAT, VALIDATION_UNSAT, TERMINATION};
-    Type getType() const {
-        if (datalen == 1) {
-            switch (data[0]) {
-            case 0:
-                return TERMINATION;
-            case 10:
-                return VALIDATION_SAT;
-            case 20:
-                return VALIDATION_UNSAT;
-            default:
-                abort();
-            }
-        }
-        if (getId() == 0) return DELETION;
-        if (getGlue() < 0) return IMPORT;
-        return DERIVATION;
-    }
-
-    int getNbLits() const {return *(u64*) (data);}
-    int getNbHints() const {return *(u64*) (data + sizeof(int));}
-    u64 getId() const {return *(u64*) (data + 2*sizeof(int));}
-    int* getLits() {return (int*) (data + 2*sizeof(int) + sizeof(u64));}
-    const int* getLits() const {return (int*) (data + 2*sizeof(int) + sizeof(u64));}
-    u64* getHints() {return (u64*) (data + 2*sizeof(int) + sizeof(u64) + getNbLits()*sizeof(int));}
-    const u64* getHints() const {return (u64*) (data + 2*sizeof(int) + sizeof(u64) + getNbLits()*sizeof(int));}
-    const u8* getSignature() const {return (u8*) getHints();}
-    u8* signature() {return (u8*) getHints();}
-    int getGlue() const {return *(int*) (data + datalen - sizeof(int));}
-    int& glue() {return *(int*) (data + datalen - sizeof(int));}
+    bool isBeginLoad() const {return type == TRUSTED_CHK_BEGIN_LOAD;}
+    bool isLoad() const {return type == TRUSTED_CHK_LOAD;}
+    bool isEndLoad() const {return type == TRUSTED_CHK_END_LOAD;}
+    bool isDerivation() const {return type == TRUSTED_CHK_CLS_PRODUCE;}
+    bool isImport() const {return type == TRUSTED_CHK_CLS_IMPORT;}
+    bool isDeletion() const {return type == TRUSTED_CHK_CLS_DELETE;}
+    bool isUnsatValidation() const {return type == TRUSTED_CHK_VALIDATE_UNSAT;}
+    bool isSatValidation() const {return type == TRUSTED_CHK_VALIDATE_SAT;}
+    bool isTermination() const {return type == TRUSTED_CHK_TERMINATE;}
 
     std::string toStr() const {
         std::string out;
-        auto type = getType();
-        if (type == DERIVATION) {
-            out += "a " + std::to_string(getId()) + " ";
-            for (int i = 0; i < getNbLits(); i++) out += std::to_string(getLits()[i]) + " ";
+        if (isDerivation()) {
+            auto& prod = data.produce;
+            out += "a " + std::to_string(prod.id) + " ";
+            for (int i = 0; i < prod.nbLits; i++) out += std::to_string(prod.lits[i]) + " ";
             out += "0 ";
-            for (int i = 0; i < getNbHints(); i++) out += std::to_string(getHints()[i]) + " ";
+            for (int i = 0; i < prod.nbHints; i++) out += std::to_string(prod.hints[i]) + " ";
             out += "0";
-        } else if (type == IMPORT) {
-            out += "i " + std::to_string(getId()) + " ";
-            for (int i = 0; i < getNbLits(); i++) out += std::to_string(getLits()[i]) + " ";
+        } else if (isImport()) {
+            auto& imp = data.import;
+            out += "i " + std::to_string(imp.id) + " ";
+            for (int i = 0; i < imp.nbLits; i++) out += std::to_string(imp.lits[i]) + " ";
             out += "0 ";
-            out += Logger::dataToHexStr(getSignature(), SIG_SIZE_BYTES) + " ";
+            out += Logger::dataToHexStr(imp.sig, SIG_SIZE_BYTES) + " ";
             out += "0";
         }
         return out;
     }
 
     ~LratOp() {
-        if (data) free(data);
+        if (isLoad()) free(data.load.lits);
+        if (isEndLoad()) free(data.endLoad.assumptions);
+        if (isDerivation()) free(data.produce.lits);
+        if (isImport()) free(data.import.lits);
+        if (isDeletion()) free(data.remove.hints);
+        if (isUnsatValidation()) free(data.concludeSat.model);
+        if (isUnsatValidation()) free(data.concludeUnsat.failed);
     }
 };

@@ -139,15 +139,12 @@ void Client::readIncomingJobs() {
                 // Read job
                 int id = foundJob.description->getId();
                 float time = Timer::elapsedSeconds();
-                bool success = true;
                 auto filesList = foundJob.getFilesList();
                 foundJob.description->beginInitialization(foundJob.description->getRevision());
-                if (foundJob.hasFiles()) {
-                    LOGGER(log, V3_VERB, "[T] Reading job #%i rev. %i %s ...\n", id, foundJob.description->getRevision(), filesList.c_str());
-                    success = app_registry::getJobReader(foundJob.description->getApplicationId())(
-                        _params, foundJob.files, *foundJob.description
-                    );
-                }
+                LOGGER(log, V3_VERB, "[T] Reading job #%i rev. %i %s ...\n", id, foundJob.description->getRevision(), filesList.c_str());
+                bool success = app_registry::getJobReader(foundJob.description->getApplicationId())(
+                    _params, foundJob.files, *foundJob.description
+                );
                 foundJob.description->endInitialization();
                 if (!success) {
                     LOGGER(log, V1_WARN, "[T] [WARN] Unsuccessful read - skipping #%i\n", id);

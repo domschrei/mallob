@@ -3,12 +3,14 @@
 #define MALLOB_SAT_READER_H
 
 #include <cstdint>
+#include <memory>
 #include <stdio.h>
 #include <bits/std_abs.h>
 #include <stdlib.h>
 #include <string>
 #include <algorithm>
 
+#include "app/sat/proof/trusted_parser_process_adapter.hpp"
 #include "data/job_description.hpp"
 
 class Parameters;
@@ -17,10 +19,13 @@ class SatReader {
 
 private:
     const Parameters& _params;
+    std::vector<std::string> _files;
     std::string _filename;
     bool _raw_content_mode;
     FILE* _pipe {nullptr};
 	int _namedpipe {-1};
+
+    std::shared_ptr<TrustedParserProcessAdapter> _tppa;
 
     // Content mode: ASCII
     int _sign = 1;
@@ -42,8 +47,12 @@ private:
     bool _input_finished {false};
 
 public:
-    SatReader(const Parameters& params, const std::string& filename) : 
-        _params(params), _filename(filename) {}
+    SatReader(const Parameters& params, const std::string& file) : 
+        _params(params), _files({file}) {}
+    SatReader(const Parameters& params, const std::vector<std::string>& files) : 
+        _params(params), _files(files) {}
+    void setTrustedParser(std::shared_ptr<TrustedParserProcessAdapter> tppa) {_tppa = tppa;}
+    std::shared_ptr<TrustedParserProcessAdapter> getTrustedParser() {return _tppa;}
     bool read(JobDescription& desc);
     bool parseInternally(JobDescription& desc);
     bool parseWithTrustedParser(JobDescription& desc);

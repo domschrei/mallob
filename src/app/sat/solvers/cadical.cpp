@@ -6,6 +6,7 @@
  */
 
 #include <assert.h>
+#include <cstdint>
 #include <stdint.h>
 #include <functional>
 #include <algorithm>
@@ -15,6 +16,7 @@
 #include "app/sat/data/definitions.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
 #include "cadical.hpp"
+#include "app/sat/proof/trusted/trusted_utils.hpp"
 #include "util/logger.hpp"
 #include "util/distribution.hpp"
 #include "app/sat/data/clause.hpp"
@@ -63,22 +65,28 @@ Cadical::Cadical(const SolverSetup& setup)
 		okay = solver->set("lrat", 1); assert(okay); // enable LRAT proof logging
 		okay = solver->set("lratsolverid", solverRank); assert(okay); // set this solver instance's ID
 		okay = solver->set("lratsolvercount", maxNumSolvers); assert(okay); // set # solvers
-		okay = solver->set("lratorigclscount", setup.numOriginalClauses); assert(okay);
+		okay = solver->set("lratorigclscount", INT32_MAX); assert(okay);
 		okay = solver->set("lratskippedepochs", setup.nbSkippedIdEpochs); assert(okay);
 
 		if (_lrat) {
 			okay = solver->set("signsharedcls", 1); assert(okay);
 			solver->trace_proof_internally(
 				[&](unsigned long id, const int* lits, int nbLits, const unsigned long* hints, int nbHints, int glue) {
-					_lrat->push(LratOp {id, lits, nbLits, hints, nbHints, glue});
+					_lrat->push(LratOp(id, lits, nbLits, hints, nbHints, glue));
 					return true;
 				},
 				[&](unsigned long id, const int* lits, int nbLits, const uint8_t* sigData, int sigSize) {
-					_lrat->push(LratOp {id, lits, nbLits, sigData});
+					// TODO Do we encode "revision" immediately after the default signature?
+					int rev = * (int*) (sigData + SIG_SIZE_BYTES);
+					_lrat->push(LratOp(id, lits, nbLits, sigData, rev));
 					return true;
 				},
 				[&](const unsigned long* ids, int nbIds) {
-					_lrat->push(LratOp {ids, nbIds});
+					_lrat->push(LratOp(ids, nbIds));
+					return true;
+				},
+				[&](unsigned long id) {
+					unsatConclusionId = id;
 					return true;
 				}
 			);
@@ -209,6 +217,8 @@ SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 
 	// start solving
 	int res = solver->solve();
+	if (_setup.onTheFlyChecking)
+		solver->conclude();
 
 	// Flush solver logs
 	_logger.flush();

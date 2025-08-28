@@ -2,7 +2,10 @@
 #pragma once
 
 #include "app/sat/data/formula_compressor.hpp"
+#include "app/sat/proof/trusted/trusted_utils.hpp"
 #include "util/logger.hpp"
+#include <cstdint>
+#include <cstring>
 
 #define SERIALIZED_FORMULA_PARSER_BASE_CLS_CHKSUM 17
 
@@ -12,7 +15,7 @@ private:
     Logger& _logger;
 
     const int* _payload;
-    const size_t _size;
+    size_t _size;
 
     size_t _pos {0};
     bool _last_lit_zero {true};
@@ -27,9 +30,16 @@ private:
     bool _compressed {false};
     FormulaCompressor::CompressedFormulaView _compr_view;
 
+    u8 _signature[SIG_SIZE_BYTES];
+
 public:
-    SerializedFormulaParser(Logger& logger, const int* data, size_t size) : 
-        _logger(logger), _payload(data), _size(size) {}
+    SerializedFormulaParser(Logger& logger, const int* data, size_t size, bool withSignature = false) : 
+        _logger(logger), _payload(data), _size(size) {
+        if (withSignature) {
+            memcpy(_signature, _payload+_size-1-(SIG_SIZE_BYTES/sizeof(int)), SIG_SIZE_BYTES);
+            size -= 1 + SIG_SIZE_BYTES/sizeof(int);
+        }
+    }
 
     void setCompressed() {
         _compr_view = FormulaCompressor::getView((const unsigned char*) _payload, sizeof(int) * _size);
@@ -75,6 +85,10 @@ public:
         if (!_parsing_assumptions) return false;
 
         lit = _payload[_pos++];
+        if (lit == 0 || lit == INT32_MIN) {
+            _parsing_assumptions = false;
+            _pos = _size; // all done
+        }
         return (lit != 0);
     }
 
@@ -83,6 +97,10 @@ public:
     }
     size_t getPayloadSize() const {
         return _size;
+    }
+
+    const u8* getSignature() const {
+        return _signature;
     }
 
     void verifyChecksum() const {
