@@ -44,23 +44,25 @@ void SweepJob::appl_start() {
     _swissat->set_option("profile",3); // do detailed profiling how much time we spent where
 	_swissat->set_option("seed", 0);   // always start with the same seed
 
-	_swissat->set_option("sweep", 1); //We want sweeping
-	_swissat->set_option("simplify", 1); //Activates probing, of which sweeping is a part of
+	_swissat->set_option("mallob_shweep", 1); //Jumps directly to shared sweeping and deactivates everything else
 
-    _swissat->set_option("factor", 0); //No bounded variable addition
-	_swissat->set_option("eliminate", 0); //No Bounded Variable Elimination
-	_swissat->set_option("substitute", 0); //No equivalent literal substitution (both obstruct import)
+	// _swissat->set_option("sweep", 1); //We want sweeping
+	// _swissat->set_option("simplify", 1); //Activates probing, of which sweeping is a part of
 
-	_swissat->set_option("fastel", 0); //No fast elimination. Fast elimination sets import->eliminated = true, which interrupts further equivalence imports
+    // _swissat->set_option("factor", 0); //No bounded variable addition
+	// _swissat->set_option("eliminate", 0); //No Bounded Variable Elimination
+	// _swissat->set_option("substitute", 0); //No equivalent literal substitution (both obstruct import)
+
+	// _swissat->set_option("fastel", 0); //No fast elimination. Fast elimination sets import->eliminated = true, which interrupts further equivalence imports
 	//Technically, we could instead maybe also follow through with the eternal-to-internal literal import, and ignore the eliminated-flag
 	//since we then anyways translate that intermediate literal again via sweeper->repr[..] to a (hopefully) valid literal
 	//so temporarily having an eliminated literal might be ok if we only use it to index its valid representative literal...
 
-	_swissat->set_option("lucky", 0);     //These operations do not obstruct sweep, but to keep everything simple we deactivate them for now
-	_swissat->set_option("congruence", 0);
-	_swissat->set_option("backbone", 0);
-	_swissat->set_option("transitive", 0);
-	_swissat->set_option("vivify", 0);
+	// _swissat->set_option("lucky", 0);     //These operations do not obstruct sweep, but to keep everything simple we deactivate them for now
+	// _swissat->set_option("congruence", 0);
+	// _swissat->set_option("backbone", 0);
+	// _swissat->set_option("transitive", 0);
+	// _swissat->set_option("vivify", 0);
 
 	//Initialize _red already here, to make sure that all processes have a valid reduction object
 	JobMessage baseMsg = getMessageTemplate();
@@ -285,6 +287,22 @@ void SweepJob::advanceSweepMessage(JobMessage& msg) {
 #endif
 }
 
+bool SweepJob::steal_from_local_solver() {
+	//We dont know how much there is to steal, so we ask
+	size_t steal_amount = shweep_get_steal_amount(_swissat->solver);
+	if (steal_amount == 0)
+		return false;
+	//Allocate memory on C++ side, easier
+	_swissat->stolen_work.resize(steal_amount);
+	//The "done" array has always the same size, so we only need to initialize it once
+	if (_swissat->stolen_done.empty()) {
+		unsigned max_idx = kissat_get_max_var_idx(_swissat->solver);
+		_swissat->stolen_done.resize(max_idx);
+	}
+	//now we can steal half the workload, gets stored in the passed arrays
+	shweep_steal_from_this_solver(_swissat->solver, _swissat->stolen_work.data(), _swissat->stolen_done.data(), steal_amount);
+	return true;
+}
 
 void SweepJob::loadFormulaToSwissat() {
 	const int* lits = getDescription().getFormulaPayload(0);

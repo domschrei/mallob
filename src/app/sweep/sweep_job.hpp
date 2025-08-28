@@ -59,6 +59,8 @@ private:
     void callback_for_broadcast_ping();
     void tryExtractResult();
 
+    bool steal_from_local_solver();
+
 };
 
 #endif

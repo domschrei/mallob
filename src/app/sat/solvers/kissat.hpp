@@ -14,6 +14,7 @@
 struct kissat;
 struct SolverSetup;
 struct SolverStatistics;
+struct sweeper;
 
 class Kissat : public PortfolioSolverInterface {
 
@@ -35,6 +36,10 @@ private:
 	const int MAX_STORED_EQUIVALENCES = 10000;
 	const int MAX_STORED_EQUIVALENCES_SIZE = MAX_STORED_EQUIVALENCES * 2;
 	friend class SweepJob;
+	//Update stuff for sweep sharing
+	std::vector<unsigned> stolen_work;
+	std::vector<char> stolen_done;
+
 
 	bool interruptionInitialized = false;
     bool interrupted = false;
@@ -95,9 +100,9 @@ public:
 	void reconstructSolutionFromPreprocessing(std::vector<int>& model);
 
     friend void produce_clause(void* state, int size, int glue);
-	friend void produce_equivalence(void *state);
-
     friend void consume_clause(void* state, int** clause, int* size, int* lbd);
+
+	friend void produce_equivalence(void *state);
 	friend void consume_equivalence(void* state, int** equivalence);
 
     friend bool begin_formula_report(void* state, int vars, int cls);
@@ -113,9 +118,9 @@ public:
 
 private:
     void produceClause(int size, int lbd);
-	void produceEquivalence();
-
     void consumeClause(int** clause, int* size, int* lbd);
+
+	void produceEquivalence();
 	void consumeEquivalence(int** equivalence);
 
     bool isPreprocessingAcceptable(int vars, int cls);
