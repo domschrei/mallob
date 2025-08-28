@@ -73,21 +73,17 @@ Cadical::Cadical(const SolverSetup& setup)
 			solver->trace_proof_internally(
 				[&](unsigned long id, const int* lits, int nbLits, const unsigned long* hints, int nbHints, int glue) {
 					_lrat->push(LratOp(id, lits, nbLits, hints, nbHints, glue));
-					return true;
 				},
 				[&](unsigned long id, const int* lits, int nbLits, const uint8_t* sigData, int sigSize) {
 					// TODO Do we encode "revision" immediately after the default signature?
 					int rev = * (int*) (sigData + SIG_SIZE_BYTES);
 					_lrat->push(LratOp(id, lits, nbLits, sigData, rev));
-					return true;
 				},
 				[&](const unsigned long* ids, int nbIds) {
 					_lrat->push(LratOp(ids, nbIds));
-					return true;
 				},
 				[&](unsigned long id) {
 					unsatConclusionId = id;
-					return true;
 				}
 			);
 		} else {
