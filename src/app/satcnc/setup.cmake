@@ -1,6 +1,7 @@
 
 # Add SATCNC-specific sources to main Mallob executable
-set(SATCNC_MALLOB_SOURCES )
+# (we need cadical.cpp and portfolio_....cpp due to the SatJobStream's internal sequential SAT solver)
+set(SATCNC_MALLOB_SOURCES src/app/sat/solvers/cadical.cpp src/app/sat/solvers/portfolio_solver_interface.cpp)
 set(MALLOB_COREPLUSCOMM_SOURCES ${MALLOB_COREPLUSCOMM_SOURCES} ${SATCNC_MALLOB_SOURCES} CACHE INTERNAL "")
 
 # Include external libraries as necessary
