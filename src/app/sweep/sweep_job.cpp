@@ -36,6 +36,7 @@ void SweepJob::appl_start() {
 	_swissat->set_option("mallob_solver_count", NUM_WORKERS);
 	_swissat->set_option("mallob_solver_id", _my_index);
 	_swissat->activateLearnedEquivalenceCallbacks();
+	_swissat->set_shweep_callbacks();
 
     // Basic configuration options for all solvers
     _swissat->set_option("quiet", 1); // suppress any standard kissat output
@@ -299,7 +300,7 @@ bool SweepJob::steal_from_local_solver() {
 		unsigned max_idx = kissat_get_max_var_idx(_swissat->solver);
 		_swissat->stolen_done.resize(max_idx);
 	}
-	//now we can steal half the workload, gets stored in the passed arrays
+	//now both arrays are allocated, can steal half the workload
 	shweep_steal_from_this_solver(_swissat->solver, _swissat->stolen_work.data(), _swissat->stolen_done.data(), steal_amount);
 	return true;
 }

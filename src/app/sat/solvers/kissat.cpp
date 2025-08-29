@@ -41,6 +41,13 @@ void consume_equivalence(void* state, int** equivalence) {
     ((Kissat*) state)->consumeEquivalence(equivalence);
 }
 
+void shweep_ts_stolen_work(void *state, unsigned **work, unsigned *size) {
+    ((Kissat*) state)-> shweep_ts_StolenWork(work, size);
+}
+
+void shweep_ts_stolen_done(void *state, char **done, unsigned *size) {
+    ((Kissat*) state)-> shweep_ts_StolenDone(done, size);
+}
 
 
 int terminate_callback(void* state) {
@@ -408,6 +415,11 @@ void Kissat::activateLearnedEquivalenceCallbacks() {
     swissat_set_equivalence_import_callback(solver, this, &consume_equivalence);
 }
 
+void Kissat::set_shweep_callbacks() {
+    shweep_set_stolen_work_callback(solver, this, &shweep_ts_stolen_work);
+    shweep_set_stolen_done_callback(solver, this, &shweep_ts_stolen_done);
+}
+
 
 
 void Kissat::produceClause(int size, int lbd) {
@@ -466,7 +478,17 @@ void Kissat::consumeEquivalence(int **equivalence) {
     }
 }
 
+//ts = to solver
+void Kissat::shweep_ts_StolenWork(unsigned **work, unsigned *size) {
+    *work = stolen_work.data();
+    *size = stolen_work.size();
+}
 
+//ts = to solver
+void Kissat::shweep_ts_StolenDone(char **done, unsigned *size) {
+    *done = stolen_done.data();
+    *size = stolen_done.size();
+}
 
 int Kissat::getVariablesCount() {
 	return numVars;

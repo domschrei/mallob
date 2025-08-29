@@ -105,6 +105,14 @@ public:
 	friend void produce_equivalence(void *state);
 	friend void consume_equivalence(void* state, int** equivalence);
 
+	//Distributed Shared Sweeping
+	//ts = to solver
+	friend void shweep_ts_stolen_work(void *state, unsigned **work, unsigned *size);
+	friend void shweep_ts_stolen_done(void *state, char **done, unsigned *size);
+	void set_shweep_callbacks();
+
+
+
     friend bool begin_formula_report(void* state, int vars, int cls);
     friend void report_preprocessed_lit(void* state, int lit);
     friend int terminate_callback(void* state);
@@ -122,6 +130,10 @@ private:
 
 	void produceEquivalence();
 	void consumeEquivalence(int** equivalence);
+
+	//Shweep
+	void shweep_ts_StolenWork(unsigned **work, unsigned *size);
+	void shweep_ts_StolenDone(char **done, unsigned *size);
 
     bool isPreprocessingAcceptable(int vars, int cls);
     void addLiteralFromPreprocessing(int lit);
