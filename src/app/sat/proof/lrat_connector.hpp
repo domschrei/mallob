@@ -217,7 +217,9 @@ private:
             bool res;
             bool ok = _checker.accept(op, res, sig);
             if (!ok) break; // terminated
-            if (!res) continue; // error in checker - nonetheless, wait for proper termination
+            if (!res) {
+                continue; // error in checker - nonetheless, wait for proper termination
+            }
             //LOG(V2_INFO, "PROOF> accept (%i) %s\n", (int)res, op.toStr().c_str());
             if (op.isDerivation()) {
                 auto& data = op.data.produce;
@@ -232,6 +234,7 @@ private:
                     ImpCheck::getKeySeed(_base_seed));
             } else if (op.isEndLoad()) {
                 _revision++; // next revision reached
+                LOGGER(_logger, V2_INFO, "IMPCHK revision %i reached\n", _revision);
             } else if (op.isTermination()) {
                 break; // end
             }

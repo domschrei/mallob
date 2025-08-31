@@ -178,12 +178,13 @@ struct LratOp {
     }
 
     ~LratOp() {
+        if (type == '\0') return;
         if (isLoad()) free(data.load.lits);
         if (isEndLoad()) free(data.endLoad.assumptions);
         if (isDerivation()) free(data.produce.lits);
         if (isImport()) free(data.import.lits);
         if (isDeletion()) free(data.remove.hints);
-        if (isUnsatValidation()) free(data.concludeSat.model);
+        if (isSatValidation()) free(data.concludeSat.model);
         if (isUnsatValidation()) free(data.concludeUnsat.failed);
     }
 };

@@ -245,7 +245,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.numOriginalClauses = numClauses;
 	setup.proofDir = proofDirectory;
 	LratConnector* modelCheckingLratConnector {nullptr};
-	setup.nbSkippedIdEpochs = config.nbPreviousBalancingEpochs;
+	setup.nbSkippedIdEpochs = std::max(0, config.nbPreviousBalancingEpochs);
 	if (params.satProfilingLevel() >= 0) {
 		setup.profilingBaseDir = params.satProfilingDir();
 		if (setup.profilingBaseDir.empty()) setup.profilingBaseDir = TmpDir::getGeneralTmpDir();

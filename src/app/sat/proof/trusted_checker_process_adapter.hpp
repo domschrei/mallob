@@ -112,7 +112,9 @@ public:
         else if (op.isDeletion()) res = acceptDeleteClauses();
         else if (op.isUnsatValidation()) res = acceptValidateUnsat();
         else if (op.isSatValidation()) res = acceptValidateSat();
-        else if (!op.isLoad()) res = acceptGeneric();
+        else if (op.isBeginLoad()) res = acceptGeneric("BEGIN LOAD");
+        else if (op.isEndLoad()) res = acceptGeneric("END LOAD");
+        else if (!op.isLoad()) res = acceptGeneric("Unspecified op");
         if (op.isEndLoad()) _revision++;
         return true;
     }
@@ -256,8 +258,11 @@ private:
         writeDirectiveType(TRUSTED_CHK_TERMINATE);
         UNLOCKED_IO(fflush)(_f_directives);
     }
-    inline bool acceptGeneric() {
-        awaitResponse();
+    inline bool acceptGeneric(const std::string& kind) {
+        if (!awaitResponse()) {
+            handleError(kind + " invalid!");
+            return false;
+        }
         return true;
     }
 
