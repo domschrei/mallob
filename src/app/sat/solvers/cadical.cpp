@@ -71,7 +71,7 @@ Cadical::Cadical(const SolverSetup& setup)
 		if (_lrat) {
 			okay = solver->set("signsharedcls", 1); assert(okay);
 			//okay = solver->set("compact", 0); assert(okay);
-			okay = solver->set("log", 1); assert(okay);
+			//okay = solver->set("log", 1); assert(okay);
 			solver->trace_proof_internally(
 				[&](unsigned long id, const int* lits, int nbLits, const unsigned long* hints, int nbHints, int glue) {
 					_lrat->push(LratOp(id, lits, nbLits, hints, nbHints, glue));

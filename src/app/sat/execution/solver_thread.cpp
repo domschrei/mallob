@@ -339,7 +339,8 @@ void SolverThread::reportResult(int res, int revision) {
         if (lrat) {
             LOGGER(_logger, V3_VERB, "Validating SAT ...\n");
             // omit first "0" in solution vector
-            lrat->push(LratOp(solution.data()+1, solution.size()-1));
+            bool accepted = lrat->push(LratOp(solution.data()+1, solution.size()-1), true, revision);
+            if (!accepted) return;
             // Whether or not this was successful (another thread might have been earlier),
             // wait until SAT was validated.
             lrat->waitForValidation();
@@ -351,7 +352,8 @@ void SolverThread::reportResult(int res, int revision) {
         auto failedVec = std::vector<int>(failed.begin(), failed.end());
         if (_lrat) {
             LOGGER(_logger, V3_VERB, "Validating UNSAT ...\n");
-            _lrat->push(LratOp(_solver.getUnsatConclusionId(), failedVec.data(), failedVec.size()));
+            bool accepted = _lrat->push(LratOp(_solver.getUnsatConclusionId(), failedVec.data(), failedVec.size()), true, revision);
+            if (!accepted) return;
             _lrat->waitForValidation();
         }
         _state_mutex.lock();

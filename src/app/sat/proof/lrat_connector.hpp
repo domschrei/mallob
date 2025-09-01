@@ -48,7 +48,8 @@ private:
 
     std::unique_ptr<SerializedFormulaParser> _f_parser;
     volatile bool _do_parse {false};
-    int _revision {-1};
+    int _arrived_revision {-1};
+    int _accepted_revision {-1};
 
     float _tampering_chance_per_mille {0};
 
@@ -88,7 +89,7 @@ public:
         _bg_emitter.run([&]() {runEmitter();});
     }
 
-    inline void push(LratOp&& op, bool acquireLock = true) {
+    inline bool push(LratOp&& op, bool acquireLock = true, int revision = -1) {
 
         if (acquireLock) {
             _mtx_submit.lock();
@@ -98,6 +99,12 @@ public:
                 usleep(1000*10);
                 _mtx_submit.lock();
             }
+        }
+
+        // Obsolete operation? -> Discard
+        if (revision >= 0 && _arrived_revision > revision) {
+            LOG(V2_INFO, "IMPCHK discard solution for rev. %i (already in rev. %i)\n", revision, _arrived_revision);
+            return false;
         }
 
         if (op.isDerivation()) {
@@ -130,6 +137,7 @@ public:
         _ringbuf.pushBlocking(op);
 
         if (acquireLock) _mtx_submit.unlock();
+        return true;
     }
     bool waitForValidation() {
         while (!_validated) usleep(1000);
@@ -178,6 +186,7 @@ private:
                 auto lock = _mtx_submit.getLock();
                 // Load formula
                 push(LratOp(_f_parser->getSignature()), false);
+                _arrived_revision++;
                 int lit;
                 std::vector<int> buf;
                 std::vector<int> assumptions;
@@ -233,8 +242,8 @@ private:
                 LOGGER(_logger, V2_INFO, "Use impcheck_confirm -key-seed=%lu to confirm the fingerprint\n",
                     ImpCheck::getKeySeed(_base_seed));
             } else if (op.isEndLoad()) {
-                _revision++; // next revision reached
-                LOGGER(_logger, V2_INFO, "IMPCHK revision %i reached\n", _revision);
+                _accepted_revision++; // next revision reached
+                LOGGER(_logger, V2_INFO, "IMPCHK revision %i reached\n", _accepted_revision);
             } else if (op.isTermination()) {
                 break; // end
             }
@@ -250,8 +259,8 @@ private:
         auto id = data.id;
         memcpy(_clause.begin, &id, sizeof(u64)); // ID
         memcpy(_clause.begin+2, sig, SIG_SIZE_BYTES); // Signature
-        assert(_revision >= 0);
-        memcpy(_clause.begin+2+4, &_revision, sizeof(int)); // Revision
+        assert(_accepted_revision >= 0);
+        memcpy(_clause.begin+2+4, &_accepted_revision, sizeof(int)); // Revision
         memcpy(_clause.begin+2+4+1, data.lits, data.nbLits*sizeof(int)); // Literals
         _clause.lbd = data.glue;
         if (data.nbLits == 1) _clause.lbd = 1;
