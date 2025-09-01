@@ -107,10 +107,10 @@ bool SolverThread::readFormula() {
 
         // Forward raw formula data to LRAT connectors
         if (_lrat) {
-            _lrat->initiateRevision(*fParser);
+            _lrat->initiateRevision(_active_revision, *fParser);
         }
         if (_solver.getSolverSetup().owningModelCheckingLratConnector) {
-            _solver.getSolverSetup().modelCheckingLratConnector->initiateRevision(*fParser);
+            _solver.getSolverSetup().modelCheckingLratConnector->initiateRevision(_active_revision, *fParser);
         }
 
         LOGGER(_logger, V4_VVER, "Reading rev. %i, start %i\n", (int)_active_revision, (int)_imported_lits_curr_revision);

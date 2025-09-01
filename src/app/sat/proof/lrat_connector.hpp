@@ -68,12 +68,17 @@ public:
         _tampering_chance_per_mille = chance;
     }
 
-    void initiateRevision(SerializedFormulaParser& fParser) {
+    void initiateRevision(int revision, SerializedFormulaParser& fParser) {
         {
             auto lock = _mtx_submit.getLock();
+            if (revision != _arrived_revision+1) {
+                LOG(V1_WARN, "[WARN] LRAT Connector: unexpected rev. %i (in rev. %i now)!\n", revision, _arrived_revision);
+                return;
+            }
             _f_parser.reset(new SerializedFormulaParser(fParser));
             _do_parse = true;
             _validated = false;
+            _arrived_revision++;
         }
 
         if (_launched) return;
@@ -185,8 +190,8 @@ private:
             if (_do_parse) {
                 auto lock = _mtx_submit.getLock();
                 // Load formula
+                assert(_do_parse);
                 push(LratOp(_f_parser->getSignature()), false);
-                _arrived_revision++;
                 int lit;
                 std::vector<int> buf;
                 std::vector<int> assumptions;
