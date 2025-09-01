@@ -41,13 +41,18 @@ void consume_equivalence(void* state, int** equivalence) {
     ((Kissat*) state)->consumeEquivalence(equivalence);
 }
 
-void shweep_ts_stolen_work(void *state, unsigned **work, unsigned *size) {
-    ((Kissat*) state)-> shweep_ts_StolenWork(work, size);
+
+void shweep_solver_searches_work(void *state, unsigned **work, char **done, unsigned *size) {
+    ((Kissat*) state)->shweep_solverSearchesWork(work, done, size);
 }
 
-void shweep_ts_stolen_done(void *state, char **done, unsigned *size) {
-    ((Kissat*) state)-> shweep_ts_StolenDone(done, size);
-}
+// void shweep_ts_stolen_work(void *state, unsigned **work, unsigned *size) {
+    // ((Kissat*) state)-> shweep_ts_StolenWork(work, size);
+// }
+
+// void shweep_ts_stolen_done(void *state, char **done, unsigned *size) {
+    // ((Kissat*) state)-> shweep_ts_StolenDone(done, size);
+// }
 
 
 int terminate_callback(void* state) {
@@ -416,8 +421,7 @@ void Kissat::activateLearnedEquivalenceCallbacks() {
 }
 
 void Kissat::set_shweep_callbacks() {
-    shweep_set_stolen_work_callback(solver, this, &shweep_ts_stolen_work);
-    shweep_set_stolen_done_callback(solver, this, &shweep_ts_stolen_done);
+    shweep_set_steal_some_work_callback(solver, this, &shweep_solver_searches_work);
 }
 
 
@@ -478,17 +482,12 @@ void Kissat::consumeEquivalence(int **equivalence) {
     }
 }
 
-//ts = to solver
-void Kissat::shweep_ts_StolenWork(unsigned **work, unsigned *size) {
-    *work = stolen_work.data();
-    *size = stolen_work.size();
+void Kissat::shweep_solverSearchesWork(unsigned **work, char **done, unsigned *size) {
+    //todo: steal work from a random other Jobs in the Job-Tree
+    //point work and done on this stolen data
 }
 
-//ts = to solver
-void Kissat::shweep_ts_StolenDone(char **done, unsigned *size) {
-    *done = stolen_done.data();
-    *size = stolen_done.size();
-}
+
 
 int Kissat::getVariablesCount() {
 	return numVars;
