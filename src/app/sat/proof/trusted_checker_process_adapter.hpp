@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -104,10 +105,10 @@ public:
         _op_queue.pushBlocking(op);
     }
 
-    inline bool accept(LratOp& op, bool& res, u8* sig) {
+    inline bool accept(LratOp& op, bool& res, u8* sig, u32& cidx) {
         bool ok = _op_queue.pollBlocking(op);
         if (!ok) return false;
-        if (op.isDerivation()) res = acceptProduceClause(sig, op.data.produce.glue > 0);
+        if (op.isDerivation()) res = acceptProduceClause(op.data.produce.glue > 0 ? sig : 0, cidx);
         else if (op.isImport()) res = acceptImportClause();
         else if (op.isDeletion()) res = acceptDeleteClauses();
         else if (op.isUnsatValidation()) res = acceptValidateUnsat();
@@ -176,12 +177,15 @@ private:
         TrustedUtils::writeUnsignedLongs(data.hints, data.nbHints, _f_directives);
         TrustedUtils::writeChar(data.glue>0 ? 1 : 0, _f_directives);
     }
-    inline bool acceptProduceClause(u8* sig, bool readSig) {
+    inline bool acceptProduceClause(u8* sig, u32& cidx) {
         if (!awaitResponse()) {
             handleError("Clause derivation not accepted");
             return false;
         }
-        if (readSig) TrustedUtils::readSignature(sig, _f_feedback);
+        if (sig) {
+            TrustedUtils::readSignature(sig, _f_feedback);
+            cidx = TrustedUtils::readUint(_f_feedback);
+        }
         return true;
     }
 
@@ -192,7 +196,7 @@ private:
         TrustedUtils::writeInt(data.nbLits, _f_directives);
         TrustedUtils::writeInts(data.lits, data.nbLits, _f_directives);
         TrustedUtils::writeSignature(data.sig, _f_directives);
-        TrustedUtils::writeInt(data.rev, _f_directives);
+        TrustedUtils::writeUint(data.cidx, _f_directives);
     }
     inline bool acceptImportClause() {
         if (!awaitResponse()) {

@@ -229,7 +229,8 @@ private:
         signature sig;
         while (true) { // This thread can only be terminated with a "termination" LratOp.
             bool res;
-            bool ok = _checker.accept(op, res, sig);
+            u32 cidx;
+            bool ok = _checker.accept(op, res, sig, cidx);
             if (!ok) break; // terminated
             if (!res) {
                 continue; // error in checker - nonetheless, wait for proper termination
@@ -239,7 +240,7 @@ private:
                 auto& data = op.data.produce;
                 bool share = data.glue > 0;
                 if (share) {
-                    prepareClause(op, sig);
+                    prepareClause(op, sig, cidx);
                     _cb_learn(_clause, _local_id);
                 }
             } else if (op.isUnsatValidation() || op.isSatValidation()) {
@@ -255,7 +256,7 @@ private:
         }
     }
 
-    inline void prepareClause(LratOp& op, const u8* sig) {
+    inline void prepareClause(LratOp& op, const u8* sig, u32 cidx) {
         assert(op.isDerivation());
         auto& data = op.data.produce;
         assert(ClauseMetadata::numInts() == 2+4+1);
@@ -265,7 +266,7 @@ private:
         memcpy(_clause.begin, &id, sizeof(u64)); // ID
         memcpy(_clause.begin+2, sig, SIG_SIZE_BYTES); // Signature
         assert(_accepted_revision >= 0);
-        memcpy(_clause.begin+2+4, &_accepted_revision, sizeof(int)); // Revision
+        memcpy(_clause.begin+2+4, &cidx, sizeof(u32)); // Revision
         memcpy(_clause.begin+2+4+1, data.lits, data.nbLits*sizeof(int)); // Literals
         _clause.lbd = data.glue;
         if (data.nbLits == 1) _clause.lbd = 1;

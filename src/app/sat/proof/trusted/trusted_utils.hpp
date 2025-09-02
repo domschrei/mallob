@@ -2,6 +2,7 @@
 #pragma once
 
 #include <cassert>
+#include <cstdint>
 #include <cstdlib> // exit
 #include <stdio.h> // file I/O
 #include <string>
@@ -19,6 +20,7 @@
 //#define UNLOCKED_IO(fun) fun
 
 typedef unsigned long u64;
+typedef uint32_t u32;
 typedef unsigned char u8;
 
 static constexpr int SIG_SIZE_BYTES = 16;
@@ -96,12 +98,21 @@ public:
         if (nbRead < 1) doAbortEof();
         return i;
     }
+    static u32 readUint(FILE* file) {
+        u32 i;
+        u64 nbRead = UNLOCKED_IO(fread)(&i, sizeof(u32), 1, file);
+        if (nbRead < 1) doAbortEof();
+        return i;
+    }
     static void readInts(int* data, size_t nbInts, FILE* file) {
         u64 nbRead = UNLOCKED_IO(fread)(data, sizeof(int), nbInts, file);
         if (nbRead < nbInts) doAbortEof();
     }
     static void writeInt(int i, FILE* file) {
         UNLOCKED_IO(fwrite)(&i, sizeof(int), 1, file);
+    }
+    static void writeUint(u32 i, FILE* file) {
+        UNLOCKED_IO(fwrite)(&i, sizeof(u32), 1, file);
     }
     static void writeInts(const int* data, size_t nbInts, FILE* file) {
         UNLOCKED_IO(fwrite)(data, sizeof(int), nbInts, file);

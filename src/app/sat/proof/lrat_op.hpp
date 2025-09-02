@@ -37,7 +37,7 @@ struct LratOp {
             int* lits;
             int nbLits;
             u8 sig[SIG_SIZE_BYTES];
-            int rev;
+            u32 cidx;
         } import;
         struct LratOpDataRemove {
             u64* hints;
@@ -74,7 +74,7 @@ struct LratOp {
         type = TRUSTED_CHK_CLS_IMPORT;
         data.import.id = id;
         data.import.nbLits = nbLits;
-        data.import.rev = rev;
+        data.import.cidx = rev;
         memcpy(data.import.sig, sig, SIG_SIZE_BYTES);
 
         data.import.lits = (int*) malloc(sizeof(int) * nbLits);
