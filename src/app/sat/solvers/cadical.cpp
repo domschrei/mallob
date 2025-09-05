@@ -17,6 +17,7 @@
 #include "app/sat/proof/lrat_connector.hpp"
 #include "cadical.hpp"
 #include "app/sat/proof/trusted/trusted_utils.hpp"
+#include "app/sat/solvers/solving_replay.hpp"
 #include "util/logger.hpp"
 #include "util/distribution.hpp"
 #include "app/sat/data/clause.hpp"
@@ -32,7 +33,7 @@
 
 Cadical::Cadical(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup),
-	  solver(new CaDiCaL::Solver), terminator(*setup.logger), 
+	  solver(new CaDiCaL::Solver), terminator(*setup.logger, _replay), 
 	  learner(_setup), learnSource(_setup, [this]() {
 		  Mallob::Clause c;
 		  fetchLearnedClause(c, GenericClauseStore::ANY);
@@ -67,6 +68,7 @@ Cadical::Cadical(const SolverSetup& setup)
 		okay = solver->set("lratsolvercount", maxNumSolvers); assert(okay); // set # solvers
 		okay = solver->set("lratorigclscount", INT32_MAX); assert(okay);
 		okay = solver->set("lratskippedepochs", setup.nbSkippedIdEpochs); assert(okay);
+		//okay = solver->set("log", 1); assert(okay); // need to compile CaDiCaL with -l (logging enabled)
 
 		if (_lrat) {
 			okay = solver->set("signsharedcls", 1); assert(okay);
@@ -112,7 +114,7 @@ void Cadical::diversify(int seed) {
 
 	if (seedSet) return;
 
-	LOGGER(_logger, V3_VERB, "Diversifying %i\n", getDiversificationIndex());
+	LOGGER(_logger, V3_VERB, "Diversifying %i seed=%i\n", getDiversificationIndex(), seed);
 	bool okay = solver->set("seed", seed);
 	assert(okay);
 
@@ -235,13 +237,15 @@ SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 }
 
 void Cadical::setSolverInterrupt() {
-	solver->terminate(); // acknowledged faster / checked more frequently by CaDiCaL
+	if (_replay.getMode() == SolvingReplay::NONE)
+		solver->terminate(); // acknowledged faster / checked more frequently by CaDiCaL
 	terminator.setInterrupt();
 }
 
 void Cadical::unsetSolverInterrupt() {
 	terminator.unsetInterrupt();
-	solver->unset_terminate();
+	if (_replay.getMode() == SolvingReplay::NONE)
+		solver->unset_terminate();
 }
 
 std::vector<int> Cadical::getSolution() {

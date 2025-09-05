@@ -111,9 +111,9 @@ public:
         if (op.isDerivation()) res = acceptProduceClause(op.data.produce.glue > 0 ? sig : 0, cidx);
         else if (op.isImport()) res = acceptImportClause();
         else if (op.isDeletion()) res = acceptDeleteClauses();
-        else if (op.isUnsatValidation()) res = acceptValidateUnsat();
-        else if (op.isSatValidation()) res = acceptValidateSat();
-        else if (op.isBeginLoad()) res = acceptGeneric("BEGIN LOAD");
+        else if (op.isUnsatValidation()) res = acceptValidateUnsat(sig, cidx);
+        else if (op.isSatValidation()) res = acceptValidateSat(sig, cidx);
+        else if (op.isBeginLoad()) res = acceptBeginLoad(cidx);
         else if (op.isEndLoad()) res = acceptGeneric("END LOAD");
         else if (!op.isLoad()) res = acceptGeneric("Unspecified op");
         if (op.isEndLoad()) _revision++;
@@ -144,6 +144,14 @@ private:
         writeDirectiveType(TRUSTED_CHK_BEGIN_LOAD);
         TrustedUtils::writeSignature(formulaSignature, _f_directives);
         UNLOCKED_IO(fflush)(_f_directives);
+    }
+    inline bool acceptBeginLoad(u32& cidx) {
+        if (!awaitResponse()) {
+            handleError("Clause derivation not accepted");
+            return false;
+        }
+        cidx = TrustedUtils::readUint(_f_feedback);
+        return true;
     }
 
     inline void submitLoad(const int* fData, size_t fSize) {
@@ -227,13 +235,13 @@ private:
         TrustedUtils::writeInts(data.failed, data.nbFailed, _f_directives);
         UNLOCKED_IO(fflush)(_f_directives);
     }
-    inline bool acceptValidateUnsat() {
+    inline bool acceptValidateUnsat(u8* sig, u32& cidx) {
         if (!awaitResponse()) {
             handleError("UNSAT NOT valid");
             return false;
         }
-        signature sig;
         TrustedUtils::readSignature(sig, _f_feedback);
+        cidx = TrustedUtils::readUint(_f_feedback);
         auto str = Logger::dataToHexStr(sig, SIG_SIZE_BYTES);
         LOGGER(_logger, V2_INFO, "IMPCHK reported UNSAT for rev. %i - sig %s\n", _revision, str.c_str());
         return true;
@@ -246,13 +254,13 @@ private:
         TrustedUtils::writeInts(data.model, data.modelSize, _f_directives);
         UNLOCKED_IO(fflush)(_f_directives);
     }
-    inline bool acceptValidateSat() {
+    inline bool acceptValidateSat(u8* sig, u32& cidx) {
         if (!awaitResponse()) {
             handleError("SAT NOT valid");
             return false;
         }
-        signature sig;
         TrustedUtils::readSignature(sig, _f_feedback);
+        cidx = TrustedUtils::readUint(_f_feedback);
         auto str = Logger::dataToHexStr(sig, SIG_SIZE_BYTES);
         LOGGER(_logger, V2_INFO, "IMPCHK reported SAT for rev. %i - sig %s\n", _revision, str.c_str());
         return true;

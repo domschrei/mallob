@@ -22,6 +22,7 @@ OPTION_GROUP(grpAppSat, "app/sat", "SAT solving options")
  OPT_BOOL(compressFormula,                  "cf", "compress-formula", false, "Compress formula serialization (reorders clauses and literals in clauses)")
  OPT_BOOL(compressModels,                   "cm", "compress-models", false, "Compress found models into hexadecimal vector in output")
  OPT_STRING(groundTruthModel,               "gtm", "", "", "Ground truth model to test learned clauses against")
+ OPT_INT(replay, "replay", "", 0, 0, 2, "0: nothing, 1: record solver threads' behavior, 2: replay solving")
 
 OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration")
  OPT_INT(bufferedImportedClsGenerations,    "bicg", "buffered-imported-cls-generations", 4,        1,   LARGE_INT, 

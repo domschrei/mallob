@@ -11,6 +11,7 @@
 #include "app/sat/data/revision_data.hpp"
 #include "app/sat/job/sat_constants.h"
 #include "solver_thread.hpp"
+#include "app/sat/solvers/solving_replay.hpp"
 #include "util/logger.hpp"
 #include "util/random.hpp"
 #include "util/string_utils.hpp"
@@ -62,9 +63,15 @@ void SolverThread::init() {
     _active_revision = 0;
     _imported_lits_curr_revision = 0;
 
-    if (_lrat) _lrat->getChecker().init();
-    if (_solver.getSolverSetup().owningModelCheckingLratConnector)
+    std::string outPath = "witness-trace." + std::to_string(_solver.getGlobalId());
+    if (_lrat) {
+        _lrat->getChecker().init();
+        _lrat->setWitnessOutputPath(outPath);
+    }
+    if (_solver.getSolverSetup().owningModelCheckingLratConnector) {
         _solver.getSolverSetup().modelCheckingLratConnector->getChecker().init();
+        _solver.getSolverSetup().modelCheckingLratConnector->setWitnessOutputPath(outPath);
+    }
 
     _initialized = true;
 }
@@ -281,6 +288,14 @@ void SolverThread::runOnce() {
         }
         res = performSolving ? _solver.solve(0, nullptr) : UNKNOWN;
     }
+
+    if (performSolving) {
+        if (_solver.getReplay().getMode() == SolvingReplay::RECORD)
+            _solver.getReplay().recordReturnFromSolve(res);
+        if (_solver.getReplay().getMode() == SolvingReplay::REPLAY)
+            res = SatResult(_solver.getReplay().replayReturnFromSolve(res));
+    }
+
     // Uninterrupt solver (if it was interrupted)
     {
         auto lock = _state_mutex.getLock();
@@ -339,11 +354,10 @@ void SolverThread::reportResult(int res, int revision) {
         if (lrat) {
             LOGGER(_logger, V3_VERB, "Validating SAT ...\n");
             // omit first "0" in solution vector
-            bool accepted = lrat->push(LratOp(solution.data()+1, solution.size()-1), true, revision);
-            if (!accepted) return;
+            lrat->push(LratOp(solution.data()+1, solution.size()-1), true, revision);
             // Whether or not this was successful (another thread might have been earlier),
             // wait until SAT was validated.
-            lrat->waitForValidation();
+            lrat->waitForConclusion(revision);
         }
         _state_mutex.lock();
         _result.setSolutionToSerialize(solution.data(), solution.size());
@@ -352,9 +366,8 @@ void SolverThread::reportResult(int res, int revision) {
         auto failedVec = std::vector<int>(failed.begin(), failed.end());
         if (_lrat) {
             LOGGER(_logger, V3_VERB, "Validating UNSAT ...\n");
-            bool accepted = _lrat->push(LratOp(_solver.getUnsatConclusionId(), failedVec.data(), failedVec.size()), true, revision);
-            if (!accepted) return;
-            _lrat->waitForValidation();
+            _lrat->push(LratOp(_solver.getUnsatConclusionId(), failedVec.data(), failedVec.size()), true, revision);
+            _lrat->waitForConclusion(revision);
         }
         _state_mutex.lock();
         _result.setSolutionToSerialize(failedVec.data(), failedVec.size());

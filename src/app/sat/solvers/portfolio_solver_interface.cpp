@@ -8,6 +8,7 @@
 #include "app/sat/sharing/adaptive_import_manager.hpp"
 #include "app/sat/sharing/ring_buffer_import_manager.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
+#include "app/sat/solvers/solving_replay.hpp"
 #include "util/random.hpp"
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
@@ -45,7 +46,9 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 				"S"+std::to_string(setup.globalId)+"."+std::to_string(setup.solverRevision), 
 				"." + setup.jobname + ".S"+std::to_string(setup.globalId)
 		  )), 
-		  _setup(setup), _job_name(setup.jobname), 
+		  _setup(setup),
+		  _replay(_setup.replayMode, "replay." + std::to_string(setup.globalId)),
+		  _job_name(setup.jobname),
 		  _global_id(setup.globalId), _local_id(setup.localId), 
 		  _diversification_index(setup.diversificationIndex),
 		  _import_manager([&]() -> GenericImportManager* {
@@ -180,14 +183,29 @@ void PortfolioSolverInterface::addLearnedClause(const Mallob::Clause& c) {
 }
 
 bool PortfolioSolverInterface::fetchLearnedClause(Mallob::Clause& clauseOut, GenericClauseStore::ExportMode mode) {
-	if (_clause_sharing_disabled) return false;
-	clauseOut = _import_manager->getClause(mode);
-	return clauseOut.begin != nullptr && clauseOut.size >= 1;
+	if (_replay.getMode() == SolvingReplay::REPLAY)
+		return _replay.replayImportCallback(clauseOut, mode);
+	bool success = !_clause_sharing_disabled;
+	if (success) {
+		clauseOut = _import_manager->getClause(mode);
+		success = clauseOut.begin != nullptr && clauseOut.size >= 1;
+	}
+	if (_replay.getMode() == SolvingReplay::RECORD)
+		_replay.recordImportCallback(success, clauseOut, mode);
+	return success;
 }
 
 std::vector<int> PortfolioSolverInterface::fetchLearnedUnitClauses() {
-	if (_clause_sharing_disabled) return std::vector<int>();
-	return _import_manager->getUnitsBuffer();
+	if (_replay.getMode() == SolvingReplay::REPLAY)
+		return _replay.replayImportCallback();
+	std::vector<int> units;
+	if (!_clause_sharing_disabled) {
+		units = _import_manager->getUnitsBuffer();
+	}
+	if (_replay.getMode() == SolvingReplay::RECORD) {
+		_replay.recordImportCallback(units);
+	}
+	return units;
 }
 
 PortfolioSolverInterface::~PortfolioSolverInterface() {

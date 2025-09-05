@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <ios>
 #include <unistd.h>
 
 #include "app/sat/data/clause.hpp"
@@ -15,6 +16,7 @@
 #include "app/sat/proof/trusted/trusted_checker_defs.hpp"
 #include "app/sat/proof/trusted_checker_process_adapter.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
+#include "robin_map.h"
 #include "trusted/trusted_utils.hpp"
 #include "util/assert.hpp"
 #include "util/logger.hpp"
@@ -28,6 +30,8 @@ private:
     Logger& _logger;
     const int _base_seed;
     const int _local_id;
+    std::string _out_path;
+
     Mutex _mtx_submit;
     SPSCBlockingRingbuffer<LratOp> _ringbuf;
 
@@ -39,19 +43,22 @@ private:
     LearnedClauseCallback _cb_learn;
 
     bool _launched {false};
-    volatile bool _validated {false};
 
     // buffering
     static constexpr int MAX_CLAUSE_LENGTH {512};
     int _clause_lits[MAX_CLAUSE_LENGTH];
     Mallob::Clause _clause {_clause_lits, 0, 0};
 
-    std::unique_ptr<SerializedFormulaParser> _f_parser;
+    std::list<std::unique_ptr<SerializedFormulaParser>> _f_parsers;
     volatile bool _do_parse {false};
-    int _arrived_revision {-1};
-    int _accepted_revision {-1};
+    volatile int _arrived_revision {-1};
+    volatile int _accepted_revision {-1};
+    volatile int _last_concluded_rev {-1};
+    volatile int _next_rev_to_conclude {-1};
 
     float _tampering_chance_per_mille {0};
+
+    tsl::robin_map<int, std::shared_ptr<LratOp>> _deferred_conclusion_ops;
 
 public:
     LratConnector(Logger& logger, int baseSeed, int localId, int nbVars, bool checkModel) :
@@ -67,18 +74,18 @@ public:
     void setTamperingChancePerMille(float chance) {
         _tampering_chance_per_mille = chance;
     }
+    void setWitnessOutputPath(const std::string& outputPath) {_out_path = outputPath;}
 
     void initiateRevision(int revision, SerializedFormulaParser& fParser) {
         {
             auto lock = _mtx_submit.getLock();
             if (revision != _arrived_revision+1) {
-                LOG(V1_WARN, "[WARN] LRAT Connector: unexpected rev. %i (in rev. %i now)!\n", revision, _arrived_revision);
+                LOGGER(_logger, V1_WARN, "[WARN] LRAT Connector: unexpected rev. %i (in rev. %i now)!\n", revision, _arrived_revision);
                 return;
             }
-            _f_parser.reset(new SerializedFormulaParser(fParser));
-            _do_parse = true;
-            _validated = false;
+            _f_parsers.emplace_back(new SerializedFormulaParser(fParser));
             _arrived_revision++;
+            _do_parse = true;
         }
 
         if (_launched) return;
@@ -101,15 +108,27 @@ public:
             // Wait until parsing is done!
             while (_do_parse) {
                 _mtx_submit.unlock();
-                usleep(1000*10);
+                usleep(1000*5);
                 _mtx_submit.lock();
             }
         }
 
-        // Obsolete operation? -> Discard
-        if (revision >= 0 && _arrived_revision > revision) {
-            LOG(V2_INFO, "IMPCHK discard solution for rev. %i (already in rev. %i)\n", revision, _arrived_revision);
-            return false;
+        // Currently unsuitable validation operation?
+        if (op.isSatValidation() || op.isUnsatValidation()) {
+            if (_next_rev_to_conclude < revision) {
+                LOGGER(_logger, V2_INFO, "IMPCHK defer conclusion for rev. %i (rev. %i next to validate)\n",
+                    revision, _next_rev_to_conclude);
+                if (!_deferred_conclusion_ops.count(revision))
+                    _deferred_conclusion_ops[revision] = std::shared_ptr<LratOp>(new LratOp(std::move(op)));
+                if (acquireLock) _mtx_submit.unlock();
+                return true;
+            }
+            if (_next_rev_to_conclude > revision) {
+                LOGGER(_logger, V2_INFO, "IMPCHK discard conclusion for rev. %i (rev. %i arrived, rev. %i next to validate)\n",
+                    revision, _arrived_revision, _next_rev_to_conclude);
+                if (acquireLock) _mtx_submit.unlock();
+                return false;
+            }
         }
 
         if (op.isDerivation()) {
@@ -139,14 +158,25 @@ public:
                 LratOpTamperer(_logger).tamper(op);
             }
         }
+        if (op.isConcluding() && _next_rev_to_conclude == revision) {
+            _next_rev_to_conclude++;
+        }
         _ringbuf.pushBlocking(op);
+
+        tryPushDeferredOp(false);
 
         if (acquireLock) _mtx_submit.unlock();
         return true;
     }
-    bool waitForValidation() {
-        while (!_validated) usleep(1000);
-        return _validated;
+    void waitForConclusion(int revision) {
+        _mtx_submit.lock();
+        while (_last_concluded_rev < revision) {
+            _mtx_submit.unlock();
+            usleep(1000 * 3);
+            _mtx_submit.lock();
+        }
+        _mtx_submit.unlock();
+        return;
     }
 
     void stop() {
@@ -177,6 +207,26 @@ public:
 
 private:
 
+    void tryPushDeferredOp(bool acquireLock) {
+
+        if (acquireLock) _mtx_submit.lock();
+        if (_do_parse || _arrived_revision < _next_rev_to_conclude) {
+            if (acquireLock) _mtx_submit.unlock();
+            return;
+        }
+        assert(!_do_parse);
+
+        auto it = _deferred_conclusion_ops.find((int) _next_rev_to_conclude);
+        if (it != _deferred_conclusion_ops.end()) {
+            auto ptr = it->second;
+            _deferred_conclusion_ops.erase(it);
+            LOGGER(_logger, V2_INFO, "IMPCHK re-push deferred solution for rev. %i\n",
+                _next_rev_to_conclude);
+            push(std::move(*ptr), false, _next_rev_to_conclude);
+        }
+        if (acquireLock) _mtx_submit.unlock();
+    }
+
     void runEmitter() {
         Proc::nameThisThread("LRATEmitter");
 
@@ -185,41 +235,58 @@ private:
 
         // Lrat operation emission loop
         LratOp op;
+        int revision = -1;
         while (_bg_emitter.continueRunning()) {
 
-            if (_do_parse) {
-                auto lock = _mtx_submit.getLock();
-                // Load formula
-                assert(_do_parse);
-                push(LratOp(_f_parser->getSignature()), false);
-                int lit;
-                std::vector<int> buf;
-                std::vector<int> assumptions;
-                assumptions.reserve(1); // suppress nullptr passing for empty assumptions
-                while (_f_parser->getNextLiteral(lit)) {
-                    do {
-                        buf.push_back(lit);
-                    } while (buf.size() < (1UL<<14) && _f_parser->getNextLiteral(lit));
-                    push(LratOp(TRUSTED_CHK_LOAD, buf.data(), buf.size()), false);
-                    buf.clear();
-                }
-                while (_f_parser->getNextAssumption(lit)) {
-                    do {
-                        assumptions.push_back(lit);
-                    } while (_f_parser->getNextAssumption(lit));
-                }
-                if (_bg_emitter.continueRunning()) {
-                    // End loading, check signature
-                    push(LratOp(TRUSTED_CHK_END_LOAD, assumptions.data(), assumptions.size()), false);
+            if (_do_parse && _mtx_submit.tryLock()) {
+                while (!_f_parsers.empty()) {
+                    // Load formula
+                    auto parser = std::move(_f_parsers.front()); _f_parsers.pop_front();
+                    // use the *old* revision index since this op may be considered
+                    // a "conclusion" operation for the previous revision
+                    push(LratOp(parser->getSignature()), false, revision);
+                    trySubmitFromRingbuf();
+                    revision++; // and *then* update the revision.
+                    int lit;
+                    std::vector<int> buf;
+                    std::vector<int> assumptions;
+                    assumptions.reserve(1); // suppress nullptr passing for empty assumptions
+                    while (parser->getNextLiteral(lit)) {
+                        do {
+                            buf.push_back(lit);
+                        } while (buf.size() < (1UL<<14) && parser->getNextLiteral(lit));
+                        push(LratOp(TRUSTED_CHK_LOAD, buf.data(), buf.size()), false);
+                        trySubmitFromRingbuf();
+                        buf.clear();
+                    }
+                    while (parser->getNextAssumption(lit)) {
+                        do {
+                            assumptions.push_back(lit);
+                        } while (parser->getNextAssumption(lit));
+                    }
+                    if (_bg_emitter.continueRunning()) {
+                        // End loading, check signature
+                        push(LratOp(TRUSTED_CHK_END_LOAD, assumptions.data(), assumptions.size()), false);
+                        trySubmitFromRingbuf();
+                    }
                 }
                 _do_parse = false;
+                _mtx_submit.unlock();
             }
 
-            if (_ringbuf.pollNonblocking(op)) { // poll for an op
-                //LOG(V2_INFO, "PROOF> submit %s\n", op.toStr().c_str());
-                _checker.submit(op);
-            } else usleep(1000*1); // 1ms
+            if (!trySubmitFromRingbuf())
+                usleep(1000*1); // 1ms
         }
+    }
+
+    bool trySubmitFromRingbuf() {
+        LratOp op;
+        if (_ringbuf.pollNonblocking(op)) { // poll for an op
+            //LOG(V2_INFO, "PROOF> submit %s\n", op.toStr().c_str());
+            _checker.submit(op);
+            return true;
+        }
+        return false;
     }
 
     void runAcceptor() {
@@ -227,9 +294,10 @@ private:
 
         LratOp op;
         signature sig;
+        std::vector<int> assumptions;
         while (true) { // This thread can only be terminated with a "termination" LratOp.
             bool res;
-            u32 cidx;
+            u32 cidx = 0;
             bool ok = _checker.accept(op, res, sig, cidx);
             if (!ok) break; // terminated
             if (!res) {
@@ -244,12 +312,37 @@ private:
                     _cb_learn(_clause, _local_id);
                 }
             } else if (op.isUnsatValidation() || op.isSatValidation()) {
-                _validated = true;
+                // SAT / UNSAT result
+                _last_concluded_rev = _accepted_revision;
                 LOGGER(_logger, V2_INFO, "Use impcheck_confirm -key-seed=%lu to confirm the fingerprint\n",
                     ImpCheck::getKeySeed(_base_seed));
+                u32 code = op.isSatValidation() ? 10 : 20;
+                if (op.isUnsatValidation())
+                    assumptions = std::vector(op.data.concludeUnsat.failed, op.data.concludeUnsat.failed + op.data.concludeUnsat.nbFailed);
+                std::string litStr;
+                for (int lit : assumptions) litStr += " " + std::to_string(lit);
+                LOGGER(_logger, V0_CRIT, "IMPCHK_CONFIRM_TRACE %u %u %s %s\n", cidx, code,
+                    Logger::dataToHexStr(sig, SIG_SIZE_BYTES).c_str(), litStr.c_str());
+                if (!_out_path.empty()) {
+                    std::ofstream ofs(_out_path, std::ios_base::app);
+                    ofs << cidx << " " << code << " " << Logger::dataToHexStr(sig, SIG_SIZE_BYTES) << litStr << std::endl;
+                }
+            } else if (op.isBeginLoad()) {
+                if (cidx == 0) continue;
+                // obsolete "unknown" result (not actually unknown)
+                if (_last_concluded_rev == _accepted_revision) continue;
+                // UNKNOWN result
+                _last_concluded_rev = _accepted_revision;
+                LOGGER(_logger, V0_CRIT, "IMPCHK_CONFIRM_TRACE %u %u\n", cidx, 0);
+                if (!_out_path.empty()) {
+                    std::ofstream ofs(_out_path, std::ios_base::app);
+                    ofs << cidx << " 0" << std::endl;
+                }
             } else if (op.isEndLoad()) {
                 _accepted_revision++; // next revision reached
                 LOGGER(_logger, V2_INFO, "IMPCHK revision %i reached\n", _accepted_revision);
+                // store assumptions for later
+                assumptions = std::vector(op.data.endLoad.assumptions, op.data.endLoad.assumptions + op.data.endLoad.nbAssumptions);
             } else if (op.isTermination()) {
                 break; // end
             }

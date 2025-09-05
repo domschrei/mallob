@@ -4,6 +4,7 @@
 #include <string>
 
 #include "app/sat/data/portfolio_sequence.hpp"
+#include "app/sat/solvers/solving_replay.hpp"
 #include "util/logger.hpp"
 #include "util/random.hpp"
 
@@ -39,6 +40,7 @@ struct SolverSetup {
 	bool doIncrementalSolving {false};
 	int diversificationIndex {0};
 
+	SolvingReplay::Mode replayMode {SolvingReplay::NONE};
 
 	bool diversifyNoise {false};
 	int decayDistribution {0};

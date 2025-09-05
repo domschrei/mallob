@@ -157,6 +157,8 @@ struct LratOp {
     bool isSatValidation() const {return type == TRUSTED_CHK_VALIDATE_SAT;}
     bool isTermination() const {return type == TRUSTED_CHK_TERMINATE;}
 
+    bool isConcluding() const {return isUnsatValidation() || isSatValidation() || isBeginLoad();}
+
     std::string toStr() const {
         std::string out;
         if (isDerivation()) {

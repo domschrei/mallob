@@ -6,6 +6,7 @@
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "app/sat/data/revision_data.hpp"
 #include "app/sat/data/theories/theory_specification.hpp"
+#include "app/sat/solvers/solving_replay.hpp"
 #include "util/logger.hpp"
 #include "util/sys/fileutils.hpp"
 #include "util/sys/thread_pool.hpp"
@@ -191,6 +192,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.jobname = config.getJobStr();
 	setup.baseSeed = params.seed();
 	setup.isJobIncremental = config.incremental;
+	setup.replayMode = _params.replay() == 1 ? SolvingReplay::RECORD :
+		(_params.replay() == 2 ? SolvingReplay::REPLAY : SolvingReplay::NONE);
 	setup.strictMaxLitsPerClause = params.strictClauseLengthLimit();
 	setup.strictLbdLimit = params.strictLbdLimit();
 	setup.qualityMaxLitsPerClause = params.qualityClauseLengthLimit();
