@@ -81,12 +81,10 @@ public:
             task.lits = std::move(_backlog_lits);
 
             _base_job_name = "satjob-" + std::to_string(_stream_id) + "-rev-";
-            _json_base = nlohmann::json {
-                {"user", _username},
-                {"incremental", _incremental},
-                {"priority", 1},
-                {"application", "SAT"}
-            };
+            _json_base["user"] = _username;
+            _json_base["incremental"] = _incremental;
+            _json_base["priority"] = 1;
+            _json_base["application"] = "SAT";
             _json_base["files"] = std::vector<std::string>();
             if (!_json_base["configuration"].count("__XL"))
                 _json_base["configuration"]["__XL"] = "-1";
@@ -195,7 +193,7 @@ public:
     }
 
     void setGroupId(const std::string& groupId, int minVar = -1, int maxVar = -1) {
-        LOG(V2_INFO, "MAXSAT %s group ID %s V=[%i,%i]\n", _base_job_name.c_str(), groupId.c_str(), minVar, maxVar);
+        LOG(V2_INFO, "%s group ID %s V=[%i,%i]\n", _base_job_name.c_str(), groupId.c_str(), minVar, maxVar);
         _json_base["group-id"] = groupId;
         _json_base["configuration"]["__XL"] = std::to_string(minVar);
         _json_base["configuration"]["__XU"] = std::to_string(maxVar);

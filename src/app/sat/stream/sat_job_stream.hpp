@@ -22,6 +22,7 @@ private:
     typedef std::pair<std::unique_ptr<SatJobStreamProcessor>, std::unique_ptr<BackgroundWorker>> Processor;
     std::vector<Processor> _processors;
     volatile bool _finalizing {false};
+    volatile bool _idle {true};
 
 public:
     SatJobStream(const std::string& baseName) : _name(baseName) {}
@@ -77,6 +78,10 @@ public:
             std::vector<int> litsCopy = newLiterals;
             proc->submit(_active_rev, std::move(litsCopy), assumptions);
         }
+        _idle = false;
+    }
+    bool isIdle() const {
+        return _idle;
     }
     bool isNonblockingSolvePending() {
         return _sync.resultQueue.empty();
@@ -85,6 +90,7 @@ public:
         SatJobStreamProcessor::SatTaskResult result;
         bool ok = _sync.resultQueue.pollBlocking(result);
         assert(ok);
+        _idle = true;
         return {result.resultCode, std::move(result.solution)};
     }
 
@@ -101,6 +107,7 @@ public:
 
     bool interrupt() {
         bool success = _sync.concludeRevision(_active_rev, 0, {});
+        _idle = true;
         return success;
     }
 
