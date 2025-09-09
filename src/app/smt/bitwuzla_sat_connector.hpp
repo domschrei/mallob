@@ -69,8 +69,10 @@ public:
         _stream_wrapper->stream.addProcessor(_stream_wrapper->mallobProcessor);
         LOG(V2_INFO, "New: %s\n", _name.c_str());
 
-        auto internalProcessor = new InternalSatJobStreamProcessor(true, _stream_wrapper->stream.getSynchronizer());
-        _stream_wrapper->stream.addProcessor(internalProcessor);
+        if (_params.internalStreamProcessor()) {
+            auto internalProcessor = new InternalSatJobStreamProcessor(true, _stream_wrapper->stream.getSynchronizer());
+            _stream_wrapper->stream.addProcessor(internalProcessor);
+        }
 
         _stream_wrapper->stream.setTerminator([&, wrapper=_stream_wrapper.get(), params=&_params, desc=&_desc, startTime=_start_time]() {
             if (wrapper->stream.finalizing()) return true;

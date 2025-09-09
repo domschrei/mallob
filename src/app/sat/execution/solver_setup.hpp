@@ -19,6 +19,7 @@ struct SolverSetup {
 	int globalId {0};
 	int localId {0};
 	std::string jobname;
+	int jobId;
 	std::string profilingBaseDir; 
 	int profilingLevel {-1};
 	int baseSeed {0};

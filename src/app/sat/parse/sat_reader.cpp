@@ -41,10 +41,9 @@ void handleUnsat(const Parameters& _params) {
 
 bool SatReader::parseWithTrustedParser(JobDescription& desc) {
 	// Parse and sign in a separate subprocess
-
 	if (!_tppa) {
 		_tppa.reset(new TrustedParserProcessAdapter(_params.seed(), desc.getId()));
-		_tppa->setup(_filename.c_str());
+		_tppa->setup(_filename.c_str(), false);
 	}
 
 	uint8_t* sig;
@@ -60,8 +59,8 @@ bool SatReader::parseWithTrustedParser(JobDescription& desc) {
 	_max_var = _tppa->getNbVars();
 	_num_read_clauses = _tppa->getNbClauses();
 	desc.setFSize(_tppa->getFSize());
-	LOG(V2_INFO, "IMPCHK parser -key-seed=%lu read %i vars, %i cls - sig %s\n",
-		ImpCheck::getKeySeed(_params.seed()), _max_var, _num_read_clauses, sigStr.c_str());
+	LOG(V2_INFO, "IMPCHK parser -key-seed=%lu read %i vars, %i cls, %i asmpt - sig %s\n",
+		ImpCheck::getKeySeed(_params.seed()), _max_var, _num_read_clauses, _tppa->getNbAssumptions(), sigStr.c_str());
 
 	if (_params.compressFormula()) {
 		auto vec = desc.getRevisionData(desc.getRevision()).get();
@@ -235,26 +234,26 @@ bool SatReader::read(JobDescription& desc) {
 		_filename = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob." + std::to_string(Proc::getPid())
 			+ ".tsinput." + std::to_string(desc.getId());
 		if (!_tppa) {
-			// Create a new pipe file and parser adapter for this job
-			mkfifo(_filename.c_str(), 0666);
+			// Create a new parser adapter for this job
 			_tppa.reset(new TrustedParserProcessAdapter(_params.seed(), desc.getId()));
-			_tppa->setup(_filename.c_str());
+			_tppa->setup(_filename.c_str(), true);
 		}
 		// Write formula to the pipe in a side thread
 		litsToParse = std::move(desc.getPreloadedLiterals());
 		desc.getPreloadedLiterals().clear();
 		optFuture = ProcessWideThreadPool::get().addTask([&]() {
 			// Output formula increment to the pipe file
-			std::ofstream ofs(_filename);
+			std::ofstream& ofs = _tppa->getFormulaToParserStream();
 			for (int lit : litsToParse) {
 				if (lit == INT32_MIN) break;
 				if (lit == INT32_MAX) {
-					ofs << "a ";
+					ofs << "a";
 					continue;
 				}
-				ofs << lit;
+				ofs << " " << lit;
 				if (lit == 0) ofs << "\n";
 			}
+			ofs.flush();
 		});
 	}
 	if (_filename.empty()) {

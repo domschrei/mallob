@@ -23,6 +23,7 @@ OPTION_GROUP(grpAppSat, "app/sat", "SAT solving options")
  OPT_BOOL(compressModels,                   "cm", "compress-models", false, "Compress found models into hexadecimal vector in output")
  OPT_STRING(groundTruthModel,               "gtm", "", "", "Ground truth model to test learned clauses against")
  OPT_INT(replay, "replay", "", 0, 0, 2, "0: nothing, 1: record solver threads' behavior, 2: replay solving")
+ OPT_BOOL(internalStreamProcessor, "isp", "", true, "For incremental SAT job streams, run a local single-threaded SAT solver for latency hiding")
 
 OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration")
  OPT_INT(bufferedImportedClsGenerations,    "bicg", "buffered-imported-cls-generations", 4,        1,   LARGE_INT, 

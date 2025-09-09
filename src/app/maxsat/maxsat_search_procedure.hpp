@@ -63,7 +63,6 @@ private:
     APIConnector& _api; // for submitting jobs to Mallob
     JobDescription& _desc; // contains our instance to solve and all metadata
     MaxSatInstance& _instance;
-    CoreAllocator::Allocation _core_alloc;
     int _nb_orig_vars;
 
     std::unique_ptr<WrappedSatJobStream> _stream_wrapper;
@@ -104,7 +103,7 @@ private:
 public:
     MaxSatSearchProcedure(const Parameters& params, APIConnector& api, JobDescription& desc,
             MaxSatInstance& instance, EncodingStrategy encStrat, SearchStrategy searchStrat, const std::string& label) :
-        _params(params), _api(api), _desc(desc), _instance(instance), _core_alloc(1),
+        _params(params), _api(api), _desc(desc), _instance(instance),
         _lits_to_add(_instance.formulaData, _instance.formulaData+_instance.formulaSize),
         _current_bound(ULONG_MAX), _encoding_strat(encStrat), _search_strat(searchStrat), _label(label) {
 
@@ -113,8 +112,12 @@ public:
         _stream_wrapper->mallobProcessor = new MallobSatJobStreamProcessor(_params, _api, _desc,
             "maxsat", _running_stream_id++, true, _stream_wrapper->stream.getSynchronizer());
         _stream_wrapper->stream.addProcessor(_stream_wrapper->mallobProcessor);
-        auto internalProcessor = new InternalSatJobStreamProcessor(true, _stream_wrapper->stream.getSynchronizer());
-        _stream_wrapper->stream.addProcessor(internalProcessor);
+
+        if (_params.internalStreamProcessor()) {
+            auto internalProcessor = new InternalSatJobStreamProcessor(true, _stream_wrapper->stream.getSynchronizer());
+            _stream_wrapper->stream.addProcessor(internalProcessor);
+        }
+
         _stream_wrapper->stream.setTerminator([&]() {return false;});
 
         _nb_orig_vars = _instance.nbVars; // before cardinality constraint encodings!
@@ -200,6 +203,7 @@ public:
         _is_encoding = true;
         if (_enc) {
             _future_encoder = ProcessWideThreadPool::get().addTask([&, min=globalLowerBound, ub=_current_bound, max=globalUpperBound]() {
+                CoreAllocator::Allocation ca(1);
                 if (!_shared_encoder) {
                     _enc->encode(min, ub, max);
                 }
@@ -210,6 +214,8 @@ public:
                 //    _assumptions_to_persist_upon_sat.push_back(_assumptions_to_set.front());
                 _is_done_encoding = true;
             });
+            // With a shared encoder, encoding needs to happen synchronously due to the overridden callbacks
+            if (_shared_encoder) _future_encoder.get();
         } else {
             _is_done_encoding = true;
         }

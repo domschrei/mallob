@@ -130,6 +130,7 @@ public:
             newLiterals.push_back(INT32_MAX);
             for (int a : assumptions) newLiterals.push_back(a);
             newLiterals.push_back(0);
+            newLiterals.push_back(INT32_MIN);
         }
         StaticStore<std::vector<int>>::insert(_json_base["name"].get<std::string>(), std::move(newLiterals));
         copy["internalliterals"] = _json_base["name"].get<std::string>();

@@ -10,6 +10,7 @@
 
 #include "app/sat/proof/impcheck.hpp"
 #include "trusted/trusted_utils.hpp"
+#include "util/logger.hpp"
 #include "util/sys/fileutils.hpp"
 #include "util/sys/proc.hpp"
 #include "util/sys/subprocess.hpp"
@@ -19,6 +20,7 @@ class TrustedParserProcessAdapter {
 
 private:
     int _base_seed;
+    std::ofstream _ofs_formula_to_parser;
 
     int _id;
     std::string _path_parsed_formula;
@@ -36,21 +38,27 @@ private:
     signature _sig;
     int _nb_vars {0};
     int _nb_cls {0};
+    int _nb_asmpt {0};
     unsigned long _f_size {0};
 
 public:
     TrustedParserProcessAdapter(int baseSeed, int id) : _base_seed(baseSeed), _id(id), _f_buf(1<<14) {}
     ~TrustedParserProcessAdapter() {
+        _ofs_formula_to_parser.close();
         fclose(_f_parsed_formula);
         FileUtils::rm(_path_parsed_formula);
         if (_subproc) delete _subproc;
     }
 
-    void setup(const char* source) {
+    void setup(const char* source, bool createSourceAsPipe) {
         auto basePath = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob." + std::to_string(Proc::getPid())
             + ".tsparse." + std::to_string(_id);
         _path_parsed_formula = basePath + ".parsedformula";
         mkfifo(_path_parsed_formula.c_str(), 0666);
+
+        if (createSourceAsPipe) {
+            mkfifo(source, 0666);
+        }
 
         Parameters params;
         params.formulaInput.set(source);
@@ -58,13 +66,19 @@ public:
 
         unsigned long keySeed = ImpCheck::getKeySeed(_base_seed);
         std::string moreArgs = "-key-seed=" + std::to_string(keySeed);
-        moreArgs += " -input-log=parser-input.txt";
+        moreArgs += " -input-log=parser-input." + std::to_string(_id) + ".txt";
 
         _subproc = new Subprocess(params, "impcheck_parse", moreArgs);
         _child_pid = _subproc->start();
         // Non-blocking reading so that we can read until the end of an increment
         int fd = open(_path_parsed_formula.c_str(), O_RDONLY | O_NONBLOCK);
         _f_parsed_formula = fdopen(fd, "r");
+
+        _ofs_formula_to_parser = std::ofstream(source);
+    }
+    std::ofstream& getFormulaToParserStream() {
+        assert(_ofs_formula_to_parser.is_open());
+        return _ofs_formula_to_parser;
     }
 
     inline bool processNextIntAndCheckDone(int& x) {
@@ -98,6 +112,7 @@ public:
         }
 
         if (_stage == LIT && x == 0) _nb_cls++;
+        if (_stage == ASMPT && x != 0) _nb_asmpt++;
         if (x != 0) {
             assert(x != INT32_MAX && x != INT32_MIN);
             _nb_vars = std::max(_nb_vars, std::abs(x));
@@ -110,6 +125,7 @@ public:
         _f_size = 0;
         _stage = LIT;
         _sig_nb_read = 0;
+        _nb_asmpt = 0;
 
         // Parse formula
         size_t fSizeBytes = out.size() * sizeof(T);
@@ -142,6 +158,7 @@ public:
 
     int getNbVars() const {return _nb_vars;}
     int getNbClauses() const {return _nb_cls;}
+    int getNbAssumptions() const {return _nb_asmpt;}
     size_t getFSize() const {return _f_size;}
 
 private:

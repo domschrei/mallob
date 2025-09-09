@@ -190,6 +190,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	SolverSetup setup;
 	setup.logger = &_logger;
 	setup.jobname = config.getJobStr();
+	setup.jobId = config.jobid;
 	setup.baseSeed = params.seed();
 	setup.isJobIncremental = config.incremental;
 	setup.replayMode = _params.replay() == 1 ? SolvingReplay::RECORD :

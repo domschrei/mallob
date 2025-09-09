@@ -10,6 +10,7 @@
 #include "app/sat/execution/solver_setup.hpp"
 #include "app/sat/solvers/cadical.hpp"
 #include "sat_job_stream_processor.hpp"
+#include "scheduling/core_allocator.hpp"
 #include "util/logger.hpp"
 
 class InternalSatJobStreamProcessor : public SatJobStreamProcessor {
@@ -43,6 +44,7 @@ public:
     }
 
     virtual void process(SatTask& task) override {
+        CoreAllocator::Allocation ca(1);
         _current_rev = task.rev;
         _pending = true;
         for (int lit : task.lits) _solver->addLiteral(lit);
