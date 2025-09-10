@@ -61,9 +61,9 @@ private:
     tsl::robin_map<int, std::shared_ptr<LratOp>> _deferred_conclusion_ops;
 
 public:
-    LratConnector(Logger& logger, int baseSeed, int localId, int nbVars, bool checkModel) :
-        _logger(logger), _base_seed(baseSeed), _local_id(localId), _ringbuf(1<<14),
-        _checker(logger, baseSeed, _local_id, nbVars, checkModel) {}
+    LratConnector(TrustedCheckerProcessAdapter::TrustedCheckerProcessSetup& setup) :
+        _logger(setup.logger), _base_seed(setup.baseSeed), _local_id(setup.localSolverId),
+        _ringbuf(1<<14), _checker(setup) {}
 
     inline auto& getChecker() {
         return _checker;

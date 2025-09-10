@@ -92,6 +92,7 @@ public:
                 _json_base["configuration"]["__XU"] = "-1";
             _json_base["configuration"]["__NV"] = std::to_string(_nb_vars);
             _json_base["configuration"]["__NC"] = std::to_string(_nb_clauses);
+            _json_base["configuration"]["__EO"] = std::to_string(1000 * _stream_id);
         }
 
         auto& newLiterals = task.lits;

@@ -38,8 +38,8 @@ private:
     Subprocess* _subproc;
     pid_t _child_pid {-1};
 
+    const int _job_id;
     const int _solver_id;
-    const int _nb_vars;
     const bool _check_model;
 
     // buffering
@@ -51,9 +51,17 @@ private:
     int _revision {-1};
 
 public:
-    TrustedCheckerProcessAdapter(Logger& logger, int baseSeed, int solverId, int nbVars, bool checkModel) :
-            _base_seed(baseSeed), _logger(logger), _solver_id(solverId), _nb_vars(nbVars),
-            _check_model(checkModel), _op_queue(1<<14) {}
+    struct TrustedCheckerProcessSetup {
+        Logger& logger;
+        int baseSeed;
+        int jobId;
+        int globalSolverId;
+        int localSolverId;
+        bool checkModel;
+    };
+    TrustedCheckerProcessAdapter(TrustedCheckerProcessSetup& setup) :
+            _base_seed(setup.baseSeed), _logger(setup.logger), _job_id(setup.jobId),
+            _solver_id(setup.globalSolverId), _check_model(setup.checkModel), _op_queue(1<<14) {}
 
     ~TrustedCheckerProcessAdapter() {
         if (!_f_directives) return;
@@ -66,8 +74,8 @@ public:
     }
 
     void init() {
-        auto basePath = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob." + std::to_string(Proc::getPid()) + ".slv"
-            + std::to_string(_solver_id) + ".ts.";
+        auto basePath = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob." + std::to_string(Proc::getPid())
+            + ".#" + std::to_string(_job_id) + ".slv" + std::to_string(_solver_id) + ".ts.";
         _path_directives = basePath + "directives";
         _path_feedback = basePath + "feedback";
         int res;

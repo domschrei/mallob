@@ -56,9 +56,7 @@ public:
         _path_parsed_formula = basePath + ".parsedformula";
         mkfifo(_path_parsed_formula.c_str(), 0666);
 
-        if (createSourceAsPipe) {
-            mkfifo(source, 0666);
-        }
+        if (createSourceAsPipe) mkfifo(source, 0666);
 
         Parameters params;
         params.formulaInput.set(source);
@@ -74,7 +72,7 @@ public:
         int fd = open(_path_parsed_formula.c_str(), O_RDONLY | O_NONBLOCK);
         _f_parsed_formula = fdopen(fd, "r");
 
-        _ofs_formula_to_parser = std::ofstream(source);
+        if (createSourceAsPipe) _ofs_formula_to_parser = std::ofstream(source);
     }
     std::ofstream& getFormulaToParserStream() {
         assert(_ofs_formula_to_parser.is_open());

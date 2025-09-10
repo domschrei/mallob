@@ -93,6 +93,7 @@ public:
         _idle = true;
         return {result.resultCode, std::move(result.solution)};
     }
+    int getRevision() const {return _active_rev;}
 
     void setTerminator(const std::function<bool()>& terminator) {
         for (auto& [proc, worker] : _processors)

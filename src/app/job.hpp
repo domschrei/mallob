@@ -349,6 +349,7 @@ public:
         _latest_balancing_epoch = std::max(_latest_balancing_epoch, latestEpoch);
         if (getJobTree().isRoot() && hasDescription() && getDescription().getFirstBalancingEpoch() < 0) {
             _description.setFirstBalancingEpoch(_latest_balancing_epoch);
+            _description.writeMetadata();
         }
     }
     int getLatestJobBalancingEpoch() const {return _latest_balancing_epoch;}

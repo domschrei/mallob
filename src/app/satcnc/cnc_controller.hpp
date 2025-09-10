@@ -32,6 +32,8 @@ private:
         return _stream_id++;
     }
 
+    enum CubingMode {VAR_OCCURRENCE, LOOKAHEAD_CADICAL} _cubing_mode {LOOKAHEAD_CADICAL};
+
 public:
     CncController(const Parameters& params, JobDescription& desc) : _params(params), _desc(desc) {
         // Extract the base formula to solve.
@@ -74,6 +76,13 @@ public:
         // until a stopping criterion is reached.
         bool stop = false;
         while (!stop) {
+            if (nbUnsatCubes == nbGeneratedCubes) {
+                // All cubes found UNSAT. We are done!
+                LOG(V2_INFO, "CNC CONCLUDE UNSAT\n");
+                res.result = UNSAT;
+                stop = true;
+                break;
+            }
             for (auto& streamWrapper : streams) {
                 auto& stream = streamWrapper->stream;
                 // already cleaning up this stream?
@@ -94,13 +103,6 @@ public:
                         // Cube was found unsatisfiable.
                         LOG(V2_INFO, "CNC Cube UNSAT\n");
                         nbUnsatCubes++;
-                        if (nbUnsatCubes == nbGeneratedCubes) {
-                            // All cubes found UNSAT. We are done!
-                            LOG(V2_INFO, "CNC CONCLUDE UNSAT\n");
-                            res.result = UNSAT;
-                            stop = true;
-                            break;
-                        }
                     } else {
                         // Cube solving returned UNKNOWN: something has gone wrong
                         // or an internal limit was reached (timeout, interrupt, etc.)
@@ -136,19 +138,42 @@ public:
 private:
     // Generate a number of cubes exponential in the provided depth.
     std::vector<std::vector<int>> getCubes(int depth) {
-        std::vector<std::vector<int>> cubes;
-        std::vector<int> vars = getSplittingVariables(depth);
-        // Just loop over all combinations of (depth) bits
-        // and use the splitting variables with according polarities.
-        for (size_t i = 0; i < (1<<depth); i++) {
-            std::bitset<64> bits(i);
-            std::vector<int> cube;
-            for (int j = 0; j < depth; j++) {
-                cube.push_back(vars[j] * (bits[j]?1:-1));
+
+        if (_cubing_mode == VAR_OCCURRENCE) {
+            std::vector<std::vector<int>> cubes;
+            std::vector<int> vars = getSplittingVariables(depth);
+            // Just loop over all combinations of (depth) bits
+            // and use the splitting variables with according polarities.
+            for (size_t i = 0; i < (1<<depth); i++) {
+                std::bitset<64> bits(i);
+                std::vector<int> cube;
+                for (int j = 0; j < depth; j++) {
+                    cube.push_back(vars[j] * (bits[j]?1:-1));
+                }
+                cubes.push_back(std::move(cube));
             }
-            cubes.push_back(std::move(cube));
+            return cubes;
         }
-        return cubes;
+
+        if (_cubing_mode == LOOKAHEAD_CADICAL) {
+            SolverSetup setup;
+            setup.logger = &Logger::getMainInstance();
+            setup.solverType = 'C';
+            setup.isJobIncremental = true;
+            setup.exportClauses = false;
+            std::unique_ptr<Cadical> solver;
+            solver.reset(new Cadical(setup));
+            solver->setLearnedClauseCallback([&](const Mallob::Clause&, int) {});
+            solver->getTerminator().setExternalTerminator([&]() {return false;});
+            solver->diversify(0);
+            for (int lit : _base_formula) solver->addLiteral(lit);
+
+            int status;
+            std::vector<std::vector<int>> cubes = solver->cube(depth, status);
+            return cubes;
+        }
+
+        return {};
     }
 
     // Select a set to variables to branch over.
@@ -198,9 +223,11 @@ private:
             "#"+std::to_string(_desc.getId())+":SAT:mal", streamId, true, wrapper->stream.getSynchronizer());
         wrapper->stream.addProcessor(wrapper->mallobProcessor);
 
-        // Add a stream processor that internally runs a single low-latency sequential solver
-        auto internalProcessor = new InternalSatJobStreamProcessor(true, wrapper->stream.getSynchronizer());
-        wrapper->stream.addProcessor(internalProcessor);
+        if (_params.internalStreamProcessor()) {
+            // Add a stream processor that internally runs a single low-latency sequential solver
+            auto internalProcessor = new InternalSatJobStreamProcessor(true, wrapper->stream.getSynchronizer());
+            wrapper->stream.addProcessor(internalProcessor);
+        }
 
         // Set the terminator for the stream
         wrapper->stream.setTerminator([&, wrapper=wrapper.get()]() {
@@ -213,7 +240,8 @@ private:
 
     // Submit a formula together with the specified cube to the specified (idle!) SatJobStream.
     void submitCube(const std::vector<int>& cube, SatJobStream& stream) {
-        std::vector<int> formula = _base_formula;
+        std::vector<int> formula;
+        if (stream.getRevision() == -1) formula = _base_formula;
         stream.solveNonblocking(std::move(formula), cube);
     }
 

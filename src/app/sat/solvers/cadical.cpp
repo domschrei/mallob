@@ -51,6 +51,8 @@ Cadical::Cadical(const SolverSetup& setup)
 		LOGGER(_logger, V3_VERB, "will write profiling to %s\n", profileFileString.c_str());
 	}
 
+	bool okay = solver->set("quiet", 1); assert(okay); // no messy logging output
+
 	// In certified UNSAT mode?
 	if (setup.certifiedUnsat) {
 
@@ -62,7 +64,6 @@ Cadical::Cadical(const SolverSetup& setup)
 			solverRank, maxNumSolvers, getDiversificationIndex(), setup.numOriginalClauses, setup.nbSkippedIdEpochs,
 			descriptor);
 
-		bool okay;
 		okay = solver->set("lrat", 1); assert(okay); // enable LRAT proof logging
 		okay = solver->set("lratsolverid", solverRank); assert(okay); // set this solver instance's ID
 		okay = solver->set("lratsolvercount", maxNumSolvers); assert(okay); // set # solvers
@@ -279,6 +280,11 @@ int Cadical::getVariablesCount() {
 
 int Cadical::getSplittingVariable() {
 	return solver->lookahead();
+}
+std::vector<std::vector<int>> Cadical::cube(int depth, int& status) {
+	auto result = solver->generate_cubes(depth, 1);
+	status = result.status;
+	return std::move(result.cubes);
 }
 
 void Cadical::writeStatistics(SolverStatistics& stats) {

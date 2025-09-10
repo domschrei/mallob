@@ -121,12 +121,14 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	const int divOffsetPrefix = appConfig.map.count(keyPrefix) ? atoi(appConfig.map[keyPrefix].c_str()) : 0;
 	const int divOffsetCycle = appConfig.map.count(keyCycle) ? atoi(appConfig.map[keyCycle].c_str()) : 0;
 	// Read # clauses and # vars from app config
-	int numClauses, numVars;
+	int numClauses, numVars, epochOffset;
 	std::vector<std::pair<int*, std::string>> fields {
 		{&numClauses, "__NC"},
-		{&numVars, "__NV"}
+		{&numVars, "__NV"},
+		{&epochOffset, "__EO"}
 	};
 	for (auto [out, id] : fields) {
+		if (!appConfig.map.count(id)) continue;
 		std::string str = appConfig.map[id];
 		while (str[str.size()-1] == '.') 
 			str.resize(str.size()-1);
@@ -249,7 +251,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.numOriginalClauses = numClauses;
 	setup.proofDir = proofDirectory;
 	LratConnector* modelCheckingLratConnector {nullptr};
-	setup.nbSkippedIdEpochs = std::max(0, config.nbPreviousBalancingEpochs);
+	setup.nbSkippedIdEpochs = std::max(0, epochOffset + config.nbPreviousBalancingEpochs);
 	if (params.satProfilingLevel() >= 0) {
 		setup.profilingBaseDir = params.satProfilingDir();
 		if (setup.profilingBaseDir.empty()) setup.profilingBaseDir = TmpDir::getGeneralTmpDir();

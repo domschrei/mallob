@@ -5,6 +5,7 @@
 #include <cmath>
 
 #include "app/sat/data/clause_metadata.hpp"
+#include "app/sat/proof/trusted_checker_process_adapter.hpp"
 #include "app/sat/sharing/adaptive_import_manager.hpp"
 #include "app/sat/sharing/ring_buffer_import_manager.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
@@ -67,22 +68,23 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 	if (_setup.onTheFlyChecking || _setup.onTheFlyCheckModel) {
 		// Yes. Is this the thread that needs to create *the* model-checking LRAT connector?
 		bool createModelCheckingLratConn = _setup.onTheFlyCheckModel && !_setup.modelCheckingLratConnector;
+		TrustedCheckerProcessAdapter::TrustedCheckerProcessSetup chkSetup {
+			_logger, _setup.baseSeed, _setup.jobId,
+			_setup.globalId, _setup.localId, true
+		};
 		// Does this thread in particular run in certified UNSAT mode?
 		if (_setup.onTheFlyChecking) {
 			// Yes: ALWAYS create your own LRAT connector. Have it support checking of models
 			// ONLY IF desired and there is no pre-created LRATConnector instance for this purpose.
 			LOGGER(_logger, V3_VERB, "Creating full LratConnector%s\n", createModelCheckingLratConn?" with checking models":"");
-			_lrat = new LratConnector(_logger, _setup.baseSeed, _setup.localId, _setup.numVars,
-				createModelCheckingLratConn
-			);
+			chkSetup.checkModel = createModelCheckingLratConn;
+			_lrat = new LratConnector(chkSetup);
 			if (createModelCheckingLratConn) _setup.modelCheckingLratConnector = _lrat;
 		} else {
 			// No: only create a model-checking LRATConnector if it is not precreated yet.
 			if (createModelCheckingLratConn) {
 				LOGGER(_logger, V3_VERB, "Creating dedicated LratConnector for checking models\n");
-				_setup.modelCheckingLratConnector = new LratConnector(
-					_logger, _setup.baseSeed, _setup.localId, _setup.numVars, true
-				);
+				_setup.modelCheckingLratConnector = new LratConnector(chkSetup);
 				_setup.owningModelCheckingLratConnector = true;
 			}
 		}

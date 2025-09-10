@@ -81,6 +81,7 @@ public:
 	
 	// Get a variable suitable for search splitting
 	int getSplittingVariable() override;
+	std::vector<std::vector<int>> cube(int depth, int& status);
 
 	// Get solver statistics
 	void writeStatistics(SolverStatistics& stats) override;
