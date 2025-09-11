@@ -49,6 +49,8 @@ public:
     bool appl_isDestructible() override {return true;}
     void appl_memoryPanic() override {}
 
+    friend void search_work_in_tree(void* SweepJob_state, unsigned **work, unsigned *work_size);
+
 private:
     void advanceSweepMessage(JobMessage& msg);
     static std::vector<int> aggregateContributions(std::list<std::vector<int>> &contribs);
@@ -59,7 +61,8 @@ private:
     void callback_for_broadcast_ping();
     void tryExtractResult();
 
-    bool steal_from_local_solver();
+    bool steal_from_this_solver();
+    void searchWorkInTree(unsigned **work, unsigned *work_size);
 
 };
 

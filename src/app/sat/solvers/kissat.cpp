@@ -28,30 +28,21 @@ extern "C" {
 void produce_clause(void* state, int size, int glue) {
     ((Kissat*) state)->produceClause(size, glue);
 }
-void produce_equivalence(void *state) {
-    ((Kissat*) state)->produceEquivalence();
-}
-
-
-
 void consume_clause(void* state, int** clause, int* size, int* glue) {
     ((Kissat*) state)->consumeClause(clause, size, glue);
 }
-void consume_equivalence(void* state, int** equivalence) {
-    ((Kissat*) state)->consumeEquivalence(equivalence);
+
+
+void pass_eq_up(void *state) {
+    ((Kissat*) state)->passEqUp();
+}
+void pass_eqs_down(void* state, int** equivalence, unsigned *eq_count) {
+    ((Kissat*) state)->passEqsDown(equivalence, eq_count);
 }
 
 
-void shweep_solver_searches_work(void *state, unsigned **work, char **done, unsigned *size) {
-    ((Kissat*) state)->shweep_solverSearchesWork(work, done, size);
-}
-
-// void shweep_ts_stolen_work(void *state, unsigned **work, unsigned *size) {
-    // ((Kissat*) state)-> shweep_ts_StolenWork(work, size);
-// }
-
-// void shweep_ts_stolen_done(void *state, char **done, unsigned *size) {
-    // ((Kissat*) state)-> shweep_ts_StolenDone(done, size);
+// void shweep_solver_searches_work(void *state, unsigned **work, unsigned *size) {
+    // ((Kissat*) state)->shweep_solverSearchesWork(work, size);
 // }
 
 
@@ -74,11 +65,11 @@ void report_preprocessed_lit(void* state, int lit) {
 Kissat::Kissat(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup), solver(kissat_init()),
         learntClauseBuffer(_setup.strictMaxLitsPerClause+ClauseMetadata::numInts()),
-        learntEquivalenceBuffer(2),  //pass two literals
-        producedEquivalenceBuffer(2) //pass two literals
+        pass_eq_up_buffer(2)  //pass two literals
+        // producedEquivalenceBuffer(2) //pass two literals
 {
-    stored_equivalences_to_share.reserve(MAX_STORED_EQUIVALENCES_SIZE);
-    stored_equivalences_to_import.reserve(MAX_STORED_EQUIVALENCES_SIZE);
+    eqs_to_share.reserve(MAX_STORED_EQUIVALENCES_SIZE);
+    eqs_to_pass_down.reserve(MAX_STORED_EQUIVALENCES_SIZE);
     kissat_set_terminate(solver, this, &terminate_callback);
     glueLimit = _setup.strictLbdLimit;
 }
@@ -415,13 +406,13 @@ void Kissat::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
 }
 
 
-void Kissat::activateLearnedEquivalenceCallbacks() {
-    swissat_set_equivalence_export_callback(solver, this, learntEquivalenceBuffer.data(), &produce_equivalence);
-    swissat_set_equivalence_import_callback(solver, this, &consume_equivalence);
+void Kissat::activateEqImportExportCallbacks() {
+    shweep_set_equivalence_export_callback(solver, this, pass_eq_up_buffer.data(), &pass_eq_up);
+    shweep_set_equivalence_import_callback(solver, this, &pass_eqs_down);
 }
 
-void Kissat::set_shweep_callbacks() {
-    shweep_set_steal_some_work_callback(solver, this, &shweep_solver_searches_work);
+void Kissat::shweep_SetSearchWorkCallback(void *SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, unsigned *work_size)) {
+    shweep_set_search_work_callback(solver, SweepJob_state, search_callback);
 }
 
 
@@ -438,17 +429,6 @@ void Kissat::produceClause(int size, int lbd) {
     callback(learntClause, _setup.localId);
 }
 
-void Kissat::produceEquivalence() {
-    int lit1 = learntEquivalenceBuffer[0];
-    int lit2 = learntEquivalenceBuffer[1];
-    if (stored_equivalences_to_share.size() < MAX_STORED_EQUIVALENCES_SIZE) {
-        stored_equivalences_to_share.push_back(lit1);
-        stored_equivalences_to_share.push_back(lit2);
-        // printf("ß Stored Eq (%i, %i) \n", lit1, lit2);
-    } else  {
-        printf("ß Not enough space to store Eq for sharing, reached limit %lu \n",stored_equivalences_to_share.size());
-    }
-}
 
 void Kissat::consumeClause(int** clause, int* size, int* lbd) {
     Mallob::Clause c;
@@ -468,21 +448,27 @@ void Kissat::consumeClause(int** clause, int* size, int* lbd) {
 }
 
 
-void Kissat::consumeEquivalence(int **equivalence) {
-    if (stored_equivalences_to_import.empty()) {
-       *equivalence = 0;
-        // LOGGER(_logger, V3_VERB, "polling ended \n ");
-    } else {
-        if (stored_equivalences_to_import.size()%200==0) {
-            LOGGER(_logger, V3_VERB, "importing equivalences, remain %lu\n ", stored_equivalences_to_import.size()/2);
-        }
-        producedEquivalenceBuffer[0] = stored_equivalences_to_import.back(); stored_equivalences_to_import.pop_back();
-        producedEquivalenceBuffer[1] = stored_equivalences_to_import.back(); stored_equivalences_to_import.pop_back();
-        *equivalence = producedEquivalenceBuffer.data();
+void Kissat::passEqUp() {
+    int lit1 = pass_eq_up_buffer[0];
+    int lit2 = pass_eq_up_buffer[1];
+    if (eqs_to_share.size() < MAX_STORED_EQUIVALENCES_SIZE) {
+        eqs_to_share.push_back(lit1);
+        eqs_to_share.push_back(lit2);
+        // printf("ß Stored Eq (%i, %i) \n", lit1, lit2);
+    } else  {
+        printf("ß Not enough space to store Eq for sharing, reached limit %lu \n",eqs_to_share.size());
     }
 }
 
-void Kissat::shweep_solverSearchesWork(unsigned **work, char **done, unsigned *size) {
+void Kissat::passEqsDown(int **equivalence, unsigned *eq_count) {
+    *equivalence = eqs_to_pass_down.data();
+    *eq_count = eqs_to_pass_down.size();
+    //todo: care that eqs_to_pass_down is not changed during the import reading & propagating...
+}
+
+void Kissat::shweep_solverSearchesWork(unsigned **work, unsigned *size) {
+
+
     //todo: steal work from a random other Jobs in the Job-Tree
     //point work and done on this stolen data
 }

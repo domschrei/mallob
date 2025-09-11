@@ -7,12 +7,22 @@
 
 #define SWEEP_COMM_TYPE 2
 
+
 SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table)
     : Job(params, setup, table) {
         assert(_params.jobCommUpdatePeriod() > 0 || log_return_false("[ERROR] For this application to work,"
             " you must explicitly enable job communicators with the -jcup option, e.g., -jcup=0.1\n"));
 }
 
+
+void search_work_in_tree(void *SweepJob_state, unsigned **work, unsigned *work_size) {
+    ((SweepJob*) SweepJob_state)->searchWorkInTree(work, work_size);
+}
+
+void SweepJob::searchWorkInTree(unsigned **work, unsigned *work_size) {
+
+
+}
 
 void SweepJob::appl_start() {
 	_my_rank = getJobTree().getRank();
@@ -35,8 +45,8 @@ void SweepJob::appl_start() {
 	_swissat->set_option("mallob_custom_sweep_verbosity", 1); //0: No custom messages. 1: Some. 2: Verbose
 	_swissat->set_option("mallob_solver_count", NUM_WORKERS);
 	_swissat->set_option("mallob_solver_id", _my_index);
-	_swissat->activateLearnedEquivalenceCallbacks();
-	_swissat->set_shweep_callbacks();
+	_swissat->activateEqImportExportCallbacks();
+	_swissat->shweep_SetSearchWorkCallback(this, &search_work_in_tree);
 
     // Basic configuration options for all solvers
     _swissat->set_option("quiet", 1); // suppress any standard kissat output
@@ -128,13 +138,13 @@ void SweepJob::appl_communicate() {
 	if (can_start && getVolume() == NUM_WORKERS && getJobComm().getWorldRankOrMinusOne(NUM_WORKERS-1) >= 0) {
 		// LOG(V3_VERB, "ß appl_communicate full volume \n");
 
-		LOG(V3_VERB, "ß have %i \n", _swissat->stored_equivalences_to_share.size());
+		LOG(V3_VERB, "ß have %i \n", _swissat->eqs_to_share.size());
 		bool reset_red = false;
 		if (_red && _red->hasResult()) {
 			//store the received equivalences such that the local solver than eventually import them
 			auto share_received = _red->extractResult();
 			LOG(V3_VERB, "ß --- Received Broadcast Result, Extracted Size %i --- \n", share_received.size());
-			auto& local_store = _swissat->stored_equivalences_to_import;
+			auto& local_store = _swissat->eqs_to_pass_down;
 			local_store.reserve(local_store.size() + share_received.size());
 			local_store.insert(
 				local_store.end(),
@@ -161,8 +171,8 @@ void SweepJob::appl_communicate() {
 			_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateContributions));
 			_red->careAboutParentStatus();
 			_red->tellChildrenParentIsReady();
-			LOG(V3_VERB, "ß contributing %i\n", _swissat->stored_equivalences_to_share.size());
-			_red->contribute(std::move(_swissat->stored_equivalences_to_share));
+			LOG(V3_VERB, "ß contributing %i\n", _swissat->eqs_to_share.size());
+			_red->contribute(std::move(_swissat->eqs_to_share));
 			if (parent_was_ready) {
 				_red->enableParentIsReady();
 			}
@@ -225,7 +235,7 @@ void SweepJob::callback_for_broadcast_ping() {
 	JobMessage baseMsg = getMessageTemplate();
 	baseMsg.tag = ALLRED;
 	_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateContributions));
-	_red->contribute(std::move(_swissat->stored_equivalences_to_share));
+	_red->contribute(std::move(_swissat->eqs_to_share));
 }
 
 
@@ -288,22 +298,19 @@ void SweepJob::advanceSweepMessage(JobMessage& msg) {
 #endif
 }
 
-bool SweepJob::steal_from_local_solver() {
+bool SweepJob::steal_from_this_solver() {
 	//We dont know how much there is to steal, so we ask
 	size_t steal_amount = shweep_get_steal_amount(_swissat->solver);
 	if (steal_amount == 0)
 		return false;
-	//Allocate memory on C++ side, easier
+	//There is something to steal, allocate memory for it
 	_swissat->stolen_work.resize(steal_amount);
-	//The "done" array has always the same size, so we only need to initialize it once
-	if (_swissat->stolen_done.empty()) {
-		unsigned max_idx = kissat_get_max_var_idx(_swissat->solver);
-		_swissat->stolen_done.resize(max_idx);
-	}
-	//now both arrays are allocated, can steal half the workload
-	shweep_steal_from_this_solver(_swissat->solver, _swissat->stolen_work.data(), _swissat->stolen_done.data(), steal_amount);
+	//the local solver now copies half its work into stolen_work[]
+	shweep_steal_from_this_solver(_swissat->solver, _swissat->stolen_work.data(), steal_amount);
 	return true;
 }
+
+
 
 void SweepJob::loadFormulaToSwissat() {
 	const int* lits = getDescription().getFormulaPayload(0);

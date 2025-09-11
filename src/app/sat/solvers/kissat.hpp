@@ -11,6 +11,7 @@
 #include "kissat/src/kissat.h"
 #include "util/sys/threading.hpp"
 
+
 struct kissat;
 struct SolverSetup;
 struct SolverStatistics;
@@ -29,10 +30,10 @@ private:
     std::vector<int> producedClause;
 
 	//For shared equivalence sweeping
-	std::vector<int> learntEquivalenceBuffer;    //transfer a single equivalence up (from kissat to Mallob::Kissat)
-    std::vector<int> producedEquivalenceBuffer;  //transfer a single equivalence down (from Mallob::Kissat to kissat)
-    std::vector<int> stored_equivalences_to_share; //accumulate exported equivalences from local solver, to share
-    std::vector<int> stored_equivalences_to_import; //accumulate share-received equivalences, to import in local solver
+	std::vector<int> pass_eq_up_buffer;    //transfer a single equivalence up (from kissat to Mallob::Kissat)
+    // std::vector<int> producedEquivalenceBuffer;  //transfer a single equivalence down (from Mallob::Kissat to kissat)
+    std::vector<int> eqs_to_share; //accumulate exported equivalences from local solver, to share
+    std::vector<int> eqs_to_pass_down; //accumulate share-received equivalences, to import in local solver
 	const int MAX_STORED_EQUIVALENCES = 10000;
 	const int MAX_STORED_EQUIVALENCES_SIZE = MAX_STORED_EQUIVALENCES * 2;
 	friend class SweepJob;
@@ -78,7 +79,7 @@ public:
 	void setLearnedClauseCallback(const LearnedClauseCallback& callback) override;
 
 	// Set a function that should be called for each learned equivalence by sweeping
-	void activateLearnedEquivalenceCallbacks();
+	void activateEqImportExportCallbacks();
 
 	
 	// Get the number of variables of the formula
@@ -102,14 +103,15 @@ public:
     friend void produce_clause(void* state, int size, int glue);
     friend void consume_clause(void* state, int** clause, int* size, int* lbd);
 
-	friend void produce_equivalence(void *state);
-	friend void consume_equivalence(void* state, int** equivalence);
+	friend void pass_eq_up(void *state);
+	friend void pass_eqs_down(void* state, int** equivalence, unsigned *eq_count);
 
 	//Distributed Shared Sweeping
 	// friend void shweep_ts_stolen_work(void *state, unsigned **work, unsigned *size);
 	// friend void shweep_ts_stolen_done(void *state, char **done, unsigned *size);
-	friend void shweep_solver_searches_work(void *state, unsigned **work, char **done, unsigned *size);
-	void set_shweep_callbacks();
+	// friend void shweep_solver_searches_work(void *JSstate, unsigned **work, unsigned *size);
+
+	void shweep_SetSearchWorkCallback(void* SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, unsigned *work_size));
 
 
 
@@ -128,11 +130,11 @@ private:
     void produceClause(int size, int lbd);
     void consumeClause(int** clause, int* size, int* lbd);
 
-	void produceEquivalence();
-	void consumeEquivalence(int** equivalence);
+	void passEqUp();
+	void passEqsDown(int** equivalence, unsigned *eq_count);
 
 	//Shweep
-	void shweep_solverSearchesWork(unsigned **work, char **done, unsigned *size);
+	// void shweep_solverSearchesWork(unsigned **work, unsigned *size);
 
     bool isPreprocessingAcceptable(int vars, int cls);
     void addLiteralFromPreprocessing(int lit);
