@@ -59,14 +59,12 @@ public:
         if (createSourceAsPipe) mkfifo(source, 0666);
 
         Parameters params;
-        params.formulaInput.set(source);
-        params.fifoParsedFormula.set(_path_parsed_formula);
-
         unsigned long keySeed = ImpCheck::getKeySeed(_base_seed);
-        std::string moreArgs = "-key-seed=" + std::to_string(keySeed);
-        moreArgs += " -input-log=parser-input." + std::to_string(_id) + ".txt";
-
-        _subproc = new Subprocess(params, "impcheck_parse", moreArgs);
+        std::string moreArgs = "-key-seed=" + std::to_string(keySeed)
+            + " -formula=" + source
+            + " -output=" + _path_parsed_formula
+            + " -input-log=parser-input." + std::to_string(_id) + ".txt";
+        _subproc = new Subprocess(params, "impcheck_parse", moreArgs, false);
         _child_pid = _subproc->start();
         // Non-blocking reading so that we can read until the end of an increment
         int fd = open(_path_parsed_formula.c_str(), O_RDONLY | O_NONBLOCK);

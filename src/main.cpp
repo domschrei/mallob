@@ -120,7 +120,7 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
                 assert(params.logDirectory.isSet());
                 std::string appCmd = fetcher.get(params.clientApplication());
                 //+ " 2>&1 > " + params.logDirectory() + "/clientapp." + std::to_string(i);
-                Subprocess subproc(params, appCmd);
+                Subprocess subproc(params, appCmd, false);
                 pid_t res = subproc.start();
             });
         }

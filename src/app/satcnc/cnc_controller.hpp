@@ -26,6 +26,7 @@ private:
     std::vector<int> _base_formula;
 
     float _start_time;
+    int _status {0};
 
     static int getNextStreamId() {
         static int _stream_id = 1;
@@ -60,7 +61,11 @@ public:
         ::random_shuffle(cubes.data(), cubes.size()); // shuffle randomly
         int nbGeneratedCubes = cubes.size();
         int nbUnsatCubes = 0; // track number of cubes found UNSAT so far
-        LOG(V2_INFO, "CNC generated %i cubes\n", nbGeneratedCubes);
+        LOG(V2_INFO, "CNC generated %i cubes, status=%i\n", nbGeneratedCubes, _status);
+        if (_status != 0) {
+            res.result = _status;
+            return res;
+        }
 
         // Set up up to four SAT job streams, but no more than the global number of processes
         std::vector<std::unique_ptr<WrappedSatJobStream>> streams;
@@ -168,8 +173,7 @@ private:
             solver->diversify(0);
             for (int lit : _base_formula) solver->addLiteral(lit);
 
-            int status;
-            std::vector<std::vector<int>> cubes = solver->cube(depth, status);
+            std::vector<std::vector<int>> cubes = solver->cube(depth, _status);
             return cubes;
         }
 

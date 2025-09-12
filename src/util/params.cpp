@@ -148,7 +148,7 @@ std::string Parameters::getParamsAsString() const {
     return out;
 }
 
-std::string Parameters::getSubprocCommandAsString(const char* execName) const {
+std::string Parameters::getSubprocCommandAsString(const char* execName, bool appendOptions) const {
 
     std::string out;
 
@@ -161,8 +161,10 @@ std::string Parameters::getSubprocCommandAsString(const char* execName) const {
     // Executable name
     out += execName + std::string(" ");
     // Options
-    for (const auto& [id, opt] : _global_map) if (!opt->getValAsString().empty()) {
-        out += ("-" + id + "=" + opt->getValAsString()) + " ";
+    if (appendOptions) {
+        for (const auto& [id, opt] : _global_map) if (!opt->getValAsString().empty()) {
+            out += ("-" + id + "=" + opt->getValAsString()) + " ";
+        }
     }
 
     return out.substr(0, out.size()-1);

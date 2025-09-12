@@ -85,15 +85,13 @@ public:
         if (res != 0) abort();
 
         Parameters params;
-        params.fifoDirectives.set(_path_directives);
-        params.fifoFeedback.set(_path_feedback);
-        std::string moreArgs = "-lenient";
+        unsigned long keySeed = ImpCheck::getKeySeed(_base_seed);
+        std::string moreArgs = "-key-seed=" + std::to_string(keySeed)
+            + " -directives=" + _path_directives
+            + " -feedback=" + _path_feedback; // + " -lenient";
         if (_check_model) moreArgs += " -check-model";
 
-        unsigned long keySeed = ImpCheck::getKeySeed(_base_seed);
-        moreArgs += " -key-seed=" + std::to_string(keySeed);
-
-        _subproc = new Subprocess(params, "impcheck_check", moreArgs);
+        _subproc = new Subprocess(params, "impcheck_check", moreArgs, false);
         _child_pid = _subproc->start();
 
         _f_directives = fopen(_path_directives.c_str(), "w");

@@ -118,7 +118,7 @@ void SatProcessAdapter::doInitialize() {
         {pipeChildToParent, _hsm->pipeBufSize, true}, true));
 
     // Create SAT solving child process
-    Subprocess subproc(_params, "mallob_sat_process");
+    Subprocess subproc(_params, "mallob_sat_process", true);
     pid_t res = subproc.start();
 
     // Set up a watchdog
