@@ -39,7 +39,8 @@ SolverThread::SolverThread(const Parameters& params, const SatProcessConfig& con
     _portfolio_size = config.mpisize;
     _local_solvers_count = config.threads;
 
-    appendRevision(0, firstRevision);
+    if (firstRevision.fLits)
+        appendRevision(0, firstRevision);
     _result.result = UNKNOWN;
 
     if (_lrat && _params.derivationErrorChancePerMille() > 0) {
