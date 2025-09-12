@@ -22,6 +22,18 @@ private:
     std::future<void> _fut_swissat;
     std::atomic_int _swissat_running_count {0};
 
+    int shweep_state;
+    const int SHWEEP_STATE_WORKING{0};
+    const int SHWEEP_STATE_IDLE{1};
+
+    const int TAG_SEARCHING_WORK{1};
+    const int TAG_SUCCESSFUL_WORK_STEAL{2};
+    const int TAG_UNSUCCESSFUL_WORK_STEAL{3};
+
+    bool formula_initially_provided=false;
+    bool got_steal_response=false;
+    // std::vector<unsigned> stolen_work;
+
 
     std::unique_ptr<JobTreeBroadcast> _bcast;
     std::unique_ptr<JobTreeAllReduction> _red;
@@ -49,7 +61,7 @@ public:
     bool appl_isDestructible() override {return true;}
     void appl_memoryPanic() override {}
 
-    friend void search_work_in_tree(void* SweepJob_state, unsigned **work, unsigned *work_size);
+    friend void search_work_in_tree(void* SweepJob_state, int **work, int *work_size);
 
 private:
     void advanceSweepMessage(JobMessage& msg);
@@ -61,7 +73,7 @@ private:
     void callback_for_broadcast_ping();
     void tryExtractResult();
 
-    bool steal_from_this_solver();
+    int steal_from_my_local_solver();
     void searchWorkInTree(unsigned **work, unsigned *work_size);
 
 };

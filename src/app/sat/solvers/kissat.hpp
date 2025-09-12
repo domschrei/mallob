@@ -38,8 +38,9 @@ private:
 	const int MAX_STORED_EQUIVALENCES_SIZE = MAX_STORED_EQUIVALENCES * 2;
 	friend class SweepJob;
 	//Update stuff for sweep sharing
-	std::vector<unsigned> stolen_work;
-	std::vector<char> stolen_done;
+	std::vector<unsigned> work_stolen_locally;
+	std::vector<unsigned> my_work;
+	// std::vector<char> stolen_done;
 
 
 	bool interruptionInitialized = false;

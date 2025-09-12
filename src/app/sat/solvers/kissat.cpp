@@ -466,13 +466,6 @@ void Kissat::passEqsDown(int **equivalence, unsigned *eq_count) {
     //todo: care that eqs_to_pass_down is not changed during the import reading & propagating...
 }
 
-void Kissat::shweep_solverSearchesWork(unsigned **work, unsigned *size) {
-
-
-    //todo: steal work from a random other Jobs in the Job-Tree
-    //point work and done on this stolen data
-}
-
 
 
 int Kissat::getVariablesCount() {

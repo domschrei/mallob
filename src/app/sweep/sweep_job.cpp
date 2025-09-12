@@ -15,14 +15,11 @@ SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTa
 }
 
 
-void search_work_in_tree(void *SweepJob_state, unsigned **work, unsigned *work_size) {
+void search_work_in_tree(void *SweepJob_state, int **work, int *work_size) {
     ((SweepJob*) SweepJob_state)->searchWorkInTree(work, work_size);
 }
 
-void SweepJob::searchWorkInTree(unsigned **work, unsigned *work_size) {
 
-
-}
 
 void SweepJob::appl_start() {
 	_my_rank = getJobTree().getRank();
@@ -55,25 +52,7 @@ void SweepJob::appl_start() {
     _swissat->set_option("profile",3); // do detailed profiling how much time we spent where
 	_swissat->set_option("seed", 0);   // always start with the same seed
 
-	_swissat->set_option("mallob_shweep", 1); //Jumps directly to shared sweeping and deactivates everything else
-
-	// _swissat->set_option("sweep", 1); //We want sweeping
-	// _swissat->set_option("simplify", 1); //Activates probing, of which sweeping is a part of
-
-    // _swissat->set_option("factor", 0); //No bounded variable addition
-	// _swissat->set_option("eliminate", 0); //No Bounded Variable Elimination
-	// _swissat->set_option("substitute", 0); //No equivalent literal substitution (both obstruct import)
-
-	// _swissat->set_option("fastel", 0); //No fast elimination. Fast elimination sets import->eliminated = true, which interrupts further equivalence imports
-	//Technically, we could instead maybe also follow through with the eternal-to-internal literal import, and ignore the eliminated-flag
-	//since we then anyways translate that intermediate literal again via sweeper->repr[..] to a (hopefully) valid literal
-	//so temporarily having an eliminated literal might be ok if we only use it to index its valid representative literal...
-
-	// _swissat->set_option("lucky", 0);     //These operations do not obstruct sweep, but to keep everything simple we deactivate them for now
-	// _swissat->set_option("congruence", 0);
-	// _swissat->set_option("backbone", 0);
-	// _swissat->set_option("transitive", 0);
-	// _swissat->set_option("vivify", 0);
+	_swissat->set_option("mallob_shweep", 1); //Jumps directly to shared sweeping and bypasses everything else
 
 	//Initialize _red already here, to make sure that all processes have a valid reduction object
 	JobMessage baseMsg = getMessageTemplate();
@@ -192,26 +171,69 @@ void SweepJob::appl_communicate() {
 	}
 	#endif
 }
-	// LOG(V3_VERB, "ß appl_communicate end \n");
 
 
 
 // React to an incoming message. (This becomes relevant only if you send custom messages)
 void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
-#if SWEEP_COMM_TYPE == 1
-	//locally store equivalences received from sharing, for kissat to import them at will
-	auto &local_store = _swissat->stored_equivalences_to_import;
-	local_store.reserve(local_store.size() + msg.payload.size());
-	local_store.insert(local_store.end(), msg.payload.begin(), msg.payload.end());
-
-	if (_my_index == 0) {
-		LOG(V2_INFO, "[sweep] Rec %i  Chain ended, arrived back to root\n \n", msg.payload.size()/2);
-	} else {
-		advanceSweepMessage(msg);
+	LOG(V2_INFO, "Shweep rank %i: received custom message from source %i, mpiTag %i, msg.tag %i \n", _my_rank, source, mpiTag, msg.tag);
+	if (msg.tag == TAG_SEARCHING_WORK) {
+		if (steal_from_my_local_solver()>0) {
+			msg.payload = std::move(_swissat->work_stolen_locally);
+			msg.tag = TAG_SUCCESSFUL_WORK_STEAL;
+			LOG(V2_INFO, "Shweep rank %i: sending own work back to source %i \n", _my_rank, source);
+		} else {
+			LOG(V2_INFO, "Shweep rank %i: didn't have work to give to source %i\n", _my_rank, source);
+			msg.tag = TAG_UNSUCCESSFUL_WORK_STEAL;
+		}
+		getJobTree().send(source, MSG_SEND_APPLICATION_MESSAGE, msg);
 	}
-#endif
+	if (msg.tag == TAG_SUCCESSFUL_WORK_STEAL) {
+		LOG(V2_INFO, "Shweep rank %i: received work from source %i\n", _my_rank, source);
+		_swissat->my_work = std::move(msg.payload);
+		got_steal_response = true;
+	}
+	if (msg.tag == TAG_UNSUCCESSFUL_WORK_STEAL) {
+		LOG(V2_INFO, "Shweep rank %i: didnt receive any work from source %i\n", _my_rank, source);
+		got_steal_response = true;
+	}
 }
 
+
+void SweepJob::searchWorkInTree(unsigned **work, unsigned *work_size) {
+	shweep_state = SHWEEP_STATE_IDLE;
+	_swissat->my_work = {};
+
+	if (_my_rank == 0 && !formula_initially_provided) {
+
+	}
+
+	while (_swissat->my_work.empty()) {
+		int n = getVolume();
+		SplitMix64Rng _rng;
+		int rank = _rng.randomInRange(0,n);
+		got_steal_response = false;
+
+		JobMessage msg = getMessageTemplate();
+		msg.tag = TAG_SEARCHING_WORK;
+
+		getJobTree().send(rank, MSG_SEND_APPLICATION_MESSAGE, msg);
+		LOG(V2_INFO, "Rank %u asks rank %u for work\n", _my_index, rank);
+
+		while (!got_steal_response) {
+			usleep(100 /*0.1 millisecond*/);
+		}
+		if (!_swissat->my_work.empty()) {
+			shweep_state = SHWEEP_STATE_WORKING;
+			//Tell C/Kissat where it can read the new work
+			*work = _swissat->my_work.data();
+			*work_size = _swissat->my_work.size();
+			LOG(V2_INFO, "Rank %u asks rank %u for work: successfully stole %u work \n", _my_index, rank, _swissat->my_work.size());
+			break;
+		}
+		LOG(V2_INFO, "Rank %u asks rank %u for work: failed, no work either\n", _my_index, rank);
+	}
+}
 
 
 void SweepJob::tryBeginBroadcastPing() {
@@ -298,16 +320,15 @@ void SweepJob::advanceSweepMessage(JobMessage& msg) {
 #endif
 }
 
-bool SweepJob::steal_from_this_solver() {
+int SweepJob::steal_from_my_local_solver() {
 	//We dont know how much there is to steal, so we ask
 	size_t steal_amount = shweep_get_steal_amount(_swissat->solver);
 	if (steal_amount == 0)
-		return false;
-	//There is something to steal, allocate memory for it
-	_swissat->stolen_work.resize(steal_amount);
-	//the local solver now copies half its work into stolen_work[]
-	shweep_steal_from_this_solver(_swissat->solver, _swissat->stolen_work.data(), steal_amount);
-	return true;
+		return 0;
+	//There is something to steal, allocate memory for it, and pass it to kissat for filling
+	_swissat->work_stolen_locally.resize(steal_amount);
+	shweep_steal_from_this_solver(_swissat->solver, _swissat->work_stolen_locally.data(), steal_amount);
+	return steal_amount;
 }
 
 
