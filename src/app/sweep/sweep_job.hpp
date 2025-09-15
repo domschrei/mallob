@@ -18,9 +18,9 @@ private:
     bool _is_root{false};
     uint8_t* _metadata; //serialized description
 
-    std::shared_ptr<Kissat> _swissat;
-    std::future<void> _fut_swissat;
-    std::atomic_int _swissat_running_count {0};
+    std::shared_ptr<Kissat> _shweeper;
+    std::future<void> _fut_shweeper;
+    std::atomic_int _shweepers_running_count {0};
 
     int shweep_state;
     const int SHWEEP_STATE_WORKING{0};
@@ -30,7 +30,7 @@ private:
     const int TAG_SUCCESSFUL_WORK_STEAL{2};
     const int TAG_UNSUCCESSFUL_WORK_STEAL{3};
 
-    bool formula_initially_provided=false;
+    bool root_received_work=false;
     bool got_steal_response=false;
     // std::vector<unsigned> stolen_work;
 
@@ -61,12 +61,12 @@ public:
     bool appl_isDestructible() override {return true;}
     void appl_memoryPanic() override {}
 
-    friend void search_work_in_tree(void* SweepJob_state, int **work, int *work_size);
+    friend void search_work_in_tree(void* SweepJob_state, unsigned **work, unsigned *work_size);
 
 private:
     void advanceSweepMessage(JobMessage& msg);
     static std::vector<int> aggregateContributions(std::list<std::vector<int>> &contribs);
-    void loadFormulaToSwissat();
+    void loadFormulaToShweeper();
 
 
     void tryBeginBroadcastPing();

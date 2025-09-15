@@ -36,10 +36,17 @@ void consume_clause(void* state, int** clause, int* size, int* glue) {
 void pass_eq_up(void *state) {
     ((Kissat*) state)->passEqUp();
 }
-void pass_eqs_down(void* state, int** equivalence, unsigned *eq_count) {
+void pass_eqs_down(void* state, int** equivalence, int *eq_count) {
     ((Kissat*) state)->passEqsDown(equivalence, eq_count);
 }
 
+void pass_unit_up(void *state, int unit) {
+    ((Kissat*) state)->passUnitUp(unit);
+}
+
+void pass_units_down(void *state, int **units, int *unit_count) {
+    ((Kissat*) state)->passUnitsDown(units, unit_count);
+}
 
 // void shweep_solver_searches_work(void *state, unsigned **work, unsigned *size) {
     // ((Kissat*) state)->shweep_solverSearchesWork(work, size);
@@ -65,11 +72,13 @@ void report_preprocessed_lit(void* state, int lit) {
 Kissat::Kissat(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup), solver(kissat_init()),
         learntClauseBuffer(_setup.strictMaxLitsPerClause+ClauseMetadata::numInts()),
-        pass_eq_up_buffer(2)  //pass two literals
+        eq_up_buffer(2)  //pass two literals
         // producedEquivalenceBuffer(2) //pass two literals
 {
-    eqs_to_share.reserve(MAX_STORED_EQUIVALENCES_SIZE);
-    eqs_to_pass_down.reserve(MAX_STORED_EQUIVALENCES_SIZE);
+    eqs_to_share.reserve(MAX_SHWEEP_STORAGE_SIZE);
+    eqs_to_pass_down.reserve(MAX_SHWEEP_STORAGE_SIZE);
+    units_to_share.reserve(MAX_SHWEEP_STORAGE_SIZE);
+    units_to_pass_down.reserve(MAX_SHWEEP_STORAGE_SIZE);
     kissat_set_terminate(solver, this, &terminate_callback);
     glueLimit = _setup.strictLbdLimit;
 }
@@ -406,12 +415,14 @@ void Kissat::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
 }
 
 
-void Kissat::activateEqImportExportCallbacks() {
-    shweep_set_equivalence_export_callback(solver, this, pass_eq_up_buffer.data(), &pass_eq_up);
+void Kissat::shweep_set_importexport_callbacks() {
+    shweep_set_equivalence_export_callback(solver, this, eq_up_buffer.data(), &pass_eq_up);
     shweep_set_equivalence_import_callback(solver, this, &pass_eqs_down);
+    shweep_set_unit_export_callback(solver, this, &pass_unit_up);
+    shweep_set_unit_import_callback(solver, this, &pass_units_down);
 }
 
-void Kissat::shweep_SetSearchWorkCallback(void *SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, unsigned *work_size)) {
+void Kissat::shweep_set_workstealing_callback(void *SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, unsigned *work_size)) {
     shweep_set_search_work_callback(solver, SweepJob_state, search_callback);
 }
 
@@ -449,9 +460,9 @@ void Kissat::consumeClause(int** clause, int* size, int* lbd) {
 
 
 void Kissat::passEqUp() {
-    int lit1 = pass_eq_up_buffer[0];
-    int lit2 = pass_eq_up_buffer[1];
-    if (eqs_to_share.size() < MAX_STORED_EQUIVALENCES_SIZE) {
+    int lit1 = eq_up_buffer[0];
+    int lit2 = eq_up_buffer[1];
+    if (eqs_to_share.size() < MAX_SHWEEP_STORAGE_SIZE) {
         eqs_to_share.push_back(lit1);
         eqs_to_share.push_back(lit2);
         // printf("ß Stored Eq (%i, %i) \n", lit1, lit2);
@@ -460,12 +471,30 @@ void Kissat::passEqUp() {
     }
 }
 
-void Kissat::passEqsDown(int **equivalence, unsigned *eq_count) {
-    *equivalence = eqs_to_pass_down.data();
-    *eq_count = eqs_to_pass_down.size();
-    //todo: care that eqs_to_pass_down is not changed during the import reading & propagating...
+void Kissat::passEqsDown(int **equivalence, int *eq_count) {
+    if (shweep_eq_import_available) {
+        *equivalence = eqs_to_pass_down.data();
+        *eq_count = eqs_to_pass_down.size();
+        shweep_eq_import_available = false;
+    } else {
+        *eq_count = 0;
+    }
+
 }
 
+void Kissat::passUnitUp(int unit) {
+    units_to_share.push_back(unit);
+}
+
+void Kissat::passUnitsDown(int **units, int *unit_count) {
+    if (shweep_unit_import_available) {
+        *units = units_to_pass_down.data();
+        *unit_count = units_to_pass_down.size();
+        shweep_unit_import_available = false;
+    } else {
+        *unit_count = 0;
+    }
+}
 
 
 int Kissat::getVariablesCount() {
