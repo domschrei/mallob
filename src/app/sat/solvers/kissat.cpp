@@ -422,7 +422,7 @@ void Kissat::shweep_set_importexport_callbacks() {
     shweep_set_unit_import_callback(solver, this, &pass_units_down);
 }
 
-void Kissat::shweep_set_workstealing_callback(void *SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, unsigned *work_size)) {
+void Kissat::shweep_set_workstealing_callback(void *SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, int *work_size)) {
     shweep_set_search_work_callback(solver, SweepJob_state, search_callback);
 }
 

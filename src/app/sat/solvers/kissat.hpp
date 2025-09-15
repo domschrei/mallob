@@ -8,7 +8,10 @@
 #include "portfolio_solver_interface.hpp"
 #include "app/sat/data/clause.hpp"
 #include "app/sat/data/definitions.hpp"
+
+extern "C" {
 #include "kissat/src/kissat.h"
+}
 #include "util/sys/threading.hpp"
 
 
@@ -43,8 +46,8 @@ private:
 	const int MAX_SHWEEP_STORAGE_SIZE = 10000;
 	friend class SweepJob;
 	//Update stuff for sweep sharing
-	std::vector<unsigned> work_stolen_locally;
-	std::vector<unsigned> my_work;
+	std::vector<int> work_stolen_locally;
+	std::vector<int> my_work;
 	// std::vector<char> stolen_done;
 
 
@@ -121,7 +124,7 @@ public:
 	// friend void shweep_ts_stolen_done(void *state, char **done, unsigned *size);
 	// friend void shweep_solver_searches_work(void *JSstate, unsigned **work, unsigned *size);
 
-	void shweep_set_workstealing_callback(void* SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, unsigned *work_size));
+	void shweep_set_workstealing_callback(void* SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, int *work_size));
 
 
 

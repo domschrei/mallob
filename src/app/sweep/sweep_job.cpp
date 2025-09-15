@@ -15,7 +15,7 @@ SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTa
 }
 
 
-void search_work_in_tree(void *SweepJob_state, unsigned **work, unsigned *work_size) {
+void search_work_in_tree(void *SweepJob_state, unsigned **work, int *work_size) {
     ((SweepJob*) SweepJob_state)->searchWorkInTree(work, work_size);
 }
 
@@ -222,7 +222,7 @@ void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 }
 
 
-void SweepJob::searchWorkInTree(unsigned **work, unsigned *work_size) {
+void SweepJob::searchWorkInTree(unsigned **work, int *work_size) {
 	shweep_state = SHWEEP_STATE_IDLE;
 	_shweeper->my_work = {};
 
@@ -230,12 +230,12 @@ void SweepJob::searchWorkInTree(unsigned **work, unsigned *work_size) {
 	    //to know how much space we need to allocate for all variables, we assume that the maximum index of any variable corresponds to the total number of variables -1,
 	    //i.e. that there are no holes in the numbering. This is an assumption that standard Kissat makes all the time, so we also do it here
 		unsigned VARS = shweep_get_num_vars(_shweeper->solver);
-		std::vector<unsigned> init_work = std::vector<unsigned>(VARS);
+		std::vector<int> init_work = std::vector<int>(VARS);
 		for (int idx = 0; idx < VARS; idx++) {
 			init_work[idx] = idx;
 		}
 		_shweeper->my_work = init_work;
-		*work = _shweeper->my_work.data();
+		*work = reinterpret_cast<unsigned int*>(_shweeper->my_work.data());
 		*work_size = VARS;
 		root_received_work = true;
 		LOG(V2_INFO, "Shweep root %i requested work, provided all %u variables\n", _my_rank, VARS);
@@ -260,7 +260,7 @@ void SweepJob::searchWorkInTree(unsigned **work, unsigned *work_size) {
 		if (!_shweeper->my_work.empty()) {
 			shweep_state = SHWEEP_STATE_WORKING;
 			//Tell C/Kissat where it can read the new work
-			*work = _shweeper->my_work.data();
+			*work = reinterpret_cast<unsigned int*>(_shweeper->my_work.data());
 			*work_size = _shweeper->my_work.size();
 			LOG(V2_INFO, "Rank %u asks rank %u for work: successfully stole %u work \n", _my_index, rank, _shweeper->my_work.size());
 			break;
@@ -381,7 +381,7 @@ int SweepJob::steal_from_my_local_solver() {
 		return 0;
 	//There is something to steal, allocate memory for it, and pass it to kissat for filling
 	_shweeper->work_stolen_locally.resize(steal_amount);
-	shweep_steal_from_this_solver(_shweeper->solver, _shweeper->work_stolen_locally.data(), steal_amount);
+	shweep_steal_from_this_solver(_shweeper->solver, reinterpret_cast<unsigned int*>(_shweeper->work_stolen_locally.data()), steal_amount);
 	return steal_amount;
 }
 

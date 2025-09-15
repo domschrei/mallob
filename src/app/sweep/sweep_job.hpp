@@ -61,7 +61,7 @@ public:
     bool appl_isDestructible() override {return true;}
     void appl_memoryPanic() override {}
 
-    friend void search_work_in_tree(void* SweepJob_state, unsigned **work, unsigned *work_size);
+    friend void search_work_in_tree(void* SweepJob_state, unsigned **work, int *work_size);
 
 private:
     void advanceSweepMessage(JobMessage& msg);
@@ -74,7 +74,7 @@ private:
     void tryExtractResult();
 
     int steal_from_my_local_solver();
-    void searchWorkInTree(unsigned **work, unsigned *work_size);
+    void searchWorkInTree(unsigned **work, int *work_size);
 
 };
 
