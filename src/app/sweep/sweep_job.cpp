@@ -123,29 +123,29 @@ void SweepJob::appl_communicate() {
 		if (_red && _red->hasResult()) {
 			//store the received equivalences such that the local solver than eventually import them
 			auto share_received = _red->extractResult();
-			const int eq_size = share_received[share_received.size()-2];
-			const int unit_size = share_received[share_received.size()-1];
-			LOG(V3_VERB, "ß --- Received Broadcast Result, Extracted Size %i, of which %i eq_size, %i unit_size, 2 counters --- \n", share_received.size(), eq_size, unit_size);
+			const int received_eq_size = share_received[share_received.size()-2];
+			const int received_unit_size = share_received[share_received.size()-1];
+			LOG(V3_VERB, "ß --- Received Broadcast Result, Extracted Size %i, of which %i eq_size, %i unit_size, 2 counters --- \n", share_received.size(), received_eq_size, received_unit_size);
 
 			//save equivalences
-			auto& eqs_down = _shweeper->eqs_to_pass_down;
-			eqs_down.reserve(eqs_down.size() + eq_size);
-			eqs_down.insert(
-				eqs_down.end(),
+			auto& eqs_received = _shweeper->eqs_received_from_sharing;
+			eqs_received.reserve(eqs_received.size() + received_eq_size);
+			eqs_received.insert(
+				eqs_received.end(),
 				std::make_move_iterator(share_received.begin()),
-				std::make_move_iterator(share_received.begin() + eq_size)
+				std::make_move_iterator(share_received.begin() + received_eq_size)
 			);
 			//save units
-			auto& units_down = _shweeper->units_to_pass_down;
-			units_down.reserve(units_down.size() + unit_size);
-			units_down.insert(
-				units_down.end(),
-				std::make_move_iterator(share_received.begin() + eq_size),
+			auto& units_received = _shweeper->units_received_from_sharing;
+			units_received.reserve(units_received.size() + received_unit_size);
+			units_received.insert(
+				units_received.end(),
+				std::make_move_iterator(share_received.begin() + received_eq_size),
 				std::make_move_iterator(share_received.end()   - 2)
 			);
 			reset_red = true;
 			// parent_is_ready = _red->isParentReady();
-			LOG(V3_VERB, "ß Storing %i equivalences for local solver to import \n", eqs_down.size());
+			LOG(V3_VERB, "ß Now storing %i equivalences and %i units, for local solver to import \n", eqs_received.size()/2, units_received.size());
 		}
 
 		if (!started_sharing) { //triggers the very first construction

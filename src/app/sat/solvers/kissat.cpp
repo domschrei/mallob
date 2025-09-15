@@ -76,9 +76,9 @@ Kissat::Kissat(const SolverSetup& setup)
         // producedEquivalenceBuffer(2) //pass two literals
 {
     eqs_to_share.reserve(MAX_SHWEEP_STORAGE_SIZE);
-    eqs_to_pass_down.reserve(MAX_SHWEEP_STORAGE_SIZE);
+    eqs_received_from_sharing.reserve(MAX_SHWEEP_STORAGE_SIZE);
     units_to_share.reserve(MAX_SHWEEP_STORAGE_SIZE);
-    units_to_pass_down.reserve(MAX_SHWEEP_STORAGE_SIZE);
+    units_received_from_sharing.reserve(MAX_SHWEEP_STORAGE_SIZE);
     kissat_set_terminate(solver, this, &terminate_callback);
     glueLimit = _setup.strictLbdLimit;
 }
@@ -472,14 +472,10 @@ void Kissat::passEqUp() {
 }
 
 void Kissat::passEqsDown(int **equivalence, int *eq_count) {
-    if (shweep_eq_import_available) {
-        *equivalence = eqs_to_pass_down.data();
-        *eq_count = eqs_to_pass_down.size();
-        shweep_eq_import_available = false;
-    } else {
-        *eq_count = 0;
-    }
-
+    eqs_passed_down = std::move(eqs_received_from_sharing);
+    eqs_received_from_sharing.clear();
+    *equivalence = eqs_passed_down.data();
+    *eq_count = eqs_passed_down.size();
 }
 
 void Kissat::passUnitUp(int unit) {
@@ -487,13 +483,10 @@ void Kissat::passUnitUp(int unit) {
 }
 
 void Kissat::passUnitsDown(int **units, int *unit_count) {
-    if (shweep_unit_import_available) {
-        *units = units_to_pass_down.data();
-        *unit_count = units_to_pass_down.size();
-        shweep_unit_import_available = false;
-    } else {
-        *unit_count = 0;
-    }
+    units_passed_down = std::move(units_received_from_sharing);
+    units_received_from_sharing.clear();
+    *units = units_passed_down.data();
+    *unit_count = units_passed_down.size();
 }
 
 

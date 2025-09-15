@@ -32,11 +32,13 @@ private:
 	//Shweep
 	std::vector<int> eq_up_buffer;    //transfer a single equivalence up, from C to C++
     std::vector<int> eqs_to_share;    //accumulate exported equivalences for sharing
-    std::vector<int> eqs_to_pass_down;//accumulate received equivalences to import in local solver
+    std::vector<int> eqs_received_from_sharing;//accumulate received equivalences to import in local solver
+	std::vector<int> eqs_passed_down;
 	std::vector<int> units_to_share;
-	std::vector<int> units_to_pass_down;
-	bool shweep_eq_import_available;
-	bool shweep_unit_import_available;
+	std::vector<int> units_received_from_sharing;
+	std::vector<int> units_passed_down;
+	bool shweep_eq_imports_available;
+	bool shweep_unit_imports_available;
 	// const int MAX_STORED_EQUIVALENCES = 10000;
 	const int MAX_SHWEEP_STORAGE_SIZE = 10000;
 	friend class SweepJob;
