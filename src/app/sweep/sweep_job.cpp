@@ -99,9 +99,13 @@ void SweepJob::appl_communicate() {
 		if (_red && _red->hasResult()) {
 			//store the received equivalences such that the local solver than eventually import them
 			auto share_received = _red->extractResult();
-			const int received_eq_size = share_received[share_received.size()-2];
-			const int received_unit_size = share_received[share_received.size()-1];
-			LOG(V3_VERB, "ß --- Received Broadcast Result, Extracted Size %i, of which %i eq_size, %i unit_size, 2 counters --- \n", share_received.size(), received_eq_size, received_unit_size);
+			const int received_eq_size = share_received[share_received.size()-EQS_SIZE_POS];
+			const int received_unit_size = share_received[share_received.size()-UNITS_SIZE_POS];
+			const int all_searching_work = share_received[share_received.size()-SEARCH_STATUS_POS];
+			LOG(V3_VERB, "ß --- Received Broadcast Result, Extracted Size %i, of which %i eq_size, %i unit_size -- \n", share_received.size(), received_eq_size, received_unit_size);
+			if (all_searching_work) {
+				LOG(V3_VERB, "ß --- ALL SWEEPERS SEARCHING WORK - CAN TERMINATE -- \n");
+			}
 
 			//save equivalences
 			auto& eqs_received = _shweeper->eqs_received_from_sharing;
@@ -141,8 +145,11 @@ void SweepJob::appl_communicate() {
 			_red->tellChildrenParentIsReady();
 			LOG(V3_VERB, "ß contributing %i eqs size\n", _shweeper->eqs_to_share.size());
 			LOG(V3_VERB, "ß contributing %i units\n", _shweeper->units_to_share.size());
-			//Combine Equivalences and Units in single array and store how much space each takes
-			//Format: [Equivalences, Units, eq_size, unit_size]
+			LOG(V3_VERB, "ß contributing %i idle \n", _is_searching_work);
+			//Combine Equivalences and Units in single array
+			//also store how much space each takes, to quickly separate them without needing to search for the separator
+			//for termination, also store a boolean whether all children are idling
+			//Format: [Equivalences, Units, eq_size, unit_size, all_idle]
 			const int eq_size = _shweeper->eqs_to_share.size();
 			const int unit_size = _shweeper->units_to_share.size();
 			std::vector<int> EU = std::move(_shweeper->eqs_to_share);
@@ -150,6 +157,8 @@ void SweepJob::appl_communicate() {
 			std::move(_shweeper->units_to_share.begin(), _shweeper->units_to_share.end(), std::back_inserter(EU));
 			EU.push_back(eq_size);
 			EU.push_back(unit_size);
+			EU.push_back(_is_searching_work);
+			_shweeper->units_to_share.clear(); //because didn't move it!
 			LOG(V3_VERB, "ß contributing in total %i size \n", EU.size());
 			_red->contribute(std::move(EU));
 			if (parent_was_ready) {
@@ -193,7 +202,7 @@ void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 
 
 void SweepJob::searchWorkInTree(unsigned **work, int *work_size) {
-	shweep_state = SHWEEP_STATE_IDLE;
+	_is_searching_work = true;
 	_shweeper->my_work = {};
 	LOG(V2_INFO, "Shweep %i searchWorkInTree \n", _my_rank);
 
@@ -209,6 +218,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size) {
 		*work = reinterpret_cast<unsigned int*>(_shweeper->my_work.data());
 		*work_size = VARS;
 		root_received_work = true;
+		_is_searching_work = false;
 		LOG(V2_INFO, "Shweep root %i requested work, got all %u variables\n", _my_rank, VARS);
 		return;
 	}
@@ -255,7 +265,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size) {
 			usleep(1000);
 		}
 		if (!_shweeper->my_work.empty()) {
-			shweep_state = SHWEEP_STATE_WORKING;
+			_is_searching_work = false;
 			//Tell C/Kissat where it can read the new work
 			*work = reinterpret_cast<unsigned int*>(_shweeper->my_work.data());
 			*work_size = _shweeper->my_work.size();
@@ -295,16 +305,18 @@ void SweepJob::callback_for_broadcast_ping() {
 
 std::vector<int> SweepJob::aggregateContributions(std::list<std::vector<int>> &contribs) {
 	//Each contribution has the format [Equivalences,Units, eq_size, unit_size].
-	size_t total_size = 2; //the two new counters
+
+
+	size_t total_size = NUM_SHARING_METADATA;
     for (const auto& vec : contribs) {
-	    total_size += vec.size()-2; //we don't copy the two counters per element
+	    total_size += vec.size()-NUM_SHARING_METADATA;
     }
     std::vector<int> aggregated;
     aggregated.reserve(total_size);
 	//Fill equivalences
 	size_t total_eq_size = 0;
     for (const auto& contrib : contribs) {
-    	int eq_size = contrib[contrib.size()-2];
+    	int eq_size = contrib[contrib.size()-EQS_SIZE_POS];
     	total_eq_size += eq_size;
 		LOG(V3_VERB, "ß Element: %i eq_size \n", eq_size);
         aggregated.insert(aggregated.end(), contrib.begin(), contrib.begin()+eq_size);
@@ -312,16 +324,23 @@ std::vector<int> SweepJob::aggregateContributions(std::list<std::vector<int>> &c
 	//Fill units
 	size_t total_unit_size = 0;
     for (const auto& contrib : contribs) {
-    	int eq_size = contrib[contrib.size()-2];
-    	int unit_size = contrib[contrib.size()-1];
+    	int eq_size = contrib[contrib.size()-EQS_SIZE_POS];
+    	int unit_size = contrib[contrib.size()-UNITS_SIZE_POS];
 		total_unit_size += unit_size;
 		LOG(V3_VERB, "ß Element: %i unit_size \n", unit_size);
         aggregated.insert(aggregated.end(), contrib.begin()+eq_size, contrib.end()-2); //not copying the two counters at the end
     }
+	bool all_searching_work = true;
+    for (const auto& contrib : contribs) {
+		bool searching_work = contrib[contrib.size()-SEARCH_STATUS_POS];
+    	all_searching_work &= searching_work;
+		LOG(V3_VERB, "ß Element: searching work == %i \n", searching_work);
+    }
 	aggregated.push_back(total_eq_size);
 	aggregated.push_back(total_unit_size);
-	LOG(V3_VERB, "ß Aggregated %i eqivalences, %i units \n", total_eq_size, total_unit_size);
-	assert(total_size == total_eq_size + total_unit_size + 2);
+	aggregated.push_back(all_searching_work);
+	LOG(V3_VERB, "ß Aggregated %i eqivalences, %i units, all_searching_work==%i \n", total_eq_size, total_unit_size, all_searching_work);
+	assert(total_size == total_eq_size + total_unit_size + NUM_SHARING_METADATA);
     return aggregated;
 }
 

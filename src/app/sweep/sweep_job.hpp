@@ -22,9 +22,9 @@ private:
     std::future<void> _fut_shweeper;
     std::atomic_int _shweepers_running_count {0};
 
-    int shweep_state;
-    const int SHWEEP_STATE_WORKING{0};
-    const int SHWEEP_STATE_IDLE{1};
+    bool _is_searching_work=false;
+    // const int SHWEEP_STATE_WORKING{0};
+    // const int SHWEEP_STATE_IDLE{1};
 
     const int TAG_SEARCHING_WORK=1;
     const int TAG_SUCCESSFUL_WORK_STEAL=2;
@@ -44,6 +44,13 @@ private:
 
     static const int MSG_SWEEP = 100; // internal message tag
     static const int NUM_WORKERS = 4; // # workers we request and require, hardcoded 4 for now
+
+	//the additional metadata [..., eqs_size, units_size, all_searching_work] stored in each shared element
+	static const int NUM_SHARING_METADATA = 3;
+	static const int EQS_SIZE_POS = 3;
+	static const int UNITS_SIZE_POS = 2;
+	static const int SEARCH_STATUS_POS = 1;
+
 
 public:
     SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table);
