@@ -5,8 +5,6 @@
 #include "app/job_tree.hpp"
 #include "util/logger.hpp"
 
-#define SWEEP_COMM_TYPE 2
-
 
 SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table)
     : Job(params, setup, table) {
@@ -87,31 +85,6 @@ void SweepJob::appl_start() {
 // Called periodically by the main thread to allow the worker to emit messages.
 void SweepJob::appl_communicate() {
 
-	#if SWEEP_COMM_TYPE == 1
-	// Not enough workers available?
-	if (getJobTree().isRoot() && getVolume() < NUM_WORKERS) {
-		if (getAgeSinceActivation() < 1) return; // wait for up to 1s after appl_start
-		LOG(V2_INFO, "[sweep] Unable to get %i workers within 1 second - giving up\n", NUM_WORKERS);
-		// Report an "unknown" result (code 0)
-		// insertResult(0, {-1});
-		// _started_roundtrip = true;
-		return;
-	}
-
-	// Workers available and valid job communicator present?
-	if (getJobTree().isRoot() && getVolume() == NUM_WORKERS && getJobComm().getWorldRankOrMinusOne(NUM_WORKERS-1) >= 0) {
-		// craft a message to initiate sweep communication
-		JobMessage msg = getMessageTemplate();
-		msg.tag = MSG_SWEEP;
-		msg.payload.clear();
-		advanceSweepMessage(msg);
-	}
-	#elif SWEEP_COMM_TYPE == 2
-
-	// auto list = getJobComm().getAddressList();
-	// for (auto &l : list) {
-	// 	LOG(V3_VERB, "list has %i \n", l.rank);
-	// }
 	LOG(V3_VERB, "ß appl_communicate \n");
 	double elapsed_time = Timer::elapsedSeconds();
 	double wait_time = 0.001;
@@ -120,7 +93,8 @@ void SweepJob::appl_communicate() {
 	if (can_start && getVolume() == NUM_WORKERS && getJobComm().getWorldRankOrMinusOne(NUM_WORKERS-1) >= 0) {
 		// LOG(V3_VERB, "ß appl_communicate full volume \n");
 
-		LOG(V3_VERB, "ß have %i \n", _shweeper->eqs_to_share.size());
+		LOG(V3_VERB, "ß have %i eqs\n", _shweeper->eqs_to_share.size());
+		LOG(V3_VERB, "ß have %i units\n", _shweeper->units_to_share.size());
 		bool reset_red = false;
 		if (_red && _red->hasResult()) {
 			//store the received equivalences such that the local solver than eventually import them
@@ -165,8 +139,9 @@ void SweepJob::appl_communicate() {
 			_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateContributions));
 			_red->careAboutParentStatus();
 			_red->tellChildrenParentIsReady();
-			LOG(V3_VERB, "ß contributing %i\n", _shweeper->eqs_to_share.size());
-			//Combine Equivalences and Units, also store how much space each takes
+			LOG(V3_VERB, "ß contributing %i eqs size\n", _shweeper->eqs_to_share.size());
+			LOG(V3_VERB, "ß contributing %i units\n", _shweeper->units_to_share.size());
+			//Combine Equivalences and Units in single array and store how much space each takes
 			//Format: [Equivalences, Units, eq_size, unit_size]
 			const int eq_size = _shweeper->eqs_to_share.size();
 			const int unit_size = _shweeper->units_to_share.size();
@@ -175,6 +150,7 @@ void SweepJob::appl_communicate() {
 			std::move(_shweeper->units_to_share.begin(), _shweeper->units_to_share.end(), std::back_inserter(EU));
 			EU.push_back(eq_size);
 			EU.push_back(unit_size);
+			LOG(V3_VERB, "ß contributing in total %i size \n", EU.size());
 			_red->contribute(std::move(EU));
 			if (parent_was_ready) {
 				_red->enableParentIsReady();
@@ -182,18 +158,6 @@ void SweepJob::appl_communicate() {
 		}
 		_red->advance();
 	}
-	#elif SWEEP_COMM_TYPE == 3
-
-
-	if (getVolume() == NUM_WORKERS && getJobComm().getWorldRankOrMinusOne(NUM_WORKERS-1) >= 0) {
-		if (_is_root) {
-			if (!_red || _red->finishedAndNoLongerValid()) {
-				tryBeginBroadcastPing();
-			}
-		}
-		tryExtractResult();
-	}
-	#endif
 }
 
 
@@ -328,27 +292,6 @@ void SweepJob::callback_for_broadcast_ping() {
 }
 
 
-// void SweepJob::tryExtractResult() {
-// 	if (!_red) return;
-// 	_red->advance();
-// 	if (!_red.hasResult()) return;
-//
-// 	auto received_reduction = _red->extractResult();
-// 	LOG(V3_VERB, "ß --- Received global Reduction Result, Extracted Size %i --- \n", received_reduction.size());
-// 	auto& local_store = _swissat->stored_equivalences_to_import;
-// 	local_store.reserve(local_store.size() + received_reduction.size());
-// 	local_store.insert(
-// 		local_store.end(),
-// 		std::make_move_iterator(received_reduction.begin()),
-// 		std::make_move_iterator(received_reduction.end())
-// 	);
-//
-// 	LOG(V3_VERB, "ß Storing %i equivalences for local solver to import \n", local_store.size());
-// 	// _red.reset();
-// 	//here is the logical point to reset _red and contribute again
-// 	//use broadcast only to communicate parent_is_ready
-// 	//but: parent_is_ready can't just be forwarded also by the children, because they themselves might not yet be ready...
-// }
 
 std::vector<int> SweepJob::aggregateContributions(std::list<std::vector<int>> &contribs) {
 	//Each contribution has the format [Equivalences,Units, eq_size, unit_size].
@@ -363,7 +306,7 @@ std::vector<int> SweepJob::aggregateContributions(std::list<std::vector<int>> &c
     for (const auto& contrib : contribs) {
     	int eq_size = contrib[contrib.size()-2];
     	total_eq_size += eq_size;
-		LOG(V3_VERB, "ß Aggregating %i eq_size \n", eq_size);
+		LOG(V3_VERB, "ß Element: %i eq_size \n", eq_size);
         aggregated.insert(aggregated.end(), contrib.begin(), contrib.begin()+eq_size);
     }
 	//Fill units
@@ -372,7 +315,7 @@ std::vector<int> SweepJob::aggregateContributions(std::list<std::vector<int>> &c
     	int eq_size = contrib[contrib.size()-2];
     	int unit_size = contrib[contrib.size()-1];
 		total_unit_size += unit_size;
-		LOG(V3_VERB, "ß Aggregating %i unit_size \n", unit_size);
+		LOG(V3_VERB, "ß Element: %i unit_size \n", unit_size);
         aggregated.insert(aggregated.end(), contrib.begin()+eq_size, contrib.end()-2); //not copying the two counters at the end
     }
 	aggregated.push_back(total_eq_size);
@@ -384,27 +327,7 @@ std::vector<int> SweepJob::aggregateContributions(std::list<std::vector<int>> &c
 
 
 void SweepJob::advanceSweepMessage(JobMessage& msg) {
-#if SWEEP_COMM_TYPE == 1
-	int incoming_eqs = msg.payload.size()/2;
-	//Transfer local data to the message
-	auto &local_eqs = _swissat->stored_equivalences_to_share;
-	msg.payload.reserve(msg.payload.size() + local_eqs.size());
-	msg.payload.insert(msg.payload.end(), local_eqs.begin(), local_eqs.end());
 
-	//Now we can delete the equivalences locally, to make place for new ones
-	int added_eqs = _swissat->stored_equivalences_to_share.size()/2;
-	_swissat->stored_equivalences_to_share.clear();
-
-	//Sending data in a circle, in order of the indices
-	int receiver_index = (_my_index + 1) % NUM_WORKERS;
-	int receiver_rank = getJobComm().getWorldRankOrMinusOne(receiver_index);
-	msg.treeIndexOfDestination = receiver_index;
-	msg.contextIdOfDestination = getJobComm().getContextIdOrZero(receiver_index);
-	assert(msg.contextIdOfDestination != 0);
-
-	LOG(V2_INFO, "[sweep] Rec %i   Add %i    Send %i  (to rank %i) \n", incoming_eqs, added_eqs, msg.payload.size()/2, receiver_rank);
-	getJobTree().send(receiver_rank, MSG_SEND_APPLICATION_MESSAGE, msg);
-#endif
 }
 
 int SweepJob::steal_from_my_local_solver() {

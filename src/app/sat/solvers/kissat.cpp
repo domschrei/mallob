@@ -36,8 +36,8 @@ void consume_clause(void* state, int** clause, int* size, int* glue) {
 void pass_eq_up(void *state) {
     ((Kissat*) state)->passEqUp();
 }
-void pass_eqs_down(void* state, int** equivalence, int *eq_count) {
-    ((Kissat*) state)->passEqsDown(equivalence, eq_count);
+void pass_eqs_down(void* state, int** equivalences, int *eqs_size) {
+    ((Kissat*) state)->passEqsDown(equivalences, eqs_size);
 }
 
 void pass_unit_up(void *state, int unit) {
@@ -471,11 +471,11 @@ void Kissat::passEqUp() {
     }
 }
 
-void Kissat::passEqsDown(int **equivalence, int *eq_count) {
+void Kissat::passEqsDown(int **equivalences, int *eqs_size) {
     eqs_passed_down = std::move(eqs_received_from_sharing);
     eqs_received_from_sharing.clear();
-    *equivalence = eqs_passed_down.data();
-    *eq_count = eqs_passed_down.size();
+    *equivalences = eqs_passed_down.data();
+    *eqs_size = eqs_passed_down.size();
 }
 
 void Kissat::passUnitUp(int unit) {

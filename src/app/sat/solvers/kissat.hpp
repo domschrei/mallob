@@ -113,7 +113,7 @@ public:
     friend void consume_clause(void* state, int** clause, int* size, int* lbd);
 
 	friend void pass_eq_up(void *state);
-	friend void pass_eqs_down(void* state, int** equivalence, int *eq_count);
+	friend void pass_eqs_down(void* state, int** equivalences, int *eqs_size);
 
 	friend void pass_unit_up(void *state, int unit);
 	friend void pass_units_down(void *state, int **units, int *unit_count);
@@ -144,7 +144,7 @@ private:
     void consumeClause(int** clause, int* size, int* lbd);
 
 	void passEqUp();
-	void passEqsDown(int** equivalence, int *eq_count);
+	void passEqsDown(int** equivalences, int *eqs_size);
 
 	void passUnitUp(int unit);
 	void passUnitsDown(int **units, int *unit_count);
