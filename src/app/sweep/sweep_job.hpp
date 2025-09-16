@@ -26,9 +26,9 @@ private:
     const int SHWEEP_STATE_WORKING{0};
     const int SHWEEP_STATE_IDLE{1};
 
-    const int TAG_SEARCHING_WORK{1};
-    const int TAG_SUCCESSFUL_WORK_STEAL{2};
-    const int TAG_UNSUCCESSFUL_WORK_STEAL{3};
+    const int TAG_SEARCHING_WORK=1;
+    const int TAG_SUCCESSFUL_WORK_STEAL=2;
+    const int TAG_UNSUCCESSFUL_WORK_STEAL=3;
 
     bool root_received_work=false;
     bool got_steal_response=false;
