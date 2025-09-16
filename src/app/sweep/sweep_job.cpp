@@ -16,6 +16,7 @@ SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTa
 
 
 void search_work_in_tree(void *SweepJob_state, unsigned **work, int *work_size) {
+	LOG(V2_INFO, "Shweep %i search_work_in_tree \n", ((SweepJob*) SweepJob_state)->_my_rank);
     ((SweepJob*) SweepJob_state)->searchWorkInTree(work, work_size);
 }
 
@@ -26,7 +27,7 @@ void SweepJob::appl_start() {
 	_my_index = getJobTree().getIndex();
 	_is_root = getJobTree().isRoot();
 	printf("ß Appl_start(): is root? %i, Parent-Index %i, Rank %i, Index %i, \n",  _is_root, getJobTree().getParentIndex(), _my_rank, _my_index);
-	printf("ß			  : num children %i", getJobTree().getNumChildren());
+	printf("ß			  : num children %i\n", getJobTree().getNumChildren());
     _metadata = getSerializedDescription(0)->data();
 
 	const JobDescription& desc = getDescription();
@@ -39,7 +40,7 @@ void SweepJob::appl_start() {
 	// printf("ß [%i] Payload: %i vars, %i clauses \n", _my_index, setup.numVars, setup.numOriginalClauses);
 
 	_shweeper.reset(new Kissat(setup));
-	_shweeper->set_option("mallob_custom_sweep_verbosity", 1); //0: No custom messages. 1: Some. 2: Verbose
+	_shweeper->set_option("mallob_custom_sweep_verbosity", 2); //0: No custom messages. 1: Some. 2: Verbose
 	_shweeper->set_option("mallob_solver_count", NUM_WORKERS);
 	_shweeper->set_option("mallob_solver_id", _my_index);
 	_shweeper->shweep_set_importexport_callbacks();
@@ -225,6 +226,7 @@ void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 void SweepJob::searchWorkInTree(unsigned **work, int *work_size) {
 	shweep_state = SHWEEP_STATE_IDLE;
 	_shweeper->my_work = {};
+	LOG(V2_INFO, "Shweep %i searchWorkInTree \n", _my_rank);
 
 	if (_my_rank == 0 && !root_received_work) {
 	    //to know how much space we need to allocate for all variables, we assume that the maximum index of any variable corresponds to the total number of variables -1,
@@ -238,7 +240,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size) {
 		*work = reinterpret_cast<unsigned int*>(_shweeper->my_work.data());
 		*work_size = VARS;
 		root_received_work = true;
-		LOG(V2_INFO, "Shweep root %i requested work, provided all %u variables\n", _my_rank, VARS);
+		LOG(V2_INFO, "Shweep root %i requested work, got all %u variables\n", _my_rank, VARS);
 		return;
 	}
 
@@ -246,13 +248,16 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size) {
 		int n = getVolume();
 		SplitMix64Rng _rng;
 		int rank = _rng.randomInRange(0,n);
+		if (rank == _my_rank) {
+			continue;
+		}
 		got_steal_response = false;
 
 		JobMessage msg = getMessageTemplate();
 		msg.tag = TAG_SEARCHING_WORK;
 
 		getJobTree().send(rank, MSG_SEND_APPLICATION_MESSAGE, msg);
-		LOG(V2_INFO, "Rank %u asks rank %u for work\n", _my_index, rank);
+		LOG(V2_INFO, "Rank %u asks random rank %u (out of volume %i) for work\n", _my_index, rank, n);
 
 		while (!got_steal_response) {
 			usleep(100 /*0.1 millisecond*/);
@@ -262,10 +267,10 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size) {
 			//Tell C/Kissat where it can read the new work
 			*work = reinterpret_cast<unsigned int*>(_shweeper->my_work.data());
 			*work_size = _shweeper->my_work.size();
-			LOG(V2_INFO, "Rank %u asks rank %u for work: successfully stole %u work \n", _my_index, rank, _shweeper->my_work.size());
+			LOG(V2_INFO, "Rank %u received work from rank %u (%i variables) \n", _my_index, rank, _shweeper->my_work.size());
 			break;
 		}
-		LOG(V2_INFO, "Rank %u asks rank %u for work: failed, no work either\n", _my_index, rank);
+		LOG(V2_INFO, "Rank %u did not received work from rank %u\n", _my_index, rank);
 	}
 }
 

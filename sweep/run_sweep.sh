@@ -21,8 +21,8 @@ MALLOB_OPTIONS=" \
   -mono=$INST_DIR"
 
 #clean old logs and traces
-rm -r $HOME/PhD/logsntraces/logs/*
-rm $HOME/PhD/logsntraces/traces/*
+rm -rf $HOME/PhD/logsntraces/logs/*
+rm -rf $HOME/PhD/logsntraces/traces/*
 
 RDMAV_FORK_SAFE=1; 
 mpirun -np $NPROCS --bind-to core --map-by ppr:${NPROCS}:node:pe=${threads} build/mallob $MALLOB_OPTIONS
