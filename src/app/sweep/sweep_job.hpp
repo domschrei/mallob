@@ -22,7 +22,8 @@ private:
     std::future<void> _fut_shweeper;
     std::atomic_int _shweepers_running_count {0};
 
-    bool _is_searching_work=false;
+    bool _is_idle=false;
+	bool _terminate=false;
     // const int SHWEEP_STATE_WORKING{0};
     // const int SHWEEP_STATE_IDLE{1};
 
@@ -49,7 +50,7 @@ private:
 	static const int NUM_SHARING_METADATA = 3;
 	static const int EQS_SIZE_POS = 3;
 	static const int UNITS_SIZE_POS = 2;
-	static const int SEARCH_STATUS_POS = 1;
+	static const int IDLE_STATUS_POS = 1;
 
 
 public:

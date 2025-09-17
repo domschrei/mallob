@@ -101,10 +101,11 @@ void SweepJob::appl_communicate() {
 			auto share_received = _red->extractResult();
 			const int received_eq_size = share_received[share_received.size()-EQS_SIZE_POS];
 			const int received_unit_size = share_received[share_received.size()-UNITS_SIZE_POS];
-			const int all_searching_work = share_received[share_received.size()-SEARCH_STATUS_POS];
+			const int all_idle = share_received[share_received.size()-IDLE_STATUS_POS];
 			LOG(V3_VERB, "ß --- Received Broadcast Result, Extracted Size %i, of which %i eq_size, %i unit_size -- \n", share_received.size(), received_eq_size, received_unit_size);
-			if (all_searching_work) {
-				LOG(V3_VERB, "ß --- ALL SWEEPERS SEARCHING WORK - CAN TERMINATE -- \n");
+			if (all_idle) {
+				_terminate = true;
+				LOG(V3_VERB, "ß --- ALL SWEEPERS IDLE - CAN TERMINATE -- \n");
 			}
 
 			//save equivalences
@@ -121,7 +122,7 @@ void SweepJob::appl_communicate() {
 			units_received.insert(
 				units_received.end(),
 				std::make_move_iterator(share_received.begin() + received_eq_size),
-				std::make_move_iterator(share_received.end()   - 2)
+				std::make_move_iterator(share_received.end()   - NUM_SHARING_METADATA)
 			);
 			reset_red = true;
 			// parent_is_ready = _red->isParentReady();
@@ -145,7 +146,7 @@ void SweepJob::appl_communicate() {
 			_red->tellChildrenParentIsReady();
 			LOG(V3_VERB, "ß contributing %i eqs size\n", _shweeper->eqs_to_share.size());
 			LOG(V3_VERB, "ß contributing %i units\n", _shweeper->units_to_share.size());
-			LOG(V3_VERB, "ß contributing %i idle \n", _is_searching_work);
+			LOG(V3_VERB, "ß contributing %i idle \n", _is_idle);
 			//Combine Equivalences and Units in single array
 			//also store how much space each takes, to quickly separate them without needing to search for the separator
 			//for termination, also store a boolean whether all children are idling
@@ -157,7 +158,7 @@ void SweepJob::appl_communicate() {
 			std::move(_shweeper->units_to_share.begin(), _shweeper->units_to_share.end(), std::back_inserter(EU));
 			EU.push_back(eq_size);
 			EU.push_back(unit_size);
-			EU.push_back(_is_searching_work);
+			EU.push_back(_is_idle);
 			_shweeper->units_to_share.clear(); //because didn't move it!
 			LOG(V3_VERB, "ß contributing in total %i size \n", EU.size());
 			_red->contribute(std::move(EU));
@@ -173,15 +174,15 @@ void SweepJob::appl_communicate() {
 
 // React to an incoming message. (This becomes relevant only if you send custom messages)
 void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
-	LOG(V2_INFO, "Shweep rank %i: received custom message from source %i, mpiTag %i, msg.tag %i \n", _my_rank, source, mpiTag, msg.tag);
+	// LOG(V2_INFO, "Shweep rank %i: received custom message from source %i, mpiTag %i, msg.tag %i \n", _my_rank, source, mpiTag, msg.tag);
 	if (msg.tag == TAG_SEARCHING_WORK) {
 		int stolen = steal_from_my_local_solver();
 		if (stolen>0) {
 			msg.payload = std::move(_shweeper->work_stolen_locally);
 			msg.tag = TAG_SUCCESSFUL_WORK_STEAL;
-			LOG(V2_INFO, "Shweep rank %i: providing %i work, sending to source %i \n",  _my_rank, stolen, source);
+			// LOG(V2_INFO, "Shweep rank %i: providing %i work, sending to source %i \n",  _my_rank, stolen, source);
 		} else {
-			LOG(V2_INFO, "Shweep rank %i: didn't have work to give to source %i\n", _my_rank, source);
+			// LOG(V2_INFO, "Shweep rank %i: didn't have work to give to source %i\n", _my_rank, source);
 			msg.tag = TAG_UNSUCCESSFUL_WORK_STEAL;
 		}
 		//send back to source
@@ -192,19 +193,19 @@ void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 	else if (msg.tag == TAG_SUCCESSFUL_WORK_STEAL) {
 		_shweeper->my_work = std::move(msg.payload);
 		got_steal_response = true;
-		LOG(V2_INFO, "Shweep rank %i: received %i work from source %i\n", _my_rank, _shweeper->my_work.size(), source);
+		// LOG(V2_INFO, "Shweep rank %i: received %i work from source %i\n", _my_rank, _shweeper->my_work.size(), source);
 	}
 	else if (msg.tag == TAG_UNSUCCESSFUL_WORK_STEAL) {
-		LOG(V2_INFO, "Shweep rank %i: didnt receive any work from source %i\n", _my_rank, source);
+		// LOG(V2_INFO, "Shweep rank %i: didnt receive any work from source %i\n", _my_rank, source);
 		got_steal_response = true;
 	}
 }
 
 
 void SweepJob::searchWorkInTree(unsigned **work, int *work_size) {
-	_is_searching_work = true;
+	_is_idle = true;
 	_shweeper->my_work = {};
-	LOG(V2_INFO, "Shweep %i searchWorkInTree \n", _my_rank);
+	// LOG(V2_INFO, "Shweep %i searchWorkInTree \n", _my_rank);
 
 	if (_my_rank == 0 && !root_received_work) {
 	    //to know how much space we need to allocate for all variables, we assume that the maximum index of any variable corresponds to the total number of variables -1,
@@ -218,18 +219,23 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size) {
 		*work = reinterpret_cast<unsigned int*>(_shweeper->my_work.data());
 		*work_size = VARS;
 		root_received_work = true;
-		_is_searching_work = false;
+		_is_idle = false;
 		LOG(V2_INFO, "Shweep root %i requested work, got all %u variables\n", _my_rank, VARS);
 		return;
 	}
 
-	LOG(V2_INFO, "Starting to ask around \n");
+	// LOG(V2_INFO, "Starting to ask around \n");
 	// while (getJobComm().getWorldRankOrMinusOne(NUM_WORKERS-1) == -1) {
 		// LOG(V2_INFO, "Tree not ready yet \n");
 		// usleep(10000 /*10 millisecond*/);
 	// }
 	SplitMix64Rng _rng;
 	while (_shweeper->my_work.empty()) {
+		if (_terminate) {
+			*work = reinterpret_cast<unsigned int*>(_shweeper->my_work.data());
+			*work_size = 0;
+			break;
+		}
 		int n = getVolume();
 		//Steal from a random other solver
 		int recv_index = _rng.randomInRange(0,n);
@@ -237,14 +243,13 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size) {
 
 		LOG(V2_INFO, "random index: %i  (volume %i)\n", recv_index, n);
         if (recv_rank == -1) {
-			LOG(V2_INFO, "No receive rank found for index %i, try new random index !\n", recv_index);
+			// LOG(V2_INFO, "No receive rank found for index %i, try new random index !\n", recv_index);
 			usleep(10000);
         	continue;
-        } else {
-			// LOG(V2_INFO, "recv_index %i -> recv_rank %i !\n", recv_index, recv_rank);
         }
 
 		if (recv_rank == _my_rank) {
+			//not asking ourselves for work
 			continue;
 		}
 
@@ -258,21 +263,21 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size) {
 		msg.contextIdOfDestination = getJobComm().getContextIdOrZero(recv_index);
 
 		LOG(V2_INFO, "Rank %i asks rank %i for work\n", _my_rank, recv_rank, n);
-		LOG(V2_INFO, "  with destionation ctx_id %i \n", msg.contextIdOfDestination);
+		// LOG(V2_INFO, "  with destionation ctx_id %i \n", msg.contextIdOfDestination);
 		getJobTree().send(recv_rank, MSG_SEND_APPLICATION_MESSAGE, msg);
 
 		while (!got_steal_response) {
 			usleep(1000);
 		}
 		if (!_shweeper->my_work.empty()) {
-			_is_searching_work = false;
+			_is_idle = false;
 			//Tell C/Kissat where it can read the new work
 			*work = reinterpret_cast<unsigned int*>(_shweeper->my_work.data());
 			*work_size = _shweeper->my_work.size();
 			LOG(V2_INFO, "Rank %u received work from rank %i (%i variables) \n", _my_rank, recv_rank, _shweeper->my_work.size());
 			break;
 		}
-		LOG(V2_INFO, "Rank %i did not received work from rank %i\n", _my_rank, recv_rank);
+		// LOG(V2_INFO, "Rank %i did not received work from rank %i\n", _my_rank, recv_rank);
 	}
 }
 
@@ -306,7 +311,6 @@ void SweepJob::callback_for_broadcast_ping() {
 std::vector<int> SweepJob::aggregateContributions(std::list<std::vector<int>> &contribs) {
 	//Each contribution has the format [Equivalences,Units, eq_size, unit_size].
 
-
 	size_t total_size = NUM_SHARING_METADATA;
     for (const auto& vec : contribs) {
 	    total_size += vec.size()-NUM_SHARING_METADATA;
@@ -328,18 +332,18 @@ std::vector<int> SweepJob::aggregateContributions(std::list<std::vector<int>> &c
     	int unit_size = contrib[contrib.size()-UNITS_SIZE_POS];
 		total_unit_size += unit_size;
 		LOG(V3_VERB, "ß Element: %i unit_size \n", unit_size);
-        aggregated.insert(aggregated.end(), contrib.begin()+eq_size, contrib.end()-2); //not copying the two counters at the end
+        aggregated.insert(aggregated.end(), contrib.begin()+eq_size, contrib.end()-NUM_SHARING_METADATA); //not copying the two counters at the end
     }
-	bool all_searching_work = true;
+	bool all_idle = true;
     for (const auto& contrib : contribs) {
-		bool searching_work = contrib[contrib.size()-SEARCH_STATUS_POS];
-    	all_searching_work &= searching_work;
-		LOG(V3_VERB, "ß Element: searching work == %i \n", searching_work);
+		bool idle = contrib[contrib.size()-IDLE_STATUS_POS];
+    	all_idle &= idle;
+		LOG(V3_VERB, "ß Element: idle == %i \n", idle);
     }
 	aggregated.push_back(total_eq_size);
 	aggregated.push_back(total_unit_size);
-	aggregated.push_back(all_searching_work);
-	LOG(V3_VERB, "ß Aggregated %i eqivalences, %i units, all_searching_work==%i \n", total_eq_size, total_unit_size, all_searching_work);
+	aggregated.push_back(all_idle);
+	LOG(V3_VERB, "ß Aggregated %i eqivalences, %i units, all_idle==%i \n", total_eq_size, total_unit_size, all_idle);
 	assert(total_size == total_eq_size + total_unit_size + NUM_SHARING_METADATA);
     return aggregated;
 }
