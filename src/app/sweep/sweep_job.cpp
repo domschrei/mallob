@@ -71,6 +71,7 @@ void SweepJob::appl_start() {
 		_internal_result.id = getId();
 		_internal_result.revision = getRevision();
 		_internal_result.result=res;
+		_solved_status = 10;
 		auto dummy_solution = std::vector<int>(1,0);
 		_internal_result.setSolutionToSerialize((int*)(dummy_solution.data()), dummy_solution.size());
 		_shweepers_running_count--;
@@ -241,7 +242,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size) {
 		int recv_index = _rng.randomInRange(0,n);
         int recv_rank = getJobComm().getWorldRankOrMinusOne(recv_index);
 
-		LOG(V2_INFO, "random index: %i  (volume %i)\n", recv_index, n);
+		// LOG(V2_INFO, "random index: %i  (volume %i)\n", recv_index, n);
         if (recv_rank == -1) {
 			// LOG(V2_INFO, "No receive rank found for index %i, try new random index !\n", recv_index);
 			usleep(10000);
@@ -363,7 +364,6 @@ int SweepJob::steal_from_my_local_solver() {
 	shweep_steal_from_this_solver(_shweeper->solver, reinterpret_cast<unsigned int*>(_shweeper->work_stolen_locally.data()), steal_amount);
 	return steal_amount;
 }
-
 
 
 void SweepJob::loadFormulaToShweeper() {
