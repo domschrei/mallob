@@ -14,7 +14,7 @@ SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTa
 
 
 void search_work_in_tree(void *SweepJob_state, unsigned **work, int *work_size) {
-	LOG(V2_INFO, "Shweep %i search_work_in_tree \n", ((SweepJob*) SweepJob_state)->_my_rank);
+	// LOG(V2_INFO, "Shweep %i search_work_in_tree \n", ((SweepJob*) SweepJob_state)->_my_rank);
     ((SweepJob*) SweepJob_state)->searchWorkInTree(work, work_size);
 }
 
@@ -53,6 +53,7 @@ void SweepJob::appl_start() {
 
 	_shweeper->set_option("mallob_is_shweeper", 1); //Make this Kissat solver a pure Distributed Sweeping Solver. Jumps directly to distributed sweeping and bypasses everything else
 	_shweeper->set_option("sweepcomplete", 1); //deactivates any tick limits on sweeping
+	_shweeper->set_option("probe", 1); //there is some cleanup-probing at the end of the sweeping
 
 	//Initialize _red already here, to make sure that all processes have a valid reduction object
 	//maybe switch back to more robust "standard" sharing later
@@ -106,7 +107,7 @@ void SweepJob::appl_communicate() {
 			LOG(V3_VERB, "ß --- Received Broadcast Result, Extracted Size %i, of which %i eq_size, %i unit_size -- \n", share_received.size(), received_eq_size, received_unit_size);
 			if (all_idle) {
 				_terminate = true;
-				LOG(V3_VERB, "ß --- ALL SWEEPERS IDLE - CAN TERMINATE -- \n");
+				LOG(V2_INFO, "ß --- ALL SWEEPERS IDLE - CAN TERMINATE -- \n");
 			}
 
 			//save equivalences
@@ -177,8 +178,11 @@ void SweepJob::appl_communicate() {
 void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 	// LOG(V2_INFO, "Shweep rank %i: received custom message from source %i, mpiTag %i, msg.tag %i \n", _my_rank, source, mpiTag, msg.tag);
 	if (msg.tag == TAG_SEARCHING_WORK) {
-		int stolen = steal_from_my_local_solver();
-		if (stolen>0) {
+		if (_terminate) {
+			msg.tag = TAG_UNSUCCESSFUL_WORK_STEAL;
+			//we dont call steal if we already know that everything has terminated, risks calling a destroyed instance
+		}
+		else if (steal_from_my_local_solver()>0) {
 			msg.payload = std::move(_shweeper->work_stolen_locally);
 			msg.tag = TAG_SUCCESSFUL_WORK_STEAL;
 			// LOG(V2_INFO, "Shweep rank %i: providing %i work, sending to source %i \n",  _my_rank, stolen, source);
@@ -234,7 +238,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size) {
 	while (_shweeper->my_work.empty()) {
 		if (_terminate) {
 			*work = reinterpret_cast<unsigned int*>(_shweeper->my_work.data());
-			*work_size = 0;
+			*work_size = 0; //this zero tells the kissat solver that we are finished
 			break;
 		}
 		int n = getVolume();
@@ -245,7 +249,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size) {
 		// LOG(V2_INFO, "random index: %i  (volume %i)\n", recv_index, n);
         if (recv_rank == -1) {
 			// LOG(V2_INFO, "No receive rank found for index %i, try new random index !\n", recv_index);
-			usleep(10000);
+			usleep(1000);
         	continue;
         }
 
@@ -263,7 +267,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size) {
 		msg.treeIndexOfDestination = recv_index;
 		msg.contextIdOfDestination = getJobComm().getContextIdOrZero(recv_index);
 
-		LOG(V2_INFO, "Rank %i asks rank %i for work\n", _my_rank, recv_rank, n);
+		// LOG(V2_INFO, "Rank %i asks rank %i for work\n", _my_rank, recv_rank, n);
 		// LOG(V2_INFO, "  with destionation ctx_id %i \n", msg.contextIdOfDestination);
 		getJobTree().send(recv_rank, MSG_SEND_APPLICATION_MESSAGE, msg);
 
