@@ -87,7 +87,7 @@ void SweepJob::appl_start() {
 // Called periodically by the main thread to allow the worker to emit messages.
 void SweepJob::appl_communicate() {
 
-	LOG(V3_VERB, "ß appl_communicate \n");
+	// LOG(V3_VERB, "ß appl_communicate \n");
 	double elapsed_time = Timer::elapsedSeconds();
 	double wait_time = 0.001;
 	bool can_start = elapsed_time > wait_time;
@@ -95,8 +95,8 @@ void SweepJob::appl_communicate() {
 	if (can_start && getVolume() == NUM_WORKERS && getJobComm().getWorldRankOrMinusOne(NUM_WORKERS-1) >= 0) {
 		// LOG(V3_VERB, "ß appl_communicate full volume \n");
 
-		LOG(V3_VERB, "ß have %i eqs\n", _shweeper->eqs_to_share.size());
-		LOG(V3_VERB, "ß have %i units\n", _shweeper->units_to_share.size());
+		// LOG(V3_VERB, "ß have %i eqs\n", _shweeper->eqs_to_share.size());
+		// LOG(V3_VERB, "ß have %i units\n", _shweeper->units_to_share.size());
 		bool reset_red = false;
 		if (_red && _red->hasResult()) {
 			//store the received equivalences such that the local solver than eventually import them
@@ -238,6 +238,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size) {
 	while (_shweeper->my_work.empty()) {
 		if (_terminate) {
 			*work = reinterpret_cast<unsigned int*>(_shweeper->my_work.data());
+
 			*work_size = 0; //this zero tells the kissat solver that we are finished
 			break;
 		}
