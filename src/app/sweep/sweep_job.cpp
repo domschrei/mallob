@@ -45,11 +45,12 @@ void SweepJob::appl_start() {
 	_shweeper->shweep_set_workstealing_callback(this, &search_work_in_tree);
 
     // Basic configuration options for all solvers
-    _shweeper->set_option("quiet", 1); // suppress any standard kissat output
-    _shweeper->set_option("verbose", 0); //the native kissat verbosity
+    _shweeper->set_option("quiet", 0); // suppress any standard kissat output
+    _shweeper->set_option("verbose", 2); //the native kissat verbosity
+    _shweeper->set_option("log", 0); //extensive logging
     _shweeper->set_option("check", 0); // do not check model or derived clauses
     _shweeper->set_option("profile",3); // do detailed profiling how much time we spent where
-	_shweeper->set_option("seed", 0);   // always start with the same seed
+	_shweeper->set_option("seed", _my_index);   //
 
 	_shweeper->set_option("mallob_is_shweeper", 1); //Make this Kissat solver a pure Distributed Sweeping Solver. Jumps directly to distributed sweeping and bypasses everything else
 	_shweeper->set_option("sweepcomplete", 1); //deactivates any tick limits on sweeping
