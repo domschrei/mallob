@@ -46,8 +46,8 @@ private:
 	const int MAX_SHWEEP_STORAGE_SIZE = 10000;
 	friend class SweepJob;
 	//Update stuff for sweep sharing
-	std::vector<int> work_stolen_locally;
-	std::vector<int> my_work;
+	std::vector<int> work_stolen_from_local_solver;
+	std::vector<int> work_received_from_others;
 	// std::vector<char> stolen_done;
 
 

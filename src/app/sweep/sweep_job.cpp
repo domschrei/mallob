@@ -46,8 +46,8 @@ void SweepJob::appl_start() {
 
     // Basic configuration options for all solvers
     _shweeper->set_option("quiet", 0); // suppress any standard kissat output
-    _shweeper->set_option("verbose", 2); //the native kissat verbosity
-    _shweeper->set_option("log", 0); //extensive logging
+    _shweeper->set_option("verbose", 1); //the native kissat verbosity
+    // _shweeper->set_option("log", 0); //extensive logging
     _shweeper->set_option("check", 0); // do not check model or derived clauses
     _shweeper->set_option("profile",3); // do detailed profiling how much time we spent where
 	_shweeper->set_option("seed", _my_index);   //
@@ -179,12 +179,12 @@ void SweepJob::appl_communicate() {
 void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 	// LOG(V2_INFO, "Shweep rank %i: received custom message from source %i, mpiTag %i, msg.tag %i \n", _my_rank, source, mpiTag, msg.tag);
 	if (msg.tag == TAG_SEARCHING_WORK) {
-		if (_terminate) {
-			msg.tag = TAG_UNSUCCESSFUL_WORK_STEAL;
-			//we dont call steal if we already know that everything has terminated, risks calling a destroyed instance
-		}
-		else if (steal_from_my_local_solver()>0) {
-			msg.payload = std::move(_shweeper->work_stolen_locally);
+		int actually_stolen = steal_from_my_local_solver();
+		if (actually_stolen>0) {
+			//the steal vector was a bit over-dimensioned before the steal, because we only knew an upper limit, but learned the actual amount only  while stealing
+			//to elegantly communicate this actual steal amount via MPI, we resize the vector to contain this information in its .size()
+			_shweeper->work_stolen_from_local_solver.resize(actually_stolen);
+			msg.payload = std::move(_shweeper->work_stolen_from_local_solver);
 			msg.tag = TAG_SUCCESSFUL_WORK_STEAL;
 			// LOG(V2_INFO, "Shweep rank %i: providing %i work, sending to source %i \n",  _my_rank, stolen, source);
 		} else {
@@ -197,7 +197,7 @@ void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 		getJobTree().send(source, MSG_SEND_APPLICATION_MESSAGE, msg);
 	}
 	else if (msg.tag == TAG_SUCCESSFUL_WORK_STEAL) {
-		_shweeper->my_work = std::move(msg.payload);
+		_shweeper->work_received_from_others = std::move(msg.payload);
 		got_steal_response = true;
 		// LOG(V2_INFO, "Shweep rank %i: received %i work from source %i\n", _my_rank, _shweeper->my_work.size(), source);
 	}
@@ -210,7 +210,7 @@ void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 
 void SweepJob::searchWorkInTree(unsigned **work, int *work_size) {
 	_is_idle = true;
-	_shweeper->my_work = {};
+	_shweeper->work_received_from_others = {};
 	// LOG(V2_INFO, "Shweep %i searchWorkInTree \n", _my_rank);
 
 	if (_my_rank == 0 && !root_received_work) {
@@ -221,8 +221,8 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size) {
 		for (int idx = 0; idx < VARS; idx++) {
 			init_work[idx] = idx;
 		}
-		_shweeper->my_work = init_work;
-		*work = reinterpret_cast<unsigned int*>(_shweeper->my_work.data());
+		_shweeper->work_received_from_others = init_work;
+		*work = reinterpret_cast<unsigned int*>(_shweeper->work_received_from_others.data());
 		*work_size = VARS;
 		root_received_work = true;
 		_is_idle = false;
@@ -236,9 +236,9 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size) {
 		// usleep(10000 /*10 millisecond*/);
 	// }
 	SplitMix64Rng _rng;
-	while (_shweeper->my_work.empty()) {
+	while (_shweeper->work_received_from_others.empty()) {
 		if (_terminate) {
-			*work = reinterpret_cast<unsigned int*>(_shweeper->my_work.data());
+			*work = reinterpret_cast<unsigned int*>(_shweeper->work_received_from_others.data());
 
 			*work_size = 0; //this zero tells the kissat solver that we are finished
 			break;
@@ -276,12 +276,12 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size) {
 		while (!got_steal_response) {
 			usleep(1000);
 		}
-		if (!_shweeper->my_work.empty()) {
+		if (!_shweeper->work_received_from_others.empty()) {
 			_is_idle = false;
 			//Tell C/Kissat where it can read the new work
-			*work = reinterpret_cast<unsigned int*>(_shweeper->my_work.data());
-			*work_size = _shweeper->my_work.size();
-			LOG(V2_INFO, "Rank %u received work from rank %i (%i variables) \n", _my_rank, recv_rank, _shweeper->my_work.size());
+			*work = reinterpret_cast<unsigned int*>(_shweeper->work_received_from_others.data());
+			*work_size = _shweeper->work_received_from_others.size();
+			LOG(V2_INFO, "Rank %u received work from rank %i (%i variables) \n", _my_rank, recv_rank, _shweeper->work_received_from_others.size());
 			break;
 		}
 		// LOG(V2_INFO, "Rank %i did not received work from rank %i\n", _my_rank, recv_rank);
@@ -361,14 +361,16 @@ void SweepJob::advanceSweepMessage(JobMessage& msg) {
 }
 
 int SweepJob::steal_from_my_local_solver() {
-	//We dont know how much there is to steal, so we ask
-	size_t steal_amount = shweep_get_steal_amount(_shweeper->solver);
-	if (steal_amount == 0)
+	if (_terminate)
 		return 0;
-	//There is something to steal, allocate memory for it, and pass it to kissat for filling
-	_shweeper->work_stolen_locally.resize(steal_amount);
-	shweep_steal_from_this_solver(_shweeper->solver, reinterpret_cast<unsigned int*>(_shweeper->work_stolen_locally.data()), steal_amount);
-	return steal_amount;
+	//We dont know how much there is to steal, so we ask
+	size_t max_steal_amount = shweep_get_max_steal_amount(_shweeper->solver);
+	if (max_steal_amount == 0)
+		return 0;
+	//There is potentially something to steal, allocate memory for it, and pass it to kissat for filling
+	_shweeper->work_stolen_from_local_solver.resize(max_steal_amount);
+	int actually_stolen = shweep_steal_from_this_solver(_shweeper->solver, reinterpret_cast<unsigned int*>(_shweeper->work_stolen_from_local_solver.data()), max_steal_amount);
+	return actually_stolen;
 }
 
 
