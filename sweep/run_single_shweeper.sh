@@ -12,4 +12,5 @@ OPTS="--mallob_is_shweeper=1 \
 
 # ~/PhD/ksst-sweep/kissat/build/kissat $OPTS
 # valgrind ~/PhD/ksst-sweep/kissat/build/kissat $OPTS
-valgrind --leak-check=full ~/PhD/ksst-sweep/kissat/build/kissat $OPTS
+# valgrind --leak-check=full ~/PhD/ksst-sweep/kissat/build/kissat $OPTS
+valgrind -s --leak-check=full ~/PhD/ksst-sweep/kissat/build/kissat $OPTS

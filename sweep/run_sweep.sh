@@ -13,12 +13,12 @@ MALLOB_OPTIONS="-t=$threads \
   -mono-app=SWEEP \
   -satsolver=k \
   -colors \
-  -v=3 \
+  -v=2 \
   -jcup=0.05 \
   -trace-dir=$OUT_DIR/traces/ \
   -log=$OUT_DIR/logs/ \
-  -mono=$INST_DIR \
-  -subproc-prefix=scripts/run/run_as_valgrind.sh"
+  -mono=$INST_DIR"
+
 
 #clean old logs and traces
 rm -rf $HOME/PhD/logsntraces/logs/*
@@ -26,6 +26,13 @@ rm -rf $HOME/PhD/logsntraces/traces/*
 
 RDMAV_FORK_SAFE=1; 
 
+#SAT Valgrind subprocess
+# MALLOB_OPTIONS="$MALLOB_OPTIONS -subproc-prefix=scripts/run/run_as_valgrind.sh"
+
+
 mpirun -np $NPROCS --bind-to core --map-by ppr:${NPROCS}:node:pe=${threads} build/mallob $MALLOB_OPTIONS
 
+#MPI Valgrind
 # mpirun -np $NPROCS --bind-to core --map-by ppr:${NPROCS}:node:pe=${threads} valgrind --leak-check=full build/mallob $MALLOB_OPTIONS
+
+# 

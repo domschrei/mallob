@@ -38,7 +38,7 @@ void SweepJob::appl_start() {
 	// printf("ß [%i] Payload: %i vars, %i clauses \n", _my_index, setup.numVars, setup.numOriginalClauses);
 
 	_shweeper.reset(new Kissat(setup));
-	_shweeper->set_option("mallob_custom_sweep_verbosity", 2); //0: No custom messages. 1: Some. 2: Verbose
+	_shweeper->set_option("mallob_custom_sweep_verbosity", 1); //0: No custom messages. 1: Some. 2: Verbose
 	_shweeper->set_option("mallob_solver_count", NUM_WORKERS);
 	_shweeper->set_option("mallob_solver_id", _my_index);
 	_shweeper->shweep_set_importexport_callbacks();
@@ -46,7 +46,7 @@ void SweepJob::appl_start() {
 
     // Basic configuration options for all solvers
     _shweeper->set_option("quiet", 0); // suppress any standard kissat output
-    _shweeper->set_option("verbose", 1); //the native kissat verbosity
+    _shweeper->set_option("verbose", 0); //the native kissat verbosity
     // _shweeper->set_option("log", 0); //extensive logging
     _shweeper->set_option("check", 0); // do not check model or derived clauses
     _shweeper->set_option("profile",3); // do detailed profiling how much time we spent where
@@ -105,10 +105,10 @@ void SweepJob::appl_communicate() {
 			const int received_eq_size = share_received[share_received.size()-EQS_SIZE_POS];
 			const int received_unit_size = share_received[share_received.size()-UNITS_SIZE_POS];
 			const int all_idle = share_received[share_received.size()-IDLE_STATUS_POS];
-			LOG(V3_VERB, "ß --- Received Broadcast Result, Extracted Size %i, of which %i eq_size, %i unit_size -- \n", share_received.size(), received_eq_size, received_unit_size);
+			LOG(V1_WARN, "ß --- Received Broadcast: %i eq_size, %i unit_size -- \n", received_eq_size, received_unit_size);
 			if (all_idle) {
 				_terminate = true;
-				LOG(V2_INFO, "ß --- ALL SWEEPERS IDLE - CAN TERMINATE -- \n");
+				LOG(V1_WARN, "ß --- ALL SWEEPERS IDLE - CAN TERMINATE -- \n");
 			}
 
 			//save equivalences
@@ -281,7 +281,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size) {
 			//Tell C/Kissat where it can read the new work
 			*work = reinterpret_cast<unsigned int*>(_shweeper->work_received_from_others.data());
 			*work_size = _shweeper->work_received_from_others.size();
-			LOG(V2_INFO, "Rank %u received work from rank %i (%i variables) \n", _my_rank, recv_rank, _shweeper->work_received_from_others.size());
+			LOG(V2_INFO, "%i variables sent from rank(%i) to rank(%i) \n", _shweeper->work_received_from_others.size(), _my_rank, recv_rank);
 			break;
 		}
 		// LOG(V2_INFO, "Rank %i did not received work from rank %i\n", _my_rank, recv_rank);
