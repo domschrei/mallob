@@ -64,7 +64,8 @@ void SolverThread::init() {
     _active_revision = 0;
     _imported_lits_curr_revision = 0;
 
-    std::string outPath = "witness-trace." + std::to_string(_solver.getSolverSetup().jobId) + "." + std::to_string(_solver.getGlobalId()) + ".txt";
+    std::string outPath = (_logger.getLogDir().empty() ? "." : _logger.getLogDir())
+        + "/witness-trace." + std::to_string(_solver.getSolverSetup().jobId) + "." + std::to_string(_solver.getGlobalId()) + ".txt";
     if (_lrat) {
         _lrat->getChecker().init();
         _lrat->setWitnessOutputPath(outPath);
