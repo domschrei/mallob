@@ -69,7 +69,7 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 			// Yes: ALWAYS create your own LRAT connector. Have it support checking of models
 			// ONLY IF desired and there is no pre-created LRATConnector instance for this purpose.
 			LOGGER(_logger, V3_VERB, "Creating full LratConnector%s\n", createModelCheckingLratConn?" with checking models":"");
-			_lrat = new LratConnector(_logger, _setup.localId, _setup.numVars,
+			_lrat = new LratConnector(_logger, _setup.baseSeed, _setup.localId, _setup.numVars,
 				createModelCheckingLratConn
 			);
 			if (createModelCheckingLratConn) _setup.modelCheckingLratConnector = _lrat;
@@ -78,7 +78,7 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 			if (createModelCheckingLratConn) {
 				LOGGER(_logger, V3_VERB, "Creating dedicated LratConnector for checking models\n");
 				_setup.modelCheckingLratConnector = new LratConnector(
-					_logger, _setup.localId, _setup.numVars, true
+					_logger, _setup.baseSeed, _setup.localId, _setup.numVars, true
 				);
 				_setup.owningModelCheckingLratConnector = true;
 			}

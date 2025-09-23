@@ -5,6 +5,7 @@
 #include <string>
 #include <sys/stat.h>
 
+#include "app/sat/proof/impcheck.hpp"
 #include "trusted/trusted_utils.hpp"
 #include "util/sys/fileutils.hpp"
 #include "util/sys/proc.hpp"
@@ -14,6 +15,8 @@
 class TrustedParserProcessAdapter {
 
 private:
+    int _base_seed;
+
     int _id;
     FILE* _f_parsed_formula;
     Subprocess* _subproc {nullptr};
@@ -25,7 +28,7 @@ private:
     unsigned long _f_size {0};
 
 public:
-    TrustedParserProcessAdapter(int id) : _id(id) {}
+    TrustedParserProcessAdapter(int baseSeed, int id) : _base_seed(baseSeed), _id(id) {}
     ~TrustedParserProcessAdapter() {
         if (_subproc) delete _subproc;
     }
@@ -40,7 +43,11 @@ public:
         Parameters params;
         params.formulaInput.set(source);
         params.fifoParsedFormula.set(pathParsedFormula);
-        _subproc = new Subprocess(params, "impcheck_parse");
+
+        unsigned long keySeed = ImpCheck::getKeySeed(_base_seed);
+        std::string moreArgs = "-key-seed=" + std::to_string(keySeed);
+
+        _subproc = new Subprocess(params, "impcheck_parse", moreArgs);
         _child_pid = _subproc->start();
 
         _f_parsed_formula = fopen(pathParsedFormula.c_str(), "r");
@@ -49,6 +56,7 @@ public:
         _nb_vars = TrustedUtils::readInt(_f_parsed_formula);
         _nb_cls = TrustedUtils::readInt(_f_parsed_formula);
         LOG(V3_VERB, "TPPA Parsed %i vars, %i cls\n", _nb_vars, _nb_cls);
+
         // Parse formula
         size_t fSizeBytes = out.size() * sizeof(T);
         out.resize(out.size() + (_nb_cls*2*sizeof(int))/sizeof(T));
@@ -66,6 +74,7 @@ public:
             fSizeBytes += nbReadBytes;
             if (nbReadBytes < maxBytesToRead) break;
         }
+
         // Pop signature from the end of the data
         int* sigOutIntPtr = (int*) _sig;
         int* fIntPtr = (int*) (((u8*)out.data()) + fSizeBytes);
@@ -74,12 +83,7 @@ public:
         outSignature = _sig;
 
         _f_size = (out.size()*sizeof(T) - outSizeBytesBefore) / sizeof(int);
-        const int* _f_data = (int*) (((u8*) out.data()) + outSizeBytesBefore);
-        std::string summary;
-        for (size_t i = 0; i < std::min(5UL, _f_size); i++) summary += std::to_string(_f_data[i]) + " ";
-        if (_f_size > 10) summary += " ... ";
-        for (size_t i = std::max(5UL, _f_size-5); i < _f_size; i++) summary += std::to_string(_f_data[i]) + " ";
-        LOG(V3_VERB, "TPPA %lu lits: %s\n", _f_size, summary.c_str());
+        LOG(V3_VERB, "TPPA %lu lits\n", _f_size);
 
         fclose(_f_parsed_formula);
         FileUtils::rm(pathParsedFormula);

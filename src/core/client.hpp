@@ -126,7 +126,6 @@ private:
 
     std::unique_ptr<JsonInterface> _json_interface;
     std::vector<std::shared_ptr<Connector>> _interface_connectors;
-    std::shared_ptr<APIConnector> _api_connector;
     BackgroundWorker _instance_reader;
 
     struct ClientSideJob {
@@ -155,7 +154,6 @@ public:
     int getInternalRank();
     std::string getFilesystemInterfacePath();
     std::string getSocketPath();
-    APIConnector& getAPI();
 
 private:
     void readIncomingJobs();

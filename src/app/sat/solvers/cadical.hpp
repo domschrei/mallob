@@ -87,4 +87,6 @@ public:
 	bool exportsConditionalClauses() override {return false;}
 
 	void cleanUp() override;
+
+	CadicalTerminator getTerminator() {return terminator;}
 };

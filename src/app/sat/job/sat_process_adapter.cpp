@@ -34,10 +34,10 @@
 #endif
 
 SatProcessAdapter::SatProcessAdapter(Parameters&& params, SatProcessConfig&& config,
-    size_t fSize, const int* fLits, size_t aSize, const int* aLits, Checksum chksum,
+    size_t fSize, const int* fLits, Checksum chksum,
     int descId, std::shared_ptr<AnytimeSatClauseCommunicator>& comm) :    
         _params(std::move(params)), _config(std::move(config)), _clause_comm(comm),
-        _f_size(fSize), _f_lits(fLits), _a_size(aSize), _a_lits(aLits), _desc_id(descId), _chksum(chksum) {
+        _f_size(fSize), _f_lits(fLits), _desc_id(descId), _chksum(chksum) {
 
     _desired_revision = _config.firstrev;
     _shmem_id = _config.getSharedMemId(Proc::getPid());
@@ -50,7 +50,6 @@ SatProcessAdapter::SatProcessAdapter(Parameters&& params, SatProcessConfig&& con
     // "placement new" operator: construct object not in the heap but in the provided chunk of memory
     _hsm = new ((char*)mainShmem) SatSharedMemory();
     _hsm->fSize = _f_size;
-    _hsm->aSize = _a_size;
     _hsm->chksum = _chksum;
     _hsm->config = _config;
     _sum_of_revision_sizes += _f_size;
@@ -80,13 +79,11 @@ void SatProcessAdapter::doWriteRevisions() {
             LOG(V4_VVER, "DBG Writing next revision\n");
             auto revStr = std::to_string(revData.revision);
             createSharedMemoryBlock("fsize."       + revStr, sizeof(size_t),              (void*)&revData.fSize);
-            createSharedMemoryBlock("asize."       + revStr, sizeof(size_t),              (void*)&revData.aSize);
             const int* fPtr = (const int*) createSharedMemoryBlock("formulae." + revStr, sizeof(int) * revData.fSize,
                 (void*)revData.fLits, revData.revision, revData.descriptionId, true);
             LOG(V2_INFO, "SUMMARY %s\n", StringUtils::getSummary(fPtr, revData.fSize).c_str());
-            if (revData.fSize > 0) assert(fPtr[0] != 0);
-            if (revData.fSize > 0) assert(fPtr[revData.fSize-1] == 0);
-            createSharedMemoryBlock("assumptions." + revStr, sizeof(int) * revData.aSize, (void*)revData.aLits);
+            //if (revData.fSize > 0) assert(fPtr[0] != 0);
+            //if (revData.fSize > 0) assert(fPtr[revData.fSize-1] == 0);
             createSharedMemoryBlock("checksum."    + revStr, sizeof(Checksum),            (void*)&(revData.checksum));
             _written_revision = revData.revision;
             LOG(V4_VVER, "DBG Done writing next revision %i\n", revData.revision);
@@ -111,10 +108,7 @@ void SatProcessAdapter::doInitialize() {
     // Allocate shared memory for formula, assumptions of initial revision
     const int* fInShmem = (const int*) createSharedMemoryBlock("formulae.0",
         sizeof(int) * _f_size, (void*)_f_lits, 0, _desc_id, true);
-    LOG(V2_INFO, "SUMMARY %s\n", StringUtils::getSummary(fInShmem, _f_size).c_str());
-    if (_f_size > 0) assert(fInShmem[0] != 0);
-    if (_f_size > 0) assert(fInShmem[_f_size-1] == 0);
-    createSharedMemoryBlock("assumptions.0", sizeof(int) * _a_size, (void*)_a_lits);
+    LOG(V2_INFO, "SPA: formula with %lu bytes\n", sizeof(int)*_f_size);
 
     // Set up bi-directional pipe to and from the subprocess
     char* pipeParentToChild = (char*) createSharedMemoryBlock("pipe-parenttochild", _hsm->pipeBufSize, nullptr);

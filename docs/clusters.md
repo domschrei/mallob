@@ -160,7 +160,7 @@ Remember to adjust the `#SBATCH` directives according to your job and to edit th
 # Load the same modules to compile Mallob
 module load slurm_setup
 module unload devEnv/Intel/2019 intel-mpi
-module load gcc/9 intel-mpi/2019-gcc cmake/3.14.5 gdb
+module load gcc/9 intel-mpi/2019-gcc cmake/3.21.4 gdb
 
 # Some output for debugging
 module list

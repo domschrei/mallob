@@ -13,9 +13,11 @@
 #include <utility>
 #include <vector>
 
+#include "app/sat/data/formula_compressor.hpp"
 #include "app/sat/proof/trusted/trusted_utils.hpp"
 #include "app/sat/proof/trusted_parser_process_adapter.hpp"
 #include "sat_reader.hpp"
+#include "data/job_description.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
 #include "util/sys/terminator.hpp"
@@ -38,20 +40,49 @@ void handleUnsat(const Parameters& _params) {
 
 bool SatReader::parseWithTrustedParser(JobDescription& desc) {
 	// Parse and sign in a separate subprocess
-	TrustedParserProcessAdapter tp(desc.getId());
+	TrustedParserProcessAdapter tp(_params.seed(), desc.getId());
 	uint8_t* sig;
-	bool ok = tp.parseAndSign(_filename.c_str(), *desc.getRevisionData(desc.getRevision()).get(), sig);
+	std::vector<unsigned char> plain;
+	std::vector<unsigned char>* out;
+	if (_params.compressFormula()) out = &plain;
+	else out = desc.getRevisionData(desc.getRevision()).get();
+
+	bool ok = tp.parseAndSign(_filename.c_str(), *out, sig);
 	if (!ok) return false;
+
 	std::string sigStr = Logger::dataToHexStr(sig, SIG_SIZE_BYTES);
 	assert(desc.getAppConfiguration().map.at("__SIG").size() == sigStr.size());
 	desc.setAppConfigurationEntry("__SIG", sigStr);
 	_max_var = tp.getNbVars();
 	_num_read_clauses = tp.getNbClauses();
-	LOG(V2_INFO, "TRUSTED parser read %i vars, %i cls - sig %s\n", _max_var, _num_read_clauses, sigStr.c_str());
+	desc.setFSize(tp.getFSize());
+	LOG(V2_INFO, "IMPCHK parser -key-seed=%lu read %i vars, %i cls - sig %s\n",
+		ImpCheck::getKeySeed(_params.seed()), _max_var, _num_read_clauses, sigStr.c_str());
+
+	if (_params.compressFormula()) {
+		auto vec = desc.getRevisionData(desc.getRevision()).get();
+		auto outSizeBytesBefore = vec->size();
+		FormulaCompressor::VectorFormulaOutput cOut(vec);
+		FormulaCompressor::compress((const int*) out->data(), out->size() / sizeof(int), 0, 0, cOut, true);
+		desc.setFSize((cOut.vec->size() - outSizeBytesBefore) / sizeof(int));
+	}
+
 	_input_finished = true;
 	_input_invalid = false;
-	desc.setFSize(tp.getFSize());
 	return true;
+}
+
+bool SatReader::parseAndCompress(JobDescription& desc) {
+	FormulaCompressor c;
+	auto vec = desc.getRevisionData(desc.getRevision()).get();
+	auto outSizeBytesBefore = vec->size();
+	FormulaCompressor::VectorFormulaOutput out(vec);
+	_input_invalid = !c.readAndCompress(_filename.c_str(), out);
+	_input_finished = true;
+	desc.setFSize((out.vec->size() - outSizeBytesBefore) / sizeof(int));
+	_max_var = out.maxVar;
+	_num_read_clauses = out.nbClauses;
+	return !_input_invalid;
 }
 
 bool SatReader::parseInternally(JobDescription& desc) {
@@ -200,6 +231,8 @@ bool SatReader::read(JobDescription& desc) {
 
 	if (_params.onTheFlyChecking()) {
 		if (!parseWithTrustedParser(desc)) return false;
+	} else if (_params.compressFormula()) {
+		if (!parseAndCompress(desc)) return false;
 	} else {
 		if (!parseInternally(desc)) return false;
 	}

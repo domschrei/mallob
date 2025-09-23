@@ -1,9 +1,9 @@
 
 # SAT-specific sources for the sub-process
-set(SAT_SUBPROC_SOURCES src/app/sat/execution/engine.cpp src/app/sat/execution/solver_thread.cpp src/app/sat/execution/solving_state.cpp src/app/sat/job/sat_process_config.cpp src/app/sat/sharing/buffer/buffer_merger.cpp src/app/sat/sharing/buffer/buffer_reader.cpp src/app/sat/sharing/filter/clause_buffer_lbd_scrambler.cpp src/app/sat/sharing/sharing_manager.cpp src/app/sat/solvers/cadical.cpp src/app/sat/solvers/kissat.cpp src/app/sat/solvers/lingeling.cpp src/app/sat/solvers/portfolio_solver_interface.cpp src/app/sat/data/clause_metadata.cpp src/app/sat/proof/lrat_utils.cpp CACHE INTERNAL "")
+set(SAT_SUBPROC_SOURCES src/app/sat/execution/engine.cpp src/app/sat/execution/solver_thread.cpp src/app/sat/execution/solving_state.cpp src/app/sat/sharing/buffer/buffer_merger.cpp src/app/sat/sharing/buffer/buffer_reader.cpp src/app/sat/sharing/filter/clause_buffer_lbd_scrambler.cpp src/app/sat/sharing/sharing_manager.cpp src/app/sat/solvers/cadical.cpp src/app/sat/solvers/kissat.cpp src/app/sat/solvers/lingeling.cpp src/app/sat/solvers/portfolio_solver_interface.cpp src/app/sat/data/clause_metadata.cpp src/app/sat/proof/lrat_utils.cpp CACHE INTERNAL "")
 
 # Add SAT-specific sources to main Mallob executable
-set(SAT_MALLOB_SOURCES src/app/sat/parse/sat_reader.cpp src/app/sat/execution/solving_state.cpp src/app/sat/job/anytime_sat_clause_communicator.cpp src/app/sat/job/forked_sat_job.cpp src/app/sat/job/sat_process_adapter.cpp src/app/sat/job/sat_process_config.cpp src/app/sat/job/historic_clause_storage.cpp src/app/sat/sharing/buffer/buffer_merger.cpp src/app/sat/sharing/buffer/buffer_reader.cpp src/app/sat/sharing/filter/clause_buffer_lbd_scrambler.cpp src/app/sat/data/clause_metadata.cpp src/app/sat/proof/lrat_utils.cpp)
+set(SAT_MALLOB_SOURCES src/app/sat/data/formula_compressor.cpp src/app/sat/parse/sat_reader.cpp src/app/sat/execution/solving_state.cpp src/app/sat/job/anytime_sat_clause_communicator.cpp src/app/sat/job/forked_sat_job.cpp src/app/sat/job/sat_process_adapter.cpp src/app/sat/job/historic_clause_storage.cpp src/app/sat/sharing/buffer/buffer_merger.cpp src/app/sat/sharing/buffer/buffer_reader.cpp src/app/sat/sharing/filter/clause_buffer_lbd_scrambler.cpp src/app/sat/data/clause_metadata.cpp src/app/sat/proof/lrat_utils.cpp src/app/sat/stream/sat_job_stream_garbage_collector.cpp)
 set(MALLOB_COREPLUSCOMM_SOURCES ${MALLOB_COREPLUSCOMM_SOURCES} ${SAT_MALLOB_SOURCES} CACHE INTERNAL "")
 
 #message("commons+SAT sources: ${BASE_SOURCES}") # Use to debug
@@ -47,7 +47,7 @@ if(MALLOB_BUILD_LRAT_MODULES)
     add_executable(standalone_lrat_checker src/app/sat/proof/standalone_checker.cpp)
     target_include_directories(standalone_lrat_checker PRIVATE ${BASE_INCLUDES})
     target_compile_options(standalone_lrat_checker PRIVATE ${BASE_COMPILEFLAGS})
-    target_link_libraries(standalone_lrat_checker mallob_sat_subproc)
+    target_link_libraries(standalone_lrat_checker mallob_corepluscomm)
 endif()
 
 # Add unit tests
@@ -67,3 +67,4 @@ new_test(lrat_checker "${BASE_INCLUDES}" mallob_sat_subproc)
 new_test(portfolio_sequence "${BASE_INCLUDES}" mallob_sat_subproc)
 new_test(theory_specification "${BASE_INCLUDES}" mallob_sat_subproc)
 new_test(model_string_compressor "${BASE_INCLUDES}" mallob_sat_subproc)
+new_test(formula_compressor "${BASE_INCLUDES}" mallob_corepluscomm)

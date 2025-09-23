@@ -1,4 +1,5 @@
 
+#include <iostream>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <assert.h>
@@ -117,13 +118,10 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
                 // Incremental job is notified to be done
                 LOGGER(_logger, V3_VERB, "Incremental job #%i is done\n", jobId);
                 _job_name_to_id_rev.erase(precursorName);
-                for (int rev = 0; rev <= _job_id_to_latest_rev[id]; rev++) {
-                    auto key = std::pair<int, int>(id, rev);
-                    JobImage* foundImg = _job_id_rev_to_image.at(key);
-                    _job_id_rev_to_image.erase(key);
-                    delete foundImg;
-                }
+                delete _job_id_to_image.at(id);
+                _job_id_to_image.erase(id);
                 _job_id_to_latest_rev.erase(id);
+                LOGGER(_logger, V3_VERB, "Cleaned up internals of incremental job #%i\n", jobId);
 
                 // Notify client that this incremental job is done
                 JobMetadata data;
@@ -135,14 +133,14 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
                 return ACCEPT_CONCLUDE;
 
             } else {
-
                 // Job is not done -- add increment to job
                 _job_id_to_latest_rev[id] = rev+1;
                 _job_name_to_id_rev[jobName] = std::pair<int, int>(id, rev+1);
-                img = new JobImage(id, jobName, arrival, feedback);
-                img->incremental = true;
+                img = _job_id_to_image[id]; // new JobImage(id, jobName, arrival, feedback);
+                img->userQualifiedName = jobName;
+                img->arrivalTime = arrival;
+                img->feedback = feedback;
                 img->baseJson = std::move(inputJson);
-                _job_id_rev_to_image[std::pair<int, int>(id, rev+1)] = img;
             }
 
         } else {
@@ -156,7 +154,7 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
             LOGGER(_logger, V3_VERB, "Mapping job \"%s\" to internal ID #%i\n", jobName.c_str(), id);
 
             // Was job already parsed before?
-            if (_job_id_rev_to_image.count(std::pair<int, int>(id, 0))) {
+            if (_job_id_to_image.count(id)) {
                 LOGGER(_logger, V1_WARN, "[WARN] Modification of a file I already parsed! Ignoring.\n");
                 throw std::invalid_argument("File was already parsed before");
                 return DISCARD;
@@ -165,7 +163,7 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
             img = new JobImage(id, jobName, arrival, feedback);
             img->incremental = incremental;
             img->baseJson = std::move(inputJson);
-            _job_id_rev_to_image[std::pair<int, int>(id, 0)] = std::move(img);
+            _job_id_to_image[id] = img;
             _job_id_to_latest_rev[id] = 0;
         }
     }
@@ -192,9 +190,6 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
         int maxDemand = json["max-demand"].get<int>();
         job->setMaxDemand(maxDemand);
         LOGGER(_logger, V4_VVER, "Job #%i : max demand %i\n", id, maxDemand);
-    }
-    if (json.contains("assumptions")) {
-        job->setPreloadedAssumptions(json["assumptions"].get<std::vector<int>>());
     }
     if (json.contains("internalliterals")) {
         job->setPreloadedLiterals(StaticStore<std::vector<int>>::extract(json["internalliterals"]));
@@ -274,9 +269,16 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
 void JsonInterface::handleJobDone(JobResult&& result, const JobProcessingStatistics& stats, int applicationId) {
 
     auto lock = _job_map_mutex.getLock();
-    
-    JobImage* img = _job_id_rev_to_image[std::pair<int, int>(result.id, result.revision)];
-    auto& j = img->baseJson;
+
+    assert(_job_id_to_latest_rev.count(result.id));
+    int latestRev = _job_id_to_latest_rev[result.id];
+    assert(latestRev == result.revision);
+
+    assert(_job_id_to_image.count(result.id));
+    JobImage* img = _job_id_to_image[result.id];
+    nlohmann::json j;
+    j["user"] = img->baseJson["user"];
+    j["name"] = img->baseJson["name"];
 
     bool useSolutionFile = (_params.pipeSolutions() == MALLOB_PIPE_SOLUTIONS_ALL && result.getSolutionSize() > 0)
         || (_params.pipeSolutions() == MALLOB_PIPE_SOLUTIONS_LARGE && result.getSolutionSize() > 65536);
@@ -333,7 +335,7 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobProcessingStatist
 
     if (!img->incremental) {
         _job_name_to_id_rev.erase(img->userQualifiedName);
-        _job_id_rev_to_image.erase(std::pair<int, int>(result.id, result.revision));
+        _job_id_to_image.erase(result.id);
         delete img;
     }
 }

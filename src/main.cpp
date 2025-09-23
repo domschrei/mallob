@@ -15,6 +15,7 @@
 
 #include "comm/distributed_termination.hpp"
 #include "comm/mympi.hpp"
+#include "interface/api/api_registry.hpp"
 #include "interface/api/rank_specific_file_fetcher.hpp"
 #include "scheduling/core_allocator.hpp"
 #include "util/periodic_event.hpp"
@@ -80,14 +81,10 @@ void introduceMonoJob(Parameters& params, Client& client) {
         json["cpu-limit"] = std::to_string(params.jobCpuLimit()) + "s";
     }
 
-    // printf("ß introduceMonoJob :: submitting json\n");
-
-    auto result = client.getAPI().submit(json, [&](nlohmann::json& response) {
+    auto result = APIRegistry::get().submit(json, [&](nlohmann::json& response) {
         // Job done? => Terminate all processes
         monoJobDone = true;
     });
-    // printf("ß introduceMonoJob :: finished submitting json\n");
-
     if (result != JsonInterface::Result::ACCEPT) {
         LOG(V0_CRIT, "[ERROR] Cannot introduce mono job!\n");
         abort();
@@ -149,7 +146,7 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     // If job streaming is enabled, initialize a corresponding job streamer
     JobStreamer* streamer = nullptr;
     if (params.jobTemplate.isSet() && isClient) {
-        streamer = new JobStreamer(params, client->getAPI(), client->getInternalRank());
+        streamer = new JobStreamer(params, APIRegistry::get(), client->getInternalRank());
     }
 
     // If a client application is provided, run this application in (a) separate thread(s)
@@ -175,17 +172,12 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     if (params.monoFilename.isSet() && isClient && MyMpi::rank(commClients) == 0)
         introduceMonoJob(params, *client);
 
-
-
-    // printf("ß Starting main loop\n");
     // Main loop
     while (true) {
 
         // update cached timing
         Timer::cacheElapsedSeconds();
 
-
-        // LOG(V2_INFO, "ß loop\n");
         // Advance worker and client logic
         if (isWorker) worker->advance();
         if (isClient) client->advance();
@@ -313,9 +305,8 @@ int main(int argc, char *argv[]) {
                 doRemove(file);
             }
         }
-        for (auto file : FileUtils::glob("/dev/shm/edu.kit.iti.mallob.*")) {
-            doRemove(file);
-        }
+        std::string cmd = "find /dev/shm/ -name 'edu.kit.iti.mallob.*' -print0 | xargs -0 rm 2>/dev/null";
+        (void) system(cmd.c_str());
         TmpDir::wipe();
 
         // Wait for all processes to have cleaned up before proceeding

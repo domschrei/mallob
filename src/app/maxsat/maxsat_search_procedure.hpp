@@ -5,24 +5,24 @@
 #include "app/maxsat/encoding/generalized_totalizer.hpp"
 #include "app/maxsat/encoding/polynomial_watchdog.hpp"
 #include "app/maxsat/encoding/warners_adder.hpp"
+#include "app/sat/stream/internal_sat_job_stream_processor.hpp"
+#include "app/sat/stream/mallob_sat_job_stream_processor.hpp"
 #include "app/maxsat/maxsat_instance.hpp"
-#include "app/maxsat/sat_job_stream.hpp"
+#include "app/sat/stream/sat_job_stream.hpp"
 #include "app/maxsat/solution_writer.hpp"
-#include "app/sat/data/model_string_compressor.hpp"
 #include "app/sat/data/theories/integer_term.hpp"
 #include "app/sat/data/theories/theory_specification.hpp"
 #include "app/sat/job/sat_constants.h"
+#include "app/sat/stream/sat_job_stream_garbage_collector.hpp"
+#include "app/sat/stream/wrapped_sat_job_stream.hpp"
+#include "interface/api/api_connector.hpp"
 #include "rustsat.h"
+#include "scheduling/core_allocator.hpp"
 #include "util/logger.hpp"
-#include "util/random.hpp"
-#include "util/string_utils.hpp"
-#include "util/sys/background_worker.hpp"
-#include "util/sys/terminator.hpp"
 #include "util/params.hpp"
 #include "util/sys/thread_pool.hpp"
 
 #include <climits>
-#include <fstream>
 #include <memory>
 #include <unistd.h>
 
@@ -63,10 +63,10 @@ private:
     APIConnector& _api; // for submitting jobs to Mallob
     JobDescription& _desc; // contains our instance to solve and all metadata
     MaxSatInstance& _instance;
+    CoreAllocator::Allocation _core_alloc;
     int _nb_orig_vars;
 
-    std::string _username;
-    SatJobStream _job_stream;
+    std::unique_ptr<WrappedSatJobStream> _stream_wrapper;
 
     // vector of 0-separated (hard) clauses to add in the next SAT call
     std::vector<int> _lits_to_add;
@@ -97,17 +97,25 @@ private:
 
     bool _yield_searcher {false};
     bool _finalized {false};
+    bool _initialized {false};
 
     std::shared_ptr<SolutionWriter> _sol_writer;
 
 public:
     MaxSatSearchProcedure(const Parameters& params, APIConnector& api, JobDescription& desc,
             MaxSatInstance& instance, EncodingStrategy encStrat, SearchStrategy searchStrat, const std::string& label) :
-        _params(params), _api(api), _desc(desc), _instance(instance),
-        _username("maxsat#" + std::to_string(_desc.getId())),
-        _job_stream(_params, _api, _desc, _running_stream_id++, true),
+        _params(params), _api(api), _desc(desc), _instance(instance), _core_alloc(1),
         _lits_to_add(_instance.formulaData, _instance.formulaData+_instance.formulaSize),
         _current_bound(ULONG_MAX), _encoding_strat(encStrat), _search_strat(searchStrat), _label(label) {
+
+        _stream_wrapper.reset(new WrappedSatJobStream("#" + std::to_string(desc.getId()) + "(Max)"));
+
+        _stream_wrapper->mallobProcessor = new MallobSatJobStreamProcessor(_params, _api, _desc,
+            "maxsat", _running_stream_id++, true, _stream_wrapper->stream.getSynchronizer());
+        _stream_wrapper->stream.addProcessor(_stream_wrapper->mallobProcessor);
+        auto internalProcessor = new InternalSatJobStreamProcessor(true, _stream_wrapper->stream.getSynchronizer());
+        _stream_wrapper->stream.addProcessor(internalProcessor);
+        _stream_wrapper->stream.setTerminator([&]() {return false;});
 
         _nb_orig_vars = _instance.nbVars; // before cardinality constraint encodings!
 
@@ -142,7 +150,7 @@ public:
             TheorySpecification spec({std::move(rule)});
             std::string specStr = spec.toStr();
             specStr.erase(std::remove_if(specStr.begin(), specStr.end(), ::isspace), specStr.end());
-            _job_stream.setInnerObjective(specStr);
+            _stream_wrapper->mallobProcessor->setInnerObjective(specStr);
         }
     }
 
@@ -225,12 +233,19 @@ public:
         LOG(V2_INFO, "MAXSAT %s Calling SAT %s (%i new lits, %i assumptions, chk %lu,%x)\n",
             _label.c_str(), _current_bound==ULONG_MAX ? "bound-free" : ("with bound " + std::to_string(_current_bound)).c_str(),
             _lits_to_add.size(), _assumptions_to_set.size(), hash.count(), hash.get());
-        if (_params.verbosity() >= V5_DEBG) {
-            LOG(V5_DEBG, "MAXSAT Literals: %s\n", StringUtils::getSummary(_lits_to_add).c_str());
-            LOG(V5_DEBG, "MAXSAT Assumptions: %s\n", StringUtils::getSummary(_assumptions_to_set).c_str());
+        if (_params.verbosity() >= V4_VVER) {
+            LOG(V4_VVER, "MAXSAT Literals: %s\n", StringUtils::getSummary(_lits_to_add).c_str());
+            LOG(V4_VVER, "MAXSAT Assumptions: %s\n", StringUtils::getSummary(_assumptions_to_set).c_str());
         }
 
-        _job_stream.submitNext(std::move(_lits_to_add), _assumptions_to_set,
+        if (!_initialized && _stream_wrapper->mallobProcessor) {
+            _stream_wrapper->mallobProcessor->setInitialSize(
+                _instance.nbVars,
+                _desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
+            _initialized = true;
+        }
+
+        _stream_wrapper->stream.solveNonblocking(std::move(_lits_to_add), _assumptions_to_set,
             _desc_label_next_call,
             // TODO still leading to error at volume_calculator.hpp:137:
             // Let the position of the tested bound influence the job's priority
@@ -244,21 +259,13 @@ public:
         _solving = true;
     }
     bool isNonblockingSolvePending() {
-        return _job_stream.isPending() && _solving;
+        return _stream_wrapper->stream.isNonblockingSolvePending() && _solving;
     }
     int processNonblockingSolveResult() {
         _solving = false;
 
         // Job is done - retrieve the result.
-        int resultCode;
-        nlohmann::json result;
-        if (_job_stream.isRejected()) {
-            LOG(V2_INFO, "MAXSAT %s Call rejected\n", _label.c_str());
-            resultCode = 0; // UNKNOWN
-        } else {
-            result = std::move(_job_stream.getResult());
-            resultCode = result["result"]["resultcode"];
-        }
+        auto [resultCode, solution] = _stream_wrapper->stream.getNonblockingSolveResult();
         if (resultCode == RESULT_UNSAT) {
             // UNSAT
             if (_search_strat == NAIVE_REFINEMENT) {
@@ -292,25 +299,20 @@ public:
         // Formula is SATisfiable.
 
         // Retrieve the initial model and compute its cost as a first upper bound.
-        std::vector<int> solution;
-        if (_params.compressModels()) {
-            solution = ModelStringCompressor::decompress(result["result"]["solution"].get<std::string>());
-        } else {
-            solution = result["result"]["solution"].get<std::vector<int>>();
-        }
         if (_search_strat == NAIVE_REFINEMENT) {
             // remember *any* found solution to forbid it in the next step
             _last_found_solution = solution;
         }
         const size_t cost = _instance.getCostOfModel(solution);
         if (cost > _current_bound) {
+            /*
             std::string reportFilename = _params.logDirectory() + "/erroneous-maxsat-model." + result["name"].get<std::string>();
             {
                 std::ofstream ofs(reportFilename);
                 ofs << "MaxSAT searcher " << _label << std::endl;
                 ofs << "Internal job ID: #" << result["internal_id"].get<int>() << std::endl;
-                ofs << "Job literals: perhaps present at " << _params.logDirectory() + "/maxsat.joblits." + result["name"].get<std::string>() << std::endl;
-                ofs << "Job assumptions: perhaps present at " << _params.logDirectory() + "/maxsat.jobassumptions." + result["name"].get<std::string>() << std::endl;
+                ofs << "Job literals: perhaps present at " << _params.logDirectory() + "/satjobstream.joblits." + result["name"].get<std::string>() << std::endl;
+                ofs << "Job assumptions: perhaps present at " << _params.logDirectory() + "/satjobstream.jobassumptions." + result["name"].get<std::string>() << std::endl;
                 ofs << "Found model: perhaps present at " << _params.solutionToFile() + "." + std::to_string(result["internal_id"].get<int>())
                     + "." + std::to_string(result["internal_revision"].get<int>()) << std::endl;
                 ofs << "Enforced cost: " << _current_bound << " or lower" << std::endl;
@@ -329,6 +331,8 @@ public:
             }
             LOG(V0_CRIT, "[ERROR] MAXSAT Model for bound %lu has cost %lu - report written to %s\n",
                 _current_bound, cost, reportFilename.c_str());
+            */
+            LOG(V0_CRIT, "[ERROR] MAXSAT Model for bound %lu has cost %lu!\n", _current_bound, cost);
             abort();
         }
         if (cost < _instance.bestCost) {
@@ -379,7 +383,7 @@ public:
     void interrupt(bool terminate = false) {
         assert(_solving);
         if (terminate) _yield_searcher = true;
-        if (_job_stream.interrupt()) {
+        if (_stream_wrapper->stream.interrupt()) {
             if (_current_bound == ULONG_MAX)
                 LOG(V2_INFO, "MAXSAT %s Interrupt bound-free solving\n", _label.c_str());
             else
@@ -392,7 +396,7 @@ public:
     }
 
     void setGroupId(const std::string& groupId, int minVar = -1, int maxVar = -1) {
-        _job_stream.setGroupId(groupId, minVar, maxVar);
+        _stream_wrapper->mallobProcessor->setGroupId(groupId, minVar, maxVar);
     }
 
     size_t getCurrentBound() const {
@@ -404,8 +408,8 @@ public:
     }
     void finalize() {
         if (_finalized) return;
-        _job_stream.finalize();
         _finalized = true;
+        SatJobStreamGarbageCollector::get().add(std::move(_stream_wrapper));
     }
 
     ~MaxSatSearchProcedure() {

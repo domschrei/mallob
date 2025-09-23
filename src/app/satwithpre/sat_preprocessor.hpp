@@ -3,11 +3,14 @@
 
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "app/sat/job/sat_constants.h"
+#include "app/sat/parse/serialized_formula_parser.hpp"
 #include "app/sat/solvers/kissat.hpp"
 #include "app/sat/solvers/lingeling.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
 #include "data/job_description.hpp"
+#include "scheduling/core_allocator.hpp"
 #include "util/logger.hpp"
+#include "util/params.hpp"
 #include "util/sys/thread_pool.hpp"
 #include <atomic>
 #include <future>
@@ -15,8 +18,10 @@
 class SatPreprocessor {
 
 private:
+    const Parameters& _params;
     const JobDescription& _desc;
     bool _run_lingeling {false};
+    CoreAllocator::Allocation _core_alloc;
 
     std::unique_ptr<Lingeling> _lingeling;
     std::unique_ptr<Kissat> _kissat;
@@ -27,7 +32,8 @@ private:
     std::vector<int> _solution;
 
 public:
-    SatPreprocessor(JobDescription& desc, bool runLingeling) : _desc(desc), _run_lingeling(runLingeling) {}
+    SatPreprocessor(const Parameters& params, JobDescription& desc, bool runLingeling) :
+        _params(params), _desc(desc), _run_lingeling(runLingeling), _core_alloc(1 + _run_lingeling) {}
     ~SatPreprocessor() {
         join(false);
         if (_kissat) _kissat->cleanUp();
@@ -38,6 +44,7 @@ public:
         SolverSetup setup;
         setup.logger = &Logger::getMainInstance();
         setup.numVars = _desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
+        setup.numOriginalClauses = _desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
         setup.solverType = 'p';
         _kissat.reset(new Kissat(setup));
         _nb_running++;
@@ -76,11 +83,13 @@ public:
     }
 
     bool done() {
-        // Did we already find a result?
-        if (_solver_result.load(std::memory_order_relaxed) != 0)
-            return true;
-        bool done = _nb_running.load(std::memory_order_relaxed) == 0;
-        if (done) _nb_running.store(-1, std::memory_order_relaxed);
+        // Return allocated cores as needed
+        int nbRunning = _nb_running.load(std::memory_order_relaxed);
+        if (nbRunning >= 0 && nbRunning < _core_alloc.getNbAllocated())
+            _core_alloc.returnCores(_core_alloc.getNbAllocated() - nbRunning);
+        // Did we already find a result? Is everyone done?
+        bool done = _solver_result.load(std::memory_order_relaxed) != 0 || nbRunning == 0;
+        if (nbRunning == 0) _nb_running.store(-1, std::memory_order_relaxed);
         return done;
     }
     int getResultCode() const {
@@ -113,9 +122,11 @@ public:
 
 private:
     void loadFormulaToSolver(PortfolioSolverInterface* slv) {
-        const int* lits = _desc.getFormulaPayload(0);
-        for (int i = 0; i < _desc.getFormulaPayloadSize(0); i++) {
-            slv->addLiteral(lits[i]);
+        SerializedFormulaParser parser(Logger::getMainInstance(), _desc.getFormulaPayload(0), _desc.getFormulaPayloadSize(0));
+        if (_params.compressFormula()) parser.setCompressed();
+        int lit;
+        while (parser.getNextLiteral(lit)) {
+            slv->addLiteral(lit);
         }
         slv->diversify(0);
     }

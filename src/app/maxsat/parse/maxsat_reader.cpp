@@ -162,26 +162,26 @@ bool MaxSatReader::read(JobDescription& desc) {
 		LOG(V3_VERB, "MAXSAT MaxPRE time parse:%.3f preprocess:%.3f\n", timeParse, timePreprocess);
 
 		// Parcel job description
-		for (int lit : formula) desc.addPermanentData(lit);
-		desc.addPermanentData(0);
+		for (int lit : formula) desc.addData(lit);
+		desc.addData(0);
 		for (auto& [weight, lit] : _objective) {
 			// Need to write each 64-bit weight as two 32-bit integers ...
 			const int* weightAsTwoInts = (int*) &weight;
-			desc.addPermanentData(weightAsTwoInts[0]);
-			desc.addPermanentData(weightAsTwoInts[1]);
-			desc.addPermanentData(lit);
+			desc.addData(weightAsTwoInts[0]);
+			desc.addData(weightAsTwoInts[1]);
+			desc.addData(lit);
 		}
-		desc.addPermanentData((int) _objective.size());
+		desc.addData((int) _objective.size());
 		unsigned long lb = parser->get_lb();
 		unsigned long ub = parser->get_ub();
 	} else
 #endif
 	if (!parseInternally(desc)) return false;
 
-	desc.addPermanentData(((int*) &lb)[0]);
-	desc.addPermanentData(((int*) &lb)[1]);
-	desc.addPermanentData(((int*) &ub)[0]);
-	desc.addPermanentData(((int*) &ub)[1]);
+	desc.addData(((int*) &lb)[0]);
+	desc.addData(((int*) &lb)[1]);
+	desc.addData(((int*) &ub)[0]);
+	desc.addData(((int*) &ub)[1]);
 
 	assert(getNbClauses() > 0);
 

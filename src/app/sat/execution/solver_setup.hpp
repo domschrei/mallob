@@ -20,6 +20,7 @@ struct SolverSetup {
 	std::string jobname;
 	std::string profilingBaseDir; 
 	int profilingLevel {-1};
+	int baseSeed {0};
 
 
 	// Properties of the SAT problem
@@ -85,8 +86,8 @@ struct SolverSetup {
 	size_t anticipatedLitsToImportPerCycle {1000};
 	bool resetLbdBeforeImport {false};
 	bool incrementLbdBeforeImport {false};
-	int randomizeLbdBeforeImport;
-	bool adaptiveImportManager;
+	int randomizeLbdBeforeImport {false};
+	bool adaptiveImportManager {true};
 
 
 	// Certified UNSAT and proof production

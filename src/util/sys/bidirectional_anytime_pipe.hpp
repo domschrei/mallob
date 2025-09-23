@@ -20,6 +20,8 @@
 #include "util/spsc_blocking_ringbuffer.hpp"
 #include "util/sys/background_worker.hpp"
 #include "util/sys/fileutils.hpp"
+#include "util/sys/process.hpp"
+#include "util/sys/timer.hpp"
 
 class BiDirectionalAnytimePipe {
 

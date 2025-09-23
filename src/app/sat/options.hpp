@@ -19,6 +19,7 @@ OPTION_GROUP(grpAppSat, "app/sat", "SAT solving options")
     "Log successfully shared clauses to the provided path")
  OPT_STRING(satProfilingDir,            "spd", "sat-profiling-dir", "", "Directory to write SAT thread profiling reports to")
  OPT_INT(satProfilingLevel,             "spl", "sat-profiling-level", -1, -1, 4, "Profiling level for SAT solvers (-1=none ... 4=all)")
+ OPT_BOOL(compressFormula,                  "cf", "compress-formula", false, "Compress formula serialization (reorders clauses and literals in clauses)")
  OPT_BOOL(compressModels,                   "cm", "compress-models", false, "Compress found models into hexadecimal vector in output")
  OPT_STRING(groundTruthModel,               "gtm", "", "", "Ground truth model to test learned clauses against")
  OPT_BOOL(useShweeping,                      "shweep", "",                            false, "Let kissat spawn the SWEEP application when it usually would do sweeping on its own")
@@ -26,13 +27,15 @@ OPTION_GROUP(grpAppSat, "app/sat", "SAT solving options")
 OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration")
  OPT_INT(bufferedImportedClsGenerations,    "bicg", "buffered-imported-cls-generations", 4,        1,   LARGE_INT, 
     "Number of subsequent full clause sharings to fit in each solver's import buffer")
- OPT_INT(clauseBufferBaseSize,              "cbbs", "clause-buffer-base-size",           1500,     0,   MAX_INT,   
-    "Clause buffer base size in literals per process")
+ OPT_INT(clauseBufferBaseSize,              "cbbs", "clause-buffer-base-size",           0,     0,   0,   
+    "DISCONTINUED - use exportVolumePerThread (-evpt) instead, which is supposed to have a one-size-fits-all default")
+ OPT_INT(exportVolumePerThread,             "evpt", "export-volume-per-thread",          500,   0,   LARGE_INT,
+    "Max. number of clause literals to export per thread per sharing operation")
  OPT_INT(clauseBufferLimitMode,             "cblm", "clause-buffer-limit-mode",          1,        0,   1,
     "Mode for computing clause buffer limit w.r.t. worker count (0: unlimited growth based on levels of binary tree, 1: limited growth based on exponential function")
- OPT_FLOAT(clauseBufferLimitParam,          "cblp", "clause-buffer-limit-param",         250'000,  0,   MAX_INT,
+ OPT_FLOAT(clauseBufferLimitParam,          "cblp", "clause-buffer-limit-param",         100'000,  0,   MAX_INT,
     "Clause buffer discount factor: reduce buffer size per PE by <factor> each depth")
- OPT_FLOAT(clauseFilterClearInterval,       "cfci", "clause-filter-clear-interval",      15,       -1,  LARGE_INT,
+ OPT_FLOAT(clauseFilterClearInterval,       "cfci", "clause-filter-clear-interval",      10,       -1,  LARGE_INT,
     "Set clear interval of clauses in solver filters (-1: never clear, 0: always clear")
  OPT_BOOL(collectClauseHistory,           "ch", "collect-clause-history",                false,
     "Employ clause history collection mechanism")
@@ -43,13 +46,13 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "Group and prioritize clauses in buffers by the sum of clause length and LBD score")
  OPT_INT(maxLbdPartitioningSize,            "mlbdps", "max-lbd-partition-size",          2,        1,   LARGE_INT,
     "Store clauses with up to this LBD in separate buckets")
- OPT_INT(minNumChunksForImportPerSolver,    "mcips", "min-import-chunks-per-solver",     10,       1,   LARGE_INT,      
-    "Min. number of cbbs-sized chunks for buffering incoming clauses for import per solver")
+ OPT_INT(minNumChunksForImportPerSolver,    "mcips", "min-import-chunks-per-solver",     10,       1,   LARGE_INT,
+    "Min. number of single-export-sized chunks for buffering incoming clauses for import per solver")
  OPT_INT(numExportChunks,                   "nec", "export-chunks",                      10,       1,   LARGE_INT,
-    "Number of cbbs-sized chunks for buffering produced clauses for export")
- OPT_INT(qualityClauseLengthLimit,          "qcll", "quality-clause-length-limit",       8,        0,   255,
+    "Number of single-export-sized chunks for buffering produced clauses for export")
+ OPT_INT(qualityClauseLengthLimit,          "qcll", "quality-clause-length-limit",       60,        0,   255,
     "Clauses up to this length are considered \"high quality\"")
- OPT_INT(qualityLbdLimit,                   "qlbdl", "quality-lbd-limit",                2,        0,   255,
+ OPT_INT(qualityLbdLimit,                   "qlbdl", "quality-lbd-limit",                60,        0,   255,
     "Clauses with an LBD score up to this value are considered \"high quality\"")
  OPT_INT(clauseFilterMode,                  "cfm", "clause-filter-mode",                 3,        0,   3, 
     "0 = no filtering, 1 = bloom filters, 2 = exact filters, 3 = exact filters with distributed filtering in a 2nd all-reduction")
@@ -57,7 +60,7 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "-1 = static by length w/ mixed LBD, 0 = static by length, 1 = static by LBD, 2 = adaptive by length + -mlbdps option, 3 = simplified adaptive")
  OPT_BOOL(lbdPriorityInner, "lbdpi", "lbd-priority-inner", false, "Whether LBD should be used as primary quality metric in the inner buckets (bound by \"quality\" limits)")
  OPT_BOOL(lbdPriorityOuter, "lbdpo", "lbd-priority-outer", false, "Whether LBD should be used as primary quality metric in the outer buckets (bound by \"strict\" limits)")
- OPT_INT(resetLbd,                          "rlbd", "reset-lbd"          ,                0,        0,   3,
+ OPT_INT(resetLbd,                          "rlbd", "reset-lbd"          ,                3,        0,   3,
     "Reset each clause's LBD to its length 0=never; 1=at import; 2=at export; 3=at production")
  OPT_INT(strictClauseLengthLimit,           "scll", "strict-clause-length-limit",        60,       0,   255,
     "Only clauses up to this length will be shared")
@@ -68,7 +71,7 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
     "Max. relative increase in size of clause sharing buffers in case of many clauses being filtered")
  OPT_BOOL(backlogExportManager,             "bem", "backlog-export-manager",             true, "Use sequentialized export manager with backlogs instead of simple HordeSat-style export")
  OPT_BOOL(adaptiveImportManager,            "aim", "adaptive-import-manager",            true, "Use adaptive clause store for each solver's import buffer instead of lock-free ring buffers")
- OPT_BOOL(incrementLbd,                     "ilbd", "increment-lbd-at-import",           true, "Increment LBD value of each clause before import")
+ OPT_BOOL(incrementLbd,                     "ilbd", "increment-lbd-at-import",           false, "Increment LBD value of each clause before import")
   OPT_INT(randomizeLbd,                     "randlbd", "randomize-lbd-at-import",        0,       0,      2, "Randomize the LBD value of each clause before import. 0=Never. 1=Uniformly. 2=Triangle-distribution. - can be combined with -ilbd afterwards")
  OPT_BOOL(noImport,                         "no-import", "",                             false, "Turn off solvers importing clauses (for comparison purposes)")
  OPT_BOOL(scrambleLbdScores,                "scramble-lbds", "",                         false, "For each clause length, randomly reassign the present LBD values to the present shared clauses")
@@ -78,8 +81,6 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
    ">=1 also overrides -lbdpi=1 -lbdpo=1 -pbbm=1 for cross-sharing ONLY.")
 
 OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversification options")
- OPT_FLOAT(inputShuffleProbability,         "isp", "input-shuffle-probability",          0,        0,   1,
-    "Probability for a solver (never the 1st one of a kind) to shuffle the order of clauses in the input to some degree")
  OPT_INT(diversifyElimination,              "div-elim", "",                              0,        0,   3,
     "0=normal diversification, 1/2/3=disable some/most/all variable elimination")
  OPT_BOOL(diversifyFanOut,                  "div-fanout", "",                            false,

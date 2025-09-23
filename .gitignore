@@ -19,6 +19,8 @@ bin/
 instances/*.cnf
 instances/*.cnf.xz
 instances/*.uri
+instances/wcnf/*.wcnf
+instances/wcnf/*.wcnf.xz
 upload.sh
 download.sh
 .unused/

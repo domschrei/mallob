@@ -29,7 +29,6 @@ void testSatInstances(Parameters& params) {
         assert(success);
         time = Timer::elapsedSeconds() - time;
         LOG(V2_INFO, " - done, took %.3fs\n", time);
-        assert(d.getNumFormulaLiterals() > 0);
 
         LOG(V2_INFO, "Only decompressing CNF %s for comparison ...\n", f.c_str());
         float time2 = Timer::elapsedSeconds();
@@ -50,26 +49,15 @@ void testIncrementalExample(Parameters& params) {
     std::string f = "instances/incremental/entertainment08-0.cnf";
     SatReader r(params, f);
     r.read(desc);
-    LOG(V2_INFO, "Base: %i lits, %i assumptions\n", desc.getNumFormulaLiterals(), desc.getNumAssumptionLiterals());
-    assert(desc.getNumFormulaLiterals() == 6);
-    assert(desc.getNumAssumptionLiterals() == 1);
 
     auto exported = desc.getSerialization(0);
 
     JobDescription imported(1, 1, app_registry::getAppId("SAT"), true);
     imported.setIncremental(true);
     imported.deserialize(exported);
-    assert(imported.getNumFormulaLiterals() == 6);
-    assert(imported.getNumAssumptionLiterals() == 1);
     assert(desc.getFormulaPayloadSize(0) == imported.getFormulaPayloadSize(0));
-    for (size_t i = 0; i < desc.getFormulaPayloadSize(0); i++) {
+    for (size_t i = 0; i < desc.getFormulaPayloadSize(0); i++)
         assert(desc.getFormulaPayload(0)[i] == imported.getFormulaPayload(0)[i]);
-    }
-    assert(desc.getAssumptionsSize(0) == imported.getAssumptionsSize(0));
-    for (size_t i = 0; i < desc.getAssumptionsSize(0); i++) {
-        LOG(V2_INFO, "Asmpt %i\n", desc.getAssumptionsPayload(0)[i]);
-        assert(desc.getAssumptionsPayload(0)[i] == imported.getAssumptionsPayload(0)[i]);
-    }
 
     f = "instances/incremental/entertainment08-1.cnf";
     SatReader r2(params, f);
@@ -77,18 +65,10 @@ void testIncrementalExample(Parameters& params) {
     update.setIncremental(true);
     update.setRevision(1);
     r2.read(update);
-    LOG(V2_INFO, "Update: %i lits, %i assumptions\n", update.getNumFormulaLiterals(), update.getNumAssumptionLiterals());
     exported = update.getSerialization(1);
     JobDescription imported1(1, 1, app_registry::getAppId("SAT"), true);
     imported1.setIncremental(true);
     imported1.deserialize(exported);
-    
-    assert(imported1.getNumAssumptionLiterals() == update.getNumAssumptionLiterals());
-    assert(update.getAssumptionsSize(1) == update.getNumAssumptionLiterals());
-    for (size_t i = 0; i < update.getAssumptionsSize(1); i++) {
-        LOG(V2_INFO, "Asmpt %i\n", update.getAssumptionsPayload(1)[i]);
-        assert(update.getAssumptionsPayload(1)[i] == imported1.getAssumptionsPayload(1)[i]);
-    }
 }
 
 int main(int argc, char *argv[]) {

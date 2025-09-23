@@ -28,7 +28,7 @@ private:
             jobUserNameToCallback[jobIdentifier] = callback;
 
             auto packed = nlohmann::json::to_msgpack(json);
-            MyMpi::isend(recvRank, MSG_SUBMIT_JOB_TO_CLIENT, std::move(packed));
+            MyMpi::isend(recvRank, MSG_SUBMIT_JOB_TO_CLIENT, std::move(packed), false);
 
             if (!sub) sub.reset(new MessageSubscription(MSG_RESPOND_TO_JOB_SUBMISSION, [this](MessageHandle& h) {
                 LOG(V2_INFO, "MAXSAT RECEIVED JOB RESPONSE\n");
@@ -49,13 +49,16 @@ private:
     static ExternalAPIConnector _ext_connector;
 
 public:
-    static void put(std::shared_ptr<APIConnector>& connector) {
-        _connector = connector;
+    static void put(APIConnector* connector) {
+        _connector.reset(connector);
     }
-    static APIConnector* get() {
-        return _connector.get();
+    static APIConnector& get() {
+        return *_connector.get();
     }
     static void sendJobSubmissionToRank(int recvRank, nlohmann::json& json, std::function<void (JsonInterface::Result, nlohmann::json &)> callback) {
         _ext_connector.submit(recvRank, json, callback);
+    }
+    static void close() {
+        _connector.reset();
     }
 };

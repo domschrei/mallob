@@ -14,12 +14,14 @@ class Terminator {
 
 private:
     static std::atomic_bool _exit;
+    static bool _forward_terminate_to_children;
 
 public:
+    static void setForwardTerminateToChildren(bool forward) {_forward_terminate_to_children = forward;}
     static void setTerminating() {
         bool expected = false;
         bool isExitNew = _exit.compare_exchange_strong(expected, true, std::memory_order_relaxed);
-        if (isExitNew) {
+        if (isExitNew && _forward_terminate_to_children) {
             Process::forwardTerminateToChildren();
         }
     }

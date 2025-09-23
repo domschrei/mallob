@@ -158,9 +158,8 @@ void Client::readIncomingJobs() {
                     atomics::incrementRelaxed(_num_failed_jobs);
                 } else {
                     time = Timer::elapsedSeconds() - time;
-                    LOGGER(log, V3_VERB, "[T] Initialized job #%i %s in %.3fs: %ld lits w/ separators, %ld assumptions\n", 
-                            id, filesList.c_str(), time, foundJob.description->getNumFormulaLiterals(), 
-                            foundJob.description->getNumAssumptionLiterals());
+                    LOGGER(log, V3_VERB, "[T] Initialized job #%i %s in %.3fs: size %ld\n", 
+                            id, filesList.c_str(), time, foundJob.description->getFSize());
                     foundJob.description->getStatistics().parseTime = time;
 
                     const int appId = foundJob.description->getApplicationId();
@@ -181,7 +180,7 @@ void Client::readIncomingJobs() {
                         printf("ß Client Side Job reset\n");
                         //Set the program
                         clientSideJob.program.reset(
-                            app_registry::getClientSideProgramCreator(appId)(_params, getAPI(), *desc)
+                            app_registry::getClientSideProgramCreator(appId)(_params, APIRegistry::get(), *desc)
                         );
                         printf("ß Client Side Job run\n");
                         //Run the program
@@ -303,10 +302,8 @@ void Client::init() {
         LOG(V2_INFO, "Set up IPC socket interface at %s\n", path.c_str());
         _interface_connectors.emplace_back(new SocketConnector(_params, *_json_interface, path));
     }
-    _api_connector.reset(new APIConnector(*_json_interface, _params, Logger::getMainInstance().copy("I-API", ".i.api")));
-    APIRegistry::put(_api_connector);
-    _interface_connectors.emplace_back(_api_connector);
-    LOG(V2_INFO, "Set up API at %s\n", "src/interface/api/api_connector.hpp");
+    APIRegistry::put(new APIConnector(*_json_interface, _params, Logger::getMainInstance().copy("I-API", ".i.api")));
+    LOG(V2_INFO, "Set up API connector\n");
 
     // Set up concurrent instance reader
     _instance_reader.run([this]() {
@@ -332,10 +329,6 @@ std::string Client::getFilesystemInterfacePath() {
 std::string Client::getSocketPath() {
     return TmpDir::getGeneralTmpDir() + "/edu.kit.iti.mallob." + std::to_string(Proc::getPid()) + "." + std::to_string(getInternalRank()) + ".sk";
 } 
-
-APIConnector& Client::getAPI() {
-    return *_api_connector;
-}
 
 void Client::advance() {
     // LOG(V2_INFO, "ßß Adv. client\n");
@@ -658,8 +651,6 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     // - In "mono" mode of operation, we only want the original job, not a secondary one.
     bool primaryJob = !_params.monoFilename.isSet() || jobId == _mono_job_id;
     bool constructSolutionStrings = primaryJob;
-    // - Only if the result actually encompasses a solution.
-    constructSolutionStrings &= resultCode == RESULT_SAT || resultCode == RESULT_OPTIMUM_FOUND;
     // - Some sort of output is in fact desired by the user.
     constructSolutionStrings &= _params.solutionToFile.isSet() || (jobId == _mono_job_id && !_params.omitSolution());
     if (constructSolutionStrings) {
@@ -690,7 +681,9 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     if (constructSolutionStrings && _params.solutionToFile.isSet()) {
         // Write solution to file
         std::ofstream file;
-        file.open(_params.solutionToFile() + "." + std::to_string(jobId) + "." + std::to_string(revision), std::ofstream::out);
+        std::string solPath = _params.solutionToFile();
+        if (jobId != _mono_job_id) solPath += "." + std::to_string(jobId) + "." + std::to_string(revision);
+        file.open(solPath);
         if (!file.is_open()) {
             LOG(V0_CRIT, "[ERROR] Could not open solution file\n");
         } else {
@@ -828,5 +821,6 @@ Client::~Client() {
     _client_side_jobs.clear();
     _done_client_side_jobs.clear();
 
+    APIRegistry::close();
     LOG(V4_VVER, "Leaving client destructor\n");
 }

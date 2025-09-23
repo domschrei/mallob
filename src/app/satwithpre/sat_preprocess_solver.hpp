@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include "app/sat/data/formula_compressor.hpp"
 #include "app/sat/data/model_string_compressor.hpp"
 #include "app/sat/job/sat_constants.h"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
@@ -11,7 +12,6 @@
 #include "interface/api/api_connector.hpp"
 #include "interface/json_interface.hpp"
 #include "mpi.h"
-#include "scheduling/core_allocator.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
 
@@ -27,7 +27,6 @@ private:
     const Parameters& _params; // configuration, cmd line arguments
     APIConnector& _api; // for submitting jobs to Mallob
     JobDescription& _desc; // contains our instance to solve and all metadata
-    int _cores_allocated {0};
 
     float _time_of_activation {0};
     float _time_of_retraction_start {0};
@@ -50,17 +49,16 @@ private:
 
 public:
     SatPreprocessSolver(const Parameters& params, APIConnector& api, JobDescription& desc) :
-        _params(params), _api(api), _desc(desc), _jobstr("#" + std::to_string(desc.getId())),
-        _prepro(*(new SatPreprocessor(desc, _params.preprocessLingeling()))) {}
+        _params(params), _api(api), _desc(desc),
+        _prepro(*(new SatPreprocessor(_params, desc, _params.preprocessLingeling()))),
+        _jobstr("#" + std::to_string(desc.getId())) {}
     ~SatPreprocessSolver() {
-        ProcessWideCoreAllocator::get().returnCores(_cores_allocated);
         if (!_params.terminateAbruptly()) delete &_prepro;
     }
 
     JobResult solve() {
         printf("Starting SATWITHPRE app");
         _time_of_activation = Timer::elapsedSeconds();
-        _cores_allocated = ProcessWideCoreAllocator::get().requestCores(1);
 
         if (_params.preprocessBalancing() >= 0) submitBaseJob();
 
@@ -91,10 +89,8 @@ public:
                 if (res.result != 0) break;
             }
             if (_prepro.done()) {
-                // Preprocess solver terminated.
+                // Preprocess solver(s) terminated.
                 LOG(V3_VERB, "SATWP preprocessor done\n");
-                ProcessWideCoreAllocator::get().returnCores(_cores_allocated);
-                _cores_allocated = 0;
                 if (_prepro.getResultCode() != 0) {
                     LOG(V3_VERB, "SATWP preprocessor reported result %i\n", _prepro.getResultCode());
                     res.result = _prepro.getResultCode();
@@ -178,20 +174,10 @@ private:
         int nbVars = fPre.back(); fPre.pop_back();
         size_t preprocessedSize = fPre.size();
 
-        /*
-        // Just for checking whether Kissat actually returns units
-        assert(fPre[fPre.size()-1] == 0);
-        for (int i = fPre.size()-2; i >= 1; i-=2) {
-            if (fPre[i-1]==0 && fPre[i]!=0 && fPre[i+1]==0) {
-                // unit clause at the end
-                for (int lit : {fPre[i], -1*fPre[i]}) {
-                    auto it = std::find(fPre.begin(), fPre.begin()+i, lit);
-                    if (it != fPre.begin()+i)
-                        LOG(V0_CRIT, "Unit %i (pos %i) occurs in formula (pos %lu)\n", fPre[i], i, it - fPre.begin());
-                }
-            } else break;
+        if (_params.compressFormula()) {
+            auto out = FormulaCompressor::compress(fPre.data(), fPre.size(), 0, 0);
+            fPre = std::move(*out.vec);
         }
-        */
 
         // begin successively retracting this job
         _time_of_retraction_start = Timer::elapsedSeconds();
@@ -226,7 +212,7 @@ private:
             {"application", "SAT"},
         };
         if (_params.crossJobCommunication()) json["group-id"] = _desc.getGroupId();
-        StaticStore<std::vector<int>>::insert(json["name"].get<std::string>(), fPre);
+        StaticStore<std::vector<int>>::insert(json["name"].get<std::string>(), std::move(fPre));
         json["internalliterals"] = json["name"].get<std::string>();
         json["configuration"]["__NV"] = std::to_string(nbVars);
         json["configuration"]["__NC"] = std::to_string(nbClauses);

@@ -22,7 +22,8 @@ public:
             int x = 0;
             for (int i = 0; i < 4; i++) {
                 if (pos >= solution.size()) break;
-                assert(solution[pos] == pos || solution[pos] == -pos);
+                assert(solution[pos] == pos || solution[pos] == -pos
+                    || log_return_false("[ERROR] Wrong model format! %s\n", StringUtils::getSummary(solution, 100).c_str()));
                 x += (1 << i) * (solution[pos] > 0);
                 pos++;
             }

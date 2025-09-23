@@ -82,6 +82,7 @@ Kissat::Kissat(const SolverSetup& setup)
     units_received_from_sharing.reserve(MAX_SHWEEP_STORAGE_SIZE);
     kissat_set_terminate(solver, this, &terminate_callback);
     glueLimit = _setup.strictLbdLimit;
+    numVars = setup.numVars;
 }
 
 void Kissat::addLiteral(int lit) {
@@ -400,6 +401,7 @@ void Kissat::reconstructSolutionFromPreprocessing(std::vector<int>& model) {
     for (int v = 1; v <= _setup.numVars; v++) {
         int val = kissat_value(solver, v);
         if (std::abs(val) == v) model[v] = val;
+        assert(model[v] != 0);
         //assert(std::abs(model[v]) == v || LOG_RETURN_FALSE("[ERROR] value of variable %i returned %i\n", v, model[v]));
     }
 }

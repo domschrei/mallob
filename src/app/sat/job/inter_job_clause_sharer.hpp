@@ -176,6 +176,9 @@ public:
     virtual int getNbSharingParticipants() const override {
         return _comm_size;
     }
+    virtual int getExportVolumeMultiplier() const override {
+        return _cs_params.numThreadsPerProcess();
+    }
 
     virtual Parameters getClauseStoreParams() const override {
         Parameters params = _cs_params;

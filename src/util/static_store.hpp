@@ -1,7 +1,10 @@
 
 #pragma once
 
+#include "util/logger.hpp"
 #include "util/sys/threading.hpp"
+#include "util/assert.hpp"
+
 #include <string>
 #include <map>
 
@@ -23,7 +26,9 @@ public:
     }
     static T extract(const std::string& key) {
         auto lock = _mtx_map.getLock();
-        T val = std::move(_map[key]);
+        auto it = _map.find(key);
+        assert(it != _map.end() || log_return_false( "[ERROR] StaticStore: key \"%s\" not found!\n", key.c_str()));
+        T val = std::move(it->second);
         _map.erase(key);
         return val;
     }

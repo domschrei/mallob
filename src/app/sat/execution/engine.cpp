@@ -74,11 +74,6 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 
 	// Launched in some certified UNSAT mode?
     if (_params.proofOutputFile.isSet() || _params.onTheFlyChecking()) {
-		
-		if (_params.inputShuffleProbability() > 0) {
-			LOG(V3_VERB, "Certified UNSAT mode: Disabling input shuffling\n");
-			_params.inputShuffleProbability.set(0);
-		}
 
 		// Override options
 		if (!portfolio.featuresProofOutput()) {
@@ -101,6 +96,11 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 			// Create directory for partial proofs
 			proofDirectory = params.proofDirectory() + "/proof" + config.getJobStr();
 			FileUtils::mkdir(proofDirectory);
+			if (_params.compressFormula()) {
+				LOG(V1_WARN, "[WARN] Using proof production (-proof) combined with formula compression (-cf): "
+					"Irredundant clause IDs in the produced proof will be ordered differently (by clause length). "
+					"Running a vanilla LRUP checker on the input CNF and the produced proof will fail!\n");
+			}
 		}
     }
 
@@ -129,7 +129,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		while (str[str.size()-1] == '.') 
 			str.resize(str.size()-1);
 		*out = atoi(str.c_str());
-		assert(*out > 0 || log_return_false("[ERROR] illegal argument for app config key %s\n", id.c_str()));
+		assert(*out >= 0 || log_return_false("[ERROR] illegal argument for app config key %s\n", id.c_str()));
 	}
 
 	if (appConfig.map.count("__OBJ")) {
@@ -188,13 +188,14 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	SolverSetup setup;
 	setup.logger = &_logger;
 	setup.jobname = config.getJobStr();
+	setup.baseSeed = params.seed();
 	setup.isJobIncremental = config.incremental;
 	setup.strictMaxLitsPerClause = params.strictClauseLengthLimit();
 	setup.strictLbdLimit = params.strictLbdLimit();
 	setup.qualityMaxLitsPerClause = params.qualityClauseLengthLimit();
 	setup.qualityLbdLimit = params.qualityLbdLimit();
 	setup.freeMaxLitsPerClause = params.freeClauseLengthLimit();
-	setup.clauseBaseBufferSize = params.clauseBufferBaseSize();
+	setup.clauseBaseBufferSize = params.exportVolumePerThread() * _num_solvers;
 	setup.anticipatedLitsToImportPerCycle = config.maxBroadcastedLitsPerCycle;
 	setup.resetLbdBeforeImport = params.resetLbd() == MALLOB_RESET_LBD_AT_IMPORT;
 	setup.incrementLbdBeforeImport = params.incrementLbd();
@@ -358,7 +359,7 @@ std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSe
 
 void SatEngine::appendRevision(int revision, RevisionData data, bool lastRevisionForNow) {
 	
-	LOGGER(_logger, V4_VVER, "Import rev. %i: %i lits, %i assumptions\n", revision, data.fSize, data.aSize);
+	LOGGER(_logger, V4_VVER, "Import rev. %i: size %lu\n", revision, data.fSize);
 	assert(_revision+1 == revision);
 	_revision_data.push_back(data);
 	_sharing_manager->setImportedRevision(revision);

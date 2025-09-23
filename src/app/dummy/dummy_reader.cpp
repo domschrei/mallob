@@ -14,9 +14,9 @@ bool DummyReader::read(const std::vector<std::string>& filenames, JobDescription
 
     // Now add the actual payload to the job, serialized as a sequence of integers.
     // (You would usually parse the provided files here.)
-    desc.addPermanentData(1);
-    desc.addPermanentData(2);
-    desc.addPermanentData(3);
+    desc.addData(1);
+    desc.addData(2);
+    desc.addData(3);
 
     // You may still update app configuration entries that already exist.
     desc.getAppConfiguration().updateFixedSizeEntry("__optA", 66);

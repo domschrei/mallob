@@ -47,7 +47,6 @@ private:
     const Parameters& _params; // configuration, cmd line arguments
     APIConnector& _api; // for submitting jobs to Mallob
     JobDescription& _desc; // contains our instance to solve and all metadata
-    int _cores_allocated;
 
     std::unique_ptr<MaxSatInstance> _instance; // the problem instance we're solving
 
@@ -90,13 +89,11 @@ public:
         _params(params), _api(api), _desc(desc) {
 
         LOG(V2_INFO, "Mallob client-side MaxSAT solver, by Jeremias Berg & Dominik Schreiber\n");
-        _cores_allocated = ProcessWideCoreAllocator::get().requestCores(1);
         parseFormula();
         pickEncodingStrategy();
     }
     MaxSatSolver(MaxSatSolver&& other) = delete;
     ~MaxSatSolver() {
-        ProcessWideCoreAllocator::get().returnCores(_cores_allocated);
 #if MALLOB_USE_MAXPRE == 1
         // join with background MaxPRE preprocessor 
         if (_fut_instance_update.valid()) {

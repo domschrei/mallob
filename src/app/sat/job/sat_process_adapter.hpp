@@ -39,8 +39,6 @@ public:
         Checksum checksum;
         size_t fSize;
         const int* fLits;
-        size_t aSize;
-        const int* aLits;
         int descriptionId;
     };
     struct ShmemObject {
@@ -65,8 +63,6 @@ private:
 
     size_t _f_size;
     const int* _f_lits;
-    size_t _a_size;
-    const int* _a_lits;
     int _desc_id;
 
     struct ShmemObjectHasher {
@@ -124,7 +120,7 @@ private:
 
 public:
     SatProcessAdapter(Parameters&& params, SatProcessConfig&& config,
-        size_t fSize, const int* fLits, size_t aSize, const int* aLits, Checksum chksum,
+        size_t fSize, const int* fLits, Checksum chksum,
         int descId, std::shared_ptr<AnytimeSatClauseCommunicator>& comm);
     ~SatProcessAdapter();
 

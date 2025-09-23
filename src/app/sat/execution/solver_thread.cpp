@@ -18,7 +18,6 @@
 #include "util/hashing.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
 #include "app/sat/data/definitions.hpp"
-#include "app/sat/execution/variable_translator.hpp"
 #include "app/sat/job/sat_process_config.hpp"
 #include "app/sat/parse/serialized_formula_parser.hpp"
 #include "app/sat/proof/trusted/trusted_utils.hpp"
@@ -112,128 +111,73 @@ void* SolverThread::run() {
 }
 
 bool SolverThread::readFormula() {
-    constexpr int batchSize = 100000;
 
     SerializedFormulaParser* fParser;
-    size_t aSize = 0;
-    const int* aLits;
 
     while (true) {
-
-        // Shuffle next input
-        if (_imported_lits_curr_revision == 0) {
-            // ... not for the first solver
-            bool shuffle = _solver.getGlobalId() >= 10;
-            float random = 0.0001f * (rand() % 10000); // random number in [0,1)
-            assert(random >= 0); assert(random <= 1);
-            // ... only if random throw hits user-defined probability
-            shuffle = shuffle && _params.inputShuffleProbability() > 0
-                && random <= _params.inputShuffleProbability();
-
-            if (shuffle) {
-                LOGGER(_logger, V4_VVER, "Shuffling input rev. %i\n", (int)_active_revision);
-                {
-                    auto lock = _state_mutex.getLock();
-                    assert(_active_revision < (int)_pending_formulae.size());
-                    fParser = _pending_formulae[_active_revision].get();
-                }
-                fParser->shuffle(_solver.getGlobalId());
-            }
-        }
-
         // Fetch the next formula to read
         {
             auto lock = _state_mutex.getLock();
             assert(_active_revision < (int)_pending_formulae.size());
             fParser = _pending_formulae[_active_revision].get();
-            aSize = _pending_assumptions[_active_revision].first;
-            aLits = _pending_assumptions[_active_revision].second;
         }
 
-        // Forward raw formula data to LRAT connector
-        if (_lrat) _lrat->launch(fParser->getRawPayload(), fParser->getPayloadSize());
-        if (_solver.getSolverSetup().owningModelCheckingLratConnector)
-            _solver.getSolverSetup().modelCheckingLratConnector->launch(fParser->getRawPayload(), fParser->getPayloadSize());
+        // Forward raw formula data to LRAT connectors
+        if (_lrat) {
+            _lrat->launch(*fParser);
+        }
+        if (_solver.getSolverSetup().owningModelCheckingLratConnector) {
+            _solver.getSolverSetup().modelCheckingLratConnector->launch(*fParser);
+        }
 
         LOGGER(_logger, V4_VVER, "Reading rev. %i, start %i\n", (int)_active_revision, (int)_imported_lits_curr_revision);
         
-        // Repeatedly read a batch of literals, checking in between whether to stop/terminate
-        while (_imported_lits_curr_revision < fParser->getPayloadSize()) {
+        // Read literals, checking in between whether to stop/terminate
+        int lit;
+        while (fParser->getNextLiteral(lit)) {
 
-            // Read next batch
-            auto numImportedBefore = _imported_lits_curr_revision;
-            auto end = std::min(numImportedBefore + batchSize, fParser->getPayloadSize());
-            int lit;
-            while (_imported_lits_curr_revision < end && fParser->getNextLiteral(lit)) {
-
-                if (std::abs(lit) > (1<<30)) {
-                    LOGGER(_logger, V0_CRIT, "[ERROR] Invalid literal %i at rev. %i pos. %ld/%ld.\n",
-                        lit, (int)_active_revision, _imported_lits_curr_revision, fParser->getPayloadSize());
-                    abort();
-                }
-                if (lit == 0 && _last_read_lit_zero) {
-                    LOGGER(_logger, V0_CRIT, "[ERROR] Empty clause at rev. %i pos. %ld/%ld.\n", 
-                        (int)_active_revision, _imported_lits_curr_revision, fParser->getPayloadSize());
-                    abort();
-                }
-                _solver.addLiteral(_vt.getTldLit(lit));
-                if (_params.useChecksums()) _running_chksum.combine(_vt.getTldLit(lit));
-                _max_var = std::max(_max_var, std::abs(lit));
-                _last_read_lit_zero = lit == 0;
-                //_dbg_lits += std::to_string(lit]) + " ";
-                //if (lit == 0) _dbg_lits += "\n";
-
-                ++_imported_lits_curr_revision;
+            if (std::abs(lit) > (1<<30)) {
+                LOGGER(_logger, V0_CRIT, "[ERROR] Invalid literal %i at rev. %i pos. %ld/%ld.\n",
+                    lit, (int)_active_revision, _imported_lits_curr_revision, fParser->getPayloadSize());
+                abort();
             }
+            if (lit == 0 && _last_read_lit_zero) {
+                LOGGER(_logger, V0_CRIT, "[ERROR] Empty clause at rev. %i pos. %ld/%ld.\n", 
+                    (int)_active_revision, _imported_lits_curr_revision, fParser->getPayloadSize());
+                abort();
+            }
+            _solver.addLiteral(lit);
+            if (_params.useChecksums()) _running_chksum.combine(lit);
+            _max_var = std::max(_max_var, std::abs(lit));
+            _last_read_lit_zero = lit == 0;
+            //_dbg_lits += std::to_string(lit]) + " ";
+            //if (lit == 0) _dbg_lits += "\n";
 
+            ++_imported_lits_curr_revision;
             // Suspend and/or terminate if needed
             if (_terminated) return false;
         }
-        // Adjust _max_var according to assumptions as well
-        for (size_t i = 0; i < aSize; i++) _max_var = std::max(_max_var, std::abs(aLits[i]));
 
         fParser->verifyChecksum();
 
         {
             auto lock = _state_mutex.getLock();
-            assert(_imported_lits_curr_revision == fParser->getPayloadSize());
-
-            // If necessary, introduce extra variable to the problem
-            // to encode equivalence to the set of assumptions
-            if (_has_pseudoincremental_solvers && _active_revision >= _vt.getExtraVariables().size()) {
-                _vt.addExtraVariable(_max_var);
-                int aEquivVar = _vt.getExtraVariables().back();
-                LOGGER(_logger, V4_VVER, "Encoding equivalence for %i assumptions of rev. %i/%i @ var. %i\n", 
-                    aSize, (int)_active_revision, (int)_latest_revision, (int)aEquivVar);
-                
-                // Make clause exporter append this condition
-                // to each clause this solver exports
-                if (_solver.exportsConditionalClauses() || !_solver.getSolverSetup().doIncrementalSolving)
-                    _solver.addConditionalLit(aSize > 0 ? -aEquivVar : 0);
-                
-                if (aSize > 0) {
-                    // If all assumptions hold, then aEquivVar holds
-                    for (size_t i = 0; i < aSize; i++) {
-                        _solver.addLiteral(-_vt.getTldLit(aLits[i]));
-                    }
-                    _solver.addLiteral(aEquivVar);
-                    _solver.addLiteral(0);
-
-                    // If aEquivVar holds, then each assumption holds
-                    for (size_t i = 0; i < aSize; i++) {
-                        _solver.addLiteral(-aEquivVar);
-                        _solver.addLiteral(_vt.getTldLit(aLits[i]));
-                        _solver.addLiteral(0);
-                    }
-                }
-            }
 
             _solver.setCurrentRevision(_active_revision);
             
             // No formula left to read?
             if (_active_revision == _latest_revision) {
-                LOGGER(_logger, V4_VVER, "Reading done @ rev. %i (%lu lits)\n", (int)_active_revision,
-                    _imported_lits_curr_revision);
+            
+                // Parse assumptions
+                _pending_assumptions.clear();
+                while (fParser->getNextAssumption(lit)) {
+                    _pending_assumptions.push_back(lit);
+                    // Adjust _max_var according to assumptions as well
+                    _max_var = std::max(_max_var, std::abs(lit));
+                }
+            
+                LOGGER(_logger, V4_VVER, "Reading done @ rev. %i (%lu lits, %lu assumptions)\n", (int)_active_revision,
+                    _imported_lits_curr_revision, _pending_assumptions.size());
                 return true;
             }
             _active_revision++;
@@ -246,14 +190,14 @@ void SolverThread::appendRevision(int revision, RevisionData data) {
     {
         auto lock = _state_mutex.getLock();
         _pending_formulae.emplace_back(
-            new SerializedFormulaParser(
-                _logger, data.fSize, data.fLits,
-                revision == 0 ? _solver.getSolverSetup().numOriginalClauses : 0
-            )
+            new SerializedFormulaParser(_logger, data.fLits, data.fSize)
         );
-        LOGGER(_logger, V4_VVER, "Received %i literals: %s\n", data.fSize, StringUtils::getSummary(data.fLits, data.fSize).c_str());
-        _pending_assumptions.emplace_back(data.aSize, data.aLits);
-        LOGGER(_logger, V4_VVER, "Received %i assumptions: %s\n", data.aSize, StringUtils::getSummary(data.aLits, data.aSize).c_str());
+        if (_params.compressFormula()) {
+            _pending_formulae.back()->setCompressed();
+            LOGGER(_logger, V4_VVER, "Received compressed formula of size %i\n", data.fSize);
+        } else {
+            LOGGER(_logger, V4_VVER, "Received %i literals: %s\n", data.fSize, StringUtils::getSummary(data.fLits, data.fSize).c_str());
+        }
         _latest_revision = revision;
         _latest_checksum = data.chksum;
         _found_result = false;
@@ -312,8 +256,8 @@ void SolverThread::runOnce() {
 
         // Set assumptions for upcoming solving attempt, set correct revision
         revision = _active_revision;
-        auto asmpt = _pending_assumptions.at(revision);
-        aSize = asmpt.first; aLits = asmpt.second;
+        aLits = _pending_assumptions.data();
+        aSize = _pending_assumptions.size();
         _in_solve_call = true;
         if (revision < _latest_revision) {
             _solver.interrupt(); // revision obsolete: stop solving immediately
@@ -322,15 +266,6 @@ void SolverThread::runOnce() {
             _solver.uninterrupt(); // make sure solver isn't in an interrupted state
             chksum = _latest_checksum; // this checksum belongs to _latest_revision.
         }
-    }
-
-    // If necessary, translate assumption literals
-    std::vector<int> tldAssumptions;
-    if (!_vt.getExtraVariables().empty()) {
-        for (size_t i = 0; i < aSize; i++) {
-            tldAssumptions.push_back(_vt.getTldLit(aLits[i]));
-        }
-        aLits = tldAssumptions.data();
     }
 
     // append assumption literals to formula hash
@@ -440,25 +375,6 @@ void SolverThread::reportResult(int res, int revision) {
     _result.result = SatResult(res);
     _result.revision = revision;
     LOGGER(_logger, V3_VERB, "found result %s for rev. %i\n", resultString, revision);
-
-    // If necessary, convert solution back to original variable domain
-    if (!_vt.getExtraVariables().empty()) {
-        std::vector<int> origSolution;
-        for (size_t i = 0; i < _result.getSolutionSize(); i++) {
-            if (res == UNSAT) {
-                // Failed assumption
-                origSolution.push_back(_vt.getOrigLitOrZero(_result.getSolution(i)));
-            } else if (i > 0) {
-                // Assignment: v or -v at position v
-                assert(_result.getSolution(i) == i || _result.getSolution(i) == -i);
-                int origLit = _vt.getOrigLitOrZero(_result.getSolution(i));
-                if (origLit != 0) origSolution.push_back(origLit);
-                assert(origSolution[origSolution.size()-1] == origSolution.size()-1 
-                    || origSolution[origSolution.size()-1] == 1-origSolution.size());
-            } else origSolution.push_back(0); // position zero
-        }
-        _result.setSolutionToSerialize(origSolution.data(), origSolution.size());
-    }
 
     _found_result = true;
     _solver.setFoundResult();

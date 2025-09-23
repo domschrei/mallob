@@ -36,6 +36,7 @@ public:
     virtual int getClausesRevision() const = 0;
     virtual const char* getLabel() = 0;
     virtual int getNbSharingParticipants() const = 0;
+    virtual int getExportVolumeMultiplier() const = 0;
 
     virtual void prepareSharing() = 0;
     virtual bool hasPreparedSharing() = 0;
@@ -121,9 +122,10 @@ public:
     }
 
     virtual size_t getBufferLimit(int numAggregatedNodes, bool selfOnly) {
-        if (selfOnly) return _compensation_factor * _cs_params.clauseBufferBaseSize();
+        int exportVolumeMultiplier = getExportVolumeMultiplier();
+        if (selfOnly) return _compensation_factor * _cs_params.exportVolumePerThread() * exportVolumeMultiplier;
         return _compensation_factor * BinaryTreeBufferLimit::getLimit(numAggregatedNodes,
-            _cs_params.clauseBufferBaseSize(), _cs_params.clauseBufferLimitParam(),
+            _cs_params.exportVolumePerThread() * exportVolumeMultiplier, _cs_params.clauseBufferLimitParam(),
             BinaryTreeBufferLimit::BufferQueryMode(_cs_params.clauseBufferLimitMode()));
     }
 };
