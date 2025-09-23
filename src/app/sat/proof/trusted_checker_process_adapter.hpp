@@ -249,7 +249,6 @@ private:
         TrustedUtils::readSignature(sig, _f_feedback);
         cidx = TrustedUtils::readUint(_f_feedback);
         auto str = Logger::dataToHexStr(sig, SIG_SIZE_BYTES);
-        LOGGER(_logger, V2_INFO, "IMPCHK reported UNSAT for rev. %i - sig %s\n", _revision, str.c_str());
         return true;
     }
 
@@ -268,7 +267,6 @@ private:
         TrustedUtils::readSignature(sig, _f_feedback);
         cidx = TrustedUtils::readUint(_f_feedback);
         auto str = Logger::dataToHexStr(sig, SIG_SIZE_BYTES);
-        LOGGER(_logger, V2_INFO, "IMPCHK reported SAT for rev. %i - sig %s\n", _revision, str.c_str());
         return true;
     }
 

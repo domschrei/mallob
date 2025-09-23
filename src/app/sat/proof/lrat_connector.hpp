@@ -115,16 +115,16 @@ public:
 
         // Currently unsuitable validation operation?
         if (op.isSatValidation() || op.isUnsatValidation()) {
-            if (_next_rev_to_conclude < revision) {
-                LOGGER(_logger, V2_INFO, "IMPCHK defer conclusion for rev. %i (rev. %i next to validate)\n",
-                    revision, _next_rev_to_conclude);
+            if (_arrived_revision < revision || _next_rev_to_conclude < revision) {
+                LOGGER(_logger, V2_INFO, "IMPCHK defer conclusion for rev. %i (rev. %i arrived, %i next to validate)\n",
+                    revision, _arrived_revision, _next_rev_to_conclude);
                 if (!_deferred_conclusion_ops.count(revision))
                     _deferred_conclusion_ops[revision] = std::shared_ptr<LratOp>(new LratOp(std::move(op)));
                 if (acquireLock) _mtx_submit.unlock();
                 return true;
             }
             if (_next_rev_to_conclude > revision) {
-                LOGGER(_logger, V2_INFO, "IMPCHK discard conclusion for rev. %i (rev. %i arrived, rev. %i next to validate)\n",
+                LOGGER(_logger, V2_INFO, "IMPCHK discard conclusion for rev. %i (rev. %i arrived, %i next to validate)\n",
                     revision, _arrived_revision, _next_rev_to_conclude);
                 if (acquireLock) _mtx_submit.unlock();
                 return false;
@@ -163,7 +163,7 @@ public:
         }
         _ringbuf.pushBlocking(op);
 
-        tryPushDeferredOp(false);
+        if (op.isEndLoad()) tryPushDeferredOp(false);
 
         if (acquireLock) _mtx_submit.unlock();
         return true;
@@ -321,7 +321,7 @@ private:
                     assumptions = std::vector(op.data.concludeUnsat.failed, op.data.concludeUnsat.failed + op.data.concludeUnsat.nbFailed);
                 std::string litStr;
                 for (int lit : assumptions) litStr += " " + std::to_string(lit);
-                LOGGER(_logger, V0_CRIT, "IMPCHK_CONFIRM_TRACE %u %u %s %s\n", cidx, code,
+                LOGGER(_logger, V0_CRIT, "IMPCHK_CONFIRM_TRACE %u %u %s%s\n", cidx, code,
                     Logger::dataToHexStr(sig, SIG_SIZE_BYTES).c_str(), litStr.c_str());
                 if (!_out_path.empty()) {
                     std::ofstream ofs(_out_path, std::ios_base::app);
