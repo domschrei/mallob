@@ -46,6 +46,7 @@ public:
 
         // FORK: Create a child process
         const pid_t res = Process::createChild();
+        LOG(V2_INFO, "Subprocess init \n");
         if (res == 0) {
             // [child process]
             // Danger zone: Do not touch any memory.
@@ -66,6 +67,11 @@ public:
         //char* const* argv = _params.asCArgs(executable.c_str());
         std::string command = _params.getSubprocCommandAsString(executable.c_str()) + " ";
         if (!_additional_args.empty()) command += _additional_args + " ";
+
+        LOG(V2_INFO, "Subprocess command: \n");
+        printf(command.c_str());
+
+
 
         // Write command to tmp file (to be read by child process)
         const std::string commandOutfile = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob.subproc_cmd_" + std::to_string(res);

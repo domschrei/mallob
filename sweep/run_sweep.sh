@@ -26,9 +26,10 @@ rm -rf $HOME/PhD/logsntraces/traces/*
 
 RDMAV_FORK_SAFE=1; 
 
-#SAT Valgrind subprocess
+# SAT Valgrind subprocess
 # MALLOB_OPTIONS="$MALLOB_OPTIONS -subproc-prefix=scripts/run/run_as_valgrind.sh"
 
+echo $MALLOB_OPTIONS | tr ' ' '\n'
 
 mpirun -np $NPROCS --bind-to core --map-by ppr:${NPROCS}:node:pe=${threads} build/mallob $MALLOB_OPTIONS
 

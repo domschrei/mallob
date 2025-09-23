@@ -97,9 +97,9 @@ void SweepJob::appl_communicate() {
 	bool can_start = elapsed_time > wait_time;
 
 	if (can_start && getVolume() == NUM_WORKERS && getJobComm().getWorldRankOrMinusOne(NUM_WORKERS-1) >= 0) {
-		LOG(V3_VERB, "ß appl_communicate. _red=%i \n", _red!=nullptr);
-		LOG(V3_VERB, "ß have %i eqs to share\n", _shweeper->eqs_to_share.size());
-		LOG(V3_VERB, "ß have %i units to share\n", _shweeper->units_to_share.size());
+		// LOG(V3_VERB, "ß appl_communicate. _red=%i \n", _red!=nullptr);
+		// LOG(V3_VERB, "ß have %i eqs to share\n", _shweeper->eqs_to_share.size());
+		// LOG(V3_VERB, "ß have %i units to share\n", _shweeper->units_to_share.size());
 		bool reset_red = false;
 		if (_red && _red->hasResult()) {
 			//store the received equivalences such that the local solver than eventually import them
@@ -110,7 +110,7 @@ void SweepJob::appl_communicate() {
 			LOG(V1_WARN, "ß --- Received Broadcast: %i eq_size, %i unit_size -- \n", received_eq_size, received_unit_size);
 			if (all_idle) {
 				_terminate = true;
-				LOG(V1_WARN, "ß --- ALL SWEEPERS IDLE - CAN TERMINATE -- \n");
+				LOG(V1_WARN, "ß # \n # \n  --- ALL SWEEPERS IDLE - CAN TERMINATE -- \n # \n # \n");
 			}
 
 			//save equivalences
