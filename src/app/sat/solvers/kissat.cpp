@@ -65,8 +65,9 @@ void report_preprocessed_lit(void* state, int lit) {
     ((Kissat*) state)->addLiteralFromPreprocessing(lit);
 }
 
-
-
+void report_database_lit(void *state, int lit) {
+    ((Kissat*) state)->addLiteralToShweepJob(lit);
+}
 
 
 Kissat::Kissat(const SolverSetup& setup)
@@ -549,6 +550,10 @@ void Kissat::addLiteralFromPreprocessing(int lit) {
         setPreprocessedFormula(std::move(preprocessedFormula));
         setSolverInterrupt();
     }
+}
+
+void Kissat::addLiteralToShweepJob(int lit) {
+   formulaToShweep.push_back(lit);
 }
 
 Kissat::~Kissat() {

@@ -49,11 +49,14 @@ private:
 	std::vector<int> work_stolen_from_local_solver;
 	std::vector<int> work_received_from_others;
 	// std::vector<char> stolen_done;
-
-
 	bool interruptionInitialized = false;
     bool interrupted = false;
     unsigned int glueLimit;
+
+	std::vector<int> formulaToShweep;
+	// \Shweep
+
+
 
 	std::vector<signed char> initialVariablePhases;
 	bool initialVariablePhasesLocked = false;
@@ -112,6 +115,7 @@ public:
     friend void produce_clause(void* state, int size, int glue);
     friend void consume_clause(void* state, int** clause, int* size, int* lbd);
 
+	//Distributed Shared Sweeping
 	friend void pass_eq_up(void *state);
 	friend void pass_eqs_down(void* state, int** equivalences, int *eqs_size);
 
@@ -119,15 +123,15 @@ public:
 	friend void pass_units_down(void *state, int **units, int *unit_count);
 
 
-	//Distributed Shared Sweeping
-	// friend void shweep_ts_stolen_work(void *state, unsigned **work, unsigned *size);
-	// friend void shweep_ts_stolen_done(void *state, char **done, unsigned *size);
-	// friend void shweep_solver_searches_work(void *JSstate, unsigned **work, unsigned *size);
+
+	friend void report_database_lit(void *state, int lit);
+
 
 	void shweep_set_workstealing_callback(void* SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, int *work_size));
 
 
 
+	//
     friend bool begin_formula_report(void* state, int vars, int cls);
     friend void report_preprocessed_lit(void* state, int lit);
     friend int terminate_callback(void* state);
@@ -143,17 +147,18 @@ private:
     void produceClause(int size, int lbd);
     void consumeClause(int** clause, int* size, int* lbd);
 
-	void passEqUp();
-	void passEqsDown(int** equivalences, int *eqs_size);
 
-	void passUnitUp(int unit);
-	void passUnitsDown(int **units, int *unit_count);
-
-	//Shweep
 	// void shweep_solverSearchesWork(unsigned **work, unsigned *size);
 
     bool isPreprocessingAcceptable(int vars, int cls);
     void addLiteralFromPreprocessing(int lit);
+
+	//Shweep
+	void passEqUp();
+	void passEqsDown(int** equivalences, int *eqs_size);
+	void passUnitUp(int unit);
+	void passUnitsDown(int **units, int *unit_count);
+    void addLiteralToShweepJob(int lit);
 
     bool shouldTerminate();
 

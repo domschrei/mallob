@@ -24,7 +24,7 @@ void SweepJob::appl_start() {
 	_my_rank = getJobTree().getRank();
 	_my_index = getJobTree().getIndex();
 	_is_root = getJobTree().isRoot();
-	printf("ß Appl_start(): is root? %i, Parent-Index %i, Rank %i, Index %i, \n",  _is_root, getJobTree().getParentIndex(), _my_rank, _my_index);
+	printf("ß Appl_start(): Rank %i, Index %i, is root? %i, Parent-Index %i, \n",   _my_rank, _my_index, _is_root, getJobTree().getParentIndex());
 	printf("ß			  : num children %i\n", getJobTree().getNumChildren());
     _metadata = getSerializedDescription(0)->data();
 
@@ -38,14 +38,14 @@ void SweepJob::appl_start() {
 	// printf("ß [%i] Payload: %i vars, %i clauses \n", _my_index, setup.numVars, setup.numOriginalClauses);
 
 	_shweeper.reset(new Kissat(setup));
-	_shweeper->set_option("mallob_custom_sweep_verbosity", 1); //0: No custom messages. 1: Some. 2: Verbose
+	_shweeper->set_option("mallob_custom_sweep_verbosity", 2); //0: No custom kissat messages. 1: Some. 2: More
 	_shweeper->set_option("mallob_solver_count", NUM_WORKERS);
 	_shweeper->set_option("mallob_solver_id", _my_index);
 	_shweeper->shweep_set_importexport_callbacks();
 	_shweeper->shweep_set_workstealing_callback(this, &search_work_in_tree);
 
     // Basic configuration options for all solvers
-    _shweeper->set_option("quiet", 0); // suppress any standard kissat output
+    _shweeper->set_option("quiet", 1); // suppress any standard kissat output
     _shweeper->set_option("verbose", 0); //the native kissat verbosity
     // _shweeper->set_option("log", 0); //extensive logging
     _shweeper->set_option("check", 0); // do not check model or derived clauses
@@ -61,13 +61,14 @@ void SweepJob::appl_start() {
 	JobMessage baseMsg = getMessageTemplate();
 	baseMsg.tag = ALLRED;
 	_red.reset(new JobTreeAllReduction(getJobTree().getSnapshot(), baseMsg, std::vector<int>(), aggregateContributions));
-	_red->careAboutParentStatus();
+	_red->setCareAboutParent();
 
 	_shweepers_running_count++;
 	_fut_shweeper = ProcessWideThreadPool::get().addTask([&]() {
 		LOG(V2_INFO, "Process loading formula  %i \n", _my_index);
 		loadFormulaToShweeper();
 		LOG(V2_INFO, "Process starting Shweeper %i \n", _my_index);
+		LOG(V3_VERB, "Tree object is present? _red=%i \n", _red!=nullptr);
 		int res = _shweeper->solve(0, nullptr);
 		LOG(V2_INFO, "\n # \n # \n Process finished Shweeper %i, result %i \n # \n # \n", _my_index, res);
 		_internal_result.id = getId();
@@ -80,6 +81,8 @@ void SweepJob::appl_start() {
 	});
 
 	LOG(V3_VERB, "ß finished appl_start\n");
+
+	// _red.reset(); This line will immediately kill _red for the new thread! Don't do this with my custom JobTreeAllReduction!
 
 }
 
@@ -94,10 +97,9 @@ void SweepJob::appl_communicate() {
 	bool can_start = elapsed_time > wait_time;
 
 	if (can_start && getVolume() == NUM_WORKERS && getJobComm().getWorldRankOrMinusOne(NUM_WORKERS-1) >= 0) {
-		// LOG(V3_VERB, "ß appl_communicate full volume \n");
-
-		// LOG(V3_VERB, "ß have %i eqs\n", _shweeper->eqs_to_share.size());
-		// LOG(V3_VERB, "ß have %i units\n", _shweeper->units_to_share.size());
+		LOG(V3_VERB, "ß appl_communicate. _red=%i \n", _red!=nullptr);
+		LOG(V3_VERB, "ß have %i eqs to share\n", _shweeper->eqs_to_share.size());
+		LOG(V3_VERB, "ß have %i units to share\n", _shweeper->units_to_share.size());
 		bool reset_red = false;
 		if (_red && _red->hasResult()) {
 			//store the received equivalences such that the local solver than eventually import them
@@ -145,7 +147,7 @@ void SweepJob::appl_communicate() {
 			baseMsg.tag = ALLRED;
 			bool parent_was_ready = _red->isParentReady();
 			_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateContributions));
-			_red->careAboutParentStatus();
+			_red->setCareAboutParent();
 			_red->tellChildrenParentIsReady();
 			LOG(V3_VERB, "ß contributing %i eqs size\n", _shweeper->eqs_to_share.size());
 			LOG(V3_VERB, "ß contributing %i units\n", _shweeper->units_to_share.size());

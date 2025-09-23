@@ -21,6 +21,7 @@ OPTION_GROUP(grpAppSat, "app/sat", "SAT solving options")
  OPT_INT(satProfilingLevel,             "spl", "sat-profiling-level", -1, -1, 4, "Profiling level for SAT solvers (-1=none ... 4=all)")
  OPT_BOOL(compressModels,                   "cm", "compress-models", false, "Compress found models into hexadecimal vector in output")
  OPT_STRING(groundTruthModel,               "gtm", "", "", "Ground truth model to test learned clauses against")
+ OPT_BOOL(useShweeping,                      "shweep", "",                            false, "Let kissat spawn the SWEEP application when it usually would do sweeping on its own")
 
 OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration")
  OPT_INT(bufferedImportedClsGenerations,    "bicg", "buffered-imported-cls-generations", 4,        1,   LARGE_INT, 

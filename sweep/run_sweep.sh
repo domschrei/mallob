@@ -13,7 +13,7 @@ MALLOB_OPTIONS="-t=$threads \
   -mono-app=SWEEP \
   -satsolver=k \
   -colors \
-  -v=2 \
+  -v=3 \
   -jcup=0.05 \
   -trace-dir=$OUT_DIR/traces/ \
   -log=$OUT_DIR/logs/ \

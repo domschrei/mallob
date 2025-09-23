@@ -128,7 +128,7 @@ public:
         _broadcast_enabled = false;
     }
 
-    void careAboutParentStatus() {
+    void setCareAboutParent() {
         _care_about_parent_status = true;
         if (!_is_root) {
             _parent_is_ready = false;
