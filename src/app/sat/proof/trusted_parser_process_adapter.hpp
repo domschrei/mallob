@@ -63,7 +63,8 @@ public:
         std::string moreArgs = "-key-seed=" + std::to_string(keySeed)
             + " -formula=" + source
             + " -output=" + _path_parsed_formula
-            + " -input-log=parser-input." + std::to_string(_id) + ".txt";
+            + " -input-log=" + (Logger::getMainInstance().getLogDir().empty() ? "." : Logger::getMainInstance().getLogDir())
+                + "/parser-input." + std::to_string(_id) + ".txt";
         _subproc = new Subprocess(params, "impcheck_parse", moreArgs, false);
         _child_pid = _subproc->start();
         // Non-blocking reading so that we can read until the end of an increment
