@@ -18,11 +18,14 @@ private:
     bool _is_root{false};
     uint8_t* _metadata; //serialized description
 
-    std::shared_ptr<Kissat> _shweeper;
-    std::future<void> _fut_shweeper;
+	std::list<std::shared_ptr<Kissat>> _shweepers;
+	std::list<std::future<void>> _fut_shweepers;
     std::atomic_int _shweepers_running_count {0};
 
-    bool _is_idle=false;
+    // std::shared_ptr<Kissat> _shweeper;
+    // std::future<void> _fut_shweeper;
+    // std::atomic_int _shweepers_running_count {0};
+
 	bool _terminate=false;
     // const int SHWEEP_STATE_WORKING{0};
     // const int SHWEEP_STATE_IDLE{1};
@@ -32,7 +35,7 @@ private:
     const int TAG_UNSUCCESSFUL_WORK_STEAL=3;
 
     bool root_received_work=false;
-    bool got_steal_response=false;
+    // bool got_steal_response=false;
     // std::vector<unsigned> stolen_work;
 
 
@@ -52,6 +55,18 @@ private:
 	static const int UNITS_SIZE_POS = 2;
 	static const int IDLE_STATUS_POS = 1;
 
+	static const int NUM_STEALING_METADATA = 1;
+
+	struct WorkstealRequest {
+		int searcher_id{-1};
+		int target_rank{-1};
+		bool sent{false};
+		bool got_steal_response{false};
+		std::vector<int> stolen_work{};
+	};
+
+	std::vector<WorkstealRequest> _worksteal_requests;
+
 
 public:
     SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table);
@@ -69,6 +84,8 @@ public:
     bool appl_isDestructible() override {return true;}
     void appl_memoryPanic() override {}
 
+
+	std::shared_ptr<Kissat> SweepJob::get_new_shweeper();
     friend void search_work_in_tree(void* SweepJob_state, unsigned **work, int *work_size);
 
 private:

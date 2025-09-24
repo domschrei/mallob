@@ -36,7 +36,7 @@ public:
         DISCARD_REQUEST, REJECT_REQUEST, STOP_WAIT_FOR_REACTIVATION, COMMIT_JOB, UNCOMMIT_JOB_LEAVING, BECOME_IDLE
     };
     virtual void setStatusDirty(StatusDirtyReason reason) {_status_dirty = true;}
-    virtual ~RequestMatcher() = default; //Allow correct 176-byte deletion instead of 64-byte deletion
+    // virtual ~RequestMatcher() = default; //Allow correct 176-byte deletion instead of 64-byte deletion
 
 protected:
     bool isIdle();

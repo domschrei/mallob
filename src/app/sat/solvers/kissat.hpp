@@ -42,19 +42,23 @@ private:
 	std::vector<int> units_passed_down;
 	bool shweep_eq_imports_available;
 	bool shweep_unit_imports_available;
-	// const int MAX_STORED_EQUIVALENCES = 10000;
 	const int MAX_SHWEEP_STORAGE_SIZE = 10000;
 	friend class SweepJob;
-	//Update stuff for sweep sharing
+
 	std::vector<int> work_stolen_from_local_solver;
 	std::vector<int> work_received_from_others;
+
+	bool shweep_is_idle;
 	// std::vector<char> stolen_done;
+
+
+	std::vector<int> formulaToShweep;
+	// \Shweep
+
 	bool interruptionInitialized = false;
     bool interrupted = false;
     unsigned int glueLimit;
 
-	std::vector<int> formulaToShweep;
-	// \Shweep
 
 
 

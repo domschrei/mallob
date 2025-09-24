@@ -49,7 +49,7 @@ bool SweepReader::read(const std::vector<std::string>& filenames, JobDescription
     int lit;
     int seen_clauses = 0;
     while (ifile >> lit) {
-        desc.addPermanentData(lit);
+        desc.addData(lit);
         if (lit==0) seen_clauses++;
     }
     if (seen_clauses == clauses) printf("[Sweep] reading: finished\n");
