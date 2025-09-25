@@ -81,7 +81,7 @@ public:
     void appl_memoryPanic() override {}
 
 
-	std::shared_ptr<Kissat> SweepJob::create_new_shweeper(int localId);
+	KissatPtr create_new_shweeper(int localId);
     friend void search_work_in_tree(void* SweepJob_state, unsigned **work, int *work_size, int local_id);
 	// friend void import_next_equivalence(void *SweepJobState, int *last_imported_round, int eq_nr, unsigned *lit1, unsigned *lit2);
 

@@ -111,7 +111,7 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 		_internal_result.setSolutionToSerialize((int*)(dummy_solution.data()), dummy_solution.size());
 		_shweepers_running_count--;
 	});
-	_fut_shweepers.push_back(fut_shweeper);
+	_fut_shweepers.push_back(std::move(fut_shweeper));
 }
 
 
@@ -160,8 +160,9 @@ void SweepJob::appl_communicate() {
 			_eqs_from_broadcast.assign(broadcast.begin(), broadcast.begin() + broadcasted_eq_size);
 			_units_from_broadcast.assign(broadcast.begin() + broadcasted_eq_size, broadcast.end() - NUM_SHARING_METADATA);
 
-			//for convenience, we copy the received data for each solver individually, makes importing easier, at the cost of slightly more memory usage
-			//for maximum memory efficiency, would need to refactor to have kissat threads read directly _eqs_from_broadcast from the SweepJob
+			//for convenience, we copy the received data into each solver individually. this makes importing easier and less ¢umbersome to code, at the cost of slightly more memory usage
+			//for maximum memory efficiency one would need to refactor this to have kissat threads directly read from SweepJob's _eqs_from_broadcast
+			//we only write to the queue, such that we don't accidentally write into the array might still be actively used by the solver-thread (unrealistic edge-case, but not impossible)
 			for (auto shweeper : _shweepers) {
 				shweeper->eqs_from_broadcast_queued = _eqs_from_broadcast;
 				shweeper->units_from_broadcast_queued = _units_from_broadcast;
@@ -224,9 +225,9 @@ void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 		int localId = msg.payload.front();
 		msg.payload.clear();
 
-		auto stolen_work = stealWorkFromAnyLocalSolver();
+		auto locally_stolen_work = stealWorkFromAnyLocalSolver();
 
-		msg.payload = std::move(stolen_work);
+		msg.payload = std::move(locally_stolen_work);
 		msg.payload.push_back(localId);
 
 		//send back to source
@@ -347,7 +348,7 @@ void SweepJob::callback_for_broadcast_ping() {
 	JobMessage baseMsg = getMessageTemplate();
 	baseMsg.tag = ALLRED;
 	_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateContributions));
-	_red->contribute(std::move(_shweeper->eqs_to_share));
+	_red->contribute({});
 }
 
 
