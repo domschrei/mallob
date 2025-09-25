@@ -194,24 +194,48 @@ void SweepJob::appl_communicate() {
 			_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateContributions));
 			_red->setCareAboutParent();
 			_red->tellChildrenParentIsReady();
-			LOG(V3_VERB, "ß contributing %i eqs size\n", _shweeper->eqs_to_share.size());
-			LOG(V3_VERB, "ß contributing %i units\n", _shweeper->units_to_share.size());
-			LOG(V3_VERB, "ß contributing %i idle \n", _is_idle);
-			//Combine Equivalences and Units in single array
+
+			//Combine Equivalences and Units from all solvers in single array
+			std::list<std::vector<int>> contribs;
+			for (auto shweeper : _shweepers) {
+				//Format: [Equivalences, Units, eq_size, unit_size, all_idle]
+				int eq_size = shweeper->eqs_to_share.size();
+				int units_size = shweeper->units_to_share.size();
+				std::vector<int> contrib = std::move(shweeper->eqs_to_share);
+				contrib.insert(contrib.end(), shweeper->units_to_share.begin(), shweeper->units_to_share.end());
+				contrib.push_back(eq_size);
+				contrib.push_back(units_size);
+				contrib.push_back(shweeper->shweep_is_idle);
+
+				shweeper->units_to_share.clear();
+				shweeper->eqs_to_share.clear();
+			}
+
+			auto aggregation_element = aggregateContributions(contribs);
+
 			//also store how much space each takes, to quickly separate them without needing to search for the separator
 			//for termination, also store a boolean whether all children are idling
 			//Format: [Equivalences, Units, eq_size, unit_size, all_idle]
-			const int eq_size = _shweeper->eqs_to_share.size();
-			const int unit_size = _shweeper->units_to_share.size();
-			std::vector<int> EU = std::move(_shweeper->eqs_to_share);
-			EU.reserve(eq_size + unit_size + 2);
-			std::move(_shweeper->units_to_share.begin(), _shweeper->units_to_share.end(), std::back_inserter(EU));
-			EU.push_back(eq_size);
-			EU.push_back(unit_size);
-			EU.push_back(_is_idle);
-			_shweeper->units_to_share.clear(); //because didn't move it!
-			LOG(V3_VERB, "ß contributing in total %i size \n", EU.size());
-			_red->contribute(std::move(EU));
+			// int total_eq_size = 0;
+			// int total_unit_size = 0;
+			// bool all_idle = (_shweepers_running_count == _params.numThreadsPerProcess.val);
+			// for (auto shweeper : _shweepers) {
+			// 	total_eq_size += shweeper->eqs_to_share.size();
+			// 	total_unit_size += shweeper->units_to_share.size();
+			// }
+			// auto local_EU = std::vector<int>(total_eq_size + total_unit_size + NUM_SHARING_METADATA);
+			//
+			// for (auto shweeper : _shweepers) {
+			// 	local_EU.insert(local_EU.end(), shweeper->eqs_to_share.begin(), shweeper->eqs_to_share.end());
+			// }
+			// for (auto shweeper : _shweepers) {
+			// 	local_EU.insert(local_EU.end(), shweeper->units_to_share.begin(), shweeper->units_to_share.end());
+			// }
+			// local_EU.push_back(total_eq_size);
+			// local_EU.push_back(total_unit_size);
+			// local_EU.push_back(all_idle);
+			LOG(V3_VERB, "ß contributing size %i to sharing\n", aggregation_element.size()-NUM_SHARING_METADATA);
+			_red->contribute(std::move(aggregation_element));
 			if (parent_was_ready) {
 				_red->enableParentIsReady();
 			}
@@ -254,36 +278,34 @@ void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 
 
 void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
-	_shweepers_idle_count++;
 	KissatPtr shweeper = _shweepers[localId];
+	shweeper->shweep_is_idle = true;
 	shweeper->work_received_from_steal = {};
 
-	//Basecase
-	if (_my_rank == 0 && localId == 0 && !_root_received_work) {
-	    //We assume that the maximum index of any variable corresponds to the total number of variables -1,
-		//To know how much space we need to allocate for all variables.
-	    //i.e. that there are no holes in the numbering. This is an assumption that standard Kissat makes all the time, so we also do it here
-		unsigned VARS = shweep_get_num_vars(shweeper->solver);
-		shweeper->work_received_from_steal = std::vector<int>(VARS);
-		//the initial work: all variables
-		for (int idx = 0; idx < VARS; idx++) {
-			shweeper->work_received_from_steal[idx] = idx;
-		}
-		*work = reinterpret_cast<unsigned int*>(shweeper->work_received_from_steal.data());
-		*work_size = VARS;
-		_root_received_work = true;
-		_shweepers_idle_count--;
-		LOG(V2_INFO, "Initial work distribution: Shweep root %i,%i requested work, got all %u variables\n", _my_rank, localId, VARS);
-		return;
-	}
-
-	//Actual stealing
 	SplitMix64Rng _rng;
 	while (true) {
 		if (_terminate_all) {
 			shweeper->work_received_from_steal = {};
 			//this will terminate the kissat thread, because it will recognize size==0
 			break;
+		}
+
+
+		//Basecase
+		if (_my_rank == 0 && localId == 0 && !_root_received_work) {
+			//To know how much space we need to allocate for all variables, we assume that the maximum index of any variable corresponds to the total number of variables -1,
+			//i.e. that there are no holes in the numbering.
+			//This is an assumption that standard Kissat makes all the time, so we also do it here
+			unsigned VARS = shweep_get_num_vars(shweeper->solver);
+			shweeper->work_received_from_steal = std::vector<int>(VARS);
+			//the initial work is all variables
+			for (int idx = 0; idx < VARS; idx++) {
+				shweeper->work_received_from_steal[idx] = idx;
+			}
+			_root_received_work = true;
+			LOG(V2_INFO, "Initial work distribution: Shweep root rank(%i)id(%i) requested work, got all %u variables\n", _my_rank, localId, VARS);
+			break;
+
 		}
 
 		//In each iteration try first to steal within the local process, without need for any MPI messages
@@ -331,7 +353,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 	//Found work (or terminated), Tell the kissat/C thread where it can find the work
 	*work = reinterpret_cast<unsigned int*>(shweeper->work_received_from_steal.data());
 	*work_size = shweeper->work_received_from_steal.size();
-	_shweepers_idle_count--;
+	shweeper->shweep_is_idle = false;
 }
 
 
@@ -362,11 +384,11 @@ void SweepJob::callback_for_broadcast_ping() {
 
 
 std::vector<int> SweepJob::aggregateContributions(std::list<std::vector<int>> &contribs) {
-	//Each contribution has the format [Equivalences,Units, eq_size, unit_size].
+	//Each contribution has the format [Equivalences,Units,eq_size,unit_size,all_idle].
 
 	size_t total_size = NUM_SHARING_METADATA;
-    for (const auto& vec : contribs) {
-	    total_size += vec.size()-NUM_SHARING_METADATA;
+    for (const auto& contrib : contribs) {
+	    total_size += contrib.size()-NUM_SHARING_METADATA;
     }
     std::vector<int> aggregated;
     aggregated.reserve(total_size);
@@ -385,7 +407,7 @@ std::vector<int> SweepJob::aggregateContributions(std::list<std::vector<int>> &c
     	int unit_size = contrib[contrib.size()-UNITS_SIZE_POS];
 		total_unit_size += unit_size;
 		LOG(V3_VERB, "ß Element: %i unit_size \n", unit_size);
-        aggregated.insert(aggregated.end(), contrib.begin()+eq_size, contrib.end()-NUM_SHARING_METADATA); //not copying the two counters at the end
+        aggregated.insert(aggregated.end(), contrib.begin()+eq_size, contrib.end()-NUM_SHARING_METADATA); //not copying the metadata at the end
     }
 	bool all_idle = true;
     for (const auto& contrib : contribs) {
@@ -396,7 +418,7 @@ std::vector<int> SweepJob::aggregateContributions(std::list<std::vector<int>> &c
 	aggregated.push_back(total_eq_size);
 	aggregated.push_back(total_unit_size);
 	aggregated.push_back(all_idle);
-	LOG(V3_VERB, "ß Aggregated %i eqivalences, %i units, all_idle==%i \n", total_eq_size, total_unit_size, all_idle);
+	LOG(V3_VERB, "ß Aggregated %i equivalences, %i units, all_idle==%i \n", total_eq_size, total_unit_size, all_idle);
 	assert(total_size == total_eq_size + total_unit_size + NUM_SHARING_METADATA);
     return aggregated;
 }
@@ -404,8 +426,6 @@ std::vector<int> SweepJob::aggregateContributions(std::list<std::vector<int>> &c
 
 
 std::vector<int> SweepJob::stealWorkFromAnyLocalSolver() {
-	if (_shweepers_idle_count == _params.numThreadsPerProcess.val)
-		return {}; //Dont need to cycle through local solvers if I know that all are also searching for work
     auto permutations = AdjustablePermutation::getPermutations(3, 10);
 	for (auto vec : permutations) {
 		for (int i : vec) {

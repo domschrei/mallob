@@ -24,10 +24,8 @@ private:
 	std::vector<std::future<void>> _fut_shweepers;
     std::atomic_int _shweepers_running_count {0};
 
-
     bool _root_received_work=false;
 	bool _terminate_all=false;
-	std::atomic_int _shweepers_idle_count {0};
 
 	// static const int NUM_STEAL_METADATA = 1;
     const int TAG_SEARCHING_WORK=1;
