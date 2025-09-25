@@ -226,6 +226,10 @@ public:
         return std::move(_msg_to_read.userData);
     }
 
+    void terminateAsynchronously() {
+        _terminate = true;
+    }
+
     // Send a piece of data, can be blocking and copies the data.
     bool writeData(const std::vector<int>& data, char contentTag) {
         return writeData(std::vector<int>(data), contentTag);

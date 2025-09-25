@@ -464,6 +464,7 @@ void SatProcessAdapter::freeSharedMemory() {
     if (_bg_writer.valid()) _bg_writer.get();
 
     // delete shmem-based pipe
+    _guard_pipe.getUnsafe()->terminateAsynchronously();
     _guard_pipe.lock()->reset();
 
     // Clean up shared memory objects created here

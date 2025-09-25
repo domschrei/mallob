@@ -56,6 +56,9 @@ public:
 	[[nodiscard]] MutexLockedData<T> lock() {
 		return MutexLockedData<T>(_obj, _mtx);
 	}
+	T& getUnsafe() {
+		return _obj;
+	}
 };
 
 class Future {
