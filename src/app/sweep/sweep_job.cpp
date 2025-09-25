@@ -3,26 +3,26 @@
 
 #include "app/job.hpp"
 #include "app/job_tree.hpp"
+#include "util/ctre.hpp"
 #include "util/logger.hpp"
 
 
 SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table)
     : Job(params, setup, table)
 {
-        assert(_params.jobCommUpdatePeriod() > 0 || log_return_false("[ERROR] For this application to work,"
+	assert(_params.jobCommUpdatePeriod() > 0 || log_return_false("[ERROR] For this application to work,"
             " you must explicitly enable job communicators with the -jcup option, e.g., -jcup=0.1\n"));
 	_worksteal_requests.resize(params.numThreadsPerProcess.val);
-	for (int id = 0; id < params.numThreadsPerProcess.val; id++) {
-		_worksteal_requests[id].searcher_id = id;
-		_worksteal_requests[id].sent = true; //the initialized objects should not trigger a send
+	for (auto request : _worksteal_requests) {
+		request.sent = true; //the initial dummy objects should not trigger a send
 	}
 	LOG(V2_INFO, "New SweepJob MPI Process with %i threads\n", params.numThreadsPerProcess.val);
 }
 
 
-void search_work_in_tree(void *SweepJob_state, unsigned **work, int *work_size) {
+void search_work_in_tree(void *SweepJob_state, unsigned **work, int *work_size, int local_id) {
 	// LOG(V2_INFO, "Shweep %i search_work_in_tree \n", ((SweepJob*) SweepJob_state)->_my_rank);
-    ((SweepJob*) SweepJob_state)->searchWorkInTree(work, work_size);
+    ((SweepJob*) SweepJob_state)->searchWorkInTree(work, work_size, local_id);
 }
 
 
@@ -35,58 +35,47 @@ void SweepJob::appl_start() {
 	printf("ß			  : num children %i\n", getJobTree().getNumChildren());
     _metadata = getSerializedDescription(0)->data();
 
-	const JobDescription& desc = getDescription();
-
-	for (int i=0; i < _params.numThreadsPerProcess.val; i++) {
-		_shweepers.push_back(get_new_shweeper());
+    auto permutations = AdjustablePermutation::getPermutations(3, 10);
+	for (auto vec : permutations) {
+		for (int i : vec) {
+			std::cout << i << " ";
+		}
+		std::cout << std::endl;
 	}
 
-
 	//Initialize _red already here, to make sure that all processes have a valid reduction object
-	//maybe switch back to more robust "standard" sharing later
+	//maybe switch back to more robust "standard" sharing
 	JobMessage baseMsg = getMessageTemplate();
 	baseMsg.tag = ALLRED;
 	_red.reset(new JobTreeAllReduction(getJobTree().getSnapshot(), baseMsg, std::vector<int>(), aggregateContributions));
 	_red->setCareAboutParent();
 
-	for (auto shweeper : _shweepers) {
-		std::future<void> fut_shweeper = ProcessWideThreadPool::get().addTask([&]() {
-			LOG(V2_INFO, "Process loading formula  %i \n", _my_index);
-			loadFormulaToShweeper();
-			LOG(V2_INFO, "Process starting Shweeper %i \n", _my_index);
-			LOG(V3_VERB, "Tree object is present? _red=%i \n", _red!=nullptr);
-			int res = shweeper->solve(0, nullptr);
-			LOG(V2_INFO, "\n # \n # \n Process finished Shweeper %i, result %i \n # \n # \n", _my_index, res);
-			_internal_result.id = getId();
-			_internal_result.revision = getRevision();
-			_internal_result.result=res;
-			_solved_status = 10;
-			auto dummy_solution = std::vector<int>(1,0);
-			_internal_result.setSolutionToSerialize((int*)(dummy_solution.data()), dummy_solution.size());
-			_shweepers_running_count--;
-		});
-		_fut_shweepers.push_back( fut_shweeper);
-		_shweepers_running_count++;
+
+	for (int localId=0; localId < _params.numThreadsPerProcess.val; localId++) {
+		auto shweeper = create_new_shweeper(localId);
+		_shweepers.push_back(shweeper);
+		startShweeper(shweeper);
 	}
 
 	LOG(V3_VERB, "ß Finished SweepJob::appl_start()\n");
-
-	// _red.reset(); This line will immediately kill _red for the new thread! Don't do this with my custom JobTreeAllReduction!
-
 }
 
-std::shared_ptr<Kissat> SweepJob::get_new_shweeper() {
+std::shared_ptr<Kissat> SweepJob::create_new_shweeper(int localId) {
+
+	const JobDescription& desc = getDescription();
 	SolverSetup setup;
 	setup.logger = &Logger::getMainInstance();
-	setup.jobname = "swissat-"+to_string(_my_index);
+	setup.jobname = "shweep-"+to_string(_my_index);
 	setup.numVars = desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
 	setup.numOriginalClauses = desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
-	// printf("ß [%i] Payload: %i vars, %i clauses \n", _my_index, setup.numVars, setup.numOriginalClauses);
+	setup.localId = localId;
+
 
 	std::shared_ptr<Kissat> shweeper(new Kissat(setup));
 	shweeper->set_option("mallob_custom_sweep_verbosity", 2); //0: No custom kissat messages. 1: Some. 2: More
 	shweeper->set_option("mallob_solver_count", NUM_WORKERS);
-	shweeper->set_option("mallob_solver_id", _my_index);
+	shweeper->set_option("mallob_local_id", localId);
+	shweeper->set_option("mallob_rank", _my_rank);
 	shweeper->shweep_set_importexport_callbacks();
 	shweeper->shweep_set_workstealing_callback(this, &search_work_in_tree);
 
@@ -99,10 +88,29 @@ std::shared_ptr<Kissat> SweepJob::get_new_shweeper() {
 	shweeper->set_option("seed", _my_index);   //
 
 	shweeper->set_option("mallob_is_shweeper", 1); //Make this Kissat solver a pure Distributed Sweeping Solver. Jumps directly to distributed sweeping and bypasses everything else
-	shweeper->set_option("sweepcomplete", 1); //deactivates any tick limits on sweeping
-	shweeper->set_option("probe", 1); //there is some cleanup-probing at the end of the sweeping
+	shweeper->set_option("sweepcomplete", 1); //go for full sweeping, deactivates any tick limits
+	shweeper->set_option("probe", 1); //there is some cleanup-probing at the end of the sweeping, keep it?
 	return shweeper;
 }
+
+void SweepJob::startShweeper(KissatPtr shweeper) {
+	std::future<void> fut_shweeper = ProcessWideThreadPool::get().addTask([&]() {
+		LOG(V2_INFO, "Start Thread rank %i localId %i\n", _my_rank, shweeper->getLocalId());
+		_shweepers_running_count++;
+		loadFormula(shweeper);
+		int res = shweeper->solve(0, nullptr);
+		LOG(V2_INFO, "\n # \n # \n Thread finished. Rank %i localId %i result %i \n # \n # \n", _my_rank, shweeper->getLocalId(), res);
+		_internal_result.id = getId();
+		_internal_result.revision = getRevision();
+		_internal_result.result=res;
+		_solved_status = 10;
+		auto dummy_solution = std::vector<int>(1,0);
+		_internal_result.setSolutionToSerialize((int*)(dummy_solution.data()), dummy_solution.size());
+		_shweepers_running_count--;
+	});
+	_fut_shweepers.push_back(fut_shweeper);
+}
+
 
 // Called periodically by the main thread to allow the worker to emit messages.
 void SweepJob::appl_communicate() {
@@ -113,19 +121,19 @@ void SweepJob::appl_communicate() {
 	bool can_start = elapsed_time > wait_time;
 
 
-	//Worksteal requests need to be execute by the main MPI thread, because sending MPI messages via a callback from C can cause undefined behaviour
+	//Worksteal requests need to be execute by the main MPI thread, because sending MPI messages via a callback from C can be problematic
 	for (auto request : _worksteal_requests) {
 		if (!request.sent) {
 			request.sent = true;
 			JobMessage msg = getMessageTemplate();
 			msg.tag = TAG_SEARCHING_WORK;
 			//Need to add these two fields because we are doing arbitrary point-to-point communication
-			msg.treeIndexOfDestination = request.target_rank;
-			msg.contextIdOfDestination = getJobComm().getContextIdOrZero(request.target_rank);
-			msg.payload = {request.searcher_id};
+			msg.treeIndexOfDestination = request.targetRank;
+			msg.contextIdOfDestination = getJobComm().getContextIdOrZero(request.targetRank);
+			msg.payload = {request.localId};
 			// LOG(V2_INFO, "Rank %i asks rank %i for work\n", _my_rank, recv_rank, n);
 			// LOG(V2_INFO, "  with destionation ctx_id %i \n", msg.contextIdOfDestination);
-			getJobTree().send(request.target_rank, MSG_SEND_APPLICATION_MESSAGE, msg);
+			getJobTree().send(request.targetRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 		}
 	}
 
@@ -136,42 +144,45 @@ void SweepJob::appl_communicate() {
 		// LOG(V3_VERB, "ß have %i units to share\n", _shweeper->units_to_share.size());
 		bool reset_red = false;
 		if (_red && _red->hasResult()) {
-			//store the received equivalences such that the local solver than eventually import them
-			auto share_received = _red->extractResult();
-			const int received_eq_size = share_received[share_received.size()-EQS_SIZE_POS];
-			const int received_unit_size = share_received[share_received.size()-UNITS_SIZE_POS];
-			const int all_idle = share_received[share_received.size()-IDLE_STATUS_POS];
-			LOG(V1_WARN, "ß --- Received Broadcast: %i eq_size, %i unit_size -- \n", received_eq_size, received_unit_size);
+			auto broadcast = _red->extractResult(); //Broadcast data
+			const int broadcasted_eq_size = broadcast[broadcast.size()-EQUIVS_SIZE_POS];
+			const int broadcasted_unit_size = broadcast[broadcast.size()-UNITS_SIZE_POS];
+			const int all_idle = broadcast[broadcast.size()-IDLE_STATUS_POS];
+			LOG(V1_WARN, "ß --- Received Broadcast: %i eq_size, %i unit_size -- \n", broadcasted_eq_size, broadcasted_unit_size);
 			if (all_idle) {
-				_terminate = true;
+				_terminate_all = true;
 				LOG(V1_WARN, "ß # \n # \n  --- ALL SWEEPERS IDLE - CAN TERMINATE -- \n # \n # \n");
 			}
 
+			_eqs_from_broadcast.assign(broadcast.begin(), broadcast.begin() + broadcasted_eq_size);
+			_units_from_broadcast.assign(broadcast.begin() + broadcasted_eq_size, broadcast.end() - NUM_SHARING_METADATA);
 			//save equivalences
+
+			/**
 			auto& eqs_received = _shweeper->eqs_received_from_sharing;
 			eqs_received.reserve(eqs_received.size() + received_eq_size);
 			eqs_received.insert(
 				eqs_received.end(),
-				std::make_move_iterator(share_received.begin()),
-				std::make_move_iterator(share_received.begin() + received_eq_size)
+				std::make_move_iterator(broadcast_data.begin()),
+				std::make_move_iterator(broadcast_data.begin() + received_eq_size)
 			);
 			//save units
 			auto& units_received = _shweeper->units_received_from_sharing;
 			units_received.reserve(units_received.size() + received_unit_size);
 			units_received.insert(
 				units_received.end(),
-				std::make_move_iterator(share_received.begin() + received_eq_size),
-				std::make_move_iterator(share_received.end()   - NUM_SHARING_METADATA)
+				std::make_move_iterator(broadcast_data.begin() + received_eq_size),
+				std::make_move_iterator(broadcast_data.end()   - NUM_SHARING_METADATA)
 			);
+			**/
 			reset_red = true;
 			// parent_is_ready = _red->isParentReady();
-			LOG(V3_VERB, "ß Now storing %i equivalences and %i units, for local solver to import \n", eqs_received.size()/2, units_received.size());
+			LOG(V3_VERB, "ß Now storing %i equivalences and %i units, for local solvers to import \n", _eqs_from_broadcast.size()/2, _units_from_broadcast.size());
 		}
 
-		if (!started_sharing) { //triggers the very first construction
+		if (!_started_sharing) { //triggers the very first construction
 			reset_red = true;
-			// parent_is_ready = true;
-			started_sharing = true;
+			_started_sharing = true;
 		}
 
 
@@ -215,105 +226,112 @@ void SweepJob::appl_communicate() {
 void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 	// LOG(V2_INFO, "Shweep rank %i: received custom message from source %i, mpiTag %i, msg.tag %i \n", _my_rank, source, mpiTag, msg.tag);
 	if (msg.tag == TAG_SEARCHING_WORK) {
-		_shweeper->work_stolen_from_local_solver = {};
-		int actually_stolen = steal_from_my_local_solver();
-		if (actually_stolen>0) {
-			//the steal vector was a bit over-dimensioned before the steal, because we only knew an upper limit, but learned the actual amount only  while stealing
-			//to elegantly communicate this actual steal amount via MPI, we resize the vector to contain this information in its .size()
-			_shweeper->work_stolen_from_local_solver.resize(actually_stolen);
-			msg.tag = TAG_SUCCESSFUL_WORK_STEAL;
-			// LOG(V2_INFO, "Shweep rank %i: providing %i work, sending to source %i \n",  _my_rank, stolen, source);
-		} else {
-			// LOG(V2_INFO, "Shweep rank %i: didn't have work to give to source %i\n", _my_rank, source);
-			msg.tag = TAG_UNSUCCESSFUL_WORK_STEAL;
-		}
+		assert(msg.payload.size() == 1);
+		int localId = msg.payload.front();
+		msg.payload.clear();
+
+		auto stolen_work = stealWorkFromAnyLocalSolver();
+
+		msg.payload = std::move(stolen_work);
+		msg.payload.push_back(localId);
+
 		//send back to source
-		int searcher_id = msg.payload[0];
-		_shweeper->work_stolen_from_local_solver.push_back(searcher_id);
-		msg.payload = std::move(_shweeper->work_stolen_from_local_solver);
+		msg.tag = TAG_RETURNING_STEAL_REQUEST;
 		msg.treeIndexOfDestination = source;
 		msg.contextIdOfDestination = getJobComm().getContextIdOrZero(source);
 		getJobTree().send(source, MSG_SEND_APPLICATION_MESSAGE, msg);
+		return;
 	}
-	else if (msg.tag == TAG_SUCCESSFUL_WORK_STEAL) {
-		int searcher_id = msg.payload.back();
+
+	if (msg.tag == TAG_RETURNING_STEAL_REQUEST) {
+		int localId = msg.payload.back();
 		msg.payload.pop_back();
-		_worksteal_requests[searcher_id].stolen_work = std::move(msg.payload);
-		_worksteal_requests[searcher_id].got_steal_response = true;
-	}
-	else if (msg.tag == TAG_UNSUCCESSFUL_WORK_STEAL) {
-		int searcher_id = msg.payload.back();
-		msg.payload.pop_back();
-		_worksteal_requests[searcher_id].got_steal_response = true;
+		_worksteal_requests[localId].stolen_work = std::move(msg.payload);
+		_worksteal_requests[localId].got_steal_response = true;
+		return;
 	}
 }
 
 
-void SweepJob::searchWorkInTree(unsigned **work, int *work_size) {
-	_shweeper->shweep_is_idle = true;
-	_shweeper->work_received_from_others = {};
+void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
+	_shweepers_idle_count++;
+	KissatPtr shweeper = _shweepers[localId];
+	shweeper->work_received_from_steal = {};
 
-	if (_my_rank == 0 && !root_received_work) {
-	    //to know how much space we need to allocate for all variables, we assume that the maximum index of any variable corresponds to the total number of variables -1,
+	//Basecase
+	if (_my_rank == 0 && localId == 0 && !_root_received_work) {
+	    //We assume that the maximum index of any variable corresponds to the total number of variables -1,
+		//To know how much space we need to allocate for all variables.
 	    //i.e. that there are no holes in the numbering. This is an assumption that standard Kissat makes all the time, so we also do it here
-		unsigned VARS = shweep_get_num_vars(_shweeper->solver);
-		_shweeper->work_received_from_others = std::vector<int>(VARS);
+		unsigned VARS = shweep_get_num_vars(shweeper->solver);
+		shweeper->work_received_from_steal = std::vector<int>(VARS);
 		//the initial work: all variables
 		for (int idx = 0; idx < VARS; idx++) {
-			_shweeper->work_received_from_others[idx] = idx;
+			shweeper->work_received_from_steal[idx] = idx;
 		}
-		*work = reinterpret_cast<unsigned int*>(_shweeper->work_received_from_others.data());
+		*work = reinterpret_cast<unsigned int*>(shweeper->work_received_from_steal.data());
 		*work_size = VARS;
-		root_received_work = true;
-		_shweeper->shweep_is_idle = false;
-		LOG(V2_INFO, "Shweep root %i requested work, got all %u variables\n", _my_rank, VARS);
+		_root_received_work = true;
+		_shweepers_idle_count--;
+		LOG(V2_INFO, "Initial work distribution: Shweep root %i,%i requested work, got all %u variables\n", _my_rank, localId, VARS);
 		return;
 	}
 
+	//Actual stealing
 	SplitMix64Rng _rng;
-	while (_shweeper->work_received_from_others.empty()) {
-		if (_terminate) {
-			*work = reinterpret_cast<unsigned int*>(_shweeper->work_received_from_others.data());
-			*work_size = 0; //this zero tells the kissat solver that we are finished
+	while (true) {
+		if (_terminate_all) {
+			shweeper->work_received_from_steal = {};
+			//this will terminate the kissat thread, because it will recognize size==0
 			break;
 		}
-		int n = getVolume();
-		//Steal from a random other solver
-		int recv_index = _rng.randomInRange(0,n);
-        int recv_rank = getJobComm().getWorldRankOrMinusOne(recv_index);
 
-		// LOG(V2_INFO, "random index: %i  (volume %i)\n", recv_index, n);
-        if (recv_rank == -1) {
-			// tree not yet fully built, LOG(V2_INFO, "No receive rank found for index %i, try new random index !\n", recv_index);
+		//In each iteration try first to steal within the local process, without need for any MPI messages
+		auto stolen_work = stealWorkFromAnyLocalSolver();
+
+		//Successful local steal
+		if ( ! stolen_work.empty()) {
+			//store steal data persistently in C++, such that C can keep operating on that memory segment
+			shweeper->work_received_from_steal = std::move(stolen_work);
+			LOG(V2_INFO, "%i variables sent within same rank(%i) to id(%i) \n", shweeper->work_received_from_steal.size(), _my_rank, localId);
+			break;
+		}
+
+		//Unsuccessful steal locally. Go global.
+		int recvIndex = _rng.randomInRange(0,getVolume());
+        int targetRank = getJobComm().getWorldRankOrMinusOne(recvIndex);
+        if (targetRank == -1) { // tree not fully built yet, try again
 			usleep(100);
         	continue;
         }
-
-		if (recv_rank == _my_rank) {//not asking ourselves for work
+		if (targetRank == _my_rank) { // don't steal from ourselves, try again
 			continue;
 		}
 
-		int searcher_id = 0; //after hybridization, the kissat solver must provide this information
+		//Request will be handled by the MPI main thread, which will send an MPI message on our behalf
+		//because here we are in code executed by the kissat thread, which can cause problems for sending MPI messages
 		WorkstealRequest request;
-		request.searcher_id = searcher_id;
-		request.target_rank = recv_rank;
-		_worksteal_requests[searcher_id] = request;
+		request.localId = localId;
+		request.targetRank = targetRank;
+		_worksteal_requests[localId] = request;
 
-		while(_worksteal_requests[searcher_id].got_steal_response == false) {
+		//Wait here until we get back an MPI message
+		while( ! _worksteal_requests[localId].got_steal_response) {
 			usleep(100);
 		}
 
-
-		if (!_worksteal_requests[searcher_id].stolen_work.empty()) {
-			_shweeper->shweep_is_idle = false;
-			//Tell C/Kissat where it can read the new work
-			*work = reinterpret_cast<unsigned int*>(_shweeper->work_received_from_others.data());
-			*work_size = _shweeper->work_received_from_others.size();
-			LOG(V2_INFO, "%i variables sent from rank(%i) to rank(%i) \n", _shweeper->work_received_from_others.size(), _my_rank, recv_rank);
+		//Successful steal if size > 0
+		if ( ! _worksteal_requests[localId].stolen_work.empty()) {
+			shweeper->work_received_from_steal = std::move(_worksteal_requests[localId].stolen_work);
+			LOG(V2_INFO, "%i variables sent from rank(%i) to rank(%i)id(%i) \n", shweeper->work_received_from_steal.size(), targetRank, _my_rank, localId);
 			break;
 		}
-		// LOG(V2_INFO, "Rank %i did not received work from rank %i\n", _my_rank, recv_rank);
+		//Unsuccessful global steal, try again
 	}
+	//Found work (or terminated), Tell the kissat/C thread where it can find the work
+	*work = reinterpret_cast<unsigned int*>(shweeper->work_received_from_steal.data());
+	*work_size = shweeper->work_received_from_steal.size();
+	_shweepers_idle_count--;
 }
 
 
@@ -355,7 +373,7 @@ std::vector<int> SweepJob::aggregateContributions(std::list<std::vector<int>> &c
 	//Fill equivalences
 	size_t total_eq_size = 0;
     for (const auto& contrib : contribs) {
-    	int eq_size = contrib[contrib.size()-EQS_SIZE_POS];
+    	int eq_size = contrib[contrib.size()-EQUIVS_SIZE_POS];
     	total_eq_size += eq_size;
 		LOG(V3_VERB, "ß Element: %i eq_size \n", eq_size);
         aggregated.insert(aggregated.end(), contrib.begin(), contrib.begin()+eq_size);
@@ -363,7 +381,7 @@ std::vector<int> SweepJob::aggregateContributions(std::list<std::vector<int>> &c
 	//Fill units
 	size_t total_unit_size = 0;
     for (const auto& contrib : contribs) {
-    	int eq_size = contrib[contrib.size()-EQS_SIZE_POS];
+    	int eq_size = contrib[contrib.size()-EQUIVS_SIZE_POS];
     	int unit_size = contrib[contrib.size()-UNITS_SIZE_POS];
 		total_unit_size += unit_size;
 		LOG(V3_VERB, "ß Element: %i unit_size \n", unit_size);
@@ -384,29 +402,47 @@ std::vector<int> SweepJob::aggregateContributions(std::list<std::vector<int>> &c
 }
 
 
-void SweepJob::advanceSweepMessage(JobMessage& msg) {
 
+std::vector<int> SweepJob::stealWorkFromAnyLocalSolver() {
+	if (_shweepers_idle_count == _params.numThreadsPerProcess.val)
+		return {}; //Dont need to cycle through local solvers if I know that all are also searching for work
+    auto permutations = AdjustablePermutation::getPermutations(3, 10);
+	for (auto vec : permutations) {
+		for (int i : vec) {
+			std::cout << i << " ";
+		}
+		std::cout << std::endl;
+	}
+
+	return {};
 }
 
-int SweepJob::steal_from_my_local_solver() {
-	if (_terminate)
-		return 0;
+std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
+	if (_terminate_all)
+		return {};
 	//We dont know how much there is to steal, so we ask
-	size_t max_steal_amount = shweep_get_max_steal_amount(_shweeper->solver);
+	KissatPtr shweeper = _shweepers[localId];
+	size_t max_steal_amount = shweep_get_max_steal_amount(shweeper->solver);
 	if (max_steal_amount == 0)
-		return 0;
-	//There is potentially something to steal, allocate memory for it, and pass it to kissat for filling
-	_shweeper->work_stolen_from_local_solver.resize(max_steal_amount);
-	int actually_stolen = shweep_steal_from_this_solver(_shweeper->solver, reinterpret_cast<unsigned int*>(_shweeper->work_stolen_from_local_solver.data()), max_steal_amount);
-	return actually_stolen;
+		return {};
+	//There is potentially something to steal
+	//Allocate memory for the steal here in C++, and pass it to kissat such that it can fill in the stolen work
+	std::vector<int> stolen_work = std::vector<int>(max_steal_amount);
+	int actually_stolen = shweep_steal_from_this_solver(shweeper->solver, reinterpret_cast<unsigned int*>(stolen_work.data()), max_steal_amount);
+	if (actually_stolen == 0)
+		return {};
+	//We oversized the provided array a bit, such that C has in any case enough space to write
+	//But since we only learn within C how much work there is actually to steal, we now at the C++ level reflect this information
+	stolen_work.resize(actually_stolen);
+	return stolen_work;
 }
 
 
-void SweepJob::loadFormulaToShweeper() {
+void SweepJob::loadFormula(KissatPtr shweeper) {
 	const int* lits = getDescription().getFormulaPayload(0);
 	const int payload_size = getDescription().getFormulaPayloadSize(0);
 	for (int i = 0; i < payload_size ; i++) {
-		_shweeper->addLiteral(lits[i]);
+		shweeper->addLiteral(lits[i]);
 	}
 }
 

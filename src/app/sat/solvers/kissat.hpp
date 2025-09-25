@@ -45,10 +45,10 @@ private:
 	const int MAX_SHWEEP_STORAGE_SIZE = 10000;
 	friend class SweepJob;
 
-	std::vector<int> work_stolen_from_local_solver;
-	std::vector<int> work_received_from_others;
+	// std::vector<int> work_stolen_from_local_solver;
+	std::vector<int> work_received_from_steal;
 
-	bool shweep_is_idle;
+	// bool shweep_is_idle;
 	// std::vector<char> stolen_done;
 
 
@@ -131,7 +131,7 @@ public:
 	friend void report_database_lit(void *state, int lit);
 
 
-	void shweep_set_workstealing_callback(void* SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, int *work_size));
+	void shweep_set_workstealing_callback(void* SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, int *work_size, int local_id));
 
 
 

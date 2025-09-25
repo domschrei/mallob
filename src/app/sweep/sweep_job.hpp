@@ -18,54 +18,48 @@ private:
     bool _is_root{false};
     uint8_t* _metadata; //serialized description
 
-	std::list<std::shared_ptr<Kissat>> _shweepers;
-	std::list<std::future<void>> _fut_shweepers;
+	typedef std::shared_ptr<Kissat> KissatPtr;
+
+	std::vector<std::shared_ptr<Kissat>> _shweepers;
+	std::vector<std::future<void>> _fut_shweepers;
     std::atomic_int _shweepers_running_count {0};
 
-    // std::shared_ptr<Kissat> _shweeper;
-    // std::future<void> _fut_shweeper;
-    // std::atomic_int _shweepers_running_count {0};
 
-	bool _terminate=false;
-    // const int SHWEEP_STATE_WORKING{0};
-    // const int SHWEEP_STATE_IDLE{1};
+    bool _root_received_work=false;
+	bool _terminate_all=false;
+	std::atomic_int _shweepers_idle_count {0};
 
+	// static const int NUM_STEAL_METADATA = 1;
     const int TAG_SEARCHING_WORK=1;
-    const int TAG_SUCCESSFUL_WORK_STEAL=2;
-    const int TAG_UNSUCCESSFUL_WORK_STEAL=3;
-
-    bool root_received_work=false;
-    // bool got_steal_response=false;
-    // std::vector<unsigned> stolen_work;
+    const int TAG_RETURNING_STEAL_REQUEST=2;
+	struct WorkstealRequest {
+		int localId{-1};
+		int targetRank{-1};
+		bool sent{false};
+		bool got_steal_response{false};
+		std::vector<int> stolen_work{};
+	};
+	std::vector<WorkstealRequest> _worksteal_requests;
 
 
     std::unique_ptr<JobTreeBroadcast> _bcast;
     std::unique_ptr<JobTreeAllReduction> _red;
-	bool started_sharing = false;
+	bool _started_sharing = false;
+
+	//the additional metadata [..., eqs_size, units_size, all_searching_work] stored in each shared element
+	static const int NUM_SHARING_METADATA = 3;
+	static const int EQUIVS_SIZE_POS = 3;
+	static const int UNITS_SIZE_POS = 2;
+	static const int IDLE_STATUS_POS = 1;
+
+    std::vector<int> _eqs_from_broadcast;//accumulate received equivalences to import in local solver
+	std::vector<int> _units_from_broadcast;
 
     const int BCAST_INIT{1};
     const int ALLRED{2};
 
     static const int MSG_SWEEP = 100; // internal message tag
     static const int NUM_WORKERS = 4; // # workers we request and require, hardcoded 4 for now
-
-	//the additional metadata [..., eqs_size, units_size, all_searching_work] stored in each shared element
-	static const int NUM_SHARING_METADATA = 3;
-	static const int EQS_SIZE_POS = 3;
-	static const int UNITS_SIZE_POS = 2;
-	static const int IDLE_STATUS_POS = 1;
-
-	static const int NUM_STEALING_METADATA = 1;
-
-	struct WorkstealRequest {
-		int searcher_id{-1};
-		int target_rank{-1};
-		bool sent{false};
-		bool got_steal_response{false};
-		std::vector<int> stolen_work{};
-	};
-
-	std::vector<WorkstealRequest> _worksteal_requests;
 
 
 public:
@@ -85,21 +79,23 @@ public:
     void appl_memoryPanic() override {}
 
 
-	std::shared_ptr<Kissat> SweepJob::get_new_shweeper();
-    friend void search_work_in_tree(void* SweepJob_state, unsigned **work, int *work_size);
+	std::shared_ptr<Kissat> SweepJob::create_new_shweeper(int localId);
+    friend void search_work_in_tree(void* SweepJob_state, unsigned **work, int *work_size, int local_id);
 
 private:
-    void advanceSweepMessage(JobMessage& msg);
+    // void advanceSweepMessage(JobMessage& msg);
     static std::vector<int> aggregateContributions(std::list<std::vector<int>> &contribs);
-    void loadFormulaToShweeper();
-
+    void loadFormula(KissatPtr shweeper);
+	void startShweeper(KissatPtr shweeper);
 
     void tryBeginBroadcastPing();
     void callback_for_broadcast_ping();
-    void tryExtractResult();
+    // void tryExtractResult();
 
-    int steal_from_my_local_solver();
-    void searchWorkInTree(unsigned **work, int *work_size);
+
+	std::vector<int> stealWorkFromAnyLocalSolver();
+    std::vector<int> stealWorkFromSpecificLocalSolver(int localId);
+    void searchWorkInTree(unsigned **work, int *work_size, int localId);
 
 };
 
