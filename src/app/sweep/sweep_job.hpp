@@ -43,6 +43,7 @@ private:
     std::unique_ptr<JobTreeBroadcast> _bcast;
     std::unique_ptr<JobTreeAllReduction> _red;
 	bool _started_sharing = false;
+	int _sharing_round = 0;
 
 	//the additional metadata [..., eqs_size, units_size, all_searching_work] stored in each shared element
 	static const int NUM_SHARING_METADATA = 3;
@@ -53,11 +54,14 @@ private:
     std::vector<int> _eqs_from_broadcast;//accumulate received equivalences to import in local solver
 	std::vector<int> _units_from_broadcast;
 
+
     const int BCAST_INIT{1};
     const int ALLRED{2};
 
     static const int MSG_SWEEP = 100; // internal message tag
     static const int NUM_WORKERS = 4; // # workers we request and require, hardcoded 4 for now
+
+	static const int INVALID_LIT = UINT_MAX;
 
 
 public:
@@ -79,6 +83,7 @@ public:
 
 	std::shared_ptr<Kissat> SweepJob::create_new_shweeper(int localId);
     friend void search_work_in_tree(void* SweepJob_state, unsigned **work, int *work_size, int local_id);
+	// friend void import_next_equivalence(void *SweepJobState, int *last_imported_round, int eq_nr, unsigned *lit1, unsigned *lit2);
 
 private:
     // void advanceSweepMessage(JobMessage& msg);
@@ -94,6 +99,7 @@ private:
 	std::vector<int> stealWorkFromAnyLocalSolver();
     std::vector<int> stealWorkFromSpecificLocalSolver(int localId);
     void searchWorkInTree(unsigned **work, int *work_size, int localId);
+	void importNextEquivalence(int *last_imported_round, int eq_nr, unsigned *lit1, unsigned *lit2);
 
 };
 

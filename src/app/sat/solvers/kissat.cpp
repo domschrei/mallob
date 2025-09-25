@@ -33,19 +33,22 @@ void consume_clause(void* state, int** clause, int* size, int* glue) {
 }
 
 
-void pass_eq_up(void *state) {
-    ((Kissat*) state)->passEqUp();
-}
-void pass_eqs_down(void* state, int** equivalences, int *eqs_size) {
-    ((Kissat*) state)->passEqsDown(equivalences, eqs_size);
+void shweep_export_eq(void *state) {
+    ((Kissat*) state)->shweepExportEq();
 }
 
-void pass_unit_up(void *state, int unit) {
-    ((Kissat*) state)->passUnitUp(unit);
+void shweep_export_unit(void *state, int unit) {
+    ((Kissat*) state)->shweepExportUnit(unit);
 }
 
-void pass_units_down(void *state, int **units, int *unit_count) {
-    ((Kissat*) state)->passUnitsDown(units, unit_count);
+
+void shweep_import_eqs(void* state, int** equivalences, int *eqs_size) {
+    ((Kissat*) state)->shweepImportEqs(equivalences, eqs_size);
+}
+
+
+void shweep_import_units(void *state, int **units, int *unit_count) {
+    ((Kissat*) state)->shweepImportUnits(units, unit_count);
 }
 
 // void shweep_solver_searches_work(void *state, unsigned **work, unsigned *size) {
@@ -74,12 +77,8 @@ Kissat::Kissat(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup), solver(kissat_init()),
         learntClauseBuffer(_setup.strictMaxLitsPerClause+ClauseMetadata::numInts()),
         eq_up_buffer(2)  //pass two literals
-        // producedEquivalenceBuffer(2) //pass two literals
 {
-    eqs_to_share.reserve(MAX_SHWEEP_STORAGE_SIZE);
-    eqs_received_from_sharing.reserve(MAX_SHWEEP_STORAGE_SIZE);
-    units_to_share.reserve(MAX_SHWEEP_STORAGE_SIZE);
-    units_received_from_sharing.reserve(MAX_SHWEEP_STORAGE_SIZE);
+
     kissat_set_terminate(solver, this, &terminate_callback);
     glueLimit = _setup.strictLbdLimit;
     numVars = setup.numVars;
@@ -419,10 +418,10 @@ void Kissat::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
 
 
 void Kissat::shweep_set_importexport_callbacks() {
-    shweep_set_equivalence_export_callback(solver, this, eq_up_buffer.data(), &pass_eq_up);
-    shweep_set_equivalence_import_callback(solver, this, &pass_eqs_down);
-    shweep_set_unit_export_callback(solver, this, &pass_unit_up);
-    shweep_set_unit_import_callback(solver, this, &pass_units_down);
+    shweep_set_equivalence_export_callback(solver, this, eq_up_buffer.data(), &shweep_export_eq);
+    shweep_set_equivalence_import_callback(solver, this, &shweep_import_eqs);
+    shweep_set_unit_export_callback(solver, this, &shweep_export_unit);
+    shweep_set_unit_import_callback(solver, this, &shweep_import_units);
 }
 
 void Kissat::shweep_set_workstealing_callback(void *SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, int *work_size, int local_id)) {
@@ -462,34 +461,31 @@ void Kissat::consumeClause(int** clause, int* size, int* lbd) {
 }
 
 
-void Kissat::passEqUp() {
-    int lit1 = eq_up_buffer[0];
-    int lit2 = eq_up_buffer[1];
-    if (eqs_to_share.size() < MAX_SHWEEP_STORAGE_SIZE) {
-        eqs_to_share.push_back(lit1);
-        eqs_to_share.push_back(lit2);
-        // printf("ß Stored Eq (%i, %i) \n", lit1, lit2);
-    } else  {
-        printf("ß Not enough space to store Eq for sharing, reached limit %lu \n",eqs_to_share.size());
-    }
+void Kissat::shweepExportEq() {
+    const int lit1 = eq_up_buffer[0];
+    const int lit2 = eq_up_buffer[1];
+    eqs_to_share.push_back(lit1);
+    eqs_to_share.push_back(lit2);
 }
 
-void Kissat::passEqsDown(int **equivalences, int *eqs_size) {
-    eqs_passed_down = std::move(eqs_received_from_sharing);
-    eqs_received_from_sharing.clear();
-    *equivalences = eqs_passed_down.data();
-    *eqs_size = eqs_passed_down.size();
-}
-
-void Kissat::passUnitUp(int unit) {
+void Kissat::shweepExportUnit(int unit) {
     units_to_share.push_back(unit);
 }
 
-void Kissat::passUnitsDown(int **units, int *unit_count) {
-    units_passed_down = std::move(units_received_from_sharing);
-    units_received_from_sharing.clear();
-    *units = units_passed_down.data();
-    *unit_count = units_passed_down.size();
+void Kissat::shweepImportEqs(int **equivalences, int *eqs_size) {
+    eqs_from_broadcast = std::move(eqs_from_broadcast_queued);
+    eqs_from_broadcast_queued.clear();
+    *equivalences = eqs_from_broadcast.data();
+    *eqs_size = eqs_from_broadcast.size();
+}
+
+
+void Kissat::shweepImportUnits(int **units, int *unit_count) {
+    //if we already imported the units from the queue, the queue is empty and we import size==0
+    units_from_broadcast = std::move(units_from_broadcast_queued);
+    units_from_broadcast_queued.clear();
+    *units = units_from_broadcast.data();
+    *unit_count = units_from_broadcast.size();
 }
 
 
@@ -555,7 +551,7 @@ void Kissat::addLiteralFromPreprocessing(int lit) {
 }
 
 void Kissat::addLiteralToShweepJob(int lit) {
-   formulaToShweep.push_back(lit);
+   formulaForShweeping.push_back(lit);
 }
 
 Kissat::~Kissat() {

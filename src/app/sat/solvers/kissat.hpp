@@ -33,16 +33,23 @@ private:
     std::vector<int> producedClause;
 
 	//Shweep
-	std::vector<int> eq_up_buffer;    //transfer a single equivalence up, from C to C++
+	std::vector<int> eq_up_buffer;    //transfer a single equivalence from C to C++
+
+
+	std::vector<int> eqs_from_broadcast_queued; //equivalences that came from the broadcast, but are not yet shown to the solver
+	std::vector<int> units_from_broadcast_queued;
+
+    std::vector<int> eqs_from_broadcast;  //equivalences that are currently shown to the solver, originating from broadcast
+	std::vector<int> units_from_broadcast;
+
+
     std::vector<int> eqs_to_share;    //accumulate exported equivalences for sharing
-    std::vector<int> eqs_received_from_sharing;//accumulate received equivalences to import in local solver
-	std::vector<int> eqs_passed_down;
 	std::vector<int> units_to_share;
-	std::vector<int> units_received_from_sharing;
-	std::vector<int> units_passed_down;
-	bool shweep_eq_imports_available;
-	bool shweep_unit_imports_available;
-	const int MAX_SHWEEP_STORAGE_SIZE = 10000;
+
+	// bool shweep_eq_imports_available;
+	// bool shweep_unit_imports_available;
+	// const int MAX_SHWEEP_STORAGE_SIZE = 10000;
+
 	friend class SweepJob;
 
 	// std::vector<int> work_stolen_from_local_solver;
@@ -52,7 +59,7 @@ private:
 	// std::vector<char> stolen_done;
 
 
-	std::vector<int> formulaToShweep;
+	std::vector<int> formulaForShweeping;
 	// \Shweep
 
 	bool interruptionInitialized = false;
@@ -120,11 +127,11 @@ public:
     friend void consume_clause(void* state, int** clause, int* size, int* lbd);
 
 	//Distributed Shared Sweeping
-	friend void pass_eq_up(void *state);
-	friend void pass_eqs_down(void* state, int** equivalences, int *eqs_size);
+	friend void shweep_export_eq(void *state);
+	friend void shweep_export_unit(void *state, int unit);
 
-	friend void pass_unit_up(void *state, int unit);
-	friend void pass_units_down(void *state, int **units, int *unit_count);
+	friend void shweep_import_eqs(void* state, int** equivalences, int *eqs_size);
+	friend void shweep_import_units(void *state, int **units, int *unit_count);
 
 
 
@@ -158,10 +165,12 @@ private:
     void addLiteralFromPreprocessing(int lit);
 
 	//Shweep
-	void passEqUp();
-	void passEqsDown(int** equivalences, int *eqs_size);
-	void passUnitUp(int unit);
-	void passUnitsDown(int **units, int *unit_count);
+	void shweepExportEq();
+	void shweepExportUnit(int unit);
+
+	void shweepImportEqs(int** equivalences, int *eqs_size);
+	void shweepImportUnits(int **units, int *unit_count);
+
     void addLiteralToShweepJob(int lit);
 
     bool shouldTerminate();

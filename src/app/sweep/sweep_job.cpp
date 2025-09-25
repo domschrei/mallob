@@ -25,6 +25,9 @@ void search_work_in_tree(void *SweepJob_state, unsigned **work, int *work_size, 
     ((SweepJob*) SweepJob_state)->searchWorkInTree(work, work_size, local_id);
 }
 
+// void import_next_equivalence(void *SweepJobState, int *last_imported_round, int eq_nr, unsigned *lit1, unsigned *lit2) {
+    // ((SweepJob*) SweepJobState)->importNextEquivalence(last_imported_round, eq_nr, lit1, lit2);
+// }
 
 
 void SweepJob::appl_start() {
@@ -156,25 +159,14 @@ void SweepJob::appl_communicate() {
 
 			_eqs_from_broadcast.assign(broadcast.begin(), broadcast.begin() + broadcasted_eq_size);
 			_units_from_broadcast.assign(broadcast.begin() + broadcasted_eq_size, broadcast.end() - NUM_SHARING_METADATA);
-			//save equivalences
 
-			/**
-			auto& eqs_received = _shweeper->eqs_received_from_sharing;
-			eqs_received.reserve(eqs_received.size() + received_eq_size);
-			eqs_received.insert(
-				eqs_received.end(),
-				std::make_move_iterator(broadcast_data.begin()),
-				std::make_move_iterator(broadcast_data.begin() + received_eq_size)
-			);
-			//save units
-			auto& units_received = _shweeper->units_received_from_sharing;
-			units_received.reserve(units_received.size() + received_unit_size);
-			units_received.insert(
-				units_received.end(),
-				std::make_move_iterator(broadcast_data.begin() + received_eq_size),
-				std::make_move_iterator(broadcast_data.end()   - NUM_SHARING_METADATA)
-			);
-			**/
+			//for convenience, we copy the received data for each solver individually, makes importing easier, at the cost of slightly more memory usage
+			//for maximum memory efficiency, would need to refactor to have kissat threads read directly _eqs_from_broadcast from the SweepJob
+			for (auto shweeper : _shweepers) {
+				shweeper->eqs_from_broadcast_queued = _eqs_from_broadcast;
+				shweeper->units_from_broadcast_queued = _units_from_broadcast;
+			}
+
 			reset_red = true;
 			// parent_is_ready = _red->isParentReady();
 			LOG(V3_VERB, "ß Now storing %i equivalences and %i units, for local solvers to import \n", _eqs_from_broadcast.size()/2, _units_from_broadcast.size());
@@ -195,10 +187,9 @@ void SweepJob::appl_communicate() {
 			_red->setCareAboutParent();
 			_red->tellChildrenParentIsReady();
 
-			//Combine Equivalences and Units from all solvers in single array
+			//Bring individual data per thread in the sharing element format: [Equivalences, Units, eq_size, unit_size, all_idle]
 			std::list<std::vector<int>> contribs;
 			for (auto shweeper : _shweepers) {
-				//Format: [Equivalences, Units, eq_size, unit_size, all_idle]
 				int eq_size = shweeper->eqs_to_share.size();
 				int units_size = shweeper->units_to_share.size();
 				std::vector<int> contrib = std::move(shweeper->eqs_to_share);
@@ -213,27 +204,6 @@ void SweepJob::appl_communicate() {
 
 			auto aggregation_element = aggregateContributions(contribs);
 
-			//also store how much space each takes, to quickly separate them without needing to search for the separator
-			//for termination, also store a boolean whether all children are idling
-			//Format: [Equivalences, Units, eq_size, unit_size, all_idle]
-			// int total_eq_size = 0;
-			// int total_unit_size = 0;
-			// bool all_idle = (_shweepers_running_count == _params.numThreadsPerProcess.val);
-			// for (auto shweeper : _shweepers) {
-			// 	total_eq_size += shweeper->eqs_to_share.size();
-			// 	total_unit_size += shweeper->units_to_share.size();
-			// }
-			// auto local_EU = std::vector<int>(total_eq_size + total_unit_size + NUM_SHARING_METADATA);
-			//
-			// for (auto shweeper : _shweepers) {
-			// 	local_EU.insert(local_EU.end(), shweeper->eqs_to_share.begin(), shweeper->eqs_to_share.end());
-			// }
-			// for (auto shweeper : _shweepers) {
-			// 	local_EU.insert(local_EU.end(), shweeper->units_to_share.begin(), shweeper->units_to_share.end());
-			// }
-			// local_EU.push_back(total_eq_size);
-			// local_EU.push_back(total_unit_size);
-			// local_EU.push_back(all_idle);
 			LOG(V3_VERB, "ß contributing size %i to sharing\n", aggregation_element.size()-NUM_SHARING_METADATA);
 			_red->contribute(std::move(aggregation_element));
 			if (parent_was_ready) {
@@ -290,13 +260,12 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 			break;
 		}
 
-
 		//Basecase
 		if (_my_rank == 0 && localId == 0 && !_root_received_work) {
 			//To know how much space we need to allocate for all variables, we assume that the maximum index of any variable corresponds to the total number of variables -1,
 			//i.e. that there are no holes in the numbering.
 			//This is an assumption that standard Kissat makes all the time, so we also do it here
-			unsigned VARS = shweep_get_num_vars(shweeper->solver);
+			const unsigned VARS = shweeper->numVars;
 			shweeper->work_received_from_steal = std::vector<int>(VARS);
 			//the initial work is all variables
 			for (int idx = 0; idx < VARS; idx++) {
@@ -308,7 +277,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 
 		}
 
-		//In each iteration try first to steal within the local process, without need for any MPI messages
+		//Try to steal locally from shared memory
 		auto stolen_work = stealWorkFromAnyLocalSolver();
 
 		//Successful local steal
@@ -319,7 +288,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 			break;
 		}
 
-		//Unsuccessful steal locally. Go global.
+		//Unsuccessful steal locally. Go global via MPI message
 		int recvIndex = _rng.randomInRange(0,getVolume());
         int targetRank = getJobComm().getWorldRankOrMinusOne(recvIndex);
         if (targetRank == -1) { // tree not fully built yet, try again
@@ -457,6 +426,17 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	return stolen_work;
 }
 
+void SweepJob::importNextEquivalence(int *last_imported_round, int eq_nr, unsigned *lit1, unsigned *lit2) {
+	if (*last_imported_round == _sharing_round || eq_nr == _eqs_from_broadcast.size()/2) {
+		//We already imported this round or we have just reached the end of importing this round
+		*lit1 = INVALID_LIT;
+		*lit2 = INVALID_LIT;
+		*last_imported_round = _sharing_round;
+		return;
+	}
+	*lit1 = _eqs_from_broadcast[2*eq_nr];
+	*lit2 = _eqs_from_broadcast[2*eq_nr + 1];
+}
 
 void SweepJob::loadFormula(KissatPtr shweeper) {
 	const int* lits = getDescription().getFormulaPayload(0);
