@@ -104,22 +104,25 @@ void* SolverThread::run() {
 
 bool SolverThread::readFormula() {
 
-    SerializedFormulaParser* fParser;
+    std::shared_ptr<SerializedFormulaParser> fParser;
 
     while (true) {
         // Fetch the next formula to read
         {
             auto lock = _state_mutex.getLock();
             assert(_active_revision < (int)_pending_formulae.size());
-            fParser = _pending_formulae[_active_revision].get();
+            fParser = _pending_formulae[_active_revision];
+            assert(fParser);
         }
 
         // Forward raw formula data to LRAT connectors
-        if (_lrat) {
-            _lrat->initiateRevision(_active_revision, *fParser);
-        }
-        if (_solver.getSolverSetup().owningModelCheckingLratConnector) {
-            _solver.getSolverSetup().modelCheckingLratConnector->initiateRevision(_active_revision, *fParser);
+        if (_imported_lits_curr_revision == 0) {
+            if (_lrat) {
+                _lrat->initiateRevision(_active_revision, *fParser);
+            }
+            if (_solver.getSolverSetup().owningModelCheckingLratConnector) {
+                _solver.getSolverSetup().modelCheckingLratConnector->initiateRevision(_active_revision, *fParser);
+            }
         }
 
         LOGGER(_logger, V4_VVER, "Reading rev. %i, start %i\n", (int)_active_revision, (int)_imported_lits_curr_revision);
@@ -169,11 +172,12 @@ bool SolverThread::readFormula() {
                     // Adjust _max_var according to assumptions as well
                     _max_var = std::max(_max_var, std::abs(lit));
                 }
-            
+
                 LOGGER(_logger, V4_VVER, "Reading done @ rev. %i (%lu lits, %lu assumptions)\n", (int)_active_revision,
                     _imported_lits_curr_revision, _pending_assumptions.size());
                 return true;
             }
+            _pending_formulae[_active_revision].reset(); // revision data no longer needed
             _active_revision++;
             _imported_lits_curr_revision = 0;
         }
@@ -184,13 +188,13 @@ void SolverThread::appendRevision(int revision, RevisionData data) {
     {
         auto lock = _state_mutex.getLock();
         _pending_formulae.emplace_back(
-            new SerializedFormulaParser(_logger, data.fLits, data.fSize, _solver.getSolverSetup().onTheFlyChecking)
+            new SerializedFormulaParser(_logger, data.fLits, _solver.getSolverSetup().onTheFlyChecking)
         );
         if (_params.compressFormula()) {
             _pending_formulae.back()->setCompressed();
-            LOGGER(_logger, V4_VVER, "Received compressed formula of size %i\n", data.fSize);
+            LOGGER(_logger, V4_VVER, "Received compressed formula of size %i\n", data.fLits->size());
         } else {
-            LOGGER(_logger, V4_VVER, "Received %i literals: %s\n", data.fSize, StringUtils::getSummary(data.fLits, data.fSize).c_str());
+            LOGGER(_logger, V4_VVER, "Received %i literals: %s\n", data.fLits->size(), StringUtils::getSummary(*data.fLits).c_str());
         }
         _latest_revision = revision;
         _latest_checksum = data.chksum;
@@ -355,6 +359,7 @@ void SolverThread::reportResult(int res, int revision) {
         auto lrat = _solver.getSolverSetup().modelCheckingLratConnector;
         if (lrat) {
             LOGGER(_logger, V3_VERB, "Validating SAT ...\n");
+            _logger.flush();
             // omit first "0" in solution vector
             lrat->push(LratOp(solution.data()+1, solution.size()-1), true, revision);
             // Whether or not this was successful (another thread might have been earlier),
@@ -368,6 +373,7 @@ void SolverThread::reportResult(int res, int revision) {
         auto failedVec = std::vector<int>(failed.begin(), failed.end());
         if (_lrat) {
             LOGGER(_logger, V3_VERB, "Validating UNSAT ...\n");
+            _logger.flush();
             _lrat->push(LratOp(_solver.getUnsatConclusionId(), failedVec.data(), failedVec.size()), true, revision);
             _lrat->waitForConclusion(revision);
         }

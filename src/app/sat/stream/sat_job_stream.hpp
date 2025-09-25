@@ -76,7 +76,7 @@ public:
 
         for (auto& [proc, worker] : _processors) {
             std::vector<int> litsCopy = newLiterals;
-            proc->submit(_active_rev, std::move(litsCopy), assumptions);
+            proc->submit(_active_rev, std::move(litsCopy), assumptions, descriptionLabel, priority, chksum);
         }
         _idle = false;
     }

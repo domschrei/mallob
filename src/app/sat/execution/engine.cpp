@@ -363,11 +363,11 @@ std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSe
 
 void SatEngine::appendRevision(int revision, RevisionData data, bool lastRevisionForNow) {
 	
-	LOGGER(_logger, V4_VVER, "Import rev. %i: size %lu\n", revision, data.fSize);
+	LOGGER(_logger, V4_VVER, "Import rev. %i: size %lu\n", revision, data.fLits->size());
 	assert(_revision+1 == revision);
 	_revision_data.push_back(data);
 	_sharing_manager->setImportedRevision(revision);
-	_prefilter.notifyFormula(data.fLits, data.fSize);
+	_prefilter.notifyFormula(data.fLits->data(), data.fLits->size());
 	
 	for (size_t i = 0; i < _num_active_solvers; i++) {
 		if (revision == 0) {
@@ -416,6 +416,7 @@ void SatEngine::appendRevision(int revision, RevisionData data, bool lastRevisio
 			}
 		}
 	}
+	_revision_data.back().fLits.reset(); // formula increment no longer needed here
 	_revision = revision;
 }
 

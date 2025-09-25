@@ -24,6 +24,7 @@ public:
             {"user", "admin"},
             {"name", "mono-job-" + std::to_string(_revision)},
             {"files", {_params.monoFilename()}},
+            {"description-id", "mono-job-desc-0"},
             {"priority", 1.000},
             {"application", getMonoApplicationName()},
             {"incremental", _params.monoIncrements() > 0}
@@ -74,6 +75,7 @@ private:
             {"user", response["user"]},
             {"name", "mono-job-" + std::to_string(_revision)},
             {"files", {_params.monoFilename()}},
+            {"description-id", "mono-job-desc-" + std::to_string(_revision)},
             {"priority", 1.000},
             {"application", getMonoApplicationName()},
             {"incremental", true},

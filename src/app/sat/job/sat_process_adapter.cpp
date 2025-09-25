@@ -69,22 +69,20 @@ void SatProcessAdapter::doWriteRevisions() {
     _bg_writer = ProcessWideThreadPool::get().addTask([this]() {
         while (!_terminate && _num_revisions_to_write > 0) {
             RevisionData revData;
+            int desiredRev;
             {
                 auto lock = _mtx_revisions.getLock();
+                desiredRev = _desired_revision;
                 if (_revisions_to_write.empty()) break;
                 revData = _revisions_to_write.front();
                 _revisions_to_write.erase(_revisions_to_write.begin());
                 _num_revisions_to_write--;
             }
             LOG(V4_VVER, "DBG Writing next revision\n");
-            auto revStr = std::to_string(revData.revision);
-            createSharedMemoryBlock("fsize."       + revStr, sizeof(size_t),              (void*)&revData.fSize);
-            const int* fPtr = (const int*) createSharedMemoryBlock("formulae." + revStr, sizeof(int) * revData.fSize,
-                (void*)revData.fLits, revData.revision, revData.descriptionId, true);
-            LOG(V2_INFO, "SUMMARY %s\n", StringUtils::getSummary(fPtr, revData.fSize).c_str());
-            //if (revData.fSize > 0) assert(fPtr[0] != 0);
-            //if (revData.fSize > 0) assert(fPtr[revData.fSize-1] == 0);
-            createSharedMemoryBlock("checksum."    + revStr, sizeof(Checksum),            (void*)&(revData.checksum));
+            std::vector<int> vecRev(revData.fLits, revData.fLits + revData.fSize);
+            vecRev.push_back(revData.revision);
+            vecRev.push_back(desiredRev);
+            _guard_pipe.lock().get()->writeData(std::move(vecRev), CLAUSE_PIPE_START_NEXT_REVISION);
             _written_revision = revData.revision;
             LOG(V4_VVER, "DBG Done writing next revision %i\n", revData.revision);
         }
@@ -104,11 +102,6 @@ void SatProcessAdapter::run() {
 }
 
 void SatProcessAdapter::doInitialize() {
-
-    // Allocate shared memory for formula, assumptions of initial revision
-    const int* fInShmem = (const int*) createSharedMemoryBlock("formulae.0",
-        sizeof(int) * _f_size, (void*)_f_lits, 0, _desc_id, true);
-    LOG(V2_INFO, "SPA: formula with %lu bytes\n", sizeof(int)*_f_size);
 
     // Set up bi-directional pipe to and from the subprocess
     char* pipeParentToChild = (char*) createSharedMemoryBlock("pipe-parenttochild", _hsm->pipeBufSize, nullptr);
@@ -135,6 +128,15 @@ void SatProcessAdapter::doInitialize() {
         Process::resume(res);
         usleep(1000 * 10); // 10 ms
     }
+
+    // Transfer first formula revision over pipe
+    std::vector<int> rev0(_f_lits, _f_lits + _f_size);
+    rev0.push_back(0); // revision index 0
+    rev0.push_back([&]() {
+        auto lock = _mtx_revisions.getLock();
+        return _desired_revision;
+    }()); // currently (i.e., initially) desired revision
+    _guard_pipe.lock().get()->writeData(std::move(rev0), CLAUSE_PIPE_START_NEXT_REVISION);
 
     // Change adapter state
     auto lock = _mtx_state.getLock();
@@ -359,11 +361,6 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
         return FOUND_PREPROCESSED_FORMULA;
     }
     pipe.unlock();
-
-    if (_published_revision < _written_revision) {
-        _published_revision = _written_revision;
-        _guard_pipe.lock().get()->writeData({_desired_revision, _published_revision}, CLAUSE_PIPE_START_NEXT_REVISION);
-    }
 
     if (_thread_count_update) {
         _guard_pipe.lock().get()->writeData({_nb_threads}, CLAUSE_PIPE_SET_THREAD_COUNT);

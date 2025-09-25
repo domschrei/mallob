@@ -6,6 +6,7 @@
 #include "util/logger.hpp"
 #include <cstdint>
 #include <cstring>
+#include <memory>
 
 #define SERIALIZED_FORMULA_PARSER_BASE_CLS_CHKSUM 17
 
@@ -14,6 +15,7 @@ class SerializedFormulaParser {
 private:
     Logger& _logger;
 
+    std::shared_ptr<std::vector<int>> _owned_data;
     const int* _payload;
     size_t _size;
 
@@ -37,7 +39,14 @@ public:
         _logger(logger), _payload(data), _size(size) {
         if (withSignature) {
             memcpy(_signature, _payload+_size-1-(SIG_SIZE_BYTES/sizeof(int)), SIG_SIZE_BYTES);
-            size -= 1 + SIG_SIZE_BYTES/sizeof(int);
+            //_size -= 1 + SIG_SIZE_BYTES/sizeof(int);
+        }
+    }
+    SerializedFormulaParser(Logger& logger, std::shared_ptr<std::vector<int>>& ownedData, bool withSignature = false) :
+        _logger(logger), _owned_data(ownedData), _payload(ownedData->data()), _size(ownedData->size()) {
+        if (withSignature) {
+            memcpy(_signature, _payload+_size-1-(SIG_SIZE_BYTES/sizeof(int)), SIG_SIZE_BYTES);
+            //_size -= 1 + SIG_SIZE_BYTES/sizeof(int);
         }
     }
 

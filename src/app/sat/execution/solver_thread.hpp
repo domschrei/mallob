@@ -38,7 +38,7 @@ private:
     Logger& _logger;
     std::thread _thread;
 
-    std::vector<std::unique_ptr<SerializedFormulaParser>> _pending_formulae;
+    std::vector<std::shared_ptr<SerializedFormulaParser>> _pending_formulae;
     std::vector<int> _pending_assumptions;
 
     SplitMix64Rng _rng;

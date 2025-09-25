@@ -80,7 +80,7 @@ public:
         {
             auto lock = _mtx_submit.getLock();
             if (revision != _arrived_revision+1) {
-                LOGGER(_logger, V1_WARN, "[WARN] LRAT Connector: unexpected rev. %i (in rev. %i now)!\n", revision, _arrived_revision);
+                LOGGER(_logger, V1_WARN, "[WARN] LRAT Connector: unexpected rev. %i (in rev. %i now)\n", revision, _arrived_revision);
                 return;
             }
             _f_parsers.emplace_back(new SerializedFormulaParser(fParser));
@@ -116,7 +116,7 @@ public:
         // Currently unsuitable validation operation?
         if (op.isSatValidation() || op.isUnsatValidation()) {
             if (_arrived_revision < revision || _next_rev_to_conclude < revision) {
-                LOGGER(_logger, V2_INFO, "IMPCHK defer conclusion for rev. %i (rev. %i arrived, %i next to validate)\n",
+                LOGGER(_logger, V4_VVER, "IMPCHK defer conclusion for rev. %i (rev. %i arrived, %i next to validate)\n",
                     revision, _arrived_revision, _next_rev_to_conclude);
                 if (!_deferred_conclusion_ops.count(revision))
                     _deferred_conclusion_ops[revision] = std::shared_ptr<LratOp>(new LratOp(std::move(op)));
@@ -124,7 +124,7 @@ public:
                 return true;
             }
             if (_next_rev_to_conclude > revision) {
-                LOGGER(_logger, V2_INFO, "IMPCHK discard conclusion for rev. %i (rev. %i arrived, %i next to validate)\n",
+                LOGGER(_logger, V4_VVER, "IMPCHK discard conclusion for rev. %i (rev. %i arrived, %i next to validate)\n",
                     revision, _arrived_revision, _next_rev_to_conclude);
                 if (acquireLock) _mtx_submit.unlock();
                 return false;
@@ -220,7 +220,7 @@ private:
         if (it != _deferred_conclusion_ops.end()) {
             auto ptr = it->second;
             _deferred_conclusion_ops.erase(it);
-            LOGGER(_logger, V2_INFO, "IMPCHK re-push deferred solution for rev. %i\n",
+            LOGGER(_logger, V4_VVER, "IMPCHK re-push deferred solution for rev. %i\n",
                 _next_rev_to_conclude);
             push(std::move(*ptr), false, _next_rev_to_conclude);
         }
@@ -340,7 +340,7 @@ private:
                 }
             } else if (op.isEndLoad()) {
                 _accepted_revision++; // next revision reached
-                LOGGER(_logger, V2_INFO, "IMPCHK revision %i reached\n", _accepted_revision);
+                LOGGER(_logger, V4_VVER, "IMPCHK revision %i reached\n", _accepted_revision);
                 // store assumptions for later
                 assumptions = std::vector(op.data.endLoad.assumptions, op.data.endLoad.assumptions + op.data.endLoad.nbAssumptions);
             } else if (op.isTermination()) {
