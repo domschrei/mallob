@@ -15,6 +15,7 @@ private:
     std::string _job_str;
     int _revision {0};
     bool _done = false;
+    float _time_of_start;
 
 public:
     MonoJob(Parameters& params) : _params(params) {}
@@ -36,6 +37,7 @@ public:
         if (_params.jobCpuLimit() > 0) {
             json["cpu-limit"] = std::to_string(_params.jobCpuLimit()) + "s";
         }
+        _time_of_start = Timer::elapsedSeconds();
         submit(json);
     }
     bool done() const {
@@ -67,7 +69,8 @@ private:
     }
 
     void monoResponseCallback(nlohmann::json& response) {
-        if (_revision > _params.monoIncrements()) {
+        if (_revision > _params.monoIncrements() || response["result"]["resultcode"] == 0) {
+            // finished or cancelled
             _done = true;
             return;
         }
@@ -82,6 +85,10 @@ private:
             {"precursor", _job_str},
             {"done", _revision == _params.monoIncrements()},
         };
+        if (_params.jobWallclockLimit() > 0)
+            nextJson["wallclock-limit"] = std::to_string(std::max(0.0001f,
+                _params.jobWallclockLimit() - (Timer::elapsedSeconds() - _time_of_start)
+            )) + "s";
         _job_str = "admin.mono-job-" + std::to_string(_revision);
         submit(nextJson);
     }

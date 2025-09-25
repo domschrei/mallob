@@ -242,12 +242,12 @@ private:
                     engine.digestHistoricClauses(epochBegin, epochEnd, data);
 
                 } else if (c == CLAUSE_PIPE_REDUCE_THREAD_COUNT) {
-                    LOGGER(_log, V3_VERB, "DO reduce thread count\n");
+                    LOGGER(_log, V4_VVER, "DO reduce thread count\n");
                     pipe.readData(c);
                     engine.reduceActiveThreadCount();
 
                 } else if (c == CLAUSE_PIPE_SET_THREAD_COUNT) {
-                    LOGGER(_log, V3_VERB, "DO set thread count\n");
+                    LOGGER(_log, V4_VVER, "DO set thread count\n");
                     int nbThreads = pipe.readData(c)[0];
                     engine.setActiveThreadCount(nbThreads);
 
