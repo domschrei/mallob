@@ -105,9 +105,6 @@ private:
             false);
         LOGGER(_log, V4_VVER, "Pipes set up\n");
 
-        // Terminate directly?
-        if (checkTerminate(engine, false)) return;
-
         // Import first revision
         _desired_revision = _config.firstrev;
         char c;
@@ -122,8 +119,6 @@ private:
         assert(rev == 0);
         engine.appendRevision(0, {std::move(rev0), {}}, 0 == _desired_revision);
         _last_present_revision = 0;
-
-        if (checkTerminate(engine, false)) return;
         
         // Start solver threads
         engine.solve();

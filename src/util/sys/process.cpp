@@ -22,7 +22,7 @@ Mutex Process::_children_mutex;
 std::set<pid_t> Process::_children;
 long Process::_main_tid;
 
-std::atomic_bool Process::_exit_signal_caught = false;
+volatile bool Process::_exit_signal_caught = false;
 std::atomic_int Process::_exit_signal = 0;
 std::atomic_long Process::_signal_tid = 0;
 
