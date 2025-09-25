@@ -69,8 +69,7 @@ private:
     }
 
     void monoResponseCallback(nlohmann::json& response) {
-        if (_revision > _params.monoIncrements() || response["result"]["resultcode"] == 0) {
-            // finished or cancelled
+        if (_revision > _params.monoIncrements()) {
             _done = true;
             return;
         }
@@ -83,7 +82,7 @@ private:
             {"application", getMonoApplicationName()},
             {"incremental", true},
             {"precursor", _job_str},
-            {"done", _revision == _params.monoIncrements()},
+            {"done", _revision == _params.monoIncrements() || response["result"]["resultcode"] == 0},
         };
         if (_params.jobWallclockLimit() > 0)
             nextJson["wallclock-limit"] = std::to_string(std::max(0.0001f,
