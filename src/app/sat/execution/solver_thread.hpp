@@ -93,9 +93,10 @@ public:
         while (_thread.joinable() && !_initialized) usleep(1000);
         _solver.cleanUp();
         // also asynchronously close LRAT pipelines
-        if (_lrat) _lrat->stop();
-        if (_solver.getSolverSetup().owningModelCheckingLratConnector) {
-            _solver.getSolverSetup().modelCheckingLratConnector->stop();
+        if (_initialized) {
+            if (_lrat) _lrat->stop();
+            if (_solver.getSolverSetup().owningModelCheckingLratConnector)
+                _solver.getSolverSetup().modelCheckingLratConnector->stop();
         }
     }
     void tryJoin() {if (_thread.joinable()) _thread.join();}

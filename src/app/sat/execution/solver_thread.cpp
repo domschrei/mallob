@@ -58,7 +58,11 @@ void SolverThread::init() {
     LOGGER(_logger, V5_DEBG, "tid %ld\n", _tid);
     std::string threadName = "SATSolver#" + std::to_string(_local_id);
     Proc::nameThisThread(threadName.c_str());
-    
+
+    if (_lrat) _lrat->init();
+    if (_solver.getSolverSetup().owningModelCheckingLratConnector)
+        _solver.getSolverSetup().modelCheckingLratConnector->init();
+
     _active_revision = 0;
     _imported_lits_curr_revision = 0;
     _initialized = true;

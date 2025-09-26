@@ -44,7 +44,7 @@ private:
     ProbingLearnedClauseCallback _cb_probe;
     LearnedClauseCallback _cb_learn;
 
-    bool _launched {false};
+    volatile bool _launched {false};
 
     // buffering
     static constexpr int MAX_CLAUSE_LENGTH {512};
@@ -66,6 +66,17 @@ public:
     LratConnector(TrustedCheckerProcessAdapter::TrustedCheckerProcessSetup& setup) :
         _logger(setup.logger), _base_seed(setup.baseSeed), _local_id(setup.localSolverId),
         _global_id(setup.globalSolverId), _job_id(setup.jobId), _ringbuf(1<<14), _checker(setup) {}
+
+    void init() {
+        assert(!_launched);
+        _checker.init();
+        std::string outPath = (_logger.getLogDir().empty() ? "." : _logger.getLogDir())
+            + "/witness-trace." + std::to_string(_job_id) + "." + std::to_string(_global_id) + ".txt";
+        setWitnessOutputPath(outPath);
+        _bg_emitter.run([&]() {runEmitter();});
+        _bg_acceptor.run([&]() {runAcceptor();});
+        _launched = true;
+    }
 
     inline auto& getChecker() {
         return _checker;
@@ -89,21 +100,12 @@ public:
         _arrived_revision++;
         _do_parse = true;
 
-        if (_launched) return;
-        _launched = true;
-
         // summary of formula for debugging
         //std::string summary;
         //for (size_t i = 0; i < std::min(5UL, _f_size); i++) summary += std::to_string(_f_data[i]) + " ";
         //if (_f_size > 10) summary += " ... ";
         //for (size_t i = std::max(5UL, _f_size-5); i < _f_size; i++) summary += std::to_string(_f_data[i]) + " ";
         //LOG(V2_INFO, "PROOF> got formula with %lu lits: %s\n", _f_size, summary.c_str());
-
-        _checker.init();
-        std::string outPath = (_logger.getLogDir().empty() ? "." : _logger.getLogDir())
-            + "/witness-trace." + std::to_string(_job_id) + "." + std::to_string(_global_id) + ".txt";
-        setWitnessOutputPath(outPath);
-        _bg_emitter.run([&]() {runEmitter();});
     }
 
     inline bool push(LratOp&& op, bool acquireLock = true, int revision = -1) {
@@ -185,6 +187,7 @@ public:
     }
 
     void stop() {
+        if (!_launched) return;
 
         // Tell solver and emitter thread to stop inserting/processing statements
         _ringbuf.markExhausted();
@@ -236,9 +239,6 @@ private:
 
     void runEmitter() {
         Proc::nameThisThread("LRATEmitter");
-
-        // *Always* start acceptor to ensure sound termination
-        _bg_acceptor.run([&]() {runAcceptor();});
 
         // Lrat operation emission loop
         LratOp op;
