@@ -13,8 +13,8 @@ class SPSCBlockingRingbuffer : public MergeSourceInterface<T> {
 private:
     std::atomic_int _num_elems {0};
     
-    std::vector<T> _buffer;
-    size_t _buffer_size {0};
+    volatile std::vector<T> _buffer;
+    volatile size_t _buffer_size {0};
 
     int _read_pos {0};
     int _write_pos {0};
@@ -22,8 +22,8 @@ private:
     Mutex _buffer_mutex;
     ConditionVariable _buffer_cond_var;
     
-    bool _input_exhausted {false};
-    bool _terminated {false};
+    volatile bool _input_exhausted {false};
+    volatile bool _terminated {false};
 
 public:
     SPSCBlockingRingbuffer() : _buffer(0) {}
@@ -60,8 +60,8 @@ public:
         // If the buffer was empty before pushing the element,
         // then it may be possible that a notification is required.
         // If it was NOT empty, then the other thread did not begin waiting.
-        if (numElemsBefore == 0) {
-            _buffer_mutex.getLock(); // lock buffer and immediately release it, for cond. var.
+        if (numElemsBefore <= 1) {
+            {_buffer_mutex.getLock();} // lock buffer and immediately release it, for cond. var.
             _buffer_cond_var.notify();
         }
         //LOG(V2_INFO, "SPSC notify nonempty\n");
@@ -103,8 +103,8 @@ public:
         // If the buffer was full before removing the element,
         // then it may be possible that a notification is required.
         // If it was NOT full, then the other thread did not begin waiting.
-        if (numElemsBefore == _buffer_size) {
-            _buffer_mutex.getLock(); // lock buffer and immediately release it, for cond. var.
+        if (numElemsBefore >= _buffer_size-1) {
+            {_buffer_mutex.getLock();} // lock buffer and immediately release it, for cond. var.
             _buffer_cond_var.notify();
         }
 
