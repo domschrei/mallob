@@ -112,7 +112,7 @@ public:
     void contribute(AllReduceElement&& localProducer) {
         assert(!_contributed);
         _contributed = true;
-        LOG(V3_VERB, "   contribute \n");
+        // LOG(V3_VERB, "   contribute \n");
         _local_elem = std::move(localProducer);
     }
 

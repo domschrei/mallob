@@ -55,7 +55,7 @@ private:
 	// std::vector<int> work_stolen_from_local_solver;
 	std::vector<int> work_received_from_steal;
 
-	bool shweep_is_idle;
+	bool shweeper_is_idle = false;
 	// std::vector<char> stolen_done;
 
 

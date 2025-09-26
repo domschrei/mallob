@@ -38,13 +38,13 @@ void SweepJob::appl_start() {
 	//Initialize _red already here, to make sure that all processes have a valid reduction object
 	//maybe switch back to more robust "standard" sharing
 
-	LOG(V2_INFO,"ß Initializing baseMsg\n");
+	// LOG(V2_INFO,"ß Initializing baseMsg\n");
 	JobMessage baseMsg = getMessageTemplate();
 	baseMsg.tag = ALLRED;
 	_red.reset(new JobTreeAllReduction(getJobTree().getSnapshot(), baseMsg, std::vector<int>(), aggregateContributions));
 	_red->setCareAboutParent();
 
-	LOG(V2_INFO,"ß Starting individual threads\n");
+	// LOG(V2_INFO,"ß Starting individual threads\n");
 	for (int localId=0; localId < _params.numThreadsPerProcess.val; localId++) {
 		auto shweeper = create_new_shweeper(localId);
 		_shweepers.push_back(shweeper);
@@ -55,7 +55,7 @@ void SweepJob::appl_start() {
 }
 
 std::shared_ptr<Kissat> SweepJob::create_new_shweeper(int localId) {
-	LOG(V2_INFO,"ß Creating new shweeper %i \n", localId);
+	// LOG(V2_INFO,"ß Creating new shweeper %i \n", localId);
 	const JobDescription& desc = getDescription();
 	SolverSetup setup;
 	setup.logger = &Logger::getMainInstance();
@@ -87,7 +87,7 @@ std::shared_ptr<Kissat> SweepJob::create_new_shweeper(int localId) {
 }
 
 void SweepJob::startShweeper(KissatPtr shweeper) {
-	LOG(V2_INFO,"ß Calling new thread\n");
+	// LOG(V2_INFO,"ß Calling new thread\n");
 	std::future<void> fut_shweeper = ProcessWideThreadPool::get().addTask([this, shweeper]() { //Changed [&] to [this, shweeper]!! (nicco)
 		LOG(V2_INFO, "Start Thread (r %i, id %i)\n", _my_rank, shweeper->getLocalId());
 		_running_shweepers_count++;
@@ -129,7 +129,7 @@ void SweepJob::appl_communicate() {
 			msg.payload = {request.localId};
 			// LOG(V2_INFO, "Rank %i asks rank %i for work\n", _my_rank, recv_rank, n);
 			// LOG(V2_INFO, "  with destionation ctx_id %i \n", msg.contextIdOfDestination);
-			LOG(V2_INFO, "  MPI: Send work request from (%i,%i) to (%i) \n", _my_rank, request.localId, request.targetRank);
+			LOG(V2_INFO, "  MPI work request from [%i](%i) to [%i] \n", _my_rank, request.localId, request.targetRank);
 			getJobTree().send(request.targetRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 		}
 	}
@@ -142,17 +142,17 @@ void SweepJob::appl_communicate() {
 		bool reset_red = false;
 		if (_red && _red->hasResult()) {
 			auto broadcast = _red->extractResult(); //Broadcast data
-			const int broadcasted_eq_size = broadcast[broadcast.size()-EQUIVS_SIZE_POS];
-			const int broadcasted_unit_size = broadcast[broadcast.size()-UNITS_SIZE_POS];
+			const int broadcast_eq_size = broadcast[broadcast.size()-EQUIVS_SIZE_POS];
+			const int broadcast_unit_size = broadcast[broadcast.size()-UNITS_SIZE_POS];
 			const int all_idle = broadcast[broadcast.size()-IDLE_STATUS_POS];
-			LOG(V1_WARN, "ß --- Received Broadcast: %i eq_size, %i unit_size -- \n", broadcasted_eq_size, broadcasted_unit_size);
+			LOG(V2_INFO, "ß --- Received Broadcast: %i equivalences, %i units -- \n", broadcast_eq_size/2, broadcast_unit_size);
 			if (all_idle) {
 				_terminate_all = true;
 				LOG(V1_WARN, "ß # \n # \n  --- ALL SWEEPERS IDLE - CAN TERMINATE -- \n # \n # \n");
 			}
 
-			_eqs_from_broadcast.assign(broadcast.begin(), broadcast.begin() + broadcasted_eq_size);
-			_units_from_broadcast.assign(broadcast.begin() + broadcasted_eq_size, broadcast.end() - NUM_SHARING_METADATA);
+			_eqs_from_broadcast.assign(broadcast.begin(), broadcast.begin() + broadcast_eq_size);
+			_units_from_broadcast.assign(broadcast.begin() + broadcast_eq_size, broadcast.end() - NUM_SHARING_METADATA);
 
 			//for convenience, we copy the received data into each solver individually. this makes importing easier and less ¢umbersome to code, at the cost of slightly more memory usage
 			//for maximum memory efficiency one would need to refactor this to have kissat threads directly read from SweepJob's _eqs_from_broadcast
@@ -164,7 +164,7 @@ void SweepJob::appl_communicate() {
 
 			reset_red = true;
 			// parent_is_ready = _red->isParentReady();
-			LOG(V3_VERB, "ß Now storing %i equivalences and %i units, for local solvers to import \n", _eqs_from_broadcast.size()/2, _units_from_broadcast.size());
+			// LOG(V3_VERB, "ß Now storing %i equivalences and %i units, for local solvers to import \n", _eqs_from_broadcast.size()/2, _units_from_broadcast.size());
 		}
 
 		if (!_started_sharing) { //triggers the very first construction
@@ -184,22 +184,24 @@ void SweepJob::appl_communicate() {
 
 			//Bring individual data per thread in the sharing element format: [Equivalences, Units, eq_size, unit_size, all_idle]
 			std::list<std::vector<int>> contribs;
-			for (auto shweeper : _shweepers) {
+			for (auto &shweeper : _shweepers) {
 				int eq_size = shweeper->eqs_to_share.size();
 				int units_size = shweeper->units_to_share.size();
 				std::vector<int> contrib = std::move(shweeper->eqs_to_share);
 				contrib.insert(contrib.end(), shweeper->units_to_share.begin(), shweeper->units_to_share.end());
 				contrib.push_back(eq_size);
 				contrib.push_back(units_size);
-				contrib.push_back(shweeper->shweep_is_idle);
-
+				contrib.push_back(shweeper->shweeper_is_idle);
+				contribs.push_back(contrib);
+				LOG(V3_VERB, "ß Contributing new: %i equivalences, %i units \n", eq_size/2, units_size);
 				shweeper->units_to_share.clear();
 				shweeper->eqs_to_share.clear();
 			}
 
+			LOG(V3_VERB, "ß Aggregate within process\n");
 			auto aggregation_element = aggregateContributions(contribs);
 
-			LOG(V3_VERB, "ß contributing size %i to sharing\n", aggregation_element.size()-NUM_SHARING_METADATA);
+			// LOG(V3_VERB, "ß contributing size %i to sharing\n", aggregation_element.size()-NUM_SHARING_METADATA);
 			_red->contribute(std::move(aggregation_element));
 			if (parent_was_ready) {
 				_red->enableParentIsReady();
@@ -219,6 +221,7 @@ void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 		int localId = msg.payload.front();
 		msg.payload.clear();
 
+		LOG(V2_INFO, "ß Received MPI steal request from [%i](%i) \n", source, localId);
 		auto locally_stolen_work = stealWorkFromAnyLocalSolver();
 
 		msg.payload = std::move(locally_stolen_work);
@@ -244,7 +247,7 @@ void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 
 void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 	KissatPtr shweeper = _shweepers[localId];
-	shweeper->shweep_is_idle = true;
+	shweeper->shweeper_is_idle = true;
 	shweeper->work_received_from_steal = {};
 
 	SplitMix64Rng _rng;
@@ -260,14 +263,14 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 			//To know how much space we need to allocate for all variables, we assume that the maximum index of any variable corresponds to the total number of variables -1,
 			//i.e. that there are no holes in the numbering.
 			//This is an assumption that standard Kissat makes all the time, so we also do it here
-			const unsigned VARS = shweeper->numVars;
+			const unsigned VARS = shweep_get_num_vars(shweeper->solver); //can be different than numVars here in C++ !! For example instant units are already propagated out.
 			shweeper->work_received_from_steal = std::vector<int>(VARS);
 			//the initial work is all variables
 			for (int idx = 0; idx < VARS; idx++) {
 				shweeper->work_received_from_steal[idx] = idx;
 			}
 			_root_received_work = true;
-			LOG(V2_INFO, "Initial work distribution: Shweep root rank(%i)id(%i) requested work, got all %u variables\n", _my_rank, localId, VARS);
+			LOG(V2_INFO, "Initial work: Shweep root [%i](%i) requested work, got all %u variables\n", _my_rank, localId, VARS);
 			break;
 
 		}
@@ -300,7 +303,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 		request.localId = localId;
 		request.targetRank = targetRank;
 		_worksteal_requests[localId] = request;
-		LOG(V2_INFO, "  Asking for work (%i,%i) \n", _my_rank, localId);
+		LOG(V2_INFO, "  [%i](%i) searches work globally\n", _my_rank, localId);
 
 		//Wait here until we get back an MPI message
 		while( ! _worksteal_requests[localId].got_steal_response) {
@@ -310,7 +313,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 		//Successful steal if size > 0
 		if ( ! _worksteal_requests[localId].stolen_work.empty()) {
 			shweeper->work_received_from_steal = std::move(_worksteal_requests[localId].stolen_work);
-			LOG(V2_INFO, "%i variables sent from rank(%i) to rank(%i)id(%i) \n", shweeper->work_received_from_steal.size(), targetRank, _my_rank, localId);
+			LOG(V2_INFO, "%i variables received by [%i](%i) sent from [%i] \n", shweeper->work_received_from_steal.size(), _my_rank, localId,targetRank);
 			break;
 		}
 		//Unsuccessful global steal, try again
@@ -318,7 +321,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 	//Found work (or terminated), Tell the kissat/C thread where it can find the work
 	*work = reinterpret_cast<unsigned int*>(shweeper->work_received_from_steal.data());
 	*work_size = shweeper->work_received_from_steal.size();
-	shweeper->shweep_is_idle = false;
+	shweeper->shweeper_is_idle = false;
 }
 
 
@@ -362,7 +365,7 @@ std::vector<int> SweepJob::aggregateContributions(std::list<std::vector<int>> &c
     for (const auto &contrib : contribs) {
     	int eq_size = contrib[contrib.size()-EQUIVS_SIZE_POS];
     	total_eq_size += eq_size;
-		LOG(V3_VERB, "ß Element: %i eq_size \n", eq_size);
+		// LOG(V3_VERB, "ß Element: %i eq_size \n", eq_size);
         aggregated.insert(aggregated.end(), contrib.begin(), contrib.begin()+eq_size);
     }
 	//Fill units
@@ -371,19 +374,19 @@ std::vector<int> SweepJob::aggregateContributions(std::list<std::vector<int>> &c
     	int eq_size = contrib[contrib.size()-EQUIVS_SIZE_POS];
     	int unit_size = contrib[contrib.size()-UNITS_SIZE_POS];
 		total_unit_size += unit_size;
-		LOG(V3_VERB, "ß Element: %i unit_size \n", unit_size);
+		// LOG(V3_VERB, "ß Element: %i unit_size \n", unit_size);
         aggregated.insert(aggregated.end(), contrib.begin()+eq_size, contrib.end()-NUM_SHARING_METADATA); //not copying the metadata at the end
     }
 	bool all_idle = true;
     for (const auto &contrib : contribs) {
 		bool idle = contrib[contrib.size()-IDLE_STATUS_POS];
     	all_idle &= idle;
-		LOG(V3_VERB, "ß Element: idle == %i \n", idle);
+		// LOG(V3_VERB, "ß Element: idle == %i \n", idle);
     }
 	aggregated.push_back(total_eq_size);
 	aggregated.push_back(total_unit_size);
 	aggregated.push_back(all_idle);
-	LOG(V3_VERB, "ß Aggregated %i equivalences, %i units, all_idle==%i \n", total_eq_size, total_unit_size, all_idle);
+	LOG(V3_VERB, "ß Aggregated: %i equivalences, %i units, %i all_idle\n", total_eq_size/2, total_unit_size, all_idle);
 	assert(total_size == total_eq_size + total_unit_size + NUM_SHARING_METADATA);
     return aggregated;
 }
@@ -408,10 +411,13 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	size_t max_steal_amount = shweep_get_max_steal_amount(shweeper->solver);
 	if (max_steal_amount == 0)
 		return {};
+
+	LOG(V2_INFO, "ß Steal request sees that I could provide %i max_steal_amount\n", max_steal_amount);
 	//There is potentially something to steal
 	//Allocate memory for the steal here in C++, and pass it to kissat such that it can fill in the stolen work
 	std::vector<int> stolen_work = std::vector<int>(max_steal_amount);
 	int actually_stolen = shweep_steal_from_this_solver(shweeper->solver, reinterpret_cast<unsigned int*>(stolen_work.data()), max_steal_amount);
+	LOG(V2_INFO, "ß Steal request got %i actually stolen\n", actually_stolen);
 	if (actually_stolen == 0)
 		return {};
 	//We oversized the provided array a bit, such that C has in any case enough space to write
