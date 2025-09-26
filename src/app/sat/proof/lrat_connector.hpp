@@ -30,6 +30,8 @@ private:
     Logger& _logger;
     const int _base_seed;
     const int _local_id;
+    const int _global_id;
+    const int _job_id;
     std::string _out_path;
 
     Mutex _mtx_submit;
@@ -63,7 +65,7 @@ private:
 public:
     LratConnector(TrustedCheckerProcessAdapter::TrustedCheckerProcessSetup& setup) :
         _logger(setup.logger), _base_seed(setup.baseSeed), _local_id(setup.localSolverId),
-        _ringbuf(1<<14), _checker(setup) {}
+        _global_id(setup.globalSolverId), _job_id(setup.jobId), _ringbuf(1<<14), _checker(setup) {}
 
     inline auto& getChecker() {
         return _checker;
@@ -77,16 +79,15 @@ public:
     void setWitnessOutputPath(const std::string& outputPath) {_out_path = outputPath;}
 
     void initiateRevision(int revision, SerializedFormulaParser& fParser) {
-        {
-            auto lock = _mtx_submit.getLock();
-            if (revision != _arrived_revision+1) {
-                LOGGER(_logger, V1_WARN, "[WARN] LRAT Connector: unexpected rev. %i (in rev. %i now)\n", revision, _arrived_revision);
-                return;
-            }
-            _f_parsers.emplace_back(new SerializedFormulaParser(fParser));
-            _arrived_revision++;
-            _do_parse = true;
+
+        auto lock = _mtx_submit.getLock();
+        if (revision != _arrived_revision+1) {
+            LOGGER(_logger, V1_WARN, "[WARN] LRAT Connector: unexpected rev. %i (in rev. %i now)\n", revision, _arrived_revision);
+            return;
         }
+        _f_parsers.emplace_back(new SerializedFormulaParser(fParser));
+        _arrived_revision++;
+        _do_parse = true;
 
         if (_launched) return;
         _launched = true;
@@ -98,6 +99,10 @@ public:
         //for (size_t i = std::max(5UL, _f_size-5); i < _f_size; i++) summary += std::to_string(_f_data[i]) + " ";
         //LOG(V2_INFO, "PROOF> got formula with %lu lits: %s\n", _f_size, summary.c_str());
 
+        _checker.init();
+        std::string outPath = (_logger.getLogDir().empty() ? "." : _logger.getLogDir())
+            + "/witness-trace." + std::to_string(_job_id) + "." + std::to_string(_global_id) + ".txt";
+        setWitnessOutputPath(outPath);
         _bg_emitter.run([&]() {runEmitter();});
     }
 
@@ -187,18 +192,20 @@ public:
 
         // Terminate the emitter thread
         _bg_emitter.stop();
-        // Now _mtx_submit is no longer needed
+
+        // In order not to interfere with a concurrent initiateRevision call
+        auto lock = _mtx_submit.getLock();
 
         // Manually submit a termination sentinel to the checker process.
         LratOp end(TRUSTED_CHK_TERMINATE);
-        _checker.submit(end);
+        _checker.submit(end); // ignored if checker was never initialized
 
         // Wait for the sentinel to make the round through the process
-        // and back to the acceptor
+        // and back to the acceptor (if they were initialized)
         _bg_acceptor.join(); // NOT stop()! We want it to finish on its own!
-        // Terminate signal arrived at the checker process, threads joined
+        // Terminate signal arrived at the checker process, threads joined (if any)
 
-        // Wait until the checker process did in fact exit
+        // Wait until any checker process did in fact exit
         _checker.terminate();
     }
     ~LratConnector() {

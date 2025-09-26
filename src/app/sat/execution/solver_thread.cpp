@@ -21,8 +21,6 @@
 #include "app/sat/data/definitions.hpp"
 #include "app/sat/job/sat_process_config.hpp"
 #include "app/sat/parse/serialized_formula_parser.hpp"
-#include "app/sat/proof/trusted/trusted_utils.hpp"
-#include "app/sat/proof/trusted_checker_process_adapter.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
 #include "util/option.hpp"
 #include "util/params.hpp"
@@ -63,18 +61,6 @@ void SolverThread::init() {
     
     _active_revision = 0;
     _imported_lits_curr_revision = 0;
-
-    std::string outPath = (_logger.getLogDir().empty() ? "." : _logger.getLogDir())
-        + "/witness-trace." + std::to_string(_solver.getSolverSetup().jobId) + "." + std::to_string(_solver.getGlobalId()) + ".txt";
-    if (_lrat) {
-        _lrat->getChecker().init();
-        _lrat->setWitnessOutputPath(outPath);
-    }
-    if (_solver.getSolverSetup().owningModelCheckingLratConnector) {
-        _solver.getSolverSetup().modelCheckingLratConnector->getChecker().init();
-        _solver.getSolverSetup().modelCheckingLratConnector->setWitnessOutputPath(outPath);
-    }
-
     _initialized = true;
 }
 

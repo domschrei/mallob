@@ -95,10 +95,13 @@ public:
         _child_pid = _subproc->start();
 
         _f_directives = fopen(_path_directives.c_str(), "w");
+        if (!_f_directives) abort();
         _f_feedback = fopen(_path_feedback.c_str(), "r");
+        if (!_f_feedback) abort();
     }
 
     inline void submit(LratOp& op) {
+        if (!_f_directives) return;
         if (op.isDerivation()) submitProduceClause(op.data.produce);
         else if (op.isImport()) submitImportClause(op.data.import);
         else if (op.isDeletion()) submitDeleteClauses(op.data.remove.hints, op.data.remove.nbHints);
