@@ -68,7 +68,7 @@ private:
     std::atomic_bool _terminated = false;
     bool _in_solve_call = false;
 
-    bool _found_result = false;
+    int _found_result_rev = -1;
     JobResult _result;
 
 public:
@@ -107,7 +107,7 @@ public:
     }
     bool hasFoundResult(int revision) {
         auto lock = _state_mutex.getLock();
-        return _initialized && _active_revision == revision && _found_result;
+        return _initialized && _active_revision == revision && _found_result_rev == revision;
     }
     JobResult& getSatResult() {
         return _result;

@@ -198,7 +198,6 @@ void SolverThread::appendRevision(int revision, RevisionData data) {
         }
         _latest_revision = revision;
         _latest_checksum = data.chksum;
-        _found_result = false;
         assert(_latest_revision+1 == (int)_pending_formulae.size() 
             || LOG_RETURN_FALSE("%i != %i", _latest_revision+1, _pending_formulae.size()));
         if (_in_solve_call) {
@@ -257,13 +256,8 @@ void SolverThread::runOnce() {
         aLits = _pending_assumptions.data();
         aSize = _pending_assumptions.size();
         _in_solve_call = true;
-        if (revision < _latest_revision) {
-            _solver.interrupt(); // revision obsolete: stop solving immediately
-            performSolving = false; // actually just "pretend" to solve ...
-        } else {
-            _solver.uninterrupt(); // make sure solver isn't in an interrupted state
-            chksum = _latest_checksum; // this checksum belongs to _latest_revision.
-        }
+        _solver.uninterrupt(); // make sure solver isn't in an interrupted state
+        performSolving = revision == _latest_revision; // obsolete revision? just "pretend" to solve ...
     }
 
     // append assumption literals to formula hash
@@ -325,7 +319,7 @@ void SolverThread::runOnce() {
 }
 
 void SolverThread::waitWhileSolved() {
-    waitUntil([&]{return _terminated || !_found_result;});
+    waitUntil([&]{return _terminated || _latest_revision > _found_result_rev;});
 }
 
 void SolverThread::waitUntil(std::function<bool()> predicate) {
@@ -335,7 +329,7 @@ void SolverThread::waitUntil(std::function<bool()> predicate) {
 
 void SolverThread::reportResult(int res, int revision) {
 
-    if (res == 0 || _found_result) return;
+    if (res == 0 || _found_result_rev >= revision) return;
     const char* resultString = res==SAT?"SAT":"UNSAT";
 
     {
@@ -384,7 +378,7 @@ void SolverThread::reportResult(int res, int revision) {
     _result.revision = revision;
     LOGGER(_logger, V3_VERB, "found result %s for rev. %i\n", resultString, revision);
 
-    _found_result = true;
+    _found_result_rev = revision;
     _solver.setFoundResult();
     _state_mutex.unlock();
 }
