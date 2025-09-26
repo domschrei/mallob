@@ -15,6 +15,9 @@ void Mutex::unlock() {
 std::unique_lock<std::mutex> Mutex::getLock() {
     return std::unique_lock<std::mutex>(mtx);
 }
+std::unique_lock<std::mutex> Mutex::getTryLock() {
+    return std::unique_lock<std::mutex>(mtx, std::try_to_lock_t());
+}
 bool Mutex::tryLock() {
     // return true if lock acquired
     return mtx.try_lock();

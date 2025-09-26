@@ -67,7 +67,7 @@ void SatProcessAdapter::doWriteRevisions() {
     if (_bg_writer.valid()) _bg_writer.get();
     
     _bg_writer = ProcessWideThreadPool::get().addTask([this]() {
-        while (!_terminate && _num_revisions_to_write > 0 && _guard_pipe.lock().get()->hasSpaceForWriting()) {
+        while (!_terminate && _num_revisions_to_write > 0) {
             RevisionData revData;
             int desiredRev;
             {
@@ -78,13 +78,23 @@ void SatProcessAdapter::doWriteRevisions() {
                 _revisions_to_write.erase(_revisions_to_write.begin());
                 _num_revisions_to_write--;
             }
-            LOG(V4_VVER, "DBG Writing next revision\n");
-            std::vector<int> vecRev(revData.fLits, revData.fLits + revData.fSize);
-            vecRev.push_back(revData.revision);
-            vecRev.push_back(desiredRev);
-            _guard_pipe.lock().get()->writeData(std::move(vecRev), CLAUSE_PIPE_START_NEXT_REVISION);
-            _written_revision = revData.revision;
-            LOG(V4_VVER, "DBG Done writing next revision %i\n", revData.revision);
+            while (!_terminate) {
+                auto maybePipe = _guard_pipe.tryLock();
+                if (!maybePipe || !maybePipe.value()->get()->hasSpaceForWriting()) {
+                    if (maybePipe) maybePipe->unlock();
+                    usleep(1000);
+                    continue;
+                }
+                auto& pipe = maybePipe.value();
+                LOG(V4_VVER, "DBG Writing next revision\n");
+                std::vector<int> vecRev(revData.fLits, revData.fLits + revData.fSize);
+                vecRev.push_back(revData.revision);
+                vecRev.push_back(desiredRev);
+                pipe.get()->writeData(std::move(vecRev), CLAUSE_PIPE_START_NEXT_REVISION);
+                _written_revision = revData.revision;
+                LOG(V4_VVER, "DBG Done writing next revision %i\n", revData.revision);
+                break;
+            }
         }
         auto lock = _mtx_revisions.getLock();
         _bg_writer_running = false;
@@ -317,6 +327,7 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
     if (!maybePipe) return NORMAL; // try later again
 
     auto& pipe = maybePipe.value();
+    assert(pipe.locked());
     char c = pipe.get()->pollForData();
     if (c == CLAUSE_PIPE_PREPARE_CLAUSES) {
         _collected_clauses = pipe.get()->readData(c);
