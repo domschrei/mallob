@@ -6,6 +6,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <future>
+#include <optional>
 
 #include "util/assert.hpp"
 
@@ -54,6 +55,9 @@ public:
 	GuardedData() {}
 	GuardedData(T&& obj) : _obj(std::move(obj)) {}
 	[[nodiscard]] MutexLockedData<T> lock() {
+		return MutexLockedData<T>(_obj, _mtx);
+	}
+	[[nodiscard]] std::optional<MutexLockedData<T>> tryLock() {
 		return MutexLockedData<T>(_obj, _mtx);
 	}
 	T& getUnsafe() {

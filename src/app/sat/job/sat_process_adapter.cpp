@@ -313,7 +313,10 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
 
     if (_state != SolvingStates::ACTIVE) return NORMAL;
 
-    auto pipe = _guard_pipe.lock();
+    auto maybePipe = _guard_pipe.tryLock();
+    if (!maybePipe) return NORMAL; // try later again
+
+    auto& pipe = maybePipe.value();
     char c = pipe.get()->pollForData();
     if (c == CLAUSE_PIPE_PREPARE_CLAUSES) {
         _collected_clauses = pipe.get()->readData(c);
@@ -360,12 +363,11 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
         pipe.unlock();
         return FOUND_PREPROCESSED_FORMULA;
     }
-    pipe.unlock();
-
-    if (_thread_count_update) {
-        _guard_pipe.lock().get()->writeData({_nb_threads}, CLAUSE_PIPE_SET_THREAD_COUNT);
+    if (_thread_count_update && pipe.get()->hasSpaceForWriting()) {
+        pipe.get()->writeData({_nb_threads}, CLAUSE_PIPE_SET_THREAD_COUNT);
         _thread_count_update = false;
     }
+    pipe.unlock();
 
     return NORMAL;
 }
