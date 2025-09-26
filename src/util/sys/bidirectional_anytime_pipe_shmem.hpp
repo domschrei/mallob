@@ -144,7 +144,7 @@ public:
     BiDirectionalAnytimePipeShmem(ChannelConfig out, ChannelConfig in, bool parent) :
         _data_out(out.data), _cap_out(out.capacity), _data_in(in.data), _cap_in(in.capacity),
         _out_concurrent(out.concurrent), _in_concurrent(in.concurrent),
-        _buf_in(64), _buf_out(64) {
+        _buf_in(512), _buf_out(512) {
 
         // double buffer method
         _data_in_left = _data_in;
@@ -273,6 +273,10 @@ public:
     void flush() {
         if (!_out_concurrent) return;
         while (!_terminate && _nb_written < _nb_to_write) usleep(3*1000);
+    }
+
+    bool hasSpaceForWriting() {
+        return !_buf_out.full();
     }
 
     ~BiDirectionalAnytimePipeShmem() {

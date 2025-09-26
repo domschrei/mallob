@@ -13,7 +13,7 @@ class SPSCBlockingRingbuffer : public MergeSourceInterface<T> {
 private:
     std::atomic_int _num_elems {0};
     
-    volatile std::vector<T> _buffer;
+    std::vector<T> _buffer;
     volatile size_t _buffer_size {0};
 
     int _read_pos {0};
@@ -138,6 +138,9 @@ public:
 
     bool empty() const {
         return size() == 0;
+    }
+    bool full() const {
+        return size() == _buffer_size;
     }
 
     bool exhausted() const {

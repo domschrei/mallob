@@ -140,7 +140,6 @@ private:
         // Main loop
         while (true) {
 
-            doSleep();
             Timer::cacheElapsedSeconds();
             watchdog.reset(Timer::elapsedSecondsCached());
 
@@ -155,7 +154,9 @@ private:
             }
 
             char c;
+            bool sleep {true};
             while ((c = pipe.pollForData()) != 0) {
+                sleep = false;
 
                 if (c == CLAUSE_PIPE_DUMP_STATS) {
                     LOGGER(_log, V5_DEBG, "DO dump stats\n");
@@ -266,6 +267,8 @@ private:
                     abort();
                 }
             }
+
+            if (sleep) doSleep();
 
             // Check initialization state
             if (!_hsm->isInitialized && engine.isFullyInitialized()) {

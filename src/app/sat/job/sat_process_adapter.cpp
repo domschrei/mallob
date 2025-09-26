@@ -67,7 +67,7 @@ void SatProcessAdapter::doWriteRevisions() {
     if (_bg_writer.valid()) _bg_writer.get();
     
     _bg_writer = ProcessWideThreadPool::get().addTask([this]() {
-        while (!_terminate && _num_revisions_to_write > 0) {
+        while (!_terminate && _num_revisions_to_write > 0 && _guard_pipe.lock().get()->hasSpaceForWriting()) {
             RevisionData revData;
             int desiredRev;
             {
