@@ -22,7 +22,7 @@ private:
 
 	std::vector<std::shared_ptr<Kissat>> _shweepers;
 	std::vector<std::future<void>> _fut_shweepers;
-    std::atomic_int _shweepers_running_count {0};
+    std::atomic_int _running_shweepers_count {0};
 
     bool _root_received_work=false;
 	bool _terminate_all=false;
@@ -95,6 +95,7 @@ private:
     void callback_for_broadcast_ping();
     // void tryExtractResult();
 
+	std::vector<int> getPermutation(int length);
 
 	std::vector<int> stealWorkFromAnyLocalSolver();
     std::vector<int> stealWorkFromSpecificLocalSolver(int localId);
