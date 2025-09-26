@@ -559,16 +559,16 @@ void SatEngine::setActiveThreadCount(int nbThreads) {
 		_sharing_manager->stopClauseImport(i);
 		SolverSetup s = _solver_interfaces[i]->getSolverSetup();
 		s.solverRevision++;
-		_solver_threads[i]->setTerminate(true);
+		_solver_threads[i]->setTerminate(false);
 		auto movedSolver = std::move(_solver_interfaces[i]);
 		_solver_interfaces[i] = createSolver(s);
 		auto movedThread = std::move(_solver_threads[i]);
 		_solver_threads[i] = std::shared_ptr<SolverThread>(new SolverThread(
 			_params, _config, _solver_interfaces[i], {}, i
 		));
-		_solver_threads[i]->setTerminate();
 		_num_active_solvers--;
 		_solver_thread_cleanups.push_back(ProcessWideThreadPool::get().addTask([thread = std::move(movedThread), solver = std::move(movedSolver)]() mutable {
+			thread->cleanUpAsynchronously();
 			thread->tryJoin();
 			thread.reset();
 			solver.reset();

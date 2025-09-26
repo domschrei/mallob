@@ -78,7 +78,7 @@ public:
 
     void start();
     void appendRevision(int revision, RevisionData data);
-    void setTerminate(bool cleanUpAsynchronously = false) {
+    void setTerminate(bool doCleanUpAsynchronously = false) {
         {
             auto lock = _state_mutex.getLock();
             if (_terminated) return;
@@ -87,14 +87,15 @@ public:
         _state_cond.notify();
         _solver.setTerminate();
         // Clean up solver
-        if (cleanUpAsynchronously) {
-            while (_thread.joinable() && !_initialized) usleep(1000);
-            _solver.cleanUp();
-            // also asynchronously close LRAT pipelines
-            if (_lrat) _lrat->stop();
-            if (_solver.getSolverSetup().owningModelCheckingLratConnector) {
-                _solver.getSolverSetup().modelCheckingLratConnector->stop();
-            }
+        if (doCleanUpAsynchronously) cleanUpAsynchronously();
+    }
+    void cleanUpAsynchronously() {
+        while (_thread.joinable() && !_initialized) usleep(1000);
+        _solver.cleanUp();
+        // also asynchronously close LRAT pipelines
+        if (_lrat) _lrat->stop();
+        if (_solver.getSolverSetup().owningModelCheckingLratConnector) {
+            _solver.getSolverSetup().modelCheckingLratConnector->stop();
         }
     }
     void tryJoin() {if (_thread.joinable()) _thread.join();}
