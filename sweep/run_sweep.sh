@@ -2,7 +2,7 @@
 
 
 NPROCS=4
-threads=1
+threads=3
 echo "NPROCS $NPROCS"
 echo "threads per process $threads"
 

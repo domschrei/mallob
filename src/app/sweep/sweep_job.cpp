@@ -276,13 +276,14 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 		}
 
 		//Try to steal locally from shared memory
+		LOG(V2_INFO, "  [%i](%i) searches work locally \n", _my_rank, localId);
 		auto stolen_work = stealWorkFromAnyLocalSolver();
 
 		//Successful local steal
 		if ( ! stolen_work.empty()) {
 			//store steal data persistently in C++, such that C can keep operating on that memory segment
 			shweeper->work_received_from_steal = std::move(stolen_work);
-			LOG(V2_INFO, "%i variables sent within same rank(%i) to id(%i) \n", shweeper->work_received_from_steal.size(), _my_rank, localId);
+			LOG(V2_INFO, "%i variables sent within [%i] to (%i) \n", shweeper->work_received_from_steal.size(), _my_rank, localId);
 			break;
 		}
 
@@ -408,11 +409,12 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 		return {};
 	//We dont know how much there is to steal, so we ask
 	KissatPtr shweeper = _shweepers[localId];
-	size_t max_steal_amount = shweep_get_max_steal_amount(shweeper->solver);
+	int max_steal_amount = shweep_get_max_steal_amount(shweeper->solver);
 	if (max_steal_amount == 0)
 		return {};
 
-	LOG(V2_INFO, "ß Steal request sees that I could provide %i max_steal_amount\n", max_steal_amount);
+	LOG(V2_INFO, "ß %i max_steal_amount\n", max_steal_amount);
+	assert(max_steal_amount > 0);
 	//There is potentially something to steal
 	//Allocate memory for the steal here in C++, and pass it to kissat such that it can fill in the stolen work
 	std::vector<int> stolen_work = std::vector<int>(max_steal_amount);
