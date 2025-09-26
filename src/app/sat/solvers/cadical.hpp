@@ -38,7 +38,7 @@ private:
 
 	std::vector<std::vector<int>> learnedClauses;
 	std::vector<int> assumptions;
-	unsigned long unsatConclusionId;
+	unsigned long unsatConclusionId {0};
 
 	CadicalTerminator terminator;
 	CadicalClauseExport learner;

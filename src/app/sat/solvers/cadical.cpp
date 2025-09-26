@@ -216,6 +216,7 @@ SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 		this->assumptions.push_back(lit);
 		//addConditionalLit(-lit);
 	}
+	unsatConclusionId = 0;
 
 	// start solving
 	int res = solver->solve();
