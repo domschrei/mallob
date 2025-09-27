@@ -321,64 +321,67 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
 
     doWriteRevisions();
 
+    if (_event_reapply_solve_state.ready()) applySolvingState();
     if (_state != SolvingStates::ACTIVE) return NORMAL;
 
-    auto maybePipe = _guard_pipe.tryLock();
-    if (!maybePipe) return NORMAL; // try later again
+    // Read all available responses from the pipe
+    while (true) {
+        auto maybePipe = _guard_pipe.tryLock();
+        if (!maybePipe) return NORMAL; // try later again
 
-    auto& pipe = maybePipe.value();
-    assert(pipe.locked());
-    char c = pipe.get()->pollForData();
-    if (c == CLAUSE_PIPE_PREPARE_CLAUSES) {
-        _collected_clauses = pipe.get()->readData(c);
+        auto& pipe = maybePipe.value();
+        assert(pipe.locked());
+        char c = pipe.get()->pollForData();
+        if (c == 0) return NORMAL;
+        if (c == CLAUSE_PIPE_PREPARE_CLAUSES) {
+            _collected_clauses = pipe.get()->readData(c);
 
-        _successful_solver_id = _collected_clauses.back(); _collected_clauses.pop_back();
-        _nb_incoming_lits = _collected_clauses.back(); _collected_clauses.pop_back();
+            _successful_solver_id = _collected_clauses.back(); _collected_clauses.pop_back();
+            _nb_incoming_lits = _collected_clauses.back(); _collected_clauses.pop_back();
 
-        // read best found objective cost
-        int costAsInts[sizeof(long long)/sizeof(int)];
-        for (size_t i = 0; i < sizeof(long long)/sizeof(int); i++) {
-            costAsInts[sizeof(long long)/sizeof(int) - 1 - i] = _collected_clauses.back();
-            _collected_clauses.pop_back();
+            // read best found objective cost
+            int costAsInts[sizeof(long long)/sizeof(int)];
+            for (size_t i = 0; i < sizeof(long long)/sizeof(int); i++) {
+                costAsInts[sizeof(long long)/sizeof(int) - 1 - i] = _collected_clauses.back();
+                _collected_clauses.pop_back();
+            }
+            _best_found_objective_cost = * (long long*) costAsInts;
+            if (_best_found_objective_cost != LLONG_MAX)
+                LOG(V4_VVER, "best found objective cost: %lld\n", _best_found_objective_cost);
+
+            _clause_collecting_stage = RETURNED;
+            LOG(V5_DEBG, "collected clauses from subprocess\n");
+        } else if (c == CLAUSE_PIPE_FILTER_IMPORT) {
+            std::vector<int> filter = pipe.get()->readData(c);
+            int epoch = filter.back(); filter.pop_back();
+            _filters_by_epoch[epoch] = std::move(filter);
+        } else if (c == CLAUSE_PIPE_DIGEST_IMPORT) {
+            _last_admitted_nb_lits = pipe.get()->readData(c).front();
+        } else if (c == CLAUSE_PIPE_SOLUTION) {
+            std::vector<int> solution = pipe.get()->readData(c);
+            pipe.unlock();
+            const int resultCode = solution.back(); solution.pop_back();
+            const unsigned long globalStartOfSuccessEpoch = * (unsigned long*) (solution.data()+solution.size()-2);
+            solution.pop_back(); solution.pop_back();
+            const int winningInstance = solution.back(); solution.pop_back();
+            const int solutionRevision = solution.back(); solution.pop_back();
+            if (solutionRevision == _desired_revision) {
+                _solution.result = resultCode;
+                _solution.revision = solutionRevision;
+                _solution.winningInstanceId = winningInstance;
+                _solution.globalStartOfSuccessEpoch = globalStartOfSuccessEpoch;
+                _solution.setSolutionToSerialize(solution.empty() ? nullptr : solution.data(), solution.size());
+                return FOUND_RESULT;
+            }
+        } else if (c == CLAUSE_PIPE_SUBMIT_PREPROCESSED_FORMULA) {
+            _preprocessed_formula = pipe.get()->readData(c);
+            return FOUND_PREPROCESSED_FORMULA;
         }
-        _best_found_objective_cost = * (long long*) costAsInts;
-        if (_best_found_objective_cost != LLONG_MAX)
-            LOG(V4_VVER, "best found objective cost: %lld\n", _best_found_objective_cost);
-
-        _clause_collecting_stage = RETURNED;
-        LOG(V5_DEBG, "collected clauses from subprocess\n");
-    } else if (c == CLAUSE_PIPE_FILTER_IMPORT) {
-        std::vector<int> filter = pipe.get()->readData(c);
-        int epoch = filter.back(); filter.pop_back();
-        _filters_by_epoch[epoch] = std::move(filter);
-    } else if (c == CLAUSE_PIPE_DIGEST_IMPORT) {
-        _last_admitted_nb_lits = pipe.get()->readData(c).front();
-    } else if (c == CLAUSE_PIPE_SOLUTION) {
-        std::vector<int> solution = pipe.get()->readData(c);
-        pipe.unlock();
-        const int resultCode = solution.back(); solution.pop_back();
-        const unsigned long globalStartOfSuccessEpoch = * (unsigned long*) (solution.data()+solution.size()-2);
-        solution.pop_back(); solution.pop_back();
-        const int winningInstance = solution.back(); solution.pop_back();
-        const int solutionRevision = solution.back(); solution.pop_back();
-        if (solutionRevision == _desired_revision) {
-            _solution.result = resultCode;
-            _solution.revision = solutionRevision;
-            _solution.winningInstanceId = winningInstance;
-            _solution.globalStartOfSuccessEpoch = globalStartOfSuccessEpoch;
-            _solution.setSolutionToSerialize(solution.empty() ? nullptr : solution.data(), solution.size());
-            return FOUND_RESULT;
+        if (_thread_count_update && pipe.get()->hasSpaceForWriting()) {
+            pipe.get()->writeData({_nb_threads}, CLAUSE_PIPE_SET_THREAD_COUNT);
+            _thread_count_update = false;
         }
-    } else if (c == CLAUSE_PIPE_SUBMIT_PREPROCESSED_FORMULA) {
-        _preprocessed_formula = pipe.get()->readData(c);
-        pipe.unlock();
-        return FOUND_PREPROCESSED_FORMULA;
     }
-    if (_thread_count_update && pipe.get()->hasSpaceForWriting()) {
-        pipe.get()->writeData({_nb_threads}, CLAUSE_PIPE_SET_THREAD_COUNT);
-        _thread_count_update = false;
-    }
-    pipe.unlock();
 
     return NORMAL;
 }

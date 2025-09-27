@@ -12,6 +12,7 @@
 
 #include "robin_map.h"
 #include "util/logger.hpp"
+#include "util/periodic_event.hpp"
 #include "util/robin_hood.hpp"
 #include "util/sys/bidirectional_anytime_pipe.hpp"
 #include "util/sys/bidirectional_anytime_pipe_shmem.hpp"
@@ -116,6 +117,8 @@ private:
 
     JobResult _solution;
     std::vector<int> _preprocessed_formula;
+
+    PeriodicEvent<200> _event_reapply_solve_state;
 
 public:
     SatProcessAdapter(Parameters&& params, SatProcessConfig&& config,
