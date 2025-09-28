@@ -120,17 +120,15 @@ int main(int argc, char** argv) {
     Process::init(0);
     ProcessWideThreadPool::init(4);
 
-    for (bool parOutConcurrent : {false, true}) {
-        Config parentOut {nullptr, bufSize, parOutConcurrent};
-        for (bool parInConcurrent : {false, true}) {
-            Config parentIn {nullptr, bufSize, parInConcurrent};
-            for (bool chiOutConcurrent : {false, true}) {
-                Config childOut {nullptr, bufSize, chiOutConcurrent};
-                for (bool chiInConcurrent : {false, true}) {
-                    Config childIn {nullptr, bufSize, chiInConcurrent};
-                    Timer::init();
-                    testAnytime(parentOut, parentIn, childOut, childIn);
-                }
+    Config parentOut {nullptr, bufSize};
+    for (bool parInConcurrent : {false, true}) {
+        Config parentIn {nullptr, bufSize};
+        for (bool chiOutConcurrent : {false, true}) {
+            Config childOut {nullptr, bufSize};
+            for (bool chiInConcurrent : {false, true}) {
+                Config childIn {nullptr, bufSize};
+                Timer::init();
+                testAnytime(parentOut, parentIn, childOut, childIn);
             }
         }
     }

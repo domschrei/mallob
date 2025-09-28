@@ -117,8 +117,8 @@ void SatProcessAdapter::doInitialize() {
     char* pipeParentToChild = (char*) createSharedMemoryBlock("pipe-parenttochild", _hsm->pipeBufSize, nullptr);
     char* pipeChildToParent = (char*) createSharedMemoryBlock("pipe-childtoparent", _hsm->pipeBufSize, nullptr);
     _guard_pipe.lock()->reset(new BiDirectionalAnytimePipeShmem(
-        {pipeParentToChild, _hsm->pipeBufSize, true},
-        {pipeChildToParent, _hsm->pipeBufSize, true}, true));
+        {pipeParentToChild, _hsm->pipeBufSize},
+        {pipeChildToParent, _hsm->pipeBufSize}, true));
 
     // Create SAT solving child process
     Subprocess subproc(_params, "mallob_sat_process", true);
