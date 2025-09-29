@@ -101,7 +101,6 @@ private:
     pid_t _child_pid = -1;
     SolvingStates::SolvingState _state = SolvingStates::INITIALIZING;
 
-    std::atomic_int _written_revision = 0;
     int _desired_revision = -1;
     int _clause_buffer_revision = -1;
 

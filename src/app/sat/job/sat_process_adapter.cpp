@@ -85,13 +85,14 @@ void SatProcessAdapter::doWriteRevisions() {
                     usleep(1000);
                     continue;
                 }
+                assert(maybePipe.has_value());
                 auto& pipe = maybePipe.value();
+                assert(pipe.locked());
                 LOG(V4_VVER, "DBG Writing next revision\n");
                 std::vector<int> vecRev(revData.fLits, revData.fLits + revData.fSize);
                 vecRev.push_back(revData.revision);
                 vecRev.push_back(desiredRev);
                 pipe.get()->writeData(std::move(vecRev), CLAUSE_PIPE_START_NEXT_REVISION);
-                _written_revision = revData.revision;
                 LOG(V4_VVER, "DBG Done writing next revision %i\n", revData.revision);
                 break;
             }

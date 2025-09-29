@@ -93,13 +93,14 @@ private:
             bool tbc = shmemMeta->toBeContinued;
             shmemMeta->available = false;
 
+            switchBuffers();
+
             if (!tbc) {
                 done = true;
                 ongoing = false;
                 return;
             }
 
-            switchBuffers();
         }
         void continueWrite() {
             if (shmemMeta->available) return;
@@ -114,13 +115,13 @@ private:
             posInMsg += shmemMeta->size / sizeof(int);
             shmemMeta->available = true;
 
+            switchBuffers();
+
             if (!tbc) {
                 done = true;
                 ongoing = false;
                 return;
             }
-
-            switchBuffers();
         }
         void switchBuffers() {
             left = !left;
@@ -177,8 +178,8 @@ public:
                     readTask.reset();
                 }
                 // no outgoing message present yet?
-                if (writeTask.msg.tag == 0) _buf_out.pollNonblocking(writeTask.msg);
-                if (writeTask.msg.tag != 0) {
+                bool success = writeTask.msg.tag != 0 || _buf_out.pollNonblocking(writeTask.msg);
+                if (success && writeTask.msg.tag != 0) {
                     // try to write message to the shmem pipe
                     writeTask.continueWrite();
                     if (writeTask.done) {

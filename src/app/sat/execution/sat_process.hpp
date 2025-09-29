@@ -251,7 +251,10 @@ private:
                     LOGGER(_log, V5_DEBG, "DO start next revision\n");
                     std::shared_ptr<std::vector<int>> data {new std::vector<int>(pipe.readData(c))};
                     _desired_revision = popLast(*data);
-                    _last_present_revision = popLast(*data);
+                    int rev = popLast(*data);
+                    assert(rev == _last_present_revision+1);
+                    _last_present_revision = rev;
+
                     engine.appendRevision(_last_present_revision, {data, {}},
                         _last_present_revision == _desired_revision);
                     _has_solution = false;
