@@ -178,7 +178,8 @@ void SolverThread::appendRevision(int revision, RevisionData data) {
     {
         auto lock = _state_mutex.getLock();
         _pending_formulae.emplace_back(
-            new SerializedFormulaParser(_logger, data.fLits, _solver.getSolverSetup().onTheFlyChecking)
+            new SerializedFormulaParser(_logger, data.fLits, _solver.getSolverSetup().onTheFlyChecking
+                || _solver.getSolverSetup().trustedParserForced)
         );
         if (_params.compressFormula()) {
             _pending_formulae.back()->setCompressed();

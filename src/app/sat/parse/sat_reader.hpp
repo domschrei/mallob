@@ -24,6 +24,7 @@ private:
     bool _raw_content_mode;
     FILE* _pipe {nullptr};
 	int _namedpipe {-1};
+    bool _force_incremental_parser;
 
     std::shared_ptr<TrustedParserProcessAdapter> _tppa;
 
@@ -47,10 +48,10 @@ private:
     bool _input_finished {false};
 
 public:
-    SatReader(const Parameters& params, const std::string& file) : 
-        _params(params), _files({file}) {}
-    SatReader(const Parameters& params, const std::vector<std::string>& files) : 
-        _params(params), _files(files) {}
+    SatReader(const Parameters& params, const std::string& file, bool forceIncrementalParser = false) : 
+        _params(params), _files({file}), _force_incremental_parser(forceIncrementalParser) {}
+    SatReader(const Parameters& params, const std::vector<std::string>& files, bool forceIncrementalParser = false) : 
+        _params(params), _files(files), _force_incremental_parser(forceIncrementalParser) {}
     void setTrustedParser(std::shared_ptr<TrustedParserProcessAdapter> tppa) {_tppa = tppa;}
     std::shared_ptr<TrustedParserProcessAdapter> getTrustedParser() {return _tppa;}
     bool read(JobDescription& desc);

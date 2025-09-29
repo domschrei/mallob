@@ -14,17 +14,17 @@ void register_mallob_app_sat() {
     app_registry::registerApplication("SAT",
         // Job reader
         [](const Parameters& params, const std::vector<std::string>& files, JobDescription& desc) {
-            auto reader = SatReader(params, files);
+            auto reader = SatReader(params, files, params.forceIncrementalTrustedParser());
             // For incremental real-time checking, we need to inject a persisting
             // parser adapter instance into the new SatReader object or in turn
             // extract it after the first parsing.
-            if (params.onTheFlyChecking()) {
+            if (params.onTheFlyChecking() || params.forceIncrementalTrustedParser()) {
                 auto lock = IncrementalTrustedParserStore::mtxMap.getLock();
                 if (IncrementalTrustedParserStore::map.count(desc.getId()))
                     reader.setTrustedParser(IncrementalTrustedParserStore::map.at(desc.getId()));
             }
             auto res = reader.read(desc);
-            if (params.onTheFlyChecking()) {
+            if (params.onTheFlyChecking() || params.forceIncrementalTrustedParser()) {
                 auto lock = IncrementalTrustedParserStore::mtxMap.getLock();
                 if (!IncrementalTrustedParserStore::map.count(desc.getId()))
                     IncrementalTrustedParserStore::map[desc.getId()] = reader.getTrustedParser();

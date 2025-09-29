@@ -227,7 +227,7 @@ bool SatReader::read(JobDescription& desc) {
 	std::vector<int> litsToParse;
 	if (_files.empty()) {
 		// No explicit file provided, so nothing to do.
-		if (!_params.onTheFlyChecking()) return true;
+		if (!_params.onTheFlyChecking() && !_force_incremental_parser) return true;
 
 		// With real-time checking, we *still* need to explicitly parse,
 		// so we route the added formula payload over a pipe.
@@ -266,7 +266,7 @@ bool SatReader::read(JobDescription& desc) {
 	desc.setAppConfigurationEntry("__NV", NC_DEFAULT_VAL);
 	desc.beginInitialization(desc.getRevision());
 
-	if (_params.onTheFlyChecking()) {
+	if (_params.onTheFlyChecking() || _force_incremental_parser) {
 		auto ok = parseWithTrustedParser(desc);
 		if (optFuture.has_value()) optFuture->get();
 		if (!ok) return false;

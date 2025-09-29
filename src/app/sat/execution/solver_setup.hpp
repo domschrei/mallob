@@ -101,6 +101,7 @@ struct SolverSetup {
 	bool onTheFlyChecking {false};
 	// If on-the-fly checking is enabled: this solver also seeks to have a found satisfying assignment checked.
 	bool onTheFlyCheckModel {false};
+	bool trustedParserForced {false};
 	// If non-null, use this LratConnector instance for checking a model;
 	// if null && onTheFlyCheckModel, then *create* a model-checking LRAT connector instance yourself (also to use for others).
 	LratConnector* modelCheckingLratConnector {nullptr};
