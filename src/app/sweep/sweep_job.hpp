@@ -23,6 +23,7 @@ private:
 	std::vector<std::shared_ptr<Kissat>> _shweepers;
 	std::vector<std::future<void>> _fut_shweepers;
     std::atomic_int _running_shweepers_count {0};
+	std::vector<int> _list_of_ids;
 
     bool _root_received_work=false;
 	bool _terminate_all=false;
@@ -40,6 +41,7 @@ private:
 	std::vector<WorkstealRequest> _worksteal_requests;
 
 
+	float _last_sharing_timestamp;
     std::unique_ptr<JobTreeBroadcast> _bcast;
     std::unique_ptr<JobTreeAllReduction> _red;
     const int BCAST_INIT{1};
@@ -82,23 +84,24 @@ public:
     void appl_memoryPanic() override {}
 
 
-	void contribute_on_broadcast_ping();
-
-	KissatPtr create_new_shweeper(int localId);
     friend void search_work_in_tree(void* SweepJob_state, unsigned **work, int *work_size, int local_id);
 	// friend void import_next_equivalence(void *SweepJobState, int *last_imported_round, int eq_nr, unsigned *lit1, unsigned *lit2);
 
 private:
     // void advanceSweepMessage(JobMessage& msg);
-    static std::vector<int> aggregateContributions(std::list<std::vector<int>> &contribs);
+	KissatPtr createNewShweeper(int localId);
     void loadFormula(KissatPtr shweeper);
 	void startShweeper(KissatPtr shweeper);
 
-    void tryBeginBroadcastPing();
-    void callback_for_broadcast_ping();
+
+	void sendMPIWorkstealRequests();
+    void initiateNewSharingRound();
+    void contributeToAllReduceCallback();
+    static std::vector<int> aggregateEqUnitContributions(std::list<std::vector<int>> &contribs);
+	void advanceAllReduction();
     // void tryExtractResult();
 
-	std::vector<int> getPermutation(int length);
+	std::vector<int> getRandomIdPermutation(int length);
 
 	std::vector<int> stealWorkFromAnyLocalSolver();
     std::vector<int> stealWorkFromSpecificLocalSolver(int localId);

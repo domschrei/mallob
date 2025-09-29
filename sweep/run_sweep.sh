@@ -17,7 +17,8 @@ MALLOB_OPTIONS="-t=$threads \
   -jcup=0.05 \
   -trace-dir=$OUT_DIR/traces/ \
   -log=$OUT_DIR/logs/ \
-  -mono=$INST_DIR"
+  -mono=$INST_DIR \
+  -sweep-sharing-period=50"
 
 
 #clean old logs and traces
