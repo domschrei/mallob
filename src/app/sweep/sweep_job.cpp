@@ -65,7 +65,7 @@ std::shared_ptr<Kissat> SweepJob::create_new_shweeper(int localId) {
 	setup.localId = localId;
 
 	std::shared_ptr<Kissat> shweeper(new Kissat(setup));
-	shweeper->set_option("mallob_custom_sweep_verbosity", 2); //0: No custom kissat messages. 1: Some. 2: More
+	shweeper->set_option("mallob_custom_sweep_verbosity", 3); //Shweeper verbosity 0..4
 	shweeper->set_option("mallob_solver_count", NUM_WORKERS);
 	shweeper->set_option("mallob_local_id", localId);
 	shweeper->set_option("mallob_rank", _my_rank);
@@ -151,8 +151,10 @@ void SweepJob::appl_communicate() {
 				LOG(V1_WARN, "ß # \n # \n  --- ALL SWEEPERS IDLE - CAN TERMINATE -- \n # \n # \n");
 			}
 
-			_eqs_from_broadcast.assign(broadcast.begin(), broadcast.begin() + broadcast_eq_size);
-			_units_from_broadcast.assign(broadcast.begin() + broadcast_eq_size, broadcast.end() - NUM_SHARING_METADATA);
+			_eqs_from_broadcast.insert(_eqs_from_broadcast.end(),	  broadcast.begin(),                     broadcast.begin() + broadcast_eq_size);
+			_units_from_broadcast.insert(_units_from_broadcast.end(), broadcast.begin() + broadcast_eq_size, broadcast.end() - NUM_SHARING_METADATA);
+			// _eqs_from_broadcast.assign(broadcast.begin(), broadcast.begin() + broadcast_eq_size);
+			// _units_from_broadcast.assign(broadcast.begin() + broadcast_eq_size, broadcast.end() - NUM_SHARING_METADATA);
 
 			//for convenience, we copy the received data into each solver individually. this makes importing easier and less ¢umbersome to code, at the cost of slightly more memory usage
 			//for maximum memory efficiency one would need to refactor this to have kissat threads directly read from SweepJob's _eqs_from_broadcast
