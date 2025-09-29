@@ -42,10 +42,13 @@ private:
 
     std::unique_ptr<JobTreeBroadcast> _bcast;
     std::unique_ptr<JobTreeAllReduction> _red;
+    const int BCAST_INIT{1};
+    const int ALLRED{2};
+
 	bool _started_sharing = false;
 	int _sharing_round = 0;
 
-	//the additional metadata [..., eqs_size, units_size, all_searching_work] stored in each shared element
+	//Positions where the additional metadata is stored in each shared element [..., eqs_size, units_size, all_idle]
 	static const int NUM_SHARING_METADATA = 3;
 	static const int EQUIVS_SIZE_POS = 3;
 	static const int UNITS_SIZE_POS = 2;
@@ -55,8 +58,6 @@ private:
 	std::vector<int> _units_from_broadcast;
 
 
-    const int BCAST_INIT{1};
-    const int ALLRED{2};
 
     static const int MSG_SWEEP = 100; // internal message tag
     static const int NUM_WORKERS = 4; // # workers we request and require, hardcoded 4 for now
@@ -80,6 +81,8 @@ public:
     bool appl_isDestructible() override {return true;}
     void appl_memoryPanic() override {}
 
+
+	void contribute_on_broadcast_ping();
 
 	KissatPtr create_new_shweeper(int localId);
     friend void search_work_in_tree(void* SweepJob_state, unsigned **work, int *work_size, int local_id);

@@ -38,6 +38,12 @@ void SweepJob::appl_start() {
 	//Initialize _red already here, to make sure that all processes have a valid reduction object
 	//maybe switch back to more robust "standard" sharing
 
+
+	LOG(V2_INFO, "[dummy] initialize broadcast object\n");
+	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(),
+		[this]() {contribute_on_broadcast_ping();}, BCAST_INIT));
+
+
 	// LOG(V2_INFO,"ß Initializing baseMsg\n");
 	JobMessage baseMsg = getMessageTemplate();
 	baseMsg.tag = ALLRED;
@@ -65,7 +71,7 @@ std::shared_ptr<Kissat> SweepJob::create_new_shweeper(int localId) {
 	setup.localId = localId;
 
 	std::shared_ptr<Kissat> shweeper(new Kissat(setup));
-	shweeper->set_option("mallob_custom_sweep_verbosity", 3); //Shweeper verbosity 0..4
+	shweeper->set_option("mallob_custom_sweep_verbosity", 2); //Shweeper verbosity 0..4
 	shweeper->set_option("mallob_solver_count", NUM_WORKERS);
 	shweeper->set_option("mallob_local_id", localId);
 	shweeper->set_option("mallob_rank", _my_rank);
@@ -246,6 +252,10 @@ void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 	}
 }
 
+void SweepJob::contribute_on_broadcast_ping() {
+
+
+}
 
 void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 	KissatPtr shweeper = _shweepers[localId];
