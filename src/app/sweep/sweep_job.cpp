@@ -114,8 +114,7 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 		_internal_result.setSolutionToSerialize((int*)(dummy_solution.data()), dummy_solution.size());
 		_running_shweepers_count--;
 		//kill members such that this solver can be fully deleted?
-		_bcast.reset();
-		_red.reset();
+		// _bcast.reset();
 	});
 	_fut_shweepers.push_back(std::move(fut_shweeper));
 }
@@ -459,6 +458,7 @@ std::vector<int> SweepJob::getRandomIdPermutation(int length) {
 	return permutation;
 }
 
+
 // void SweepJob::importNextEquivalence(int *last_imported_round, int eq_nr, unsigned *lit1, unsigned *lit2) {
 	// if (*last_imported_round == _sharing_round || eq_nr == _eqs_from_broadcast.size()/2) {
 		//We already imported this round or we have just reached the end of importing this round
@@ -479,7 +479,6 @@ void SweepJob::loadFormula(KissatPtr shweeper) {
 		shweeper->addLiteral(lits[i]);
 	}
 }
-
 
 
 
