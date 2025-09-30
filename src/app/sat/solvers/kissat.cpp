@@ -51,6 +51,10 @@ void shweep_import_units(void *state, int **units, int *unit_count) {
     ((Kissat*) state)->shweepImportUnits(units, unit_count);
 }
 
+void start_sweep_app_callback(void *state) {
+    ((Kissat*) state)->startSweepAppCallback();
+}
+
 // void shweep_solver_searches_work(void *state, unsigned **work, unsigned *size) {
     // ((Kissat*) state)->shweep_solverSearchesWork(work, size);
 // }
@@ -151,6 +155,11 @@ void Kissat::diversify(int seed) {
             kissat_set_preprocessing_report_callback(solver, this,
             begin_formula_report, report_preprocessed_lit);
         kissat_set_option(solver, "factor", 1); // do perform bounded variable addition
+        if (_setup.shared_sweeping) {
+            kissat_set_option(solver, "mallob_shared_sweeping", 1);
+            //kissat_set_sweep_app_callback
+
+        }
         //kissat_set_option(solver, "luckyearly", 0); // lucky before preprocess can take very long
         seedSet = true;
         interruptionInitialized = true;
@@ -488,6 +497,14 @@ void Kissat::shweepImportUnits(int **units, int *unit_count) {
     *unit_count = units_from_broadcast.size();
 }
 
+void Kissat::startSweepAppCallback() {
+    //extract current formula from single preprocessing solver which is idling in shared_sweeping state
+    //spawn a SWEEP Job via json from here
+    //wait for the SWEEP job to finish, or maybe even read off Units/Equivalences on-the-fly
+    //pass units and equivalences to the single preprocessing solver - using same E/U import as the shweepers themselves
+    //let solver continue as if it had swept all by itself
+
+}
 
 int Kissat::getVariablesCount() {
 	return numVars;

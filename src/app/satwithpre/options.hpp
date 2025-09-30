@@ -14,3 +14,4 @@ OPT_FLOAT(preprocessJobPriority, "pjp", "preprocess-job-priority", LARGE_INT, 0.
 OPT_FLOAT(preprocessExpansionFactor, "pef", "preprocess-expansion-factor", 1.f, 0.0001f, LARGE_INT, "Expand preprocessed task over -pef times the task's running time up to that point")
 OPT_BOOL(preprocessLingeling, "pl", "preprocess-lingeling", false, "Additionally run Lingeling as a preprocessor")
 OPT_BOOL(terminateAbruptly, "terminate-abruptly", "", false, "Upon termination, avoid waiting for preprocessors to finish")
+OPT_BOOL(sharedSweeping, "shared-sweeping", "", false, "calls the Mallob SWEEP app for distributed sweeping, instead of the ordinary sequential function")

@@ -101,15 +101,12 @@ public:
 	// Set a function that should be called for each learned clause
 	void setLearnedClauseCallback(const LearnedClauseCallback& callback) override;
 
-	// Set a function that should be called for each learned equivalence by sweeping
-	void shweep_set_importexport_callbacks();
 
-	
 	// Get the number of variables of the formula
 	int getVariablesCount() override;
 
 	int getNumOriginalDiversifications() override;
-	
+
 	// Get a variable suitable for search splitting
 	int getSplittingVariable() override;
 
@@ -126,19 +123,8 @@ public:
     friend void produce_clause(void* state, int size, int glue);
     friend void consume_clause(void* state, int** clause, int* size, int* lbd);
 
-	//Distributed Shared Sweeping
-	friend void shweep_export_eq(void *state);
-	friend void shweep_export_unit(void *state, int unit);
-
-	friend void shweep_import_eqs(void* state, int** equivalences, int *eqs_size);
-	friend void shweep_import_units(void *state, int **units, int *unit_count);
-
-
-
 	friend void report_database_lit(void *state, int lit);
 
-
-	void shweep_set_workstealing_callback(void* SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, int *work_size, int local_id));
 
 
 
@@ -147,8 +133,19 @@ public:
     friend void report_preprocessed_lit(void* state, int lit);
     friend int terminate_callback(void* state);
 
+	//Shared Sweeping (SWEEP App)
+	void shweep_set_importexport_callbacks();
+	friend void shweep_export_eq(void *state);
+	friend void shweep_export_unit(void *state, int unit);
+	friend void shweep_import_eqs(void* state, int** equivalences, int *eqs_size);
+	friend void shweep_import_units(void *state, int **units, int *unit_count);
+	void shweep_set_workstealing_callback(void* SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, int *work_size, int local_id));
 
-	//Pass-through to access kissat_set_option
+	//Callback to start the SWEEP App
+	friend void start_sweep_app_callback(void *state);
+
+
+	//Pass-through
 	void set_option(const std::string &option_name, int value);
 
 
@@ -158,21 +155,19 @@ private:
     void produceClause(int size, int lbd);
     void consumeClause(int** clause, int* size, int* lbd);
 
-
-	// void shweep_solverSearchesWork(unsigned **work, unsigned *size);
-
     bool isPreprocessingAcceptable(int vars, int cls);
     void addLiteralFromPreprocessing(int lit);
 
-	//Shweep
+    bool shouldTerminate();
+
+	//Shared Sweeping
 	void shweepExportEq();
 	void shweepExportUnit(int unit);
-
 	void shweepImportEqs(int** equivalences, int *eqs_size);
 	void shweepImportUnits(int **units, int *unit_count);
-
     void addLiteralToShweepJob(int lit);
 
-    bool shouldTerminate();
+
+	void startSweepAppCallback();
 
 };
