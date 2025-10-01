@@ -59,12 +59,12 @@ private:
     std::vector<int> _eqs_from_broadcast;//accumulate received equivalences to import in local solver
 	std::vector<int> _units_from_broadcast;
 
-
-
-    static const int MSG_SWEEP = 100; // internal message tag
-    static const int NUM_WORKERS = 4; // # workers we request and require, hardcoded 4 for now
+    // static const int MSG_SWEEP = 100; // internal message tag
+    // static const int NUM_WORKERS = 4; // # workers we request and require, hardcoded 4 for now
 
 	static const int INVALID_LIT = UINT_MAX;
+
+	// std::vector<int> _processedFormula;
 
 
 public:

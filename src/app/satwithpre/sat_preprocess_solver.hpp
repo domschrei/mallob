@@ -45,6 +45,13 @@ private:
     nlohmann::json _prepro_job_submission;
     nlohmann::json _prepro_job_response;
 
+    //Shared Sweeping
+    bool _sweep_job_submitted {false};
+    volatile bool _sweep_job_done {false};
+    bool _sweep_job_digested {false};
+    nlohmann::json _sweep_job_submission;
+    nlohmann::json _sweep_job_response;
+
     SatPreprocessor& _prepro;
 
 public:
@@ -98,10 +105,21 @@ public:
                     break;
                 }
             }
-            if (_prepro.hasPreprocessedFormula()) {
-                LOG(V3_VERB, "SATWP submit preprocessed task\n");
+            if (_prepro.hasPreprocessedFormula() && ! _params.preprocessSweep.val) {
+                LOG(V3_VERB, "SATWP: submit preprocessed task (skipping SWEEP)\n");
                 submitPreprocessedJob(_prepro.extractPreprocessedFormula());
             }
+            if (_prepro.hasPreprocessedFormula() && _params.preprocessSweep.val && ! _sweep_job_submitted) {
+                //squeeze in another preprocessing step: distributed equivalence sweeping
+                LOG(V3_VERB, "SATWP: Submit SWEEP task\n");
+                submitSweepJob(_prepro.extractPreprocessedFormula());
+                // _prepro.resetPreprocessedFormula();
+            }
+            if (_prepro.hasPreprocessedFormula() && _params.preprocessSweep.val && _sweep_job_done) {
+                LOG(V3_VERB, "SATWP:SWEEP: submit preprocessed task\n");
+                submitPreprocessedJob(_prepro.extractPreprocessedFormula());
+            }
+
             if (!_base_job_done && _time_of_retraction_end > 0 && Timer::elapsedSeconds() >= _time_of_retraction_end)
                 interrupt(_base_job_submission, _base_job_done);
             usleep(3*1000);
@@ -132,6 +150,69 @@ private:
         if (Terminator::isTerminating())
             return true;
         return false;
+    }
+
+    void submitSweepJob(std::vector<int>&& fPre) {
+
+        assert(fPre.size() > 2);
+        int nbClauses = fPre.back(); fPre.pop_back();
+        int nbVars = fPre.back(); fPre.pop_back();
+        size_t preprocessedSize = fPre.size();
+
+        if (_params.compressFormula()) {
+            auto out = FormulaCompressor::compress(fPre.data(), fPre.size(), 0, 0);
+            fPre = std::move(*out.vec);
+        }
+
+        // drop original immediately
+        _time_of_retraction_start = Timer::elapsedSeconds();
+        float totalRetractionDuration = 0.001;
+        _time_of_retraction_end = _time_of_retraction_start;
+
+        // If this preprocessing result could be critical in terms of RAM usage,
+        // perform the retraction essentially immediately.
+        // size_t currentSize = _desc.getFormulaPayloadSize(0);
+        // if (currentSize > 100'000'000 && preprocessedSize/(double)currentSize < 0.75)
+            // totalRetractionDuration = 0.001;
+        _retraction_round_duration = totalRetractionDuration / std::sqrt(MyMpi::size(MPI_COMM_WORLD));
+        // if (_params.preprocessBalancing() == 1) {
+            // LOG(V3_VERB, "SATWP %s : Retracting base job over ~%.3fs\n", toStr(), totalRetractionDuration);
+            // _time_of_retraction_end = _time_of_retraction_start + 1.1f * totalRetractionDuration;
+        // }
+
+        // Prepare job submission data
+        auto& json = _sweep_job_submission;
+        json = {
+            {"user", "sweep-" + std::string(toStr())},
+            {"name", std::string(toStr())+":prepro:sweep"},
+            {"priority", _params.preprocessJobPriority()},
+            {"application", "SWEEP"},
+        };
+        if (_params.crossJobCommunication()) json["group-id"] = _desc.getGroupId();
+        StaticStore<std::vector<int>>::insert(json["name"].get<std::string>(), std::move(fPre));
+        json["internalliterals"] = json["name"].get<std::string>();
+        json["configuration"]["__NV"] = std::to_string(nbVars);
+        json["configuration"]["__NC"] = std::to_string(nbClauses);
+        // if (_params.preprocessBalancing() == 1)
+            // json["configuration"]["__growprd"] = std::to_string(_retraction_round_duration);
+        if (_desc.getWallclockLimit() > 0)
+            json["wallclock-limit"] = std::to_string(_desc.getWallclockLimit() - getAgeSinceActivation()) + "s";
+        if (_desc.getCpuLimit() > 0)
+            json["cpu-limit"] = std::to_string(_desc.getCpuLimit() - getAgeSinceActivation()) + "s";
+
+        // Obtain API and submit the job
+        auto copiedJson = json;
+        auto retcode = _api.submit(copiedJson, [&](nlohmann::json& response) {
+            // Job done
+            _sweep_job_response = std::move(response);
+            _sweep_job_done = true;
+        });
+        if (retcode != JsonInterface::ACCEPT) return;
+
+        _sweep_job_submitted = true;
+
+
+
     }
 
     void submitBaseJob() {

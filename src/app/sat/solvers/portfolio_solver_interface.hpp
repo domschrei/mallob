@@ -193,6 +193,10 @@ public:
 		_has_preprocessed_formula = false;
 		return std::move(_preprocessed_formula);
 	}
+	// void resetPreprocessedFormula() {
+		// _has_preprocessed_formula = false;
+		// _preprocessed_formula.clear();
+	// }
 
 	LratConnector* getLratConnector() {
 		return _lrat;

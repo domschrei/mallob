@@ -51,9 +51,9 @@ void shweep_import_units(void *state, int **units, int *unit_count) {
     ((Kissat*) state)->shweepImportUnits(units, unit_count);
 }
 
-void start_sweep_app_callback(void *state) {
-    ((Kissat*) state)->startSweepAppCallback();
-}
+// void start_sweep_app_callback(void *state) {
+    // ((Kissat*) state)->startSweepAppCallback();
+// }
 
 // void shweep_solver_searches_work(void *state, unsigned **work, unsigned *size) {
     // ((Kissat*) state)->shweep_solverSearchesWork(work, size);
@@ -97,6 +97,8 @@ void Kissat::addLiteral(int lit) {
 void Kissat::set_option(const std::string &option_name, int value) {
     kissat_set_option(solver, option_name.c_str(), value);
 }
+
+
 
 
 void Kissat::diversify(int seed) {
@@ -155,11 +157,9 @@ void Kissat::diversify(int seed) {
             kissat_set_preprocessing_report_callback(solver, this,
             begin_formula_report, report_preprocessed_lit);
         kissat_set_option(solver, "factor", 1); // do perform bounded variable addition
-        if (_setup.shared_sweeping) {
-            kissat_set_option(solver, "mallob_shared_sweeping", 1);
-            //kissat_set_sweep_app_callback
-
-        }
+        // if (_setup.shared_sweeping) {
+            // kissat_set_option(solver, "mallob_shared_sweeping", 1);
+        // }
         //kissat_set_option(solver, "luckyearly", 0); // lucky before preprocess can take very long
         seedSet = true;
         interruptionInitialized = true;
@@ -332,6 +332,8 @@ void Kissat::diversify(int seed) {
     interruptionInitialized = true;
 }
 
+
+
 int Kissat::getNumOriginalDiversifications() {
     return _setup.flavour == PortfolioSequence::SAT ? 4 : 11;
 }
@@ -426,14 +428,14 @@ void Kissat::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
 }
 
 
-void Kissat::shweep_set_importexport_callbacks() {
+void Kissat::shweepSetImportExportCallbacks() {
     shweep_set_equivalence_export_callback(solver, this, eq_up_buffer.data(), &shweep_export_eq);
     shweep_set_equivalence_import_callback(solver, this, &shweep_import_eqs);
     shweep_set_unit_export_callback(solver, this, &shweep_export_unit);
     shweep_set_unit_import_callback(solver, this, &shweep_import_units);
 }
 
-void Kissat::shweep_set_workstealing_callback(void *SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, int *work_size, int local_id)) {
+void Kissat::shweepSetWorkstealingCallback(void *SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, int *work_size, int local_id)) {
     shweep_set_search_work_callback(solver, SweepJob_state, search_callback);
 }
 
@@ -497,14 +499,10 @@ void Kissat::shweepImportUnits(int **units, int *unit_count) {
     *unit_count = units_from_broadcast.size();
 }
 
-void Kissat::startSweepAppCallback() {
-    //extract current formula from single preprocessing solver which is idling in shared_sweeping state
-    //spawn a SWEEP Job via json from here
-    //wait for the SWEEP job to finish, or maybe even read off Units/Equivalences on-the-fly
-    //pass units and equivalences to the single preprocessing solver - using same E/U import as the shweepers themselves
-    //let solver continue as if it had swept all by itself
-
+void Kissat::shweepSetReportCallback() {
+    kissat_set_preprocessing_report_callback(solver, this, begin_formula_report, report_preprocessed_lit);
 }
+
 
 int Kissat::getVariablesCount() {
 	return numVars;

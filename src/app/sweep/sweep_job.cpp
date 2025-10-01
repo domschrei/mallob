@@ -30,12 +30,13 @@ void SweepJob::appl_start() {
     _metadata = getSerializedDescription(0)->data();
 	_last_sharing_timestamp = Timer::elapsedSeconds();
 
-	//the initial worksteal dummy objects should not trigger a send
+	//do not trigger a send on the initial dummy worksteal requests
 	_worksteal_requests.resize(_params.numThreadsPerProcess.val);
 	for (auto &request : _worksteal_requests) {
 		request.sent = true;
 	}
-	//orderded list of IDs, that will be shuffled for each request for randomized workstealing
+
+	//IDs that will be shuffled for each workstealing request
 	for (int localId=0; localId < _params.numThreadsPerProcess.val; ++localId) {
 		_list_of_ids.push_back(localId);
 	}
@@ -76,11 +77,13 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 
 	std::shared_ptr<Kissat> shweeper(new Kissat(setup));
 	shweeper->set_option("mallob_custom_sweep_verbosity", 2); //Shweeper verbosity 0..4
-	shweeper->set_option("mallob_solver_count", NUM_WORKERS);
+	// shweeper->set_option("mallob_solver_count", NUM_WORKERS);
 	shweeper->set_option("mallob_local_id", localId);
 	shweeper->set_option("mallob_rank", _my_rank);
-	shweeper->shweep_set_importexport_callbacks();
-	shweeper->shweep_set_workstealing_callback(this, &search_work_in_tree);
+
+	shweeper->shweepSetImportExportCallbacks();
+	shweeper->shweepSetWorkstealingCallback(this, &search_work_in_tree);
+	shweeper->shweepSetReportCallback(); //for kissat_report_dimacs
 
     // Basic configuration options for all solvers
     shweeper->set_option("quiet", 1); // suppress any standard kissat output
@@ -91,8 +94,14 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	shweeper->set_option("seed", 0);   //keep seeds identical and constant for now, for easier debugging
 
 	shweeper->set_option("mallob_is_shweeper", 1); //Make this Kissat solver a pure Distributed Sweeping Solver. Jumps directly to distributed sweeping and bypasses everything else
-	shweeper->set_option("sweepcomplete", 1); //go for full sweeping, deactivates any tick limits
-	shweeper->set_option("probe", 1); //there is some cleanup-probing at the end of the sweeping, keep it?
+	shweeper->set_option("sweepcomplete", 1);      //full sweeping, deactivates any tick limits
+
+	//Skip everything that lies between direct Sweeping and formula reporting
+	shweeper->set_option("preprocess", 0);
+	// shweeper->set_option("probe", 1);      //there is some cleanup-probing at the end of the sweeping, keep it?
+	shweeper->set_option("luckyearly", 0);
+	shweeper->set_option("luckylate", 0);
+
 	return shweeper;
 }
 
@@ -109,12 +118,10 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 		_internal_result.id = getId();
 		_internal_result.revision = getRevision();
 		_internal_result.result=res;
-		_solved_status = 10;
-		auto dummy_solution = std::vector<int>(1,0);
-		_internal_result.setSolutionToSerialize((int*)(dummy_solution.data()), dummy_solution.size());
+		_solved_status = 0;
+		_internal_result.setSolution(shweeper->extractPreprocessedFormula());
+		// _internal_result.setSolutionToSerialize((int*)(dummy_solution.data()), dummy_solution.size());
 		_running_shweepers_count--;
-		//kill members such that this solver can be fully deleted?
-		// _bcast.reset();
 	});
 	_fut_shweepers.push_back(std::move(fut_shweeper));
 }
@@ -133,6 +140,7 @@ void SweepJob::appl_communicate() {
 		initiateNewSharingRound();
 
 	advanceAllReduction();
+
 }
 
 

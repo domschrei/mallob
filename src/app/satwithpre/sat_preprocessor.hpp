@@ -46,7 +46,7 @@ public:
         setup.numVars = _desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
         setup.numOriginalClauses = _desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
         setup.solverType = 'p';
-        setup.shared_sweeping = _params.sharedSweeping.val;
+        // setup.shared_sweeping = _params.sharedSweeping.val;
         _kissat.reset(new Kissat(setup));
         _nb_running++;
         _fut_kissat = ProcessWideThreadPool::get().addTask([&]() {
@@ -106,6 +106,9 @@ public:
     std::vector<int>&& extractPreprocessedFormula() {
         return _kissat->extractPreprocessedFormula();
     }
+    // void resetPreprocessedFormula() {
+        // _kissat->resetPreprocessedFormula();
+    // }
 
     // Interrupt any preprocessing, no more need for a result
     void interrupt() {

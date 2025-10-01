@@ -125,29 +125,19 @@ public:
 
 	friend void report_database_lit(void *state, int lit);
 
-
-
-
-	//
+	//Preprocessing
     friend bool begin_formula_report(void* state, int vars, int cls);
     friend void report_preprocessed_lit(void* state, int lit);
     friend int terminate_callback(void* state);
 
 	//Shared Sweeping (SWEEP App)
-	void shweep_set_importexport_callbacks();
 	friend void shweep_export_eq(void *state);
 	friend void shweep_export_unit(void *state, int unit);
 	friend void shweep_import_eqs(void* state, int** equivalences, int *eqs_size);
 	friend void shweep_import_units(void *state, int **units, int *unit_count);
-	void shweep_set_workstealing_callback(void* SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, int *work_size, int local_id));
-
-	//Callback to start the SWEEP App
-	friend void start_sweep_app_callback(void *state);
-
 
 	//Pass-through
 	void set_option(const std::string &option_name, int value);
-
 
 
 
@@ -155,6 +145,8 @@ private:
     void produceClause(int size, int lbd);
     void consumeClause(int** clause, int* size, int* lbd);
 
+
+	void shweepSetReportCallback();
     bool isPreprocessingAcceptable(int vars, int cls);
     void addLiteralFromPreprocessing(int lit);
 
@@ -167,7 +159,9 @@ private:
 	void shweepImportUnits(int **units, int *unit_count);
     void addLiteralToShweepJob(int lit);
 
+	void shweepSetImportExportCallbacks();
+	void shweepSetWorkstealingCallback(void* SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, int *work_size, int local_id));
 
-	void startSweepAppCallback();
+	// void startSweepAppCallback();
 
 };
