@@ -54,8 +54,8 @@ public:
             bzla::main::parse_options(argc, argv, args);
 
         auto out = &std::cout;
-        if (_params.solutionToFile.isSet()) {
-            out = new std::ofstream(_params.solutionToFile());
+        if (_params.smtSolutionFile.isSet()) {
+            out = new std::ofstream(_params.smtSolutionFile());
         }
 
         // This instruction replaces the internal SAT solver of Bitwuzla with a Mallob-connected solver.
@@ -125,7 +125,7 @@ public:
             abort();
         }
 
-        if (_params.solutionToFile.isSet()) {
+        if (_params.smtSolutionFile.isSet()) {
             delete out;
         }
 
