@@ -64,7 +64,7 @@ public:
     }
 
     JobResult solve() {
-        printf("Starting SATWITHPRE app");
+        printf("Starting SATWITHPRE app\n");
         _time_of_activation = Timer::elapsedSeconds();
 
         if (_params.preprocessBalancing() >= 0) submitBaseJob();
@@ -95,6 +95,13 @@ public:
                 _prepro_job_digested = true;
                 if (res.result != 0) break;
             }
+
+            if (_sweep_job_done && !_sweep_job_digested) {
+                LOG(V3_VERB, "SATWP SWEEP done\n");
+                res = jsonToJobResult(_sweep_job_response, false); //eventually probably convert = true, for tracking equivalences...
+                _sweep_job_digested = true;
+                assert(res.result == 0);
+            }
             if (_prepro.done()) {
                 // Preprocess solver(s) terminated.
                 LOG(V3_VERB, "SATWP preprocessor done\n");
@@ -105,19 +112,21 @@ public:
                     break;
                 }
             }
+
+            //default SAT call without sweep
             if (_prepro.hasPreprocessedFormula() && ! _params.preprocessSweep.val) {
-                LOG(V3_VERB, "SATWP: submit preprocessed task (skipping SWEEP)\n");
+                LOG(V3_VERB, "SATWP: submit preprocessed SAT task, skip Sweep\n");
                 submitPreprocessedJob(_prepro.extractPreprocessedFormula());
             }
+            //instead with sweep
             if (_prepro.hasPreprocessedFormula() && _params.preprocessSweep.val && ! _sweep_job_submitted) {
-                //squeeze in another preprocessing step: distributed equivalence sweeping
-                LOG(V3_VERB, "SATWP: Submit SWEEP task\n");
-                submitSweepJob(_prepro.extractPreprocessedFormula());
-                // _prepro.resetPreprocessedFormula();
+                LOG(V3_VERB, "SATWP: Submit SWEEP\n");
+                submitSweepJob(_prepro.extractPreprocessedFormula()); //schedule another preprocessing step: distributed equivalence sweeping
             }
-            if (_prepro.hasPreprocessedFormula() && _params.preprocessSweep.val && _sweep_job_done) {
-                LOG(V3_VERB, "SATWP:SWEEP: submit preprocessed task\n");
-                submitPreprocessedJob(_prepro.extractPreprocessedFormula());
+            //delayed SAT call after sweep
+            if (_sweep_job_digested) {
+                LOG(V3_VERB, "SATWP: Sweep finished, submit preprocessed SAT task\n");
+                submitPreprocessedJob(res.extractSolution());
             }
 
             if (!_base_job_done && _time_of_retraction_end > 0 && Timer::elapsedSeconds() >= _time_of_retraction_end)
@@ -200,6 +209,10 @@ private:
         if (_desc.getCpuLimit() > 0)
             json["cpu-limit"] = std::to_string(_desc.getCpuLimit() - getAgeSinceActivation()) + "s";
 
+
+        LOG(V3_VERB, "SATWP: Starting Sweep Job: %d Vars\n", nbVars);
+        LOG(V3_VERB, "SATWP: Starting Sweep Job: %d Clauses\n", nbClauses);
+
         // Obtain API and submit the job
         auto copiedJson = json;
         auto retcode = _api.submit(copiedJson, [&](nlohmann::json& response) {
@@ -210,8 +223,6 @@ private:
         if (retcode != JsonInterface::ACCEPT) return;
 
         _sweep_job_submitted = true;
-
-
 
     }
 
@@ -233,6 +244,9 @@ private:
             json["wallclock-limit"] = std::to_string(_desc.getWallclockLimit() - getAgeSinceActivation()) + "s";
         if (_desc.getCpuLimit() > 0)
             json["cpu-limit"] = std::to_string(_desc.getCpuLimit() - getAgeSinceActivation()) + "s";
+
+        LOG(V3_VERB, "SATWP: Starting Base Job: %d Vars\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NV"));
+        LOG(V3_VERB, "SATWP: Starting Base Job: %d Clauses\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
 
         auto copiedJson = json;
         auto result = _api.submit(copiedJson, [&](nlohmann::json& response) {
@@ -303,6 +317,10 @@ private:
             json["wallclock-limit"] = std::to_string(_desc.getWallclockLimit() - getAgeSinceActivation()) + "s";
         if (_desc.getCpuLimit() > 0)
             json["cpu-limit"] = std::to_string(_desc.getCpuLimit() - getAgeSinceActivation()) + "s";
+
+
+        LOG(V3_VERB, "SATWP: Starting SAT Job: %d Vars\n", nbVars);
+        LOG(V3_VERB, "SATWP: Starting SAT Job: %d Clauses\n", nbClauses);
 
         // Obtain API and submit the job
         auto copiedJson = json;

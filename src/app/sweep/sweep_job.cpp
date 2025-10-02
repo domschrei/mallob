@@ -27,6 +27,7 @@ void SweepJob::appl_start() {
 	_is_root = getJobTree().isRoot();
 	LOG(V2_INFO,"ß SweepJob application start: Rank %i, Index %i, is root? %i, Parent-Index %i, \n",   _my_rank, _my_index, _is_root, getJobTree().getParentIndex());
 	LOG(V2_INFO,"ß							 : num children %i\n", getJobTree().getNumChildren());
+	LOG(V2_INFO,"ß sweep-sharing-period=%i ms\n", _params.sweepSharingPeriod_ms.val);
     _metadata = getSerializedDescription(0)->data();
 	_last_sharing_timestamp = Timer::elapsedSeconds();
 
@@ -76,29 +77,28 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	setup.localId = localId;
 
 	std::shared_ptr<Kissat> shweeper(new Kissat(setup));
-	shweeper->set_option("mallob_custom_sweep_verbosity", 2); //Shweeper verbosity 0..4
-	// shweeper->set_option("mallob_solver_count", NUM_WORKERS);
-	shweeper->set_option("mallob_local_id", localId);
-	shweeper->set_option("mallob_rank", _my_rank);
 
 	shweeper->shweepSetImportExportCallbacks();
 	shweeper->shweepSetWorkstealingCallback(this, &search_work_in_tree);
 	shweeper->shweepSetReportCallback(); //for kissat_report_dimacs
 
     // Basic configuration options for all solvers
-    shweeper->set_option("quiet", 1); // suppress any standard kissat output
-    shweeper->set_option("verbose", 0); //the native kissat verbosity
-    // _shweeper->set_option("log", 0); //extensive logging
-    shweeper->set_option("check", 0); // do not check model or derived clauses
+    shweeper->set_option("quiet", 1);  //suppress any standard kissat messages
+    shweeper->set_option("verbose", 0);//the native kissat verbosity
+    // _shweeper->set_option("log", 0);//extensive logging
+    shweeper->set_option("check", 0);  // do not check model or derived clauses
     shweeper->set_option("profile",3); // do detailed profiling how much time we spent where
 	shweeper->set_option("seed", 0);   //keep seeds identical and constant for now, for easier debugging
 
+	shweeper->set_option("mallob_custom_sweep_verbosity", 2); //Shweeper verbosity 0..4
 	shweeper->set_option("mallob_is_shweeper", 1); //Make this Kissat solver a pure Distributed Sweeping Solver. Jumps directly to distributed sweeping and bypasses everything else
 	shweeper->set_option("sweepcomplete", 1);      //full sweeping, deactivates any tick limits
+	shweeper->set_option("mallob_local_id", localId);
+	shweeper->set_option("mallob_rank", _my_rank);
 
-	//Skip everything that lies between direct Sweeping and formula reporting
+	//Skip stuff after Sweeping and before formula reporting
 	shweeper->set_option("preprocess", 0);
-	// shweeper->set_option("probe", 1);      //there is some cleanup-probing at the end of the sweeping, keep it?
+	// shweeper->set_option("probe", 1);      //there is some cleanup-probing at the end of the sweeping. keep it?
 	shweeper->set_option("luckyearly", 0);
 	shweeper->set_option("luckylate", 0);
 
@@ -115,12 +115,18 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 		// LOG(V2_INFO, "shweeper->solve() (r %i, id %i)\n", _my_rank, shweeper->getLocalId());
 		int res = shweeper->solve(0, nullptr);
 		LOG(V2_INFO, "# # Thread finished. Rank %i localId %i result %i # #\n", _my_rank, shweeper->getLocalId(), res);
-		_internal_result.id = getId();
-		_internal_result.revision = getRevision();
-		_internal_result.result=res;
-		_solved_status = 0;
-		_internal_result.setSolution(shweeper->extractPreprocessedFormula());
-		// _internal_result.setSolutionToSerialize((int*)(dummy_solution.data()), dummy_solution.size());
+
+		//Hardcoded for now: Only specifically the rank=0 id=0 solver reports the final formula
+		if (_my_rank == 0 && shweeper->getLocalId() == 0 ) {
+			_internal_result.id = getId();
+			_internal_result.revision = getRevision();
+			_internal_result.result=res;
+			_internal_result.setSolution(shweeper->extractPreprocessedFormula()); //Format: [Clauses, #Vars, #Clauses]
+			for (int i=0; i<12; i++) {
+				LOG(V2_INFO, "Shweep [0](0) final Formula peek %i: %i \n", i, _internal_result.getSolution(i));
+			}
+			_solved_status = 0;
+		}
 		_running_shweepers_count--;
 	});
 	_fut_shweepers.push_back(std::move(fut_shweeper));

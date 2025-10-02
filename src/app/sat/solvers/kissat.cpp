@@ -552,6 +552,10 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
 }
 
 void Kissat::addLiteralFromPreprocessing(int lit) {
+    if (preprocessedFormula.size()<6) {
+        LOG(V2_INFO, "Piped Formula peek %i: %i \n", preprocessedFormula.size(), lit);
+    }
+
     preprocessedFormula.push_back(lit);
     if (lit == 0) nbPreprocessedClausesReceived++;
     if (nbPreprocessedClausesReceived == nbPreprocessedClausesAdvertised) {
