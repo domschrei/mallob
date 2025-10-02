@@ -299,6 +299,7 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobProcessingStatist
         j["result"]["solution-size"] = result.getSolutionSize();
         mkfifo(solutionFile.c_str(), 0666);
     } else {
+        LOG(V4_VVER, "Json handleJobDone: Setting [result][solution] via app_registry::getJobSolutionFormatter\n");
         j["result"]["solution"] = app_registry::getJobSolutionFormatter(applicationId)(_params, result, stats);
     }
     j["stats"] = {

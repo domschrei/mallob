@@ -20,8 +20,8 @@ void register_mallob_app_sweep() {
         },
         // Job solution formatter
         [](const Parameters& params, const JobResult& result, const JobProcessingStatistics& stat) {
-            // An actual application would nicely format the result here ...
-            return nlohmann::json();
+            nlohmann::json j = result.copySolution();
+            return j;
         }
     );
 }

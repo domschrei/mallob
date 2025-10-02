@@ -49,6 +49,7 @@ private:
     bool _sweep_job_submitted {false};
     volatile bool _sweep_job_done {false};
     bool _sweep_job_digested {false};
+    bool _sweep_job_forwarded {false};
     nlohmann::json _sweep_job_submission;
     nlohmann::json _sweep_job_response;
 
@@ -84,24 +85,23 @@ public:
           */
         while (!isTimeoutHit()) {
             if (_base_job_done && !_base_job_digested) {
-                LOG(V3_VERB, "SATWP: base done\n");
+                LOG(V3_VERB, "SATWP base done\n");
                 res = jsonToJobResult(_base_job_response, false);
                 _base_job_digested = true;
                 if (res.result != 0) break;
             }
             if (_prepro_job_done && !_prepro_job_digested) {
-                LOG(V3_VERB, "SATWP: prepro done\n");
+                LOG(V3_VERB, "SATWP prepro done\n");
                 res = jsonToJobResult(_prepro_job_response, true);
                 _prepro_job_digested = true;
                 if (res.result != 0) break;
             }
 
             if (_sweep_job_done && !_sweep_job_digested) {
-                LOG(V3_VERB, "SATWP: SWEEP done\n");
+                LOG(V3_VERB, "SATWP SWEEP done\n");
                 res = jsonToJobResult(_sweep_job_response, false); //eventually probably convert = true, for tracking equivalences...
                 _sweep_job_digested = true;
-                LOG(V3_VERB, "SATWP: SWEEP done, res SolutionSize=%i\n", res.getSolutionSize());
-                assert(res.result == 0);
+                LOG(V3_VERB, "SATWP SWEEP read JobResult from json, SolutionSize=%i\n", res.getSolutionSize());
             }
             if (_prepro.done()) {
                 // Preprocess solver(s) terminated.
@@ -116,18 +116,19 @@ public:
 
             //default SAT call without sweep
             if (_prepro.hasPreprocessedFormula() && ! _params.preprocessSweep.val) {
-                LOG(V3_VERB, "SATWP: submit preprocessed SAT task, skip Sweep\n");
+                LOG(V3_VERB, "SATWP submit preprocessed SAT task, skip SWEEP\n");
                 submitPreprocessedJob(_prepro.extractPreprocessedFormula());
             }
             //instead with sweep
             if (_prepro.hasPreprocessedFormula() && _params.preprocessSweep.val && ! _sweep_job_submitted) {
-                LOG(V3_VERB, "SATWP: Submit SWEEP\n");
+                LOG(V3_VERB, "SATWP Submit SWEEP\n");
                 submitSweepJob(_prepro.extractPreprocessedFormula()); //schedule another preprocessing step: distributed equivalence sweeping
             }
             //delayed SAT call after sweep
-            if (_sweep_job_digested) {
-                LOG(V3_VERB, "SATWP: Sweep finished, submit preprocessed SAT task\n");
+            if (_sweep_job_digested && !_sweep_job_forwarded) {
+                LOG(V3_VERB, "SATWP SWEEP digested, submit preprocessed SAT task\n");
                 submitPreprocessedJob(res.extractSolution());
+                _sweep_job_forwarded = true; //prevent multiple SAT submissions, since we don't move out the solution, but just copy it out
             }
 
             if (!_base_job_done && _time_of_retraction_end > 0 && Timer::elapsedSeconds() >= _time_of_retraction_end)
@@ -211,8 +212,8 @@ private:
             json["cpu-limit"] = std::to_string(_desc.getCpuLimit() - getAgeSinceActivation()) + "s";
 
 
-        LOG(V3_VERB, "SATWP: Starting Sweep Job: %d Vars\n", nbVars);
-        LOG(V3_VERB, "SATWP: Starting Sweep Job: %d Clauses\n", nbClauses);
+        LOG(V3_VERB, "SATWP Starting SWEEP Job: %d Vars\n", nbVars);
+        LOG(V3_VERB, "SATWP Starting SWEEP Job: %d Clauses\n", nbClauses);
 
         // Obtain API and submit the job
         auto copiedJson = json;
