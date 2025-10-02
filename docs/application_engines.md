@@ -41,7 +41,7 @@ All options defined after this definition and before the next group definition a
 
 ## `register.hpp`
 
-A typical `register.hpp` for a **regular** application engine looks as follows. See also [dummy/register.cpp](src/app/dummy/register.hpp) for potential recent updates.
+A typical `register.hpp` for a **regular** application engine looks as follows. See also [dummy/register.hpp](/src/app/dummy/register.hpp) for potential recent updates.
 
 ```C++
 #pragma once
