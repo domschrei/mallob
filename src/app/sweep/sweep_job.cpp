@@ -124,7 +124,7 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 			std::vector<int> formula = shweeper->extractPreprocessedFormula();
 			_internal_result.setSolutionToSerialize(formula.data(), formula.size()); //Format: [Clauses, #Vars, #Clauses]
 			LOG(V2_INFO, "# # [0](0) Serialized final formula, SolutionSize=%i\n",_internal_result.getSolutionSize());
-			for (int i=0; i<12; i++) {
+			for (int i=0; i<30; i++) {
 				LOG(V2_INFO, "Shweep [0](0) final Formula peek %i: %i \n", i, _internal_result.getSolution(i));
 			}
 			_solved_status = SAT; //need a code !=0 (UNKNOWN_RESULT), because in that case jsonToJobResult(...) would return early without copying/moving the solution array

@@ -87,6 +87,7 @@ public:
             if (_base_job_done && !_base_job_digested) {
                 LOG(V3_VERB, "SATWP base done\n");
                 res = jsonToJobResult(_base_job_response, false);
+                LOG(V3_VERB, "SATWP base done, result code %i\n", res.result);
                 _base_job_digested = true;
                 if (res.result != 0) break;
             }
@@ -128,11 +129,13 @@ public:
             if (_sweep_job_digested && !_sweep_job_forwarded) {
                 LOG(V3_VERB, "SATWP SWEEP digested, submit preprocessed SAT task\n");
                 submitPreprocessedJob(res.extractSolution());
-                _sweep_job_forwarded = true; //prevent multiple SAT submissions, since we don't move out the solution, but just copy it out
+                _sweep_job_forwarded = true; //prevent multiple SAT submissions, since we don't move out the solution here but just copy it
             }
 
-            if (!_base_job_done && _time_of_retraction_end > 0 && Timer::elapsedSeconds() >= _time_of_retraction_end)
+            if (!_base_job_done && _time_of_retraction_end > 0 && Timer::elapsedSeconds() >= _time_of_retraction_end) {
+                LOG(V3_VERB, "SATWP Interrupting base job due to retraction\n");
                 interrupt(_base_job_submission, _base_job_done);
+            }
             usleep(3*1000);
         }
 
@@ -175,17 +178,20 @@ private:
             fPre = std::move(*out.vec);
         }
 
+        //NOT copying the retraction code, because we are continuing the preprocessing with SWEEP,
+        //i.e. not retracting the base job yet
+
         // drop original immediately
-        _time_of_retraction_start = Timer::elapsedSeconds();
-        float totalRetractionDuration = 0.001;
-        _time_of_retraction_end = _time_of_retraction_start;
+        // _time_of_retraction_start = Timer::elapsedSeconds();
+        // float totalRetractionDuration = 0.001;
+        // _time_of_retraction_end = _time_of_retraction_start;
 
         // If this preprocessing result could be critical in terms of RAM usage,
         // perform the retraction essentially immediately.
         // size_t currentSize = _desc.getFormulaPayloadSize(0);
         // if (currentSize > 100'000'000 && preprocessedSize/(double)currentSize < 0.75)
             // totalRetractionDuration = 0.001;
-        _retraction_round_duration = totalRetractionDuration / std::sqrt(MyMpi::size(MPI_COMM_WORLD));
+        // _retraction_round_duration = totalRetractionDuration / std::sqrt(MyMpi::size(MPI_COMM_WORLD));
         // if (_params.preprocessBalancing() == 1) {
             // LOG(V3_VERB, "SATWP %s : Retracting base job over ~%.3fs\n", toStr(), totalRetractionDuration);
             // _time_of_retraction_end = _time_of_retraction_start + 1.1f * totalRetractionDuration;
