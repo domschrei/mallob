@@ -16,7 +16,7 @@ MALLOB_OPTIONS="-t=$threads \
   -sweep-sharing-period=50 \
   -satsolver=k \
   -colors \
-  -v=3 \
+  -v=4 \
   -jcup=0.05 \
   -trace-dir=$OUT_DIR/traces/ \
   -log=$OUT_DIR/logs/ \

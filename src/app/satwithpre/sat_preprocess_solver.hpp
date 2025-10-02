@@ -84,22 +84,23 @@ public:
           */
         while (!isTimeoutHit()) {
             if (_base_job_done && !_base_job_digested) {
-                LOG(V3_VERB, "SATWP base done\n");
+                LOG(V3_VERB, "SATWP: base done\n");
                 res = jsonToJobResult(_base_job_response, false);
                 _base_job_digested = true;
                 if (res.result != 0) break;
             }
             if (_prepro_job_done && !_prepro_job_digested) {
-                LOG(V3_VERB, "SATWP prepro done\n");
+                LOG(V3_VERB, "SATWP: prepro done\n");
                 res = jsonToJobResult(_prepro_job_response, true);
                 _prepro_job_digested = true;
                 if (res.result != 0) break;
             }
 
             if (_sweep_job_done && !_sweep_job_digested) {
-                LOG(V3_VERB, "SATWP SWEEP done\n");
+                LOG(V3_VERB, "SATWP: SWEEP done\n");
                 res = jsonToJobResult(_sweep_job_response, false); //eventually probably convert = true, for tracking equivalences...
                 _sweep_job_digested = true;
+                LOG(V3_VERB, "SATWP: SWEEP done, res SolutionSize=%i\n", res.getSolutionSize());
                 assert(res.result == 0);
             }
             if (_prepro.done()) {
@@ -355,6 +356,7 @@ private:
         res.id = _desc.getId();
         res.revision = 0;
         res.result = json["result"]["resultcode"];
+        LOG(V3_VERB, "SATWP jsonToJobResult res.result=%i\n", res.result);
         if (res.result == RESULT_UNKNOWN) return res;
         std::vector<int> solution;
         if (_params.compressModels() && res.result == RESULT_SAT) {
@@ -371,6 +373,7 @@ private:
         }
         res.setSolution(std::move(solution));
         LOG(V3_VERB, "SATWP %s extracted\n", json["name"].get<std::string>().c_str());
+        LOG(V3_VERB, "SATWP %s extracted, SolutionSize=%i\n", json["name"].get<std::string>().c_str(), res.getSolutionSize());
         return res;
     }
 

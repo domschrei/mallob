@@ -286,6 +286,7 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobProcessingStatist
         + std::to_string(result.id) + "." 
         + std::to_string(result.revision) + ".pipe";
 
+    LOG(V4_VVER, "Json handleJobDone: SolutionSize=%i\n", result.getSolutionSize());
     // Pack job result into JSON
     j["internal_id"] = result.id;
     j["internal_revision"] = result.revision;

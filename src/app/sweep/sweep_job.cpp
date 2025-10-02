@@ -120,12 +120,15 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 		if (_my_rank == 0 && shweeper->getLocalId() == 0 ) {
 			_internal_result.id = getId();
 			_internal_result.revision = getRevision();
-			_internal_result.result=res;
-			_internal_result.setSolution(shweeper->extractPreprocessedFormula()); //Format: [Clauses, #Vars, #Clauses]
+			_internal_result.result= UNSAT;
+			std::vector<int> formula = shweeper->extractPreprocessedFormula();
+			_internal_result.setSolutionToSerialize(formula.data(), formula.size()); //Format: [Clauses, #Vars, #Clauses]
+			LOG(V2_INFO, "# # [0](0) Serialized final formula, SolutionSize=%i\n",_internal_result.getSolutionSize());
 			for (int i=0; i<12; i++) {
 				LOG(V2_INFO, "Shweep [0](0) final Formula peek %i: %i \n", i, _internal_result.getSolution(i));
 			}
-			_solved_status = 0;
+			_solved_status = UNSAT; //need a code !=0 (UNKNOWN_RESULT), because in that case jsonToJobResult(...) would return early without copying/moving the solution array
+								 //chose some random number (like 15) because the solution is neither SAT nor UNSAT
 		}
 		_running_shweepers_count--;
 	});
