@@ -217,15 +217,6 @@ public:
             });
         }
 
-        // LOG(V3_VERB, "      : contributed      %i\n", _contributed);
-        // LOG(V3_VERB, "      : local elem size  %u\n", _local_elem->size());
-        // LOG(V3_VERB, "      : _childs elems    %u\n", _child_elems.size());
-        // LOG(V3_VERB, "      : _parent_is_rdy   %i\n", _parent_is_ready);
-        // LOG(V3_VERB, "      : _aggregating     %i\n", _aggregating);
-        // LOG(V3_VERB, "      : _future.valid()  %i\n", _future_aggregate.valid());
-
-        // LOG(V3_VERB, "      : _aggregated size %u\n", _aggregated_elem->size());
-        // LOG(V3_VERB, "   : _expected childs %i\n",  _num_expected_child_elems);
 
         if (!_aggregating && _future_aggregate.valid() && _parent_is_ready) {
             // Aggregation done
@@ -251,6 +242,7 @@ public:
                 _base_msg.treeIndexOfDestination = _parent_index;
                 _base_msg.contextIdOfDestination = _parent_ctx_id;
                 LOG(V3_VERB, "  send to  parent %i\n", _parent_rank);
+                assert(_base_msg.contextIdOfDestination != 0);
                 MyMpi::isend(_parent_rank, MSG_JOB_TREE_MODULAR_REDUCE, _base_msg);
                 if (_care_about_parent_status) {
                     _parent_is_ready = false;
@@ -270,6 +262,7 @@ public:
             _base_msg.payload = _neutral_elem;
             _base_msg.treeIndexOfDestination = _parent_index;
             _base_msg.contextIdOfDestination = _parent_ctx_id;
+            assert(_base_msg.contextIdOfDestination != 0);
             MyMpi::isend(_parent_rank, MSG_JOB_TREE_MODULAR_REDUCE, _base_msg);
         }
         // finished but not valid
@@ -282,6 +275,7 @@ public:
             _base_msg.treeIndexOfDestination = _expected_child_indices.first;
             _base_msg.contextIdOfDestination = _expected_child_ctx_ids.first;
             LOG(V3_VERB, "      tell child %i I'm ready\n", _expected_child_indices.first);
+            assert(_base_msg.contextIdOfDestination != 0);
             MyMpi::isend(_expected_child_ranks.first, MSG_JOB_TREE_PARENT_IS_READY, _base_msg);
 
         }
@@ -289,6 +283,7 @@ public:
             _base_msg.treeIndexOfDestination = _expected_child_indices.second;
             _base_msg.contextIdOfDestination = _expected_child_ctx_ids.second;
             LOG(V3_VERB, "      tell child %i I'm ready \n", _expected_child_indices.second);
+            assert(_base_msg.contextIdOfDestination != 0);
             MyMpi::isend(_expected_child_ranks.second, MSG_JOB_TREE_PARENT_IS_READY, _base_msg);
         }
     }
@@ -338,11 +333,13 @@ private:
         if (_expected_child_ranks.first >= 0) {
             _base_msg.treeIndexOfDestination = _expected_child_indices.first;
             _base_msg.contextIdOfDestination = _expected_child_ctx_ids.first;
+            assert(_base_msg.contextIdOfDestination != 0);
             MyMpi::isend(_expected_child_ranks.first, MSG_JOB_TREE_MODULAR_BROADCAST, _base_msg);
         }
         if (_expected_child_ranks.second >= 0) {
             _base_msg.treeIndexOfDestination = _expected_child_indices.second;
             _base_msg.contextIdOfDestination = _expected_child_ctx_ids.second;
+            assert(_base_msg.contextIdOfDestination != 0);
             MyMpi::isend(_expected_child_ranks.second, MSG_JOB_TREE_MODULAR_BROADCAST, _base_msg);
         }
     }

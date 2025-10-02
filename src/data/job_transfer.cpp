@@ -127,7 +127,8 @@ std::vector<uint8_t> JobMessage::serialize() const {
     assert(treeIndexOfSender >= 0);
     assert(treeIndexOfDestination >= 0);
     assert(contextIdOfSender != 0);
-    assert(contextIdOfDestination != 0);
+    assert(contextIdOfDestination != 0 ||
+        log_return_false("Message Error contextIdOfDestintion==0! From: ContextIdOfSender=%i, jobId=%i, tag=%i \n", contextIdOfSender, jobId, tag));
 
     int i = 0, n;
     n = sizeof(int); memcpy(packed.data()+i, &jobId, n); i += n;

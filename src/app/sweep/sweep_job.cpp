@@ -176,6 +176,10 @@ void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 		msg.tag = TAG_RETURNING_STEAL_REQUEST;
 		msg.treeIndexOfDestination = source;
 		msg.contextIdOfDestination = getJobComm().getContextIdOrZero(source);
+        int sourceRank = getJobComm().getWorldRankOrMinusOne(source);
+		//Rank 3 already sent out a message to us, but it isnot yet found in WorldRank list for us to answer it!
+		assert(msg.contextIdOfDestination != 0 ||
+			log_return_false("Error in TAG_RETURNING_STEAL_REQUEST! Invalid contextIdOfDestination==0. With source=%i, source_rank=%i, payload.size()=%i \n", source, sourceRank, msg.payload.size()));
 		getJobTree().send(source, MSG_SEND_APPLICATION_MESSAGE, msg);
 		return;
 	}
@@ -202,6 +206,13 @@ void SweepJob::sendMPIWorkstealRequests() {
 			//Need to add these two fields because we are doing arbitrary point-to-point communication
 			msg.treeIndexOfDestination = request.targetRank;
 			msg.contextIdOfDestination = getJobComm().getContextIdOrZero(request.targetRank);
+			// if (msg.contextIdOfDestination==0) {
+				// rank has probably just tree is just not ready yet for this rank, immediately shut down the request for this rank
+				// request.got_steal_response = true;
+				// LOG(V2_INFO, "")
+				// return;
+			// }
+
 			assert(msg.contextIdOfDestination != 0 || log_return_false("Error: contextIdOfDestination==0 in workstealing request! Source rank=%i, targetRank %i \n", _my_rank, request.targetRank));
 			msg.payload = {request.localId};
 			// LOG(V2_INFO, "Rank %i asks rank %i for work\n", _my_rank, recv_rank, n);
@@ -257,11 +268,20 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 		//Unsuccessful steal locally. Go global via MPI message
 		int recvIndex = _rng.randomInRange(0,getVolume());
         int targetRank = getJobComm().getWorldRankOrMinusOne(recvIndex);
-        if (targetRank == -1) { // tree not fully built yet, try again
+
+        if (targetRank == -1) {
+        	// tree not fully built yet, try again
 			usleep(100);
         	continue;
         }
-		if (targetRank == _my_rank) { // don't steal from ourselves, try again
+
+		if (targetRank == _my_rank) {
+			// don't steal from ourselves, try again
+			continue;
+		}
+
+		if (getJobComm().getContextIdOrZero(targetRank)==0) {
+			//targetRank not yet listed in address list. Might happen for a short period just after it is spawned
 			continue;
 		}
 
