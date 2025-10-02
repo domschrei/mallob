@@ -120,15 +120,14 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 		if (_my_rank == 0 && shweeper->getLocalId() == 0 ) {
 			_internal_result.id = getId();
 			_internal_result.revision = getRevision();
-			_internal_result.result= SAT;
+			_internal_result.result= SAT; //technically its not SAT but just *some* information, but to elegantly pass the higher abstraction layers, declare it SAT for them
 			std::vector<int> formula = shweeper->extractPreprocessedFormula();
 			_internal_result.setSolutionToSerialize(formula.data(), formula.size()); //Format: [Clauses, #Vars, #Clauses]
 			LOG(V2_INFO, "# # [0](0) Serialized final formula, SolutionSize=%i\n",_internal_result.getSolutionSize());
 			for (int i=0; i<30; i++) {
 				LOG(V2_INFO, "Shweep [0](0) final Formula peek %i: %i \n", i, _internal_result.getSolution(i));
 			}
-			_solved_status = SAT; //need a code !=0 (UNKNOWN_RESULT), because in that case jsonToJobResult(...) would return early without copying/moving the solution array
-								 //chose some random number (like 15) because the solution is neither SAT nor UNSAT
+			_solved_status = SAT;
 		}
 		_running_shweepers_count--;
 	});
@@ -157,6 +156,11 @@ void SweepJob::appl_communicate() {
 // React to an incoming message. (This becomes relevant only if you send custom messages)
 void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 	// LOG(V2_INFO, "Shweep rank %i: received custom message from source %i, mpiTag %i, msg.tag %i \n", _my_rank, source, mpiTag, msg.tag);
+	if (msg.returnedToSender) {
+		LOG(V2_INFO, "ß Error: received unexpected returnedToSender message during Sweep Job Workstealing!\n");
+		LOG(V2_INFO, "ß Error: source=%i mpiTag=%i, treeIdxOfSender=%i, treeIdxOfDestination=%i \n", source, mpiTag,  msg.treeIndexOfSender, msg.treeIndexOfDestination);
+		assert(false);
+	}
 	if (msg.tag == TAG_SEARCHING_WORK) {
 		assert(msg.payload.size() == 1);
 		int localId = msg.payload.front();
@@ -198,6 +202,7 @@ void SweepJob::sendMPIWorkstealRequests() {
 			//Need to add these two fields because we are doing arbitrary point-to-point communication
 			msg.treeIndexOfDestination = request.targetRank;
 			msg.contextIdOfDestination = getJobComm().getContextIdOrZero(request.targetRank);
+			assert(msg.contextIdOfDestination != 0 || log_return_false("Error: contextIdOfDestination==0 in workstealing request! Source rank=%i, targetRank %i \n", _my_rank, request.targetRank));
 			msg.payload = {request.localId};
 			// LOG(V2_INFO, "Rank %i asks rank %i for work\n", _my_rank, recv_rank, n);
 			// LOG(V2_INFO, "  with destionation ctx_id %i \n", msg.contextIdOfDestination);
