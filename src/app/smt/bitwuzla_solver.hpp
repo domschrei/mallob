@@ -13,6 +13,8 @@
 #include "bitwuzla/cpp/bitwuzla.h"
 #include "bitwuzla/cpp/sat_solver_factory.h"
 #include "bitwuzla/cpp/main.h"
+#include <cstdint>
+#include <cstdio>
 
 class BitwuzlaSolver {
 
@@ -46,6 +48,17 @@ public:
         argVec.push_back((char*) _problem_file.c_str());
         argVec.push_back("--print-model");
         argVec.push_back("-v");
+        char wcl[64];
+        if (_params.jobWallclockLimit.isNonzero() || _params.timeLimit.isNonzero()) {
+            unsigned long limitMillis = INT32_MAX;
+            if (_params.jobWallclockLimit.isNonzero())
+                limitMillis = std::min(limitMillis, (unsigned long) (1000 * _params.jobWallclockLimit()));
+            if (_params.timeLimit.isNonzero())
+                limitMillis = std::min(limitMillis, (unsigned long) (1000 * (_params.timeLimit() - Timer::elapsedSeconds())));
+            snprintf(wcl, 63, "%lu", limitMillis);
+            argVec.push_back("--time-limit");
+            argVec.push_back(wcl);
+        }
         int argc = argVec.size();
         char** argv = argVec.data();
 

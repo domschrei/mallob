@@ -38,6 +38,7 @@ void handleSignal(int signum) {
     // If crash, try to write a trace of the concerned thread with gdb
     if (Process::isCrash(signum)) Process::writeTrace(Proc::getTid());
 
+    Logger::getMainInstance().flush();
     Process::_exit_signal_caught = true;
     Process::_exit_signal = signum;
     Process::_signal_tid = Proc::getTid();

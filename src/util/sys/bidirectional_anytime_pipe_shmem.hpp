@@ -36,9 +36,12 @@ private:
     volatile char* _data_in_left;
     volatile char* _data_in_right;
 
+    volatile size_t _msg_counter {0};
+
     struct InPlaceData {
-        volatile bool available;
         volatile size_t size;
+        volatile size_t counter;
+        volatile bool available;
         volatile bool toBeContinued;
         volatile char tag;
         static InPlaceData* getMetadata(volatile char* buffer) {return (InPlaceData*) buffer;}
@@ -51,6 +54,7 @@ private:
 
     struct Message {
         char tag {0};
+        size_t counter {0};
         std::vector<int> userData;
     };
 
@@ -83,8 +87,11 @@ private:
         void continueRead() {
             if (!shmemMeta->available) return;
 
-            ongoing = true;
-            msg.tag = shmemMeta->tag;
+            if (!ongoing) {
+                ongoing = true;
+                msg.tag = shmemMeta->tag;
+                msg.counter = shmemMeta->counter;
+            }
             assert(shmemMeta->size <= shmemSize ||
                 log_return_false("[ERROR] prompted to read %lu bytes into buffer of length %lu!\n", shmemMeta->size, shmemSize));
             size_t oldMsgNbInts = msg.userData.size();
@@ -105,8 +112,11 @@ private:
         void continueWrite() {
             if (shmemMeta->available) return;
 
-            ongoing = true;
-            shmemMeta->tag = msg.tag;
+            if (!ongoing) {
+                ongoing = true;
+                shmemMeta->tag = msg.tag;
+                shmemMeta->counter = msg.counter;
+            }
             size_t endInMsg = std::min(posInMsg + shmemSize/sizeof(int), msg.userData.size());
             shmemMeta->size = (endInMsg-posInMsg) * sizeof(int);
             memcpy((char*)shmemBuf, msg.userData.data() + posInMsg, shmemMeta->size);
@@ -169,12 +179,16 @@ public:
             Proc::nameThisThread("ShmemPipeIO");
             IOTask readTask(_data_in_left, _data_in_right, _cap_in);
             IOTask writeTask(_data_out_left, _data_out_right, _cap_out);
+            size_t readCounter = _msg_counter;
             while (!_terminate) { // run indefinitely until you should terminate
                 readTask.continueRead();
                 if (readTask.done) {
                     // message read over pipe: push to incoming messages queue
+                    auto c = readTask.msg.counter;
                     bool success = readTask.msg.tag == 0 || _buf_in.pushBlocking(readTask.msg);
                     if (!success) break;
+                    assert(c == readCounter);
+                    readCounter++;
                     readTask.reset();
                 }
                 // no outgoing message present yet?
@@ -198,7 +212,7 @@ public:
         if (_buf_in.empty()) return 0;
         bool ok = _buf_in.pollNonblocking(_msg_to_read);
         if (!ok) return 0;
-        LOG(V5_DEBG, "PIPE read %c\n", _msg_to_read.tag);
+        LOG(V3_VERB, "PIPE read %c#%lu\n", _msg_to_read.tag, _msg_to_read.counter);
         return _msg_to_read.tag;
     }
     // immediately returns the available data prepared via a successful pollForData()
@@ -224,8 +238,9 @@ public:
     }
     // Send a piece of data, can be blocking and moves the data.
     bool writeData(std::vector<int>&& data, char contentTag) {
-        LOG(V5_DEBG, "PIPE write %c\n", contentTag);
-        Message msg {contentTag, std::move(data)};
+        LOG(V3_VERB, "PIPE write %c#%lu\n", contentTag, _msg_counter);
+        assert(contentTag != 0);
+        Message msg {contentTag, _msg_counter++, std::move(data)};
         bool success = _buf_out.pushBlocking(msg);
         if (success) _nb_to_write++;
         return success;
@@ -233,9 +248,10 @@ public:
     // Send a piece of data built from concatenating the two provided arrays (for convenience),
     // can be blocking and moves/copies the data.
     bool writeData(std::vector<int>&& data1, const std::vector<int>& data2, char contentTag) {
-        LOG(V5_DEBG, "PIPE write %c\n", contentTag);
+        LOG(V3_VERB, "PIPE write %c#%lu\n", contentTag, _msg_counter);
+        assert(contentTag != 0);
         data1.insert(data1.end(), data2.begin(), data2.end());
-        Message msg {contentTag, std::move(data1)};
+        Message msg {contentTag, _msg_counter++, std::move(data1)};
         bool success = _buf_out.pushBlocking(msg);
         if (success) _nb_to_write++;
         return success;

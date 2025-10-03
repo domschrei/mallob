@@ -106,6 +106,7 @@ private:
 
     std::atomic_int _num_revisions_to_write = 0;
     std::list<RevisionData> _revisions_to_write;
+    int _next_revision_to_write {0};
     Mutex _mtx_revisions;
     Mutex _mtx_state;
     unsigned long _sum_of_revision_sizes {0};

@@ -75,7 +75,7 @@ void SatProcessAdapter::doWriteRevisions() {
                 desiredRev = _desired_revision;
                 if (_revisions_to_write.empty()) break;
                 revData = _revisions_to_write.front();
-                _revisions_to_write.erase(_revisions_to_write.begin());
+                _revisions_to_write.pop_front();
                 _num_revisions_to_write--;
             }
             while (!_terminate) {
@@ -92,8 +92,10 @@ void SatProcessAdapter::doWriteRevisions() {
                 std::vector<int> vecRev(revData.fLits, revData.fLits + revData.fSize);
                 vecRev.push_back(revData.revision);
                 vecRev.push_back(desiredRev);
+                assert(revData.revision == _next_revision_to_write);
                 pipe.get()->writeData(std::move(vecRev), CLAUSE_PIPE_START_NEXT_REVISION);
                 LOG(V4_VVER, "DBG Done writing next revision %i\n", revData.revision);
+                _next_revision_to_write++;
                 break;
             }
         }
@@ -147,7 +149,9 @@ void SatProcessAdapter::doInitialize() {
         auto lock = _mtx_revisions.getLock();
         return _desired_revision;
     }()); // currently (i.e., initially) desired revision
+    assert(_next_revision_to_write == 0);
     _guard_pipe.lock().get()->writeData(std::move(rev0), CLAUSE_PIPE_START_NEXT_REVISION);
+    _next_revision_to_write = 1;
 
     // Change adapter state
     auto lock = _mtx_state.getLock();
