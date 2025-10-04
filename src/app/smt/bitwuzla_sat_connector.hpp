@@ -50,7 +50,7 @@ private:
     tsl::robin_set<int> _failed_lits;
 
     float _start_time {0};
-    bool _in_solved_state {false};
+    bool _in_solved_state {false}; // whether a result would already be known for an immediate solve() call
     bzla::Result _result;
 
     std::ostream* _out_stream {nullptr};
@@ -118,9 +118,10 @@ public:
             _stream_wrapper->mallobProcessor->setInitialSize(_nb_vars, _nb_clauses);
         }
         auto time = Timer::elapsedSeconds();
-        LOG(V2_INFO, "%s submit rev. %i (%i lits)\n", _name.c_str(), _revision, _lits.size());
+        LOG(V2_INFO, "%s submit rev. %i (%i lits, %i asmpt)\n", _name.c_str(), _revision, _lits.size(), _assumptions.size());
 
         auto [resultCode, solution] = _stream_wrapper->stream.solve(std::move(_lits), _assumptions);
+        _in_solved_state = _assumptions.empty();
         _lits.clear();
         _assumptions.clear();
 
@@ -146,7 +147,6 @@ public:
             for (int lit : solution) _failed_lits.insert(lit);
         }
 
-        _in_solved_state = true;
         _result = bzlaResult;
         return _result;
     }
