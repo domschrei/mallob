@@ -123,7 +123,7 @@ public:
         if (_in_solved_state) return _result;
 
         _revision++;
-        if (_revision == 0 && _stream_wrapper->mallobProcessor) {
+        if (_stream_wrapper->mallobProcessor) {
             _stream_wrapper->mallobProcessor->setInitialSize(_nb_vars, _nb_clauses);
         }
         auto time = Timer::elapsedSeconds();
@@ -162,7 +162,10 @@ public:
 
     virtual int32_t value(int32_t lit) override {
         int var = std::abs(lit);
-        assert(var < _solution.size() || log_return_false("[ERROR] Solution has size %lu - variable %i queried!\n", _solution.size(), var));
+        if (var >= _solution.size()) {
+            LOG(V1_WARN, "[WARN] Solution has size %lu - variable %i queried!\n", _solution.size(), var);
+            return 0;
+        }
         int val = _solution[var];
         assert(std::abs(val) == var);
         if (val > 0) return 1;

@@ -167,7 +167,8 @@ public:
                     solution = result["result"]["solution"].get<std::vector<int>>();
                 }
                 bool winner = concludeRevision(rev, resultCode, std::move(solution));
-                if (winner) LOG(V2_INFO, "%s rev. %i (internally %i) won with res=%i\n", _name.c_str(), rev, subjob, resultCode);
+                if (winner) LOG(V2_INFO, "%s rev. %i (internally %i) won with res=%i solsize=%i\n",
+                    _name.c_str(), rev, subjob, resultCode, solution.size());
                 _task_pending = false;
             });
             if (response == JsonInterface::Result::DISCARD) {
