@@ -14,6 +14,7 @@
 #include "bitwuzla/cpp/bitwuzla.h"
 #include "bitwuzla/cpp/sat_solver_factory.h"
 #include "bitwuzla/cpp/main.h"
+
 #include <cstdint>
 #include <cstdio>
 
@@ -42,6 +43,7 @@ public:
     }
 
     JobResult solve() {
+        float startTime = Timer::elapsedSeconds();
 
         bitwuzla::Options options;
         bitwuzla::TermManager tm;
@@ -59,8 +61,11 @@ public:
             if (_params.timeLimit.isNonzero())
                 limitMillis = std::min(limitMillis, (unsigned long) (1000 * (_params.timeLimit() - Timer::elapsedSeconds())));
             snprintf(wcl, 63, "%lu", limitMillis);
-            argVec.push_back("--time-limit");
-            argVec.push_back(wcl);
+            // Unfortunately we can't give the timeout to Bitwuzla directly right now
+            // because Bitwuzla acknowledges timeouts via process exit, which we can't
+            // do as a job within a Mallob MPI process.
+            //argVec.push_back("--time-limit");
+            //argVec.push_back(wcl);
         }
         int argc = argVec.size();
         char** argv = argVec.data();
@@ -74,10 +79,19 @@ public:
             out = new std::ofstream(_params.smtSolutionFile());
         }
 
+        // If Bitwuzla fails to clean up after itself, we're gonna do it.
+        std::vector<BitwuzlaSatConnector*> solverPointers;
+        std::vector<bool> solversCleanedUp;
+
         // This instruction replaces the internal SAT solver of Bitwuzla with a Mallob-connected solver.
-        bzla::sat::ExternalSatSolver::new_sat_solver = [&, out, name=_name]() {
-            auto sat = new BitwuzlaSatConnector(_params, _api, _desc, name); // cleaned up by Bitwuzla
+        bzla::sat::ExternalSatSolver::new_sat_solver = [&, out, name=_name, startTime]() {
+            auto sat = new BitwuzlaSatConnector(_params, _api, _desc, name, startTime); // cleaned up by Bitwuzla
             //sat->outputModels(out); // for debugging
+            solverPointers.push_back(sat);
+            solversCleanedUp.push_back(false);
+            sat->setCleanupCallback([i = solverPointers.size()-1, &solversCleanedUp]() {
+                solversCleanedUp[i] = true;
+            });
             return sat;
         };
 
@@ -141,6 +155,10 @@ public:
             abort();
         }
 
+        for (int i = solverPointers.size()-1; i >= 0; i--) {
+            if (!solversCleanedUp[i]) delete solverPointers[i];
+        }
+
         if (_params.smtSolutionFile.isSet()) {
             delete out;
         }
@@ -150,6 +168,7 @@ public:
         res.revision = 0;
         res.result = 20;
         LOG(V2_INFO,"SMT return result\n");
+
         return res;
     }
 };

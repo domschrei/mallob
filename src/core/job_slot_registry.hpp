@@ -14,6 +14,15 @@ public:
     struct JobSlot {
         std::function<void()> callbackAtEviction;
         JobSlot(std::function<void()> cb) : callbackAtEviction(cb) {}
+        JobSlot(JobSlot&& other) {
+            callbackAtEviction = other.callbackAtEviction;
+            other.callbackAtEviction = {};
+        }
+        JobSlot& operator=(JobSlot&& other) {
+            callbackAtEviction = other.callbackAtEviction;
+            other.callbackAtEviction = {};
+            return *this;
+        }
         ~JobSlot() {
             if (callbackAtEviction) callbackAtEviction();
         }
@@ -32,7 +41,7 @@ public:
     }
     static void acquireSlot(std::function<void()> cbAtEviction) {
         assert(isInitialized());
-        _slots.push_back(cbAtEviction);
+        _slots.emplace_back(cbAtEviction);
         if (_slots.size() > _max_nb_slots)
             _slots.pop_front(); // triggers eviction callback
     }

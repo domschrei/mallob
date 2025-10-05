@@ -69,7 +69,7 @@ private:
     }
 
     void monoResponseCallback(nlohmann::json& response) {
-        if (_revision > _params.monoIncrements()) {
+        if (_params.monoIncrements() == 0 || _revision > _params.monoIncrements()) {
             _done = true;
             return;
         }

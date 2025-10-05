@@ -57,8 +57,10 @@ private:
 
     std::unique_ptr<WrappedSatJobStream> _stream_wrapper;
 
+    std::function<void()> _cb_cleanup;
+
 public:
-    BitwuzlaSatConnector(const Parameters& params, APIConnector& api, JobDescription& desc, const std::string& name) :
+    BitwuzlaSatConnector(const Parameters& params, APIConnector& api, JobDescription& desc, const std::string& name, float startTime) :
         bzla::sat::SatSolver(), _params(params), _desc(desc), _stream_id(getNextStreamId()),
         _name(name + ":" + std::to_string(_stream_id) + "(SAT)") {
 
@@ -81,13 +83,15 @@ public:
             return isTimeoutHit(params, desc, startTime);
         });
 
-        _start_time = Timer::elapsedSeconds();
+        _start_time = startTime;
     }
     virtual ~BitwuzlaSatConnector() {
         LOG(V2_INFO, "Done: %s\n", _name.c_str());
         SatJobStreamGarbageCollector::get().add(std::move(_stream_wrapper));
+        if (_cb_cleanup) _cb_cleanup();
     }
 
+    void setCleanupCallback(std::function<void()> cb) {_cb_cleanup = cb;}
     void outputModels(std::ostream* os) {
         _out_stream = os;
     }
@@ -111,6 +115,11 @@ public:
     }
 
     virtual bzla::Result solve() override {
+        if (isTimeoutHit(&_params, &_desc, _start_time)) {
+            _lits.clear();
+            _assumptions.clear();
+            return bzla::Result::UNKNOWN;
+        }
         if (_in_solved_state) return _result;
 
         _revision++;
