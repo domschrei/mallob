@@ -12,7 +12,7 @@ if [ ! -d bitwuzla ]; then
     mv bitwuzla-* bitwuzla
 fi
 cd bitwuzla
-    ./configure.py
+    ./configure.py --fpexp
     cd build
         ninja
     cd ..

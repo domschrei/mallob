@@ -48,6 +48,7 @@ private:
     bool _began_nontrivial_solving {false};
     std::vector<int> _backlog_lits;
     bool _finalized {false};
+    Mutex _mtx_finalize;
 
 public:
     MallobSatJobStreamProcessor(const Parameters& params, APIConnector& api, JobDescription& desc,
@@ -186,6 +187,7 @@ public:
     }
 
     virtual void finalize() override {
+        auto lock = _mtx_finalize.getLock();
         _finalized = true;
         SatJobStreamProcessor::finalize();
         if (!_began_nontrivial_solving) return;
@@ -197,15 +199,17 @@ public:
         nlohmann::json copy(_json_base);
         copy["done"] = true;
         // The callback is never called.
-        LOG(V2_INFO, "%s closing API\n", _name.c_str());
+        LOG(V4_VVER, "%s closing API\n", _name.c_str());
         _api.submit(copy, [&](nlohmann::json& result) {assert(false);});
-        LOG(V2_INFO, "%s closed API\n", _name.c_str());
+        LOG(V4_VVER, "%s closed API\n", _name.c_str());
     }
 
     void reinitialize() {
         if (_finalized || !_began_nontrivial_solving) return;
 
-        LOG(V2_INFO, "%s evicted: re-initialize\n", _name.c_str());
+        if (!_mtx_finalize.tryLock()) return; // already in the process of being finalized
+
+        LOG(V3_VERB, "%s evicted: re-initialize\n", _name.c_str());
         while (_task_pending) usleep(3000);
         if (!_incremental) return;
         if (!_json_base.contains("name")) return;
@@ -214,13 +218,14 @@ public:
         nlohmann::json copy(_json_base);
         copy["done"] = true;
         // The callback is never called.
-        LOG(V2_INFO, "%s closing API\n", _name.c_str());
+        LOG(V4_VVER, "%s closing API\n", _name.c_str());
         _api.submit(copy, [&](nlohmann::json& result) {assert(false);});
-        LOG(V2_INFO, "%s closed API\n", _name.c_str());
+        LOG(V4_VVER, "%s closed API\n", _name.c_str());
 
         _began_nontrivial_solving = false;
         _backlog_lits = _cb_retrieve_full_task().lits;
         _json_base = {};
+        _mtx_finalize.unlock();
     }
 
     void setGroupId(const std::string& groupId, int minVar = -1, int maxVar = -1) {
