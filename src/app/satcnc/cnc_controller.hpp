@@ -4,6 +4,7 @@
 #include "app/sat/data/definitions.hpp"
 #include "app/sat/stream/internal_sat_job_stream_processor.hpp"
 #include "app/sat/stream/wrapped_sat_job_stream.hpp"
+#include "core/job_slot_registry.hpp"
 #include "data/job_description.hpp"
 #include "data/job_result.hpp"
 #include "interface/api/api_registry.hpp"
@@ -42,6 +43,8 @@ public:
             _desc.getFormulaPayload(0),
             _desc.getFormulaPayload(0)+_desc.getFormulaPayloadSize(0));
         LOG(V2_INFO, "CNC formula: %s\n", StringUtils::getSummary(_base_formula, 20).c_str());
+
+        if (!JobSlotRegistry::isInitialized()) JobSlotRegistry::init(params);
     }
 
     // Solves the provided SAT formula by means of Cube-and-Conquer.

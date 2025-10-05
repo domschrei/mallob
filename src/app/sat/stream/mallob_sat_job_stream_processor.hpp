@@ -11,6 +11,7 @@
 
 #include "app/sat/data/formula_compressor.hpp"
 #include "app/sat/data/model_string_compressor.hpp"
+#include "core/job_slot_registry.hpp"
 #include "data/job_description.hpp"
 #include "interface/api/api_connector.hpp"
 #include "interface/json_interface.hpp"
@@ -46,6 +47,7 @@ private:
 
     bool _began_nontrivial_solving {false};
     std::vector<int> _backlog_lits;
+    bool _finalized {false};
 
 public:
     MallobSatJobStreamProcessor(const Parameters& params, APIConnector& api, JobDescription& desc,
@@ -79,6 +81,12 @@ public:
             LOG(V2_INFO, "%s awakes for rev. %i\n", _name.c_str(), task.rev);
             _began_nontrivial_solving = true;
             task.lits = std::move(_backlog_lits);
+
+            JobSlotRegistry::acquireSlot([&]() {
+                // When evicted, tear down the Mallob job and then re-initialize
+                // the interface as "didn't begin non-trivial solving yet"
+                reinitialize();
+            });
 
             _base_job_name = "satjob-" + std::to_string(_stream_id) + "-rev-";
             _json_base["user"] = _username;
@@ -178,6 +186,7 @@ public:
     }
 
     virtual void finalize() override {
+        _finalized = true;
         SatJobStreamProcessor::finalize();
         if (!_began_nontrivial_solving) return;
         while (_task_pending) usleep(3000);
@@ -191,6 +200,27 @@ public:
         LOG(V2_INFO, "%s closing API\n", _name.c_str());
         _api.submit(copy, [&](nlohmann::json& result) {assert(false);});
         LOG(V2_INFO, "%s closed API\n", _name.c_str());
+    }
+
+    void reinitialize() {
+        if (_finalized || !_began_nontrivial_solving) return;
+
+        LOG(V2_INFO, "%s evicted: re-initialize\n", _name.c_str());
+        while (_task_pending) usleep(3000);
+        if (!_incremental) return;
+        if (!_json_base.contains("name")) return;
+        _json_base["precursor"] = _username + std::string(".") + _json_base["name"].get<std::string>();
+        _json_base["name"] = _base_job_name + std::to_string(_subjob_counter++);
+        nlohmann::json copy(_json_base);
+        copy["done"] = true;
+        // The callback is never called.
+        LOG(V2_INFO, "%s closing API\n", _name.c_str());
+        _api.submit(copy, [&](nlohmann::json& result) {assert(false);});
+        LOG(V2_INFO, "%s closed API\n", _name.c_str());
+
+        _began_nontrivial_solving = false;
+        _backlog_lits = _cb_retrieve_full_task().lits;
+        _json_base = {};
     }
 
     void setGroupId(const std::string& groupId, int minVar = -1, int maxVar = -1) {

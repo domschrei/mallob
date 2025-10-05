@@ -20,7 +20,10 @@ public:
         std::string descLabel;
         float priority;
         Checksum chksum;
-        void integrate(SatTask& other) {
+        void integrate(const SatTask& other) {
+            integrate(SatTask(other));
+        }
+        void integrate(SatTask&& other) {
             assert(other.rev != rev);
             if (other.rev > rev) {
                 rev = other.rev;
@@ -55,6 +58,7 @@ public:
 protected:
     std::string _name;
     std::function<bool(int)> _terminator;
+    std::function<const SatTask&()> _cb_retrieve_full_task;
 
 private:
     Synchronizer& _sync;
@@ -67,7 +71,9 @@ public:
     virtual void setName(const std::string& baseName) {
         _name = baseName + ":base";
     }
-
+    virtual void setRetrieveFullTaskCallback(std::function<const SatTask&()> cb) {
+        _cb_retrieve_full_task = cb;
+    }
     virtual void setTerminator(const std::function<bool(int)>& terminator) {
         _terminator = terminator;
     }
@@ -80,10 +86,11 @@ public:
         _queue.markTerminated();
     }
 
-    void submit(int revision, std::vector<int>&& newLiterals, const std::vector<int>& assumptions,
-            const std::string& descriptionLabel = "", float priority = 0, Checksum chksum = {}) {
-
-        SatTask task {revision, newLiterals, assumptions, "", 1, {}};
+    void submit(const SatTask& task) {
+        submit(SatTask(task));
+    }
+    void submit(SatTask&& task) {
+        //SatTask task {revision, newLiterals, assumptions, "", 1, {}};
         _queue.pushBlocking(task);
     }
 

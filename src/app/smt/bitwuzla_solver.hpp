@@ -2,6 +2,7 @@
 #pragma once
 
 #include "app/smt/bitwuzla_sat_connector.hpp"
+#include "core/job_slot_registry.hpp"
 #include "data/job_description.hpp"
 #include "data/job_result.hpp"
 #include "interface/api/api_connector.hpp"
@@ -33,6 +34,8 @@ public:
             _name("#" + std::to_string(desc.getId()) + "(SMT)") {
 
         LOG(V2_INFO,"SMT Bitwuzla+Mallob %s\n", _name.c_str());
+
+        if (!JobSlotRegistry::isInitialized()) JobSlotRegistry::init(params);
     }
     ~BitwuzlaSolver() {
         LOG(V2_INFO, "Deleting SMT Bitwuzla+Mallob #%i\n", _desc.getId());

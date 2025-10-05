@@ -12,6 +12,7 @@
 #include "app/sat/data/definitions.hpp"
 #include "app/sat/job/sat_constants.h"
 #include "comm/mympi.hpp"
+#include "core/job_slot_registry.hpp"
 #include "data/job_description.hpp"
 #include "data/job_result.hpp"
 #include "data/job_transfer.hpp"
@@ -89,6 +90,9 @@ public:
         _params(params), _api(api), _desc(desc) {
 
         LOG(V2_INFO, "Mallob client-side MaxSAT solver, by Jeremias Berg & Dominik Schreiber\n");
+
+        if (!JobSlotRegistry::isInitialized()) JobSlotRegistry::init(params);
+
         parseFormula();
         pickEncodingStrategy();
     }

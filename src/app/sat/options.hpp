@@ -24,6 +24,7 @@ OPTION_GROUP(grpAppSat, "app/sat", "SAT solving options")
  OPT_STRING(groundTruthModel,               "gtm", "", "", "Ground truth model to test learned clauses against")
  OPT_INT(replay, "replay", "", 0, 0, 2, "0: nothing, 1: record solver threads' behavior, 2: replay solving")
  OPT_BOOL(internalStreamProcessor, "isp", "", true, "For incremental SAT job streams, run a local single-threaded SAT solver for latency hiding")
+ OPT_INT(jobSlots, "js", "", 0, 0, LARGE_INT, "Max. concurrent SAT job streams per client process (0: use # MPI processes)")
 
 OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration")
  OPT_INT(bufferedImportedClsGenerations,    "bicg", "buffered-imported-cls-generations", 4,        1,   LARGE_INT, 

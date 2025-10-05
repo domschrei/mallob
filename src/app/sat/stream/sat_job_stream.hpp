@@ -24,6 +24,8 @@ private:
     volatile bool _finalizing {false};
     volatile bool _idle {true};
 
+    SatJobStreamProcessor::SatTask _complete_task;
+
 public:
     SatJobStream(const std::string& baseName) : _name(baseName) {}
     ~SatJobStream() {
@@ -37,6 +39,7 @@ public:
     // Transfers ownership of the pointer.
     void addProcessor(SatJobStreamProcessor* processor) {
         processor->setName(_name);
+        processor->setRetrieveFullTaskCallback([this]() -> const SatJobStreamProcessor::SatTask& {return _complete_task;});
         Processor p {std::unique_ptr<SatJobStreamProcessor>(processor), std::unique_ptr<BackgroundWorker>(new BackgroundWorker())};
         p.second->run([&, processor = p.first.get(), bgWorker = p.second.get()]() {
             SatJobStreamProcessor::SatTask accumulatedTask;
@@ -45,7 +48,7 @@ public:
                 bool ok = processor->getQueue().pollBlocking(task);
                 if (!ok) break;
 
-                accumulatedTask.integrate(task);
+                accumulatedTask.integrate(std::move(task));
                 if (_sync.lastEndedRev.load(std::memory_order_relaxed) >= accumulatedTask.rev) {
                     continue;
                 }
@@ -74,10 +77,11 @@ public:
         _active_rev++;
         assert(_sync.resultQueue.empty());
 
+        SatJobStreamProcessor::SatTask task {_active_rev, newLiterals, assumptions, descriptionLabel, priority, chksum};
         for (auto& [proc, worker] : _processors) {
-            std::vector<int> litsCopy = newLiterals;
-            proc->submit(_active_rev, std::move(litsCopy), assumptions, descriptionLabel, priority, chksum);
+            proc->submit(task);
         }
+        _complete_task.integrate(std::move(task));
         _idle = false;
     }
     bool isIdle() const {

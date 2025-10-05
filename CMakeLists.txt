@@ -100,7 +100,7 @@ set(MALLOB_COREPLUSCOMM_SOURCES ${MALLOB_CORE_SOURCES}
     src/app/job.cpp src/app/app_registry.cpp src/app/app_message_subscription.cpp src/balancing/event_driven_balancer.cpp 
     src/balancing/request_matcher.cpp src/balancing/routing_tree_request_matcher.cpp src/comm/msg_queue/message_queue.cpp 
     src/comm/mpi_base.cpp src/comm/mympi.cpp src/comm/sysstate_unresponsive_crash.cpp src/core/scheduling_manager.cpp 
-    src/data/job_transfer.cpp src/scheduling/job_scheduling_update.cpp 
+    src/core/job_slot_registry.cpp src/data/job_transfer.cpp src/scheduling/job_scheduling_update.cpp
     CACHE INTERNAL "")
 
 # Use to debug
