@@ -148,7 +148,7 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
         // Check termination
         if (distTerm.triggered())
             Terminator::setTerminating();
-        if (monoJob && monoJob->done())
+        if (monoJob && monoJob->done() && client->getNbActiveJobs() == 0)
             Terminator::setTerminating();
         if (params.timeLimit() > 0 && Timer::elapsedSecondsCached() > params.timeLimit())
             Terminator::setTerminating();

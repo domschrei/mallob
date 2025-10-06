@@ -262,6 +262,9 @@ void SolverThread::runOnce() {
         abort();
     }
 
+    if (_solver.getSolverSetup().firstImportDelaySecs > 0)
+        _solver.setNextValidImportTime(Timer::elapsedSeconds() + _solver.getSolverSetup().firstImportDelaySecs);
+
     // Perform solving (blocking)
     LOGGER(_logger, V4_VVER, "BEGSOL rev. %i (chk %lu,%x, %i assumptions): %s\n", revision, hash.count(), hash.get(),
         aSize, StringUtils::getSummary(aLits, aSize).c_str());

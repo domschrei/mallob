@@ -188,6 +188,10 @@ bool PortfolioSolverInterface::fetchLearnedClause(Mallob::Clause& clauseOut, Gen
 	if (_replay.getMode() == SolvingReplay::REPLAY)
 		return _replay.replayImportCallback(clauseOut, mode);
 	bool success = !_clause_sharing_disabled;
+	if (success && _next_valid_import_time > 0) {
+		success = Timer::elapsedSeconds() >= _next_valid_import_time;
+		if (success) _next_valid_import_time = 0;
+	}
 	if (success) {
 		clauseOut = _import_manager->getClause(mode);
 		success = clauseOut.begin != nullptr && clauseOut.size >= 1;

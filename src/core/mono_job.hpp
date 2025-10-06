@@ -63,6 +63,7 @@ private:
             abort();
         };
         if (result == JsonInterface::Result::ACCEPT_CONCLUDE) {
+            LOG(V2_INFO, "Mono job done\n");
             _done = true;
             return;
         }
@@ -70,6 +71,7 @@ private:
 
     void monoResponseCallback(nlohmann::json& response) {
         if (_params.monoIncrements() == 0 || _revision > _params.monoIncrements()) {
+            LOG(V2_INFO, "Mono job done\n");
             _done = true;
             return;
         }
