@@ -91,7 +91,6 @@ struct SolverSetup {
 	bool incrementLbdBeforeImport {false};
 	int randomizeLbdBeforeImport {false};
 	bool adaptiveImportManager {true};
-	float firstImportDelaySecs {0};
 
 
 	// Certified UNSAT and proof production

@@ -184,9 +184,9 @@ void Cadical::diversify(int seed) {
 
 	// Disable clause import for the 0th solver thread in incremental solving
 	// for the lowest possible best-case response latencies.
-	if (_setup.isJobIncremental && _setup.doIncrementalSolving && _setup.globalId == 0
-		&& _setup.maxNumSolvers >= 8)
-		_clause_import_enabled = false;
+	//if (_setup.isJobIncremental && _setup.doIncrementalSolving && _setup.globalId == 0
+	//	&& _setup.maxNumSolvers >= 8)
+	//	_clause_import_enabled = false;
 
 	assert(okay);
 }

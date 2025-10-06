@@ -180,7 +180,6 @@ public:
 	// Within the solver, fetch a clause that was previously added as a learned clause.
 	bool fetchLearnedClause(Mallob::Clause& clauseOut, GenericClauseStore::ExportMode mode = GenericClauseStore::ANY);
 	std::vector<int> fetchLearnedUnitClauses();
-	void setNextValidImportTime(float time) {_next_valid_import_time = time;}
 
 	std::function<void(int)> _cb_result_found;
 	void setCallbackResultFound(std::function<void(int)> cb) {_cb_result_found = cb;}
@@ -222,8 +221,6 @@ private:
 
 	SolverStatistics _stats;
 	std::unique_ptr<GenericImportManager> _import_manager;
-	float _next_valid_import_time {0};
-	Mallob::Clause _tmp_cls;
 
 	SplitMix64Rng _rng;
 };

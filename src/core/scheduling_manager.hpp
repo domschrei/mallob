@@ -74,6 +74,10 @@ public:
 
     int getGlobalBalancingEpoch() const;
 
+    bool hasJobsLeftToDelete() const {
+        return !_job_registry.collectAllJobs().empty() || _job_registry.hasJobsLeftToDelete();
+    }
+
 private:
     void handleAdoptionOffer(MessageHandle& handle);
     void handleRejectionOfDirectedRequest(MessageHandle& handle);

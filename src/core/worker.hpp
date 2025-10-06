@@ -62,6 +62,9 @@ public:
     void init();
     void advance();
     void setHostComm(HostComm& hostComm) {_host_comm = &hostComm;}
+    bool hasJobsLeftToDelete() {
+        return _job_active || _sched_man.hasJobsLeftToDelete();
+    }
 
 private:
     void checkStats();
