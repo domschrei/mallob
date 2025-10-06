@@ -81,7 +81,14 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 
 	shweeper->shweepSetImportExportCallbacks();
 	shweeper->shweepSetWorkstealingCallback(this, &search_work_in_tree);
+
+
+
+	//Give an custom Sweep callback for begin_formula_report that only accepts the first shweepers formula and reports FALSE to all further solvers!
+	//This needs to be a function that can access the SweepJob, i.e. can't be set just within Kissat::
+
 	shweeper->shweepSetReportCallback(); //for kissat_report_dimacs
+    shweeper->solver->kissat_set_preprocessing_report_callback(shweeper->solver, shweeper, Kissat::begin_formula_report, Kissat::report_preprocessed_lit);
 
     // Basic configuration options for all solvers
     shweeper->set_option("quiet", 1);  //suppress any standard kissat messages
