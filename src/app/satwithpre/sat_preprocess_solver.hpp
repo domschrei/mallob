@@ -65,7 +65,7 @@ public:
     }
 
     JobResult solve() {
-        printf("Starting SATWITHPRE app\n");
+        LOG(V1_WARN, "Starting SATWITHPRE app\n");
         _time_of_activation = Timer::elapsedSeconds();
 
         if (_params.preprocessBalancing() >= 0) submitBaseJob();
@@ -166,12 +166,54 @@ private:
         return false;
     }
 
+
+    void submitBaseJob() {
+        auto& json = _base_job_submission;
+        json = {
+            {"user", "sat-" + std::string(toStr())},
+            {"name", std::string(toStr())+":base"},
+            {"priority", 1.000},
+            {"application", "SAT"}
+        };
+        if (_params.crossJobCommunication()) json["group-id"] = "1";
+        StaticStore<std::vector<int>>::insert(json["name"].get<std::string>(),
+            std::vector<int>(_desc.getFormulaPayload(0), _desc.getFormulaPayload(0)+_desc.getFormulaPayloadSize(0)));
+        json["internalliterals"] = json["name"].get<std::string>();
+        json["configuration"]["__NV"] = std::to_string(_desc.getAppConfiguration().fixedSizeEntryToInt("__NV"));
+        json["configuration"]["__NC"] = std::to_string(_desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
+        if (_desc.getWallclockLimit() > 0)
+            json["wallclock-limit"] = std::to_string(_desc.getWallclockLimit() - getAgeSinceActivation()) + "s";
+        if (_desc.getCpuLimit() > 0)
+            json["cpu-limit"] = std::to_string(_desc.getCpuLimit() - getAgeSinceActivation()) + "s";
+
+        LOG(V3_VERB, "SATWP Starting Base Job: %d Vars\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NV"));
+        LOG(V3_VERB, "SATWP Starting Base Job: %d Clauses\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
+
+    	// int base_procs = 2;
+        // json["max-demand"] = 2; //Test: Manually/hardcoded control number of PEs
+        // LOG(V3_VERB, "SATWP Starting Base Job: %d MPI Processes/Ranks allocated\n", base_procs);
+
+        auto copiedJson = json;
+        auto result = _api.submit(copiedJson, [&](nlohmann::json& response) {
+            // Job done
+            _base_job_response = std::move(response);
+            _base_job_done = true;
+        });
+        if (result != JsonInterface::Result::ACCEPT) {
+            LOG(V0_CRIT, "[ERROR] Cannot introduce mono job!\n");
+            abort();
+        }
+
+        _base_job_submitted = true;
+    }
+
+
     void submitSweepJob(std::vector<int>&& fPre) {
 
         assert(fPre.size() > 2);
         int nbClauses = fPre.back(); fPre.pop_back();
         int nbVars = fPre.back(); fPre.pop_back();
-        size_t preprocessedSize = fPre.size();
+        // size_t preprocessedSize = fPre.size();
 
         if (_params.compressFormula()) {
             auto out = FormulaCompressor::compress(fPre.data(), fPre.size(), 0, 0);
@@ -179,7 +221,7 @@ private:
         }
 
         //NOT copying the retraction code, because we are continuing the preprocessing with SWEEP,
-        //i.e. not retracting the base job yet
+        //i.e. not growing the sweep job or retracting the base job yet
 
         // drop original immediately
         // _time_of_retraction_start = Timer::elapsedSeconds();
@@ -202,7 +244,7 @@ private:
         json = {
             {"user", "sweep-" + std::string(toStr())},
             {"name", std::string(toStr())+":prepro:sweep"},
-            {"priority", _params.preprocessJobPriority()},
+            {"priority", _params.preprocessSweepPriority()},
             {"application", "SWEEP"},
         };
         if (_params.crossJobCommunication()) json["group-id"] = _desc.getGroupId();
@@ -218,6 +260,11 @@ private:
             json["cpu-limit"] = std::to_string(_desc.getCpuLimit() - getAgeSinceActivation()) + "s";
 
 
+    	// int sweep_procs = 2;
+        // json["max-demand"] = sweep_procs; //Test: SWEEP with only two PEs/Workers
+        // json["configuration"]["t"] = std::to_string(2); //Test: Only two threads per sweep worker
+        // LOG(V3_VERB, "SATWP Starting SWEEP Job: %d MPI Processes/Ranks allocated\n", sweep_procs);
+
         LOG(V3_VERB, "SATWP Starting SWEEP Job: %d Vars\n", nbVars);
         LOG(V3_VERB, "SATWP Starting SWEEP Job: %d Clauses\n", nbClauses);
 
@@ -232,42 +279,6 @@ private:
 
         _sweep_job_submitted = true;
 
-    }
-
-    void submitBaseJob() {
-        auto& json = _base_job_submission;
-        json = {
-            {"user", "sat-" + std::string(toStr())},
-            {"name", std::string(toStr())+":base"},
-            {"priority", 1.000},
-            {"application", "SAT"}
-        };
-        if (_params.crossJobCommunication()) json["group-id"] = "1";
-        StaticStore<std::vector<int>>::insert(json["name"].get<std::string>(),
-            std::vector<int>(_desc.getFormulaPayload(0), _desc.getFormulaPayload(0)+_desc.getFormulaPayloadSize(0)));
-        json["internalliterals"] = json["name"].get<std::string>();
-        json["configuration"]["__NV"] = std::to_string(_desc.getAppConfiguration().fixedSizeEntryToInt("__NV"));
-        json["configuration"]["__NC"] = std::to_string(_desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
-        if (_desc.getWallclockLimit() > 0)
-            json["wallclock-limit"] = std::to_string(_desc.getWallclockLimit() - getAgeSinceActivation()) + "s";
-        if (_desc.getCpuLimit() > 0)
-            json["cpu-limit"] = std::to_string(_desc.getCpuLimit() - getAgeSinceActivation()) + "s";
-
-        LOG(V3_VERB, "SATWP: Starting Base Job: %d Vars\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NV"));
-        LOG(V3_VERB, "SATWP: Starting Base Job: %d Clauses\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
-
-        auto copiedJson = json;
-        auto result = _api.submit(copiedJson, [&](nlohmann::json& response) {
-            // Job done
-            _base_job_response = std::move(response);
-            _base_job_done = true;
-        });
-        if (result != JsonInterface::Result::ACCEPT) {
-            LOG(V0_CRIT, "[ERROR] Cannot introduce mono job!\n");
-            abort();
-        }
-
-        _base_job_submitted = true;
     }
 
     void submitPreprocessedJob(std::vector<int>&& fPre) {

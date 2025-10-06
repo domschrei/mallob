@@ -25,7 +25,8 @@ void SweepJob::appl_start() {
 	_my_rank = getJobTree().getRank();
 	_my_index = getJobTree().getIndex();
 	_is_root = getJobTree().isRoot();
-	LOG(V2_INFO,"ß SweepJob application start: Rank %i, Index %i, is root? %i, Parent-Index %i, \n",   _my_rank, _my_index, _is_root, getJobTree().getParentIndex());
+	LOG(V2_INFO,"ß SweepJob application start: Rank %i, Index %i, is root? %i, Parent-Index %i, numWorkers=%d, numThreadsPerProcess=%d\n",
+		_my_rank, _my_index, _is_root, getJobTree().getParentIndex(), _params.numWorkers, _params.numThreadsPerProcess.val);
 	LOG(V2_INFO,"ß							 : num children %i\n", getJobTree().getNumChildren());
 	LOG(V2_INFO,"ß sweep-sharing-period=%i ms\n", _params.sweepSharingPeriod_ms.val);
     _metadata = getSerializedDescription(0)->data();
@@ -177,9 +178,9 @@ void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 		msg.treeIndexOfDestination = source;
 		msg.contextIdOfDestination = getJobComm().getContextIdOrZero(source);
         int sourceRank = getJobComm().getWorldRankOrMinusOne(source);
-		//Rank 3 already sent out a message to us, but it isnot yet found in WorldRank list for us to answer it!
+		//Rank 3 sent us a message, but it is not yet found in the WorldRank list so we can't yet answer it!
 		assert(msg.contextIdOfDestination != 0 ||
-			log_return_false("Error in TAG_RETURNING_STEAL_REQUEST! Invalid contextIdOfDestination==0. With source=%i, source_rank=%i, payload.size()=%i \n", source, sourceRank, msg.payload.size()));
+			log_return_false("Error in TAG_RETURNING_STEAL_REQUEST! Want to return an message, but invalid contextIdOfDestination==0. With source=%i, source_rank=%i, payload.size()=%i \n", source, sourceRank, msg.payload.size()));
 		getJobTree().send(source, MSG_SEND_APPLICATION_MESSAGE, msg);
 		return;
 	}
@@ -236,19 +237,24 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 			break;
 		}
 
-		if (_my_rank == 0 && localId == 0 && !_root_received_work) {
-			//Give all the work to the first solver.
-			//To know how much space we need to allocate for all variables, we assume that the maximum index of any variable corresponds to the total number of variables -1,
-			//i.e. that there are no holes in the numbering.
-			//This is an assumption that standard Kissat makes all the time, so we also do it here
-			const unsigned VARS = shweep_get_num_vars(shweeper->solver); //can be different than numVars here in C++ !! For example instant units are already propagated out.
+
+		 /*
+		  * The root node might not be rank 0 !! In Multi-Job environments, rank 0 might belong to another Job, for example the SAT Basejob
+		  * We just serve the initial work to whichever solver asks first
+		  */
+		if ( ! _shweepers_received_initial_work) {
+			//We need to know how much space to allocate to store each variable "idx" at the array position work[idx].
+			//i.e. we need to know max(idx).
+			//We assume that the maximum variable index corresponds to the total number of variables
+			//i.e. that there are no holes in kissats internal numbering. This is an assumption that standard Kissat makes all the time, so we also do it here
+			const unsigned VARS = shweep_get_num_vars(shweeper->solver); //this value can be different from numVars here in C++ !! Because kissat might havel aready propagated some units, etc.
 			shweeper->work_received_from_steal = std::vector<int>(VARS);
 			//the initial work is all variables
 			for (int idx = 0; idx < VARS; idx++) {
 				shweeper->work_received_from_steal[idx] = idx;
 			}
-			_root_received_work = true;
-			LOG(V2_INFO, "Initial work: Shweep root [%i](%i) requested work, got all %u variables\n", _my_rank, localId, VARS);
+			_shweepers_received_initial_work = true;
+			LOG(V2_INFO, "Initial work: Shweeper at [%i](%i) requested work, got all %u variables\n", _my_rank, localId, VARS);
 			break;
 
 		}
@@ -265,12 +271,21 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 			break;
 		}
 
+		int myTreeRank = getJobComm().getWorldRankOrMinusOne(_my_rank);
+		if (myTreeRank == -1) {
+			LOG(V2_INFO, "Rank %i is not yet in JobComm, waits with sending its request\n", _my_rank);
+			usleep(1000);
+			continue;
+		}
+
 		//Unsuccessful steal locally. Go global via MPI message
 		int recvIndex = _rng.randomInRange(0,getVolume());
         int targetRank = getJobComm().getWorldRankOrMinusOne(recvIndex);
 
+		LOG(V2_INFO, "getVolume()=%i, rndIndex=%i, targetRank=%i \n", getVolume(), recvIndex, targetRank);
+
         if (targetRank == -1) {
-        	// tree not fully built yet, try again
+        	//target rank not yet in JobTree, might need some more milliseconds to update, try again
 			usleep(100);
         	continue;
         }
@@ -282,6 +297,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 
 		if (getJobComm().getContextIdOrZero(targetRank)==0) {
 			//targetRank not yet listed in address list. Might happen for a short period just after it is spawned
+			usleep(100);
 			continue;
 		}
 
