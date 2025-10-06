@@ -188,13 +188,17 @@ bool PortfolioSolverInterface::fetchLearnedClause(Mallob::Clause& clauseOut, Gen
 	if (_replay.getMode() == SolvingReplay::REPLAY)
 		return _replay.replayImportCallback(clauseOut, mode);
 	bool success = !_clause_sharing_disabled;
-	if (success && _next_valid_import_time > 0) {
-		success = Timer::elapsedSeconds() >= _next_valid_import_time;
-		if (success) _next_valid_import_time = 0;
-	}
 	if (success) {
-		clauseOut = _import_manager->getClause(mode);
-		success = clauseOut.begin != nullptr && clauseOut.size >= 1;
+		if (_next_valid_import_time > 0) {
+			success = Timer::elapsedSeconds() >= _next_valid_import_time;
+			if (success) _next_valid_import_time = 0;
+		}
+		if (!_tmp_cls.begin) _tmp_cls = _import_manager->getClause(mode);
+		if (_tmp_cls.begin && (success || _tmp_cls.size-ClauseMetadata::numInts() == 1)) {
+			success = true;
+			clauseOut = _tmp_cls;
+			_tmp_cls.begin = 0;
+		} else success = false;
 	}
 	if (_replay.getMode() == SolvingReplay::RECORD)
 		_replay.recordImportCallback(success, clauseOut, mode);

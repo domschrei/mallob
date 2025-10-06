@@ -221,6 +221,7 @@ private:
 	SolverStatistics _stats;
 	std::unique_ptr<GenericImportManager> _import_manager;
 	float _next_valid_import_time {0};
+	Mallob::Clause _tmp_cls;
 
 	SplitMix64Rng _rng;
 };
