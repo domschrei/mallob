@@ -180,14 +180,14 @@ void PortfolioSolverInterface::setExtProbingLearnedClauseCallback(const ProbingL
 }
 
 void PortfolioSolverInterface::addLearnedClause(const Mallob::Clause& c) {
-	if (_clause_sharing_disabled) return;
+	if (!_clause_import_enabled) return;
 	_import_manager->addSingleClause(c);
 }
 
 bool PortfolioSolverInterface::fetchLearnedClause(Mallob::Clause& clauseOut, GenericClauseStore::ExportMode mode) {
 	if (_replay.getMode() == SolvingReplay::REPLAY)
 		return _replay.replayImportCallback(clauseOut, mode);
-	bool success = !_clause_sharing_disabled;
+	bool success = _clause_import_enabled;
 	if (success) {
 		if (_next_valid_import_time > 0) {
 			success = Timer::elapsedSeconds() >= _next_valid_import_time;
@@ -209,7 +209,7 @@ std::vector<int> PortfolioSolverInterface::fetchLearnedUnitClauses() {
 	if (_replay.getMode() == SolvingReplay::REPLAY)
 		return _replay.replayImportCallback();
 	std::vector<int> units;
-	if (!_clause_sharing_disabled) {
+	if (_clause_import_enabled) {
 		units = _import_manager->getUnitsBuffer();
 	}
 	if (_replay.getMode() == SolvingReplay::RECORD) {

@@ -40,6 +40,8 @@ protected:
 	LratConnector* _lrat {nullptr};
 	std::unique_ptr<OptimizingPropagator> _optimizer;
 	SolvingReplay _replay;
+	bool _clause_import_enabled = true;
+	bool _clause_export_enabled = true;
 
 // ************** INTERFACE TO IMPLEMENT **************
 
@@ -133,12 +135,13 @@ public:
 			int divCycleIdx = getDiversificationIndex() % numOriginalDiversifications;
 			if (divCycleIdx+1 == depth) {
 				LOGGER(_logger, V4_VVER, "Skip clause sharing\n");
-				_clause_sharing_disabled = true;
+				_clause_import_enabled = false;
+				_clause_export_enabled = false;
 			}
 		}
 	}
-	bool isClauseSharingEnabled() const {
-		return !_clause_sharing_disabled;
+	bool isClauseImportEnabled() const {
+		return _clause_import_enabled;
 	}
 
 	void addConditionalLit(int condLit) {assert(condLit != 0); _conditional_lits.push_back(condLit);}
@@ -169,7 +172,7 @@ public:
 	// The learned clauses might be added later or possibly never
 	void addLearnedClause(const Mallob::Clause& c);
 	void addLearnedClauses(BufferReader& reader, int revision) {
-		if (_clause_sharing_disabled) return;
+		if (!_clause_import_enabled) return;
 		_import_manager->setImportedRevision(revision);
 		_import_manager->performImport(reader);
 	}
@@ -214,7 +217,6 @@ private:
 	int _global_id;
 	int _local_id;
 	int _diversification_index;
-	bool _clause_sharing_disabled = false;
 	std::vector<int> _conditional_lits; // to append to each exported clause to make it global
 	std::atomic_bool _terminated = false;
 
