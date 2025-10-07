@@ -546,27 +546,19 @@ void Kissat::configureBoundedVariableAddition() {
 bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
     bool accept = nbVars != _setup.numVars || nbClauses != _setup.numOriginalClauses;
 
-    //For Sweep App: Only a single solver needs to report the formula, we choos the first that arrives here, and block all others
-    if (shweepDimacsReportLocalId) {
+    //For Sweep App: Only a single solver needs to report the formula, we choose the first solver on the root node that arrives here
+    //We only provided this callback to solvers on the root node, this is how we know that if we are here and a shweeper, its on the root node
+    if (is_shweeper) {
         int expected_unset = -1;
         bool weAreFirst = shweepDimacsReportLocalId->compare_exchange_strong(expected_unset, getLocalId());
         if (weAreFirst) {
-            LOG(V2_INFO, "Dimacs report: [?](%i) is first, was selected\n", getLocalId());
+            LOG(V2_INFO, "Dimacs report: [root](%i) is first, was selected\n", getLocalId());
             assert(accept); //todo: sidestep if formula is still identical and thus accept==false
         } else {
-            LOG(V2_INFO, "Dimacs report: [?](%i) is skipped\n", getLocalId());
+            LOG(V2_INFO, "Dimacs report: [root](%i) is skipped\n", getLocalId());
             accept = false;
         }
     }
-    // if (dimacsReportingLocalId && dimacsReportingLocalId->load() != -1) { //Somebody else is already reporting, no need for us
-        // LOG(V2_INFO, "Skipping [%i](%i) dimacs report: already going \n", getLocalId());
-        // accept = false;
-    // }
-    // if (dimacsReportingLocalId && dimacsReportingLocalId->load() == -1) { //We are the first to report, block for others
-        // dimacsReportingLocalId.
-        // _sweepJob->setDimacsReportingLocalId(getLocalId());
-        // LOG(V2_INFO, "Decided on [%i](%i) for dimacs report: first to arrive for reporting\n", _sweepJob->getMyMpiRank(), getLocalId());
-    // }
 
     if (accept) {
         nbPreprocessedVariables = nbVars;
@@ -598,6 +590,11 @@ void Kissat::addLiteralFromPreprocessing(int lit) {
 
 void Kissat::shweepSetDimacsReportPtr(std::shared_ptr<std::atomic<int>> ptr) {
     shweepDimacsReportLocalId = ptr;
+}
+
+
+void Kissat::setIsShweeper() {
+    is_shweeper = true;
 }
 // void Kissat::setSweepJob(const std::shared_ptr<SweepJob> sweepJob) {
    // _sweepJob = sweepJob;

@@ -38,10 +38,9 @@ private:
 
 	//#################################################
 	//Shweep
-	friend class SweepJob; //forward decl
-	// std::shared_ptr<SweepJob> _sweepJob;
+	bool is_shweeper = false;
+	friend class SweepJob; //fwd
 	std::vector<int> eq_up_buffer;    //transfer a single equivalence from C to C++
-
 
 	std::vector<int> eqs_from_broadcast_queued; //equivalences that came from the broadcast, but are not yet shown to the solver
 	std::vector<int> units_from_broadcast_queued;
@@ -49,16 +48,9 @@ private:
     std::vector<int> eqs_from_broadcast;  //equivalences that are currently shown to the solver, originating from broadcast
 	std::vector<int> units_from_broadcast;
 
-
     std::vector<int> eqs_to_share;    //accumulate exported equivalences for sharing
 	std::vector<int> units_to_share;
 
-	// bool shweep_eq_imports_available;
-	// bool shweep_unit_imports_available;
-	// const int MAX_SHWEEP_STORAGE_SIZE = 10000;
-
-
-	// std::vector<int> work_stolen_from_local_solver;
 	std::vector<int> work_received_from_steal;
 
 	bool shweeper_is_idle = false;
@@ -146,7 +138,7 @@ public:
 	friend void shweep_import_eqs(void* state, int** equivalences, int *eqs_size);
 	friend void shweep_import_units(void *state, int **units, int *unit_count);
 	void shweepSetDimacsReportPtr(std::shared_ptr<std::atomic<int>> field);
-
+	void setIsShweeper();
 
 	//Pass-through
 	void set_option(const std::string &option_name, int value);

@@ -29,9 +29,9 @@ void SweepJob::appl_start() {
 	_my_rank = getJobTree().getRank();
 	_my_index = getJobTree().getIndex();
 	_is_root = getJobTree().isRoot();
-	LOG(V2_INFO,"ß SweepJob application start: Rank %i, Index %i, is root? %i, Parent-Index %i, numThreadsPerProcess=%d\n",
-		_my_rank, _my_index, _is_root, getJobTree().getParentIndex(), _params.numThreadsPerProcess.val);
-	LOG(V2_INFO,"ß							 : num children %i\n", getJobTree().getNumChildren());
+	LOG(V2_INFO,"ß SweepJob application start: Rank %i, Index %i, is root? %i, Parent-Rank %i, Parent-Index %i, numThreadsPerProcess=%d\n",
+		_my_rank, _my_index, _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _params.numThreadsPerProcess.val);
+	LOG(V2_INFO,"ß num children %i\n", getJobTree().getNumChildren());
 	LOG(V2_INFO,"ß sweep-sharing-period=%i ms\n", _params.sweepSharingPeriod_ms.val);
     _metadata = getSerializedDescription(0)->data();
 	_last_sharing_timestamp = Timer::elapsedSeconds();
@@ -83,12 +83,16 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	setup.localId = localId;
 
 	std::shared_ptr<Kissat> shweeper(new Kissat(setup));
+	shweeper->setIsShweeper();
 
 	shweeper->shweepSetImportExportCallbacks();
-	shweeper->shweepSetReportCallback();
-    shweep_set_search_work_callback(shweeper->solver, this, search_work_in_tree);
-	shweeper->shweepSetDimacsReportPtr(_dimacsReportLocalId);
+    shweep_set_search_work_callback(shweeper->solver, this, search_work_in_tree); //passing functions directly here from SweepJob, bypassing Kissat
 
+	if (_is_root) {
+		//read out final formula at the root node
+		shweeper->shweepSetReportCallback();
+		shweeper->shweepSetDimacsReportPtr(_dimacsReportLocalId);
+	}
 
 	//Give an custom Sweep callback for begin_formula_report that only accepts the first shweepers formula and reports FALSE to all further solvers!
 	//This needs to be a function that can access the SweepJob, i.e. can't be set just within Kissat::
@@ -133,7 +137,7 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 
 		//To save RAM space, the final formula after sweeping is only saved in one Mallob Kissat shweeper instance
 		assert(_dimacsReportLocalId->load() != -1);
-		if (shweeper->getLocalId() == _dimacsReportLocalId->load()) {
+		if (_is_root && shweeper->getLocalId() == _dimacsReportLocalId->load()) {
 			_internal_result.id = getId();
 			_internal_result.revision = getRevision();
 			_internal_result.result= SAT; //technically its not SAT but just *some* information, but just calling it SAT helps to seamlessly pass it though the higher abstraction layers
@@ -254,10 +258,10 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 
 
 		 /*
-		  * The root node might not be rank 0 !! In Multi-Job environments, rank 0 might belong to another Job, for example the SAT Basejob
-		  * We just serve the initial work to whichever solver asks first
+		  * At the root node, we serve the initial work to whichever solver asks first
 		  */
-		if ( ! _shweepers_received_initial_work) {
+		if (_is_root && ! _root_provided_initial_work) {
+			_root_provided_initial_work = true;
 			//We need to know how much space to allocate to store each variable "idx" at the array position work[idx].
 			//i.e. we need to know max(idx).
 			//We assume that the maximum variable index corresponds to the total number of variables
@@ -268,7 +272,6 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 			for (int idx = 0; idx < VARS; idx++) {
 				shweeper->work_received_from_steal[idx] = idx;
 			}
-			_shweepers_received_initial_work = true;
 			LOG(V2_INFO, "Initial work: Shweeper at [%i](%i) requested work, got all %u variables\n", _my_rank, localId, VARS);
 			break;
 

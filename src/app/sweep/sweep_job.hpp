@@ -25,7 +25,7 @@ private:
     std::atomic_int _running_shweepers_count {0};
 	std::vector<int> _list_of_ids;
 
-    std::atomic_bool _shweepers_received_initial_work=false;
+    bool _root_provided_initial_work=false;
 	bool _terminate_all=false;
 
 	// static const int NUM_STEAL_METADATA = 1;
