@@ -48,11 +48,9 @@ public:
         bitwuzla::Options options;
         bitwuzla::TermManager tm;
 
-        std::vector<char*> argVec;
+        std::vector<std::string> argVec;
         argVec.push_back("./bitwuzla");
         argVec.push_back((char*) _problem_file.c_str());
-        argVec.push_back("--print-model");
-        argVec.push_back("-v");
         char wcl[64];
         if (_params.jobWallclockLimit.isNonzero() || _params.timeLimit.isNonzero()) {
             unsigned long limitMillis = INT32_MAX;
@@ -67,16 +65,26 @@ public:
             //argVec.push_back("--time-limit");
             //argVec.push_back(wcl);
         }
+        if (_params.bitwuzlaArgs.isSet()) {
+            stringstream ss(_params.bitwuzlaArgs());
+            string str;
+            while (getline(ss, str, ',')) {
+                LOG(V2_INFO, "SMT Appending Bitwuzla arg \"%s\"\n", str.c_str());
+                argVec.push_back(str);
+            }
+        }
         int argc = argVec.size();
-        char** argv = argVec.data();
+        std::vector<char*> v;
+        for (auto& str : argVec) v.push_back((char*) str.c_str());
+        char** argv = v.data();
 
         std::vector<std::string> args;
         bzla::main::Options main_options =
             bzla::main::parse_options(argc, argv, args);
 
         auto out = &std::cout;
-        if (_params.smtSolutionFile.isSet()) {
-            out = new std::ofstream(_params.smtSolutionFile());
+        if (_params.smtOutputFile.isSet()) {
+            out = new std::ofstream(getSmtOutputFilePath(_params, _desc.getId()));
         }
 
         // If Bitwuzla fails to clean up after itself, we're gonna do it.
@@ -159,7 +167,7 @@ public:
             if (!solversCleanedUp[i]) delete solverPointers[i];
         }
 
-        if (_params.smtSolutionFile.isSet()) {
+        if (_params.smtOutputFile.isSet()) {
             delete out;
         }
 
@@ -170,5 +178,9 @@ public:
         LOG(V2_INFO,"SMT return result\n");
 
         return res;
+    }
+
+    static std::string getSmtOutputFilePath(const Parameters& params, int jobId) {
+        return params.smtOutputFile() + (params.monoFilename.isSet() ? "" : "." + std::to_string(jobId));
     }
 };

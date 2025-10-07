@@ -9,4 +9,5 @@
 
 OPTION_GROUP(grpAppSmt, "app/smt", "SMT solving options")
 
-OPT_STRING(smtSolutionFile, "smt-sol-file", "", "", "Path to file to write SMT level solutions to")
+OPT_STRING(smtOutputFile, "smt-out-file", "", "", "Path to file to write SMT output and solutions to")
+OPT_STRING(bitwuzlaArgs, "bitwuzla-args", "", "--print-model,-v", "Additional comma-separated arguments (no whitespaces) to forward to Bitwuzla")
