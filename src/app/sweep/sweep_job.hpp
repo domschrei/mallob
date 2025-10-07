@@ -33,6 +33,7 @@ private:
     const int TAG_RETURNING_STEAL_REQUEST=1002;
 	struct WorkstealRequest {
 		int localId{-1};
+		int targetIndex{-1};
 		int targetRank{-1};
 		bool sent{false};
 		bool got_steal_response{false};
@@ -75,7 +76,7 @@ public:
     SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table);
     void appl_start() override;
     void appl_communicate() override;
-    void appl_communicate(int source, int mpiTag, JobMessage& msg) override;
+    void appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) override;
 
     int appl_solved() override            {return _solved_status;}
     JobResult&& appl_getResult() override {return std::move(_internal_result);}

@@ -86,20 +86,13 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	shweeper->setIsShweeper();
 
 	shweeper->shweepSetImportExportCallbacks();
-    shweep_set_search_work_callback(shweeper->solver, this, search_work_in_tree); //passing functions directly here from SweepJob, bypassing Kissat
+    shweep_set_search_work_callback(shweeper->solver, this, search_work_in_tree); //connecting directly between SweepJob and kissat-solver, bypassing Kissat::
 
 	if (_is_root) {
-		//read out final formula at the root node
+		//read out final formula only at the root node
 		shweeper->shweepSetReportCallback();
 		shweeper->shweepSetDimacsReportPtr(_dimacsReportLocalId);
 	}
-
-	//Give an custom Sweep callback for begin_formula_report that only accepts the first shweepers formula and reports FALSE to all further solvers!
-	//This needs to be a function that can access the SweepJob, i.e. can't be set just within Kissat::
-
-	// shweeper->shweepSetReportCallback(); //for kissat_report_dimacs
-	// kissat_set_preprocessing_report_callback(shweeper->solver, shweeper, shweeper->begin_formula_report, Kissat::report_preprocessed_lit);
-    // shweeper->solver->kissat_set_preprocessing_report_callback(shweeper->solver, shweeper, Kissat::begin_formula_report, Kissat::report_preprocessed_lit);
 
     // Basic configuration options for all solvers
     shweeper->set_option("quiet", 1);  //suppress any standard kissat messages
@@ -135,7 +128,6 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 		int res = shweeper->solve(0, nullptr);
 		LOG(V2_INFO, "# # Thread finished. Rank %i localId %i result %i # #\n", _my_rank, shweeper->getLocalId(), res);
 
-		//To save RAM space, the final formula after sweeping is only saved in one Mallob Kissat shweeper instance
 		assert(_dimacsReportLocalId->load() != -1);
 		if (_is_root && shweeper->getLocalId() == _dimacsReportLocalId->load()) {
 			_internal_result.id = getId();
@@ -174,11 +166,11 @@ void SweepJob::appl_communicate() {
 
 
 // React to an incoming message. (This becomes relevant only if you send custom messages)
-void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
+void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 	// LOG(V2_INFO, "Shweep rank %i: received custom message from source %i, mpiTag %i, msg.tag %i \n", _my_rank, source, mpiTag, msg.tag);
 	if (msg.returnedToSender) {
 		LOG(V2_INFO, "ß Error: received unexpected returnedToSender message during Sweep Job Workstealing!\n");
-		LOG(V2_INFO, "ß Error: source=%i mpiTag=%i, treeIdxOfSender=%i, treeIdxOfDestination=%i \n", source, mpiTag,  msg.treeIndexOfSender, msg.treeIndexOfDestination);
+		LOG(V2_INFO, "ß Error: source=%i mpiTag=%i, treeIdxOfSender=%i, treeIdxOfDestination=%i \n", sourceRank, mpiTag,  msg.treeIndexOfSender, msg.treeIndexOfDestination);
 		assert(false);
 	}
 	if (msg.tag == TAG_SEARCHING_WORK) {
@@ -186,7 +178,7 @@ void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 		int localId = msg.payload.front();
 		msg.payload.clear();
 
-		LOG(V2_INFO, "ß Received MPI steal request from [%i](%i) \n", source, localId);
+		LOG(V2_INFO, "ß Received MPI steal request from [%i](%i) \n", sourceRank, localId);
 		auto locally_stolen_work = stealWorkFromAnyLocalSolver();
 
 		msg.payload = std::move(locally_stolen_work);
@@ -194,13 +186,13 @@ void SweepJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
 
 		//send back to source
 		msg.tag = TAG_RETURNING_STEAL_REQUEST;
-		msg.treeIndexOfDestination = source;
-		msg.contextIdOfDestination = getJobComm().getContextIdOrZero(source);
-        int sourceRank = getJobComm().getWorldRankOrMinusOne(source);
-		//Rank 3 sent us a message, but it is not yet found in the WorldRank list so we can't yet answer it!
+		int sourceIndex = getJobComm().getInternalRankOrMinusOne(sourceRank);
+		msg.treeIndexOfDestination = sourceIndex;
+		msg.contextIdOfDestination = getJobComm().getContextIdOrZero(sourceIndex);
 		assert(msg.contextIdOfDestination != 0 ||
-			log_return_false("Error in TAG_RETURNING_STEAL_REQUEST! Want to return an message, but invalid contextIdOfDestination==0. With source=%i, source_rank=%i, payload.size()=%i \n", source, sourceRank, msg.payload.size()));
-		getJobTree().send(source, MSG_SEND_APPLICATION_MESSAGE, msg);
+			log_return_false("Error in TAG_RETURNING_STEAL_REQUEST! Want to return an message, but invalid contextIdOfDestination==0. "
+					"With sourceRank=%i, sourceIndex=%i, payload.size()=%i \n", sourceRank, sourceIndex, msg.payload.size()));
+		getJobTree().send(sourceRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 		return;
 	}
 
@@ -224,8 +216,8 @@ void SweepJob::sendMPIWorkstealRequests() {
 			JobMessage msg = getMessageTemplate();
 			msg.tag = TAG_SEARCHING_WORK;
 			//Need to add these two fields because we are doing arbitrary point-to-point communication
-			msg.treeIndexOfDestination = request.targetRank;
-			msg.contextIdOfDestination = getJobComm().getContextIdOrZero(request.targetRank);
+			msg.treeIndexOfDestination = request.targetIndex;
+			msg.contextIdOfDestination = getJobComm().getContextIdOrZero(request.targetIndex);
 			// if (msg.contextIdOfDestination==0) {
 				// rank has probably just tree is just not ready yet for this rank, immediately shut down the request for this rank
 				// request.got_steal_response = true;
@@ -289,40 +281,47 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 			break;
 		}
 
-		int myTreeRank = getJobComm().getWorldRankOrMinusOne(_my_rank);
-		if (myTreeRank == -1) {
-			LOG(V2_INFO, "Rank %i is not yet in JobComm, waits with sending its request\n", _my_rank);
+		int my_comm_rank = getJobComm().getWorldRankOrMinusOne(_my_index);
+
+		if (my_comm_rank == -1) {
+			LOG(V2_INFO, "Rank %i (Internal Index %i) is not yet in JobComm, waits with sending its request\n", _my_rank, _my_index);
+			LOG(V2_INFO, " with _my_index %i \n", _my_index);
+			LOG(V2_INFO, " with JobComm().size %i \n", getJobComm().size());
 			usleep(1000);
 			continue;
 		}
 
 		//Unsuccessful steal locally. Go global via MPI message
-		int recvIndex = _rng.randomInRange(0,getVolume());
-        int targetRank = getJobComm().getWorldRankOrMinusOne(recvIndex);
+		int targetIndex = _rng.randomInRange(0,getVolume());
+        int targetRank = getJobComm().getWorldRankOrMinusOne(targetIndex);
 
-		LOG(V2_INFO, "getVolume()=%i, rndIndex=%i, targetRank=%i \n", getVolume(), recvIndex, targetRank);
 
         if (targetRank == -1) {
         	//target rank not yet in JobTree, might need some more milliseconds to update, try again
+			LOG(V2_INFO, "Target not yet in JobTree. getVolume()=%i, rndTargetIndex=%i, rndTargetRank=%i \n", getVolume(), targetIndex, targetRank);
 			usleep(100);
         	continue;
         }
 
 		if (targetRank == _my_rank) {
-			// don't steal from ourselves, try again
+			// not stealing from ourselves, try again
 			continue;
 		}
 
-		if (getJobComm().getContextIdOrZero(targetRank)==0) {
-			//targetRank not yet listed in address list. Might happen for a short period just after it is spawned
+		if (getJobComm().getContextIdOrZero(targetIndex)==0) {
+			LOG(V2_INFO, "Context ID of target is missing. getVolume()=%i, rndTargetIndex=%i, rndTargetRank=%i, myIndex=%i, myRank=%i \n", getVolume(), targetIndex, targetRank, _my_index, _my_rank);
+			//target is not yet listed in address list. Might happen for a short period just after it is spawned
 			usleep(100);
 			continue;
 		}
+
+		LOG(V2_INFO, "Steal request to targetIndex %i, targetRank=%i \n", targetIndex, targetRank);
 
 		//Request will be handled by the MPI main thread, which will send an MPI message on our behalf
 		//because here we are in code executed by the kissat thread, which can cause problems for sending MPI messages
 		WorkstealRequest request;
 		request.localId = localId;
+		request.targetIndex = targetIndex;
 		request.targetRank = targetRank;
 		_worksteal_requests[localId] = request;
 		LOG(V2_INFO, "  [%i](%i) searches work globally\n", _my_rank, localId);
