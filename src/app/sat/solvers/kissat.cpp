@@ -1,4 +1,3 @@
-
 #include <assert.h>
 #include <bits/std_abs.h>
 #include <stdlib.h>
@@ -22,6 +21,7 @@ extern "C" {
 #include "kissat.hpp"
 #include "util/distribution.hpp"
 
+#include "app/sweep/sweep_job.hpp"
 
 
 
@@ -72,9 +72,10 @@ void report_preprocessed_lit(void* state, int lit) {
     ((Kissat*) state)->addLiteralFromPreprocessing(lit);
 }
 
-void report_database_lit(void *state, int lit) {
-    ((Kissat*) state)->addLiteralToShweepJob(lit);
-}
+// void report_database_lit(void *state, int lit) {
+    // ((Kissat*) state)->addLiteralToShweepJob(lit);
+// }
+
 
 
 Kissat::Kissat(const SolverSetup& setup)
@@ -435,9 +436,9 @@ void Kissat::shweepSetImportExportCallbacks() {
     shweep_set_unit_import_callback(solver, this, &shweep_import_units);
 }
 
-void Kissat::shweepSetWorkstealingCallback(void *SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, int *work_size, int local_id)) {
-    shweep_set_search_work_callback(solver, SweepJob_state, search_callback);
-}
+// void Kissat::shweepSetWorkstealingCallback(void *SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, int *work_size, int local_id)) {
+    // shweep_set_search_work_callback(solver, SweepJob_state, search_callback);
+// }
 
 
 
@@ -544,6 +545,29 @@ void Kissat::configureBoundedVariableAddition() {
 
 bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
     bool accept = nbVars != _setup.numVars || nbClauses != _setup.numOriginalClauses;
+
+    //For Sweep App: Only a single solver needs to report the formula, we choos the first that arrives here, and block all others
+    if (shweepDimacsReportLocalId) {
+        int expected_unset = -1;
+        bool weAreFirst = shweepDimacsReportLocalId->compare_exchange_strong(expected_unset, getLocalId());
+        if (weAreFirst) {
+            LOG(V2_INFO, "Dimacs report: [?](%i) is first, was selected\n", getLocalId());
+            assert(accept); //todo: sidestep if formula is still identical and thus accept==false
+        } else {
+            LOG(V2_INFO, "Dimacs report: [?](%i) is skipped\n", getLocalId());
+            accept = false;
+        }
+    }
+    // if (dimacsReportingLocalId && dimacsReportingLocalId->load() != -1) { //Somebody else is already reporting, no need for us
+        // LOG(V2_INFO, "Skipping [%i](%i) dimacs report: already going \n", getLocalId());
+        // accept = false;
+    // }
+    // if (dimacsReportingLocalId && dimacsReportingLocalId->load() == -1) { //We are the first to report, block for others
+        // dimacsReportingLocalId.
+        // _sweepJob->setDimacsReportingLocalId(getLocalId());
+        // LOG(V2_INFO, "Decided on [%i](%i) for dimacs report: first to arrive for reporting\n", _sweepJob->getMyMpiRank(), getLocalId());
+    // }
+
     if (accept) {
         nbPreprocessedVariables = nbVars;
         nbPreprocessedClausesAdvertised = nbClauses;
@@ -566,12 +590,22 @@ void Kissat::addLiteralFromPreprocessing(int lit) {
         preprocessedFormula.push_back(nbPreprocessedClausesReceived);
         setPreprocessedFormula(std::move(preprocessedFormula));
         setSolverInterrupt();
+
+
     }
 }
 
-void Kissat::addLiteralToShweepJob(int lit) {
-   formulaForShweeping.push_back(lit);
+
+void Kissat::shweepSetDimacsReportPtr(std::shared_ptr<std::atomic<int>> ptr) {
+    shweepDimacsReportLocalId = ptr;
 }
+// void Kissat::setSweepJob(const std::shared_ptr<SweepJob> sweepJob) {
+   // _sweepJob = sweepJob;
+// }
+
+// void Kissat::addLiteralToShweepJob(int lit) {
+   // formulaForShweeping.push_back(lit);
+// }
 
 Kissat::~Kissat() {
     if (solver) {

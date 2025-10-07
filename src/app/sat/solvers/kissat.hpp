@@ -15,10 +15,12 @@ extern "C" {
 #include "util/sys/threading.hpp"
 
 
+
 struct kissat;
 struct SolverSetup;
 struct SolverStatistics;
-struct sweeper;
+// class SweepJob;
+
 
 class Kissat : public PortfolioSolverInterface {
 
@@ -32,7 +34,12 @@ private:
 	Mallob::Clause learntClause;
     std::vector<int> producedClause;
 
+
+
+	//#################################################
 	//Shweep
+	friend class SweepJob; //forward decl
+	// std::shared_ptr<SweepJob> _sweepJob;
 	std::vector<int> eq_up_buffer;    //transfer a single equivalence from C to C++
 
 
@@ -50,17 +57,20 @@ private:
 	// bool shweep_unit_imports_available;
 	// const int MAX_SHWEEP_STORAGE_SIZE = 10000;
 
-	friend class SweepJob;
 
 	// std::vector<int> work_stolen_from_local_solver;
 	std::vector<int> work_received_from_steal;
 
 	bool shweeper_is_idle = false;
+	std::shared_ptr<std::atomic<int>> shweepDimacsReportLocalId;
 	// std::vector<char> stolen_done;
+	// std::vector<int> formulaForShweeping;
+	//##################################################
 
 
-	std::vector<int> formulaForShweeping;
-	// \Shweep
+
+
+
 
 	bool interruptionInitialized = false;
     bool interrupted = false;
@@ -130,15 +140,16 @@ public:
     friend void report_preprocessed_lit(void* state, int lit);
     friend int terminate_callback(void* state);
 
-	//Shared Sweeping (SWEEP App)
+	//Shared Sweeping / SWEEP App
 	friend void shweep_export_eq(void *state);
 	friend void shweep_export_unit(void *state, int unit);
 	friend void shweep_import_eqs(void* state, int** equivalences, int *eqs_size);
 	friend void shweep_import_units(void *state, int **units, int *unit_count);
+	void shweepSetDimacsReportPtr(std::shared_ptr<std::atomic<int>> field);
+
 
 	//Pass-through
 	void set_option(const std::string &option_name, int value);
-
 
 
 private:
@@ -157,10 +168,10 @@ private:
 	void shweepExportUnit(int unit);
 	void shweepImportEqs(int** equivalences, int *eqs_size);
 	void shweepImportUnits(int **units, int *unit_count);
-    void addLiteralToShweepJob(int lit);
+    // void addLiteralToShweepJob(int lit);
 
 	void shweepSetImportExportCallbacks();
-	void shweepSetWorkstealingCallback(void* SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, int *work_size, int local_id));
+	// void shweepSetWorkstealingCallback(void* SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, int *work_size, int local_id));
 
 	// void startSweepAppCallback();
 

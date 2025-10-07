@@ -6,6 +6,9 @@
 #include "util/ctre.hpp"
 #include "util/logger.hpp"
 
+extern "C" {
+#include "kissat/src/kissat.h"
+}
 
 SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table)
     : Job(params, setup, table)
@@ -21,12 +24,13 @@ void search_work_in_tree(void *SweepJob_state, unsigned **work, int *work_size, 
 }
 
 
+
 void SweepJob::appl_start() {
 	_my_rank = getJobTree().getRank();
 	_my_index = getJobTree().getIndex();
 	_is_root = getJobTree().isRoot();
-	LOG(V2_INFO,"ß SweepJob application start: Rank %i, Index %i, is root? %i, Parent-Index %i, numWorkers=%d, numThreadsPerProcess=%d\n",
-		_my_rank, _my_index, _is_root, getJobTree().getParentIndex(), _params.numWorkers, _params.numThreadsPerProcess.val);
+	LOG(V2_INFO,"ß SweepJob application start: Rank %i, Index %i, is root? %i, Parent-Index %i, numThreadsPerProcess=%d\n",
+		_my_rank, _my_index, _is_root, getJobTree().getParentIndex(), _params.numThreadsPerProcess.val);
 	LOG(V2_INFO,"ß							 : num children %i\n", getJobTree().getNumChildren());
 	LOG(V2_INFO,"ß sweep-sharing-period=%i ms\n", _params.sweepSharingPeriod_ms.val);
     _metadata = getSerializedDescription(0)->data();
@@ -49,6 +53,7 @@ void SweepJob::appl_start() {
 	LOG(V2_INFO, "[sweep] initialize broadcast object\n");
 	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(),
 		[this]() {contributeToAllReduceCallback();}, BCAST_INIT));
+
 
 
 	// LOG(V2_INFO,"ß Initializing baseMsg\n");
@@ -80,15 +85,17 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	std::shared_ptr<Kissat> shweeper(new Kissat(setup));
 
 	shweeper->shweepSetImportExportCallbacks();
-	shweeper->shweepSetWorkstealingCallback(this, &search_work_in_tree);
-
+	shweeper->shweepSetReportCallback();
+    shweep_set_search_work_callback(shweeper->solver, this, search_work_in_tree);
+	shweeper->shweepSetDimacsReportPtr(_dimacsReportLocalId);
 
 
 	//Give an custom Sweep callback for begin_formula_report that only accepts the first shweepers formula and reports FALSE to all further solvers!
 	//This needs to be a function that can access the SweepJob, i.e. can't be set just within Kissat::
 
-	shweeper->shweepSetReportCallback(); //for kissat_report_dimacs
-    shweeper->solver->kissat_set_preprocessing_report_callback(shweeper->solver, shweeper, Kissat::begin_formula_report, Kissat::report_preprocessed_lit);
+	// shweeper->shweepSetReportCallback(); //for kissat_report_dimacs
+	// kissat_set_preprocessing_report_callback(shweeper->solver, shweeper, shweeper->begin_formula_report, Kissat::report_preprocessed_lit);
+    // shweeper->solver->kissat_set_preprocessing_report_callback(shweeper->solver, shweeper, Kissat::begin_formula_report, Kissat::report_preprocessed_lit);
 
     // Basic configuration options for all solvers
     shweeper->set_option("quiet", 1);  //suppress any standard kissat messages
@@ -115,7 +122,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 
 void SweepJob::startShweeper(KissatPtr shweeper) {
 	// LOG(V2_INFO,"ß Calling new thread\n");
-	std::future<void> fut_shweeper = ProcessWideThreadPool::get().addTask([this, shweeper]() { //Changed [&] to [this, shweeper]!! (nicco)
+	std::future<void> fut_shweeper = ProcessWideThreadPool::get().addTask([this, shweeper]() { //Changed from [&] to [this, shweeper]!! (nicco)
 		// LOG(V2_INFO, "Start Thread (r %i, id %i)\n", _my_rank, shweeper->getLocalId());
 		_running_shweepers_count++;
 		loadFormula(shweeper);
@@ -124,16 +131,17 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 		int res = shweeper->solve(0, nullptr);
 		LOG(V2_INFO, "# # Thread finished. Rank %i localId %i result %i # #\n", _my_rank, shweeper->getLocalId(), res);
 
-		//Hardcoded for now: Only specifically the rank=0 id=0 solver reports the final formula
-		if (_my_rank == 0 && shweeper->getLocalId() == 0 ) {
+		//To save RAM space, the final formula after sweeping is only saved in one Mallob Kissat shweeper instance
+		assert(_dimacsReportLocalId->load() != -1);
+		if (shweeper->getLocalId() == _dimacsReportLocalId->load()) {
 			_internal_result.id = getId();
 			_internal_result.revision = getRevision();
-			_internal_result.result= SAT; //technically its not SAT but just *some* information, but to elegantly pass the higher abstraction layers, declare it SAT for them
+			_internal_result.result= SAT; //technically its not SAT but just *some* information, but just calling it SAT helps to seamlessly pass it though the higher abstraction layers
 			std::vector<int> formula = shweeper->extractPreprocessedFormula();
 			_internal_result.setSolutionToSerialize(formula.data(), formula.size()); //Format: [Clauses, #Vars, #Clauses]
-			LOG(V2_INFO, "# # [0](0) Serialized final formula, SolutionSize=%i\n",_internal_result.getSolutionSize());
+			LOG(V2_INFO, "# # [%i](%i) Serialized final formula, SolutionSize=%i\n", _my_rank, _dimacsReportLocalId->load(), _internal_result.getSolutionSize());
 			for (int i=0; i<30; i++) {
-				LOG(V2_INFO, "Shweep [0](0) final Formula peek %i: %i \n", i, _internal_result.getSolution(i));
+				LOG(V2_INFO, "result Formula peek %i: %i \n", i, _internal_result.getSolution(i));
 			}
 			_solved_status = SAT;
 		}
@@ -339,9 +347,9 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 void SweepJob::initiateNewSharingRound() {
 	if (!_bcast) return;
 
-	LOG(V2_INFO, "time %f\n", Timer::elapsedSeconds());
-	LOG(V2_INFO, "last %f\n", _last_sharing_timestamp);
-	LOG(V2_INFO, "l+p  %f\n", _last_sharing_timestamp + _params.sweepSharingPeriod_ms.val/1000.0);
+	// LOG(V2_INFO, "time %f\n", Timer::elapsedSeconds());
+	// LOG(V2_INFO, "last %f\n", _last_sharing_timestamp);
+	// LOG(V2_INFO, "l+p  %f\n", _last_sharing_timestamp + _params.sweepSharingPeriod_ms.val/1000.0);
 
 	if (Timer::elapsedSeconds() < _last_sharing_timestamp + _params.sweepSharingPeriod_ms.val/1000.0)
 		return;
@@ -534,6 +542,19 @@ std::vector<int> SweepJob::getRandomIdPermutation(int length) {
 	// }
 	// *lit1 = _eqs_from_broadcast[2*eq_nr];
 	// *lit2 = _eqs_from_broadcast[2*eq_nr + 1];
+// }
+
+
+// bool SweepJob::isDimacsReportStarted() {
+	// return _dimacs_report_started;
+// }
+
+// void SweepJob::setDimacsReportStarted() {
+	// _dimacs_report_started = true;
+// }
+
+// void SweepJob::setDimacsReportingLocalId(int local_id) {
+	// _dimacs_reporting_local_id = local_id;
 // }
 
 void SweepJob::loadFormula(KissatPtr shweeper) {

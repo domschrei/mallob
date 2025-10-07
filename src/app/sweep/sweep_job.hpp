@@ -47,8 +47,8 @@ private:
     const int BCAST_INIT{1};
     const int ALLRED{2};
 
-	bool _started_sharing = false;
-	int _sharing_round = 0;
+	// bool _started_sharing = false;
+	// int _sharing_round = 0;
 
 	//Positions where the additional metadata is stored in each shared element [..., eqs_size, units_size, all_idle]
 	static const int NUM_SHARING_METADATA = 3;
@@ -56,7 +56,7 @@ private:
 	static const int UNITS_SIZE_POS = 2;
 	static const int IDLE_STATUS_POS = 1;
 
-    std::vector<int> _eqs_from_broadcast;//accumulate received equivalences to import in local solver
+    std::vector<int> _eqs_from_broadcast;  //store received equivalences to copy to individual solvers
 	std::vector<int> _units_from_broadcast;
 
     // static const int MSG_SWEEP = 100; // internal message tag
@@ -64,6 +64,10 @@ private:
 
 	static const int INVALID_LIT = UINT_MAX;
 
+	std::shared_ptr<std::atomic<int>> _dimacsReportLocalId = std::make_shared<std::atomic<int>>(-1);
+	// bool _dimacs_report_started=false;
+	// int _dimacs_reporting_local_id=-1;
+	// std::vector<int> _sweptFormula;
 	// std::vector<int> _processedFormula;
 
 
@@ -86,6 +90,12 @@ public:
 
     friend void search_work_in_tree(void* SweepJob_state, unsigned **work, int *work_size, int local_id);
 	// friend void import_next_equivalence(void *SweepJobState, int *last_imported_round, int eq_nr, unsigned *lit1, unsigned *lit2);
+
+	// bool isDimacsReportStarted();
+	// void setDimacsReportStarted();
+	// void setDimacsReportingLocalId(int local_id);
+	// std::shared_ptr<Kissat> _reporting_Kissat_obj = nullptr;
+
 
 private:
     // void advanceSweepMessage(JobMessage& msg);
