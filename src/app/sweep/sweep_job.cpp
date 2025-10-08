@@ -19,7 +19,7 @@ SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTa
 }
 
 
-void search_work_in_tree(void *SweepJob_state, unsigned **work, int *work_size, int local_id) {
+void search_work_in_tree(void *SweepJob_state, unsigned **work, int *work_size, int local_id) { //callback from kissat
     ((SweepJob*) SweepJob_state)->searchWorkInTree(work, work_size, local_id);
 }
 
@@ -43,11 +43,11 @@ void SweepJob::appl_start() {
 	for (int localId=0; localId < _params.numThreadsPerProcess.val; ++localId) {
 		_list_of_ids.push_back(localId);
 	}
-	//this broadcast object is used to initiate an all-reduction by first "pinging" each processes currently in the tree reachable by the root node
-	//the ping clarifies the tree structure, and provides a callback to contribute to the all-reduction
+	//a broadcast object is used to initiate an all-reduction by first pinging each processes currently reachable by the root node
+	//the ping detects the current tree structure and provides a callback to contribute to the all-reduction
 	LOG(V2_INFO, "[sweep] initialize broadcast object\n");
 	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {contributeToAllReduceCallback();}, BCAST_INIT));
-	//Starting individual Kissat threads, which immediately jump into the sweeping algorithm
+	//Start individual Kissat threads, which immediately jump into the sweeping algorithm
 	for (int localId=0; localId < _params.numThreadsPerProcess.val; localId++) {
 		auto shweeper = createNewShweeper(localId);
 		_shweepers.push_back(shweeper);
@@ -70,7 +70,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	shweeper->setIsShweeper();
 
 	shweeper->shweepSetImportExportCallbacks();
-    shweep_set_search_work_callback(shweeper->solver, this, search_work_in_tree); //here we cnnect directly between SweepJob and kissat-solver, bypassing Kissat::
+    shweep_set_search_work_callback(shweeper->solver, this, search_work_in_tree); //here we connect directly between SweepJob and kissat-solver, bypassing Kissat::
 
 	if (_is_root) {
 		//read out final formula only at the root node
@@ -84,7 +84,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
     // _shweeper->set_option("log", 0);//extensive logging
     shweeper->set_option("check", 0);  // do not check model or derived clauses
     shweeper->set_option("profile",3); // do detailed profiling how much time we spent where
-	shweeper->set_option("seed", 0);   //keep seeds identical and constant for now, for easier debugging
+	shweeper->set_option("seed", 0);   //keep seeds constant and identical for now, for easier debugging
 
 	//Specific for Mallob interaction
 	shweeper->set_option("mallob_custom_sweep_verbosity", 2); //Shweeper verbosity 0..4
@@ -96,7 +96,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	//Specific for clean sweep run
 	shweeper->set_option("preprocess", 0); //skip other preprocessing stuff after shweep finished
 	// shweeper->set_option("probe", 1);      //there is some cleanup-probing at the end of the sweeping. keep it?
-	shweeper->set_option("substitute", 0); //default anyways, but keep explicitly here, applies equivalence substitutions at the end
+	shweeper->set_option("substitute", 1); //shoul be 1. is default anyways, but keep explicitly here, to apply equivalence substitutions at the end
 	shweeper->set_option("luckyearly", 0);
 	shweeper->set_option("luckylate", 0);
 

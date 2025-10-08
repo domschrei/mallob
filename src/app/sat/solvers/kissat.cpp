@@ -543,11 +543,12 @@ void Kissat::configureBoundedVariableAddition() {
     kissat_set_option(solver, "factorexport", 1);
 }
 
+//Callback Called from both sequential preprocessing as well as the shared sweeping.
 bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
     bool accept = nbVars != _setup.numVars || nbClauses != _setup.numOriginalClauses;
 
-    //For Sweep App: Only a single solver needs to report the formula, we choose the first solver on the root node that arrives here
-    //We only provided this callback to solvers on the root node, this is how we know that if we are here and a shweeper, its on the root node
+    //For Sweeping only: Only a single solver needs to report the formula. We choose the first solver on the root node that arrives here
+    //We only provided this callback to solvers on the root node in the first place, so all arriving here are on root
     if (is_shweeper) {
         int expected_unset = -1;
         bool weAreFirst = shweepDimacsReportLocalId->compare_exchange_strong(expected_unset, getLocalId());
