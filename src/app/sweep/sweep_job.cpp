@@ -24,7 +24,6 @@ void search_work_in_tree(void *SweepJob_state, unsigned **work, int *work_size, 
 }
 
 
-
 void SweepJob::appl_start() {
 	_my_rank = getJobTree().getRank();
 	_my_index = getJobTree().getIndex();
@@ -35,34 +34,20 @@ void SweepJob::appl_start() {
 	LOG(V2_INFO,"ß sweep-sharing-period=%i ms\n", _params.sweepSharingPeriod_ms.val);
     _metadata = getSerializedDescription(0)->data();
 	_last_sharing_timestamp = Timer::elapsedSeconds();
-
 	//do not trigger a send on the initial dummy worksteal requests
 	_worksteal_requests.resize(_params.numThreadsPerProcess.val);
 	for (auto &request : _worksteal_requests) {
 		request.sent = true;
 	}
-
-	//IDs that will be shuffled for each workstealing request
+	//the IDs will be shuffled for each workstealing request
 	for (int localId=0; localId < _params.numThreadsPerProcess.val; ++localId) {
 		_list_of_ids.push_back(localId);
 	}
-
-
-	//this broadcast object is used to "ping" the processes currently in the tree reachable by the root node
-	//the ping provides them a callback, where they contribute their local element to the allreduction
+	//this broadcast object is used to initiate an all-reduction by first "pinging" each processes currently in the tree reachable by the root node
+	//the ping clarifies the tree structure, and provides a callback to contribute to the all-reduction
 	LOG(V2_INFO, "[sweep] initialize broadcast object\n");
-	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(),
-		[this]() {contributeToAllReduceCallback();}, BCAST_INIT));
-
-
-
-	// LOG(V2_INFO,"ß Initializing baseMsg\n");
-	// JobMessage baseMsg = getMessageTemplate();
-	// baseMsg.tag = ALLRED;
-	// _red.reset(new JobTreeAllReduction(getJobTree().getSnapshot(), baseMsg, std::vector<int>(), aggregateContributions));
-	// _red->setCareAboutParent();
-
-	//Starting individual threads
+	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {contributeToAllReduceCallback();}, BCAST_INIT));
+	//Starting individual Kissat threads, which immediately jump into the sweeping algorithm
 	for (int localId=0; localId < _params.numThreadsPerProcess.val; localId++) {
 		auto shweeper = createNewShweeper(localId);
 		_shweepers.push_back(shweeper);
@@ -73,7 +58,6 @@ void SweepJob::appl_start() {
 }
 
 std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
-	// LOG(V2_INFO,"ß Creating new shweeper %i \n", localId);
 	const JobDescription& desc = getDescription();
 	SolverSetup setup;
 	setup.logger = &Logger::getMainInstance();
@@ -86,7 +70,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	shweeper->setIsShweeper();
 
 	shweeper->shweepSetImportExportCallbacks();
-    shweep_set_search_work_callback(shweeper->solver, this, search_work_in_tree); //connecting directly between SweepJob and kissat-solver, bypassing Kissat::
+    shweep_set_search_work_callback(shweeper->solver, this, search_work_in_tree); //here we cnnect directly between SweepJob and kissat-solver, bypassing Kissat::
 
 	if (_is_root) {
 		//read out final formula only at the root node
@@ -94,7 +78,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 		shweeper->shweepSetDimacsReportPtr(_dimacsReportLocalId);
 	}
 
-    // Basic configuration options for all solvers
+    //Basic configuration
     shweeper->set_option("quiet", 1);  //suppress any standard kissat messages
     shweeper->set_option("verbose", 0);//the native kissat verbosity
     // _shweeper->set_option("log", 0);//extensive logging
@@ -102,15 +86,17 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
     shweeper->set_option("profile",3); // do detailed profiling how much time we spent where
 	shweeper->set_option("seed", 0);   //keep seeds identical and constant for now, for easier debugging
 
+	//Specific for Mallob interaction
 	shweeper->set_option("mallob_custom_sweep_verbosity", 2); //Shweeper verbosity 0..4
 	shweeper->set_option("mallob_is_shweeper", 1); //Make this Kissat solver a pure Distributed Sweeping Solver. Jumps directly to distributed sweeping and bypasses everything else
 	shweeper->set_option("sweepcomplete", 1);      //full sweeping, deactivates any tick limits
-	shweeper->set_option("mallob_local_id", localId);
+	shweeper->set_option("mallob_local_id", localId); //for debugging mostly, keeping track
 	shweeper->set_option("mallob_rank", _my_rank);
 
-	//Skip stuff after Sweeping and before formula reporting
-	shweeper->set_option("preprocess", 0);
+	//Specific for clean sweep run
+	shweeper->set_option("preprocess", 0); //skip other preprocessing stuff after shweep finished
 	// shweeper->set_option("probe", 1);      //there is some cleanup-probing at the end of the sweeping. keep it?
+	shweeper->set_option("substitute", 0); //default anyways, but keep explicitly here, applies equivalence substitutions at the end
 	shweeper->set_option("luckyearly", 0);
 	shweeper->set_option("luckylate", 0);
 
@@ -128,7 +114,8 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 		int res = shweeper->solve(0, nullptr);
 		LOG(V2_INFO, "# # Thread finished. Rank %i localId %i result %i # #\n", _my_rank, shweeper->getLocalId(), res);
 
-		assert(_dimacsReportLocalId->load() != -1);
+
+		assert( ! _is_root || _dimacsReportLocalId->load() != -1);
 		if (_is_root && shweeper->getLocalId() == _dimacsReportLocalId->load()) {
 			_internal_result.id = getId();
 			_internal_result.revision = getRevision();
@@ -270,14 +257,14 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 		}
 
 		//Try to steal locally from shared memory
-		LOG(V2_INFO, "  [%i](%i) searches work locally \n", _my_rank, localId);
+		LOG(V2_INFO, "  [%i](%i) searching work locally (Volumen %i) \n", _my_rank, localId, getVolume());
 		auto stolen_work = stealWorkFromAnyLocalSolver();
 
 		//Successful local steal
 		if ( ! stolen_work.empty()) {
 			//store steal data persistently in C++, such that C can keep operating on that memory segment
 			shweeper->work_received_from_steal = std::move(stolen_work);
-			LOG(V2_INFO, "%i variables sent within [%i] to (%i) \n", shweeper->work_received_from_steal.size(), _my_rank, localId);
+			LOG(V2_INFO, "Within [%i] %i variables sent to (%i) \n", _my_rank, shweeper->work_received_from_steal.size(), localId);
 			break;
 		}
 
@@ -334,7 +321,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 		//Successful steal if size > 0
 		if ( ! _worksteal_requests[localId].stolen_work.empty()) {
 			shweeper->work_received_from_steal = std::move(_worksteal_requests[localId].stolen_work);
-			LOG(V2_INFO, "%i variables received by [%i](%i) sent from [%i] \n", shweeper->work_received_from_steal.size(), _my_rank, localId,targetRank);
+			LOG(V2_INFO, "[%i](%i) received %i variables from [%i] \n", _my_rank, localId,shweeper->work_received_from_steal.size(), targetRank);
 			break;
 		}
 		//Unsuccessful global steal, try again

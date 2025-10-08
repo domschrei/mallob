@@ -553,7 +553,8 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
         bool weAreFirst = shweepDimacsReportLocalId->compare_exchange_strong(expected_unset, getLocalId());
         if (weAreFirst) {
             LOG(V2_INFO, "Dimacs report: [root](%i) is first, was selected\n", getLocalId());
-            assert(accept); //todo: sidestep if formula is still identical and thus accept==false
+            LOG(V2_INFO, "Accept shweeper formula? %i.  (%i --> %i vars) (%i --> %i clauses) \n", accept, _setup.numVars, nbVars, _setup.numOriginalClauses, nbClauses);
+            // assert(accept); //todo: sidestep if formula is still identical and thus accept==false
         } else {
             LOG(V2_INFO, "Dimacs report: [root](%i) is skipped\n", getLocalId());
             accept = false;
