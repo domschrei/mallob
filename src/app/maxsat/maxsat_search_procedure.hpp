@@ -14,6 +14,7 @@
 #include "app/sat/data/theories/theory_specification.hpp"
 #include "app/sat/job/sat_constants.h"
 #include "app/sat/stream/sat_job_stream_garbage_collector.hpp"
+#include "app/sat/stream/sat_job_stream_processor.hpp"
 #include "app/sat/stream/wrapped_sat_job_stream.hpp"
 #include "interface/api/api_connector.hpp"
 #include "rustsat.h"
@@ -114,7 +115,13 @@ public:
         _stream_wrapper->stream.addProcessor(_stream_wrapper->mallobProcessor);
 
         if (_params.internalStreamProcessor()) {
-            auto internalProcessor = new InternalSatJobStreamProcessor(true, _stream_wrapper->stream.getSynchronizer());
+            SolverSetup setup;
+            setup.baseSeed = _params.seed();
+            setup.jobId = _desc.getId();
+            setup.isJobIncremental = true;
+            setup.onTheFlyChecking = _params.onTheFlyChecking();
+            setup.onTheFlyCheckModel = _params.onTheFlyCheckModel();
+            auto internalProcessor = new InternalSatJobStreamProcessor(setup, _stream_wrapper->stream.getSynchronizer());
             _stream_wrapper->stream.addProcessor(internalProcessor);
         }
 
@@ -251,14 +258,14 @@ public:
             _initialized = true;
         }
 
-        _stream_wrapper->stream.solveNonblocking(std::move(_lits_to_add), _assumptions_to_set,
+        _stream_wrapper->stream.solveNonblocking({{}, std::move(_lits_to_add), _assumptions_to_set,
             _desc_label_next_call,
             // TODO still leading to error at volume_calculator.hpp:137:
             // Let the position of the tested bound influence the job's priority
             // as a tie-breaker for the scheduler - considering the highest bounds
             // as the most useful to give resources to.
             // 1.0f + 0.01f * (_current_bound - _instance.lowerBound) / (float) (_instance.upperBound - _instance.lowerBound));
-            0, hash);
+            0, hash});
         _lits_to_add.clear();
         _assumptions_to_set.clear();
         _desc_label_next_call = "";

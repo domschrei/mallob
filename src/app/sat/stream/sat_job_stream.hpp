@@ -61,23 +61,20 @@ public:
         _processors.push_back(std::move(p));
     }
 
-    std::pair<int, std::vector<int>> solve(std::vector<int>&& newLiterals, const std::vector<int>& assumptions,
-            const std::string& descriptionLabel = "", float priority = 0, Checksum chksum = {}) {
+    std::pair<int, std::vector<int>> solve(SatJobStreamProcessor::SatTask&& task) {
 
-        solveNonblocking(std::move(newLiterals), assumptions, descriptionLabel, priority, chksum);
+        solveNonblocking(std::move(task));
         return getNonblockingSolveResult();
     }
 
-    void solveNonblocking(std::vector<int>&& newLiterals, const std::vector<int>& assumptions,
-            const std::string& descriptionLabel = "", float priority = 0, Checksum chksum = {}) {
+    void solveNonblocking(SatJobStreamProcessor::SatTask&& task) {
 
-        assert(newLiterals.empty() || newLiterals.front() != 0);
-        assert(newLiterals.empty() || newLiterals.back() == 0);
+        assert(task.lits.empty() || task.lits.front() != 0);
 
         _active_rev++;
         assert(_sync.resultQueue.empty());
+        task.rev = _active_rev;
 
-        SatJobStreamProcessor::SatTask task {_active_rev, newLiterals, assumptions, descriptionLabel, priority, chksum};
         for (auto& [proc, worker] : _processors) {
             proc->submit(task);
         }

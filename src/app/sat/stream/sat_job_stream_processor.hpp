@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#include "app/sat/proof/trusted/trusted_utils.hpp"
 #include "data/checksum.hpp"
 #include "util/spsc_blocking_ringbuffer.hpp"
 
@@ -14,12 +15,13 @@ class SatJobStreamProcessor {
 
 public:
     struct SatTask {
-        int rev {-1};
+        enum Type {RAW, SPLIT} type {SPLIT};
         std::vector<int> lits;
         std::vector<int> assumptions;
         std::string descLabel;
         float priority;
         Checksum chksum;
+        int rev {-1};
         void integrate(const SatTask& other) {
             integrate(SatTask(other));
         }
@@ -27,14 +29,26 @@ public:
             assert(other.rev != rev);
             if (other.rev > rev) {
                 rev = other.rev;
+                type = other.type;
                 descLabel = std::move(other.descLabel);
-                priority = other.priority;
                 assumptions = std::move(other.assumptions);
+                priority = other.priority;
                 // TODO handle checksum
                 chksum = other.chksum;
             }
             if (lits.empty()) lits = std::move(other.lits);
-            else for (int lit : other.lits) lits.push_back(lit);
+            else {
+                if (type == RAW) {
+                    // Truncate away old fingerprint and assumptions
+                    assert(lits.back() == INT32_MIN);
+                    lits.resize(lits.size() - 1 - SIG_SIZE_BYTES/sizeof(int));
+                    while (lits.back() != INT32_MAX) lits.pop_back();
+                    lits.pop_back();
+                    assert(lits.back() == 0);
+                }
+                // Append new clauses, fingerprint, and assumptions
+                for (int lit : other.lits) lits.push_back(lit);
+            }
         }
     };
     struct SatTaskResult {

@@ -12,24 +12,27 @@ class JobSlotRegistry {
 
 public:
     struct JobSlot {
+        bool allocated {false};
         std::function<void()> callbackAtEviction;
         JobSlot(std::function<void()> cb) : callbackAtEviction(cb) {}
         JobSlot(JobSlot&& other) {
-            callbackAtEviction = other.callbackAtEviction;
-            other.callbackAtEviction = {};
+            *this = std::move(other);
         }
         JobSlot& operator=(JobSlot&& other) {
+            allocated = other.allocated;
             callbackAtEviction = other.callbackAtEviction;
+            other.allocated = false;
             other.callbackAtEviction = {};
             return *this;
         }
-        ~JobSlot() {
-            if (callbackAtEviction) callbackAtEviction();
+        void evict() {
+            if (allocated) callbackAtEviction();
+            allocated = false;
         }
     };
 
 private:
-    static std::list<JobSlot> _slots;
+    static std::list<JobSlot*> _slots;
     static int _max_nb_slots;
 
 public:
@@ -39,10 +42,13 @@ public:
     static void init(const Parameters& params) {
         _max_nb_slots = params.jobSlots() > 0 ? params.jobSlots() : MyMpi::size(MPI_COMM_WORLD);
     }
-    static void acquireSlot(std::function<void()> cbAtEviction) {
+    static void acquireSlot(JobSlot& slot) {
         assert(isInitialized());
-        _slots.emplace_back(cbAtEviction);
-        if (_slots.size() > _max_nb_slots)
-            _slots.pop_front(); // triggers eviction callback
+        slot.allocated = true;
+        _slots.push_back(&slot);
+        if (_slots.size() > _max_nb_slots) {
+            _slots.front()->evict();
+            _slots.pop_front();
+        }
     }
 };

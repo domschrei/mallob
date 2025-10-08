@@ -47,6 +47,7 @@ public:
 
         // FORK: Create a child process
         const pid_t res = Process::createChild();
+        assert(res >= 0);
         if (res == 0) {
             // [child process]
             // Danger zone: Do not touch any memory.

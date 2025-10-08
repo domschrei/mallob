@@ -67,11 +67,11 @@ public:
         _logger(setup.logger), _base_seed(setup.baseSeed), _local_id(setup.localSolverId),
         _global_id(setup.globalSolverId), _job_id(setup.jobId), _ringbuf(1<<14), _checker(setup) {}
 
-    void init() {
+    void init(const std::string& witnessSuffix = "") {
         assert(!_launched);
         _checker.init();
         std::string outPath = (_logger.getLogDir().empty() ? "." : _logger.getLogDir())
-            + "/witness-trace." + std::to_string(_job_id) + "." + std::to_string(_global_id) + ".txt";
+            + "/witness-trace." + std::to_string(_job_id) + "." + std::to_string(_global_id) + witnessSuffix + ".txt";
         setWitnessOutputPath(outPath);
         _bg_emitter.run([&]() {runEmitter();});
         _bg_acceptor.run([&]() {runAcceptor();});
@@ -130,12 +130,13 @@ public:
                 if (acquireLock) _mtx_submit.unlock();
                 return true;
             }
-            if (_next_rev_to_conclude > revision) {
+            if (_arrived_revision > revision || _next_rev_to_conclude > revision) {
                 LOGGER(_logger, V4_VVER, "IMPCHK discard conclusion for rev. %i (rev. %i arrived, %i next to validate)\n",
                     revision, _arrived_revision, _next_rev_to_conclude);
                 if (acquireLock) _mtx_submit.unlock();
                 return false;
             }
+            // revision == _next_rev_to_conclude == _arrived_revision
         }
 
         if (op.isDerivation()) {
@@ -147,7 +148,7 @@ public:
             // and signals to the acceptor thread that the clause is NOT to be shared.
             auto& data = op.data.produce;
             int& glue = data.glue;
-            bool share = glue > 0 && _cb_probe(data.nbLits);
+            bool share = glue > 0 && _cb_probe && _cb_probe(data.nbLits);
             if (share) op.sortLiterals();
             else glue = 0;
 
@@ -166,11 +167,9 @@ public:
             }
         }
         if (op.isConcluding() && _next_rev_to_conclude == revision) {
-            _next_rev_to_conclude++;
+            _next_rev_to_conclude++; // prevent repeated validation of a result
         }
         _ringbuf.pushBlocking(op);
-
-        if (op.isEndLoad()) tryPushDeferredOp(false);
 
         if (acquireLock) _mtx_submit.unlock();
         return true;
@@ -186,7 +185,7 @@ public:
         return;
     }
 
-    void stop() {
+    void prepareStop() {
         if (!_launched) return;
 
         // Tell solver and emitter thread to stop inserting/processing statements
@@ -195,6 +194,11 @@ public:
 
         // Terminate the emitter thread
         _bg_emitter.stop();
+    }
+
+    void stop() {
+        if (!_launched) return;
+        prepareStop();
 
         // In order not to interfere with a concurrent initiateRevision call
         auto lock = _mtx_submit.getLock();
@@ -210,13 +214,13 @@ public:
 
         // Wait until any checker process did in fact exit
         _checker.terminate();
+        _launched = false;
     }
     ~LratConnector() {
         stop();
     }
 
 private:
-
     void tryPushDeferredOp(bool acquireLock) {
 
         if (acquireLock) _mtx_submit.lock();
@@ -246,14 +250,18 @@ private:
         while (_bg_emitter.continueRunning()) {
 
             if (_do_parse && _mtx_submit.tryLock()) {
+                // Flush all prior operations
+                while (trySubmitFromRingbuf()) {}
+                // Process all new revisions
                 while (!_f_parsers.empty()) {
                     // Load formula
                     auto parser = std::move(_f_parsers.front()); _f_parsers.pop_front();
                     // use the *old* revision index since this op may be considered
                     // a "conclusion" operation for the previous revision
-                    push(LratOp(parser->getSignature()), false, revision);
-                    trySubmitFromRingbuf();
+                    _checker.submit(LratOp(parser->getSignature()));
                     revision++; // and *then* update the revision.
+                    assert(_next_rev_to_conclude <= revision);
+                    _next_rev_to_conclude = revision;
                     int lit;
                     std::vector<int> buf;
                     std::vector<int> assumptions;
@@ -262,8 +270,7 @@ private:
                         do {
                             buf.push_back(lit);
                         } while (buf.size() < (1UL<<14) && parser->getNextLiteral(lit));
-                        push(LratOp(TRUSTED_CHK_LOAD, buf.data(), buf.size()), false);
-                        trySubmitFromRingbuf();
+                        _checker.submit(LratOp(TRUSTED_CHK_LOAD, buf.data(), buf.size()));
                         buf.clear();
                     }
                     while (parser->getNextAssumption(lit)) {
@@ -271,18 +278,15 @@ private:
                             assumptions.push_back(lit);
                         } while (parser->getNextAssumption(lit));
                     }
-                    if (_bg_emitter.continueRunning()) {
-                        // End loading, check signature
-                        push(LratOp(TRUSTED_CHK_END_LOAD, assumptions.data(), assumptions.size()), false);
-                        trySubmitFromRingbuf();
-                    }
+                    // End loading, check signature
+                    _checker.submit(LratOp(TRUSTED_CHK_END_LOAD, assumptions.data(), assumptions.size()));
+                    tryPushDeferredOp(false);
                 }
                 _do_parse = false;
                 _mtx_submit.unlock();
             }
 
-            if (!trySubmitFromRingbuf())
-                usleep(1000*1); // 1ms
+            if (!trySubmitFromRingbuf()) usleep(1000*1); // 1ms
         }
     }
 
@@ -306,14 +310,14 @@ private:
             bool res;
             u32 cidx = 0;
             bool ok = _checker.accept(op, res, sig, cidx);
-            if (!ok) break; // terminated
+            if (!ok || op.isTermination()) break; // terminated
             if (!res) {
                 continue; // error in checker - nonetheless, wait for proper termination
             }
             //LOG(V2_INFO, "PROOF> accept (%i) %s\n", (int)res, op.toStr().c_str());
             if (op.isDerivation()) {
                 auto& data = op.data.produce;
-                bool share = data.glue > 0;
+                bool share = data.glue > 0 && _cb_learn;
                 if (share) {
                     prepareClause(op, sig, cidx);
                     _cb_learn(_clause, _local_id);
@@ -321,16 +325,18 @@ private:
             } else if (op.isUnsatValidation() || op.isSatValidation()) {
                 // SAT / UNSAT result
                 _last_concluded_rev = _accepted_revision;
-                LOGGER(_logger, V2_INFO, "Use impcheck_confirm -key-seed=%lu to confirm the fingerprint\n",
-                    ImpCheck::getKeySeed(_base_seed));
+                if (_last_concluded_rev == 0)
+                    LOGGER(_logger, V2_INFO, "Use impcheck_confirm -key-seed=%lu to confirm fingerprint\n",
+                        ImpCheck::getKeySeed(_base_seed));
                 u32 code = op.isSatValidation() ? 10 : 20;
                 if (op.isUnsatValidation())
                     assumptions = std::vector(op.data.concludeUnsat.failed, op.data.concludeUnsat.failed + op.data.concludeUnsat.nbFailed);
                 std::string litStr;
                 for (int lit : assumptions) litStr += " " + std::to_string(lit);
-                LOGGER(_logger, V0_CRIT, "IMPCHK_CONFIRM_TRACE %u %u %s%s\n", cidx, code,
-                    Logger::dataToHexStr(sig, SIG_SIZE_BYTES).c_str(), litStr.c_str());
-                if (!_out_path.empty()) {
+                if (_out_path.empty()) {
+                    LOGGER(_logger, V0_CRIT, "IMPCHK_CONFIRM %u %u %s%s\n", cidx, code,
+                        Logger::dataToHexStr(sig, SIG_SIZE_BYTES).c_str(), litStr.c_str());
+                } else {
                     std::ofstream ofs(_out_path, std::ios_base::app);
                     ofs << cidx << " " << code << " " << Logger::dataToHexStr(sig, SIG_SIZE_BYTES) << litStr << std::endl;
                 }
@@ -340,18 +346,17 @@ private:
                 if (_last_concluded_rev == _accepted_revision) continue;
                 // UNKNOWN result
                 _last_concluded_rev = _accepted_revision;
-                LOGGER(_logger, V0_CRIT, "IMPCHK_CONFIRM_TRACE %u %u\n", cidx, 0);
-                if (!_out_path.empty()) {
+                if (_out_path.empty()) {
+                    LOGGER(_logger, V0_CRIT, "IMPCHK_CONFIRM %u %u\n", cidx, 0);
+                } else {
                     std::ofstream ofs(_out_path, std::ios_base::app);
                     ofs << cidx << " 0" << std::endl;
                 }
             } else if (op.isEndLoad()) {
                 _accepted_revision++; // next revision reached
-                LOGGER(_logger, V4_VVER, "IMPCHK revision %i reached\n", _accepted_revision);
+                LOGGER(_logger, V4_VVER, "IMPCHK in rev. %i\n", _accepted_revision);
                 // store assumptions for later
                 assumptions = std::vector(op.data.endLoad.assumptions, op.data.endLoad.assumptions + op.data.endLoad.nbAssumptions);
-            } else if (op.isTermination()) {
-                break; // end
             }
         }
     }

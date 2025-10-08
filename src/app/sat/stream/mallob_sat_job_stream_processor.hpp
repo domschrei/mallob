@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <cstring>
 #include <stdlib.h>
 #include <string>
 #include <unistd.h>
@@ -11,6 +12,7 @@
 
 #include "app/sat/data/formula_compressor.hpp"
 #include "app/sat/data/model_string_compressor.hpp"
+#include "app/sat/proof/trusted/trusted_utils.hpp"
 #include "core/job_slot_registry.hpp"
 #include "data/job_description.hpp"
 #include "interface/api/api_connector.hpp"
@@ -50,11 +52,13 @@ private:
     bool _finalized {false};
     Mutex _mtx_finalize;
 
+    JobSlotRegistry::JobSlot _job_slot;
+
 public:
     MallobSatJobStreamProcessor(const Parameters& params, APIConnector& api, JobDescription& desc,
             const std::string& baseUserName, int streamId, bool incremental, Synchronizer& sync) :
         SatJobStreamProcessor(sync), _params(params), _api(api), _stream_id(streamId),
-        _incremental(incremental), _username(baseUserName) {}
+        _incremental(incremental), _username(baseUserName), _job_slot([&]() {reinitialize();}) {}
 
     ~MallobSatJobStreamProcessor() override {}
 
@@ -83,11 +87,9 @@ public:
             _began_nontrivial_solving = true;
             task.lits = std::move(_backlog_lits);
 
-            JobSlotRegistry::acquireSlot([&]() {
-                // When evicted, tear down the Mallob job and then re-initialize
-                // the interface as "didn't begin non-trivial solving yet"
-                reinitialize();
-            });
+            assert(!_job_slot.allocated);
+            JobSlotRegistry::acquireSlot(_job_slot);
+            assert(_job_slot.allocated);
 
             _base_job_name = "satjob-" + std::to_string(_stream_id) + "-rev-";
             _json_base["user"] = _username;
@@ -134,7 +136,7 @@ public:
             auto out = FormulaCompressor::compress(newLiterals.data(), newLiterals.size(),
                 assumptions.data(), assumptions.size());
             newLiterals = std::move(*out.vec);
-        } else {
+        } else if (task.type == SatJobStreamProcessor::SatTask::SPLIT) {
             newLiterals.push_back(INT32_MAX);
             for (int a : assumptions) newLiterals.push_back(a);
             newLiterals.push_back(0);
@@ -188,6 +190,7 @@ public:
     }
 
     virtual void finalize() override {
+        LOG(V3_VERB, "%s do finalize\n", _name.c_str());
         auto lock = _mtx_finalize.getLock();
         _finalized = true;
         SatJobStreamProcessor::finalize();
@@ -203,6 +206,7 @@ public:
         LOG(V4_VVER, "%s closing API\n", _name.c_str());
         _api.submit(copy, [&](nlohmann::json& result) {assert(false);});
         LOG(V4_VVER, "%s closed API\n", _name.c_str());
+        _job_slot.allocated = false;
     }
 
     void reinitialize() {

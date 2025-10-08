@@ -212,7 +212,7 @@ public:
         if (_buf_in.empty()) return 0;
         bool ok = _buf_in.pollNonblocking(_msg_to_read);
         if (!ok) return 0;
-        LOG(V3_VERB, "PIPE read %c#%lu\n", _msg_to_read.tag, _msg_to_read.counter);
+        LOG(V4_VVER, "PIPE read %c#%lu\n", _msg_to_read.tag, _msg_to_read.counter);
         return _msg_to_read.tag;
     }
     // immediately returns the available data prepared via a successful pollForData()
@@ -238,7 +238,7 @@ public:
     }
     // Send a piece of data, can be blocking and moves the data.
     bool writeData(std::vector<int>&& data, char contentTag) {
-        LOG(V3_VERB, "PIPE write %c#%lu\n", contentTag, _msg_counter);
+        LOG(V4_VVER, "PIPE write %c#%lu\n", contentTag, _msg_counter);
         assert(contentTag != 0);
         Message msg {contentTag, _msg_counter++, std::move(data)};
         bool success = _buf_out.pushBlocking(msg);
@@ -248,7 +248,7 @@ public:
     // Send a piece of data built from concatenating the two provided arrays (for convenience),
     // can be blocking and moves/copies the data.
     bool writeData(std::vector<int>&& data1, const std::vector<int>& data2, char contentTag) {
-        LOG(V3_VERB, "PIPE write %c#%lu\n", contentTag, _msg_counter);
+        LOG(V4_VVER, "PIPE write %c#%lu\n", contentTag, _msg_counter);
         assert(contentTag != 0);
         data1.insert(data1.end(), data2.begin(), data2.end());
         Message msg {contentTag, _msg_counter++, std::move(data1)};

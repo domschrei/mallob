@@ -46,6 +46,7 @@ private:
     int _buf_lits[TRUSTED_CHK_MAX_BUF_SIZE];
     int _buflen_lits {0};
     SPSCBlockingRingbuffer<LratOp> _op_queue;
+    ImpCheckIO _io;
 
     bool _error_reported {false};
     int _revision {-1};
@@ -93,6 +94,7 @@ public:
 
         _subproc = new Subprocess(params, "impcheck_check", moreArgs, false);
         _child_pid = _subproc->start();
+        assert(_child_pid != getpid());
 
         _f_directives = fopen(_path_directives.c_str(), "w");
         if (!_f_directives) abort();
@@ -100,6 +102,9 @@ public:
         if (!_f_feedback) abort();
     }
 
+    inline void submit(LratOp&& op) {
+        submit(op);
+    }
     inline void submit(LratOp& op) {
         if (!_f_directives) return;
         if (op.isDerivation()) submitProduceClause(op.data.produce);
@@ -126,7 +131,7 @@ public:
         else if (op.isEndLoad()) res = acceptGeneric("END LOAD");
         else if (!op.isLoad()) res = acceptGeneric("Unspecified op");
         if (op.isEndLoad()) _revision++;
-        return true;
+        return !_io.encounteredEOF();
     }
 
     void terminate() {
@@ -144,6 +149,10 @@ public:
 private:
     void handleError(const std::string& errMsg) {
         if (_error_reported) return;
+        if (_io.encounteredEOF()) {
+            LOGGER(_logger, V1_WARN, "[WARN] IMPCHK feedback reached EOF\n");
+            return;
+        }
         LOGGER(_logger, V0_CRIT, "[ERROR] IMPCHK rejected operation: %s\n", errMsg.c_str());
         Terminator::setTerminating();
         _error_reported = true;
@@ -151,7 +160,7 @@ private:
 
     inline void submitBeginLoad(const u8* formulaSignature) {
         writeDirectiveType(TRUSTED_CHK_BEGIN_LOAD);
-        TrustedUtils::writeSignature(formulaSignature, _f_directives);
+        _io.writeSignature(formulaSignature, _f_directives);
         UNLOCKED_IO(fflush)(_f_directives);
     }
     inline bool acceptBeginLoad(u32& cidx) {
@@ -159,7 +168,7 @@ private:
             handleError("Clause derivation not accepted");
             return false;
         }
-        cidx = TrustedUtils::readUint(_f_feedback);
+        cidx = _io.readUint(_f_feedback);
         return true;
     }
 
@@ -179,20 +188,20 @@ private:
     inline void submitEndLoad(const int* asmpt, int nbAsmpt) {
         if (_buflen_lits > 0) flushLiteralBuffer();
         writeDirectiveType(TRUSTED_CHK_END_LOAD);
-        TrustedUtils::writeInt(nbAsmpt, _f_directives);
-        TrustedUtils::writeInts(asmpt, nbAsmpt, _f_directives);
+        _io.writeInt(nbAsmpt, _f_directives);
+        _io.writeInts(asmpt, nbAsmpt, _f_directives);
         UNLOCKED_IO(fflush)(_f_directives);
     }
 
     inline void submitProduceClause(const LratOp::LratOpData::LratOpDataProduce& data) {
 
         writeDirectiveType(TRUSTED_CHK_CLS_PRODUCE);
-        TrustedUtils::writeUnsignedLong(data.id, _f_directives);
-        TrustedUtils::writeInt(data.nbLits, _f_directives);
-        TrustedUtils::writeInts(data.lits, data.nbLits, _f_directives);
-        TrustedUtils::writeInt(data.nbHints, _f_directives);
-        TrustedUtils::writeUnsignedLongs(data.hints, data.nbHints, _f_directives);
-        TrustedUtils::writeChar(data.glue>0 ? 1 : 0, _f_directives);
+        _io.writeUnsignedLong(data.id, _f_directives);
+        _io.writeInt(data.nbLits, _f_directives);
+        _io.writeInts(data.lits, data.nbLits, _f_directives);
+        _io.writeInt(data.nbHints, _f_directives);
+        _io.writeUnsignedLongs(data.hints, data.nbHints, _f_directives);
+        _io.writeChar(data.glue>0 ? 1 : 0, _f_directives);
     }
     inline bool acceptProduceClause(u8* sig, u32& cidx) {
         if (!awaitResponse()) {
@@ -200,8 +209,8 @@ private:
             return false;
         }
         if (sig) {
-            TrustedUtils::readSignature(sig, _f_feedback);
-            cidx = TrustedUtils::readUint(_f_feedback);
+            _io.readSignature(sig, _f_feedback);
+            cidx = _io.readUint(_f_feedback);
         }
         return true;
     }
@@ -209,11 +218,11 @@ private:
     inline void submitImportClause(const LratOp::LratOpData::LratOpDataImport& data) {
 
         writeDirectiveType(TRUSTED_CHK_CLS_IMPORT);
-        TrustedUtils::writeUnsignedLong(data.id, _f_directives);
-        TrustedUtils::writeInt(data.nbLits, _f_directives);
-        TrustedUtils::writeInts(data.lits, data.nbLits, _f_directives);
-        TrustedUtils::writeSignature(data.sig, _f_directives);
-        TrustedUtils::writeUint(data.cidx, _f_directives);
+        _io.writeUnsignedLong(data.id, _f_directives);
+        _io.writeInt(data.nbLits, _f_directives);
+        _io.writeInts(data.lits, data.nbLits, _f_directives);
+        _io.writeSignature(data.sig, _f_directives);
+        _io.writeUint(data.cidx, _f_directives);
     }
     inline bool acceptImportClause() {
         if (!awaitResponse()) {
@@ -226,8 +235,8 @@ private:
     inline void submitDeleteClauses(const unsigned long* ids, int nbIds) {
 
         writeDirectiveType(TRUSTED_CHK_CLS_DELETE);
-        TrustedUtils::writeInt(nbIds, _f_directives);
-        TrustedUtils::writeUnsignedLongs(ids, nbIds, _f_directives);
+        _io.writeInt(nbIds, _f_directives);
+        _io.writeUnsignedLongs(ids, nbIds, _f_directives);
     }
     inline bool acceptDeleteClauses() {
         if (!awaitResponse()) {
@@ -239,9 +248,9 @@ private:
 
     inline void submitValidateUnsat(const LratOp::LratOpData::LratOpDataConcludeUnsat& data) {
         writeDirectiveType(TRUSTED_CHK_VALIDATE_UNSAT);
-        TrustedUtils::writeUnsignedLong(data.id, _f_directives);
-        TrustedUtils::writeInt(data.nbFailed, _f_directives);
-        TrustedUtils::writeInts(data.failed, data.nbFailed, _f_directives);
+        _io.writeUnsignedLong(data.id, _f_directives);
+        _io.writeInt(data.nbFailed, _f_directives);
+        _io.writeInts(data.failed, data.nbFailed, _f_directives);
         UNLOCKED_IO(fflush)(_f_directives);
     }
     inline bool acceptValidateUnsat(u8* sig, u32& cidx) {
@@ -249,8 +258,8 @@ private:
             handleError("UNSAT NOT valid");
             return false;
         }
-        TrustedUtils::readSignature(sig, _f_feedback);
-        cidx = TrustedUtils::readUint(_f_feedback);
+        _io.readSignature(sig, _f_feedback);
+        cidx = _io.readUint(_f_feedback);
         auto str = Logger::dataToHexStr(sig, SIG_SIZE_BYTES);
         return true;
     }
@@ -258,8 +267,8 @@ private:
     inline void submitValidateSat(const LratOp::LratOpData::LratOpDataConcludeSat& data) {
         writeDirectiveType(TRUSTED_CHK_VALIDATE_SAT);
         // write model
-        TrustedUtils::writeInt(data.modelSize, _f_directives);
-        TrustedUtils::writeInts(data.model, data.modelSize, _f_directives);
+        _io.writeInt(data.modelSize, _f_directives);
+        _io.writeInts(data.model, data.modelSize, _f_directives);
         UNLOCKED_IO(fflush)(_f_directives);
     }
     inline bool acceptValidateSat(u8* sig, u32& cidx) {
@@ -267,8 +276,8 @@ private:
             handleError("SAT NOT valid");
             return false;
         }
-        TrustedUtils::readSignature(sig, _f_feedback);
-        cidx = TrustedUtils::readUint(_f_feedback);
+        _io.readSignature(sig, _f_feedback);
+        cidx = _io.readUint(_f_feedback);
         auto str = Logger::dataToHexStr(sig, SIG_SIZE_BYTES);
         return true;
     }
@@ -287,16 +296,16 @@ private:
 
     void flushLiteralBuffer() {
         writeDirectiveType(TRUSTED_CHK_LOAD);
-        TrustedUtils::writeInt(_buflen_lits, _f_directives);
-        TrustedUtils::writeInts(_buf_lits, _buflen_lits, _f_directives);
+        _io.writeInt(_buflen_lits, _f_directives);
+        _io.writeInts(_buf_lits, _buflen_lits, _f_directives);
         _buflen_lits = 0;
     }
 
     void writeDirectiveType(char type) {
-        TrustedUtils::writeChar(type, _f_directives);
+        _io.writeChar(type, _f_directives);
     }
     bool awaitResponse() {
-        int res = TrustedUtils::readChar(_f_feedback);
+        int res = _io.readChar(_f_feedback);
         return (char)res == TRUSTED_CHK_RES_ACCEPT;
     }
 };

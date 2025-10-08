@@ -232,7 +232,13 @@ private:
 
         if (_params.internalStreamProcessor()) {
             // Add a stream processor that internally runs a single low-latency sequential solver
-            auto internalProcessor = new InternalSatJobStreamProcessor(true, wrapper->stream.getSynchronizer());
+            SolverSetup setup;
+            setup.baseSeed = _params.seed();
+            setup.jobId = _desc.getId();
+            setup.isJobIncremental = true;
+            setup.onTheFlyChecking = _params.onTheFlyChecking();
+            setup.onTheFlyCheckModel = _params.onTheFlyCheckModel();
+            auto internalProcessor = new InternalSatJobStreamProcessor(setup, wrapper->stream.getSynchronizer());
             wrapper->stream.addProcessor(internalProcessor);
         }
 
@@ -249,7 +255,7 @@ private:
     void submitCube(const std::vector<int>& cube, SatJobStream& stream) {
         std::vector<int> formula;
         if (stream.getRevision() == -1) formula = _base_formula;
-        stream.solveNonblocking(std::move(formula), cube);
+        stream.solveNonblocking({{}, std::move(formula), cube});
     }
 
     // Check whether this job should terminate right now.

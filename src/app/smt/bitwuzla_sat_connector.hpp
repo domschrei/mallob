@@ -17,6 +17,7 @@
 #include "app/sat/stream/internal_sat_job_stream_processor.hpp"
 #include "app/sat/stream/mallob_sat_job_stream_processor.hpp"
 #include "app/sat/stream/sat_job_stream_garbage_collector.hpp"
+#include "app/sat/stream/sat_job_stream_processor.hpp"
 #include "app/sat/stream/wrapped_sat_job_stream.hpp"
 #include "bitwuzla/cpp/sat_solver.h"
 #include "data/job_description.hpp"
@@ -72,7 +73,13 @@ public:
         LOG(V2_INFO, "New: %s\n", _name.c_str());
 
         if (_params.internalStreamProcessor()) {
-            auto internalProcessor = new InternalSatJobStreamProcessor(true, _stream_wrapper->stream.getSynchronizer());
+            SolverSetup setup;
+            setup.baseSeed = _params.seed();
+            setup.jobId = _desc.getId();
+            setup.isJobIncremental = true;
+            setup.onTheFlyChecking = _params.onTheFlyChecking();
+            setup.onTheFlyCheckModel = _params.onTheFlyCheckModel();
+            auto internalProcessor = new InternalSatJobStreamProcessor(setup, _stream_wrapper->stream.getSynchronizer());
             _stream_wrapper->stream.addProcessor(internalProcessor);
         }
 
@@ -129,7 +136,9 @@ public:
         auto time = Timer::elapsedSeconds();
         LOG(V2_INFO, "%s submit rev. %i (%i lits, %i asmpt)\n", _name.c_str(), _revision, _lits.size(), _assumptions.size());
 
-        auto [resultCode, solution] = _stream_wrapper->stream.solve(std::move(_lits), _assumptions);
+        auto [resultCode, solution] = _stream_wrapper->stream.solve(
+            SatJobStreamProcessor::SatTask {SatJobStreamProcessor::SatTask::Type::SPLIT, std::move(_lits), _assumptions}
+        );
         _in_solved_state = _assumptions.empty();
         _lits.clear();
         _assumptions.clear();

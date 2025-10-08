@@ -7,6 +7,7 @@
 #include <string>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 #include "app/sat/proof/impcheck.hpp"
 #include "trusted/trusted_utils.hpp"
@@ -40,6 +41,8 @@ private:
     int _nb_cls {0};
     int _nb_asmpt {0};
     unsigned long _f_size {0};
+
+    bool _eof {false};
 
 public:
     TrustedParserProcessAdapter(int baseSeed, int id) : _base_seed(baseSeed), _id(id), _f_buf(1<<14) {}
@@ -80,12 +83,23 @@ public:
 
     inline bool processNextIntAndCheckDone(int& x) {
 
+        int checkCounter = 0;
+        int graceCounter = 0;
         while (_f_buf_idx == _f_buf_size) {
             // Read next chunk
             _f_buf_size = UNLOCKED_IO(fread)(_f_buf.data(),
                 sizeof(int), _f_buf.size(), _f_parsed_formula);
             assert(_f_buf_size >= 0);
             _f_buf_idx = 0;
+            if (checkCounter % 1024 == 0 && Process::didChildExit(_child_pid)) graceCounter++;
+            if (graceCounter == 2) break;
+            checkCounter++;
+        }
+        if (_f_buf_idx == _f_buf_size) {
+            _eof = true;
+            LOG(V2_INFO, "TPPA BREAK : %i\n", Process::didChildExit(_child_pid) ? 1 : 0);
+            x = 0;
+            return false;
         }
 
         x = _f_buf[_f_buf_idx++];
@@ -141,6 +155,7 @@ public:
             }
             int x;
             done = processNextIntAndCheckDone(x);
+            if (MALLOB_UNLIKELY(_eof)) break;
             memcpy(((u8*)out.data())+fSizeBytes, &x, sizeof(int));
             fSizeBytes += sizeof(int);
         }
@@ -150,7 +165,7 @@ public:
         memcpy(_sig, ((u8*)out.data()) + fSizeBytes - sizeof(int) - SIG_SIZE_BYTES, SIG_SIZE_BYTES);
         outSignature = _sig;
         LOG(V3_VERB, "TPPA %lu lits\n", _f_size);
-        return true;
+        return done && _f_size >= 4;
     }
 
     int getNbVars() const {return _nb_vars;}

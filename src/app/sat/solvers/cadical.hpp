@@ -13,12 +13,9 @@
 #include <string>
 #include <vector>
 
-#include "app/sat/proof/trusted/trusted_solving.hpp"
-#include "app/sat/proof/trusted_checker_process_adapter.hpp"
 #include "app/sat/solvers/optimizing_propagator.hpp"
 #include "portfolio_solver_interface.hpp"
 #include "util/sys/threading.hpp"
-#include "util/logger.hpp"
 #include "cadical/src/cadical.hpp"
 #include "cadical_terminator.hpp"
 #include "cadical_clause_export.hpp"
@@ -91,5 +88,5 @@ public:
 
 	void cleanUp() override;
 
-	CadicalTerminator getTerminator() {return terminator;}
+	CadicalTerminator& getTerminator() {return terminator;}
 };

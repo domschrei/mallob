@@ -26,13 +26,7 @@ typedef unsigned char u8;
 static constexpr int SIG_SIZE_BYTES = 16;
 typedef u8 signature[SIG_SIZE_BYTES];
 
-class TrustedUtils {
-
-public:
-    static void doAbortEof() {
-        log("end-of-file - terminating");
-        ::exit(0);
-    }
+struct TrustedUtils {
     static void doAbort() {
         log("ABORT");
         while (true) {}
@@ -69,64 +63,6 @@ public:
         return true;
     }
 
-    static void readSignature(u8* outSig, FILE* file) {
-        signature dummy;
-        if (!outSig) outSig = dummy;
-        u64 nbRead = UNLOCKED_IO(fread)(outSig, sizeof(int), 4, file);
-        if (nbRead < 4) doAbortEof();
-    }
-    static void writeSignature(const u8* sig, FILE* file) {
-        UNLOCKED_IO(fwrite)(sig, sizeof(int), 4, file);
-    }
-
-    static u64 readUnsignedLong(FILE* file) {
-        u64 u;
-        u64 nbRead = UNLOCKED_IO(fread)(&u, sizeof(u64), 1, file);
-        if (nbRead < 1) doAbortEof();
-        return u;
-    }
-    static void writeUnsignedLong(u64 u, FILE* file) {
-        UNLOCKED_IO(fwrite)(&u, sizeof(u64), 1, file);
-    }
-    static void writeUnsignedLongs(const u64* data, size_t nbHints, FILE* file) {
-        UNLOCKED_IO(fwrite)(data, sizeof(u64), nbHints, file);
-    }
-
-    static int readInt(FILE* file) {
-        int i;
-        u64 nbRead = UNLOCKED_IO(fread)(&i, sizeof(int), 1, file);
-        if (nbRead < 1) doAbortEof();
-        return i;
-    }
-    static u32 readUint(FILE* file) {
-        u32 i;
-        u64 nbRead = UNLOCKED_IO(fread)(&i, sizeof(u32), 1, file);
-        if (nbRead < 1) doAbortEof();
-        return i;
-    }
-    static void readInts(int* data, size_t nbInts, FILE* file) {
-        u64 nbRead = UNLOCKED_IO(fread)(data, sizeof(int), nbInts, file);
-        if (nbRead < nbInts) doAbortEof();
-    }
-    static void writeInt(int i, FILE* file) {
-        UNLOCKED_IO(fwrite)(&i, sizeof(int), 1, file);
-    }
-    static void writeUint(u32 i, FILE* file) {
-        UNLOCKED_IO(fwrite)(&i, sizeof(u32), 1, file);
-    }
-    static void writeInts(const int* data, size_t nbInts, FILE* file) {
-        UNLOCKED_IO(fwrite)(data, sizeof(int), nbInts, file);
-    }
-
-    static int readChar(FILE* file) {
-        int res = UNLOCKED_IO(fgetc)(file);
-        if (res == EOF) doAbortEof();
-        return res;
-    }
-    static void writeChar(char c, FILE* file) {
-        UNLOCKED_IO(fputc)(c, file);
-    }
-
     static std::string sigToStr(const u8* sig) {
         std::string out(2*SIG_SIZE_BYTES, '0');
         for (int charpos = 0; charpos < SIG_SIZE_BYTES; charpos++) {
@@ -139,7 +75,6 @@ public:
         }
         return out;
     }
-
     static bool strToSig(const std::string& str, u8* out) {
         for (int bytepos = 0; bytepos < SIG_SIZE_BYTES; bytepos++) {
             const char* hex_pair = str.data() + bytepos*2;
@@ -150,5 +85,79 @@ public:
             out[bytepos] = (u8) byte;
         }
         return true;
+    }
+};
+
+class ImpCheckIO {
+
+private:
+    bool _encountered_eof {false};
+
+public:
+    bool encounteredEOF() const {
+        return _encountered_eof;
+    }
+    void setEof() {
+        TrustedUtils::log("encountered end-of-file");
+        _encountered_eof = true;
+        //::exit(0);
+    }
+
+    void readSignature(u8* outSig, FILE* file) {
+        signature dummy;
+        if (!outSig) outSig = dummy;
+        u64 nbRead = UNLOCKED_IO(fread)(outSig, sizeof(int), 4, file);
+        if (nbRead < 4) setEof();
+    }
+    void writeSignature(const u8* sig, FILE* file) {
+        UNLOCKED_IO(fwrite)(sig, sizeof(int), 4, file);
+    }
+
+    u64 readUnsignedLong(FILE* file) {
+        u64 u;
+        u64 nbRead = UNLOCKED_IO(fread)(&u, sizeof(u64), 1, file);
+        if (nbRead < 1) setEof();
+        return u;
+    }
+    void writeUnsignedLong(u64 u, FILE* file) {
+        UNLOCKED_IO(fwrite)(&u, sizeof(u64), 1, file);
+    }
+    void writeUnsignedLongs(const u64* data, size_t nbHints, FILE* file) {
+        UNLOCKED_IO(fwrite)(data, sizeof(u64), nbHints, file);
+    }
+
+    int readInt(FILE* file) {
+        int i;
+        u64 nbRead = UNLOCKED_IO(fread)(&i, sizeof(int), 1, file);
+        if (nbRead < 1) setEof();
+        return i;
+    }
+    u32 readUint(FILE* file) {
+        u32 i;
+        u64 nbRead = UNLOCKED_IO(fread)(&i, sizeof(u32), 1, file);
+        if (nbRead < 1) setEof();
+        return i;
+    }
+    void readInts(int* data, size_t nbInts, FILE* file) {
+        u64 nbRead = UNLOCKED_IO(fread)(data, sizeof(int), nbInts, file);
+        if (nbRead < nbInts) setEof();
+    }
+    void writeInt(int i, FILE* file) {
+        UNLOCKED_IO(fwrite)(&i, sizeof(int), 1, file);
+    }
+    void writeUint(u32 i, FILE* file) {
+        UNLOCKED_IO(fwrite)(&i, sizeof(u32), 1, file);
+    }
+    void writeInts(const int* data, size_t nbInts, FILE* file) {
+        UNLOCKED_IO(fwrite)(data, sizeof(int), nbInts, file);
+    }
+
+    int readChar(FILE* file) {
+        int res = UNLOCKED_IO(fgetc)(file);
+        if (res == EOF) setEof();
+        return res;
+    }
+    void writeChar(char c, FILE* file) {
+        UNLOCKED_IO(fputc)(c, file);
     }
 };
