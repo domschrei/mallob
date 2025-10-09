@@ -7,8 +7,6 @@
 #include "data/job_description.hpp"
 #include "data/job_processing_statistics.hpp"
 #include "interface/api/api_connector.hpp"
-
-#include "app/smt/bitwuzla_solver.hpp"
 #include "util/static_store.hpp"
 
 struct ClientSideIncSatProgram : public app_registry::ClientSideProgram {
