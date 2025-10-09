@@ -1,0 +1,399 @@
+c 0.038 0 <#2> S0.0 Diversification index 0
+c 0.039 0 <#2> S0.0 Received 153575 literals: 487 3235 -271 0 -487 ... 481 482 483 484 0 
+c 0.039 0 <#2> S0.0 Diversifying 0
+c 0.039 0 <#2> S0.0 Reading rev. 0, start 0
+c 0.049 0 <#2> S0.0 Reading done @ rev. 0 (153575 lits, 0 assumptions)
+c 0.049 0 <#2> S0.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 0.373 0 <#2> S0.0 disc_reasons r_ee:0,r_ed:0,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:0,r_ia:0,r_tl:0
+c 0.373 0 <#2> S0.0 ENDSOL
+c 0.373 0 <#2> S0.0 exiting
+c 0.039 0 <#2> S1.0 Diversification index 1
+c 0.039 0 <#2> S1.0 Received 153575 literals: 487 3235 -271 0 -487 ... 481 482 483 484 0 
+c 0.039 0 <#2> S1.0 Diversifying 1
+c 0.039 0 <#2> S1.0 Reading rev. 0, start 0
+c 0.049 0 <#2> S1.0 Reading done @ rev. 0 (153575 lits, 0 assumptions)
+c 0.049 0 <#2> S1.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 0.373 0 <#2> S1.0 disc_reasons r_ee:0,r_ed:0,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:0,r_ia:0,r_tl:0
+c 0.382 0 <#3> S10.0 Diversification index 10
+c 0.382 0 <#3> S10.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.382 0 <#3> S10.0 Diversifying 10
+c 0.382 0 <#3> S10.0 Reading rev. 0, start 0
+c 0.387 0 <#3> S10.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.387 0 <#3> S10.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.695 0 <#3> S10.0 disc_reasons r_ee:0,r_ed:1432,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1385,r_ia:0,r_tl:0
+c 1.696 0 <#3> S10.0 ENDSOL
+c 1.696 0 <#3> S10.0 exiting
+c 0.382 0 <#3> S11.0 Diversification index 11
+c 0.382 0 <#3> S11.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.382 0 <#3> S11.0 Diversifying 11
+c 0.382 0 <#3> S11.0 Reading rev. 0, start 0
+c 0.387 0 <#3> S11.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.387 0 <#3> S11.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.695 0 <#3> S11.0 disc_reasons r_ee:0,r_ed:1059,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1413,r_ia:0,r_tl:0
+c 1.696 0 <#3> S11.0 ENDSOL
+c 1.696 0 <#3> S11.0 exiting
+c 0.382 0 <#3> S9.0 Diversification index 9
+c 0.382 0 <#3> S9.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.382 0 <#3> S9.0 Diversifying 9
+c 0.382 0 <#3> S9.0 Reading rev. 0, start 0
+c 0.387 0 <#3> S9.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.387 0 <#3> S9.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.688 0 <#3> S9.0 ENDSOL
+c 1.688 0 <#3> S9.0 found result UNSAT for rev. 0
+c 1.695 0 <#3> S9.0 disc_reasons r_ee:0,r_ed:1101,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1258,r_ia:0,r_tl:0
+c 1.696 0 <#3> S9.0 exiting
+c 0.025 0 <#2> S0.0 Diversification index 0
+c 0.025 0 <#2> S0.0 Received 153575 literals: 487 3235 -271 0 -487 ... 481 482 483 484 0 
+c 0.026 0 <#2> S0.0 Diversifying 0
+c 0.026 0 <#2> S0.0 Reading rev. 0, start 0
+c 0.032 0 <#2> S0.0 Reading done @ rev. 0 (153575 lits, 0 assumptions)
+c 0.032 0 <#2> S0.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 0.369 0 <#2> S0.0 disc_reasons r_ee:0,r_ed:0,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:0,r_ia:0,r_tl:0
+c 0.369 0 <#2> S0.0 ENDSOL
+c 0.369 0 <#2> S0.0 exiting
+c 0.025 0 <#2> S1.0 Diversification index 1
+c 0.025 0 <#2> S1.0 Received 153575 literals: 487 3235 -271 0 -487 ... 481 482 483 484 0 
+c 0.026 0 <#2> S1.0 Diversifying 1
+c 0.026 0 <#2> S1.0 Reading rev. 0, start 0
+c 0.032 0 <#2> S1.0 Reading done @ rev. 0 (153575 lits, 0 assumptions)
+c 0.032 0 <#2> S1.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 0.369 0 <#2> S1.0 disc_reasons r_ee:0,r_ed:0,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:0,r_ia:0,r_tl:0
+c 0.369 0 <#2> S1.0 ENDSOL
+c 0.369 0 <#2> S1.0 exiting
+c 0.384 0 <#3> S10.0 Diversification index 10
+c 0.385 0 <#3> S10.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.385 0 <#3> S10.0 Diversifying 10
+c 0.385 0 <#3> S10.0 Reading rev. 0, start 0
+c 0.391 0 <#3> S10.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.391 0 <#3> S10.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.786 0 <#3> S10.0 disc_reasons r_ee:0,r_ed:2138,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1807,r_ia:0,r_tl:0
+c 0.385 0 <#3> S11.0 Diversification index 11
+c 0.385 0 <#3> S11.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.385 0 <#3> S11.0 Diversifying 11
+c 0.385 0 <#3> S11.0 Reading rev. 0, start 0
+c 0.391 0 <#3> S11.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.391 0 <#3> S11.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.786 0 <#3> S11.0 disc_reasons r_ee:0,r_ed:1788,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1899,r_ia:0,r_tl:0
+c 1.786 0 <#3> S11.0 ENDSOL
+c 1.786 0 <#3> S11.0 exiting
+c 0.384 0 <#3> S9.0 Diversification index 9
+c 0.385 0 <#3> S9.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.385 0 <#3> S9.0 Diversifying 9
+c 0.385 0 <#3> S9.0 Reading rev. 0, start 0
+c 0.391 0 <#3> S9.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.391 0 <#3> S9.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.786 0 <#3> S9.0 disc_reasons r_ee:0,r_ed:1032,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1124,r_ia:0,r_tl:0
+c 1.786 0 <#3> S9.0 ENDSOL
+c 1.786 0 <#3> S9.0 exiting
+c 0.027 0 <#2> S0.0 Diversification index 0
+c 0.028 0 <#2> S0.0 Received 153575 literals: 487 3235 -271 0 -487 ... 481 482 483 484 0 
+c 0.028 0 <#2> S0.0 Diversifying 0
+c 0.028 0 <#2> S0.0 Reading rev. 0, start 0
+c 0.040 0 <#2> S0.0 Reading done @ rev. 0 (153575 lits, 0 assumptions)
+c 0.040 0 <#2> S0.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 0.412 0 <#2> S0.0 disc_reasons r_ee:0,r_ed:0,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:0,r_ia:0,r_tl:0
+c 0.413 0 <#2> S0.0 ENDSOL
+c 0.413 0 <#2> S0.0 exiting
+c 0.028 0 <#2> S1.0 Diversification index 1
+c 0.028 0 <#2> S1.0 Received 153575 literals: 487 3235 -271 0 -487 ... 481 482 483 484 0 
+c 0.028 0 <#2> S1.0 Diversifying 1
+c 0.028 0 <#2> S1.0 Reading rev. 0, start 0
+c 0.040 0 <#2> S1.0 Reading done @ rev. 0 (153575 lits, 0 assumptions)
+c 0.040 0 <#2> S1.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 0.412 0 <#2> S1.0 disc_reasons r_ee:0,r_ed:0,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:0,r_ia:0,r_tl:0
+c 0.413 0 <#2> S1.0 ENDSOL
+c 0.413 0 <#2> S1.0 exiting
+c 0.428 0 <#3> S10.0 Diversification index 10
+c 0.428 0 <#3> S10.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.428 0 <#3> S10.0 Diversifying 10
+c 0.428 0 <#3> S10.0 Reading rev. 0, start 0
+c 0.437 0 <#3> S10.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.437 0 <#3> S10.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.869 0 <#3> S10.0 disc_reasons r_ee:0,r_ed:1840,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1771,r_ia:0,r_tl:0
+c 1.869 0 <#3> S10.0 ENDSOL
+c 1.869 0 <#3> S10.0 exiting
+c 0.428 0 <#3> S11.0 Diversification index 11
+c 0.428 0 <#3> S11.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.428 0 <#3> S11.0 Diversifying 11
+c 0.428 0 <#3> S11.0 Reading rev. 0, start 0
+c 0.437 0 <#3> S11.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.437 0 <#3> S11.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.869 0 <#3> S11.0 disc_reasons r_ee:0,r_ed:1786,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1688,r_ia:0,r_tl:0
+c 1.869 0 <#3> S11.0 ENDSOL
+c 1.869 0 <#3> S11.0 exiting
+c 0.427 0 <#3> S9.0 Diversification index 9
+c 0.428 0 <#3> S9.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.428 0 <#3> S9.0 Diversifying 9
+c 0.428 0 <#3> S9.0 Reading rev. 0, start 0
+c 0.433 0 <#3> S9.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.434 0 <#3> S9.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.868 0 <#3> S9.0 disc_reasons r_ee:0,r_ed:2142,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1562,r_ia:0,r_tl:0
+c 1.869 0 <#3> S9.0 ENDSOL
+c 1.869 0 <#3> S9.0 exiting
+c 0.026 0 <#2> S0.0 Diversification index 0
+c 0.026 0 <#2> S0.0 Received 153575 literals: 487 3235 -271 0 -487 ... 481 482 483 484 0 
+c 0.026 0 <#2> S0.0 Diversifying 0
+c 0.026 0 <#2> S0.0 Reading rev. 0, start 0
+c 0.035 0 <#2> S0.0 Reading done @ rev. 0 (153575 lits, 0 assumptions)
+c 0.035 0 <#2> S0.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 0.391 0 <#2> S0.0 disc_reasons r_ee:0,r_ed:0,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:0,r_ia:0,r_tl:0
+c 0.392 0 <#2> S0.0 ENDSOL
+c 0.392 0 <#2> S0.0 exiting
+c 0.026 0 <#2> S1.0 Diversification index 1
+c 0.026 0 <#2> S1.0 Received 153575 literals: 487 3235 -271 0 -487 ... 481 482 483 484 0 
+c 0.026 0 <#2> S1.0 Diversifying 1
+c 0.026 0 <#2> S1.0 Reading rev. 0, start 0
+c 0.035 0 <#2> S1.0 Reading done @ rev. 0 (153575 lits, 0 assumptions)
+c 0.035 0 <#2> S1.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 0.392 0 <#2> S1.0 disc_reasons r_ee:0,r_ed:0,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:0,r_ia:0,r_tl:0
+c 0.392 0 <#2> S1.0 ENDSOL
+c 0.392 0 <#2> S1.0 exiting
+c 0.405 0 <#3> S10.0 Diversification index 10
+c 0.405 0 <#3> S10.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.405 0 <#3> S10.0 Diversifying 10
+c 0.405 0 <#3> S10.0 Reading rev. 0, start 0
+c 0.411 0 <#3> S10.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.411 0 <#3> S10.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.682 0 <#3> S10.0 disc_reasons r_ee:0,r_ed:726,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1236,r_ia:0,r_tl:0
+c 1.682 0 <#3> S10.0 ENDSOL
+c 1.682 0 <#3> S10.0 exiting
+c 0.405 0 <#3> S11.0 Diversification index 11
+c 0.405 0 <#3> S11.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.405 0 <#3> S11.0 Diversifying 11
+c 0.405 0 <#3> S11.0 Reading rev. 0, start 0
+c 0.411 0 <#3> S11.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.411 0 <#3> S11.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.682 0 <#3> S11.0 disc_reasons r_ee:0,r_ed:840,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1119,r_ia:0,r_tl:0
+c 0.404 0 <#3> S9.0 Diversification index 9
+c 0.405 0 <#3> S9.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.405 0 <#3> S9.0 Diversifying 9
+c 0.405 0 <#3> S9.0 Reading rev. 0, start 0
+c 0.411 0 <#3> S9.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.411 0 <#3> S9.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.681 0 <#3> S9.0 disc_reasons r_ee:0,r_ed:1020,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1057,r_ia:0,r_tl:0
+c 1.682 0 <#3> S9.0 ENDSOL
+c 1.682 0 <#3> S9.0 exiting
+c 0.030 0 <#2> S0.0 Diversification index 0
+c 0.031 0 <#2> S0.0 Received 153575 literals: 487 3235 -271 0 -487 ... 481 482 483 484 0 
+c 0.031 0 <#2> S0.0 Diversifying 0
+c 0.031 0 <#2> S0.0 Reading rev. 0, start 0
+c 0.043 0 <#2> S0.0 Reading done @ rev. 0 (153575 lits, 0 assumptions)
+c 0.044 0 <#2> S0.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 0.427 0 <#2> S0.0 disc_reasons r_ee:0,r_ed:0,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:0,r_ia:0,r_tl:0
+c 0.427 0 <#2> S0.0 ENDSOL
+c 0.427 0 <#2> S0.0 exiting
+c 0.031 0 <#2> S1.0 Diversification index 1
+c 0.031 0 <#2> S1.0 Received 153575 literals: 487 3235 -271 0 -487 ... 481 482 483 484 0 
+c 0.031 0 <#2> S1.0 Diversifying 1
+c 0.031 0 <#2> S1.0 Reading rev. 0, start 0
+c 0.043 0 <#2> S1.0 Reading done @ rev. 0 (153575 lits, 0 assumptions)
+c 0.043 0 <#2> S1.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 0.427 0 <#2> S1.0 disc_reasons r_ee:0,r_ed:0,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:0,r_ia:0,r_tl:0
+c 0.441 0 <#3> S10.0 Diversification index 10
+c 0.441 0 <#3> S10.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.441 0 <#3> S10.0 Diversifying 10
+c 0.441 0 <#3> S10.0 Reading rev. 0, start 0
+c 0.446 0 <#3> S10.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.446 0 <#3> S10.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.762 0 <#3> S10.0 disc_reasons r_ee:0,r_ed:1245,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1201,r_ia:0,r_tl:0
+c 1.762 0 <#3> S10.0 ENDSOL
+c 1.762 0 <#3> S10.0 exiting
+c 0.441 0 <#3> S11.0 Diversification index 11
+c 0.441 0 <#3> S11.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.441 0 <#3> S11.0 Diversifying 11
+c 0.441 0 <#3> S11.0 Reading rev. 0, start 0
+c 0.446 0 <#3> S11.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.446 0 <#3> S11.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.762 0 <#3> S11.0 disc_reasons r_ee:0,r_ed:852,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1224,r_ia:0,r_tl:0
+c 1.762 0 <#3> S11.0 ENDSOL
+c 1.762 0 <#3> S11.0 exiting
+c 0.440 0 <#3> S9.0 Diversification index 9
+c 0.441 0 <#3> S9.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.441 0 <#3> S9.0 Diversifying 9
+c 0.441 0 <#3> S9.0 Reading rev. 0, start 0
+c 0.447 0 <#3> S9.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.447 0 <#3> S9.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.762 0 <#3> S9.0 disc_reasons r_ee:0,r_ed:1044,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1107,r_ia:0,r_tl:0
+c 1.762 0 <#3> S9.0 ENDSOL
+c 1.762 0 <#3> S9.0 exiting
+c 0.029 0 <#2> S0.0 Diversification index 0
+c 0.030 0 <#2> S0.0 Received 153575 literals: 487 3235 -271 0 -487 ... 481 482 483 484 0 
+c 0.030 0 <#2> S0.0 Diversifying 0
+c 0.030 0 <#2> S0.0 Reading rev. 0, start 0
+c 0.037 0 <#2> S0.0 Reading done @ rev. 0 (153575 lits, 0 assumptions)
+c 0.037 0 <#2> S0.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 0.362 0 <#2> S0.0 disc_reasons r_ee:0,r_ed:0,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:0,r_ia:0,r_tl:0
+c 0.363 0 <#2> S0.0 ENDSOL
+c 0.363 0 <#2> S0.0 exiting
+c 0.029 0 <#2> S1.0 Diversification index 1
+c 0.030 0 <#2> S1.0 Received 153575 literals: 487 3235 -271 0 -487 ... 481 482 483 484 0 
+c 0.030 0 <#2> S1.0 Diversifying 1
+c 0.030 0 <#2> S1.0 Reading rev. 0, start 0
+c 0.037 0 <#2> S1.0 Reading done @ rev. 0 (153575 lits, 0 assumptions)
+c 0.037 0 <#2> S1.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 0.362 0 <#2> S1.0 disc_reasons r_ee:0,r_ed:0,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:0,r_ia:0,r_tl:0
+c 0.363 0 <#2> S1.0 ENDSOL
+c 0.363 0 <#2> S1.0 exiting
+c 0.379 0 <#3> S10.0 Diversification index 10
+c 0.379 0 <#3> S10.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.379 0 <#3> S10.0 Diversifying 10
+c 0.379 0 <#3> S10.0 Reading rev. 0, start 0
+c 0.385 0 <#3> S10.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.385 0 <#3> S10.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.825 0 <#3> S10.0 disc_reasons r_ee:0,r_ed:1717,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1886,r_ia:0,r_tl:0
+c 0.379 0 <#3> S11.0 Diversification index 11
+c 0.379 0 <#3> S11.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.379 0 <#3> S11.0 Diversifying 11
+c 0.379 0 <#3> S11.0 Reading rev. 0, start 0
+c 0.385 0 <#3> S11.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.385 0 <#3> S11.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.825 0 <#3> S11.0 disc_reasons r_ee:0,r_ed:1890,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1842,r_ia:0,r_tl:0
+c 1.825 0 <#3> S11.0 ENDSOL
+c 1.825 0 <#3> S11.0 exiting
+c 0.378 0 <#3> S9.0 Diversification index 9
+c 0.379 0 <#3> S9.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.379 0 <#3> S9.0 Diversifying 9
+c 0.379 0 <#3> S9.0 Reading rev. 0, start 0
+c 0.385 0 <#3> S9.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.385 0 <#3> S9.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.825 0 <#3> S9.0 disc_reasons r_ee:0,r_ed:1922,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1644,r_ia:0,r_tl:0
+c 1.825 0 <#3> S9.0 ENDSOL
+c 1.825 0 <#3> S9.0 exiting
+c 0.029 0 <#2> S0.0 Diversification index 0
+c 0.029 0 <#2> S0.0 Received 153575 literals: 487 3235 -271 0 -487 ... 481 482 483 484 0 
+c 0.029 0 <#2> S0.0 Diversifying 0
+c 0.029 0 <#2> S0.0 Reading rev. 0, start 0
+c 0.042 0 <#2> S0.0 Reading done @ rev. 0 (153575 lits, 0 assumptions)
+c 0.042 0 <#2> S0.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 0.402 0 <#2> S0.0 disc_reasons r_ee:0,r_ed:0,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:0,r_ia:0,r_tl:0
+c 0.403 0 <#2> S0.0 ENDSOL
+c 0.403 0 <#2> S0.0 exiting
+c 0.029 0 <#2> S1.0 Diversification index 1
+c 0.029 0 <#2> S1.0 Received 153575 literals: 487 3235 -271 0 -487 ... 481 482 483 484 0 
+c 0.029 0 <#2> S1.0 Diversifying 1
+c 0.030 0 <#2> S1.0 Reading rev. 0, start 0
+c 0.042 0 <#2> S1.0 Reading done @ rev. 0 (153575 lits, 0 assumptions)
+c 0.042 0 <#2> S1.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 0.402 0 <#2> S1.0 disc_reasons r_ee:0,r_ed:0,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:0,r_ia:0,r_tl:0
+c 0.403 0 <#2> S1.0 ENDSOL
+c 0.403 0 <#2> S1.0 exiting
+c 0.414 0 <#3> S10.0 Diversification index 10
+c 0.414 0 <#3> S10.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.414 0 <#3> S10.0 Diversifying 10
+c 0.414 0 <#3> S10.0 Reading rev. 0, start 0
+c 0.421 0 <#3> S10.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.421 0 <#3> S10.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.789 0 <#3> S10.0 disc_reasons r_ee:0,r_ed:1762,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1896,r_ia:0,r_tl:0
+c 1.789 0 <#3> S10.0 ENDSOL
+c 1.789 0 <#3> S10.0 exiting
+c 0.414 0 <#3> S11.0 Diversification index 11
+c 0.414 0 <#3> S11.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.414 0 <#3> S11.0 Diversifying 11
+c 0.414 0 <#3> S11.0 Reading rev. 0, start 0
+c 0.421 0 <#3> S11.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.421 0 <#3> S11.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.780 0 <#3> S11.0 ENDSOL
+c 1.780 0 <#3> S11.0 found result UNSAT for rev. 0
+c 1.789 0 <#3> S11.0 disc_reasons r_ee:0,r_ed:1928,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1914,r_ia:0,r_tl:0
+c 1.789 0 <#3> S11.0 exiting
+c 0.414 0 <#3> S9.0 Diversification index 9
+c 0.414 0 <#3> S9.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.414 0 <#3> S9.0 Diversifying 9
+c 0.414 0 <#3> S9.0 Reading rev. 0, start 0
+c 0.421 0 <#3> S9.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.421 0 <#3> S9.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.789 0 <#3> S9.0 disc_reasons r_ee:0,r_ed:2021,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1580,r_ia:0,r_tl:0
+c 1.789 0 <#3> S9.0 ENDSOL
+c 1.789 0 <#3> S9.0 exiting
+c 0.029 0 <#2> S0.0 Diversification index 0
+c 0.030 0 <#2> S0.0 Received 153575 literals: 487 3235 -271 0 -487 ... 481 482 483 484 0 
+c 0.030 0 <#2> S0.0 Diversifying 0
+c 0.030 0 <#2> S0.0 Reading rev. 0, start 0
+c 0.040 0 <#2> S0.0 Reading done @ rev. 0 (153575 lits, 0 assumptions)
+c 0.040 0 <#2> S0.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 0.367 0 <#2> S0.0 disc_reasons r_ee:0,r_ed:0,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:0,r_ia:0,r_tl:0
+c 0.367 0 <#2> S0.0 ENDSOL
+c 0.367 0 <#2> S0.0 exiting
+c 0.030 0 <#2> S1.0 Diversification index 1
+c 0.030 0 <#2> S1.0 Received 153575 literals: 487 3235 -271 0 -487 ... 481 482 483 484 0 
+c 0.030 0 <#2> S1.0 Diversifying 1
+c 0.030 0 <#2> S1.0 Reading rev. 0, start 0
+c 0.040 0 <#2> S1.0 Reading done @ rev. 0 (153575 lits, 0 assumptions)
+c 0.040 0 <#2> S1.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 0.367 0 <#2> S1.0 disc_reasons r_ee:0,r_ed:0,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:0,r_ia:0,r_tl:0
+c 0.367 0 <#2> S1.0 ENDSOL
+c 0.367 0 <#2> S1.0 exiting
+c 0.380 0 <#3> S10.0 Diversification index 10
+c 0.380 0 <#3> S10.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.381 0 <#3> S10.0 Diversifying 10
+c 0.381 0 <#3> S10.0 Reading rev. 0, start 0
+c 0.391 0 <#3> S10.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.391 0 <#3> S10.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.863 0 <#3> S10.0 disc_reasons r_ee:0,r_ed:1890,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1604,r_ia:0,r_tl:0
+c 1.864 0 <#3> S10.0 ENDSOL
+c 1.864 0 <#3> S10.0 exiting
+c 0.380 0 <#3> S11.0 Diversification index 11
+c 0.380 0 <#3> S11.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.381 0 <#3> S11.0 Diversifying 11
+c 0.381 0 <#3> S11.0 Reading rev. 0, start 0
+c 0.390 0 <#3> S11.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.390 0 <#3> S11.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.863 0 <#3> S11.0 disc_reasons r_ee:0,r_ed:1651,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1654,r_ia:0,r_tl:0
+c 1.864 0 <#3> S11.0 ENDSOL
+c 1.864 0 <#3> S11.0 exiting
+c 0.380 0 <#3> S9.0 Diversification index 9
+c 0.380 0 <#3> S9.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.381 0 <#3> S9.0 Diversifying 9
+c 0.381 0 <#3> S9.0 Reading rev. 0, start 0
+c 0.388 0 <#3> S9.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.388 0 <#3> S9.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.853 0 <#3> S9.0 ENDSOL
+c 1.853 0 <#3> S9.0 found result UNSAT for rev. 0
+c 1.863 0 <#3> S9.0 disc_reasons r_ee:0,r_ed:1982,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1474,r_ia:0,r_tl:0
+c 1.863 0 <#3> S9.0 exiting
+c 0.028 0 <#2> S0.0 Diversification index 0
+c 0.029 0 <#2> S0.0 Received 153575 literals: 487 3235 -271 0 -487 ... 481 482 483 484 0 
+c 0.029 0 <#2> S0.0 Diversifying 0
+c 0.029 0 <#2> S0.0 Reading rev. 0, start 0
+c 0.043 0 <#2> S0.0 Reading done @ rev. 0 (153575 lits, 0 assumptions)
+c 0.043 0 <#2> S0.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 0.431 0 <#2> S0.0 disc_reasons r_ee:0,r_ed:0,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:0,r_ia:0,r_tl:0
+c 0.431 0 <#2> S0.0 ENDSOL
+c 0.431 0 <#2> S0.0 exiting
+c 0.028 0 <#2> S1.0 Diversification index 1
+c 0.029 0 <#2> S1.0 Received 153575 literals: 487 3235 -271 0 -487 ... 481 482 483 484 0 
+c 0.029 0 <#2> S1.0 Diversifying 1
+c 0.029 0 <#2> S1.0 Reading rev. 0, start 0
+c 0.043 0 <#2> S1.0 Reading done @ rev. 0 (153575 lits, 0 assumptions)
+c 0.043 0 <#2> S1.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 0.431 0 <#2> S1.0 disc_reasons r_ee:0,r_ed:0,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:0,r_ia:0,r_tl:0
+c 0.431 0 <#2> S1.0 ENDSOL
+c 0.431 0 <#2> S1.0 exiting
+c 0.443 0 <#3> S10.0 Diversification index 10
+c 0.443 0 <#3> S10.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.443 0 <#3> S10.0 Diversifying 10
+c 0.443 0 <#3> S10.0 Reading rev. 0, start 0
+c 0.450 0 <#3> S10.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.450 0 <#3> S10.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.804 0 <#3> S10.0 disc_reasons r_ee:0,r_ed:719,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1282,r_ia:0,r_tl:0
+c 1.804 0 <#3> S10.0 ENDSOL
+c 1.804 0 <#3> S10.0 exiting
+c 0.443 0 <#3> S11.0 Diversification index 11
+c 0.443 0 <#3> S11.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.443 0 <#3> S11.0 Diversifying 11
+c 0.443 0 <#3> S11.0 Reading rev. 0, start 0
+c 0.450 0 <#3> S11.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.450 0 <#3> S11.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.804 0 <#3> S11.0 disc_reasons r_ee:0,r_ed:1715,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1839,r_ia:0,r_tl:0
+c 1.804 0 <#3> S11.0 ENDSOL
+c 1.804 0 <#3> S11.0 exiting
+c 0.443 0 <#3> S9.0 Diversification index 9
+c 0.443 0 <#3> S9.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.443 0 <#3> S9.0 Diversifying 9
+c 0.443 0 <#3> S9.0 Reading rev. 0, start 0
+c 0.450 0 <#3> S9.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.450 0 <#3> S9.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.792 0 <#3> S9.0 ENDSOL
+c 1.792 0 <#3> S9.0 found result UNSAT for rev. 0
+c 1.804 0 <#3> S9.0 disc_reasons r_ee:0,r_ed:2029,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1680,r_ia:0,r_tl:0
+c 1.804 0 <#3> S9.0 exiting

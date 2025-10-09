@@ -1,0 +1,56 @@
+[New LWP 59418]
+[New LWP 59381]
+[New LWP 59357]
+[New LWP 59342]
+[New LWP 59331]
+[New LWP 59326]
+[New LWP 59321]
+[New LWP 59318]
+[New LWP 59316]
+[New LWP 59313]
+[New LWP 59308]
+[New LWP 59306]
+[New LWP 59304]
+
+warning: could not find '.gnu_debugaltlink' file for /lib/x86_64-linux-gnu/libcap.so.2
+
+warning: could not find '.gnu_debugaltlink' file for /usr/lib/x86_64-linux-gnu/pmix2/lib/pmix/pmix_mca_pcompress_zlib.so
+
+warning: could not find '.gnu_debugaltlink' file for /usr/lib/x86_64-linux-gnu/hwloc/hwloc_opencl.so
+
+warning: could not find '.gnu_debugaltlink' file for /usr/lib/x86_64-linux-gnu/hwloc/hwloc_pci.so
+
+warning: could not find '.gnu_debugaltlink' file for /usr/lib/x86_64-linux-gnu/hwloc/hwloc_xml_libxml.so
+
+warning: could not find '.gnu_debugaltlink' file for /usr/lib/x86_64-linux-gnu/hwloc/hwloc_gl.so
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+
+Thread 1 "MainThread" received signal SIGTSTP, Stopped (user).
+0x00007058a6698d71 in __futex_abstimed_wait_common64 (private=128, cancel=true, abstime=0x0, op=265, expected=59418, futex_word=0x705897bff990) at ./nptl/futex-internal.c:57
+
+warning: 57	./nptl/futex-internal.c: No such file or directory
+#0  0x00007058a6698d71 in __futex_abstimed_wait_common64 (private=128, cancel=true, abstime=0x0, op=265, expected=59418, futex_word=0x705897bff990) at ./nptl/futex-internal.c:57
+#1  __futex_abstimed_wait_common (cancel=true, private=128, abstime=0x0, clockid=0, expected=59418, futex_word=0x705897bff990) at ./nptl/futex-internal.c:87
+#2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x705897bff990, expected=59418, clockid=clockid@entry=0, abstime=abstime@entry=0x0, private=private@entry=128) at ./nptl/futex-internal.c:139
+#3  0x00007058a669e7a3 in __pthread_clockjoin_ex (threadid=123525805373120, thread_return=0x0, clockid=0, abstime=0x0, block=<optimized out>) at ./nptl/pthread_join_common.c:102
+#4  0x00007058a6aece33 in std::thread::join() () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#5  0x00005ddec2945c1c in Process::writeTrace (tid=<optimized out>) at /home/nicco/PhD/tmp/mallob/src/util/sys/process.cpp:207
+#6  0x00005ddec2946dfe in handleSignal (signum=6) at /home/nicco/PhD/tmp/mallob/src/util/sys/process.cpp:43
+#7  handleSignal (signum=6) at /home/nicco/PhD/tmp/mallob/src/util/sys/process.cpp:34
+#8  <signal handler called>
+#9  __pthread_kill_implementation (no_tid=0, signo=6, threadid=<optimized out>) at ./nptl/pthread_kill.c:44
+#10 __pthread_kill_internal (signo=6, threadid=<optimized out>) at ./nptl/pthread_kill.c:78
+#11 __GI___pthread_kill (threadid=<optimized out>, signo=signo@entry=6) at ./nptl/pthread_kill.c:89
+#12 0x00007058a664527e in __GI_raise (sig=sig@entry=6) at ../sysdeps/posix/raise.c:26
+#13 0x00007058a66288ff in __GI_abort () at ./stdlib/abort.c:79
+#14 0x00007058a662881b in __assert_fail_base (fmt=0x7058a67d01e8 "%s%s%s:%u: %s%sAssertion `%s' failed.\n%n", assertion=assertion@entry=0x5ddec2b25860 "log_return_false(\"[ERROR] Unexpected job message mpitag=%i inttag=%i jobId=%i ctx_id_sender=%i <= [%i]\\n\", mpiTag, msg.tag, msg.jobId, msg.contextIdOfSender, source)", file=file@entry=0x5ddec2b253b0 "/home/nicco/PhD/tmp/mallob/src/app/sat/job/anytime_sat_clause_communicator.cpp", line=line@entry=187, function=function@entry=0x5ddec2b25818 "void AnytimeSatClauseCommunicator::handle(int, int, JobMessage&)") at ./assert/assert.c:96
+#15 0x00007058a663b517 in __assert_fail (assertion=0x5ddec2b25860 "log_return_false(\"[ERROR] Unexpected job message mpitag=%i inttag=%i jobId=%i ctx_id_sender=%i <= [%i]\\n\", mpiTag, msg.tag, msg.jobId, msg.contextIdOfSender, source)", file=0x5ddec2b253b0 "/home/nicco/PhD/tmp/mallob/src/app/sat/job/anytime_sat_clause_communicator.cpp", line=187, function=0x5ddec2b25818 "void AnytimeSatClauseCommunicator::handle(int, int, JobMessage&)") at ./assert/assert.c:105
+#16 0x00005ddec29f5c69 in AnytimeSatClauseCommunicator::handle (this=0x7058a080d740, source=2, mpiTag=30, msg=...) at /home/nicco/PhD/tmp/mallob/src/app/sat/job/anytime_sat_clause_communicator.cpp:187
+#17 0x00005ddec2966dc2 in JobRegistry::processAppMessage (msg=..., mpiTag=30, source=2, this=0x7058a068bd10) at /home/nicco/PhD/tmp/mallob/src/core/job_registry.hpp:71
+#18 SchedulingManager::handleApplicationMessage (this=0x7058a068bf78, handle=...) at /home/nicco/PhD/tmp/mallob/src/core/scheduling_manager.cpp:710
+#19 0x00005ddec295e918 in MessageQueue::processReceived (this=this@entry=0x7058a1980700) at /home/nicco/PhD/tmp/mallob/src/comm/msg_queue/message_queue.cpp:360
+#20 0x00005ddec295f6c7 in MessageQueue::advance (this=0x7058a1980700) at /home/nicco/PhD/tmp/mallob/src/comm/msg_queue/message_queue.cpp:203
+#21 0x00005ddec28e91ec in doMainProgram (commWorkers=@0x7ffd48858878: 0x7058a63e6280, commClients=@0x7ffd48858870: 0x5ddec2b87ee0 <ompi_mpi_comm_null>, params=..., distTerm=...) at /home/nicco/PhD/tmp/mallob/src/main.cpp:182
+#22 0x00005ddec288f23b in main (argc=<optimized out>, argv=<optimized out>) at /home/nicco/PhD/tmp/mallob/src/main.cpp:361
+[Inferior 1 (process 59298) detached]

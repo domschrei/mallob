@@ -158,6 +158,7 @@ public:
             msg.epoch = 0;
             msg.jobId = _id;
             msg.tag = MSG_AGGREGATE_RANKLIST;
+            LOG(V1_WARN, "jobId<#%i>: sending [%i]->[%i] MSG_AGGREGATE_RANKLIST \n", _id, _job_tree.getRank(), _job_tree.getParentNodeRank());
             //log(LOG_ADD_DESTRANK | V3_VERB, "send Ranklist size %i", getJobTree().getParentNodeRank(), msg.payload.size());
             _job_tree.sendToParent(msg);
         }

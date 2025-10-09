@@ -1,0 +1,1644 @@
+c 0.002 0 Program options: -0o=0 -J=0 -SJ=0 -T=0 -adc=0 -aim=1 -ajpc=0 -ans=0 -apidir=.api -ba=4 -bem=1 -bicg=4 -br=0 -c=1 -cbbs=0 -cblm=1 -cblp=100000 -cdel=2 -cecpm=0 -cf=0 -cfci=10 -cfm=3 -cg=1 -ch=0 -checksums=0 -cjc=0 -client-app-threads=1 -cm=0 -cmp=0 -colors=1 -compact-proof=0 -cpshm=0 -csm=3 -cusv=1 -dc=0 -decay-distr=1 -decay-max=200 -decay-mean=50 -decay-min=1 -decay-stddev=3 -decpm=0 -delaymonkey=0 -div-elim=0 -div-fanout=0 -div-init-shuffle=0 -div-native=1 -div-noise=0 -div-phases=1 -div-reduce=0 -div-seeds=1 -dpa=1 -ds=0 -evpt=500 -evu=0 -extmem-disk-dir=.disk -fapii=0 -fcll=1 -g=0 -gclls=0 -h=0 -huca=0 -iff=0 -ilbd=0 -inotify=1 -interface-fs=0 -interface-ipc=0 -ipm=1 -ivdh=1 -jc=1 -jcl=0 -jcup=0.05 -jjp=0 -jwl=0 -l=1 -latencymonkey=0 -lbdpi=0 -lbdpo=0 -ljpc=32 -log=logsntraces//logs/ -mbt=8388608 -mcips=10 -md=0 -mempanic=1 -mjps=0 -mlbdps=2 -mlpt=50000000 -mmpi=0 -mono=instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf -mono-app=SATWITHPRE -mscf=5 -nec=10 -no-import=0 -os=0 -otfc=0 -otfcm=1 -p=0.1 -pb=1 -pbbm=0 -pef=1 -pjp=9999999 -pl=0 -plain-add-specific=0 -pph=0 -pre-cleanup=0 -prisma=0 -proof-debugging=0 -ps=0 -q=0 -qcll=60 -qlbdl=60 -randlbd=0 -reduce-delta=100 -reduce-max=980 -reduce-mean=700 -reduce-min=300 -reduce-stddev=150 -rlbd=3 -rpa=0 -rs=1 -rspaa=0 -s=0.5 -satsolver=k -scll=60 -scramble-lbds=0 -scsd=0 -seed=0 -sjd=0 -slbdl=60 -sleep=100 -spl=-1 -sswl=0 -t=3 -terminate-abruptly=0 -tmp=/tmp -trace-dir=logsntraces//traces/ -uninvert-proof=1 -v=4 -w=-1 -wam=10000 -warmup=0 -watchdog=1 -y=1 -yield=0 
+c 0.002 0 Mallob rls pid=58123 on host vvbk
+c 0.003 0 4 workers, 1 clients
+c 0.007 0 Created client communicator
+c 0.007 0 Created worker communicator
+c 0.007 0 I am worker #0
+c 0.007 0 I am client #0
+c 0.007 0 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.007 0 [WARN] Falling back to safe value r=2.
+c 0.007 0 My bounce alternatives: 3 1 
+c 0.008 0 Set up API connector
+c 0.008 0 Machine color 0 with 4 total workers (my rank: 0)
+c 0.008 0 Assuming application "SATWITHPRE" for mono job
+c 0.008 0 [CA] Root: 0 requests, 1 idle (epoch=0)
+c 0.009 0 [CA] Root: 0 requests, 3 idle (epoch=0)
+c 0.010 0 [CA] Root: 0 requests, 4 idle (epoch=0)
+c 0.017 0 corealloc req 1 -> 1 granted, 2 free
+c 0.021 0 Introducing job #2 rev. 0 : r.#2:0 rev. 0 <- [0] born=0.021 hops=0 epoch=-1 matchId=-1 => [0]
+c 0.021 0 BLC insert (2,1,0.010)
+c 0.021 0 Activate r.#2:0 rev. 0 <- [0] born=0.021 hops=0 epoch=-1 matchId=-1
+c 0.021 0 ADOPT r.#2:0 rev. 0 <- [0] born=0.021 hops=1 epoch=-1 matchId=-1 mode=1 <= [0]
+c 0.022 0 corealloc req 0 -> 0 granted, 2 free
+c 0.022 0 COMMIT #2 -> #2:0
+c 0.022 0 Scheduling r.#2:0 rev. 0 <- [0] born=0.021 hops=1 epoch=-1 matchId=-1 on [0] (latency: 0.00111s)
+c 0.022 0 Sending job desc. of #2 rev. 0 of size 614404, formula begins at idx 104 => [0]
+c 0.022 0 Sent job desc. of #2 of size 614404 => [0]
+c 0.022 0 Got desc. of size 614404 for job #2 <= [0]
+c 0.022 0 UNCOMMIT #2:0
+c 0.022 0 LOAD 1 (+#2:0)
+c 0.022 0 EXECUTE #2:0 <= [0]
+c 0.022 0 #2:0 : new job node starting
+c 0.022 0 corealloc req 3 -> 2 granted, 0 free
+c 0.023 0 BLC insert (2,4,1.000)
+c 0.023 0 #2:0 : update v=1 epoch=1 lastreqsepoch=-1 evlat=0.00000
+c 0.023 0 SPA: formula with 614300 bytes
+c 0.031 0 #2:0 : update v=4 epoch=2 lastreqsepoch=1 evlat=0.00886
+c 0.031 0 #2:0 growing: r.#2:1 rev. 0 <- [0] born=0.031 hops=0 epoch=2 matchId=-1 => [1]
+c 0.031 0 #2:0 growing: r.#2:2 rev. 0 <- [0] born=0.031 hops=0 epoch=2 matchId=-1 => [2]
+c 0.032 0 Adoption offer for #2:1 <= [1]
+c 0.032 0 RBS #2:1 EXPAND e=2 #inactives=0 => [1]
+c 0.032 0 Adoption offer for #2:2 <= [2]
+c 0.032 0 RBS #2:2 EXPAND e=2 #inactives=0 => [2]
+c 0.032 0 Sending job desc. of #2:0 rev. 0, size 614404, formula begins at idx 104 => [1]
+c 0.032 0 Sent id=16 => [1]
+c 0.032 0 Sending job desc. of #2:0 rev. 0, size 614404, formula begins at idx 104 => [2]
+c 0.032 0 Sent id=17 => [2]
+c 0.036 0 PREPRO running Kissat
+c 0.046 0 Watchdog sleep interrupted by signal
+c 0.052 0 [WARN] #2:0 job tree has size 0/4
+c 0.185 0 PREPRO Kissat done, result 0
+c 0.186 0 corealloc ret 1 -> 1 free
+c 0.186 0 SATWP preprocessor done
+c 0.186 0 SATWP submit preprocessed task
+c 0.186 0 SATWP #1 : Retracting base job over ~0.169s
+c 0.188 0 Introducing job #3 rev. 0 : r.#3:0 rev. 0 <- [0] born=0.188 hops=0 epoch=-1 matchId=-1 => [0]
+c 0.188 0 BLC insert (3,1,0.010)
+c 0.188 0 #2:0 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.188 0 Activate r.#3:0 rev. 0 <- [0] born=0.188 hops=0 epoch=-1 matchId=-1
+c 0.188 0 [CA] Root: 1 requests, 0 idle (epoch=3)
+c 0.189 0 [CA] Root: 0 requests, 0 idle (epoch=3)
+c 0.190 0 Scheduling r.#3:0 rev. 0 <- [0] born=0.188 hops=2 epoch=-1 matchId=-1 on [3] (latency: 0.00232s)
+c 0.190 0 Sending job desc. of #3 rev. 0 of size 502328, formula begins at idx 124 => [3]
+c 0.190 0 Sent job desc. of #3 of size 502328 => [3]
+c 0.190 0 [CA] Root: 0 requests, 0 idle (epoch=3)
+c 0.198 0 #2:0 : update v=3 epoch=4 lastreqsepoch=3 evlat=0.00000
+c 0.205 0 [WARN] #2:0 job tree has size 4/3
+c 0.301 0 BLC FINALIZED alpha=5000000.093751 excess=0
+c 0.301 0 #2:0 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00000
+c 0.302 0 RBS #2:2 SHRINK #inactives=1 <= [2]
+c 0.332 0 BLC FINALIZED alpha=1.000000 excess=0
+c 0.332 0 #2:0 : update v=1 epoch=6 lastreqsepoch=5 evlat=0.00000
+c 0.332 0 RBS #2:1 SHRINK #inactives=2 <= [1]
+c 0.352 0 BLC FINALIZED alpha=1.000000 excess=0
+c 0.352 0 #2:0 : update v=1 epoch=7 lastreqsepoch=6 evlat=0.00000
+c 0.353 0 [CA] Root: 0 requests, 0 idle (epoch=7)
+c 0.354 0 [CA] Root: 0 requests, 0 idle (epoch=7)
+c 0.355 0 [CA] Root: 0 requests, 0 idle (epoch=7)
+c 0.372 0 SATWP Interrupt #1:base
+c 0.372 0 Interrupt #2
+c 0.372 0 Acknowledge #2 interrupt
+c 0.372 0 #2 sent feedback of interrupt to client
+c 0.372 0 Propagate interruption of #2:0 ... => [1]
+c 0.372 0 Propagate interruption of #2:0 ... => [2]
+c 0.372 0 LOAD 0 (-#2:0)
+c 0.372 0 corealloc ret 2 -> 3 free
+c 0.372 0 #2:0 : terminated
+c 0.372 0 BLC insert (2,0,0.000)
+c 0.372 0 #2:0 balancing latency={num:1 min:0.00886 med:0.00886 avg:0.00886 max:0.00886}
+c 0.372 0 Forget #2:0
+c 0.372 0 FORGET #2:0
+c 0.372 0 #2:0 desires fulfilled=1.0000 latency={num:2 min:0.00020 med:0.00023 avg:0.00022 max:0.00023}
+c 0.373 0 TIMEOUT/UNKNOWN #2 rev. 0 0.352118 <= [0]
+c 0.374 0 #2:0 : FSJ freeing mem
+c 0.374 0 ADOPT r.#3:3 rev. 0 <- [2] born=0.373 hops=2 epoch=8 matchId=-1 mode=1 <= [0]
+c 0.374 0 corealloc req 0 -> 0 granted, 3 free
+c 0.374 0 COMMIT #3 -> #3:3
+c 0.375 0 Got desc. of size 502328 for job #3 <= [2]
+c 0.375 0 UNCOMMIT #3:3
+c 0.375 0 LOAD 1 (+#3:3)
+c 0.375 0 EXECUTE #3:3 <= [2]
+c 0.375 0 #3:3 : new job node starting
+c 0.375 0 corealloc req 3 -> 3 granted, 0 free
+c 0.375 0 SATWP base done
+c 0.375 0 SATWP Extract result of #1:base
+c 0.375 0 #3:3 : update v=4 epoch=8 lastreqsepoch=8 evlat=0.00000
+c 0.376 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.376 0 SPA: formula with 502204 bytes
+c 0.384 0 #2:0 : FSJ mem freed
+c 0.385 0 Watchdog sleep interrupted by signal
+c 0.385 0 #2:0 ready for destruction
+c 0.389 0 Watchdog sleep interrupted by signal
+c 0.434 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.485 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.535 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.586 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.636 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.687 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.695 0 #3:3 : INIT COMM e=1 nc=0
+c 0.707 0 #3:3 CS produced cls size=1707 lits=1701/1500
+c 0.707 0 #3:3 : merged 1 contribs rev=0 (inp=1500, t=0.0003s) ~> len=1707
+c 0.737 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.787 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.838 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.888 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.939 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.989 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.000 0 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.000 0 contexts=1 descriptions=1
+c 1.039 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.090 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.140 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.191 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.199 0 #3:3 : INIT COMM e=2 nc=0
+c 1.201 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.00GB newreqs=6 hops=5
+c 1.201 0 sysstate entered=3 parsed=3 scheduled=3 processed=1 successful=0
+c 1.211 0 #3:3 CS produced cls size=2216 lits=2210/2123
+c 1.211 0 #3:3 : merged 1 contribs rev=0 (inp=2123, t=0.0004s) ~> len=2216
+c 1.241 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.291 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.342 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.392 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.443 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.493 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.544 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.594 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.644 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.695 0 #3:3 rev. 0 : found result UNSAT => [3]
+c 1.695 0 #3:3 rev. 0: sending finished info => [3]
+c 1.695 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.695 0 Will receive job result for job #3 rev. 0 <= [3]
+c 1.695 0 Send result of #3 rev. 0 to client => [0]
+c 1.695 0 LOAD 0 (-#3:3)
+c 1.695 0 corealloc ret 3 -> 3 free
+c 1.695 0 #3:3 : terminated
+c 1.695 0 Forget #3:3
+c 1.695 0 FORGET #3:3
+c 1.695 0 #3:3 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.695 0 Received result of job #3 rev. 0, code: 20 <= [0]
+c 1.695 0 RESPONSE_TIME #3 1.509570 rev. 0
+c 1.695 0 SOLUTION #3 UNSATISFIABLE rev. 0
+c 1.698 0 SATWP prepro done
+c 1.698 0 SATWP Extract result of #1:prepro
+c 1.698 0 SATWP #1:prepro extracted
+c 1.698 0 #1 SATWP RES ~20~
+c 1.705 0 Received result of job #1 rev. 0, code: 20 <= [0]
+c 1.705 0 RESPONSE_TIME #1 1.696409 rev. 0
+c 1.705 0 SOLUTION #1 UNSATISFIABLE rev. 0
+s UNSATISFIABLE
+c 1.705 0 Destruct worker
+c 1.705 0 #3:3 : FSJ freeing mem
+c 1.705 0 #3:3 : FSJ mem freed
+c 1.705 0 Watchdog sleep interrupted by signal
+c 1.706 0 #3:3 ready for destruction
+c 1.707 0 all jobs deleted
+c 1.707 0 Watchdog sleep interrupted by signal
+c 1.707 0 STATS balancing_latencies num:1 min:0.008856 max:0.008856 med:0.008856 mean:0.008856
+c 1.707 0 busytime=1.671
+c 1.707 0 STATS treegrowth_latencies num:2 min:0.000202 max:0.000235 med:0.000235 mean:0.000218
+c 1.707 0 Watchdog sleep interrupted by signal
+c 1.707 0 Leaving client destructor
+c 1.707 0 Watchdog sleep interrupted by signal
+c 1.767 0 Exiting happily
+c 0.001 0 Program options: -0o=0 -J=0 -SJ=0 -T=0 -adc=0 -aim=1 -ajpc=0 -ans=0 -apidir=.api -ba=4 -bem=1 -bicg=4 -br=0 -c=1 -cbbs=0 -cblm=1 -cblp=100000 -cdel=2 -cecpm=0 -cf=0 -cfci=10 -cfm=3 -cg=1 -ch=0 -checksums=0 -cjc=0 -client-app-threads=1 -cm=0 -cmp=0 -colors=1 -compact-proof=0 -cpshm=0 -csm=3 -cusv=1 -dc=0 -decay-distr=1 -decay-max=200 -decay-mean=50 -decay-min=1 -decay-stddev=3 -decpm=0 -delaymonkey=0 -div-elim=0 -div-fanout=0 -div-init-shuffle=0 -div-native=1 -div-noise=0 -div-phases=1 -div-reduce=0 -div-seeds=1 -dpa=1 -ds=0 -evpt=500 -evu=0 -extmem-disk-dir=.disk -fapii=0 -fcll=1 -g=0 -gclls=0 -h=0 -huca=0 -iff=0 -ilbd=0 -inotify=1 -interface-fs=0 -interface-ipc=0 -ipm=1 -ivdh=1 -jc=1 -jcl=0 -jcup=0.05 -jjp=0 -jwl=0 -l=1 -latencymonkey=0 -lbdpi=0 -lbdpo=0 -ljpc=32 -log=logsntraces//logs/ -mbt=8388608 -mcips=10 -md=0 -mempanic=1 -mjps=0 -mlbdps=2 -mlpt=50000000 -mmpi=0 -mono=instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf -mono-app=SATWITHPRE -mscf=5 -nec=10 -no-import=0 -os=0 -otfc=0 -otfcm=1 -p=0.1 -pb=1 -pbbm=0 -pef=1 -pjp=9999999 -pl=0 -plain-add-specific=0 -pph=0 -pre-cleanup=0 -prisma=0 -proof-debugging=0 -ps=0 -q=0 -qcll=60 -qlbdl=60 -randlbd=0 -reduce-delta=100 -reduce-max=980 -reduce-mean=700 -reduce-min=300 -reduce-stddev=150 -rlbd=3 -rpa=0 -rs=1 -rspaa=0 -s=0.5 -satsolver=k -scll=60 -scramble-lbds=0 -scsd=0 -seed=0 -sjd=0 -slbdl=60 -sleep=100 -spl=-1 -sswl=0 -t=3 -terminate-abruptly=0 -tmp=/tmp -trace-dir=logsntraces//traces/ -uninvert-proof=1 -v=4 -w=-1 -wam=10000 -warmup=0 -watchdog=1 -y=1 -yield=0 
+c 0.001 0 Mallob rls pid=58275 on host vvbk
+c 0.001 0 4 workers, 1 clients
+c 0.004 0 Created client communicator
+c 0.004 0 Created worker communicator
+c 0.004 0 I am worker #0
+c 0.004 0 I am client #0
+c 0.004 0 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.004 0 [WARN] Falling back to safe value r=2.
+c 0.004 0 My bounce alternatives: 3 1 
+c 0.004 0 Set up API connector
+c 0.004 0 Machine color 0 with 4 total workers (my rank: 0)
+c 0.004 0 Assuming application "SATWITHPRE" for mono job
+c 0.004 0 [CA] Root: 0 requests, 1 idle (epoch=0)
+c 0.006 0 [CA] Root: 0 requests, 3 idle (epoch=0)
+c 0.007 0 [CA] Root: 0 requests, 4 idle (epoch=0)
+c 0.012 0 corealloc req 1 -> 1 granted, 2 free
+c 0.016 0 Introducing job #2 rev. 0 : r.#2:0 rev. 0 <- [0] born=0.016 hops=0 epoch=-1 matchId=-1 => [0]
+c 0.016 0 BLC insert (2,1,0.010)
+c 0.016 0 Activate r.#2:0 rev. 0 <- [0] born=0.016 hops=0 epoch=-1 matchId=-1
+c 0.017 0 ADOPT r.#2:0 rev. 0 <- [0] born=0.016 hops=1 epoch=-1 matchId=-1 mode=1 <= [0]
+c 0.017 0 corealloc req 0 -> 0 granted, 2 free
+c 0.017 0 COMMIT #2 -> #2:0
+c 0.017 0 Scheduling r.#2:0 rev. 0 <- [0] born=0.016 hops=1 epoch=-1 matchId=-1 on [0] (latency: 0.00045s)
+c 0.017 0 Sending job desc. of #2 rev. 0 of size 614404, formula begins at idx 104 => [0]
+c 0.017 0 Sent job desc. of #2 of size 614404 => [0]
+c 0.017 0 Got desc. of size 614404 for job #2 <= [0]
+c 0.017 0 UNCOMMIT #2:0
+c 0.017 0 LOAD 1 (+#2:0)
+c 0.017 0 EXECUTE #2:0 <= [0]
+c 0.017 0 #2:0 : new job node starting
+c 0.017 0 corealloc req 3 -> 2 granted, 0 free
+c 0.017 0 BLC insert (2,4,1.000)
+c 0.017 0 #2:0 : update v=1 epoch=1 lastreqsepoch=-1 evlat=0.00000
+c 0.018 0 SPA: formula with 614300 bytes
+c 0.026 0 PREPRO running Kissat
+c 0.027 0 #2:0 : update v=4 epoch=2 lastreqsepoch=1 evlat=0.00922
+c 0.027 0 #2:0 growing: r.#2:1 rev. 0 <- [0] born=0.027 hops=0 epoch=2 matchId=-1 => [1]
+c 0.027 0 #2:0 growing: r.#2:2 rev. 0 <- [0] born=0.027 hops=0 epoch=2 matchId=-1 => [2]
+c 0.027 0 Adoption offer for #2:1 <= [1]
+c 0.027 0 RBS #2:1 EXPAND e=2 #inactives=0 => [1]
+c 0.027 0 Adoption offer for #2:2 <= [2]
+c 0.027 0 RBS #2:2 EXPAND e=2 #inactives=0 => [2]
+c 0.027 0 Sending job desc. of #2:0 rev. 0, size 614404, formula begins at idx 104 => [1]
+c 0.027 0 Sent id=16 => [1]
+c 0.027 0 Sending job desc. of #2:0 rev. 0, size 614404, formula begins at idx 104 => [2]
+c 0.027 0 Sent id=17 => [2]
+c 0.030 0 Watchdog sleep interrupted by signal
+c 0.054 0 [WARN] #2:0 job tree has size 0/4
+c 0.181 0 PREPRO Kissat done, result 0
+c 0.181 0 corealloc ret 1 -> 1 free
+c 0.181 0 SATWP preprocessor done
+c 0.181 0 SATWP submit preprocessed task
+c 0.181 0 SATWP #1 : Retracting base job over ~0.168s
+c 0.183 0 Introducing job #3 rev. 0 : r.#3:0 rev. 0 <- [0] born=0.183 hops=0 epoch=-1 matchId=-1 => [0]
+c 0.183 0 BLC insert (3,1,0.010)
+c 0.183 0 #2:0 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.183 0 Activate r.#3:0 rev. 0 <- [0] born=0.183 hops=0 epoch=-1 matchId=-1
+c 0.183 0 [CA] Root: 1 requests, 0 idle (epoch=3)
+c 0.184 0 [CA] Root: 0 requests, 0 idle (epoch=3)
+c 0.185 0 Scheduling r.#3:0 rev. 0 <- [0] born=0.183 hops=2 epoch=-1 matchId=-1 on [3] (latency: 0.00259s)
+c 0.185 0 Sending job desc. of #3 rev. 0 of size 502328, formula begins at idx 124 => [3]
+c 0.185 0 Sent job desc. of #3 of size 502328 => [3]
+c 0.186 0 [CA] Root: 0 requests, 0 idle (epoch=3)
+c 0.193 0 #2:0 : update v=3 epoch=4 lastreqsepoch=3 evlat=0.00000
+c 0.211 0 [WARN] #2:0 job tree has size 4/3
+c 0.289 0 BLC FINALIZED alpha=5000000.093751 excess=0
+c 0.289 0 #2:0 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00000
+c 0.290 0 RBS #2:2 SHRINK #inactives=1 <= [2]
+c 0.290 0 [WARN] #2:0 job tree has size 3/2
+c 0.319 0 BLC FINALIZED alpha=1.000000 excess=0
+c 0.319 0 #2:0 : update v=1 epoch=6 lastreqsepoch=5 evlat=0.00000
+c 0.320 0 RBS #2:1 SHRINK #inactives=2 <= [1]
+c 0.349 0 BLC FINALIZED alpha=1.000000 excess=0
+c 0.349 0 #2:0 : update v=1 epoch=7 lastreqsepoch=6 evlat=0.00000
+c 0.350 0 [CA] Root: 0 requests, 0 idle (epoch=7)
+c 0.351 0 [CA] Root: 0 requests, 0 idle (epoch=7)
+c 0.368 0 SATWP Interrupt #1:base
+c 0.368 0 Interrupt #2
+c 0.368 0 Acknowledge #2 interrupt
+c 0.368 0 #2 sent feedback of interrupt to client
+c 0.368 0 Propagate interruption of #2:0 ... => [1]
+c 0.368 0 Propagate interruption of #2:0 ... => [2]
+c 0.368 0 LOAD 0 (-#2:0)
+c 0.368 0 corealloc ret 2 -> 3 free
+c 0.368 0 #2:0 : terminated
+c 0.368 0 BLC insert (2,0,0.000)
+c 0.368 0 #2:0 balancing latency={num:1 min:0.00922 med:0.00922 avg:0.00922 max:0.00922}
+c 0.368 0 Forget #2:0
+c 0.368 0 FORGET #2:0
+c 0.368 0 #2:0 desires fulfilled=1.0000 latency={num:2 min:0.00022 med:0.00028 avg:0.00025 max:0.00028}
+c 0.368 0 TIMEOUT/UNKNOWN #2 rev. 0 0.351829 <= [0]
+c 0.369 0 #2:0 : FSJ freeing mem
+c 0.370 0 ADOPT r.#3:3 rev. 0 <- [2] born=0.368 hops=2 epoch=8 matchId=-1 mode=1 <= [0]
+c 0.370 0 corealloc req 0 -> 0 granted, 3 free
+c 0.370 0 COMMIT #3 -> #3:3
+c 0.371 0 SATWP base done
+c 0.371 0 SATWP Extract result of #1:base
+c 0.371 0 Got desc. of size 502328 for job #3 <= [2]
+c 0.371 0 UNCOMMIT #3:3
+c 0.371 0 LOAD 1 (+#3:3)
+c 0.371 0 EXECUTE #3:3 <= [2]
+c 0.371 0 #3:3 : new job node starting
+c 0.371 0 corealloc req 3 -> 3 granted, 0 free
+c 0.372 0 #3:3 : update v=4 epoch=8 lastreqsepoch=8 evlat=0.00000
+c 0.372 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.373 0 SPA: formula with 502204 bytes
+c 0.380 0 #2:0 : FSJ mem freed
+c 0.380 0 Watchdog sleep interrupted by signal
+c 0.382 0 #2:0 ready for destruction
+c 0.384 0 Watchdog sleep interrupted by signal
+c 0.431 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.481 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.532 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.582 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.632 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.683 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.692 0 #3:3 : INIT COMM e=1 nc=0
+c 0.703 0 #3:3 CS produced cls size=1693 lits=1687/1500
+c 0.703 0 #3:3 : merged 1 contribs rev=0 (inp=1500, t=0.0003s) ~> len=1693
+c 0.733 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.784 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.834 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.884 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.935 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.985 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.000 0 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.000 0 contexts=1 descriptions=1
+c 1.035 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.086 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.136 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.186 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.187 0 #3:3 : INIT COMM e=2 nc=0
+c 1.196 0 #3:3 CS produced cls size=2086 lits=2080/2000
+c 1.197 0 #3:3 : merged 1 contribs rev=0 (inp=2000, t=0.0006s) ~> len=2086
+c 1.201 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.00GB newreqs=6 hops=5
+c 1.201 0 sysstate entered=3 parsed=3 scheduled=3 processed=1 successful=0
+c 1.237 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.287 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.338 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.388 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.438 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.489 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.539 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.590 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.640 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.690 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.693 0 #3:3 : INIT COMM e=3 nc=0
+c 1.700 0 #3:3 CS produced cls size=2013 lits=2007/1975
+c 1.701 0 #3:3 : merged 1 contribs rev=0 (inp=1975, t=0.0004s) ~> len=2013
+c 1.741 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.783 0 Will receive job result for job #3 rev. 0 <= [3]
+c 1.783 0 Received result of job #3 rev. 0, code: 20 <= [1]
+c 1.783 0 RESPONSE_TIME #3 1.602589 rev. 0
+c 1.783 0 SOLUTION #3 UNSATISFIABLE rev. 0
+c 1.785 0 LOAD 0 (-#3:3)
+c 1.785 0 corealloc ret 3 -> 3 free
+c 1.785 0 #3:3 : terminated
+c 1.785 0 Forget #3:3
+c 1.785 0 FORGET #3:3
+c 1.785 0 #3:3 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.786 0 SATWP prepro done
+c 1.786 0 SATWP Extract result of #1:prepro
+c 1.786 0 SATWP #1:prepro extracted
+c 1.786 0 #1 SATWP RES ~20~
+c 1.791 0 #3:3 : FSJ freeing mem
+c 1.792 0 #3:3 : FSJ mem freed
+c 1.793 0 Watchdog sleep interrupted by signal
+c 1.794 0 Received result of job #1 rev. 0, code: 20 <= [0]
+c 1.794 0 RESPONSE_TIME #1 1.789430 rev. 0
+c 1.794 0 SOLUTION #1 UNSATISFIABLE rev. 0
+s UNSATISFIABLE
+c 1.794 0 Destruct worker
+c 1.794 0 #3:3 ready for destruction
+c 1.795 0 all jobs deleted
+c 1.795 0 Watchdog sleep interrupted by signal
+c 1.795 0 STATS balancing_latencies num:1 min:0.009217 max:0.009217 med:0.009217 mean:0.009217
+c 1.795 0 busytime=1.765
+c 1.795 0 STATS treegrowth_latencies num:2 min:0.000218 max:0.000279 med:0.000279 mean:0.000248
+c 1.796 0 Watchdog sleep interrupted by signal
+c 1.796 0 Leaving client destructor
+c 1.796 0 Watchdog sleep interrupted by signal
+c 1.856 0 Exiting happily
+c 0.001 0 Program options: -0o=0 -J=0 -SJ=0 -T=0 -adc=0 -aim=1 -ajpc=0 -ans=0 -apidir=.api -ba=4 -bem=1 -bicg=4 -br=0 -c=1 -cbbs=0 -cblm=1 -cblp=100000 -cdel=2 -cecpm=0 -cf=0 -cfci=10 -cfm=3 -cg=1 -ch=0 -checksums=0 -cjc=0 -client-app-threads=1 -cm=0 -cmp=0 -colors=1 -compact-proof=0 -cpshm=0 -csm=3 -cusv=1 -dc=0 -decay-distr=1 -decay-max=200 -decay-mean=50 -decay-min=1 -decay-stddev=3 -decpm=0 -delaymonkey=0 -div-elim=0 -div-fanout=0 -div-init-shuffle=0 -div-native=1 -div-noise=0 -div-phases=1 -div-reduce=0 -div-seeds=1 -dpa=1 -ds=0 -evpt=500 -evu=0 -extmem-disk-dir=.disk -fapii=0 -fcll=1 -g=0 -gclls=0 -h=0 -huca=0 -iff=0 -ilbd=0 -inotify=1 -interface-fs=0 -interface-ipc=0 -ipm=1 -ivdh=1 -jc=1 -jcl=0 -jcup=0.05 -jjp=0 -jwl=0 -l=1 -latencymonkey=0 -lbdpi=0 -lbdpo=0 -ljpc=32 -log=logsntraces//logs/ -mbt=8388608 -mcips=10 -md=0 -mempanic=1 -mjps=0 -mlbdps=2 -mlpt=50000000 -mmpi=0 -mono=instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf -mono-app=SATWITHPRE -mscf=5 -nec=10 -no-import=0 -os=0 -otfc=0 -otfcm=1 -p=0.1 -pb=1 -pbbm=0 -pef=1 -pjp=9999999 -pl=0 -plain-add-specific=0 -pph=0 -pre-cleanup=0 -prisma=0 -proof-debugging=0 -ps=0 -q=0 -qcll=60 -qlbdl=60 -randlbd=0 -reduce-delta=100 -reduce-max=980 -reduce-mean=700 -reduce-min=300 -reduce-stddev=150 -rlbd=3 -rpa=0 -rs=1 -rspaa=0 -s=0.5 -satsolver=k -scll=60 -scramble-lbds=0 -scsd=0 -seed=0 -sjd=0 -slbdl=60 -sleep=100 -spl=-1 -sswl=0 -t=3 -terminate-abruptly=0 -tmp=/tmp -trace-dir=logsntraces//traces/ -uninvert-proof=1 -v=4 -w=-1 -wam=10000 -warmup=0 -watchdog=1 -y=1 -yield=0 
+c 0.001 0 Mallob rls pid=58418 on host vvbk
+c 0.001 0 4 workers, 1 clients
+c 0.001 0 Created client communicator
+c 0.001 0 Created worker communicator
+c 0.001 0 I am worker #0
+c 0.001 0 I am client #0
+c 0.001 0 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.001 0 [WARN] Falling back to safe value r=2.
+c 0.002 0 My bounce alternatives: 3 1 
+c 0.002 0 Set up API connector
+c 0.002 0 Machine color 0 with 4 total workers (my rank: 0)
+c 0.002 0 Assuming application "SATWITHPRE" for mono job
+c 0.002 0 [CA] Root: 0 requests, 1 idle (epoch=0)
+c 0.003 0 [CA] Root: 0 requests, 3 idle (epoch=0)
+c 0.004 0 [CA] Root: 0 requests, 4 idle (epoch=0)
+c 0.009 0 corealloc req 1 -> 1 granted, 2 free
+c 0.013 0 Introducing job #2 rev. 0 : r.#2:0 rev. 0 <- [0] born=0.013 hops=0 epoch=-1 matchId=-1 => [0]
+c 0.013 0 BLC insert (2,1,0.010)
+c 0.013 0 Activate r.#2:0 rev. 0 <- [0] born=0.013 hops=0 epoch=-1 matchId=-1
+c 0.014 0 ADOPT r.#2:0 rev. 0 <- [0] born=0.013 hops=1 epoch=-1 matchId=-1 mode=1 <= [0]
+c 0.014 0 corealloc req 0 -> 0 granted, 2 free
+c 0.014 0 COMMIT #2 -> #2:0
+c 0.014 0 Scheduling r.#2:0 rev. 0 <- [0] born=0.013 hops=1 epoch=-1 matchId=-1 on [0] (latency: 0.00091s)
+c 0.014 0 Sending job desc. of #2 rev. 0 of size 614404, formula begins at idx 104 => [0]
+c 0.014 0 Sent job desc. of #2 of size 614404 => [0]
+c 0.014 0 Got desc. of size 614404 for job #2 <= [0]
+c 0.014 0 UNCOMMIT #2:0
+c 0.014 0 LOAD 1 (+#2:0)
+c 0.014 0 EXECUTE #2:0 <= [0]
+c 0.014 0 #2:0 : new job node starting
+c 0.014 0 corealloc req 3 -> 2 granted, 0 free
+c 0.015 0 BLC insert (2,4,1.000)
+c 0.015 0 #2:0 : update v=1 epoch=1 lastreqsepoch=-1 evlat=0.00000
+c 0.016 0 SPA: formula with 614300 bytes
+c 0.024 0 #2:0 : update v=4 epoch=2 lastreqsepoch=1 evlat=0.00899
+c 0.024 0 #2:0 growing: r.#2:1 rev. 0 <- [0] born=0.024 hops=0 epoch=2 matchId=-1 => [1]
+c 0.024 0 #2:0 growing: r.#2:2 rev. 0 <- [0] born=0.024 hops=0 epoch=2 matchId=-1 => [2]
+c 0.025 0 Adoption offer for #2:1 <= [1]
+c 0.025 0 RBS #2:1 EXPAND e=2 #inactives=0 => [1]
+c 0.025 0 Adoption offer for #2:2 <= [2]
+c 0.025 0 RBS #2:2 EXPAND e=2 #inactives=0 => [2]
+c 0.025 0 Sending job desc. of #2:0 rev. 0, size 614404, formula begins at idx 104 => [1]
+c 0.025 0 Sent id=16 => [1]
+c 0.025 0 Sending job desc. of #2:0 rev. 0, size 614404, formula begins at idx 104 => [2]
+c 0.025 0 Sent id=17 => [2]
+c 0.028 0 PREPRO running Kissat
+c 0.030 0 Watchdog sleep interrupted by signal
+c 0.051 0 [WARN] #2:0 job tree has size 0/4
+c 0.199 0 PREPRO Kissat done, result 0
+c 0.200 0 corealloc ret 1 -> 1 free
+c 0.200 0 SATWP preprocessor done
+c 0.200 0 SATWP submit preprocessed task
+c 0.200 0 SATWP #1 : Retracting base job over ~0.191s
+c 0.202 0 Introducing job #3 rev. 0 : r.#3:0 rev. 0 <- [0] born=0.202 hops=0 epoch=-1 matchId=-1 => [0]
+c 0.202 0 BLC insert (3,1,0.010)
+c 0.202 0 #2:0 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.202 0 Activate r.#3:0 rev. 0 <- [0] born=0.202 hops=0 epoch=-1 matchId=-1
+c 0.202 0 [CA] Root: 1 requests, 0 idle (epoch=3)
+c 0.203 0 [CA] Root: 0 requests, 0 idle (epoch=3)
+c 0.204 0 Scheduling r.#3:0 rev. 0 <- [0] born=0.202 hops=2 epoch=-1 matchId=-1 on [3] (latency: 0.00200s)
+c 0.204 0 Sending job desc. of #3 rev. 0 of size 502328, formula begins at idx 124 => [3]
+c 0.204 0 Sent job desc. of #3 of size 502328 => [3]
+c 0.204 0 [CA] Root: 0 requests, 0 idle (epoch=3)
+c 0.207 0 [WARN] #2:0 job tree has size 4/3
+c 0.212 0 #2:0 : update v=3 epoch=4 lastreqsepoch=3 evlat=0.00000
+c 0.328 0 BLC FINALIZED alpha=5000000.093751 excess=0
+c 0.328 0 #2:0 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00000
+c 0.328 0 RBS #2:2 SHRINK #inactives=1 <= [2]
+c 0.359 0 [WARN] #2:0 job tree has size 3/2
+c 0.359 0 BLC FINALIZED alpha=1.000000 excess=0
+c 0.359 0 #2:0 : update v=1 epoch=6 lastreqsepoch=5 evlat=0.00000
+c 0.359 0 [WARN] #2:0 job tree has size 2/1
+c 0.359 0 RBS #2:1 SHRINK #inactives=2 <= [1]
+c 0.388 0 BLC FINALIZED alpha=1.000000 excess=0
+c 0.388 0 #2:0 : update v=1 epoch=7 lastreqsepoch=6 evlat=0.00000
+c 0.389 0 [CA] Root: 0 requests, 0 idle (epoch=7)
+c 0.391 0 [CA] Root: 0 requests, 0 idle (epoch=7)
+c 0.392 0 [CA] Root: 0 requests, 0 idle (epoch=7)
+c 0.412 0 SATWP Interrupt #1:base
+c 0.412 0 Interrupt #2
+c 0.412 0 Acknowledge #2 interrupt
+c 0.412 0 #2 sent feedback of interrupt to client
+c 0.412 0 Propagate interruption of #2:0 ... => [1]
+c 0.412 0 Propagate interruption of #2:0 ... => [2]
+c 0.412 0 LOAD 0 (-#2:0)
+c 0.412 0 corealloc ret 2 -> 3 free
+c 0.412 0 #2:0 : terminated
+c 0.412 0 BLC insert (2,0,0.000)
+c 0.412 0 #2:0 balancing latency={num:1 min:0.00899 med:0.00899 avg:0.00899 max:0.00899}
+c 0.412 0 Forget #2:0
+c 0.412 0 FORGET #2:0
+c 0.412 0 #2:0 desires fulfilled=1.0000 latency={num:2 min:0.00040 med:0.00046 avg:0.00043 max:0.00046}
+c 0.412 0 TIMEOUT/UNKNOWN #2 rev. 0 0.398998 <= [0]
+c 0.414 0 ADOPT r.#3:3 rev. 0 <- [2] born=0.412 hops=2 epoch=8 matchId=-1 mode=1 <= [0]
+c 0.414 0 corealloc req 0 -> 0 granted, 3 free
+c 0.414 0 COMMIT #3 -> #3:3
+c 0.415 0 SATWP base done
+c 0.415 0 SATWP Extract result of #1:base
+c 0.416 0 Got desc. of size 502328 for job #3 <= [2]
+c 0.416 0 UNCOMMIT #3:3
+c 0.416 0 LOAD 1 (+#3:3)
+c 0.416 0 EXECUTE #3:3 <= [2]
+c 0.416 0 #3:3 : new job node starting
+c 0.416 0 corealloc req 3 -> 3 granted, 0 free
+c 0.416 0 #3:3 : update v=4 epoch=8 lastreqsepoch=8 evlat=0.00000
+c 0.417 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.417 0 #2:0 : FSJ freeing mem
+c 0.417 0 SPA: formula with 502204 bytes
+c 0.417 0 #2:0 : FSJ mem freed
+c 0.417 0 Watchdog sleep interrupted by signal
+c 0.418 0 #2:0 ready for destruction
+c 0.432 0 Watchdog sleep interrupted by signal
+c 0.467 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.517 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.568 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.618 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.669 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.711 0 #3:3 : INIT COMM e=1 nc=0
+c 0.719 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.719 0 #3:3 CS produced cls size=1619 lits=1613/1500
+c 0.720 0 #3:3 : merged 1 contribs rev=0 (inp=1500, t=0.0003s) ~> len=1619
+c 0.770 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.820 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.870 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.921 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.971 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.000 0 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.000 0 contexts=1 descriptions=1
+c 1.021 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.072 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.122 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.173 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.201 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.00GB newreqs=6 hops=5
+c 1.201 0 sysstate entered=3 parsed=3 scheduled=3 processed=1 successful=0
+c 1.208 0 #3:3 : INIT COMM e=2 nc=0
+c 1.213 0 #3:3 CS produced cls size=2080 lits=2074/1926
+c 1.213 0 #3:3 : merged 1 contribs rev=0 (inp=1926, t=0.0003s) ~> len=2080
+c 1.223 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.273 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.324 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.374 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.425 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.475 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.525 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.576 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.626 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.677 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.709 0 #3:3 : INIT COMM e=3 nc=0
+c 1.717 0 #3:3 CS produced cls size=2012 lits=2006/1985
+c 1.718 0 #3:3 : merged 1 contribs rev=0 (inp=1985, t=0.0006s) ~> len=2012
+c 1.727 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.778 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.828 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.868 0 Will receive job result for job #3 rev. 0 <= [3]
+c 1.868 0 Received result of job #3 rev. 0, code: 20 <= [1]
+c 1.868 0 RESPONSE_TIME #3 1.667632 rev. 0
+c 1.868 0 SOLUTION #3 UNSATISFIABLE rev. 0
+c 1.868 0 LOAD 0 (-#3:3)
+c 1.868 0 corealloc ret 3 -> 3 free
+c 1.868 0 #3:3 : terminated
+c 1.868 0 Forget #3:3
+c 1.868 0 FORGET #3:3
+c 1.868 0 #3:3 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.868 0 #3:3 : FSJ freeing mem
+c 1.870 0 SATWP prepro done
+c 1.870 0 SATWP Extract result of #1:prepro
+c 1.870 0 SATWP #1:prepro extracted
+c 1.870 0 #1 SATWP RES ~20~
+c 1.875 0 Received result of job #1 rev. 0, code: 20 <= [0]
+c 1.875 0 RESPONSE_TIME #1 1.872723 rev. 0
+c 1.875 0 SOLUTION #1 UNSATISFIABLE rev. 0
+s UNSATISFIABLE
+c 1.875 0 Destruct worker
+c 1.879 0 #3:3 : FSJ mem freed
+c 1.879 0 Watchdog sleep interrupted by signal
+c 1.880 0 #3:3 ready for destruction
+c 1.881 0 all jobs deleted
+c 1.881 0 Watchdog sleep interrupted by signal
+c 1.882 0 STATS balancing_latencies num:1 min:0.008987 max:0.008987 med:0.008987 mean:0.008987
+c 1.882 0 busytime=1.851
+c 1.882 0 STATS treegrowth_latencies num:2 min:0.000397 max:0.000462 med:0.000462 mean:0.000430
+c 1.882 0 Watchdog sleep interrupted by signal
+c 1.882 0 Leaving client destructor
+c 1.882 0 Watchdog sleep interrupted by signal
+c 1.939 0 Exiting happily
+c 0.001 0 Program options: -0o=0 -J=0 -SJ=0 -T=0 -adc=0 -aim=1 -ajpc=0 -ans=0 -apidir=.api -ba=4 -bem=1 -bicg=4 -br=0 -c=1 -cbbs=0 -cblm=1 -cblp=100000 -cdel=2 -cecpm=0 -cf=0 -cfci=10 -cfm=3 -cg=1 -ch=0 -checksums=0 -cjc=0 -client-app-threads=1 -cm=0 -cmp=0 -colors=1 -compact-proof=0 -cpshm=0 -csm=3 -cusv=1 -dc=0 -decay-distr=1 -decay-max=200 -decay-mean=50 -decay-min=1 -decay-stddev=3 -decpm=0 -delaymonkey=0 -div-elim=0 -div-fanout=0 -div-init-shuffle=0 -div-native=1 -div-noise=0 -div-phases=1 -div-reduce=0 -div-seeds=1 -dpa=1 -ds=0 -evpt=500 -evu=0 -extmem-disk-dir=.disk -fapii=0 -fcll=1 -g=0 -gclls=0 -h=0 -huca=0 -iff=0 -ilbd=0 -inotify=1 -interface-fs=0 -interface-ipc=0 -ipm=1 -ivdh=1 -jc=1 -jcl=0 -jcup=0.05 -jjp=0 -jwl=0 -l=1 -latencymonkey=0 -lbdpi=0 -lbdpo=0 -ljpc=32 -log=logsntraces//logs/ -mbt=8388608 -mcips=10 -md=0 -mempanic=1 -mjps=0 -mlbdps=2 -mlpt=50000000 -mmpi=0 -mono=instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf -mono-app=SATWITHPRE -mscf=5 -nec=10 -no-import=0 -os=0 -otfc=0 -otfcm=1 -p=0.1 -pb=1 -pbbm=0 -pef=1 -pjp=9999999 -pl=0 -plain-add-specific=0 -pph=0 -pre-cleanup=0 -prisma=0 -proof-debugging=0 -ps=0 -q=0 -qcll=60 -qlbdl=60 -randlbd=0 -reduce-delta=100 -reduce-max=980 -reduce-mean=700 -reduce-min=300 -reduce-stddev=150 -rlbd=3 -rpa=0 -rs=1 -rspaa=0 -s=0.5 -satsolver=k -scll=60 -scramble-lbds=0 -scsd=0 -seed=0 -sjd=0 -slbdl=60 -sleep=100 -spl=-1 -sswl=0 -t=3 -terminate-abruptly=0 -tmp=/tmp -trace-dir=logsntraces//traces/ -uninvert-proof=1 -v=4 -w=-1 -wam=10000 -warmup=0 -watchdog=1 -y=1 -yield=0 
+c 0.001 0 Mallob rls pid=58565 on host vvbk
+c 0.001 0 4 workers, 1 clients
+c 0.001 0 Created client communicator
+c 0.001 0 Created worker communicator
+c 0.002 0 I am worker #0
+c 0.002 0 I am client #0
+c 0.002 0 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.002 0 [WARN] Falling back to safe value r=2.
+c 0.002 0 My bounce alternatives: 3 1 
+c 0.002 0 Set up API connector
+c 0.002 0 Machine color 0 with 4 total workers (my rank: 0)
+c 0.002 0 Assuming application "SATWITHPRE" for mono job
+c 0.002 0 [CA] Root: 0 requests, 1 idle (epoch=0)
+c 0.003 0 [CA] Root: 0 requests, 3 idle (epoch=0)
+c 0.004 0 [CA] Root: 0 requests, 4 idle (epoch=0)
+c 0.010 0 corealloc req 1 -> 1 granted, 2 free
+c 0.014 0 Introducing job #2 rev. 0 : r.#2:0 rev. 0 <- [0] born=0.014 hops=0 epoch=-1 matchId=-1 => [0]
+c 0.014 0 BLC insert (2,1,0.010)
+c 0.014 0 Activate r.#2:0 rev. 0 <- [0] born=0.014 hops=0 epoch=-1 matchId=-1
+c 0.015 0 ADOPT r.#2:0 rev. 0 <- [0] born=0.014 hops=1 epoch=-1 matchId=-1 mode=1 <= [0]
+c 0.015 0 corealloc req 0 -> 0 granted, 2 free
+c 0.015 0 COMMIT #2 -> #2:0
+c 0.015 0 Scheduling r.#2:0 rev. 0 <- [0] born=0.014 hops=1 epoch=-1 matchId=-1 on [0] (latency: 0.00050s)
+c 0.015 0 Sending job desc. of #2 rev. 0 of size 614404, formula begins at idx 104 => [0]
+c 0.015 0 Sent job desc. of #2 of size 614404 => [0]
+c 0.015 0 Got desc. of size 614404 for job #2 <= [0]
+c 0.015 0 UNCOMMIT #2:0
+c 0.015 0 LOAD 1 (+#2:0)
+c 0.015 0 EXECUTE #2:0 <= [0]
+c 0.015 0 #2:0 : new job node starting
+c 0.015 0 corealloc req 3 -> 2 granted, 0 free
+c 0.016 0 BLC insert (2,4,1.000)
+c 0.016 0 #2:0 : update v=1 epoch=1 lastreqsepoch=-1 evlat=0.00000
+c 0.017 0 SPA: formula with 614300 bytes
+c 0.025 0 #2:0 : update v=4 epoch=2 lastreqsepoch=1 evlat=0.00911
+c 0.025 0 #2:0 growing: r.#2:1 rev. 0 <- [0] born=0.025 hops=0 epoch=2 matchId=-1 => [1]
+c 0.025 0 #2:0 growing: r.#2:2 rev. 0 <- [0] born=0.025 hops=0 epoch=2 matchId=-1 => [2]
+c 0.025 0 Adoption offer for #2:1 <= [1]
+c 0.025 0 RBS #2:1 EXPAND e=2 #inactives=0 => [1]
+c 0.025 0 Adoption offer for #2:2 <= [2]
+c 0.025 0 RBS #2:2 EXPAND e=2 #inactives=0 => [2]
+c 0.025 0 Sending job desc. of #2:0 rev. 0, size 614404, formula begins at idx 104 => [1]
+c 0.025 0 Sent id=16 => [1]
+c 0.026 0 Sending job desc. of #2:0 rev. 0, size 614404, formula begins at idx 104 => [2]
+c 0.026 0 Sent id=17 => [2]
+c 0.027 0 PREPRO running Kissat
+c 0.029 0 Watchdog sleep interrupted by signal
+c 0.055 0 [WARN] #2:0 job tree has size 0/4
+c 0.190 0 PREPRO Kissat done, result 0
+c 0.191 0 corealloc ret 1 -> 1 free
+c 0.191 0 SATWP preprocessor done
+c 0.191 0 SATWP submit preprocessed task
+c 0.191 0 SATWP #1 : Retracting base job over ~0.181s
+c 0.193 0 Introducing job #3 rev. 0 : r.#3:0 rev. 0 <- [0] born=0.193 hops=0 epoch=-1 matchId=-1 => [0]
+c 0.193 0 BLC insert (3,1,0.010)
+c 0.193 0 #2:0 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.193 0 Activate r.#3:0 rev. 0 <- [0] born=0.193 hops=0 epoch=-1 matchId=-1
+c 0.194 0 [CA] Root: 0 requests, 0 idle (epoch=3)
+c 0.195 0 Scheduling r.#3:0 rev. 0 <- [0] born=0.193 hops=2 epoch=-1 matchId=-1 on [3] (latency: 0.00205s)
+c 0.195 0 Sending job desc. of #3 rev. 0 of size 502328, formula begins at idx 124 => [3]
+c 0.195 0 Sent job desc. of #3 of size 502328 => [3]
+c 0.196 0 [CA] Root: 0 requests, 0 idle (epoch=3)
+c 0.204 0 #2:0 : update v=3 epoch=4 lastreqsepoch=3 evlat=0.00000
+c 0.209 0 [WARN] #2:0 job tree has size 4/3
+c 0.316 0 BLC FINALIZED alpha=5000000.093751 excess=0
+c 0.316 0 #2:0 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00000
+c 0.317 0 RBS #2:2 SHRINK #inactives=1 <= [2]
+c 0.346 0 BLC FINALIZED alpha=1.000000 excess=0
+c 0.346 0 #2:0 : update v=1 epoch=6 lastreqsepoch=5 evlat=0.00000
+c 0.346 0 RBS #2:1 SHRINK #inactives=2 <= [1]
+c 0.367 0 BLC FINALIZED alpha=1.000000 excess=0
+c 0.367 0 #2:0 : update v=1 epoch=7 lastreqsepoch=6 evlat=0.00000
+c 0.368 0 [CA] Root: 0 requests, 0 idle (epoch=7)
+c 0.369 0 [CA] Root: 0 requests, 0 idle (epoch=7)
+c 0.390 0 SATWP Interrupt #1:base
+c 0.390 0 Interrupt #2
+c 0.390 0 Acknowledge #2 interrupt
+c 0.390 0 #2 sent feedback of interrupt to client
+c 0.390 0 Propagate interruption of #2:0 ... => [1]
+c 0.390 0 Propagate interruption of #2:0 ... => [2]
+c 0.390 0 LOAD 0 (-#2:0)
+c 0.390 0 corealloc ret 2 -> 3 free
+c 0.390 0 #2:0 : terminated
+c 0.390 0 BLC insert (2,0,0.000)
+c 0.390 0 #2:0 balancing latency={num:1 min:0.00911 med:0.00911 avg:0.00911 max:0.00911}
+c 0.390 0 Forget #2:0
+c 0.390 0 FORGET #2:0
+c 0.390 0 #2:0 desires fulfilled=1.0000 latency={num:2 min:0.00039 med:0.00043 avg:0.00041 max:0.00043}
+c 0.391 0 TIMEOUT/UNKNOWN #2 rev. 0 0.376403 <= [0]
+c 0.393 0 ADOPT r.#3:3 rev. 0 <- [2] born=0.391 hops=2 epoch=8 matchId=-1 mode=1 <= [0]
+c 0.393 0 corealloc req 0 -> 0 granted, 3 free
+c 0.393 0 COMMIT #3 -> #3:3
+c 0.393 0 SATWP base done
+c 0.393 0 SATWP Extract result of #1:base
+c 0.394 0 Got desc. of size 502328 for job #3 <= [2]
+c 0.394 0 UNCOMMIT #3:3
+c 0.394 0 LOAD 1 (+#3:3)
+c 0.394 0 EXECUTE #3:3 <= [2]
+c 0.394 0 #3:3 : new job node starting
+c 0.394 0 corealloc req 3 -> 3 granted, 0 free
+c 0.394 0 #3:3 : update v=4 epoch=8 lastreqsepoch=8 evlat=0.00000
+c 0.394 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.394 0 #2:0 : FSJ freeing mem
+c 0.394 0 SPA: formula with 502204 bytes
+c 0.396 0 #2:0 : FSJ mem freed
+c 0.396 0 Watchdog sleep interrupted by signal
+c 0.397 0 #2:0 ready for destruction
+c 0.406 0 Watchdog sleep interrupted by signal
+c 0.453 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.503 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.553 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.604 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.654 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.699 0 #3:3 : INIT COMM e=1 nc=0
+c 0.704 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.704 0 #3:3 CS produced cls size=1690 lits=1684/1500
+c 0.705 0 #3:3 : merged 1 contribs rev=0 (inp=1500, t=0.0003s) ~> len=1690
+c 0.755 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.805 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.855 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.906 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.956 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.000 0 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.000 0 contexts=1 descriptions=1
+c 1.006 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.057 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.107 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.157 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.197 0 #3:3 : INIT COMM e=2 nc=0
+c 1.201 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.00GB newreqs=6 hops=5
+c 1.201 0 sysstate entered=3 parsed=3 scheduled=3 processed=1 successful=0
+c 1.208 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.208 0 #3:3 CS produced cls size=2060 lits=2054/1973
+c 1.208 0 #3:3 : merged 1 contribs rev=0 (inp=1973, t=0.0002s) ~> len=2060
+c 1.258 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.309 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.360 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.412 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.463 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.513 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.564 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.614 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.665 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.681 0 Will receive job result for job #3 rev. 0 <= [3]
+c 1.681 0 Received result of job #3 rev. 0, code: 20 <= [1]
+c 1.681 0 RESPONSE_TIME #3 1.490207 rev. 0
+c 1.681 0 SOLUTION #3 UNSATISFIABLE rev. 0
+c 1.681 0 LOAD 0 (-#3:3)
+c 1.681 0 corealloc ret 3 -> 3 free
+c 1.681 0 #3:3 : terminated
+c 1.681 0 Forget #3:3
+c 1.681 0 FORGET #3:3
+c 1.681 0 #3:3 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.683 0 SATWP prepro done
+c 1.683 0 SATWP Extract result of #1:prepro
+c 1.683 0 SATWP #1:prepro extracted
+c 1.683 0 #1 SATWP RES ~20~
+c 1.685 0 #3:3 : FSJ freeing mem
+c 1.685 0 Received result of job #1 rev. 0, code: 20 <= [0]
+c 1.685 0 RESPONSE_TIME #1 1.682556 rev. 0
+c 1.685 0 SOLUTION #1 UNSATISFIABLE rev. 0
+s UNSATISFIABLE
+c 1.685 0 Destruct worker
+c 1.696 0 #3:3 : FSJ mem freed
+c 1.696 0 Watchdog sleep interrupted by signal
+c 1.697 0 #3:3 ready for destruction
+c 1.698 0 all jobs deleted
+c 1.698 0 Watchdog sleep interrupted by signal
+c 1.698 0 STATS balancing_latencies num:1 min:0.009109 max:0.009109 med:0.009109 mean:0.009109
+c 1.698 0 busytime=1.663
+c 1.698 0 STATS treegrowth_latencies num:2 min:0.000392 max:0.000431 med:0.000431 mean:0.000411
+c 1.698 0 Watchdog sleep interrupted by signal
+c 1.698 0 Leaving client destructor
+c 1.698 0 Watchdog sleep interrupted by signal
+c 1.746 0 Exiting happily
+c 0.001 0 Program options: -0o=0 -J=0 -SJ=0 -T=0 -adc=0 -aim=1 -ajpc=0 -ans=0 -apidir=.api -ba=4 -bem=1 -bicg=4 -br=0 -c=1 -cbbs=0 -cblm=1 -cblp=100000 -cdel=2 -cecpm=0 -cf=0 -cfci=10 -cfm=3 -cg=1 -ch=0 -checksums=0 -cjc=0 -client-app-threads=1 -cm=0 -cmp=0 -colors=1 -compact-proof=0 -cpshm=0 -csm=3 -cusv=1 -dc=0 -decay-distr=1 -decay-max=200 -decay-mean=50 -decay-min=1 -decay-stddev=3 -decpm=0 -delaymonkey=0 -div-elim=0 -div-fanout=0 -div-init-shuffle=0 -div-native=1 -div-noise=0 -div-phases=1 -div-reduce=0 -div-seeds=1 -dpa=1 -ds=0 -evpt=500 -evu=0 -extmem-disk-dir=.disk -fapii=0 -fcll=1 -g=0 -gclls=0 -h=0 -huca=0 -iff=0 -ilbd=0 -inotify=1 -interface-fs=0 -interface-ipc=0 -ipm=1 -ivdh=1 -jc=1 -jcl=0 -jcup=0.05 -jjp=0 -jwl=0 -l=1 -latencymonkey=0 -lbdpi=0 -lbdpo=0 -ljpc=32 -log=logsntraces//logs/ -mbt=8388608 -mcips=10 -md=0 -mempanic=1 -mjps=0 -mlbdps=2 -mlpt=50000000 -mmpi=0 -mono=instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf -mono-app=SATWITHPRE -mscf=5 -nec=10 -no-import=0 -os=0 -otfc=0 -otfcm=1 -p=0.1 -pb=1 -pbbm=0 -pef=1 -pjp=9999999 -pl=0 -plain-add-specific=0 -pph=0 -pre-cleanup=0 -prisma=0 -proof-debugging=0 -ps=0 -q=0 -qcll=60 -qlbdl=60 -randlbd=0 -reduce-delta=100 -reduce-max=980 -reduce-mean=700 -reduce-min=300 -reduce-stddev=150 -rlbd=3 -rpa=0 -rs=1 -rspaa=0 -s=0.5 -satsolver=k -scll=60 -scramble-lbds=0 -scsd=0 -seed=0 -sjd=0 -slbdl=60 -sleep=100 -spl=-1 -sswl=0 -t=3 -terminate-abruptly=0 -tmp=/tmp -trace-dir=logsntraces//traces/ -uninvert-proof=1 -v=4 -w=-1 -wam=10000 -warmup=0 -watchdog=1 -y=1 -yield=0 
+c 0.001 0 Mallob rls pid=58717 on host vvbk
+c 0.001 0 4 workers, 1 clients
+c 0.003 0 Created client communicator
+c 0.003 0 Created worker communicator
+c 0.003 0 I am worker #0
+c 0.003 0 I am client #0
+c 0.003 0 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.003 0 [WARN] Falling back to safe value r=2.
+c 0.003 0 My bounce alternatives: 3 1 
+c 0.003 0 Set up API connector
+c 0.004 0 Machine color 0 with 4 total workers (my rank: 0)
+c 0.004 0 Assuming application "SATWITHPRE" for mono job
+c 0.004 0 [CA] Root: 0 requests, 1 idle (epoch=0)
+c 0.005 0 [CA] Root: 0 requests, 3 idle (epoch=0)
+c 0.006 0 [CA] Root: 0 requests, 4 idle (epoch=0)
+c 0.012 0 corealloc req 1 -> 1 granted, 2 free
+c 0.017 0 Introducing job #2 rev. 0 : r.#2:0 rev. 0 <- [0] born=0.017 hops=0 epoch=-1 matchId=-1 => [0]
+c 0.017 0 BLC insert (2,1,0.010)
+c 0.017 0 Activate r.#2:0 rev. 0 <- [0] born=0.017 hops=0 epoch=-1 matchId=-1
+c 0.017 0 ADOPT r.#2:0 rev. 0 <- [0] born=0.017 hops=1 epoch=-1 matchId=-1 mode=1 <= [0]
+c 0.018 0 corealloc req 0 -> 0 granted, 2 free
+c 0.018 0 COMMIT #2 -> #2:0
+c 0.018 0 Scheduling r.#2:0 rev. 0 <- [0] born=0.017 hops=1 epoch=-1 matchId=-1 on [0] (latency: 0.00038s)
+c 0.018 0 Sending job desc. of #2 rev. 0 of size 614404, formula begins at idx 104 => [0]
+c 0.018 0 Sent job desc. of #2 of size 614404 => [0]
+c 0.018 0 Got desc. of size 614404 for job #2 <= [0]
+c 0.018 0 UNCOMMIT #2:0
+c 0.018 0 LOAD 1 (+#2:0)
+c 0.018 0 EXECUTE #2:0 <= [0]
+c 0.018 0 #2:0 : new job node starting
+c 0.018 0 corealloc req 3 -> 2 granted, 0 free
+c 0.019 0 BLC insert (2,4,1.000)
+c 0.019 0 #2:0 : update v=1 epoch=1 lastreqsepoch=-1 evlat=0.00000
+c 0.020 0 SPA: formula with 614300 bytes
+c 0.028 0 #2:0 : update v=4 epoch=2 lastreqsepoch=1 evlat=0.00905
+c 0.028 0 #2:0 growing: r.#2:1 rev. 0 <- [0] born=0.028 hops=0 epoch=2 matchId=-1 => [1]
+c 0.028 0 #2:0 growing: r.#2:2 rev. 0 <- [0] born=0.028 hops=0 epoch=2 matchId=-1 => [2]
+c 0.028 0 Adoption offer for #2:1 <= [1]
+c 0.028 0 RBS #2:1 EXPAND e=2 #inactives=0 => [1]
+c 0.028 0 Adoption offer for #2:2 <= [2]
+c 0.028 0 RBS #2:2 EXPAND e=2 #inactives=0 => [2]
+c 0.028 0 Sending job desc. of #2:0 rev. 0, size 614404, formula begins at idx 104 => [1]
+c 0.028 0 Sent id=16 => [1]
+c 0.028 0 Sending job desc. of #2:0 rev. 0, size 614404, formula begins at idx 104 => [2]
+c 0.028 0 Sent id=17 => [2]
+c 0.032 0 PREPRO running Kissat
+c 0.033 0 Watchdog sleep interrupted by signal
+c 0.055 0 [WARN] #2:0 job tree has size 0/4
+c 0.206 0 PREPRO Kissat done, result 0
+c 0.208 0 corealloc ret 1 -> 1 free
+c 0.208 0 SATWP preprocessor done
+c 0.208 0 SATWP submit preprocessed task
+c 0.208 0 SATWP #1 : Retracting base job over ~0.196s
+c 0.210 0 Introducing job #3 rev. 0 : r.#3:0 rev. 0 <- [0] born=0.210 hops=0 epoch=-1 matchId=-1 => [0]
+c 0.210 0 BLC insert (3,1,0.010)
+c 0.210 0 #2:0 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.210 0 Activate r.#3:0 rev. 0 <- [0] born=0.210 hops=0 epoch=-1 matchId=-1
+c 0.211 0 [CA] Root: 1 requests, 0 idle (epoch=3)
+c 0.212 0 [CA] Root: 0 requests, 0 idle (epoch=3)
+c 0.212 0 [WARN] #2:0 job tree has size 4/3
+c 0.213 0 Scheduling r.#3:0 rev. 0 <- [0] born=0.210 hops=2 epoch=-1 matchId=-1 on [3] (latency: 0.00334s)
+c 0.213 0 Sending job desc. of #3 rev. 0 of size 502328, formula begins at idx 124 => [3]
+c 0.213 0 Sent job desc. of #3 of size 502328 => [3]
+c 0.214 0 [CA] Root: 0 requests, 0 idle (epoch=3)
+c 0.221 0 #2:0 : update v=3 epoch=4 lastreqsepoch=3 evlat=0.00000
+c 0.337 0 BLC FINALIZED alpha=5000000.093751 excess=0
+c 0.337 0 #2:0 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00000
+c 0.337 0 RBS #2:2 SHRINK #inactives=1 <= [2]
+c 0.362 0 [WARN] #2:0 job tree has size 3/2
+c 0.377 0 BLC FINALIZED alpha=1.000000 excess=0
+c 0.378 0 #2:0 : update v=1 epoch=6 lastreqsepoch=5 evlat=0.00000
+c 0.378 0 RBS #2:1 SHRINK #inactives=2 <= [1]
+c 0.407 0 BLC FINALIZED alpha=1.000000 excess=0
+c 0.407 0 #2:0 : update v=1 epoch=7 lastreqsepoch=6 evlat=0.00000
+c 0.408 0 [CA] Root: 0 requests, 0 idle (epoch=7)
+c 0.409 0 [CA] Root: 0 requests, 0 idle (epoch=7)
+c 0.426 0 SATWP Interrupt #1:base
+c 0.426 0 Interrupt #2
+c 0.426 0 Acknowledge #2 interrupt
+c 0.426 0 #2 sent feedback of interrupt to client
+c 0.426 0 Propagate interruption of #2:0 ... => [1]
+c 0.426 0 Propagate interruption of #2:0 ... => [2]
+c 0.426 0 LOAD 0 (-#2:0)
+c 0.426 0 corealloc ret 2 -> 3 free
+c 0.426 0 #2:0 : terminated
+c 0.426 0 BLC insert (2,0,0.000)
+c 0.426 0 #2:0 balancing latency={num:1 min:0.00905 med:0.00905 avg:0.00905 max:0.00905}
+c 0.426 0 Forget #2:0
+c 0.426 0 FORGET #2:0
+c 0.426 0 #2:0 desires fulfilled=1.0000 latency={num:2 min:0.00021 med:0.00023 avg:0.00022 max:0.00023}
+c 0.426 0 TIMEOUT/UNKNOWN #2 rev. 0 0.409213 <= [0]
+c 0.428 0 ADOPT r.#3:3 rev. 0 <- [2] born=0.426 hops=2 epoch=8 matchId=-1 mode=1 <= [0]
+c 0.428 0 corealloc req 0 -> 0 granted, 3 free
+c 0.428 0 COMMIT #3 -> #3:3
+c 0.428 0 Got desc. of size 502328 for job #3 <= [2]
+c 0.428 0 UNCOMMIT #3:3
+c 0.428 0 LOAD 1 (+#3:3)
+c 0.428 0 EXECUTE #3:3 <= [2]
+c 0.428 0 #3:3 : new job node starting
+c 0.428 0 corealloc req 3 -> 3 granted, 0 free
+c 0.429 0 #3:3 : update v=4 epoch=8 lastreqsepoch=8 evlat=0.00000
+c 0.429 0 SATWP base done
+c 0.429 0 SATWP Extract result of #1:base
+c 0.429 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.429 0 #2:0 : FSJ freeing mem
+c 0.429 0 SPA: formula with 502204 bytes
+c 0.431 0 #2:0 : FSJ mem freed
+c 0.431 0 Watchdog sleep interrupted by signal
+c 0.432 0 #2:0 ready for destruction
+c 0.441 0 Watchdog sleep interrupted by signal
+c 0.487 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.538 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.588 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.639 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.689 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.723 0 #3:3 : INIT COMM e=1 nc=0
+c 0.729 0 #3:3 CS produced cls size=1685 lits=1679/1500
+c 0.730 0 #3:3 : merged 1 contribs rev=0 (inp=1500, t=0.0003s) ~> len=1685
+c 0.739 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.790 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.840 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.890 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.941 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.991 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.000 0 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.000 0 contexts=1 descriptions=1
+c 1.042 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.092 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.143 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.193 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.201 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.00GB newreqs=6 hops=5
+c 1.201 0 sysstate entered=3 parsed=3 scheduled=3 processed=1 successful=0
+c 1.217 0 #3:3 : INIT COMM e=2 nc=0
+c 1.223 0 #3:3 CS produced cls size=2075 lits=2069/1967
+c 1.224 0 #3:3 : merged 1 contribs rev=0 (inp=1967, t=0.0005s) ~> len=2075
+c 1.243 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.293 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.344 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.394 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.445 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.495 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.546 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.596 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.647 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.697 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.722 0 #3:3 : INIT COMM e=3 nc=0
+c 1.727 0 #3:3 CS produced cls size=1990 lits=1984/1964
+c 1.728 0 #3:3 : merged 1 contribs rev=0 (inp=1964, t=0.0006s) ~> len=1990
+c 1.747 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.761 0 Will receive job result for job #3 rev. 0 <= [3]
+c 1.761 0 LOAD 0 (-#3:3)
+c 1.761 0 corealloc ret 3 -> 3 free
+c 1.761 0 #3:3 : terminated
+c 1.761 0 Forget #3:3
+c 1.761 0 FORGET #3:3
+c 1.761 0 #3:3 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.761 0 Received result of job #3 rev. 0, code: 20 <= [1]
+c 1.761 0 RESPONSE_TIME #3 1.553071 rev. 0
+c 1.761 0 SOLUTION #3 UNSATISFIABLE rev. 0
+c 1.764 0 SATWP prepro done
+c 1.764 0 SATWP Extract result of #1:prepro
+c 1.764 0 SATWP #1:prepro extracted
+c 1.764 0 #1 SATWP RES ~20~
+c 1.774 0 Received result of job #1 rev. 0, code: 20 <= [0]
+c 1.774 0 RESPONSE_TIME #1 1.769903 rev. 0
+c 1.774 0 SOLUTION #1 UNSATISFIABLE rev. 0
+s UNSATISFIABLE
+c 1.774 0 Destruct worker
+c 1.777 0 #3:3 : FSJ freeing mem
+c 1.778 0 #3:3 : FSJ mem freed
+c 1.778 0 Watchdog sleep interrupted by signal
+c 1.778 0 #3:3 ready for destruction
+c 1.780 0 all jobs deleted
+c 1.780 0 Watchdog sleep interrupted by signal
+c 1.780 0 STATS balancing_latencies num:1 min:0.009050 max:0.009050 med:0.009050 mean:0.009050
+c 1.780 0 busytime=1.741
+c 1.780 0 STATS treegrowth_latencies num:2 min:0.000206 max:0.000233 med:0.000233 mean:0.000220
+c 1.780 0 Watchdog sleep interrupted by signal
+c 1.780 0 Leaving client destructor
+c 1.780 0 Watchdog sleep interrupted by signal
+c 1.836 0 Exiting happily
+c 0.001 0 Program options: -0o=0 -J=0 -SJ=0 -T=0 -adc=0 -aim=1 -ajpc=0 -ans=0 -apidir=.api -ba=4 -bem=1 -bicg=4 -br=0 -c=1 -cbbs=0 -cblm=1 -cblp=100000 -cdel=2 -cecpm=0 -cf=0 -cfci=10 -cfm=3 -cg=1 -ch=0 -checksums=0 -cjc=0 -client-app-threads=1 -cm=0 -cmp=0 -colors=1 -compact-proof=0 -cpshm=0 -csm=3 -cusv=1 -dc=0 -decay-distr=1 -decay-max=200 -decay-mean=50 -decay-min=1 -decay-stddev=3 -decpm=0 -delaymonkey=0 -div-elim=0 -div-fanout=0 -div-init-shuffle=0 -div-native=1 -div-noise=0 -div-phases=1 -div-reduce=0 -div-seeds=1 -dpa=1 -ds=0 -evpt=500 -evu=0 -extmem-disk-dir=.disk -fapii=0 -fcll=1 -g=0 -gclls=0 -h=0 -huca=0 -iff=0 -ilbd=0 -inotify=1 -interface-fs=0 -interface-ipc=0 -ipm=1 -ivdh=1 -jc=1 -jcl=0 -jcup=0.05 -jjp=0 -jwl=0 -l=1 -latencymonkey=0 -lbdpi=0 -lbdpo=0 -ljpc=32 -log=logsntraces//logs/ -mbt=8388608 -mcips=10 -md=0 -mempanic=1 -mjps=0 -mlbdps=2 -mlpt=50000000 -mmpi=0 -mono=instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf -mono-app=SATWITHPRE -mscf=5 -nec=10 -no-import=0 -os=0 -otfc=0 -otfcm=1 -p=0.1 -pb=1 -pbbm=0 -pef=1 -pjp=9999999 -pl=0 -plain-add-specific=0 -pph=0 -pre-cleanup=0 -prisma=0 -proof-debugging=0 -ps=0 -q=0 -qcll=60 -qlbdl=60 -randlbd=0 -reduce-delta=100 -reduce-max=980 -reduce-mean=700 -reduce-min=300 -reduce-stddev=150 -rlbd=3 -rpa=0 -rs=1 -rspaa=0 -s=0.5 -satsolver=k -scll=60 -scramble-lbds=0 -scsd=0 -seed=0 -sjd=0 -slbdl=60 -sleep=100 -spl=-1 -sswl=0 -t=3 -terminate-abruptly=0 -tmp=/tmp -trace-dir=logsntraces//traces/ -uninvert-proof=1 -v=4 -w=-1 -wam=10000 -warmup=0 -watchdog=1 -y=1 -yield=0 
+c 0.001 0 Mallob rls pid=58864 on host vvbk
+c 0.001 0 4 workers, 1 clients
+c 0.003 0 Created client communicator
+c 0.004 0 Created worker communicator
+c 0.004 0 I am worker #0
+c 0.004 0 I am client #0
+c 0.004 0 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.004 0 [WARN] Falling back to safe value r=2.
+c 0.004 0 My bounce alternatives: 3 1 
+c 0.004 0 Set up API connector
+c 0.004 0 Machine color 0 with 4 total workers (my rank: 0)
+c 0.004 0 Assuming application "SATWITHPRE" for mono job
+c 0.004 0 [CA] Root: 0 requests, 1 idle (epoch=0)
+c 0.005 0 [CA] Root: 0 requests, 3 idle (epoch=0)
+c 0.007 0 [CA] Root: 0 requests, 4 idle (epoch=0)
+c 0.012 0 corealloc req 1 -> 1 granted, 2 free
+c 0.017 0 Introducing job #2 rev. 0 : r.#2:0 rev. 0 <- [0] born=0.017 hops=0 epoch=-1 matchId=-1 => [0]
+c 0.017 0 BLC insert (2,1,0.010)
+c 0.017 0 Activate r.#2:0 rev. 0 <- [0] born=0.017 hops=0 epoch=-1 matchId=-1
+c 0.017 0 ADOPT r.#2:0 rev. 0 <- [0] born=0.017 hops=1 epoch=-1 matchId=-1 mode=1 <= [0]
+c 0.017 0 corealloc req 0 -> 0 granted, 2 free
+c 0.017 0 COMMIT #2 -> #2:0
+c 0.017 0 Scheduling r.#2:0 rev. 0 <- [0] born=0.017 hops=1 epoch=-1 matchId=-1 on [0] (latency: 0.00031s)
+c 0.017 0 Sending job desc. of #2 rev. 0 of size 614404, formula begins at idx 104 => [0]
+c 0.017 0 Sent job desc. of #2 of size 614404 => [0]
+c 0.018 0 Got desc. of size 614404 for job #2 <= [0]
+c 0.018 0 UNCOMMIT #2:0
+c 0.018 0 LOAD 1 (+#2:0)
+c 0.018 0 EXECUTE #2:0 <= [0]
+c 0.018 0 #2:0 : new job node starting
+c 0.018 0 corealloc req 3 -> 2 granted, 0 free
+c 0.018 0 BLC insert (2,4,1.000)
+c 0.018 0 #2:0 : update v=1 epoch=1 lastreqsepoch=-1 evlat=0.00000
+c 0.019 0 SPA: formula with 614300 bytes
+c 0.027 0 #2:0 : update v=4 epoch=2 lastreqsepoch=1 evlat=0.00908
+c 0.028 0 #2:0 growing: r.#2:1 rev. 0 <- [0] born=0.028 hops=0 epoch=2 matchId=-1 => [1]
+c 0.028 0 #2:0 growing: r.#2:2 rev. 0 <- [0] born=0.028 hops=0 epoch=2 matchId=-1 => [2]
+c 0.028 0 Adoption offer for #2:1 <= [1]
+c 0.028 0 RBS #2:1 EXPAND e=2 #inactives=0 => [1]
+c 0.028 0 Adoption offer for #2:2 <= [2]
+c 0.028 0 RBS #2:2 EXPAND e=2 #inactives=0 => [2]
+c 0.028 0 Sending job desc. of #2:0 rev. 0, size 614404, formula begins at idx 104 => [1]
+c 0.028 0 Sent id=16 => [1]
+c 0.028 0 Sending job desc. of #2:0 rev. 0, size 614404, formula begins at idx 104 => [2]
+c 0.028 0 Sent id=17 => [2]
+c 0.030 0 PREPRO running Kissat
+c 0.032 0 Watchdog sleep interrupted by signal
+c 0.055 0 [WARN] #2:0 job tree has size 0/4
+c 0.177 0 PREPRO Kissat done, result 0
+c 0.178 0 corealloc ret 1 -> 1 free
+c 0.178 0 SATWP preprocessor done
+c 0.178 0 SATWP submit preprocessed task
+c 0.178 0 SATWP #1 : Retracting base job over ~0.165s
+c 0.179 0 Introducing job #3 rev. 0 : r.#3:0 rev. 0 <- [0] born=0.179 hops=0 epoch=-1 matchId=-1 => [0]
+c 0.179 0 BLC insert (3,1,0.010)
+c 0.180 0 #2:0 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.180 0 Activate r.#3:0 rev. 0 <- [0] born=0.179 hops=0 epoch=-1 matchId=-1
+c 0.180 0 [CA] Root: 1 requests, 0 idle (epoch=3)
+c 0.181 0 [CA] Root: 1 requests, 0 idle (epoch=3)
+c 0.183 0 [CA] Root: 0 requests, 0 idle (epoch=3)
+c 0.184 0 Scheduling r.#3:0 rev. 0 <- [0] born=0.179 hops=2 epoch=-1 matchId=-1 on [3] (latency: 0.00410s)
+c 0.184 0 Sending job desc. of #3 rev. 0 of size 502328, formula begins at idx 124 => [3]
+c 0.184 0 Sent job desc. of #3 of size 502328 => [3]
+c 0.184 0 [CA] Root: 0 requests, 0 idle (epoch=3)
+c 0.191 0 #2:0 : update v=3 epoch=4 lastreqsepoch=3 evlat=0.00000
+c 0.204 0 [WARN] #2:0 job tree has size 4/3
+c 0.291 0 BLC FINALIZED alpha=5000000.093751 excess=0
+c 0.291 0 #2:0 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00000
+c 0.291 0 [WARN] #2:0 job tree has size 3/2
+c 0.291 0 RBS #2:2 SHRINK #inactives=1 <= [2]
+c 0.321 0 BLC FINALIZED alpha=1.000000 excess=0
+c 0.321 0 #2:0 : update v=1 epoch=6 lastreqsepoch=5 evlat=0.00000
+c 0.321 0 RBS #2:1 SHRINK #inactives=2 <= [1]
+c 0.341 0 BLC FINALIZED alpha=1.000000 excess=0
+c 0.341 0 #2:0 : update v=1 epoch=7 lastreqsepoch=6 evlat=0.00000
+c 0.341 0 [CA] Root: 0 requests, 0 idle (epoch=7)
+c 0.342 0 [CA] Root: 0 requests, 0 idle (epoch=7)
+c 0.343 0 [CA] Root: 0 requests, 0 idle (epoch=7)
+c 0.362 0 SATWP Interrupt #1:base
+c 0.362 0 Interrupt #2
+c 0.362 0 Acknowledge #2 interrupt
+c 0.362 0 #2 sent feedback of interrupt to client
+c 0.362 0 Propagate interruption of #2:0 ... => [1]
+c 0.362 0 Propagate interruption of #2:0 ... => [2]
+c 0.362 0 LOAD 0 (-#2:0)
+c 0.362 0 corealloc ret 2 -> 3 free
+c 0.362 0 #2:0 : terminated
+c 0.362 0 BLC insert (2,0,0.000)
+c 0.362 0 #2:0 balancing latency={num:1 min:0.00908 med:0.00908 avg:0.00908 max:0.00908}
+c 0.362 0 Forget #2:0
+c 0.362 0 FORGET #2:0
+c 0.362 0 #2:0 desires fulfilled=1.0000 latency={num:2 min:0.00036 med:0.00041 avg:0.00038 max:0.00041}
+c 0.362 0 TIMEOUT/UNKNOWN #2 rev. 0 0.345004 <= [0]
+c 0.365 0 SATWP base done
+c 0.365 0 SATWP Extract result of #1:base
+c 0.365 0 ADOPT r.#3:3 rev. 0 <- [2] born=0.362 hops=2 epoch=8 matchId=-1 mode=1 <= [0]
+c 0.365 0 corealloc req 0 -> 0 granted, 3 free
+c 0.365 0 COMMIT #3 -> #3:3
+c 0.366 0 Got desc. of size 502328 for job #3 <= [2]
+c 0.366 0 UNCOMMIT #3:3
+c 0.366 0 LOAD 1 (+#3:3)
+c 0.366 0 EXECUTE #3:3 <= [2]
+c 0.366 0 #3:3 : new job node starting
+c 0.366 0 corealloc req 3 -> 3 granted, 0 free
+c 0.366 0 #3:3 : update v=4 epoch=8 lastreqsepoch=8 evlat=0.00000
+c 0.367 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.367 0 #2:0 : FSJ freeing mem
+c 0.367 0 SPA: formula with 502204 bytes
+c 0.370 0 #2:0 : FSJ mem freed
+c 0.370 0 Watchdog sleep interrupted by signal
+c 0.371 0 #2:0 ready for destruction
+c 0.380 0 Watchdog sleep interrupted by signal
+c 0.425 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.475 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.526 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.576 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.626 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.677 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.688 0 #3:3 : INIT COMM e=1 nc=0
+c 0.697 0 #3:3 CS produced cls size=1694 lits=1688/1500
+c 0.697 0 #3:3 : merged 1 contribs rev=0 (inp=1500, t=0.0004s) ~> len=1694
+c 0.727 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.778 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.828 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.879 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.929 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.979 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.000 0 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.000 0 contexts=1 descriptions=1
+c 1.030 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.080 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.131 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.181 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.191 0 #3:3 : INIT COMM e=2 nc=0
+c 1.201 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.00GB newreqs=6 hops=5
+c 1.201 0 sysstate entered=3 parsed=3 scheduled=3 processed=1 successful=0
+c 1.201 0 #3:3 CS produced cls size=2079 lits=2073/1989
+c 1.202 0 #3:3 : merged 1 contribs rev=0 (inp=1989, t=0.0003s) ~> len=2079
+c 1.231 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.282 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.332 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.383 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.433 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.484 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.534 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.585 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.635 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.686 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.686 0 #3:3 : INIT COMM e=3 nc=0
+c 1.696 0 #3:3 CS produced cls size=2050 lits=2044/2011
+c 1.697 0 #3:3 : merged 1 contribs rev=0 (inp=2011, t=0.0004s) ~> len=2050
+c 1.736 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.787 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.824 0 Will receive job result for job #3 rev. 0 <= [3]
+c 1.825 0 LOAD 0 (-#3:3)
+c 1.825 0 corealloc ret 3 -> 3 free
+c 1.825 0 #3:3 : terminated
+c 1.825 0 Forget #3:3
+c 1.825 0 FORGET #3:3
+c 1.825 0 #3:3 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.825 0 Received result of job #3 rev. 0, code: 20 <= [1]
+c 1.825 0 RESPONSE_TIME #3 1.646921 rev. 0
+c 1.825 0 SOLUTION #3 UNSATISFIABLE rev. 0
+c 1.826 0 SATWP prepro done
+c 1.826 0 SATWP Extract result of #1:prepro
+c 1.826 0 SATWP #1:prepro extracted
+c 1.826 0 #1 SATWP RES ~20~
+c 1.826 0 Received result of job #1 rev. 0, code: 20 <= [0]
+c 1.826 0 RESPONSE_TIME #1 1.821943 rev. 0
+c 1.826 0 SOLUTION #1 UNSATISFIABLE rev. 0
+s UNSATISFIABLE
+c 1.826 0 Destruct worker
+c 1.826 0 #3:3 : FSJ freeing mem
+c 1.837 0 #3:3 : FSJ mem freed
+c 1.837 0 Watchdog sleep interrupted by signal
+c 1.837 0 #3:3 ready for destruction
+c 1.838 0 all jobs deleted
+c 1.838 0 Watchdog sleep interrupted by signal
+c 1.838 0 STATS balancing_latencies num:1 min:0.009081 max:0.009081 med:0.009081 mean:0.009081
+c 1.838 0 busytime=1.803
+c 1.838 0 STATS treegrowth_latencies num:2 min:0.000362 max:0.000406 med:0.000406 mean:0.000384
+c 1.839 0 Watchdog sleep interrupted by signal
+c 1.839 0 Leaving client destructor
+c 1.839 0 Watchdog sleep interrupted by signal
+c 1.891 0 Exiting happily
+c 0.001 0 Program options: -0o=0 -J=0 -SJ=0 -T=0 -adc=0 -aim=1 -ajpc=0 -ans=0 -apidir=.api -ba=4 -bem=1 -bicg=4 -br=0 -c=1 -cbbs=0 -cblm=1 -cblp=100000 -cdel=2 -cecpm=0 -cf=0 -cfci=10 -cfm=3 -cg=1 -ch=0 -checksums=0 -cjc=0 -client-app-threads=1 -cm=0 -cmp=0 -colors=1 -compact-proof=0 -cpshm=0 -csm=3 -cusv=1 -dc=0 -decay-distr=1 -decay-max=200 -decay-mean=50 -decay-min=1 -decay-stddev=3 -decpm=0 -delaymonkey=0 -div-elim=0 -div-fanout=0 -div-init-shuffle=0 -div-native=1 -div-noise=0 -div-phases=1 -div-reduce=0 -div-seeds=1 -dpa=1 -ds=0 -evpt=500 -evu=0 -extmem-disk-dir=.disk -fapii=0 -fcll=1 -g=0 -gclls=0 -h=0 -huca=0 -iff=0 -ilbd=0 -inotify=1 -interface-fs=0 -interface-ipc=0 -ipm=1 -ivdh=1 -jc=1 -jcl=0 -jcup=0.05 -jjp=0 -jwl=0 -l=1 -latencymonkey=0 -lbdpi=0 -lbdpo=0 -ljpc=32 -log=logsntraces//logs/ -mbt=8388608 -mcips=10 -md=0 -mempanic=1 -mjps=0 -mlbdps=2 -mlpt=50000000 -mmpi=0 -mono=instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf -mono-app=SATWITHPRE -mscf=5 -nec=10 -no-import=0 -os=0 -otfc=0 -otfcm=1 -p=0.1 -pb=1 -pbbm=0 -pef=1 -pjp=9999999 -pl=0 -plain-add-specific=0 -pph=0 -pre-cleanup=0 -prisma=0 -proof-debugging=0 -ps=0 -q=0 -qcll=60 -qlbdl=60 -randlbd=0 -reduce-delta=100 -reduce-max=980 -reduce-mean=700 -reduce-min=300 -reduce-stddev=150 -rlbd=3 -rpa=0 -rs=1 -rspaa=0 -s=0.5 -satsolver=k -scll=60 -scramble-lbds=0 -scsd=0 -seed=0 -sjd=0 -slbdl=60 -sleep=100 -spl=-1 -sswl=0 -t=3 -terminate-abruptly=0 -tmp=/tmp -trace-dir=logsntraces//traces/ -uninvert-proof=1 -v=4 -w=-1 -wam=10000 -warmup=0 -watchdog=1 -y=1 -yield=0 
+c 0.001 0 Mallob rls pid=59007 on host vvbk
+c 0.001 0 4 workers, 1 clients
+c 0.004 0 Created client communicator
+c 0.004 0 Created worker communicator
+c 0.004 0 I am worker #0
+c 0.004 0 I am client #0
+c 0.004 0 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.004 0 [WARN] Falling back to safe value r=2.
+c 0.004 0 My bounce alternatives: 3 1 
+c 0.004 0 Set up API connector
+c 0.004 0 Machine color 0 with 4 total workers (my rank: 0)
+c 0.004 0 Assuming application "SATWITHPRE" for mono job
+c 0.004 0 [CA] Root: 0 requests, 1 idle (epoch=0)
+c 0.006 0 [CA] Root: 0 requests, 3 idle (epoch=0)
+c 0.007 0 [CA] Root: 0 requests, 4 idle (epoch=0)
+c 0.012 0 corealloc req 1 -> 1 granted, 2 free
+c 0.016 0 Introducing job #2 rev. 0 : r.#2:0 rev. 0 <- [0] born=0.016 hops=0 epoch=-1 matchId=-1 => [0]
+c 0.016 0 BLC insert (2,1,0.010)
+c 0.016 0 Activate r.#2:0 rev. 0 <- [0] born=0.016 hops=0 epoch=-1 matchId=-1
+c 0.016 0 ADOPT r.#2:0 rev. 0 <- [0] born=0.016 hops=1 epoch=-1 matchId=-1 mode=1 <= [0]
+c 0.016 0 corealloc req 0 -> 0 granted, 2 free
+c 0.016 0 COMMIT #2 -> #2:0
+c 0.016 0 Scheduling r.#2:0 rev. 0 <- [0] born=0.016 hops=1 epoch=-1 matchId=-1 on [0] (latency: 0.00062s)
+c 0.016 0 Sending job desc. of #2 rev. 0 of size 614404, formula begins at idx 104 => [0]
+c 0.016 0 Sent job desc. of #2 of size 614404 => [0]
+c 0.017 0 Got desc. of size 614404 for job #2 <= [0]
+c 0.017 0 UNCOMMIT #2:0
+c 0.017 0 LOAD 1 (+#2:0)
+c 0.017 0 EXECUTE #2:0 <= [0]
+c 0.017 0 #2:0 : new job node starting
+c 0.017 0 corealloc req 3 -> 2 granted, 0 free
+c 0.017 0 BLC insert (2,4,1.000)
+c 0.018 0 #2:0 : update v=1 epoch=1 lastreqsepoch=-1 evlat=0.00000
+c 0.018 0 SPA: formula with 614300 bytes
+c 0.027 0 #2:0 : update v=4 epoch=2 lastreqsepoch=1 evlat=0.00907
+c 0.027 0 #2:0 growing: r.#2:1 rev. 0 <- [0] born=0.027 hops=0 epoch=2 matchId=-1 => [1]
+c 0.027 0 #2:0 growing: r.#2:2 rev. 0 <- [0] born=0.027 hops=0 epoch=2 matchId=-1 => [2]
+c 0.027 0 Adoption offer for #2:2 <= [2]
+c 0.027 0 RBS #2:2 EXPAND e=2 #inactives=0 => [2]
+c 0.027 0 Adoption offer for #2:1 <= [1]
+c 0.027 0 RBS #2:1 EXPAND e=2 #inactives=0 => [1]
+c 0.027 0 Sending job desc. of #2:0 rev. 0, size 614404, formula begins at idx 104 => [2]
+c 0.027 0 Sent id=16 => [2]
+c 0.027 0 Sending job desc. of #2:0 rev. 0, size 614404, formula begins at idx 104 => [1]
+c 0.027 0 Sent id=17 => [1]
+c 0.030 0 PREPRO running Kissat
+c 0.031 0 Watchdog sleep interrupted by signal
+c 0.058 0 [WARN] #2:0 job tree has size 0/4
+c 0.194 0 PREPRO Kissat done, result 0
+c 0.196 0 corealloc ret 1 -> 1 free
+c 0.196 0 SATWP preprocessor done
+c 0.196 0 SATWP submit preprocessed task
+c 0.196 0 SATWP #1 : Retracting base job over ~0.184s
+c 0.198 0 Introducing job #3 rev. 0 : r.#3:0 rev. 0 <- [0] born=0.198 hops=0 epoch=-1 matchId=-1 => [0]
+c 0.198 0 BLC insert (3,1,0.010)
+c 0.198 0 #2:0 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.198 0 Activate r.#3:0 rev. 0 <- [0] born=0.198 hops=0 epoch=-1 matchId=-1
+c 0.199 0 [CA] Root: 1 requests, 0 idle (epoch=3)
+c 0.200 0 [CA] Root: 0 requests, 0 idle (epoch=3)
+c 0.201 0 Scheduling r.#3:0 rev. 0 <- [0] born=0.198 hops=2 epoch=-1 matchId=-1 on [3] (latency: 0.00313s)
+c 0.201 0 Sending job desc. of #3 rev. 0 of size 502328, formula begins at idx 124 => [3]
+c 0.201 0 Sent job desc. of #3 of size 502328 => [3]
+c 0.202 0 [CA] Root: 0 requests, 0 idle (epoch=3)
+c 0.209 0 #2:0 : update v=3 epoch=4 lastreqsepoch=3 evlat=0.00000
+c 0.211 0 [WARN] #2:0 job tree has size 4/3
+c 0.324 0 BLC FINALIZED alpha=5000000.093751 excess=0
+c 0.324 0 #2:0 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00000
+c 0.324 0 RBS #2:2 SHRINK #inactives=1 <= [2]
+c 0.351 0 [WARN] #2:0 job tree has size 3/2
+c 0.354 0 BLC FINALIZED alpha=1.000000 excess=0
+c 0.354 0 #2:0 : update v=1 epoch=6 lastreqsepoch=5 evlat=0.00000
+c 0.354 0 RBS #2:1 SHRINK #inactives=2 <= [1]
+c 0.374 0 BLC FINALIZED alpha=1.000000 excess=0
+c 0.374 0 #2:0 : update v=1 epoch=7 lastreqsepoch=6 evlat=0.00000
+c 0.374 0 [CA] Root: 0 requests, 0 idle (epoch=7)
+c 0.375 0 [CA] Root: 0 requests, 0 idle (epoch=7)
+c 0.401 0 SATWP Interrupt #1:base
+c 0.401 0 Interrupt #2
+c 0.401 0 Acknowledge #2 interrupt
+c 0.401 0 #2 sent feedback of interrupt to client
+c 0.401 0 Propagate interruption of #2:0 ... => [1]
+c 0.401 0 Propagate interruption of #2:0 ... => [2]
+c 0.401 0 LOAD 0 (-#2:0)
+c 0.401 0 corealloc ret 2 -> 3 free
+c 0.401 0 #2:0 : terminated
+c 0.401 0 BLC insert (2,0,0.000)
+c 0.401 0 #2:0 balancing latency={num:1 min:0.00907 med:0.00907 avg:0.00907 max:0.00907}
+c 0.401 0 Forget #2:0
+c 0.401 0 FORGET #2:0
+c 0.401 0 #2:0 desires fulfilled=1.0000 latency={num:2 min:0.00036 med:0.00041 avg:0.00038 max:0.00041}
+c 0.402 0 TIMEOUT/UNKNOWN #2 rev. 0 0.385876 <= [0]
+c 0.404 0 SATWP base done
+c 0.404 0 SATWP Extract result of #1:base
+c 0.406 0 ADOPT r.#3:3 rev. 0 <- [2] born=0.402 hops=2 epoch=8 matchId=-1 mode=1 <= [0]
+c 0.406 0 corealloc req 0 -> 0 granted, 3 free
+c 0.406 0 COMMIT #3 -> #3:3
+c 0.407 0 Got desc. of size 502328 for job #3 <= [2]
+c 0.407 0 UNCOMMIT #3:3
+c 0.407 0 LOAD 1 (+#3:3)
+c 0.407 0 EXECUTE #3:3 <= [2]
+c 0.407 0 #3:3 : new job node starting
+c 0.407 0 corealloc req 3 -> 3 granted, 0 free
+c 0.408 0 #3:3 : update v=4 epoch=8 lastreqsepoch=8 evlat=0.00000
+c 0.408 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.408 0 #2:0 : FSJ freeing mem
+c 0.409 0 SPA: formula with 502204 bytes
+c 0.409 0 #2:0 : FSJ mem freed
+c c 0.410 0 0.410 0 #2:0 ready for destruction
+Watchdog sleep interrupted by signal
+c 0.420 0 Watchdog sleep interrupted by signal
+c 0.467 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.517 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.568 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.618 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.669 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.709 0 #3:3 : INIT COMM e=1 nc=0
+c 0.719 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.719 0 #3:3 CS produced cls size=1690 lits=1684/1500
+c 0.719 0 #3:3 : merged 1 contribs rev=0 (inp=1500, t=0.0003s) ~> len=1690
+c 0.769 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.820 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.870 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.921 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.971 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.000 0 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.000 0 contexts=1 descriptions=1
+c 1.021 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.072 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.122 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.173 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.201 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.00GB newreqs=6 hops=5
+c 1.201 0 sysstate entered=3 parsed=3 scheduled=3 processed=1 successful=0
+c 1.204 0 #3:3 : INIT COMM e=2 nc=0
+c 1.213 0 #3:3 CS produced cls size=2059 lits=2053/1968
+c 1.214 0 #3:3 : merged 1 contribs rev=0 (inp=1968, t=0.0006s) ~> len=2059
+c 1.223 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.273 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.324 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.375 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.425 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.475 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.526 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.576 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.626 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.677 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.710 0 #3:3 : INIT COMM e=3 nc=0
+c 1.717 0 #3:3 CS produced cls size=2054 lits=2048/2005
+c 1.718 0 #3:3 : merged 1 contribs rev=0 (inp=2005, t=0.0005s) ~> len=2054
+c 1.727 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.777 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.787 0 #3:3 rev. 0 : found result UNSAT => [3]
+c 1.788 0 #3:3 rev. 0: sending finished info => [3]
+c 1.788 0 Will receive job result for job #3 rev. 0 <= [3]
+c 1.788 0 LOAD 0 (-#3:3)
+c 1.788 0 corealloc ret 3 -> 3 free
+c 1.788 0 #3:3 : terminated
+c 1.788 0 Forget #3:3
+c 1.788 0 FORGET #3:3
+c 1.788 0 #3:3 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.788 0 Send result of #3 rev. 0 to client => [0]
+c 1.788 0 Received result of job #3 rev. 0, code: 20 <= [0]
+c 1.788 0 RESPONSE_TIME #3 1.592224 rev. 0
+c 1.788 0 SOLUTION #3 UNSATISFIABLE rev. 0
+c 1.791 0 SATWP prepro done
+c 1.791 0 SATWP Extract result of #1:prepro
+c 1.791 0 SATWP #1:prepro extracted
+c 1.791 0 #1 SATWP RES ~20~
+c 1.795 0 Received result of job #1 rev. 0, code: 20 <= [0]
+c 1.795 0 RESPONSE_TIME #1 1.790276 rev. 0
+c 1.795 0 SOLUTION #1 UNSATISFIABLE rev. 0
+s UNSATISFIABLE
+c 1.795 0 Destruct worker
+c 1.795 0 #3:3 : FSJ freeing mem
+c 1.795 0 #3:3 : FSJ mem freed
+c 1.795 0 Watchdog sleep interrupted by signal
+c 1.796 0 #3:3 ready for destruction
+c 1.797 0 all jobs deleted
+c 1.797 0 Watchdog sleep interrupted by signal
+c 1.797 0 STATS balancing_latencies num:1 min:0.009066 max:0.009066 med:0.009066 mean:0.009066
+c 1.797 0 busytime=1.767
+c 1.797 0 STATS treegrowth_latencies num:2 min:0.000356 max:0.000411 med:0.000411 mean:0.000383
+c 1.797 0 Watchdog sleep interrupted by signal
+c 1.797 0 Leaving client destructor
+c 1.797 0 Watchdog sleep interrupted by signal
+c 1.857 0 Exiting happily
+c 0.001 0 Program options: -0o=0 -J=0 -SJ=0 -T=0 -adc=0 -aim=1 -ajpc=0 -ans=0 -apidir=.api -ba=4 -bem=1 -bicg=4 -br=0 -c=1 -cbbs=0 -cblm=1 -cblp=100000 -cdel=2 -cecpm=0 -cf=0 -cfci=10 -cfm=3 -cg=1 -ch=0 -checksums=0 -cjc=0 -client-app-threads=1 -cm=0 -cmp=0 -colors=1 -compact-proof=0 -cpshm=0 -csm=3 -cusv=1 -dc=0 -decay-distr=1 -decay-max=200 -decay-mean=50 -decay-min=1 -decay-stddev=3 -decpm=0 -delaymonkey=0 -div-elim=0 -div-fanout=0 -div-init-shuffle=0 -div-native=1 -div-noise=0 -div-phases=1 -div-reduce=0 -div-seeds=1 -dpa=1 -ds=0 -evpt=500 -evu=0 -extmem-disk-dir=.disk -fapii=0 -fcll=1 -g=0 -gclls=0 -h=0 -huca=0 -iff=0 -ilbd=0 -inotify=1 -interface-fs=0 -interface-ipc=0 -ipm=1 -ivdh=1 -jc=1 -jcl=0 -jcup=0.05 -jjp=0 -jwl=0 -l=1 -latencymonkey=0 -lbdpi=0 -lbdpo=0 -ljpc=32 -log=logsntraces//logs/ -mbt=8388608 -mcips=10 -md=0 -mempanic=1 -mjps=0 -mlbdps=2 -mlpt=50000000 -mmpi=0 -mono=instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf -mono-app=SATWITHPRE -mscf=5 -nec=10 -no-import=0 -os=0 -otfc=0 -otfcm=1 -p=0.1 -pb=1 -pbbm=0 -pef=1 -pjp=9999999 -pl=0 -plain-add-specific=0 -pph=0 -pre-cleanup=0 -prisma=0 -proof-debugging=0 -ps=0 -q=0 -qcll=60 -qlbdl=60 -randlbd=0 -reduce-delta=100 -reduce-max=980 -reduce-mean=700 -reduce-min=300 -reduce-stddev=150 -rlbd=3 -rpa=0 -rs=1 -rspaa=0 -s=0.5 -satsolver=k -scll=60 -scramble-lbds=0 -scsd=0 -seed=0 -sjd=0 -slbdl=60 -sleep=100 -spl=-1 -sswl=0 -t=3 -terminate-abruptly=0 -tmp=/tmp -trace-dir=logsntraces//traces/ -uninvert-proof=1 -v=4 -w=-1 -wam=10000 -warmup=0 -watchdog=1 -y=1 -yield=0 
+c 0.001 0 Mallob rls pid=59152 on host vvbk
+c 0.001 0 4 workers, 1 clients
+c 0.001 0 Created client communicator
+c 0.001 0 Created worker communicator
+c 0.002 0 I am worker #0
+c 0.002 0 I am client #0
+c 0.002 0 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.002 0 [WARN] Falling back to safe value r=2.
+c 0.002 0 My bounce alternatives: 3 1 
+c 0.002 0 Set up API connector
+c 0.002 0 Machine color 0 with 4 total workers (my rank: 0)
+c 0.002 0 Assuming application "SATWITHPRE" for mono job
+c 0.002 0 [CA] Root: 0 requests, 1 idle (epoch=0)
+c 0.003 0 [CA] Root: 0 requests, 3 idle (epoch=0)
+c 0.004 0 [CA] Root: 0 requests, 4 idle (epoch=0)
+c 0.010 0 corealloc req 1 -> 1 granted, 2 free
+c 0.015 0 Introducing job #2 rev. 0 : r.#2:0 rev. 0 <- [0] born=0.015 hops=0 epoch=-1 matchId=-1 => [0]
+c 0.015 0 BLC insert (2,1,0.010)
+c 0.015 0 Activate r.#2:0 rev. 0 <- [0] born=0.015 hops=0 epoch=-1 matchId=-1
+c 0.015 0 ADOPT r.#2:0 rev. 0 <- [0] born=0.015 hops=1 epoch=-1 matchId=-1 mode=1 <= [0]
+c 0.015 0 corealloc req 0 -> 0 granted, 2 free
+c 0.015 0 COMMIT #2 -> #2:0
+c 0.015 0 Scheduling r.#2:0 rev. 0 <- [0] born=0.015 hops=1 epoch=-1 matchId=-1 on [0] (latency: 0.00079s)
+c 0.015 0 Sending job desc. of #2 rev. 0 of size 614404, formula begins at idx 104 => [0]
+c 0.016 0 Sent job desc. of #2 of size 614404 => [0]
+c 0.016 0 Got desc. of size 614404 for job #2 <= [0]
+c 0.016 0 UNCOMMIT #2:0
+c 0.016 0 LOAD 1 (+#2:0)
+c 0.016 0 EXECUTE #2:0 <= [0]
+c 0.016 0 #2:0 : new job node starting
+c 0.016 0 corealloc req 3 -> 2 granted, 0 free
+c 0.017 0 BLC insert (2,4,1.000)
+c 0.017 0 #2:0 : update v=1 epoch=1 lastreqsepoch=-1 evlat=0.00000
+c 0.017 0 SPA: formula with 614300 bytes
+c 0.026 0 #2:0 : update v=4 epoch=2 lastreqsepoch=1 evlat=0.00901
+c 0.026 0 #2:0 growing: r.#2:1 rev. 0 <- [0] born=0.026 hops=0 epoch=2 matchId=-1 => [1]
+c 0.026 0 #2:0 growing: r.#2:2 rev. 0 <- [0] born=0.026 hops=0 epoch=2 matchId=-1 => [2]
+c 0.026 0 Adoption offer for #2:1 <= [1]
+c 0.026 0 RBS #2:1 EXPAND e=2 #inactives=0 => [1]
+c 0.026 0 Adoption offer for #2:2 <= [2]
+c 0.026 0 RBS #2:2 EXPAND e=2 #inactives=0 => [2]
+c 0.026 0 Sending job desc. of #2:0 rev. 0, size 614404, formula begins at idx 104 => [1]
+c 0.026 0 Sent id=16 => [1]
+c 0.026 0 Sending job desc. of #2:0 rev. 0, size 614404, formula begins at idx 104 => [2]
+c 0.026 0 Sent id=17 => [2]
+c 0.030 0 PREPRO running Kissat
+c 0.030 0 Watchdog sleep interrupted by signal
+c 0.052 0 [WARN] #2:0 job tree has size 0/4
+c 0.177 0 PREPRO Kissat done, result 0
+c 0.180 0 corealloc ret 1 -> 1 free
+c 0.180 0 SATWP preprocessor done
+c 0.180 0 SATWP submit preprocessed task
+c 0.180 0 SATWP #1 : Retracting base job over ~0.169s
+c 0.182 0 Introducing job #3 rev. 0 : r.#3:0 rev. 0 <- [0] born=0.182 hops=0 epoch=-1 matchId=-1 => [0]
+c 0.182 0 BLC insert (3,1,0.010)
+c 0.182 0 #2:0 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.182 0 Activate r.#3:0 rev. 0 <- [0] born=0.182 hops=0 epoch=-1 matchId=-1
+c 0.182 0 [CA] Root: 1 requests, 0 idle (epoch=3)
+c 0.183 0 [CA] Root: 0 requests, 0 idle (epoch=3)
+c 0.184 0 Scheduling r.#3:0 rev. 0 <- [0] born=0.182 hops=2 epoch=-1 matchId=-1 on [3] (latency: 0.00231s)
+c 0.184 0 Sending job desc. of #3 rev. 0 of size 502328, formula begins at idx 124 => [3]
+c 0.184 0 Sent job desc. of #3 of size 502328 => [3]
+c 0.184 0 [CA] Root: 0 requests, 0 idle (epoch=3)
+c 0.192 0 #2:0 : update v=3 epoch=4 lastreqsepoch=3 evlat=0.00000
+c 0.211 0 [WARN] #2:0 job tree has size 4/3
+c 0.298 0 BLC FINALIZED alpha=5000000.093751 excess=0
+c 0.298 0 #2:0 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00000
+c 0.299 0 RBS #2:2 SHRINK #inactives=1 <= [2]
+c 0.319 0 BLC FINALIZED alpha=1.000000 excess=0
+c 0.319 0 #2:0 : update v=1 epoch=6 lastreqsepoch=5 evlat=0.00000
+c 0.319 0 RBS #2:1 SHRINK #inactives=2 <= [1]
+c 0.349 0 BLC FINALIZED alpha=1.000000 excess=0
+c 0.349 0 #2:0 : update v=1 epoch=7 lastreqsepoch=6 evlat=0.00000
+c 0.349 0 [CA] Root: 0 requests, 0 idle (epoch=7)
+c 0.350 0 [CA] Root: 0 requests, 0 idle (epoch=7)
+c 0.367 0 SATWP Interrupt #1:base
+c 0.367 0 Interrupt #2
+c 0.367 0 Acknowledge #2 interrupt
+c 0.367 0 #2 sent feedback of interrupt to client
+c 0.367 0 Propagate interruption of #2:0 ... => [1]
+c 0.367 0 Propagate interruption of #2:0 ... => [2]
+c 0.367 0 LOAD 0 (-#2:0)
+c 0.367 0 corealloc ret 2 -> 3 free
+c 0.367 0 #2:0 : terminated
+c 0.367 0 BLC insert (2,0,0.000)
+c 0.367 0 #2:0 balancing latency={num:1 min:0.00901 med:0.00901 avg:0.00901 max:0.00901}
+c 0.367 0 Forget #2:0
+c 0.367 0 FORGET #2:0
+c 0.367 0 #2:0 desires fulfilled=1.0000 latency={num:2 min:0.00039 med:0.00046 avg:0.00043 max:0.00046}
+c 0.367 0 TIMEOUT/UNKNOWN #2 rev. 0 0.352572 <= [0]
+c 0.368 0 #2:0 : FSJ freeing mem
+c 0.369 0 ADOPT r.#3:3 rev. 0 <- [2] born=0.367 hops=2 epoch=8 matchId=-1 mode=1 <= [0]
+c 0.369 0 corealloc req 0 -> 0 granted, 3 free
+c 0.369 0 COMMIT #3 -> #3:3
+c 0.370 0 SATWP base done
+c 0.370 0 SATWP Extract result of #1:base
+c 0.371 0 Got desc. of size 502328 for job #3 <= [2]
+c 0.371 0 UNCOMMIT #3:3
+c 0.371 0 LOAD 1 (+#3:3)
+c 0.371 0 EXECUTE #3:3 <= [2]
+c 0.371 0 #3:3 : new job node starting
+c 0.371 0 corealloc req 3 -> 3 granted, 0 free
+c 0.372 0 #3:3 : update v=4 epoch=8 lastreqsepoch=8 evlat=0.00000
+c 0.372 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.372 0 SPA: formula with 502204 bytes
+c 0.379 0 #2:0 : FSJ mem freed
+c 0.379 0 Watchdog sleep interrupted by signal
+c 0.381 0 #2:0 ready for destruction
+c 0.387 0 Watchdog sleep interrupted by signal
+c 0.431 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.481 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.532 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.582 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.632 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.683 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.686 0 #3:3 : INIT COMM e=1 nc=0
+c 0.693 0 #3:3 CS produced cls size=1664 lits=1658/1500
+c 0.694 0 #3:3 : merged 1 contribs rev=0 (inp=1500, t=0.0005s) ~> len=1664
+c 0.733 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.784 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.834 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.884 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.935 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.985 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.000 0 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.000 0 contexts=1 descriptions=1
+c 1.035 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.086 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.136 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.187 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.190 0 #3:3 : INIT COMM e=2 nc=0
+c 1.197 0 #3:3 CS produced cls size=2051 lits=2045/1941
+c 1.198 0 #3:3 : merged 1 contribs rev=0 (inp=1941, t=0.0005s) ~> len=2051
+c 1.201 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.00GB newreqs=6 hops=5
+c 1.201 0 sysstate entered=3 parsed=3 scheduled=3 processed=1 successful=0
+c 1.237 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.288 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.338 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.389 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.439 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.489 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.539 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.590 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.640 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.691 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.694 0 #3:3 : INIT COMM e=3 nc=0
+c 1.701 0 #3:3 CS produced cls size=2062 lits=2056/2014
+c 1.702 0 #3:3 : merged 1 contribs rev=0 (inp=2014, t=0.0006s) ~> len=2062
+c 1.741 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.792 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.842 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.862 0 #3:3 rev. 0 : found result UNSAT => [3]
+c 1.862 0 #3:3 rev. 0: sending finished info => [3]
+c 1.863 0 Will receive job result for job #3 rev. 0 <= [3]
+c 1.863 0 LOAD 0 (-#3:3)
+c 1.863 0 corealloc ret 3 -> 3 free
+c 1.863 0 #3:3 : terminated
+c 1.863 0 Forget #3:3
+c 1.863 0 FORGET #3:3
+c 1.863 0 #3:3 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.863 0 Send result of #3 rev. 0 to client => [0]
+c 1.863 0 Received result of job #3 rev. 0, code: 20 <= [0]
+c 1.863 0 RESPONSE_TIME #3 1.683304 rev. 0
+c 1.863 0 SOLUTION #3 UNSATISFIABLE rev. 0
+c 1.866 0 SATWP prepro done
+c 1.866 0 SATWP Extract result of #1:prepro
+c 1.866 0 SATWP #1:prepro extracted
+c 1.866 0 #1 SATWP RES ~20~
+c 1.872 0 #3:3 : FSJ freeing mem
+c 1.874 0 #3:3 : FSJ mem freed
+c 1.874 0 Watchdog sleep interrupted by signal
+c 1.875 0 Received result of job #1 rev. 0, code: 20 <= [0]
+c 1.875 0 RESPONSE_TIME #1 1.872995 rev. 0
+c 1.875 0 SOLUTION #1 UNSATISFIABLE rev. 0
+s UNSATISFIABLE
+c 1.875 0 Destruct worker
+c 1.875 0 #3:3 ready for destruction
+c 1.876 0 all jobs deleted
+c 1.876 0 Watchdog sleep interrupted by signal
+c 1.876 0 STATS balancing_latencies num:1 min:0.009015 max:0.009015 med:0.009015 mean:0.009015
+c 1.877 0 busytime=1.844
+c 1.877 0 STATS treegrowth_latencies num:2 min:0.000395 max:0.000458 med:0.000458 mean:0.000426
+c 1.877 0 Watchdog sleep interrupted by signal
+c 1.877 0 Leaving client destructor
+c 1.877 0 Watchdog sleep interrupted by signal
+c 1.937 0 Exiting happily
+c 0.001 0 Program options: -0o=0 -J=0 -SJ=0 -T=0 -adc=0 -aim=1 -ajpc=0 -ans=0 -apidir=.api -ba=4 -bem=1 -bicg=4 -br=0 -c=1 -cbbs=0 -cblm=1 -cblp=100000 -cdel=2 -cecpm=0 -cf=0 -cfci=10 -cfm=3 -cg=1 -ch=0 -checksums=0 -cjc=0 -client-app-threads=1 -cm=0 -cmp=0 -colors=1 -compact-proof=0 -cpshm=0 -csm=3 -cusv=1 -dc=0 -decay-distr=1 -decay-max=200 -decay-mean=50 -decay-min=1 -decay-stddev=3 -decpm=0 -delaymonkey=0 -div-elim=0 -div-fanout=0 -div-init-shuffle=0 -div-native=1 -div-noise=0 -div-phases=1 -div-reduce=0 -div-seeds=1 -dpa=1 -ds=0 -evpt=500 -evu=0 -extmem-disk-dir=.disk -fapii=0 -fcll=1 -g=0 -gclls=0 -h=0 -huca=0 -iff=0 -ilbd=0 -inotify=1 -interface-fs=0 -interface-ipc=0 -ipm=1 -ivdh=1 -jc=1 -jcl=0 -jcup=0.05 -jjp=0 -jwl=0 -l=1 -latencymonkey=0 -lbdpi=0 -lbdpo=0 -ljpc=32 -log=logsntraces//logs/ -mbt=8388608 -mcips=10 -md=0 -mempanic=1 -mjps=0 -mlbdps=2 -mlpt=50000000 -mmpi=0 -mono=instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf -mono-app=SATWITHPRE -mscf=5 -nec=10 -no-import=0 -os=0 -otfc=0 -otfcm=1 -p=0.1 -pb=1 -pbbm=0 -pef=1 -pjp=9999999 -pl=0 -plain-add-specific=0 -pph=0 -pre-cleanup=0 -prisma=0 -proof-debugging=0 -ps=0 -q=0 -qcll=60 -qlbdl=60 -randlbd=0 -reduce-delta=100 -reduce-max=980 -reduce-mean=700 -reduce-min=300 -reduce-stddev=150 -rlbd=3 -rpa=0 -rs=1 -rspaa=0 -s=0.5 -satsolver=k -scll=60 -scramble-lbds=0 -scsd=0 -seed=0 -sjd=0 -slbdl=60 -sleep=100 -spl=-1 -sswl=0 -t=3 -terminate-abruptly=0 -tmp=/tmp -trace-dir=logsntraces//traces/ -uninvert-proof=1 -v=4 -w=-1 -wam=10000 -warmup=0 -watchdog=1 -y=1 -yield=0 
+c 0.001 0 Mallob rls pid=59295 on host vvbk
+c 0.001 0 4 workers, 1 clients
+c 0.001 0 Created client communicator
+c 0.001 0 Created worker communicator
+c 0.001 0 I am worker #0
+c 0.001 0 I am client #0
+c 0.001 0 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.001 0 [WARN] Falling back to safe value r=2.
+c 0.001 0 My bounce alternatives: 3 1 
+c 0.001 0 Set up API connector
+c 0.002 0 Machine color 0 with 4 total workers (my rank: 0)
+c 0.002 0 Assuming application "SATWITHPRE" for mono job
+c 0.002 0 [CA] Root: 0 requests, 1 idle (epoch=0)
+c 0.003 0 [CA] Root: 0 requests, 3 idle (epoch=0)
+c 0.004 0 [CA] Root: 0 requests, 4 idle (epoch=0)
+c 0.010 0 corealloc req 1 -> 1 granted, 2 free
+c 0.014 0 Introducing job #2 rev. 0 : r.#2:0 rev. 0 <- [0] born=0.014 hops=0 epoch=-1 matchId=-1 => [0]
+c 0.014 0 BLC insert (2,1,0.010)
+c 0.014 0 Activate r.#2:0 rev. 0 <- [0] born=0.014 hops=0 epoch=-1 matchId=-1
+c 0.014 0 ADOPT r.#2:0 rev. 0 <- [0] born=0.014 hops=1 epoch=-1 matchId=-1 mode=1 <= [0]
+c 0.014 0 corealloc req 0 -> 0 granted, 2 free
+c 0.014 0 COMMIT #2 -> #2:0
+c 0.014 0 Scheduling r.#2:0 rev. 0 <- [0] born=0.014 hops=1 epoch=-1 matchId=-1 on [0] (latency: 0.00060s)
+c 0.014 0 Sending job desc. of #2 rev. 0 of size 614404, formula begins at idx 104 => [0]
+c 0.014 0 Sent job desc. of #2 of size 614404 => [0]
+c 0.014 0 Got desc. of size 614404 for job #2 <= [0]
+c 0.014 0 UNCOMMIT #2:0
+c 0.014 0 LOAD 1 (+#2:0)
+c 0.014 0 EXECUTE #2:0 <= [0]
+c 0.015 0 #2:0 : new job node starting
+c 0.015 0 corealloc req 3 -> 2 granted, 0 free
+c 0.016 0 BLC insert (2,4,1.000)
+c 0.016 0 #2:0 : update v=1 epoch=1 lastreqsepoch=-1 evlat=0.00000
+c 0.017 0 SPA: formula with 614300 bytes
+c 0.024 0 #2:0 : update v=4 epoch=2 lastreqsepoch=1 evlat=0.00812
+c 0.024 0 #2:0 growing: r.#2:1 rev. 0 <- [0] born=0.024 hops=0 epoch=2 matchId=-1 => [1]
+c 0.024 0 #2:0 growing: r.#2:2 rev. 0 <- [0] born=0.024 hops=0 epoch=2 matchId=-1 => [2]
+c 0.025 0 Adoption offer for #2:2 <= [2]
+c 0.025 0 RBS #2:2 EXPAND e=2 #inactives=0 => [2]
+c 0.025 0 Adoption offer for #2:1 <= [1]
+c 0.025 0 RBS #2:1 EXPAND e=2 #inactives=0 => [1]
+c 0.025 0 Sending job desc. of #2:0 rev. 0, size 614404, formula begins at idx 104 => [2]
+c 0.025 0 Sent id=16 => [2]
+c 0.025 0 Sending job desc. of #2:0 rev. 0, size 614404, formula begins at idx 104 => [1]
+c 0.025 0 Sent id=17 => [1]
+c 0.030 0 PREPRO running Kissat
+c 0.032 0 Watchdog sleep interrupted by signal
+c 0.055 0 [WARN] #2:0 job tree has size 0/4
+c 0.207 0 PREPRO Kissat done, result 0
+c 0.209 0 corealloc ret 1 -> 1 free
+c 0.209 0 SATWP preprocessor done
+c 0.209 0 SATWP submit preprocessed task
+c 0.209 0 SATWP #1 : Retracting base job over ~0.199s
+c 0.210 0 Introducing job #3 rev. 0 : r.#3:0 rev. 0 <- [0] born=0.210 hops=0 epoch=-1 matchId=-1 => [0]
+c 0.210 0 BLC insert (3,1,0.010)
+c 0.210 0 #2:0 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.210 0 Activate r.#3:0 rev. 0 <- [0] born=0.210 hops=0 epoch=-1 matchId=-1
+c 0.210 0 [CA] Root: 1 requests, 0 idle (epoch=3)
+c 0.211 0 [CA] Root: 1 requests, 0 idle (epoch=3)
+c 0.213 0 [WARN] #2:0 job tree has size 4/3
+c 0.213 0 [WARN] #2:0 job tree has size 4/3
+c 0.215 0 [CA] Root: 0 requests, 0 idle (epoch=3)
+c 0.216 0 [CA] Root: 0 requests, 1 idle (epoch=3)
+c 0.216 0 Scheduling r.#3:0 rev. 0 <- [0] born=0.210 hops=2 epoch=-1 matchId=-1 on [3] (latency: 0.00629s)
+c 0.216 0 Sending job desc. of #3 rev. 0 of size 502328, formula begins at idx 124 => [3]
+c 0.216 0 Sent job desc. of #3 of size 502328 => [3]
+c 0.217 0 [CA] Root: 0 requests, 0 idle (epoch=3)
+c 0.220 0 #2:0 : update v=3 epoch=4 lastreqsepoch=3 evlat=0.00000
+c 0.260 0 [WARN] #2:0 job tree has size 4/3
+c 0.341 0 BLC FINALIZED alpha=5000000.093751 excess=0
+c 0.341 0 #2:0 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00000
+c 0.341 0 RBS #2:2 SHRINK #inactives=1 <= [2]
+c 0.369 0 [WARN] #2:0 job tree has size 3/2
+c 0.382 0 BLC FINALIZED alpha=1.000000 excess=0
+c 0.382 0 #2:0 : update v=1 epoch=6 lastreqsepoch=5 evlat=0.00000
+c 0.382 0 RBS #2:1 SHRINK #inactives=2 <= [1]
+c 0.412 0 BLC FINALIZED alpha=1.000000 excess=0
+c 0.412 0 #2:0 : update v=1 epoch=7 lastreqsepoch=6 evlat=0.00000
+c 0.413 0 [CA] Root: 0 requests, 0 idle (epoch=7)
+c 0.414 0 [CA] Root: 0 requests, 0 idle (epoch=7)
+c 0.430 0 SATWP Interrupt #1:base
+c 0.430 0 Interrupt #2
+c 0.430 0 Acknowledge #2 interrupt
+c 0.430 0 #2 sent feedback of interrupt to client
+c 0.430 0 Propagate interruption of #2:0 ... => [1]
+c 0.430 0 Propagate interruption of #2:0 ... => [2]
+c 0.430 0 LOAD 0 (-#2:0)
+c 0.430 0 corealloc ret 2 -> 3 free
+c 0.430 0 #2:0 : terminated
+c 0.430 0 BLC insert (2,0,0.000)
+c 0.430 0 #2:0 balancing latency={num:1 min:0.00812 med:0.00812 avg:0.00812 max:0.00812}
+c 0.430 0 Forget #2:0
+c 0.430 0 FORGET #2:0
+c 0.430 0 #2:0 desires fulfilled=1.0000 latency={num:2 min:0.00039 med:0.00049 avg:0.00044 max:0.00049}
+c 0.431 0 TIMEOUT/UNKNOWN #2 rev. 0 0.416976 <= [0]
+c 0.432 0 ADOPT r.#3:3 rev. 0 <- [2] born=0.431 hops=2 epoch=8 matchId=-1 mode=1 <= [0]
+c 0.432 0 corealloc req 0 -> 0 granted, 3 free
+c 0.432 0 COMMIT #3 -> #3:3
+c 0.433 0 SATWP base done
+c 0.433 0 Got desc. of size 502328 for job #3 <= [2]
+c 0.433 0 SATWP Extract result of #1:base
+c 0.433 0 UNCOMMIT #3:3
+c 0.433 0 LOAD 1 (+#3:3)
+c 0.433 0 EXECUTE #3:3 <= [2]
+c 0.433 0 #3:3 : new job node starting
+c 0.433 0 corealloc req 3 -> 3 granted, 0 free
+c 0.434 0 #3:3 : update v=4 epoch=8 lastreqsepoch=8 evlat=0.00000
+c 0.434 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.434 0 #2:0 : FSJ freeing mem
+c 0.435 0 SPA: formula with 502204 bytes
+c 0.438 0 #2:0 : FSJ mem freed
+c 0.438 0 Watchdog sleep interrupted by signal
+c 0.439 0 #2:0 ready for destruction
+c 0.449 0 Watchdog sleep interrupted by signal
+c 0.493 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.544 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.594 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.644 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.695 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.724 0 #3:3 : INIT COMM e=1 nc=0
+c 0.735 0 #3:3 CS produced cls size=1686 lits=1680/1500
+c 0.736 0 #3:3 : merged 1 contribs rev=0 (inp=1500, t=0.0005s) ~> len=1686
+c 0.745 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.795 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.846 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.896 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.946 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 0.997 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.000 0 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.000 0 contexts=1 descriptions=1
+c 1.047 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.098 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.148 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.199 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.200 0 sysstate busyratio=1.000 cmtdratio=0.000 jobs=1 globmem=0.00GB newreqs=6 hops=5
+c 1.200 0 sysstate entered=3 parsed=3 scheduled=3 processed=1 successful=0
+c 1.220 0 #3:3 : INIT COMM e=2 nc=0
+c 1.229 0 #3:3 CS produced cls size=2058 lits=2052/1960
+c 1.229 0 #3:3 : merged 1 contribs rev=0 (inp=1960, t=0.0004s) ~> len=2058
+c 1.249 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.299 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.349 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.400 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.450 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.501 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.551 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.601 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.652 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.702 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.725 0 #3:3 : INIT COMM e=3 nc=0
+c 1.733 0 #3:3 CS produced cls size=2002 lits=1996/1969
+c 1.734 0 #3:3 : merged 1 contribs rev=0 (inp=1969, t=0.0006s) ~> len=2002
+c 1.753 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.803 0 #3:3 rev. 0 : found result UNSAT => [3]
+c 1.803 0 #3:3 rev. 0: sending finished info => [3]
+c 1.803 0 jobId<#3>: sending [0]->[2] MSG_AGGREGATE_RANKLIST 
+c 1.803 0 Will receive job result for job #3 rev. 0 <= [3]
+c 1.803 0 Send result of #3 rev. 0 to client => [0]
+c 1.804 0 LOAD 0 (-#3:3)
+c 1.804 0 corealloc ret 3 -> 3 free
+c 1.804 0 #3:3 : terminated
+c 1.804 0 Forget #3:3
+c 1.804 0 FORGET #3:3
+c 1.804 0 #3:3 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.804 0 Received result of job #3 rev. 0, code: 20 <= [0]
+c 1.804 0 RESPONSE_TIME #3 1.594814 rev. 0
+c 1.804 0 SOLUTION #3 UNSATISFIABLE rev. 0
+c 1.804 0 SATWP prepro done
+c 1.804 0 SATWP Extract result of #1:prepro
+c 1.804 0 SATWP #1:prepro extracted
+c 1.804 0 #1 SATWP RES ~20~
+c 1.805 0 Received result of job #1 rev. 0, code: 20 <= [0]
+c 1.805 0 RESPONSE_TIME #1 1.802593 rev. 0
+c 1.805 0 SOLUTION #1 UNSATISFIABLE rev. 0
+s UNSATISFIABLE

@@ -1,0 +1,7 @@
+c 0.233 3 <#3> S1.0 Diversification index 1
+c 0.234 3 <#3> S1.0 Received 125551 literals: 487 -873 0 3235 -3622 ... 0 4445 0 4451 0 
+c 0.234 3 <#3> S1.0 Diversifying 1
+c 0.234 3 <#3> S1.0 Reading rev. 0, start 0
+c 0.243 3 <#3> S1.0 Reading done @ rev. 0 (125551 lits, 0 assumptions)
+c 0.243 3 <#3> S1.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 1.804 3 <#3> S1.0 disc_reasons r_ee:0,r_ed:1427,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:1753,r_ia:0,r_tl:0

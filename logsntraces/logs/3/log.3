@@ -1,0 +1,1023 @@
+c 0.002 3 Mallob rls pid=58126 on host vvbk
+c 0.007 3 I am worker #3
+c 0.007 3 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.007 3 [WARN] Falling back to safe value r=2.
+c 0.007 3 My bounce alternatives: 2 0 
+c 0.008 3 Machine color 0 with 4 total workers (my rank: 3)
+c 0.032 3 ADOPT r.#2:3 rev. 0 <- [1] born=0.032 hops=0 epoch=2 matchId=-1 mode=1 <= [1]
+c 0.032 3 corealloc req 0 -> 0 granted, 3 free
+c 0.032 3 COMMIT #2 -> #2:3
+c 0.035 3 Got desc. of size 614404 for job #2 <= [1]
+c 0.035 3 UNCOMMIT #2:3
+c 0.035 3 LOAD 1 (+#2:3)
+c 0.035 3 EXECUTE #2:3 <= [1]
+c 0.035 3 #2:3 : new job node starting
+c 0.035 3 corealloc req 3 -> 3 granted, 0 free
+c 0.036 3 #2:3 : update v=4 epoch=2 lastreqsepoch=2 evlat=0.00000
+c 0.036 3 SPA: formula with 614300 bytes
+c 0.049 3 Watchdog sleep interrupted by signal
+c 0.051 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.108 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.158 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.188 3 #2:3 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.188 3 #2:3 shrinking
+c 0.188 3 corealloc ret 3 -> 3 free
+c 0.188 3 #2:3 : suspended solver
+c 0.188 3 LOAD 0 (-#2:3)
+c 0.188 3 SUSPEND #2:3
+c 0.190 3 ADOPT r.#3:0 rev. 0 <- [0] born=0.188 hops=2 epoch=-1 matchId=-1 mode=1 <= [3]
+c 0.190 3 corealloc req 0 -> 0 granted, 3 free
+c 0.190 3 COMMIT #3 -> #3:0
+c 0.191 3 Got desc. of size 502328 for job #3 <= [0]
+c 0.191 3 UNCOMMIT #3:0
+c 0.191 3 LOAD 1 (+#3:0)
+c 0.191 3 EXECUTE #3:0 <= [0]
+c 0.191 3 #3:0 : new job node starting
+c 0.191 3 corealloc req 3 -> 3 granted, 0 free
+c 0.191 3 BLC insert (3,1,9999999.000)
+c 0.191 3 #3:0 : update v=1 epoch=3 lastreqsepoch=-1 evlat=0.00000
+c 0.191 3 SPA: formula with 502204 bytes
+c 0.198 3 #3:0 : update v=1 epoch=4 lastreqsepoch=3 evlat=0.00672
+c 0.198 3 [CA] Root: 0 requests, 0 idle (epoch=4)
+c 0.199 3 [CA] Root: 0 requests, 0 idle (epoch=4)
+c 0.200 3 [CA] Root: 0 requests, 0 idle (epoch=4)
+c 0.208 3 Watchdog sleep interrupted by signal
+c 0.301 3 BLC insert (3,2,9999999.000)
+c 0.301 3 #3:0 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00037
+c 0.301 3 #3:0 growing: r.#3:1 rev. 0 <- [3] born=0.301 hops=0 epoch=5 matchId=-1 => [1]
+c 0.303 3 Adoption offer for #3:1 <= [2]
+c 0.303 3 RBS #3:1 EXPAND e=5 #inactives=0 => [2]
+c 0.303 3 Sending job desc. of #3:0 rev. 0, size 502328, formula begins at idx 124 => [2]
+c 0.303 3 Sent id=21 => [2]
+c 0.305 3 [WARN] #3:0 job tree has size 1/2
+c 0.331 3 BLC insert (3,3,9999999.000)
+c 0.332 3 #3:0 : update v=3 epoch=6 lastreqsepoch=5 evlat=0.00081
+c 0.332 3 #3:0 growing: r.#3:2 rev. 0 <- [3] born=0.332 hops=0 epoch=6 matchId=-1 => [2]
+c 0.338 3 Adoption offer for #3:2 <= [1]
+c 0.338 3 RBS #3:2 EXPAND e=6 #inactives=0 => [1]
+c 0.338 3 Sending job desc. of #3:0 rev. 0, size 502328, formula begins at idx 124 => [1]
+c 0.338 3 Sent id=29 => [1]
+c 0.352 3 BLC insert (3,4,9999999.000)
+c 0.352 3 #3:0 : update v=3 epoch=7 lastreqsepoch=6 evlat=0.00035
+c 0.359 3 [WARN] #3:0 job tree has size 2/3
+c 0.372 3 #3:0 : update v=4 epoch=8 lastreqsepoch=7 evlat=0.00000
+c 0.374 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.375 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.398 3 [WARN] #3:0 job tree has size 3/4
+c 0.695 3 CS estinc=5899.0 estshr=5899.0 accdes=58990.0 accshr=58990.0 totdes=0 totshr=0
+c 0.695 3 CS last sharing: 0/0/5899 globally passed ~> c=1.000
+c 0.695 3 #3:0 : INIT COMM e=1 nc=2
+c 0.705 3 #3:0 CS produced cls size=1607 lits=1601/1500
+c 0.725 3 #3:0 : merged 4 contribs rev=0 (inp=5899, t=0.0011s) ~> len=4420
+c 1.000 3 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.000 3 contexts=2 descriptions=2
+c 1.199 3 CS estinc=5899.0 estshr=5028.5 accdes=58990.0 accshr=57249.0 totdes=5899 totshr=4158
+c 1.199 3 CS last sharing: 4158/5899/5899 globally passed ~> c=1.415
+c 1.199 3 #3:0 : INIT COMM e=2 nc=2
+c 1.209 3 #3:0 CS produced cls size=2189 lits=2183/2123
+c 1.230 3 #3:0 : merged 4 contribs rev=0 (inp=8349, t=0.0010s) ~> len=7394
+c 1.695 3 #3 rev. 0 solved <= [0]
+c 1.695 3 #3:0 : inform client job is done => [0]
+c 1.695 3 Propagate interruption of #3:0 ... => [1]
+c 1.695 3 Propagate interruption of #3:0 ... => [2]
+c 1.695 3 LOAD 0 (-#3:0)
+c 1.695 3 corealloc ret 3 -> 3 free
+c 1.695 3 #3:0 : terminated
+c 1.695 3 BLC insert (3,0,0.000)
+c 1.695 3 #3:0 balancing latency={num:4 min:0.00035 med:0.00081 avg:0.00206 max:0.00672}
+c 1.695 3 Forget #3:0
+c 1.695 3 FORGET #3:0
+c 1.695 3 #3:0 desires fulfilled=1.0000 latency={num:2 min:0.00140 med:0.00596 avg:0.00368 max:0.00596}
+c 1.695 3 [CA] Root: 0 requests, 1 idle (epoch=8)
+c 1.698 3 #3:0 : FSJ freeing mem
+c 1.708 3 Destruct worker
+c 1.708 3 FORGET #2:3
+c 1.708 3 #2:3 : terminated
+c 1.708 3 #2:3 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.708 3 #2:3 : FSJ freeing mem
+c 1.708 3 Grow thread pool (8 -> 10)
+c 1.709 3 #3:0 : FSJ mem freed
+c 1.709 3 Watchdog sleep interrupted by signal
+c 1.709 3 #3:0 ready for destruction
+c 1.709 3 #3:0 CS total expected=5899 exchanged=4158 ratio=1.419
+c 1.719 3 #2:3 : FSJ mem freed
+c 1.719 3 Watchdog sleep interrupted by signal
+c 1.720 3 #2:3 ready for destruction
+c 1.721 3 all jobs deleted
+c 1.721 3 Watchdog sleep interrupted by signal
+c 1.721 3 STATS balancing_latencies num:4 min:0.000348 max:0.006725 med:0.000814 mean:0.002063
+c 1.721 3 busytime=1.659
+c 1.721 3 STATS treegrowth_latencies num:2 min:0.001403 max:0.005960 med:0.005960 mean:0.003681
+c 1.721 3 Watchdog sleep interrupted by signal
+c 1.768 3 Exiting happily
+c 0.001 3 Mallob rls pid=58278 on host vvbk
+c 0.004 3 I am worker #3
+c 0.004 3 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.004 3 [WARN] Falling back to safe value r=2.
+c 0.004 3 My bounce alternatives: 2 0 
+c 0.004 3 Machine color 0 with 4 total workers (my rank: 3)
+c 0.027 3 ADOPT r.#2:3 rev. 0 <- [1] born=0.027 hops=0 epoch=2 matchId=-1 mode=1 <= [1]
+c 0.027 3 corealloc req 0 -> 0 granted, 3 free
+c 0.027 3 COMMIT #2 -> #2:3
+c 0.031 3 Got desc. of size 614404 for job #2 <= [1]
+c 0.031 3 UNCOMMIT #2:3
+c 0.031 3 LOAD 1 (+#2:3)
+c 0.031 3 EXECUTE #2:3 <= [1]
+c 0.031 3 #2:3 : new job node starting
+c 0.031 3 corealloc req 3 -> 3 granted, 0 free
+c 0.032 3 #2:3 : update v=4 epoch=2 lastreqsepoch=2 evlat=0.00000
+c 0.034 3 SPA: formula with 614300 bytes
+c 0.047 3 Watchdog sleep interrupted by signal
+c 0.053 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.112 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.162 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.183 3 #2:3 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.183 3 #2:3 shrinking
+c 0.183 3 corealloc ret 3 -> 3 free
+c 0.183 3 #2:3 : suspended solver
+c 0.183 3 LOAD 0 (-#2:3)
+c 0.183 3 SUSPEND #2:3
+c 0.185 3 ADOPT r.#3:0 rev. 0 <- [0] born=0.183 hops=2 epoch=-1 matchId=-1 mode=1 <= [3]
+c 0.185 3 corealloc req 0 -> 0 granted, 3 free
+c 0.185 3 COMMIT #3 -> #3:0
+c 0.187 3 Got desc. of size 502328 for job #3 <= [0]
+c 0.187 3 UNCOMMIT #3:0
+c 0.187 3 LOAD 1 (+#3:0)
+c 0.187 3 EXECUTE #3:0 <= [0]
+c 0.187 3 #3:0 : new job node starting
+c 0.187 3 corealloc req 3 -> 3 granted, 0 free
+c 0.188 3 BLC insert (3,1,9999999.000)
+c 0.188 3 #3:0 : update v=1 epoch=3 lastreqsepoch=-1 evlat=0.00000
+c 0.188 3 SPA: formula with 502204 bytes
+c 0.193 3 #3:0 : update v=1 epoch=4 lastreqsepoch=3 evlat=0.00537
+c 0.193 3 [CA] Root: 0 requests, 0 idle (epoch=4)
+c 0.194 3 [CA] Root: 0 requests, 0 idle (epoch=4)
+c 0.200 3 Watchdog sleep interrupted by signal
+c 0.289 3 BLC insert (3,2,9999999.000)
+c 0.290 3 #3:0 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00066
+c 0.290 3 #3:0 growing: r.#3:1 rev. 0 <- [3] born=0.290 hops=0 epoch=5 matchId=-1 => [1]
+c 0.291 3 Adoption offer for #3:1 <= [2]
+c 0.291 3 RBS #3:1 EXPAND e=5 #inactives=0 => [2]
+c 0.291 3 Sending job desc. of #3:0 rev. 0, size 502328, formula begins at idx 124 => [2]
+c 0.291 3 Sent id=21 => [2]
+c 0.294 3 [WARN] #3:0 job tree has size 1/2
+c 0.319 3 BLC insert (3,3,9999999.000)
+c 0.320 3 #3:0 : update v=3 epoch=6 lastreqsepoch=5 evlat=0.00060
+c 0.320 3 #3:0 growing: r.#3:2 rev. 0 <- [3] born=0.320 hops=0 epoch=6 matchId=-1 => [2]
+c 0.322 3 Adoption offer for #3:2 <= [1]
+c 0.322 3 RBS #3:2 EXPAND e=6 #inactives=0 => [1]
+c 0.322 3 Sending job desc. of #3:0 rev. 0, size 502328, formula begins at idx 124 => [1]
+c 0.322 3 Sent id=29 => [1]
+c 0.345 3 [WARN] #3:0 job tree has size 2/3
+c 0.349 3 BLC insert (3,4,9999999.000)
+c 0.350 3 #3:0 : update v=3 epoch=7 lastreqsepoch=6 evlat=0.00035
+c 0.368 3 #3:0 : update v=4 epoch=8 lastreqsepoch=7 evlat=0.00000
+c 0.369 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.370 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.371 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.383 3 [WARN] #3:0 job tree has size 3/4
+c 0.692 3 CS estinc=5899.0 estshr=5899.0 accdes=58990.0 accshr=58990.0 totdes=0 totshr=0
+c 0.692 3 CS last sharing: 0/0/5899 globally passed ~> c=1.000
+c 0.692 3 #3:0 : INIT COMM e=1 nc=2
+c 0.702 3 #3:0 CS produced cls size=1594 lits=1588/1500
+c 0.721 3 #3:0 : merged 4 contribs rev=0 (inp=5899, t=0.0007s) ~> len=4714
+c 1.000 3 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.003 3 contexts=2 descriptions=2
+c 1.187 3 CS estinc=5899.0 estshr=5178.5 accdes=58990.0 accshr=57549.0 totdes=5899 totshr=4458
+c 1.187 3 CS last sharing: 4458/5899/5899 globally passed ~> c=1.334
+c 1.187 3 #3:0 : INIT COMM e=2 nc=2
+c 1.197 3 #3:0 CS produced cls size=2060 lits=2054/2000
+c 1.216 3 #3:0 : merged 4 contribs rev=0 (inp=7868, t=0.0012s) ~> len=7242
+c 1.693 3 CS estinc=5898.7 estshr=5024.2 accdes=58989.0 accshr=58290.1 totdes=11797 totshr=10954
+c 1.693 3 CS last sharing: 6496/7868/7868 globally passed ~> c=1.317
+c 1.693 3 #3:0 : INIT COMM e=3 nc=2
+c 1.703 3 #3:0 CS produced cls size=2001 lits=1995/1975
+c 1.724 3 #3:0 : merged 4 contribs rev=0 (inp=7770, t=0.0006s) ~> len=7350
+c 1.783 3 #3 rev. 0 solved <= [1]
+c 1.783 3 #3:0 : inform client job is done => [0]
+c 1.783 3 Propagate interruption of #3:0 ... => [1]
+c 1.783 3 Propagate interruption of #3:0 ... => [2]
+c 1.783 3 LOAD 0 (-#3:0)
+c 1.783 3 corealloc ret 3 -> 3 free
+c 1.783 3 #3:0 : terminated
+c 1.783 3 BLC insert (3,0,0.000)
+c 1.783 3 #3:0 balancing latency={num:4 min:0.00035 med:0.00066 avg:0.00174 max:0.00537}
+c 1.783 3 Forget #3:0
+c 1.783 3 FORGET #3:0
+c 1.783 3 #3:0 desires fulfilled=1.0000 latency={num:2 min:0.00150 med:0.00189 avg:0.00170 max:0.00189}
+c 1.783 3 [CA] Root: 0 requests, 1 idle (epoch=8)
+c 1.784 3 #3:0 : FSJ freeing mem
+c 1.798 3 Destruct worker
+c 1.798 3 FORGET #2:3
+c 1.798 3 #2:3 : terminated
+c 1.798 3 #2:3 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.798 3 #2:3 : FSJ freeing mem
+c 1.798 3 Grow thread pool (8 -> 10)
+c 1.798 3 #3:0 : FSJ mem freed
+c 1.798 3 Watchdog sleep interrupted by signal
+c 1.799 3 #3:0 ready for destruction
+c 1.799 3 #3:0 CS total expected=11797 exchanged=10954 ratio=1.077
+c 1.809 3 #2:3 : FSJ mem freed
+c 1.809 3 Watchdog sleep interrupted by signal
+c 1.809 3 #2:3 ready for destruction
+c 1.810 3 all jobs deleted
+c 1.810 3 Watchdog sleep interrupted by signal
+c 1.810 3 STATS balancing_latencies num:4 min:0.000350 max:0.005368 med:0.000656 mean:0.001744
+c 1.810 3 busytime=1.751
+c 1.810 3 STATS treegrowth_latencies num:2 min:0.001505 max:0.001887 med:0.001887 mean:0.001696
+c 1.810 3 Watchdog sleep interrupted by signal
+c 1.857 3 Exiting happily
+c 0.001 3 Mallob rls pid=58421 on host vvbk
+c 0.001 3 I am worker #3
+c 0.002 3 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.002 3 [WARN] Falling back to safe value r=2.
+c 0.002 3 My bounce alternatives: 2 0 
+c 0.002 3 Machine color 0 with 4 total workers (my rank: 3)
+c 0.025 3 ADOPT r.#2:3 rev. 0 <- [1] born=0.025 hops=0 epoch=2 matchId=-1 mode=1 <= [1]
+c 0.025 3 corealloc req 0 -> 0 granted, 3 free
+c 0.025 3 COMMIT #2 -> #2:3
+c 0.029 3 Got desc. of size 614404 for job #2 <= [1]
+c 0.029 3 UNCOMMIT #2:3
+c 0.029 3 LOAD 1 (+#2:3)
+c 0.029 3 EXECUTE #2:3 <= [1]
+c 0.029 3 #2:3 : new job node starting
+c 0.029 3 corealloc req 3 -> 3 granted, 0 free
+c 0.029 3 #2:3 : update v=4 epoch=2 lastreqsepoch=2 evlat=0.00000
+c 0.030 3 SPA: formula with 614300 bytes
+c 0.051 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.056 3 Watchdog sleep interrupted by signal
+c 0.109 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.159 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.202 3 #2:3 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.202 3 #2:3 shrinking
+c 0.202 3 corealloc ret 3 -> 3 free
+c 0.202 3 #2:3 : suspended solver
+c 0.202 3 LOAD 0 (-#2:3)
+c 0.202 3 SUSPEND #2:3
+c 0.204 3 ADOPT r.#3:0 rev. 0 <- [0] born=0.202 hops=2 epoch=-1 matchId=-1 mode=1 <= [3]
+c 0.204 3 corealloc req 0 -> 0 granted, 3 free
+c 0.204 3 COMMIT #3 -> #3:0
+c 0.205 3 Got desc. of size 502328 for job #3 <= [0]
+c 0.205 3 UNCOMMIT #3:0
+c 0.205 3 LOAD 1 (+#3:0)
+c 0.205 3 EXECUTE #3:0 <= [0]
+c 0.205 3 #3:0 : new job node starting
+c 0.205 3 corealloc req 3 -> 3 granted, 0 free
+c 0.206 3 SPA: formula with 502204 bytes
+c 0.206 3 BLC insert (3,1,9999999.000)
+c 0.206 3 #3:0 : update v=1 epoch=3 lastreqsepoch=-1 evlat=0.00000
+c 0.212 3 #3:0 : update v=1 epoch=4 lastreqsepoch=3 evlat=0.00592
+c 0.213 3 [CA] Root: 0 requests, 0 idle (epoch=4)
+c 0.214 3 [CA] Root: 0 requests, 0 idle (epoch=4)
+c 0.215 3 [CA] Root: 0 requests, 0 idle (epoch=4)
+c 0.221 3 Watchdog sleep interrupted by signal
+c 0.327 3 BLC insert (3,2,9999999.000)
+c 0.328 3 #3:0 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00038
+c 0.328 3 #3:0 growing: r.#3:1 rev. 0 <- [3] born=0.328 hops=0 epoch=5 matchId=-1 => [1]
+c 0.329 3 Adoption offer for #3:1 <= [2]
+c 0.329 3 RBS #3:1 EXPAND e=5 #inactives=0 => [2]
+c 0.329 3 Sending job desc. of #3:0 rev. 0, size 502328, formula begins at idx 124 => [2]
+c 0.329 3 Sent id=21 => [2]
+c 0.332 3 [WARN] #3:0 job tree has size 1/2
+c 0.358 3 BLC insert (3,3,9999999.000)
+c 0.359 3 #3:0 : update v=3 epoch=6 lastreqsepoch=5 evlat=0.00133
+c 0.359 3 #3:0 growing: r.#3:2 rev. 0 <- [3] born=0.359 hops=0 epoch=6 matchId=-1 => [2]
+c 0.365 3 Adoption offer for #3:2 <= [1]
+c 0.365 3 RBS #3:2 EXPAND e=6 #inactives=0 => [1]
+c 0.365 3 Sending job desc. of #3:0 rev. 0, size 502328, formula begins at idx 124 => [1]
+c 0.365 3 Sent id=29 => [1]
+c 0.386 3 [WARN] #3:0 job tree has size 2/3
+c 0.388 3 BLC insert (3,4,9999999.000)
+c 0.388 3 #3:0 : update v=3 epoch=7 lastreqsepoch=6 evlat=0.00047
+c 0.412 3 #3:0 : update v=4 epoch=8 lastreqsepoch=7 evlat=0.00000
+c 0.413 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.414 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.415 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.426 3 [WARN] #3:0 job tree has size 3/4
+c 0.711 3 CS estinc=5899.0 estshr=5899.0 accdes=58990.0 accshr=58990.0 totdes=0 totshr=0
+c 0.711 3 CS last sharing: 0/0/5899 globally passed ~> c=1.000
+c 0.711 3 #3:0 : INIT COMM e=1 nc=2
+c 0.721 3 #3:0 CS produced cls size=1588 lits=1582/1500
+c 0.740 3 #3:0 : merged 4 contribs rev=0 (inp=5899, t=0.0012s) ~> len=4846
+c 1.000 3 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.001 3 contexts=2 descriptions=2
+c 1.208 3 CS estinc=5899.0 estshr=5274.5 accdes=58990.0 accshr=57741.0 totdes=5899 totshr=4650
+c 1.208 3 CS last sharing: 4650/5899/5899 globally passed ~> c=1.284
+c 1.208 3 #3:0 : INIT COMM e=2 nc=2
+c 1.218 3 #3:0 CS produced cls size=1994 lits=1988/1926
+c 1.227 3 #3:0 : merged 4 contribs rev=0 (inp=7575, t=0.0007s) ~> len=6954
+c 1.708 3 CS estinc=5898.9 estshr=5047.4 accdes=58989.0 accshr=58156.9 totdes=11797 totshr=10840
+c 1.708 3 CS last sharing: 6190/7575/7575 globally passed ~> c=1.324
+c 1.708 3 #3:0 : INIT COMM e=3 nc=2
+c 1.718 3 #3:0 CS produced cls size=2001 lits=1995/1985
+c 1.734 3 #3:0 : merged 4 contribs rev=0 (inp=7808, t=0.0010s) ~> len=7315
+c 1.867 3 #3 rev. 0 solved <= [1]
+c 1.867 3 #3:0 : inform client job is done => [0]
+c 1.867 3 Propagate interruption of #3:0 ... => [1]
+c 1.867 3 Propagate interruption of #3:0 ... => [2]
+c 1.867 3 LOAD 0 (-#3:0)
+c 1.868 3 corealloc ret 3 -> 3 free
+c 1.868 3 #3:0 : terminated
+c 1.868 3 BLC insert (3,0,0.000)
+c 1.868 3 #3:0 balancing latency={num:4 min:0.00038 med:0.00133 avg:0.00203 max:0.00592}
+c 1.868 3 Forget #3:0
+c 1.868 3 FORGET #3:0
+c 1.868 3 #3:0 desires fulfilled=1.0000 latency={num:2 min:0.00068 med:0.00549 avg:0.00309 max:0.00549}
+c 1.868 3 [CA] Root: 0 requests, 1 idle (epoch=8)
+c 1.869 3 #3:0 : FSJ freeing mem
+c 1.875 3 Destruct worker
+c 1.875 3 FORGET #2:3
+c 1.875 3 #2:3 : terminated
+c 1.875 3 #2:3 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.875 3 #2:3 : FSJ freeing mem
+c 1.876 3 Grow thread pool (8 -> 10)
+c 1.880 3 #3:0 : FSJ mem freed
+c 1.880 3 Watchdog sleep interrupted by signal
+c 1.880 3 #3:0 ready for destruction
+c 1.880 3 #3:0 CS total expected=11797 exchanged=10840 ratio=1.088
+c 1.887 3 #2:3 : FSJ mem freed
+c 1.887 3 Watchdog sleep interrupted by signal
+c 1.888 3 #2:3 ready for destruction
+c 1.889 3 all jobs deleted
+c 1.889 3 Watchdog sleep interrupted by signal
+c 1.889 3 STATS balancing_latencies num:4 min:0.000381 max:0.005921 med:0.001335 mean:0.002028
+c 1.889 3 busytime=1.838
+c 1.889 3 STATS treegrowth_latencies num:2 min:0.000685 max:0.005490 med:0.005490 mean:0.003087
+c 1.889 3 Watchdog sleep interrupted by signal
+c 1.939 3 Exiting happily
+c 0.001 3 Mallob rls pid=58568 on host vvbk
+c 0.002 3 I am worker #3
+c 0.002 3 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.002 3 [WARN] Falling back to safe value r=2.
+c 0.002 3 My bounce alternatives: 2 0 
+c 0.002 3 Machine color 0 with 4 total workers (my rank: 3)
+c 0.026 3 ADOPT r.#2:3 rev. 0 <- [1] born=0.025 hops=0 epoch=2 matchId=-1 mode=1 <= [1]
+c 0.026 3 corealloc req 0 -> 0 granted, 3 free
+c 0.026 3 COMMIT #2 -> #2:3
+c 0.028 3 Got desc. of size 614404 for job #2 <= [1]
+c 0.028 3 UNCOMMIT #2:3
+c 0.028 3 LOAD 1 (+#2:3)
+c 0.028 3 EXECUTE #2:3 <= [1]
+c 0.028 3 #2:3 : new job node starting
+c 0.028 3 corealloc req 3 -> 3 granted, 0 free
+c 0.029 3 #2:3 : update v=4 epoch=2 lastreqsepoch=2 evlat=0.00000
+c 0.030 3 SPA: formula with 614300 bytes
+c 0.045 3 Watchdog sleep interrupted by signal
+c 0.050 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.108 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.159 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.193 3 #2:3 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.193 3 #2:3 shrinking
+c 0.193 3 corealloc ret 3 -> 3 free
+c 0.193 3 #2:3 : suspended solver
+c 0.193 3 LOAD 0 (-#2:3)
+c 0.193 3 SUSPEND #2:3
+c 0.195 3 ADOPT r.#3:0 rev. 0 <- [0] born=0.193 hops=2 epoch=-1 matchId=-1 mode=1 <= [3]
+c 0.195 3 corealloc req 0 -> 0 granted, 3 free
+c 0.195 3 COMMIT #3 -> #3:0
+c 0.196 3 Got desc. of size 502328 for job #3 <= [0]
+c 0.196 3 UNCOMMIT #3:0
+c 0.196 3 LOAD 1 (+#3:0)
+c 0.196 3 EXECUTE #3:0 <= [0]
+c 0.196 3 #3:0 : new job node starting
+c 0.196 3 corealloc req 3 -> 3 granted, 0 free
+c 0.196 3 BLC insert (3,1,9999999.000)
+c 0.196 3 #3:0 : update v=1 epoch=3 lastreqsepoch=-1 evlat=0.00000
+c 0.197 3 SPA: formula with 502204 bytes
+c 0.204 3 #3:0 : update v=1 epoch=4 lastreqsepoch=3 evlat=0.00792
+c 0.205 3 [CA] Root: 0 requests, 0 idle (epoch=4)
+c 0.206 3 [CA] Root: 0 requests, 0 idle (epoch=4)
+c 0.213 3 Watchdog sleep interrupted by signal
+c 0.316 3 BLC insert (3,2,9999999.000)
+c 0.317 3 #3:0 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00156
+c 0.317 3 #3:0 growing: r.#3:1 rev. 0 <- [3] born=0.317 hops=0 epoch=5 matchId=-1 => [1]
+c 0.318 3 Adoption offer for #3:1 <= [2]
+c 0.319 3 RBS #3:1 EXPAND e=5 #inactives=0 => [2]
+c 0.319 3 Sending job desc. of #3:0 rev. 0, size 502328, formula begins at idx 124 => [2]
+c 0.319 3 Sent id=21 => [2]
+c 0.321 3 [WARN] #3:0 job tree has size 1/2
+c 0.346 3 BLC insert (3,3,9999999.000)
+c 0.346 3 #3:0 : update v=3 epoch=6 lastreqsepoch=5 evlat=0.00035
+c 0.346 3 #3:0 growing: r.#3:2 rev. 0 <- [3] born=0.346 hops=0 epoch=6 matchId=-1 => [2]
+c 0.348 3 Adoption offer for #3:2 <= [1]
+c 0.348 3 RBS #3:2 EXPAND e=6 #inactives=0 => [1]
+c 0.348 3 Sending job desc. of #3:0 rev. 0, size 502328, formula begins at idx 124 => [1]
+c 0.348 3 Sent id=29 => [1]
+c 0.366 3 BLC insert (3,4,9999999.000)
+c 0.367 3 #3:0 : update v=3 epoch=7 lastreqsepoch=6 evlat=0.00073
+c 0.372 3 [WARN] #3:0 job tree has size 2/3
+c 0.391 3 #3:0 : update v=4 epoch=8 lastreqsepoch=7 evlat=0.00000
+c 0.392 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.393 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.394 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.409 3 [WARN] #3:0 job tree has size 3/4
+c 0.699 3 CS estinc=5899.0 estshr=5899.0 accdes=58990.0 accshr=58990.0 totdes=0 totshr=0
+c 0.699 3 CS last sharing: 0/0/5899 globally passed ~> c=1.000
+c 0.699 3 #3:0 : INIT COMM e=1 nc=2
+c 0.709 3 #3:0 CS produced cls size=1584 lits=1578/1500
+c 0.724 3 #3:0 : merged 4 contribs rev=0 (inp=5899, t=0.0016s) ~> len=4771
+c 1.000 3 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.004 3 contexts=2 descriptions=2
+c 1.196 3 CS estinc=5899.0 estshr=5213.0 accdes=58990.0 accshr=57618.0 totdes=5899 totshr=4527
+c 1.196 3 CS last sharing: 4527/5899/5899 globally passed ~> c=1.316
+c 1.196 3 #3:0 : INIT COMM e=2 nc=2
+c 1.207 3 #3:0 CS produced cls size=2026 lits=2020/1973
+c 1.227 3 #3:0 : merged 4 contribs rev=0 (inp=7762, t=0.0023s) ~> len=6990
+c 1.680 3 #3 rev. 0 solved <= [1]
+c 1.680 3 #3:0 : inform client job is done => [0]
+c 1.681 3 Propagate interruption of #3:0 ... => [1]
+c 1.681 3 Propagate interruption of #3:0 ... => [2]
+c 1.681 3 LOAD 0 (-#3:0)
+c 1.681 3 corealloc ret 3 -> 3 free
+c 1.681 3 #3:0 : terminated
+c 1.681 3 BLC insert (3,0,0.000)
+c 1.681 3 #3:0 balancing latency={num:4 min:0.00035 med:0.00156 avg:0.00264 max:0.00792}
+c 1.681 3 Forget #3:0
+c 1.681 3 FORGET #3:0
+c 1.681 3 #3:0 desires fulfilled=1.0000 latency={num:2 min:0.00104 med:0.00119 avg:0.00111 max:0.00119}
+c 1.682 3 [CA] Root: 0 requests, 1 idle (epoch=8)
+c 1.684 3 #3:0 : FSJ freeing mem
+c 1.688 3 Destruct worker
+c 1.689 3 FORGET #2:3
+c 1.689 3 #2:3 : terminated
+c 1.689 3 #2:3 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.689 3 #2:3 : FSJ freeing mem
+c 1.689 3 Grow thread pool (8 -> 10)
+c 1.694 3 #3:0 : FSJ mem freed
+c 1.694 3 Watchdog sleep interrupted by signal
+c 1.695 3 #3:0 ready for destruction
+c 1.695 3 #3:0 CS total expected=5899 exchanged=4527 ratio=1.303
+c 1.700 3 #2:3 : FSJ mem freed
+c 1.700 3 Watchdog sleep interrupted by signal
+c 1.701 3 #2:3 ready for destruction
+c 1.702 3 all jobs deleted
+c 1.702 3 Watchdog sleep interrupted by signal
+c 1.702 3 STATS balancing_latencies num:4 min:0.000352 max:0.007924 med:0.001564 mean:0.002643
+c 1.702 3 busytime=1.651
+c 1.702 3 STATS treegrowth_latencies num:2 min:0.001038 max:0.001190 med:0.001190 mean:0.001114
+c 1.702 3 Watchdog sleep interrupted by signal
+c 1.747 3 Exiting happily
+c 0.001 3 Mallob rls pid=58720 on host vvbk
+c 0.003 3 I am worker #3
+c 0.003 3 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.003 3 [WARN] Falling back to safe value r=2.
+c 0.003 3 My bounce alternatives: 2 0 
+c 0.004 3 Machine color 0 with 4 total workers (my rank: 3)
+c 0.029 3 ADOPT r.#2:3 rev. 0 <- [1] born=0.028 hops=0 epoch=2 matchId=-1 mode=1 <= [1]
+c 0.029 3 corealloc req 0 -> 0 granted, 3 free
+c 0.029 3 COMMIT #2 -> #2:3
+c 0.032 3 Got desc. of size 614404 for job #2 <= [1]
+c 0.032 3 UNCOMMIT #2:3
+c 0.032 3 LOAD 1 (+#2:3)
+c 0.032 3 EXECUTE #2:3 <= [1]
+c 0.032 3 #2:3 : new job node starting
+c 0.032 3 corealloc req 3 -> 3 granted, 0 free
+c 0.033 3 #2:3 : update v=4 epoch=2 lastreqsepoch=2 evlat=0.00000
+c 0.034 3 SPA: formula with 614300 bytes
+c 0.054 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.064 3 Watchdog sleep interrupted by signal
+c 0.114 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.164 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.210 3 #2:3 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.210 3 #2:3 shrinking
+c 0.210 3 corealloc ret 3 -> 3 free
+c 0.210 3 #2:3 : suspended solver
+c 0.210 3 LOAD 0 (-#2:3)
+c 0.210 3 SUSPEND #2:3
+c 0.213 3 ADOPT r.#3:0 rev. 0 <- [0] born=0.210 hops=2 epoch=-1 matchId=-1 mode=1 <= [3]
+c 0.213 3 corealloc req 0 -> 0 granted, 3 free
+c 0.213 3 COMMIT #3 -> #3:0
+c 0.214 3 Got desc. of size 502328 for job #3 <= [0]
+c 0.214 3 UNCOMMIT #3:0
+c 0.214 3 LOAD 1 (+#3:0)
+c 0.214 3 EXECUTE #3:0 <= [0]
+c 0.214 3 #3:0 : new job node starting
+c 0.214 3 corealloc req 3 -> 3 granted, 0 free
+c 0.215 3 BLC insert (3,1,9999999.000)
+c 0.215 3 #3:0 : update v=1 epoch=3 lastreqsepoch=-1 evlat=0.00000
+c 0.215 3 SPA: formula with 502204 bytes
+c 0.221 3 #3:0 : update v=1 epoch=4 lastreqsepoch=3 evlat=0.00659
+c 0.222 3 [CA] Root: 0 requests, 0 idle (epoch=4)
+c 0.223 3 [CA] Root: 0 requests, 0 idle (epoch=4)
+c 0.240 3 Watchdog sleep interrupted by signal
+c 0.336 3 BLC insert (3,2,9999999.000)
+c 0.337 3 #3:0 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00067
+c 0.337 3 #3:0 growing: r.#3:1 rev. 0 <- [3] born=0.337 hops=0 epoch=5 matchId=-1 => [1]
+c 0.339 3 Adoption offer for #3:1 <= [2]
+c 0.339 3 RBS #3:1 EXPAND e=5 #inactives=0 => [2]
+c 0.339 3 Sending job desc. of #3:0 rev. 0, size 502328, formula begins at idx 124 => [2]
+c 0.339 3 Sent id=20 => [2]
+c 0.342 3 [WARN] #3:0 job tree has size 1/2
+c 0.377 3 BLC insert (3,3,9999999.000)
+c 0.378 3 #3:0 : update v=3 epoch=6 lastreqsepoch=5 evlat=0.00097
+c 0.378 3 #3:0 growing: r.#3:2 rev. 0 <- [3] born=0.378 hops=0 epoch=6 matchId=-1 => [2]
+c 0.379 3 Adoption offer for #3:2 <= [1]
+c 0.379 3 RBS #3:2 EXPAND e=6 #inactives=0 => [1]
+c 0.380 3 Sending job desc. of #3:0 rev. 0, size 502328, formula begins at idx 124 => [1]
+c 0.380 3 Sent id=28 => [1]
+c 0.402 3 [WARN] #3:0 job tree has size 2/3
+c 0.407 3 BLC insert (3,4,9999999.000)
+c 0.407 3 #3:0 : update v=3 epoch=7 lastreqsepoch=6 evlat=0.00043
+c 0.427 3 #3:0 : update v=4 epoch=8 lastreqsepoch=7 evlat=0.00000
+c 0.427 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.428 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.429 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.440 3 [WARN] #3:0 job tree has size 3/4
+c 0.723 3 CS estinc=5899.0 estshr=5899.0 accdes=58990.0 accshr=58990.0 totdes=0 totshr=0
+c 0.723 3 CS last sharing: 0/0/5899 globally passed ~> c=1.000
+c 0.723 3 #3:0 : INIT COMM e=1 nc=2
+c 0.733 3 #3:0 CS produced cls size=1594 lits=1588/1500
+c 0.744 3 #3:0 : merged 4 contribs rev=0 (inp=5899, t=0.0011s) ~> len=4787
+c 1.000 3 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.001 3 contexts=2 descriptions=2
+c 1.217 3 CS estinc=5899.0 estshr=5221.0 accdes=58990.0 accshr=57634.0 totdes=5899 totshr=4543
+c 1.217 3 CS last sharing: 4543/5899/5899 globally passed ~> c=1.312
+c 1.217 3 #3:0 : INIT COMM e=2 nc=2
+c 1.227 3 #3:0 CS produced cls size=2027 lits=2021/1967
+c 1.238 3 #3:0 : merged 4 contribs rev=0 (inp=7737, t=0.0009s) ~> len=7096
+c 1.721 3 CS estinc=5898.8 estshr=5051.7 accdes=58989.0 accshr=58274.6 totdes=11797 totshr=10947
+c 1.722 3 CS last sharing: 6404/7737/7737 globally passed ~> c=1.310
+c 1.722 3 #3:0 : INIT COMM e=3 nc=2
+c 1.731 3 #3:0 CS produced cls size=1983 lits=1977/1964
+c 1.744 3 #3:0 : merged 4 contribs rev=0 (inp=7725, t=0.0012s) ~> len=7250
+c 1.761 3 #3 rev. 0 solved <= [1]
+c 1.761 3 #3:0 : inform client job is done => [0]
+c 1.761 3 Propagate interruption of #3:0 ... => [1]
+c 1.761 3 Propagate interruption of #3:0 ... => [2]
+c 1.761 3 LOAD 0 (-#3:0)
+c 1.761 3 corealloc ret 3 -> 3 free
+c 1.761 3 #3:0 : terminated
+c 1.761 3 BLC insert (3,0,0.000)
+c 1.761 3 #3:0 balancing latency={num:4 min:0.00043 med:0.00097 avg:0.00217 max:0.00659}
+c 1.761 3 Forget #3:0
+c 1.761 3 FORGET #3:0
+c 1.761 3 #3:0 desires fulfilled=1.0000 latency={num:2 min:0.00143 med:0.00188 avg:0.00166 max:0.00188}
+c 1.762 3 [CA] Root: 0 requests, 1 idle (epoch=8)
+c 1.774 3 Destruct worker
+c 1.775 3 FORGET #2:3
+c 1.775 3 #2:3 : terminated
+c 1.775 3 #2:3 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.775 3 #2:3 : FSJ freeing mem
+c 1.777 3 #3:0 : FSJ freeing mem
+c 1.777 3 Grow thread pool (8 -> 10)
+c 1.778 3 #3:0 : FSJ mem freed
+c 1.778 3 Watchdog sleep interrupted by signal
+c 1.779 3 #3:0 ready for destruction
+c 1.779 3 #3:0 CS total expected=11797 exchanged=10947 ratio=1.078
+c 1.786 3 #2:3 : FSJ mem freed
+c 1.786 3 Watchdog sleep interrupted by signal
+c 1.786 3 #2:3 ready for destruction
+c 1.787 3 all jobs deleted
+c 1.787 3 Watchdog sleep interrupted by signal
+c 1.787 3 STATS balancing_latencies num:4 min:0.000435 max:0.006588 med:0.000973 mean:0.002167
+c 1.788 3 busytime=1.727
+c 1.788 3 STATS treegrowth_latencies num:2 min:0.001430 max:0.001883 med:0.001883 mean:0.001657
+c 1.788 3 Watchdog sleep interrupted by signal
+c 1.837 3 Exiting happily
+c 0.001 3 Mallob rls pid=58867 on host vvbk
+c 0.004 3 I am worker #3
+c 0.004 3 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.004 3 [WARN] Falling back to safe value r=2.
+c 0.004 3 My bounce alternatives: 2 0 
+c 0.004 3 Machine color 0 with 4 total workers (my rank: 3)
+c 0.028 3 ADOPT r.#2:3 rev. 0 <- [1] born=0.028 hops=0 epoch=2 matchId=-1 mode=1 <= [1]
+c 0.028 3 corealloc req 0 -> 0 granted, 3 free
+c 0.028 3 COMMIT #2 -> #2:3
+c 0.032 3 Got desc. of size 614404 for job #2 <= [1]
+c 0.032 3 UNCOMMIT #2:3
+c 0.032 3 LOAD 1 (+#2:3)
+c 0.032 3 EXECUTE #2:3 <= [1]
+c 0.032 3 #2:3 : new job node starting
+c 0.032 3 corealloc req 3 -> 3 granted, 0 free
+c 0.032 3 #2:3 : update v=4 epoch=2 lastreqsepoch=2 evlat=0.00000
+c 0.033 3 SPA: formula with 614300 bytes
+c 0.050 3 Watchdog sleep interrupted by signal
+c 0.054 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.112 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.163 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.181 3 #2:3 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.181 3 #2:3 shrinking
+c 0.181 3 corealloc ret 3 -> 3 free
+c 0.181 3 #2:3 : suspended solver
+c 0.181 3 LOAD 0 (-#2:3)
+c 0.181 3 SUSPEND #2:3
+c 0.183 3 ADOPT r.#3:0 rev. 0 <- [0] born=0.179 hops=2 epoch=-1 matchId=-1 mode=1 <= [3]
+c 0.183 3 corealloc req 0 -> 0 granted, 3 free
+c 0.183 3 COMMIT #3 -> #3:0
+c 0.185 3 Got desc. of size 502328 for job #3 <= [0]
+c 0.185 3 UNCOMMIT #3:0
+c 0.185 3 LOAD 1 (+#3:0)
+c 0.185 3 EXECUTE #3:0 <= [0]
+c 0.185 3 #3:0 : new job node starting
+c 0.185 3 corealloc req 3 -> 3 granted, 0 free
+c 0.185 3 BLC insert (3,1,9999999.000)
+c 0.186 3 #3:0 : update v=1 epoch=3 lastreqsepoch=-1 evlat=0.00000
+c 0.186 3 SPA: formula with 502204 bytes
+c 0.192 3 #3:0 : update v=1 epoch=4 lastreqsepoch=3 evlat=0.00620
+c 0.192 3 [CA] Root: 0 requests, 0 idle (epoch=4)
+c 0.193 3 [CA] Root: 0 requests, 0 idle (epoch=4)
+c 0.203 3 Watchdog sleep interrupted by signal
+c 0.290 3 BLC insert (3,2,9999999.000)
+c 0.291 3 #3:0 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00088
+c 0.291 3 #3:0 growing: r.#3:1 rev. 0 <- [3] born=0.291 hops=0 epoch=5 matchId=-1 => [1]
+c 0.293 3 Adoption offer for #3:1 <= [2]
+c 0.293 3 RBS #3:1 EXPAND e=5 #inactives=0 => [2]
+c 0.293 3 Sending job desc. of #3:0 rev. 0, size 502328, formula begins at idx 124 => [2]
+c 0.293 3 Sent id=21 => [2]
+c 0.295 3 [WARN] #3:0 job tree has size 1/2
+c 0.320 3 BLC insert (3,3,9999999.000)
+c 0.321 3 #3:0 : update v=3 epoch=6 lastreqsepoch=5 evlat=0.00067
+c 0.321 3 #3:0 growing: r.#3:2 rev. 0 <- [3] born=0.321 hops=0 epoch=6 matchId=-1 => [2]
+c 0.322 3 Adoption offer for #3:2 <= [1]
+c 0.322 3 RBS #3:2 EXPAND e=6 #inactives=0 => [1]
+c 0.322 3 Sending job desc. of #3:0 rev. 0, size 502328, formula begins at idx 124 => [1]
+c 0.322 3 Sent id=29 => [1]
+c 0.341 3 BLC insert (3,4,9999999.000)
+c 0.341 3 #3:0 : update v=3 epoch=7 lastreqsepoch=6 evlat=0.00075
+c 0.346 3 [WARN] #3:0 job tree has size 2/3
+c 0.362 3 #3:0 : update v=4 epoch=8 lastreqsepoch=7 evlat=0.00000
+c 0.363 3 [CA] Root: 1 requests, 0 idle (epoch=8)
+c 0.364 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.365 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.366 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.382 3 [WARN] #3:0 job tree has size 3/4
+c 0.687 3 CS estinc=5899.0 estshr=5899.0 accdes=58990.0 accshr=58990.0 totdes=0 totshr=0
+c 0.687 3 CS last sharing: 0/0/5899 globally passed ~> c=1.000
+c 0.687 3 #3:0 : INIT COMM e=1 nc=2
+c 0.697 3 #3:0 CS produced cls size=1592 lits=1586/1500
+c 0.721 3 #3:0 : merged 4 contribs rev=0 (inp=5899, t=0.0024s) ~> len=4740
+c 1.000 3 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.000 3 contexts=2 descriptions=2
+c 1.191 3 CS estinc=5899.0 estshr=5193.0 accdes=58990.0 accshr=57578.0 totdes=5899 totshr=4487
+c 1.191 3 CS last sharing: 4487/5899/5899 globally passed ~> c=1.326
+c 1.191 3 #3:0 : INIT COMM e=2 nc=2
+c 1.201 3 #3:0 CS produced cls size=2033 lits=2027/1989
+c 1.216 3 #3:0 : merged 4 contribs rev=0 (inp=7823, t=0.0007s) ~> len=7096
+c 1.686 3 CS estinc=5898.7 estshr=4992.3 accdes=58989.0 accshr=58175.2 totdes=11797 totshr=10842
+c 1.686 3 CS last sharing: 6355/7823/7823 globally passed ~> c=1.341
+c 1.686 3 #3:0 : INIT COMM e=3 nc=2
+c 1.696 3 #3:0 CS produced cls size=2032 lits=2026/2011
+c 1.711 3 #3:0 : merged 4 contribs rev=0 (inp=7910, t=0.0005s) ~> len=7478
+c 1.824 3 #3 rev. 0 solved <= [1]
+c 1.824 3 #3:0 : inform client job is done => [0]
+c 1.824 3 Propagate interruption of #3:0 ... => [1]
+c 1.824 3 Propagate interruption of #3:0 ... => [2]
+c 1.824 3 LOAD 0 (-#3:0)
+c 1.824 3 corealloc ret 3 -> 3 free
+c 1.824 3 #3:0 : terminated
+c 1.824 3 BLC insert (3,0,0.000)
+c 1.824 3 #3:0 balancing latency={num:4 min:0.00067 med:0.00088 avg:0.00213 max:0.00620}
+c 1.824 3 Forget #3:0
+c 1.824 3 FORGET #3:0
+c 1.824 3 #3:0 desires fulfilled=1.0000 latency={num:2 min:0.00093 med:0.00180 avg:0.00136 max:0.00180}
+c 1.825 3 [CA] Root: 0 requests, 1 idle (epoch=8)
+c 1.831 3 Destruct worker
+c 1.831 3 FORGET #2:3
+c 1.831 3 #2:3 : terminated
+c 1.831 3 #2:3 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.831 3 #3:0 : FSJ freeing mem
+c 1.831 3 #2:3 : FSJ freeing mem
+c 1.832 3 #3:0 : FSJ mem freed
+c 1.832 3 Watchdog sleep interrupted by signal
+c 1.832 3 #3:0 ready for destruction
+c 1.832 3 #3:0 CS total expected=11797 exchanged=10842 ratio=1.088
+c 1.842 3 #2:3 : FSJ mem freed
+c 1.842 3 Watchdog sleep interrupted by signal
+c 1.843 3 #2:3 ready for destruction
+c 1.844 3 all jobs deleted
+c 1.844 3 Watchdog sleep interrupted by signal
+c 1.844 3 STATS balancing_latencies num:4 min:0.000674 max:0.006198 med:0.000881 mean:0.002125
+c 1.844 3 busytime=1.791
+c 1.844 3 STATS treegrowth_latencies num:2 min:0.000929 max:0.001800 med:0.001800 mean:0.001364
+c 1.845 3 Watchdog sleep interrupted by signal
+c 1.892 3 Exiting happily
+c 0.001 3 Mallob rls pid=59010 on host vvbk
+c 0.003 3 I am worker #3
+c 0.004 3 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.004 3 [WARN] Falling back to safe value r=2.
+c 0.004 3 My bounce alternatives: 2 0 
+c 0.004 3 Machine color 0 with 4 total workers (my rank: 3)
+c 0.027 3 ADOPT r.#2:3 rev. 0 <- [1] born=0.027 hops=0 epoch=2 matchId=-1 mode=1 <= [1]
+c 0.027 3 corealloc req 0 -> 0 granted, 3 free
+c 0.027 3 COMMIT #2 -> #2:3
+c 0.031 3 Got desc. of size 614404 for job #2 <= [1]
+c 0.031 3 UNCOMMIT #2:3
+c 0.031 3 LOAD 1 (+#2:3)
+c 0.031 3 EXECUTE #2:3 <= [1]
+c 0.031 3 #2:3 : new job node starting
+c 0.031 3 corealloc req 3 -> 3 granted, 0 free
+c 0.032 3 #2:3 : update v=4 epoch=2 lastreqsepoch=2 evlat=0.00000
+c 0.033 3 SPA: formula with 614300 bytes
+c 0.049 3 Watchdog sleep interrupted by signal
+c 0.053 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.111 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.162 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.198 3 #2:3 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.198 3 #2:3 shrinking
+c 0.198 3 corealloc ret 3 -> 3 free
+c 0.198 3 #2:3 : suspended solver
+c 0.198 3 LOAD 0 (-#2:3)
+c 0.198 3 SUSPEND #2:3
+c 0.201 3 ADOPT r.#3:0 rev. 0 <- [0] born=0.198 hops=2 epoch=-1 matchId=-1 mode=1 <= [3]
+c 0.201 3 corealloc req 0 -> 0 granted, 3 free
+c 0.201 3 COMMIT #3 -> #3:0
+c 0.202 3 Got desc. of size 502328 for job #3 <= [0]
+c 0.202 3 UNCOMMIT #3:0
+c 0.202 3 LOAD 1 (+#3:0)
+c 0.202 3 EXECUTE #3:0 <= [0]
+c 0.202 3 #3:0 : new job node starting
+c 0.202 3 corealloc req 3 -> 3 granted, 0 free
+c 0.202 3 BLC insert (3,1,9999999.000)
+c 0.202 3 #3:0 : update v=1 epoch=3 lastreqsepoch=-1 evlat=0.00000
+c 0.202 3 SPA: formula with 502204 bytes
+c 0.209 3 #3:0 : update v=1 epoch=4 lastreqsepoch=3 evlat=0.00646
+c 0.209 3 [CA] Root: 0 requests, 0 idle (epoch=4)
+c 0.210 3 [CA] Root: 0 requests, 0 idle (epoch=4)
+c 0.211 3 [CA] Root: 0 requests, 0 idle (epoch=4)
+c 0.218 3 Watchdog sleep interrupted by signal
+c 0.323 3 BLC insert (3,2,9999999.000)
+c 0.324 3 #3:0 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00050
+c 0.324 3 #3:0 growing: r.#3:1 rev. 0 <- [3] born=0.324 hops=0 epoch=5 matchId=-1 => [1]
+c 0.325 3 Adoption offer for #3:1 <= [2]
+c 0.325 3 RBS #3:1 EXPAND e=5 #inactives=0 => [2]
+c 0.325 3 Sending job desc. of #3:0 rev. 0, size 502328, formula begins at idx 124 => [2]
+c 0.325 3 Sent id=21 => [2]
+c 0.328 3 [WARN] #3:0 job tree has size 1/2
+c 0.353 3 BLC insert (3,3,9999999.000)
+c 0.354 3 #3:0 : update v=3 epoch=6 lastreqsepoch=5 evlat=0.00070
+c 0.354 3 #3:0 growing: r.#3:2 rev. 0 <- [3] born=0.354 hops=0 epoch=6 matchId=-1 => [2]
+c 0.356 3 Adoption offer for #3:2 <= [1]
+c 0.356 3 RBS #3:2 EXPAND e=6 #inactives=0 => [1]
+c 0.356 3 Sending job desc. of #3:0 rev. 0, size 502328, formula begins at idx 124 => [1]
+c 0.356 3 Sent id=29 => [1]
+c 0.373 3 BLC insert (3,4,9999999.000)
+c 0.374 3 #3:0 : update v=3 epoch=7 lastreqsepoch=6 evlat=0.00035
+c 0.387 3 [WARN] #3:0 job tree has size 2/3
+c 0.401 3 #3:0 : update v=4 epoch=8 lastreqsepoch=7 evlat=0.00000
+c 0.403 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.404 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.407 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.417 3 [WARN] #3:0 job tree has size 3/4
+c 0.709 3 CS estinc=5899.0 estshr=5899.0 accdes=58990.0 accshr=58990.0 totdes=0 totshr=0
+c 0.709 3 CS last sharing: 0/0/5899 globally passed ~> c=1.000
+c 0.709 3 #3:0 : INIT COMM e=1 nc=2
+c 0.719 3 #3:0 CS produced cls size=1596 lits=1590/1500
+c 0.741 3 #3:0 : merged 4 contribs rev=0 (inp=5899, t=0.0006s) ~> len=4792
+c 1.000 3 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.001 3 contexts=2 descriptions=2
+c 1.203 3 CS estinc=5899.0 estshr=5220.0 accdes=58990.0 accshr=57632.0 totdes=5899 totshr=4541
+c 1.203 3 CS last sharing: 4541/5899/5899 globally passed ~> c=1.312
+c 1.203 3 #3:0 : INIT COMM e=2 nc=2
+c 1.213 3 #3:0 CS produced cls size=2018 lits=2012/1968
+c 1.225 3 #3:0 : merged 4 contribs rev=0 (inp=7740, t=0.0009s) ~> len=7067
+c 1.710 3 CS estinc=5898.8 estshr=5007.5 accdes=58989.0 accshr=58160.8 totdes=11797 totshr=10833
+c 1.710 3 CS last sharing: 6292/7740/7740 globally passed ~> c=1.337
+c 1.710 3 #3:0 : INIT COMM e=3 nc=2
+c 1.720 3 #3:0 CS produced cls size=2036 lits=2030/2005
+c 1.728 3 #3:0 : merged 4 contribs rev=0 (inp=7887, t=0.0006s) ~> len=7527
+c 1.788 3 #3 rev. 0 solved <= [0]
+c 1.788 3 #3:0 : inform client job is done => [0]
+c 1.788 3 Propagate interruption of #3:0 ... => [1]
+c 1.788 3 Propagate interruption of #3:0 ... => [2]
+c 1.788 3 LOAD 0 (-#3:0)
+c 1.788 3 corealloc ret 3 -> 3 free
+c 1.788 3 #3:0 : terminated
+c 1.788 3 BLC insert (3,0,0.000)
+c 1.788 3 #3:0 balancing latency={num:4 min:0.00035 med:0.00070 avg:0.00200 max:0.00646}
+c 1.788 3 Forget #3:0
+c 1.788 3 FORGET #3:0
+c 1.788 3 #3:0 desires fulfilled=1.0000 latency={num:2 min:0.00099 med:0.00153 avg:0.00126 max:0.00153}
+c 1.790 3 #3:0 : FSJ freeing mem
+c 1.795 3 Destruct worker
+c 1.795 3 FORGET #2:3
+c 1.795 3 #2:3 : terminated
+c 1.795 3 #2:3 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.795 3 #2:3 : FSJ freeing mem
+c 1.795 3 Grow thread pool (8 -> 10)
+c 1.801 3 #3:0 : FSJ mem freed
+c 1.801 3 Watchdog sleep interrupted by signal
+c 1.802 3 #3:0 ready for destruction
+c 1.802 3 #3:0 CS total expected=11797 exchanged=10833 ratio=1.089
+c 1.807 3 #2:3 : FSJ mem freed
+c 1.807 3 Watchdog sleep interrupted by signal
+c 1.807 3 #2:3 ready for destruction
+c 1.808 3 all jobs deleted
+c 1.808 3 Watchdog sleep interrupted by signal
+c 1.808 3 STATS balancing_latencies num:4 min:0.000352 max:0.006465 med:0.000701 mean:0.002004
+c 1.808 3 busytime=1.755
+c 1.808 3 STATS treegrowth_latencies num:2 min:0.000993 max:0.001533 med:0.001533 mean:0.001263
+c 1.809 3 Watchdog sleep interrupted by signal
+c 1.857 3 Exiting happily
+c 0.001 3 Mallob rls pid=59156 on host vvbk
+c 0.002 3 I am worker #3
+c 0.002 3 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.002 3 [WARN] Falling back to safe value r=2.
+c 0.002 3 My bounce alternatives: 2 0 
+c 0.002 3 Machine color 0 with 4 total workers (my rank: 3)
+c 0.026 3 ADOPT r.#2:3 rev. 0 <- [1] born=0.026 hops=0 epoch=2 matchId=-1 mode=1 <= [1]
+c 0.026 3 corealloc req 0 -> 0 granted, 3 free
+c 0.026 3 COMMIT #2 -> #2:3
+c 0.030 3 Got desc. of size 614404 for job #2 <= [1]
+c 0.030 3 UNCOMMIT #2:3
+c 0.030 3 LOAD 1 (+#2:3)
+c 0.030 3 EXECUTE #2:3 <= [1]
+c 0.030 3 #2:3 : new job node starting
+c 0.030 3 corealloc req 3 -> 3 granted, 0 free
+c 0.031 3 #2:3 : update v=4 epoch=2 lastreqsepoch=2 evlat=0.00000
+c 0.031 3 SPA: formula with 614300 bytes
+c 0.046 3 Watchdog sleep interrupted by signal
+c 0.052 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.110 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.160 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.182 3 #2:3 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.182 3 #2:3 shrinking
+c 0.182 3 corealloc ret 3 -> 3 free
+c 0.182 3 #2:3 : suspended solver
+c 0.182 3 LOAD 0 (-#2:3)
+c 0.182 3 SUSPEND #2:3
+c 0.184 3 ADOPT r.#3:0 rev. 0 <- [0] born=0.182 hops=2 epoch=-1 matchId=-1 mode=1 <= [3]
+c 0.184 3 corealloc req 0 -> 0 granted, 3 free
+c 0.184 3 COMMIT #3 -> #3:0
+c 0.186 3 Got desc. of size 502328 for job #3 <= [0]
+c 0.186 3 UNCOMMIT #3:0
+c 0.186 3 LOAD 1 (+#3:0)
+c 0.186 3 EXECUTE #3:0 <= [0]
+c 0.186 3 #3:0 : new job node starting
+c 0.186 3 corealloc req 3 -> 3 granted, 0 free
+c 0.187 3 BLC insert (3,1,9999999.000)
+c 0.187 3 #3:0 : update v=1 epoch=3 lastreqsepoch=-1 evlat=0.00000
+c 0.188 3 SPA: formula with 502204 bytes
+c 0.192 3 #3:0 : update v=1 epoch=4 lastreqsepoch=3 evlat=0.00520
+c 0.193 3 [CA] Root: 0 requests, 0 idle (epoch=4)
+c 0.194 3 [CA] Root: 0 requests, 0 idle (epoch=4)
+c 0.205 3 Watchdog sleep interrupted by signal
+c 0.298 3 BLC insert (3,2,9999999.000)
+c 0.299 3 #3:0 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00137
+c 0.299 3 #3:0 growing: r.#3:1 rev. 0 <- [3] born=0.299 hops=0 epoch=5 matchId=-1 => [1]
+c 0.301 3 Adoption offer for #3:1 <= [2]
+c 0.301 3 RBS #3:1 EXPAND e=5 #inactives=0 => [2]
+c 0.301 3 Sending job desc. of #3:0 rev. 0, size 502328, formula begins at idx 124 => [2]
+c 0.301 3 Sent id=21 => [2]
+c 0.304 3 [WARN] #3:0 job tree has size 1/2
+c 0.318 3 BLC insert (3,3,9999999.000)
+c 0.319 3 #3:0 : update v=3 epoch=6 lastreqsepoch=5 evlat=0.00079
+c 0.319 3 #3:0 growing: r.#3:2 rev. 0 <- [3] born=0.319 hops=0 epoch=6 matchId=-1 => [2]
+c 0.324 3 Adoption offer for #3:2 <= [1]
+c 0.325 3 RBS #3:2 EXPAND e=6 #inactives=0 => [1]
+c 0.325 3 Sending job desc. of #3:0 rev. 0, size 502328, formula begins at idx 124 => [1]
+c 0.325 3 Sent id=29 => [1]
+c 0.348 3 BLC insert (3,4,9999999.000)
+c 0.349 3 #3:0 : update v=3 epoch=7 lastreqsepoch=6 evlat=0.00045
+c 0.356 3 [WARN] #3:0 job tree has size 2/3
+c 0.367 3 #3:0 : update v=4 epoch=8 lastreqsepoch=7 evlat=0.00000
+c 0.368 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.373 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.386 3 [WARN] #3:0 job tree has size 3/4
+c 0.686 3 CS estinc=5899.0 estshr=5899.0 accdes=58990.0 accshr=58990.0 totdes=0 totshr=0
+c 0.686 3 CS last sharing: 0/0/5899 globally passed ~> c=1.000
+c 0.686 3 #3:0 : INIT COMM e=1 nc=2
+c 0.696 3 #3:0 CS produced cls size=1589 lits=1583/1500
+c 0.710 3 #3:0 : merged 4 contribs rev=0 (inp=5899, t=0.0007s) ~> len=4841
+c 1.000 3 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.005 3 contexts=2 descriptions=2
+c 1.189 3 CS estinc=5899.0 estshr=5254.0 accdes=58990.0 accshr=57700.0 totdes=5899 totshr=4609
+c 1.189 3 CS last sharing: 4609/5899/5899 globally passed ~> c=1.295
+c 1.189 3 #3:0 : INIT COMM e=2 nc=2
+c 1.200 3 #3:0 CS produced cls size=2002 lits=1996/1941
+c 1.211 3 #3:0 : merged 4 contribs rev=0 (inp=7637, t=0.0014s) ~> len=6854
+c 1.694 3 CS estinc=5899.0 estshr=5009.5 accdes=58989.0 accshr=58099.0 totdes=11797 totshr=10778
+c 1.694 3 CS last sharing: 6169/7637/7637 globally passed ~> c=1.343
+c 1.694 3 #3:0 : INIT COMM e=3 nc=2
+c 1.704 3 #3:0 CS produced cls size=2046 lits=2040/2014
+c 1.719 3 #3:0 : merged 4 contribs rev=0 (inp=7922, t=0.0008s) ~> len=7474
+c 1.862 3 #3 rev. 0 solved <= [0]
+c 1.863 3 #3:0 : inform client job is done => [0]
+c 1.863 3 Propagate interruption of #3:0 ... => [1]
+c 1.863 3 Propagate interruption of #3:0 ... => [2]
+c 1.863 3 LOAD 0 (-#3:0)
+c 1.863 3 corealloc ret 3 -> 3 free
+c 1.863 3 #3:0 : terminated
+c 1.863 3 BLC insert (3,0,0.000)
+c 1.863 3 #3:0 balancing latency={num:4 min:0.00045 med:0.00137 avg:0.00195 max:0.00520}
+c 1.863 3 Forget #3:0
+c 1.863 3 FORGET #3:0
+c 1.863 3 #3:0 desires fulfilled=1.0000 latency={num:2 min:0.00183 med:0.00546 avg:0.00365 max:0.00546}
+c 1.863 3 [CA] Root: 0 requests, 1 idle (epoch=8)
+c 1.865 3 #3:0 : FSJ freeing mem
+c 1.876 3 #3:0 : FSJ mem freed
+c 1.876 3 Watchdog sleep interrupted by signal
+c 1.876 3 Destruct worker
+c 1.876 3 FORGET #2:3
+c 1.876 3 #2:3 : terminated
+c 1.876 3 #2:3 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.876 3 #3:0 ready for destruction
+c 1.876 3 #2:3 : FSJ freeing mem
+c 1.879 3 #3:0 CS total expected=11797 exchanged=10778 ratio=1.095
+c 1.890 3 #2:3 : FSJ mem freed
+c 1.890 3 Watchdog sleep interrupted by signal
+c 1.892 3 #2:3 ready for destruction
+c 1.893 3 all jobs deleted
+c 1.893 3 Watchdog sleep interrupted by signal
+c 1.893 3 STATS balancing_latencies num:4 min:0.000449 max:0.005203 med:0.001367 mean:0.001951
+c 1.893 3 busytime=1.832
+c 1.893 3 STATS treegrowth_latencies num:2 min:0.001833 max:0.005464 med:0.005464 mean:0.003648
+c 1.893 3 Watchdog sleep interrupted by signal
+c 1.938 3 Exiting happily
+c 0.001 3 Mallob rls pid=59298 on host vvbk
+c 0.001 3 I am worker #3
+c 0.001 3 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.001 3 [WARN] Falling back to safe value r=2.
+c 0.001 3 My bounce alternatives: 2 0 
+c 0.002 3 Machine color 0 with 4 total workers (my rank: 3)
+c 0.025 3 ADOPT r.#2:3 rev. 0 <- [1] born=0.025 hops=0 epoch=2 matchId=-1 mode=1 <= [1]
+c 0.025 3 corealloc req 0 -> 0 granted, 3 free
+c 0.025 3 COMMIT #2 -> #2:3
+c 0.030 3 Got desc. of size 614404 for job #2 <= [1]
+c 0.030 3 UNCOMMIT #2:3
+c 0.030 3 LOAD 1 (+#2:3)
+c 0.030 3 EXECUTE #2:3 <= [1]
+c 0.030 3 #2:3 : new job node starting
+c 0.030 3 corealloc req 3 -> 3 granted, 0 free
+c 0.031 3 #2:3 : update v=4 epoch=2 lastreqsepoch=2 evlat=0.00000
+c 0.032 3 SPA: formula with 614300 bytes
+c 0.053 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.061 3 Watchdog sleep interrupted by signal
+c 0.112 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.163 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.213 3 jobId<#2>: sending [3]->[1] MSG_AGGREGATE_RANKLIST 
+c 0.213 3 #2:3 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.213 3 #2:3 shrinking
+c 0.213 3 corealloc ret 3 -> 3 free
+c 0.213 3 #2:3 : suspended solver
+c 0.213 3 LOAD 0 (-#2:3)
+c 0.213 3 SUSPEND #2:3
+c 0.216 3 ADOPT r.#3:0 rev. 0 <- [0] born=0.210 hops=2 epoch=-1 matchId=-1 mode=1 <= [3]
+c 0.216 3 corealloc req 0 -> 0 granted, 3 free
+c 0.216 3 COMMIT #3 -> #3:0
+c 0.218 3 Got desc. of size 502328 for job #3 <= [0]
+c 0.218 3 UNCOMMIT #3:0
+c 0.218 3 LOAD 1 (+#3:0)
+c 0.218 3 EXECUTE #3:0 <= [0]
+c 0.218 3 #3:0 : new job node starting
+c 0.218 3 corealloc req 3 -> 3 granted, 0 free
+c 0.220 3 BLC insert (3,1,9999999.000)
+c 0.220 3 #3:0 : update v=1 epoch=3 lastreqsepoch=-1 evlat=0.00000
+c 0.220 3 SPA: formula with 502204 bytes
+c 0.220 3 #3:0 : update v=1 epoch=4 lastreqsepoch=3 evlat=0.00043
+c 0.221 3 [CA] Root: 0 requests, 0 idle (epoch=4)
+c 0.224 3 [CA] Root: 0 requests, 0 idle (epoch=4)
+c 0.238 3 Watchdog sleep interrupted by signal
+c 0.341 3 BLC insert (3,2,9999999.000)
+c 0.341 3 #3:0 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00041
+c 0.341 3 #3:0 growing: r.#3:1 rev. 0 <- [3] born=0.341 hops=0 epoch=5 matchId=-1 => [1]
+c 0.342 3 Adoption offer for #3:1 <= [2]
+c 0.342 3 RBS #3:1 EXPAND e=5 #inactives=0 => [2]
+c 0.342 3 Sending job desc. of #3:0 rev. 0, size 502328, formula begins at idx 124 => [2]
+c 0.342 3 Sent id=23 => [2]
+c 0.345 3 [WARN] #3:0 job tree has size 1/2
+c 0.381 3 BLC insert (3,3,9999999.000)
+c 0.382 3 #3:0 : update v=3 epoch=6 lastreqsepoch=5 evlat=0.00067
+c 0.382 3 #3:0 growing: r.#3:2 rev. 0 <- [3] born=0.382 hops=0 epoch=6 matchId=-1 => [2]
+c 0.384 3 Adoption offer for #3:2 <= [1]
+c 0.384 3 RBS #3:2 EXPAND e=6 #inactives=0 => [1]
+c 0.384 3 Sending job desc. of #3:0 rev. 0, size 502328, formula begins at idx 124 => [1]
+c 0.384 3 Sent id=32 => [1]
+c 0.396 3 [WARN] #3:0 job tree has size 2/3
+c 0.411 3 BLC insert (3,4,9999999.000)
+c 0.412 3 #3:0 : update v=3 epoch=7 lastreqsepoch=6 evlat=0.00060
+c 0.431 3 #3:0 : update v=4 epoch=8 lastreqsepoch=7 evlat=0.00000
+c 0.432 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.433 3 [CA] Root: 0 requests, 0 idle (epoch=8)
+c 0.445 3 [WARN] #3:0 job tree has size 3/4
+c 0.724 3 CS estinc=5899.0 estshr=5899.0 accdes=58990.0 accshr=58990.0 totdes=0 totshr=0
+c 0.724 3 CS last sharing: 0/0/5899 globally passed ~> c=1.000
+c 0.724 3 #3:0 : INIT COMM e=1 nc=2
+c 0.734 3 #3:0 CS produced cls size=1589 lits=1583/1500
+c 0.749 3 #3:0 : merged 4 contribs rev=0 (inp=5899, t=0.0010s) ~> len=4803
+c 1.000 3 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.000 3 contexts=2 descriptions=2
+c 1.219 3 CS estinc=5899.0 estshr=5229.5 accdes=58990.0 accshr=57651.0 totdes=5899 totshr=4560
+c 1.219 3 CS last sharing: 4560/5899/5899 globally passed ~> c=1.307
+c 1.219 3 #3:0 : INIT COMM e=2 nc=2
+c 1.229 3 #3:0 CS produced cls size=2011 lits=2005/1960
+c 1.246 3 #3:0 : merged 4 contribs rev=0 (inp=7711, t=0.0010s) ~> len=6985
+c 1.724 3 CS estinc=5898.8 estshr=5048.9 accdes=58989.0 accshr=58249.9 totdes=11797 totshr=10924
+c 1.724 3 CS last sharing: 6364/7711/7711 globally passed ~> c=1.313
+c 1.725 3 #3:0 : INIT COMM e=3 nc=2
+c 1.734 3 #3:0 CS produced cls size=1992 lits=1986/1969
+c 1.752 3 #3:0 : merged 4 contribs rev=0 (inp=7746, t=0.0010s) ~> len=7341
+c 1.803 3 #3 rev. 0 solved <= [0]
+c 1.803 3 #3:0 : inform client job is done => [0]
+c 1.803 3 Propagate interruption of #3:0 ... => [1]
+c 1.803 3 Propagate interruption of #3:0 ... => [2]
+c 1.803 3 LOAD 0 (-#3:0)
+c 1.803 3 corealloc ret 3 -> 3 free
+c 1.803 3 #3:0 : terminated
+c 1.803 3 BLC insert (3,0,0.000)
+c 1.803 3 #3:0 balancing latency={num:4 min:0.00041 med:0.00060 avg:0.00053 max:0.00067}
+c 1.803 3 Forget #3:0
+c 1.803 3 FORGET #3:0
+c 1.803 3 #3:0 desires fulfilled=1.0000 latency={num:2 min:0.00064 med:0.00198 avg:0.00131 max:0.00198}
+c 1.803 3 [ERROR] Unexpected job message mpitag=30 inttag=419 jobId=3 ctx_id_sender=10 <= [2]
+c 4.099 3 [WARN] Watchdog: No reset for 2295 ms (activity=0 recvtag=30 sendtag=0)
+c 4.130 3 [ERROR] pid=59298 tid=59298 signal=6

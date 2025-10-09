@@ -1,0 +1,9 @@
+c 0.052 3 <#2> S9.0 Diversification index 9
+c 0.054 3 <#2> S9.0 Received 153575 literals: 487 3235 -271 0 -487 ... 481 482 483 484 0 
+c 0.055 3 <#2> S9.0 Diversifying 9
+c 0.055 3 <#2> S9.0 Reading rev. 0, start 0
+c 0.077 3 <#2> S9.0 Reading done @ rev. 0 (153575 lits, 0 assumptions)
+c 0.078 3 <#2> S9.0 BEGSOL rev. 0 (chk 0,0, 0 assumptions): 
+c 4.130 3 <#2> S9.0 disc_reasons r_ee:0,r_ed:0,r_pb:0,r_ss:0,r_sw:0,r_tr:0,r_fx:0,r_ia:0,r_tl:0
+c 4.130 3 <#2> S9.0 ENDSOL
+c 4.130 3 <#2> S9.0 exiting

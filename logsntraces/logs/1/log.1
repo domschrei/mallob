@@ -1,0 +1,1047 @@
+c 0.002 1 Mallob rls pid=58124 on host vvbk
+c 0.007 1 I am worker #1
+c 0.007 1 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.007 1 [WARN] Falling back to safe value r=2.
+c 0.007 1 My bounce alternatives: 0 2 
+c 0.008 1 Machine color 0 with 4 total workers (my rank: 1)
+c 0.032 1 ADOPT r.#2:1 rev. 0 <- [0] born=0.031 hops=0 epoch=2 matchId=-1 mode=1 <= [0]
+c 0.032 1 corealloc req 0 -> 0 granted, 3 free
+c 0.032 1 COMMIT #2 -> #2:1
+c 0.032 1 #2:1 growing: r.#2:3 rev. 0 <- [1] born=0.032 hops=0 epoch=2 matchId=-1 => [3]
+c 0.032 1 [CA] Root: 0 requests, 0 idle (epoch=2)
+c 0.033 1 Got desc. of size 614404 for job #2 <= [0]
+c 0.033 1 UNCOMMIT #2:1
+c 0.033 1 LOAD 1 (+#2:1)
+c 0.033 1 EXECUTE #2:1 <= [0]
+c 0.033 1 #2:1 : new job node starting
+c 0.033 1 corealloc req 3 -> 3 granted, 0 free
+c 0.033 1 #2:1 : update v=4 epoch=2 lastreqsepoch=2 evlat=0.00000
+c 0.033 1 Adoption offer for #2:3 <= [3]
+c 0.034 1 RBS #2:3 EXPAND e=2 #inactives=0 => [3]
+c 0.034 1 Sending job desc. of #2:1 rev. 0, size 614404, formula begins at idx 104 => [3]
+c 0.034 1 Sent id=8 => [3]
+c 0.034 1 SPA: formula with 614300 bytes
+c 0.035 1 [CA] Root: 0 requests, 0 idle (epoch=2)
+c 0.046 1 Watchdog sleep interrupted by signal
+c 0.188 1 #2:1 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.188 1 RBS #2:3 SHRINK #inactives=1 <= [3]
+c 0.194 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.198 1 #2:1 : update v=3 epoch=4 lastreqsepoch=3 evlat=0.00000
+c 0.244 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.295 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.301 1 #2:1 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00000
+c 0.332 1 #2:1 : update v=1 epoch=6 lastreqsepoch=5 evlat=0.00000
+c 0.332 1 #2:1 shrinking
+c 0.332 1 corealloc ret 3 -> 3 free
+c 0.332 1 #2:1 : suspended solver
+c 0.332 1 LOAD 0 (-#2:1)
+c 0.332 1 SUSPEND #2:1
+c 0.333 1 [CA] Root: 0 requests, 1 idle (epoch=6)
+c 0.334 1 [CA] Root: 0 requests, 1 idle (epoch=6)
+c 0.337 1 [CA] Root: 0 requests, 1 idle (epoch=6)
+c 0.338 1 ADOPT r.#3:2 rev. 0 <- [3] born=0.332 hops=2 epoch=6 matchId=-1 mode=1 <= [1]
+c 0.338 1 corealloc req 0 -> 0 granted, 3 free
+c 0.338 1 COMMIT #3 -> #3:2
+c 0.338 1 [CA] Root: 0 requests, 0 idle (epoch=6)
+c 0.339 1 Got desc. of size 502328 for job #3 <= [3]
+c 0.339 1 UNCOMMIT #3:2
+c 0.339 1 LOAD 1 (+#3:2)
+c 0.339 1 EXECUTE #3:2 <= [3]
+c 0.339 1 #3:2 : new job node starting
+c 0.339 1 corealloc req 3 -> 3 granted, 0 free
+c 0.339 1 #3:2 : update v=3 epoch=6 lastreqsepoch=6 evlat=0.00000
+c 0.339 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.339 1 SPA: formula with 502204 bytes
+c 0.351 1 Watchdog sleep interrupted by signal
+c 0.352 1 #3:2 : update v=3 epoch=7 lastreqsepoch=6 evlat=0.00000
+c 0.373 1 #3:2 : update v=4 epoch=8 lastreqsepoch=7 evlat=0.00000
+c 0.398 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.448 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.499 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.549 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.600 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.650 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.695 1 #3:2 : INIT COMM e=1 nc=0
+c 0.700 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.700 1 #3:2 CS produced cls size=1621 lits=1617/1500
+c 0.701 1 #3:2 : merged 1 contribs rev=0 (inp=1500, t=0.0004s) ~> len=1621
+c 0.751 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.801 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.851 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.902 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.952 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.000 1 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.000 1 contexts=2 descriptions=2
+c 1.003 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.053 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.103 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.153 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.199 1 #3:2 : INIT COMM e=2 nc=0
+c 1.204 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.204 1 #3:2 CS produced cls size=2230 lits=2224/2123
+c 1.204 1 #3:2 : merged 1 contribs rev=0 (inp=2123, t=0.0004s) ~> len=2230
+c 1.254 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.304 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.355 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.405 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.456 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.506 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.556 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.607 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.657 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.695 1 LOAD 0 (-#3:2)
+c 1.695 1 corealloc ret 3 -> 3 free
+c 1.695 1 #3:2 : terminated
+c 1.695 1 Forget #3:2
+c 1.695 1 FORGET #3:2
+c 1.695 1 #3:2 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.697 1 #3:2 : FSJ freeing mem
+c 1.705 1 Destruct worker
+c 1.705 1 FORGET #2:1
+c 1.705 1 #2:1 : terminated
+c 1.705 1 #2:1 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.705 1 #2:1 : FSJ freeing mem
+c 1.705 1 Grow thread pool (8 -> 10)
+c 1.708 1 #3:2 : FSJ mem freed
+c 1.708 1 Watchdog sleep interrupted by signal
+c 1.708 1 #3:2 ready for destruction
+c 1.716 1 #2:1 : FSJ mem freed
+c 1.716 1 Watchdog sleep interrupted by signal
+c 1.717 1 #2:1 ready for destruction
+c 1.718 1 all jobs deleted
+c 1.718 1 Watchdog sleep interrupted by signal
+c 1.718 1 STATS balancing_latencies num:0 min:0.000000 max:0.000000 med:0.000000 mean:0.000000
+c 1.718 1 busytime=1.657
+c 1.718 1 Watchdog sleep interrupted by signal
+c 1.768 1 Exiting happily
+c 0.001 1 Mallob rls pid=58276 on host vvbk
+c 0.004 1 I am worker #1
+c 0.004 1 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.004 1 [WARN] Falling back to safe value r=2.
+c 0.004 1 My bounce alternatives: 0 2 
+c 0.004 1 Machine color 0 with 4 total workers (my rank: 1)
+c 0.027 1 ADOPT r.#2:1 rev. 0 <- [0] born=0.027 hops=0 epoch=2 matchId=-1 mode=1 <= [0]
+c 0.027 1 corealloc req 0 -> 0 granted, 3 free
+c 0.027 1 COMMIT #2 -> #2:1
+c 0.027 1 #2:1 growing: r.#2:3 rev. 0 <- [1] born=0.027 hops=0 epoch=2 matchId=-1 => [3]
+c 0.028 1 Got desc. of size 614404 for job #2 <= [0]
+c 0.028 1 UNCOMMIT #2:1
+c 0.028 1 LOAD 1 (+#2:1)
+c 0.028 1 EXECUTE #2:1 <= [0]
+c 0.028 1 #2:1 : new job node starting
+c 0.028 1 corealloc req 3 -> 3 granted, 0 free
+c 0.029 1 #2:1 : update v=4 epoch=2 lastreqsepoch=2 evlat=0.00000
+c 0.029 1 Adoption offer for #2:3 <= [3]
+c 0.029 1 RBS #2:3 EXPAND e=2 #inactives=0 => [3]
+c 0.029 1 [CA] Root: 0 requests, 0 idle (epoch=2)
+c 0.029 1 Sending job desc. of #2:1 rev. 0, size 614404, formula begins at idx 104 => [3]
+c 0.029 1 Sent id=8 => [3]
+c 0.030 1 SPA: formula with 614300 bytes
+c 0.031 1 [CA] Root: 0 requests, 0 idle (epoch=2)
+c 0.044 1 Watchdog sleep interrupted by signal
+c 0.183 1 #2:1 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.183 1 RBS #2:3 SHRINK #inactives=1 <= [3]
+c 0.189 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.193 1 #2:1 : update v=3 epoch=4 lastreqsepoch=3 evlat=0.00000
+c 0.239 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.289 1 #2:1 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00000
+c 0.290 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.319 1 #2:1 : update v=1 epoch=6 lastreqsepoch=5 evlat=0.00000
+c 0.320 1 #2:1 shrinking
+c 0.320 1 corealloc ret 3 -> 3 free
+c 0.320 1 #2:1 : suspended solver
+c 0.320 1 LOAD 0 (-#2:1)
+c 0.320 1 SUSPEND #2:1
+c 0.320 1 [CA] Root: 0 requests, 1 idle (epoch=6)
+c 0.321 1 ADOPT r.#3:2 rev. 0 <- [3] born=0.320 hops=2 epoch=6 matchId=-1 mode=1 <= [1]
+c 0.321 1 corealloc req 0 -> 0 granted, 3 free
+c 0.321 1 COMMIT #3 -> #3:2
+c 0.321 1 [CA] Root: 0 requests, 0 idle (epoch=6)
+c 0.323 1 Got desc. of size 502328 for job #3 <= [3]
+c 0.323 1 UNCOMMIT #3:2
+c 0.323 1 LOAD 1 (+#3:2)
+c 0.323 1 EXECUTE #3:2 <= [3]
+c 0.323 1 #3:2 : new job node starting
+c 0.323 1 corealloc req 3 -> 3 granted, 0 free
+c 0.323 1 #3:2 : update v=3 epoch=6 lastreqsepoch=6 evlat=0.00000
+c 0.324 1 [CA] Root: 0 requests, 0 idle (epoch=6)
+c 0.324 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.324 1 SPA: formula with 502204 bytes
+c 0.336 1 Watchdog sleep interrupted by signal
+c 0.349 1 #3:2 : update v=3 epoch=7 lastreqsepoch=6 evlat=0.00000
+c 0.368 1 #3:2 : update v=4 epoch=8 lastreqsepoch=7 evlat=0.00000
+c 0.382 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.433 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.483 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.533 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.584 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.634 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.685 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.692 1 #3:2 : INIT COMM e=1 nc=0
+c 0.705 1 #3:2 CS produced cls size=1635 lits=1631/1500
+c 0.705 1 #3:2 : merged 1 contribs rev=0 (inp=1500, t=0.0005s) ~> len=1635
+c 0.735 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.785 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.836 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.886 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.936 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.987 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.000 1 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.001 1 contexts=2 descriptions=2
+c 1.037 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.088 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.138 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.187 1 #3:2 : INIT COMM e=2 nc=0
+c 1.189 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.199 1 #3:2 CS produced cls size=2089 lits=2083/2000
+c 1.199 1 #3:2 : merged 1 contribs rev=0 (inp=2000, t=0.0005s) ~> len=2089
+c 1.239 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.289 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.340 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.390 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.441 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.491 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.541 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.592 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.642 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.693 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.693 1 #3:2 : INIT COMM e=3 nc=0
+c 1.703 1 #3:2 CS produced cls size=2025 lits=2019/1975
+c 1.703 1 #3:2 : merged 1 contribs rev=0 (inp=1975, t=0.0004s) ~> len=2025
+c 1.743 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.783 1 #3:2 rev. 0 : found result UNSAT => [3]
+c 1.783 1 #3:2 rev. 0: sending finished info => [3]
+c 1.783 1 Send result of #3 rev. 0 to client => [0]
+c 1.783 1 LOAD 0 (-#3:2)
+c 1.783 1 corealloc ret 3 -> 3 free
+c 1.783 1 #3:2 : terminated
+c 1.783 1 Forget #3:2
+c 1.783 1 FORGET #3:2
+c 1.783 1 #3:2 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.793 1 #3:2 : FSJ freeing mem
+c 1.794 1 Destruct worker
+c 1.794 1 FORGET #2:1
+c 1.794 1 #2:1 : terminated
+c 1.794 1 #2:1 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.794 1 #2:1 : FSJ freeing mem
+c 1.794 1 Grow thread pool (8 -> 10)
+c 1.795 1 #3:2 : FSJ mem freed
+c 1.795 1 Watchdog sleep interrupted by signal
+c 1.795 1 #3:2 ready for destruction
+c 1.805 1 #2:1 : FSJ mem freed
+c 1.805 1 Watchdog sleep interrupted by signal
+c 1.805 1 #2:1 ready for destruction
+c 1.806 1 all jobs deleted
+c 1.806 1 Watchdog sleep interrupted by signal
+c 1.806 1 STATS balancing_latencies num:0 min:0.000000 max:0.000000 med:0.000000 mean:0.000000
+c 1.806 1 busytime=1.754
+c 1.806 1 Watchdog sleep interrupted by signal
+c 1.856 1 Exiting happily
+c 0.000 1 Mallob rls pid=58419 on host vvbk
+c 0.001 1 I am worker #1
+c 0.001 1 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.001 1 [WARN] Falling back to safe value r=2.
+c 0.001 1 My bounce alternatives: 0 2 
+c 0.002 1 Machine color 0 with 4 total workers (my rank: 1)
+c 0.024 1 ADOPT r.#2:1 rev. 0 <- [0] born=0.024 hops=0 epoch=2 matchId=-1 mode=1 <= [0]
+c 0.024 1 corealloc req 0 -> 0 granted, 3 free
+c 0.024 1 COMMIT #2 -> #2:1
+c 0.025 1 [CA] Root: 0 requests, 0 idle (epoch=2)
+c 0.025 1 #2:1 growing: r.#2:3 rev. 0 <- [1] born=0.025 hops=0 epoch=2 matchId=-1 => [3]
+c 0.026 1 Got desc. of size 614404 for job #2 <= [0]
+c 0.027 1 UNCOMMIT #2:1
+c 0.027 1 LOAD 1 (+#2:1)
+c 0.027 1 EXECUTE #2:1 <= [0]
+c 0.027 1 #2:1 : new job node starting
+c 0.027 1 corealloc req 3 -> 3 granted, 0 free
+c 0.027 1 #2:1 : update v=4 epoch=2 lastreqsepoch=2 evlat=0.00000
+c 0.027 1 Adoption offer for #2:3 <= [3]
+c 0.027 1 RBS #2:3 EXPAND e=2 #inactives=0 => [3]
+c 0.027 1 [CA] Root: 0 requests, 0 idle (epoch=2)
+c 0.027 1 Sending job desc. of #2:1 rev. 0, size 614404, formula begins at idx 104 => [3]
+c 0.028 1 Sent id=8 => [3]
+c 0.028 1 SPA: formula with 614300 bytes
+c 0.029 1 [CA] Root: 0 requests, 0 idle (epoch=2)
+c 0.050 1 Watchdog sleep interrupted by signal
+c 0.202 1 #2:1 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.202 1 RBS #2:3 SHRINK #inactives=1 <= [3]
+c 0.207 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.212 1 #2:1 : update v=3 epoch=4 lastreqsepoch=3 evlat=0.00000
+c 0.258 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.308 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.328 1 #2:1 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00000
+c 0.359 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.359 1 #2:1 : update v=1 epoch=6 lastreqsepoch=5 evlat=0.00000
+c 0.359 1 #2:1 shrinking
+c 0.359 1 corealloc ret 3 -> 3 free
+c 0.359 1 #2:1 : suspended solver
+c 0.359 1 LOAD 0 (-#2:1)
+c 0.359 1 SUSPEND #2:1
+c 0.360 1 [CA] Root: 0 requests, 1 idle (epoch=6)
+c 0.363 1 [CA] Root: 0 requests, 1 idle (epoch=6)
+c 0.364 1 ADOPT r.#3:2 rev. 0 <- [3] born=0.359 hops=2 epoch=6 matchId=-1 mode=1 <= [1]
+c 0.364 1 corealloc req 0 -> 0 granted, 3 free
+c 0.364 1 COMMIT #3 -> #3:2
+c 0.364 1 [CA] Root: 0 requests, 0 idle (epoch=6)
+c 0.366 1 Got desc. of size 502328 for job #3 <= [3]
+c 0.366 1 UNCOMMIT #3:2
+c 0.366 1 LOAD 1 (+#3:2)
+c 0.366 1 EXECUTE #3:2 <= [3]
+c 0.366 1 #3:2 : new job node starting
+c 0.366 1 corealloc req 3 -> 3 granted, 0 free
+c 0.367 1 #3:2 : update v=3 epoch=6 lastreqsepoch=6 evlat=0.00000
+c 0.367 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.367 1 SPA: formula with 502204 bytes
+c 0.382 1 Watchdog sleep interrupted by signal
+c 0.388 1 #3:2 : update v=3 epoch=7 lastreqsepoch=6 evlat=0.00000
+c 0.412 1 #3:2 : update v=4 epoch=8 lastreqsepoch=7 evlat=0.00000
+c 0.425 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.476 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.526 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.577 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.627 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.677 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.711 1 #3:2 : INIT COMM e=1 nc=0
+c 0.718 1 #3:2 CS produced cls size=1614 lits=1610/1500
+c 0.718 1 #3:2 : merged 1 contribs rev=0 (inp=1500, t=0.0003s) ~> len=1614
+c 0.728 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.778 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.829 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.879 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.930 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.980 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.000 1 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.000 1 contexts=2 descriptions=2
+c 1.030 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.081 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.131 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.182 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.208 1 #3:2 : INIT COMM e=2 nc=0
+c 1.212 1 #3:2 CS produced cls size=2034 lits=2028/1926
+c 1.213 1 #3:2 : merged 1 contribs rev=0 (inp=1926, t=0.0006s) ~> len=2034
+c 1.232 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.282 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.333 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.383 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.434 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.484 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.534 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.585 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.635 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.685 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.708 1 #3:2 : INIT COMM e=3 nc=0
+c 1.716 1 #3:2 CS produced cls size=2031 lits=2025/1985
+c 1.716 1 #3:2 : merged 1 contribs rev=0 (inp=1985, t=0.0006s) ~> len=2031
+c 1.736 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.786 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.837 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.867 1 #3:2 rev. 0 : found result UNSAT => [3]
+c 1.867 1 #3:2 rev. 0: sending finished info => [3]
+c 1.867 1 LOAD 0 (-#3:2)
+c 1.867 1 corealloc ret 3 -> 3 free
+c 1.867 1 #3:2 : terminated
+c 1.867 1 Forget #3:2
+c 1.867 1 FORGET #3:2
+c 1.867 1 #3:2 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.868 1 Send result of #3 rev. 0 to client => [0]
+c 1.875 1 Destruct worker
+c 1.875 1 FORGET #2:1
+c 1.875 1 #2:1 : terminated
+c 1.875 1 #2:1 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.875 1 #3:2 : FSJ freeing mem
+c 1.875 1 #2:1 : FSJ freeing mem
+c 1.886 1 #3:2 : FSJ mem freed
+c 1.886 1 Watchdog sleep interrupted by signal
+c 1.886 1 #2:1 : FSJ mem freed
+c 1.886 1 Watchdog sleep interrupted by signal
+c 1.887 1 #3:2 ready for destruction
+c 1.887 1 #2:1 ready for destruction
+c 1.888 1 all jobs deleted
+c 1.888 1 Watchdog sleep interrupted by signal
+c 1.888 1 STATS balancing_latencies num:0 min:0.000000 max:0.000000 med:0.000000 mean:0.000000
+c 1.888 1 busytime=1.836
+c 1.889 1 Watchdog sleep interrupted by signal
+c 1.939 1 Exiting happily
+c 0.001 1 Mallob rls pid=58566 on host vvbk
+c 0.001 1 I am worker #1
+c 0.001 1 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.001 1 [WARN] Falling back to safe value r=2.
+c 0.002 1 My bounce alternatives: 0 2 
+c 0.002 1 Machine color 0 with 4 total workers (my rank: 1)
+c 0.025 1 ADOPT r.#2:1 rev. 0 <- [0] born=0.025 hops=0 epoch=2 matchId=-1 mode=1 <= [0]
+c 0.025 1 corealloc req 0 -> 0 granted, 3 free
+c 0.025 1 COMMIT #2 -> #2:1
+c 0.025 1 [CA] Root: 0 requests, 0 idle (epoch=2)
+c 0.025 1 #2:1 growing: r.#2:3 rev. 0 <- [1] born=0.025 hops=0 epoch=2 matchId=-1 => [3]
+c 0.026 1 Got desc. of size 614404 for job #2 <= [0]
+c 0.026 1 UNCOMMIT #2:1
+c 0.026 1 LOAD 1 (+#2:1)
+c 0.026 1 EXECUTE #2:1 <= [0]
+c 0.026 1 #2:1 : new job node starting
+c 0.026 1 corealloc req 3 -> 3 granted, 0 free
+c 0.027 1 #2:1 : update v=4 epoch=2 lastreqsepoch=2 evlat=0.00000
+c 0.027 1 Adoption offer for #2:3 <= [3]
+c 0.027 1 RBS #2:3 EXPAND e=2 #inactives=0 => [3]
+c 0.027 1 [CA] Root: 0 requests, 0 idle (epoch=2)
+c 0.027 1 Sending job desc. of #2:1 rev. 0, size 614404, formula begins at idx 104 => [3]
+c 0.027 1 Sent id=8 => [3]
+c 0.027 1 SPA: formula with 614300 bytes
+c 0.029 1 [CA] Root: 0 requests, 0 idle (epoch=2)
+c 0.040 1 Watchdog sleep interrupted by signal
+c 0.193 1 #2:1 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.193 1 RBS #2:3 SHRINK #inactives=1 <= [3]
+c 0.198 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.204 1 #2:1 : update v=3 epoch=4 lastreqsepoch=3 evlat=0.00000
+c 0.248 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.299 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.316 1 #2:1 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00000
+c 0.346 1 #2:1 : update v=1 epoch=6 lastreqsepoch=5 evlat=0.00000
+c 0.346 1 #2:1 shrinking
+c 0.346 1 corealloc ret 3 -> 3 free
+c 0.346 1 #2:1 : suspended solver
+c 0.346 1 LOAD 0 (-#2:1)
+c 0.346 1 SUSPEND #2:1
+c 0.347 1 ADOPT r.#3:2 rev. 0 <- [3] born=0.346 hops=2 epoch=6 matchId=-1 mode=1 <= [1]
+c 0.347 1 corealloc req 0 -> 0 granted, 3 free
+c 0.347 1 COMMIT #3 -> #3:2
+c 0.347 1 [CA] Root: 0 requests, 0 idle (epoch=6)
+c 0.349 1 Got desc. of size 502328 for job #3 <= [3]
+c 0.349 1 UNCOMMIT #3:2
+c 0.349 1 LOAD 1 (+#3:2)
+c 0.349 1 EXECUTE #3:2 <= [3]
+c 0.349 1 #3:2 : new job node starting
+c 0.349 1 corealloc req 3 -> 3 granted, 0 free
+c 0.350 1 #3:2 : update v=3 epoch=6 lastreqsepoch=6 evlat=0.00000
+c 0.350 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.350 1 SPA: formula with 502204 bytes
+c 0.364 1 Watchdog sleep interrupted by signal
+c 0.367 1 #3:2 : update v=3 epoch=7 lastreqsepoch=6 evlat=0.00000
+c 0.390 1 #3:2 : update v=4 epoch=8 lastreqsepoch=7 evlat=0.00000
+c 0.409 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.459 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.510 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.560 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.610 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.661 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.699 1 #3:2 : INIT COMM e=1 nc=0
+c 0.711 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.712 1 #3:2 CS produced cls size=1618 lits=1614/1500
+c 0.712 1 #3:2 : merged 1 contribs rev=0 (inp=1500, t=0.0003s) ~> len=1618
+c 0.762 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.812 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.863 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.913 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.963 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.000 1 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.000 1 contexts=2 descriptions=2
+c 1.014 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.064 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.115 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.165 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.196 1 #3:2 : INIT COMM e=2 nc=0
+c 1.205 1 #3:2 CS produced cls size=2077 lits=2071/1973
+c 1.206 1 #3:2 : merged 1 contribs rev=0 (inp=1973, t=0.0003s) ~> len=2077
+c 1.215 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.266 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.316 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.367 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.417 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.468 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.519 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.569 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.619 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.670 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.680 1 #3:2 rev. 0 : found result UNSAT => [3]
+c 1.680 1 #3:2 rev. 0: sending finished info => [3]
+c 1.681 1 LOAD 0 (-#3:2)
+c 1.681 1 corealloc ret 3 -> 3 free
+c 1.681 1 #3:2 : terminated
+c 1.681 1 Forget #3:2
+c 1.681 1 FORGET #3:2
+c 1.681 1 #3:2 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.681 1 Send result of #3 rev. 0 to client => [0]
+c 1.685 1 Destruct worker
+c 1.685 1 FORGET #2:1
+c 1.685 1 #2:1 : terminated
+c 1.685 1 #2:1 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.685 1 #3:2 : FSJ freeing mem
+c 1.685 1 #2:1 : FSJ freeing mem
+c 1.696 1 #3:2 : FSJ mem freed
+c 1.696 1 Watchdog sleep interrupted by signal
+c 1.697 1 #3:2 ready for destruction
+c 1.697 1 #2:1 : FSJ mem freed
+c 1.697 1 Watchdog sleep interrupted by signal
+c 1.698 1 #2:1 ready for destruction
+c 1.699 1 all jobs deleted
+c 1.699 1 Watchdog sleep interrupted by signal
+c 1.699 1 STATS balancing_latencies num:0 min:0.000000 max:0.000000 med:0.000000 mean:0.000000
+c 1.699 1 busytime=1.654
+c 1.699 1 Watchdog sleep interrupted by signal
+c 1.746 1 Exiting happily
+c 0.001 1 Mallob rls pid=58718 on host vvbk
+c 0.003 1 I am worker #1
+c 0.003 1 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.003 1 [WARN] Falling back to safe value r=2.
+c 0.003 1 My bounce alternatives: 0 2 
+c 0.004 1 Machine color 0 with 4 total workers (my rank: 1)
+c 0.028 1 ADOPT r.#2:1 rev. 0 <- [0] born=0.028 hops=0 epoch=2 matchId=-1 mode=1 <= [0]
+c 0.028 1 corealloc req 0 -> 0 granted, 3 free
+c 0.028 1 COMMIT #2 -> #2:1
+c 0.028 1 #2:1 growing: r.#2:3 rev. 0 <- [1] born=0.028 hops=0 epoch=2 matchId=-1 => [3]
+c 0.030 1 Got desc. of size 614404 for job #2 <= [0]
+c 0.030 1 UNCOMMIT #2:1
+c 0.030 1 LOAD 1 (+#2:1)
+c 0.030 1 EXECUTE #2:1 <= [0]
+c 0.030 1 #2:1 : new job node starting
+c 0.030 1 corealloc req 3 -> 3 granted, 0 free
+c 0.030 1 #2:1 : update v=4 epoch=2 lastreqsepoch=2 evlat=0.00000
+c 0.030 1 Adoption offer for #2:3 <= [3]
+c 0.030 1 RBS #2:3 EXPAND e=2 #inactives=0 => [3]
+c 0.030 1 [CA] Root: 0 requests, 0 idle (epoch=2)
+c 0.031 1 Sending job desc. of #2:1 rev. 0, size 614404, formula begins at idx 104 => [3]
+c 0.031 1 Sent id=8 => [3]
+c 0.031 1 SPA: formula with 614300 bytes
+c 0.033 1 [CA] Root: 0 requests, 0 idle (epoch=2)
+c 0.054 1 Watchdog sleep interrupted by signal
+c 0.210 1 #2:1 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.210 1 RBS #2:3 SHRINK #inactives=1 <= [3]
+c 0.211 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.221 1 #2:1 : update v=3 epoch=4 lastreqsepoch=3 evlat=0.00000
+c 0.261 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.312 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.337 1 #2:1 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00000
+c 0.362 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.378 1 #2:1 : update v=1 epoch=6 lastreqsepoch=5 evlat=0.00000
+c 0.378 1 #2:1 shrinking
+c 0.378 1 corealloc ret 3 -> 3 free
+c 0.378 1 #2:1 : suspended solver
+c 0.378 1 LOAD 0 (-#2:1)
+c 0.378 1 SUSPEND #2:1
+c 0.378 1 [CA] Root: 0 requests, 1 idle (epoch=6)
+c 0.379 1 ADOPT r.#3:2 rev. 0 <- [3] born=0.378 hops=2 epoch=6 matchId=-1 mode=1 <= [1]
+c 0.379 1 corealloc req 0 -> 0 granted, 3 free
+c 0.379 1 COMMIT #3 -> #3:2
+c 0.379 1 [CA] Root: 0 requests, 0 idle (epoch=6)
+c 0.380 1 Got desc. of size 502328 for job #3 <= [3]
+c 0.380 1 UNCOMMIT #3:2
+c 0.380 1 LOAD 1 (+#3:2)
+c 0.380 1 EXECUTE #3:2 <= [3]
+c 0.380 1 #3:2 : new job node starting
+c 0.380 1 corealloc req 3 -> 3 granted, 0 free
+c 0.380 1 #3:2 : update v=3 epoch=6 lastreqsepoch=6 evlat=0.00000
+c 0.381 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.381 1 SPA: formula with 502204 bytes
+c 0.394 1 Watchdog sleep interrupted by signal
+c 0.407 1 #3:2 : update v=3 epoch=7 lastreqsepoch=6 evlat=0.00000
+c 0.426 1 #3:2 : update v=4 epoch=8 lastreqsepoch=7 evlat=0.00000
+c 0.439 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.490 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.540 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.591 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.641 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.692 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.723 1 #3:2 : INIT COMM e=1 nc=0
+c 0.732 1 #3:2 CS produced cls size=1616 lits=1612/1500
+c 0.733 1 #3:2 : merged 1 contribs rev=0 (inp=1500, t=0.0003s) ~> len=1616
+c 0.742 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.793 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.843 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.893 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.944 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.994 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.000 1 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.000 1 contexts=2 descriptions=2
+c 1.045 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.096 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.146 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.197 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.217 1 #3:2 : INIT COMM e=2 nc=0
+c 1.227 1 #3:2 CS produced cls size=2073 lits=2067/1967
+c 1.227 1 #3:2 : merged 1 contribs rev=0 (inp=1967, t=0.0003s) ~> len=2073
+c 1.247 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.297 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.348 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.398 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.448 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.499 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.549 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.599 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.650 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.700 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.722 1 #3:2 : INIT COMM e=3 nc=0
+c 1.730 1 #3:2 CS produced cls size=2008 lits=2002/1964
+c 1.731 1 #3:2 : merged 1 contribs rev=0 (inp=1964, t=0.0003s) ~> len=2008
+c 1.750 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.761 1 #3:2 rev. 0 : found result UNSAT => [3]
+c 1.761 1 #3:2 rev. 0: sending finished info => [3]
+c 1.761 1 LOAD 0 (-#3:2)
+c 1.761 1 corealloc ret 3 -> 3 free
+c 1.761 1 #3:2 : terminated
+c 1.761 1 Forget #3:2
+c 1.761 1 FORGET #3:2
+c 1.761 1 #3:2 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.761 1 Send result of #3 rev. 0 to client => [0]
+c 1.774 1 Destruct worker
+c 1.774 1 FORGET #2:1
+c 1.774 1 #2:1 : terminated
+c 1.774 1 #2:1 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.774 1 #2:1 : FSJ freeing mem
+c 1.777 1 #3:2 : FSJ freeing mem
+c 1.777 1 Grow thread pool (8 -> 10)
+c 1.778 1 #3:2 : FSJ mem freed
+c 1.778 1 Watchdog sleep interrupted by signal
+c 1.779 1 #3:2 ready for destruction
+c 1.785 1 #2:1 : FSJ mem freed
+c 1.785 1 Watchdog sleep interrupted by signal
+c 1.786 1 #2:1 ready for destruction
+c 1.788 1 all jobs deleted
+c 1.788 1 Watchdog sleep interrupted by signal
+c 1.788 1 STATS balancing_latencies num:0 min:0.000000 max:0.000000 med:0.000000 mean:0.000000
+c 1.788 1 busytime=1.730
+c 1.788 1 Watchdog sleep interrupted by signal
+c 1.836 1 Exiting happily
+c 0.001 1 Mallob rls pid=58865 on host vvbk
+c 0.003 1 I am worker #1
+c 0.003 1 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.003 1 [WARN] Falling back to safe value r=2.
+c 0.004 1 My bounce alternatives: 0 2 
+c 0.004 1 Machine color 0 with 4 total workers (my rank: 1)
+c 0.028 1 ADOPT r.#2:1 rev. 0 <- [0] born=0.028 hops=0 epoch=2 matchId=-1 mode=1 <= [0]
+c 0.028 1 corealloc req 0 -> 0 granted, 3 free
+c 0.028 1 COMMIT #2 -> #2:1
+c 0.028 1 #2:1 growing: r.#2:3 rev. 0 <- [1] born=0.028 hops=0 epoch=2 matchId=-1 => [3]
+c 0.029 1 Got desc. of size 614404 for job #2 <= [0]
+c 0.029 1 UNCOMMIT #2:1
+c 0.029 1 LOAD 1 (+#2:1)
+c 0.029 1 EXECUTE #2:1 <= [0]
+c 0.029 1 #2:1 : new job node starting
+c 0.029 1 corealloc req 3 -> 3 granted, 0 free
+c 0.030 1 #2:1 : update v=4 epoch=2 lastreqsepoch=2 evlat=0.00000
+c 0.030 1 Adoption offer for #2:3 <= [3]
+c 0.030 1 RBS #2:3 EXPAND e=2 #inactives=0 => [3]
+c 0.030 1 [CA] Root: 0 requests, 0 idle (epoch=2)
+c 0.030 1 Sending job desc. of #2:1 rev. 0, size 614404, formula begins at idx 104 => [3]
+c 0.030 1 Sent id=8 => [3]
+c 0.030 1 SPA: formula with 614300 bytes
+c 0.031 1 [CA] Root: 0 requests, 0 idle (epoch=2)
+c 0.044 1 Watchdog sleep interrupted by signal
+c 0.180 1 #2:1 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.181 1 RBS #2:3 SHRINK #inactives=1 <= [3]
+c 0.190 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.190 1 #2:1 : update v=3 epoch=4 lastreqsepoch=3 evlat=0.00000
+c 0.240 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.291 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.291 1 #2:1 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00000
+c 0.321 1 #2:1 : update v=1 epoch=6 lastreqsepoch=5 evlat=0.00000
+c 0.321 1 #2:1 shrinking
+c 0.321 1 corealloc ret 3 -> 3 free
+c 0.321 1 #2:1 : suspended solver
+c 0.321 1 LOAD 0 (-#2:1)
+c 0.321 1 SUSPEND #2:1
+c 0.322 1 ADOPT r.#3:2 rev. 0 <- [3] born=0.321 hops=2 epoch=6 matchId=-1 mode=1 <= [1]
+c 0.322 1 corealloc req 0 -> 0 granted, 3 free
+c 0.322 1 COMMIT #3 -> #3:2
+c 0.322 1 [CA] Root: 0 requests, 0 idle (epoch=6)
+c 0.323 1 Got desc. of size 502328 for job #3 <= [3]
+c 0.323 1 UNCOMMIT #3:2
+c 0.323 1 LOAD 1 (+#3:2)
+c 0.323 1 EXECUTE #3:2 <= [3]
+c 0.323 1 #3:2 : new job node starting
+c 0.323 1 corealloc req 3 -> 3 granted, 0 free
+c 0.323 1 #3:2 : update v=3 epoch=6 lastreqsepoch=6 evlat=0.00000
+c 0.323 1 [CA] Root: 0 requests, 0 idle (epoch=6)
+c 0.323 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.323 1 SPA: formula with 502204 bytes
+c 0.335 1 Watchdog sleep interrupted by signal
+c 0.341 1 #3:2 : update v=3 epoch=7 lastreqsepoch=6 evlat=0.00000
+c 0.362 1 #3:2 : update v=4 epoch=8 lastreqsepoch=7 evlat=0.00000
+c 0.382 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.432 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.482 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.532 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.583 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.633 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.684 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.687 1 #3:2 : INIT COMM e=1 nc=0
+c 0.694 1 #3:2 CS produced cls size=1633 lits=1629/1500
+c 0.694 1 #3:2 : merged 1 contribs rev=0 (inp=1500, t=0.0004s) ~> len=1633
+c 0.734 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.784 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.835 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.885 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.936 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.986 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.000 1 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.000 1 contexts=2 descriptions=2
+c 1.037 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.087 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.138 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.188 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.191 1 #3:2 : INIT COMM e=2 nc=0
+c 1.198 1 #3:2 CS produced cls size=2076 lits=2070/1989
+c 1.198 1 #3:2 : merged 1 contribs rev=0 (inp=1989, t=0.0003s) ~> len=2076
+c 1.238 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.289 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.339 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.390 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.440 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.490 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.541 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.592 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.642 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.686 1 #3:2 : INIT COMM e=3 nc=0
+c 1.692 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.693 1 #3:2 CS produced cls size=2053 lits=2047/2011
+c 1.693 1 #3:2 : merged 1 contribs rev=0 (inp=2011, t=0.0003s) ~> len=2053
+c 1.743 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.793 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.824 1 #3:2 rev. 0 : found result UNSAT => [3]
+c 1.824 1 #3:2 rev. 0: sending finished info => [3]
+c 1.824 1 LOAD 0 (-#3:2)
+c 1.824 1 corealloc ret 3 -> 3 free
+c 1.824 1 #3:2 : terminated
+c 1.824 1 Forget #3:2
+c 1.824 1 FORGET #3:2
+c 1.824 1 #3:2 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.824 1 Send result of #3 rev. 0 to client => [0]
+c 1.826 1 Destruct worker
+c 1.826 1 FORGET #2:1
+c 1.826 1 #2:1 : terminated
+c 1.826 1 #2:1 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.826 1 #3:2 : FSJ freeing mem
+c 1.826 1 #2:1 : FSJ freeing mem
+c 1.838 1 #2:1 : FSJ mem freed
+c 1.838 1 #3:2 : FSJ mem freed
+c 1.838 1 Watchdog sleep interrupted by signal
+c 1.838 1 #3:2 ready for destruction
+c 1.838 1 #2:1 ready for destruction
+c 1.839 1 all jobs deleted
+c 1.839 1 Watchdog sleep interrupted by signal
+c 1.839 1 STATS balancing_latencies num:0 min:0.000000 max:0.000000 med:0.000000 mean:0.000000
+c 1.839 1 busytime=1.795
+c 1.840 1 Watchdog sleep interrupted by signal
+c 1.892 1 Exiting happily
+c 0.001 1 Mallob rls pid=59008 on host vvbk
+c 0.004 1 I am worker #1
+c 0.004 1 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.004 1 [WARN] Falling back to safe value r=2.
+c 0.004 1 My bounce alternatives: 0 2 
+c 0.004 1 Machine color 0 with 4 total workers (my rank: 1)
+c 0.027 1 ADOPT r.#2:1 rev. 0 <- [0] born=0.027 hops=0 epoch=2 matchId=-1 mode=1 <= [0]
+c 0.027 1 corealloc req 0 -> 0 granted, 3 free
+c 0.027 1 COMMIT #2 -> #2:1
+c 0.027 1 #2:1 growing: r.#2:3 rev. 0 <- [1] born=0.027 hops=0 epoch=2 matchId=-1 => [3]
+c 0.028 1 Got desc. of size 614404 for job #2 <= [0]
+c 0.028 1 UNCOMMIT #2:1
+c 0.029 1 LOAD 1 (+#2:1)
+c 0.029 1 EXECUTE #2:1 <= [0]
+c 0.029 1 #2:1 : new job node starting
+c 0.029 1 corealloc req 3 -> 3 granted, 0 free
+c 0.029 1 #2:1 : update v=4 epoch=2 lastreqsepoch=2 evlat=0.00000
+c 0.029 1 Adoption offer for #2:3 <= [3]
+c 0.029 1 RBS #2:3 EXPAND e=2 #inactives=0 => [3]
+c 0.029 1 [CA] Root: 0 requests, 0 idle (epoch=2)
+c 0.029 1 Sending job desc. of #2:1 rev. 0, size 614404, formula begins at idx 104 => [3]
+c 0.029 1 Sent id=8 => [3]
+c 0.030 1 SPA: formula with 614300 bytes
+c 0.030 1 [CA] Root: 0 requests, 0 idle (epoch=2)
+c 0.053 1 Watchdog sleep interrupted by signal
+c 0.198 1 #2:1 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.198 1 RBS #2:3 SHRINK #inactives=1 <= [3]
+c 0.199 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.209 1 #2:1 : update v=3 epoch=4 lastreqsepoch=3 evlat=0.00000
+c 0.250 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.300 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.324 1 #2:1 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00000
+c 0.350 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.354 1 #2:1 : update v=1 epoch=6 lastreqsepoch=5 evlat=0.00000
+c 0.354 1 #2:1 shrinking
+c 0.354 1 corealloc ret 3 -> 3 free
+c 0.354 1 #2:1 : suspended solver
+c 0.354 1 LOAD 0 (-#2:1)
+c 0.354 1 SUSPEND #2:1
+c 0.355 1 [CA] Root: 0 requests, 1 idle (epoch=6)
+c 0.356 1 ADOPT r.#3:2 rev. 0 <- [3] born=0.354 hops=2 epoch=6 matchId=-1 mode=1 <= [1]
+c 0.356 1 corealloc req 0 -> 0 granted, 3 free
+c 0.356 1 COMMIT #3 -> #3:2
+c 0.356 1 [CA] Root: 0 requests, 0 idle (epoch=6)
+c 0.357 1 Got desc. of size 502328 for job #3 <= [3]
+c 0.357 1 UNCOMMIT #3:2
+c 0.357 1 LOAD 1 (+#3:2)
+c 0.357 1 EXECUTE #3:2 <= [3]
+c 0.357 1 #3:2 : new job node starting
+c 0.357 1 corealloc req 3 -> 3 granted, 0 free
+c 0.358 1 #3:2 : update v=3 epoch=6 lastreqsepoch=6 evlat=0.00000
+c 0.358 1 [CA] Root: 0 requests, 0 idle (epoch=6)
+c 0.358 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.358 1 SPA: formula with 502204 bytes
+c 0.373 1 Watchdog sleep interrupted by signal
+c 0.374 1 #3:2 : update v=3 epoch=7 lastreqsepoch=6 evlat=0.00000
+c 0.401 1 #3:2 : update v=4 epoch=8 lastreqsepoch=7 evlat=0.00000
+c 0.417 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.467 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.517 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.567 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.618 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.668 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.709 1 #3:2 : INIT COMM e=1 nc=0
+c 0.719 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.719 1 #3:2 CS produced cls size=1630 lits=1626/1500
+c 0.719 1 #3:2 : merged 1 contribs rev=0 (inp=1500, t=0.0003s) ~> len=1630
+c 0.769 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.820 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.870 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.920 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.970 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.000 1 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.000 1 contexts=2 descriptions=2
+c 1.021 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.071 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.121 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.172 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.204 1 #3:2 : INIT COMM e=2 nc=0
+c 1.212 1 #3:2 CS produced cls size=2047 lits=2041/1968
+c 1.213 1 #3:2 : merged 1 contribs rev=0 (inp=1968, t=0.0005s) ~> len=2047
+c 1.222 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.273 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.323 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.374 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.424 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.475 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.525 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.575 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.626 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.676 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.710 1 #3:2 : INIT COMM e=3 nc=0
+c 1.717 1 #3:2 CS produced cls size=2045 lits=2039/2005
+c 1.718 1 #3:2 : merged 1 contribs rev=0 (inp=2005, t=0.0006s) ~> len=2045
+c 1.727 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.777 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.788 1 LOAD 0 (-#3:2)
+c 1.788 1 corealloc ret 3 -> 3 free
+c 1.788 1 #3:2 : terminated
+c 1.788 1 Forget #3:2
+c 1.788 1 FORGET #3:2
+c 1.788 1 #3:2 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.795 1 Destruct worker
+c 1.795 1 FORGET #2:1
+c 1.795 1 #2:1 : terminated
+c 1.795 1 #2:1 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.795 1 #3:2 : FSJ freeing mem
+c 1.795 1 #2:1 : FSJ freeing mem
+c 1.804 1 Grow thread pool (8 -> 10)
+c 1.805 1 #2:1 : FSJ mem freed
+c 1.805 1 Watchdog sleep interrupted by signal
+c 1.806 1 #2:1 ready for destruction
+c 1.806 1 #3:2 : FSJ mem freed
+c 1.806 1 Watchdog sleep interrupted by signal
+c 1.807 1 #3:2 ready for destruction
+c 1.808 1 all jobs deleted
+c 1.808 1 Watchdog sleep interrupted by signal
+c 1.808 1 STATS balancing_latencies num:0 min:0.000000 max:0.000000 med:0.000000 mean:0.000000
+c 1.808 1 busytime=1.759
+c 1.808 1 Watchdog sleep interrupted by signal
+c 1.856 1 Exiting happily
+c 0.001 1 Mallob rls pid=59154 on host vvbk
+c 0.001 1 I am worker #1
+c 0.002 1 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.002 1 [WARN] Falling back to safe value r=2.
+c 0.002 1 My bounce alternatives: 0 2 
+c 0.002 1 Machine color 0 with 4 total workers (my rank: 1)
+c 0.026 1 ADOPT r.#2:1 rev. 0 <- [0] born=0.026 hops=0 epoch=2 matchId=-1 mode=1 <= [0]
+c 0.026 1 corealloc req 0 -> 0 granted, 3 free
+c 0.026 1 COMMIT #2 -> #2:1
+c 0.026 1 #2:1 growing: r.#2:3 rev. 0 <- [1] born=0.026 hops=0 epoch=2 matchId=-1 => [3]
+c 0.026 1 [CA] Root: 0 requests, 0 idle (epoch=2)
+c 0.028 1 Got desc. of size 614404 for job #2 <= [0]
+c 0.028 1 UNCOMMIT #2:1
+c 0.028 1 LOAD 1 (+#2:1)
+c 0.028 1 EXECUTE #2:1 <= [0]
+c 0.028 1 #2:1 : new job node starting
+c 0.028 1 corealloc req 3 -> 3 granted, 0 free
+c 0.028 1 #2:1 : update v=4 epoch=2 lastreqsepoch=2 evlat=0.00000
+c 0.028 1 Adoption offer for #2:3 <= [3]
+c 0.028 1 RBS #2:3 EXPAND e=2 #inactives=0 => [3]
+c 0.029 1 [CA] Root: 0 requests, 0 idle (epoch=2)
+c 0.029 1 Sending job desc. of #2:1 rev. 0, size 614404, formula begins at idx 104 => [3]
+c 0.029 1 Sent id=8 => [3]
+c 0.029 1 SPA: formula with 614300 bytes
+c 0.030 1 [CA] Root: 0 requests, 0 idle (epoch=2)
+c 0.041 1 Watchdog sleep interrupted by signal
+c 0.182 1 #2:1 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.182 1 RBS #2:3 SHRINK #inactives=1 <= [3]
+c 0.188 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.192 1 #2:1 : update v=3 epoch=4 lastreqsepoch=3 evlat=0.00000
+c 0.238 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.288 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.299 1 #2:1 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00000
+c 0.319 1 #2:1 : update v=1 epoch=6 lastreqsepoch=5 evlat=0.00000
+c 0.319 1 #2:1 shrinking
+c 0.319 1 corealloc ret 3 -> 3 free
+c 0.319 1 #2:1 : suspended solver
+c 0.319 1 LOAD 0 (-#2:1)
+c 0.319 1 SUSPEND #2:1
+c 0.320 1 [CA] Root: 0 requests, 1 idle (epoch=6)
+c 0.321 1 [CA] Root: 0 requests, 1 idle (epoch=6)
+c 0.324 1 ADOPT r.#3:2 rev. 0 <- [3] born=0.319 hops=2 epoch=6 matchId=-1 mode=1 <= [1]
+c 0.324 1 corealloc req 0 -> 0 granted, 3 free
+c 0.324 1 COMMIT #3 -> #3:2
+c 0.324 1 [CA] Root: 0 requests, 0 idle (epoch=6)
+c 0.326 1 Got desc. of size 502328 for job #3 <= [3]
+c 0.326 1 UNCOMMIT #3:2
+c 0.326 1 LOAD 1 (+#3:2)
+c 0.326 1 EXECUTE #3:2 <= [3]
+c 0.326 1 #3:2 : new job node starting
+c 0.326 1 corealloc req 3 -> 3 granted, 0 free
+c 0.327 1 #3:2 : update v=3 epoch=6 lastreqsepoch=6 evlat=0.00000
+c 0.327 1 [CA] Root: 0 requests, 0 idle (epoch=6)
+c 0.327 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.327 1 SPA: formula with 502204 bytes
+c 0.339 1 Watchdog sleep interrupted by signal
+c 0.349 1 #3:2 : update v=3 epoch=7 lastreqsepoch=6 evlat=0.00000
+c 0.367 1 #3:2 : update v=4 epoch=8 lastreqsepoch=7 evlat=0.00000
+c 0.386 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.436 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.486 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.537 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.587 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.638 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.686 1 #3:2 : INIT COMM e=1 nc=0
+c 0.688 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.698 1 #3:2 CS produced cls size=1626 lits=1622/1500
+c 0.699 1 #3:2 : merged 1 contribs rev=0 (inp=1500, t=0.0008s) ~> len=1626
+c 0.739 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.790 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.840 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.890 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.941 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.991 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.000 1 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.001 1 contexts=2 descriptions=2
+c 1.042 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.092 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.143 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.190 1 #3:2 : INIT COMM e=2 nc=0
+c 1.193 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.193 1 #3:2 CS produced cls size=2032 lits=2026/1941
+c 1.194 1 #3:2 : merged 1 contribs rev=0 (inp=1941, t=0.0004s) ~> len=2032
+c 1.244 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.294 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.344 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.394 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.445 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.495 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.546 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.596 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.646 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.694 1 #3:2 : INIT COMM e=3 nc=0
+c 1.697 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.697 1 #3:2 CS produced cls size=2064 lits=2058/2014
+c 1.698 1 #3:2 : merged 1 contribs rev=0 (inp=2014, t=0.0005s) ~> len=2064
+c 1.747 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.798 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.848 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.863 1 LOAD 0 (-#3:2)
+c 1.863 1 corealloc ret 3 -> 3 free
+c 1.863 1 #3:2 : terminated
+c 1.863 1 Forget #3:2
+c 1.863 1 FORGET #3:2
+c 1.863 1 #3:2 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.868 1 #3:2 : FSJ freeing mem
+c 1.875 1 Destruct worker
+c 1.875 1 FORGET #2:1
+c 1.875 1 #2:1 : terminated
+c 1.875 1 #2:1 desires fulfilled=0.0000 latency={num:0 min:0.00000 med:0.00000 avg:0.00000 max:0.00000}
+c 1.875 1 #2:1 : FSJ freeing mem
+c 1.876 1 Grow thread pool (8 -> 10)
+c 1.879 1 #3:2 : FSJ mem freed
+c 1.879 1 Watchdog sleep interrupted by signal
+c 1.880 1 #3:2 ready for destruction
+c 1.887 1 #2:1 : FSJ mem freed
+c 1.887 1 Watchdog sleep interrupted by signal
+c 1.887 1 #2:1 ready for destruction
+c 1.888 1 all jobs deleted
+c 1.889 1 Watchdog sleep interrupted by signal
+c 1.889 1 STATS balancing_latencies num:0 min:0.000000 max:0.000000 med:0.000000 mean:0.000000
+c 1.889 1 busytime=1.830
+c 1.889 1 Watchdog sleep interrupted by signal
+c 1.937 1 Exiting happily
+c 0.001 1 Mallob rls pid=59296 on host vvbk
+c 0.001 1 I am worker #1
+c 0.001 1 [WARN] Num bounce alternatives must be at most half the number of workers!
+c 0.001 1 [WARN] Falling back to safe value r=2.
+c 0.001 1 My bounce alternatives: 0 2 
+c 0.002 1 Machine color 0 with 4 total workers (my rank: 1)
+c 0.024 1 ADOPT r.#2:1 rev. 0 <- [0] born=0.024 hops=0 epoch=2 matchId=-1 mode=1 <= [0]
+c 0.024 1 corealloc req 0 -> 0 granted, 3 free
+c 0.024 1 COMMIT #2 -> #2:1
+c 0.025 1 #2:1 growing: r.#2:3 rev. 0 <- [1] born=0.025 hops=0 epoch=2 matchId=-1 => [3]
+c 0.025 1 [CA] Root: 0 requests, 0 idle (epoch=2)
+c 0.027 1 Got desc. of size 614404 for job #2 <= [0]
+c 0.027 1 UNCOMMIT #2:1
+c 0.027 1 LOAD 1 (+#2:1)
+c 0.027 1 EXECUTE #2:1 <= [0]
+c 0.027 1 #2:1 : new job node starting
+c 0.027 1 corealloc req 3 -> 3 granted, 0 free
+c 0.028 1 #2:1 : update v=4 epoch=2 lastreqsepoch=2 evlat=0.00000
+c 0.028 1 Adoption offer for #2:3 <= [3]
+c 0.028 1 RBS #2:3 EXPAND e=2 #inactives=0 => [3]
+c 0.028 1 Sending job desc. of #2:1 rev. 0, size 614404, formula begins at idx 104 => [3]
+c 0.028 1 Sent id=8 => [3]
+c 0.028 1 SPA: formula with 614300 bytes
+c 0.029 1 [CA] Root: 0 requests, 0 idle (epoch=2)
+c 0.052 1 Watchdog sleep interrupted by signal
+c 0.210 1 #2:1 : update v=3 epoch=3 lastreqsepoch=2 evlat=0.00000
+c 0.213 1 RBS #2:3 SHRINK #inactives=1 <= [3]
+c 0.217 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.220 1 #2:1 : update v=3 epoch=4 lastreqsepoch=3 evlat=0.00000
+c 0.268 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.318 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.341 1 #2:1 : update v=2 epoch=5 lastreqsepoch=4 evlat=0.00000
+c 0.369 1 jobId<#2>: sending [1]->[0] MSG_AGGREGATE_RANKLIST 
+c 0.382 1 #2:1 : update v=1 epoch=6 lastreqsepoch=5 evlat=0.00000
+c 0.382 1 #2:1 shrinking
+c 0.382 1 corealloc ret 3 -> 3 free
+c 0.382 1 #2:1 : suspended solver
+c 0.382 1 LOAD 0 (-#2:1)
+c 0.382 1 SUSPEND #2:1
+c 0.382 1 [CA] Root: 0 requests, 1 idle (epoch=6)
+c 0.384 1 ADOPT r.#3:2 rev. 0 <- [3] born=0.382 hops=2 epoch=6 matchId=-1 mode=1 <= [1]
+c 0.384 1 corealloc req 0 -> 0 granted, 3 free
+c 0.384 1 COMMIT #3 -> #3:2
+c 0.384 1 [CA] Root: 0 requests, 0 idle (epoch=6)
+c 0.385 1 Got desc. of size 502328 for job #3 <= [3]
+c 0.385 1 UNCOMMIT #3:2
+c 0.385 1 LOAD 1 (+#3:2)
+c 0.385 1 EXECUTE #3:2 <= [3]
+c 0.385 1 #3:2 : new job node starting
+c 0.385 1 corealloc req 3 -> 3 granted, 0 free
+c 0.386 1 #3:2 : update v=3 epoch=6 lastreqsepoch=6 evlat=0.00000
+c 0.386 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.387 1 SPA: formula with 502204 bytes
+c 0.399 1 Watchdog sleep interrupted by signal
+c 0.412 1 #3:2 : update v=3 epoch=7 lastreqsepoch=6 evlat=0.00000
+c 0.430 1 #3:2 : update v=4 epoch=8 lastreqsepoch=7 evlat=0.00000
+c 0.445 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.495 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.546 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.596 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.646 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.697 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.724 1 #3:2 : INIT COMM e=1 nc=0
+c 0.727 1 #3:2 CS produced cls size=1615 lits=1611/1500
+c 0.728 1 #3:2 : merged 1 contribs rev=0 (inp=1500, t=0.0006s) ~> len=1615
+c 0.747 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.798 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.848 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.899 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.949 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 0.999 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.000 1 mem=0.00GB mt_cpu=0.000 mt_sys=0.000
+c 1.000 1 contexts=2 descriptions=2
+c 1.049 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.100 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.150 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.200 1 jobId<#3>: sending [1]->[3] MSG_AGGREGATE_RANKLIST 
+c 1.220 1 #3:2 : INIT COMM e=2 nc=0
+c 1.230 1 #3:2 CS produced cls size=2067 lits=2061/196

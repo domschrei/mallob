@@ -1,0 +1,81 @@
+c 0.008 0 <Reader> Starting
+c 0.008 0 <Reader> ENQUEUE #1
+c 0.009 0 <Reader> [T] Reading job #1 rev. 0 {instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf} ...
+c 0.017 0 <Reader> [T] Initialized job #1 {instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf} in 0.008s: size 153575
+c 0.018 0 <Reader> ENQUEUE #2
+c 0.020 0 <Reader> [T] Initialized job #2 {} in 0.003s: size 153575
+c 0.186 0 <Reader> ENQUEUE #3
+c 0.187 0 <Reader> [T] Initialized job #3 {} in 0.002s: size 125551
+c 1.707 0 <Reader> Stopping
+c 0.004 0 <Reader> Starting
+c 0.004 0 <Reader> ENQUEUE #1
+c 0.005 0 <Reader> [T] Reading job #1 rev. 0 {instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf} ...
+c 0.012 0 <Reader> [T] Initialized job #1 {instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf} in 0.008s: size 153575
+c 0.013 0 <Reader> ENQUEUE #2
+c 0.016 0 <Reader> [T] Initialized job #2 {} in 0.003s: size 153575
+c 0.181 0 <Reader> ENQUEUE #3
+c 0.182 0 <Reader> [T] Initialized job #3 {} in 0.002s: size 125551
+c 1.796 0 <Reader> Stopping
+c 0.002 0 <Reader> Starting
+c 0.002 0 <Reader> ENQUEUE #1
+c 0.002 0 <Reader> [T] Reading job #1 rev. 0 {instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf} ...
+c 0.009 0 <Reader> [T] Initialized job #1 {instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf} in 0.007s: size 153575
+c 0.010 0 <Reader> ENQUEUE #2
+c 0.013 0 <Reader> [T] Initialized job #2 {} in 0.003s: size 153575
+c 0.200 0 <Reader> ENQUEUE #3
+c 0.202 0 <Reader> [T] Initialized job #3 {} in 0.002s: size 125551
+c 1.882 0 <Reader> Stopping
+c 0.002 0 <Reader> Starting
+c 0.002 0 <Reader> ENQUEUE #1
+c 0.002 0 <Reader> [T] Reading job #1 rev. 0 {instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf} ...
+c 0.010 0 <Reader> [T] Initialized job #1 {instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf} in 0.007s: size 153575
+c 0.011 0 <Reader> ENQUEUE #2
+c 0.014 0 <Reader> [T] Initialized job #2 {} in 0.003s: size 153575
+c 0.191 0 <Reader> ENQUEUE #3
+c 0.193 0 <Reader> [T] Initialized job #3 {} in 0.002s: size 125551
+c 1.698 0 <Reader> Stopping
+c 0.004 0 <Reader> Starting
+c 0.004 0 <Reader> ENQUEUE #1
+c 0.004 0 <Reader> [T] Reading job #1 rev. 0 {instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf} ...
+c 0.012 0 <Reader> [T] Initialized job #1 {instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf} in 0.008s: size 153575
+c 0.014 0 <Reader> ENQUEUE #2
+c 0.017 0 <Reader> [T] Initialized job #2 {} in 0.003s: size 153575
+c 0.208 0 <Reader> ENQUEUE #3
+c 0.210 0 <Reader> [T] Initialized job #3 {} in 0.001s: size 125551
+c 1.780 0 <Reader> Stopping
+c 0.004 0 <Reader> Starting
+c 0.004 0 <Reader> ENQUEUE #1
+c 0.004 0 <Reader> [T] Reading job #1 rev. 0 {instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf} ...
+c 0.012 0 <Reader> [T] Initialized job #1 {instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf} in 0.008s: size 153575
+c 0.014 0 <Reader> ENQUEUE #2
+c 0.017 0 <Reader> [T] Initialized job #2 {} in 0.003s: size 153575
+c 0.178 0 <Reader> ENQUEUE #3
+c 0.179 0 <Reader> [T] Initialized job #3 {} in 0.001s: size 125551
+c 1.839 0 <Reader> Stopping
+c 0.004 0 <Reader> Starting
+c 0.004 0 <Reader> ENQUEUE #1
+c 0.004 0 <Reader> [T] Reading job #1 rev. 0 {instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf} ...
+c 0.011 0 <Reader> [T] Initialized job #1 {instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf} in 0.007s: size 153575
+c 0.013 0 <Reader> ENQUEUE #2
+c 0.016 0 <Reader> [T] Initialized job #2 {} in 0.003s: size 153575
+c 0.196 0 <Reader> ENQUEUE #3
+c 0.198 0 <Reader> [T] Initialized job #3 {} in 0.002s: size 125551
+c 1.797 0 <Reader> Stopping
+c 0.002 0 <Reader> Starting
+c 0.002 0 <Reader> ENQUEUE #1
+c 0.002 0 <Reader> [T] Reading job #1 rev. 0 {instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf} ...
+c 0.010 0 <Reader> [T] Initialized job #1 {instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf} in 0.008s: size 153575
+c 0.011 0 <Reader> ENQUEUE #2
+c 0.015 0 <Reader> [T] Initialized job #2 {} in 0.003s: size 153575
+c 0.180 0 <Reader> ENQUEUE #3
+c 0.181 0 <Reader> [T] Initialized job #3 {} in 0.002s: size 125551
+c 1.877 0 <Reader> Stopping
+c 0.002 0 <Reader> Starting
+c 0.002 0 <Reader> ENQUEUE #1
+c 0.002 0 <Reader> [T] Reading job #1 rev. 0 {instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf} ...
+c 0.009 0 <Reader> [T] Initialized job #1 {instances/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf} in 0.007s: size 153575
+c 0.011 0 <Reader> ENQUEUE #2
+c 0.013 0 <Reader> [T] Initialized job #2 {} in 0.003s: size 153575
+c 0.209 0 <Reader> ENQUEUE #3
+c 0.210 0 <Reader> [T] Initialized job #3 {} in 0.001s: size 125551
+c 1.818 0 <Reader> Stopping
