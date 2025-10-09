@@ -43,6 +43,7 @@ void SweepJob::appl_start() {
 	for (int localId=0; localId < _params.numThreadsPerProcess.val; ++localId) {
 		_list_of_ids.push_back(localId);
 	}
+	_shweepers.resize(_params.numThreadsPerProcess.val);
 	//a broadcast object is used to initiate an all-reduction by first pinging each processes currently reachable by the root node
 	//the ping detects the current tree structure and provides a callback to contribute to the all-reduction
 	LOG(V2_INFO, "[sweep] initialize broadcast object\n");
@@ -50,7 +51,7 @@ void SweepJob::appl_start() {
 	//Start individual Kissat threads, which immediately jump into the sweeping algorithm
 	for (int localId=0; localId < _params.numThreadsPerProcess.val; localId++) {
 		auto shweeper = createNewShweeper(localId);
-		_shweepers.push_back(shweeper);
+		_shweepers[localId] = shweeper;
 		startShweeper(shweeper);
 	}
 
@@ -109,13 +110,11 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 	LOG(V2_INFO, "Add Task to start shweeper [%i](%i)\n", _my_rank, shweeper->getLocalId());
 	std::future<void> fut_shweeper = ProcessWideThreadPool::get().addTask([this, shweeper]() { //Changed from [&] to [this, shweeper]!! (nicco)
 		// LOG(V2_INFO, "Start Thread (r %i, id %i)\n", _my_rank, shweeper->getLocalId());
-		_running_shweepers_count++;
 		loadFormula(shweeper);
-
 		LOG(V2_INFO, "# # Starting shweeper solve() [%i](%i)\n", _my_rank, shweeper->getLocalId());
+		_running_shweepers_count++;
 		int res = shweeper->solve(0, nullptr);
 		LOG(V2_INFO, "# # Thread finished. Rank %i localId %i result %i # #\n", _my_rank, shweeper->getLocalId(), res);
-
 
 		assert( ! _is_root || _dimacsReportLocalId->load() != -1);
 		if (_is_root && shweeper->getLocalId() == _dimacsReportLocalId->load()) {
@@ -138,20 +137,12 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 
 // Called periodically by the main thread to allow the worker to emit messages.
 void SweepJob::appl_communicate() {
-
-
-
 	sendMPIWorkstealRequests();
-
-	// Root: Update job tree snapshot in case your children changed
-	if (_bcast && _is_root)
+	if (_bcast && _is_root)// Root: Update job tree snapshot in case your children changed
 		_bcast->updateJobTree(getJobTree());
-
 	if (_is_root)
 		initiateNewSharingRound();
-
 	advanceAllReduction();
-
 }
 
 
@@ -239,9 +230,8 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 			break;
 		}
 
-
 		 /*
-		  * At the root node, we serve the initial work to whichever solver asks first
+		  * At the root node we serve the initial work to whichever solver asks first
 		  */
 		if (_is_root && ! _root_provided_initial_work) {
 			_root_provided_initial_work = true;
@@ -275,9 +265,9 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 		int my_comm_rank = getJobComm().getWorldRankOrMinusOne(_my_index);
 
 		if (my_comm_rank == -1) {
-			LOG(V2_INFO, "My own rank %i (Internal Index %i) not yet in JobComm\n", _my_rank, _my_index);
+			LOG(V2_INFO, "Delaying global steal request, my own rank %i (index %i) not yet in JobComm \n", _my_rank, _my_index);
 			// LOG(V2_INFO, " with _my_index %i \n", _my_index);
-			LOG(V2_INFO, " with JobComm().size %i \n", getJobComm().size());
+			// LOG(V2_INFO, " with JobComm().size %i \n", getJobComm().size());
 			usleep(10000);
 			continue;
 		}
@@ -481,7 +471,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 
 
 std::vector<int> SweepJob::stealWorkFromAnyLocalSolver() {
-	auto rand_permutation = getRandomIdPermutation(_running_shweepers_count);
+	auto rand_permutation = getRandomIdPermutation();
 	for (int localId : rand_permutation) {
 		auto stolen_work = stealWorkFromSpecificLocalSolver(localId);
 		if ( ! stolen_work.empty())
@@ -492,18 +482,21 @@ std::vector<int> SweepJob::stealWorkFromAnyLocalSolver() {
 }
 
 std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
-	if (_terminate_all) //job finished
+	if (_terminate_all) //sweeping globally finished
 		return {};
-	if (_shweepers.size() < localId) //target solver not yet created
+	if ( ! _shweepers[localId]) {
+		LOG(V2_INFO, "Skipping local worksteal on [%i](%i), target solver does not exist yet\n", _my_rank, localId);
 		return {};
+	}
 	KissatPtr shweeper = _shweepers[localId];
-	//We dont know how much there is to steal, so we ask for an upper bound
-	//In the C code there are further guards against unfinished initialization of this particular thread, all returning 0
+	//We dont know yet how much there is to steal, so we ask for an upper bound
+	//It can also be that the solver we want to steal from is not fully initialized yet
+	//For that in the C code there are further guards against unfinished initialization, all returning 0 in that case
 	int max_steal_amount = shweep_get_max_steal_amount(shweeper->solver);
 	if (max_steal_amount == 0)
 		return {};
 
-	LOG(V2_INFO, "ß %i max_steal_amount\n", max_steal_amount);
+	// LOG(V2_INFO, "ß %i max_steal_amount\n", max_steal_amount);
 	assert(max_steal_amount > 0);
 	//There is something to steal
 	//Allocate memory for the steal here in C++, and pass the array location to kissat such that it can fill it with the stolen work
@@ -518,7 +511,7 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	return stolen_work;
 }
 
-std::vector<int> SweepJob::getRandomIdPermutation(int length) {
+std::vector<int> SweepJob::getRandomIdPermutation() {
 	auto permutation = _list_of_ids; //copy
 	std::shuffle(permutation.begin(), permutation.end(), std::mt19937());
 	return permutation;

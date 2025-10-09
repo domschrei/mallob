@@ -112,7 +112,7 @@ private:
 	void advanceAllReduction();
     // void tryExtractResult();
 
-	std::vector<int> getRandomIdPermutation(int length);
+	std::vector<int> getRandomIdPermutation();
 
 	std::vector<int> stealWorkFromAnyLocalSolver();
     std::vector<int> stealWorkFromSpecificLocalSolver(int localId);
