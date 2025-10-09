@@ -60,16 +60,15 @@ private:
     std::vector<int> _eqs_from_broadcast;  //store received equivalences to copy to individual solvers
 	std::vector<int> _units_from_broadcast;
 
+	// int _eqs_found{-1};
+	// int _sweep_units_found{-1};
     // static const int MSG_SWEEP = 100; // internal message tag
     // static const int NUM_WORKERS = 4; // # workers we request and require, hardcoded 4 for now
 
 	static const int INVALID_LIT = UINT_MAX;
 
+	//keep track which solver reports the final formula, we need only one
 	std::shared_ptr<std::atomic<int>> _dimacsReportLocalId = std::make_shared<std::atomic<int>>(-1);
-	// bool _dimacs_report_started=false;
-	// int _dimacs_reporting_local_id=-1;
-	// std::vector<int> _sweptFormula;
-	// std::vector<int> _processedFormula;
 
 
 public:

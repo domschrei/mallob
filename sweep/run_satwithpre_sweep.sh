@@ -14,6 +14,7 @@ INST_DIR=$HOME/PhD/instances/miter/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter
 MALLOB_OPTIONS="-t=$threads \
   -mono-app=SATWITHPRE \
   -sweep-sharing-period=50 \
+  -sweep-solver-verbosity=2 \
   -satsolver=k \
   -colors \
   -v=4 \
@@ -24,8 +25,8 @@ MALLOB_OPTIONS="-t=$threads \
 
 
 if [ -z "$1" ] || ["$1" != "x" ]; then
-    MALLOB_OPTIONS="$MALLOB_OPTIONS -preprocess-sweep"
     echo "Adding SWEEP Preprocessing !"
+    MALLOB_OPTIONS="$MALLOB_OPTIONS -preprocess-sweep"
 else
     echo "Skipping SWEEP Preprocessing !"
 fi

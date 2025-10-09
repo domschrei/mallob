@@ -55,6 +55,7 @@ private:
 
 	bool shweeper_is_idle = false;
 	std::shared_ptr<std::atomic<int>> shweepDimacsReportLocalId;
+
 	// std::vector<char> stolen_done;
 	// std::vector<int> formulaForShweeping;
 	//##################################################

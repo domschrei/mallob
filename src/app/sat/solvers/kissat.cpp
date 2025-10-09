@@ -583,9 +583,12 @@ void Kissat::addLiteralFromPreprocessing(int lit) {
         preprocessedFormula.push_back(nbPreprocessedVariables);
         preprocessedFormula.push_back(nbPreprocessedClausesReceived);
         setPreprocessedFormula(std::move(preprocessedFormula));
+        if (is_shweeper) {
+            auto &stats = getSolverStatsRef();
+            shweep_get_sweep_stats(solver, &stats.shweep_eqs_found, &stats.shweep_sweep_units_found, &stats.shweep_total_units_found);
+            LOG(V2_INFO, "SWEEP RESULT: %i %i %i\n", stats.shweep_eqs_found, stats.shweep_total_units_found, stats.shweep_sweep_units_found);
+        }
         setSolverInterrupt();
-
-
     }
 }
 
@@ -598,6 +601,7 @@ void Kissat::shweepSetDimacsReportPtr(std::shared_ptr<std::atomic<int>> ptr) {
 void Kissat::setIsShweeper() {
     is_shweeper = true;
 }
+
 // void Kissat::setSweepJob(const std::shared_ptr<SweepJob> sweepJob) {
    // _sweepJob = sweepJob;
 // }

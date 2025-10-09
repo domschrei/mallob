@@ -89,7 +89,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	shweeper->set_option("seed", 0);   //keep seeds constant and identical for now, for easier debugging
 
 	//Specific for Mallob interaction
-	shweeper->set_option("mallob_custom_sweep_verbosity", 2); //Shweeper verbosity 0..4
+	shweeper->set_option("mallob_custom_sweep_verbosity", _params.sweepSolverVerbosity()); //Shweeper verbosity 0..4
 	shweeper->set_option("mallob_is_shweeper", 1); //Make this Kissat solver a pure Distributed Sweeping Solver. Jumps directly to distributed sweeping and bypasses everything else
 	shweeper->set_option("sweepcomplete", 1);      //full sweeping, deactivates any tick limits
 	shweeper->set_option("mallob_local_id", localId); //for debugging mostly, keeping track
@@ -97,10 +97,10 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 
 	//Specific for clean sweep run
 	shweeper->set_option("preprocess", 0); //skip other preprocessing stuff after shweep finished
-	// shweeper->set_option("probe", 1);      //there is some cleanup-probing at the end of the sweeping. keep it?
+	// shweeper->set_option("probe", 1);   //there is some cleanup-probing at the end of the sweeping. keep it? (apparently the probe option is used nowhere anyways)
 	shweeper->set_option("substitute", 1); //apply equivalence substitutions at the end after sweeping (kissat default 1, but keep here explicitly to remember it)
-	shweeper->set_option("luckyearly", 0);
-	shweeper->set_option("luckylate", 0);
+	shweeper->set_option("luckyearly", 0); //skip
+	shweeper->set_option("luckylate", 0);  //skip
 
 	return shweeper;
 }
@@ -121,11 +121,15 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 			_internal_result.id = getId();
 			_internal_result.revision = getRevision();
 			_internal_result.result= SAT; //technically its not SAT but just *some* information, but just calling it SAT helps to seamlessly pass it though the higher abstraction layers
+			// _eqs_found = shweeper->getSolverStats().shweep_eqs_found;
+			// _sweep_units_found = shweeper->getSolverStats().shweep_sweep_units_found;
+			auto stats = shweeper->getSolverStats();
+			LOG(V2_INFO, "[%i](%i) SWEEP APP RESULT: %i Eqs, %i total units, of which %i sweep_units\n", _my_rank, _dimacsReportLocalId->load(), stats.shweep_eqs_found, stats.shweep_total_units_found, stats.shweep_sweep_units_found);
 			std::vector<int> formula = shweeper->extractPreprocessedFormula();
 			_internal_result.setSolutionToSerialize(formula.data(), formula.size()); //Format: [Clauses, #Vars, #Clauses]
 			LOG(V2_INFO, "# # [%i](%i) Serialized final formula, SolutionSize=%i\n", _my_rank, _dimacsReportLocalId->load(), _internal_result.getSolutionSize());
 			for (int i=0; i<30; i++) {
-				LOG(V2_INFO, "result Formula peek %i: %i \n", i, _internal_result.getSolution(i));
+				LOG(V2_INFO, "Received Formula peek %i: %i \n", i, _internal_result.getSolution(i));
 			}
 			_solved_status = SAT;
 		}
