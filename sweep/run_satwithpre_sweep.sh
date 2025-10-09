@@ -13,7 +13,6 @@ INST_DIR=$HOME/PhD/instances/miter/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter
 
 MALLOB_OPTIONS="-t=$threads \
   -mono-app=SATWITHPRE \
-  -preprocess-sweep \
   -sweep-sharing-period=50 \
   -satsolver=k \
   -colors \
@@ -23,6 +22,13 @@ MALLOB_OPTIONS="-t=$threads \
   -log=$OUT_DIR/logs/ \
   -mono=$INST_DIR"
 
+
+if [ -z "$1" ] || ["$1" != "x" ]; then
+    MALLOB_OPTIONS="$MALLOB_OPTIONS -preprocess-sweep"
+    echo "Adding SWEEP Preprocessing !"
+else
+    echo "Skipping SWEEP Preprocessing !"
+fi
 
 #clean old logs and traces
 rm -rf $HOME/PhD/logsntraces/logs/*
