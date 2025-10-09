@@ -82,11 +82,6 @@ void Parameters::expand() {
         // Single instance solving
         //numClients.set(1); // 1 client
         useFilesystemInterface.set(false); // no fs interface
-        useIPCSocketInterface.set(false); // no socket interface
-        numWorkers.set(-1); // all workers
-        loadFactor.set(1); // full load factor
-        maxDemand.set(0); // no limit of max. demand
-        jobCacheSize.set(1); // only remember a single job desc. at a time
     }
 }
 
