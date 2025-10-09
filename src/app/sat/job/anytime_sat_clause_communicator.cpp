@@ -184,7 +184,7 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
         return;
     }
 
-    assert(log_return_false("[ERROR] Unexpected job message mpitag=%i inttag=%i <= [%i]\n", mpiTag, msg.tag, source));
+    assert(log_return_false("[ERROR] Unexpected job message mpitag=%i inttag=%i jobId=%i ctx_id_sender=%i <= [%i]\n", mpiTag, msg.tag, msg.jobId, msg.contextIdOfSender, source));
 }
 
 bool AnytimeSatClauseCommunicator::handleClauseHistoryMessage(int source, int mpiTag, JobMessage& msg) {

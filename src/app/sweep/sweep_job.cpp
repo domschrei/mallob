@@ -96,7 +96,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	//Specific for clean sweep run
 	shweeper->set_option("preprocess", 0); //skip other preprocessing stuff after shweep finished
 	// shweeper->set_option("probe", 1);      //there is some cleanup-probing at the end of the sweeping. keep it?
-	shweeper->set_option("substitute", 1); //shoul be 1. is default anyways, but keep explicitly here, to apply equivalence substitutions at the end
+	shweeper->set_option("substitute", 1); //apply equivalence substitutions at the end after sweeping (kissat default 1, but keep here explicitly to remember it)
 	shweeper->set_option("luckyearly", 0);
 	shweeper->set_option("luckylate", 0);
 
@@ -136,6 +136,8 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 
 // Called periodically by the main thread to allow the worker to emit messages.
 void SweepJob::appl_communicate() {
+
+
 
 	sendMPIWorkstealRequests();
 

@@ -33,25 +33,29 @@ private:
     float _time_of_retraction_end {0};
     float _retraction_round_duration;
 
+    //SAT call on original formula
     bool _base_job_submitted {false};
     volatile bool _base_job_done {false};
     bool _base_job_digested {false};
     nlohmann::json _base_job_submission;
     nlohmann::json _base_job_response;
 
-    bool _prepro_job_submitted {false};
-    volatile bool _prepro_job_done {false};
-    bool _prepro_job_digested {false};
-    nlohmann::json _prepro_job_submission;
-    nlohmann::json _prepro_job_response;
 
-    //Shared Sweeping
+    //Shared Sweeping Preprocessing
     bool _sweep_job_submitted {false};
     volatile bool _sweep_job_done {false};
     bool _sweep_job_digested {false};
     bool _sweep_job_forwarded {false};
     nlohmann::json _sweep_job_submission;
     nlohmann::json _sweep_job_response;
+
+
+    //SAT call on preprocessed formula
+    bool _preprod_job_submitted {false};
+    volatile bool _preprod_job_done {false};
+    bool _preprod_job_digested {false};
+    nlohmann::json _preprod_job_submission;
+    nlohmann::json _preprod_job_response;
 
     SatPreprocessor& _prepro;
 
@@ -91,12 +95,6 @@ public:
                 _base_job_digested = true;
                 if (res.result != 0) break;
             }
-            if (_prepro_job_done && !_prepro_job_digested) {
-                LOG(V3_VERB, "SATWP prepro done\n");
-                res = jsonToJobResult(_prepro_job_response, true);
-                _prepro_job_digested = true;
-                if (res.result != 0) break;
-            }
 
             if (_sweep_job_done && !_sweep_job_digested) {
                 LOG(V3_VERB, "SATWP SWEEP done\n");
@@ -104,6 +102,14 @@ public:
                 _sweep_job_digested = true;
                 LOG(V3_VERB, "SATWP SWEEP read JobResult from json, SolutionSize=%i\n", res.getSolutionSize());
             }
+
+            if (_preprod_job_done && !_preprod_job_digested) {
+                LOG(V3_VERB, "SATWP preprod done\n");
+                res = jsonToJobResult(_preprod_job_response, true);
+                _preprod_job_digested = true;
+                if (res.result != 0) break;
+            }
+
             if (_prepro.done()) {
                 // Preprocess solver(s) terminated.
                 LOG(V3_VERB, "SATWP preprocessor done\n");
@@ -115,17 +121,19 @@ public:
                 }
             }
 
-            //default SAT call without sweep
+            //continue directly from prepro to prepro'd SAT, without sweep
             if (_prepro.hasPreprocessedFormula() && ! _params.preprocessSweep.val) {
                 LOG(V3_VERB, "SATWP submit preprocessed SAT task, skip SWEEP\n");
                 submitPreprocessedJob(_prepro.extractPreprocessedFormula());
             }
-            //instead with sweep
+            //continue from prepro to SWEEP
+            //schedules "distributed equivalence sweeping" as another preprocessing step
+            //does NOT yet start the retraction of the base job, as we are still doing preprocessing on the side
             if (_prepro.hasPreprocessedFormula() && _params.preprocessSweep.val && ! _sweep_job_submitted) {
                 LOG(V3_VERB, "SATWP Submit SWEEP\n");
-                submitSweepJob(_prepro.extractPreprocessedFormula()); //schedule another preprocessing step: distributed equivalence sweeping
+                submitSweepJob(_prepro.extractPreprocessedFormula());
             }
-            //delayed SAT call after sweep
+            //continue from SWEEP to prepro'd SAT
             if (_sweep_job_digested && !_sweep_job_forwarded) {
                 LOG(V3_VERB, "SATWP SWEEP digested, submit preprocessed SAT task\n");
                 submitPreprocessedJob(res.extractSolution());
@@ -144,10 +152,15 @@ public:
             interrupt(_base_job_submission, _base_job_done);
             while (!_base_job_done) usleep(5*1000);
         }
-        if (_prepro_job_submitted && !_prepro_job_done) {
-            interrupt(_prepro_job_submission, _prepro_job_done);
-            while (!_prepro_job_done) usleep(5*1000);
+        if (_preprod_job_submitted && !_preprod_job_done) {
+            interrupt(_preprod_job_submission, _preprod_job_done);
+            while (!_preprod_job_done) usleep(5*1000);
         }
+        if (_sweep_job_submitted && !_sweep_job_done) {
+            interrupt(_sweep_job_submission, _sweep_job_done);
+            while (!_sweep_job_done) usleep(5*1000);
+        }
+
         _prepro.interrupt();
 
         LOG(V2_INFO, "#%i SATWP RES ~%i~\n", _desc.getId(), res.result);
@@ -301,10 +314,10 @@ private:
         }
 
         // Prepare job submission data
-        auto& json = _prepro_job_submission;
+        auto& json = _preprod_job_submission;
         json = {
             {"user", "sat-" + std::string(toStr())},
-            {"name", std::string(toStr())+":prepro"},
+            {"name", std::string(toStr())+":preprod"},
             {"priority", _params.preprocessJobPriority()},
             {"application", "SAT"},
         };
@@ -328,12 +341,12 @@ private:
         auto copiedJson = json;
         auto retcode = _api.submit(copiedJson, [&](nlohmann::json& response) {
             // Job done
-            _prepro_job_response = std::move(response);
-            _prepro_job_done = true;
+            _preprod_job_response = std::move(response);
+            _preprod_job_done = true;
         });
         if (retcode != JsonInterface::ACCEPT) return;
 
-        _prepro_job_submitted = true;
+        _preprod_job_submitted = true;
     }
 
     void interrupt(nlohmann::json& json, volatile bool& doneFlag) {
