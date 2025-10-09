@@ -784,7 +784,7 @@ Client::~Client() {
 
     Watchdog watchdog(_params.watchdog(), 1'000, true);
     watchdog.setWarningPeriod(1'000);
-    watchdog.setAbortPeriod(20'000);
+    watchdog.setAbortPeriod(_params.watchdogAbortMillis());
 
     for (auto& pending : _pending_subtasks) pending.future.get();
 

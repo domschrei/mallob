@@ -134,7 +134,7 @@ private:
             SolverSetup setup;
             setup.baseSeed = _params.seed();
             setup.jobId = _desc.getId();
-            setup.jobname = _name;
+            setup.jobname = _name + ".int";
             setup.isJobIncremental = true;
             setup.onTheFlyChecking = _params.onTheFlyChecking();
             setup.onTheFlyCheckModel = _params.onTheFlyChecking() && _params.onTheFlyCheckModel();
