@@ -5,7 +5,7 @@ set -e
 if [ ! -d bitwuzla ]; then
     if [ ! -f bitwuzla.zip ]; then
         # for fixing a branch instead of a commit, prepend "refs/heads/"
-        branchorcommit="bd60c2f9a93d3d6fb98f28e10bb308f637146100" # main branch, updated 2025-06-25
+        branchorcommit="5e1211dc06a9f61fa96f1ea4d1e433849d8e67ae" # main branch, updated 2025-10-09
         wget -nc https://github.com/domschrei/bitwuzla/archive/${branchorcommit}.zip -O bitwuzla.zip
     fi
     unzip bitwuzla.zip

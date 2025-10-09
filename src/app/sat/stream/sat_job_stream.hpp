@@ -2,6 +2,7 @@
 #pragma once
 
 #include <atomic>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <unistd.h>
@@ -25,6 +26,7 @@ private:
     volatile bool _idle {true};
 
     SatJobStreamProcessor::SatTask _complete_task;
+    bool _initialized_complete_task {false};
 
 public:
     SatJobStream(const std::string& baseName) : _name(baseName) {}
@@ -43,11 +45,16 @@ public:
         Processor p {std::unique_ptr<SatJobStreamProcessor>(processor), std::unique_ptr<BackgroundWorker>(new BackgroundWorker())};
         p.second->run([&, processor = p.first.get(), bgWorker = p.second.get()]() {
             SatJobStreamProcessor::SatTask accumulatedTask;
+            bool taskInitialized {false};
             while (bgWorker->continueRunning()) {
                 SatJobStreamProcessor::SatTask task;
                 bool ok = processor->getQueue().pollBlocking(task);
                 if (!ok) break;
 
+                if (!taskInitialized) {
+                    accumulatedTask.type = task.type;
+                    taskInitialized = true;
+                }
                 accumulatedTask.integrate(std::move(task));
                 if (_sync.lastEndedRev.load(std::memory_order_relaxed) >= accumulatedTask.rev) {
                     continue;
@@ -55,14 +62,13 @@ public:
 
                 processor->process(accumulatedTask); // blocking
 
-                accumulatedTask = SatJobStreamProcessor::SatTask();
+                accumulatedTask = SatJobStreamProcessor::SatTask{accumulatedTask.type};
             }
         });
         _processors.push_back(std::move(p));
     }
 
     std::pair<int, std::vector<int>> solve(SatJobStreamProcessor::SatTask&& task) {
-
         solveNonblocking(std::move(task));
         return getNonblockingSolveResult();
     }
@@ -77,6 +83,10 @@ public:
 
         for (auto& [proc, worker] : _processors) {
             proc->submit(task);
+        }
+        if (!_initialized_complete_task) {
+            _complete_task.type = task.type;
+            _initialized_complete_task = true;
         }
         _complete_task.integrate(std::move(task));
         _idle = false;
@@ -99,7 +109,7 @@ public:
     void setTerminator(const std::function<bool()>& terminator) {
         for (auto& [proc, worker] : _processors)
             proc->setTerminator([&, terminator](int rev) {
-                if (terminator() || rev <= _sync.lastEndedRev.load(std::memory_order_relaxed)) {
+                if ((terminator && terminator()) || rev <= _sync.lastEndedRev.load(std::memory_order_relaxed)) {
                     _sync.concludeRevision(rev, 0, {});
                     return true;
                 }

@@ -23,7 +23,7 @@ private:
     int _base_seed;
     std::ofstream _ofs_formula_to_parser;
 
-    int _id;
+    std::string _name;
     std::string _path_parsed_formula;
     FILE* _f_parsed_formula;
     Subprocess* _subproc {nullptr};
@@ -45,7 +45,7 @@ private:
     bool _eof {false};
 
 public:
-    TrustedParserProcessAdapter(int baseSeed, int id) : _base_seed(baseSeed), _id(id), _f_buf(1<<14) {}
+    TrustedParserProcessAdapter(int baseSeed, const std::string& name) : _base_seed(baseSeed), _name(name), _f_buf(1<<14) {}
     ~TrustedParserProcessAdapter() {
         _ofs_formula_to_parser.close();
         fclose(_f_parsed_formula);
@@ -55,11 +55,15 @@ public:
 
     void setup(const char* source, bool createSourceAsPipe) {
         auto basePath = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob." + std::to_string(Proc::getPid())
-            + ".tsparse." + std::to_string(_id);
+            + ".tsparse." + _name;
         _path_parsed_formula = basePath + ".parsedformula";
-        mkfifo(_path_parsed_formula.c_str(), 0666);
 
-        if (createSourceAsPipe) mkfifo(source, 0666);
+        int res = mkfifo(_path_parsed_formula.c_str(), 0666);
+        assert(res != -1);
+        if (createSourceAsPipe) {
+            res = mkfifo(source, 0666);
+            assert(res != -1);
+        }
 
         Parameters params;
         unsigned long keySeed = ImpCheck::getKeySeed(_base_seed);
@@ -67,7 +71,7 @@ public:
             + " -formula=" + source
             + " -output=" + _path_parsed_formula
             + " -input-log=" + (Logger::getMainInstance().getLogDir().empty() ? "." : Logger::getMainInstance().getLogDir())
-                + "/parser-input." + std::to_string(_id) + ".txt";
+                + "/parser-input." + _name;
         _subproc = new Subprocess(params, "impcheck_parse", moreArgs, false);
         _child_pid = _subproc->start();
         // Non-blocking reading so that we can read until the end of an increment
@@ -83,27 +87,24 @@ public:
 
     inline bool processNextIntAndCheckDone(int& x) {
 
-        int checkCounter = 0;
-        int graceCounter = 0;
         while (_f_buf_idx == _f_buf_size) {
             // Read next chunk
             _f_buf_size = UNLOCKED_IO(fread)(_f_buf.data(),
                 sizeof(int), _f_buf.size(), _f_parsed_formula);
             assert(_f_buf_size >= 0);
             _f_buf_idx = 0;
-            if (checkCounter % 1024 == 0 && Process::didChildExit(_child_pid)) graceCounter++;
-            if (graceCounter == 2) break;
-            checkCounter++;
         }
-        if (_f_buf_idx == _f_buf_size) {
+
+        x = _f_buf[_f_buf_idx++];
+        _f_size++;
+
+        // Premature termination marker?
+        if (_stage != SIG && x == INT32_MIN) {
             _eof = true;
             LOG(V2_INFO, "TPPA BREAK : %i\n", Process::didChildExit(_child_pid) ? 1 : 0);
             x = 0;
             return false;
         }
-
-        x = _f_buf[_f_buf_idx++];
-        _f_size++;
 
         if (_stage == LIT && x == INT32_MAX) {
             _stage = ASMPT;

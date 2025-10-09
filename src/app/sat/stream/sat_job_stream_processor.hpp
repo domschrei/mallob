@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <cmath>
+#include <cstdint>
 #include <string>
 #include <utility>
 #include <vector>
@@ -10,6 +11,7 @@
 #include "app/sat/proof/trusted/trusted_utils.hpp"
 #include "data/checksum.hpp"
 #include "util/spsc_blocking_ringbuffer.hpp"
+#include "util/string_utils.hpp"
 
 class SatJobStreamProcessor {
 
@@ -27,9 +29,9 @@ public:
         }
         void integrate(SatTask&& other) {
             assert(other.rev != rev);
+            assert(type == other.type);
             if (other.rev > rev) {
                 rev = other.rev;
-                type = other.type;
                 descLabel = std::move(other.descLabel);
                 assumptions = std::move(other.assumptions);
                 priority = other.priority;
@@ -40,11 +42,13 @@ public:
             else {
                 if (type == RAW) {
                     // Truncate away old fingerprint and assumptions
-                    assert(lits.back() == INT32_MIN);
+                    assert(lits.back() == INT32_MIN || log_return_false("[ERROR] unexpected lits structure: %s", StringUtils::getSummary(lits, INT32_MAX).c_str()));
                     lits.resize(lits.size() - 1 - SIG_SIZE_BYTES/sizeof(int));
-                    while (lits.back() != INT32_MAX) lits.pop_back();
+                    while (!lits.empty() && lits.back() != INT32_MAX) lits.pop_back();
+                    assert(!lits.empty());
                     lits.pop_back();
-                    assert(lits.back() == 0);
+                    assert(lits.empty() || lits.back() == 0);
+                    //for (int l : lits) assert(l != INT32_MAX && l != INT32_MIN);
                 }
                 // Append new clauses, fingerprint, and assumptions
                 for (int lit : other.lits) lits.push_back(lit);

@@ -6,7 +6,6 @@
 #include "data/job_description.hpp"
 #include "data/job_result.hpp"
 #include "interface/api/api_connector.hpp"
-#include "scheduling/core_allocator.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
 
@@ -25,14 +24,23 @@ private:
     APIConnector& _api;
     JobDescription& _desc;
     std::string _problem_file;
-    CoreAllocator::Allocation _core_alloc;
+    float _start_time = (float) INT32_MAX;
 
     std::string _name;
 
+    struct BzllobTerminator : public bitwuzla::Terminator {
+        std::function<bool()> cb;
+        BzllobTerminator(std::function<bool()> cb) : cb(cb) {}
+        virtual bool terminate() {
+            return cb();
+        }
+    } _terminator;
+
 public:
     BitwuzlaSolver(const Parameters& params, APIConnector& api, JobDescription& desc, const std::string& problemFile) :
-            _params(params), _api(api), _desc(desc), _problem_file(problemFile), _core_alloc(1),
-            _name("#" + std::to_string(desc.getId()) + "(SMT)") {
+            _params(params), _api(api), _desc(desc), _problem_file(problemFile),
+            _name("#" + std::to_string(desc.getId()) + "(SMT)"),
+            _terminator([&]() {return isTimeoutHit(&_params, &_desc, _start_time);}) {
 
         LOG(V2_INFO,"SMT Bitwuzla+Mallob %s\n", _name.c_str());
 
@@ -43,7 +51,7 @@ public:
     }
 
     JobResult solve() {
-        float startTime = Timer::elapsedSeconds();
+        _start_time = Timer::elapsedSeconds();
 
         bitwuzla::Options options;
         bitwuzla::TermManager tm;
@@ -92,8 +100,10 @@ public:
         std::vector<bool> solversCleanedUp;
 
         // This instruction replaces the internal SAT solver of Bitwuzla with a Mallob-connected solver.
-        bzla::sat::ExternalSatSolver::new_sat_solver = [&, out, name=_name, startTime]() {
-            auto sat = new BitwuzlaSatConnector(_params, _api, _desc, name, startTime); // cleaned up by Bitwuzla
+        int solverCounter = 1;
+        bzla::sat::ExternalSatSolver::new_sat_solver = [&, name=_name]() {
+            auto sat = new BitwuzlaSatConnector(_params, _api, _desc,
+                name + ":sat" + std::to_string(solverCounter++), _start_time); // cleaned up by Bitwuzla
             //sat->outputModels(out); // for debugging
             solverPointers.push_back(sat);
             solversCleanedUp.push_back(false);
@@ -119,6 +129,7 @@ public:
             bitwuzla::parser::Parser parser(
                 tm, options, main_options.language, out);
             parser.configure_auto_print_model(main_options.print_model);
+            parser.configure_terminator(&_terminator);
             parser.parse(
                 main_options.infile_name,
                 main_options.print || main_options.pp_only || main_options.parse_only
@@ -182,5 +193,16 @@ public:
 
     static std::string getSmtOutputFilePath(const Parameters& params, int jobId) {
         return params.smtOutputFile() + (params.monoFilename.isSet() ? "" : "." + std::to_string(jobId));
+    }
+
+    bool isTimeoutHit(const Parameters* params, JobDescription* desc, float startTime) const {
+        if (Terminator::isTerminating())
+            return true;
+        float t = Timer::elapsedSeconds();
+        if (params->timeLimit() > 0 && t >= params->timeLimit())
+            return true;
+        if (desc->getWallclockLimit() > 0 && (t - startTime) >= desc->getWallclockLimit())
+            return true;
+        return false;
     }
 };

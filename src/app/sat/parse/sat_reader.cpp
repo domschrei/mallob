@@ -42,7 +42,7 @@ void handleUnsat(const Parameters& _params) {
 bool SatReader::parseWithTrustedParser(JobDescription& desc) {
 	// Parse and sign in a separate subprocess
 	if (!_tppa) {
-		_tppa.reset(new TrustedParserProcessAdapter(_params.seed(), desc.getId()));
+		_tppa.reset(new TrustedParserProcessAdapter(_params.seed(), std::to_string(desc.getId())));
 		_tppa->setup(_filename.c_str(), false);
 	}
 
@@ -235,7 +235,7 @@ bool SatReader::read(JobDescription& desc) {
 			+ ".tsinput." + std::to_string(desc.getId());
 		if (!_tppa) {
 			// Create a new parser adapter for this job
-			_tppa.reset(new TrustedParserProcessAdapter(_params.seed(), desc.getId()));
+			_tppa.reset(new TrustedParserProcessAdapter(_params.seed(), std::to_string(desc.getId())));
 			_tppa->setup(_filename.c_str(), true);
 		}
 		// Write formula to the pipe in a side thread

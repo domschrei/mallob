@@ -14,8 +14,8 @@
 struct ClientSideIncSatProgram : public app_registry::ClientSideProgram {
     std::unique_ptr<IncSatController> solver;
     ClientSideIncSatProgram(const Parameters& params, APIConnector& api, JobDescription& desc, const std::string& problemFile) :
-        app_registry::ClientSideProgram(), solver(new IncSatController(params, api, desc, problemFile)) {
-        function = [&]() {return solver->solve();};
+        app_registry::ClientSideProgram(), solver(new IncSatController(params, api, desc)) {
+        function = [s=&solver, problemFile]() {return s->get()->solveFromIncrementalFile(problemFile);};
     }
     virtual ~ClientSideIncSatProgram() {}
 };

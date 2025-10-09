@@ -12,7 +12,6 @@
 
 #include "app/sat/data/formula_compressor.hpp"
 #include "app/sat/data/model_string_compressor.hpp"
-#include "app/sat/proof/trusted/trusted_utils.hpp"
 #include "core/job_slot_registry.hpp"
 #include "data/job_description.hpp"
 #include "interface/api/api_connector.hpp"
@@ -22,7 +21,6 @@
 #include "util/logger.hpp"
 #include "util/params.hpp"
 #include "util/static_store.hpp"
-#include "util/assert.hpp"
 #include "util/sys/timer.hpp"
 
 class MallobSatJobStreamProcessor : public SatJobStreamProcessor {
@@ -48,17 +46,19 @@ private:
     bool _pending_task_interrupted {false};
 
     bool _began_nontrivial_solving {false};
-    std::vector<int> _backlog_lits;
+    SatTask _backlog_task {SatTask::RAW};
+    bool _initialized_backlog_task {false};
     bool _finalized {false};
     Mutex _mtx_finalize;
 
-    JobSlotRegistry::JobSlot _job_slot;
+    std::shared_ptr<JobSlotRegistry::JobSlot> _job_slot;
 
 public:
     MallobSatJobStreamProcessor(const Parameters& params, APIConnector& api, JobDescription& desc,
             const std::string& baseUserName, int streamId, bool incremental, Synchronizer& sync) :
         SatJobStreamProcessor(sync), _params(params), _api(api), _stream_id(streamId),
-        _incremental(incremental), _username(baseUserName), _job_slot([&]() {reinitialize();}) {}
+        _incremental(incremental), _username(baseUserName),
+        _job_slot(new JobSlotRegistry::JobSlot(_username, [&]() {reinitialize();})) {}
 
     ~MallobSatJobStreamProcessor() override {}
 
@@ -71,12 +71,16 @@ public:
     }
 
     virtual void process(SatTask& task) override {
+        auto time = Timer::elapsedSeconds();
+        if (!_initialized_backlog_task) {
+            _backlog_task.type = task.type;
+            _initialized_backlog_task = true;
+        }
+        _backlog_task.integrate(task);
 
         if (!_began_nontrivial_solving) {
             // If no distributed job was submitted yet, we try to avoid this overhead;
             // we wait for a short while if a more lightweight solver finds a solution immediately.
-            auto time = Timer::elapsedSeconds();
-            _backlog_lits.insert(_backlog_lits.end(), task.lits.begin(), task.lits.end());
             time = Timer::elapsedSeconds() - time;
             usleep(1'000'000 * std::max(0.0, 0.05 - time)); // 50 ms minus the time taken to copy the literals
             if (_terminator(task.rev)) {
@@ -85,11 +89,8 @@ public:
             // Task is not (yet) obsolete after the wait, so we now begin proper distributed solving
             LOG(V2_INFO, "%s awakes for rev. %i\n", _name.c_str(), task.rev);
             _began_nontrivial_solving = true;
-            task.lits = std::move(_backlog_lits);
 
-            assert(!_job_slot.allocated);
             JobSlotRegistry::acquireSlot(_job_slot);
-            assert(_job_slot.allocated);
 
             _base_job_name = "satjob-" + std::to_string(_stream_id) + "-rev-";
             _json_base["user"] = _username;
@@ -106,8 +107,8 @@ public:
             _json_base["configuration"]["__EO"] = std::to_string(1000 * _stream_id);
         }
 
-        auto& newLiterals = task.lits;
-        const auto& assumptions = task.assumptions;
+        auto& newLiterals = _backlog_task.lits;
+        const auto& assumptions = _backlog_task.assumptions;
         auto chksum = task.chksum;
         const auto& descriptionLabel = task.descLabel;
         float priority = task.priority;
@@ -142,6 +143,7 @@ public:
             newLiterals.push_back(0);
             newLiterals.push_back(INT32_MIN);
         }
+
         StaticStore<std::vector<int>>::insert(_json_base["name"].get<std::string>(), std::move(newLiterals));
         copy["internalliterals"] = _json_base["name"].get<std::string>();
         if (!descriptionLabel.empty()) {
@@ -177,6 +179,7 @@ public:
                 concludeRevision(_pending_rev, 0, {});
                 _task_pending = false;
             }
+            _job_slot->startActiveTime();
         } catch (...) {
             LOG(V0_CRIT, "[ERROR] uncaught exception while submitting JSON\n");
             abort();
@@ -187,10 +190,13 @@ public:
             usleep(sleepInterval);
             sleepInterval = std::min(2500UL, (unsigned long) std::ceil(1.2*sleepInterval));
         }
+        _job_slot->endActiveTime();
+
+        _backlog_task = SatTask{_backlog_task.type};
     }
 
     virtual void finalize() override {
-        LOG(V3_VERB, "%s do finalize\n", _name.c_str());
+        LOG(V4_VVER, "%s do finalize\n", _name.c_str());
         auto lock = _mtx_finalize.getLock();
         _finalized = true;
         SatJobStreamProcessor::finalize();
@@ -206,13 +212,14 @@ public:
         LOG(V4_VVER, "%s closing API\n", _name.c_str());
         _api.submit(copy, [&](nlohmann::json& result) {assert(false);});
         LOG(V4_VVER, "%s closed API\n", _name.c_str());
-        _job_slot.allocated = false;
+        _job_slot->release();
     }
 
     void reinitialize() {
         if (_finalized || !_began_nontrivial_solving) return;
 
-        if (!_mtx_finalize.tryLock()) return; // already in the process of being finalized
+        auto lock = _mtx_finalize.getTryLock();
+        if (!lock.owns_lock()) return; // already in the process of being finalized
 
         LOG(V3_VERB, "%s evicted: re-initialize\n", _name.c_str());
         while (_task_pending) usleep(3000);
@@ -228,9 +235,8 @@ public:
         LOG(V4_VVER, "%s closed API\n", _name.c_str());
 
         _began_nontrivial_solving = false;
-        _backlog_lits = _cb_retrieve_full_task().lits;
+        _backlog_task = _cb_retrieve_full_task();
         _json_base = {};
-        _mtx_finalize.unlock();
     }
 
     void setGroupId(const std::string& groupId, int minVar = -1, int maxVar = -1) {

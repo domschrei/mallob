@@ -69,21 +69,21 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 		// Yes. Is this the thread that needs to create *the* model-checking LRAT connector?
 		bool createModelCheckingLratConn = _setup.onTheFlyCheckModel && !_setup.modelCheckingLratConnector;
 		TrustedCheckerProcessAdapter::TrustedCheckerProcessSetup chkSetup {
-			_logger, _setup.baseSeed, _setup.jobId,
+			_logger, _setup.jobname, _setup.baseSeed, _setup.jobId,
 			_setup.globalId, _setup.localId, true
 		};
 		// Does this thread in particular run in certified UNSAT mode?
 		if (_setup.onTheFlyChecking) {
 			// Yes: ALWAYS create your own LRAT connector. Have it support checking of models
 			// ONLY IF desired and there is no pre-created LRATConnector instance for this purpose.
-			LOGGER(_logger, V3_VERB, "Creating full LratConnector%s\n", createModelCheckingLratConn?" with checking models":"");
+			LOGGER(_logger, V3_VERB, "Start ImpChk%s\n", createModelCheckingLratConn?" + checkmodel":"");
 			chkSetup.checkModel = createModelCheckingLratConn;
 			_lrat = new LratConnector(chkSetup);
 			if (createModelCheckingLratConn) _setup.modelCheckingLratConnector = _lrat;
 		} else {
 			// No: only create a model-checking LRATConnector if it is not precreated yet.
 			if (createModelCheckingLratConn) {
-				LOGGER(_logger, V3_VERB, "Creating dedicated LratConnector for checking models\n");
+				LOGGER(_logger, V3_VERB, "Start ImpChk to check models\n");
 				_setup.modelCheckingLratConnector = new LratConnector(chkSetup);
 				_setup.owningModelCheckingLratConnector = true;
 			}

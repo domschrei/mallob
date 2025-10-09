@@ -2,7 +2,6 @@
 #pragma once
 
 #include <algorithm>
-#include <atomic>
 #include <cmath>
 #include <csignal>
 #include <cstdint>
@@ -14,18 +13,14 @@
 #include <unistd.h>
 #include <vector>
 
-#include "app/sat/stream/internal_sat_job_stream_processor.hpp"
-#include "app/sat/stream/mallob_sat_job_stream_processor.hpp"
+#include "app/incsat/inc_sat_controller.hpp"
 #include "app/sat/stream/sat_job_stream_garbage_collector.hpp"
-#include "app/sat/stream/sat_job_stream_processor.hpp"
-#include "app/sat/stream/wrapped_sat_job_stream.hpp"
 #include "bitwuzla/cpp/sat_solver.h"
 #include "data/job_description.hpp"
 #include "interface/api/api_connector.hpp"
 #include "robin_set.h"
 #include "util/logger.hpp"
 #include "util/params.hpp"
-#include "util/sys/terminator.hpp"
 #include "util/sys/timer.hpp"
 
 class BitwuzlaSatConnector : public bzla::sat::SatSolver {
@@ -34,11 +29,6 @@ private:
     const Parameters& _params;
     JobDescription& _desc;
 
-    static int getNextStreamId() {
-        static int _stream_id = 1;
-        return _stream_id++;
-    }
-    int _stream_id;
     std::string _name;
 
     std::vector<int> _lits;
@@ -56,45 +46,25 @@ private:
 
     std::ostream* _out_stream {nullptr};
 
-    std::unique_ptr<WrappedSatJobStream> _stream_wrapper;
+    std::unique_ptr<IncSatController> _incsat;
 
     std::function<void()> _cb_cleanup;
+    bzla::Terminator* _bzla_term {nullptr};
 
 public:
     BitwuzlaSatConnector(const Parameters& params, APIConnector& api, JobDescription& desc, const std::string& name, float startTime) :
-        bzla::sat::SatSolver(), _params(params), _desc(desc), _stream_id(getNextStreamId()),
-        _name(name + ":" + std::to_string(_stream_id) + "(SAT)") {
+        bzla::sat::SatSolver(), _params(params), _desc(desc),
+        _name(name) {
 
-        _stream_wrapper.reset(new WrappedSatJobStream(_name));
-
-        _stream_wrapper->mallobProcessor = new MallobSatJobStreamProcessor(params, api, desc,
-            _name, _stream_id, true, _stream_wrapper->stream.getSynchronizer());
-        _stream_wrapper->stream.addProcessor(_stream_wrapper->mallobProcessor);
-        LOG(V2_INFO, "New: %s\n", _name.c_str());
-
-        if (_params.internalStreamProcessor()) {
-            SolverSetup setup;
-            setup.baseSeed = _params.seed();
-            setup.jobId = _desc.getId();
-            setup.isJobIncremental = true;
-            setup.onTheFlyChecking = _params.onTheFlyChecking();
-            setup.onTheFlyCheckModel = _params.onTheFlyCheckModel();
-            auto internalProcessor = new InternalSatJobStreamProcessor(setup, _stream_wrapper->stream.getSynchronizer());
-            _stream_wrapper->stream.addProcessor(internalProcessor);
-        }
-
-        _stream_wrapper->stream.setTerminator([&, wrapper=_stream_wrapper.get(), params=&_params, desc=&_desc, startTime=_start_time]() {
-            if (wrapper->stream.finalizing()) return true;
-            bzla::Terminator* bzlaTerm = (bzla::Terminator*) wrapper->innerTerminator.load(std::memory_order_relaxed);
-            if (bzlaTerm && bzlaTerm->terminate()) return true;
-            return isTimeoutHit(params, desc, startTime);
+        _incsat.reset(new IncSatController(_params, api, _desc));
+        _incsat->setInnerTerminator([&]() {
+            return _bzla_term && _bzla_term->terminate();
         });
 
         _start_time = startTime;
     }
     virtual ~BitwuzlaSatConnector() {
         LOG(V2_INFO, "Done: %s\n", _name.c_str());
-        SatJobStreamGarbageCollector::get().add(std::move(_stream_wrapper));
         if (_cb_cleanup) _cb_cleanup();
     }
 
@@ -118,28 +88,19 @@ public:
     }
 
     virtual void configure_terminator(bzla::Terminator* terminator) override {
-        _stream_wrapper->innerTerminator.store(terminator, std::memory_order_relaxed);
+        _bzla_term = terminator;
     }
 
     virtual bzla::Result solve() override {
-        if (isTimeoutHit(&_params, &_desc, _start_time)) {
-            _lits.clear();
-            _assumptions.clear();
-            return bzla::Result::UNKNOWN;
-        }
         if (_in_solved_state) return _result;
 
         _revision++;
-        if (_stream_wrapper->mallobProcessor) {
-            _stream_wrapper->mallobProcessor->setInitialSize(_nb_vars, _nb_clauses);
-        }
         auto time = Timer::elapsedSeconds();
         LOG(V2_INFO, "%s submit rev. %i (%i lits, %i asmpt)\n", _name.c_str(), _revision, _lits.size(), _assumptions.size());
 
-        auto [resultCode, solution] = _stream_wrapper->stream.solve(
-            SatJobStreamProcessor::SatTask {SatJobStreamProcessor::SatTask::Type::SPLIT, std::move(_lits), _assumptions}
-        );
-        _in_solved_state = _assumptions.empty();
+        bool noAssumptions = _assumptions.empty();
+        auto [resultCode, solution] = _incsat->solveNextRevision(std::move(_lits), std::move(_assumptions));
+        _in_solved_state = noAssumptions;
         _lits.clear();
         _assumptions.clear();
 
@@ -188,15 +149,5 @@ public:
     virtual int32_t fixed(int32_t lit) override {
         // TODO
         return 0; // -1: not implied, 1: implied, 0: unknown
-    }
-
-    bool isTimeoutHit(const Parameters* params, JobDescription* desc, float startTime) const {
-        if (Terminator::isTerminating())
-            return true;
-        if (params->timeLimit() > 0 && Timer::elapsedSeconds() >= params->timeLimit())
-            return true;
-        if (desc->getWallclockLimit() > 0 && (Timer::elapsedSeconds() - startTime) >= desc->getWallclockLimit())
-            return true;
-        return false;
     }
 };

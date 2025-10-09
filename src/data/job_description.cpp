@@ -11,6 +11,7 @@ void JobDescription::beginInitialization(int revision) {
     _data_per_revision[_revision].reset(new std::vector<uint8_t>(
         getMetadataSize()
     ));
+    getRevisionData(_revision)->resize(getMetadataSize());
     _f_size = 0;
 }
 

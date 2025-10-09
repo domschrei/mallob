@@ -59,8 +59,8 @@ Cadical::Cadical(const SolverSetup& setup)
 		int solverRank = setup.globalId;
 		int maxNumSolvers = setup.maxNumSolvers;
 
-		auto descriptor = _lrat ? "on-the-fly LRAT checking" : "LRAT proof production";
-		LOGGER(_logger, V3_VERB, "Initializing rank=%i size=%i DI=%i #C=%ld IDskips=%i with %s\n",
+		auto descriptor = _lrat ? "ImpChk" : "LRUP production";
+		LOGGER(_logger, V3_VERB, "Init rank=%i size=%i DI=%i #C=%ld IDskips=%i with %s\n",
 			solverRank, maxNumSolvers, getDiversificationIndex(), setup.numOriginalClauses, setup.nbSkippedIdEpochs,
 			descriptor);
 

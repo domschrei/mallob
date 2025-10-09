@@ -93,7 +93,7 @@ public:
 
         auto lock = _mtx_submit.getLock();
         if (revision != _arrived_revision+1) {
-            LOGGER(_logger, V1_WARN, "[WARN] LRAT Connector: unexpected rev. %i (in rev. %i now)\n", revision, _arrived_revision);
+            LOGGER(_logger, V4_VVER, "LRAT Connector: reject rev. %i (in rev. %i now)\n", revision, _arrived_revision);
             return;
         }
         _f_parsers.emplace_back(new SerializedFormulaParser(fParser));
@@ -176,9 +176,11 @@ public:
     }
     void waitForConclusion(int revision) {
         _mtx_submit.lock();
+        u64 sleepMicrosecs = 100;
         while (_last_concluded_rev < revision) {
             _mtx_submit.unlock();
-            usleep(1000 * 3);
+            usleep(sleepMicrosecs);
+            sleepMicrosecs = std::min((u64) (1.2 * sleepMicrosecs), 3000UL);
             _mtx_submit.lock();
         }
         _mtx_submit.unlock();

@@ -41,6 +41,7 @@ private:
     const int _job_id;
     const int _solver_id;
     const bool _check_model;
+    std::string _id_suffix;
 
     // buffering
     int _buf_lits[TRUSTED_CHK_MAX_BUF_SIZE];
@@ -54,6 +55,7 @@ private:
 public:
     struct TrustedCheckerProcessSetup {
         Logger& logger;
+        std::string idSuffix;
         int baseSeed;
         int jobId;
         int globalSolverId;
@@ -62,7 +64,8 @@ public:
     };
     TrustedCheckerProcessAdapter(TrustedCheckerProcessSetup& setup) :
             _base_seed(setup.baseSeed), _logger(setup.logger), _job_id(setup.jobId),
-            _solver_id(setup.globalSolverId), _check_model(setup.checkModel), _op_queue(1<<14) {}
+            _solver_id(setup.globalSolverId), _check_model(setup.checkModel),
+            _id_suffix(setup.idSuffix), _op_queue(1<<14) {}
 
     ~TrustedCheckerProcessAdapter() {
         if (!_f_directives) return;
@@ -76,7 +79,7 @@ public:
 
     void init() {
         auto basePath = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob." + std::to_string(Proc::getPid())
-            + ".#" + std::to_string(_job_id) + ".slv" + std::to_string(_solver_id) + ".ts.";
+            + "." + std::to_string(_job_id) + _id_suffix + ".slv" + std::to_string(_solver_id) + ".ts.";
         _path_directives = basePath + "directives";
         _path_feedback = basePath + "feedback";
         int res;
@@ -165,7 +168,7 @@ private:
     }
     inline bool acceptBeginLoad(u32& cidx) {
         if (!awaitResponse()) {
-            handleError("Clause derivation not accepted");
+            handleError("Begin load not accepted");
             return false;
         }
         cidx = _io.readUint(_f_feedback);
