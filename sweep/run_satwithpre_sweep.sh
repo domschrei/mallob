@@ -10,10 +10,10 @@ echo "threads per process $threads"
 OUT_DIR=$HOME/PhD/logsntraces/
 INST_DIR=$HOME/PhD/instances/miter/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf
 
-#-preprocess-sweep \
 
 MALLOB_OPTIONS="-t=$threads \
   -mono-app=SATWITHPRE \
+  -preprocess-sweep \
   -sweep-sharing-period=50 \
   -satsolver=k \
   -colors \

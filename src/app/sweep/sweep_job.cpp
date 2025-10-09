@@ -58,6 +58,7 @@ void SweepJob::appl_start() {
 }
 
 std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
+	LOG(V2_INFO, "Create shweeper [%i](%i)\n", _my_rank, localId);
 	const JobDescription& desc = getDescription();
 	SolverSetup setup;
 	setup.logger = &Logger::getMainInstance();
@@ -105,12 +106,13 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 
 void SweepJob::startShweeper(KissatPtr shweeper) {
 	// LOG(V2_INFO,"ß Calling new thread\n");
+	LOG(V2_INFO, "Add Task to start shweeper [%i](%i)\n", _my_rank, shweeper->getLocalId());
 	std::future<void> fut_shweeper = ProcessWideThreadPool::get().addTask([this, shweeper]() { //Changed from [&] to [this, shweeper]!! (nicco)
 		// LOG(V2_INFO, "Start Thread (r %i, id %i)\n", _my_rank, shweeper->getLocalId());
 		_running_shweepers_count++;
 		loadFormula(shweeper);
 
-		// LOG(V2_INFO, "shweeper->solve() (r %i, id %i)\n", _my_rank, shweeper->getLocalId());
+		LOG(V2_INFO, "# # Starting shweeper solve() [%i](%i)\n", _my_rank, shweeper->getLocalId());
 		int res = shweeper->solve(0, nullptr);
 		LOG(V2_INFO, "# # Thread finished. Rank %i localId %i result %i # #\n", _my_rank, shweeper->getLocalId(), res);
 
@@ -259,7 +261,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 		}
 
 		//Try to steal locally from shared memory
-		LOG(V2_INFO, "  [%i](%i) searching work locally (Volumen %i) \n", _my_rank, localId, getVolume());
+		LOG(V2_INFO, "  [%i](%i) searching work locally \n", _my_rank, localId);
 		auto stolen_work = stealWorkFromAnyLocalSolver();
 
 		//Successful local steal
@@ -273,10 +275,10 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 		int my_comm_rank = getJobComm().getWorldRankOrMinusOne(_my_index);
 
 		if (my_comm_rank == -1) {
-			LOG(V2_INFO, "Rank %i (Internal Index %i) is not yet in JobComm, waits with sending its request\n", _my_rank, _my_index);
-			LOG(V2_INFO, " with _my_index %i \n", _my_index);
+			LOG(V2_INFO, "My own rank %i (Internal Index %i) not yet in JobComm\n", _my_rank, _my_index);
+			// LOG(V2_INFO, " with _my_index %i \n", _my_index);
 			LOG(V2_INFO, " with JobComm().size %i \n", getJobComm().size());
-			usleep(1000);
+			usleep(10000);
 			continue;
 		}
 
@@ -287,8 +289,8 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 
         if (targetRank == -1) {
         	//target rank not yet in JobTree, might need some more milliseconds to update, try again
-			LOG(V2_INFO, "Target not yet in JobTree. getVolume()=%i, rndTargetIndex=%i, rndTargetRank=%i \n", getVolume(), targetIndex, targetRank);
-			usleep(100);
+			LOG(V2_INFO, "targetIndex %i, targetRank %i not yet in JobComm\n", targetIndex, targetRank);
+			usleep(10000);
         	continue;
         }
 
