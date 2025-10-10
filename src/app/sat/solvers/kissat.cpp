@@ -553,11 +553,11 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
         int expected_unset = -1;
         bool weAreFirst = shweepDimacsReportLocalId->compare_exchange_strong(expected_unset, getLocalId());
         if (weAreFirst) {
-            LOG(V2_INFO, "Dimacs report: [root](%i) is first, was selected\n", getLocalId());
+            LOG(V2_INFO, "[root](%i) first to report dimacs result\n", getLocalId());
             LOG(V2_INFO, "Accept shweeper formula? %i.  (%i --> %i vars) (%i --> %i clauses) \n", accept, _setup.numVars, nbVars, _setup.numOriginalClauses, nbClauses);
             // assert(accept); //todo: sidestep if formula is still identical and thus accept==false
         } else {
-            LOG(V2_INFO, "Dimacs report: [root](%i) is skipped\n", getLocalId());
+            LOG(V2_INFO, "[root](%i) skipped for reporting dimacs results, already done by somebody\n", getLocalId());
             accept = false;
         }
     }
@@ -570,9 +570,9 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
 }
 
 void Kissat::addLiteralFromPreprocessing(int lit) {
-    if (preprocessedFormula.size()<30) {
-        LOG(V2_INFO, "Piped Formula peek %i: %i \n", preprocessedFormula.size(), lit);
-    }
+    // if (preprocessedFormula.size()<30) {
+        // LOG(V2_INFO, "Piped Formula peek %i: %i \n", preprocessedFormula.size(), lit);
+    // }
 
     preprocessedFormula.push_back(lit);
     if (lit == 0) nbPreprocessedClausesReceived++;

@@ -55,7 +55,7 @@ void SweepJob::appl_start() {
 		startShweeper(shweeper);
 	}
 
-	LOG(V2_INFO, "ß Finished SweepJob appl_start() \n");
+	LOG(V2_INFO, "[sweep] Finished SweepJob appl_start() \n");
 }
 
 std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
@@ -107,7 +107,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 
 void SweepJob::startShweeper(KissatPtr shweeper) {
 	// LOG(V2_INFO,"ß Calling new thread\n");
-	LOG(V2_INFO, "Add Task to start shweeper [%i](%i)\n", _my_rank, shweeper->getLocalId());
+	LOG(V2_INFO, "Add shweeper [%i](%i) to Pool Tasks\n", _my_rank, shweeper->getLocalId());
 	std::future<void> fut_shweeper = ProcessWideThreadPool::get().addTask([this, shweeper]() { //Changed from [&] to [this, shweeper]!! (nicco)
 		// LOG(V2_INFO, "Start Thread (r %i, id %i)\n", _my_rank, shweeper->getLocalId());
 		loadFormula(shweeper);
@@ -129,8 +129,8 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 			std::vector<int> formula = shweeper->extractPreprocessedFormula();
 			_internal_result.setSolutionToSerialize(formula.data(), formula.size()); //Format: [Clauses, #Vars, #Clauses]
 			LOG(V2_INFO, "# # [%i](%i) Serialized final formula, SolutionSize=%i\n", _my_rank, _dimacsReportLocalId->load(), _internal_result.getSolutionSize());
-			for (int i=0; i<30; i++) {
-				LOG(V2_INFO, "Received Formula peek %i: %i \n", i, _internal_result.getSolution(i));
+			for (int i=0; i<15; i++) {
+				LOG(V2_INFO, "Formula peek %i: %i \n", i, _internal_result.getSolution(i));
 			}
 			_solved_status = SAT;
 		}
@@ -156,8 +156,8 @@ void SweepJob::appl_communicate() {
 void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 	// LOG(V2_INFO, "Shweep rank %i: received custom message from source %i, mpiTag %i, msg.tag %i \n", _my_rank, source, mpiTag, msg.tag);
 	if (msg.returnedToSender) {
-		LOG(V2_INFO, "ß Error: received unexpected returnedToSender message during Sweep Job Workstealing!\n");
-		LOG(V2_INFO, "ß Error: source=%i mpiTag=%i, treeIdxOfSender=%i, treeIdxOfDestination=%i \n", sourceRank, mpiTag,  msg.treeIndexOfSender, msg.treeIndexOfDestination);
+		LOG(V0_CRIT, "ß Error: received unexpected returnedToSender message during Sweep Job Workstealing!\n");
+		LOG(V0_CRIT, "ß Error: source=%i mpiTag=%i, treeIdxOfSender=%i, treeIdxOfDestination=%i \n", sourceRank, mpiTag,  msg.treeIndexOfSender, msg.treeIndexOfDestination);
 		assert(false);
 	}
 	if (msg.tag == TAG_SEARCHING_WORK) {
@@ -165,7 +165,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		int localId = msg.payload.front();
 		msg.payload.clear();
 
-		LOG(V2_INFO, "ß Received MPI steal request from [%i](%i) \n", sourceRank, localId);
+		LOG(V3_VERB, "ß Received MPI steal request from [%i](%i) \n", sourceRank, localId);
 		auto locally_stolen_work = stealWorkFromAnyLocalSolver();
 
 		msg.payload = std::move(locally_stolen_work);
@@ -205,18 +205,12 @@ void SweepJob::sendMPIWorkstealRequests() {
 			//Need to add these two fields because we are doing arbitrary point-to-point communication
 			msg.treeIndexOfDestination = request.targetIndex;
 			msg.contextIdOfDestination = getJobComm().getContextIdOrZero(request.targetIndex);
-			// if (msg.contextIdOfDestination==0) {
-				// rank has probably just tree is just not ready yet for this rank, immediately shut down the request for this rank
-				// request.got_steal_response = true;
-				// LOG(V2_INFO, "")
-				// return;
-			// }
 
 			assert(msg.contextIdOfDestination != 0 || log_return_false("Error: contextIdOfDestination==0 in workstealing request! Source rank=%i, targetRank %i \n", _my_rank, request.targetRank));
 			msg.payload = {request.localId};
 			// LOG(V2_INFO, "Rank %i asks rank %i for work\n", _my_rank, recv_rank, n);
 			// LOG(V2_INFO, "  with destionation ctx_id %i \n", msg.contextIdOfDestination);
-			LOG(V2_INFO, "  MPI work request from [%i](%i) to [%i] \n", _my_rank, request.localId, request.targetRank);
+			LOG(V3_VERB, "  MPI work request from [%i](%i) to [%i] \n", _my_rank, request.localId, request.targetRank);
 			getJobTree().send(request.targetRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 		}
 	}
@@ -234,7 +228,6 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 			shweeper->work_received_from_steal = {};
 			break;
 		}
-
 		 /*
 		  * At the root node we serve the initial work to whichever solver asks first
 		  */
@@ -256,21 +249,21 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 		}
 
 		//Try to steal locally from shared memory
-		LOG(V2_INFO, "  [%i](%i) searching work locally \n", _my_rank, localId);
+		LOG(V3_VERB, "  [%i](%i) searching work locally \n", _my_rank, localId);
 		auto stolen_work = stealWorkFromAnyLocalSolver();
 
 		//Successful local steal
 		if ( ! stolen_work.empty()) {
 			//store steal data persistently in C++, such that C can keep operating on that memory segment
 			shweeper->work_received_from_steal = std::move(stolen_work);
-			LOG(V2_INFO, "Within [%i] %i variables sent to (%i) \n", _my_rank, shweeper->work_received_from_steal.size(), localId);
+			LOG(V3_VERB, "Within [%i] %i variables sent to (%i) \n", _my_rank, shweeper->work_received_from_steal.size(), localId);
 			break;
 		}
 
 		int my_comm_rank = getJobComm().getWorldRankOrMinusOne(_my_index);
 
 		if (my_comm_rank == -1) {
-			LOG(V2_INFO, "Delaying global steal request, my own rank %i (index %i) not yet in JobComm \n", _my_rank, _my_index);
+			LOG(V3_VERB, "Delaying global steal request, my own rank %i (index %i) not yet in JobComm \n", _my_rank, _my_index);
 			// LOG(V2_INFO, " with _my_index %i \n", _my_index);
 			// LOG(V2_INFO, " with JobComm().size %i \n", getJobComm().size());
 			usleep(10000);
@@ -284,7 +277,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 
         if (targetRank == -1) {
         	//target rank not yet in JobTree, might need some more milliseconds to update, try again
-			LOG(V2_INFO, "targetIndex %i, targetRank %i not yet in JobComm\n", targetIndex, targetRank);
+			LOG(V3_VERB, "targetIndex %i, targetRank %i not yet in JobComm\n", targetIndex, targetRank);
 			usleep(10000);
         	continue;
         }
@@ -295,13 +288,13 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 		}
 
 		if (getJobComm().getContextIdOrZero(targetIndex)==0) {
-			LOG(V2_INFO, "Context ID of target is missing. getVolume()=%i, rndTargetIndex=%i, rndTargetRank=%i, myIndex=%i, myRank=%i \n", getVolume(), targetIndex, targetRank, _my_index, _my_rank);
+			LOG(V3_VERB, "Context ID of target is missing. getVolume()=%i, rndTargetIndex=%i, rndTargetRank=%i, myIndex=%i, myRank=%i \n", getVolume(), targetIndex, targetRank, _my_index, _my_rank);
 			//target is not yet listed in address list. Might happen for a short period just after it is spawned
 			usleep(100);
 			continue;
 		}
 
-		LOG(V2_INFO, "Steal request to targetIndex %i, targetRank=%i \n", targetIndex, targetRank);
+		LOG(V3_VERB, "Steal request to targetIndex %i, targetRank=%i \n", targetIndex, targetRank);
 
 		//Request will be handled by the MPI main thread, which will send an MPI message on our behalf
 		//because here we are in code executed by the kissat thread, which can cause problems for sending MPI messages
@@ -310,7 +303,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 		request.targetIndex = targetIndex;
 		request.targetRank = targetRank;
 		_worksteal_requests[localId] = request;
-		LOG(V2_INFO, "  [%i](%i) searches work globally\n", _my_rank, localId);
+		LOG(V3_VERB, "  [%i](%i) searches work globally\n", _my_rank, localId);
 
 		//Wait here until we get back an MPI message
 		while( ! _worksteal_requests[localId].got_steal_response) {
@@ -320,7 +313,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 		//Successful steal if size > 0
 		if ( ! _worksteal_requests[localId].stolen_work.empty()) {
 			shweeper->work_received_from_steal = std::move(_worksteal_requests[localId].stolen_work);
-			LOG(V2_INFO, "[%i](%i) received %i variables from [%i] \n", _my_rank, localId,shweeper->work_received_from_steal.size(), targetRank);
+			LOG(V3_VERB, "[%i](%i) received %i variables from [%i] \n", _my_rank, localId,shweeper->work_received_from_steal.size(), targetRank);
 			break;
 		}
 		//Unsuccessful global steal, try again
@@ -346,7 +339,7 @@ void SweepJob::initiateNewSharingRound() {
 	//Broadcast a ping to all workers to initiate an AllReduce
 	//The broadcast includes all workers currently reachable by the root-node (i.e. active) and informs them about their number of children in the current tree
 	//It then causes the leaf nodes to call the callback, initiating the AllReduce
-	LOG(V2_INFO, "Initiating Sharing via Ping\n");
+	LOG(V3_VERB, "Initiating Sharing via Ping\n");
 	JobMessage msg = getMessageTemplate();
 	msg.tag = _bcast->getMessageTag();
 	msg.payload = {};
@@ -399,17 +392,17 @@ void SweepJob::advanceAllReduction() {
 	_red->advance();
 	if (!_red->hasResult()) return;
 
-	LOG(V2_INFO, "[sweep] all-reduction complete\n");
+	LOG(V3_VERB, "[sweep] all-reduction complete\n");
 
 	//Extract, unserialize and distribute shared Equivalences and units
 	auto shared = _red->extractResult();
 	const int eq_size = shared[shared.size()-EQUIVS_SIZE_POS];
 	const int unit_size = shared[shared.size()-UNITS_SIZE_POS];
 	const int all_idle = shared[shared.size()-IDLE_STATUS_POS];
-	LOG(V2_INFO, "ß --- Received sharing data: %i equivalences, %i units -- \n", eq_size/2, unit_size);
+	LOG(V3_VERB, "ß --- Received sharing data: %i equivalences, %i units -- \n", eq_size/2, unit_size);
 	if (all_idle) {
 		_terminate_all = true;
-		LOG(V1_WARN, "ß # \n # \n  --- ALL SWEEPERS IDLE - CAN TERMINATE -- \n # \n # \n");
+		LOG(V1_WARN, "ß # \n # \n # --- ALL SWEEPERS IDLE - CAN TERMINATE -- \n # \n");
 	}
 
 	_eqs_from_broadcast.assign(shared.begin(),             shared.begin() + eq_size);
@@ -490,7 +483,7 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	if (_terminate_all) //sweeping globally finished
 		return {};
 	if ( ! _shweepers[localId]) {
-		LOG(V2_INFO, "Skipping local worksteal on [%i](%i), target solver does not exist yet\n", _my_rank, localId);
+		LOG(V3_VERB, "Skipping local worksteal on [%i](%i), target solver does not exist yet\n", _my_rank, localId);
 		return {};
 	}
 	KissatPtr shweeper = _shweepers[localId];
@@ -507,7 +500,7 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	//Allocate memory for the steal here in C++, and pass the array location to kissat such that it can fill it with the stolen work
 	std::vector<int> stolen_work = std::vector<int>(max_steal_amount);
 	int actually_stolen = shweep_steal_from_this_solver(shweeper->solver, reinterpret_cast<unsigned int*>(stolen_work.data()), max_steal_amount);
-	LOG(V2_INFO, "ß Steal request got %i actually stolen\n", actually_stolen);
+	LOG(V3_VERB, "ß Steal request got %i actually stolen\n", actually_stolen);
 	if (actually_stolen == 0)
 		return {};
 	//We sized he provided array to be maximally conservative,
@@ -522,31 +515,6 @@ std::vector<int> SweepJob::getRandomIdPermutation() {
 	return permutation;
 }
 
-
-// void SweepJob::importNextEquivalence(int *last_imported_round, int eq_nr, unsigned *lit1, unsigned *lit2) {
-	// if (*last_imported_round == _sharing_round || eq_nr == _eqs_from_broadcast.size()/2) {
-		//We already imported this round or we have just reached the end of importing this round
-		// *lit1 = INVALID_LIT;
-		// *lit2 = INVALID_LIT;
-		// *last_imported_round = _sharing_round;
-		// return;
-	// }
-	// *lit1 = _eqs_from_broadcast[2*eq_nr];
-	// *lit2 = _eqs_from_broadcast[2*eq_nr + 1];
-// }
-
-
-// bool SweepJob::isDimacsReportStarted() {
-	// return _dimacs_report_started;
-// }
-
-// void SweepJob::setDimacsReportStarted() {
-	// _dimacs_report_started = true;
-// }
-
-// void SweepJob::setDimacsReportingLocalId(int local_id) {
-	// _dimacs_reporting_local_id = local_id;
-// }
 
 void SweepJob::loadFormula(KissatPtr shweeper) {
 	const int* lits = getDescription().getFormulaPayload(0);
