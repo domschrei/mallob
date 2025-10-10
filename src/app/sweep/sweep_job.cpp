@@ -124,7 +124,8 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 			// _eqs_found = shweeper->getSolverStats().shweep_eqs_found;
 			// _sweep_units_found = shweeper->getSolverStats().shweep_sweep_units_found;
 			auto stats = shweeper->getSolverStats();
-			LOG(V2_INFO, "[%i](%i) SWEEP APP RESULT: %i Eqs, %i total units, of which %i sweep_units\n", _my_rank, _dimacsReportLocalId->load(), stats.shweep_eqs_found, stats.shweep_total_units_found, stats.shweep_sweep_units_found);
+			LOG(V2_INFO, "[%i](%i) SWEEP APP RESULT: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated\n",
+				_my_rank, _dimacsReportLocalId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
 			std::vector<int> formula = shweeper->extractPreprocessedFormula();
 			_internal_result.setSolutionToSerialize(formula.data(), formula.size()); //Format: [Clauses, #Vars, #Clauses]
 			LOG(V2_INFO, "# # [%i](%i) Serialized final formula, SolutionSize=%i\n", _my_rank, _dimacsReportLocalId->load(), _internal_result.getSolutionSize());

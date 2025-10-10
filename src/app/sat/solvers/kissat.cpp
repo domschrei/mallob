@@ -585,8 +585,7 @@ void Kissat::addLiteralFromPreprocessing(int lit) {
         setPreprocessedFormula(std::move(preprocessedFormula));
         if (is_shweeper) {
             auto &stats = getSolverStatsRef();
-            shweep_get_sweep_stats(solver, &stats.shweep_eqs_found, &stats.shweep_sweep_units_found, &stats.shweep_total_units_found);
-            LOG(V2_INFO, "SWEEP RESULT: %i %i %i\n", stats.shweep_eqs_found, stats.shweep_total_units_found, stats.shweep_sweep_units_found);
+            shweep_get_sweep_stats(solver, &stats.shweep_eqs, &stats.shweep_sweep_units, &stats.shweep_new_units, &stats.shweep_total_units, &stats.shweep_eliminated);
         }
         setSolverInterrupt();
     }
