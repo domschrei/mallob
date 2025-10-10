@@ -112,6 +112,8 @@ struct SolverSetup {
 	int nbSkippedIdEpochs {0};
 
 	// Do shared instead of sequential sweeping, whenever sweeping is scheduled
+	// Sweep related
+	bool preprocessSequentialSweepComplete{false};
 	// bool shared_sweeping {false};
 
 	// Optimization and theories

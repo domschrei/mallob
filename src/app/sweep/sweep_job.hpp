@@ -25,6 +25,7 @@ private:
     std::atomic_int _running_shweepers_count {0};
 	std::vector<int> _list_of_ids;
 
+	float _start_shweep_timestamp;
     bool _root_provided_initial_work=false;
 	bool _terminate_all=false;
 

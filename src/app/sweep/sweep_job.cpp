@@ -30,9 +30,10 @@ void SweepJob::appl_start() {
 	_is_root = getJobTree().isRoot();
 	LOG(V2_INFO,"ß SweepJob application start: Rank %i, Index %i, is root? %i, Parent-Rank %i, Parent-Index %i, numThreadsPerProcess=%d\n",
 		_my_rank, _my_index, _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _params.numThreadsPerProcess.val);
-	LOG(V2_INFO,"ß num children %i\n", getJobTree().getNumChildren());
-	LOG(V2_INFO,"ß sweep-sharing-period=%i ms\n", _params.sweepSharingPeriod_ms.val);
+	// LOG(V2_INFO,"ß num children %i\n", getJobTree().getNumChildren());
+	LOG(V2_INFO,"ß sweep-sharing-period: %i ms\n", _params.sweepSharingPeriod_ms.val);
     _metadata = getSerializedDescription(0)->data();
+	_start_shweep_timestamp = Timer::elapsedSeconds();
 	_last_sharing_timestamp = Timer::elapsedSeconds();
 	//do not trigger a send on the initial dummy worksteal requests
 	_worksteal_requests.resize(_params.numThreadsPerProcess.val);
@@ -91,7 +92,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	//Specific for Mallob interaction
 	shweeper->set_option("mallob_custom_sweep_verbosity", _params.sweepSolverVerbosity()); //Shweeper verbosity 0..4
 	shweeper->set_option("mallob_is_shweeper", 1); //Make this Kissat solver a pure Distributed Sweeping Solver. Jumps directly to distributed sweeping and bypasses everything else
-	shweeper->set_option("sweepcomplete", 1);      //full sweeping, deactivates any tick limits
+	shweeper->set_option("sweepcomplete", 1);      //full sweeping, removes any tick limits
 	shweeper->set_option("mallob_local_id", localId); //for debugging mostly, keeping track
 	shweeper->set_option("mallob_rank", _my_rank);
 
@@ -124,8 +125,9 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 			// _eqs_found = shweeper->getSolverStats().shweep_eqs_found;
 			// _sweep_units_found = shweeper->getSolverStats().shweep_sweep_units_found;
 			auto stats = shweeper->getSolverStats();
-			LOG(V2_INFO, "[%i](%i) SWEEP APP RESULT: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated\n",
+			LOG(V2_INFO, "[%i](%i) SWEEP APP RESULT: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
 				_my_rank, _dimacsReportLocalId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
+			LOG(V2_INFO, "[%i](%i) SWEEP APP RESULT: %i Processes, %f seconds \n", _my_rank, _dimacsReportLocalId->load(), getVolume(), Timer::elapsedSeconds() - _start_shweep_timestamp);
 			std::vector<int> formula = shweeper->extractPreprocessedFormula();
 			_internal_result.setSolutionToSerialize(formula.data(), formula.size()); //Format: [Clauses, #Vars, #Clauses]
 			LOG(V2_INFO, "# # [%i](%i) Serialized final formula, SolutionSize=%i\n", _my_rank, _dimacsReportLocalId->load(), _internal_result.getSolutionSize());

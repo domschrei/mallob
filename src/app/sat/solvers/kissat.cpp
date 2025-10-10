@@ -158,6 +158,8 @@ void Kissat::diversify(int seed) {
             kissat_set_preprocessing_report_callback(solver, this,
             begin_formula_report, report_preprocessed_lit);
         kissat_set_option(solver, "factor", 1); // do perform bounded variable addition
+        if (_setup.preprocessSequentialSweepComplete)
+            kissat_set_option(solver, "sweepcomplete", 1);
         // if (_setup.shared_sweeping) {
             // kissat_set_option(solver, "mallob_shared_sweeping", 1);
         // }

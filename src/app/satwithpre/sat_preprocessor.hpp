@@ -46,6 +46,7 @@ public:
         setup.numVars = _desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
         setup.numOriginalClauses = _desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
         setup.solverType = 'p';
+        setup.preprocessSequentialSweepComplete = _params.preprocessSequentialSweepComplete.val;
         // setup.shared_sweeping = _params.sharedSweeping.val;
         _kissat.reset(new Kissat(setup));
         _nb_running++;
