@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --nodes=$DS_NODES
+#SBATCH --nodes=4
 #SBATCH --ntasks-per-node=2
 #SBATCH --cpus-per-task=48
 #SBATCH --ntasks-per-core=2 # enables hyperthreading
-#SBATCH -t $DS_RUNTIME_SLURMSTR
-#SBATCH -p $DS_PARTITION # general or micro
-#SBATCH --account=$DS_PROJECTNAME
-#SBATCH -J $DS_JOBNAME
+#SBATCH -t 00:01:00
+#SBATCH -p micro # general or micro
+#SBATCH --account=pn72pu
+#SBATCH -J hwtest4
 #SBATCH --ear=off # Needed for profiling / benchmarking
 #SBATCH --switches=1 # Force a single island
 
@@ -17,8 +17,8 @@
 
 module load slurm_setup; module unload devEnv/Intel/2019 intel-mpi; module load gcc/11 intel-mpi/2019-gcc cmake/3.14.5 gdb
 
-username="$DS_USERNAME"
-projname="$DS_PROJECTNAME"
+username="di97lib"
+projname="pn72pu"
 starttime=$(date +%s)
 
 # For debugging
@@ -35,17 +35,15 @@ export RDMAV_FORK_SAFE=1
 export MALLOC_CONF="thp:always"
 
 # HOME
-globallogdir_base=logs/$DS_JOBNAME-$SLURM_JOB_ID
+globallogdir_base=logs/hwtest4-$SLURM_JOB_ID
 # WORK
-if [ -d "$WORK_$DS_PROJECTNAME" ]; then globallogdir_base="$WORK_$DS_PROJECTNAME/$globallogdir_base"; fi
+if [ -d "$WORK_pn72pu" ]; then globallogdir_base="$WORK_pn72pu/$globallogdir_base"; fi
 # SCRATCH
 #if [ -d "$SCRATCH" ]; then globallogdir_base="$SCRATCH/$globallogdir_base"; fi
 
 # Directories for writing and for storing logs
-localtmpdir_base=/tmp/$DS_JOBNAME-$SLURM_JOB_ID # fast local disk
+localtmpdir_base=/tmp/hwtest4-$SLURM_JOB_ID # fast local disk
 mkdir -p $localtmpdir_base $globallogdir_base
-
-echo "globallogdir: $globallogdir_base"
 
 # Benchmark instances, one per line
 benchmarkfile="/hppfs/work/$projname/$username/instances/hwmcc20miters/cnf/opt/pathlist.txt" # TODO 
@@ -56,35 +54,32 @@ if [ ! -f $benchmarkfile ]; then
 fi
 
 # Diagnose number of done / active / total jobs
-ndone=$(echo sbatch/generated/$DS_JOBNAME/.done.* | wc -w)
-ntotal=$(($DS_LASTJOBIDX - $DS_FIRSTJOBIDX + 1))
+ndone=$(echo sbatch/generated/hwtest4/.done.* | wc -w)
+ntotal=$((8 - 0 + 1))
 nactive=$(squeue -u $username|grep $username|wc -l)
 # All jobs already done? -> exit
 if [ $ndone -ge $ntotal ]; then exit; fi
 
 # Failsafe: Exit if an unreasonable number of jobs of this kind have launched
-echo "I" >> sbatch/generated/$DS_JOBNAME/.ticks
-if [ $(cat sbatch/generated/$DS_JOBNAME/.ticks|wc -l) -gt $ntotal ]; then exit; fi
+echo "I" >> sbatch/generated/hwtest4/.ticks
+if [ $(cat sbatch/generated/hwtest4/.ticks|wc -l) -gt $ntotal ]; then exit; fi
 
 change=false # track if this task makes any progress and should hence start another task
 
 # MAIN LOOP over benchmark instances (shuffled differently for each execution)
-for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
+for i in $(seq 0 8 | shuf) ; do
 
     # already done? -> skip
-    if [ -d sbatch/generated/$DS_JOBNAME/.done.$i ] ; then continue; fi
+    if [ -d sbatch/generated/hwtest4/.done.$i ] ; then continue; fi
     # exit if you may be unable to finish this job in time
-    if [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -gt $DS_RUNTIME ]; then 
-		echo "Exit job because probably unable to finish in time"
-		break; 
-	fi
+    if [ $(( $(date +%s) - $starttime + 40 + 30 )) -gt 60 ]; then break; fi
     # try to get a reservation for working on this job
-    if [ -d sbatch/generated/$DS_JOBNAME/.reserved.$i ] && ! [[ $(find sbatch/generated/$DS_JOBNAME/.reserved.$i -newermt "8 minutes ago") ]]; then
+    if [ -d sbatch/generated/hwtest4/.reserved.$i ] && ! [[ $(find sbatch/generated/hwtest4/.reserved.$i -newermt "8 minutes ago") ]]; then
         # reservation is old (>8 minutes) - reset it
-        rmdir sbatch/generated/$DS_JOBNAME/.reserved.$i
+        rmdir sbatch/generated/hwtest4/.reserved.$i
     fi
     # unable to get a reservation? -> skip
-    if ! mkdir sbatch/generated/$DS_JOBNAME/.reserved.$i 2> /dev/null ; then continue; fi
+    if ! mkdir sbatch/generated/hwtest4/.reserved.$i 2> /dev/null ; then continue; fi
 
     change=true
 
@@ -99,7 +94,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 	
 	echo " "
     echo " "
-    echo "jobname:  $DS_JOBNAME"
+    echo "jobname:  hwtest4"
     echo "index:    $i"
     echo "logdir:   $globallogdir"
     echo "localtmp: $localtmpdir"
@@ -108,7 +103,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
     echo " "
 
 
-    timeout=$DS_SECONDSPERJOB
+    timeout=40
     cmd="$build/mallob \
 	-mono-app=SATWITHPRE \
 	-satsolver=[k_]w \
@@ -123,7 +118,6 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 	-rlbd=0 -ilbd=1 -randlbd=0 -scramble-lbds=0 \
 	-seed=0 \
 	-spd=${globallogdir}/ -spl=3 \
-	-jcup=0.05 \
 	-preprocess-sweep \
 	-sweep-sharing-period=50 \
 	-sweep-solver-verbosity=1 \
@@ -137,7 +131,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
     export MALLOB_LOCALTMPDIR=$localtmpdir
     export MALLOB_OUTPUTLOGDIR=$outputlogdir
     export MALLOB_BUILDDIR=$build
-    export MALLOB_NUMNODES=$DS_NODES
+    export MALLOB_NUMNODES=4
 
     # Assemble MPI command options
     mpicall="mpiexec -n $SLURM_NTASKS --bind-to core --map-by numa -genvall"
@@ -157,7 +151,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
     echo "$(date) JOB $i FINISHED"
 
     # Commit that we're done with this job
-    mkdir -p sbatch/generated/$DS_JOBNAME/.done.$i
+    mkdir -p sbatch/generated/hwtest4/.done.$i
 
     sleep 3 # maybe a means to avoid "nodes are still busy" srun error?
 
@@ -167,4 +161,4 @@ done # END OF MAIN LOOP
 if ! $change; then exit; fi
 
 # Submit next instance, to begin after this job is done (do nothing if it fails)
-sbatch --begin=now`#+$(($DS_RUNTIME+30))` sbatch/generated/$DS_JOBNAME/sbatch.sh
+sbatch --begin=now`#+$((60+30))` sbatch/generated/hwtest4/sbatch.sh

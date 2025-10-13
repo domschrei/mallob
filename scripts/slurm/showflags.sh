@@ -3,7 +3,7 @@
 echo $(grep "^benchmarkfile" "scripts/slurm/sbatch.sh") 
 echo ""
 echo ""
-flags=$(grep -A 13 -- "build/mallob" "scripts/slurm/sbatch.sh")
+flags=$(grep -A 18 -- "build/mallob" "scripts/slurm/sbatch.sh")
 echo "$flags"
 echo ""
 
