@@ -364,6 +364,8 @@ void AnytimeSatClauseCommunicator::feedLocalClausesIntoCrossSharing(std::vector<
         msg.payload.resize(packedComm.size() / sizeof(int));
         memcpy(msg.payload.data(), packedComm.data(), packedComm.size());
         _job->getJobTree().sendToSelf(msg); // will be deferred if cross-comm is already ongoing
+    } else if (comm.getCommSize() == 1) {
+        LOG(V4_VVER, "XTCS #%i comm-size 1 (group ID %i)\n", _job->getId(), _job->getDescription().getGroupId());
     } else if (comm.getCommSize() == 0) {
         LOG(V4_VVER, "XTCS communicator not ready yet\n");
     }

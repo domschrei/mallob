@@ -1,9 +1,8 @@
 
 #pragma once
 
+#include "app/incsat/inc_sat_controller.hpp"
 #include "app/sat/data/definitions.hpp"
-#include "app/sat/stream/internal_sat_job_stream_processor.hpp"
-#include "app/sat/stream/wrapped_sat_job_stream.hpp"
 #include "core/job_slot_registry.hpp"
 #include "data/job_description.hpp"
 #include "data/job_result.hpp"
@@ -28,11 +27,6 @@ private:
 
     float _start_time;
     int _status {0};
-
-    static int getNextStreamId() {
-        static int _stream_id = 1;
-        return _stream_id++;
-    }
 
     enum CubingMode {VAR_OCCURRENCE, LOOKAHEAD_CADICAL} _cubing_mode {LOOKAHEAD_CADICAL};
 
@@ -67,18 +61,15 @@ public:
         LOG(V2_INFO, "CNC generated %i cubes, status=%i\n", nbGeneratedCubes, _status);
         if (_status != 0) {
             res.result = _status;
+            LOG(V2_INFO, "CNC CONCLUDE %s\n", _status==10 ? "SAT" : "UNSAT");
             return res;
         }
 
         // Set up up to four SAT job streams, but no more than the global number of processes
-        std::vector<std::unique_ptr<WrappedSatJobStream>> streams;
+        std::vector<std::unique_ptr<IncSatController>> incsats;
         int numConcStreams = std::min(4, MyMpi::size(MPI_COMM_WORLD));
-        for (int i = 0; i < numConcStreams; i++) {
-            streams.push_back(addJobStream());
-            // This line allows the stream to cross-share clauses
-            // with other streams of the same group ID and user name.
-            streams.back()->mallobProcessor->setGroupId("cnc-#" + std::to_string(_desc.getId()));
-        }
+        for (int i = 0; i < numConcStreams; i++)
+            incsats.push_back(addJobStream());
 
         // Repeatedly loop over all your streams, submitting cubes and fetching results,
         // until a stopping criterion is reached.
@@ -91,9 +82,10 @@ public:
                 stop = true;
                 break;
             }
-            for (auto& streamWrapper : streams) {
-                auto& stream = streamWrapper->stream;
+            for (auto& incsat : incsats) {
                 // already cleaning up this stream?
+                if (!incsat->hasStream()) continue;
+                auto& stream = incsat->getStream();
                 if (stream.finalizing()) continue;
                 // result available?
                 if (!stream.isIdle() && !stream.isNonblockingSolvePending()) {
@@ -109,8 +101,8 @@ public:
                         break;
                     } else if (code == UNSAT) {
                         // Cube was found unsatisfiable.
-                        LOG(V2_INFO, "CNC Cube UNSAT\n");
                         nbUnsatCubes++;
+                        LOG(V2_INFO, "CNC Cube UNSAT (%i/%i)\n", nbUnsatCubes, nbGeneratedCubes);
                     } else {
                         // Cube solving returned UNKNOWN: something has gone wrong
                         // or an internal limit was reached (timeout, interrupt, etc.)
@@ -124,13 +116,14 @@ public:
                     if (cubes.empty()) {
                         // No cubes left to submit - yield this stream
                         // TODO finalize can sometimes take longer - do concurrently instead?
-                        stream.interrupt();
-                        stream.finalize();
+                        LOG(V3_VERB, "CNC finalizing stream\n");
+                        incsat->finalize();
+                        LOG(V3_VERB, "CNC stream finalized\n");
                         continue;
                     }
                     // Remove next cube and submit it
                     auto cube = cubes.back(); cubes.pop_back();
-                    submitCube(cube, stream);
+                    submitCube(cube, *incsat);
                     assert(!stream.isIdle());
                 }
             }
@@ -138,7 +131,7 @@ public:
 
         // RAII should take care of cleaning up all of the remaining job streams
         // and their associated resources.
-        streams.clear();
+        incsats.clear();
 
         return res;
     }
@@ -216,46 +209,20 @@ private:
     }
 
     // A bit of boilerplate code to get an incremental SAT solving task in Mallob up and running.
-    std::unique_ptr<WrappedSatJobStream> addJobStream() {
-
-        // Every job stream needs a unique stream ID and a unique name
-        int streamId = getNextStreamId();
-        std::string name = "#" + std::to_string(_desc.getId()) + ":" + std::to_string(streamId) + "(SAT)";
+    std::unique_ptr<IncSatController> addJobStream() {
 
         // Create wrapper object for SAT job stream
-        std::unique_ptr<WrappedSatJobStream> wrapper(new WrappedSatJobStream(name));
-
-        // Add a stream processor that internally orchestrates a Mallob SAT task
-        wrapper->mallobProcessor = new MallobSatJobStreamProcessor(_params, APIRegistry::get(), _desc,
-            "#"+std::to_string(_desc.getId())+":SAT:mal", streamId, true, wrapper->stream.getSynchronizer());
-        wrapper->stream.addProcessor(wrapper->mallobProcessor);
-
-        if (_params.internalStreamProcessor()) {
-            // Add a stream processor that internally runs a single low-latency sequential solver
-            SolverSetup setup;
-            setup.baseSeed = _params.seed();
-            setup.jobId = _desc.getId();
-            setup.isJobIncremental = true;
-            setup.onTheFlyChecking = _params.onTheFlyChecking();
-            setup.onTheFlyCheckModel = _params.onTheFlyCheckModel();
-            auto internalProcessor = new InternalSatJobStreamProcessor(setup, wrapper->stream.getSynchronizer());
-            wrapper->stream.addProcessor(internalProcessor);
-        }
-
-        // Set the terminator for the stream
-        wrapper->stream.setTerminator([&, wrapper=wrapper.get()]() {
-            if (wrapper->stream.finalizing()) return true;
-            return isTimeoutHit();
-        });
-
-        return wrapper;
+        std::unique_ptr<IncSatController> incsat(new IncSatController(_params, APIRegistry::get(), _desc));
+        incsat->initInteractiveSolving();
+        incsat->getMallobProcessor()->setGroupId("cnc-" + std::to_string(_desc.getId()));
+        return incsat;
     }
 
     // Submit a formula together with the specified cube to the specified (idle!) SatJobStream.
-    void submitCube(const std::vector<int>& cube, SatJobStream& stream) {
+    void submitCube(const std::vector<int>& cube, IncSatController& incsat) {
         std::vector<int> formula;
-        if (stream.getRevision() == -1) formula = _base_formula;
-        stream.solveNonblocking({{}, std::move(formula), cube});
+        if (incsat.getStream().getRevision() == -1) formula = _base_formula;
+        incsat.solveNextRevisionNonblocking(std::move(formula), std::vector<int>(cube));
     }
 
     // Check whether this job should terminate right now.

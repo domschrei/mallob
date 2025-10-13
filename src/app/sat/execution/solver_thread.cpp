@@ -186,7 +186,8 @@ void SolverThread::appendRevision(int revision, RevisionData data) {
             LOGGER(_logger, V4_VVER, "Received compressed formula of size %i\n", data.fLits->size());
         } else {
             if (_solver.getSolverSetup().globalId == 0)
-                LOGGER(_logger, V4_VVER, "Received %i literals: %s\n", data.fLits->size(), StringUtils::getSummary(*data.fLits, INT32_MAX).c_str());
+                LOGGER(_logger, V4_VVER, "Received %i literals: %s\n", data.fLits->size(),
+                    StringUtils::getSummary(*data.fLits, 10).c_str());
         }
         _latest_revision = revision;
         _latest_checksum = data.chksum;

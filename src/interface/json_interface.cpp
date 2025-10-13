@@ -201,7 +201,8 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
         LOGGER(_logger, V4_VVER, "Job #%i rev. %i: set job description ID %i\n", id, job->getRevision(), descId);
     } else job->setJobDescriptionId(0);
     if (json.contains("group-id")) {
-        const std::string label = json["user"].get<std::string>() + "." + json["group-id"].get<std::string>();
+        const std::string label = //json["user"].get<std::string>() + "." +
+            json["group-id"].get<std::string>();
         const int groupId = _job_desc_id_allocator.getId(label);
         job->setGroupId(groupId);
         LOGGER(_logger, V4_VVER, "Job #%i rev. %i: set group ID %i\n", id, job->getRevision(), groupId);

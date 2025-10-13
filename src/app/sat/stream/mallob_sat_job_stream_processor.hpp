@@ -49,7 +49,6 @@ private:
     SatTask _backlog_task {SatTask::RAW};
     bool _initialized_backlog_task {false};
     bool _finalized {false};
-    Mutex _mtx_finalize;
 
     std::shared_ptr<JobSlotRegistry::JobSlot> _job_slot;
 
@@ -113,8 +112,9 @@ public:
         const auto& descriptionLabel = task.descLabel;
         float priority = task.priority;
 
-        if (_params.useChecksums()) _json_base["checksum"] = {chksum.count(), chksum.get()};
+        if (_finalized || !_began_nontrivial_solving) return;
 
+        if (_params.useChecksums()) _json_base["checksum"] = {chksum.count(), chksum.get()};
         if (_incremental && _json_base.contains("name")) {
             _json_base["precursor"] = _username + std::string(".") + _json_base["name"].get<std::string>();
         }
@@ -133,6 +133,7 @@ public:
             }
         }*/
         nlohmann::json copy(_json_base);
+
         if (_params.compressFormula()) {
             auto out = FormulaCompressor::compress(newLiterals.data(), newLiterals.size(),
                 assumptions.data(), assumptions.size());
@@ -144,8 +145,8 @@ public:
             newLiterals.push_back(INT32_MIN);
         }
 
-        StaticStore<std::vector<int>>::insert(_json_base["name"].get<std::string>(), std::move(newLiterals));
-        copy["internalliterals"] = _json_base["name"].get<std::string>();
+        StaticStore<std::vector<int>>::insert(copy["name"].get<std::string>(), std::move(newLiterals));
+        copy["internalliterals"] = copy["name"].get<std::string>();
         if (!descriptionLabel.empty()) {
             copy["description-id"] = descriptionLabel;
         }
@@ -197,7 +198,6 @@ public:
 
     virtual void finalize() override {
         LOG(V4_VVER, "%s do finalize\n", _name.c_str());
-        auto lock = _mtx_finalize.getLock();
         _finalized = true;
         SatJobStreamProcessor::finalize();
         if (!_began_nontrivial_solving) return;
@@ -216,13 +216,12 @@ public:
     }
 
     void reinitialize() {
+
+        // already (in the process of being) finalized?
         if (_finalized || !_began_nontrivial_solving) return;
 
-        auto lock = _mtx_finalize.getTryLock();
-        if (!lock.owns_lock()) return; // already in the process of being finalized
-
         LOG(V3_VERB, "%s evicted: re-initialize\n", _name.c_str());
-        while (_task_pending) usleep(3000);
+        while (_task_pending) usleep(1000);
         if (!_incremental) return;
         if (!_json_base.contains("name")) return;
         _json_base["precursor"] = _username + std::string(".") + _json_base["name"].get<std::string>();

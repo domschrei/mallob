@@ -31,7 +31,7 @@ private:
 public:
     SatJobStream(const std::string& baseName) : _name(baseName) {}
     ~SatJobStream() {
-        interrupt();
+        if (!_idle) interrupt();
         finalize();
     }
 
@@ -124,6 +124,7 @@ public:
     }
 
     void finalize() {
+        if (_finalizing) return;
         _finalizing = true;
         for (auto& [proc, worker] : _processors) proc->finalize();
     }

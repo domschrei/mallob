@@ -4,6 +4,7 @@
 #include "app/sat/execution/solver_setup.hpp"
 #include "app/sat/proof/trusted_parser_process_adapter.hpp"
 #include "app/sat/stream/internal_sat_job_stream_processor.hpp"
+#include "app/sat/stream/mallob_sat_job_stream_processor.hpp"
 #include "app/sat/stream/sat_job_stream_garbage_collector.hpp"
 #include "app/sat/stream/sat_job_stream_processor.hpp"
 #include "app/sat/stream/wrapped_sat_job_stream.hpp"
@@ -74,17 +75,21 @@ public:
         return res;
     }
 
-    std::pair<int, std::vector<int>> solveNextRevision(std::vector<int>&& clauses, std::vector<int>&& assumptions) {
-        if (!_stream) {
-            if (_params.onTheFlyChecking())
-                _problem_file = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob.incsattparse."
-                    + std::to_string(_desc.getId()) + "." + std::to_string(_stream_id);
-            initStream(true);
-        }
+    void initInteractiveSolving() {
+        if (_stream) return;
+        if (_params.onTheFlyChecking())
+            _problem_file = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob.incsattparse."
+                + std::to_string(_desc.getId()) + "." + std::to_string(_stream_id);
+        initStream(true);
+    }
+
+    bool solveNextRevisionNonblocking(std::vector<int>&& clauses, std::vector<int>&& assumptions) {
+        initInteractiveSolving();
 
         if (!_params.onTheFlyChecking()) {
-            return _stream->stream.solve({SatJobStreamProcessor::SatTask::Type::SPLIT,
+            _stream->stream.solveNonblocking({SatJobStreamProcessor::SatTask::Type::SPLIT,
                 std::move(clauses), std::move(assumptions)});
+            return true;
         }
         auto futWrite = ProcessWideThreadPool::get().addTask([&]() {
             // Output formula increment to the pipe file
@@ -103,11 +108,18 @@ public:
         assumptions.clear();
         if (!ok) {
             LOG(V1_WARN, "[WARN] %s parsing revision unsuccessful\n", _name.c_str());
-            return {0, {}};
+            return false;
         }
         std::vector<int> payload(_desc.getFormulaPayload(_rev),
             _desc.getFormulaPayload(_rev)+_desc.getFormulaPayloadSize(_rev));
-        return _stream->stream.solve({SatJobStreamProcessor::SatTask::Type::RAW, std::move(payload)});
+        _stream->stream.solveNonblocking({SatJobStreamProcessor::SatTask::Type::RAW, std::move(payload)});
+        return true;
+    }
+
+    std::pair<int, std::vector<int>> solveNextRevision(std::vector<int>&& clauses, std::vector<int>&& assumptions) {
+        bool ok = solveNextRevisionNonblocking(std::move(clauses), std::move(assumptions));
+        assert(ok);
+        return _stream->stream.getNonblockingSolveResult();
     }
 
     std::function<bool()> _cb_terminate;
@@ -120,6 +132,18 @@ public:
         _stream->stream.finalize();
         SatJobStreamGarbageCollector::get().add(std::move(_stream));
         _tppa.reset();
+    }
+
+    bool hasStream() const {
+        return !!_stream;
+    }
+    SatJobStream& getStream() {
+        assert(hasStream());
+        return _stream->stream;
+    }
+    MallobSatJobStreamProcessor* getMallobProcessor() {
+        assert(hasStream());
+        return _stream->mallobProcessor;
     }
 
 private:
