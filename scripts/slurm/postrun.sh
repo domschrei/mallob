@@ -1,17 +1,23 @@
 #!/bin/bash
 
-source scripts/slurm/account.sh # $projectname , $username
+source $ACCOUNTINFO # $projectname , $username
 
 set -e
 
 jobname="$1"
 outdir="/hppfs/work/$projectname/$username/logs/${jobname}"
 
+echo "$jobname: moving to $outdir"
+echo "$jobname: moving logs"
+
 mkdir -p "$outdir/"
 for f in /hppfs/work/$projectname/$username/logs/${jobname}-*/*/.alldone ; do
     if [ -d "$outdir/$(basename $(dirname $f))" ]; then continue; fi
     mv $(dirname $f) "$outdir/"
 done
+
+echo "$jobname: moving slurm-out's"
+
 mv sbatch/generated/${jobname}/sbatch.sh "$outdir/"
 echo /hppfs/work/$projectname/$username/logs/${jobname}-*/ | grep -oE "\-[0-9]{7}/" | grep -oE "[0-9]{7}" | while read slurmid; do
     mv slurm-${slurmid}.out "$outdir/"
@@ -24,6 +30,9 @@ done
 echo "All logs and sbatch / SLURM files moved to: $outdir"
 echo ""
 
+
+
+echo "$jobname: removing generated sbatch"
 rmdir sbatch/generated/${jobname}/.{done,reserved}* # locks for starting jobs
 rm sbatch/generated/${jobname}/.ticks # tick list for job counting failsafe
 rmdir sbatch/generated/${jobname}
