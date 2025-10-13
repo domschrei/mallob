@@ -12,7 +12,7 @@
 
 #include "app/sat/data/formula_compressor.hpp"
 #include "app/sat/data/model_string_compressor.hpp"
-#include "core/job_slot_registry.hpp"
+//#include "core/job_slot_registry.hpp"
 #include "data/job_description.hpp"
 #include "interface/api/api_connector.hpp"
 #include "interface/json_interface.hpp"
@@ -51,14 +51,15 @@ private:
     bool _finalized {false};
     bool _reinitialize_posted {false};
 
-    std::shared_ptr<JobSlotRegistry::JobSlot> _job_slot;
+    //std::shared_ptr<JobSlotRegistry::JobSlot> _job_slot;
 
 public:
     MallobSatJobStreamProcessor(const Parameters& params, APIConnector& api, JobDescription& desc,
             const std::string& baseUserName, int streamId, bool incremental, Synchronizer& sync) :
         SatJobStreamProcessor(sync), _params(params), _api(api), _stream_id(streamId),
-        _incremental(incremental), _username(baseUserName),
-        _job_slot(new JobSlotRegistry::JobSlot(_username, [&]() {signalReinitialization();})) {}
+        _incremental(incremental), _username(baseUserName)
+        //,_job_slot(new JobSlotRegistry::JobSlot(_username, [&]() {signalReinitialization();})) 
+        {}
 
     ~MallobSatJobStreamProcessor() override {}
 
@@ -90,7 +91,7 @@ public:
             LOG(V2_INFO, "%s awakes for rev. %i\n", _name.c_str(), task.rev);
             _began_nontrivial_solving = true;
 
-            JobSlotRegistry::acquireSlot(_job_slot);
+            //JobSlotRegistry::acquireSlot(_job_slot);
 
             _base_job_name = "satjob-" + std::to_string(_stream_id) + "-rev-";
             _json_base["user"] = _username;
@@ -181,7 +182,7 @@ public:
                 concludeRevision(_pending_rev, 0, {});
                 _task_pending = false;
             }
-            _job_slot->startActiveTime();
+            //_job_slot->startActiveTime();
         } catch (...) {
             LOG(V0_CRIT, "[ERROR] uncaught exception while submitting JSON\n");
             abort();
@@ -192,7 +193,7 @@ public:
             usleep(sleepInterval);
             sleepInterval = std::min(2500UL, (unsigned long) std::ceil(1.2*sleepInterval));
         }
-        _job_slot->endActiveTime();
+        //_job_slot->endActiveTime();
 
         if (_reinitialize_posted) {
             reinitialize();
@@ -217,7 +218,7 @@ public:
         LOG(V4_VVER, "%s closing API\n", _name.c_str());
         _api.submit(copy, [&](nlohmann::json& result) {assert(false);});
         LOG(V4_VVER, "%s closed API\n", _name.c_str());
-        _job_slot->release();
+        //_job_slot->release();
     }
 
     void signalReinitialization() {
