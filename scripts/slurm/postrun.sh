@@ -2,13 +2,15 @@
 
 source $ACCOUNTINFO # $projectname , $username
 
+echo "$username"
+echo "$projectname"
+
 set -e
 
 jobname="$1"
 outdir="/hppfs/work/$projectname/$username/logs/${jobname}"
 
-echo "$jobname: moving to $outdir"
-echo "$jobname: moving logs"
+echo "$jobname: moving results to unified $outdir"
 
 mkdir -p "$outdir/"
 for f in /hppfs/work/$projectname/$username/logs/${jobname}-*/*/.alldone ; do

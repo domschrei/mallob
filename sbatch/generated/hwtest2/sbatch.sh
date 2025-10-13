@@ -6,7 +6,7 @@
 #SBATCH -t 00:06:00
 #SBATCH -p micro # general or micro
 #SBATCH --account=pn72pu
-#SBATCH -J hwtest
+#SBATCH -J hwtest2
 #SBATCH --ear=off # Needed for profiling / benchmarking
 #SBATCH --switches=1 # Force a single island
 
@@ -35,14 +35,14 @@ export RDMAV_FORK_SAFE=1
 export MALLOC_CONF="thp:always"
 
 # HOME
-globallogdir_base=logs/hwtest-$SLURM_JOB_ID
+globallogdir_base=logs/hwtest2-$SLURM_JOB_ID
 # WORK
 if [ -d "$WORK_pn72pu" ]; then globallogdir_base="$WORK_pn72pu/$globallogdir_base"; fi
 # SCRATCH
 #if [ -d "$SCRATCH" ]; then globallogdir_base="$SCRATCH/$globallogdir_base"; fi
 
 # Directories for writing and for storing logs
-localtmpdir_base=/tmp/hwtest-$SLURM_JOB_ID # fast local disk
+localtmpdir_base=/tmp/hwtest2-$SLURM_JOB_ID # fast local disk
 mkdir -p $localtmpdir_base $globallogdir_base
 
 # Benchmark instances, one per line
@@ -54,15 +54,15 @@ if [ ! -f $benchmarkfile ]; then
 fi
 
 # Diagnose number of done / active / total jobs
-ndone=$(echo sbatch/generated/hwtest/.done.* | wc -w)
+ndone=$(echo sbatch/generated/hwtest2/.done.* | wc -w)
 ntotal=$((8 - 0 + 1))
 nactive=$(squeue -u $username|grep $username|wc -l)
 # All jobs already done? -> exit
 if [ $ndone -ge $ntotal ]; then exit; fi
 
 # Failsafe: Exit if an unreasonable number of jobs of this kind have launched
-echo "I" >> sbatch/generated/hwtest/.ticks
-if [ $(cat sbatch/generated/hwtest/.ticks|wc -l) -gt $ntotal ]; then exit; fi
+echo "I" >> sbatch/generated/hwtest2/.ticks
+if [ $(cat sbatch/generated/hwtest2/.ticks|wc -l) -gt $ntotal ]; then exit; fi
 
 change=false # track if this task makes any progress and should hence start another task
 
@@ -70,16 +70,16 @@ change=false # track if this task makes any progress and should hence start anot
 for i in $(seq 0 8 | shuf) ; do
 
     # already done? -> skip
-    if [ -d sbatch/generated/hwtest/.done.$i ] ; then continue; fi
+    if [ -d sbatch/generated/hwtest2/.done.$i ] ; then continue; fi
     # exit if you may be unable to finish this job in time
     if [ $(( $(date +%s) - $starttime + 300 + 30 )) -gt 360 ]; then break; fi
     # try to get a reservation for working on this job
-    if [ -d sbatch/generated/hwtest/.reserved.$i ] && ! [[ $(find sbatch/generated/hwtest/.reserved.$i -newermt "8 minutes ago") ]]; then
+    if [ -d sbatch/generated/hwtest2/.reserved.$i ] && ! [[ $(find sbatch/generated/hwtest2/.reserved.$i -newermt "8 minutes ago") ]]; then
         # reservation is old (>8 minutes) - reset it
-        rmdir sbatch/generated/hwtest/.reserved.$i
+        rmdir sbatch/generated/hwtest2/.reserved.$i
     fi
     # unable to get a reservation? -> skip
-    if ! mkdir sbatch/generated/hwtest/.reserved.$i 2> /dev/null ; then continue; fi
+    if ! mkdir sbatch/generated/hwtest2/.reserved.$i 2> /dev/null ; then continue; fi
 
     change=true
 
@@ -94,7 +94,7 @@ for i in $(seq 0 8 | shuf) ; do
 	
 	echo " "
     echo " "
-    echo "jobname:  hwtest"
+    echo "jobname:  hwtest2"
     echo "index:    $i"
     echo "logdir:   $globallogdir"
     echo "localtmp: $localtmpdir"
@@ -146,7 +146,7 @@ for i in $(seq 0 8 | shuf) ; do
     echo "$(date) JOB $i FINISHED"
 
     # Commit that we're done with this job
-    mkdir -p sbatch/generated/hwtest/.done.$i
+    mkdir -p sbatch/generated/hwtest2/.done.$i
 
     sleep 3 # maybe a means to avoid "nodes are still busy" srun error?
 
@@ -156,4 +156,4 @@ done # END OF MAIN LOOP
 if ! $change; then exit; fi
 
 # Submit next instance, to begin after this job is done (do nothing if it fails)
-sbatch --begin=now`#+$((360+30))` sbatch/generated/hwtest/sbatch.sh
+sbatch --begin=now`#+$((360+30))` sbatch/generated/hwtest2/sbatch.sh
