@@ -87,7 +87,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
     // _shweeper->set_option("log", 0);//extensive logging
     shweeper->set_option("check", 0);  // do not check model or derived clauses
     shweeper->set_option("profile",3); // do detailed profiling how much time we spent where
-	shweeper->set_option("seed", 0);   //keep seeds constant and identical for now, for easier debugging
+	shweeper->set_option("seed", 0);   //Sweeping should not contain any RNG part
 
 	//Specific for Mallob interaction
 	shweeper->set_option("mallob_custom_sweep_verbosity", _params.sweepSolverVerbosity()); //Shweeper verbosity 0..4
@@ -100,6 +100,8 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	shweeper->set_option("preprocess", 0); //skip other preprocessing stuff after shweep finished
 	// shweeper->set_option("probe", 1);   //there is some cleanup-probing at the end of the sweeping. keep it? (apparently the probe option is used nowhere anyways)
 	shweeper->set_option("substitute", 1); //apply equivalence substitutions at the end after sweeping (kissat default 1, but keep here explicitly to remember it)
+	// shweeper->set_option("substituteeffort", 1000); //modification doesnt seem to have much effect...
+	// shweeper->set_option("substituterounds", 10);
 	shweeper->set_option("luckyearly", 0); //skip
 	shweeper->set_option("luckylate", 0);  //skip
 
@@ -128,6 +130,11 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 			LOG(V2_INFO, "[%i](%i) SWEEP APP RESULT: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
 				_my_rank, _dimacsReportLocalId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
 			LOG(V2_INFO, "[%i](%i) SWEEP APP RESULT: %i Processes, %f seconds \n", _my_rank, _dimacsReportLocalId->load(), getVolume(), Timer::elapsedSeconds() - _start_shweep_timestamp);
+			LOG(V1_WARN, "SWEEP_EQUIVALENCES %i\n", stats.shweep_eqs);
+			LOG(V1_WARN, "SWEEP_UNITS %i\n", stats.shweep_new_units);
+			LOG(V1_WARN, "SWEEP_ELIMINATED %i\n", stats.shweep_eliminated);
+			LOG(V1_WARN, "SWEEP_PROCESSES %i\n", getVolume());
+			LOG(V1_WARN, "SWEEP_TIME %f\n", Timer::elapsedSeconds() - _start_shweep_timestamp);
 			std::vector<int> formula = shweeper->extractPreprocessedFormula();
 			_internal_result.setSolutionToSerialize(formula.data(), formula.size()); //Format: [Clauses, #Vars, #Clauses]
 			LOG(V2_INFO, "# # [%i](%i) Serialized final formula, SolutionSize=%i\n", _my_rank, _dimacsReportLocalId->load(), _internal_result.getSolutionSize());
