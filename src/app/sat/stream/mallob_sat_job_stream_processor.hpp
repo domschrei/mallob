@@ -49,6 +49,7 @@ private:
     SatTask _backlog_task {SatTask::RAW};
     bool _initialized_backlog_task {false};
     bool _finalized {false};
+    bool _reinitialize_posted {false};
 
     std::shared_ptr<JobSlotRegistry::JobSlot> _job_slot;
 
@@ -57,7 +58,7 @@ public:
             const std::string& baseUserName, int streamId, bool incremental, Synchronizer& sync) :
         SatJobStreamProcessor(sync), _params(params), _api(api), _stream_id(streamId),
         _incremental(incremental), _username(baseUserName),
-        _job_slot(new JobSlotRegistry::JobSlot(_username, [&]() {reinitialize();})) {}
+        _job_slot(new JobSlotRegistry::JobSlot(_username, [&]() {signalReinitialization();})) {}
 
     ~MallobSatJobStreamProcessor() override {}
 
@@ -193,6 +194,10 @@ public:
         }
         _job_slot->endActiveTime();
 
+        if (_reinitialize_posted) {
+            reinitialize();
+        }
+
         _backlog_task = SatTask{_backlog_task.type};
     }
 
@@ -215,7 +220,11 @@ public:
         _job_slot->release();
     }
 
+    void signalReinitialization() {
+        _reinitialize_posted = true;
+    }
     void reinitialize() {
+        _reinitialize_posted = false;
 
         // already (in the process of being) finalized?
         if (_finalized || !_began_nontrivial_solving) return;
@@ -256,7 +265,7 @@ private:
     bool checkTaskPending(int rev) {
         if (!_task_pending) return false;
         if (_pending_task_interrupted) return true;
-        if (!_terminator(rev)) return true;
+        if (!_terminator(rev) && !_reinitialize_posted) return true;
 
         _pending_task_interrupted = true;
         nlohmann::json jsonInterrupt {

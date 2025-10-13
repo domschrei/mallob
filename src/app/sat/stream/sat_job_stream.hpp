@@ -31,8 +31,10 @@ private:
 public:
     SatJobStream(const std::string& baseName) : _name(baseName) {}
     ~SatJobStream() {
-        if (!_idle) interrupt();
         finalize();
+        for (auto& [proc, worker] : _processors) {
+            worker->join();
+        }
     }
 
     SatJobStreamProcessor::Synchronizer& getSynchronizer() {
@@ -64,6 +66,7 @@ public:
 
                 accumulatedTask = SatJobStreamProcessor::SatTask{accumulatedTask.type};
             }
+            processor->finalize();
         });
         _processors.push_back(std::move(p));
     }
@@ -126,7 +129,10 @@ public:
     void finalize() {
         if (_finalizing) return;
         _finalizing = true;
-        for (auto& [proc, worker] : _processors) proc->finalize();
+        interrupt();
+        for (auto& [proc, worker] : _processors) {
+            worker->stopWithoutWaiting(); // will internally finalize
+        }
     }
 
     bool finalizing() const {

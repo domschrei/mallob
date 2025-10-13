@@ -128,21 +128,20 @@ public:
     }
 
     void finalize() {
-        if (!_stream) return;
+        if (!hasStream()) return;
         _stream->stream.finalize();
-        SatJobStreamGarbageCollector::get().add(std::move(_stream));
         _tppa.reset();
     }
 
     bool hasStream() const {
-        return !!_stream;
+        return _stream && !_stream->stream.finalizing();
     }
     SatJobStream& getStream() {
-        assert(hasStream());
+        assert(_stream);
         return _stream->stream;
     }
     MallobSatJobStreamProcessor* getMallobProcessor() {
-        assert(hasStream());
+        assert(_stream);
         return _stream->mallobProcessor;
     }
 
