@@ -12,6 +12,7 @@
 #include "sat_job_stream_processor.hpp"
 #include "data/checksum.hpp"
 #include "util/assert.hpp"
+#include "util/logger.hpp"
 #include "util/sys/background_worker.hpp"
 
 class SatJobStream {
@@ -66,6 +67,7 @@ public:
 
                 accumulatedTask = SatJobStreamProcessor::SatTask{accumulatedTask.type};
             }
+            LOG(V4_VVER, "Processor %s stopping\n", processor->getName().c_str());
             processor->finalize();
         });
         _processors.push_back(std::move(p));
@@ -132,6 +134,8 @@ public:
         interrupt();
         for (auto& [proc, worker] : _processors) {
             worker->stopWithoutWaiting(); // will internally finalize
+            proc->getQueue().markExhausted();
+            proc->getQueue().markTerminated();
         }
     }
 
