@@ -8,7 +8,7 @@ echo "Modules loaded"
 #
 # Only needed if building with -DMALLOB_APP_SAT=1 (enabled by default).
 # For non-x86-64 architectures (ARM, POWER9, etc.), prepend `DISABLE_FPU=1` to "bash".
-( cd lib && bash fetch_and_build_solvers.sh k sweep)
+( cd lib && bash fetch_and_build_solvers.sh klyc sweep)
 #
 # Build Mallob
 # Specify `-DCMAKE_BUILD_TYPE=RELEASE` for a release build or `-DCMAKE_BUILD_TYPE=DEBUG` for a debug build.
