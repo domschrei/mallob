@@ -52,7 +52,7 @@ public:
         res.result = 0; // unknown
 
         // Generate a set of cubes
-        int depth = 8; // 2^8 = 256 cubes
+        int depth = 13; // 2^8 = 8192 cubes
         LOG(V2_INFO, "CNC generating cubes with depth %i\n", depth);
         std::vector<std::vector<int>> cubes = getCubes(depth);
         ::random_shuffle(cubes.data(), cubes.size()); // shuffle randomly
@@ -67,7 +67,8 @@ public:
 
         // Set up up to four SAT job streams, but no more than the global number of processes
         std::vector<std::unique_ptr<IncSatController>> incsats;
-        int numConcStreams = std::min(4, MyMpi::size(MPI_COMM_WORLD));
+        int jobSlots = _params.jobSlots() > 0 ? _params.jobSlots() : MyMpi::size(MPI_COMM_WORLD);
+        int numConcStreams = std::min(jobSlots, MyMpi::size(MPI_COMM_WORLD));
         for (int i = 0; i < numConcStreams; i++)
             incsats.push_back(addJobStream());
 
