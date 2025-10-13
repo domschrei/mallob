@@ -77,6 +77,8 @@ public:
 private:
     struct JobSlotCompare {
         bool operator()(const std::shared_ptr<JobSlot>& left, const std::shared_ptr<JobSlot>& right) const {
+            if (!left || !right)
+                return !left && right;
             if (left->isAllocated() != right->isAllocated())
                 return !left->isAllocated() && right->isAllocated();
             if (left->getTotalActiveTime() != right->getTotalActiveTime())
@@ -97,6 +99,7 @@ public:
     }
     static void acquireSlot(std::shared_ptr<JobSlot> slot) {
         assert(isInitialized());
+        assert(slot);
         slot->acquire();
         auto [itNew, ok] = _slots.insert(slot);
         assert(ok);
@@ -105,9 +108,11 @@ public:
             auto it = _slots.begin();
             while (it == itNew) ++it;
             assert(it != _slots.end());
-            LOG(V3_VERB, "Evict %s alloc=%i timeofstart=%.3f totaltime=%.3f\n",
-                (*it)->getName(), (*it)->isAllocated(), (*it)->getTimeOfStart(), (*it)->getTotalActiveTime());
-            (*it)->evict(); // no-op if it was already released
+            if (*it) {
+                LOG(V3_VERB, "Evict %s alloc=%i timeofstart=%.3f totaltime=%.3f\n",
+                    (*it)->getName(), (*it)->isAllocated(), (*it)->getTimeOfStart(), (*it)->getTotalActiveTime());
+                (*it)->evict(); // no-op if it was already released
+            }
             _slots.erase(it);
         }
     }
