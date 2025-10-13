@@ -75,7 +75,7 @@ public:
         // Repeatedly loop over all your streams, submitting cubes and fetching results,
         // until a stopping criterion is reached.
         bool stop = false;
-        while (!stop) {
+        while (!stop && !isTimeoutHit()) {
             if (nbUnsatCubes == nbGeneratedCubes) {
                 // All cubes found UNSAT. We are done!
                 LOG(V2_INFO, "CNC CONCLUDE UNSAT\n");
