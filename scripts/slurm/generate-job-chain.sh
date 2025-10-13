@@ -19,12 +19,9 @@ echo "$jobname: nodes       $DS_NODES"
 #echo "benchmarkf  $benchmarkfile"
 echo " "
 
-#As security check also show the current mallob flags
+#As security check show the current mallob flags
 lcmd.sh
-#mallob_cmd=$(grep -A 12 -- "-mono" "$NEWSCRIPTS/sbatch.sh")
-#echo "$mallob_cmd"
 echo " "
-
 
 dir="$HOME/mallob/sbatch/generated/$jobname"
 mkdir -p "$dir"
