@@ -11,7 +11,7 @@ elif [ x$DISABLE_FPU != x1 ]; then
 fi
 
 if [ -z $1 ]; then
-    solvers="clyk"
+    solvers="k"
     echo "Defaulting to solvers $solvers (supply another string to override solvers to build)"
 else
     solvers="$1"
@@ -29,7 +29,7 @@ switch_to_sweep_kissat=$2
 #     echo "Use equivalence sweep forked kissat"
 # fi
 
-echo "fetching of solvers switches to sweep kissat" $switch_to_sweep_kissat
+echo "Fetching of solvers switches to sweep kissat? : " $switch_to_sweep_kissat
 
 #bash fetch_solvers.sh $solvers
 bash fetch_solvers_with_curl.sh $solvers $switch_to_sweep_kissat
@@ -79,7 +79,7 @@ if echo $solvers|grep -q "y" && [ ! -f yalsat/libyals.a ]; then
         sed -i 's/#ifdef __linux__/#if 0/g' yals.c
     fi
     ./configure.sh
-    make
+    make -j 10
     cd ..
 fi
 
@@ -92,7 +92,7 @@ if echo $solvers|grep -q "l" && [ ! -f lingeling/liblgl.a ]; then
         sed -i 's/exit ([01])/abort()/g' $f
     done
     ./configure.sh
-    make
+    make -j 10
     cd ..
 fi
 
@@ -113,7 +113,7 @@ if echo $solvers|grep -q "c" && [ ! -f cadical/libcadical.a ]; then
 
     cd cadical
     ./configure
-    make
+    make -j 10
     cp build/libcadical.a .
     cd ..
 fi

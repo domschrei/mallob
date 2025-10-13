@@ -130,10 +130,13 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 			LOG(V2_INFO, "[%i](%i) SWEEP APP RESULT: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
 				_my_rank, _dimacsReportLocalId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
 			LOG(V2_INFO, "[%i](%i) SWEEP APP RESULT: %i Processes, %f seconds \n", _my_rank, _dimacsReportLocalId->load(), getVolume(), Timer::elapsedSeconds() - _start_shweep_timestamp);
+			LOG(V1_WARN, "SWEEP_PRIORITY %f\n", _params.preprocessSweepPriority.val);
+			LOG(V1_WARN, "SWEEP_PROCESSES %i\n", getVolume());
+			LOG(V1_WARN, "SWEEP_THREADS_PER_PROCESS %i\n", _params.numThreadsPerProcess.val);
+			LOG(V1_WARN, "SWEEP_SHARING_PERIOD %i \n", _params.sweepSharingPeriod_ms.val);
 			LOG(V1_WARN, "SWEEP_EQUIVALENCES %i\n", stats.shweep_eqs);
 			LOG(V1_WARN, "SWEEP_UNITS %i\n", stats.shweep_new_units);
 			LOG(V1_WARN, "SWEEP_ELIMINATED %i\n", stats.shweep_eliminated);
-			LOG(V1_WARN, "SWEEP_PROCESSES %i\n", getVolume());
 			LOG(V1_WARN, "SWEEP_TIME %f\n", Timer::elapsedSeconds() - _start_shweep_timestamp);
 			std::vector<int> formula = shweeper->extractPreprocessedFormula();
 			_internal_result.setSolutionToSerialize(formula.data(), formula.size()); //Format: [Clauses, #Vars, #Clauses]

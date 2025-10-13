@@ -2,7 +2,7 @@
 
 # Only needed if building with -DMALLOB_APP_SAT=1 (enabled by default).
 # For non-x86-64 architectures (ARM, POWER9, etc.), prepend `DISABLE_FPU=1` to "bash".
-( cd lib && bash fetch_and_build_solvers.sh kcly )
+( cd lib && bash fetch_and_build_solvers.sh k sweep)
 #
 # Build Mallob
 # Specify `-DCMAKE_BUILD_TYPE=RELEASE` for a release build or `-DCMAKE_BUILD_TYPE=DEBUG` for a debug build.
@@ -17,7 +17,7 @@ CC=$(which mpicc) CXX=$(which mpicxx) cmake -DCMAKE_BUILD_TYPE=RELEASE \
   -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\" ..
 
 make clean
-make -j20; cd ..
+make -j 20; cd ..
 
 
 #-DMALLOB_APP_SWEEP=1 \
