@@ -45,7 +45,7 @@ public:
         assert(_internal_msg_tag == -1 || _msg.tag == _internal_msg_tag);
         _internal_msg_tag = _msg.tag;
 
-        LOG(V2_INFO, "received broadcast\n");
+        LOG(V4_VVER, "BCAST in broadcast(), isRoot? %i \n", rootOfBcast);
         _received_broadcast = true;
 
         assert(!_msg.returnedToSender);
@@ -98,6 +98,7 @@ private:
         // Undeliverable message being returned?
         if (msg.returnedToSender) {
             // prune child
+            LOG(V4_VVER, "BCAST received msg: returnToSender. sourceRank %i \n", h.source);
             if (h.source == _tree.leftChildNodeRank) {
                 _tree.leftChildNodeRank = -1;
                 _received_response_left = true;
@@ -109,6 +110,8 @@ private:
             if (hasResult()) _cb(); // callback
             return true;
         }
+
+        LOG(V4_VVER, "BCAST received msg. sourceRank %i \n", h.source);
 
         // Response from child?
         if (_received_broadcast && h.source == _tree.leftChildNodeRank) {

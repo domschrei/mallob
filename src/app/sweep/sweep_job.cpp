@@ -354,7 +354,7 @@ void SweepJob::initiateNewSharingRound() {
 	//Broadcast a ping to all workers to initiate an AllReduce
 	//The broadcast includes all workers currently reachable by the root-node (i.e. active) and informs them about their number of children in the current tree
 	//It then causes the leaf nodes to call the callback, initiating the AllReduce
-	LOG(V3_VERB, "Initiating Sharing via Ping\n");
+	LOG(V3_VERB, "BCAST Initiating Sharing via Ping\n");
 	JobMessage msg = getMessageTemplate();
 	msg.tag = _bcast->getMessageTag();
 	msg.payload = {};
@@ -485,11 +485,14 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 
 std::vector<int> SweepJob::stealWorkFromAnyLocalSolver() {
 	auto rand_permutation = getRandomIdPermutation();
-	LOG(V4_VVER, "Steal permutation: ");
+
+	std::ostringstream oss;
+	oss << "Steal permutation: ";
 	for (int id : rand_permutation) {
-		LOG(V4_VVER, "%i ", id);
+		oss << id << ' ';
 	}
-	LOG(V4_VVER, "\n");
+	LOG(V4_VVER, "%s \n", oss.str().c_str());
+
 	for (int localId : rand_permutation) {
 		auto stolen_work = stealWorkFromSpecificLocalSolver(localId);
 		if ( ! stolen_work.empty()) {
@@ -533,7 +536,8 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 
 std::vector<int> SweepJob::getRandomIdPermutation() {
 	auto permutation = _list_of_ids; //copy
-	std::shuffle(permutation.begin(), permutation.end(), std::mt19937());
+	static thread_local std::mt19937 rng(std::random_device{}()); //created/seeded once per thread, then only advancing calls
+	std::shuffle(permutation.begin(), permutation.end(), rng);
 	return permutation;
 }
 
