@@ -107,7 +107,7 @@ private:
 
 	void sendMPIWorkstealRequests();
     void initiateNewSharingRound();
-    void contributeToAllReduceCallback();
+    void cbContributeToAllReduce();
     static std::vector<int> aggregateEqUnitContributions(std::list<std::vector<int>> &contribs);
 	void advanceAllReduction();
     // void tryExtractResult();

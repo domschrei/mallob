@@ -48,7 +48,7 @@ void SweepJob::appl_start() {
 	//a broadcast object is used to initiate an all-reduction by first pinging each processes currently reachable by the root node
 	//the ping detects the current tree structure and provides a callback to contribute to the all-reduction
 	LOG(V2_INFO, "[sweep] initialize broadcast object\n");
-	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {contributeToAllReduceCallback();}, BCAST_INIT));
+	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {cbContributeToAllReduce();}, BCAST_INIT));
 	//Start individual Kissat threads, which immediately jump into the sweeping algorithm
 	for (int localId=0; localId < _params.numThreadsPerProcess.val; localId++) {
 		auto shweeper = createNewShweeper(localId);
@@ -361,14 +361,14 @@ void SweepJob::initiateNewSharingRound() {
 	_bcast->broadcast(std::move(msg));
 }
 
-void SweepJob::contributeToAllReduceCallback() {
+void SweepJob::cbContributeToAllReduce() {
 	assert(_bcast);
 	assert(_bcast->hasResult());
 
 	auto snapshot = _bcast->getJobTreeSnapshot();
 
 	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(),
-		[this]() {contributeToAllReduceCallback();}, BCAST_INIT));
+		[this]() {cbContributeToAllReduce();}, BCAST_INIT));
 
 
 	JobMessage baseMsg = getMessageTemplate();

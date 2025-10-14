@@ -26,11 +26,17 @@ struct JobTreeSnapshot {
     void sendToLeftChild(JobMessage& msg, int mpiTag) const {
         msg.contextIdOfDestination = leftChildContextId;
         msg.treeIndexOfDestination = leftChildIndex;
+        assert(msg.contextIdOfDestination != 0
+            || log_return_false("Error in Brodcast! Want to send to left child but its contextId is 0! mpiTag %i, msgTag %i, senderIdx %i, destinationIdx %i \n",
+                mpiTag, msg.tag, msg.treeIndexOfSender, msg.treeIndexOfDestination));
         send(leftChildNodeRank, mpiTag, msg);
     }
     void sendToRightChild(JobMessage& msg, int mpiTag) const {
         msg.contextIdOfDestination = rightChildContextId;
         msg.treeIndexOfDestination = rightChildIndex;
+        assert(msg.contextIdOfDestination != 0
+            || log_return_false("Error in Brodcast! Want to send to right child but its contextId is 0! mpiTag %i, msgTag %i, senderIdx %i, destinationIdx %i \n",
+                mpiTag, msg.tag, msg.treeIndexOfSender, msg.treeIndexOfDestination));
         send(rightChildNodeRank, mpiTag, msg);
     }
     void sendToAnyChildren(JobMessage& msg, int mpiTag) const {
