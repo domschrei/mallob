@@ -355,6 +355,7 @@ void SweepJob::initiateNewSharingRound() {
 	//The broadcast includes all workers currently reachable by the root-node (i.e. active) and informs them about their number of children in the current tree
 	//It then causes the leaf nodes to call the callback, initiating the AllReduce
 	LOG(V3_VERB, "BCAST Initiating Sharing via Ping\n");
+	//todo: maybe reset bcast here, to prevent initiating with the same object twice, maybe prevent pingpong?
 	JobMessage msg = getMessageTemplate();
 	msg.tag = _bcast->getMessageTag();
 	msg.payload = {};
