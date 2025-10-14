@@ -128,7 +128,8 @@ std::vector<uint8_t> JobMessage::serialize() const {
     assert(treeIndexOfDestination >= 0);
     assert(contextIdOfSender != 0);
     assert(contextIdOfDestination != 0 ||
-        log_return_false("Message Error contextIdOfDestintion==0! From: ContextIdOfSender=%i, jobId=%i, tag=%i \n", contextIdOfSender, jobId, tag));
+        log_return_false("Error contextIdOfDestintion==0! From: ContextIdOfSender=%i, jobId=%i, tag=%i, payload_size=%i, epoch=%i, treeIdxOfSender=%i, treeIndexOfDest=%i \n",
+            contextIdOfSender, jobId, tag, payload.size(), epoch, treeIndexOfSender, treeIndexOfDestination));
 
     int i = 0, n;
     n = sizeof(int); memcpy(packed.data()+i, &jobId, n); i += n;

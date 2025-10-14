@@ -271,7 +271,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 		if ( ! stolen_work.empty()) {
 			//store steal data persistently in C++, such that C can keep operating on that memory segment
 			shweeper->work_received_from_steal = std::move(stolen_work);
-			LOG(V3_VERB, "Within [%i] %i variables sent to (%i) \n", _my_rank, shweeper->work_received_from_steal.size(), localId);
+			LOG(V3_VERB, "[%i] ---%i---> (%i) \n", _my_rank, shweeper->work_received_from_steal.size(), localId);
 			break;
 		}
 
@@ -309,7 +309,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 			continue;
 		}
 
-		LOG(V3_VERB, "Steal request to targetIndex %i, targetRank=%i \n", targetIndex, targetRank);
+		LOG(V3_VERB, "Global steal request to targetIndex %i, targetRank=%i \n", targetIndex, targetRank);
 
 		//Request will be handled by the MPI main thread, which will send an MPI message on our behalf
 		//because here we are in code executed by the kissat thread, which can cause problems for sending MPI messages
@@ -328,7 +328,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 		//Successful steal if size > 0
 		if ( ! _worksteal_requests[localId].stolen_work.empty()) {
 			shweeper->work_received_from_steal = std::move(_worksteal_requests[localId].stolen_work);
-			LOG(V3_VERB, "[%i](%i) received %i variables from [%i] \n", _my_rank, localId,shweeper->work_received_from_steal.size(), targetRank);
+			LOG(V3_VERB, "[%i] ---%i---> [%i](%i) \n", targetRank, shweeper->work_received_from_steal.size(), _my_rank, localId);
 			break;
 		}
 		//Unsuccessful global steal, try again
@@ -487,8 +487,10 @@ std::vector<int> SweepJob::stealWorkFromAnyLocalSolver() {
 	auto rand_permutation = getRandomIdPermutation();
 	for (int localId : rand_permutation) {
 		auto stolen_work = stealWorkFromSpecificLocalSolver(localId);
-		if ( ! stolen_work.empty())
+		if ( ! stolen_work.empty()) {
+			LOG(V3_VERB, "ß (%i) ---%i---> \n", localId, stolen_work.size());
 			return stolen_work;
+		}
 	}
 	//no work available, all local solvers are searching too
 	return {};
@@ -515,7 +517,7 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	//Allocate memory for the steal here in C++, and pass the array location to kissat such that it can fill it with the stolen work
 	std::vector<int> stolen_work = std::vector<int>(max_steal_amount);
 	int actually_stolen = shweep_steal_from_this_solver(shweeper->solver, reinterpret_cast<unsigned int*>(stolen_work.data()), max_steal_amount);
-	LOG(V3_VERB, "ß Steal request got %i actually stolen\n", actually_stolen);
+	// LOG(V3_VERB, "ß Steal request got %i actually stolen\n", actually_stolen);
 	if (actually_stolen == 0)
 		return {};
 	//We sized he provided array to be maximally conservative,

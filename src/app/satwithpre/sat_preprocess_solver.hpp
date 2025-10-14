@@ -123,6 +123,7 @@ public:
 
             //continue directly from prepro to prepro'd SAT, without sweep
             if (_prepro.hasPreprocessedFormula() && ! _params.preprocessSweep.val) {
+                printf("SATWP submit preprocessed SAT task, skip SWEEP\n");
                 LOG(V3_VERB, "SATWP submit preprocessed SAT task, skip SWEEP\n");
                 submitPreprocessedJob(_prepro.extractPreprocessedFormula());
             }
@@ -130,6 +131,7 @@ public:
             //schedules "distributed equivalence sweeping" as another preprocessing step
             //does NOT yet start the retraction of the base job, as we are still doing preprocessing on the side
             if (_prepro.hasPreprocessedFormula() && _params.preprocessSweep.val && ! _sweep_job_submitted) {
+                printf("SATWP submit SWEEP\n");
                 LOG(V3_VERB, "SATWP Submit SWEEP\n");
                 submitSweepJob(_prepro.extractPreprocessedFormula());
             }

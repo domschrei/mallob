@@ -30,8 +30,8 @@ private:
 	bool _terminate_all=false;
 
 	// static const int NUM_STEAL_METADATA = 1;
-    const int TAG_SEARCHING_WORK=1001;
-    const int TAG_RETURNING_STEAL_REQUEST=1002;
+    const int TAG_SEARCHING_WORK = 1001;
+    const int TAG_RETURNING_STEAL_REQUEST = 1002;
 	struct WorkstealRequest {
 		int localId{-1};
 		int targetIndex{-1};
@@ -46,8 +46,8 @@ private:
 	float _last_sharing_timestamp;
     std::unique_ptr<JobTreeBroadcast> _bcast;
     std::unique_ptr<JobTreeAllReduction> _red;
-    const int BCAST_INIT{1};
-    const int ALLRED{2};
+    const int BCAST_INIT = 1003;
+    const int ALLRED = 1004;
 
 	// bool _started_sharing = false;
 	// int _sharing_round = 0;
