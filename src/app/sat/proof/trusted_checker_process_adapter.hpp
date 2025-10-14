@@ -125,6 +125,7 @@ public:
     inline bool accept(LratOp& op, bool& res, u8* sig, u32& cidx) {
         bool ok = _op_queue.pollBlocking(op);
         if (!ok) return false;
+        res = true;
         if (op.isDerivation()) res = acceptProduceClause(op.data.produce.glue > 0 ? sig : 0, cidx);
         else if (op.isImport()) res = acceptImportClause();
         else if (op.isDeletion()) res = acceptDeleteClauses();
@@ -134,6 +135,7 @@ public:
         else if (op.isEndLoad()) res = acceptGeneric("END LOAD");
         else if (!op.isLoad()) res = acceptGeneric("Unspecified op");
         if (op.isEndLoad()) _revision++;
+        res = res && !_error_reported;
         return !_io.encounteredEOF();
     }
 
@@ -157,7 +159,6 @@ private:
             return;
         }
         LOGGER(_logger, V0_CRIT, "[ERROR] IMPCHK rejected operation: %s\n", errMsg.c_str());
-        Terminator::setTerminating();
         _error_reported = true;
     }
 

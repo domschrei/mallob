@@ -15,6 +15,7 @@
 #include "data/job_interrupt_reason.hpp"
 #include "data/job_state.h"
 #include "data/job_transfer.hpp"
+#include "comm/mympi.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
 #include "util/sys/watchdog.hpp"
@@ -26,7 +27,6 @@
 #include "app/job_tree.hpp"
 #include "comm/msg_queue/message_queue.hpp"
 #include "comm/mympi.hpp"
-#include "comm/sysstate_impl.hpp"
 #include "core/job_description_interface.hpp"
 #include "core/reactivation_scheduler.hpp"
 #include "core/request_manager.hpp"
@@ -185,8 +185,9 @@ void SchedulingManager::execute(Job& job, int source) {
 
     // execute post-execution hooks once, then delete them
     if (_job_execution_hooks.count(jobId)) {
-        for (auto& fun : _job_execution_hooks[jobId]) fun();
+        auto funs = std::move(_job_execution_hooks[jobId]);
         _job_execution_hooks.erase(jobId);
+        for (auto& fun : funs) fun();
     }
 }
 
@@ -264,8 +265,8 @@ void SchedulingManager::checkSuspendedJobs() {
     auto [deferredRootId, source] = _id_and_source_of_deferred_root_to_reactivate;
     if (deferredRootId >= 0) {
         if (_reactivation_scheduler.checkResumeDeferredRoot(deferredRootId)) {
-            handleJobAfterArrivedJobDescription(deferredRootId, source);
             _id_and_source_of_deferred_root_to_reactivate = {-1, -1};
+            handleJobAfterArrivedJobDescription(deferredRootId, source);
         }
     }
 
@@ -560,7 +561,7 @@ void SchedulingManager::handleIncomingJobDescription(MessageHandle& handle, bool
     }
     if (_reactivation_scheduler.checkResumeDeferredRoot(jobId)) {
         handleJobAfterArrivedJobDescription(jobId, handle.source);
-    } else {
+    } else if (has(jobId) && get(jobId).getJobTree().isRoot()) {
         // This root node cannot be resumed yet
         // since its suspension protocol is not done yet!
         // Remember the id and source to resume later.
@@ -662,10 +663,10 @@ void SchedulingManager::handleJobInterruption(MessageHandle& handle) {
     int rev = vec[1];
     JobInterruptReason reason = static_cast<JobInterruptReason>(vec[2]);
 
-    if (!has(jobId) || get(jobId).getState() != ACTIVE) {
+    if (!has(jobId) || get(jobId).getState() != ACTIVE || get(jobId).getRevision() < rev) {
         // defer message until the job is ACTIVE in revision "rev"
         _job_execution_hooks[jobId].push_back([&, h = std::move(handle)]() mutable {
-            LOG(V4_VVER, "#%i post-execution hook : interrupt\n", Serializable::get<IntVec>(h.getRecvData())[0]);
+            LOG(V4_VVER, "#%i post-exec hook : interrupt\n", Serializable::get<IntVec>(h.getRecvData())[0]);
             handleJobInterruption(h);
         });
         return;
@@ -697,6 +698,16 @@ void SchedulingManager::handleJobInterruption(MessageHandle& handle) {
 
 void SchedulingManager::handleIncrementalJobFinished(MessageHandle& handle) {
     int jobId = Serializable::get<int>(handle.getRecvData());
+
+    auto [defId, defSource] = _id_and_source_of_deferred_root_to_reactivate;
+    if (defId == jobId) {
+        // This is still a deferred root! Accordingly defer the interruption until the root is re-initialized.
+        _job_execution_hooks[jobId].push_back([&, h = std::move(handle)]() mutable {
+            handleIncrementalJobFinished(h);
+        });
+        return;
+    }
+
     if (has(jobId)) {
         LOG(V3_VERB, "Incremental job %s done\n", get(jobId).toStr());
         interruptJob(Serializable::get<int>(handle.getRecvData()), /*terminate=*/true, /*reckless=*/false);
@@ -1220,6 +1231,27 @@ void SchedulingManager::terminate(Job& job) {
 
 void SchedulingManager::interruptJob(int jobId, bool doTerminate, bool reckless) {
 
+    int msgTag;
+    if (doTerminate && reckless) msgTag = MSG_NOTIFY_JOB_ABORTING;
+    else if (doTerminate) msgTag = MSG_NOTIFY_JOB_TERMINATING;
+    else msgTag = MSG_INTERRUPT;
+
+    if (doTerminate && _orphaned_child_nodes.count(jobId)) {
+        // We are terminating a job for which we know some orphaned child nodes:
+        // Forward the termination message to them
+        for (int rank : _orphaned_child_nodes.at(jobId)) {
+            if (rank == MyMpi::rank(MPI_COMM_WORLD) || rank < 0) continue;
+            MyMpi::isend(rank, msgTag, IntVec({jobId, JobInterruptReason::DONE}));
+            LOG_ADD_DEST(V4_VVER, "Propagate termination of #%i ...", rank, jobId);
+        }
+        _orphaned_child_nodes.erase(jobId);
+    }
+
+    if (_id_and_source_of_deferred_root_to_reactivate.first == jobId) {
+        // Has deferred root of this job. This is not the right place to interrupt or terminate it.
+        return;
+    }
+
     if (!has(jobId)) return;
     Job& job = get(jobId);
 
@@ -1229,10 +1261,6 @@ void SchedulingManager::interruptJob(int jobId, bool doTerminate, bool reckless)
         return;
 
     // Propagate message down the job tree
-    int msgTag;
-    if (doTerminate && reckless) msgTag = MSG_NOTIFY_JOB_ABORTING;
-    else if (doTerminate) msgTag = MSG_NOTIFY_JOB_TERMINATING;
-    else msgTag = MSG_INTERRUPT;
     auto destinations = job.getJobTree().getPastChildren();
     if (job.getJobTree().hasLeftChild()) destinations.insert(job.getJobTree().getLeftChildNodeRank());
     if (job.getJobTree().hasRightChild()) destinations.insert(job.getJobTree().getRightChildNodeRank());
@@ -1267,7 +1295,14 @@ void SchedulingManager::forgetOldJobs() {
 
 void SchedulingManager::eraseJobAndQueueForDeletion(Job& job) {
     LOG(V4_VVER, "FORGET %s\n", job.toStr());
-    if (job.getState() != PAST) job.terminate();
+    if (job.getState() != PAST) {
+        job.terminate();
+        // We need to remember the job's past child nodes.
+        // If the job itself gets terminated later on, we need to be able
+        // to forward the termination message to them.
+        LOG(V4_VVER, "keeping %i orphaned children of #%i\n", job.getJobTree().getPastChildren().size(), job.getId());
+        _orphaned_child_nodes[job.getId()].insert(job.getJobTree().getPastChildren().begin(), job.getJobTree().getPastChildren().end());
+    }
     assert(job.getState() == PAST);
     _job_registry.erase(&job);
 }

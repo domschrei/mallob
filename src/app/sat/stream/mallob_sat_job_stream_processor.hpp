@@ -78,17 +78,18 @@ public:
             _initialized_backlog_task = true;
         }
         _backlog_task.integrate(task);
+        auto& t = _backlog_task;
 
-        if (!_began_nontrivial_solving) {
+        if (!_finalized && !_began_nontrivial_solving) {
             // If no distributed job was submitted yet, we try to avoid this overhead;
             // we wait for a short while if a more lightweight solver finds a solution immediately.
             time = Timer::elapsedSeconds() - time;
             usleep(1'000'000 * std::max(0.0, 0.05 - time)); // 50 ms minus the time taken to copy the literals
-            if (_terminator(task.rev)) {
+            if (_terminator(t.rev)) {
                 return; // Task has become obsolete in the meantime, so skip solving
             }
             // Task is not (yet) obsolete after the wait, so we now begin proper distributed solving
-            LOG(V2_INFO, "%s awakes for rev. %i\n", _name.c_str(), task.rev);
+            LOG(V2_INFO, "%s awakes for rev. %i\n", _name.c_str(), t.rev);
             _began_nontrivial_solving = true;
 
             //JobSlotRegistry::acquireSlot(_job_slot);
@@ -108,11 +109,11 @@ public:
             _json_base["configuration"]["__EO"] = std::to_string(1000 * _stream_id);
         }
 
-        auto& newLiterals = _backlog_task.lits;
-        const auto& assumptions = _backlog_task.assumptions;
-        auto chksum = task.chksum;
-        const auto& descriptionLabel = task.descLabel;
-        float priority = task.priority;
+        auto& newLiterals = t.lits;
+        const auto& assumptions = t.assumptions;
+        auto chksum = t.chksum;
+        const auto& descriptionLabel = t.descLabel;
+        float priority = t.priority;
 
         if (_finalized || !_began_nontrivial_solving) return;
 
@@ -140,7 +141,7 @@ public:
             auto out = FormulaCompressor::compress(newLiterals.data(), newLiterals.size(),
                 assumptions.data(), assumptions.size());
             newLiterals = std::move(*out.vec);
-        } else if (task.type == SatJobStreamProcessor::SatTask::SPLIT) {
+        } else if (t.type == SatJobStreamProcessor::SatTask::SPLIT) {
             newLiterals.push_back(INT32_MAX);
             for (int a : assumptions) newLiterals.push_back(a);
             newLiterals.push_back(0);
@@ -155,9 +156,10 @@ public:
         _expected_result_job_name = copy["name"].get<std::string>();
 
         _task_pending = true;
-        _pending_rev = task.rev;
+        _pending_rev = t.rev;
         _pending_task_interrupted = false;
         try {
+            LOG(V4_VVER, "%s SUBMIT %s\n", _name.c_str(), copy["name"].get<std::string>().c_str());
             auto response = _api.submit(copy, [&, rev = _pending_rev, subjob](nlohmann::json& result) {
 
                 if (result["name"].get<std::string>() != _expected_result_job_name) {
@@ -189,7 +191,7 @@ public:
         }
 
         unsigned long sleepInterval {1};
-        while (checkTaskPending(task.rev)) {
+        while (checkTaskPending(t.rev)) {
             usleep(sleepInterval);
             sleepInterval = std::min(2500UL, (unsigned long) std::ceil(1.2*sleepInterval));
         }
@@ -278,6 +280,7 @@ private:
         };
         // In this particular case, the callback is never called.
         // Instead, the callback of the job's original submission is called.
+        LOG(V4_VVER, "%s interrupt\n", _name.c_str());
         auto response = _api.submit(jsonInterrupt, [&](nlohmann::json& result) {assert(false);});
         if (response == JsonInterface::Result::DISCARD) {
             concludeRevision(_pending_rev, 0, {});

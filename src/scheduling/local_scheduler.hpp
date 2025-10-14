@@ -148,6 +148,7 @@ public:
             update.deserialize(h.getRecvData());
             auto& session = getSessionByChildRank(h.source);
             if (session) session->addJobNodesFromSuspendedChild(h.source, update.inactiveJobNodes);
+            else LOG(V1_WARN, "[WARN] RBS no session found for [%i]\n", h.source);
         }
 
         if (canReturnInactiveJobNodes()) returnInactiveJobNodesToParent();
@@ -319,6 +320,8 @@ private:
     std::unique_ptr<ChildInterface>& getSessionByChildRank(int childRank) {
         if (_sessions[0] && _sessions[1] && _sessions[0]->getChildRank() == _sessions[1]->getChildRank()
                 && childRank == _sessions[0]->getChildRank()) {
+            // We have two sessions, both of which match the specified rank.
+            // If possible, we select one of them that still has nodes.
             if (_sessions[0]->doesChildHaveNodes()) return _sessions[0];
             else return _sessions[1];
         }

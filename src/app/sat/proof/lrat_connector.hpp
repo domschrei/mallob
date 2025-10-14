@@ -186,6 +186,10 @@ public:
         _mtx_submit.unlock();
         return;
     }
+    bool checkForConclusion(int revision) {
+        auto lock = _mtx_submit.getLock();
+        return _last_concluded_rev >= revision;
+    }
 
     void prepareStop() {
         if (!_launched) return;
@@ -195,12 +199,13 @@ public:
         _ringbuf.markTerminated();
 
         // Terminate the emitter thread
-        _bg_emitter.stop();
+        _bg_emitter.stopWithoutWaiting();
     }
 
     void stop() {
         if (!_launched) return;
         prepareStop();
+        _bg_emitter.stop();
 
         // In order not to interfere with a concurrent initiateRevision call
         auto lock = _mtx_submit.getLock();

@@ -119,7 +119,7 @@ public:
     }
 
     bool wantsChild() const {
-        return childIndex < volume;
+        return childIndex < volume && !childHasNodes;
     }
 
     int getEpoch() const {

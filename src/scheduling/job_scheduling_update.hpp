@@ -14,6 +14,7 @@
 #include "util/hashing.hpp"
 #include "data/serializable.hpp"
 #include "util/assert.hpp"
+#include "util/logger.hpp"
 #include "util/robin_hood.hpp"
 
 struct InactiveJobNode : public Serializable {
@@ -23,8 +24,28 @@ struct InactiveJobNode : public Serializable {
     mutable enum Status {AVAILABLE, BUSY, LOST} status = AVAILABLE;
     static const char* STATUS_STR[4];
 
+    struct Copyable {
+        int rank;
+        int originalIndex;
+        int lastEpoch;
+        InactiveJobNode::Status status;
+        void check() {
+            if (status != AVAILABLE && status != BUSY && status != LOST) {
+                LOG(V0_CRIT, "[ERROR] Inactive job node has invalid status %i!\n", status);
+                abort();
+            }
+        }
+    };
+    Copyable getCopyable() const {
+        assert(status == AVAILABLE || status == BUSY || status == LOST);
+        return {rank, originalIndex, lastEpoch, status};
+    }
+
     InactiveJobNode() {}
     InactiveJobNode(int rank, int index, int epoch) : rank(rank), originalIndex(index), lastEpoch(epoch) {}
+    InactiveJobNode(Copyable c) : rank(c.rank), originalIndex(c.originalIndex), lastEpoch(c.lastEpoch), status(c.status) {
+        assert(status == AVAILABLE || status == BUSY || status == LOST);
+    }
 
     bool operator<(const InactiveJobNode& other) const {
         if (originalIndex != other.originalIndex) return originalIndex < other.originalIndex;
@@ -40,16 +61,14 @@ struct InactiveJobNode : public Serializable {
     }
 
     std::vector<uint8_t> serialize() const override {
-        std::vector<int> packedInts {rank, originalIndex, lastEpoch, status};
-        std::vector<uint8_t> packed((uint8_t*)packedInts.data(), (uint8_t*)(packedInts.data()+packedInts.size()));    
+        auto c = getCopyable();
+        std::vector<uint8_t> packed((uint8_t*) &c, ((uint8_t*) &c) + sizeof(Copyable));    
         return packed;
     }
 
     InactiveJobNode& deserialize(const std::vector<uint8_t>& packed) override {
-        rank = * (int*) (packed.data());
-        originalIndex = * (int*) (packed.data() + sizeof(int));
-        lastEpoch = * (int*) (packed.data() + 2*sizeof(int));
-        status = (Status) * (int*) (packed.data() + 3*sizeof(int));
+        auto c = * (Copyable*) packed.data();
+        *this = InactiveJobNode(c);
         return *this;
     }
 };
@@ -153,16 +172,17 @@ struct InactiveJobNodeList : public Serializable {
     }
 
     size_t getTransferSize() const {
-        return set.size()*sizeof(InactiveJobNode);
+        return set.size()*sizeof(InactiveJobNode::Copyable);
     }
 
     std::vector<uint8_t> serialize() const override {
         std::vector<uint8_t> packed(sizeof(int)+getTransferSize());
         int size = set.size();
         memcpy(packed.data(), &size, sizeof(int));
-        int n = sizeof(InactiveJobNode), i = sizeof(int);
+        int n = sizeof(InactiveJobNode::Copyable), i = sizeof(int);
         for (auto& node : set) {
-            memcpy(packed.data()+i, &node, n); i += n;
+            auto c = node.getCopyable();
+            memcpy(packed.data()+i, &c, n); i += n;
         }
         assert(i == packed.size());
         return packed;
@@ -172,11 +192,11 @@ struct InactiveJobNodeList : public Serializable {
         int n = sizeof(int), i = 0;
         int size;
         memcpy(&size, packed.data()+i, n); i += n;
-        n = sizeof(InactiveJobNode);
+        n = sizeof(InactiveJobNode::Copyable);
         for (size_t j = 0; j < size; j++) {
-            InactiveJobNode node;
-            memcpy(&node, packed.data()+i, n); i += n;
-            set.insert(node);
+            InactiveJobNode::Copyable c;
+            memcpy(&c, packed.data()+i, n); i += n;
+            set.insert(InactiveJobNode(c));
         }
         assert(size == set.size());
         assert(i == packed.size());
@@ -206,15 +226,16 @@ struct JobSchedulingUpdate : public Serializable {
         : jobId(jobId), epoch(epoch), volume(volume), inactiveJobNodes(std::move(inactiveJobNodes)) {}
 
     std::vector<uint8_t> serialize() const override {
-        std::vector<uint8_t> packed(4*sizeof(int) + inactiveJobNodes.set.size()*sizeof(InactiveJobNode));
+        std::vector<uint8_t> packed(4*sizeof(int) + inactiveJobNodes.set.size()*sizeof(InactiveJobNode::Copyable));
         int i = 0, n = sizeof(int);
         memcpy(packed.data()+i, &jobId, n); i += n;
         memcpy(packed.data()+i, &destinationIndex, n); i += n;
         memcpy(packed.data()+i, &epoch, n); i += n;
         memcpy(packed.data()+i, &volume, n); i += n;
-        n = sizeof(InactiveJobNode);
+        n = sizeof(InactiveJobNode::Copyable);
         for (auto& node : inactiveJobNodes.set) {
-            memcpy(packed.data()+i, &node, n); i += n;
+            auto c = node.getCopyable();
+            memcpy(packed.data()+i, &c, n); i += n;
         }
         return packed;
     }
@@ -225,12 +246,13 @@ struct JobSchedulingUpdate : public Serializable {
         memcpy(&destinationIndex, packed.data()+i, n); i += n;
         memcpy(&epoch, packed.data()+i, n); i += n;
         memcpy(&volume, packed.data()+i, n); i += n;
-        n = sizeof(InactiveJobNode);
+        n = sizeof(InactiveJobNode::Copyable);
         inactiveJobNodes.set.clear();
         while (i < packed.size()) {
-            InactiveJobNode node;
-            memcpy(&node, packed.data()+i, n); i += n;
-            inactiveJobNodes.set.insert(node);
+            InactiveJobNode::Copyable c;
+            memcpy(&c, packed.data()+i, n); i += n;
+            c.check();
+            inactiveJobNodes.set.insert(InactiveJobNode(c));
         }
         return *this;
     }

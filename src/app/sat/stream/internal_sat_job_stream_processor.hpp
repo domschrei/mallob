@@ -48,8 +48,8 @@ public:
 
     ~InternalSatJobStreamProcessor() override {
         finalize(); // interrupt solving, prepare cleanup
+        if (_lrat) _lrat->stop(); // blocks until checker is stopped
         while (_pending) {usleep(1000);} // blocks until solver returned
-        if (_lrat) _lrat->stop(); // blocks until checker is cleaned up
     }
 
     virtual void setName(const std::string& baseName) override {
@@ -83,7 +83,8 @@ public:
                 _lrat->push(LratOp(solution.data()+1, solution.size()-1), true, _internal_rev);
                 // Whether or not this was successful (another thread might have been earlier),
                 // wait until SAT was validated.
-                _lrat->waitForConclusion(_internal_rev);
+                while (!_lrat->checkForConclusion(_internal_rev) && !_terminator(_current_rev)) {usleep(1000);}
+                if (_terminator(_current_rev)) res = 0;
             }
         }
         if (res == 20) {
@@ -94,7 +95,8 @@ public:
                 auto id = _solver->getUnsatConclusionId();
                 assert(id != 0);
                 _lrat->push(LratOp(id, failedVec.data(), failedVec.size()), true, _internal_rev);
-                _lrat->waitForConclusion(_internal_rev);
+                while (!_lrat->checkForConclusion(_internal_rev) && !_terminator(_current_rev)) {usleep(1000);}
+                if (_terminator(_current_rev)) res = 0;
             }
             solution = std::move(failedVec);
         }
