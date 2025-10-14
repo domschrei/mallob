@@ -45,7 +45,7 @@ public:
         assert(_internal_msg_tag == -1 || _msg.tag == _internal_msg_tag);
         _internal_msg_tag = _msg.tag;
 
-        LOG(V4_VVER, "BCAST in broadcast(), isRoot? %i \n", rootOfBcast);
+        LOG(V4_VVER, "BCAST in broadcast(), isRoot? %i _received_broadcast? %i \n", rootOfBcast, _received_broadcast);
         _received_broadcast = true;
 
         assert(!_msg.returnedToSender);
@@ -98,7 +98,7 @@ private:
         // Undeliverable message being returned?
         if (msg.returnedToSender) {
             // prune child
-            LOG(V4_VVER, "BCAST received msg: returnToSender. sourceRank %i \n", h.source);
+            LOG(V4_VVER, "BCAST received msg from sourceRank %i with returnToSender\n", h.source);
             if (h.source == _tree.leftChildNodeRank) {
                 _tree.leftChildNodeRank = -1;
                 _received_response_left = true;
@@ -111,7 +111,8 @@ private:
             return true;
         }
 
-        LOG(V4_VVER, "BCAST received msg. sourceRank %i \n", h.source);
+        LOG(V4_VVER, "BCAST received msg from sourceRank %i (local _received_broadcast=%i, leftChildRank %i, RightChildRank %i)\n",
+            h.source, _received_broadcast, _tree.leftChildNodeRank, _tree.rightChildNodeRank);
 
         // Response from child?
         if (_received_broadcast && h.source == _tree.leftChildNodeRank) {
@@ -126,6 +127,8 @@ private:
         }
 
         // Advance broadcast
+
+        LOG(V4_VVER, "BCAST received message source doesnt match children or not yet self received, advance \n");
         broadcast(std::move(msg), false);
         return true;
     }
