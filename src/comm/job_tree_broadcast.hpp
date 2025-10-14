@@ -63,7 +63,7 @@ public:
             _tree.sendToParent(_msg, MSG_JOB_TREE_MODULAR_BROADCAST);
         }
 
-        if (hasResult()) _cb(); // execute the provided callback. In case of SweepJob it's actOnBroadcastPing()
+        if (hasResult()) _cb(); // execute the provided callback. In case of SweepJob it is SweepJob::cbContributeToAllReduce()
     }
 
     void updateJobTree(const JobTree& tree) {

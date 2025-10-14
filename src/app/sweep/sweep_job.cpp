@@ -485,6 +485,11 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 
 std::vector<int> SweepJob::stealWorkFromAnyLocalSolver() {
 	auto rand_permutation = getRandomIdPermutation();
+	LOG(V4_VVER, "Steal permutation: ");
+	for (int id : rand_permutation) {
+		LOG(V4_VVER, "%i ", id);
+	}
+	LOG(V4_VVER, "\n");
 	for (int localId : rand_permutation) {
 		auto stolen_work = stealWorkFromSpecificLocalSolver(localId);
 		if ( ! stolen_work.empty()) {

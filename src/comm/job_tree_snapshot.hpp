@@ -26,17 +26,17 @@ struct JobTreeSnapshot {
     void sendToLeftChild(JobMessage& msg, int mpiTag) const {
         msg.contextIdOfDestination = leftChildContextId;
         msg.treeIndexOfDestination = leftChildIndex;
-        assert(msg.contextIdOfDestination != 0
-            || log_return_false("Error in Brodcast! Want to send to left child but its contextId is 0! mpiTag %i, msgTag %i, senderIdx %i, destinationIdx %i \n",
-                mpiTag, msg.tag, msg.treeIndexOfSender, msg.treeIndexOfDestination));
+        // assert(msg.contextIdOfDestination != 0
+            // || log_return_false("Error in Brodcast! Want to send to left child but its contextId is 0! mpiTag %i, msgTag %i, senderIdx %i, destinationIdx %i \n",
+                // mpiTag, msg.tag, msg.treeIndexOfSender, msg.treeIndexOfDestination));
         send(leftChildNodeRank, mpiTag, msg);
     }
     void sendToRightChild(JobMessage& msg, int mpiTag) const {
         msg.contextIdOfDestination = rightChildContextId;
         msg.treeIndexOfDestination = rightChildIndex;
-        assert(msg.contextIdOfDestination != 0
-            || log_return_false("Error in Brodcast! Want to send to right child but its contextId is 0! mpiTag %i, msgTag %i, senderIdx %i, destinationIdx %i \n",
-                mpiTag, msg.tag, msg.treeIndexOfSender, msg.treeIndexOfDestination));
+        // assert(msg.contextIdOfDestination != 0
+            // || log_return_false("Error in Brodcast! Want to send to right child but its contextId is 0! mpiTag %i, msgTag %i, senderIdx %i, destinationIdx %i \n",
+                // mpiTag, msg.tag, msg.treeIndexOfSender, msg.treeIndexOfDestination));
         send(rightChildNodeRank, mpiTag, msg);
     }
     void sendToAnyChildren(JobMessage& msg, int mpiTag) const {
@@ -46,6 +46,11 @@ struct JobTreeSnapshot {
     void send(int dest, int mpiTag, JobMessage& msg) const {
         msg.contextIdOfSender = contextId;
         msg.treeIndexOfSender = index;
+        assert(msg.contextIdOfDestination != 0
+            || log_return_false("Error in Brodcast! Want to send within tree but destination contextId is 0! "
+                                "mpiTag %i, msgTag %i, senderIdx %i, destinationIdx %i , senderContextId %i, destRank %i, "
+                                "leftChildRank %i rightChildRank %i parentRank %i \n",
+                mpiTag, msg.tag, msg.treeIndexOfSender, msg.treeIndexOfDestination, contextId, dest, leftChildNodeRank, rightChildNodeRank, parentNodeRank));
         MyMpi::isend(dest, mpiTag, msg);
     }
 };
