@@ -94,6 +94,9 @@ public:
 
             //JobSlotRegistry::acquireSlot(_job_slot);
 
+            int jobSlots = _params.jobSlots() > 0 ? _params.jobSlots() : MyMpi::size(MPI_COMM_WORLD);
+            int numConcStreams = std::min(jobSlots, MyMpi::size(MPI_COMM_WORLD));
+
             _base_job_name = "satjob-" + std::to_string(_stream_id) + "-rev-";
             _json_base["user"] = _username;
             _json_base["incremental"] = _incremental;
@@ -106,7 +109,8 @@ public:
                 _json_base["configuration"]["__XU"] = "-1";
             _json_base["configuration"]["__NV"] = std::to_string(_nb_vars);
             _json_base["configuration"]["__NC"] = std::to_string(_nb_clauses);
-            _json_base["configuration"]["__EO"] = std::to_string(1000 * _stream_id);
+            _json_base["configuration"]["__EO"] = std::to_string(_stream_id);
+            _json_base["configuration"]["__EM"] = std::to_string(numConcStreams);
         }
 
         auto& newLiterals = t.lits;

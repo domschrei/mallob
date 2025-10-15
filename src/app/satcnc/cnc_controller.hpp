@@ -52,10 +52,11 @@ public:
         res.result = 0; // unknown
 
         // Generate a set of cubes
-        int depth = 13; // 2^8 = 8192 cubes
+        SplitMix64Rng rng(_params.seed());
+        int depth = 10; // 2^10 = 1024 cubes
         LOG(V2_INFO, "CNC generating cubes with depth %i\n", depth);
         std::vector<std::vector<int>> cubes = getCubes(depth);
-        ::random_shuffle(cubes.data(), cubes.size()); // shuffle randomly
+        ::random_shuffle(cubes.data(), cubes.size(), rng); // shuffle randomly
         int nbGeneratedCubes = cubes.size();
         int nbUnsatCubes = 0; // track number of cubes found UNSAT so far
         LOG(V2_INFO, "CNC generated %i cubes, status=%i\n", nbGeneratedCubes, _status);
@@ -163,6 +164,7 @@ private:
             setup.solverType = 'C';
             setup.isJobIncremental = true;
             setup.exportClauses = false;
+            setup.baseSeed = 0;
             std::unique_ptr<Cadical> solver;
             solver.reset(new Cadical(setup));
             solver->setLearnedClauseCallback([&](const Mallob::Clause&, int) {});
