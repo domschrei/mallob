@@ -1,56 +1,31 @@
 #!/bin/bash
-#
-set -e
+
 # TODO Load your own suitable modules here
 module load slurm_setup
 module unload devEnv/Intel/2019 intel-mpi cmake
 module load gcc/11 intel-mpi/2019-gcc cmake/3.21.4 gdb valgrind
 echo "Modules loaded"
-#
-# Only needed if building with -DMALLOB_APP_SAT=1 (enabled by default).
-# For non-x86-64 architectures (ARM, POWER9, etc.), prepend `DISABLE_FPU=1` to "bash".
+
 ( cd lib && bash fetch_and_build_solvers.sh klyc sweep)
-#
-# Build Mallob
-# Specify `-DCMAKE_BUILD_TYPE=RELEASE` for a release build or `-DCMAKE_BUILD_TYPE=DEBUG` for a debug build.
-# Find all build options at: docs/setup.md
+
 mkdir -p build
-# rm build/*mallob*
-rm -f build/*mallob* 2>/dev/null || true
-
-BUILD_TYPE="DEBUG"
-if [ "$1" = "release" || "$1" = "rel" ]; then
-  BUILD_TYPE="RELEASE"
-fi
-
-echo "Building $BUILD_TYPE"
-
-BUILD_OPTIONS=(
-  -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
-  -DMALLOB_APP_SAT=1
-  -DMALLOB_APP_SATWITHPRE=1
-  -DMALLOB_APP_SWEEP=1
-  -DMALLOB_LOG_VERBOSITY=4
-  -DMALLOB_ASSERT=1
-  -DMALLOB_USE_JEMALLOC=1
-  -DMALLOB_JEMALLOC_DIR="$HOME/jemalloc-5.2.1/lib/"
-  -DMALLOB_SUBPROC_DISPATCH_PATH="build/"
-  -DMALLOB_MAX_N_APPTHREADS_PER_PROCESS=64
-)
-
-# Add AddressSanitizer only for debug builds
-if [[ "$BUILD_TYPE" == "DEBUG" ]]; then
-  BUILD_OPTIONS+=(-DMALLOB_USE_ASAN=1)
-fi
+rm build/*mallob*
 
 cd build
+
 CC=$(which mpicc) 
 CXX=$(which mpicxx) 
-cmake "${BUILD_OPTIONS[@]}" ..
-# cmake $BUILD_OPTIONS
+cmake -DCMAKE_BUILD_TYPE=RELEASE \
+  -DMALLOB_APP_SAT=1 \
+  -DMALLOB_APP_SATWITHPRE=1 \
+  -DMALLOB_APP_SWEEP=1 \
+  -DMALLOB_LOG_VERBOSITY=4 \
+  -DMALLOB_ASSERT=1 \
+  -DMALLOB_USE_JEMALLOC=1 \
+  -DMALLOB_MAX_N_APPTHREADS_PER_PROCESS=64 \
+  -DMALLOB_JEMALLOC_DIR="$HOME/jemalloc-5.2.1/lib/" \
+  -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\" ..
+
 make clean
 make -j 20; cd ..
-
-
-#-DMALLOB_APP_SWEEP=1 \
 
