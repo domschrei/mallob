@@ -28,10 +28,10 @@ void SweepJob::appl_start() {
 	_my_rank = getJobTree().getRank();
 	_my_index = getJobTree().getIndex();
 	_is_root = getJobTree().isRoot();
-	LOG(V2_INFO,"ß SweepJob application start: Rank %i, Index %i, is root? %i, Parent-Rank %i, Parent-Index %i, numThreadsPerProcess=%d\n",
-		_my_rank, _my_index, _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _params.numThreadsPerProcess.val);
+	LOG(V2_INFO,"ß SWEEP SweepJob application start: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, numThreadsPerProcess=%d\n",
+		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _params.numThreadsPerProcess.val);
 	// LOG(V2_INFO,"ß num children %i\n", getJobTree().getNumChildren());
-	LOG(V2_INFO,"ß sweep-sharing-period: %i ms\n", _params.sweepSharingPeriod_ms.val);
+	LOG(V2_INFO,"ß SWEEP sweep-sharing-period: %i ms\n", _params.sweepSharingPeriod_ms.val);
     _metadata = getSerializedDescription(0)->data();
 	_start_shweep_timestamp = Timer::elapsedSeconds();
 	_last_sharing_timestamp = Timer::elapsedSeconds();
@@ -47,7 +47,7 @@ void SweepJob::appl_start() {
 	_shweepers.resize(_params.numThreadsPerProcess.val);
 	//a broadcast object is used to initiate an all-reduction by first pinging each processes currently reachable by the root node
 	//the ping detects the current tree structure and provides a callback to contribute to the all-reduction
-	LOG(V2_INFO, "[sweep] initialize broadcast object\n");
+	LOG(V2_INFO, "[SWEEP] initialize broadcast object\n");
 	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
 	//Start individual Kissat threads, which immediately jump into the sweeping algorithm
 	for (int localId=0; localId < _params.numThreadsPerProcess.val; localId++) {
@@ -56,11 +56,11 @@ void SweepJob::appl_start() {
 		startShweeper(shweeper);
 	}
 
-	LOG(V2_INFO, "[sweep] Finished SweepJob appl_start() \n");
+	LOG(V2_INFO, "[SWEEP] Finished SweepJob appl_start() \n");
 }
 
 std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
-	LOG(V2_INFO, "Create shweeper [%i](%i)\n", _my_rank, localId);
+	LOG(V2_INFO, "SWEEP Create shweeper [%i](%i)\n", _my_rank, localId);
 	const JobDescription& desc = getDescription();
 	SolverSetup setup;
 	setup.logger = &Logger::getMainInstance();
@@ -110,14 +110,14 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 
 void SweepJob::startShweeper(KissatPtr shweeper) {
 	// LOG(V2_INFO,"ß Calling new thread\n");
-	LOG(V2_INFO, "Add shweeper [%i](%i) to Pool Tasks\n", _my_rank, shweeper->getLocalId());
+	LOG(V2_INFO, "SWEEP Add shweeper [%i](%i) to Pool Tasks\n", _my_rank, shweeper->getLocalId());
 	std::future<void> fut_shweeper = ProcessWideThreadPool::get().addTask([this, shweeper]() { //Changed from [&] to [this, shweeper]!! (nicco)
 		// LOG(V2_INFO, "Start Thread (r %i, id %i)\n", _my_rank, shweeper->getLocalId());
 		loadFormula(shweeper);
-		LOG(V2_INFO, "# # Starting shweeper solve() [%i](%i)\n", _my_rank, shweeper->getLocalId());
+		LOG(V2_INFO, "# # SWEEP Starting shweeper solve() [%i](%i)\n", _my_rank, shweeper->getLocalId());
 		_running_shweepers_count++;
 		int res = shweeper->solve(0, nullptr);
-		LOG(V2_INFO, "# # Thread finished. Rank %i localId %i result %i # #\n", _my_rank, shweeper->getLocalId(), res);
+		LOG(V2_INFO, "# # SWEEP Thread finished. Rank %i localId %i result %i # #\n", _my_rank, shweeper->getLocalId(), res);
 
 		assert( ! _is_root || _dimacsReportLocalId->load() != -1);
 		if (_is_root && shweeper->getLocalId() == _dimacsReportLocalId->load()) {
@@ -171,8 +171,8 @@ void SweepJob::appl_communicate() {
 void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 	// LOG(V2_INFO, "Shweep rank %i: received custom message from source %i, mpiTag %i, msg.tag %i \n", _my_rank, source, mpiTag, msg.tag);
 	if (msg.returnedToSender) {
-		LOG(V0_CRIT, "ß Error: received unexpected returnedToSender message during Sweep Job Workstealing!\n");
-		LOG(V0_CRIT, "ß Error: source=%i mpiTag=%i, treeIdxOfSender=%i, treeIdxOfDestination=%i \n", sourceRank, mpiTag,  msg.treeIndexOfSender, msg.treeIndexOfDestination);
+		LOG(V0_CRIT, "ß SWEEP Error: received unexpected returnedToSender message during Sweep Job Workstealing!\n");
+		LOG(V0_CRIT, "ß SWEEP Error: source=%i mpiTag=%i, treeIdxOfSender=%i, treeIdxOfDestination=%i \n", sourceRank, mpiTag,  msg.treeIndexOfSender, msg.treeIndexOfDestination);
 		assert(false);
 	}
 	if (msg.tag == TAG_SEARCHING_WORK) {
@@ -180,7 +180,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		int localId = msg.payload.front();
 		msg.payload.clear();
 
-		LOG(V3_VERB, "ß Received MPI steal request from [%i](%i) \n", sourceRank, localId);
+		LOG(V3_VERB, "ß SWEEP Received MPI steal request from [%i](%i) \n", sourceRank, localId);
 		auto locally_stolen_work = stealWorkFromAnyLocalSolver();
 
 		msg.payload = std::move(locally_stolen_work);
@@ -192,7 +192,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		msg.treeIndexOfDestination = sourceIndex;
 		msg.contextIdOfDestination = getJobComm().getContextIdOrZero(sourceIndex);
 		assert(msg.contextIdOfDestination != 0 ||
-			log_return_false("Error in TAG_RETURNING_STEAL_REQUEST! Want to return an message, but invalid contextIdOfDestination==0. "
+			log_return_false("SWEEP Error in TAG_RETURNING_STEAL_REQUEST! Want to return an message, but invalid contextIdOfDestination==0. "
 					"With sourceRank=%i, sourceIndex=%i, payload.size()=%i \n", sourceRank, sourceIndex, msg.payload.size()));
 		getJobTree().send(sourceRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 		return;
@@ -221,11 +221,11 @@ void SweepJob::sendMPIWorkstealRequests() {
 			msg.treeIndexOfDestination = request.targetIndex;
 			msg.contextIdOfDestination = getJobComm().getContextIdOrZero(request.targetIndex);
 
-			assert(msg.contextIdOfDestination != 0 || log_return_false("Error: contextIdOfDestination==0 in workstealing request! Source rank=%i, targetRank %i \n", _my_rank, request.targetRank));
+			assert(msg.contextIdOfDestination != 0 || log_return_false("SWEEP Error: contextIdOfDestination==0 in workstealing request! Source rank=%i, targetRank %i \n", _my_rank, request.targetRank));
 			msg.payload = {request.localId};
 			// LOG(V2_INFO, "Rank %i asks rank %i for work\n", _my_rank, recv_rank, n);
 			// LOG(V2_INFO, "  with destionation ctx_id %i \n", msg.contextIdOfDestination);
-			LOG(V3_VERB, "  MPI work request from [%i](%i) to [%i] \n", _my_rank, request.localId, request.targetRank);
+			LOG(V3_VERB, "SWEEP MPI work request from [%i](%i) to [%i] \n", _my_rank, request.localId, request.targetRank);
 			getJobTree().send(request.targetRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 		}
 	}
@@ -278,7 +278,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 		int my_comm_rank = getJobComm().getWorldRankOrMinusOne(_my_index);
 
 		if (my_comm_rank == -1) {
-			LOG(V3_VERB, "Delaying global steal request, my own rank %i (index %i) is not yet in JobComm \n", _my_rank, _my_index);
+			LOG(V3_VERB, "SWEEP Delaying global steal request, my own rank %i (index %i) is not yet in JobComm \n", _my_rank, _my_index);
 			// LOG(V2_INFO, " with _my_index %i \n", _my_index);
 			// LOG(V2_INFO, " with JobComm().size %i \n", getJobComm().size());
 			usleep(10000);
@@ -303,7 +303,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 		}
 
 		if (getJobComm().getContextIdOrZero(targetIndex)==0) {
-			LOG(V3_VERB, "Context ID of target is missing. getVolume()=%i, rndTargetIndex=%i, rndTargetRank=%i, myIndex=%i, myRank=%i \n", getVolume(), targetIndex, targetRank, _my_index, _my_rank);
+			LOG(V3_VERB, "SWEEP Context ID of target is missing. getVolume()=%i, rndTargetIndex=%i, rndTargetRank=%i, myIndex=%i, myRank=%i \n", getVolume(), targetIndex, targetRank, _my_index, _my_rank);
 			//target is not yet listed in address list. Might happen for a short period just after it is spawned
 			usleep(100);
 			continue;
