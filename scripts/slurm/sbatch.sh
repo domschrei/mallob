@@ -124,7 +124,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 	-scll=60 -slbdl=60 -qcll=60 -qlbdl=60 -csm=3 -cfm=3 -cfci=30 -mscf=5 -bem=1 -aim=1 \
 	-rlbd=0 -ilbd=1 -randlbd=0 -scramble-lbds=0 \
 	-seed=0 \
-	-spd=${globallogdir}/ -spl=3 \
+	-spd=${globallogdir}/ -spl=-1 \
 	-jcup=0.05 \
 	-preprocess-sweep \
 	-sweep-sharing-period=50 \
