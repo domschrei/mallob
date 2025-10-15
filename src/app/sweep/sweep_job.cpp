@@ -28,39 +28,66 @@ void SweepJob::appl_start() {
 	_my_rank = getJobTree().getRank();
 	_my_index = getJobTree().getIndex();
 	_is_root = getJobTree().isRoot();
-	LOG(V2_INFO,"ß SWEEP SweepJob application start: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, numThreadsPerProcess=%d\n",
+	LOG(V2_INFO,"ß [SWEEP] SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, numThreadsPerProcess=%d\n",
 		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _params.numThreadsPerProcess.val);
-	// LOG(V2_INFO,"ß num children %i\n", getJobTree().getNumChildren());
 	LOG(V2_INFO,"ß SWEEP sweep-sharing-period: %i ms\n", _params.sweepSharingPeriod_ms.val);
     _metadata = getSerializedDescription(0)->data();
 	_start_shweep_timestamp = Timer::elapsedSeconds();
 	_last_sharing_timestamp = Timer::elapsedSeconds();
+
 	//do not trigger a send on the initial dummy worksteal requests
 	_worksteal_requests.resize(_params.numThreadsPerProcess.val);
 	for (auto &request : _worksteal_requests) {
 		request.sent = true;
 	}
-	//the IDs will be shuffled for each workstealing request
+
+	//the local IDs will be shuffled for each workstealing request
 	for (int localId=0; localId < _params.numThreadsPerProcess.val; ++localId) {
 		_list_of_ids.push_back(localId);
 	}
 	_shweepers.resize(_params.numThreadsPerProcess.val);
+
 	//a broadcast object is used to initiate an all-reduction by first pinging each processes currently reachable by the root node
 	//the ping detects the current tree structure and provides a callback to contribute to the all-reduction
 	LOG(V2_INFO, "[SWEEP] initialize broadcast object\n");
 	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
-	//Start individual Kissat threads, which immediately jump into the sweeping algorithm
+
+	//Start individual Kissat threads (those then immediately jump into the sweep algorithm)
+	//To keep appl_start() responsive, everything is outsourced to the individual threads
+	//(Improvement form earlier initialization which was still done by the main thread, takes ca. 4ms per solver, with x32 threads this resulted in being stuck here for 150ms!
 	for (int localId=0; localId < _params.numThreadsPerProcess.val; localId++) {
-		auto shweeper = createNewShweeper(localId);
-		_shweepers[localId] = shweeper;
-		startShweeper(shweeper);
+		createAndStartNewShweeper(localId);
 	}
 
-	LOG(V2_INFO, "[SWEEP] Finished SweepJob appl_start() \n");
+	LOG(V2_INFO, "[SWEEP] SweepJob appl_start() FINISHED\n");
+}
+
+void SweepJob::createAndStartNewShweeper(int localId) {
+
+	LOG(V2_INFO, "SWEEP [%i](%i) add thread pool request\n", _my_rank, localId);
+	std::future<void> fut_shweeper = ProcessWideThreadPool::get().addTask([this, localId]() { //Changed from [&] to [this, shweeper] back to [&] to [this, localId] !! (nicco)
+		//passing localId by value to this lambda, because the thread might only execute after createAndStartNewShweeper is already gone
+
+		auto shweeper = createNewShweeper(localId);
+		_shweepers[localId] = shweeper;
+
+		loadFormula(shweeper);
+		LOG(V2_INFO, "SWEEP [%i](%i) START solve() \n", _my_rank, localId);
+		_running_shweepers_count++;
+		int res = shweeper->solve(0, nullptr);
+		LOG(V2_INFO, "SWEEP [%i](%i) FINISH solve(). Result %i \n", _my_rank, localId, res);
+
+		assert( ! _is_root || _dimacsReportingLocalId->load() != -1);
+		if (_is_root && localId == _dimacsReportingLocalId->load()) {
+			readSolutionFormula(shweeper);
+		}
+		_running_shweepers_count--;
+	});
+	_fut_shweepers.push_back(std::move(fut_shweeper));
+
 }
 
 std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
-	LOG(V2_INFO, "SWEEP Create shweeper [%i](%i)\n", _my_rank, localId);
 	const JobDescription& desc = getDescription();
 	SolverSetup setup;
 	setup.logger = &Logger::getMainInstance();
@@ -69,7 +96,9 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	setup.numOriginalClauses = desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
 	setup.localId = localId;
 
+	LOG(V2_INFO, "SWEEP [%i](%i) create kissat shweeper \n", _my_rank, localId);
 	std::shared_ptr<Kissat> shweeper(new Kissat(setup));
+	LOG(V2_INFO, "SWEEP [%i](%i) received kissat shweeper \n", _my_rank, localId);
 	shweeper->setIsShweeper();
 
 	shweeper->shweepSetImportExportCallbacks();
@@ -78,7 +107,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	if (_is_root) {
 		//read out final formula only at the root node
 		shweeper->shweepSetReportCallback();
-		shweeper->shweepSetDimacsReportPtr(_dimacsReportLocalId);
+		shweeper->shweepSetDimacsReportPtr(_dimacsReportingLocalId);
 	}
 
     //Basic configuration
@@ -108,6 +137,43 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	return shweeper;
 }
 
+void SweepJob::readSolutionFormula(KissatPtr shweeper) {
+	_internal_result.id = getId();
+	_internal_result.revision = getRevision();
+	_internal_result.result= SAT; //technically its not SAT but just *some* information, but just calling it SAT helps to seamlessly pass it though the higher abstraction layers
+	std::vector<int> formula = shweeper->extractPreprocessedFormula();
+	_internal_result.setSolutionToSerialize(formula.data(), formula.size()); //Format: [Clauses, #Vars, #Clauses]
+
+
+	//Logging
+	auto stats = shweeper->getSolverStats();
+	printf("SWEEP_ finished\n");
+	printf("[%i](%i) SWEEP APP RESULT: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
+		_my_rank, _dimacsReportingLocalId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
+	LOG(V2_INFO, "[%i](%i) SWEEP APP RESULT: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
+		_my_rank, _dimacsReportingLocalId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
+	LOG(V2_INFO, "[%i](%i) SWEEP APP RESULT: %i Processes, %f seconds \n", _my_rank, _dimacsReportingLocalId->load(), getVolume(), Timer::elapsedSeconds() - _start_shweep_timestamp);
+	LOG(V1_WARN, "SWEEP_PRIORITY %f\n", _params.preprocessSweepPriority.val);
+	LOG(V1_WARN, "SWEEP_PROCESSES %i\n", getVolume());
+	LOG(V1_WARN, "SWEEP_THREADS_PER_PROCESS %i\n", _params.numThreadsPerProcess.val);
+	LOG(V1_WARN, "SWEEP_SHARING_PERIOD %i \n", _params.sweepSharingPeriod_ms.val);
+	LOG(V1_WARN, "SWEEP_EQUIVALENCES %i\n", stats.shweep_eqs);
+	LOG(V1_WARN, "SWEEP_UNITS %i\n", stats.shweep_new_units);
+	LOG(V1_WARN, "SWEEP_ELIMINATED %i\n", stats.shweep_eliminated);
+	LOG(V1_WARN, "SWEEP_TIME %f\n", Timer::elapsedSeconds() - _start_shweep_timestamp);
+
+	LOG(V2_INFO, "# # [%i](%i) Serialized final formula, SolutionSize=%i\n", _my_rank, _dimacsReportingLocalId->load(), _internal_result.getSolutionSize());
+	for (int i=0; i<15; i++) {
+		LOG(V2_INFO, "Formula peek %i: %i \n", i, _internal_result.getSolution(i));
+	}
+
+
+
+	//This flag tells the system that the result is actually ready
+	_solved_status = SAT;
+}
+
+/*
 void SweepJob::startShweeper(KissatPtr shweeper) {
 	// LOG(V2_INFO,"ß Calling new thread\n");
 	LOG(V2_INFO, "SWEEP Add shweeper [%i](%i) to Pool Tasks\n", _my_rank, shweeper->getLocalId());
@@ -153,6 +219,7 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 	});
 	_fut_shweepers.push_back(std::move(fut_shweeper));
 }
+*/
 
 
 // Called periodically by the main thread to allow the worker to emit messages.
@@ -172,7 +239,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 	// LOG(V2_INFO, "Shweep rank %i: received custom message from source %i, mpiTag %i, msg.tag %i \n", _my_rank, source, mpiTag, msg.tag);
 	if (msg.returnedToSender) {
 		LOG(V0_CRIT, "ß SWEEP Error: received unexpected returnedToSender message during Sweep Job Workstealing!\n");
-		LOG(V0_CRIT, "ß SWEEP Error: source=%i mpiTag=%i, treeIdxOfSender=%i, treeIdxOfDestination=%i \n", sourceRank, mpiTag,  msg.treeIndexOfSender, msg.treeIndexOfDestination);
+		LOG(V0_CRIT, "ß SWEEP Error: source=%i mpiTag=%i, msg.tag=%i treeIdxOfSender=%i, treeIdxOfDestination=%i \n", sourceRank, mpiTag, msg.tag, msg.treeIndexOfSender, msg.treeIndexOfDestination);
 		assert(false);
 	}
 	if (msg.tag == TAG_SEARCHING_WORK) {
@@ -225,7 +292,7 @@ void SweepJob::sendMPIWorkstealRequests() {
 			msg.payload = {request.localId};
 			// LOG(V2_INFO, "Rank %i asks rank %i for work\n", _my_rank, recv_rank, n);
 			// LOG(V2_INFO, "  with destionation ctx_id %i \n", msg.contextIdOfDestination);
-			LOG(V3_VERB, "SWEEP MPI work request from [%i](%i) to [%i] \n", _my_rank, request.localId, request.targetRank);
+			LOG(V3_VERB, "MPI work request from [%i](%i) to [%i] \n", _my_rank, request.localId, request.targetRank);
 			getJobTree().send(request.targetRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 		}
 	}

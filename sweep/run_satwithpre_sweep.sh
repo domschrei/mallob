@@ -56,7 +56,7 @@ echo "PREPROCESS_SEQUENTIAL_SWEEPCOMPLETE: $PREPROCESS_SEQUENTIAL_SWEEPCOMPLETE"
 
 MALLOB_OPTIONS="-t=$THREADS \
   -mono-app=SATWITHPRE \
-  -v=2 \
+  -v=4 \
   -satsolver=k \
   -colors \
   -jcup=0.05 \

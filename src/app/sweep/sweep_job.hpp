@@ -69,7 +69,7 @@ private:
 	static const int INVALID_LIT = UINT_MAX;
 
 	//keep track which solver reports the final formula, we need only one
-	std::shared_ptr<std::atomic<int>> _dimacsReportLocalId = std::make_shared<std::atomic<int>>(-1);
+	std::shared_ptr<std::atomic<int>> _dimacsReportingLocalId = std::make_shared<std::atomic<int>>(-1);
 
 
 public:
@@ -101,8 +101,12 @@ public:
 private:
     // void advanceSweepMessage(JobMessage& msg);
 	KissatPtr createNewShweeper(int localId);
+	// void startShweeper(KissatPtr shweeper);
+
+	void createAndStartNewShweeper(int localId);
     void loadFormula(KissatPtr shweeper);
-	void startShweeper(KissatPtr shweeper);
+
+	void readSolutionFormula(KissatPtr shweeper);
 
 
 	void sendMPIWorkstealRequests();
