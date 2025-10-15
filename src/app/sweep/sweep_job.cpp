@@ -48,7 +48,7 @@ void SweepJob::appl_start() {
 	//a broadcast object is used to initiate an all-reduction by first pinging each processes currently reachable by the root node
 	//the ping detects the current tree structure and provides a callback to contribute to the all-reduction
 	LOG(V2_INFO, "[sweep] initialize broadcast object\n");
-	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {cbContributeToAllReduce();}, BCAST_INIT));
+	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
 	//Start individual Kissat threads, which immediately jump into the sweeping algorithm
 	for (int localId=0; localId < _params.numThreadsPerProcess.val; localId++) {
 		auto shweeper = createNewShweeper(localId);
@@ -278,7 +278,7 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 		int my_comm_rank = getJobComm().getWorldRankOrMinusOne(_my_index);
 
 		if (my_comm_rank == -1) {
-			LOG(V3_VERB, "Delaying global steal request, my own rank %i (index %i) not yet in JobComm \n", _my_rank, _my_index);
+			LOG(V3_VERB, "Delaying global steal request, my own rank %i (index %i) is not yet in JobComm \n", _my_rank, _my_index);
 			// LOG(V2_INFO, " with _my_index %i \n", _my_index);
 			// LOG(V2_INFO, " with JobComm().size %i \n", getJobComm().size());
 			usleep(10000);
@@ -347,13 +347,14 @@ void SweepJob::initiateNewSharingRound() {
 	// LOG(V2_INFO, "last %f\n", _last_sharing_timestamp);
 	// LOG(V2_INFO, "l+p  %f\n", _last_sharing_timestamp + _params.sweepSharingPeriod_ms.val/1000.0);
 
-	if (Timer::elapsedSeconds() < _last_sharing_timestamp + _params.sweepSharingPeriod_ms.val/1000.0)
+	if (Timer::elapsedSeconds() < _last_sharing_timestamp + _params.sweepSharingPeriod_ms.val/1000.0) //convert to seconds
 		return;
 
-	_last_sharing_timestamp = Timer::elapsedSeconds();
+
 	//Broadcast a ping to all workers to initiate an AllReduce
-	//The broadcast includes all workers currently reachable by the root-node (i.e. active) and informs them about their number of children in the current tree
+	//The broadcast includes all workers currently reachable by the root-node and informs them about their parent and potential children
 	//It then causes the leaf nodes to call the callback, initiating the AllReduce
+	_last_sharing_timestamp = Timer::elapsedSeconds();
 	LOG(V3_VERB, "BCAST Initiating Sharing via Ping\n");
 	//todo: maybe reset bcast here, to prevent initiating with the same object twice, maybe prevent pingpong?
 	JobMessage msg = getMessageTemplate();
@@ -366,14 +367,15 @@ void SweepJob::cbContributeToAllReduce() {
 	assert(_bcast);
 	assert(_bcast->hasResult());
 
+	LOG(V4_VVER, "BCAST Callback to AllReduce\n");
 	auto snapshot = _bcast->getJobTreeSnapshot();
 
 	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(),
-		[this]() {cbContributeToAllReduce();}, BCAST_INIT));
+		[this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
 
 
 	JobMessage baseMsg = getMessageTemplate();
-	baseMsg.tag = ALLRED;
+	baseMsg.tag = TAG_ALLRED;
 	_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateEqUnitContributions));
 
 
@@ -389,16 +391,16 @@ void SweepJob::cbContributeToAllReduce() {
 		contrib.push_back(shweeper->shweeper_is_idle);
 
 		contribs.push_back(contrib);
-		LOG(V3_VERB, "ß New contribution: %i equivalences, %i units, %i idle \n", eq_size/2, units_size, shweeper->shweeper_is_idle);
+		LOG(V3_VERB, "ß Contribution (%i): %i equivalences, %i units, %i idle \n", shweeper->getLocalId(), eq_size/2, units_size, shweeper->shweeper_is_idle);
 
 		shweeper->units_to_share.clear();
 		shweeper->eqs_to_share.clear();
 	}
 
-	LOG(V3_VERB, "ß Aggregate contributions within single process\n");
+	LOG(V3_VERB, "ß Aggregate contributions within process\n");
 	auto aggregation_element = aggregateEqUnitContributions(contribs);
 
-	LOG(V3_VERB, "ß contributing size %i to sharing\n", aggregation_element.size()-NUM_SHARING_METADATA);
+	LOG(V3_VERB, "ß Contribution [%i]: size %i to sharing\n", _my_rank, aggregation_element.size()-NUM_SHARING_METADATA);
 	_red->contribute(std::move(aggregation_element));
 
 }

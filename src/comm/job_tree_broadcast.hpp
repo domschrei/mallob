@@ -45,7 +45,7 @@ public:
         assert(_internal_msg_tag == -1 || _msg.tag == _internal_msg_tag);
         _internal_msg_tag = _msg.tag;
 
-        LOG(V4_VVER, "BCAST in broadcast(), isRoot? %i _received_broadcast? %i \n", rootOfBcast, _received_broadcast);
+        LOG(V4_VVER, "BCAST in broadcast(). isRoot? %i _received_broadcast? %i \n", rootOfBcast, _received_broadcast);
         _received_broadcast = true;
 
         assert(!_msg.returnedToSender);
@@ -89,8 +89,10 @@ public:
 
 private:
     bool receiveMessage(MessageHandle& h) {
+        //received on MSG_JOB_TREE_MODULAR_BROADCAST mpiTag (via _sub_broadcast(...))
         JobMessage msg = Serializable::get<JobMessage>(h.getRecvData());
 
+        LOG(V4_VVER, "BCAST received msg from sourceRank %i\n", h.source);
         // Right recipient?
         if (msg.jobId != _job_id) return false;
         if (_internal_msg_tag >= 0 && msg.tag != _internal_msg_tag) return false;
@@ -98,7 +100,7 @@ private:
         // Undeliverable message being returned?
         if (msg.returnedToSender) {
             // prune child
-            LOG(V4_VVER, "BCAST received msg from sourceRank %i with returnToSender\n", h.source);
+            LOG(V4_VVER, "BCAST returnToSender received from sourceRank %i\n", h.source);
             if (h.source == _tree.leftChildNodeRank) {
                 _tree.leftChildNodeRank = -1;
                 _received_response_left = true;
@@ -128,7 +130,7 @@ private:
 
         // Advance broadcast
 
-        LOG(V4_VVER, "BCAST received message source doesnt match children or not yet self received, advance \n");
+        LOG(V4_VVER, "BCAST received message, but source doesnt match any children or we not yet self received, advance \n");
         broadcast(std::move(msg), false);
         return true;
     }

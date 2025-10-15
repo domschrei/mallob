@@ -46,8 +46,8 @@ private:
 	float _last_sharing_timestamp;
     std::unique_ptr<JobTreeBroadcast> _bcast;
     std::unique_ptr<JobTreeAllReduction> _red;
-    const int BCAST_INIT = 1003;
-    const int ALLRED = 1004;
+    const int TAG_BCAST_INIT = 1003;
+    const int TAG_ALLRED = 1004;
 
 	// bool _started_sharing = false;
 	// int _sharing_round = 0;

@@ -40,6 +40,7 @@ public:
                 memcpy(&ctxId, packed.data()+i+1, sizeof(ctx_id_t));
                 list.push_back({rank, ctxId});
                 i += 3;
+                LOG(V4_VVER, "JOBCOMM deserialized <rank %i, ctxId %i> \n", rank, ctxId);
             }
             return *this;
         }
@@ -150,7 +151,9 @@ public:
             auto lock = _access_mutex.getLock();
             _address_list = AddressList {{1, {_job_tree.getRank(), _job_tree.getContextId()}}};
             updateMap();
+            LOG(V4_VVER, "JOBCOMM aggregation at root. (rank %i, contextId %i, CommSize %i)\n", _job_tree.getRank(), _job_tree.getContextId(), _job_tree.getCommSize());
         } else {
+            LOG(V4_VVER, "JOBCOMM aggregation at non-root. (rank %i, contextId %i, CommSize %i)\n", _job_tree.getRank(), _job_tree.getContextId(), _job_tree.getCommSize());
             JobMessage msg;
             AddressList addressList{{(size_t)(_job_tree.getIndex()+1), Address {-1, 0}}};
             addressList.list[_job_tree.getIndex()] = {_job_tree.getRank(), _job_tree.getContextId()};
@@ -158,7 +161,7 @@ public:
             msg.epoch = 0;
             msg.jobId = _id;
             msg.tag = MSG_AGGREGATE_RANKLIST;
-            // LOG(V1_WARN, "jobId<#%i>: sending [%i]->[%i] MSG_AGGREGATE_RANKLIST \n", _id, _job_tree.getRank(), _job_tree.getParentNodeRank());
+            LOG(V4_VVER, "JOBCOMM aggregation sending [%i]->[%i] to parent MSG_AGGREGATE_RANKLIST \n", _job_tree.getRank(), _job_tree.getParentNodeRank());
             // for (Address adr : addressList.list) {
                 // LOG(V1_WARN, "  ----  address: rank %i context %i \n", adr.rank, adr.contextId);
             // }
@@ -174,6 +177,7 @@ public:
 
         if (msg.tag == MSG_AGGREGATE_RANKLIST) {
 
+            LOG(V4_VVER, "JOBCOMM [%i] received MSG_AGGREGATE_RANKLIST \n", _job_tree.getRank());
             {
                 AddressList ranklist;
                 ranklist.deserializeFromJobMsg(msg.payload);
@@ -222,6 +226,7 @@ public:
 
         } else if (msg.tag == MSG_BROADCAST_RANKLIST) {
 
+            LOG(V4_VVER, "JOBCOMM [%i] received MSG_BROADCAST_RANKLIST \n", _job_tree.getRank());
             // Store locally and forward to children
             {
                 auto lock = _access_mutex.getLock();
