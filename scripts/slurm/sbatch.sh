@@ -55,6 +55,8 @@ if [ ! -f $benchmarkfile ]; then
     exit 1
 fi
 
+echo "Benchmarkfile: $benchmarkfile"
+
 # Diagnose number of done / active / total jobs
 ndone=$(echo sbatch/generated/$DS_JOBNAME/.done.* | wc -w)
 ntotal=$(($DS_LASTJOBIDX - $DS_FIRSTJOBIDX + 1))

@@ -7,6 +7,11 @@ echo "$projectname"
 
 set -e
 
+if [ -z "${1:-}" ]; then
+	echo "usage: $0 <JOBNAME>"
+	exit 1
+fi
+
 jobname="$1"
 outdir="/hppfs/work/$projectname/$username/logs/${jobname}"
 

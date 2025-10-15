@@ -31,3 +31,4 @@ directives.*.impcheck
 compile_commands.json
 cmake-build-debug/
 /sbatch/generated/
+generated/
