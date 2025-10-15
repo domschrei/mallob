@@ -12,19 +12,34 @@ mkdir -p build
 rm build/*mallob*
 
 cd build
-
 CC=$(which mpicc) 
 CXX=$(which mpicxx) 
-cmake -DCMAKE_BUILD_TYPE=RELEASE \
-  -DMALLOB_APP_SAT=1 \
-  -DMALLOB_APP_SATWITHPRE=1 \
-  -DMALLOB_APP_SWEEP=1 \
-  -DMALLOB_LOG_VERBOSITY=4 \
-  -DMALLOB_ASSERT=1 \
-  -DMALLOB_USE_JEMALLOC=1 \
-  -DMALLOB_MAX_N_APPTHREADS_PER_PROCESS=64 \
-  -DMALLOB_JEMALLOC_DIR="$HOME/jemalloc-5.2.1/lib/" \
-  -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\" ..
+
+if [ "$1" = "rel" ] || [ "$1" = "release" ]; then
+  echo "Building RELEASE"
+  cmake -DCMAKE_BUILD_TYPE=RELEASE \
+    -DMALLOB_APP_SAT=1 \
+    -DMALLOB_APP_SATWITHPRE=1 \
+    -DMALLOB_APP_SWEEP=1 \
+    -DMALLOB_LOG_VERBOSITY=4 \
+    -DMALLOB_ASSERT=1 \
+    -DMALLOB_USE_JEMALLOC=1 \
+    -DMALLOB_MAX_N_APPTHREADS_PER_PROCESS=64 \
+    -DMALLOB_JEMALLOC_DIR="$HOME/jemalloc-5.2.1/lib/" \
+    -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\" ..
+else
+  echo "Building DEBUG"
+  cmake -DCMAKE_BUILD_TYPE=DEBUG \
+    -DMALLOB_APP_SAT=1 \
+    -DMALLOB_APP_SATWITHPRE=1 \
+    -DMALLOB_APP_SWEEP=1 \
+    -DMALLOB_LOG_VERBOSITY=4 \
+    -DMALLOB_ASSERT=1 \
+    -DMALLOB_USE_JEMALLOC=1 \
+    -DMALLOB_MAX_N_APPTHREADS_PER_PROCESS=64 \
+    -DMALLOB_JEMALLOC_DIR="$HOME/jemalloc-5.2.1/lib/" \
+    -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\" ..
+fi
 
 make clean
 make -j 20; cd ..
