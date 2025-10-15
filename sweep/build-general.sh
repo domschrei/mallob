@@ -38,9 +38,9 @@ BUILD_OPTIONS=(
 )
 
 # Add AddressSanitizer only for debug builds
-if [[ "$BUILD_TYPE" == "DEBUG" ]]; then
+# if [[ "$BUILD_TYPE" == "DEBUG" ]]; then
   # BUILD_OPTIONS+=(-DMALLOB_USE_ASAN=1) #created too many warnings/errors everywhere !?
-fi
+# fi
 
 cd build
 CC=$(which mpicc) 
