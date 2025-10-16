@@ -1,6 +1,6 @@
 # Compiling Mallob in a spack environment 
 
-On machines that use [spack](https://spack.readthedocs.io/en/latest/index.html) for package management (for example custom servers), Mallob can be compiled in the following way.
+On machines that use [spack](https://spack.readthedocs.io/en/latest/index.html) for package management (for example custom servers), Mallob can be compiled in the following way. To be executed from the home ```mallob``` directory.
 
     
     if ! spack env list | grep -q mallob_env; then
