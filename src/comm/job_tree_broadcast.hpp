@@ -87,6 +87,10 @@ public:
         return _internal_msg_tag;
     }
 
+    bool getReceivedBroadcast() {
+        return _received_broadcast;
+    }
+
 private:
     bool receiveMessage(MessageHandle& h) {
         //received on MSG_JOB_TREE_MODULAR_BROADCAST mpiTag (via _sub_broadcast(...))

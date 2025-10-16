@@ -406,16 +406,19 @@ void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
 
 
 void SweepJob::initiateNewSharingRound() {
-	if (!_bcast) return;
-
-	// LOG(V2_INFO, "time %f\n", Timer::elapsedSeconds());
-	// LOG(V2_INFO, "last %f\n", _last_sharing_timestamp);
-	// LOG(V2_INFO, "l+p  %f\n", _last_sharing_timestamp + _params.sweepSharingPeriod_ms.val/1000.0);
+	if (!_bcast) {
+		LOG(V1_WARN, "[WARN] SWEEP BCAST root couldn't initiate sharing round, _bcast is Null\n");
+		return;
+	}
 
 	if (Timer::elapsedSeconds() < _last_sharing_timestamp + _params.sweepSharingPeriod_ms.val/1000.0) //convert to seconds
 		return;
 
 
+	if (_bcast->getReceivedBroadcast()) {
+		LOG(V1_WARN, "[WARN] SWEEP BCAST: Would like to initiate new sharing round, but old round is not completed yet\n");
+		return;
+	}
 	//Broadcast a ping to all workers to initiate an AllReduce
 	//The broadcast includes all workers currently reachable by the root-node and informs them about their parent and potential children
 	//It then causes the leaf nodes to call the callback, initiating the AllReduce
