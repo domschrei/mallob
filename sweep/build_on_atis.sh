@@ -1,11 +1,11 @@
 echo "SPACK environment activation"
 spack env activate mallob_env
-spack add cmake gcc jemalloc openmpi libcurl gdb
+spack add cmake gcc jemalloc openmpi curl gdb
 spack concretize
 spack install -j 32
 echo "SPACK environment installed"
 
-#libcurl needed for gdb
+#curl needed for gdb
 
 mkdir -p build
 rm build/*mallob*
