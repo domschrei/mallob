@@ -54,9 +54,9 @@ private:
 
 	//Positions where the additional metadata is stored in each shared element [..., eqs_size, units_size, all_idle]
 	static const int NUM_SHARING_METADATA = 3;
-	static const int EQUIVS_SIZE_POS = 3;
-	static const int UNITS_SIZE_POS = 2;
-	static const int IDLE_STATUS_POS = 1;
+	static const int EQUIVS_METADATA_POS = 3;
+	static const int UNITS_METADATA_POS = 2;
+	static const int IDLE_METADATA_POS = 1;
 
     std::vector<int> _eqs_from_broadcast;  //store received equivalences to copy to individual solvers
 	std::vector<int> _units_from_broadcast;

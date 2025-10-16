@@ -67,13 +67,11 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 	LOG(V2_INFO, "SWEEP [%i](%i) add thread pool request\n", _my_rank, localId);
 	std::future<void> fut_shweeper = ProcessWideThreadPool::get().addTask([this, localId]() { //Changed from [&] to [this, shweeper] back to [&] to [this, localId] !! (nicco)
 		//passing localId by value to this lambda, because the thread might only execute after createAndStartNewShweeper is already gone
-
 		auto shweeper = createNewShweeper(localId);
-		_shweepers[localId] = shweeper;
-
 		loadFormula(shweeper);
 		LOG(V2_INFO, "SWEEP [%i](%i) START solve() \n", _my_rank, localId);
 		_running_shweepers_count++;
+		_shweepers[localId] = shweeper;
 		int res = shweeper->solve(0, nullptr);
 		LOG(V2_INFO, "SWEEP [%i](%i) FINISH solve(). Result %i \n", _my_rank, localId, res);
 
@@ -481,9 +479,9 @@ void SweepJob::advanceAllReduction() {
 
 	//Extract, unserialize and distribute shared Equivalences and units
 	auto shared = _red->extractResult();
-	const int eq_size = shared[shared.size()-EQUIVS_SIZE_POS];
-	const int unit_size = shared[shared.size()-UNITS_SIZE_POS];
-	const int all_idle = shared[shared.size()-IDLE_STATUS_POS];
+	const int eq_size = shared[shared.size()-EQUIVS_METADATA_POS];
+	const int unit_size = shared[shared.size()-UNITS_METADATA_POS];
+	const int all_idle = shared[shared.size()-IDLE_METADATA_POS];
 	LOG(V3_VERB, "ß --- Received sharing data: %i equivalences, %i units -- \n", eq_size/2, unit_size);
 	if (all_idle) {
 		_terminate_all = true;
@@ -522,7 +520,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	//Fill equivalences
 	size_t total_eq_size = 0;
     for (const auto &contrib : contribs) {
-    	int eq_size = contrib[contrib.size()-EQUIVS_SIZE_POS];
+    	int eq_size = contrib[contrib.size()-EQUIVS_METADATA_POS];
     	total_eq_size += eq_size;
 		// LOG(V3_VERB, "ß Element: %i eq_size \n", eq_size);
         aggregated.insert(aggregated.end(), contrib.begin(), contrib.begin()+eq_size);
@@ -530,8 +528,8 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	//Fill units
 	size_t total_unit_size = 0;
     for (const auto &contrib : contribs) {
-    	int eq_size = contrib[contrib.size()-EQUIVS_SIZE_POS];
-    	int unit_size = contrib[contrib.size()-UNITS_SIZE_POS];
+    	int eq_size = contrib[contrib.size()-EQUIVS_METADATA_POS];
+    	int unit_size = contrib[contrib.size()-UNITS_METADATA_POS];
 		total_unit_size += unit_size;
 		// LOG(V3_VERB, "ß Element: %i unit_size \n", unit_size);
         aggregated.insert(aggregated.end(), contrib.begin()+eq_size, contrib.end()-NUM_SHARING_METADATA); //not copying the metadata at the end
@@ -539,7 +537,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	//See whether all solvers are idle
 	bool all_idle = true;
     for (const auto &contrib : contribs) {
-		bool idle = contrib[contrib.size()-IDLE_STATUS_POS];
+		bool idle = contrib[contrib.size()-IDLE_METADATA_POS];
     	all_idle &= idle;
 		// LOG(V3_VERB, "ß Element: idle == %i \n", idle);
     }
@@ -585,6 +583,7 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	//We dont know yet how much there is to steal, so we ask for an upper bound
 	//It can also be that the solver we want to steal from is not fully initialized yet
 	//For that in the C code there are further guards against unfinished initialization, all returning 0 in that case
+	LOG(V3_VERB, "[%i] stealing from (%i) \n", _my_rank, localId);
 	int max_steal_amount = shweep_get_max_steal_amount(shweeper->solver);
 	if (max_steal_amount == 0)
 		return {};
