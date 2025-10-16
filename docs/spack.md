@@ -15,6 +15,8 @@ On machines that use [spack](https://spack.readthedocs.io/en/latest/index.html) 
     spack install -j 32
     
     #need elfutils:variants and curl for the gdb compilation
+
+    ( cd lib && bash fetch_and_build_solvers.sh kcly )
     
     mkdir -p build
     rm build/*mallob*
