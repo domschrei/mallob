@@ -615,7 +615,7 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	//Allocate memory for the steal here in C++, and pass the array location to kissat such that it can fill it with the stolen work
 	std::vector<int> stolen_work = std::vector<int>(max_steal_amount);
 
-	LOG(V3_VERB, "[%i] stealing from (%i), expecting max %i  \n", _my_rank, localId, max_steal_amount);
+	// LOG(V3_VERB, "[%i] stealing from (%i), expecting max %i  \n", _my_rank, localId, max_steal_amount);
 	int actually_stolen = shweep_steal_from_this_solver(shweeper->solver, reinterpret_cast<unsigned int*>(stolen_work.data()), max_steal_amount);
 	// LOG(V3_VERB, "ß Steal request got %i actually stolen\n", actually_stolen);
 	if (actually_stolen == 0)
