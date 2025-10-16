@@ -17,6 +17,7 @@ private:
     int _my_index{0};
     bool _is_root{false};
     uint8_t* _metadata; //serialized description
+	int _numVars{0};
 
 	typedef std::shared_ptr<Kissat> KissatPtr;
 

@@ -10,6 +10,8 @@ echo "SPACK environment installed"
 #curl needed for gdb
 #elfutils variant needed for gdb
 
+( cd lib && bash fetch_and_build_solvers.sh klyc sweep)
+
 mkdir -p build
 rm build/*mallob*
 cd build

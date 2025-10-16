@@ -40,7 +40,7 @@ public:
                 memcpy(&ctxId, packed.data()+i+1, sizeof(ctx_id_t));
                 list.push_back({rank, ctxId});
                 i += 3;
-                LOG(V4_VVER, "JOBCOMM deserialized <rank %i, ctxId %i> \n", rank, ctxId);
+                // LOG(V4_VVER, "JOBCOMM deserialized <rank %i, ctxId %i> \n", rank, ctxId);
             }
             return *this;
         }
@@ -153,7 +153,7 @@ public:
             updateMap();
             LOG(V4_VVER, "JOBCOMM aggregation at root. (rank %i, contextId %i, CommSize %i)\n", _job_tree.getRank(), _job_tree.getContextId(), _job_tree.getCommSize());
         } else {
-            LOG(V4_VVER, "JOBCOMM aggregation at non-root. (rank %i, contextId %i, CommSize %i)\n", _job_tree.getRank(), _job_tree.getContextId(), _job_tree.getCommSize());
+            // LOG(V4_VVER, "JOBCOMM aggregation at non-root. (rank %i, contextId %i, CommSize %i)\n", _job_tree.getRank(), _job_tree.getContextId(), _job_tree.getCommSize());
             JobMessage msg;
             AddressList addressList{{(size_t)(_job_tree.getIndex()+1), Address {-1, 0}}};
             addressList.list[_job_tree.getIndex()] = {_job_tree.getRank(), _job_tree.getContextId()};
@@ -226,7 +226,7 @@ public:
 
         } else if (msg.tag == MSG_BROADCAST_RANKLIST) {
 
-            LOG(V4_VVER, "JOBCOMM [%i] received MSG_BROADCAST_RANKLIST \n", _job_tree.getRank());
+            // LOG(V4_VVER, "JOBCOMM [%i] received MSG_BROADCAST_RANKLIST \n", _job_tree.getRank());
             // Store locally and forward to children
             {
                 auto lock = _access_mutex.getLock();
