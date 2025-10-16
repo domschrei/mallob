@@ -9,6 +9,10 @@ echo "SPACK environment installed"
 
 #curl needed for gdb
 #elfutils variant needed for gdb
+if [ "$1" = "newkiss" ]; then
+  echo "REMOVING OLD KISSAT, FETCHING NEWEST ONE"
+  rm lib/kissat/libkissat.a
+fi
 
 ( cd lib && bash fetch_and_build_solvers.sh klyc sweep)
 
