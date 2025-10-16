@@ -90,7 +90,7 @@ public:
     void appl_memoryPanic() override {}
 
 
-    friend void search_work_in_tree(void* SweepJob_state, unsigned **work, int *work_size, int local_id);
+    friend void cb_search_work_in_tree(void* SweepJob_state, unsigned **work, int *work_size, int local_id);
 	// friend void import_next_equivalence(void *SweepJobState, int *last_imported_round, int eq_nr, unsigned *lit1, unsigned *lit2);
 
 	// bool isDimacsReportStarted();
@@ -121,7 +121,7 @@ private:
 
 	std::vector<int> stealWorkFromAnyLocalSolver();
     std::vector<int> stealWorkFromSpecificLocalSolver(int localId);
-    void searchWorkInTree(unsigned **work, int *work_size, int localId);
+    void cbSearchWorkInTree(unsigned **work, int *work_size, int localId);
 	void importNextEquivalence(int *last_imported_round, int eq_nr, unsigned *lit1, unsigned *lit2);
 
 };

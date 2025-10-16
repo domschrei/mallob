@@ -19,8 +19,9 @@ SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTa
 }
 
 
-void search_work_in_tree(void *SweepJob_state, unsigned **work, int *work_size, int local_id) { //callback from kissat
-    ((SweepJob*) SweepJob_state)->searchWorkInTree(work, work_size, local_id);
+//callback from kissat
+void cb_search_work_in_tree(void *SweepJob_state, unsigned **work, int *work_size, int local_id) {
+    ((SweepJob*) SweepJob_state)->cbSearchWorkInTree(work, work_size, local_id);
 }
 
 
@@ -103,7 +104,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	shweeper->setIsShweeper();
 
 	shweeper->shweepSetImportExportCallbacks();
-    shweep_set_search_work_callback(shweeper->solver, this, search_work_in_tree); //here we connect directly between SweepJob and kissat-solver, bypassing Kissat::
+    shweep_set_search_work_callback(shweeper->solver, this, cb_search_work_in_tree); //here we connect directly between SweepJob and kissat-solver, bypassing Kissat::
 
 	if (_is_root) {
 		//read out final formula only at the root node
@@ -299,8 +300,8 @@ void SweepJob::sendMPIWorkstealRequests() {
 	}
 }
 
-void SweepJob::searchWorkInTree(unsigned **work, int *work_size, int localId) {
-	KissatPtr shweeper = _shweepers[localId];
+void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) {
+	KissatPtr shweeper = _shweepers[localId]; //array access safe (we know the sweeper exists) because this callback is called by this sweeper itself
 	shweeper->shweeper_is_idle = true;
 	shweeper->work_received_from_steal = {};
 
@@ -452,7 +453,13 @@ void SweepJob::cbContributeToAllReduce() {
 
 	//Bring individual data per thread in the sharing element format: [Equivalences, Units, eq_size, unit_size, all_idle]
 	std::list<std::vector<int>> contribs;
+	int id=-1; //for debugging
 	for (auto &shweeper : _shweepers) {
+		id++;
+		if (!shweeper) {
+			LOG(V4_VVER, "SWEEP [%i](%i) not yet initialized, skipped in contribution aggregation \n", _my_rank, id);
+			continue;
+		}
 		int eq_size = shweeper->eqs_to_share.size();
 		int units_size = shweeper->units_to_share.size();
 		std::vector<int> contrib = std::move(shweeper->eqs_to_share);
@@ -503,7 +510,13 @@ void SweepJob::advanceAllReduction() {
 	//This makes importing the E/U data into each thread easier and less cumbersome to code, at the cost of slightly more memory usage
 	//For maximum memory efficiency one would have all kissat threads directly read from this one SweepJob's array
 	//We write to a queue, to not mess with the specific memory allocation the thread is currently working on
+	int id=-1; //for debugging
 	for (auto shweeper : _shweepers) {
+		id++;
+		if (!shweeper) {
+			LOG(V4_VVER, "SWEEP [%i](%i) not yet initialized, skipped in contribution broadcasting \n", _my_rank, id);
+			continue;
+		}
 		shweeper->eqs_from_broadcast_queued.insert(shweeper->eqs_from_broadcast_queued.end(), _eqs_from_broadcast.begin(), _eqs_from_broadcast.end());
 		shweeper->units_from_broadcast_queued.insert(shweeper->units_from_broadcast_queued.end(), _units_from_broadcast.begin(), _units_from_broadcast.end());
 	}
@@ -582,7 +595,7 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	if (_terminate_all) //sweeping globally finished
 		return {};
 	if ( ! _shweepers[localId]) {
-		LOG(V3_VERB, "Skipping local worksteal on [%i](%i), target solver does not exist yet\n", _my_rank, localId);
+		LOG(V3_VERB, "SWEEP Skipping local worksteal on [%i](%i), target solver does not exist yet\n", _my_rank, localId);
 		return {};
 	}
 	KissatPtr shweeper = _shweepers[localId];
