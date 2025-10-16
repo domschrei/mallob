@@ -14,7 +14,7 @@ On a machine that uses [spack](https://spack.io/SPACK) for package management, M
     spack concretize
     spack install -j 32
     
-    #gdb compilation crashes without this elfutils:variants and curl
+    #need elfutils:variants and curl for the gdb compilation
     
     mkdir -p build
     rm build/*mallob*
