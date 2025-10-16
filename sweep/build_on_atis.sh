@@ -23,5 +23,6 @@ cmake -DMALLOB_JEMALLOC_DIR=/nfs/home/$USER/.user_spack/environments/mallob_env/
   -DMALLOB_ASSERT=1 \
   -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\" ..
 
+make clean
 make -j 20
 cd ..
