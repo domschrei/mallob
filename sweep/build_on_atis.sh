@@ -14,7 +14,7 @@ CC=$(which mpicc)
 CXX=$(which mpicxx) 
 
 cmake -DMALLOB_JEMALLOC_DIR=/nfs/home/$USER/.user_spack/environments/mallob_env/.spack-env/view/lib \
-  -DCMAKE_BUILD_TYPE=RELEASE \
+  -DCMAKE_BUILD_TYPE=DEBUG \
   -DMALLOB_APP_SAT=1 \
   -DMALLOB_APP_SATWITHPRE=1 \
   -DMALLOB_APP_SWEEP=1 \
