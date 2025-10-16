@@ -3,7 +3,8 @@
 
 echo "SPACK environment activation"
 spack env activate mallob_env
-spack add cmake gcc jemalloc openmpi gdb
+spack config add "packages:elfutils:variants: ~debuginfod"
+spack add cmake gcc jemalloc openmpi curl gdb
 spack concretize
 spack install -j 32
 echo "SPACK environment installed"
