@@ -595,12 +595,12 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	if (_terminate_all) //sweeping globally finished
 		return {};
 	if ( ! _shweepers[localId]) {
-		LOG(V3_VERB, "SWEEP STEAL stealing from [%i](%i), shweeper does not exist yet\n", _my_rank, localId);
+		// LOG(V3_VERB, "SWEEP STEAL stealing from [%i](%i), shweeper does not exist yet\n", _my_rank, localId);
 		return {};
 	}
 	KissatPtr shweeper = _shweepers[localId];
 	if ( ! shweeper->solver) {
-		LOG(V3_VERB, "SWEEP STEAL stealing from [%i](%i), shweeper->solver does not exist yet \n", _my_rank, localId);
+		// LOG(V3_VERB, "SWEEP STEAL stealing from [%i](%i), shweeper->solver does not exist yet \n", _my_rank, localId);
 		return {};
 	}
 
