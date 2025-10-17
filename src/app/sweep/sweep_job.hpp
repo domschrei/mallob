@@ -111,6 +111,8 @@ private:
 
 
 	void sendMPIWorkstealRequests();
+	void showIdleFraction();
+
     void initiateNewSharingRound();
     void cbContributeToAllReduce();
     static std::vector<int> aggregateEqUnitContributions(std::list<std::vector<int>> &contribs);

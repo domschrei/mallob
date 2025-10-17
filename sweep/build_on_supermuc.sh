@@ -24,7 +24,7 @@ echo $CC
 echo $CXX
 
 if [ "$1" = "rel" ] || [ "$1" = "release" ]; then
-  echo "Building RELEASE"
+  echo "Building Mallob RELEASE"
   cmake -DCMAKE_BUILD_TYPE=RELEASE \
     -DMALLOB_APP_SAT=1 \
     -DMALLOB_APP_SATWITHPRE=1 \
@@ -36,7 +36,7 @@ if [ "$1" = "rel" ] || [ "$1" = "release" ]; then
     -DMALLOB_JEMALLOC_DIR="$HOME/jemalloc-5.2.1/lib/" \
     -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\" ..
 else
-  echo "Building DEBUG"
+  echo "Building Mallob DEBUG"
   cmake -DCMAKE_BUILD_TYPE=DEBUG \
     -DMALLOB_APP_SAT=1 \
     -DMALLOB_APP_SATWITHPRE=1 \

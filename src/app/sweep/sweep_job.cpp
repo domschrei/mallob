@@ -29,9 +29,9 @@ void SweepJob::appl_start() {
 	_my_rank = getJobTree().getRank();
 	_my_index = getJobTree().getIndex();
 	_is_root = getJobTree().isRoot();
-	LOG(V2_INFO,"ß [SWEEP] SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, numThreadsPerProcess=%d\n",
+	LOG(V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, numThreadsPerProcess=%d\n",
 		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _params.numThreadsPerProcess.val);
-	LOG(V2_INFO,"ß SWEEP sweep-sharing-period: %i ms\n", _params.sweepSharingPeriod_ms.val);
+	LOG(V2_INFO,"SWEEP JOB sweep-sharing-period: %i ms\n", _params.sweepSharingPeriod_ms.val);
     _metadata = getSerializedDescription(0)->data();
 	_start_shweep_timestamp = Timer::elapsedSeconds();
 	_last_sharing_timestamp = Timer::elapsedSeconds();
@@ -50,7 +50,7 @@ void SweepJob::appl_start() {
 
 	//a broadcast object is used to initiate an all-reduction by first pinging each processes currently reachable by the root node
 	//the ping detects the current tree structure and provides a callback to contribute to the all-reduction
-	LOG(V2_INFO, "[SWEEP] initialize broadcast object\n");
+	// LOG(V2_INFO, "[SWEEP] initialize broadcast object\n");
 	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
 
 	//Start individual Kissat threads (those then immediately jump into the sweep algorithm)
@@ -60,21 +60,21 @@ void SweepJob::appl_start() {
 		createAndStartNewShweeper(localId);
 	}
 
-	LOG(V2_INFO, "[SWEEP] SweepJob appl_start() FINISHED\n");
+	LOG(V2_INFO, "SWEEP JOB appl_start() FINISHED\n");
 }
 
 void SweepJob::createAndStartNewShweeper(int localId) {
 
-	LOG(V2_INFO, "SWEEP [%i](%i) add thread pool request\n", _my_rank, localId);
+	LOG(V2_INFO, "SWEEP JOB [%i](%i) thread queued \n", _my_rank, localId);
 	std::future<void> fut_shweeper = ProcessWideThreadPool::get().addTask([this, localId]() { //Changed from [&] to [this, shweeper] back to [&] to [this, localId] !! (nicco)
 		//passing localId by value to this lambda, because the thread might only execute after createAndStartNewShweeper is already gone
 		auto shweeper = createNewShweeper(localId);
 		loadFormula(shweeper);
-		LOG(V2_INFO, "SWEEP [%i](%i) START solve() \n", _my_rank, localId);
+		LOG(V2_INFO, "SWEEP JOB [%i](%i) START solve() \n", _my_rank, localId);
 		_running_shweepers_count++;
 		_shweepers[localId] = shweeper;
 		int res = shweeper->solve(0, nullptr);
-		LOG(V2_INFO, "SWEEP [%i](%i) FINISH solve(). Result %i \n", _my_rank, localId, res);
+		LOG(V2_INFO, "SWEEP JOB [%i](%i) FINISH solve(). Result %i \n", _my_rank, localId, res);
 
 		assert( ! _is_root || _dimacsReportingLocalId->load() != -1);
 		if (_is_root && localId == _dimacsReportingLocalId->load()) {
@@ -98,9 +98,10 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	if (_numVars==0)
 		_numVars = setup.numVars;
 
-	LOG(V2_INFO, "SWEEP [%i](%i) create kissat shweeper \n", _my_rank, localId);
+	// LOG(V2_INFO, "SWEEP JOB [%i](%i) create kissat shweeper \n", _my_rank, localId);
+	float t = Timer::elapsedSeconds();
 	std::shared_ptr<Kissat> shweeper(new Kissat(setup));
-	LOG(V2_INFO, "SWEEP [%i](%i) received kissat shweeper \n", _my_rank, localId);
+	LOG(V2_INFO, "SWEEP JOB [%i](%i) received kissat object in %f sec\n", _my_rank, localId, Timer::elapsedSeconds() - t);
 	shweeper->setIsShweeper();
 
 	shweeper->shweepSetImportExportCallbacks();
@@ -226,6 +227,7 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 
 // Called periodically by the main thread to allow the worker to emit messages.
 void SweepJob::appl_communicate() {
+	showIdleFraction();
 	sendMPIWorkstealRequests();
 	if (_bcast && _is_root)// Root: Update job tree snapshot in case your children changed
 		_bcast->updateJobTree(getJobTree());
@@ -249,7 +251,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		int localId = msg.payload.front();
 		msg.payload.clear();
 
-		LOG(V3_VERB, "SWEEP MSG Received steal request from [%i](%i) \n", sourceRank, localId);
+		LOG(V3_VERB, "SWEEP MSG [%i] received steal request from [%i](%i) \n", _my_rank, sourceRank, localId);
 		auto locally_stolen_work = stealWorkFromAnyLocalSolver();
 
 		msg.payload = std::move(locally_stolen_work);
@@ -272,12 +274,28 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		msg.payload.pop_back();
 		_worksteal_requests[localId].stolen_work = std::move(msg.payload);
 		_worksteal_requests[localId].got_steal_response = true;
-		LOG(V3_VERB, "SWEEP MSG received answer form [%i] ---%i--> [%i](%i)\n", sourceRank, _worksteal_requests[localId].stolen_work.size(), _my_rank, localId);
+		LOG(V3_VERB, "SWEEP MSG [%i] received steal answer --%i-- from [%i](%i)\n", sourceRank, _worksteal_requests[localId].stolen_work.size(), _my_rank, localId);
 		return;
 	}
 }
 
 
+
+void SweepJob::showIdleFraction() {
+	int idles = 0;
+	int active = 0;
+	std::ostringstream oss;
+	for (auto shweeper : _shweepers) {
+		if (shweeper) {
+			active++;
+			if (shweeper->shweeper_is_idle) {
+				idles++;
+				oss << "(" << shweeper->getLocalId() << ") ";
+			}
+		}
+	}
+	LOG(V3_VERB, "SWEEP IDLE  %i/%i : %s \n", idles, active, oss.str().c_str());
+}
 
 void SweepJob::sendMPIWorkstealRequests() {
 	//Worksteal requests need to be execute by the MPI main thread, as it can be problematic if the kissat-threads issue MPI messages in the callback on their own
@@ -295,7 +313,7 @@ void SweepJob::sendMPIWorkstealRequests() {
 			msg.payload = {request.localId};
 			// LOG(V2_INFO, "Rank %i asks rank %i for work\n", _my_rank, recv_rank, n);
 			// LOG(V2_INFO, "  with destionation ctx_id %i \n", msg.contextIdOfDestination);
-			LOG(V3_VERB, "SWEEP MSG sending MPI work request from [%i](%i) to [%i] \n", _my_rank, request.localId, request.targetRank);
+			LOG(V3_VERB, "SWEEP MSG sending MPI request [%i](%i) -> [%i] \n", _my_rank, request.localId, request.targetRank);
 			getJobTree().send(request.targetRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 		}
 	}
@@ -334,7 +352,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		}
 
 		//Try to steal locally from shared memory
-		LOG(V3_VERB, "SWEEP [%i](%i) searching work locally \n", _my_rank, localId);
+		// LOG(V3_VERB, "SWEEP [%i](%i) searching work locally \n", _my_rank, localId);
 		auto stolen_work = stealWorkFromAnyLocalSolver();
 
 		//Successful local steal
@@ -379,7 +397,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 			continue;
 		}
 
-		LOG(V3_VERB, "SWEEP Global steal request to targetIndex %i, targetRank=%i \n", targetIndex, targetRank);
+		// LOG(V3_VERB, "SWEEP Global steal request to targetIndex %i, targetRank=%i \n", targetIndex, targetRank);
 
 		//Request will be handled by the MPI main thread, which will send an MPI message on our behalf
 		//because here we are in code executed by the kissat thread, which can cause problems for sending MPI messages
@@ -388,7 +406,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		request.targetIndex = targetIndex;
 		request.targetRank = targetRank;
 		_worksteal_requests[localId] = request;
-		LOG(V3_VERB, "SWEEP  [%i](%i) searches work globally\n", _my_rank, localId);
+		// LOG(V3_VERB, "SWEEP  [%i](%i) searches work globally\n", _my_rank, localId);
 
 		//Wait here until we get back an MPI message
 		while( ! _worksteal_requests[localId].got_steal_response) {
@@ -398,7 +416,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		//Successful steal if size > 0
 		if ( ! _worksteal_requests[localId].stolen_work.empty()) {
 			shweeper->work_received_from_steal = std::move(_worksteal_requests[localId].stolen_work);
-			LOG(V3_VERB, "SWEEP WORK [%i] ---%i---> [%i](%i) \n", targetRank, shweeper->work_received_from_steal.size(), _my_rank, localId);
+			LOG(V3_VERB, "SWEEP WORK via MPI [%i] ---%i---> [%i](%i) \n", targetRank, shweeper->work_received_from_steal.size(), _my_rank, localId);
 			break;
 		}
 		//Unsuccessful global steal, try again
@@ -643,7 +661,7 @@ std::vector<int> SweepJob::getRandomIdPermutation() {
 void SweepJob::loadFormula(KissatPtr shweeper) {
 	const int* lits = getDescription().getFormulaPayload(0);
 	const int payload_size = getDescription().getFormulaPayloadSize(0);
-	LOG(V2_INFO, "SWEEP Loading Formula, size %i \n", payload_size);
+	// LOG(V2_INFO, "SWEEP Loading Formula, size %i \n", payload_size);
 	for (int i = 0; i < payload_size ; i++) {
 		shweeper->addLiteral(lits[i]);
 	}
