@@ -595,21 +595,26 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	if (_terminate_all) //sweeping globally finished
 		return {};
 	if ( ! _shweepers[localId]) {
-		LOG(V3_VERB, "SWEEP Skipping local worksteal on [%i](%i), target solver does not exist yet\n", _my_rank, localId);
+		LOG(V3_VERB, "SWEEP STEAL stealing from [%i](%i), shweeper does not exist yet\n", _my_rank, localId);
 		return {};
 	}
 	KissatPtr shweeper = _shweepers[localId];
+	if ( ! shweeper->solver) {
+		LOG(V3_VERB, "SWEEP STEAL stealing from [%i](%i), shweeper->solver does not exist yet \n", _my_rank, localId);
+		return {};
+	}
+
 	//We dont know yet how much there is to steal, so we ask for an upper bound
 	//It can also be that the solver we want to steal from is not fully initialized yet
 	//For that in the C code there are further guards against unfinished initialization, all returning 0 in that case
-	LOG(V3_VERB, "[%i] getting max steal info from (%i) \n", _my_rank, localId);
+	LOG(V3_VERB, "SWEEP STEAL [%i] getting max steal info from (%i) \n", _my_rank, localId);
 	int max_steal_amount = shweep_get_max_steal_amount(shweeper->solver);
 	if (max_steal_amount == 0)
 		return {};
 
 	// LOG(V2_INFO, "ß %i max_steal_amount\n", max_steal_amount);
-	assert(max_steal_amount > 0 || log_return_false("SWEEP Error : negative max steal amount %i, maybe segfault into non-initialized kissat solver \n", max_steal_amount));
-	assert(max_steal_amount < 2*_numVars || log_return_false("SWEEP Error : too large max steal amount %i >= 2*NUM_VARS, maybe segfault into non-initialized kissat solver \n", max_steal_amount));
+	assert(max_steal_amount > 0 || log_return_false("SWEEP STEAL Error [%i](%i): negative max steal amount %i, maybe segfault into non-initialized kissat solver \n", _my_rank, localId, max_steal_amount));
+	assert(max_steal_amount < 2*_numVars || log_return_false("SWEEP STEAL Error [%i](%i): too large max steal amount %i >= 2*NUM_VARS, maybe segfault into non-initialized kissat solver \n", _my_rank, localId, max_steal_amount));
 
 	//There is something to steal
 	//Allocate memory for the steal here in C++, and pass the array location to kissat such that it can fill it with the stolen work
