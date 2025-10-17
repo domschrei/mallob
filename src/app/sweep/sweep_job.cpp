@@ -99,9 +99,10 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 		_numVars = setup.numVars;
 
 	// LOG(V2_INFO, "SWEEP JOB [%i](%i) create kissat shweeper \n", _my_rank, localId);
-	float t = Timer::elapsedSeconds();
+	float t0 = Timer::elapsedSeconds();
 	std::shared_ptr<Kissat> shweeper(new Kissat(setup));
-	LOG(V2_INFO, "SWEEP JOB [%i](%i) received kissat object in %f sec\n", _my_rank, localId, Timer::elapsedSeconds() - t);
+	float t1 = Timer::elapsedSeconds();
+	LOG(V2_INFO, "SWEEP JOB [%i](%i) received kissat object in %f ms\n", _my_rank, localId, (t1 - t0)*1000);
 	shweeper->setIsShweeper();
 
 	shweeper->shweepSetImportExportCallbacks();
@@ -228,12 +229,20 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 // Called periodically by the main thread to allow the worker to emit messages.
 void SweepJob::appl_communicate() {
 	showIdleFraction();
+
+	LOG(V4_VVER, "SWEEP STAGE 1: Workstealing\n");
 	sendMPIWorkstealRequests();
 	if (_bcast && _is_root)// Root: Update job tree snapshot in case your children changed
 		_bcast->updateJobTree(getJobTree());
+
+	LOG(V4_VVER, "SWEEP STAGE 2: Sharing\n");
 	if (_is_root)
 		initiateNewSharingRound();
+
+	LOG(V4_VVER, "SWEEP STAGE 3: AllReduction\n");
 	advanceAllReduction();
+
+	LOG(V4_VVER, "SWEEP STAGE 4: Ended \n");
 }
 
 
@@ -300,6 +309,7 @@ void SweepJob::showIdleFraction() {
 void SweepJob::sendMPIWorkstealRequests() {
 	//Worksteal requests need to be execute by the MPI main thread, as it can be problematic if the kissat-threads issue MPI messages in the callback on their own
 	//Thus the solver-threads only write a request in the callback, and that is picked up here by the main MPI thread
+
 	for (auto &request : _worksteal_requests) {
 		if (!request.sent) {
 			request.sent = true;
