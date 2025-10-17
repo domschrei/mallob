@@ -14,8 +14,6 @@ else
   BUILD_PROCS=20
 fi
 
-mkdir -p build
-rm -f build/*mallob* 2>/dev/null || true
 
 BUILD_TYPE="DEBUG"
 if [ "$1" = "release" ] || [ "$1" = "rel" ]; then
@@ -31,6 +29,7 @@ BUILD_OPTIONS=(
   -DMALLOB_APP_SWEEP=1
   -DMALLOB_LOG_VERBOSITY=4
   -DMALLOB_ASSERT=1
+  -DMALLOB_USE_ASAN=0
   -DMALLOB_USE_JEMALLOC=1
   -DMALLOB_JEMALLOC_DIR="$HOME/jemalloc-5.2.1/lib/"
   -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\"
@@ -42,6 +41,8 @@ BUILD_OPTIONS=(
   # BUILD_OPTIONS+=(-DMALLOB_USE_ASAN=1) #created too many warnings/errors everywhere !?
 # fi
 
+mkdir -p build
+rm -f build/*mallob* 2>/dev/null || true
 cd build
 CC=$(which mpicc) 
 CXX=$(which mpicxx) 

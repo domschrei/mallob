@@ -1,11 +1,16 @@
 #!/bin/bash
 
-# TODO Load your own suitable modules here
 module load slurm_setup
 module unload devEnv/Intel/2019 intel-mpi cmake
 module load gcc/11 intel-mpi/2019-gcc cmake/3.21.4 gdb valgrind
 echo "Modules loaded"
 
+
+echo "\n \n"
+echo "REMOVING OLD KISSAT, forcing fetching of newest"
+echo "\n \n"
+rm -r lib/kissat
+rm lib/kissat.zip
 ( cd lib && bash fetch_and_build_solvers.sh klyc sweep)
 
 mkdir -p build
@@ -14,6 +19,9 @@ rm build/*mallob*
 cd build
 CC=$(which mpicc) 
 CXX=$(which mpicxx) 
+
+echo $CC
+echo $CXX
 
 if [ "$1" = "rel" ] || [ "$1" = "release" ]; then
   echo "Building RELEASE"
@@ -42,5 +50,5 @@ else
 fi
 
 make clean
-make -j 20; cd ..
+make -j 30; cd ..
 

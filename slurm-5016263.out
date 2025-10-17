@@ -1,0 +1,156 @@
+Unloading intel-mpi/2019-intel <aL>
+  Unloading useless requirement: intel-oneapi-compilers/2021.4.0
+i01r01c01s07
+Currently Loaded Modulefiles:
+ 1) intel-mkl/2020(default) <aL>            5) intel-mpi/2019-gcc  
+ 2) stack/22.2.1{arch=auto}(default) <aL>   6) cmake/3.14.5        
+ 3) slurm_setup/1.0(default)                7) gdb/11.1            
+ 4) gcc/11.2.0(default)                    
+
+Key:
+{variant=value}  (symbolic-version)  <module-tag>  <aL>=auto-loaded  
+/dss/lrzsys/sys/spack/release/22.2.1/opt/x86_64/intel-mpi/2019.12.320-gcc-wx7cjlg/compilers_and_libraries_2020.4.320/linux/mpi/intel64/bin/mpirun
+#ranks: 4
+globallogdir: /hppfs/work/pn72pu/di97lib/logs/hw27-5016263
+Benchmarkfile: /hppfs/work/pn72pu/di97lib/instances/hwmcc20miters/cnf/opt/pathlist.txt
+ 
+ 
+jobname:  hw27
+index:    1
+logdir:   /tmp/hw27-5016263/1
+localtmp: /tmp/hw27-5016263/tmp/1
+output:   /hppfs/work/pn72pu/di97lib/logs/hw27-5016263
+instance: /hppfs/work/pn72pu/di97lib/instances/hwmcc20miters/cnf/opt/rast-p18.cnf.xz
+ 
+/hppfs/work/pn72pu/di97lib/instances/hwmcc20miters/cnf/opt/rast-p18.cnf.xz -> /tmp/hw27-5016263/1
+Fri Oct 17 11:26:01 CEST 2025 JOB 1 LAUNCHING
+mpiexec -n 4 --bind-to core --map-by numa -genvall build/mallob -mono-app=SATWITHPRE -satsolver=[k_]w -pb=1 -pjp=999999 -pef=1 -mono=/hppfs/work/pn72pu/di97lib/instances/hwmcc20miters/cnf/opt/rast-p18.cnf.xz -jwl=300 -T=330 -wam=60000 -pre-cleanup=1 -q=1 -log=/tmp/hw27-5016263/1 -tmp=/tmp/hw27-5016263/tmp/1 -comment-outputlogdir=/hppfs/work/pn72pu/di97lib/logs/hw27-5016263 -sro=/tmp/hw27-5016263/1/processed-jobs.out -trace-dir=/tmp/hw27-5016263/1/ -os=1 -v=4 -iff=0 -s2f=/tmp/hw27-5016263/1/model -cm=0 -rpa=1 -pph=2 -mlpt=50000000 -t=24 -isp=0 -div-phases=1 -div-noise=0 -div-seeds=1 -div-elim=0 -div-native=0 -scsd=0 -scll=60 -slbdl=60 -qcll=60 -qlbdl=60 -csm=3 -cfm=3 -cfci=30 -mscf=5 -bem=1 -aim=1 -rlbd=0 -ilbd=1 -randlbd=0 -scramble-lbds=0 -seed=0 -spd=/tmp/hw27-5016263/1/ -spl=-1 -jcup=0.05 -preprocess-sweep -sweep-sharing-period=50 -sweep-solver-verbosity=1 -preprocess-sweep-priority=1.0
+PROLOG: /tmp/hw27-5016263/1 /tmp/hw27-5016263/tmp/1
+PROLOG: /tmp/hw27-5016263/1 /tmp/hw27-5016263/tmp/1
+PROLOG: /tmp/hw27-5016263/1 /tmp/hw27-5016263/tmp/1
+PROLOG: /tmp/hw27-5016263/1 /tmp/hw27-5016263/tmp/1
+c 
+c Mallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving
+c Copyright (C) 2019-2025 Dominik Schreiber, Karlsruhe Institute of Technology, Germany
+c 
+ß start looping to read incoming jobs
+ß found job with app id 2
+ß Launching client-side program
+ß Client Side Job reset
+ß Client Side Job run
+ß found job with app id 1
+ß Enqueueing new regular job
+build/mallob_sat_process -md=0 -aim=1 -ba=4 -ilbd=1 -c=1 -J=0 -uninvert-proof=1 -mjps=0 -div-init-shuffle=0 -evu=0 -mscf=5 -randlbd=0 -rs=1 -ljpc=32 -colors=0 -y=1 -psp=1 -qlbdl=60 -proof-debugging=0 -cpshm=0 -pbbm=0 -decay-min=1 -plain-add-specific=0 -mlpt=50000000 -mmpi=0 -cf=0 -br=0 -g=0 -qcll=60 -scramble-lbds=0 -dc=0 -otfc=0 -no-import=0 -SJ=0 -pef=1 -rpa=1 -ps=0 -inotify=1 -dpa=1 -decay-stddev=3 -jcl=0 -div-native=0 -gclls=0 -csm=3 -fapii=0 -wam=60000 -otfcm=1 -ajpc=0 -s2f=/tmp/hw27-5016263/1/model -trace-dir=/tmp/hw27-5016263/1/ -latencymonkey=0 -ipm=1 -ivdh=1 -ssp=50 -reduce-stddev=150 -watchdog=1 -jcup=0.05 -l=1 -p=0.1 -mlbdps=2 -reduce-delta=100 -os=1 -cm=0 -div-seeds=1 -pre-cleanup=1 -bem=1 -bicg=4 -cbbs=0 -yield=0 -apidir=.api -cblp=100000 -checksums=0 -cjc=0 -rlbd=0 -extmem-disk-dir=.disk -satsolver=[k_]w -mono=/hppfs/work/pn72pu/di97lib/instances/hwmcc20miters/cnf/opt/rast-p18.cnf.xz -decay-max=200 -interface-ipc=0 -interface-fs=0 -div-noise=0 -pssc=0 -log=/tmp/hw27-5016263/1 -mcips=10 -slbdl=60 -warmup=0 -ds=0 -q=1 -terminate-abruptly=0 -div-fanout=0 -mempanic=1 -evpt=500 -=1 -prisma=0 -pjp=999999 -div-phases=1 -sswl=0 -sjd=0 -spl=-1 -sec=851484,674571040,0,0,4,194,0,0,23,200355,1,0 -lbdpo=0 -mbt=8388608 -fcll=1 -jc=1 -adc=0 -ans=0 -huca=0 -lbdpi=0 -cblm=1 -delaymonkey=0 -client-app-threads=1 -pph=2 -0o=0 -mono-app=SATWITHPRE -reduce-min=300 -decpm=0 -div-elim=0 -decay-distr=1 -tmp=/tmp/hw27-5016263/tmp/1 -pb=1 -scsd=0 -reduce-mean=700 -t=24 -reduce-max=980 -spd=/tmp/hw27-5016263/1/ -nec=10 -pl=0 -div-reduce=0 -w=-1 -seed=0 -cg=1 -T=330 -cdel=2 -rspaa=0 -jjp=0 -iff=0 -cmp=0 -h=0 -preprocess-sweep=1 -cfci=30 -app-config=-__NC=274469;-__NV=85536; -scll=60 -s=0.5 -v=4 -decay-mean=50 -cusv=1 -cfm=3 -jwl=300 -compact-proof=0 -sro=/tmp/hw27-5016263/1/processed-jobs.out -ch=0 -cecpm=0 -sleep=100 build/mallob_sat_process -md=0 -aim=1 -ba=4 -ilbd=1 -c=1 -J=0 -uninvert-proof=1 -mjps=0 -div-init-shuffle=0 -evu=0 -mscf=5 -randlbd=0 -rs=1 -ljpc=32 -colors=0 -y=1 -psp=1 -qlbdl=60 -proof-debugging=0 -cpshm=0 -pbbm=0 -decay-min=1 -plain-add-specific=0 -mlpt=50000000 -mmpi=0 -cf=0 -br=0 -g=0 -qcll=60 -scramble-lbds=0 -dc=0 -otfc=0 -no-import=0 -SJ=0 -pef=1 -rpa=1 -ps=0 -inotify=1 -dpa=1 -decay-stddev=3 -jcl=0 -div-native=0 -gclls=0 -csm=3 -fapii=0 -wam=60000 -otfcm=1 -ajpc=0 -s2f=/tmp/hw27-5016263/1/model -trace-dir=/tmp/hw27-5016263/1/ -latencymonkey=0 -ipm=1 -ivdh=1 -ssp=50 -reduce-stddev=150 -watchdog=1 -jcup=0.05 -l=1 -p=0.1 -mlbdps=2 -reduce-delta=100 -os=1 -cm=0 -div-seeds=1 -pre-cleanup=1 -bem=1 -bicg=4 -cbbs=0 -yield=0 -apidir=.api -cblp=100000 -checksums=0 -cjc=0 -rlbd=0 -extmem-disk-dir=.disk -satsolver=[k_]w -mono=/hppfs/work/pn72pu/di97lib/instances/hwmcc20miters/cnf/opt/rast-p18.cnf.xz -decay-max=200 -interface-ipc=0 -interface-fs=0 -div-noise=0 -pssc=0 -log=/tmp/hw27-5016263/1 -mcips=10 -slbdl=60 -warmup=0 -ds=0 -q=1 -terminate-abruptly=0 -div-fanout=0 -mempanic=1 -evpt=500 -=1 -prisma=0 -pjp=999999 -div-phases=1 -sswl=0 -sjd=0 -spl=-1 -sec=851484,674393289,1,1,4,194,0,0,24,207730,1,0 -lbdpo=0 -mbt=8388608 -fcll=1 -jc=1 -adc=0 -ans=0 -huca=0 -lbdpi=0 -cblm=1 -delaymonkey=0 -client-app-threads=1 -pph=2 -0o=0 -mono-app=SATWITHPRE -reduce-min=300 -decpm=0 -div-elim=0 -decay-distr=1 -tmp=/tmp/hw27-5016263/tmp/1 -pb=1 -scsd=0 -reduce-mean=700 -t=24 -reduce-max=980 -spd=/tmp/hw27-5016263/1/ -nec=10 -pl=0 -div-reduce=0 -w=-1 -seed=0 -cg=1 -T=330 -cdel=2 -rspaa=0 -jjp=0 -iff=0 -cmp=0 -h=0 -preprocess-sweep=1 -cfci=30 -app-config=-__NC=274469;-__NV=85536; -scll=60 -s=0.5 -v=4 -decay-mean=50 -cusv=1 -cfm=3 -jwl=300 -compact-proof=0 -sro=/tmp/hw27-5016263/1/processed-jobs.out -ch=0 -cecpm=0 -sleep=100 build/mallob_sat_process -md=0 -aim=1 -ba=4 -ilbd=1 -c=1 -J=0 -uninvert-proof=1 -mjps=0 -div-init-shuffle=0 -evu=0 -mscf=5 -randlbd=0 -rs=1 -ljpc=32 -colors=0 -y=1 -psp=1 -qlbdl=60 -proof-debugging=0 -cpshm=0 -pbbm=0 -decay-min=1 -plain-add-specific=0 -mlpt=50000000 -mmpi=0 -cf=0 -br=0 -g=0 -qcll=60 -scramble-lbds=0 -dc=0 -otfc=0 -no-import=0 -SJ=0 -pef=1 -rpa=1 -ps=0 -inotify=1 -dpa=1 -decay-stddev=3 -jcl=0 -div-native=0 -gclls=0 -csm=3 -fapii=0 -wam=60000 -otfcm=1 -ajpc=0 -s2f=/tmp/hw27-5016263/1/model -trace-dir=/tmp/hw27-5016263/1/ -latencymonkey=0 -ipm=1 -ivdh=1 -ssp=50 -reduce-stddev=150 -watchdog=1 -jcup=0.05 -l=1 -p=0.1 -mlbdps=2 -reduce-delta=100 -os=1 -cm=0 -div-seeds=1 -pre-cleanup=1 -bem=1 -bicg=4 -cbbs=0 -yield=0 -apidir=.api -cblp=100000 -checksums=0 -cjc=0 -rlbd=0 -extmem-disk-dir=.disk -satsolver=[k_]w -mono=/hppfs/work/pn72pu/di97lib/instances/hwmcc20miters/cnf/opt/rast-p18.cnf.xz -decay-max=200 -interface-ipc=0 -interface-fs=0 -div-noise=0 -pssc=0 -log=/tmp/hw27-5016263/1 -mcips=10 -slbdl=60 -warmup=0 -ds=0 -q=1 -terminate-abruptly=0 -div-fanout=0 -mempanic=1 -evpt=500 -=1 -prisma=0 -pjp=999999 -div-phases=1 -sswl=0 -sjd=0 -spl=-1 -sec=834470,124645373,2,2,4,194,0,0,24,207730,1,0 -lbdpo=0 -mbt=8388608 -fcll=1 -jc=1 -adc=0 -ans=0 -huca=0 -lbdpi=0 -cblm=1 -delaymonkey=0 -client-app-threads=1 -pph=2 -0o=0 -mono-app=SATWITHPRE -reduce-min=300 -decpm=0 -div-elim=0 -decay-distr=1 -tmp=/tmp/hw27-5016263/tmp/1 -pb=1 -scsd=0 -reduce-mean=700 -t=24 -reduce-max=980 -spd=/tmp/hw27-5016263/1/ -nec=10 -pl=0 -div-reduce=0 -w=-1 -seed=0 -cg=1 -T=330 -cdel=2 -rspaa=0 -jjp=0 -iff=0 -cmp=0 -h=0 -preprocess-sweep=1 -cfci=30 -app-config=-__NC=274469;-__NV=85536; -scll=60 -s=0.5 -v=4 -decay-mean=50 -cusv=1 -cfm=3 -jwl=300 -compact-proof=0 -sro=/tmp/hw27-5016263/1/processed-jobs.out -ch=0 -cecpm=0 -sleep=100 build/mallob_sat_process -md=0 -aim=1 -ba=4 -ilbd=1 -c=1 -J=0 -uninvert-proof=1 -mjps=0 -div-init-shuffle=0 -evu=0 -mscf=5 -randlbd=0 -rs=1 -ljpc=32 -colors=0 -y=1 -psp=1 -qlbdl=60 -proof-debugging=0 -cpshm=0 -pbbm=0 -decay-min=1 -plain-add-specific=0 -mlpt=50000000 -mmpi=0 -cf=0 -br=0 -g=0 -qcll=60 -scramble-lbds=0 -dc=0 -otfc=0 -no-import=0 -SJ=0 -pef=1 -rpa=1 -ps=0 -inotify=1 -dpa=1 -decay-stddev=3 -jcl=0 -div-native=0 -gclls=0 -csm=3 -fapii=0 -wam=60000 -otfcm=1 -ajpc=0 -s2f=/tmp/hw27-5016263/1/model -trace-dir=/tmp/hw27-5016263/1/ -latencymonkey=0 -ipm=1 -ivdh=1 -ssp=50 -reduce-stddev=150 -watchdog=1 -jcup=0.05 -l=1 -p=0.1 -mlbdps=2 -reduce-delta=100 -os=1 -cm=0 -div-seeds=1 -pre-cleanup=1 -bem=1 -bicg=4 -cbbs=0 -yield=0 -apidir=.api -cblp=100000 -checksums=0 -cjc=0 -rlbd=0 -extmem-disk-dir=.disk -satsolver=[k_]w -mono=/hppfs/work/pn72pu/di97lib/instances/hwmcc20miters/cnf/opt/rast-p18.cnf.xz -decay-max=200 -interface-ipc=0 -interface-fs=0 -div-noise=0 -pssc=0 -log=/tmp/hw27-5016263/1 -mcips=10 -slbdl=60 -warmup=0 -ds=0 -q=1 -terminate-abruptly=0 -div-fanout=0 -mempanic=1 -evpt=500 -=1 -prisma=0 -pjp=999999 -div-phases=1 -sswl=0 -sjd=0 -spl=-1 -sec=834470,124641534,3,3,4,194,0,0,24,207730,1,0 -lbdpo=0 -mbt=8388608 -fcll=1 -jc=1 -adc=0 -ans=0 -huca=0 -lbdpi=0 -cblm=1 -delaymonkey=0 -client-app-threads=1 -pph=2 -0o=0 -mono-app=SATWITHPRE -reduce-min=300 -decpm=0 -div-elim=0 -decay-distr=1 -tmp=/tmp/hw27-5016263/tmp/1 -pb=1 -scsd=0 -reduce-mean=700 -t=24 -reduce-max=980 -spd=/tmp/hw27-5016263/1/ -nec=10 -pl=0 -div-reduce=0 -w=-1 -seed=0 -cg=1 -T=330 -cdel=2 -rspaa=0 -jjp=0 -iff=0 -cmp=0 -h=0 -preprocess-sweep=1 -cfci=30 -app-config=-__NC=274469;-__NV=85536; -scll=60 -s=0.5 -v=4 -decay-mean=50 -cusv=1 -cfm=3 -jwl=300 -compact-proof=0 -sro=/tmp/hw27-5016263/1/processed-jobs.out -ch=0 -cecpm=0 -sleep=100  sweep-start-time: 0.332688 
+ Kissat Sequential sweep (not distributed!): 0 Eqs, 0 sweep-units
+ sweep-end-time: 0.382127 
+SATWP submit SWEEP
+ß found job with app id 3
+ß Enqueueing new regular job
+c                                                                                                               [3](2) --Jumped into kissat_mallob_shweep--
+c                                                                                                               [3](2) --init_sweeper--
+c                                                                                                     [3](1) --Jumped into kissat_mallob_shweep--
+c                                                                                                     [3](1) --init_sweeper--
+c                                                                                                                         [3](3) --Jumped into kissat_mallob_shweep--
+c                                                                                                                         [3](3) --init_sweeper--
+c                                                                                                                                   [3](4) --Jumped into kissat_mallob_shweep--
+c                                                                                                                                   [3](4) --init_sweeper--
+c                                                                                           [3](0) --Jumped into kissat_mallob_shweep--
+c                                                                                           [3](0) --init_sweeper--
+c                                                                                                               [3](2) ## -- active 46571 
+c                                                                                                               [3](2) ## -- units  952 
+c                                                                                                               [3](2) ## -- eliminated 0 
+c                                                                                                               [3](2) ## -- 
+c                                                                                                               [3](2) ## -- clauses irredundant 184802 
+c                                                                                                               [3](2) ## -- clauses binary      22047 
+c                                                                                                               [3](2) ## -- clauses irr+binary  206849 
+c                                                                                                               [3](2) ## -- clauses added       206886 
+c                                                                                                               [3](2) ## -- clauses learned     0 
+c                                                                                                               [3](2) --starting shweep loop--
+c                                                                                                                         [3](3) ## -- active 46571 
+c                                                                                                                         [3](3) ## -- units  952 
+c                                                                                                                         [3](3) ## -- eliminated 0 
+c                                                                                                                         [3](3) ## -- 
+c                                                                                                                         [3](3) ## -- clauses irredundant 184802 
+c                                                                                                                         [3](3) ## -- clauses binary      22047 
+c                                                                                                                         [3](3) ## -- clauses irr+binary  206849 
+c                                                                                                                         [3](3) ## -- clauses added       206886 
+c                                                                                                                         [3](3) ## -- clauses learned     0 
+c                                                                                                                         [3](3) --starting shweep loop--
+c                                                                                                     [3](1) ## -- active 46571 
+c                                                                                                     [3](1) ## -- units  952 mallob: /dss/dsshome1/0D/di97lib/mallob/src/app/sweep/sweep_job.cpp:616: std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int): Assertion `max_steal_amount > 0 || log_return_false("SWEEP STEAL Error [%i](%i): negative max steal amount %i, maybe segfault into non-initialized kissat solver \n", _my_rank, localId, max_steal_amount)' failed.
+
+c                                                                                                     [3](1) ## -- eliminated 0 
+c                                                                                                     [3](1) ## -- 
+c                                                                                                     [3](1) ## -- clauses irredundant 184802 
+c                                                                                                     [3](1) ## -- clauses binary      22047 
+c                                                                                                     [3](1) ## -- clauses irr+binary  206849 
+c                                                                                                     [3](1) ## -- clauses added       206886 
+c                                                                                                     [3](1) ## -- clauses learned     0 
+c                                                                                                     [3](1) --starting shweep loop--
+c                                                                                                                                   [3](4) ## -- active 46571 
+c                                                                                                                                   [3](4) ## -- units  952 
+c                                                                                                                                   [3](4) ## -- eliminated 0 
+c                                                                                                                                   [3](4) ## -- 
+c                                                                                                                                   [3](4) ## -- clauses irredundant 184802 
+c                                                                                                                                   [3](4) ## -- clauses binary      22047 
+c                                                                                                                                   [3](4) ## -- clauses irr+binary  206849 
+c                                                                                                                                   [3](4) ## -- clauses added       206886 
+c                                                                                                                                   [3](4) ## -- clauses learned     0 
+c                                                                                                                                   [3](4) --starting shweep loop--
+c                                                                                           [3](0) ## -- active 46571 
+c                                                                                           [3](0) ## -- units  952 
+c                                                                                           [3](0) ## -- eliminated 0 
+c                                                                                           [3](0) ## -- 
+c                                                                                           [3](0) ## -- clauses irredundant 184802 
+c                                                                                           [3](0) ## -- clauses binary      22047 
+c                                                                                           [3](0) ## -- clauses irr+binary  206849 
+c                                                                                           [3](0) ## -- clauses added       206886 
+c                                                                                           [3](0) ## -- clauses learned     0 
+c                                                                                           [3](0) --starting shweep loop--
+c                                                                                                     [2](4) --Jumped into kissat_mallob_shweep--
+c                                                                                                     [2](4) --init_sweeper--
+c                                                                                 [2](2) --Jumped into kissat_mallob_shweep--
+c                                                                                 [2](2) --init_sweeper--
+c c                                                             [2](0) --Jumped into kissat_mallob_shweep--
+c                                                             [2](0) --init_sweeper--
+                                                                      [2](1) --Jumped into kissat_mallob_shweep--
+c                                                                       [2](1) --init_sweeper--
+c                                                                                                     [2](4) ## -- active 46571 
+c                                                                                                     [2](4) ## -- units  952 
+c                                                                                                     [2](4) ## -- eliminated 0 
+c                                                                                                     [2](4) ## -- 
+c                                                                                                     [2](4) ## -- clauses irredundant 184802 
+c                                                                                                     [2](4) ## -- clauses binary      22047 
+c                                                                                                     [2](4) ## -- clauses irr+binary  206849 
+c                                                                                                     [2](4) ## -- clauses added       206886 
+c                                                                                                     [2](4) ## -- clauses learned     0 
+c                                                                                                     [2](4) --starting shweep loop--
+mallob: /dss/dsshome1/0D/di97lib/mallob/src/app/sweep/sweep_job.cpp:617: std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int): Assertion `max_steal_amount < 2*_numVars || log_return_false("SWEEP STEAL Error [%i](%i): too large max steal amount %i >= 2*NUM_VARS, maybe segfault into non-initialized kissat solver \n", _my_rank, localId, max_steal_amount)' failed.
+c                                                                                           [2](3) --Jumped into kissat_mallob_shweep--
+c                                                                                           [2](3) --init_sweeper--
+c                                                             [2](0) ## -- active 46571 
+c                                                             [2](0) ## -- units  952 
+c                                                             [2](0) ## -- eliminated 0 
+c                                                             [2](0) ## -- 
+c                                                             [2](0) ## -- clauses irredundant 184802 
+c                                                             [2](0) ## -- clauses binary      22047 
+c                                                             [2](0) ## -- clauses irr+binary  206849 
+c                                                             [2](0) ## -- clauses added       206886 
+c                                                             [2](0) ## -- clauses learned     0 
+c                                                             [2](0) --starting shweep loop--
+mallob: /dss/dsshome1/0D/di97lib/mallob/src/app/sweep/sweep_job.cpp:617: std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int): Assertion `max_steal_amount < 2*_numVars || log_return_false("SWEEP STEAL Error [%i](%i): too large max steal amount %i >= 2*NUM_VARS, maybe segfault into non-initialized kissat solver \n", _my_rank, localId, max_steal_amount)' failed.
+sh: line 0: kill: (3175343) - No such process
+bash: line 1: 3175234 Aborted                 (core dumped) build/mallob -mono-app=SATWITHPRE -satsolver=[k_]w -pb=1 -pjp=999999 -pef=1 -mono=/hppfs/work/pn72pu/di97lib/instances/hwmcc20miters/cnf/opt/rast-p18.cnf.xz -jwl=300 -T=330 -wam=60000 -pre-cleanup=1 -q=1 -log=/tmp/hw27-5016263/1 -tmp=/tmp/hw27-5016263/tmp/1 -comment-outputlogdir=/hppfs/work/pn72pu/di97lib/logs/hw27-5016263 -sro=/tmp/hw27-5016263/1/processed-jobs.out -trace-dir=/tmp/hw27-5016263/1/ -os=1 -v=4 -iff=0 -s2f=/tmp/hw27-5016263/1/model -cm=0 -rpa=1 -pph=2 -mlpt=50000000 -t=24 -isp=0 -div-phases=1 -div-noise=0 -div-seeds=1 -div-elim=0 -div-native=0 -scsd=0 -scll=60 -slbdl=60 -qcll=60 -qlbdl=60 -csm=3 -cfm=3 -cfci=30 -mscf=5 -bem=1 -aim=1 -rlbd=0 -ilbd=1 -randlbd=0 -scramble-lbds=0 -seed=0 -spd=/tmp/hw27-5016263/1/ -spl=-1 -jcup=0.05 -preprocess-sweep -sweep-sharing-period=50 -sweep-solver-verbosity=1 -preprocess-sweep-priority=1.0
+sh: line 0: kill: (3175343) - No such process
+
+===================================================================================
+=   BAD TERMINATION OF ONE OF YOUR APPLICATION PROCESSES
+=   RANK 3 PID 3175228 RUNNING AT i01r01c01s08
+=   KILLED BY SIGNAL: 9 (Killed)
+===================================================================================
+Fri Oct 17 11:26:09 CEST 2025 EPILOG i01r01c01s07: build /tmp/hw27-5016263/1 /hppfs/work/pn72pu/di97lib/logs/hw27-5016263
+Fri Oct 17 11:26:09 CEST 2025 EPILOG i01r01c01s08: build /tmp/hw27-5016263/1 /hppfs/work/pn72pu/di97lib/logs/hw27-5016263
+Fri Oct 17 11:26:10 CEST 2025 END EPILOG i01r01c01s08
+Fri Oct 17 11:26:10 CEST 2025 END EPILOG i01r01c01s07
+Fri Oct 17 11:26:11 CEST 2025 JOB 1 FINISHED
+slurmstepd: error: *** JOB 5016263 ON i01r01c01s07 CANCELLED AT 2025-10-17T11:26:12 ***
