@@ -48,7 +48,8 @@ mkdir -p $localtmpdir_base $globallogdir_base
 echo "globallogdir: $globallogdir_base"
 
 # Benchmark instances, one per line
-benchmarkfile="/hppfs/work/$projname/$username/instances/hwmcc20miters/cnf/opt/pathlist.txt" # TODO 
+#benchmarkfile="/hppfs/work/$projname/$username/instances/hwmcc20miters/cnf/opt/pathlist.txt" # TODO 
+benchmarkfile="/hppfs/work/$projname/$username/instances/rotmul_testcase/rotmul-4-copies.txt"
 
 if [ ! -f $benchmarkfile ]; then
     echo "Benchmark file not found!"
