@@ -107,7 +107,7 @@ private:
 	void createAndStartNewShweeper(int localId);
     void loadFormula(KissatPtr shweeper);
 
-	void readSolutionFormula(KissatPtr shweeper);
+	void readResult(KissatPtr shweeper);
 
 
 	void sendMPIWorkstealRequests();

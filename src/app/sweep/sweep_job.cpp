@@ -78,7 +78,7 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 
 		assert( ! _is_root || _dimacsReportingLocalId->load() != -1);
 		if (_is_root && localId == _dimacsReportingLocalId->load()) {
-			readSolutionFormula(shweeper);
+			readResult(shweeper);
 		}
 		_running_shweepers_count--;
 	});
@@ -139,7 +139,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	return shweeper;
 }
 
-void SweepJob::readSolutionFormula(KissatPtr shweeper) {
+void SweepJob::readResult(KissatPtr shweeper) {
 	_internal_result.id = getId();
 	_internal_result.revision = getRevision();
 	_internal_result.result= SAT; //technically its not SAT but just *some* information, but just calling it SAT helps to seamlessly pass it though the higher abstraction layers
@@ -150,11 +150,11 @@ void SweepJob::readSolutionFormula(KissatPtr shweeper) {
 	//Logging
 	auto stats = shweeper->getSolverStats();
 	printf("SWEEP_ finished\n");
-	printf("[%i](%i) SWEEP APP RESULT: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
+	printf("[%i](%i) SWEEP RESULT: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
 		_my_rank, _dimacsReportingLocalId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
-	LOG(V2_INFO, "[%i](%i) SWEEP APP RESULT: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
+	LOG(V2_INFO, "[%i](%i) SWEEP RESULT: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
 		_my_rank, _dimacsReportingLocalId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
-	LOG(V2_INFO, "[%i](%i) SWEEP APP RESULT: %i Processes, %f seconds \n", _my_rank, _dimacsReportingLocalId->load(), getVolume(), Timer::elapsedSeconds() - _start_shweep_timestamp);
+	LOG(V2_INFO, "[%i](%i) SWEEP RESULT: %i Processes, %f seconds \n", _my_rank, _dimacsReportingLocalId->load(), getVolume(), Timer::elapsedSeconds() - _start_shweep_timestamp);
 	LOG(V1_WARN, "SWEEP_PRIORITY %f\n", _params.preprocessSweepPriority.val);
 	LOG(V1_WARN, "SWEEP_PROCESSES %i\n", getVolume());
 	LOG(V1_WARN, "SWEEP_THREADS_PER_PROCESS %i\n", _params.numThreadsPerProcess.val);
@@ -261,7 +261,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		msg.treeIndexOfDestination = sourceIndex;
 		msg.contextIdOfDestination = getJobComm().getContextIdOrZero(sourceIndex);
 		assert(msg.contextIdOfDestination != 0 ||
-			log_return_false("SWEEP Error in TAG_RETURNING_STEAL_REQUEST! Want to return an message, but invalid contextIdOfDestination==0. "
+			log_return_false("SWEEP STEAL Error in TAG_RETURNING_STEAL_REQUEST! Want to return an message, but invalid contextIdOfDestination==0. "
 					"With sourceRank=%i, sourceIndex=%i, payload.size()=%i \n", sourceRank, sourceIndex, msg.payload.size()));
 		getJobTree().send(sourceRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 		return;
@@ -272,6 +272,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		msg.payload.pop_back();
 		_worksteal_requests[localId].stolen_work = std::move(msg.payload);
 		_worksteal_requests[localId].got_steal_response = true;
+		LOG(V3_VERB, "SWEEP MSG received answer form [%i] ---%i--> [%i](%i)\n", sourceRank, _worksteal_requests[localId].stolen_work.size(), _my_rank, localId);
 		return;
 	}
 }
@@ -294,7 +295,7 @@ void SweepJob::sendMPIWorkstealRequests() {
 			msg.payload = {request.localId};
 			// LOG(V2_INFO, "Rank %i asks rank %i for work\n", _my_rank, recv_rank, n);
 			// LOG(V2_INFO, "  with destionation ctx_id %i \n", msg.contextIdOfDestination);
-			LOG(V3_VERB, "MPI work request from [%i](%i) to [%i] \n", _my_rank, request.localId, request.targetRank);
+			LOG(V3_VERB, "SWEEP MSG sending MPI work request from [%i](%i) to [%i] \n", _my_rank, request.localId, request.targetRank);
 			getJobTree().send(request.targetRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 		}
 	}
@@ -427,7 +428,7 @@ void SweepJob::initiateNewSharingRound() {
 	//The broadcast includes all workers currently reachable by the root-node and informs them about their parent and potential children
 	//It then causes the leaf nodes to call the callback, initiating the AllReduce
 	_last_sharing_timestamp = Timer::elapsedSeconds();
-	LOG(V3_VERB, "BCAST Initiating Sharing via Ping\n");
+	LOG(V3_VERB, "SWEEP BCAST Initiating Sharing via Ping\n");
 	//todo: maybe reset bcast here, to prevent initiating with the same object twice, maybe prevent pingpong?
 	JobMessage msg = getMessageTemplate();
 	msg.tag = _bcast->getMessageTag();
@@ -439,7 +440,7 @@ void SweepJob::cbContributeToAllReduce() {
 	assert(_bcast);
 	assert(_bcast->hasResult());
 
-	LOG(V4_VVER, "BCAST Callback to AllReduce\n");
+	LOG(V4_VVER, "SWEEP BCAST Callback to AllReduce\n");
 	auto snapshot = _bcast->getJobTreeSnapshot();
 
 	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(),
@@ -607,7 +608,7 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	//We dont know yet how much there is to steal, so we ask for an upper bound
 	//It can also be that the solver we want to steal from is not fully initialized yet
 	//For that in the C code there are further guards against unfinished initialization, all returning 0 in that case
-	LOG(V3_VERB, "SWEEP STEAL [%i] getting max steal info from (%i) \n", _my_rank, localId);
+	// LOG(V3_VERB, "SWEEP STEAL [%i] getting max steal info from (%i) \n", _my_rank, localId);
 	int max_steal_amount = shweep_get_max_steal_amount(shweeper->solver);
 	if (max_steal_amount == 0)
 		return {};
@@ -642,7 +643,7 @@ std::vector<int> SweepJob::getRandomIdPermutation() {
 void SweepJob::loadFormula(KissatPtr shweeper) {
 	const int* lits = getDescription().getFormulaPayload(0);
 	const int payload_size = getDescription().getFormulaPayloadSize(0);
-	LOG(V2_INFO, "ß Loading Formula, size %i \n", payload_size);
+	LOG(V2_INFO, "SWEEP Loading Formula, size %i \n", payload_size);
 	for (int i = 0; i < payload_size ; i++) {
 		shweeper->addLiteral(lits[i]);
 	}
