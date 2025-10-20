@@ -69,6 +69,11 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 	std::future<void> fut_shweeper = ProcessWideThreadPool::get().addTask([this, localId]() { //Changed from [&] to [this, shweeper] back to [&] to [this, localId] !! (nicco)
 		//passing localId by value to this lambda, because the thread might only execute after createAndStartNewShweeper is already gone
 		auto shweeper = createNewShweeper(localId);
+		if (_terminate_all) {
+			LOG(V2_INFO, "SWEEP JOB [%i](%i) terminated new shweeper directly, job already done \n", _my_rank, localId);
+			return;
+		}
+
 		loadFormula(shweeper);
 		LOG(V2_INFO, "SWEEP JOB [%i](%i) START solve() \n", _my_rank, localId);
 		_running_shweepers_count++;
@@ -103,6 +108,10 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	std::shared_ptr<Kissat> shweeper(new Kissat(setup));
 	float t1 = Timer::elapsedSeconds();
 	LOG(V2_INFO, "SWEEP JOB [%i](%i) received kissat object in %f ms\n", _my_rank, localId, (t1 - t0)*1000);
+	if (_terminate_all) {
+		LOG(V2_INFO, "SWEEP JOB [%i](%i) terminated new kissat directly, job already done \n", _my_rank, localId);
+		return shweeper;
+	}
 	shweeper->setIsShweeper();
 
 	shweeper->shweepSetImportExportCallbacks();
@@ -440,7 +449,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 
 void SweepJob::initiateNewSharingRound() {
 	if (!_bcast) {
-		LOG(V1_WARN, "[WARN] SWEEP BCAST root couldn't initiate sharing round, _bcast is Null\n");
+		LOG(V1_WARN, "[WARN] SWEEP SHARE BCAST root couldn't initiate sharing round, _bcast is Null\n");
 		return;
 	}
 
@@ -449,14 +458,14 @@ void SweepJob::initiateNewSharingRound() {
 
 
 	if (_bcast->getReceivedBroadcast()) {
-		LOG(V1_WARN, "[WARN] SWEEP BCAST: Would like to initiate new sharing round, but old round is not completed yet\n");
+		LOG(V1_WARN, "[WARN] SWEEP SHARE BCAST: Would like to initiate new sharing round, but old round is not completed yet\n");
 		return;
 	}
 	//Broadcast a ping to all workers to initiate an AllReduce
 	//The broadcast includes all workers currently reachable by the root-node and informs them about their parent and potential children
 	//It then causes the leaf nodes to call the callback, initiating the AllReduce
 	_last_sharing_timestamp = Timer::elapsedSeconds();
-	LOG(V3_VERB, "SWEEP BCAST Initiating Sharing via Ping\n");
+	LOG(V3_VERB, "SWEEP SHARE BCAST Initiating Sharing via Ping\n");
 	//todo: maybe reset bcast here, to prevent initiating with the same object twice, maybe prevent pingpong?
 	JobMessage msg = getMessageTemplate();
 	msg.tag = _bcast->getMessageTag();
@@ -468,7 +477,7 @@ void SweepJob::cbContributeToAllReduce() {
 	assert(_bcast);
 	assert(_bcast->hasResult());
 
-	LOG(V4_VVER, "SWEEP BCAST Callback to AllReduce\n");
+	LOG(V4_VVER, "SWEEP SHARE BCAST Callback to AllReduce\n");
 	auto snapshot = _bcast->getJobTreeSnapshot();
 
 	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(),
@@ -486,7 +495,7 @@ void SweepJob::cbContributeToAllReduce() {
 	for (auto &shweeper : _shweepers) {
 		id++;
 		if (!shweeper) {
-			LOG(V4_VVER, "SWEEP [%i](%i) not yet initialized, skipped in contribution aggregation \n", _my_rank, id);
+			LOG(V4_VVER, "SWEEP SHARE [%i](%i) not yet initialized, skipped in contribution aggregation \n", _my_rank, id);
 			continue;
 		}
 		int eq_size = shweeper->eqs_to_share.size();
@@ -498,7 +507,7 @@ void SweepJob::cbContributeToAllReduce() {
 		contrib.push_back(shweeper->shweeper_is_idle);
 
 		contribs.push_back(contrib);
-		LOG(V3_VERB, "SWEEP CONTRIB (%i): %i equivalences, %i units, %i idle \n", shweeper->getLocalId(), eq_size/2, units_size, shweeper->shweeper_is_idle);
+		LOG(V3_VERB, "SWEEP SHARE CONTRIB (%i): %i equivalences, %i units, %i idle \n", shweeper->getLocalId(), eq_size/2, units_size, shweeper->shweeper_is_idle);
 
 		shweeper->units_to_share.clear();
 		shweeper->eqs_to_share.clear();
@@ -507,7 +516,7 @@ void SweepJob::cbContributeToAllReduce() {
 	// LOG(V3_VERB, "SWEEP Aggregate contributions within process\n");
 	auto aggregation_element = aggregateEqUnitContributions(contribs);
 
-	LOG(V3_VERB, "SWEEP CONTRIB [%i]: size %i to sharing\n", _my_rank, aggregation_element.size()-NUM_SHARING_METADATA);
+	LOG(V3_VERB, "SWEEP SHARE CONTRIB [%i]: size %i to sharing\n", _my_rank, aggregation_element.size()-NUM_SHARING_METADATA);
 	_red->contribute(std::move(aggregation_element));
 
 }
@@ -524,7 +533,8 @@ void SweepJob::advanceAllReduction() {
 	const int eq_size = shared[shared.size()-EQUIVS_METADATA_POS];
 	const int unit_size = shared[shared.size()-UNITS_METADATA_POS];
 	const int all_idle = shared[shared.size()-IDLE_METADATA_POS];
-	LOG(V3_VERB, "SWEEP REDUCE --- Received sharing data: %i equivalences, %i units -- \n", eq_size/2, unit_size);
+	LOG(V3_VERB, "SWEEP SHARE REDUCE --- Received sharing data: %i equivalences, %i units -- \n", eq_size/2, unit_size);
+	LOG(V3_VERB, "SWEEP SHARE IDLE ALL %i \n", all_idle);
 	if (all_idle) {
 		_terminate_all = true;
 		LOG(V1_WARN, "ß # \n # \n # --- SWEEP ALL SWEEPERS IDLE - CAN TERMINATE -- \n # \n");
