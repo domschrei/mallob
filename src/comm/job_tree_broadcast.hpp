@@ -87,7 +87,7 @@ public:
         return _internal_msg_tag;
     }
 
-    bool getReceivedBroadcast() {
+    bool hasReceivedBroadcast() {
         return _received_broadcast;
     }
 

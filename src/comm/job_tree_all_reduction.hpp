@@ -216,9 +216,12 @@ public:
                 for (auto& childElem : _child_elems) elemsList.push_back(std::move(childElem.elem));
                 _aggregated_elem = _aggregator(elemsList);
                 _aggregating = false;
+                LOG(V4_VVER, "SWEEP SHARE own aggregation done\n");
             });
         }
 
+        LOG(V4_VVER, "SWEEP SHARE: aggregating %i, future_aggregate.valid() %i, parent_is_ready %i\n",
+            _aggregating, _future_aggregate.valid(), _parent_is_ready);
 
         if (!_aggregating && _future_aggregate.valid() && _parent_is_ready) {
             // Aggregation done

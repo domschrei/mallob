@@ -51,6 +51,8 @@ void SweepJob::appl_start() {
 	//a broadcast object is used to initiate an all-reduction by first pinging each processes currently reachable by the root node
 	//the ping detects the current tree structure and provides a callback to contribute to the all-reduction
 	// LOG(V2_INFO, "[SWEEP] initialize broadcast object\n");
+
+	LOG(V4_VVER, "SWEEP SHARE [%i] RESET BCAST\n", _my_rank);
 	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
 
 	//Start individual Kissat threads (those then immediately jump into the sweep algorithm)
@@ -457,7 +459,7 @@ void SweepJob::initiateNewSharingRound() {
 		return;
 
 
-	if (_bcast->getReceivedBroadcast()) {
+	if (_bcast->hasReceivedBroadcast()) {
 		LOG(V1_WARN, "[WARN] SWEEP SHARE BCAST: Would like to initiate new sharing round, but old round is not completed yet\n");
 		return;
 	}
@@ -481,10 +483,11 @@ void SweepJob::cbContributeToAllReduce() {
 	auto snapshot = _bcast->getJobTreeSnapshot();
 
 	if (! _is_root) {
+		LOG(V4_VVER, "SWEEP SHARE [%i] RESET non-root BCAST\n", _my_rank);
 		_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(),
 			[this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
-		//root is only reset once the whole reduction is done and broadcasted to prevent two broadcasts going in parallel
-		//(might add overlapping broadcasts later for faster turnovers, but for now keep only one for cleaner debugging)
+		//root is reset only after the whole reduction result is broadcasted, to prevent starting a new one while the old one is still running
+		//(might change this to add overlapping broadcasts later for faster turnovers, but for now keep only one for cleaner debugging)
 	}
 
 
@@ -567,10 +570,12 @@ void SweepJob::advanceAllReduction() {
 
 	//Now we can reset the root node, broadcast is finished and can prepare a new one
 	if (_is_root) {
+		LOG(V4_VVER, "SWEEP SHARE [%i] RESET root BCAST\n", _my_rank);
 		_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(),
 			[this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
 	}
 
+	LOG(V4_VVER, "SWEEP SHARE [%i] RESET root RED\n", _my_rank);
 	_red.reset();
 }
 
@@ -612,7 +617,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	aggregated.push_back(total_eq_size);
 	aggregated.push_back(total_unit_size);
 	aggregated.push_back(all_idle);
-	// LOG(V3_VERB, "SWEEP Aggregated: %i equivalences, %i units, %i all_idle\n", total_eq_size/2, total_unit_size, all_idle);
+	LOG(V3_VERB, "SWEEP SHARE EU-Aggregation done: %i equivalences, %i units, %i all_idle\n", total_eq_size/2, total_unit_size, all_idle);
 	assert(total_size == total_eq_size + total_unit_size + NUM_SHARING_METADATA);
     return aggregated;
 }
