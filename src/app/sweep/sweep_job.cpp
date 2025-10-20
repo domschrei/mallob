@@ -48,6 +48,11 @@ void SweepJob::appl_start() {
 	}
 	_shweepers.resize(_params.numThreadsPerProcess.val);
 
+	_bg_workers.reserve(_params.numThreadsPerProcess.val);
+	for (int i = 0; i < _params.numThreadsPerProcess.val; ++i) {
+		_bg_workers.emplace_back(std::make_unique<BackgroundWorker>());
+	}
+
 	//a broadcast object is used to initiate an all-reduction by first pinging each processes currently reachable by the root node
 	//the ping detects the current tree structure and provides a callback to contribute to the all-reduction
 	// LOG(V2_INFO, "[SWEEP] initialize broadcast object\n");
@@ -66,13 +71,14 @@ void SweepJob::appl_start() {
 }
 
 void SweepJob::createAndStartNewShweeper(int localId) {
-
-	LOG(V2_INFO, "SWEEP JOB [%i](%i) thread queued \n", _my_rank, localId);
-	std::future<void> fut_shweeper = ProcessWideThreadPool::get().addTask([this, localId]() { //Changed from [&] to [this, shweeper] back to [&] to [this, localId] !! (nicco)
+	LOG(V2_INFO, "SWEEP JOB [%i](%i) queuing background worker thread\n", _my_rank, localId);
+	_bg_workers[localId]->run([this, localId]() {
+	// std::future<void> fut_shweeper = ProcessWideThreadPool::get().addTask([this, localId]() { //Changed from [&] to [this, shweeper] back to [&] to [this, localId] !! (nicco)
 		//passing localId by value to this lambda, because the thread might only execute after createAndStartNewShweeper is already gone
 		auto shweeper = createNewShweeper(localId);
 		if (_terminate_all) {
-			LOG(V2_INFO, "SWEEP JOB [%i](%i) terminated new shweeper directly, job already done \n", _my_rank, localId);
+			_bg_workers[localId]->stop();
+			LOG(V2_INFO, "SWEEP JOB TERMINATE [%i](%i) terminated new shweeper directly, job already done \n", _my_rank, localId);
 			return;
 		}
 
@@ -88,10 +94,11 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 			readResult(shweeper);
 		}
 		_running_shweepers_count--;
+		// );
 	});
-	_fut_shweepers.push_back(std::move(fut_shweeper));
-
+	// _fut_shweepers.push_back(std::move(fut_shweeper));
 }
+
 
 std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	const JobDescription& desc = getDescription();
@@ -109,9 +116,9 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	float t0 = Timer::elapsedSeconds();
 	std::shared_ptr<Kissat> shweeper(new Kissat(setup));
 	float t1 = Timer::elapsedSeconds();
-	LOG(V2_INFO, "SWEEP JOB [%i](%i) received kissat object in %f ms\n", _my_rank, localId, (t1 - t0)*1000);
+	LOG(V2_INFO, "SWEEP STARTUP [%i](%i) kissat init in %f ms\n", _my_rank, localId, (t1 - t0)*1000);
 	if (_terminate_all) {
-		LOG(V2_INFO, "SWEEP JOB [%i](%i) terminated new kissat directly, job already done \n", _my_rank, localId);
+		LOG(V2_INFO, "SWEEP JOB TERMINATE [%i](%i) terminated new kissat directly, job already done \n", _my_rank, localId);
 		return shweeper;
 	}
 	shweeper->setIsShweeper();
@@ -158,7 +165,6 @@ void SweepJob::readResult(KissatPtr shweeper) {
 	_internal_result.result= SAT; //technically its not SAT but just *some* information, but just calling it SAT helps to seamlessly pass it though the higher abstraction layers
 	std::vector<int> formula = shweeper->extractPreprocessedFormula();
 	_internal_result.setSolutionToSerialize(formula.data(), formula.size()); //Format: [Clauses, #Vars, #Clauses]
-
 
 	//Logging
 	auto stats = shweeper->getSolverStats();
@@ -348,7 +354,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 	SplitMix64Rng _rng;
 	while (true) {
 		if (_terminate_all) {
-			//this sends kissat a size==0 array, which tells kissat that we terminate
+			//this crucially sends the kissat solver a size zero array, which is the signal for it to terminate itself
 			shweeper->work_received_from_steal = {};
 			break;
 		}
@@ -646,7 +652,7 @@ std::vector<int> SweepJob::stealWorkFromAnyLocalSolver() {
 }
 
 std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
-	if (_terminate_all) //sweeping globally finished
+	if (_terminate_all) //sweeping finished globally, nothing to steal anymore
 		return {};
 	if ( ! _shweepers[localId]) {
 		// LOG(V3_VERB, "SWEEP STEAL stealing from [%i](%i), shweeper does not exist yet\n", _my_rank, localId);
@@ -700,6 +706,18 @@ void SweepJob::loadFormula(KissatPtr shweeper) {
 	for (int i = 0; i < payload_size ; i++) {
 		shweeper->addLiteral(lits[i]);
 	}
+}
+
+SweepJob::~SweepJob() {
+	int id=0;
+	for (auto &bg_worker : _bg_workers) {
+		if (bg_worker->isRunning()) {
+			LOG(V3_VERB, "SWEEP JOB ENDING WORKER %i \n", id);
+			bg_worker->stop();
+		}
+		id++;
+	}
+
 }
 
 

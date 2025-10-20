@@ -152,7 +152,7 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     // If a client application is provided, run this application in (a) separate thread(s)
     std::list<BackgroundWorker> clientAppWorkers;
     if (params.clientApplication.isSet() && isClient) {
-        printf("Found client application\n");
+        // printf("Found client application\n");
         int internalClientRank = MyMpi::rank(commClients);
         int nbThreads = params.clientAppThreads();
         for (size_t i = internalClientRank*nbThreads; i < (internalClientRank+1)*nbThreads; ++i) {

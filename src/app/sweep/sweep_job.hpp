@@ -22,6 +22,7 @@ private:
 	typedef std::shared_ptr<Kissat> KissatPtr;
 
 	std::vector<std::shared_ptr<Kissat>> _shweepers;
+	std::vector<std::unique_ptr<BackgroundWorker>> _bg_workers;
 	std::vector<std::future<void>> _fut_shweepers;
     std::atomic_int _running_shweepers_count {0};
 	std::vector<int> _list_of_ids;
@@ -125,6 +126,8 @@ private:
     std::vector<int> stealWorkFromSpecificLocalSolver(int localId);
     void cbSearchWorkInTree(unsigned **work, int *work_size, int localId);
 	void importNextEquivalence(int *last_imported_round, int eq_nr, unsigned *lit1, unsigned *lit2);
+
+	virtual ~SweepJob();
 
 };
 
