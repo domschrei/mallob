@@ -306,6 +306,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 
 std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSetup& setup) {
 	// printf("ß creating new solver\n");
+	float t0 = Timer::elapsedSeconds();
 
 	std::shared_ptr<PortfolioSolverInterface> solver;
 	switch (setup.solverType) {
@@ -354,6 +355,8 @@ std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSe
 		abort();
 		break;
 	}
+	float t1 = Timer::elapsedSeconds();
+	LOG(V2_INFO, "STARTUP Solver-type %s init duration: %f ms \n", setup.solverType, (t1-t0)*1000);
 	return solver;
 }
 

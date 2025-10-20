@@ -48,7 +48,10 @@ public:
         setup.solverType = 'p';
         setup.preprocessSequentialSweepComplete = _params.preprocessSequentialSweepComplete.val;
         // setup.shared_sweeping = _params.sharedSweeping.val;
+        float t0 = Timer::elapsedSeconds();
         _kissat.reset(new Kissat(setup));
+        float t1 = Timer::elapsedSeconds();
+        LOG(V2_INFO, "STARTUP (PREPRO) Kissat init duration: %f ms \n", (t1-t0)*1000);
         _nb_running++;
         _fut_kissat = ProcessWideThreadPool::get().addTask([&]() {
             loadFormulaToSolver(_kissat.get());
