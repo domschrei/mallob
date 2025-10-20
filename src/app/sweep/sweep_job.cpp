@@ -523,6 +523,7 @@ void SweepJob::cbContributeToAllReduce() {
 
 void SweepJob::advanceAllReduction() {
 	if (!_red) return;
+	LOG(V3_VERB, "SWEEP SHARE ADVANCE [%i]\n", _my_rank);
 	_red->advance();
 	if (!_red->hasResult()) return;
 

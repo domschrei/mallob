@@ -202,8 +202,10 @@ public:
 
         if (_finished) return *this;
 
+        LOG(V4_VVER, "SWEEP SHARE expected child elems %i, actual child elems %i \n", _num_expected_child_elems, _child_elems.size());
         if (_child_elems.size() == _num_expected_child_elems && _local_elem.has_value()) {
 
+            LOG(V4_VVER, "SWEEP SHARE adding own element to aggregation\n");
             _child_elems.insert({-1, std::move(_local_elem.value())});
             _local_elem.reset();
 
@@ -221,6 +223,7 @@ public:
         if (!_aggregating && _future_aggregate.valid() && _parent_is_ready) {
             // Aggregation done
             LOG(V5_DEBG, "CS got aggregation\n");
+            LOG(V4_VVER, "SWEEP SHARE aggregation done, send up or broadcast\n");
 
             _future_aggregate.get();
             _reduction_locally_done = true;
