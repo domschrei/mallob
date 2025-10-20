@@ -480,8 +480,12 @@ void SweepJob::cbContributeToAllReduce() {
 	LOG(V4_VVER, "SWEEP SHARE BCAST Callback to AllReduce\n");
 	auto snapshot = _bcast->getJobTreeSnapshot();
 
-	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(),
-		[this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
+	if (! _is_root) {
+		_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(),
+			[this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
+		//root is only reset once the whole reduction is done and broadcasted to prevent two broadcasts going in parallel
+		//(might add overlapping broadcasts later for faster turnovers, but for now keep only one for cleaner debugging)
+	}
 
 
 	JobMessage baseMsg = getMessageTemplate();
@@ -561,7 +565,12 @@ void SweepJob::advanceAllReduction() {
 		shweeper->units_from_broadcast_queued.insert(shweeper->units_from_broadcast_queued.end(), _units_from_broadcast.begin(), _units_from_broadcast.end());
 	}
 
-	// Conclude the all-reduction
+	//Now we can reset the root node, broadcast is finished and can prepare a new one
+	if (_is_root) {
+		_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(),
+			[this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
+	}
+
 	_red.reset();
 }
 
