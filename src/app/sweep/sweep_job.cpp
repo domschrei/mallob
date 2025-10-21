@@ -101,8 +101,8 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 		int res = shweeper->solve(0, nullptr);
 		LOG(V2_INFO, "SWEEP JOB [%i](%i) FINISH solve(). Result %i \n", _my_rank, localId, res);
 
-		assert( ! _is_root || _dimacsReportingLocalId->load() != -1);
-		if (_is_root && localId == _dimacsReportingLocalId->load()) {
+		assert( ! _is_root || _dimacsReport_localId->load() != -1);
+		if (_is_root && localId == _dimacsReport_localId->load()) {
 			readResult(shweeper);
 		}
 		_running_shweepers_count--;
@@ -141,7 +141,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	if (_is_root) {
 		//read out final formula only at the root node
 		shweeper->shweepSetReportCallback();
-		shweeper->shweepSetDimacsReportPtr(_dimacsReportingLocalId);
+		shweeper->shweepSetDimacsReportPtr(_dimacsReport_localId);
 	}
 
     //Basic configuration
@@ -155,10 +155,12 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	//Specific for Mallob interaction
 	shweeper->set_option("mallob_custom_sweep_verbosity", _params.sweepSolverVerbosity()); //Shweeper verbosity 0..4
 	shweeper->set_option("mallob_is_shweeper", 1); //Make this Kissat solver a pure Distributed Sweeping Solver. Jumps directly to distributed sweeping and bypasses everything else
-	shweeper->set_option("sweepcomplete", 1);      //full sweeping, removes any tick limits
-	shweeper->set_option("mallob_local_id", localId); //for debugging mostly, keeping track
+	shweeper->set_option("mallob_local_id", localId);
 	shweeper->set_option("mallob_rank", _my_rank);
+	shweeper->set_option("mallob_is_root", _is_root);
 
+
+	shweeper->set_option("sweepcomplete", 1);      //full sweeping, removes any tick limits
 	//Specific for clean sweep run
 	shweeper->set_option("preprocess", 0); //skip other preprocessing stuff after shweep finished
 	// shweeper->set_option("probe", 1);   //there is some cleanup-probing at the end of the sweeping. keep it? (apparently the probe option is used nowhere anyways)
@@ -182,22 +184,28 @@ void SweepJob::readResult(KissatPtr shweeper) {
 	auto stats = shweeper->getSolverStats();
 	printf("SWEEP finished\n");
 	printf("[%i](%i) RESULT SWEEP: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
-		_my_rank, _dimacsReportingLocalId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
+		_my_rank, _dimacsReport_localId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
 	LOG(V2_INFO, "[%i](%i) RESULT SWEEP: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
-		_my_rank, _dimacsReportingLocalId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
-	LOG(V2_INFO, "[%i](%i) SWEEP RESULT: %i Processes, %f seconds \n", _my_rank, _dimacsReportingLocalId->load(), getVolume(), Timer::elapsedSeconds() - _start_shweep_timestamp);
-	LOG(V1_WARN, "RESULT SWEEP_PRIORITY %f\n", _params.preprocessSweepPriority.val);
-	LOG(V1_WARN, "RESULT SWEEP_PROCESSES %i\n", getVolume());
-	LOG(V1_WARN, "RESULT SWEEP_THREADS_PER_PROCESS %i\n", _params.numThreadsPerProcess.val);
-	LOG(V1_WARN, "RESULT SWEEP_SHARING_PERIOD %i \n", _params.sweepSharingPeriod_ms.val);
-	LOG(V1_WARN, "RESULT SWEEP_EQUIVALENCES %i\n", stats.shweep_eqs);
-	LOG(V1_WARN, "RESULT SWEEP_UNITS %i\n", stats.shweep_new_units);
-	LOG(V1_WARN, "RESULT SWEEP_ELIMINATED %i\n", stats.shweep_eliminated);
-	LOG(V1_WARN, "RESULT SWEEP_TIME %f\n", Timer::elapsedSeconds() - _start_shweep_timestamp);
+		_my_rank, _dimacsReport_localId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
+	LOG(V2_INFO, "[%i](%i) RESULT SWEEP: %i Processes, %f seconds \n", _my_rank, _dimacsReport_localId->load(), getVolume(), Timer::elapsedSeconds() - _start_shweep_timestamp);
+	LOG(V2_INFO, "RESULT SWEEP_PRIORITY       %f\n", _params.preprocessSweepPriority.val);
+	LOG(V2_INFO, "RESULT SWEEP_PROCESSES      %i\n", getVolume());
+	LOG(V2_INFO, "RESULT SWEEP_THREADS_PP     %i\n", _params.numThreadsPerProcess.val);
+	LOG(V2_INFO, "RESULT SWEEP_SHARING_PERIOD %i ms \n", _params.sweepSharingPeriod_ms.val);
+	LOG(V2_INFO, "RESULT SWEEP_VARS_ORIG      %i\n", stats.shweep_vars_orig);
+	LOG(V2_INFO, "RESULT SWEEP_VARS_END       %i\n", stats.shweep_vars_end);
+	LOG(V2_INFO, "RESULT SWEEP_ACTIVE_ORIG    %i\n", stats.shweep_active_orig);
+	LOG(V2_INFO, "RESULT SWEEP_ACTIVE_END     %i\n", stats.shweep_active_end);
+	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_ORIG   %i\n", stats.shweep_clauses_orig);
+	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_END    %i\n", stats.shweep_clauses_end);
+	LOG(V2_INFO, "RESULT SWEEP_EQUIVALENCES   %i\n", stats.shweep_eqs);
+	LOG(V2_INFO, "RESULT SWEEP_UNITS          %i\n", stats.shweep_new_units);
+	LOG(V2_INFO, "RESULT SWEEP_ELIMINATED     %i\n", stats.shweep_eliminated);
+	LOG(V2_INFO, "RESULT SWEEP_TIME           %f sec\n", Timer::elapsedSeconds() - _start_shweep_timestamp);
 
-	LOG(V2_INFO, "# # RESULT [%i](%i) Serialized final formula, SolutionSize=%i\n", _my_rank, _dimacsReportingLocalId->load(), _internal_result.getSolutionSize());
+	LOG(V3_VERB, "# # RESULT [%i](%i) Serialized final formula, SolutionSize=%i\n", _my_rank, _dimacsReport_localId->load(), _internal_result.getSolutionSize());
 	for (int i=0; i<15; i++) {
-		LOG(V2_INFO, "RESULT Formula peek %i: %i \n", i, _internal_result.getSolution(i));
+		LOG(V3_VERB, "RESULT Formula peek %i: %i \n", i, _internal_result.getSolution(i));
 	}
 
 
@@ -205,54 +213,6 @@ void SweepJob::readResult(KissatPtr shweeper) {
 	//This flag tells the system that the result is actually ready
 	_solved_status = SAT;
 }
-
-/*
-void SweepJob::startShweeper(KissatPtr shweeper) {
-	// LOG(V2_INFO,"ß Calling new thread\n");
-	LOG(V2_INFO, "SWEEP Add shweeper [%i](%i) to Pool Tasks\n", _my_rank, shweeper->getLocalId());
-	std::future<void> fut_shweeper = ProcessWideThreadPool::get().addTask([this, shweeper]() { //Changed from [&] to [this, shweeper]!! (nicco)
-		// LOG(V2_INFO, "Start Thread (r %i, id %i)\n", _my_rank, shweeper->getLocalId());
-		loadFormula(shweeper);
-		LOG(V2_INFO, "# # SWEEP Starting shweeper solve() [%i](%i)\n", _my_rank, shweeper->getLocalId());
-		_running_shweepers_count++;
-		int res = shweeper->solve(0, nullptr);
-		LOG(V2_INFO, "# # SWEEP Thread finished. Rank %i localId %i result %i # #\n", _my_rank, shweeper->getLocalId(), res);
-
-		assert( ! _is_root || _dimacsReportLocalId->load() != -1);
-		if (_is_root && shweeper->getLocalId() == _dimacsReportLocalId->load()) {
-			_internal_result.id = getId();
-			_internal_result.revision = getRevision();
-			_internal_result.result= SAT; //technically its not SAT but just *some* information, but just calling it SAT helps to seamlessly pass it though the higher abstraction layers
-			// _eqs_found = shweeper->getSolverStats().shweep_eqs_found;
-			// _sweep_units_found = shweeper->getSolverStats().shweep_sweep_units_found;
-			auto stats = shweeper->getSolverStats();
-			printf("SWEEP_ finished\n");
-			printf("[%i](%i) SWEEP APP RESULT: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
-				_my_rank, _dimacsReportLocalId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
-			LOG(V2_INFO, "[%i](%i) SWEEP APP RESULT: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
-				_my_rank, _dimacsReportLocalId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
-			LOG(V2_INFO, "[%i](%i) SWEEP APP RESULT: %i Processes, %f seconds \n", _my_rank, _dimacsReportLocalId->load(), getVolume(), Timer::elapsedSeconds() - _start_shweep_timestamp);
-			LOG(V1_WARN, "SWEEP_PRIORITY %f\n", _params.preprocessSweepPriority.val);
-			LOG(V1_WARN, "SWEEP_PROCESSES %i\n", getVolume());
-			LOG(V1_WARN, "SWEEP_THREADS_PER_PROCESS %i\n", _params.numThreadsPerProcess.val);
-			LOG(V1_WARN, "SWEEP_SHARING_PERIOD %i \n", _params.sweepSharingPeriod_ms.val);
-			LOG(V1_WARN, "SWEEP_EQUIVALENCES %i\n", stats.shweep_eqs);
-			LOG(V1_WARN, "SWEEP_UNITS %i\n", stats.shweep_new_units);
-			LOG(V1_WARN, "SWEEP_ELIMINATED %i\n", stats.shweep_eliminated);
-			LOG(V1_WARN, "SWEEP_TIME %f\n", Timer::elapsedSeconds() - _start_shweep_timestamp);
-			std::vector<int> formula = shweeper->extractPreprocessedFormula();
-			_internal_result.setSolutionToSerialize(formula.data(), formula.size()); //Format: [Clauses, #Vars, #Clauses]
-			LOG(V2_INFO, "# # [%i](%i) Serialized final formula, SolutionSize=%i\n", _my_rank, _dimacsReportLocalId->load(), _internal_result.getSolutionSize());
-			for (int i=0; i<15; i++) {
-				LOG(V2_INFO, "Formula peek %i: %i \n", i, _internal_result.getSolution(i));
-			}
-			_solved_status = SAT;
-		}
-		_running_shweepers_count--;
-	});
-	_fut_shweepers.push_back(std::move(fut_shweeper));
-}
-*/
 
 
 // Called periodically by the main thread to allow the worker to emit messages.
@@ -392,27 +352,33 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		}
 
 		//Try to steal locally from shared memory
-		int rnd_percent = _rng.randomInRange(0,100);
-		LOG(V2_INFO, "SWEEP STEAL [%i](%i) rnd_percent = %i \n", _my_rank, localId, rnd_percent);
-		bool first_local =  rnd_percent <= SEARCH_FIRST_LOCAL_PERCENT;
 
-		if (first_local) {
-			auto stolen_work = stealWorkFromAnyLocalSolver();
-			//Successful local steal
-			if ( ! stolen_work.empty()) {
-				//store steal data persistently in C++, such that C can keep operating on that memory segment
-				shweeper->work_received_from_steal = std::move(stolen_work);
-				LOG(V3_VERB, "SWEEP WORK [%i] ---%i---> (%i) \n", _my_rank, shweeper->work_received_from_steal.size(), localId);
-				break;
-			}
-		} else {
-			LOG(V2_INFO, "SWEEP STEAL [%i](%i) go immediately for global steal\n", _my_rank, localId);
+		// int rnd_percent = _rng.randomInRange(0,100);
+		// LOG(V2_INFO, "SWEEP STEAL [%i](%i) rnd_percent = %i \n", _my_rank, localId, rnd_percent);
+		// bool first_local =  rnd_percent <= SEARCH_FIRST_LOCAL_PERCENT;
+
+		 /*
+		  * Going for some direct global steals doesnt do much here, because the big rally happens anyways the moment all are depleted locally
+		  * At that point they anyways schedule a global sweep, and some sweepers stealing globally before cant stop that
+		  */
+
+		// if (first_local) {
+		auto stolen_work = stealWorkFromAnyLocalSolver();
+		//Successful local steal
+		if ( ! stolen_work.empty()) {
+			//store steal data persistently in C++, such that C can keep operating on that memory segment
+			shweeper->work_received_from_steal = std::move(stolen_work);
+			LOG(V3_VERB, "SWEEP WORK [%i] ---%i---> (%i) \n", _my_rank, shweeper->work_received_from_steal.size(), localId);
+			break;
 		}
+		// } else {
+			// LOG(V2_INFO, "SWEEP STEAL [%i](%i) go immediately for global steal\n", _my_rank, localId);
+		// }
 
 		int my_comm_rank = getJobComm().getWorldRankOrMinusOne(_my_index);
 
 		if (my_comm_rank == -1) {
-			LOG(V3_VERB, "SWEEP Delaying global steal request, my own rank %i (index %i) is not yet in JobComm \n", _my_rank, _my_index);
+			LOG(V3_VERB, "SWEEP SKIP Delaying global steal request, my own rank %i (index %i) is not yet in JobComm \n", _my_rank, _my_index);
 			// LOG(V2_INFO, " with _my_index %i \n", _my_index);
 			// LOG(V2_INFO, " with JobComm().size %i \n", getJobComm().size());
 			usleep(1000);
@@ -426,7 +392,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 
         if (targetRank == -1) {
         	//target rank not yet in JobTree, might need some more milliseconds to update, try again
-			LOG(V3_VERB, "SWEEP targetIndex %i, targetRank %i not yet in JobComm\n", targetIndex, targetRank);
+			LOG(V3_VERB, "SWEEP SKIP targetIndex %i, targetRank %i not yet in JobComm\n", targetIndex, targetRank);
 			usleep(1000);
         	continue;
         }
@@ -437,7 +403,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		}
 
 		if (getJobComm().getContextIdOrZero(targetIndex)==0) {
-			LOG(V3_VERB, "SWEEP Context ID of target is missing. getVolume()=%i, rndTargetIndex=%i, rndTargetRank=%i, myIndex=%i, myRank=%i \n", getVolume(), targetIndex, targetRank, _my_index, _my_rank);
+			LOG(V3_VERB, "SWEEP SKIP Context ID of target is missing. getVolume()=%i, rndTargetIndex=%i, rndTargetRank=%i, myIndex=%i, myRank=%i \n", getVolume(), targetIndex, targetRank, _my_index, _my_rank);
 			//target is not yet listed in address list. Might happen for a short period just after it is spawned
 			usleep(1000);
 			continue;
@@ -586,7 +552,7 @@ void SweepJob::advanceAllReduction() {
 	for (auto shweeper : _shweepers) {
 		id++;
 		if (!shweeper) {
-			LOG(V4_VVER, "SWEEP SHARE REDUCE [%i](%i) not yet initialized, skipped in contribution broadcasting \n", _my_rank, id);
+			LOG(V4_VVER, "[WARN] SWEEP SHARE REDUCE [%i](%i) not yet initialized, skipped importing results!\n", _my_rank, id);
 			continue;
 		}
 		shweeper->eqs_from_broadcast_queued.insert(shweeper->eqs_from_broadcast_queued.end(), _eqs_from_broadcast.begin(), _eqs_from_broadcast.end());

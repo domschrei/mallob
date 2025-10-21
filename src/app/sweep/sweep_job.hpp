@@ -21,7 +21,7 @@ private:
 
 	typedef std::shared_ptr<Kissat> KissatPtr;
 
-	std::vector<std::shared_ptr<Kissat>> _shweepers;
+	std::vector<KissatPtr> _shweepers;
 	std::vector<std::unique_ptr<BackgroundWorker>> _bg_workers;
 	std::vector<std::future<void>> _fut_shweepers;
     std::atomic_int _running_shweepers_count {0};
@@ -74,7 +74,7 @@ private:
 	static const int INVALID_LIT = UINT_MAX;
 
 	//keep track which solver reports the final formula, we need only one
-	std::shared_ptr<std::atomic<int>> _dimacsReportingLocalId = std::make_shared<std::atomic<int>>(-1);
+	std::shared_ptr<std::atomic<int>> _dimacsReport_localId = std::make_shared<std::atomic<int>>(-1);
 
 
 public:

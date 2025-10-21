@@ -550,16 +550,21 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
     bool accept = nbVars != _setup.numVars || nbClauses != _setup.numOriginalClauses;
 
     //For Sweeping only: Only a single solver needs to report the formula. We choose the first solver on the root node that arrives here
-    //We only provided this callback to solvers on the root node in the first place, so all arriving here are on root
+    //Only solvers on the root node are provided this callback, so if we are here we are guaranteed to be on root
     if (is_shweeper) {
         int expected_unset = -1;
         bool weAreFirst = shweepDimacsReportLocalId->compare_exchange_strong(expected_unset, getLocalId());
         if (weAreFirst) {
-            LOG(V2_INFO, "[root](%i) first to report dimacs result\n", getLocalId());
-            LOG(V2_INFO, "Accept shweeper formula? %i.  (%i --> %i vars) (%i --> %i clauses) \n", accept, _setup.numVars, nbVars, _setup.numOriginalClauses, nbClauses);
+            LOG(V2_INFO, "SWEEP [root](%i) first to report dimacs result\n", getLocalId());
+            LOG(V2_INFO, "SWEEP Accept shweeper formula? %i.  (%i --> %i vars) (%i --> %i clauses) \n", accept, _setup.numVars, nbVars, _setup.numOriginalClauses, nbClauses);
+            auto &stats = getSolverStatsRef();
+            stats.shweep_vars_orig = _setup.numVars;
+            stats.shweep_clauses_orig = _setup.numOriginalClauses;
+            stats.shweep_vars_end = nbVars;
+            stats.shweep_clauses_end = nbClauses;
             // assert(accept); //todo: sidestep if formula is still identical and thus accept==false
         } else {
-            LOG(V2_INFO, "[root](%i) skipped for reporting dimacs results, already done by somebody\n", getLocalId());
+            LOG(V2_INFO, "SWEEP [root](%i) skipped reporting dimacs results, already done by somebody else\n", getLocalId());
             accept = false;
         }
     }
@@ -587,7 +592,8 @@ void Kissat::addLiteralFromPreprocessing(int lit) {
         setPreprocessedFormula(std::move(preprocessedFormula));
         if (is_shweeper) {
             auto &stats = getSolverStatsRef();
-            shweep_get_sweep_stats(solver, &stats.shweep_eqs, &stats.shweep_sweep_units, &stats.shweep_new_units, &stats.shweep_total_units, &stats.shweep_eliminated);
+            shweep_get_sweep_stats(solver, &stats.shweep_eqs, &stats.shweep_sweep_units, &stats.shweep_new_units, &stats.shweep_total_units, &stats.shweep_eliminated,
+                &stats.shweep_active_orig, &stats.shweep_active_end);
         }
         setSolverInterrupt();
     }

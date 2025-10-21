@@ -33,8 +33,14 @@ struct SolverStatistics {
 	int shweep_eqs{-1};
 	int shweep_sweep_units{-1};
 	int shweep_new_units{-1};
-	int shweep_total_units{-1};
+	int shweep_total_units{-1}; //incl. those already present during read in
 	int shweep_eliminated{-1};
+	int shweep_vars_orig{-1};
+	int shweep_vars_end{-1};
+	int shweep_clauses_orig{-1};
+	int shweep_clauses_end{-1};
+	int shweep_active_orig{-1};
+	int shweep_active_end{-1};
 
 	std::string getReport() const {
 		return "pps:" + std::to_string(propagations)
