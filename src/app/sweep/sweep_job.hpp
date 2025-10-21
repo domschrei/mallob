@@ -32,6 +32,7 @@ private:
 	bool _terminate_all=false;
 
 	// static const int NUM_STEAL_METADATA = 1;
+	const int SEARCH_FIRST_LOCAL_PERCENT = 90;
     const int TAG_SEARCHING_WORK = 1001;
     const int TAG_RETURNING_STEAL_REQUEST = 1002;
 	struct WorkstealRequest {

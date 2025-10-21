@@ -10,6 +10,8 @@ extern "C" {
 #include "kissat/src/kissat.h"
 }
 
+#define INIT_PARALLEL 1
+
 SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table)
     : Job(params, setup, table)
 {
@@ -64,6 +66,10 @@ void SweepJob::appl_start() {
 	//To keep appl_start() responsive, everything is outsourced to the individual threads
 	//(Improvement form earlier initialization which was still done by the main thread, takes ca. 4ms per solver, with x32 threads this resulted in being stuck here for 150ms!
 	for (int localId=0; localId < _params.numThreadsPerProcess.val; localId++) {
+		#if INIT_PARALLEL==0
+			auto shweeper = createNewShweeper(localId);
+			_shweepers[localId] = shweeper;
+		#endif
 		createAndStartNewShweeper(localId);
 	}
 
@@ -75,7 +81,11 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 	_bg_workers[localId]->run([this, localId]() {
 	// std::future<void> fut_shweeper = ProcessWideThreadPool::get().addTask([this, localId]() { //Changed from [&] to [this, shweeper] back to [&] to [this, localId] !! (nicco)
 		//passing localId by value to this lambda, because the thread might only execute after createAndStartNewShweeper is already gone
-		auto shweeper = createNewShweeper(localId);
+		#if INIT_PARALLEL
+				auto shweeper = createNewShweeper(localId);
+		#else
+		auto &shweeper = _shweepers[localId];
+		#endif
 		if (_terminate_all) {
 			_bg_workers[localId]->stop();
 			LOG(V2_INFO, "SWEEP JOB TERMINATE [%i](%i) terminated new shweeper directly, job already done \n", _my_rank, localId);
@@ -85,7 +95,9 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 		loadFormula(shweeper);
 		LOG(V2_INFO, "SWEEP JOB [%i](%i) START solve() \n", _my_rank, localId);
 		_running_shweepers_count++;
+		#if INIT_PARALLEL
 		_shweepers[localId] = shweeper;
+		#endif
 		int res = shweeper->solve(0, nullptr);
 		LOG(V2_INFO, "SWEEP JOB [%i](%i) FINISH solve(). Result %i \n", _my_rank, localId, res);
 
@@ -300,7 +312,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		msg.payload.pop_back();
 		_worksteal_requests[localId].stolen_work = std::move(msg.payload);
 		_worksteal_requests[localId].got_steal_response = true;
-		LOG(V3_VERB, "SWEEP MSG [%i] received steal answer --%i-- from [%i](%i)\n", sourceRank, _worksteal_requests[localId].stolen_work.size(), _my_rank, localId);
+		LOG(V3_VERB, "SWEEP MSG to [%i](%i) received steal answer --%i-- from [%i]\n", _my_rank, localId, _worksteal_requests[localId].stolen_work.size(), sourceRank );
 		return;
 	}
 }
@@ -352,6 +364,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 	shweeper->work_received_from_steal = {};
 
 	SplitMix64Rng _rng;
+	//loop until we find work or the whole sweeping is terminated
 	while (true) {
 		if (_terminate_all) {
 			//this crucially sends the kissat solver a size zero array, which is the signal for it to terminate itself
@@ -379,15 +392,19 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		}
 
 		//Try to steal locally from shared memory
-		// LOG(V3_VERB, "SWEEP [%i](%i) searching work locally \n", _my_rank, localId);
-		auto stolen_work = stealWorkFromAnyLocalSolver();
+		bool first_local = _rng.randomInRange(0,100) <= SEARCH_FIRST_LOCAL_PERCENT;
 
-		//Successful local steal
-		if ( ! stolen_work.empty()) {
-			//store steal data persistently in C++, such that C can keep operating on that memory segment
-			shweeper->work_received_from_steal = std::move(stolen_work);
-			LOG(V3_VERB, "SWEEP WORK [%i] ---%i---> (%i) \n", _my_rank, shweeper->work_received_from_steal.size(), localId);
-			break;
+		if (first_local) {
+			auto stolen_work = stealWorkFromAnyLocalSolver();
+			//Successful local steal
+			if ( ! stolen_work.empty()) {
+				//store steal data persistently in C++, such that C can keep operating on that memory segment
+				shweeper->work_received_from_steal = std::move(stolen_work);
+				LOG(V3_VERB, "SWEEP WORK [%i] ---%i---> (%i) \n", _my_rank, shweeper->work_received_from_steal.size(), localId);
+				break;
+			}
+		} else {
+			LOG(V2_INFO, "SWEEP STEAL [%i](%i) go immediately for global steal\n", _my_rank, localId);
 		}
 
 		int my_comm_rank = getJobComm().getWorldRankOrMinusOne(_my_index);
@@ -396,7 +413,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 			LOG(V3_VERB, "SWEEP Delaying global steal request, my own rank %i (index %i) is not yet in JobComm \n", _my_rank, _my_index);
 			// LOG(V2_INFO, " with _my_index %i \n", _my_index);
 			// LOG(V2_INFO, " with JobComm().size %i \n", getJobComm().size());
-			usleep(10000);
+			usleep(1000);
 			continue;
 		}
 
@@ -408,7 +425,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
         if (targetRank == -1) {
         	//target rank not yet in JobTree, might need some more milliseconds to update, try again
 			LOG(V3_VERB, "SWEEP targetIndex %i, targetRank %i not yet in JobComm\n", targetIndex, targetRank);
-			usleep(10000);
+			usleep(1000);
         	continue;
         }
 
@@ -420,7 +437,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		if (getJobComm().getContextIdOrZero(targetIndex)==0) {
 			LOG(V3_VERB, "SWEEP Context ID of target is missing. getVolume()=%i, rndTargetIndex=%i, rndTargetRank=%i, myIndex=%i, myRank=%i \n", getVolume(), targetIndex, targetRank, _my_index, _my_rank);
 			//target is not yet listed in address list. Might happen for a short period just after it is spawned
-			usleep(100);
+			usleep(1000);
 			continue;
 		}
 
@@ -581,7 +598,7 @@ void SweepJob::advanceAllReduction() {
 			[this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
 	}
 
-	LOG(V4_VVER, "SWEEP SHARE [%i] RESET root RED\n", _my_rank);
+	LOG(V4_VVER, "SWEEP SHARE [%i] RESET RED\n", _my_rank);
 	_red.reset();
 }
 

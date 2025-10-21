@@ -57,14 +57,14 @@ echo "PREPROCESS_SEQUENTIAL_SWEEPCOMPLETE: $PREPROCESS_SEQUENTIAL_SWEEPCOMPLETE"
 MALLOB_OPTIONS="-t=$THREADS \
   -mono-app=SATWITHPRE \
   -v=4 \
-  -satsolver=k \
+  -satsolver=[k_]w \
   -colors \
   -jcup=0.05 \
   -trace-dir=$OUT_DIR/traces/ \
   -log=$OUT_DIR/logs/ \
   -mono=$INST_PATH \
   -sweep-sharing-period=20 \
-  -sweep-solver-verbosity=1"
+  -sweep-solver-verbosity=2"
 
 if $SWEEP; then
     echo "SWEEP Preprocessing ADDED !"

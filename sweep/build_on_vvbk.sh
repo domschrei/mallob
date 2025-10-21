@@ -11,7 +11,7 @@ rm build/*mallob*
 # BUILD_TYPE="DEBUG"
 
 cd build
-CC=$(which mpicc) CXX=$(which mpicxx) cmake -DCMAKE_BUILD_TYPE="RELEASE" \
+CC=$(which mpicc) CXX=$(which mpicxx) cmake -DCMAKE_BUILD_TYPE=RELEASE \
   -DMALLOB_APP_SAT=1 \
   -DMALLOB_APP_SATWITHPRE=1 \
   -DMALLOB_APP_SWEEP=1 \
