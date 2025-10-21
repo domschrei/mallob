@@ -175,7 +175,7 @@ private:
             accept &= fromLeftChild || fromRightChild;
             if (!accept) return false;
 
-            LOG(V3_VERB, "  received from child %i\n", source);
+            LOG(V4_VVER, "SWEEP SHARE REDUCE received element from child rank [%i] with size %i \n", source, msg.payload.size());
             // message accepted: store and check off
             _child_elems.insert({source, std::move(msg.payload)});
             if (fromLeftChild) _received_child_elems.first = true;
@@ -249,7 +249,7 @@ public:
                 _base_msg.payload = std::move(_aggregated_elem.value());
                 _base_msg.treeIndexOfDestination = _parent_index;
                 _base_msg.contextIdOfDestination = _parent_ctx_id;
-                LOG(V3_VERB, "SWEEP SHARE MPI send reduction element to parent %i\n", _parent_rank);
+                LOG(V3_VERB, "SWEEP SHARE REDUCE send MPI element to parent rank [%i]\n", _parent_rank);
                 assert(_base_msg.contextIdOfDestination != 0);
                 MyMpi::isend(_parent_rank, MSG_JOB_TREE_MODULAR_REDUCE, _base_msg);
                 if (_care_about_parent_status) {

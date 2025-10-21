@@ -392,7 +392,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 
 		//Try to steal locally from shared memory
 		int rnd_percent = _rng.randomInRange(0,100);
-		LOG(V2_INFO, "SWEEP STEAL [%i](%i) rnd_percent = %i \n", rnd_percent);
+		LOG(V2_INFO, "SWEEP STEAL [%i](%i) rnd_percent = %i \n", _my_rank, localId, rnd_percent);
 		bool first_local =  rnd_percent <= SEARCH_FIRST_LOCAL_PERCENT;
 
 		if (first_local) {
@@ -538,7 +538,7 @@ void SweepJob::cbContributeToAllReduce() {
 		contrib.push_back(shweeper->shweeper_is_idle);
 
 		contribs.push_back(contrib);
-		LOG(V3_VERB, "SWEEP SHARE CONTRIB (%i): %i equivalences, %i units, %i idle \n", shweeper->getLocalId(), eq_size/2, units_size, shweeper->shweeper_is_idle);
+		LOG(V3_VERB, "SWEEP SHARE REDUCE (%i): %i equivalences, %i units, %i idle \n", shweeper->getLocalId(), eq_size/2, units_size, shweeper->shweeper_is_idle);
 
 		shweeper->units_to_share.clear();
 		shweeper->eqs_to_share.clear();
@@ -547,14 +547,14 @@ void SweepJob::cbContributeToAllReduce() {
 	// LOG(V3_VERB, "SWEEP Aggregate contributions within process\n");
 	auto aggregation_element = aggregateEqUnitContributions(contribs);
 
-	LOG(V3_VERB, "SWEEP SHARE CONTRIB [%i]: size %i to sharing\n", _my_rank, aggregation_element.size()-NUM_SHARING_METADATA);
+	LOG(V3_VERB, "SWEEP SHARE REDUCE [%i]: size %i to sharing\n", _my_rank, aggregation_element.size()-NUM_SHARING_METADATA);
 	_red->contribute(std::move(aggregation_element));
 
 }
 
 void SweepJob::advanceAllReduction() {
 	if (!_red) return;
-	LOG(V3_VERB, "SWEEP SHARE ADVANCE [%i]\n", _my_rank);
+	LOG(V3_VERB, "SWEEP SHARE REDUCE ADVANCE [%i]\n", _my_rank);
 	_red->advance();
 	if (!_red->hasResult()) return;
 
@@ -566,7 +566,7 @@ void SweepJob::advanceAllReduction() {
 	const int unit_size = shared[shared.size()-UNITS_METADATA_POS];
 	const int all_idle = shared[shared.size()-IDLE_METADATA_POS];
 	LOG(V3_VERB, "SWEEP SHARE REDUCE --- Received sharing data: %i equivalences, %i units -- \n", eq_size/2, unit_size);
-	LOG(V3_VERB, "SWEEP SHARE IDLE ALL %i \n", all_idle);
+	LOG(V3_VERB, "SWEEP SHARE REDUCE IDLE ALL %i \n", all_idle);
 	if (all_idle) {
 		_terminate_all = true;
 		LOG(V1_WARN, "ß # \n # \n # --- SWEEP ALL SWEEPERS IDLE - CAN TERMINATE -- \n # \n");
@@ -585,7 +585,7 @@ void SweepJob::advanceAllReduction() {
 	for (auto shweeper : _shweepers) {
 		id++;
 		if (!shweeper) {
-			LOG(V4_VVER, "SWEEP [%i](%i) not yet initialized, skipped in contribution broadcasting \n", _my_rank, id);
+			LOG(V4_VVER, "SWEEP SHARE REDUCE [%i](%i) not yet initialized, skipped in contribution broadcasting \n", _my_rank, id);
 			continue;
 		}
 		shweeper->eqs_from_broadcast_queued.insert(shweeper->eqs_from_broadcast_queued.end(), _eqs_from_broadcast.begin(), _eqs_from_broadcast.end());
@@ -599,7 +599,7 @@ void SweepJob::advanceAllReduction() {
 			[this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
 	}
 
-	LOG(V4_VVER, "SWEEP SHARE [%i] RESET RED\n", _my_rank);
+	LOG(V4_VVER, "SWEEP SHARE [%i] RESET REDUCE\n", _my_rank);
 	_red.reset();
 }
 
@@ -641,7 +641,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	aggregated.push_back(total_eq_size);
 	aggregated.push_back(total_unit_size);
 	aggregated.push_back(all_idle);
-	LOG(V3_VERB, "SWEEP SHARE EU-Aggregation done: %i equivalences, %i units, %i all_idle\n", total_eq_size/2, total_unit_size, all_idle);
+	LOG(V3_VERB, "SWEEP SHARE REDUCE aggregated %i equivalences, %i units, %i all_idle\n", total_eq_size/2, total_unit_size, all_idle);
 	assert(total_size == total_eq_size + total_unit_size + NUM_SHARING_METADATA);
     return aggregated;
 }
