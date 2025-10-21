@@ -52,7 +52,11 @@ public:
             while (bgWorker->continueRunning()) {
                 SatJobStreamProcessor::SatTask task;
                 bool ok = processor->getQueue().pollBlocking(task);
-                if (!ok) break;
+                if (!ok) {
+                    if (processor->getQueue().exhausted()) break;
+                    processor->loop();
+                    continue;
+                }
 
                 if (!taskInitialized) {
                     accumulatedTask.type = task.type;

@@ -3,16 +3,17 @@
 
 #include "app/app_registry.hpp"
 #include "app/incsat/inc_sat_controller.hpp"
-#include "app/sat/job/sat_constants.h"
+#include "core/dtask_tracker.hpp"
 #include "data/job_description.hpp"
 #include "data/job_processing_statistics.hpp"
 #include "interface/api/api_connector.hpp"
 #include "util/static_store.hpp"
 
 struct ClientSideIncSatProgram : public app_registry::ClientSideProgram {
+    DTaskTracker dTaskTracker;
     std::unique_ptr<IncSatController> solver;
     ClientSideIncSatProgram(const Parameters& params, APIConnector& api, JobDescription& desc, const std::string& problemFile) :
-        app_registry::ClientSideProgram(), solver(new IncSatController(params, api, desc)) {
+        app_registry::ClientSideProgram(), dTaskTracker(params), solver(new IncSatController(params, api, desc, dTaskTracker)) {
         function = [s=&solver, problemFile]() {return s->get()->solveFromIncrementalFile(problemFile);};
     }
     virtual ~ClientSideIncSatProgram() {}

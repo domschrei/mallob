@@ -18,6 +18,7 @@
 #include "cadical.hpp"
 #include "app/sat/proof/trusted/trusted_utils.hpp"
 #include "app/sat/solvers/solving_replay.hpp"
+#include "cadical/src/onthefly_checking.hpp"
 #include "util/logger.hpp"
 #include "util/distribution.hpp"
 #include "app/sat/data/clause.hpp"
@@ -278,7 +279,14 @@ std::set<int> Cadical::getFailedAssumptions() {
 
 void Cadical::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
 	learner.setCallback(callback);
-	solver->connect_learner(&learner);
+	//solver->connect_learner(&learner);
+	if (_setup.certifiedUnsat || _setup.onTheFlyChecking) return;
+	solver->trace_proof_internally([&](unsigned long id, const int* lits, int nbLits, const unsigned long* hints, int nbHints, int glue) {
+		if (!learner.learning(nbLits)) return;
+		for (int i = 0; i < nbLits; i++)
+			learner.append_literal(lits[i]);
+		learner.publish_clause(id, glue, nullptr, 0);
+	});
 }
 void Cadical::setProbingLearnedClauseCallback(const ProbingLearnedClauseCallback& callback) {
 	learner.setProbingCallback(callback);

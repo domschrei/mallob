@@ -2,7 +2,7 @@
 #pragma once
 
 #include "app/smt/bitwuzla_sat_connector.hpp"
-#include "core/job_slot_registry.hpp"
+#include "core/dtask_tracker.hpp"
 #include "data/job_description.hpp"
 #include "data/job_result.hpp"
 #include "interface/api/api_connector.hpp"
@@ -43,8 +43,6 @@ public:
             _terminator([&]() {return isTimeoutHit(&_params, &_desc, _start_time);}) {
 
         LOG(V2_INFO,"SMT Bitwuzla+Mallob %s\n", _name.c_str());
-
-        if (!JobSlotRegistry::isInitialized()) JobSlotRegistry::init(params);
     }
     ~BitwuzlaSolver() {
         LOG(V2_INFO, "Deleting SMT Bitwuzla+Mallob #%i\n", _desc.getId());
@@ -91,9 +89,16 @@ public:
             bzla::main::parse_options(argc, argv, args);
 
         auto out = &std::cout;
-        if (_params.smtOutputFile.isSet()) {
+        bool smtOutFileSet = false;
+        if (_desc.getAppConfiguration().map.count("smt-out-file")) {
+            out = new std::ofstream(_desc.getAppConfiguration().map["smt-out-file"]);
+            smtOutFileSet = true;
+        } else if (_params.smtOutputFile.isSet()) {
             out = new std::ofstream(getSmtOutputFilePath(_params, _desc.getId()));
+            smtOutFileSet = true;
         }
+
+        DTaskTracker dTaskTracker(_params);
 
         // If Bitwuzla fails to clean up after itself, we're gonna do it.
         std::vector<BitwuzlaSatConnector*> solverPointers;
@@ -102,7 +107,7 @@ public:
         // This instruction replaces the internal SAT solver of Bitwuzla with a Mallob-connected solver.
         int solverCounter = 1;
         bzla::sat::ExternalSatSolver::new_sat_solver = [&, name=_name]() {
-            auto sat = new BitwuzlaSatConnector(_params, _api, _desc,
+            auto sat = new BitwuzlaSatConnector(_params, _api, _desc, dTaskTracker,
                 name + ":sat" + std::to_string(solverCounter++), _start_time); // cleaned up by Bitwuzla
             //sat->outputModels(out); // for debugging
             solverPointers.push_back(sat);
@@ -178,9 +183,7 @@ public:
             if (!solversCleanedUp[i]) delete solverPointers[i];
         }
 
-        if (_params.smtOutputFile.isSet()) {
-            delete out;
-        }
+        if (smtOutFileSet) delete out;
 
         JobResult res;
         res.id = _desc.getId();

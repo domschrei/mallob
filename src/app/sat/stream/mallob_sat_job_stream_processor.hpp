@@ -12,7 +12,7 @@
 
 #include "app/sat/data/formula_compressor.hpp"
 #include "app/sat/data/model_string_compressor.hpp"
-//#include "core/job_slot_registry.hpp"
+#include "core/dtask_tracker.hpp"
 #include "data/job_description.hpp"
 #include "interface/api/api_connector.hpp"
 #include "interface/json_interface.hpp"
@@ -49,9 +49,8 @@ private:
     SatTask _backlog_task {SatTask::RAW};
     bool _initialized_backlog_task {false};
     bool _finalized {false};
-    bool _reinitialize_posted {false};
 
-    //std::shared_ptr<JobSlotRegistry::JobSlot> _job_slot;
+    std::unique_ptr<DTaskTracker::DTaskSlot> _slot;
 
 public:
     MallobSatJobStreamProcessor(const Parameters& params, APIConnector& api, JobDescription& desc,
@@ -70,6 +69,15 @@ public:
         _nb_vars = nbVars;
         _nb_clauses = nbClauses;
     }
+    void setDTaskSlot(std::unique_ptr<DTaskTracker::DTaskSlot>&& slot) {
+        _slot = std::move(slot);
+        _slot->setCallbackOnEvict([&]() {getQueue().interrupt();});
+    }
+
+    virtual void loop() override {
+        auto lock = _slot->getLock();
+        if (_slot->wasEvicted()) yield();
+    }
 
     virtual void process(SatTask& task) override {
         auto time = Timer::elapsedSeconds();
@@ -80,7 +88,14 @@ public:
         _backlog_task.integrate(task);
         auto& t = _backlog_task;
 
+        auto lock = _slot->getLock();
+        if (_slot->wasEvicted()) {
+            yield();
+            return;
+        }
         if (!_finalized && !_began_nontrivial_solving) {
+            assert(!_slot->wasEvicted());
+
             // If no distributed job was submitted yet, we try to avoid this overhead;
             // we wait for a short while if a more lightweight solver finds a solution immediately.
             time = Timer::elapsedSeconds() - time;
@@ -91,6 +106,7 @@ public:
             // Task is not (yet) obsolete after the wait, so we now begin proper distributed solving
             LOG(V2_INFO, "%s awakes for rev. %i\n", _name.c_str(), t.rev);
             _began_nontrivial_solving = true;
+            _slot->deploy();
 
             //JobSlotRegistry::acquireSlot(_job_slot);
 
@@ -159,6 +175,7 @@ public:
         }
         _expected_result_job_name = copy["name"].get<std::string>();
 
+        _slot->resume();
         _task_pending = true;
         _pending_rev = t.rev;
         _pending_task_interrupted = false;
@@ -193,6 +210,7 @@ public:
             LOG(V0_CRIT, "[ERROR] uncaught exception while submitting JSON\n");
             abort();
         }
+        lock.unlock();
 
         unsigned long sleepInterval {1};
         while (checkTaskPending(t.rev)) {
@@ -201,9 +219,8 @@ public:
         }
         //_job_slot->endActiveTime();
 
-        if (_reinitialize_posted) {
-            reinitialize();
-        }
+        lock = _slot->getLock();
+        _slot->suspend();
 
         _backlog_task = SatTask{_backlog_task.type};
     }
@@ -213,6 +230,7 @@ public:
         _finalized = true;
         SatJobStreamProcessor::finalize();
         if (!_began_nontrivial_solving) return;
+        _slot->yield();
         while (_task_pending) usleep(3000);
         if (!_incremental) return;
         if (!_json_base.contains("name")) return;
@@ -227,16 +245,12 @@ public:
         //_job_slot->release();
     }
 
-    void signalReinitialization() {
-        _reinitialize_posted = true;
-    }
-    void reinitialize() {
-        _reinitialize_posted = false;
+    void yield() {
 
         // already (in the process of being) finalized?
         if (_finalized || !_began_nontrivial_solving) return;
 
-        LOG(V3_VERB, "%s evicted: re-initialize\n", _name.c_str());
+        LOG(V3_VERB, "%s evicted: yielding\n", _name.c_str());
         while (_task_pending) usleep(1000);
         if (!_incremental) return;
         if (!_json_base.contains("name")) return;
@@ -272,7 +286,9 @@ private:
     bool checkTaskPending(int rev) {
         if (!_task_pending) return false;
         if (_pending_task_interrupted) return true;
-        if (!_terminator(rev) && !_reinitialize_posted) return true;
+        auto lock = _slot->getLock();
+        if (!_terminator(rev) && !_slot->wasEvicted()) return true;
+        lock.unlock();
 
         _pending_task_interrupted = true;
         nlohmann::json jsonInterrupt {

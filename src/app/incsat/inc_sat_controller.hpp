@@ -5,15 +5,15 @@
 #include "app/sat/proof/trusted_parser_process_adapter.hpp"
 #include "app/sat/stream/internal_sat_job_stream_processor.hpp"
 #include "app/sat/stream/mallob_sat_job_stream_processor.hpp"
-#include "app/sat/stream/sat_job_stream_garbage_collector.hpp"
 #include "app/sat/stream/sat_job_stream_processor.hpp"
 #include "app/sat/stream/wrapped_sat_job_stream.hpp"
-#include "core/job_slot_registry.hpp"
+#include "core/dtask_tracker.hpp"
 #include "data/job_description.hpp"
 #include "interface/api/api_connector.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
 #include "util/sys/tmpdir.hpp"
+#include <string>
 #include <sys/stat.h>
 
 class IncSatController {
@@ -37,13 +37,15 @@ private:
     float _start_time = -1;
     std::unique_ptr<WrappedSatJobStream> _stream;
 
+    DTaskTracker _dtask_tracker;
+
 public:
-    IncSatController(const Parameters& params, APIConnector& api, JobDescription& desc) :
+    IncSatController(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& dTaskTracker) :
             _params(params), _api(api), _desc(desc), _stream_id(getNextStreamId()),
-            _name("#" + std::to_string(desc.getId()) + "(ISAT):" + std::to_string(_stream_id)) {
+            _name("#" + std::to_string(desc.getId()) + "(ISAT):" + std::to_string(_stream_id)),
+            _dtask_tracker(dTaskTracker) {
 
         LOG(V3_VERB, "+IncSat %s\n", _name.c_str());
-        if (!JobSlotRegistry::isInitialized()) JobSlotRegistry::init(params);
     }
     ~IncSatController() {
         LOG(V3_VERB, "-IncSat %s\n", _name.c_str());
@@ -83,7 +85,7 @@ public:
         initStream(true);
     }
 
-    bool solveNextRevisionNonblocking(std::vector<int>&& clauses, std::vector<int>&& assumptions) {
+    bool solveNextRevisionNonblocking(std::vector<int>&& clauses, std::vector<int>&& assumptions, const std::string& descLabel = "") {
         initInteractiveSolving();
 
         if (!_params.onTheFlyChecking()) {
@@ -151,6 +153,7 @@ private:
         _stream.reset(new WrappedSatJobStream(_name));
         _stream->mallobProcessor = new MallobSatJobStreamProcessor(_params, _api, _desc,
             _name, _stream_id, true, _stream->stream.getSynchronizer());
+        _stream->mallobProcessor->setDTaskSlot(_dtask_tracker.createDTask());
         _stream->stream.addProcessor(_stream->mallobProcessor);
 
         if (_params.internalStreamProcessor()) {

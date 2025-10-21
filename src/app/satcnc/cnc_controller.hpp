@@ -3,7 +3,7 @@
 
 #include "app/incsat/inc_sat_controller.hpp"
 #include "app/sat/data/definitions.hpp"
-#include "core/job_slot_registry.hpp"
+#include "core/dtask_tracker.hpp"
 #include "data/job_description.hpp"
 #include "data/job_result.hpp"
 #include "interface/api/api_registry.hpp"
@@ -30,15 +30,15 @@ private:
 
     enum CubingMode {VAR_OCCURRENCE, LOOKAHEAD_CADICAL} _cubing_mode {LOOKAHEAD_CADICAL};
 
+    DTaskTracker _dtask_tracker;
+
 public:
-    CncController(const Parameters& params, JobDescription& desc) : _params(params), _desc(desc) {
+    CncController(const Parameters& params, JobDescription& desc) : _params(params), _desc(desc), _dtask_tracker(_params) {
         // Extract the base formula to solve.
         _base_formula.insert(_base_formula.end(),
             _desc.getFormulaPayload(0),
             _desc.getFormulaPayload(0)+_desc.getFormulaPayloadSize(0));
         LOG(V2_INFO, "CNC formula: %s\n", StringUtils::getSummary(_base_formula, 20).c_str());
-
-        if (!JobSlotRegistry::isInitialized()) JobSlotRegistry::init(params);
     }
 
     // Solves the provided SAT formula by means of Cube-and-Conquer.
@@ -215,7 +215,7 @@ private:
     std::unique_ptr<IncSatController> addJobStream() {
 
         // Create wrapper object for SAT job stream
-        std::unique_ptr<IncSatController> incsat(new IncSatController(_params, APIRegistry::get(), _desc));
+        std::unique_ptr<IncSatController> incsat(new IncSatController(_params, APIRegistry::get(), _desc, _dtask_tracker));
         incsat->initInteractiveSolving();
         incsat->getMallobProcessor()->setGroupId("cnc-" + std::to_string(_desc.getId()));
         return incsat;

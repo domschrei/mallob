@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include "app/incsat/inc_sat_controller.hpp"
 #include "app/maxsat/encoding/cardinality_encoding.hpp"
 #include "app/maxsat/encoding/generalized_totalizer.hpp"
 #include "app/maxsat/encoding/polynomial_watchdog.hpp"
@@ -16,6 +17,7 @@
 #include "app/sat/stream/sat_job_stream_garbage_collector.hpp"
 #include "app/sat/stream/sat_job_stream_processor.hpp"
 #include "app/sat/stream/wrapped_sat_job_stream.hpp"
+#include "core/dtask_tracker.hpp"
 #include "interface/api/api_connector.hpp"
 #include "rustsat.h"
 #include "scheduling/core_allocator.hpp"
@@ -58,7 +60,6 @@ public:
     };
 
 private:
-    static int _running_stream_id;
 
     const Parameters& _params; // configuration, cmd line arguments
     APIConnector& _api; // for submitting jobs to Mallob
@@ -66,7 +67,7 @@ private:
     MaxSatInstance& _instance;
     int _nb_orig_vars;
 
-    std::unique_ptr<WrappedSatJobStream> _stream_wrapper;
+    std::unique_ptr<IncSatController> _stream_wrapper;
 
     // vector of 0-separated (hard) clauses to add in the next SAT call
     std::vector<int> _lits_to_add;
@@ -81,7 +82,6 @@ private:
 
     EncodingStrategy _encoding_strat;
     std::shared_ptr<CardinalityEncoding> _enc;
-    bool _shared_encoder;
     volatile bool _is_encoding {false};
     volatile bool _is_done_encoding {false};
     std::future<void> _future_encoder;
@@ -102,45 +102,25 @@ private:
     std::shared_ptr<SolutionWriter> _sol_writer;
 
 public:
-    MaxSatSearchProcedure(const Parameters& params, APIConnector& api, JobDescription& desc,
+    MaxSatSearchProcedure(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& tracker,
             MaxSatInstance& instance, EncodingStrategy encStrat, SearchStrategy searchStrat, const std::string& label) :
         _params(params), _api(api), _desc(desc), _instance(instance),
         _lits_to_add(_instance.formulaData, _instance.formulaData+_instance.formulaSize),
         _current_bound(ULONG_MAX), _encoding_strat(encStrat), _search_strat(searchStrat), _label(label) {
 
-        _stream_wrapper.reset(new WrappedSatJobStream("#" + std::to_string(desc.getId()) + "(Max)"));
-
-        _stream_wrapper->mallobProcessor = new MallobSatJobStreamProcessor(_params, _api, _desc,
-            "maxsat", _running_stream_id++, true, _stream_wrapper->stream.getSynchronizer());
-        _stream_wrapper->stream.addProcessor(_stream_wrapper->mallobProcessor);
-
-        if (_params.internalStreamProcessor()) {
-            SolverSetup setup;
-            setup.baseSeed = _params.seed();
-            setup.jobId = _desc.getId();
-            setup.isJobIncremental = true;
-            setup.onTheFlyChecking = _params.onTheFlyChecking();
-            setup.onTheFlyCheckModel = _params.onTheFlyCheckModel();
-            auto internalProcessor = new InternalSatJobStreamProcessor(setup, _stream_wrapper->stream.getSynchronizer());
-            _stream_wrapper->stream.addProcessor(internalProcessor);
-        }
-
-        _stream_wrapper->stream.setTerminator([&]() {return false;});
+        _stream_wrapper.reset(new IncSatController(_params, _api, _desc, tracker));
 
         _nb_orig_vars = _instance.nbVars; // before cardinality constraint encodings!
 
-        _shared_encoder = _params.maxSatSharedEncoder();
-        if (!_shared_encoder) {
-            if (encStrat == WARNERS_ADDER)
-                _enc.reset(new WarnersAdder(_instance.nbVars, _instance.objective));
-            if (encStrat == DYNAMIC_POLYNOMIAL_WATCHDOG)
-                _enc.reset(new PolynomialWatchdog(_instance.nbVars, _instance.objective));
-            if (encStrat == GENERALIZED_TOTALIZER)
-                _enc.reset(new GeneralizedTotalizer(_instance.nbVars, _instance.objective));
-            if (_enc) {
-                _enc->setClauseCollector([&](int lit) {appendLiteral(lit);});
-                _enc->setAssumptionCollector([&](int lit) {appendAssumption(lit);});
-            }
+        if (encStrat == WARNERS_ADDER)
+            _enc.reset(new WarnersAdder(_instance.nbVars, _instance.objective));
+        if (encStrat == DYNAMIC_POLYNOMIAL_WATCHDOG)
+            _enc.reset(new PolynomialWatchdog(_instance.nbVars, _instance.objective));
+        if (encStrat == GENERALIZED_TOTALIZER)
+            _enc.reset(new GeneralizedTotalizer(_instance.nbVars, _instance.objective));
+        if (_enc) {
+            _enc->setClauseCollector([&](int lit) {appendLiteral(lit);});
+            _enc->setAssumptionCollector([&](int lit) {appendAssumption(lit);});
         }
 
         if (_encoding_strat == VIRTUAL) {
@@ -160,14 +140,10 @@ public:
             TheorySpecification spec({std::move(rule)});
             std::string specStr = spec.toStr();
             specStr.erase(std::remove_if(specStr.begin(), specStr.end(), ::isspace), specStr.end());
-            _stream_wrapper->mallobProcessor->setInnerObjective(specStr);
+            _stream_wrapper->getMallobProcessor()->setInnerObjective(specStr);
         }
     }
 
-    void setSharedEncoder(const std::shared_ptr<CardinalityEncoding>& encoder) {
-        assert(_shared_encoder);
-        _enc = encoder;
-    }
     void setSolutionWriter(std::shared_ptr<SolutionWriter> solutionWriter) {
         _sol_writer = solutionWriter;
     }
@@ -198,22 +174,13 @@ public:
 
         LOG(V4_VVER, "MAXSAT %s Enforcing bound %lu ...\n", _label.c_str(), _current_bound);
         // Encode any cardinality constraints that are still missing for the upcoming call.
-        
-        // If we use a shared encoder, the constraints are already encoded, but we need to re-link 
-        // the collectors for the enforceBound() call. Otherwise, we encode the constraints now.
-        if (_shared_encoder) {
-            _enc->setClauseCollector([&](int lit) {appendLiteral(lit);});
-            _enc->setAssumptionCollector([&](int lit) {appendAssumption(lit);});
-        }
 
         assert(!_future_encoder.valid());
         _is_encoding = true;
         if (_enc) {
             _future_encoder = ProcessWideThreadPool::get().addTask([&, min=globalLowerBound, ub=_current_bound, max=globalUpperBound]() {
                 CoreAllocator::Allocation ca(1);
-                if (!_shared_encoder) {
-                    _enc->encode(min, ub, max);
-                }
+                _enc->encode(min, ub, max);
                 // Enforce our current bound (assumptions only)
                 _enc->enforceBound(ub);
                 // If the result is SAT, we can add the 1st assumption permanently.
@@ -221,8 +188,6 @@ public:
                 //    _assumptions_to_persist_upon_sat.push_back(_assumptions_to_set.front());
                 _is_done_encoding = true;
             });
-            // With a shared encoder, encoding needs to happen synchronously due to the overridden callbacks
-            if (_shared_encoder) _future_encoder.get();
         } else {
             _is_done_encoding = true;
         }
@@ -251,34 +216,29 @@ public:
             LOG(V4_VVER, "MAXSAT Assumptions: %s\n", StringUtils::getSummary(_assumptions_to_set).c_str());
         }
 
-        if (!_initialized && _stream_wrapper->mallobProcessor) {
-            _stream_wrapper->mallobProcessor->setInitialSize(
+        if (!_initialized && _stream_wrapper->hasStream()) {
+            _stream_wrapper->getMallobProcessor()->setInitialSize(
                 _instance.nbVars,
                 _desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
             _initialized = true;
         }
 
-        _stream_wrapper->stream.solveNonblocking({{}, std::move(_lits_to_add), _assumptions_to_set,
-            _desc_label_next_call,
-            // TODO still leading to error at volume_calculator.hpp:137:
-            // Let the position of the tested bound influence the job's priority
-            // as a tie-breaker for the scheduler - considering the highest bounds
-            // as the most useful to give resources to.
-            // 1.0f + 0.01f * (_current_bound - _instance.lowerBound) / (float) (_instance.upperBound - _instance.lowerBound));
-            0, hash});
+        _stream_wrapper->solveNextRevisionNonblocking(std::move(_lits_to_add),
+            std::move(_assumptions_to_set), _desc_label_next_call);
+
         _lits_to_add.clear();
         _assumptions_to_set.clear();
         _desc_label_next_call = "";
         _solving = true;
     }
     bool isNonblockingSolvePending() {
-        return _stream_wrapper->stream.isNonblockingSolvePending() && _solving;
+        return _stream_wrapper->getStream().isNonblockingSolvePending() && _solving;
     }
     int processNonblockingSolveResult() {
         _solving = false;
 
         // Job is done - retrieve the result.
-        auto [resultCode, solution] = _stream_wrapper->stream.getNonblockingSolveResult();
+        auto [resultCode, solution] = _stream_wrapper->getStream().getNonblockingSolveResult();
         if (resultCode == RESULT_UNSAT) {
             // UNSAT
             if (_search_strat == NAIVE_REFINEMENT) {
@@ -396,7 +356,7 @@ public:
     void interrupt(bool terminate = false) {
         assert(_solving);
         if (terminate) _yield_searcher = true;
-        if (_stream_wrapper->stream.interrupt()) {
+        if (_stream_wrapper->getStream().interrupt()) {
             if (_current_bound == ULONG_MAX)
                 LOG(V2_INFO, "MAXSAT %s Interrupt bound-free solving\n", _label.c_str());
             else
@@ -409,7 +369,7 @@ public:
     }
 
     void setGroupId(const std::string& groupId, int minVar = -1, int maxVar = -1) {
-        _stream_wrapper->mallobProcessor->setGroupId(groupId, minVar, maxVar);
+        _stream_wrapper->getMallobProcessor()->setGroupId(groupId, minVar, maxVar);
     }
 
     size_t getCurrentBound() const {
@@ -422,7 +382,7 @@ public:
     void finalize() {
         if (_finalized) return;
         _finalized = true;
-        SatJobStreamGarbageCollector::get().add(std::move(_stream_wrapper));
+        _stream_wrapper->finalize();
     }
 
     ~MaxSatSearchProcedure() {

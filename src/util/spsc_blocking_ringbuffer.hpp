@@ -23,6 +23,8 @@ private:
     ConditionVariable _buffer_cond_var;
     
     volatile bool _input_exhausted {false};
+    volatile bool _exhausted_is_one_time_signal {false};
+
     volatile bool _terminated {false};
 
 public:
@@ -78,6 +80,14 @@ public:
 
     inline bool pollBlocking(T& out, bool returnIfEmpty) {
 
+        if (_input_exhausted && _exhausted_is_one_time_signal) {
+            auto lock = _buffer_mutex.getLock();
+            if (_input_exhausted && _exhausted_is_one_time_signal) {
+                _exhausted_is_one_time_signal = false;
+                return false;
+            }
+        }
+
         if (empty()) {
             if (returnIfEmpty) return false;
 
@@ -90,7 +100,15 @@ public:
                 return _input_exhausted || !empty();
             });
             //LOG(V2_INFO, "SPSC wait nonempty or exhausted done\n");
-            
+
+            if (_input_exhausted && _exhausted_is_one_time_signal) {
+                auto lock = _buffer_mutex.getLock();
+                if (_input_exhausted && _exhausted_is_one_time_signal) {
+                    _exhausted_is_one_time_signal = false;
+                    return false;
+                }
+            }
+
             // still no elements? => fully exhausted.
             if (empty()) return false;
         }
@@ -118,6 +136,16 @@ public:
         }
         _buffer_cond_var.notify();
         //LOG(V2_INFO, "SPSC notify exhausted\n");
+    }
+
+    void interrupt() {
+        {
+            auto lock = _buffer_mutex.getLock();
+            _input_exhausted = true;
+            assert(!_exhausted_is_one_time_signal);
+            _exhausted_is_one_time_signal = true;
+        }
+        _buffer_cond_var.notify();
     }
 
     void markTerminated() {

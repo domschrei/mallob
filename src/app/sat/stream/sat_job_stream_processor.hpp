@@ -100,6 +100,7 @@ public:
         return _name;
     }
 
+    virtual void loop() {}
     virtual void process(SatTask& task) = 0;
 
     virtual void finalize() {

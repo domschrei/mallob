@@ -16,6 +16,7 @@
 #include "app/incsat/inc_sat_controller.hpp"
 #include "app/sat/stream/sat_job_stream_garbage_collector.hpp"
 #include "bitwuzla/cpp/sat_solver.h"
+#include "core/dtask_tracker.hpp"
 #include "data/job_description.hpp"
 #include "interface/api/api_connector.hpp"
 #include "robin_set.h"
@@ -52,11 +53,11 @@ private:
     bzla::Terminator* _bzla_term {nullptr};
 
 public:
-    BitwuzlaSatConnector(const Parameters& params, APIConnector& api, JobDescription& desc, const std::string& name, float startTime) :
+    BitwuzlaSatConnector(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& tracker, const std::string& name, float startTime) :
         bzla::sat::SatSolver(), _params(params), _desc(desc),
         _name(name) {
 
-        _incsat.reset(new IncSatController(_params, api, _desc));
+        _incsat.reset(new IncSatController(_params, api, _desc, tracker));
         _incsat->setInnerTerminator([&]() {
             return _bzla_term && _bzla_term->terminate();
         });
