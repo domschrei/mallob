@@ -32,6 +32,8 @@ private:
 	bool _terminate_all=false;
 
 	// static const int NUM_STEAL_METADATA = 1;
+
+	SplitMix64Rng _rng;
 	const int SEARCH_FIRST_LOCAL_PERCENT = 90;
     const int TAG_SEARCHING_WORK = 1001;
     const int TAG_RETURNING_STEAL_REQUEST = 1002;

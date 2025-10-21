@@ -363,7 +363,6 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 	shweeper->shweeper_is_idle = true;
 	shweeper->work_received_from_steal = {};
 
-	SplitMix64Rng _rng;
 	//loop until we find work or the whole sweeping is terminated
 	while (true) {
 		if (_terminate_all) {
@@ -392,7 +391,9 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		}
 
 		//Try to steal locally from shared memory
-		bool first_local = _rng.randomInRange(0,100) <= SEARCH_FIRST_LOCAL_PERCENT;
+		int rnd_percent = _rng.randomInRange(0,100);
+		LOG(V2_INFO, "SWEEP STEAL [%i](%i) rnd_percent = %i \n", rnd_percent);
+		bool first_local =  rnd_percent <= SEARCH_FIRST_LOCAL_PERCENT;
 
 		if (first_local) {
 			auto stolen_work = stealWorkFromAnyLocalSolver();
