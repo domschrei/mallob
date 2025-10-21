@@ -180,24 +180,24 @@ void SweepJob::readResult(KissatPtr shweeper) {
 
 	//Logging
 	auto stats = shweeper->getSolverStats();
-	printf("SWEEP_ finished\n");
-	printf("[%i](%i) SWEEP RESULT: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
+	printf("SWEEP finished\n");
+	printf("[%i](%i) RESULT SWEEP: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
 		_my_rank, _dimacsReportingLocalId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
-	LOG(V2_INFO, "[%i](%i) SWEEP RESULT: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
+	LOG(V2_INFO, "[%i](%i) RESULT SWEEP: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
 		_my_rank, _dimacsReportingLocalId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
 	LOG(V2_INFO, "[%i](%i) SWEEP RESULT: %i Processes, %f seconds \n", _my_rank, _dimacsReportingLocalId->load(), getVolume(), Timer::elapsedSeconds() - _start_shweep_timestamp);
-	LOG(V1_WARN, "SWEEP_PRIORITY %f\n", _params.preprocessSweepPriority.val);
-	LOG(V1_WARN, "SWEEP_PROCESSES %i\n", getVolume());
-	LOG(V1_WARN, "SWEEP_THREADS_PER_PROCESS %i\n", _params.numThreadsPerProcess.val);
-	LOG(V1_WARN, "SWEEP_SHARING_PERIOD %i \n", _params.sweepSharingPeriod_ms.val);
-	LOG(V1_WARN, "SWEEP_EQUIVALENCES %i\n", stats.shweep_eqs);
-	LOG(V1_WARN, "SWEEP_UNITS %i\n", stats.shweep_new_units);
-	LOG(V1_WARN, "SWEEP_ELIMINATED %i\n", stats.shweep_eliminated);
-	LOG(V1_WARN, "SWEEP_TIME %f\n", Timer::elapsedSeconds() - _start_shweep_timestamp);
+	LOG(V1_WARN, "RESULT SWEEP_PRIORITY %f\n", _params.preprocessSweepPriority.val);
+	LOG(V1_WARN, "RESULT SWEEP_PROCESSES %i\n", getVolume());
+	LOG(V1_WARN, "RESULT SWEEP_THREADS_PER_PROCESS %i\n", _params.numThreadsPerProcess.val);
+	LOG(V1_WARN, "RESULT SWEEP_SHARING_PERIOD %i \n", _params.sweepSharingPeriod_ms.val);
+	LOG(V1_WARN, "RESULT SWEEP_EQUIVALENCES %i\n", stats.shweep_eqs);
+	LOG(V1_WARN, "RESULT SWEEP_UNITS %i\n", stats.shweep_new_units);
+	LOG(V1_WARN, "RESULT SWEEP_ELIMINATED %i\n", stats.shweep_eliminated);
+	LOG(V1_WARN, "RESULT SWEEP_TIME %f\n", Timer::elapsedSeconds() - _start_shweep_timestamp);
 
-	LOG(V2_INFO, "# # [%i](%i) Serialized final formula, SolutionSize=%i\n", _my_rank, _dimacsReportingLocalId->load(), _internal_result.getSolutionSize());
+	LOG(V2_INFO, "# # RESULT [%i](%i) Serialized final formula, SolutionSize=%i\n", _my_rank, _dimacsReportingLocalId->load(), _internal_result.getSolutionSize());
 	for (int i=0; i<15; i++) {
-		LOG(V2_INFO, "Formula peek %i: %i \n", i, _internal_result.getSolution(i));
+		LOG(V2_INFO, "RESULT Formula peek %i: %i \n", i, _internal_result.getSolution(i));
 	}
 
 
@@ -259,19 +259,20 @@ void SweepJob::startShweeper(KissatPtr shweeper) {
 void SweepJob::appl_communicate() {
 	showIdleFraction();
 
-	LOG(V4_VVER, "SWEEP STAGE 1: Workstealing\n");
+	LOG(V4_VVER, "SWEEP JOB appl_communicate() \n");
+	// LOG(V4_VVER, "SWEEP STAGE 1: Workstealing\n");
 	sendMPIWorkstealRequests();
 	if (_bcast && _is_root)// Root: Update job tree snapshot in case your children changed
 		_bcast->updateJobTree(getJobTree());
 
-	LOG(V4_VVER, "SWEEP STAGE 2: Sharing\n");
+	// LOG(V4_VVER, "SWEEP STAGE 2: Sharing\n");
 	if (_is_root)
 		initiateNewSharingRound();
 
-	LOG(V4_VVER, "SWEEP STAGE 3: AllReduction\n");
+	// LOG(V4_VVER, "SWEEP STAGE 3: AllReduction\n");
 	advanceAllReduction();
 
-	LOG(V4_VVER, "SWEEP STAGE 4: Ended \n");
+	// LOG(V4_VVER, "SWEEP STAGE 4: Ended \n");
 }
 
 
