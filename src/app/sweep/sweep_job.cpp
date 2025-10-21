@@ -709,15 +709,12 @@ void SweepJob::loadFormula(KissatPtr shweeper) {
 }
 
 SweepJob::~SweepJob() {
-	int id=0;
 	for (auto &bg_worker : _bg_workers) {
 		if (bg_worker->isRunning()) {
-			LOG(V3_VERB, "SWEEP JOB ENDING WORKER %i \n", id);
 			bg_worker->stop();
 		}
-		id++;
 	}
-
+	LOG(V3_VERB, "SWEEP JOB ENDING WORKERS\n");
 }
 
 
