@@ -165,7 +165,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	shweeper->set_option("preprocess", 0); //skip other preprocessing stuff after shweep finished
 	// shweeper->set_option("probe", 1);   //there is some cleanup-probing at the end of the sweeping. keep it? (apparently the probe option is used nowhere anyways)
 	shweeper->set_option("substitute", 1); //apply equivalence substitutions after sweeping (kissat default 1, but keep here explicitly to remember it)
-	shweeper->set_option("substituterounds", 2); //default is 2, and currently in round 2 already exactly zero substitutions are found, so it exits there, no matter how high we choose the number here
+	shweeper->set_option("substituterounds", 2); //default is 2, and changing that has currently no effect, because all substitutions happen in round 1, and already in round 2 zero substitutions are found, so it exits there.
 	// shweeper->set_option("substituteeffort", 1000); //modification doesnt seem to have much effect...
 	// shweeper->set_option("substituterounds", 10);
 	shweeper->set_option("luckyearly", 0); //skip
@@ -183,6 +183,13 @@ void SweepJob::readResult(KissatPtr shweeper) {
 
 	//Logging
 	auto stats = shweeper->getSolverStats();
+	int units_orig = stats.shweep_total_units - stats.shweep_new_units;
+	int actual_done = stats.shweep_eqs + stats.shweep_sweep_units;
+	//actual_done is a slightly conservative count, because we only include the units found by the sweeping algorithm itself,
+	//and dont include some stray units found while propagating the sweep decisions (that would be stats.shweep_new_units)
+	int actual_remaining = stats.shweep_active_orig + units_orig - actual_done;
+	// int actual_eliminated ;
+
 	printf("SWEEP finished\n");
 	printf("[%i](%i) RESULT SWEEP: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
 		_my_rank, _dimacsReport_localId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
@@ -199,9 +206,15 @@ void SweepJob::readResult(KissatPtr shweeper) {
 	LOG(V2_INFO, "RESULT SWEEP_ACTIVE_END     %i\n", stats.shweep_active_end);
 	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_ORIG   %i\n", stats.shweep_clauses_orig);
 	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_END    %i\n", stats.shweep_clauses_end);
-	LOG(V2_INFO, "RESULT SWEEP_EQUIVALENCES   %i\n", stats.shweep_eqs);
-	LOG(V2_INFO, "RESULT SWEEP_UNITS          %i\n", stats.shweep_new_units);
+	LOG(V2_INFO, "RESULT SWEEP_UNITS_ORIG     %i\n", units_orig);
+	LOG(V2_INFO, "RESULT SWEEP_UNITS_SWEEP    %i\n", stats.shweep_sweep_units);
+	LOG(V2_INFO, "RESULT SWEEP_UNITS_NEW      %i\n", stats.shweep_new_units);
+	LOG(V2_INFO, "RESULT SWEEP_UNITS_TOTAL    %i\n", stats.shweep_total_units);
 	LOG(V2_INFO, "RESULT SWEEP_ELIMINATED     %i\n", stats.shweep_eliminated);
+	LOG(V2_INFO, "RESULT SWEEP_EQUIVALENCES   %i\n", stats.shweep_eqs);
+	LOG(V2_INFO, "RESULT SWEEP_ACTUAL_DONE    %i\n", actual_done);
+	LOG(V2_INFO, "RESULT SWEEP_ACTUAL_REMAIN  %i\n", actual_remaining);
+	// LOG(V2_INFO, "RESULT SWEEP_ACTUAL_ELIM    %i\n", actual_eliminated);
 	LOG(V2_INFO, "RESULT SWEEP_TIME           %f sec\n", Timer::elapsedSeconds() - _start_shweep_timestamp);
 
 	LOG(V3_VERB, "# # RESULT [%i](%i) Serialized final formula, SolutionSize=%i\n", _my_rank, _dimacsReport_localId->load(), _internal_result.getSolutionSize());
