@@ -73,9 +73,8 @@ Cadical::Cadical(const SolverSetup& setup)
 		//okay = solver->set("log", 1); assert(okay); // need to compile CaDiCaL with -l (logging enabled)
 
 		if (_lrat) {
-			okay = solver->set("signsharedcls", 1); assert(okay);
-			//okay = solver->set("compact", 0); assert(okay);
-			//okay = solver->set("log", 1); assert(okay);
+			// Real-time proof checking: internal LIDRUP tracer that forwards relevant data programmatically;
+			// clause export happens in the backend of the Mallob-side proof connector.
 			solver->trace_proof_internally(
 				[&](unsigned long id, const int* lits, int nbLits, const unsigned long* hints, int nbHints, int glue) {
 					_lrat->push(LratOp(id, lits, nbLits, hints, nbHints, glue));
@@ -96,6 +95,8 @@ Cadical::Cadical(const SolverSetup& setup)
 				}
 			);
 		} else {
+			// Monolithic proof production: LRAT tracer that outputs to a file.
+			// Clause export for sharing is separate, set up in setLearnedClauseCallback.
 			okay = solver->set("binary", 1); assert(okay); // set proof logging mode to binary format
 			okay = solver->set("lratdeletelines", 0); assert(okay); // disable printing deletion lines
 			proofFileString = _setup.proofDir + "/proof." + std::to_string(_setup.globalId) + ".lrat";
@@ -279,8 +280,10 @@ std::set<int> Cadical::getFailedAssumptions() {
 
 void Cadical::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
 	learner.setCallback(callback);
-	//solver->connect_learner(&learner);
-	if (_setup.certifiedUnsat || _setup.onTheFlyChecking) return;
+	// With real-time checking, clause-sharing is implemented via the proof connector.
+	if (_setup.onTheFlyChecking) return;
+	// In all other cases, we add a separate ("virtual") proof tracer to CaDiCaL
+	// that just forwards derived clauses for the purpose of sharing.
 	solver->trace_proof_internally([&](unsigned long id, const int* lits, int nbLits, const unsigned long* hints, int nbHints, int glue) {
 		if (!learner.learning(nbLits)) return;
 		for (int i = 0; i < nbLits; i++)
