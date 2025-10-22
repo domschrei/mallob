@@ -184,10 +184,11 @@ void SweepJob::readResult(KissatPtr shweeper) {
 	//Logging
 	auto stats = shweeper->getSolverStats();
 	int units_orig = stats.shweep_total_units - stats.shweep_new_units;
+	int total_orig = stats.shweep_active_orig + units_orig;
 	int actual_done = stats.shweep_eqs + stats.shweep_sweep_units;
 	//actual_done is a slightly conservative count, because we only include the units found by the sweeping algorithm itself,
 	//and dont include some stray units found while propagating the sweep decisions (that would be stats.shweep_new_units)
-	int actual_remaining = stats.shweep_active_orig + units_orig - actual_done;
+	int actual_remaining = total_orig - actual_done;
 	// int actual_eliminated ;
 
 	printf("SWEEP finished\n");
@@ -212,8 +213,8 @@ void SweepJob::readResult(KissatPtr shweeper) {
 	LOG(V2_INFO, "RESULT SWEEP_UNITS_TOTAL    %i\n", stats.shweep_total_units);
 	LOG(V2_INFO, "RESULT SWEEP_ELIMINATED     %i\n", stats.shweep_eliminated);
 	LOG(V2_INFO, "RESULT SWEEP_EQUIVALENCES   %i\n", stats.shweep_eqs);
-	LOG(V2_INFO, "RESULT SWEEP_ACTUAL_DONE    %i\n", actual_done);
-	LOG(V2_INFO, "RESULT SWEEP_ACTUAL_REMAIN  %i\n", actual_remaining);
+	LOG(V2_INFO, "RESULT SWEEP_ACTUAL_DONE    %i / %i \n", actual_done, total_orig);
+	LOG(V2_INFO, "RESULT SWEEP_ACTUAL_REMAIN  %i / %i \n", actual_remaining, total_orig);
 	// LOG(V2_INFO, "RESULT SWEEP_ACTUAL_ELIM    %i\n", actual_eliminated);
 	LOG(V2_INFO, "RESULT SWEEP_TIME           %f sec\n", Timer::elapsedSeconds() - _start_shweep_timestamp);
 
