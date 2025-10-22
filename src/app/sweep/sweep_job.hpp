@@ -19,24 +19,23 @@ private:
     uint8_t* _metadata; //serialized description
 	int _numVars{0};
 
+	//Local Solvers
 	typedef std::shared_ptr<Kissat> KissatPtr;
-
 	std::vector<KissatPtr> _shweepers;
 	std::vector<std::unique_ptr<BackgroundWorker>> _bg_workers;
 	std::vector<std::future<void>> _fut_shweepers;
     std::atomic_int _running_shweepers_count {0};
 	std::vector<int> _list_of_ids;
 
+	//Timing
 	float _start_shweep_timestamp;
+	std::vector<float> _sharing_start_ping_timestamps;
+	std::vector<float> _sharing_receive_result_timestamps;
+
+
+	//Workstealing
     bool _root_provided_initial_work=false;
-	bool _terminate_all=false;
-
-	// static const int NUM_STEAL_METADATA = 1;
-
 	SplitMix64Rng _rng;
-	const int SEARCH_FIRST_LOCAL_PERCENT = 90;
-    const int TAG_SEARCHING_WORK = 1001;
-    const int TAG_RETURNING_STEAL_REQUEST = 1002;
 	struct WorkstealRequest {
 		int localId{-1};
 		int targetIndex{-1};
@@ -46,35 +45,32 @@ private:
 		std::vector<int> stolen_work{};
 	};
 	std::vector<WorkstealRequest> _worksteal_requests;
+    const int TAG_SEARCHING_WORK = 1001;
+    const int TAG_RETURNING_STEAL_REQUEST = 1002;
 
 
-	float _last_sharing_timestamp;
+	//Sharing Equivalences and Units
+	float _last_sharing_start_timestamp;
     std::unique_ptr<JobTreeBroadcast> _bcast;
     std::unique_ptr<JobTreeAllReduction> _red;
     const int TAG_BCAST_INIT = 1003;
     const int TAG_ALLRED = 1004;
-
-	// bool _started_sharing = false;
-	// int _sharing_round = 0;
-
-	//Positions where the additional metadata is stored in each shared element [..., eqs_size, units_size, all_idle]
+	//Positions where the metadata is stored in each shared element. Format [ <actual data> , eqs_size, units_size, all_idle]
 	static const int NUM_SHARING_METADATA = 3;
 	static const int EQUIVS_METADATA_POS = 3;
 	static const int UNITS_METADATA_POS = 2;
 	static const int IDLE_METADATA_POS = 1;
-
-    std::vector<int> _eqs_from_broadcast;  //store received equivalences to copy to individual solvers
+    std::vector<int> _eqs_from_broadcast;  //store received equivalences at rank level to copy to individual solvers
 	std::vector<int> _units_from_broadcast;
 
-	// int _eqs_found{-1};
-	// int _sweep_units_found{-1};
-    // static const int MSG_SWEEP = 100; // internal message tag
-    // static const int NUM_WORKERS = 4; // # workers we request and require, hardcoded 4 for now
 
-	static const int INVALID_LIT = UINT_MAX;
+	//Termination. Determined during workstealing, broadcasted via sharing
+	bool _terminate_all=false;
 
-	//keep track which solver reports the final formula, we need only one
+
+	//Keep track which solver reports the final formula, we only use one
 	std::shared_ptr<std::atomic<int>> _dimacsReport_localId = std::make_shared<std::atomic<int>>(-1);
+
 
 
 public:
@@ -93,20 +89,12 @@ public:
     bool appl_isDestructible() override {return true;}
     void appl_memoryPanic() override {}
 
-
     friend void cb_search_work_in_tree(void* SweepJob_state, unsigned **work, int *work_size, int local_id);
-	// friend void import_next_equivalence(void *SweepJobState, int *last_imported_round, int eq_nr, unsigned *lit1, unsigned *lit2);
-
-	// bool isDimacsReportStarted();
-	// void setDimacsReportStarted();
-	// void setDimacsReportingLocalId(int local_id);
-	// std::shared_ptr<Kissat> _reporting_Kissat_obj = nullptr;
 
 
 private:
     // void advanceSweepMessage(JobMessage& msg);
 	KissatPtr createNewShweeper(int localId);
-	// void startShweeper(KissatPtr shweeper);
 
 	void createAndStartNewShweeper(int localId);
     void loadFormula(KissatPtr shweeper);
@@ -121,7 +109,6 @@ private:
     void cbContributeToAllReduce();
     static std::vector<int> aggregateEqUnitContributions(std::list<std::vector<int>> &contribs);
 	void advanceAllReduction();
-    // void tryExtractResult();
 
 	std::vector<int> getRandomIdPermutation();
 

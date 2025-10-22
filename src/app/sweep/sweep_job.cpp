@@ -36,7 +36,7 @@ void SweepJob::appl_start() {
 	LOG(V2_INFO,"SWEEP JOB sweep-sharing-period: %i ms\n", _params.sweepSharingPeriod_ms.val);
     _metadata = getSerializedDescription(0)->data();
 	_start_shweep_timestamp = Timer::elapsedSeconds();
-	_last_sharing_timestamp = Timer::elapsedSeconds();
+	_last_sharing_start_timestamp = Timer::elapsedSeconds();
 
 	//do not trigger a send on the initial dummy worksteal requests
 	_worksteal_requests.resize(_params.numThreadsPerProcess.val);
@@ -215,14 +215,21 @@ void SweepJob::readResult(KissatPtr shweeper) {
 	LOG(V2_INFO, "RESULT SWEEP_EQUIVALENCES   %i\n", stats.shweep_eqs);
 	LOG(V2_INFO, "RESULT SWEEP_ACTUAL_DONE    %i / %i \n", actual_done, total_orig);
 	LOG(V2_INFO, "RESULT SWEEP_ACTUAL_REMAIN  %i / %i \n", actual_remaining, total_orig);
-	// LOG(V2_INFO, "RESULT SWEEP_ACTUAL_ELIM    %i\n", actual_eliminated);
 	LOG(V2_INFO, "RESULT SWEEP_TIME           %f sec\n", Timer::elapsedSeconds() - _start_shweep_timestamp);
+
+	for (int i=0; i < _sharing_start_ping_timestamps.size() && i < _sharing_receive_result_timestamps.size(); i++) {
+		float start = _sharing_start_ping_timestamps[i];
+		float end = _sharing_receive_result_timestamps[i];
+		LOG(V2_INFO, "RESULT SWEEP_SHARING_LATENCY %f sec (ping %f, receive result %f) \n", end-start, start, end);
+	}
+	for (int i=0; i < _sharing_start_ping_timestamps.size() -1; i++) {
+		LOG(V2_INFO, "RESULT SWEEP_SHARING_PERIOD_REAL %f sec \n", _sharing_start_ping_timestamps[i+1] - _sharing_start_ping_timestamps[i]);
+	}
 
 	LOG(V3_VERB, "# # RESULT [%i](%i) Serialized final formula, SolutionSize=%i\n", _my_rank, _dimacsReport_localId->load(), _internal_result.getSolutionSize());
 	for (int i=0; i<15; i++) {
 		LOG(V3_VERB, "RESULT Formula peek %i: %i \n", i, _internal_result.getSolution(i));
 	}
-
 
 
 	//This flag tells the system that the result is actually ready
@@ -464,7 +471,7 @@ void SweepJob::initiateNewSharingRound() {
 		return;
 	}
 
-	if (Timer::elapsedSeconds() < _last_sharing_timestamp + _params.sweepSharingPeriod_ms.val/1000.0) //convert to seconds
+	if (Timer::elapsedSeconds() < _last_sharing_start_timestamp + _params.sweepSharingPeriod_ms.val/1000.0) //convert to seconds
 		return;
 
 
@@ -475,7 +482,8 @@ void SweepJob::initiateNewSharingRound() {
 	//Broadcast a ping to all workers to initiate an AllReduce
 	//The broadcast includes all workers currently reachable by the root-node and informs them about their parent and potential children
 	//It then causes the leaf nodes to call the callback, initiating the AllReduce
-	_last_sharing_timestamp = Timer::elapsedSeconds();
+	_last_sharing_start_timestamp = Timer::elapsedSeconds();
+	_sharing_start_ping_timestamps.push_back(_last_sharing_start_timestamp);
 	LOG(V3_VERB, "SWEEP SHARE BCAST Initiating Sharing via Ping\n");
 	//todo: maybe reset bcast here, to prevent initiating with the same object twice, maybe prevent pingpong?
 	JobMessage msg = getMessageTemplate();
@@ -546,6 +554,7 @@ void SweepJob::advanceAllReduction() {
 	// LOG(V3_VERB, "[sweep] all-reduction complete\n");
 
 	//Extract, unserialize and distribute shared Equivalences and units
+	_sharing_receive_result_timestamps.push_back(Timer::elapsedSeconds());
 	auto shared = _red->extractResult();
 	const int eq_size = shared[shared.size()-EQUIVS_METADATA_POS];
 	const int unit_size = shared[shared.size()-UNITS_METADATA_POS];
