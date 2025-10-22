@@ -564,7 +564,7 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
             stats.shweep_clauses_end = nbClauses;
             // assert(accept); //todo: sidestep if formula is still identical and thus accept==false
         } else {
-            LOG(V2_INFO, "SWEEP [root](%i) skipped reporting dimacs results, already done by somebody else\n", getLocalId());
+            // LOG(V2_INFO, "SWEEP [root](%i) skipped reporting dimacs results, already done by somebody else\n", getLocalId());
             accept = false;
         }
     }

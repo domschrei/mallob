@@ -341,7 +341,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 	//loop until we find work or the whole sweeping is terminated
 	while (true) {
 		if (_terminate_all) {
-			//this crucially sends the kissat solver a size zero array, which is the signal for it to terminate itself
+			//this is the signal for the solver to terminate itself, by sending it a work array of size 0
 			shweeper->work_received_from_steal = {};
 			break;
 		}
@@ -451,6 +451,9 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 	*work = reinterpret_cast<unsigned int*>(shweeper->work_received_from_steal.data());
 	*work_size = shweeper->work_received_from_steal.size();
 	shweeper->shweeper_is_idle = false;
+
+	//The thread now returns to the kissat solver
+	//work_size==0 set here is there interpreted as the termination signal
 }
 
 
@@ -646,7 +649,7 @@ std::vector<int> SweepJob::stealWorkFromAnyLocalSolver() {
 			return stolen_work;
 		}
 	}
-	//no work available, all local solvers are searching too
+	//no work available at the local rank
 	return {};
 }
 

@@ -129,8 +129,8 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 	-jcup=0.05 \
 	-preprocess-sweep \
 	-sweep-sharing-period=50 \
-	-sweep-solver-verbosity=2 \
-    -preprocess-sweep-priority=1.0"
+	-sweep-solver-verbosity=1 \
+  -preprocess-sweep-priority=1.0"
 
 
     # Pre-create network-disk output directories to avoid many concurrent filesystem manips
