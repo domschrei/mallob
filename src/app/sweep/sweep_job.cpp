@@ -164,7 +164,8 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	//Specific for clean sweep run
 	shweeper->set_option("preprocess", 0); //skip other preprocessing stuff after shweep finished
 	// shweeper->set_option("probe", 1);   //there is some cleanup-probing at the end of the sweeping. keep it? (apparently the probe option is used nowhere anyways)
-	shweeper->set_option("substitute", 1); //apply equivalence substitutions at the end after sweeping (kissat default 1, but keep here explicitly to remember it)
+	shweeper->set_option("substitute", 1); //apply equivalence substitutions after sweeping (kissat default 1, but keep here explicitly to remember it)
+	shweeper->set_option("substituterounds", 2); //default is 2, and currently in round 2 already exactly zero substitutions are found, so it exits there, no matter how high we choose the number here
 	// shweeper->set_option("substituteeffort", 1000); //modification doesnt seem to have much effect...
 	// shweeper->set_option("substituterounds", 10);
 	shweeper->set_option("luckyearly", 0); //skip
