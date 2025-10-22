@@ -103,7 +103,7 @@ private:
 
 
 	void sendMPIWorkstealRequests();
-	void showIdleFraction();
+	void printIdleFraction();
 
     void initiateNewSharingRound();
     void cbContributeToAllReduce();

@@ -239,22 +239,17 @@ void SweepJob::readResult(KissatPtr shweeper) {
 
 // Called periodically by the main thread to allow the worker to emit messages.
 void SweepJob::appl_communicate() {
-	showIdleFraction();
-
 	LOG(V4_VVER, "SWEEP JOB appl_communicate() \n");
-	// LOG(V4_VVER, "SWEEP STAGE 1: Workstealing\n");
+
+	printIdleFraction();
 	sendMPIWorkstealRequests();
 	if (_bcast && _is_root)// Root: Update job tree snapshot in case your children changed
 		_bcast->updateJobTree(getJobTree());
 
-	// LOG(V4_VVER, "SWEEP STAGE 2: Sharing\n");
 	if (_is_root)
 		initiateNewSharingRound();
 
-	// LOG(V4_VVER, "SWEEP STAGE 3: AllReduction\n");
 	advanceAllReduction();
-
-	// LOG(V4_VVER, "SWEEP STAGE 4: Ended \n");
 }
 
 
@@ -302,7 +297,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 
 
 
-void SweepJob::showIdleFraction() {
+void SweepJob::printIdleFraction() {
 	int idles = 0;
 	int active = 0;
 	std::ostringstream oss;
@@ -632,6 +627,11 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
     	all_idle &= idle;
 		// LOG(V3_VERB, "ß Element: idle == %i \n", idle);
     }
+	if (contribs.empty()) {
+		all_idle = false; //edge-case: not a single solver is initialized yet, we are waiting for them to come online, they are not idle
+	}
+
+
 	aggregated.push_back(total_eq_size);
 	aggregated.push_back(total_unit_size);
 	aggregated.push_back(all_idle);
