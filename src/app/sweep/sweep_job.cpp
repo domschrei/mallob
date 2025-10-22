@@ -220,10 +220,10 @@ void SweepJob::readResult(KissatPtr shweeper) {
 	for (int i=0; i < _sharing_start_ping_timestamps.size() && i < _sharing_receive_result_timestamps.size(); i++) {
 		float start = _sharing_start_ping_timestamps[i];
 		float end = _sharing_receive_result_timestamps[i];
-		LOG(V2_INFO, "RESULT SWEEP_SHARING_LATENCY %f sec (ping %f, receive result %f) \n", end-start, start, end);
+		LOG(V2_INFO, "RESULT SWEEP_SHARING_LATENCY  %f ms   (ping->result  %f --> %f) \n", (end-start)*1000, start, end);
 	}
 	for (int i=0; i < _sharing_start_ping_timestamps.size() -1; i++) {
-		LOG(V2_INFO, "RESULT SWEEP_SHARING_PERIOD_REAL %f sec \n", _sharing_start_ping_timestamps[i+1] - _sharing_start_ping_timestamps[i]);
+		LOG(V2_INFO, "RESULT SWEEP_SHARING_PERIOD_REAL  %f ms \n", (_sharing_start_ping_timestamps[i+1] - _sharing_start_ping_timestamps[i])*1000);
 	}
 
 	LOG(V3_VERB, "# # RESULT [%i](%i) Serialized final formula, SolutionSize=%i\n", _my_rank, _dimacsReport_localId->load(), _internal_result.getSolutionSize());
