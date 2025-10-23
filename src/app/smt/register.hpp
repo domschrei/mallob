@@ -2,7 +2,6 @@
 #pragma once
 
 #include "app/app_registry.hpp"
-#include "app/sat/job/sat_constants.h"
 #include "data/job_description.hpp"
 #include "data/job_processing_statistics.hpp"
 #include "interface/api/api_connector.hpp"

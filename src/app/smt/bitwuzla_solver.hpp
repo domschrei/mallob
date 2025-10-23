@@ -11,11 +11,49 @@
 
 #include "bitwuzla/cpp/parser.h"
 #include "bitwuzla/cpp/bitwuzla.h"
-#include "bitwuzla/cpp/sat_solver_factory.h"
-#include "bitwuzla/cpp/main.h"
+#include "bitwuzla/cpp/sat_solver.h"
+#include "include/options.h"
 
 #include <cstdint>
 #include <cstdio>
+
+class BitwuzllobSatSolverFactory : public bitwuzla::SatSolverFactory {
+private:
+    const Parameters& _params;
+    APIConnector& _api;
+    JobDescription& _desc;
+    DTaskTracker& _tracker;
+    std::string _name;
+    float _start_time;
+
+    std::vector<BitwuzlaSatConnector*> solverPointers;
+    std::vector<bool> solversCleanedUp;
+    int solverCounter = 1;
+
+public:
+    BitwuzllobSatSolverFactory(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& tracker,
+        const std::string& name, float startTime, const bitwuzla::Options &options) : bitwuzla::SatSolverFactory(options),
+            _params(params), _api(api), _desc(desc), _tracker(tracker), _name(name), _start_time(startTime) {}
+
+    virtual std::unique_ptr<bitwuzla::SatSolver> new_sat_solver() override {
+        auto sat = new BitwuzlaSatConnector(_params, _api, _desc, _tracker,
+            _name + ":sat" + std::to_string(solverCounter++), _start_time); // cleaned up by Bitwuzla
+        solverPointers.push_back(sat);
+        solversCleanedUp.push_back(false);
+        sat->setCleanupCallback([&, i = solverPointers.size()-1]() {
+            solversCleanedUp[i] = true;
+        });
+        return std::unique_ptr<bitwuzla::SatSolver>(sat);
+    }
+    /** Determine if configured SAT solver has terminator support. */
+    virtual bool has_terminator_support() override {return true;}
+
+    ~BitwuzllobSatSolverFactory() {
+        for (int i = solverPointers.size()-1; i >= 0; i--) {
+            if (!solversCleanedUp[i]) delete solverPointers[i];
+        }
+    }
+};
 
 class BitwuzlaSolver {
 
@@ -99,27 +137,10 @@ public:
         }
 
         DTaskTracker dTaskTracker(_params);
-
-        // If Bitwuzla fails to clean up after itself, we're gonna do it.
-        std::vector<BitwuzlaSatConnector*> solverPointers;
-        std::vector<bool> solversCleanedUp;
-
-        // This instruction replaces the internal SAT solver of Bitwuzla with a Mallob-connected solver.
-        int solverCounter = 1;
-        bzla::sat::ExternalSatSolver::new_sat_solver = [&, name=_name]() {
-            auto sat = new BitwuzlaSatConnector(_params, _api, _desc, dTaskTracker,
-                name + ":sat" + std::to_string(solverCounter++), _start_time); // cleaned up by Bitwuzla
-            //sat->outputModels(out); // for debugging
-            solverPointers.push_back(sat);
-            solversCleanedUp.push_back(false);
-            sat->setCleanupCallback([i = solverPointers.size()-1, &solversCleanedUp]() {
-                solversCleanedUp[i] = true;
-            });
-            return sat;
-        };
+        std::unique_ptr<BitwuzllobSatSolverFactory> factory;
 
         try {
-            bzla::main::set_time_limit(main_options.time_limit);
+            //bzla::main::set_time_limit(main_options.time_limit);
             options.set(args);
 
             if (main_options.print_unsat_core) {
@@ -131,15 +152,18 @@ public:
 
             *out << bitwuzla::set_bv_format(main_options.bv_format);
             *out << bitwuzla::set_letify(!main_options.print_no_letify);
+
+            factory = std::make_unique<BitwuzllobSatSolverFactory>(_params, _api, _desc, dTaskTracker, _name, _start_time, options);
+
             bitwuzla::parser::Parser parser(
-                tm, options, main_options.language, out);
+                tm, *factory.get(), options, main_options.language, out);
             parser.configure_auto_print_model(main_options.print_model);
             parser.configure_terminator(&_terminator);
             parser.parse(
                 main_options.infile_name,
                 main_options.print || main_options.pp_only || main_options.parse_only
             );
-            bzla::main::reset_time_limit();
+            //bzla::main::reset_time_limit();
             auto bitwuzla = parser.bitwuzla();
 
             if (main_options.pp_only) {
@@ -164,24 +188,22 @@ public:
             }
 
         } catch (const bitwuzla::parser::Exception& e) {
-            bzla::main::Error() << e.msg();
+            LOG(V0_CRIT, "[ERROR] exception in Bitwuzla parser: %s\n", e.msg().c_str());
         } catch (const bitwuzla::Exception& e) {
             //// Remove the "invalid call to '...', prefix
             if (e.msg().find("invalid call") == 0) {
                 const std::string& msg = e.msg();
                 size_t pos             = msg.find("', ");
-                bzla::main::Error() << msg.substr(pos + 3);
+                LOG(V0_CRIT, "[ERROR] exception in Bitwuzla program: %s\n", msg.substr(pos+3).c_str());
             } else {
-                bzla::main::Error() << e.msg();
+                LOG(V0_CRIT, "[ERROR] exception in Bitwuzla program: %s\n", e.msg().c_str());
             }
         } catch (...) {
             LOG(V0_CRIT, "[ERROR] uncaught exception in Bitwuzla program\n");
             abort();
         }
 
-        for (int i = solverPointers.size()-1; i >= 0; i--) {
-            if (!solversCleanedUp[i]) delete solverPointers[i];
-        }
+        factory.reset(); // cleans up any dangling solvers
 
         if (smtOutFileSet) delete out;
 

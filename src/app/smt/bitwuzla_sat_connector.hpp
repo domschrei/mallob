@@ -14,7 +14,6 @@
 #include <vector>
 
 #include "app/incsat/inc_sat_controller.hpp"
-#include "app/sat/stream/sat_job_stream_garbage_collector.hpp"
 #include "bitwuzla/cpp/sat_solver.h"
 #include "core/dtask_tracker.hpp"
 #include "data/job_description.hpp"
@@ -24,7 +23,7 @@
 #include "util/params.hpp"
 #include "util/sys/timer.hpp"
 
-class BitwuzlaSatConnector : public bzla::sat::SatSolver {
+class BitwuzlaSatConnector : public bitwuzla::SatSolver {
 
 private:
     const Parameters& _params;
@@ -43,18 +42,18 @@ private:
 
     float _start_time {0};
     bool _in_solved_state {false}; // whether a result would already be known for an immediate solve() call
-    bzla::Result _result;
+    bitwuzla::Result _result;
 
     std::ostream* _out_stream {nullptr};
 
     std::unique_ptr<IncSatController> _incsat;
 
     std::function<void()> _cb_cleanup;
-    bzla::Terminator* _bzla_term {nullptr};
+    bitwuzla::Terminator* _bzla_term {nullptr};
 
 public:
     BitwuzlaSatConnector(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& tracker, const std::string& name, float startTime) :
-        bzla::sat::SatSolver(), _params(params), _desc(desc),
+        bitwuzla::SatSolver(), _params(params), _desc(desc),
         _name(name) {
 
         _incsat.reset(new IncSatController(_params, api, _desc, tracker));
@@ -88,11 +87,11 @@ public:
         _assumptions.push_back(lit);
     }
 
-    virtual void configure_terminator(bzla::Terminator* terminator) override {
+    virtual void configure_terminator(bitwuzla::Terminator* terminator) override {
         _bzla_term = terminator;
     }
 
-    virtual bzla::Result solve() override {
+    virtual bitwuzla::Result solve() override {
         if (_in_solved_state) return _result;
 
         _revision++;
@@ -105,13 +104,13 @@ public:
         _lits.clear();
         _assumptions.clear();
 
-        bzla::Result bzlaResult = bzla::Result::UNKNOWN;
+        bitwuzla::Result bzlaResult = bitwuzla::Result::UNKNOWN;
         time = Timer::elapsedSeconds() - time;
         LOG(V2_INFO, "%s rev. %i done - time=%.3fs res=%i\n", _name.c_str(), _revision, time, resultCode);
-        if (resultCode == 10) bzlaResult = bzla::Result::SAT;
-        if (resultCode == 20) bzlaResult = bzla::Result::UNSAT;
+        if (resultCode == 10) bzlaResult = bitwuzla::Result::SAT;
+        if (resultCode == 20) bzlaResult = bitwuzla::Result::UNSAT;
 
-        if (bzlaResult == bzla::Result::SAT) {
+        if (bzlaResult == bitwuzla::Result::SAT) {
             _solution = std::move(solution);
             if (_out_stream) {
                 *_out_stream << _name << " : MODEL " << _revision << " : ";
@@ -122,7 +121,7 @@ public:
                 *_out_stream << std::endl;
             }
         }
-        if (bzlaResult == bzla::Result::UNSAT) {
+        if (bzlaResult == bitwuzla::Result::UNSAT) {
             _failed_lits.clear();
             for (int lit : solution) _failed_lits.insert(lit);
         }
