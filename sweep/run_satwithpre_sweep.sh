@@ -62,7 +62,7 @@ MALLOB_OPTIONS="-t=$THREADS \
   -jcup=0.05 \
   -trace-dir=$OUT_DIR \
   -log=$OUT_DIR \
-  -spd=$OUT_DIR -spl=3 \
+  -spd=$OUT_DIR -spl=4 \
   -tmp=$OUT_DIR \
   -mono=$INST_PATH \
   -sweep-sharing-period=20 \

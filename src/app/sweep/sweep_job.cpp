@@ -162,7 +162,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
     shweeper->set_option("verbose", 0);//the native kissat verbosity
     // _shweeper->set_option("log", 0);//extensive logging
     shweeper->set_option("check", 0);  // do not check model or derived clauses
-    shweeper->set_option("profile",3); // do detailed profiling how much time we spent where
+    shweeper->set_option("profile", _params.satProfilingLevel.val); // do detailed profiling how much time we spent where
 	shweeper->set_option("seed", 0);   //Sweeping should not contain any RNG part
 
 
