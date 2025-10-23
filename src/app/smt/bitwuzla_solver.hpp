@@ -12,7 +12,6 @@
 #include "bitwuzla/cpp/parser.h"
 #include "bitwuzla/cpp/bitwuzla.h"
 #include "bitwuzla/cpp/sat_solver.h"
-#include "include/options.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -92,40 +91,6 @@ public:
         bitwuzla::Options options;
         bitwuzla::TermManager tm;
 
-        std::vector<std::string> argVec;
-        argVec.push_back("./bitwuzla");
-        argVec.push_back((char*) _problem_file.c_str());
-        char wcl[64];
-        if (_params.jobWallclockLimit.isNonzero() || _params.timeLimit.isNonzero()) {
-            unsigned long limitMillis = INT32_MAX;
-            if (_params.jobWallclockLimit.isNonzero())
-                limitMillis = std::min(limitMillis, (unsigned long) (1000 * _params.jobWallclockLimit()));
-            if (_params.timeLimit.isNonzero())
-                limitMillis = std::min(limitMillis, (unsigned long) (1000 * (_params.timeLimit() - Timer::elapsedSeconds())));
-            snprintf(wcl, 63, "%lu", limitMillis);
-            // Unfortunately we can't give the timeout to Bitwuzla directly right now
-            // because Bitwuzla acknowledges timeouts via process exit, which we can't
-            // do as a job within a Mallob MPI process.
-            //argVec.push_back("--time-limit");
-            //argVec.push_back(wcl);
-        }
-        if (_params.bitwuzlaArgs.isSet()) {
-            stringstream ss(_params.bitwuzlaArgs());
-            string str;
-            while (getline(ss, str, ',')) {
-                LOG(V2_INFO, "SMT Appending Bitwuzla arg \"%s\"\n", str.c_str());
-                argVec.push_back(str);
-            }
-        }
-        int argc = argVec.size();
-        std::vector<char*> v;
-        for (auto& str : argVec) v.push_back((char*) str.c_str());
-        char** argv = v.data();
-
-        std::vector<std::string> args;
-        bzla::main::Options main_options =
-            bzla::main::parse_options(argc, argv, args);
-
         auto out = &std::cout;
         bool smtOutFileSet = false;
         if (_desc.getAppConfiguration().map.count("smt-out-file")) {
@@ -136,47 +101,87 @@ public:
             smtOutFileSet = true;
         }
 
+        // Default top-level Bitwuzla options
+        bool print_unsat_core = false, print_model = false, print_no_letify = false;
+        bool print = false, pp_only = false, parse_only = false;
+        uint8_t bv_format = 2;
+        std::string language = "smt2";
+
+        // Parse Bitwuzla options
+        std::string bzlaArgsString = _params.bitwuzlaArgs();
+        if (_desc.getAppConfiguration().map.count("smt-args"))
+            bzlaArgsString += _desc.getAppConfiguration().map["smt-args"];
+        std::stringstream ss(bzlaArgsString);
+        string arg;
+        std::vector<std::string> opts;
+        while (!bzlaArgsString.empty() && getline(ss, arg, ',')) {
+            std::string lhs, rhs;
+            int ll = (arg.size()>0 && arg[0]=='-') + (arg.size()>1 && arg[1]=='-');
+            int lr = ll + 1;
+            while (lr < arg.size() && arg[lr] != '=') lr++;
+            if (lr < arg.size()) {
+                // -a=b
+                lhs = arg.substr(ll, lr-ll);
+                rhs = arg.substr(lr+1);
+            } else {
+                // -a
+                lhs = arg.substr(ll);
+            }
+            LOG(V2_INFO, "SMT Appending Bitwuzla arg: %s := %s\n", lhs.c_str(), rhs.c_str());
+            if (rhs.empty() && lhs == "print-unsat-core") print_unsat_core = true;
+            else if (rhs.empty() && lhs == "print-model") print_model = true;
+            else if (rhs.empty() && lhs == "print-formula") print = true;
+            else if (rhs.empty() && lhs == "print-no-letify") print_no_letify = true;
+            else if (rhs.empty() && lhs == "pp-only") pp_only = true;
+            else if (rhs.empty() && (lhs == "parse-only" || lhs == "P")) parse_only = true;
+            else if (!rhs.empty() && lhs == "bv-output-format") bv_format = atoi(rhs.c_str());
+            else if (!rhs.empty() && lhs == "lang") language = rhs;
+            else opts.push_back(arg);
+        }
+        options.set(opts);
+
         DTaskTracker dTaskTracker(_params);
         std::unique_ptr<BitwuzllobSatSolverFactory> factory;
 
         try {
             //bzla::main::set_time_limit(main_options.time_limit);
-            options.set(args);
 
-            if (main_options.print_unsat_core) {
+            if (print_unsat_core) {
                 options.set(bitwuzla::Option::PRODUCE_UNSAT_CORES, 1);
             }
-            if (main_options.print_model) {
+            if (print_model) {
                 options.set(bitwuzla::Option::PRODUCE_MODELS, 1);
             }
 
-            *out << bitwuzla::set_bv_format(main_options.bv_format);
-            *out << bitwuzla::set_letify(!main_options.print_no_letify);
+            *out << bitwuzla::set_bv_format(bv_format);
+            *out << bitwuzla::set_letify(!print_no_letify);
 
-            factory = std::make_unique<BitwuzllobSatSolverFactory>(_params, _api, _desc, dTaskTracker, _name, _start_time, options);
+            factory = std::make_unique<BitwuzllobSatSolverFactory>(
+                _params, _api, _desc, dTaskTracker,
+                _name, _start_time, options);
 
             bitwuzla::parser::Parser parser(
-                tm, *factory.get(), options, main_options.language, out);
-            parser.configure_auto_print_model(main_options.print_model);
+                tm, *factory.get(), options, language, out);
+            parser.configure_auto_print_model(print_model);
             parser.configure_terminator(&_terminator);
             parser.parse(
-                main_options.infile_name,
-                main_options.print || main_options.pp_only || main_options.parse_only
+                _problem_file,
+                print || pp_only || parse_only
             );
             //bzla::main::reset_time_limit();
             auto bitwuzla = parser.bitwuzla();
 
-            if (main_options.pp_only) {
+            if (pp_only) {
                 bitwuzla->simplify();
             }
-            if (main_options.print) {
-                if (!main_options.parse_only && !main_options.pp_only) {
+            if (print) {
+                if (!parse_only && !pp_only) {
                     bitwuzla->simplify();
                 }
                 bitwuzla->print_formula(*out, "smt2");
             }
 
-            if (main_options.print_unsat_core) {
+            if (print_unsat_core) {
                 bitwuzla->print_unsat_core(*out);
             }
 
