@@ -5,6 +5,7 @@
 #include "app/job_tree.hpp"
 #include "util/ctre.hpp"
 #include "util/logger.hpp"
+#include "util/sys/tmpdir.hpp"
 
 extern "C" {
 #include "kissat/src/kissat.h"
@@ -88,7 +89,7 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 		#endif
 		if (_terminate_all) {
 			_bg_workers[localId]->stop();
-			LOG(V2_INFO, "SWEEP JOB TERMINATE [%i](%i) terminated new shweeper directly, job already done \n", _my_rank, localId);
+			LOG(V2_INFO, "SWEEP JOB TERMINATE [%i](%i) terminated new shweeper directly before it even started, job already done \n", _my_rank, localId);
 			return;
 		}
 
@@ -106,6 +107,7 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 			readResult(shweeper);
 		}
 		_running_shweepers_count--;
+		_shweepers[localId]->cleanUp(); //write profile
 		// );
 	});
 	// _fut_shweepers.push_back(std::move(fut_shweeper));
@@ -120,6 +122,17 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	setup.numVars = desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
 	setup.numOriginalClauses = desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
 	setup.localId = localId;
+	setup.globalId = _my_rank * _params.numThreadsPerProcess.val + localId;
+
+	if (_params.satProfilingLevel() >= 0) {
+		setup.profilingBaseDir = _params.satProfilingDir();
+		if (setup.profilingBaseDir.empty()) setup.profilingBaseDir = TmpDir::getGeneralTmpDir();
+		setup.profilingBaseDir += "/" + std::to_string(_my_rank) + "/"; // rank == appRank ?
+		LOG(V4_VVER, "SWEEP [%i](%i) Profiling Dir = %s \n", _my_rank, localId, setup.profilingBaseDir.c_str());
+		FileUtils::mkdir(setup.profilingBaseDir);
+		setup.profilingLevel = _params.satProfilingLevel();
+	}
+
 
 	if (_numVars==0)
 		_numVars = setup.numVars;
@@ -151,6 +164,8 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
     shweeper->set_option("check", 0);  // do not check model or derived clauses
     shweeper->set_option("profile",3); // do detailed profiling how much time we spent where
 	shweeper->set_option("seed", 0);   //Sweeping should not contain any RNG part
+
+
 
 	//Specific for Mallob interaction
 	shweeper->set_option("mallob_custom_sweep_verbosity", _params.sweepSolverVerbosity()); //Shweeper verbosity 0..4

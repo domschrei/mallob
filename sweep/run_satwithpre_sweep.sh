@@ -60,8 +60,10 @@ MALLOB_OPTIONS="-t=$THREADS \
   -satsolver=[k_]w \
   -colors \
   -jcup=0.05 \
-  -trace-dir=$OUT_DIR/traces/ \
-  -log=$OUT_DIR/logs/ \
+  -trace-dir=$OUT_DIR \
+  -log=$OUT_DIR \
+  -spd=$OUT_DIR -spl=3 \
+  -tmp=$OUT_DIR \
   -mono=$INST_PATH \
   -sweep-sharing-period=20 \
   -sweep-solver-verbosity=1"
@@ -79,8 +81,8 @@ if $PREPROCESS_SEQUENTIAL_SWEEPCOMPLETE; then
 fi
 
 #clean old logs and traces
-rm -rf "$HOME/PhD/logsntraces/logs"/*
-rm -rf "$HOME/PhD/logsntraces/traces"/*
+rm -rf "$HOME/PhD/logsntraces"/*
+# rm -rf "$HOME/PhD/logsntraces/traces"/*
 
 RDMAV_FORK_SAFE=1; 
 

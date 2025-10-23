@@ -23,7 +23,7 @@ CC=$(which mpicc) CXX=$(which mpicxx) cmake -DCMAKE_BUILD_TYPE=RELEASE \
   -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\" ..
 
 # make clean
-make -j 20; cd ..
+make -j 12; cd ..
 
 
 

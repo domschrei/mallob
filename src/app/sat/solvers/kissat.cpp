@@ -388,6 +388,7 @@ void Kissat::cleanUp() {
     if (_setup.profilingLevel > 0) {
         auto profileFileString = _setup.profilingBaseDir + "/profile." + _setup.jobname
             + "." + std::to_string(_setup.globalId);
+        LOGGER(_logger, V4_VVER, "Kissat cleanup, jobname %s, filestring %s \n", _setup.jobname.c_str(), profileFileString.c_str());
 		LOGGER(_logger, V4_VVER, "Writing profile ...\n");
 		kissat_write_profile(solver, profileFileString.c_str());
 		LOGGER(_logger, V4_VVER, "Profile written\n");
