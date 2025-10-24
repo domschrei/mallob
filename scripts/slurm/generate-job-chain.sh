@@ -19,7 +19,7 @@ echo "$jobname: min         $minjobidx"
 echo "$jobname: max         $maxjobidx"
 echo "$jobname: chains      $numchains"
 echo "$jobname: nodes       $DS_NODES"
-echo "$jobname: $DS_BECHMARKFILE"
+echo "$jobname: $DS_BENCHMARKFILE"
 echo " "
 
 #As security check show the current mallob flags
