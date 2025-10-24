@@ -3,6 +3,7 @@
 
 #include "app/smt/bitwuzla_sat_connector.hpp"
 #include "bitwuzla/cpp/bitwuzla.h"
+#include "bitwuzla/cpp/terminator.h"
 #include "core/dtask_tracker.hpp"
 #include "data/job_description.hpp"
 #include "interface/api/api_connector.hpp"
@@ -14,8 +15,8 @@ private:
     APIConnector& _api;
     JobDescription& _desc;
     DTaskTracker& _tracker;
+    bitwuzla::Terminator& _term;
     std::string _name;
-    float _start_time;
 
     std::vector<BitwuzlaSatConnector*> solverPointers;
     std::vector<bool> solversCleanedUp;
@@ -23,17 +24,19 @@ private:
 
 public:
     BitwuzllobSatSolverFactory(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& tracker,
-        const std::string& name, float startTime, const bitwuzla::Options &options) : bitwuzla::SatSolverFactory(options),
-            _params(params), _api(api), _desc(desc), _tracker(tracker), _name(name), _start_time(startTime) {}
+        bitwuzla::Terminator& term, const std::string& name, const bitwuzla::Options &options)
+            : bitwuzla::SatSolverFactory(options),
+            _params(params), _api(api), _desc(desc), _tracker(tracker), _term(term), _name(name) {}
 
     virtual std::unique_ptr<bitwuzla::SatSolver> new_sat_solver() override {
         auto sat = new BitwuzlaSatConnector(_params, _api, _desc, _tracker,
-            _name + ":sat" + std::to_string(solverCounter++), _start_time); // cleaned up by Bitwuzla
+            _name + ":sat" + std::to_string(solverCounter++)); // cleaned up by Bitwuzla
         solverPointers.push_back(sat);
         solversCleanedUp.push_back(false);
         sat->setCleanupCallback([&, i = solverPointers.size()-1]() {
             solversCleanedUp[i] = true;
         });
+        sat->configure_terminator(&_term);
         return std::unique_ptr<bitwuzla::SatSolver>(sat);
     }
     /** Determine if configured SAT solver has terminator support. */

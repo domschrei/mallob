@@ -63,8 +63,7 @@ public:
         }
 
         // Default top-level Bitwuzla options
-        bool print_unsat_core = false, print_model = false, print_no_letify = false;
-        bool print = false, pp_only = false, parse_only = false;
+        bool print_no_letify = false, print_formula = false, pp_only = false, parse_only = false;
         uint8_t bv_format = 2;
         std::string language = "smt2";
 
@@ -89,9 +88,11 @@ public:
                 lhs = arg.substr(ll);
             }
             LOG(V2_INFO, "SMT Appending Bitwuzla arg: %s := %s\n", lhs.c_str(), rhs.c_str());
-            if (rhs.empty() && lhs == "print-unsat-core") print_unsat_core = true;
-            else if (rhs.empty() && lhs == "print-model") print_model = true;
-            else if (rhs.empty() && lhs == "print-formula") print = true;
+            if (rhs.empty() && lhs == "print-unsat-core")
+                options.set(bitwuzla::Option::PRODUCE_UNSAT_CORES, 1);
+            else if (rhs.empty() && lhs == "print-model")
+                options.set(bitwuzla::Option::PRODUCE_MODELS, 1);
+            else if (rhs.empty() && lhs == "print-formula") print_formula = true;
             else if (rhs.empty() && lhs == "print-no-letify") print_no_letify = true;
             else if (rhs.empty() && lhs == "pp-only") pp_only = true;
             else if (rhs.empty() && (lhs == "parse-only" || lhs == "P")) parse_only = true;
@@ -107,44 +108,31 @@ public:
         try {
             //bzla::main::set_time_limit(main_options.time_limit);
 
-            if (print_unsat_core) {
-                options.set(bitwuzla::Option::PRODUCE_UNSAT_CORES, 1);
-            }
-            if (print_model) {
-                options.set(bitwuzla::Option::PRODUCE_MODELS, 1);
-            }
-
             *out << bitwuzla::set_bv_format(bv_format);
             *out << bitwuzla::set_letify(!print_no_letify);
 
             factory = std::make_unique<BitwuzllobSatSolverFactory>(
                 _params, _api, _desc, dTaskTracker,
-                _name, _start_time, options);
+                _terminator, _name, options);
 
             bitwuzla::parser::Parser parser(
                 tm, *factory.get(), options, language, out);
-            parser.configure_auto_print_model(print_model);
+            parser.configure_auto_print_model(options.get(bitwuzla::Option::PRODUCE_MODELS));
             parser.configure_terminator(&_terminator);
             parser.parse(
                 _problem_file,
-                print || pp_only || parse_only
+                print_formula || pp_only || parse_only
             );
             //bzla::main::reset_time_limit();
             auto bitwuzla = parser.bitwuzla();
 
-            if (pp_only) {
-                bitwuzla->simplify();
-            }
-            if (print) {
-                if (!parse_only && !pp_only) {
-                    bitwuzla->simplify();
-                }
+            if (pp_only) bitwuzla->simplify();
+            if (print_formula) {
+                if (!parse_only && !pp_only) bitwuzla->simplify();
                 bitwuzla->print_formula(*out, "smt2");
             }
-
-            if (print_unsat_core) {
+            if (options.get(bitwuzla::Option::PRODUCE_UNSAT_CORES))
                 bitwuzla->print_unsat_core(*out);
-            }
 
             if (options.get(bitwuzla::Option::VERBOSITY)) {
                 auto stats = bitwuzla->statistics();

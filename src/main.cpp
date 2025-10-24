@@ -188,7 +188,7 @@ int main(int argc, char *argv[]) {
 
     Parameters params;
     params.init(argc, argv);
-    if (rank == 0) params.printBanner();
+    if (rank == 0 && !params.quiet()) params.printBanner();
 
     longStartupWarnMsg(rank, "Init'd params");
 

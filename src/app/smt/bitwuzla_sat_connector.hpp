@@ -40,7 +40,6 @@ private:
     std::vector<int> _solution;
     tsl::robin_set<int> _failed_lits;
 
-    float _start_time {0};
     bool _in_solved_state {false}; // whether a result would already be known for an immediate solve() call
     bitwuzla::Result _result;
 
@@ -52,7 +51,7 @@ private:
     bitwuzla::Terminator* _bzla_term {nullptr};
 
 public:
-    BitwuzlaSatConnector(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& tracker, const std::string& name, float startTime) :
+    BitwuzlaSatConnector(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& tracker, const std::string& name) :
         bitwuzla::SatSolver(), _params(params), _desc(desc),
         _name(name) {
 
@@ -60,8 +59,6 @@ public:
         _incsat->setInnerTerminator([&]() {
             return _bzla_term && _bzla_term->terminate();
         });
-
-        _start_time = startTime;
     }
     virtual ~BitwuzlaSatConnector() {
         LOG(V2_INFO, "Done: %s\n", _name.c_str());
@@ -88,6 +85,7 @@ public:
     }
 
     virtual void configure_terminator(bitwuzla::Terminator* terminator) override {
+        if (_bzla_term) LOG(V1_WARN, "[WARN] overriding bzla terminator\n");
         _bzla_term = terminator;
     }
 
