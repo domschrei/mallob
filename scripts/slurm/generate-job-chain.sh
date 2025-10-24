@@ -47,7 +47,8 @@ sed -i 's/$DS_SECONDSPERJOB/'$DS_SECONDSPERJOB'/g' "$out_templated"
 sed -i 's/$DS_FIRSTJOBIDX/'$minjobidx'/g' "$out_templated"
 sed -i 's/$DS_LASTJOBIDX/'$maxjobidx'/g' "$out_templated"
 # escaped_benchmarkfile=$(echo "$benchmarkfile" | sed 's/\//\\\//g')
-sed -i 's/$DS_BENCHMARKFILE/'$DS_BENCHMARKFILE'/g' "$out_templated"
+# sed -i 's/$DS_BENCHMARKFILE/'$DS_BENCHMARKFILE'/g' "$out_templated"
+sed -i "s|\$DS_BENCHMARKFILE|$DS_BENCHMARKFILE|g" "$out_templated"   #file paths have / that sed should not escape
 
 cmd="for i in {1..$numchains}; do sbatch $out_templated; done"
 
