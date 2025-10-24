@@ -165,9 +165,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
     shweeper->set_option("profile", _params.satProfilingLevel.val); // do detailed profiling how much time we spent where
 	shweeper->set_option("seed", 0);   //Sweeping should not contain any RNG part
 
-
-
-	//Specific for Mallob interaction
+	//Specific for Mallob
 	shweeper->set_option("mallob_custom_sweep_verbosity", _params.sweepSolverVerbosity()); //Shweeper verbosity 0..4
 	shweeper->set_option("mallob_is_shweeper", 1); //Make this Kissat solver a pure Distributed Sweeping Solver. Jumps directly to distributed sweeping and bypasses everything else
 	shweeper->set_option("mallob_local_id", localId);
@@ -175,7 +173,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	shweeper->set_option("mallob_is_root", _is_root);
 
 
-	shweeper->set_option("sweepcomplete", 1);      //full sweeping, removes any tick limits
+	shweeper->set_option("sweepcomplete", 1);      //full sweeping, removes any time/tick limits
 	//Specific for clean sweep run
 	shweeper->set_option("preprocess", 0); //skip other preprocessing stuff after shweep finished
 	// shweeper->set_option("probe", 1);   //there is some cleanup-probing at the end of the sweeping. keep it? (apparently the probe option is used nowhere anyways)
@@ -223,11 +221,11 @@ void SweepJob::readResult(KissatPtr shweeper) {
 	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_ORIG   %i\n", stats.shweep_clauses_orig);
 	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_END    %i\n", stats.shweep_clauses_end);
 	LOG(V2_INFO, "RESULT SWEEP_UNITS_ORIG     %i\n", units_orig);
-	LOG(V2_INFO, "RESULT SWEEP_UNITS_SWEEP    %i\n", stats.shweep_sweep_units);
 	LOG(V2_INFO, "RESULT SWEEP_UNITS_NEW      %i\n", stats.shweep_new_units);
 	LOG(V2_INFO, "RESULT SWEEP_UNITS_TOTAL    %i\n", stats.shweep_total_units);
 	LOG(V2_INFO, "RESULT SWEEP_ELIMINATED     %i\n", stats.shweep_eliminated);
 	LOG(V2_INFO, "RESULT SWEEP_EQUIVALENCES   %i\n", stats.shweep_eqs);
+	LOG(V2_INFO, "RESULT SWEEP_UNITS_SWEEP    %i\n", stats.shweep_sweep_units);
 	LOG(V2_INFO, "RESULT SWEEP_ACTUAL_DONE    %i / %i \n", actual_done, total_orig);
 	LOG(V2_INFO, "RESULT SWEEP_ACTUAL_REMAIN  %i / %i \n", actual_remaining, total_orig);
 	LOG(V2_INFO, "RESULT SWEEP_TIME           %f sec\n", Timer::elapsedSeconds() - _start_shweep_timestamp);
