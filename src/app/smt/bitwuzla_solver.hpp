@@ -101,6 +101,9 @@ public:
             else opts.push_back(arg);
         }
         options.set(opts);
+        float endTime = getEndTime(&_params, &_desc, _start_time);
+        if (endTime < INT32_MAX)
+            options.set(bitwuzla::Option::TIME_LIMIT_PER, 1000.f * (endTime - Timer::elapsedSeconds()));
 
         DTaskTracker dTaskTracker(_params);
         std::unique_ptr<BitwuzllobSatSolverFactory> factory;
@@ -174,14 +177,19 @@ public:
         return params.smtOutputFile() + (params.monoFilename.isSet() ? "" : "." + std::to_string(jobId));
     }
 
-    bool isTimeoutHit(const Parameters* params, JobDescription* desc, float startTime) const {
+    static bool isTimeoutHit(const Parameters* params, JobDescription* desc, float startTime) {
         if (Terminator::isTerminating())
             return true;
-        float t = Timer::elapsedSeconds();
-        if (params->timeLimit() > 0 && t >= params->timeLimit())
-            return true;
-        if (desc->getWallclockLimit() > 0 && (t - startTime) >= desc->getWallclockLimit())
+        if (Timer::elapsedSeconds() > getEndTime(params, desc, startTime))
             return true;
         return false;
+    }
+    static float getEndTime(const Parameters* params, JobDescription* desc, float startTime) {
+        float endTime = INT32_MAX;
+        if (params->timeLimit() > 0)
+            endTime = std::min(endTime, startTime + params->timeLimit());
+        if (desc->getWallclockLimit() > 0)
+            endTime = std::min(endTime, startTime + desc->getWallclockLimit());
+        return endTime;
     }
 };
