@@ -83,6 +83,7 @@ public:
         if (_input_exhausted && _exhausted_is_one_time_signal) {
             auto lock = _buffer_mutex.getLock();
             if (_input_exhausted && _exhausted_is_one_time_signal) {
+                _input_exhausted = false;
                 _exhausted_is_one_time_signal = false;
                 return false;
             }
@@ -104,6 +105,7 @@ public:
             if (_input_exhausted && _exhausted_is_one_time_signal) {
                 auto lock = _buffer_mutex.getLock();
                 if (_input_exhausted && _exhausted_is_one_time_signal) {
+                    _input_exhausted = false;
                     _exhausted_is_one_time_signal = false;
                     return false;
                 }
@@ -133,6 +135,7 @@ public:
         {
             auto lock = _buffer_mutex.getLock();
             _input_exhausted = true;
+            _exhausted_is_one_time_signal = false;
         }
         _buffer_cond_var.notify();
         //LOG(V2_INFO, "SPSC notify exhausted\n");

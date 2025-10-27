@@ -86,6 +86,7 @@ public:
     }
 
     virtual void configure_terminator(bitwuzla::Terminator* terminator) override {
+        if (!terminator) return;
         _bzla_terms.push_back(terminator);
     }
 
