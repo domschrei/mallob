@@ -34,7 +34,7 @@ DS_NODES=1 DS_RUNTIME=720 DS_PARTITION=micro DS_SECONDSPERJOB=300 scripts/slurm/
 ```
 
 * `DS_NODES`: Number of compute nodes to use
-* `DS_RUNTIME`: The maximum runtime of a single SBATCH job, including setup/teardown. Can encompass several Mallob runs.
+* `DS_RUNTIME`: The maximum runtime of a single SBATCH job in minutes, including setup/teardown. Can encompass several Mallob runs.
 * `DS_PARTITION`: The HPC partition to execute the job in (e.g., `micro`, `general`)
 * `DS_SECONDSPERJOB`: Duration of each individual Mallob run (excluding some leniency for setup, teardown).
 * 1st argument: The job name.
