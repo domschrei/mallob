@@ -35,9 +35,8 @@ private:
     std::string _name;
 
     float _start_time = -1;
-    std::unique_ptr<WrappedSatJobStream> _stream;
-
     DTaskTracker _dtask_tracker;
+    std::unique_ptr<WrappedSatJobStream> _stream;
 
 public:
     IncSatController(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& dTaskTracker) :
