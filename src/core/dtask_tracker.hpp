@@ -9,6 +9,7 @@
 
 #include "comm/mympi.hpp"
 #include "mpi.h"
+#include "util/logger.hpp"
 #include "util/params.hpp"
 #include "util/sys/threading.hpp"
 #include "util/sys/timer.hpp"

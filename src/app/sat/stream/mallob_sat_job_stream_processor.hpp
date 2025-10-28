@@ -175,6 +175,7 @@ public:
         }
         _expected_result_job_name = copy["name"].get<std::string>();
 
+        LOG(V5_DEBG, "MSJS %s begin call\n", _name.c_str());
         _slot->resume();
         _task_pending = true;
         _pending_rev = t.rev;
@@ -221,6 +222,7 @@ public:
 
         lock = _slot->getLock();
         _slot->suspend();
+        LOG(V5_DEBG, "MSJS %s call ended\n", _name.c_str());
 
         _backlog_task = SatTask{_backlog_task.type};
     }

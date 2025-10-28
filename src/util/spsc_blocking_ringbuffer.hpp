@@ -144,6 +144,7 @@ public:
     void interrupt() {
         {
             auto lock = _buffer_mutex.getLock();
+            if (_input_exhausted) return;
             _input_exhausted = true;
             assert(!_exhausted_is_one_time_signal);
             _exhausted_is_one_time_signal = true;
@@ -176,6 +177,9 @@ public:
 
     bool exhausted() const {
         return _input_exhausted;
+    }
+    bool terminated() const {
+        return _terminated;
     }
 
 private:

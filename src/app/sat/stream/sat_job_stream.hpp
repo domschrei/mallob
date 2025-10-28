@@ -53,7 +53,7 @@ public:
                 SatJobStreamProcessor::SatTask task;
                 bool ok = processor->getQueue().pollBlocking(task);
                 if (!ok) {
-                    if (processor->getQueue().exhausted()) break;
+                    if (processor->getQueue().exhausted() || processor->getQueue().terminated()) break;
                     processor->loop();
                     continue;
                 }
