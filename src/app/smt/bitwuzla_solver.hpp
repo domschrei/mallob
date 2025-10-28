@@ -55,11 +55,15 @@ public:
         auto out = &std::cout;
         bool smtOutFileSet = false;
         if (_desc.getAppConfiguration().map.count("smt-out-file")) {
+            LOG(V2_INFO, "SMT Using smt-out-file %s\n", _desc.getAppConfiguration().map["smt-out-file"].c_str());
             out = new std::ofstream(_desc.getAppConfiguration().map["smt-out-file"]);
             smtOutFileSet = true;
         } else if (_params.smtOutputFile.isSet()) {
+            LOG(V2_INFO, "SMT Using smt-out-file %s\n", _params.smtOutputFile().c_str());
             out = new std::ofstream(getSmtOutputFilePath(_params, _desc.getId()));
             smtOutFileSet = true;
+        } else {
+            LOG(V2_INFO, "SMT Using NO smt-out-file\n");
         }
 
         // Default top-level Bitwuzla options
@@ -71,11 +75,12 @@ public:
         // Parse Bitwuzla options
         std::string bzlaArgsString = _params.bitwuzlaArgs();
         if (_desc.getAppConfiguration().map.count("smt-args"))
-            bzlaArgsString += _desc.getAppConfiguration().map["smt-args"];
+            bzlaArgsString += "," + _desc.getAppConfiguration().map["smt-args"];
         std::stringstream ss(bzlaArgsString);
         string arg;
         std::vector<std::string> opts;
         while (!bzlaArgsString.empty() && getline(ss, arg, ',')) {
+            if (arg.empty()) continue;
             std::string lhs, rhs;
             int ll = (arg.size()>0 && arg[0]=='-') + (arg.size()>1 && arg[1]=='-');
             int lr = ll + 1;
