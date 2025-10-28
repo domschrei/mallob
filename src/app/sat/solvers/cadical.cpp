@@ -40,6 +40,7 @@ Cadical::Cadical(const SolverSetup& setup)
 	solver->connect_terminator(&terminator);
 	solver->connect_learn_source(&learnSource);
 
+
 	if (setup.profilingLevel >= 0) {
 		bool okay = solver->set("profile", setup.profilingLevel); assert(okay);
 		okay = solver->set("realtime", 1); assert(okay);

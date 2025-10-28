@@ -161,19 +161,22 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
     shweeper->set_option("quiet", 1);  //suppress any standard kissat messages
     shweeper->set_option("verbose", 0);//the native kissat verbosity
     // _shweeper->set_option("log", 0);//extensive logging
-    shweeper->set_option("check", 0);  // do not check model or derived clauses
+    shweeper->set_option("check", 0);  // do not check model or derived clauses, because we import anyways units and equivalences without proof tracking
+    shweeper->set_option("statistics", 1);  //print full statistics
     shweeper->set_option("profile", _params.satProfilingLevel.val); // do detailed profiling how much time we spent where
 	shweeper->set_option("seed", 0);   //Sweeping should not contain any RNG part
 
-	//Specific for Mallob
-	shweeper->set_option("mallob_custom_sweep_verbosity", _params.sweepSolverVerbosity()); //Shweeper verbosity 0..4
+	//Specific due to Mallob
+	shweeper->set_option("mallob_custom_sweep_verbosity", _params.sweepSolverVerbosity.val); //Shweeper verbosity 0..4
 	shweeper->set_option("mallob_is_shweeper", 1); //Make this Kissat solver a pure Distributed Sweeping Solver. Jumps directly to distributed sweeping and bypasses everything else
 	shweeper->set_option("mallob_local_id", localId);
 	shweeper->set_option("mallob_rank", _my_rank);
 	shweeper->set_option("mallob_is_root", _is_root);
+	shweeper->set_option("mallob_resweep_chance", _params.sweepResweepChance.val);
 
 
-	shweeper->set_option("sweepcomplete", 1);      //full sweeping, removes any time/tick limits
+	//Own options of Kissat
+	shweeper->set_option("sweepcomplete", 1);      //deactivates checking for time limits during sweeping, so we dont get kicked out due to some limits
 	//Specific for clean sweep run
 	shweeper->set_option("preprocess", 0); //skip other preprocessing stuff after shweep finished
 	// shweeper->set_option("probe", 1);   //there is some cleanup-probing at the end of the sweeping. keep it? (apparently the probe option is used nowhere anyways)
