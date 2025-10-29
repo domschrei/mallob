@@ -354,7 +354,7 @@ void SweepJob::sendMPIWorkstealRequests() {
 
 void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) {
 	KissatPtr shweeper = _shweepers[localId]; //array access safe (we know the sweeper exists) because this callback is called by this sweeper itself
-	shweeper->shweeper_is_idle = true;
+	//shweeper->shweeper_is_idle = true; //made idle flag more fine grained, because it caused a race condition here for the very first solver that was marked idle while it was receiving the initial work
 	shweeper->work_received_from_steal = {};
 
 	//loop until we find work or the whole sweeping is terminated
@@ -362,6 +362,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		if (_terminate_all) {
 			//this is the signal for the solver to terminate itself, by sending it a work array of size 0
 			shweeper->work_received_from_steal = {};
+			shweeper->shweeper_is_idle = true;
 			break;
 		}
 		 /*
@@ -369,6 +370,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		  */
 		if (_is_root && ! _root_provided_initial_work) {
 			_root_provided_initial_work = true;
+			shweeper->shweeper_is_idle = false; //to prevent race condition, already set non-idle here (otherwhise solver might already be initialized, but still deemed idle while the initial work is being provided)
 			//We need to know how much space to allocate to store each variable "idx" at the array position work[idx].
 			//i.e. we need to know max(idx).
 			//We assume that the maximum variable index corresponds to the total number of variables
@@ -395,6 +397,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		  * At that point they anyways schedule a global sweep, and some sweepers stealing globally before cant stop that
 		  */
 
+		shweeper->shweeper_is_idle = true;
 		// if (first_local) {
 		auto stolen_work = stealWorkFromAnyLocalSolver();
 		//Successful local steal
@@ -467,9 +470,9 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		//Unsuccessful global steal, try again
 	}
 	//Found work (or terminated), Tell the kissat/C thread where it can find the work
+	shweeper->shweeper_is_idle = false;
 	*work = reinterpret_cast<unsigned int*>(shweeper->work_received_from_steal.data());
 	*work_size = shweeper->work_received_from_steal.size();
-	shweeper->shweeper_is_idle = false;
 
 	//The thread now returns to the kissat solver
 	//work_size==0 set here is there interpreted as the termination signal
@@ -597,7 +600,7 @@ void SweepJob::advanceAllReduction() {
 		shweeper->units_from_broadcast_queued.insert(shweeper->units_from_broadcast_queued.end(), _units_from_broadcast.begin(), _units_from_broadcast.end());
 	}
 
-	//Now we can reset the root node, broadcast is finished and can prepare a new one
+	//Now we can reset the root node, because the sharing operation (broadcast + allreduce) is finished and can prepare a new one
 	if (_is_root) {
 		LOG(V4_VVER, "SWEEP SHARE [%i] RESET root BCAST\n", _my_rank);
 		_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(),
@@ -643,6 +646,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
     	all_idle &= idle;
 		// LOG(V3_VERB, "ß Element: idle == %i \n", idle);
     }
+
 	if (contribs.empty()) {
 		all_idle = false; //edge-case: not a single solver is initialized yet, we are waiting for them to come online, they are not idle
 	}
