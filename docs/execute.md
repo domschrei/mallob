@@ -117,6 +117,20 @@ export RDMAV_FORK_SAFE=1;
 mpirun -np 4 --oversubscribe build/mallob -mono-app=MAXSAT -mono=instances/wcnf/warehouses_wt-warehouse0.wcsp.wcnf -v=4 -t=4 -satsolver=C -adc=1 -cjc=1 -pre-cleanup=1 -maxpre=1 -maxpre-timeout=5 -maxsat-card-encoding=3 -maxsat-searchers=2 -maxsat-focus-period=30 | grep -iE "maxsat|solution"
 ```
 
+## SMT Solving
+
+You can use Mallob for SMT solving on any logics/theories supported by the SMT solver [Bitwuzla](https://github.com/bitwuzla/bitwuzla).
+
+Compile Mallob with `-DMALLOB_APP_SMT=1` after building the SMT dependencies (`cd lib && bash fetch_and_build_smt_deps.sh`).
+
+Mallob expects `.smt2` instances and internally invokes Bitwuzla, which in turn uses Mallob's incremental SAT task interface as its SAT solving backend.
+
+Here is an example 16-core (4x4) invocation that redirects Bitwuzla's result stream to `out.smt2` and ensures that it outputs any found models:
+
+```
+mpirun -np 4 build/mallob -mono-app=SMT -mono=instances/smt/modulus_true.c.17.smt2 -v=4 -t=4 -pre-cleanup=1 -smt-out-file=out.smt2 -smt-args=--print-model
+```
+
 ## Solve multiple instances in an orchestrated manner
 
 If you want to solve a fixed set of $n$ jobs or wish to evaluate Mallob's scheduling behavior with simulated jobs, follow these steps:
