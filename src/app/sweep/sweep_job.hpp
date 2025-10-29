@@ -99,6 +99,7 @@ private:
 	void createAndStartNewShweeper(int localId);
     void loadFormula(KissatPtr shweeper);
 
+	void readStats(KissatPtr shweeper);
 	void readResult(KissatPtr shweeper);
 
 

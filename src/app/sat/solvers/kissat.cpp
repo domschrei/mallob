@@ -556,14 +556,18 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
         int expected_unset = -1;
         bool weAreFirst = shweepDimacsReportLocalId->compare_exchange_strong(expected_unset, getLocalId());
         if (weAreFirst) {
-            LOG(V2_INFO, "SWEEP [root](%i) first to report dimacs result\n", getLocalId());
-            LOG(V2_INFO, "SWEEP Accept shweeper formula? %i.  (%i --> %i vars) (%i --> %i clauses) \n", accept, _setup.numVars, nbVars, _setup.numOriginalClauses, nbClauses);
+            LOG(V2_INFO, "SWEEP [root](%i) first to ask to report dimacs result\n", getLocalId());
             auto &stats = getSolverStatsRef();
             stats.shweep_vars_orig = _setup.numVars;
             stats.shweep_clauses_orig = _setup.numOriginalClauses;
             stats.shweep_vars_end = nbVars;
             stats.shweep_clauses_end = nbClauses;
-            // assert(accept); //todo: sidestep if formula is still identical and thus accept==false
+            shweep_get_sweep_stats(solver, &stats.shweep_eqs, &stats.shweep_sweep_units, &stats.shweep_new_units, &stats.shweep_total_units, &stats.shweep_eliminated, &stats.shweep_active_orig, &stats.shweep_active_end);
+            if (accept)
+                LOG(V2_INFO, "SATWP ACCEPTS SWEEP dimacs formula.  progress:  (%i --> %i vars) (%i --> %i clauses) \n", _setup.numVars, nbVars, _setup.numOriginalClauses, nbClauses);
+            else
+                LOG(V2_INFO, "SWEEP DECLINES SWEEP dimacs formula. no progress: (%i --> %i vars) (%i --> %i clauses) \n", _setup.numVars, nbVars, _setup.numOriginalClauses, nbClauses);
+
         } else {
             LOG(V2_INFO, "SWEEP [root](%i) denied report request, already taken by (%i) \n", getLocalId(), shweepDimacsReportLocalId->load());
             accept = false;
@@ -591,11 +595,6 @@ void Kissat::addLiteralFromPreprocessing(int lit) {
         preprocessedFormula.push_back(nbPreprocessedVariables);
         preprocessedFormula.push_back(nbPreprocessedClausesReceived);
         setPreprocessedFormula(std::move(preprocessedFormula));
-        if (is_shweeper) {
-            auto &stats = getSolverStatsRef();
-            shweep_get_sweep_stats(solver, &stats.shweep_eqs, &stats.shweep_sweep_units, &stats.shweep_new_units, &stats.shweep_total_units, &stats.shweep_eliminated,
-                &stats.shweep_active_orig, &stats.shweep_active_end);
-        }
         setSolverInterrupt();
     }
 }
@@ -606,7 +605,7 @@ void Kissat::shweepSetDimacsReportPtr(std::shared_ptr<std::atomic<int>> ptr) {
 }
 
 
-void Kissat::setIsShweeper() {
+void Kissat::setToShweeper() {
     is_shweeper = true;
 }
 

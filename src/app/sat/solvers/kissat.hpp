@@ -139,7 +139,7 @@ public:
 	friend void shweep_import_eqs(void* state, int** equivalences, int *eqs_size);
 	friend void shweep_import_units(void *state, int **units, int *unit_count);
 	void shweepSetDimacsReportPtr(std::shared_ptr<std::atomic<int>> field);
-	void setIsShweeper();
+	void setToShweeper();
 
 	//Pass-through
 	void set_option(const std::string &option_name, int value);

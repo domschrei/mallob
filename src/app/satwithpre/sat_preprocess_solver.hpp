@@ -45,7 +45,8 @@ private:
     bool _sweep_job_submitted {false};
     volatile bool _sweep_job_done {false};
     bool _sweep_job_digested {false};
-    bool _sweep_job_forwarded {false};
+    bool _sweep_job_has_improved_formula {false};
+    bool _sweep_job_started_next {false};
     nlohmann::json _sweep_job_submission;
     nlohmann::json _sweep_job_response;
 
@@ -101,6 +102,10 @@ public:
                 res = jsonToJobResult(_sweep_job_response, false); //eventually probably convert = true, for tracking equivalences...
                 _sweep_job_digested = true;
                 LOG(V3_VERB, "SATWP SWEEP read JobResult from json, SolutionSize=%i\n", res.getSolutionSize());
+                if (res.getSolutionSize() > 0) {
+                    _sweep_job_has_improved_formula = true;
+                }
+                //todo: break if sweep solves the problem completeley to SAT/UNSAT?
             }
 
             if (_preprod_job_done && !_preprod_job_digested) {
@@ -121,25 +126,26 @@ public:
                 }
             }
 
-            //continue directly from prepro to prepro'd SAT, without sweep
+            //old route without sweep: continue directly from prepro to prepro'd SAT
             if (_prepro.hasPreprocessedFormula() && ! _params.preprocessSweep.val) {
                 printf("SATWP submit preprocessed SAT task, skip SWEEP\n");
                 LOG(V3_VERB, "SATWP submit preprocessed SAT task, skip SWEEP\n");
                 submitPreprocessedJob(_prepro.extractPreprocessedFormula());
             }
-            //continue from prepro to SWEEP
-            //schedules "distributed equivalence sweeping" as another preprocessing step
-            //does NOT yet start the retraction of the base job, as we are still doing preprocessing on the side
+
+            //new route: continue from prepro to SWEEP
+            //does NOT yet start the retraction of the base job, as we are still in the preprocessing phase
             if (_prepro.hasPreprocessedFormula() && _params.preprocessSweep.val && ! _sweep_job_submitted) {
                 printf("SATWP submit SWEEP\n");
                 LOG(V3_VERB, "SATWP Submit SWEEP\n");
                 submitSweepJob(_prepro.extractPreprocessedFormula());
             }
+            //todo: we probably still want to submit SWEEP even if _prepro does no progress at all?
             //continue from SWEEP to prepro'd SAT
-            if (_sweep_job_digested && !_sweep_job_forwarded) {
+            if (_sweep_job_digested && _sweep_job_has_improved_formula && !_sweep_job_started_next) {
                 LOG(V3_VERB, "SATWP SWEEP digested, submit preprocessed SAT task\n");
                 submitPreprocessedJob(res.extractSolution());
-                _sweep_job_forwarded = true; //prevent multiple SAT submissions, since we don't move out the solution here but just copy it
+                _sweep_job_started_next = true; //prevent multiple submissions from SWEEP to PreprocessedJob
             }
 
             if (!_base_job_done && _time_of_retraction_end > 0 && Timer::elapsedSeconds() >= _time_of_retraction_end) {

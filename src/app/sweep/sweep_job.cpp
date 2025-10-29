@@ -105,6 +105,7 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 		assert( ! _is_root || _dimacsReport_localId->load() != -1); //on the root node, we need to know which solver has copied its final formula to mallob
 		if (_is_root && localId == _dimacsReport_localId->load()) {
 			readResult(shweeper);
+			readStats(shweeper);
 		}
 		_running_shweepers_count--;
 		_shweepers[localId]->cleanUp(); //write profile
@@ -146,7 +147,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 		LOG(V2_INFO, "SWEEP JOB TERMINATE [%i](%i) terminated new kissat directly, job already done \n", _my_rank, localId);
 		return shweeper;
 	}
-	shweeper->setIsShweeper();
+	shweeper->setToShweeper();
 
 	shweeper->shweepSetImportExportCallbacks();
     shweep_set_search_work_callback(shweeper->solver, this, cb_search_work_in_tree); //here we connect directly between SweepJob and kissat-solver, bypassing Kissat::
@@ -193,11 +194,18 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 void SweepJob::readResult(KissatPtr shweeper) {
 	_internal_result.id = getId();
 	_internal_result.revision = getRevision();
-	_internal_result.result= SAT; //technically its not SAT but just *some* information, but just calling it SAT helps to seamlessly pass it though the higher abstraction layers
-	std::vector<int> formula = shweeper->extractPreprocessedFormula();
-	_internal_result.setSolutionToSerialize(formula.data(), formula.size()); //Format: [Clauses, #Vars, #Clauses]
+	_internal_result.result= UNKNOWN; //technically its not SAT but just *some* information, but just calling it SAT helps to seamlessly pass it though the higher abstraction layers
+	// if (shweeper->hasPreprocessedFormula()) {
+	std::vector<int> formula = shweeper->extractPreprocessedFormula(); //Can be either empty (size==0) if no progress was made, or format [Clauses, #Vars, #Clauses] otherwise
+	_internal_result.setSolutionToSerialize(formula.data(), formula.size());
+	// } else {
+		// _internal_result.setSolutionToSerialize(formula.data(), formula.size()); //Format: [Clauses, #Vars, #Clauses], the last two integers are pushed at the end of the literal reporting
+	// }
+	//This flag tells the system that the result is actually ready
+	_solved_status = UNKNOWN;
+}
 
-	//Logging
+void SweepJob::readStats(KissatPtr shweeper) {
 	auto stats = shweeper->getSolverStats();
 	int units_orig = stats.shweep_total_units - stats.shweep_new_units;
 	int total_orig = stats.shweep_active_orig + units_orig;
@@ -205,11 +213,10 @@ void SweepJob::readResult(KissatPtr shweeper) {
 	//actual_done is a slightly conservative count, because we only include the units found by the sweeping algorithm itself,
 	//and dont include some stray units found while propagating the sweep decisions (that would be stats.shweep_new_units)
 	int actual_remaining = total_orig - actual_done;
-	// int actual_eliminated ;
 
-	printf("SWEEP finished\n");
-	printf("[%i](%i) RESULT SWEEP: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
-		_my_rank, _dimacsReport_localId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
+	//printf("SWEEP finished\n");
+	// printf("[%i](%i) RESULT SWEEP: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
+		// _my_rank, _dimacsReport_localId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
 	LOG(V2_INFO, "RESULT SWEEP [%i](%i):  %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
 		_my_rank, _dimacsReport_localId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
 	LOG(V2_INFO, "RESULT SWEEP [%i](%i): %i Processes, %f seconds \n", _my_rank, _dimacsReport_localId->load(), getVolume(), Timer::elapsedSeconds() - _start_shweep_timestamp);
@@ -242,14 +249,11 @@ void SweepJob::readResult(KissatPtr shweeper) {
 		LOG(V2_INFO, "RESULT SWEEP_SHARING_PERIOD_REAL  %f ms \n", (_sharing_start_ping_timestamps[i+1] - _sharing_start_ping_timestamps[i])*1000);
 	}
 
-	LOG(V3_VERB, "# # RESULT [%i](%i) Serialized final formula, SolutionSize=%i\n", _my_rank, _dimacsReport_localId->load(), _internal_result.getSolutionSize());
-	for (int i=0; i<15; i++) {
-		LOG(V3_VERB, "RESULT Formula peek %i: %i \n", i, _internal_result.getSolution(i));
+	LOG(V3_VERB, "RESULT SWEEP [%i](%i) Serialized final formula to SolutionSize=%i\n", _my_rank, _dimacsReport_localId->load(), _internal_result.getSolutionSize());
+	for (int i=0; i<15 && i<_internal_result.getSolutionSize(); i++) {
+		LOG(V3_VERB, "RESULT Sweep Formula peek %i: %i \n", i, _internal_result.getSolution(i));
 	}
 
-
-	//This flag tells the system that the result is actually ready
-	_solved_status = SAT;
 }
 
 
@@ -262,7 +266,7 @@ void SweepJob::appl_communicate() {
 	if (_bcast && _is_root)// Root: Update job tree snapshot in case your children changed
 		_bcast->updateJobTree(getJobTree());
 
-	if (_is_root)
+	if (_is_root && ! _terminate_all)
 		initiateNewSharingRound();
 
 	advanceAllReduction();
@@ -516,6 +520,11 @@ void SweepJob::cbContributeToAllReduce() {
 	LOG(V4_VVER, "SWEEP SHARE BCAST Callback to AllReduce\n");
 	auto snapshot = _bcast->getJobTreeSnapshot();
 
+	if (_terminate_all) {
+		LOG(V4_VVER, "SWEEP SHARE BCAST skip reduction, seen already _terminate_all\n");
+		return;
+	}
+
 	if (! _is_root) {
 		LOG(V4_VVER, "SWEEP SHARE [%i] RESET non-root BCAST\n", _my_rank);
 		_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(),
@@ -561,6 +570,12 @@ void SweepJob::cbContributeToAllReduce() {
 	auto aggregation_element = aggregateEqUnitContributions(contribs);
 
 	LOG(V3_VERB, "SWEEP SHARE REDUCE [%i]: size %i to sharing\n", _my_rank, aggregation_element.size()-NUM_SHARING_METADATA);
+
+	if (_terminate_all) {
+		LOG(V4_VVER, "SWEEP SHARE BCAST skip contribution, seen already _terminate_all\n");
+		return;
+	}
+
 	_red->contribute(std::move(aggregation_element));
 
 }
