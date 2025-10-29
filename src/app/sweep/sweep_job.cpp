@@ -102,7 +102,7 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 		int res = shweeper->solve(0, nullptr);
 		LOG(V2_INFO, "SWEEP JOB [%i](%i) FINISH solve(). Result %i \n", _my_rank, localId, res);
 
-		assert( ! _is_root || _dimacsReport_localId->load() != -1);
+		assert( ! _is_root || _dimacsReport_localId->load() != -1); //on the root node, we need to know which solver has copied its final formula to mallob
 		if (_is_root && localId == _dimacsReport_localId->load()) {
 			readResult(shweeper);
 		}
@@ -128,7 +128,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 		setup.profilingBaseDir = _params.satProfilingDir();
 		if (setup.profilingBaseDir.empty()) setup.profilingBaseDir = TmpDir::getGeneralTmpDir();
 		setup.profilingBaseDir += "/" + std::to_string(_my_rank) + "/"; // rank == appRank ?
-		LOG(V4_VVER, "SWEEP [%i](%i) Profiling Dir = %s \n", _my_rank, localId, setup.profilingBaseDir.c_str());
+		// LOG(V4_VVER, "SWEEP [%i](%i) Profiling Dir = %s \n", _my_rank, localId, setup.profilingBaseDir.c_str());
 		FileUtils::mkdir(setup.profilingBaseDir);
 		setup.profilingLevel = _params.satProfilingLevel();
 	}
@@ -210,9 +210,9 @@ void SweepJob::readResult(KissatPtr shweeper) {
 	printf("SWEEP finished\n");
 	printf("[%i](%i) RESULT SWEEP: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
 		_my_rank, _dimacsReport_localId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
-	LOG(V2_INFO, "[%i](%i) RESULT SWEEP: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
+	LOG(V2_INFO, "RESULT SWEEP [%i](%i):  %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
 		_my_rank, _dimacsReport_localId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
-	LOG(V2_INFO, "[%i](%i) RESULT SWEEP: %i Processes, %f seconds \n", _my_rank, _dimacsReport_localId->load(), getVolume(), Timer::elapsedSeconds() - _start_shweep_timestamp);
+	LOG(V2_INFO, "RESULT SWEEP [%i](%i): %i Processes, %f seconds \n", _my_rank, _dimacsReport_localId->load(), getVolume(), Timer::elapsedSeconds() - _start_shweep_timestamp);
 	LOG(V2_INFO, "RESULT SWEEP_PRIORITY       %f\n", _params.preprocessSweepPriority.val);
 	LOG(V2_INFO, "RESULT SWEEP_PROCESSES      %i\n", getVolume());
 	LOG(V2_INFO, "RESULT SWEEP_THREADS_PP     %i\n", _params.numThreadsPerProcess.val);
@@ -469,10 +469,13 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		}
 		//Unsuccessful global steal, try again
 	}
-	//Found work (or terminated), Tell the kissat/C thread where it can find the work
-	shweeper->shweeper_is_idle = false;
+	//Found work (work_size>0) or terminated (work_size==0). Tell the kissat solver thread where it can find this work (or where it can read the zero, to terminate itself)
 	*work = reinterpret_cast<unsigned int*>(shweeper->work_received_from_steal.data());
 	*work_size = shweeper->work_received_from_steal.size();
+	assert(*work_size>=0);
+	if (*work_size>0) {
+		shweeper->shweeper_is_idle = false; //in case of termination (work_size==0) we interpret the shweeper of remaining idle
+	}
 
 	//The thread now returns to the kissat solver
 	//work_size==0 set here is there interpreted as the termination signal
@@ -538,17 +541,20 @@ void SweepJob::cbContributeToAllReduce() {
 		}
 		int eq_size = shweeper->eqs_to_share.size();
 		int units_size = shweeper->units_to_share.size();
+		//we need to glue together equivalences and units. can use move on the equivalences to save a copying of them, and only need to copy the units
+		//moved logging before the actions, because this code triggered std::bad_alloc once, might give some more info next time
+		LOG(V3_VERB, "SWEEP SHARE REDUCE (%i): %i equivalences, %i units, %i idle \n", shweeper->getLocalId(), eq_size/2, units_size, shweeper->shweeper_is_idle);
 		std::vector<int> contrib = std::move(shweeper->eqs_to_share);
+		assert(contrib.size()%2==0); //equivalences come always in pairs
 		contrib.insert(contrib.end(), shweeper->units_to_share.begin(), shweeper->units_to_share.end());
 		contrib.push_back(eq_size);
 		contrib.push_back(units_size);
 		contrib.push_back(shweeper->shweeper_is_idle);
 
 		contribs.push_back(contrib);
-		LOG(V3_VERB, "SWEEP SHARE REDUCE (%i): %i equivalences, %i units, %i idle \n", shweeper->getLocalId(), eq_size/2, units_size, shweeper->shweeper_is_idle);
 
 		shweeper->units_to_share.clear();
-		shweeper->eqs_to_share.clear();
+		shweeper->eqs_to_share.clear(); //implicitly already happened due to move, but keep here for clarity
 	}
 
 	// LOG(V3_VERB, "SWEEP Aggregate contributions within process\n");
@@ -741,12 +747,12 @@ void SweepJob::loadFormula(KissatPtr shweeper) {
 }
 
 SweepJob::~SweepJob() {
+	LOG(V3_VERB, "SWEEP JOB STOPPING WORKERS\n");
 	for (auto &bg_worker : _bg_workers) {
 		if (bg_worker->isRunning()) {
 			bg_worker->stop();
 		}
 	}
-	LOG(V3_VERB, "SWEEP JOB ENDING WORKERS\n");
 }
 
 
