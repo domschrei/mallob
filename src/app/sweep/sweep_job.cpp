@@ -169,9 +169,11 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 		int res = shweeper->solve(0, nullptr);
 		LOG(V2_INFO, "SWEEP JOB [%i](%i) solve() FINISH. Result %i \n", _my_rank, localId, res);
 
-		assert( ! _is_root || _dimacsReport_localId->load() != -1 || _external_termination); //on the root node we need to know which solver has copied its final formula to mallob, unless there has been an external termination
+		//on the root node we need to know which solver has copied its final formula to mallob, unless there has been an external termination, in which case we don't need any result
+		assert( ! _is_root || _dimacsReport_localId->load() != -1 || _external_termination);
 		if (_is_root && localId == _dimacsReport_localId->load()) {
 			readResult(shweeper, true);
+			//todo: also read result if there is external termination?
 		}
 		_running_shweepers_count--;
 		_shweepers[localId]->cleanUp(); //write kissat timing profile
@@ -536,7 +538,7 @@ void SweepJob::cbContributeToAllReduce() {
 	auto snapshot = _bcast->getJobTreeSnapshot();
 
 	if (_terminate_all) {
-		LOG(V4_VVER, "SWEEP SHARE BCAST skip reduction, seen already _terminate_all\n");
+		LOG(V4_VVER, "SWEEP SHARE BCAST skip reduction, status is already _terminate_all\n");
 		return;
 	}
 
@@ -802,9 +804,9 @@ void SweepJob::gentlyTerminateSolvers() {
 }
 
 SweepJob::~SweepJob() {
-	LOG(V3_VERB, "SWEEP JOB DESTRUCTOR\n");
+	LOG(V3_VERB, "DELETE SWEEP JOB\n");
 	gentlyTerminateSolvers();
-
+	LOG(V3_VERB, "DELETED SWEEP JOB\n");
 }
 
 

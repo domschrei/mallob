@@ -337,6 +337,7 @@ private:
     }
 
     void receiveAndForwardFinalElem(AllReduceElement&& elem) {
+        LOG(V3_VERB, "SWEEP SHARE receive and forwarding final element \n");
         receiveFinalElem(std::move(elem));
         if (_expected_child_ranks.first >= 0) {
             _base_msg.treeIndexOfDestination = _expected_child_indices.first;

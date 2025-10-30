@@ -243,6 +243,11 @@ public:
 
     ~JobRegistry() {
         // Output total busy time
+        LOG(V4_VVER, "DELETE JobRegistry \n");
+        if (_current_job) {
+            LOG(V4_VVER, "DELETE JobRegistry, with _current_job [name %s, id %i, context %i] \n", _current_job->getId(), _current_job->getContextId(), _current_job->toStr());
+        }
         LOG(V3_VERB, "busytime=%.3f\n", _total_busy_time);
+        LOG(V4_VVER, "DELETED JobRegistry \n");
     }
 };

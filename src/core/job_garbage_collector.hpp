@@ -63,12 +63,15 @@ public:
     }
 
     ~JobGarbageCollector() {
+        LOG(V4_VVER, "DELETE JobGarbageCollector \n");
         {
             auto lock = _mtx.getLock();
             _worker.stopWithoutWaiting();
         }
         _cond_var.notify();
         _worker.join();
+
+        LOG(V4_VVER, "DELETED JobGarbageCollector \n");
     }
 
 private:

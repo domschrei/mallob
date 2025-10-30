@@ -151,7 +151,7 @@ public:
             auto lock = _access_mutex.getLock();
             _address_list = AddressList {{1, {_job_tree.getRank(), _job_tree.getContextId()}}};
             updateMap();
-            LOG(V4_VVER, "JOBCOMM aggregation at root. (rank %i, contextId %i, CommSize %i)\n", _job_tree.getRank(), _job_tree.getContextId(), _job_tree.getCommSize());
+            // LOG(V4_VVER, "JOBCOMM aggregation at root. (rank %i, contextId %i, CommSize %i)\n", _job_tree.getRank(), _job_tree.getContextId(), _job_tree.getCommSize());
         } else {
             // LOG(V4_VVER, "JOBCOMM aggregation at non-root. (rank %i, contextId %i, CommSize %i)\n", _job_tree.getRank(), _job_tree.getContextId(), _job_tree.getCommSize());
             JobMessage msg;
@@ -161,7 +161,7 @@ public:
             msg.epoch = 0;
             msg.jobId = _id;
             msg.tag = MSG_AGGREGATE_RANKLIST;
-            LOG(V4_VVER, "JOBCOMM aggregation sending [%i]->[%i] to parent MSG_AGGREGATE_RANKLIST \n", _job_tree.getRank(), _job_tree.getParentNodeRank());
+            // LOG(V4_VVER, "JOBCOMM aggregation sending [%i]->[%i] to parent MSG_AGGREGATE_RANKLIST \n", _job_tree.getRank(), _job_tree.getParentNodeRank());
             // for (Address adr : addressList.list) {
                 // LOG(V1_WARN, "  ----  address: rank %i context %i \n", adr.rank, adr.contextId);
             // }
@@ -177,7 +177,7 @@ public:
 
         if (msg.tag == MSG_AGGREGATE_RANKLIST) {
 
-            LOG(V4_VVER, "JOBCOMM [%i] received MSG_AGGREGATE_RANKLIST \n", _job_tree.getRank());
+            // LOG(V4_VVER, "JOBCOMM [%i] received MSG_AGGREGATE_RANKLIST \n", _job_tree.getRank());
             {
                 AddressList ranklist;
                 ranklist.deserializeFromJobMsg(msg.payload);
