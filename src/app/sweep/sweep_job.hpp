@@ -66,6 +66,7 @@ private:
 
 	//Termination. Determined during workstealing, broadcasted via sharing
 	bool _terminate_all=false;
+	bool _external_termination=false;
 
 
 	//Keep track which solver reports the final formula, we only use one
@@ -78,13 +79,13 @@ public:
     void appl_start() override;
     void appl_communicate() override;
     void appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) override;
+    void appl_terminate() override;
 
     int appl_solved() override            {return _solved_status;}
     JobResult&& appl_getResult() override {return std::move(_internal_result);}
 
     void appl_suspend() override {}
     void appl_resume() override {}
-    void appl_terminate() override {}
     void appl_dumpStats() override {}
     bool appl_isDestructible() override {return true;}
     void appl_memoryPanic() override {}
@@ -100,7 +101,9 @@ private:
     void loadFormula(KissatPtr shweeper);
 
 	void readStats(KissatPtr shweeper);
-	void readResult(KissatPtr shweeper);
+	void readResult(KissatPtr shweeper, bool withStats);
+
+	void gentlyTerminateSolvers();
 
 
 	void sendMPIWorkstealRequests();

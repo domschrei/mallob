@@ -234,6 +234,7 @@ void Client::handleNewJob(JobMetadata&& data) {
         // Interrupt job (-> abort entire job if non-incremental, abort iteration if incremental)
         int jobId = data.description->getId();
         int rev = data.description->getRevision();
+        LOG(V2_INFO, "Interrupt Signal on job %s (#%i) in Client::handleNewJob, adding to interrupt list  \n", data.jobName, data.description->getId());
         {
             auto lock = _jobs_to_interrupt_lock.getLock();
             _jobs_to_interrupt.push_back({jobId, rev});
@@ -370,6 +371,7 @@ void Client::advance() {
         auto it = _jobs_to_interrupt.begin();
         while (it != _jobs_to_interrupt.end()) {
             auto [jobId, rev] = *it;
+            LOG(V2_INFO, "Reading job #%i in interrupt list \n", jobId);
             if (_done_jobs.count(jobId) && _done_jobs[jobId].revision >= rev) {
                 LOG(V2_INFO, "Interrupt #%i obsolete\n", jobId);
                 it = _jobs_to_interrupt.erase(it);

@@ -94,7 +94,8 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
             data.description->setIncremental(incremental);
             data.description->setRevision(rev);
             data.interrupt = true;
-            _job_callback(std::move(data));
+            LOGGER(_logger, V2_INFO, " Interrupt Signal on job %s #%i via JsonInterface (now calling _job_callback) \n", jobName, id);
+            _job_callback(std::move(data)); //goes to handleNewJob in client.cpp
             return ACCEPT;
         }
 
