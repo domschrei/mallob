@@ -56,7 +56,7 @@ private:
     const int TAG_BCAST_INIT = 1003;
     const int TAG_ALLRED = 1004;
 	//Positions where the metadata is stored in each shared element. Format [ <actual data> , eqs_size, units_size, all_idle]
-	static const int NUM_SHARING_METADATA = 3;
+	static const int SHARING_METADATA_FIELDS = 3;
 	static const int EQUIVS_METADATA_POS = 3;
 	static const int UNITS_METADATA_POS = 2;
 	static const int IDLE_METADATA_POS = 1;

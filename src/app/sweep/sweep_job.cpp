@@ -586,7 +586,7 @@ void SweepJob::cbContributeToAllReduce() {
 	// LOG(V3_VERB, "SWEEP Aggregate contributions within process\n");
 	auto aggregation_element = aggregateEqUnitContributions(contribs);
 
-	LOG(V3_VERB, "SWEEP SHARE REDUCE [%i]: size %i to sharing\n", _my_rank, aggregation_element.size()-NUM_SHARING_METADATA);
+	LOG(V3_VERB, "SWEEP SHARE REDUCE [%i]: size %i to sharing\n", _my_rank, aggregation_element.size()-SHARING_METADATA_FIELDS);
 
 	if (_terminate_all) {
 		LOG(V4_VVER, "SWEEP SHARE BCAST skip contribution, seen already _terminate_all\n");
@@ -619,7 +619,7 @@ void SweepJob::advanceAllReduction() {
 	}
 
 	_eqs_from_broadcast.assign(shared.begin(),             shared.begin() + eq_size);
-	_units_from_broadcast.assign(shared.begin() + eq_size, shared.end() - NUM_SHARING_METADATA);
+	_units_from_broadcast.assign(shared.begin() + eq_size, shared.end() - SHARING_METADATA_FIELDS);
 	// _eqs_from_broadcast.insert(_eqs_from_broadcast.end(),	  shared.begin(),                     shared.begin() + eq_size);
 	// _units_from_broadcast.insert(_units_from_broadcast.end(), shared.begin() + eq_size, shared.end() - NUM_SHARING_METADATA);
 
@@ -652,11 +652,13 @@ void SweepJob::advanceAllReduction() {
 
 
 std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<int>> &contribs) {
-	//Each contribution has the format [Equivalences,Units,eq_size,unit_size,all_idle].
+	//Each contribution has the format [Equivalences,Units, eq_size,unit_size,all_idle].
+	//									-----data---------  ------metadata------------
 
-	size_t total_size = NUM_SHARING_METADATA;
+	LOG(V3_VERB, "SWEEP AGGR %i contributions \n", contribs.size());
+	size_t total_size = SHARING_METADATA_FIELDS;
     for (const auto& contrib : contribs) {
-	    total_size += contrib.size()-NUM_SHARING_METADATA;
+	    total_size += contrib.size()-SHARING_METADATA_FIELDS;
     }
     std::vector<int> aggregated;
     aggregated.reserve(total_size);
@@ -665,7 +667,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
     for (const auto &contrib : contribs) {
     	int eq_size = contrib[contrib.size()-EQUIVS_METADATA_POS];
     	total_eq_size += eq_size;
-		// LOG(V3_VERB, "ß Element: %i eq_size \n", eq_size);
+		LOG(V3_VERB, "SWEEP AGGR Element: %i eq_size \n", eq_size);
         aggregated.insert(aggregated.end(), contrib.begin(), contrib.begin()+eq_size);
     }
 	//Fill units
@@ -674,27 +676,29 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
     	int eq_size = contrib[contrib.size()-EQUIVS_METADATA_POS];
     	int unit_size = contrib[contrib.size()-UNITS_METADATA_POS];
 		total_unit_size += unit_size;
-		// LOG(V3_VERB, "ß Element: %i unit_size \n", unit_size);
-        aggregated.insert(aggregated.end(), contrib.begin()+eq_size, contrib.end()-NUM_SHARING_METADATA); //not copying the metadata at the end
+		LOG(V3_VERB, "SWEEP AGGR Element: %i unit_size \n", unit_size);
+        aggregated.insert(aggregated.end(), contrib.begin()+eq_size, contrib.end()-SHARING_METADATA_FIELDS); //not copying the metadata at the end
     }
 	//See whether all solvers are idle
 	bool all_idle = true;
     for (const auto &contrib : contribs) {
 		bool idle = contrib[contrib.size()-IDLE_METADATA_POS];
     	all_idle &= idle;
-		// LOG(V3_VERB, "ß Element: idle == %i \n", idle);
+		LOG(V3_VERB, "SWEEP AGGR Element: idle == %i \n", idle);
     }
 
 	if (contribs.empty()) {
 		all_idle = false; //edge-case: not a single solver is initialized yet, we are waiting for them to come online, they are not idle
 	}
 
-
 	aggregated.push_back(total_eq_size);
 	aggregated.push_back(total_unit_size);
 	aggregated.push_back(all_idle);
 	LOG(V3_VERB, "SWEEP SHARE REDUCE aggregated %i equivalences, %i units, %i all_idle\n", total_eq_size/2, total_unit_size, all_idle);
-	assert(total_size == total_eq_size + total_unit_size + NUM_SHARING_METADATA);
+	int individual_sum =  total_eq_size + total_unit_size + SHARING_METADATA_FIELDS;
+	assert(total_size == individual_sum ||
+		log_return_false("ERROR in SWEEP: aggregated element assert failed: total_size %i != %i individual_sum (total_eq_size %i + total_unit_size %i + metadata %i) ",
+			total_size, individual_sum, total_eq_size, total_unit_size, SHARING_METADATA_FIELDS));
     return aggregated;
 }
 
