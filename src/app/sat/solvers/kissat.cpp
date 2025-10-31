@@ -477,30 +477,47 @@ void Kissat::consumeClause(int** clause, int* size, int* lbd) {
 
 
 void Kissat::shweepExportEq() {
-    const int lit1 = eq_up_buffer[0];
-    const int lit2 = eq_up_buffer[1];
-    eqs_to_share.push_back(lit1);
-    eqs_to_share.push_back(lit2);
+    {
+        std::lock_guard<std::mutex> lock(shweep_sharing_mutex); //dont push something when the aggregation thread is just touching the eqs_to_share vector
+        const int lit1 = eq_up_buffer[0];
+        const int lit2 = eq_up_buffer[1];
+        eqs_to_share.push_back(lit1);
+        eqs_to_share.push_back(lit2);
+    }
 }
 
 void Kissat::shweepExportUnit(int unit) {
-    units_to_share.push_back(unit);
+    {
+        std::lock_guard<std::mutex> lock(shweep_sharing_mutex);
+        units_to_share.push_back(unit);
+    }
 }
 
 void Kissat::shweepImportEqs(int **equivalences, int *eqs_size) {
-    eqs_from_broadcast = std::move(eqs_from_broadcast_queued);
-    eqs_from_broadcast_queued.clear();
-    *equivalences = eqs_from_broadcast.data();
-    *eqs_size = eqs_from_broadcast.size();
+    if (eqs_from_broadcast_queued.empty()) {
+        //dont even move the empty queue, reduce danger of concurrent touching. The main thread might just be copying something into the array
+       *eqs_size = 0;
+    } else {
+        eqs_from_broadcast = std::move(eqs_from_broadcast_queued);
+        eqs_from_broadcast_queued.clear(); //explicitly to remind us that we wont read this data again
+        *equivalences = eqs_from_broadcast.data(); //this array is owned by this Mallob Kissat object, and the solver is only reading through it, it must persist until the solver calls this function again
+        *eqs_size = eqs_from_broadcast.size();
+    }
+    //todo: also mutex here? move is not atomic, in theory a sharing result might just be copied into the queue the moment we move it here
 }
 
 
 void Kissat::shweepImportUnits(int **units, int *unit_count) {
     //if we already imported the units from the queue, the queue is empty and we import size==0
-    units_from_broadcast = std::move(units_from_broadcast_queued);
-    units_from_broadcast_queued.clear();
-    *units = units_from_broadcast.data();
-    *unit_count = units_from_broadcast.size();
+    if (units_from_broadcast_queued.empty()) {
+       *unit_count = 0;
+    } else {
+        units_from_broadcast = std::move(units_from_broadcast_queued);
+        units_from_broadcast_queued.clear();
+        *units = units_from_broadcast.data();
+        *unit_count = units_from_broadcast.size();
+    }
+    //todo: mutex? there might be concurrent std::move and std::insert...
 }
 
 void Kissat::shweepSetReportCallback() {

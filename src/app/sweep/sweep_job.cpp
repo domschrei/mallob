@@ -565,22 +565,32 @@ void SweepJob::cbContributeToAllReduce() {
 			LOG(V4_VVER, "SWEEP SHARE [%i](%i) not yet initialized, skipped in contribution aggregation \n", _my_rank, id);
 			continue;
 		}
-		int eq_size = shweeper->eqs_to_share.size();
-		int units_size = shweeper->units_to_share.size();
-		assert(shweeper->eqs_to_share.size()%2==0); //equivalences come always in pairs
+
+		//quickly move the arrays away from the shweepers, such that concurrent threads that keep pushing onto them don't interfere
+		//also implicitly clears them, so we are sure to not pull any of that data twice
+		std::vector<int> eqs, units;
+		{
+			std::lock_guard<std::mutex> lock(shweeper->shweep_sharing_mutex);
+			eqs = std::move(shweeper->eqs_to_share);
+			units = std::move(shweeper->units_to_share);
+		}
+
+		int eq_size = eqs.size();
+		int unit_size = units.size();
+		assert(eq_size%2==0 || log_return_false("ERROR in AGGR: Non-even number %i of equivalence literals, should always come in pairs", eq_size)); //equivalences come always in pairs
 		//we need to glue together equivalences and units. can use move on the equivalences to save a copying of them, and only need to copy the units
 		//moved logging before the actions, because this code triggered std::bad_alloc once, might give some more info next time
-		LOG(V3_VERB, "SWEEP SHARE REDUCE (%i): %i eq_size, %i units, %i idle \n", shweeper->getLocalId(), eq_size, units_size, shweeper->shweeper_is_idle);
-		std::vector<int> contrib = std::move(shweeper->eqs_to_share);
-		contrib.insert(contrib.end(), shweeper->units_to_share.begin(), shweeper->units_to_share.end());
+		LOG(V3_VERB, "SWEEP SHARE REDUCE (%i): %i eq_size, %i units, %i idle \n", shweeper->getLocalId(), eq_size, unit_size, shweeper->shweeper_is_idle);
+		std::vector<int> contrib = std::move(eqs);
+		contrib.insert(contrib.end(), units.begin(), units.end());
 		contrib.push_back(eq_size);
-		contrib.push_back(units_size);
+		contrib.push_back(unit_size);
 		contrib.push_back(shweeper->shweeper_is_idle);
 
 		contribs.push_back(contrib);
 
-		shweeper->units_to_share.clear();
-		shweeper->eqs_to_share.clear(); //implicitly already happened due to move, but keep here for clarity
+		// shweeper->units_to_share.clear();
+		// shweeper->eqs_to_share.clear(); //implicitly already happened due to move, but keep here for clarity
 	}
 
 	// LOG(V3_VERB, "SWEEP Aggregate contributions within process\n");
@@ -634,6 +644,7 @@ void SweepJob::advanceAllReduction() {
 			LOG(V4_VVER, "[WARN] SWEEP SHARE REDUCE [%i](%i) not yet initialized, skipped importing results!\n", _my_rank, id);
 			continue;
 		}
+		//todo: mutex, because the queue might be just std::move'd by some importing solver right now?
 		shweeper->eqs_from_broadcast_queued.insert(shweeper->eqs_from_broadcast_queued.end(), _eqs_from_broadcast.begin(), _eqs_from_broadcast.end());
 		shweeper->units_from_broadcast_queued.insert(shweeper->units_from_broadcast_queued.end(), _units_from_broadcast.begin(), _units_from_broadcast.end());
 	}
@@ -662,13 +673,13 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	// }
 	// LOG(V4_VVER, "%s \n", oss.str().c_str());
 
-	//sanity check whether each individual contribution checks out
+	//sanity check whether each contribution contains coherent size information about itself
 	for (const auto& contrib : contribs) {
 		int claimed_eq_size = contrib[contrib.size()- METADATA_EQ_COUNT_POS];
 		int claimed_unit_size = contrib[contrib.size()- METADATA_UNIT_COUNT_POS];
 		int claimed_total_size = claimed_eq_size + claimed_unit_size + NUM_METADATA_FIELDS;
 		assert(contrib.size() == claimed_total_size ||
-			log_return_false("ERROR in AllReduce, Bad Element Format: Claims eq_size %i units size %i, metadata %i --> sum %i != %i actual contrib.size()", claimed_eq_size, claimed_unit_size, NUM_METADATA_FIELDS, claimed_total_size, contrib.size())
+			log_return_false("ERROR in AllReduce, Bad Element Format: Claims total size %i != %i actual contrib.size() (claims: eq_size %i,  units size %i, metadata %i)", claimed_total_size, contrib.size(), claimed_eq_size, claimed_unit_size, NUM_METADATA_FIELDS)
 			);
 	}
 
@@ -733,7 +744,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
     for (const auto &contrib : contribs) {
 		bool idle = contrib[contrib.size()-METADATA_IDLE_FLAG_POS];
     	all_idle &= idle;
-		LOG(V3_VERB, "SWEEP AGGR Element: idle == %i \n", idle);
+		// LOG(V3_VERB, "SWEEP AGGR Element: idle == %i \n", idle);
     }
 
 	if (contribs.empty()) {

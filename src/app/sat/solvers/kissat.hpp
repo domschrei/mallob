@@ -50,6 +50,8 @@ private:
 
     std::vector<int> eqs_to_share;    //accumulate exported equivalences for sharing
 	std::vector<int> units_to_share;
+	std::mutex shweep_sharing_mutex; //need to lock "eqs_to_share" and "units_to_share" when extracting them for sharing, because solver thread can be concurrently pushing new data onto them
+	// std::mutex shweep_unit_mutex;
 
 	std::vector<int> work_received_from_steal;
 
