@@ -56,10 +56,10 @@ private:
     const int TAG_BCAST_INIT = 1003;
     const int TAG_ALLRED = 1004;
 	//Positions where the metadata is stored in each shared element. Format [ <actual data> , eqs_size, units_size, all_idle]
-	static const int SHARING_METADATA_FIELDS = 3;
-	static const int EQUIVS_METADATA_POS = 3;
-	static const int UNITS_METADATA_POS = 2;
-	static const int IDLE_METADATA_POS = 1;
+	static const int NUM_METADATA_FIELDS = 3; //three integers at the end of an aggregation element
+	static const int METADATA_EQ_COUNT_POS = 3;
+	static const int METADATA_UNIT_COUNT_POS = 2;
+	static const int METADATA_IDLE_FLAG_POS = 1;
     std::vector<int> _eqs_from_broadcast;  //store received equivalences at rank level to copy to individual solvers
 	std::vector<int> _units_from_broadcast;
 

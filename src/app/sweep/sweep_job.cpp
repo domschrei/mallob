@@ -586,7 +586,7 @@ void SweepJob::cbContributeToAllReduce() {
 	// LOG(V3_VERB, "SWEEP Aggregate contributions within process\n");
 	auto aggregation_element = aggregateEqUnitContributions(contribs);
 
-	LOG(V3_VERB, "SWEEP SHARE REDUCE [%i]: size %i to sharing\n", _my_rank, aggregation_element.size()-SHARING_METADATA_FIELDS);
+	LOG(V3_VERB, "SWEEP SHARE REDUCE [%i]: size %i (+%i) to sharing\n", _my_rank, aggregation_element.size()-NUM_METADATA_FIELDS, NUM_METADATA_FIELDS);
 
 	if (_terminate_all) {
 		LOG(V4_VVER, "SWEEP SHARE BCAST skip contribution, seen already _terminate_all\n");
@@ -608,9 +608,9 @@ void SweepJob::advanceAllReduction() {
 	//Extract, unserialize and distribute shared Equivalences and units
 	_sharing_receive_result_timestamps.push_back(Timer::elapsedSeconds());
 	auto shared = _red->extractResult();
-	const int eq_size = shared[shared.size()-EQUIVS_METADATA_POS];
-	const int unit_size = shared[shared.size()-UNITS_METADATA_POS];
-	const int all_idle = shared[shared.size()-IDLE_METADATA_POS];
+	const int eq_size = shared[shared.size()-METADATA_EQ_COUNT_POS];
+	const int unit_size = shared[shared.size()-METADATA_UNIT_COUNT_POS];
+	const int all_idle = shared[shared.size()-METADATA_IDLE_FLAG_POS];
 	LOG(V3_VERB, "SWEEP SHARE REDUCE --- Received sharing data: %i equivalences, %i units -- \n", eq_size/2, unit_size);
 	LOG(V3_VERB, "SWEEP SHARE REDUCE ALL IDLE %i \n", all_idle);
 	if (all_idle) {
@@ -619,7 +619,7 @@ void SweepJob::advanceAllReduction() {
 	}
 
 	_eqs_from_broadcast.assign(shared.begin(),             shared.begin() + eq_size);
-	_units_from_broadcast.assign(shared.begin() + eq_size, shared.end() - SHARING_METADATA_FIELDS);
+	_units_from_broadcast.assign(shared.begin() + eq_size, shared.end() - NUM_METADATA_FIELDS);
 	// _eqs_from_broadcast.insert(_eqs_from_broadcast.end(),	  shared.begin(),                     shared.begin() + eq_size);
 	// _units_from_broadcast.insert(_units_from_broadcast.end(), shared.begin() + eq_size, shared.end() - NUM_SHARING_METADATA);
 
@@ -662,16 +662,26 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	// }
 	// LOG(V4_VVER, "%s \n", oss.str().c_str());
 
+	//sanity check whether each individual contribution checks out
+	for (const auto& contrib : contribs) {
+		int claimed_eq_size = contrib[contrib.size()- METADATA_EQ_COUNT_POS];
+		int claimed_unit_size = contrib[contrib.size()- METADATA_UNIT_COUNT_POS];
+		int claimed_total_size = claimed_eq_size + claimed_unit_size + NUM_METADATA_FIELDS;
+		assert(contrib.size() == claimed_total_size ||
+			log_return_false("ERROR in AllReduce, Bad Element Format: Claims eq_size %i units size %i, metadata %i --> sum %i != %i actual contrib.size()", claimed_eq_size, claimed_unit_size, NUM_METADATA_FIELDS, claimed_total_size, contrib.size())
+			);
+	}
+
 
 	LOG(V3_VERB, "SWEEP AGGR %i contributions \n", contribs.size());
-	size_t total_aggregated_size = SHARING_METADATA_FIELDS; //the new element will contain the metadata once at the end
+	size_t total_aggregated_size = NUM_METADATA_FIELDS; //the new element will contain the metadata once at the end
 	int i=0;
     for (const auto& contrib : contribs) {
-	    total_aggregated_size += contrib.size()-SHARING_METADATA_FIELDS; //we will copy everything but the metadata from each contribution
-		LOG(V3_VERB, "SWEEP AGGR Element: curr total size %i \n", total_aggregated_size);
+	    total_aggregated_size += contrib.size()-NUM_METADATA_FIELDS; //we will copy everything but the metadata from each contribution
+		LOG(V3_VERB, "SWEEP AGGR Element %i: contrib.size() %i, w/o metadata %i, curr summed size %i \n", i, contrib.size(), contrib.size()-NUM_METADATA_FIELDS, total_aggregated_size);
 		oss_tot << "| " << i << ":" << contrib.size() << " "	;
 		i++;
-    	assert(contrib.size() >= SHARING_METADATA_FIELDS || log_return_false("ERROR in Aggregating: contrib with too small size() == %i < %i SHARING_METADATA_FIELDS", contrib.size(), SHARING_METADATA_FIELDS));
+    	assert(contrib.size() >= NUM_METADATA_FIELDS || log_return_false("ERROR in Aggregating: contrib with too small size() == %i < %i SHARING_METADATA_FIELDS", contrib.size(), NUM_METADATA_FIELDS));
     }
 
 
@@ -687,7 +697,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	//Fill equivalences
 	size_t aggr_eq_size = 0;
     for (const auto &contrib : contribs) {
-    	int eq_size = contrib[contrib.size()-EQUIVS_METADATA_POS];
+    	int eq_size = contrib[contrib.size()-METADATA_EQ_COUNT_POS];
     	aggr_eq_size += eq_size;
 		// LOG(V3_VERB, "SWEEP AGGR Element: %i eq_size \n", eq_size);
         aggregated.insert(aggregated.end(), contrib.begin(), contrib.begin()+eq_size);
@@ -707,11 +717,11 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	//Fill units
 	size_t aggr_unit_size = 0;
     for (const auto &contrib : contribs) {
-    	int eq_size = contrib[contrib.size()-EQUIVS_METADATA_POS];  //need to know where the eq ends, i.e. where the units start
-    	int unit_size = contrib[contrib.size()-UNITS_METADATA_POS];
+    	int eq_size = contrib[contrib.size()-METADATA_EQ_COUNT_POS];  //need to know where the eq ends, i.e. where the units start
+    	int unit_size = contrib[contrib.size()-METADATA_UNIT_COUNT_POS];
 		aggr_unit_size += unit_size;
 		// LOG(V3_VERB, "SWEEP AGGR Element: %i unit_size \n", unit_size);
-        aggregated.insert(aggregated.end(), contrib.begin()+eq_size, contrib.end()-SHARING_METADATA_FIELDS); //not copying the metadata at the end
+        aggregated.insert(aggregated.end(), contrib.begin()+eq_size, contrib.end()-NUM_METADATA_FIELDS); //not copying the metadata at the end
     	oss_u << "| " << i << ":" << unit_size << " "	;
     	i++;
     }
@@ -721,7 +731,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	//See whether all solvers are idle
 	bool all_idle = true;
     for (const auto &contrib : contribs) {
-		bool idle = contrib[contrib.size()-IDLE_METADATA_POS];
+		bool idle = contrib[contrib.size()-METADATA_IDLE_FLAG_POS];
     	all_idle &= idle;
 		LOG(V3_VERB, "SWEEP AGGR Element: idle == %i \n", idle);
     }
@@ -735,10 +745,10 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	aggregated.push_back(aggr_unit_size);
 	aggregated.push_back(all_idle);
 	LOG(V3_VERB, "SWEEP SHARE REDUCE aggregated %i equivalences, %i units, %i all_idle\n", aggr_eq_size/2, aggr_unit_size, all_idle);
-	int individual_sum =  aggr_eq_size + aggr_unit_size + SHARING_METADATA_FIELDS;
+	int individual_sum =  aggr_eq_size + aggr_unit_size + NUM_METADATA_FIELDS;
 	assert(total_aggregated_size == individual_sum ||
 		log_return_false("ERROR in SWEEP: aggregated element assert failed: total_size %i != %i individual_sum (total_eq_size %i + total_unit_size %i + metadata %i) ",
-			total_aggregated_size, individual_sum, aggr_eq_size, aggr_unit_size, SHARING_METADATA_FIELDS));
+			total_aggregated_size, individual_sum, aggr_eq_size, aggr_unit_size, NUM_METADATA_FIELDS));
     return aggregated;
 }
 
