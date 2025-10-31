@@ -567,11 +567,11 @@ void SweepJob::cbContributeToAllReduce() {
 		}
 		int eq_size = shweeper->eqs_to_share.size();
 		int units_size = shweeper->units_to_share.size();
+		assert(shweeper->eqs_to_share.size()%2==0); //equivalences come always in pairs
 		//we need to glue together equivalences and units. can use move on the equivalences to save a copying of them, and only need to copy the units
 		//moved logging before the actions, because this code triggered std::bad_alloc once, might give some more info next time
-		LOG(V3_VERB, "SWEEP SHARE REDUCE (%i): %i equivalences, %i units, %i idle \n", shweeper->getLocalId(), eq_size/2, units_size, shweeper->shweeper_is_idle);
+		LOG(V3_VERB, "SWEEP SHARE REDUCE (%i): %i eq_size, %i units, %i idle \n", shweeper->getLocalId(), eq_size, units_size, shweeper->shweeper_is_idle);
 		std::vector<int> contrib = std::move(shweeper->eqs_to_share);
-		assert(contrib.size()%2==0); //equivalences come always in pairs
 		contrib.insert(contrib.end(), shweeper->units_to_share.begin(), shweeper->units_to_share.end());
 		contrib.push_back(eq_size);
 		contrib.push_back(units_size);
@@ -655,30 +655,69 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	//Each contribution has the format [Equivalences,Units, eq_size,unit_size,all_idle].
 	//									-----data---------  ------metadata------------
 
+	std::ostringstream oss_tot;
+	oss_tot << "Contrib sizes: ";
+	// for (int id : rand_permutation) {
+		// oss << id << ' ';
+	// }
+	// LOG(V4_VVER, "%s \n", oss.str().c_str());
+
+
 	LOG(V3_VERB, "SWEEP AGGR %i contributions \n", contribs.size());
-	size_t total_size = SHARING_METADATA_FIELDS;
+	size_t total_aggregated_size = SHARING_METADATA_FIELDS; //the new element will contain the metadata once at the end
+	int i=0;
     for (const auto& contrib : contribs) {
-	    total_size += contrib.size()-SHARING_METADATA_FIELDS;
+	    total_aggregated_size += contrib.size()-SHARING_METADATA_FIELDS; //we will copy everything but the metadata from each contribution
+		LOG(V3_VERB, "SWEEP AGGR Element: curr total size %i \n", total_aggregated_size);
+		oss_tot << "| " << i << ":" << contrib.size() << " "	;
+		i++;
+    	assert(contrib.size() >= SHARING_METADATA_FIELDS || log_return_false("ERROR in Aggregating: contrib with too small size() == %i < %i SHARING_METADATA_FIELDS", contrib.size(), SHARING_METADATA_FIELDS));
     }
+
+
+
+	LOG(V4_VVER, "%s \n", oss_tot.str().c_str());
+	std::ostringstream oss_e;
+	oss_e << "Eq sizes: ";
+	i=0;
+
+
     std::vector<int> aggregated;
-    aggregated.reserve(total_size);
+    aggregated.reserve(total_aggregated_size);
 	//Fill equivalences
-	size_t total_eq_size = 0;
+	size_t aggr_eq_size = 0;
     for (const auto &contrib : contribs) {
     	int eq_size = contrib[contrib.size()-EQUIVS_METADATA_POS];
-    	total_eq_size += eq_size;
-		LOG(V3_VERB, "SWEEP AGGR Element: %i eq_size \n", eq_size);
+    	aggr_eq_size += eq_size;
+		// LOG(V3_VERB, "SWEEP AGGR Element: %i eq_size \n", eq_size);
         aggregated.insert(aggregated.end(), contrib.begin(), contrib.begin()+eq_size);
+		oss_e << "| " << i << ":" << eq_size << " "	;
+    	i++;
     }
+
+
+
+	LOG(V4_VVER, "%s \n", oss_e.str().c_str());
+	std::ostringstream oss_u;
+	oss_u << "Unit sizes: ";
+	i=0;
+
+
+
 	//Fill units
-	size_t total_unit_size = 0;
+	size_t aggr_unit_size = 0;
     for (const auto &contrib : contribs) {
-    	int eq_size = contrib[contrib.size()-EQUIVS_METADATA_POS];
+    	int eq_size = contrib[contrib.size()-EQUIVS_METADATA_POS];  //need to know where the eq ends, i.e. where the units start
     	int unit_size = contrib[contrib.size()-UNITS_METADATA_POS];
-		total_unit_size += unit_size;
-		LOG(V3_VERB, "SWEEP AGGR Element: %i unit_size \n", unit_size);
+		aggr_unit_size += unit_size;
+		// LOG(V3_VERB, "SWEEP AGGR Element: %i unit_size \n", unit_size);
         aggregated.insert(aggregated.end(), contrib.begin()+eq_size, contrib.end()-SHARING_METADATA_FIELDS); //not copying the metadata at the end
+    	oss_u << "| " << i << ":" << unit_size << " "	;
+    	i++;
     }
+
+	LOG(V4_VVER, "%s \n", oss_u.str().c_str());
+
 	//See whether all solvers are idle
 	bool all_idle = true;
     for (const auto &contrib : contribs) {
@@ -691,14 +730,15 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 		all_idle = false; //edge-case: not a single solver is initialized yet, we are waiting for them to come online, they are not idle
 	}
 
-	aggregated.push_back(total_eq_size);
-	aggregated.push_back(total_unit_size);
+	//these are the three fields we account for with SHARING_METADATA_FIELDS
+	aggregated.push_back(aggr_eq_size);
+	aggregated.push_back(aggr_unit_size);
 	aggregated.push_back(all_idle);
-	LOG(V3_VERB, "SWEEP SHARE REDUCE aggregated %i equivalences, %i units, %i all_idle\n", total_eq_size/2, total_unit_size, all_idle);
-	int individual_sum =  total_eq_size + total_unit_size + SHARING_METADATA_FIELDS;
-	assert(total_size == individual_sum ||
+	LOG(V3_VERB, "SWEEP SHARE REDUCE aggregated %i equivalences, %i units, %i all_idle\n", aggr_eq_size/2, aggr_unit_size, all_idle);
+	int individual_sum =  aggr_eq_size + aggr_unit_size + SHARING_METADATA_FIELDS;
+	assert(total_aggregated_size == individual_sum ||
 		log_return_false("ERROR in SWEEP: aggregated element assert failed: total_size %i != %i individual_sum (total_eq_size %i + total_unit_size %i + metadata %i) ",
-			total_size, individual_sum, total_eq_size, total_unit_size, SHARING_METADATA_FIELDS));
+			total_aggregated_size, individual_sum, aggr_eq_size, aggr_unit_size, SHARING_METADATA_FIELDS));
     return aggregated;
 }
 
