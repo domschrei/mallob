@@ -120,7 +120,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 	-jwl=$timeout -T=$(($timeout+30)) -wam=60``000 -pre-cleanup=1 \
 	-q=1 -log=$globallogdir -tmp=$localtmpdir -comment-outputlogdir=$outputlogdir \
 	-sro=${globallogdir}/processed-jobs.out -trace-dir=${globallogdir}/ -os=1 \
-	-v=5 \
+	-v=4 \
   -iff=0 -s2f=${globallogdir}/model -cm=0 \
 	-rpa=1 -pph=${SLURM_NTASKS_PER_NODE} -mlpt=50``000``000 -t=$((${SLURM_CPUS_PER_TASK} / 2)) \
 	-isp=0 -div-phases=1 -div-noise=0 -div-seeds=1 -div-elim=0 -div-native=0 -scsd=0 \

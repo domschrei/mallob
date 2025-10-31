@@ -237,12 +237,14 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	shweeper->set_option("seed", 0);   //Sweeping should not contain any RNG part
 
 	//Specific due to Mallob
+	printf("Mallob sweep Solver verbosity %i \n", _params.sweepSolverVerbosity.val);
 	shweeper->set_option("mallob_custom_sweep_verbosity", _params.sweepSolverVerbosity.val); //Shweeper verbosity 0..4
 	shweeper->set_option("mallob_is_shweeper", 1); //Make this Kissat solver a pure Distributed Sweeping Solver. Jumps directly to distributed sweeping and bypasses everything else
 	shweeper->set_option("mallob_local_id", localId);
 	shweeper->set_option("mallob_rank", _my_rank);
 	shweeper->set_option("mallob_is_root", _is_root);
 	shweeper->set_option("mallob_resweep_chance", _params.sweepResweepChance.val);
+	shweeper->set_option("mallob_staggered_logs", 0); //set to 1 to have spatially separated logs, useful for verbose runs with 2-16 threads total
 
 
 	//Own options of Kissat
@@ -635,8 +637,9 @@ void SweepJob::advanceAllReduction() {
 
 	//For convenience, we copy the received data into each solver individually.
 	//This makes importing the E/U data into each thread easier and less cumbersome to code, at the cost of slightly more memory usage
-	//For maximum memory efficiency one would have all kissat threads directly read from this one SweepJob's array
-	//We write to a queue, to not mess with the specific memory allocation the thread is currently working on
+	//Per Solver we write to a queue, to not mess with the fixed allocated memory that Mallob is currently providing to the kissat solver
+
+	//For maximum memory efficiency one would have all kissat threads directly read from a single vector belonging to this SweepJob
 	int id=-1; //for debugging
 	for (auto shweeper : _shweepers) {
 		id++;
@@ -844,7 +847,7 @@ void SweepJob::loadFormula(KissatPtr shweeper) {
 }
 
 void SweepJob::gentlyTerminateSolvers() {
-	LOG(V2_INFO, "SWEEP JOB id #%i rank [%i] interrupting solver \n", _my_rank, getId());
+	LOG(V2_INFO, "SWEEP JOB id #%i rank [%i] interrupting its own solver, DELETE\n", _my_rank, getId());
 	//each sweeper checks constantly for the interruption signal (on the ms scale or faster), allow for gentle own exit
 	int i=0;
 	for (auto &shweeper : _shweepers) {
@@ -853,19 +856,19 @@ void SweepJob::gentlyTerminateSolvers() {
 			i++;
 		}
 	}
-	LOG(V2_INFO, "SWEEP JOB id #%i rank [%i] interrupted %i solves \n", _my_rank, getId(), i);
+	LOG(V2_INFO, "SWEEP JOB id #%i rank [%i] interrupted %i solves, DELTED \n", _my_rank, getId(), i);
 
 	usleep(2000);
 
 	i=0;
-	LOG(V2_INFO, "SWEEP JOB id #%i rank [%i] joining bg_worker threads \n", _my_rank, getId());
+	LOG(V2_INFO, "SWEEP JOB id #%i rank [%i] joining own bg_worker threads, DELETE \n", _my_rank, getId());
 	for (auto &bg_worker : _bg_workers) {
 		if (bg_worker->isRunning()) {
 			bg_worker->stop();
 			i++;
 		}
 	}
-	LOG(V2_INFO, "SWEEP JOB id #%i rank [%i] joined %i threads \n", _my_rank, getId(), i);
+	LOG(V2_INFO, "SWEEP JOB id #%i rank [%i] joined %i own threads, DELETED \n", _my_rank, getId(), i);
 }
 
 SweepJob::~SweepJob() {

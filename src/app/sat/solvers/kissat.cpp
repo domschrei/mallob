@@ -95,8 +95,18 @@ void Kissat::addLiteral(int lit) {
 }
 
 //Pass-through
-void Kissat::set_option(const std::string &option_name, int value) {
-    kissat_set_option(solver, option_name.c_str(), value);
+int Kissat::set_option(const std::string &option_name, int value) {
+    int prev_value =
+    if (value!=0) {
+        //the function returns either 0 if the option is not found, or the previous value of that option
+        //we set the option twice, to get in the second time hopefully back the value that we set in the first time
+        int prev_value_or_zero_at_fail = kissat_set_option(solver, option_name.c_str(), value);
+        int our_value_or_zero_at_fail = kissat_set_option(solver, option_name.c_str(), value);
+        assert(our_value_or_zero_at_fail == value);
+    } else {
+        //we can sadly not distinguish a
+        kissat_set_option(solver, option_name.c_str(), value);
+    }
 }
 
 
