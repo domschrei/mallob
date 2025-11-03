@@ -1,0 +1,6 @@
+scripts/server/example_in/05c8e94aaee86390eaf6e68dd3ec3570-noL-11-2.sanitized.cnf.xz
+scripts/server/example_in/08ccc34df5d8eb9e9d45278af3dc093d-simon-r16-1.sanitized.cnf.xz
+scripts/server/example_in/07b476c83150d3cb7e08f5d045e255ab-marg5x5.shuffled-as.sat03-1455.cnf.xz
+scripts/server/example_in/089f909e37b3ef0c4d90687f7e22b68f-simon-r18-0.sanitized.cnf.xz
+scripts/server/example_in/04ded94454830d4ea960327e8b91f5a3-mdp-28-14-sat.cnf.xz
+scripts/server/example_in/0265448c232e3a25aa5bcd29b1b14567-x9-10051.sat.sanitized.cnf.xz
