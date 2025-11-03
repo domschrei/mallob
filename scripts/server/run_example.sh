@@ -4,7 +4,7 @@ set -eu  #Abort if encounter error or unset variable
 
 MPI_PROCESSES=4 #TODO: Set to desired number 
 THREADS_PER_PROCESS=3 #TODO Set to desired number
-INSTANCES=4 #TODO: Set to desired number (or count paths in paths.txt file)
+INSTANCES=7 #TODO: Set to desired number (or count paths in paths.txt file)
 
 echo "" 
 echo ""
