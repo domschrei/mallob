@@ -4,12 +4,16 @@ set -eu  #Abort if encounter error or unset variable
 
 MPI_PROCESSES=4 #TODO: Set to desired number 
 THREADS_PER_PROCESS=3 #TODO Set to desired number
-INSTANCES=7 #TODO: Set to desired number (or count paths in paths.txt file)
+INSTANCES=6 #TODO: Set to desired number (or count paths in paths.txt file)
 
 echo "" 
 echo ""
 echo "Using $((MPI_PROCESSES * THREADS_PER_PROCESS))/$(nproc) cores"
 echo $(lscpu | grep "Model name")
+
+echo "MPI_PROCESSES: $MPI_PROCESSES"
+echo "THREADS_PER_PROCESS: $THREADS_PER_PROCESS"
+echo "INSTANCES: $INSTANCES"
 
 OUT_DIR="scripts/server/example_logsntraces/" #TODO: Set to own paths
 INST_PATHS_TXT="scripts/server/example_in/paths.txt" #TODO: Set to own instances
@@ -36,8 +40,6 @@ MALLOB_OPTIONS=" \
   -q=1 \
 "
 
-echo "MPI_PROCESSES: $MPI_PROCESSES"
-echo "THREADS_PER_PROCESS: $THREADS_PER_PROCESS"
 echo "MALLOB_OPTIONS"
 echo $MALLOB_OPTIONS | tr ' ' '\n'
 
@@ -74,4 +76,5 @@ for ((i=1; i<=INSTANCES; i++)); do
   mpirun -np $MPI_PROCESSES --bind-to core --map-by ppr:${MPI_PROCESSES}:node:pe=${THREADS_PER_PROCESS} build/mallob $MY_MALLOB_OPTIONS 
 done 
 
+echo ""
 echo "Successfully processed $INSTANCES instances"
