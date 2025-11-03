@@ -4,12 +4,11 @@ set -eu  #Abort if encounter error or unset variable
 
 MPI_PROCESSES=4 #TODO: Set to desired number 
 THREADS_PER_PROCESS=3 #TODO Set to desired number
-INSTANCES=5 #TODO: Set to desired number (or have determined by paths.txt file)
+INSTANCES=4 #TODO: Set to desired number (or count paths in paths.txt file)
 
 echo "" 
 echo ""
-echo "$((MPI_PROCESSES * THREADS_PER_PROCESS)) cores required"
-echo "$(nproc) cores available"
+echo "Using $((MPI_PROCESSES * THREADS_PER_PROCESS))/$(nproc) cores"
 echo $(lscpu | grep "Model name")
 
 OUT_DIR="scripts/server/example_logsntraces/" #TODO: Set to own paths
