@@ -14,7 +14,7 @@ Still from within the ```mallob/``` directory, you can now execute
 
 to run the script ```build_and_run_example.sh``` on a chosen target machine, here examplary on ```blum```. We include a compilation step in the submitted job to have the code be compiled by the target machine itself, so that it can optimize the binary for its own specific CPU architecture. 
 
-See [build_and_run_example.sh](/scripts/server/build_and_run_example.sh) for more details on building Mallob and [run_example.sh](/scripts/server/run_example.sh) to loop over some instances and output the results.
+See [build_and_run_example.sh](/scripts/server/build_and_run_example.sh) for more details on building Mallob and [run_example.sh](/scripts/server/run_example.sh) for an example on how to loop over some instances and output their results.
 
 To check for available machines
 
