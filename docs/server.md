@@ -1,6 +1,6 @@
 # Using Mallob on a custom server
 
-On machines that use the [spack](https://spack.readthedocs.io/en/latest/index.html) package manager and the slurm job scheduler, Mallob can be used in the following way. 
+On machines that use the [spack](https://spack.readthedocs.io/en/latest/index.html) package manager and the [slurm](https://ae.iti.kit.edu/wiki/index.php?title=Slurm) job scheduler, Mallob can be used in the following way. 
 
 On the login node, from within the ```mallob/``` directory, execute
     
