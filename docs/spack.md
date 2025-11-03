@@ -2,11 +2,20 @@
 
 On machines that use [spack](https://spack.readthedocs.io/en/latest/index.html) for package management (for example our custom servers), Mallob can be compiled in the following way. 
 
-First, on the login node, run once 
+First, on the login node, from within the ```mallob/``` directory, execute
     
     source scripts/spack/create_mallob_env.sh 
 
 This create a spack environment ```mallob_env``` containing all necessary compilers and libraries (see [create_mallob_env.sh](/scripts/spack/create_mallob_env.sh)). In case you want to update or extend the environment, rerun this script with the flag ```--fresh```, this forces a complete reinstall and is more robust than an incremental addition.
+
+To compile and run Mallob on one of the machines (say, the one called ```blum```), on the login node execute 
+
+    sbatch --partition=blum compile_and_run.sh
+
+This starts the script ```compile_and_run.sh``` on the machine ```blum```. We want to compile on the specific machine that also runs the code, since all machines are slightly different and compiled binaries on the login node might not be ideal to run on the individual other machines.
+
+
+
 
 Next, we create a script that compiles Mallob and runs it on some simple instances.  
 
