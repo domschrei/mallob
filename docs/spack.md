@@ -1,6 +1,16 @@
-# Compiling Mallob in a spack environment 
+# Using Mallob on a server with the  spack environment 
 
-On machines that use [spack](https://spack.readthedocs.io/en/latest/index.html) for package management (for example custom servers), Mallob can be compiled in the following way. To be executed from the home ```mallob``` directory.
+On machines that use [spack](https://spack.readthedocs.io/en/latest/index.html) for package management (for example our custom servers), Mallob can be compiled in the following way. 
+
+First, on the login node, run once 
+    
+    source scripts/spack/create_mallob_env.sh 
+
+This create a unified spack environment called [```mallob_env```](scripts/spack/create_mallob_env.sh) that contains all necessary compilers and libraries. In case you want to update or extend the environment with additional libraries run this script with the flag ```--fresh```, this forces a complete reinstall and is more robust than an incremental addition.
+
+
+
+To be executed from the home ```mallob``` directory.
 
     
     if ! spack env list | grep -q mallob_env; then
