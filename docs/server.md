@@ -6,7 +6,7 @@ On the login node, from within the ```mallob/``` directory, execute
     
     source scripts/server/create_mallob_env.sh 
 
-This creates a persistent spack environment ```mallob_env``` that contains all necessary compilers and libraries (for details, see [create_mallob_env.sh](/scripts/server/create_mallob_env.sh)). If you want to extend this environment, run the command above with the flag ```--fresh``` to force a clean reinstall.
+This creates a persistent spack environment ```mallob_env``` that contains all necessary compilers and libraries (see [create_mallob_env.sh](/scripts/server/create_mallob_env.sh) for details). If you want to extend this environment, run the command above with the flag ```--fresh``` to force a clean reinstall.
 
 Still from within the ```mallob/``` directory, you can now execute
 
