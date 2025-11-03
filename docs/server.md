@@ -28,7 +28,7 @@ To stop all of your jobs
 
     scancel -u $USER
 
-While the submitted sbatch job is running, its terminal output is redirected to ```slurm-*``` file in your ```mallob/``` directory. You can check this growing file for the current progress and some potential error messages.  
+While the submitted sbatch job is running, its terminal output is redirected to a ```slurm-*``` file in your ```mallob/``` directory. You can check this growing file for the current progress and some potential error messages.  
 
 Log files are written to ```scripts/server/example_logsntraces```, at least for this dummy example. A simple check for any errors can be done there via
 
