@@ -12,9 +12,9 @@ Still from within the ```mallob/``` directory, you can now execute
 
     sbatch --partition=blum scripts/server/build_and_run_example.sh
 
-to run the script ```build_and_run_example.sh``` on a chosen target machine, here examplary on ```blum```. We include a compilation step in the submitted job to have the binary be compiled (and thus optimized) for the target machine CPU.   
+to run the script ```build_and_run_example.sh``` on a chosen target machine, here examplary on ```blum```. We include a compilation step in the submitted job to have the binary be compiled (and thus optimized) for the CPU of the target machine.   
 
-See [build_and_run_example.sh](/scripts/server/build_and_run_example.sh) for more details on building Mallob and [run_example.sh](/scripts/server/run_example.sh) for a simple loop that executes Mallob on some instances and outputs the log files and results.
+See [build_and_run_example.sh](/scripts/server/build_and_run_example.sh) for more details on building Mallob and [run_example.sh](/scripts/server/run_example.sh) for a simple loop that executes Mallob on some instances, and outputs the log files and results.
 
 To check for available machines and their names
 
