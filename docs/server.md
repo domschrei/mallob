@@ -6,9 +6,9 @@ On the login node, from within the ```mallob/``` directory, execute
     
     source scripts/server/create_mallob_env.sh 
 
-This creates a persistent spack environment ```mallob_env``` that contains all necessary compilers and libraries (for details, see [create_mallob_env.sh](/scripts/server/create_mallob_env.sh)). In case you want to update or extend this environment, rerun the command above with the flag ```--fresh``` to force a fresh environment reinstall.
+This creates a persistent spack environment ```mallob_env``` that contains all necessary compilers and libraries (for details, see [create_mallob_env.sh](/scripts/server/create_mallob_env.sh)). If you want to extend this environment, run the command above with the flag ```--fresh``` to force a clean reinstall.
 
-Still from the login node, and from within the ```mallob/``` directory, you can now execute
+Still from within the ```mallob/``` directory, you can now execute
 
     sbatch --partition=blum scripts/server/build_and_run_example.sh
 
