@@ -16,7 +16,7 @@ to run the script ```build_and_run_example.sh``` on a chosen target machine, her
 
 See [build_and_run_example.sh](/scripts/server/build_and_run_example.sh) for more details on building Mallob and [run_example.sh](/scripts/server/run_example.sh) for a simple loop that executes Mallob on some instances, and outputs the log files and results.
 
-To check for available machines and their names
+To check for available machines
 
     sinfo
 
