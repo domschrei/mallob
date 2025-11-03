@@ -10,7 +10,7 @@ echo "$((MPI_PROCESSES * THREADS_PER_PROCESS)) cores required"
 echo "$(nproc) cores available"
 echo $(lscpu | grep "Model name")
 
-OUT_DIR="scripts/server/example_logsntraces" #TODO: Set to own paths
+OUT_DIR="scripts/server/example_logsntraces/" #TODO: Set to own paths
 INST_PATHS_TXT="scripts/server/example_in/paths.txt" #TODO: Set to own instances
 
 (cd scripts/server/example_in; find "$(pwd)" -type f -name "*.xz" > paths.txt) #TODO remove, we are creating paths.txt this way only to have a quick running example
@@ -42,14 +42,15 @@ echo $MALLOB_OPTIONS | tr ' ' '\n'
 
 # main loop over instances
 INSTANCES_PROCESSED=0
-for i in $INSTANCES; do
+for ((i=1; i<=INSTANCES; i++)); do
+  echo "" 
+  echo ""
+  echo "Reading path of instance Nr $i"
   INST_PATH=$(cat $INST_PATHS_TXT|sed $i'q;d')
 
   [[ -z "$INST_PATH" ]] && continue #check for empty line
 
-  echo "" 
-  echo ""
-  echo "Processing instance: ($INST_PATH)"
+  echo "Processing instance Nr. $i: ($INST_PATH)"
 
   # create an output dir for each instance
   MY_LOG="$OUT_DIR/$i/"
