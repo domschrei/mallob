@@ -26,7 +26,7 @@ To see all currently running machines
 
 To stop all of your jobs
 
-    scancle -u $USER
+    scancel -u $USER
 
 While the job is running, its terminal output is redirected to a growing ```slurm-*``` file in your ```mallob/``` directory. You can check this for general progress and some potential Error messages.  
 
