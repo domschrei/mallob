@@ -1,58 +1,42 @@
-# Using Mallob on a server with the  spack environment 
+# Using Mallob on a custom server
 
-On machines that use [spack](https://spack.readthedocs.io/en/latest/index.html) for package management (for example our custom servers), Mallob can be compiled in the following way. 
+On machines that use the [spack](https://spack.readthedocs.io/en/latest/index.html) package manager and the slurm job scheduler, Mallob can be used in the following way. 
 
-First, on the login node, from within the ```mallob/``` directory, execute
+On the login node, from within the ```mallob/``` directory, execute
     
-    source scripts/spack/create_mallob_env.sh 
+    source scripts/server/create_mallob_env.sh 
 
-This create a spack environment ```mallob_env``` containing all necessary compilers and libraries (see [create_mallob_env.sh](/scripts/spack/create_mallob_env.sh)). In case you want to update or extend the environment, rerun this script with the flag ```--fresh```, this forces a complete reinstall and is more robust than an incremental addition.
+This creates a persistent spack environment ```mallob_env``` that contains all necessary compilers and libraries (for details, see [create_mallob_env.sh](/scripts/server/create_mallob_env.sh)). In case you want to update or extend this environment, rerun the command above with the flag ```--fresh``` to force a fresh environment reinstall.
 
-To compile and run Mallob on one of the machines (say, the one called ```blum```), on the login node execute 
+Still from the login node, and from within the ```mallob/``` directory, you can now execute
 
-    sbatch --partition=blum compile_and_run.sh
+    sbatch --partition=blum scripts/server/build_and_run_example.sh
 
-This starts the script ```compile_and_run.sh``` on the machine ```blum```. We want to compile on the specific machine that also runs the code, since all machines are slightly different and compiled binaries on the login node might not be ideal to run on the individual other machines.
+to run the script ```build_and_run_example.sh``` on a chosen target machine, here examplary on ```blum```. We include a compilation step in the submitted job to have the binary be compiled (and thus optimized) for the target machine CPU.   
 
+See [build_and_run_example.sh](/scripts/server/build_and_run_example.sh) for more details on building Mallob and [run_example.sh](/scripts/server/run_example.sh) for a simple loop that executes Mallob on some instances and outputs the log files and results.
 
+To check for available machines and their names
 
+    sinfo
 
-Next, we create a script that compiles Mallob and runs it on some simple instances.  
+To see all currently running machines 
 
-To be executed from the home ```mallob``` directory.
-TODO:
+    squeue
 
-    
-    source /nfs/software/setup.sh
-    
-    if ! spack env list | grep -q mallob_env; then
-        echo "Spack environment mallob_env is missing, you must create that first! "
-        return 0
-    fi
+To stop all of your jobs
 
+    scancle -u $USER
 
-    
-    spack env activate mallob_env
-    
-    ( cd lib && bash fetch_and_build_solvers.sh kcly )
-    
-    mkdir -p build
-    rm build/*mallob*
-    cd build
+While the job is running, its terminal output is redirected to a growing ```slurm-*``` file in your ```mallob/``` directory. You can check this for general progress and some potential Error messages.  
 
-    #with USE_JEMALLOC=0, the linker won't find lz, and adding libz results in spack compiling every library like gcc which takes pretty long
-    
-    CC=$(which mpicc) 
-    CXX=$(which mpicxx) 
-    cmake -DMALLOB_JEMALLOC_DIR=/nfs/home/$USER/.user_spack/environments/mallob_env/.spack-env/view/lib \
-      -DCMAKE_BUILD_TYPE=RELEASE \
-      -DMALLOB_APP_SAT=1 \
-      -DMALLOB_USE_JEMALLOC=1 \
-      -DMALLOB_LOG_VERBOSITY=4 \
-      -DMALLOB_ASSERT=1 \
-      -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\" ..
-  
-    make clean
-    make -j 20
-    cd ..
-  
+Log files are written to ```scripts/server/example_logsntraces```, at least for this dummy example. A simple check for any errors can be done there via
+
+    grep ERROR -r *
+
+which should ideally return nothing. Similarly, a simple check for the SAT solving times can be done there via
+
+    grep SOLUTION -r *
+
+See [develop.md](/docs/develop.md) for more information on the log files and how to use them.
+
