@@ -13,7 +13,7 @@ echo $(lscpu | grep "Model name")
 OUT_DIR="scripts/server/example_logsntraces" #TODO: Set to own paths
 INST_PATHS_TXT="scripts/server/example_in/paths.txt" #TODO: Set to own instances
 
-(cd scripts/server/example_in; find "$(pwd)" -type f > paths.txt) #TODO remove, we are creating paths.txt this way only to have a quick running example
+(cd scripts/server/example_in; find "$(pwd)" -type f -name "*.xz" > paths.txt) #TODO remove, we are creating paths.txt this way only to have a quick running example
 
 #Clean old logs and traces
 : "${OUT_DIR:?ERROR: OUT_DIR is not set or empty}"  #safety measure to not accidentaly rm -rf the whole /* (!!)
@@ -31,6 +31,7 @@ MALLOB_OPTIONS=" \
   -v=4 \
   -satsolver=c \
   -colors \
+  -os=1 \
 "
 
 echo "MPI_PROCESSES: $MPI_PROCESSES"
@@ -45,6 +46,8 @@ for i in $INSTANCES; do
 
   [[ -z "$INST_PATH" ]] && continue #check for empty line
 
+  echo "" 
+  echo ""
   echo "Processing instance: ($INST_PATH)"
 
   # create an output dir for each instance
@@ -62,6 +65,8 @@ for i in $INSTANCES; do
 
   echo "MY_MALLOB_OPTIONS"
   echo $MY_MALLOB_OPTIONS | tr ' ' '\n'
+  echo "" 
+  echo ""
 
   mpirun -np $MPI_PROCESSES --bind-to core --map-by ppr:${MPI_PROCESSES}:node:pe=${THREADS_PER_PROCESS} build/mallob $MY_MALLOB_OPTIONS 
 done 
