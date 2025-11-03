@@ -6,26 +6,25 @@ First, on the login node, run once
     
     source scripts/spack/create_mallob_env.sh 
 
-This create a unified spack environment called [```mallob_env```](scripts/spack/create_mallob_env.sh) that contains all necessary compilers and libraries. In case you want to update or extend the environment with additional libraries run this script with the flag ```--fresh```, this forces a complete reinstall and is more robust than an incremental addition.
+This create a spack environment ```mallob_env``` containing all necessary compilers and libraries (see [create_mallob_env.sh](/scripts/spack/create_mallob_env.sh)). In case you want to update or extend the environment, rerun this script with the flag ```--fresh```, this forces a complete reinstall and is more robust than an incremental addition.
 
-
+Next, we create a script that compiles Mallob and runs it on some simple instances.  
 
 To be executed from the home ```mallob``` directory.
+TODO:
 
+    
+    source /nfs/software/setup.sh
     
     if ! spack env list | grep -q mallob_env; then
-        echo "Creating Spack environment mallob_env"
-        spack env create mallob_env
+        echo "Spack environment mallob_env is missing, you must create that first! "
+        return 0
     fi
+
+
     
     spack env activate mallob_env
-    spack config add "packages:elfutils:variants: ~debuginfod"
-    spack add cmake gcc jemalloc openmpi curl gdb
-    spack concretize
-    spack install -j 32
     
-    #need elfutils:variants and curl for the gdb compilation
-
     ( cd lib && bash fetch_and_build_solvers.sh kcly )
     
     mkdir -p build
