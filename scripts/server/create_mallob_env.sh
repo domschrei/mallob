@@ -2,7 +2,7 @@
 
 source /nfs/software/setup.sh  #Might be necessary to boostrap spack itself (if not on login node)
 
-echo "Usage: source scripts/spack/create_mallob_env.sh [--fresh]"
+echo "Usage: source scripts/server/create_mallob_env.sh [--fresh]"
 
 if ! spack env list | grep -q mallob_env; then
     echo "Spack: creating mallob_env"
