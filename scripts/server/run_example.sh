@@ -2,10 +2,12 @@
 
 set -eu  #Abort if encounter error or unset variable
 
-MPI_PROCESSES=4 #TODO: Desired number 
-THREADS_PER_PROCESS=3 #TODO Desired number
-INSTANCES=2 #TODO: Desired number
+MPI_PROCESSES=4 #TODO: Set to desired number 
+THREADS_PER_PROCESS=3 #TODO Set to desired number
+INSTANCES=5 #TODO: Set to desired number (or have determined by paths.txt file)
 
+echo "" 
+echo ""
 echo "$((MPI_PROCESSES * THREADS_PER_PROCESS)) cores required"
 echo "$(nproc) cores available"
 echo $(lscpu | grep "Model name")
@@ -13,7 +15,7 @@ echo $(lscpu | grep "Model name")
 OUT_DIR="scripts/server/example_logsntraces/" #TODO: Set to own paths
 INST_PATHS_TXT="scripts/server/example_in/paths.txt" #TODO: Set to own instances
 
-(cd scripts/server/example_in; find "$(pwd)" -type f -name "*.xz" > paths.txt) #TODO remove, we are creating paths.txt this way only to have a quick running example
+(cd scripts/server/example_in; find "$(pwd)" -type f -name "*.xz" > paths.txt) #TODO remove. We create paths.txt this way only here for the example to have valid full paths
 
 #Clean old logs and traces
 : "${OUT_DIR:?ERROR: OUT_DIR is not set or empty}"  #safety measure to not accidentaly rm -rf the whole /* (!!)
