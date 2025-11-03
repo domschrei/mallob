@@ -32,6 +32,7 @@ MALLOB_OPTIONS=" \
   -satsolver=c \
   -colors \
   -os=1 \
+  -q=1 \
 "
 
 echo "MPI_PROCESSES: $MPI_PROCESSES"
