@@ -144,7 +144,7 @@ public:
 	void setToShweeper();
 
 	//Pass-through
-	int set_option(const std::string &option_name, int value);
+	bool set_option(const std::string &option_name, int value);
 
 
 private:
