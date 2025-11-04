@@ -11,7 +11,6 @@ extern "C" {
 #include "kissat/src/kissat.h"
 }
 
-#define INIT_PARALLEL 1
 
 SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table)
     : Job(params, setup, table)
@@ -67,10 +66,6 @@ void SweepJob::appl_start() {
 	//To keep appl_start() responsive, everything is outsourced to the individual threads
 	//(Improvement form earlier initialization which was still done by the main thread, takes ca. 4ms per solver, with x32 threads this resulted in being stuck here for 150ms!
 	for (int localId=0; localId < _params.numThreadsPerProcess.val; localId++) {
-		#if INIT_PARALLEL==0
-			auto shweeper = createNewShweeper(localId);
-			_shweepers[localId] = shweeper;
-		#endif
 		createAndStartNewShweeper(localId);
 	}
 
@@ -149,23 +144,19 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 	_bg_workers[localId]->run([this, localId]() {
 		// std::future<void> fut_shweeper = ProcessWideThreadPool::get().addTask([this, localId]() { //Changed from [&] to [this, shweeper] back to [&] to [this, localId] !! (nicco)
 		//passing localId by value to this lambda, because the thread might only execute after createAndStartNewShweeper is already gone
-		#if INIT_PARALLEL
-				auto shweeper = createNewShweeper(localId);
-		#else
-		auto &shweeper = _shweepers[localId];
-		#endif
+
 		if (_terminate_all) {
 			// _bg_workers[localId]->stop();
-			LOG(V2_INFO, "SWEEP JOB [%i](%i) got terminated before it was even initialized, job already done \n", _my_rank, localId);
+			LOG(V2_INFO, "SWEEP [%i](%i) terminated before creation\n", _my_rank, localId);
 			return;
 		}
+
+		auto shweeper = createNewShweeper(localId);
 
 		loadFormula(shweeper);
 		LOG(V2_INFO, "SWEEP JOB [%i](%i) solve() START \n", _my_rank, localId);
 		_running_shweepers_count++;
-		#if INIT_PARALLEL
 		_shweepers[localId] = shweeper; //signal to the remaining system that this solver now exists
-		#endif
 		int res = shweeper->solve(0, nullptr);
 		LOG(V2_INFO, "SWEEP JOB [%i](%i) solve() FINISH. Result %i \n", _my_rank, localId, res);
 
@@ -211,11 +202,16 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	float t0 = Timer::elapsedSeconds();
 	std::shared_ptr<Kissat> shweeper(new Kissat(setup));
 	float t1 = Timer::elapsedSeconds();
-	LOG(V2_INFO, "SWEEP STARTUP [%i](%i) kissat init in %f ms\n", _my_rank, localId, (t1 - t0)*1000);
-	if (_terminate_all) {
-		LOG(V2_INFO, "SWEEP JOB [%i](%i) terminated new kissat directly, job already done \n", _my_rank, localId);
-		return shweeper;
-	}
+	LOG(V2_INFO, "SWEEP STARTUP [%i](%i) kissat init %f ms\n", _my_rank, localId, (t1 - t0)*1000);
+
+	//Dangerous to immediately return here! because kissat is already initialized, can't just forget it, need to properly release it
+	//releasing could potentially be done directly here with kissat_release(...) ....
+	//for now leaving it to finish initialising and receiving termination through the normal procedure
+	// if (_terminate_all) {
+		// LOG(V2_INFO, "SWEEP [%i](%i) terminated during creation \n", _my_rank, localId);
+		// return shweeper;
+	// }
+
 	shweeper->setToShweeper();
 
 	shweeper->shweepSetImportExportCallbacks();
