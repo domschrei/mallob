@@ -21,6 +21,7 @@
 #include "util/logger.hpp"
 #include "util/params.hpp"
 #include "util/sys/terminator.hpp"
+#include "util/sys/thread_pool.hpp"
 #include "util/sys/timer.hpp"
 #include "util/sys/tmpdir.hpp"
 #include "data/app_configuration.hpp"
@@ -40,24 +41,26 @@ void handleUnsat(const Parameters& _params) {
 
 bool SatReader::parseWithTrustedParser(JobDescription& desc) {
 	// Parse and sign in a separate subprocess
-	TrustedParserProcessAdapter tp(_params.seed(), desc.getId());
+	if (!_tppa) {
+		_tppa.reset(new TrustedParserProcessAdapter(_params.seed(), std::to_string(desc.getId())));
+		_tppa->setup(_filename.c_str(), false);
+	}
+
 	uint8_t* sig;
 	std::vector<unsigned char> plain;
 	std::vector<unsigned char>* out;
 	if (_params.compressFormula()) out = &plain;
 	else out = desc.getRevisionData(desc.getRevision()).get();
 
-	bool ok = tp.parseAndSign(_filename.c_str(), *out, sig);
+	bool ok = _tppa->parseAndSign(*out, sig);
 	if (!ok) return false;
 
 	std::string sigStr = Logger::dataToHexStr(sig, SIG_SIZE_BYTES);
-	assert(desc.getAppConfiguration().map.at("__SIG").size() == sigStr.size());
-	desc.setAppConfigurationEntry("__SIG", sigStr);
-	_max_var = tp.getNbVars();
-	_num_read_clauses = tp.getNbClauses();
-	desc.setFSize(tp.getFSize());
-	LOG(V2_INFO, "IMPCHK parser -key-seed=%lu read %i vars, %i cls - sig %s\n",
-		ImpCheck::getKeySeed(_params.seed()), _max_var, _num_read_clauses, sigStr.c_str());
+	_max_var = _tppa->getNbVars();
+	_num_read_clauses = _tppa->getNbClauses();
+	desc.setFSize(_tppa->getFSize());
+	LOG(V2_INFO, "IMPCHK parser -key-seed=%lu read %i vars, %i cls, %i asmpt - sig %s\n",
+		ImpCheck::getKeySeed(_params.seed()), _max_var, _num_read_clauses, _tppa->getNbAssumptions(), sigStr.c_str());
 
 	if (_params.compressFormula()) {
 		auto vec = desc.getRevisionData(desc.getRevision()).get();
@@ -220,17 +223,53 @@ bool SatReader::parseInternally(JobDescription& desc) {
 
 bool SatReader::read(JobDescription& desc) {
 
+	std::optional<std::future<void>> optFuture;
+	std::vector<int> litsToParse;
+	if (_files.empty()) {
+		// No explicit file provided, so nothing to do.
+		if (!_force_incremental_parser) return true;
+
+		// With real-time checking, we *still* need to explicitly parse,
+		// so we route the added formula payload over a pipe.
+		_filename = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob." + std::to_string(Proc::getPid())
+			+ ".tsinput." + std::to_string(desc.getId());
+		if (!_tppa) {
+			// Create a new parser adapter for this job
+			_tppa.reset(new TrustedParserProcessAdapter(_params.seed(), std::to_string(desc.getId())));
+			_tppa->setup(_filename.c_str(), true);
+		}
+		// Write formula to the pipe in a side thread
+		litsToParse = std::move(desc.getPreloadedLiterals());
+		desc.getPreloadedLiterals().clear();
+		optFuture = ProcessWideThreadPool::get().addTask([&]() {
+			// Output formula increment to the pipe file
+			std::ofstream& ofs = _tppa->getFormulaToParserStream();
+			for (int lit : litsToParse) {
+				if (lit == INT32_MIN) break;
+				if (lit == INT32_MAX) {
+					ofs << "a";
+					continue;
+				}
+				ofs << " " << lit;
+				if (lit == 0) ofs << "\n";
+			}
+			ofs.flush();
+		});
+	}
+	if (_filename.empty()) {
+		assert(_files.size() == 1);
+		_filename = _files.front();
+	}
+
 	const std::string NC_DEFAULT_VAL = "BMMMKKK111";
 	desc.setAppConfigurationEntry("__NC", NC_DEFAULT_VAL);
 	desc.setAppConfigurationEntry("__NV", NC_DEFAULT_VAL);
-	if (_params.onTheFlyChecking()) {
-		std::string placeholder(32, 'x');
-		desc.setAppConfigurationEntry("__SIG", placeholder.c_str());
-	}
 	desc.beginInitialization(desc.getRevision());
 
-	if (_params.onTheFlyChecking()) {
-		if (!parseWithTrustedParser(desc)) return false;
+	if (_force_incremental_parser) {
+		auto ok = parseWithTrustedParser(desc);
+		if (optFuture.has_value()) optFuture->get();
+		if (!ok) return false;
 	} else if (_params.compressFormula()) {
 		if (!parseAndCompress(desc)) return false;
 	} else {

@@ -82,11 +82,6 @@ void Parameters::expand() {
         // Single instance solving
         //numClients.set(1); // 1 client
         useFilesystemInterface.set(false); // no fs interface
-        useIPCSocketInterface.set(false); // no socket interface
-        numWorkers.set(-1); // all workers
-        loadFactor.set(1); // full load factor
-        maxDemand.set(0); // no limit of max. demand
-        jobCacheSize.set(1); // only remember a single job desc. at a time
     }
 }
 
@@ -148,7 +143,7 @@ std::string Parameters::getParamsAsString() const {
     return out;
 }
 
-std::string Parameters::getSubprocCommandAsString(const char* execName) const {
+std::string Parameters::getSubprocCommandAsString(const char* execName, bool appendOptions) const {
 
     std::string out;
 
@@ -161,8 +156,10 @@ std::string Parameters::getSubprocCommandAsString(const char* execName) const {
     // Executable name
     out += execName + std::string(" ");
     // Options
-    for (const auto& [id, opt] : _global_map) if (!opt->getValAsString().empty()) {
-        out += ("-" + id + "=" + opt->getValAsString()) + " ";
+    if (appendOptions) {
+        for (const auto& [id, opt] : _global_map) if (!opt->getValAsString().empty()) {
+            out += ("-" + id + "=" + opt->getValAsString()) + " ";
+        }
     }
 
     return out.substr(0, out.size()-1);

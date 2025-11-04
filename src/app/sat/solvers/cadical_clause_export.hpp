@@ -5,6 +5,7 @@
 
 #include "app/sat/data/clause.hpp"
 #include "app/sat/data/clause_metadata.hpp"
+#include "app/sat/data/definitions.hpp"
 #include "util/assert.hpp"
 
 #include "cadical/src/cadical.hpp"
@@ -84,7 +85,9 @@ public:
     void setCallback(const LearnedClauseCallback& callback) {
         _callback = callback;
     }
-
+	LearnedClauseCallback getCallback() {
+		return _callback;
+	}
 	void setProbingCallback(const ProbingLearnedClauseCallback& callback) {
 		_probing_callback = callback;
 	}

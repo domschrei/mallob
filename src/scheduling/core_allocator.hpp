@@ -39,7 +39,7 @@ public:
     void returnCores(int nbReturned) {
         if (nbReturned == 0) return;
         _nb_available += nbReturned;
-        LOG(V2_INFO, "corealloc ret %i -> %i free\n", nbReturned, _nb_available);
+        LOG(V4_VVER, "corealloc ret %i -> %i free\n", nbReturned, _nb_available);
     }
 };
 

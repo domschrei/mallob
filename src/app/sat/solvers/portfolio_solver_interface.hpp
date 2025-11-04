@@ -15,6 +15,7 @@
 #include "app/sat/sharing/generic_import_manager.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
 #include "app/sat/solvers/optimizing_propagator.hpp"
+#include "app/sat/solvers/solving_replay.hpp"
 #include "util/random.hpp"
 #include "util/logger.hpp"
 #include "util/string_utils.hpp"
@@ -38,6 +39,9 @@ protected:
 	SolverSetup _setup;
 	LratConnector* _lrat {nullptr};
 	std::unique_ptr<OptimizingPropagator> _optimizer;
+	SolvingReplay _replay;
+	bool _clause_import_enabled = true;
+	bool _clause_export_enabled = true;
 
 // ************** INTERFACE TO IMPLEMENT **************
 
@@ -66,6 +70,7 @@ public:
 
 	// Get a set of failed assumptions
 	virtual std::set<int> getFailedAssumptions() = 0;
+	virtual unsigned long getUnsatConclusionId() const {return 0;}
 
 	// Add a permanent literal to the formula (zero for clause separator)
 	virtual void addLiteral(int lit) = 0;
@@ -130,12 +135,13 @@ public:
 			int divCycleIdx = getDiversificationIndex() % numOriginalDiversifications;
 			if (divCycleIdx+1 == depth) {
 				LOGGER(_logger, V4_VVER, "Skip clause sharing\n");
-				_clause_sharing_disabled = true;
+				_clause_import_enabled = false;
+				_clause_export_enabled = false;
 			}
 		}
 	}
-	bool isClauseSharingEnabled() const {
-		return !_clause_sharing_disabled;
+	bool isClauseImportEnabled() const {
+		return _clause_import_enabled;
 	}
 
 	void addConditionalLit(int condLit) {assert(condLit != 0); _conditional_lits.push_back(condLit);}
@@ -166,7 +172,7 @@ public:
 	// The learned clauses might be added later or possibly never
 	void addLearnedClause(const Mallob::Clause& c);
 	void addLearnedClauses(BufferReader& reader, int revision) {
-		if (_clause_sharing_disabled) return;
+		if (!_clause_import_enabled) return;
 		_import_manager->setImportedRevision(revision);
 		_import_manager->performImport(reader);
 	}
@@ -204,6 +210,9 @@ public:
 	OptimizingPropagator* getOptimizer() {
 		return _optimizer.get();
 	}
+	SolvingReplay& getReplay() {
+		return _replay;
+	}
 
 private:
 	std::string _global_name;
@@ -211,7 +220,6 @@ private:
 	int _global_id;
 	int _local_id;
 	int _diversification_index;
-	bool _clause_sharing_disabled = false;
 	std::vector<int> _conditional_lits; // to append to each exported clause to make it global
 	std::atomic_bool _terminated = false;
 

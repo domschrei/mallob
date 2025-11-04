@@ -411,7 +411,7 @@ void SharingManager::digestSharingWithFilter(std::vector<int>& clauseBuf, std::v
 	for (size_t i = 0; i < _solvers.size(); i++) {
 		auto& solver = _solvers[i];
 		if (!solver || !_solver_stats[i]) continue; // solver was cleaned up
-		if (!solver->isClauseSharingEnabled()) continue;
+		if (!solver->isClauseImportEnabled()) continue;
 		assert(i == solver->getLocalId());
 		importingSolvers.emplace_back(solver->getGlobalId(), solver->getLocalId(), _solver_stats[i], _id_alignment.get());
 	}

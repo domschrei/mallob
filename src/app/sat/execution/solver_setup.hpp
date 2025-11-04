@@ -4,6 +4,7 @@
 #include <string>
 
 #include "app/sat/data/portfolio_sequence.hpp"
+#include "app/sat/solvers/solving_replay.hpp"
 #include "util/logger.hpp"
 #include "util/random.hpp"
 
@@ -18,6 +19,7 @@ struct SolverSetup {
 	int globalId {0};
 	int localId {0};
 	std::string jobname;
+	int jobId;
 	std::string profilingBaseDir; 
 	int profilingLevel {-1};
 	int baseSeed {0};
@@ -39,6 +41,7 @@ struct SolverSetup {
 	bool doIncrementalSolving {false};
 	int diversificationIndex {0};
 
+	SolvingReplay::Mode replayMode {SolvingReplay::NONE};
 
 	bool diversifyNoise {false};
 	int decayDistribution {0};
@@ -98,6 +101,7 @@ struct SolverSetup {
 	bool onTheFlyChecking {false};
 	// If on-the-fly checking is enabled: this solver also seeks to have a found satisfying assignment checked.
 	bool onTheFlyCheckModel {false};
+	bool trustedParserForced {false};
 	// If non-null, use this LratConnector instance for checking a model;
 	// if null && onTheFlyCheckModel, then *create* a model-checking LRAT connector instance yourself (also to use for others).
 	LratConnector* modelCheckingLratConnector {nullptr};
@@ -107,8 +111,6 @@ struct SolverSetup {
 	bool avoidUnsatParticipation {false};
 	// Directory to write proofs to
 	std::string proofDir;
-	// Signature of the formula to process - to be validated by the on-the-fly checker
-	std::string sigFormula;
 	int nbSkippedIdEpochs {0};
 
 	// Do shared instead of sequential sweeping, whenever sweeping is scheduled

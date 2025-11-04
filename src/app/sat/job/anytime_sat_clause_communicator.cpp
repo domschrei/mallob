@@ -306,7 +306,7 @@ void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg, int so
         // defer message until all past sessions are done
         // and all earlier deferred initiation messages have been processed
         LOG(V3_VERB, "%s : deferring CS initiation\n", _job->toStr());
-        _deferred_sharing_initiation_msgs.push_back(std::move(msg));
+        _deferred_sharing_initiation_msgs.push_back({source, std::move(msg)});
         return;
     }
 
@@ -320,6 +320,11 @@ void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg, int so
     // no current sessions active - can start new session
     _current_epoch = msg.epoch;
     const auto snapshot = _job->getJobTree().getSnapshot();
+    if (!_job->getJobTree().isRoot() && snapshot.parentNodeRank != source) {
+        // wrong sender from the view of the current snapshot - context changed since this message was sent
+        msg.returnToSender(source, MSG_SEND_APPLICATION_MESSAGE);
+        return;
+    }
     LOG(V4_VVER, "%s : INIT COMM e=%i nc=%i\n", _job->toStr(), _current_epoch, snapshot.nbChildren);
 
     // extract compensation factor for this session from the message
@@ -367,6 +372,8 @@ void AnytimeSatClauseCommunicator::feedLocalClausesIntoCrossSharing(std::vector<
         msg.payload.resize(packedComm.size() / sizeof(int));
         memcpy(msg.payload.data(), packedComm.data(), packedComm.size());
         _job->getJobTree().sendToSelf(msg); // will be deferred if cross-comm is already ongoing
+    } else if (comm.getCommSize() == 1) {
+        LOG(V4_VVER, "XTCS #%i comm-size 1 (group ID %i)\n", _job->getId(), _job->getDescription().getGroupId());
     } else if (comm.getCommSize() == 0) {
         LOG(V4_VVER, "XTCS communicator not ready yet\n");
     }
@@ -377,7 +384,7 @@ void AnytimeSatClauseCommunicator::initiateCrossSharing(JobMessage& msg, int sou
     if (_cross_sharing_session || !_cross_job_clause_sharer ||
             (!fromDeferredQueue && !_deferred_cross_sharing_initiation_msgs.empty())) {
         LOG(V3_VERB, "%s XTCS deferring initiation\n", _job->toStr());
-        _deferred_cross_sharing_initiation_msgs.push_back(msg);
+        _deferred_cross_sharing_initiation_msgs.push_back({source, msg});
         return;
     }
 
@@ -419,15 +426,15 @@ void AnytimeSatClauseCommunicator::tryActivateDeferredSharingInitiation() {
     if (!_deferred_sharing_initiation_msgs.empty() && !_current_session) {
         // sessions are empty -> WILL succeed to initiate sharing
         // -> initiation message CAN be deleted afterwards.
-        JobMessage msg = std::move(_deferred_sharing_initiation_msgs.front());
+        auto [source, msg] = std::move(_deferred_sharing_initiation_msgs.front());
         _deferred_sharing_initiation_msgs.pop_front();
-        initiateClauseSharing(msg, _job->getMyMpiRank(), true);
+        initiateClauseSharing(msg, source, true);
     }
 
     if (!_deferred_cross_sharing_initiation_msgs.empty() && !_cross_sharing_session) {
-        JobMessage msg = std::move(_deferred_cross_sharing_initiation_msgs.front());
+        auto [source, msg] = std::move(_deferred_cross_sharing_initiation_msgs.front());
         _deferred_cross_sharing_initiation_msgs.pop_front();
-        initiateCrossSharing(msg, _job->getMyMpiRank(), true);
+        initiateCrossSharing(msg, source, true);
     }
 }
 
@@ -486,6 +493,8 @@ bool AnytimeSatClauseCommunicator::isDestructible() {
     if (_current_session) return false;
     if (_cross_sharing_session) return false;
     for (auto& session : _cancelled_sessions) if (!session->isDestructible()) return false;
+    if (!_deferred_sharing_initiation_msgs.empty()) return false;
+    if (!_deferred_cross_sharing_initiation_msgs.empty()) return false;
     return true;
 }
 

@@ -51,6 +51,8 @@ private:
 
     tsl::robin_map<int, std::list<std::function<void()>>> _job_execution_hooks;
 
+    tsl::robin_map<int, robin_hood::unordered_set<int>> _orphaned_child_nodes;
+
 public:
     SchedulingManager(Parameters& params, MPI_Comm& comm, RandomizedRoutingTree& routingTree, 
         JobRegistry& jobRegistry, WorkerSysState& sysstate);
@@ -73,6 +75,10 @@ public:
     void handleIncomingJobRequest(MessageHandle& handle, JobRequestMode mode);
 
     int getGlobalBalancingEpoch() const;
+
+    bool hasJobsLeftToDelete() const {
+        return !_job_registry.collectAllJobs().empty() || _job_registry.hasJobsLeftToDelete();
+    }
 
 private:
     void handleAdoptionOffer(MessageHandle& handle);

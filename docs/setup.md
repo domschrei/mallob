@@ -29,6 +29,9 @@ We repeat its details here:
 # Only needed if building with -DMALLOB_APP_MAXSAT=1.
 # ( cd lib && bash fetch_and_build_maxsat_deps.sh )
 
+# Only needed if building with -DMALLOB_APP_SMT=1.
+# ( cd lib && bash fetch_and_build_smt_deps.sh )
+
 # Build Mallob
 # Specify `-DCMAKE_BUILD_TYPE=RELEASE` for a release build or `-DCMAKE_BUILD_TYPE=DEBUG` for a debug build.
 mkdir -p build

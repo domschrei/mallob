@@ -53,7 +53,7 @@ Watchdog::Watchdog(bool enabled, int checkIntervalMillis, bool useThreadPool, st
             }
             int res = usleep(1000 * checkIntervalMillis);
             if (res == -1 && errno == EINTR) {
-                LOG(V4_VVER, "Watchdog sleep interrupted by signal\n");
+                LOG(V5_DEBG, "Watchdog sleep interrupted by signal\n");
             }
         }
     };

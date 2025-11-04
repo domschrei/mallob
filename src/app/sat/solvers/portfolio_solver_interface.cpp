@@ -5,9 +5,11 @@
 #include <cmath>
 
 #include "app/sat/data/clause_metadata.hpp"
+#include "app/sat/proof/trusted_checker_process_adapter.hpp"
 #include "app/sat/sharing/adaptive_import_manager.hpp"
 #include "app/sat/sharing/ring_buffer_import_manager.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
+#include "app/sat/solvers/solving_replay.hpp"
 #include "util/random.hpp"
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
@@ -45,7 +47,9 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 				"S"+std::to_string(setup.globalId)+"."+std::to_string(setup.solverRevision), 
 				"." + setup.jobname + ".S"+std::to_string(setup.globalId)
 		  )), 
-		  _setup(setup), _job_name(setup.jobname), 
+		  _setup(setup),
+		  _replay(_setup.replayMode, "replay." + std::to_string(setup.globalId)),
+		  _job_name(setup.jobname),
 		  _global_id(setup.globalId), _local_id(setup.localId), 
 		  _diversification_index(setup.diversificationIndex),
 		  _import_manager([&]() -> GenericImportManager* {
@@ -64,22 +68,23 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 	if (_setup.onTheFlyChecking || _setup.onTheFlyCheckModel) {
 		// Yes. Is this the thread that needs to create *the* model-checking LRAT connector?
 		bool createModelCheckingLratConn = _setup.onTheFlyCheckModel && !_setup.modelCheckingLratConnector;
+		TrustedCheckerProcessAdapter::TrustedCheckerProcessSetup chkSetup {
+			_logger, _setup.jobname, _setup.baseSeed, _setup.jobId,
+			_setup.globalId, _setup.localId, true
+		};
 		// Does this thread in particular run in certified UNSAT mode?
 		if (_setup.onTheFlyChecking) {
 			// Yes: ALWAYS create your own LRAT connector. Have it support checking of models
 			// ONLY IF desired and there is no pre-created LRATConnector instance for this purpose.
-			LOGGER(_logger, V3_VERB, "Creating full LratConnector%s\n", createModelCheckingLratConn?" with checking models":"");
-			_lrat = new LratConnector(_logger, _setup.baseSeed, _setup.localId, _setup.numVars,
-				createModelCheckingLratConn
-			);
+			LOGGER(_logger, V3_VERB, "Start ImpChk%s\n", createModelCheckingLratConn?" + checkmodel":"");
+			chkSetup.checkModel = createModelCheckingLratConn;
+			_lrat = new LratConnector(chkSetup);
 			if (createModelCheckingLratConn) _setup.modelCheckingLratConnector = _lrat;
 		} else {
 			// No: only create a model-checking LRATConnector if it is not precreated yet.
 			if (createModelCheckingLratConn) {
-				LOGGER(_logger, V3_VERB, "Creating dedicated LratConnector for checking models\n");
-				_setup.modelCheckingLratConnector = new LratConnector(
-					_logger, _setup.baseSeed, _setup.localId, _setup.numVars, true
-				);
+				LOGGER(_logger, V3_VERB, "Start ImpChk to check models\n");
+				_setup.modelCheckingLratConnector = new LratConnector(chkSetup);
 				_setup.owningModelCheckingLratConnector = true;
 			}
 		}
@@ -175,19 +180,34 @@ void PortfolioSolverInterface::setExtProbingLearnedClauseCallback(const ProbingL
 }
 
 void PortfolioSolverInterface::addLearnedClause(const Mallob::Clause& c) {
-	if (_clause_sharing_disabled) return;
+	if (!_clause_import_enabled) return;
 	_import_manager->addSingleClause(c);
 }
 
 bool PortfolioSolverInterface::fetchLearnedClause(Mallob::Clause& clauseOut, GenericClauseStore::ExportMode mode) {
-	if (_clause_sharing_disabled) return false;
-	clauseOut = _import_manager->getClause(mode);
-	return clauseOut.begin != nullptr && clauseOut.size >= 1;
+	if (_replay.getMode() == SolvingReplay::REPLAY)
+		return _replay.replayImportCallback(clauseOut, mode);
+	bool success = false;
+	if (_clause_import_enabled) {
+		clauseOut = _import_manager->getClause(mode);
+		success = clauseOut.begin != nullptr;
+	}
+	if (_replay.getMode() == SolvingReplay::RECORD)
+		_replay.recordImportCallback(success, clauseOut, mode);
+	return success;
 }
 
 std::vector<int> PortfolioSolverInterface::fetchLearnedUnitClauses() {
-	if (_clause_sharing_disabled) return std::vector<int>();
-	return _import_manager->getUnitsBuffer();
+	if (_replay.getMode() == SolvingReplay::REPLAY)
+		return _replay.replayImportCallback();
+	std::vector<int> units;
+	if (_clause_import_enabled) {
+		units = _import_manager->getUnitsBuffer();
+	}
+	if (_replay.getMode() == SolvingReplay::RECORD) {
+		_replay.recordImportCallback(units);
+	}
+	return units;
 }
 
 PortfolioSolverInterface::~PortfolioSolverInterface() {

@@ -2,6 +2,7 @@
 #pragma once
 
 #include "app/job.hpp"
+#include "util/logger.hpp"
 #include "util/tsl/robin_map.h"
 #include "scheduling/local_scheduler.hpp"
 #include "comm/msg_queue/message_subscription.hpp"
@@ -63,6 +64,7 @@ public:
             return true;
         if (!_schedulers.count(_key_of_deferred_root_to_resume)) return true;
         if (!_schedulers.at(_key_of_deferred_root_to_resume).canBeginResumptionAsRoot()) {
+            LOG(V4_VVER, "#%i cannot begin resumption as root\n", jobId);
             return false;
         }
         _schedulers.at(_key_of_deferred_root_to_resume).beginResumptionAsRoot();

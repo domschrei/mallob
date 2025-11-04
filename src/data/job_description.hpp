@@ -199,7 +199,6 @@ public:
     void setJobDescriptionId(int descId) {_description_id = descId;}
     void setFirstBalancingEpoch(int nb) {
         _first_balancing_epoch = nb;
-        writeMetadata();
     }
 
     Checksum getChecksum() const {return _checksum;}

@@ -302,10 +302,18 @@ bool ForkedSatJob::appl_isDestructible() {
     // Wrong state?
     if (getState() != PAST) return false;
     // Not initialized (yet)?
-    if (!_initialized) return true;
+    if (!_initialized) {
+        // In this state, we still need to clear any deferred messages,
+        // which we'll never be able to process properly.
+        while (hasDeferredMessage()) {
+            auto msg = getDeferredMessage();
+            msg.msg.returnToSender(msg.source, msg.mpiTag);
+        }
+        return true;
+    }
     // SAT comm. present which is not destructible (yet)?
     if (!_clause_comm->isDestructible()) {
-        _clause_comm->communicate(); // may advance destructibility
+        for (int i = 0; i < 10; i++) _clause_comm->communicate(); // may advance destructibility
         return false;
     }
     // Destructible!
@@ -342,7 +350,7 @@ void ForkedSatJob::appl_communicate() {
 }
 
 void ForkedSatJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
-    if (!_initialized && (ClauseMetadata::enabled() || _params.deterministicSolving()) 
+    if (!_initialized && (_params.proofOutputFile.isSet() || _params.deterministicSolving())
             && msg.tag == MSG_INITIATE_CLAUSE_SHARING) {
         LOG(V2_INFO, "DEFER MSG <= [%i]\n", source);
         deferMessage(source, mpiTag, msg);

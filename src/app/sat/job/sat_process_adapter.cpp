@@ -69,24 +69,35 @@ void SatProcessAdapter::doWriteRevisions() {
     _bg_writer = ProcessWideThreadPool::get().addTask([this]() {
         while (!_terminate && _num_revisions_to_write > 0) {
             RevisionData revData;
+            int desiredRev;
             {
                 auto lock = _mtx_revisions.getLock();
+                desiredRev = _desired_revision;
                 if (_revisions_to_write.empty()) break;
                 revData = _revisions_to_write.front();
-                _revisions_to_write.erase(_revisions_to_write.begin());
+                _revisions_to_write.pop_front();
                 _num_revisions_to_write--;
             }
-            LOG(V4_VVER, "DBG Writing next revision\n");
-            auto revStr = std::to_string(revData.revision);
-            createSharedMemoryBlock("fsize."       + revStr, sizeof(size_t),              (void*)&revData.fSize);
-            const int* fPtr = (const int*) createSharedMemoryBlock("formulae." + revStr, sizeof(int) * revData.fSize,
-                (void*)revData.fLits, revData.revision, revData.descriptionId, true);
-            LOG(V2_INFO, "SUMMARY %s\n", StringUtils::getSummary(fPtr, revData.fSize).c_str());
-            //if (revData.fSize > 0) assert(fPtr[0] != 0);
-            //if (revData.fSize > 0) assert(fPtr[revData.fSize-1] == 0);
-            createSharedMemoryBlock("checksum."    + revStr, sizeof(Checksum),            (void*)&(revData.checksum));
-            _written_revision = revData.revision;
-            LOG(V4_VVER, "DBG Done writing next revision %i\n", revData.revision);
+            while (!_terminate) {
+                auto maybePipe = _guard_pipe.tryLock();
+                if (!maybePipe || !maybePipe.value()->get()->hasSpaceForWriting()) {
+                    if (maybePipe) maybePipe->unlock();
+                    usleep(1000);
+                    continue;
+                }
+                assert(maybePipe.has_value());
+                auto& pipe = maybePipe.value();
+                assert(pipe.locked());
+                LOG(V4_VVER, "DBG Writing next revision\n");
+                std::vector<int> vecRev(revData.fLits, revData.fLits + revData.fSize);
+                vecRev.push_back(revData.revision);
+                vecRev.push_back(desiredRev);
+                assert(revData.revision == _next_revision_to_write);
+                pipe.get()->writeData(std::move(vecRev), CLAUSE_PIPE_START_NEXT_REVISION);
+                LOG(V4_VVER, "DBG Done writing next revision %i\n", revData.revision);
+                _next_revision_to_write++;
+                break;
+            }
         }
         auto lock = _mtx_revisions.getLock();
         _bg_writer_running = false;
@@ -105,20 +116,15 @@ void SatProcessAdapter::run() {
 
 void SatProcessAdapter::doInitialize() {
 
-    // Allocate shared memory for formula, assumptions of initial revision
-    const int* fInShmem = (const int*) createSharedMemoryBlock("formulae.0",
-        sizeof(int) * _f_size, (void*)_f_lits, 0, _desc_id, true);
-    LOG(V2_INFO, "SPA: formula with %lu bytes\n", sizeof(int)*_f_size);
-
     // Set up bi-directional pipe to and from the subprocess
     char* pipeParentToChild = (char*) createSharedMemoryBlock("pipe-parenttochild", _hsm->pipeBufSize, nullptr);
     char* pipeChildToParent = (char*) createSharedMemoryBlock("pipe-childtoparent", _hsm->pipeBufSize, nullptr);
     _guard_pipe.lock()->reset(new BiDirectionalAnytimePipeShmem(
-        {pipeParentToChild, _hsm->pipeBufSize, true},
-        {pipeChildToParent, _hsm->pipeBufSize, true}, true));
+        {pipeParentToChild, _hsm->pipeBufSize},
+        {pipeChildToParent, _hsm->pipeBufSize}, true));
 
     // Create SAT solving child process
-    Subprocess subproc(_params, "mallob_sat_process");
+    Subprocess subproc(_params, "mallob_sat_process", true);
     pid_t res = subproc.start();
 
     // Set up a watchdog
@@ -135,6 +141,17 @@ void SatProcessAdapter::doInitialize() {
         Process::resume(res);
         usleep(1000 * 10); // 10 ms
     }
+
+    // Transfer first formula revision over pipe
+    std::vector<int> rev0(_f_lits, _f_lits + _f_size);
+    rev0.push_back(0); // revision index 0
+    rev0.push_back([&]() {
+        auto lock = _mtx_revisions.getLock();
+        return _desired_revision;
+    }()); // currently (i.e., initially) desired revision
+    assert(_next_revision_to_write == 0);
+    _guard_pipe.lock().get()->writeData(std::move(rev0), CLAUSE_PIPE_START_NEXT_REVISION);
+    _next_revision_to_write = 1;
 
     // Change adapter state
     auto lock = _mtx_state.getLock();
@@ -309,65 +326,67 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
 
     doWriteRevisions();
 
+    if (_event_reapply_solve_state.ready()) applySolvingState();
     if (_state != SolvingStates::ACTIVE) return NORMAL;
 
-    auto pipe = _guard_pipe.lock();
-    char c = pipe.get()->pollForData();
-    if (c == CLAUSE_PIPE_PREPARE_CLAUSES) {
-        _collected_clauses = pipe.get()->readData(c);
+    // Read all available responses from the pipe
+    while (true) {
+        auto maybePipe = _guard_pipe.tryLock();
+        if (!maybePipe) return NORMAL; // try later again
 
-        _successful_solver_id = _collected_clauses.back(); _collected_clauses.pop_back();
-        _nb_incoming_lits = _collected_clauses.back(); _collected_clauses.pop_back();
+        auto& pipe = maybePipe.value();
+        assert(pipe.locked());
+        char c = pipe.get()->pollForData();
+        if (c == 0) return NORMAL;
+        if (c == CLAUSE_PIPE_PREPARE_CLAUSES) {
+            _collected_clauses = pipe.get()->readData(c);
 
-        // read best found objective cost
-        int costAsInts[sizeof(long long)/sizeof(int)];
-        for (size_t i = 0; i < sizeof(long long)/sizeof(int); i++) {
-            costAsInts[sizeof(long long)/sizeof(int) - 1 - i] = _collected_clauses.back();
-            _collected_clauses.pop_back();
+            _successful_solver_id = _collected_clauses.back(); _collected_clauses.pop_back();
+            _nb_incoming_lits = _collected_clauses.back(); _collected_clauses.pop_back();
+
+            // read best found objective cost
+            int costAsInts[sizeof(long long)/sizeof(int)];
+            for (size_t i = 0; i < sizeof(long long)/sizeof(int); i++) {
+                costAsInts[sizeof(long long)/sizeof(int) - 1 - i] = _collected_clauses.back();
+                _collected_clauses.pop_back();
+            }
+            _best_found_objective_cost = * (long long*) costAsInts;
+            if (_best_found_objective_cost != LLONG_MAX)
+                LOG(V4_VVER, "best found objective cost: %lld\n", _best_found_objective_cost);
+
+            _clause_collecting_stage = RETURNED;
+            LOG(V5_DEBG, "collected clauses from subprocess\n");
+        } else if (c == CLAUSE_PIPE_FILTER_IMPORT) {
+            std::vector<int> filter = pipe.get()->readData(c);
+            int epoch = filter.back(); filter.pop_back();
+            _filters_by_epoch[epoch] = std::move(filter);
+        } else if (c == CLAUSE_PIPE_DIGEST_IMPORT) {
+            _last_admitted_nb_lits = pipe.get()->readData(c).front();
+        } else if (c == CLAUSE_PIPE_SOLUTION) {
+            std::vector<int> solution = pipe.get()->readData(c);
+            pipe.unlock();
+            const int resultCode = solution.back(); solution.pop_back();
+            const unsigned long globalStartOfSuccessEpoch = * (unsigned long*) (solution.data()+solution.size()-2);
+            solution.pop_back(); solution.pop_back();
+            const int winningInstance = solution.back(); solution.pop_back();
+            const int solutionRevision = solution.back(); solution.pop_back();
+            if (solutionRevision == _desired_revision) {
+                _solution.result = resultCode;
+                _solution.revision = solutionRevision;
+                _solution.winningInstanceId = winningInstance;
+                _solution.globalStartOfSuccessEpoch = globalStartOfSuccessEpoch;
+                _solution.setSolutionToSerialize(solution.empty() ? nullptr : solution.data(), solution.size());
+                return FOUND_RESULT;
+            }
+            return NORMAL;
+        } else if (c == CLAUSE_PIPE_SUBMIT_PREPROCESSED_FORMULA) {
+            _preprocessed_formula = pipe.get()->readData(c);
+            return FOUND_PREPROCESSED_FORMULA;
         }
-        _best_found_objective_cost = * (long long*) costAsInts;
-        if (_best_found_objective_cost != LLONG_MAX)
-            LOG(V4_VVER, "best found objective cost: %lld\n", _best_found_objective_cost);
-
-        _clause_collecting_stage = RETURNED;
-        LOG(V5_DEBG, "collected clauses from subprocess\n");
-    } else if (c == CLAUSE_PIPE_FILTER_IMPORT) {
-        std::vector<int> filter = pipe.get()->readData(c);
-        int epoch = filter.back(); filter.pop_back();
-        _filters_by_epoch[epoch] = std::move(filter);
-    } else if (c == CLAUSE_PIPE_DIGEST_IMPORT) {
-        _last_admitted_nb_lits = pipe.get()->readData(c).front();
-    } else if (c == CLAUSE_PIPE_SOLUTION) {
-        std::vector<int> solution = pipe.get()->readData(c);
-        pipe.unlock();
-        const int resultCode = solution.back(); solution.pop_back();
-        const unsigned long globalStartOfSuccessEpoch = * (unsigned long*) (solution.data()+solution.size()-2);
-        solution.pop_back(); solution.pop_back();
-        const int winningInstance = solution.back(); solution.pop_back();
-        const int solutionRevision = solution.back(); solution.pop_back();
-        if (solutionRevision == _desired_revision) {
-            _solution.result = resultCode;
-            _solution.revision = solutionRevision;
-            _solution.winningInstanceId = winningInstance;
-            _solution.globalStartOfSuccessEpoch = globalStartOfSuccessEpoch;
-            _solution.setSolutionToSerialize(solution.empty() ? nullptr : solution.data(), solution.size());
-            return FOUND_RESULT;
+        if (_thread_count_update && pipe.get()->hasSpaceForWriting()) {
+            pipe.get()->writeData({_nb_threads}, CLAUSE_PIPE_SET_THREAD_COUNT);
+            _thread_count_update = false;
         }
-    } else if (c == CLAUSE_PIPE_SUBMIT_PREPROCESSED_FORMULA) {
-        _preprocessed_formula = pipe.get()->readData(c);
-        pipe.unlock();
-        return FOUND_PREPROCESSED_FORMULA;
-    }
-    pipe.unlock();
-
-    if (_published_revision < _written_revision) {
-        _published_revision = _written_revision;
-        _guard_pipe.lock().get()->writeData({_desired_revision, _published_revision}, CLAUSE_PIPE_START_NEXT_REVISION);
-    }
-
-    if (_thread_count_update) {
-        _guard_pipe.lock().get()->writeData({_nb_threads}, CLAUSE_PIPE_SET_THREAD_COUNT);
-        _thread_count_update = false;
     }
 
     return NORMAL;
@@ -467,6 +486,7 @@ void SatProcessAdapter::freeSharedMemory() {
     if (_bg_writer.valid()) _bg_writer.get();
 
     // delete shmem-based pipe
+    _guard_pipe.getUnsafe()->terminateAsynchronously();
     _guard_pipe.lock()->reset();
 
     // Clean up shared memory objects created here

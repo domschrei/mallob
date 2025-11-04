@@ -4,7 +4,6 @@
 #include <assert.h>
 #include <ctype.h>
 #include <iostream>
-#include <algorithm>
 #include <string>
 #include <exception>
 #include <initializer_list>
@@ -15,10 +14,10 @@
 
 #include "comm/distributed_termination.hpp"
 #include "comm/mympi.hpp"
+#include "core/mono_job.hpp"
 #include "interface/api/api_registry.hpp"
 #include "interface/api/rank_specific_file_fetcher.hpp"
 #include "scheduling/core_allocator.hpp"
-#include "util/periodic_event.hpp"
 #include "util/sys/subprocess.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
@@ -31,16 +30,10 @@
 #include "util/sys/thread_pool.hpp"
 #include "interface/api/job_streamer.hpp"
 #include "comm/host_comm.hpp"
-#include "data/job_transfer.hpp"
-#include "comm/msg_queue/message_subscription.hpp"
 #include "util/sys/tmpdir.hpp"
-#include "comm/mpi_base.hpp"
-#include "comm/msg_queue/message_handle.hpp"
 #include "comm/msg_queue/message_queue.hpp"
-#include "comm/msgtags.h"
 #include "interface/api/api_connector.hpp"
 #include "interface/json_interface.hpp"
-#include "util/json.hpp"
 #include "util/option.hpp"
 #include "util/sys/background_worker.hpp"
 #include "util/sys/fileutils.hpp"
@@ -55,41 +48,7 @@
 #define MALLOB_SUBPROC_DISPATCH_PATH ""
 #endif
 
-bool monoJobDone = false;
-void introduceMonoJob(Parameters& params, Client& client) {
-
-    // Parse application name
-     /*
-      *  -mono-app=SWEEP to side-step the SAT-app and have this mono-job only execute the Sweep-App
-      */
-    auto app = params.monoApplication();
-    std::transform(app.begin(), app.end(), app.begin(), ::toupper);
-    LOG(V2_INFO, "Assuming application \"%s\" for mono job\n", app.c_str());
-
-    // Write a job JSON for the singular job to solve
-    nlohmann::json json = {
-        {"user", "admin"},
-        {"name", "mono-job"},
-        {"files", {params.monoFilename()}},
-        {"priority", 1.000},
-        {"application", app}
-    };
-    if (params.crossJobCommunication()) json["group-id"] = "1";
-    if (params.jobWallclockLimit() > 0)
-        json["wallclock-limit"] = std::to_string(params.jobWallclockLimit()) + "s";
-    if (params.jobCpuLimit() > 0) {
-        json["cpu-limit"] = std::to_string(params.jobCpuLimit()) + "s";
-    }
-
-    auto result = APIRegistry::get().submit(json, [&](nlohmann::json& response) {
-        // Job done? => Terminate all processes
-        monoJobDone = true;
-    });
-    if (result != JsonInterface::Result::ACCEPT) {
-        LOG(V0_CRIT, "[ERROR] Cannot introduce mono job!\n");
-        abort();
-    }
-}
+std::unique_ptr<MonoJob> monoJob {nullptr};
 
 inline bool doTerminate(Parameters& params, int rank) {
     
@@ -98,7 +57,7 @@ inline bool doTerminate(Parameters& params, int rank) {
         terminate = true;
         MyMpi::broadcastExitSignal();
     }
-    if (monoJobDone || (params.timeLimit() > 0 && Timer::elapsedSecondsCached() > params.timeLimit())) {
+    if ((monoJob && monoJob->done()) || (params.timeLimit() > 0 && Timer::elapsedSecondsCached() > params.timeLimit())) {
         terminate = true;
         MyMpi::broadcastExitSignal();
     }
@@ -152,7 +111,6 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
     // If a client application is provided, run this application in (a) separate thread(s)
     std::list<BackgroundWorker> clientAppWorkers;
     if (params.clientApplication.isSet() && isClient) {
-        // printf("Found client application\n");
         int internalClientRank = MyMpi::rank(commClients);
         int nbThreads = params.clientAppThreads();
         for (size_t i = internalClientRank*nbThreads; i < (internalClientRank+1)*nbThreads; ++i) {
@@ -162,15 +120,17 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
                 assert(params.logDirectory.isSet());
                 std::string appCmd = fetcher.get(params.clientApplication());
                 //+ " 2>&1 > " + params.logDirectory() + "/clientapp." + std::to_string(i);
-                Subprocess subproc(params, appCmd);
+                Subprocess subproc(params, appCmd, false);
                 pid_t res = subproc.start();
             });
         }
     }
 
     // If mono solving mode is enabled, introduce the singular job to solve
-    if (params.monoFilename.isSet() && isClient && MyMpi::rank(commClients) == 0)
-        introduceMonoJob(params, *client);
+    if (params.monoFilename.isSet() && isClient && MyMpi::rank(commClients) == 0) {
+        monoJob.reset(new MonoJob(params));
+        monoJob->submitFirst();
+    }
 
     // Main loop
     while (true) {
@@ -188,7 +148,7 @@ void doMainProgram(MPI_Comm& commWorkers, MPI_Comm& commClients, Parameters& par
         // Check termination
         if (distTerm.triggered())
             Terminator::setTerminating();
-        if (monoJobDone)
+        if (monoJob && monoJob->done() && (!worker || !worker->hasJobsLeftToDelete()))
             Terminator::setTerminating();
         if (params.timeLimit() > 0 && Timer::elapsedSecondsCached() > params.timeLimit())
             Terminator::setTerminating();
@@ -228,7 +188,7 @@ int main(int argc, char *argv[]) {
 
     Parameters params;
     params.init(argc, argv);
-    if (rank == 0) params.printBanner();
+    if (rank == 0 && !params.quiet()) params.printBanner();
 
     longStartupWarnMsg(rank, "Init'd params");
 

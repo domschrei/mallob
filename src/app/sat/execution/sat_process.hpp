@@ -38,11 +38,8 @@ private:
     std::string _shmem_id;
     SatSharedMemory* _hsm;
 
-    int _last_imported_revision;
     int _last_present_revision;
     int _desired_revision;
-
-    std::vector<std::vector<int>> _read_formulae;
 
     bool _has_solution {false};
 
@@ -103,22 +100,25 @@ private:
         char* pipeParentToChild = (char*) accessMemory(_shmem_id + ".pipe-parenttochild", _hsm->pipeBufSize);
         char* pipeChildToParent = (char*) accessMemory(_shmem_id + ".pipe-childtoparent", _hsm->pipeBufSize);
         BiDirectionalAnytimePipeShmem pipe(
-            {pipeChildToParent, _hsm->pipeBufSize, true},
-            {pipeParentToChild, _hsm->pipeBufSize, true},
+            {pipeChildToParent, _hsm->pipeBufSize},
+            {pipeParentToChild, _hsm->pipeBufSize},
             false);
         LOGGER(_log, V4_VVER, "Pipes set up\n");
 
-        // Terminate directly?
-        if (checkTerminate(engine, false)) return;
-
         // Import first revision
         _desired_revision = _config.firstrev;
-        readFormulaAndAssumptionsFromSharedMem(engine, 0);
-        _last_imported_revision = 0;
+        char c;
+        while ((c = pipe.pollForData()) == 0) usleep(100);
+        if (c != CLAUSE_PIPE_START_NEXT_REVISION) {
+            LOG(V0_CRIT, "[ERROR] Expected pipe data %c (START_NEW_REVISION), got %c!\n", CLAUSE_PIPE_START_NEXT_REVISION, c);
+            abort();
+        }
+        std::shared_ptr<std::vector<int>> rev0 {new std::vector<int>(pipe.readData(c))};
+        _desired_revision = popLast(*rev0);
+        int rev = popLast(*rev0);
+        assert(rev == 0);
+        engine.appendRevision(0, {std::move(rev0), {}}, 0 == _desired_revision);
         _last_present_revision = 0;
-        // Import subsequent revisions
-        importRevisions(engine);
-        if (checkTerminate(engine, false)) return;
         
         // Start solver threads
         engine.solve();
@@ -140,7 +140,6 @@ private:
         // Main loop
         while (true) {
 
-            doSleep();
             Timer::cacheElapsedSeconds();
             watchdog.reset(Timer::elapsedSecondsCached());
 
@@ -154,11 +153,10 @@ private:
                 break;
             }
 
-            // Read new revisions as necessary
-            importRevisions(engine);
-
             char c;
+            bool sleep {true};
             while ((c = pipe.pollForData()) != 0) {
+                sleep = false;
 
                 if (c == CLAUSE_PIPE_DUMP_STATS) {
                     LOGGER(_log, V5_DEBG, "DO dump stats\n");
@@ -240,20 +238,26 @@ private:
                     engine.digestHistoricClauses(epochBegin, epochEnd, data);
 
                 } else if (c == CLAUSE_PIPE_REDUCE_THREAD_COUNT) {
-                    LOGGER(_log, V3_VERB, "DO reduce thread count\n");
+                    LOGGER(_log, V4_VVER, "DO reduce thread count\n");
                     pipe.readData(c);
                     engine.reduceActiveThreadCount();
 
                 } else if (c == CLAUSE_PIPE_SET_THREAD_COUNT) {
-                    LOGGER(_log, V3_VERB, "DO set thread count\n");
+                    LOGGER(_log, V4_VVER, "DO set thread count\n");
                     int nbThreads = pipe.readData(c)[0];
                     engine.setActiveThreadCount(nbThreads);
 
                 } else if (c == CLAUSE_PIPE_START_NEXT_REVISION) {
                     LOGGER(_log, V5_DEBG, "DO start next revision\n");
-                    auto data = pipe.readData(c);
-                    _last_present_revision = popLast(data);
-                    _desired_revision = popLast(data);
+                    std::shared_ptr<std::vector<int>> data {new std::vector<int>(pipe.readData(c))};
+                    _desired_revision = popLast(*data);
+                    int rev = popLast(*data);
+                    assert(rev == _last_present_revision+1);
+                    _last_present_revision = rev;
+
+                    engine.appendRevision(_last_present_revision, {data, {}},
+                        _last_present_revision == _desired_revision);
+                    _has_solution = false;
 
                 } else if (c == CLAUSE_PIPE_UPDATE_BEST_FOUND_OBJECTIVE_COST) {
                     LOGGER(_log, V5_DEBG, "DO update best found objective cost\n");
@@ -266,6 +270,8 @@ private:
                     abort();
                 }
             }
+
+            if (sleep) doSleep();
 
             // Check initialization state
             if (!_hsm->isInitialized && engine.isFullyInitialized()) {
@@ -303,7 +309,7 @@ private:
 
             // Do not check solved state if the current 
             // revision has already been solved
-            if (lastSolvedRevision == _last_imported_revision) continue;
+            if (lastSolvedRevision == _last_present_revision) continue;
 
             // Check solved state
             int resultCode = engine.solveLoop();
@@ -320,7 +326,7 @@ private:
                     // Result obsolete
                     continue;
                 }
-                assert(result.revision == _last_imported_revision);
+                assert(result.revision == _last_present_revision);
 
                 std::vector<int> solutionVec = result.extractSolution();
                 int solutionRevision = result.revision;
@@ -361,52 +367,6 @@ private:
         return terminate;
     }
 
-    void readFormulaAndAssumptionsFromSharedMem(SatEngine& engine, int revision) {
-
-        float time = Timer::elapsedSeconds();
-
-        size_t fSize;
-        Checksum checksum;
-        if (revision == 0) {
-            fSize = _hsm->fSize;
-            checksum = _hsm->chksum;
-        } else {
-            size_t* fSizePtr = (size_t*) accessMemory(_shmem_id + ".fsize." + std::to_string(revision), sizeof(size_t));
-            Checksum* chk = (Checksum*) accessMemory(_shmem_id + ".checksum." + std::to_string(revision), sizeof(Checksum));
-            fSize = *fSizePtr;
-            checksum = *chk;
-        }
-
-        std::string formulaShmemId = _shmem_id + ".formulae." + std::to_string(revision);
-        int* descIdPtr = (int*) accessMemory(_shmem_id + ".descid." + std::to_string(revision),
-            sizeof(int), SharedMemory::ARBITRARY, false);
-        if (descIdPtr) {
-            const int descId = *descIdPtr;
-            formulaShmemId = "/edu.kit.iti.mallob.jobdesc." + std::to_string(descId);
-        }
-
-        const int* fPtr = (const int*) accessMemory(formulaShmemId,
-            sizeof(int) * fSize, SharedMemory::READONLY);
-
-        LOGGER(_log, V5_DEBG, "FORMULA rev. %i : %s\n", revision, StringUtils::getSummary(fPtr, fSize).c_str());
-
-        if (_params.copyFormulaeFromSharedMem()) {
-            // Copy formula and assumptions to your own local memory
-            _read_formulae.emplace_back(fPtr, fPtr+fSize);
-
-            // Reference the according positions in local memory when forwarding the data
-            engine.appendRevision(revision, {fSize, _read_formulae.back().data(), checksum},
-                revision == _desired_revision);
-        } else {
-            // Let the solvers read from shared memory directly
-            engine.appendRevision(revision, {fSize, fPtr, checksum}, revision == _desired_revision);
-        }
-
-        time = Timer::elapsedSeconds() - time;
-        LOGGER(_log, V3_VERB, "Read formula rev. %i (size:%lu, chk:%lu,%x) from shared memory in %.4fs\n", revision, fSize,
-            checksum.count(), checksum.get(), time);
-    }
-
     void* accessMemory(const std::string& shmemId, size_t size, SharedMemory::AccessMode accessMode = SharedMemory::ARBITRARY, bool abortOnFailure = true) {
         void* ptr = SharedMemory::access(shmemId, size, accessMode);
         if (abortOnFailure && ptr == nullptr) {
@@ -414,15 +374,6 @@ private:
             abort();
         }
         return ptr;
-    }
-
-    void importRevisions(SatEngine& engine) {
-        while (_last_imported_revision < _last_present_revision) {
-            if (checkTerminate(engine, false)) return;
-            _last_imported_revision++;
-            readFormulaAndAssumptionsFromSharedMem(engine, _last_imported_revision);
-            _has_solution = false;
-        }
     }
 
     void doSleep() {

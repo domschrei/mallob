@@ -205,7 +205,8 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
         LOGGER(_logger, V4_VVER, "Job #%i rev. %i: set job description ID %i\n", id, job->getRevision(), descId);
     } else job->setJobDescriptionId(0);
     if (json.contains("group-id")) {
-        const std::string label = json["user"].get<std::string>() + "." + json["group-id"].get<std::string>();
+        const std::string label = //json["user"].get<std::string>() + "." +
+            json["group-id"].get<std::string>();
         const int groupId = _job_desc_id_allocator.getId(label);
         job->setGroupId(groupId);
         LOGGER(_logger, V4_VVER, "Job #%i rev. %i: set group ID %i\n", id, job->getRevision(), groupId);
@@ -269,7 +270,7 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
 
 void JsonInterface::handleJobDone(JobResult&& result, const JobProcessingStatistics& stats, int applicationId) {
 
-    auto lock = _job_map_mutex.getLock();
+    _job_map_mutex.lock();
 
     assert(_job_id_to_latest_rev.count(result.id));
     int latestRev = _job_id_to_latest_rev[result.id];
@@ -316,7 +317,9 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobProcessingStatist
     };
 
     // Send back feedback over whichever connection the job arrived
+    _job_map_mutex.unlock();
     img->feedback(j);
+    _job_map_mutex.lock();
 
     if (useSolutionFile) {
         ProcessWideThreadPool::get().addTask([solutionFile, sol = result.extractSolution()]() {
@@ -341,4 +344,5 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobProcessingStatist
         _job_id_to_image.erase(result.id);
         delete img;
     }
+    _job_map_mutex.unlock();
 }

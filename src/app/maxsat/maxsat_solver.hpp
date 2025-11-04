@@ -1,10 +1,6 @@
 
 #pragma once
 
-#include "app/maxsat/encoding/cardinality_encoding.hpp"
-#include "app/maxsat/encoding/generalized_totalizer.hpp"
-#include "app/maxsat/encoding/polynomial_watchdog.hpp"
-#include "app/maxsat/encoding/warners_adder.hpp"
 #include "app/maxsat/maxsat_instance.hpp"
 #include "app/maxsat/maxsat_search_procedure.hpp"
 #include "app/maxsat/parse/maxsat_reader.hpp"
@@ -12,9 +8,9 @@
 #include "app/sat/data/definitions.hpp"
 #include "app/sat/job/sat_constants.h"
 #include "comm/mympi.hpp"
+#include "core/dtask_tracker.hpp"
 #include "data/job_description.hpp"
 #include "data/job_result.hpp"
-#include "data/job_transfer.hpp"
 #include "interface/api/api_connector.hpp"
 #include <algorithm>
 #include <climits>
@@ -22,18 +18,13 @@
 #include <memory>
 #include <unistd.h>
 #include "robin_set.h"
-#include "scheduling/core_allocator.hpp"
 #include "util/logger.hpp"
-#include "rustsat.h" // external
-#include "util/string_utils.hpp"
 #include "util/sys/terminator.hpp"
 #include "util/params.hpp"
 #include "util/sys/watchdog.hpp"
 #if MALLOB_USE_MAXPRE == 1
 #include "parse/static_maxsat_parser_store.hpp"
 #endif
-
-void maxsat_collect_clause_for_shared_encoding(int lit, void* data);
 
 // A MaxSAT solving approach based on solution improving search, i.e., 
 // a sequence of SAT calls which impose varying restrictions on admissible
@@ -50,7 +41,6 @@ private:
 
     std::unique_ptr<MaxSatInstance> _instance; // the problem instance we're solving
 
-    bool _shared_encoder;
     MaxSatSearchProcedure::EncodingStrategy _encoding_strat;
     std::vector<int> _shared_lits_to_add;
 
@@ -83,12 +73,15 @@ private:
     std::future<void> _fut_instance_update;
     std::atomic_long _maxpre_tid;
 
+    DTaskTracker _dtask_tracker;
+
 public:
     // Initializes the solver instance and parses the description's formula.
     MaxSatSolver(const Parameters& params, APIConnector& api, JobDescription& desc) :
-        _params(params), _api(api), _desc(desc) {
+        _params(params), _api(api), _desc(desc), _dtask_tracker(_params) {
 
         LOG(V2_INFO, "Mallob client-side MaxSAT solver, by Jeremias Berg & Dominik Schreiber\n");
+
         parseFormula();
         pickEncodingStrategy();
     }
@@ -163,11 +156,9 @@ public:
             searches.emplace_back(initializeSearchProcedure(c, i, searchStrats.size()));
             searches.back()->setDescriptionLabelForNextCall("base-formula-" + std::to_string(updateLayer));
 
-            // If everybody uses their own encoder, we can still put all of them in the same cross-sharing group
+            // While everybody uses their own encoder, we can put all of them in the same cross-sharing group
             // due to the consistent naming of variables across all encoders.
-            if (!_shared_encoder) {
-                searches.back()->setGroupId("consistent-logic-" + std::to_string(updateLayer)/*, 1, _instance->nbVars*/);
-            }
+            searches.back()->setGroupId("consistent-logic-" + std::to_string(updateLayer)/*, 1, _instance->nbVars*/);
 
             if (writer) searches.back()->setSolutionWriter(writer);
         }
@@ -226,28 +217,6 @@ public:
             // if we have a "constructive" upper bound, the best known cost minus one
             _instance->intervalSearch->init(_instance->lowerBound,
                 std::min(_instance->upperBound, _instance->bestCost-1));
-        }
-
-        if (_shared_encoder) {
-            // Initialize cardinality constraint encoder.
-            std::shared_ptr<CardinalityEncoding> encoder;
-            if (_encoding_strat == MaxSatSearchProcedure::WARNERS_ADDER)
-                encoder.reset(new WarnersAdder(_instance->nbVars, _instance->objective));
-            if (_encoding_strat == MaxSatSearchProcedure::DYNAMIC_POLYNOMIAL_WATCHDOG)
-                encoder.reset(new PolynomialWatchdog(_instance->nbVars, _instance->objective));
-            if (_encoding_strat == MaxSatSearchProcedure::GENERALIZED_TOTALIZER)
-                encoder.reset(new GeneralizedTotalizer(_instance->nbVars, _instance->objective));
-            encoder->setClauseCollector([&](int lit) {_shared_lits_to_add.push_back(lit);});
-            encoder->setAssumptionCollector([&](int lit) {abort();}); // no assumptions at this stage!
-            encoder->encode(_instance->lowerBound, _instance->upperBound, _instance->upperBound);
-
-            // Add the encoder and its encoding to each search
-            for (auto& search : searches) {
-                search->setSharedEncoder(encoder);
-                search->setDescriptionLabelForNextCall("initial-bounds-" + std::to_string(updateLayer));
-                search->setGroupId("common-logic-" + std::to_string(updateLayer)); // enable cross job clause sharing
-                search->appendLiterals(_shared_lits_to_add);
-            }
         }
 
         // Main loop for solution improving search.
@@ -497,7 +466,6 @@ private:
     }
 
     void pickEncodingStrategy() {
-        _shared_encoder = _params.maxSatSharedEncoder();
         switch (_params.maxSatCardinalityEncoding()) {
         case 0: {_encoding_strat = MaxSatSearchProcedure::WARNERS_ADDER; break;}
         case 1: {_encoding_strat = MaxSatSearchProcedure::DYNAMIC_POLYNOMIAL_WATCHDOG; break;}
@@ -644,7 +612,7 @@ private:
             break;
         }
         // Initialize search procedure
-        auto p = new MaxSatSearchProcedure(_params, _api, _desc,
+        auto p = new MaxSatSearchProcedure(_params, _api, _desc, _dtask_tracker,
             *_instance, _encoding_strat, searchStrat, label);
         return p;
     }

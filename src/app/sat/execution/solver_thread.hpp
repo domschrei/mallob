@@ -38,7 +38,7 @@ private:
     Logger& _logger;
     std::thread _thread;
 
-    std::vector<std::unique_ptr<SerializedFormulaParser>> _pending_formulae;
+    std::vector<std::shared_ptr<SerializedFormulaParser>> _pending_formulae;
     std::vector<int> _pending_assumptions;
 
     SplitMix64Rng _rng;
@@ -68,7 +68,7 @@ private:
     std::atomic_bool _terminated = false;
     bool _in_solve_call = false;
 
-    bool _found_result = false;
+    int _found_result_rev = -1;
     JobResult _result;
 
 public:
@@ -78,7 +78,7 @@ public:
 
     void start();
     void appendRevision(int revision, RevisionData data);
-    void setTerminate(bool cleanUpAsynchronously = false) {
+    void setTerminate(bool doCleanUpAsynchronously = false) {
         {
             auto lock = _state_mutex.getLock();
             if (_terminated) return;
@@ -87,14 +87,16 @@ public:
         _state_cond.notify();
         _solver.setTerminate();
         // Clean up solver
-        if (cleanUpAsynchronously) {
-            while (_thread.joinable() && !_initialized) usleep(1000);
-            _solver.cleanUp();
-            // also asynchronously close LRAT pipelines
+        if (doCleanUpAsynchronously) cleanUpAsynchronously();
+    }
+    void cleanUpAsynchronously() {
+        while (_thread.joinable() && !_initialized) usleep(1000);
+        _solver.cleanUp();
+        // also asynchronously close LRAT pipelines
+        if (_initialized) {
             if (_lrat) _lrat->stop();
-            if (_solver.getSolverSetup().owningModelCheckingLratConnector) {
+            if (_solver.getSolverSetup().owningModelCheckingLratConnector)
                 _solver.getSolverSetup().modelCheckingLratConnector->stop();
-            }
         }
     }
     void tryJoin() {if (_thread.joinable()) _thread.join();}
@@ -107,7 +109,7 @@ public:
     }
     bool hasFoundResult(int revision) {
         auto lock = _state_mutex.getLock();
-        return _initialized && _active_revision == revision && _found_result;
+        return _initialized && _active_revision == revision && _found_result_rev == revision;
     }
     JobResult& getSatResult() {
         return _result;

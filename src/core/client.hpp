@@ -154,6 +154,7 @@ public:
     int getInternalRank();
     std::string getFilesystemInterfacePath();
     std::string getSocketPath();
+    int getNbActiveJobs() const {return _active_jobs.size();}
 
 private:
     void readIncomingJobs();

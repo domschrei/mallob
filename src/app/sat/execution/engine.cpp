@@ -6,6 +6,7 @@
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "app/sat/data/revision_data.hpp"
 #include "app/sat/data/theories/theory_specification.hpp"
+#include "app/sat/solvers/solving_replay.hpp"
 #include "util/logger.hpp"
 #include "util/sys/fileutils.hpp"
 #include "util/sys/thread_pool.hpp"
@@ -90,6 +91,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		ClauseMetadata::enableClauseIds();
 		if (_params.onTheFlyChecking()) {
 			ClauseMetadata::enableClauseSignatures();
+			ClauseMetadata::enableIncrementalSignatures();
 		}
 
 		if (_params.proofOutputFile.isSet()) {
@@ -119,12 +121,15 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	const int divOffsetPrefix = appConfig.map.count(keyPrefix) ? atoi(appConfig.map[keyPrefix].c_str()) : 0;
 	const int divOffsetCycle = appConfig.map.count(keyCycle) ? atoi(appConfig.map[keyCycle].c_str()) : 0;
 	// Read # clauses and # vars from app config
-	int numClauses, numVars;
+	int numClauses, numVars, epochOffset, epochModulus;
 	std::vector<std::pair<int*, std::string>> fields {
 		{&numClauses, "__NC"},
-		{&numVars, "__NV"}
+		{&numVars, "__NV"},
+		{&epochOffset, "__EO"},
+		{&epochModulus, "__EM"},
 	};
 	for (auto [out, id] : fields) {
+		if (!appConfig.map.count(id)) continue;
 		std::string str = appConfig.map[id];
 		while (str[str.size()-1] == '.') 
 			str.resize(str.size()-1);
@@ -188,8 +193,11 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	SolverSetup setup;
 	setup.logger = &_logger;
 	setup.jobname = config.getJobStr();
+	setup.jobId = config.jobid;
 	setup.baseSeed = params.seed();
 	setup.isJobIncremental = config.incremental;
+	setup.replayMode = _params.replay() == 1 ? SolvingReplay::RECORD :
+		(_params.replay() == 2 ? SolvingReplay::REPLAY : SolvingReplay::NONE);
 	setup.strictMaxLitsPerClause = params.strictClauseLengthLimit();
 	setup.strictLbdLimit = params.strictLbdLimit();
 	setup.qualityMaxLitsPerClause = params.qualityClauseLengthLimit();
@@ -243,9 +251,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.numVars = numVars;
 	setup.numOriginalClauses = numClauses;
 	setup.proofDir = proofDirectory;
-	setup.sigFormula = appConfig.map["__SIG"];
 	LratConnector* modelCheckingLratConnector {nullptr};
-	setup.nbSkippedIdEpochs = config.nbPreviousBalancingEpochs;
+	setup.nbSkippedIdEpochs = std::max(0, epochOffset + epochModulus * config.nbPreviousBalancingEpochs);
 	if (params.satProfilingLevel() >= 0) {
 		setup.profilingBaseDir = params.satProfilingDir();
 		if (setup.profilingBaseDir.empty()) setup.profilingBaseDir = TmpDir::getGeneralTmpDir();
@@ -288,6 +295,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		setup.certifiedUnsat = item.outputProof && (params.proofOutputFile.isSet() || params.onTheFlyChecking());
 		setup.onTheFlyChecking = setup.certifiedUnsat && params.onTheFlyChecking();
 		setup.onTheFlyCheckModel = params.onTheFlyChecking() && params.onTheFlyCheckModel();
+		setup.trustedParserForced = params.forceIncrementalTrustedParser();
 		setup.modelCheckingLratConnector = modelCheckingLratConnector;
 		setup.avoidUnsatParticipation = (params.proofOutputFile.isSet() || params.onTheFlyChecking()) && !item.outputProof;
 		setup.exportClauses = !setup.avoidUnsatParticipation;
@@ -362,11 +370,11 @@ std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSe
 
 void SatEngine::appendRevision(int revision, RevisionData data, bool lastRevisionForNow) {
 	
-	LOGGER(_logger, V4_VVER, "Import rev. %i: size %lu\n", revision, data.fSize);
+	LOGGER(_logger, V4_VVER, "Import rev. %i: size %lu\n", revision, data.fLits->size());
 	assert(_revision+1 == revision);
 	_revision_data.push_back(data);
 	_sharing_manager->setImportedRevision(revision);
-	_prefilter.notifyFormula(data.fLits, data.fSize);
+	_prefilter.notifyFormula(data.fLits->data(), data.fLits->size());
 	
 	for (size_t i = 0; i < _num_active_solvers; i++) {
 		if (revision == 0) {
@@ -415,6 +423,7 @@ void SatEngine::appendRevision(int revision, RevisionData data, bool lastRevisio
 			}
 		}
 	}
+	_revision_data.back().fLits.reset(); // formula increment no longer needed here
 	_revision = revision;
 }
 
@@ -557,16 +566,16 @@ void SatEngine::setActiveThreadCount(int nbThreads) {
 		_sharing_manager->stopClauseImport(i);
 		SolverSetup s = _solver_interfaces[i]->getSolverSetup();
 		s.solverRevision++;
-		_solver_threads[i]->setTerminate(true);
+		_solver_threads[i]->setTerminate(false);
 		auto movedSolver = std::move(_solver_interfaces[i]);
 		_solver_interfaces[i] = createSolver(s);
 		auto movedThread = std::move(_solver_threads[i]);
 		_solver_threads[i] = std::shared_ptr<SolverThread>(new SolverThread(
 			_params, _config, _solver_interfaces[i], {}, i
 		));
-		_solver_threads[i]->setTerminate();
 		_num_active_solvers--;
 		_solver_thread_cleanups.push_back(ProcessWideThreadPool::get().addTask([thread = std::move(movedThread), solver = std::move(movedSolver)]() mutable {
+			thread->cleanUpAsynchronously();
 			thread->tryJoin();
 			thread.reset();
 			solver.reset();

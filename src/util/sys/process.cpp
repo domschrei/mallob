@@ -22,7 +22,7 @@ Mutex Process::_children_mutex;
 std::set<pid_t> Process::_children;
 long Process::_main_tid;
 
-std::atomic_bool Process::_exit_signal_caught = false;
+volatile bool Process::_exit_signal_caught = false;
 std::atomic_int Process::_exit_signal = 0;
 std::atomic_long Process::_signal_tid = 0;
 
@@ -35,12 +35,13 @@ void handleSignal(int signum) {
     // Do not recursively catch signals (if something goes wrong in here)
     if (Process::_exit_signal_caught) return;
 
+    // If crash, try to write a trace of the concerned thread with gdb
+    if (Process::isCrash(signum)) Process::writeTrace(Proc::getTid());
+
+    Logger::getMainInstance().flush();
     Process::_exit_signal_caught = true;
     Process::_exit_signal = signum;
     Process::_signal_tid = Proc::getTid();
-
-    // If crash, try to write a trace of the concerned thread with gdb
-    if (Process::isCrash(signum)) Process::writeTrace(Proc::getTid());
 
     // Impose a hard timeout for this process' lifetime from this point,
     // to avoid indeterminate freezes

@@ -12,6 +12,7 @@
 
 #include "robin_map.h"
 #include "util/logger.hpp"
+#include "util/periodic_event.hpp"
 #include "util/robin_hood.hpp"
 #include "util/sys/bidirectional_anytime_pipe.hpp"
 #include "util/sys/bidirectional_anytime_pipe_shmem.hpp"
@@ -100,13 +101,12 @@ private:
     pid_t _child_pid = -1;
     SolvingStates::SolvingState _state = SolvingStates::INITIALIZING;
 
-    std::atomic_int _written_revision = 0;
-    int _published_revision = 0;
     int _desired_revision = -1;
     int _clause_buffer_revision = -1;
 
     std::atomic_int _num_revisions_to_write = 0;
     std::list<RevisionData> _revisions_to_write;
+    int _next_revision_to_write {0};
     Mutex _mtx_revisions;
     Mutex _mtx_state;
     unsigned long _sum_of_revision_sizes {0};
@@ -117,6 +117,8 @@ private:
 
     JobResult _solution;
     std::vector<int> _preprocessed_formula;
+
+    PeriodicEvent<200> _event_reapply_solve_state;
 
 public:
     SatProcessAdapter(Parameters&& params, SatProcessConfig&& config,

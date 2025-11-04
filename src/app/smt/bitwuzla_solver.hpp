@@ -1,18 +1,19 @@
 
 #pragma once
 
-#include "app/smt/bitwuzla_sat_connector.hpp"
+#include "app/smt/bitwuzllob_sat_solver_factory.hpp"
+#include "core/dtask_tracker.hpp"
 #include "data/job_description.hpp"
 #include "data/job_result.hpp"
 #include "interface/api/api_connector.hpp"
-#include "scheduling/core_allocator.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
 
 #include "bitwuzla/cpp/parser.h"
 #include "bitwuzla/cpp/bitwuzla.h"
-#include "bitwuzla/cpp/sat_solver_factory.h"
-#include "bitwuzla/cpp/main.h"
+
+#include <cstdint>
+#include <cstdio>
 
 class BitwuzlaSolver {
 
@@ -21,14 +22,23 @@ private:
     APIConnector& _api;
     JobDescription& _desc;
     std::string _problem_file;
-    CoreAllocator::Allocation _core_alloc;
+    float _start_time = (float) INT32_MAX;
 
     std::string _name;
 
+    struct BzllobTerminator : public bitwuzla::Terminator {
+        std::function<bool()> cb;
+        BzllobTerminator(std::function<bool()> cb) : cb(cb) {}
+        virtual bool terminate() {
+            return cb();
+        }
+    } _terminator;
+
 public:
     BitwuzlaSolver(const Parameters& params, APIConnector& api, JobDescription& desc, const std::string& problemFile) :
-            _params(params), _api(api), _desc(desc), _problem_file(problemFile), _core_alloc(1),
-            _name("#" + std::to_string(desc.getId()) + "(SMT)") {
+            _params(params), _api(api), _desc(desc), _problem_file(problemFile),
+            _name("#" + std::to_string(desc.getId()) + "(SMT)"),
+            _terminator([&]() {return isTimeoutHit(&_params, &_desc, _start_time);}) {
 
         LOG(V2_INFO,"SMT Bitwuzla+Mallob %s\n", _name.c_str());
     }
@@ -37,103 +47,145 @@ public:
     }
 
     JobResult solve() {
+        _start_time = Timer::elapsedSeconds();
 
         bitwuzla::Options options;
         bitwuzla::TermManager tm;
 
-        std::vector<char*> argVec;
-        argVec.push_back("./bitwuzla");
-        argVec.push_back((char*) _problem_file.c_str());
-        argVec.push_back("--print-model");
-        argVec.push_back("-v");
-        int argc = argVec.size();
-        char** argv = argVec.data();
-
-        std::vector<std::string> args;
-        bzla::main::Options main_options =
-            bzla::main::parse_options(argc, argv, args);
-
         auto out = &std::cout;
-        if (_params.solutionToFile.isSet()) {
-            out = new std::ofstream(_params.solutionToFile());
+        bool smtOutFileSet = false;
+        if (_desc.getAppConfiguration().map.count("smt-out-file")) {
+            LOG(V2_INFO, "SMT Using smt-out-file %s\n", _desc.getAppConfiguration().map["smt-out-file"].c_str());
+            out = new std::ofstream(_desc.getAppConfiguration().map["smt-out-file"]);
+            smtOutFileSet = true;
+        } else if (_params.smtOutputFile.isSet()) {
+            LOG(V2_INFO, "SMT Using smt-out-file %s\n", _params.smtOutputFile().c_str());
+            out = new std::ofstream(getSmtOutputFilePath(_params, _desc.getId()));
+            smtOutFileSet = true;
+        } else {
+            LOG(V2_INFO, "SMT Using NO smt-out-file\n");
         }
 
-        // This instruction replaces the internal SAT solver of Bitwuzla with a Mallob-connected solver.
-        bzla::sat::ExternalSatSolver::new_sat_solver = [&, out, name=_name]() {
-            auto sat = new BitwuzlaSatConnector(_params, _api, _desc, name); // cleaned up by Bitwuzla
-            //sat->outputModels(out); // for debugging
-            return sat;
-        };
+        // Default top-level Bitwuzla options
+        bool print_no_letify = false, print_formula = false, pp_only = false, parse_only = false;
+        bool print_model = false;
+        uint8_t bv_format = 2;
+        std::string language = "smt2";
+
+        // Parse Bitwuzla options
+        std::string bzlaArgsString = _params.bitwuzlaArgs();
+        if (_desc.getAppConfiguration().map.count("smt-args"))
+            bzlaArgsString += "," + _desc.getAppConfiguration().map["smt-args"];
+        std::stringstream ss(bzlaArgsString);
+        string arg;
+        std::vector<std::string> opts;
+        while (!bzlaArgsString.empty() && getline(ss, arg, ',')) {
+            if (arg.empty()) continue;
+            std::string lhs, rhs;
+            int ll = (arg.size()>0 && arg[0]=='-') + (arg.size()>1 && arg[1]=='-');
+            int lr = ll + 1;
+            while (lr < arg.size() && arg[lr] != '=') lr++;
+            if (lr < arg.size()) {
+                // -a=b
+                lhs = arg.substr(ll, lr-ll);
+                rhs = arg.substr(lr+1);
+            } else {
+                // -a
+                lhs = arg.substr(ll);
+            }
+            LOG(V2_INFO, "SMT Appending Bitwuzla arg: %s := %s\n", lhs.c_str(), rhs.c_str());
+            if (rhs.empty() && lhs == "print-unsat-core")
+                options.set(bitwuzla::Option::PRODUCE_UNSAT_CORES, 1);
+            else if (rhs.empty() && lhs == "print-model") {
+                options.set(bitwuzla::Option::PRODUCE_MODELS, 1);
+                print_model = true;
+            }
+            else if (rhs.empty() && lhs == "print-formula") print_formula = true;
+            else if (rhs.empty() && lhs == "print-no-letify") print_no_letify = true;
+            else if (rhs.empty() && lhs == "pp-only") pp_only = true;
+            else if (rhs.empty() && (lhs == "parse-only" || lhs == "P")) parse_only = true;
+            else if (!rhs.empty() && lhs == "bv-output-format") bv_format = atoi(rhs.c_str());
+            else if (!rhs.empty() && lhs == "lang") language = rhs;
+            else opts.push_back(arg);
+        }
+        options.set(opts);
+        float endTime = getEndTime(&_params, &_desc, _start_time);
+        if (endTime < INT32_MAX)
+            options.set(bitwuzla::Option::TIME_LIMIT_PER, 1000.f * (endTime - Timer::elapsedSeconds()));
+
+        DTaskTracker dTaskTracker(_params);
+        std::unique_ptr<BitwuzllobSatSolverFactory> factory;
 
         try {
-            bzla::main::set_time_limit(main_options.time_limit);
-            options.set(args);
+            *out << bitwuzla::set_bv_format(bv_format);
+            *out << bitwuzla::set_letify(!print_no_letify);
 
-            if (main_options.print_unsat_core) {
-                options.set(bitwuzla::Option::PRODUCE_UNSAT_CORES, 1);
-            }
-            if (main_options.print_model) {
-                options.set(bitwuzla::Option::PRODUCE_MODELS, 1);
-            }
+            factory = std::make_unique<BitwuzllobSatSolverFactory>(
+                _params, _api, _desc, dTaskTracker,
+                _terminator, _name, options);
 
-            *out << bitwuzla::set_bv_format(main_options.bv_format);
-            *out << bitwuzla::set_letify(!main_options.print_no_letify);
             bitwuzla::parser::Parser parser(
-                tm, options, main_options.language, out);
-            parser.configure_auto_print_model(main_options.print_model);
+                tm, *factory.get(), options, language, out);
+            parser.configure_auto_print_model(print_model);
+            parser.configure_terminator(&_terminator);
             parser.parse(
-                main_options.infile_name,
-                main_options.print || main_options.pp_only || main_options.parse_only
+                _problem_file,
+                print_formula || pp_only || parse_only
             );
-            bzla::main::reset_time_limit();
             auto bitwuzla = parser.bitwuzla();
 
-            if (main_options.pp_only) {
-                bitwuzla->simplify();
-            }
-            if (main_options.print) {
-                if (!main_options.parse_only && !main_options.pp_only) {
-                    bitwuzla->simplify();
-                }
+            if (pp_only) bitwuzla->simplify();
+            if (print_formula) {
+                if (!parse_only && !pp_only) bitwuzla->simplify();
                 bitwuzla->print_formula(*out, "smt2");
             }
 
-            if (main_options.print_unsat_core) {
-                bitwuzla->print_unsat_core(*out);
-            }
-
-            if (options.get(bitwuzla::Option::VERBOSITY)) {
-                auto stats = bitwuzla->statistics();
-                for (auto& [name, val] : stats) {
-                    *out << name << ": " << val << std::endl;
-                }
-            }
-
         } catch (const bitwuzla::parser::Exception& e) {
-            bzla::main::Error() << e.msg();
+            LOG(V0_CRIT, "[ERROR] exception in Bitwuzla parser: %s\n", e.msg().c_str());
         } catch (const bitwuzla::Exception& e) {
             //// Remove the "invalid call to '...', prefix
             if (e.msg().find("invalid call") == 0) {
                 const std::string& msg = e.msg();
                 size_t pos             = msg.find("', ");
-                bzla::main::Error() << msg.substr(pos + 3);
+                LOG(V0_CRIT, "[ERROR] exception in Bitwuzla program: %s\n", msg.substr(pos+3).c_str());
             } else {
-                bzla::main::Error() << e.msg();
+                LOG(V0_CRIT, "[ERROR] exception in Bitwuzla program: %s\n", e.msg().c_str());
             }
         } catch (...) {
             LOG(V0_CRIT, "[ERROR] uncaught exception in Bitwuzla program\n");
             abort();
         }
 
-        if (_params.solutionToFile.isSet()) {
-            delete out;
-        }
+        factory.reset(); // cleans up any dangling solvers
+
+        if (smtOutFileSet) delete out;
 
         JobResult res;
         res.id = _desc.getId();
         res.revision = 0;
         res.result = 20;
         LOG(V2_INFO,"SMT return result\n");
+
         return res;
+    }
+
+    static std::string getSmtOutputFilePath(const Parameters& params, int jobId) {
+        return params.smtOutputFile() + (params.monoFilename.isSet() ? "" : "." + std::to_string(jobId));
+    }
+
+    static bool isTimeoutHit(const Parameters* params, JobDescription* desc, float startTime) {
+        if (Terminator::isTerminating())
+            return true;
+        if (Timer::elapsedSeconds() > getEndTime(params, desc, startTime))
+            return true;
+        return false;
+    }
+    static float getEndTime(const Parameters* params, JobDescription* desc, float startTime) {
+        float endTime = INT32_MAX;
+        if (params->timeLimit() > 0)
+            endTime = std::min(endTime, startTime + params->timeLimit());
+        if (desc->getWallclockLimit() > 0)
+            endTime = std::min(endTime, startTime + desc->getWallclockLimit());
+        return endTime;
     }
 };

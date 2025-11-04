@@ -6,6 +6,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <future>
+#include <optional>
 
 #include "util/assert.hpp"
 
@@ -17,6 +18,7 @@ public:
 	void lock();
 	void unlock();
 	std::unique_lock<std::mutex> getLock();
+	std::unique_lock<std::mutex> getTryLock();
 	bool tryLock();
 };
 
@@ -39,6 +41,8 @@ private:
 	T& _obj;
 public:
 	MutexLockedData(T& obj, Mutex& mtx) : _mtx(mtx.getLock()), _obj(obj) {}
+	MutexLockedData(T& obj, std::unique_lock<std::mutex>&& lock) : _mtx(std::move(lock)), _obj(obj) {}
+	bool locked() const {return _mtx.owns_lock();}
 	void unlock() {if (_mtx.owns_lock()) _mtx.unlock();}
 	T& operator*() {assert(_mtx.owns_lock()); return _obj;}
 	T* operator->() {assert(_mtx.owns_lock()); return &_obj;}
@@ -55,6 +59,14 @@ public:
 	GuardedData(T&& obj) : _obj(std::move(obj)) {}
 	[[nodiscard]] MutexLockedData<T> lock() {
 		return MutexLockedData<T>(_obj, _mtx);
+	}
+	[[nodiscard]] std::optional<MutexLockedData<T>> tryLock() {
+		auto out = MutexLockedData<T>(_obj, _mtx.getTryLock());
+		if (out.locked()) return out;
+		return {};
+	}
+	T& getUnsafe() {
+		return _obj;
 	}
 };
 

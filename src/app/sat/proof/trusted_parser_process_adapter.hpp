@@ -1,12 +1,17 @@
 
 #pragma once
 
+#include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <string>
 #include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "app/sat/proof/impcheck.hpp"
 #include "trusted/trusted_utils.hpp"
+#include "util/logger.hpp"
 #include "util/sys/fileutils.hpp"
 #include "util/sys/proc.hpp"
 #include "util/sys/subprocess.hpp"
@@ -16,82 +21,157 @@ class TrustedParserProcessAdapter {
 
 private:
     int _base_seed;
+    std::ofstream _ofs_formula_to_parser;
 
-    int _id;
+    std::string _name;
+    std::string _path_parsed_formula;
     FILE* _f_parsed_formula;
     Subprocess* _subproc {nullptr};
     pid_t _child_pid;
 
+    std::vector<int> _f_buf;
+    int _f_buf_size {0};
+    int _f_buf_idx {0};
+
+    enum ParsingStage {LIT, ASMPT, SIG} _stage;
+    int _sig_nb_read {0};
+
     signature _sig;
-    int _nb_vars;
-    int _nb_cls;
+    int _nb_vars {0};
+    int _nb_cls {0};
+    int _nb_asmpt {0};
     unsigned long _f_size {0};
 
+    bool _eof {false};
+
 public:
-    TrustedParserProcessAdapter(int baseSeed, int id) : _base_seed(baseSeed), _id(id) {}
+    TrustedParserProcessAdapter(int baseSeed, const std::string& name) : _base_seed(baseSeed), _name(name), _f_buf(1<<14) {}
     ~TrustedParserProcessAdapter() {
+        _ofs_formula_to_parser.close();
+        fclose(_f_parsed_formula);
+        FileUtils::rm(_path_parsed_formula);
         if (_subproc) delete _subproc;
     }
 
-    template <typename T>
-    bool parseAndSign(const char* source, std::vector<T>& out, uint8_t*& outSignature) {
+    void setup(const char* source, bool createSourceAsPipe) {
         auto basePath = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob." + std::to_string(Proc::getPid())
-            + ".tsparse." + std::to_string(_id);
-        auto pathParsedFormula = basePath + ".parsedformula";
-        mkfifo(pathParsedFormula.c_str(), 0666);
+            + ".tsparse." + _name;
+        _path_parsed_formula = basePath + ".parsedformula";
+
+        int res = mkfifo(_path_parsed_formula.c_str(), 0666);
+        assert(res != -1);
+        if (createSourceAsPipe) {
+            res = mkfifo(source, 0666);
+            assert(res != -1);
+        }
 
         Parameters params;
-        params.formulaInput.set(source);
-        params.fifoParsedFormula.set(pathParsedFormula);
-
         unsigned long keySeed = ImpCheck::getKeySeed(_base_seed);
-        std::string moreArgs = "-key-seed=" + std::to_string(keySeed);
-
-        _subproc = new Subprocess(params, "impcheck_parse", moreArgs);
+        std::string moreArgs = "-key-seed=" + std::to_string(keySeed)
+            + " -formula=" + source
+            + " -output=" + _path_parsed_formula
+            + " -input-log=" + (Logger::getMainInstance().getLogDir().empty() ? "." : Logger::getMainInstance().getLogDir())
+                + "/parser-input." + _name;
+        _subproc = new Subprocess(params, "impcheck_parse", moreArgs, false);
         _child_pid = _subproc->start();
+        // Non-blocking reading so that we can read until the end of an increment
+        int fd = open(_path_parsed_formula.c_str(), O_RDONLY | O_NONBLOCK);
+        _f_parsed_formula = fdopen(fd, "r");
 
-        _f_parsed_formula = fopen(pathParsedFormula.c_str(), "r");
+        if (createSourceAsPipe) _ofs_formula_to_parser = std::ofstream(source);
+    }
+    std::ofstream& getFormulaToParserStream() {
+        assert(_ofs_formula_to_parser.is_open());
+        return _ofs_formula_to_parser;
+    }
 
-        // Parse # vars and # clauses
-        _nb_vars = TrustedUtils::readInt(_f_parsed_formula);
-        _nb_cls = TrustedUtils::readInt(_f_parsed_formula);
-        LOG(V3_VERB, "TPPA Parsed %i vars, %i cls\n", _nb_vars, _nb_cls);
+    inline bool processNextIntAndCheckDone(int& x) {
+
+        while (_f_buf_idx == _f_buf_size) {
+            // Read next chunk
+            _f_buf_size = UNLOCKED_IO(fread)(_f_buf.data(),
+                sizeof(int), _f_buf.size(), _f_parsed_formula);
+            assert(_f_buf_size >= 0);
+            _f_buf_idx = 0;
+        }
+
+        x = _f_buf[_f_buf_idx++];
+        _f_size++;
+
+        // Premature termination marker?
+        if (_stage != SIG && x == INT32_MIN) {
+            _eof = true;
+            LOG(V2_INFO, "TPPA BREAK : %i\n", Process::didChildExit(_child_pid) ? 1 : 0);
+            x = 0;
+            return false;
+        }
+
+        if (_stage == LIT && x == INT32_MAX) {
+            _stage = ASMPT;
+            return false;
+        }
+        if (_stage == ASMPT && x == 0) {
+            _stage = SIG;
+            return false;
+        }
+        if (_stage == SIG) {
+            if (_sig_nb_read == 4) {
+                assert(x == INT32_MIN);
+                return true;
+            }
+            _sig_nb_read++;
+            return false;
+        }
+
+        if (_stage == LIT && x == 0) _nb_cls++;
+        if (_stage == ASMPT && x != 0) _nb_asmpt++;
+        if (x != 0) {
+            assert(x != INT32_MAX && x != INT32_MIN);
+            _nb_vars = std::max(_nb_vars, std::abs(x));
+        }
+        return false;
+    }
+
+    template <typename T>
+    bool parseAndSign(std::vector<T>& out, uint8_t*& outSignature) {
+        _f_size = 0;
+        _stage = LIT;
+        _sig_nb_read = 0;
+        _nb_asmpt = 0;
 
         // Parse formula
         size_t fSizeBytes = out.size() * sizeof(T);
-        out.resize(out.size() + (_nb_cls*2*sizeof(int))/sizeof(T));
+        assert(fSizeBytes % sizeof(int) == 0); // aligned!
+        //out.resize(out.size() + (_nb_cls*2*sizeof(int))/sizeof(T));
         size_t capacityBytes = out.size() * sizeof(T);
         const size_t outSizeBytesBefore = fSizeBytes;
-        const size_t maxBytesToRead = 1<<14;
-        while (true) {
-            if (fSizeBytes + maxBytesToRead > capacityBytes) {
-                capacityBytes = std::max((unsigned long) (1.25*capacityBytes), fSizeBytes+maxBytesToRead);
+
+        bool done = false;
+        while (!done) {
+            // Read next chunk of data.
+            if (fSizeBytes + sizeof(int) > capacityBytes) {
+                capacityBytes = std::max((unsigned long) (1.25*capacityBytes),
+                    fSizeBytes + _f_buf_size*sizeof(int));
                 out.resize(capacityBytes / sizeof(T));
             }
-            const size_t nbReadInts = UNLOCKED_IO(fread)(((uint8_t*) out.data())+fSizeBytes,
-                sizeof(int), maxBytesToRead/sizeof(int), _f_parsed_formula);
-            const size_t nbReadBytes = nbReadInts * sizeof(int);
-            fSizeBytes += nbReadBytes;
-            if (nbReadBytes < maxBytesToRead) break;
+            int x;
+            done = processNextIntAndCheckDone(x);
+            if (MALLOB_UNLIKELY(_eof)) break;
+            memcpy(((u8*)out.data())+fSizeBytes, &x, sizeof(int));
+            fSizeBytes += sizeof(int);
         }
+        out.resize(fSizeBytes / sizeof(T));
 
-        // Pop signature from the end of the data
-        int* sigOutIntPtr = (int*) _sig;
-        int* fIntPtr = (int*) (((u8*)out.data()) + fSizeBytes);
-        for (int i = 0; i < 4; i++) sigOutIntPtr[i] = *(fIntPtr-4+i);
-        out.resize((fSizeBytes - 4*sizeof(int)) / sizeof(T));
+        // Read signature from the end of the data
+        memcpy(_sig, ((u8*)out.data()) + fSizeBytes - sizeof(int) - SIG_SIZE_BYTES, SIG_SIZE_BYTES);
         outSignature = _sig;
-
-        _f_size = (out.size()*sizeof(T) - outSizeBytesBefore) / sizeof(int);
         LOG(V3_VERB, "TPPA %lu lits\n", _f_size);
-
-        fclose(_f_parsed_formula);
-        FileUtils::rm(pathParsedFormula);
-        return true;
+        return done && _f_size >= 4;
     }
 
     int getNbVars() const {return _nb_vars;}
     int getNbClauses() const {return _nb_cls;}
+    int getNbAssumptions() const {return _nb_asmpt;}
     size_t getFSize() const {return _f_size;}
 
 private:
