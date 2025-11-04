@@ -237,7 +237,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	shweeper->set_option("seed", 0);   //Sweeping should not contain any RNG part
 
 	//Specific due to Mallob
-	printf("Mallob sweep Solver verbosity %i \n", _params.sweepSolverVerbosity.val);
+	// printf("Mallob sweep Solver verbosity %i \n", _params.sweepSolverVerbosity.val);
 	shweeper->set_option("mallob_custom_sweep_verbosity", _params.sweepSolverVerbosity.val); //Shweeper verbosity 0..4
 	shweeper->set_option("mallob_is_shweeper", 1); //Make this Kissat solver a pure Distributed Sweeping Solver. Jumps directly to distributed sweeping and bypasses everything else
 	shweeper->set_option("mallob_local_id", localId);
