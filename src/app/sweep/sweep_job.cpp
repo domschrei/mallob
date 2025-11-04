@@ -137,7 +137,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 }
 
 void SweepJob::appl_terminate() {
-	LOG(V2_INFO, "SWEEP JOB id #%i rank [%i] got TERMINATE signal \n", _my_rank, getId());
+	LOG(V2_INFO, "SWEEP JOB id #%i rank [%i] got TERMINATE signal \n", getId(), _my_rank);
 	_terminate_all = true;
 	_external_termination = true;
 	gentlyTerminateSolvers();
@@ -258,6 +258,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	// shweeper->set_option("substituterounds", 10);
 	shweeper->set_option("luckyearly", 0); //skip
 	shweeper->set_option("luckylate", 0);  //skip
+	shweeper->interruptionInitialized = true;
 
 	return shweeper;
 }
@@ -515,6 +516,7 @@ void SweepJob::initiateNewSharingRound() {
 		return;
 
 
+	//make sure that only one sharing operation is going on at a time
 	if (_bcast->hasReceivedBroadcast()) {
 		LOG(V1_WARN, "[WARN] SWEEP SHARE BCAST: Would like to initiate new sharing round, but old round is not completed yet\n");
 		return;
