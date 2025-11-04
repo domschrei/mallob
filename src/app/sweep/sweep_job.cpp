@@ -202,7 +202,12 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	float t0 = Timer::elapsedSeconds();
 	std::shared_ptr<Kissat> shweeper(new Kissat(setup));
 	float t1 = Timer::elapsedSeconds();
-	LOG(V2_INFO, "SWEEP STARTUP [%i](%i) kissat init %f ms\n", _my_rank, localId, (t1 - t0)*1000);
+	float init_dur_ms =  (t1 - t0)*1000;
+	const float WARN_init_dur = 50; //Usual initializations take 0.2ms in the Sat Solver Subprocess and 4-25ms  in the sweep job (for some weird reasons), but should never be above ~30ms
+	LOG(V2_INFO, "SWEEP STARTUP [%i](%i) kissat init %f ms\n", _my_rank, localId, init_dur_ms);
+	if (init_dur_ms > WARN_init_dur) {
+		LOG(V1_WARN, "WARN SWEEP STARTUP [%i](%i): kissat init took unusally long, %f ms !\n", _my_rank, localId, init_dur_ms);
+	}
 
 	//Dangerous to immediately return here! because kissat is already initialized, can't just forget it, need to properly release it
 	//releasing could potentially be done directly here with kissat_release(...) ....
