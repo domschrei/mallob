@@ -298,7 +298,7 @@ void SweepJob::readStats(KissatPtr shweeper) {
 	LOG(V2_INFO, "RESULT SWEEP [%i](%i): %i Processes, %f seconds \n", _my_rank, _dimacsReport_localId->load(), getVolume(), Timer::elapsedSeconds() - _start_shweep_timestamp);
 	LOG(V2_INFO, "RESULT SWEEP_PRIORITY       %f\n", _params.preprocessSweepPriority.val);
 	LOG(V2_INFO, "RESULT SWEEP_PROCESSES      %i\n", getVolume());
-	LOG(V2_INFO, "RESULT SWEEP_THREADS_PP     %i\n", _params.numThreadsPerProcess.val);
+	LOG(V2_INFO, "RESULT SWEEP_THREADS_PER_P  %i\n", _params.numThreadsPerProcess.val);
 	LOG(V2_INFO, "RESULT SWEEP_SHARING_PERIOD %i ms \n", _params.sweepSharingPeriod_ms.val);
 	LOG(V2_INFO, "RESULT SWEEP_VARS_ORIG      %i\n", stats.shweep_vars_orig);
 	LOG(V2_INFO, "RESULT SWEEP_VARS_END       %i\n", stats.shweep_vars_end);
@@ -312,8 +312,8 @@ void SweepJob::readStats(KissatPtr shweeper) {
 	LOG(V2_INFO, "RESULT SWEEP_ELIMINATED     %i\n", stats.shweep_eliminated);
 	LOG(V2_INFO, "RESULT SWEEP_EQUIVALENCES   %i\n", stats.shweep_eqs);
 	LOG(V2_INFO, "RESULT SWEEP_UNITS_SWEEP    %i\n", stats.shweep_sweep_units);
-	LOG(V2_INFO, "RESULT SWEEP_ACTUAL_DONE    %i / %i \n", actual_done, total_orig);
-	LOG(V2_INFO, "RESULT SWEEP_ACTUAL_REMAIN  %i / %i \n", actual_remaining, total_orig);
+	LOG(V2_INFO, "RESULT SWEEP_ACTUAL_DONE    %i / %i (%.2f %)\n", actual_done, total_orig, 100*actual_done/(float)total_orig);
+	LOG(V2_INFO, "RESULT SWEEP_ACTUAL_REMAIN  %i / %i (%.2f %)\n", actual_remaining, total_orig, 100*actual_remaining/(float)total_orig);
 	LOG(V2_INFO, "RESULT SWEEP_TIME           %f sec\n", Timer::elapsedSeconds() - _start_shweep_timestamp);
 
 	for (int i=0; i < _sharing_start_ping_timestamps.size() && i < _sharing_receive_result_timestamps.size(); i++) {
@@ -859,7 +859,7 @@ void SweepJob::gentlyTerminateSolvers() {
 			i++;
 		}
 	}
-	LOG(V2_INFO, "SWEEP JOB id #%i rank [%i] interrupted %i solves, DELTED \n", _my_rank, getId(), i);
+	LOG(V2_INFO, "SWEEP JOB id #%i rank [%i] interrupted %i solves, DELETED \n", _my_rank, getId(), i);
 
 	usleep(2000);
 
