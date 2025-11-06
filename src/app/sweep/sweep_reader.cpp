@@ -10,6 +10,9 @@ bool SweepReader::read(const std::vector<std::string>& filenames, JobDescription
 
     // read the description and write serialized data
     // using desc.addPermanentData and desc.addTransientData
+    if (filenames.empty()) {
+        return true;  //bypass reading if the formula is already included in the job description, i.e. when it is passed on from the SATWITHPRE flow
+    }
     std::string filename = filenames[0];
     std::cout << "[Sweep] reading: " << filename << std::endl;
     std::ifstream ifile(filename.c_str(), std::ios::in);

@@ -260,7 +260,6 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
      /*
       *This now calls
       *   Client::handleNewJob(metadata) !
-      *
       * Because _job_callback was set to be Client::handleNewJob(metadata) by Client::init()
       */
     _job_callback(std::move(metadata));

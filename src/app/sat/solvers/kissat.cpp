@@ -104,7 +104,7 @@ bool Kissat::set_option(const std::string &option_name, int value) {
         LOGGER(_logger, V0_CRIT, "ERROR Setting Kissat Option %s: %i --> %i failed, remained at %i (or option not found)\n", option_name.c_str(), prev_value, value, prev_value);
         return false;
     }
-    LOGGER(_logger, V3_VERB, "Kissat Set Option: %i --> %i (%s)\n", prev_value, value, option_name.c_str());
+    // LOGGER(_logger, V3_VERB, "Kissat Set Option: %i --> %i (%s)\n", prev_value, value, option_name.c_str());
     return true;
 }
 

@@ -50,7 +50,6 @@ void Client::readIncomingJobs() {
     std::vector<std::future<void>> taskFutures;
     std::set<std::pair<int, int>> unreadyJobs;
 
-    printf("ß start looping to read incoming jobs\n");
     while (true) {
         // Wait for a nonempty incoming job queue
         _incoming_job_cond_var.wait(_incoming_job_lock, [&]() {
@@ -76,6 +75,7 @@ void Client::readIncomingJobs() {
         bool foundAJob = false;
         for (auto& data : _incoming_job_queue) {
 
+            LOGGER(log, V3_VERB, "NEWJOB %s (#%i) from incoming job queue", data.jobName.c_str(), data.description->getId());
             // printf("ß looping through incoming job queue\n");
             // Jobs are sorted by arrival:
             // If this job has not arrived yet, then none have arrived yet
@@ -127,7 +127,7 @@ void Client::readIncomingJobs() {
             }
 
             // Job can be read: Enqueue reader task into thread pool
-            LOGGER(log, V4_VVER, "ENQUEUE #%i\n", data.description->getId());
+            LOGGER(log, V4_VVER, "NEWJOB ENQUEUE id #%i\n", data.description->getId());
             unreadyJobs.erase(std::pair<int, int>(data.description->getId(), data.description->getRevision()));
             if (_params.monoFilename.isSet() && _mono_job_id < 0) _mono_job_id = data.description->getId();
 
@@ -160,10 +160,10 @@ void Client::readIncomingJobs() {
                     foundJob.description->getStatistics().parseTime = time;
 
                     const int appId = foundJob.description->getApplicationId();
-                    printf("ß found job with app id %i\n", appId);
+                    LOGGER(log, V4_VVER, "NEWJOB found %s #%i <#%i> \n", foundJob.jobName.c_str(), foundJob.description->getId(), appId);
                     if (app_registry::isClientSide(appId)) {
                         // Launch client-side program
-                        printf("ß Launching client-side program\n");
+                        LOGGER(log, V4_VVER, "NEWJOB #%i <#%i> is client side\n", foundJob.description->getId(), appId);
                         auto lock = _client_side_jobs_mutex.getLock();
                         _client_side_jobs.emplace_back(std::move(foundJob.description));
                         _sys_state.addLocal(SYSSTATE_SCHEDULED_JOBS, 1);
@@ -174,12 +174,13 @@ void Client::readIncomingJobs() {
                         // store "original" arrival time value as the job's submission time
                         desc->getStatistics().timeOfSubmission = desc->getArrival();
                         desc->getStatistics().timeOfScheduling = Timer::elapsedSeconds();
-                        printf("ß Client Side Job reset\n");
+                        // LOGGER(log, V4_VVER, "NEWJOB #%i AppId %i client side reset registry\n", foundJob.description->getId(), appId);
+                        LOGGER(log, V4_VVER, "NEWJOB #%i <#%i> reset registry\n", desc->getId(), appId);
                         //Set the program
                         clientSideJob.program.reset(
                             app_registry::getClientSideProgramCreator(appId)(_params, APIRegistry::get(), *desc)
                         );
-                        printf("ß Client Side Job run\n");
+                        LOGGER(log, V4_VVER, "NEWJOB #%i <#%i> launch\n", desc->getId(), appId);
                         //Run the program
                         clientSideJob.thread->run([&, prog = clientSideJob.program.get(), done, res]() {
                             *res = prog->function();
@@ -187,7 +188,8 @@ void Client::readIncomingJobs() {
                         });
                     } else {
                         // Enqueue in ready jobs to be scheduled properly
-                        printf("ß Enqueueing new regular job\n");
+
+                        LOGGER(log, V4_VVER, "NEWJOB %s #%i <#%i> is regular job, enqueue\n", foundJob.jobName.c_str(), foundJob.description->getId(), appId);
                         auto lock = _ready_job_lock.getLock();
                         _ready_job_queue.push_back(std::move(foundJob.description));
                         atomics::incrementRelaxed(_num_ready_jobs);
@@ -231,7 +233,7 @@ void Client::handleNewJob(JobMetadata&& data) {
         // Interrupt job (-> abort entire job if non-incremental, abort iteration if incremental)
         int jobId = data.description->getId();
         int rev = data.description->getRevision();
-        LOG(V2_INFO, "Interrupt Signal on job %s (#%i) in Client::handleNewJob, adding to interrupt list  \n", data.jobName, data.description->getId());
+        LOG(V2_INFO, "DELTE Interrupt Signal on job %s (#%i) in Client::handleNewJob, adding to interrupt list  \n", data.jobName.c_str(), data.description->getId());
         {
             auto lock = _jobs_to_interrupt_lock.getLock();
             _jobs_to_interrupt.push_back({jobId, rev});
@@ -240,6 +242,8 @@ void Client::handleNewJob(JobMetadata&& data) {
         return;
     }
 
+
+    LOG(V2_INFO, "NEWJOB %s (#%i) to incoming queue \n", data.jobName.c_str(), data.description->getId());
     // Introduce new job into "incoming" queue
     // printf("ß Client::handleNewJob: enqueuing new job\n");
     // printf("ß Client::handleNewJob: jobName: %s\n", data.jobName.c_str());
