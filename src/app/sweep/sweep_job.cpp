@@ -850,7 +850,7 @@ void SweepJob::loadFormula(KissatPtr shweeper) {
 }
 
 void SweepJob::gentlyTerminateSolvers() {
-	LOG(V2_INFO, "SWEEP JOB id #%i rank [%i] interrupting its own solver, DELETE\n", _my_rank, getId());
+	LOG(V2_INFO, "SWEEP JOB DELETE #%i on rank [%i]: interrupting solvers\n", getId(), _my_rank);
 	//each sweeper checks constantly for the interruption signal (on the ms scale or faster), allow for gentle own exit
 	int i=0;
 	for (auto &shweeper : _shweepers) {
@@ -859,25 +859,25 @@ void SweepJob::gentlyTerminateSolvers() {
 			i++;
 		}
 	}
-	LOG(V2_INFO, "SWEEP JOB id #%i rank [%i] interrupted %i solves, DELETED \n", _my_rank, getId(), i);
+	LOG(V2_INFO, "SWEEP JOB DELETED #%i on rank [%i]: interrupted %i solvers \n", getId(), _my_rank, i);
 
 	usleep(2000);
 
 	i=0;
-	LOG(V2_INFO, "SWEEP JOB id #%i rank [%i] joining own bg_worker threads, DELETE \n", _my_rank, getId());
+	LOG(V2_INFO, "SWEEP JOB DELETE #%i on rank [%i]: joining bg_workers \n",  getId(),_my_rank);
 	for (auto &bg_worker : _bg_workers) {
 		if (bg_worker->isRunning()) {
 			bg_worker->stop();
 			i++;
 		}
 	}
-	LOG(V2_INFO, "SWEEP JOB id #%i rank [%i] joined %i own threads, DELETED \n", _my_rank, getId(), i);
+	LOG(V2_INFO, "SWEEP JOB DELETE #%i on rank [%i]: joined %i bg_workers \n", getId(),_my_rank,  i);
 }
 
 SweepJob::~SweepJob() {
-	LOG(V3_VERB, "DELETE SWEEP JOB\n");
+	LOG(V2_INFO, "DELETE SWEEP JOB\n");
 	gentlyTerminateSolvers();
-	LOG(V3_VERB, "DELETED SWEEP JOB\n");
+	LOG(V2_INFO, "DELETED SWEEP JOB\n");
 }
 
 
