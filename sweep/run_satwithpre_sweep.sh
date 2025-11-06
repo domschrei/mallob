@@ -56,7 +56,7 @@ echo "PREPROCESS_SEQUENTIAL_SWEEPCOMPLETE: $PREPROCESS_SEQUENTIAL_SWEEPCOMPLETE"
 
 MALLOB_OPTIONS="-t=$THREADS \
   -mono-app=SATWITHPRE \
-  -v=4 \
+  -v=3 \
   -satsolver=[k_]w \
   -colors \
   -jcup=0.05 \
@@ -65,13 +65,15 @@ MALLOB_OPTIONS="-t=$THREADS \
   -spd=$OUT_DIR -spl=4 \
   -tmp=$OUT_DIR \
   -mono=$INST_PATH \
-  -sweep-sharing-period=20 \
-  -sweep-solver-verbosity=2 \
 "
 
 if $SWEEP; then
     echo "SWEEP Preprocessing ADDED !"
-    MALLOB_OPTIONS="$MALLOB_OPTIONS -preprocess-sweep -preprocess-sweep-priority=$SWEEP_PRIO"
+    MALLOB_OPTIONS="$MALLOB_OPTIONS \
+      -preprocess-sweep \
+      -sweep-sharing-period=20 \
+      -sweep-solver-verbosity=2 \
+      -preprocess-sweep-priority=$SWEEP_PRIO"
 else
     echo "SWEEP Preprocessing SKIPPED !"
 fi

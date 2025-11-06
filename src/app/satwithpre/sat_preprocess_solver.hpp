@@ -46,7 +46,7 @@ private:
     volatile bool _sweep_job_done {false};
     bool _sweep_job_digested {false};
     bool _sweep_job_has_improved_formula {false};
-    bool _sweep_job_started_next {false};
+    bool _sweep_job_submitted_sat {false};
     nlohmann::json _sweep_job_submission;
     nlohmann::json _sweep_job_response;
 
@@ -99,11 +99,15 @@ public:
 
             if (_sweep_job_done && !_sweep_job_digested) {
                 LOG(V3_VERB, "SATWP SWEEP done\n");
-                res = jsonToJobResult(_sweep_job_response, false); //eventually probably convert = true, for tracking equivalences...
+                res = jsonToJobResult(_sweep_job_response, false); //eventually probably convert = true to reconstruct solution if necessary
                 _sweep_job_digested = true;
                 LOG(V3_VERB, "SATWP SWEEP read JobResult from json, SolutionSize=%i\n", res.getSolutionSize());
                 if (res.getSolutionSize() > 0) {
+                    LOG(V3_VERB, "SATWP SWEEP has improved formula\n");
                     _sweep_job_has_improved_formula = true;
+                } else {
+                    LOG(V1_WARN, "WARN: SATWP SWEEP did not improve formula! (Solution size 0). Not starting Preprocessed SAT Task (!)\n");
+                    //todo: we probably still want to submit the Preprocessed SAT Job even if sweep couldnt make any progress!
                 }
                 //todo: break if sweep solves the problem completeley to SAT/UNSAT?
             }
@@ -128,7 +132,7 @@ public:
 
             //old route without sweep: continue directly from prepro to prepro'd SAT
             if (_prepro.hasPreprocessedFormula() && ! _params.preprocessSweep.val) {
-                printf("SATWP submit preprocessed SAT task, skip SWEEP\n");
+                // printf("SATWP submit preprocessed SAT task, skip SWEEP\n");
                 LOG(V3_VERB, "SATWP submit preprocessed SAT task, skip SWEEP\n");
                 submitPreprocessedJob(_prepro.extractPreprocessedFormula());
             }
@@ -136,16 +140,16 @@ public:
             //new route: continue from prepro to SWEEP
             //does NOT yet start the retraction of the base job, as we are still in the preprocessing phase
             if (_prepro.hasPreprocessedFormula() && _params.preprocessSweep.val && ! _sweep_job_submitted) {
-                printf("SATWP submit SWEEP\n");
+                // printf("SATWP submit SWEEP\n");
                 LOG(V3_VERB, "SATWP Submit SWEEP\n");
                 submitSweepJob(_prepro.extractPreprocessedFormula());
             }
             //todo: we probably still want to submit SWEEP even if _prepro does no progress at all?
             //continue from SWEEP to prepro'd SAT
-            if (_sweep_job_digested && _sweep_job_has_improved_formula && !_sweep_job_started_next) {
-                LOG(V3_VERB, "SATWP SWEEP digested, submit preprocessed SAT task\n");
+            if (_sweep_job_digested && _sweep_job_has_improved_formula && !_sweep_job_submitted_sat) {
+                LOG(V3_VERB, "SATWP submit preprocessed SAT task (via providing SWEEP results)\n");
                 submitPreprocessedJob(res.extractSolution());
-                _sweep_job_started_next = true; //prevent multiple submissions from SWEEP to PreprocessedJob
+                _sweep_job_submitted_sat = true; //prevent multiple submissions from SWEEP to SAT
             }
 
             if (!_base_job_done && _time_of_retraction_end > 0 && Timer::elapsedSeconds() >= _time_of_retraction_end) {
@@ -373,12 +377,11 @@ private:
     }
 
     JobResult jsonToJobResult(nlohmann::json& json, bool convert) {
-        LOG(V3_VERB, "SATWP Extract result of %s\n", json["name"].get<std::string>().c_str());
         JobResult res;
         res.id = _desc.getId();
         res.revision = 0;
         res.result = json["result"]["resultcode"];
-        LOG(V3_VERB, "SATWP jsonToJobResult res.result=%i\n", res.result);
+        LOG(V3_VERB, "SATWP Extract result of %s  (result code %i)\n", json["name"].get<std::string>().c_str(), res.result);
         if (res.result == RESULT_UNKNOWN) return res;
         std::vector<int> solution;
         if (_params.compressModels() && res.result == RESULT_SAT) {
@@ -394,8 +397,8 @@ private:
             LOG(V3_VERB, "SATWP original solution reconstructed\n");
         }
         res.setSolution(std::move(solution));
-        LOG(V3_VERB, "SATWP %s extracted\n", json["name"].get<std::string>().c_str());
-        LOG(V3_VERB, "SATWP %s extracted, SolutionSize=%i\n", json["name"].get<std::string>().c_str(), res.getSolutionSize());
+        // LOG(V3_VERB, "SATWP %s extracted\n", json["name"].get<std::string>().c_str());
+        LOG(V3_VERB, "SATWP %s extracted  Solution Size %i\n", json["name"].get<std::string>().c_str(), res.getSolutionSize());
         return res;
     }
 

@@ -267,7 +267,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 void SweepJob::readResult(KissatPtr shweeper, bool withStats = true) {
 	_internal_result.id = getId();
 	_internal_result.revision = getRevision();
-	_internal_result.result= UNKNOWN; //technically its not SAT but just *some* information, but just calling it SAT helps to seamlessly pass it though the higher abstraction layers
+	_internal_result.result=SAT; //technically the result is not SAT but just *some* information, but it helps to mark it SAT to seamlessly pass though the higher abstraction layers (UNKNOWN result for example might not even try to copy the solution formula)
 	// if (shweeper->hasPreprocessedFormula()) {
 	std::vector<int> formula = shweeper->extractPreprocessedFormula(); //Can be either empty (size==0) if no progress was made, or format [Clauses, #Vars, #Clauses] otherwise
 	_internal_result.setSolutionToSerialize(formula.data(), formula.size());
@@ -275,7 +275,7 @@ void SweepJob::readResult(KissatPtr shweeper, bool withStats = true) {
 		// _internal_result.setSolutionToSerialize(formula.data(), formula.size()); //Format: [Clauses, #Vars, #Clauses], the last two integers are pushed at the end of the literal reporting
 	// }
 	//This flag tells the system that the result is actually ready
-	_solved_status = UNKNOWN;
+	_solved_status = SAT;
 
 	if (withStats)
 		readStats(shweeper);
