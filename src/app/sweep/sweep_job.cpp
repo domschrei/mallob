@@ -585,7 +585,7 @@ void SweepJob::cbContributeToAllReduce() {
 		assert(eq_size%2==0 || log_return_false("ERROR in AGGR: Non-even number %i of equivalence literals, should always come in pairs", eq_size)); //equivalences come always in pairs
 		//we need to glue together equivalences and units. can use move on the equivalences to save a copying of them, and only need to copy the units
 		//moved logging before the actions, because this code triggered std::bad_alloc once, might give some more info next time
-		LOG(V3_VERB, "SWEEP SHARE REDUCE (%i): %i eq_size, %i units, %i idle \n", shweeper->getLocalId(), eq_size, unit_size, shweeper->shweeper_is_idle);
+		LOG(V4_VVER, "SWEEP SHARE REDUCE (%i): %i eq_size, %i units, %i idle \n", shweeper->getLocalId(), eq_size, unit_size, shweeper->shweeper_is_idle);
 		std::vector<int> contrib = std::move(eqs);
 		contrib.insert(contrib.end(), units.begin(), units.end());
 		contrib.push_back(eq_size);
@@ -626,8 +626,8 @@ void SweepJob::advanceAllReduction() {
 	const int eq_size = shared[shared.size()-METADATA_EQ_COUNT_POS];
 	const int unit_size = shared[shared.size()-METADATA_UNIT_COUNT_POS];
 	const int all_idle = shared[shared.size()-METADATA_IDLE_FLAG_POS];
-	LOG(V3_VERB, "SWEEP SHARE REDUCE --- Received sharing data: %i equivalences, %i units -- \n", eq_size/2, unit_size);
-	LOG(V3_VERB, "SWEEP SHARE REDUCE ALL IDLE %i \n", all_idle);
+	LOG(V3_VERB, "SWEEP SHARE REDUCE RECEIVED %i equivalences, %i units\n", eq_size/2, unit_size);
+	LOG(V3_VERB, "SWEEP SHARE REDUCE RECEIVED ALL IDLE %i \n", all_idle);
 	if (all_idle) {
 		_terminate_all = true;
 		LOG(V1_WARN, "ß # \n # \n # --- ALL SWEEPERS IDLE - CAN TERMINATE -- \n # \n");
@@ -695,7 +695,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	int i=0;
     for (const auto& contrib : contribs) {
 	    total_aggregated_size += contrib.size()-NUM_METADATA_FIELDS; //we will copy everything but the metadata from each contribution
-		LOG(V3_VERB, "SWEEP AGGR Element %i: contrib.size() %i, w/o metadata %i, curr summed size %i \n", i, contrib.size(), contrib.size()-NUM_METADATA_FIELDS, total_aggregated_size);
+		LOG(V4_VVER, "SWEEP AGGR Element %i: contrib.size() %i, w/o metadata %i, curr summed size %i \n", i, contrib.size(), contrib.size()-NUM_METADATA_FIELDS, total_aggregated_size);
 		oss_tot << "| " << i << ":" << contrib.size() << " "	;
 		i++;
     	assert(contrib.size() >= NUM_METADATA_FIELDS || log_return_false("ERROR in Aggregating: contrib with too small size() == %i < %i SHARING_METADATA_FIELDS", contrib.size(), NUM_METADATA_FIELDS));

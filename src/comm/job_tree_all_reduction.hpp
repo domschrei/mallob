@@ -322,7 +322,7 @@ public:
     }
 
     void destroy() {
-        LOG(V3_VERB, "      -- destroy JobTree --\n");
+        // LOG(V3_VERB, "      -- destroy JobTree --\n");
         if (_future_aggregate.valid()) _future_aggregate.get();
     }
 

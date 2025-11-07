@@ -106,8 +106,7 @@ public:
                     LOG(V3_VERB, "SATWP SWEEP has improved formula\n");
                     _sweep_job_has_improved_formula = true;
                 } else {
-                    LOG(V1_WARN, "WARN: SATWP SWEEP did not improve formula! (Solution size 0). Not starting Preprocessed SAT Task (!)\n");
-                    //todo: we probably still want to submit the Preprocessed SAT Job even if sweep couldnt make any progress!
+                    LOG(V1_WARN, "WARN: SATWP SWEEP did not improve formula! (Solution size 0). Not starting Preprocessed SAT job, instead leaving all resources to already running SAT job\n");
                 }
                 //todo: break if sweep solves the problem completeley to SAT/UNSAT?
             }
@@ -128,24 +127,30 @@ public:
                     res.setSolution(std::move(_prepro.getSolution()));
                     break;
                 }
+
+                //special case: sequential preprocessing was unsuccessful but we still want to do distributed sweeping as another preprocessing step
+                //the preprocessing doesnt return a formula in that case that we could pipe into Sweep, so we need to get the original formula instead
+                if (_params.preprocessSweep.val && ! _prepro.hasPreprocessedFormula()) {
+                    LOG(V1_WARN, "SATWP preprocessor done, but failed to find any improvement. Not continuing with Sweep\n");
+                }
             }
 
             //old route without sweep: continue directly from prepro to prepro'd SAT
             if (_prepro.hasPreprocessedFormula() && ! _params.preprocessSweep.val) {
-                // printf("SATWP submit preprocessed SAT task, skip SWEEP\n");
                 LOG(V3_VERB, "SATWP submit preprocessed SAT task, skip SWEEP\n");
                 submitPreprocessedJob(_prepro.extractPreprocessedFormula());
             }
 
             //new route: continue from prepro to SWEEP
-            //does NOT yet start the retraction of the base job, as we are still in the preprocessing phase
+            //does NOT yet start the retraction of the base job, as we are still doing preprocessing
             if (_prepro.hasPreprocessedFormula() && _params.preprocessSweep.val && ! _sweep_job_submitted) {
-                // printf("SATWP submit SWEEP\n");
                 LOG(V3_VERB, "SATWP Submit SWEEP\n");
                 submitSweepJob(_prepro.extractPreprocessedFormula());
             }
+
+
             //todo: we probably still want to submit SWEEP even if _prepro does no progress at all?
-            //continue from SWEEP to prepro'd SAT
+            //continue from SWEEP to preprocessed SAT
             if (_sweep_job_digested && _sweep_job_has_improved_formula && !_sweep_job_submitted_sat) {
                 LOG(V3_VERB, "SATWP submit preprocessed SAT task (via providing SWEEP results)\n");
                 submitPreprocessedJob(res.extractSolution());
@@ -245,7 +250,7 @@ private:
             fPre = std::move(*out.vec);
         }
 
-        //NOT copying the retraction code, because we are not yet retracting the base job
+        //NOT copying the retraction code, because we are not retracting the base job yet
 
         // Prepare job submission data
         auto& json = _sweep_job_submission;
