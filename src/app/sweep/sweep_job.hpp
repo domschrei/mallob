@@ -65,8 +65,8 @@ private:
 
 
 	//Termination. Determined during workstealing, broadcasted via sharing
-	bool _terminate_all=false;
-	bool _external_termination=false;
+	volatile bool _terminate_all=false; //termination (on this node) due to sharing consensus that there is no more work
+	volatile bool _external_termination=false; //termination because somebody else told us (Job interrupted, ...)
 
 
 	//Keep track which solver reports the final formula, we only use one

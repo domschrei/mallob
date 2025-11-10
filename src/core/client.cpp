@@ -233,7 +233,7 @@ void Client::handleNewJob(JobMetadata&& data) {
         // Interrupt job (-> abort entire job if non-incremental, abort iteration if incremental)
         int jobId = data.description->getId();
         int rev = data.description->getRevision();
-        LOG(V2_INFO, "DELTE Interrupt Signal on job %s (#%i) in Client::handleNewJob, adding to interrupt list  \n", data.jobName.c_str(), data.description->getId());
+        LOG(V2_INFO, "DELETE Interrupt Signal on job %s (#%i) in Client::handleNewJob, adding to interrupt list  \n", data.jobName.c_str(), data.description->getId());
         {
             auto lock = _jobs_to_interrupt_lock.getLock();
             _jobs_to_interrupt.push_back({jobId, rev});

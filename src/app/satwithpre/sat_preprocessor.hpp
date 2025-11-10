@@ -51,6 +51,8 @@ public:
         float t0 = Timer::elapsedSeconds();
         _kissat.reset(new Kissat(setup));
         float t1 = Timer::elapsedSeconds();
+
+        LOG(V3_VERB, "SATWP start sequential preprocessor\n");
         LOG(V2_INFO, "STARTUP (PREPRO) Kissat init duration: %f ms \n", (t1-t0)*1000);
         _nb_running++;
         _fut_kissat = ProcessWideThreadPool::get().addTask([&]() {

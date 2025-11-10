@@ -31,9 +31,9 @@ void SweepJob::appl_start() {
 	_my_rank = getJobTree().getRank();
 	_my_index = getJobTree().getIndex();
 	_is_root = getJobTree().isRoot();
-	LOG(V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, numThreadsPerProcess=%d\n",
+	LOG(V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d\n",
 		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _params.numThreadsPerProcess.val);
-	LOG(V2_INFO,"SWEEP JOB sweep-sharing-period: %i ms\n", _params.sweepSharingPeriod_ms.val);
+	// LOG(V2_INFO,"SWEEP JOB sweep-sharing-period: %i ms\n", _params.sweepSharingPeriod_ms.val);
     _metadata = getSerializedDescription(0)->data();
 	_start_shweep_timestamp = Timer::elapsedSeconds();
 	_last_sharing_start_timestamp = Timer::elapsedSeconds();
@@ -93,12 +93,15 @@ void SweepJob::appl_communicate() {
 // React to an incoming message. (This becomes relevant only if you send custom messages)
 void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 	// LOG(V2_INFO, "Shweep rank %i: received custom message from source %i, mpiTag %i, msg.tag %i \n", _my_rank, source, mpiTag, msg.tag);
-	if (msg.returnedToSender) {
-		LOG(V0_CRIT, "SWEEP MSG Error [%i]: received unexpected returnedToSender message during Sweep Job Workstealing!\n", _my_rank);
-		LOG(V0_CRIT, "SWEEP MSG Error [%i]: source=%i mpiTag=%i, msg.tag=%i treeIdxOfSender=%i, treeIdxOfDestination=%i \n", _my_rank, sourceRank, mpiTag, msg.tag, msg.treeIndexOfSender, msg.treeIndexOfDestination);
-		assert(false);
+	if (mpiTag != MSG_SEND_APPLICATION_MESSAGE) {
+		LOG(V1_WARN, "WARN SWEEP MSG [%i] got unexpected message with mpiTag=%i, msg.tag=%i  (instead of MSG_SEND_APPLICATION_MESSAGE mpiTag == 30)\n", _my_rank, mpiTag, msg.tag);
 	}
-	if (msg.tag == TAG_SEARCHING_WORK) {
+	if (msg.returnedToSender) {
+		LOG(V0_CRIT, "SWEEP MSG WARN/ERROR [%i]: received unexpected returnedToSender message during Sweep Job Workstealing!\n", _my_rank);
+		LOG(V0_CRIT, "SWEEP MSG WARN/ERROR [%i]: source=%i mpiTag=%i, msg.tag=%i treeIdxOfSender=%i, treeIdxOfDestination=%i \n", _my_rank, sourceRank, mpiTag, msg.tag, msg.treeIndexOfSender, msg.treeIndexOfDestination);
+		// assert(log_return_false("SWEEP MSG ERROR, got msg.returnToSender"));
+	}
+	else if (msg.tag == TAG_SEARCHING_WORK) {
 		assert(msg.payload.size() == 1);
 		int localId = msg.payload.front();
 		msg.payload.clear();
@@ -118,21 +121,28 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 			log_return_false("SWEEP STEAL Error in TAG_RETURNING_STEAL_REQUEST! Want to return an message, but invalid contextIdOfDestination==0. "
 					"With sourceRank=%i, sourceIndex=%i, payload.size()=%i \n", sourceRank, sourceIndex, msg.payload.size()));
 		getJobTree().send(sourceRank, MSG_SEND_APPLICATION_MESSAGE, msg);
-		return;
 	}
-
-	if (msg.tag == TAG_RETURNING_STEAL_REQUEST) {
+	else if (msg.tag == TAG_RETURNING_STEAL_REQUEST) {
 		int localId = msg.payload.back();
 		msg.payload.pop_back();
 		_worksteal_requests[localId].stolen_work = std::move(msg.payload);
 		_worksteal_requests[localId].got_steal_response = true;
 		LOG(V3_VERB, "SWEEP MSG to [%i](%i) received steal answer --%i-- from [%i]\n", _my_rank, localId, _worksteal_requests[localId].stolen_work.size(), sourceRank );
-		return;
+	}
+	else if (mpiTag == MSG_NOTIFY_JOB_ABORTING)  {
+		LOG(V1_WARN, "SWEEP MSG [%i]: received NOTIFY_JOB_ABORTING \n", _my_rank);
+	} else if (mpiTag == MSG_NOTIFY_JOB_TERMINATING) {
+		LOG(V1_WARN, "SWEEP MSG [%i]: received NOTIFY_JOB_TERMINATING \n", _my_rank);
+	} else if (mpiTag == MSG_INTERRUPT) {
+		LOG(V1_WARN, "SWEEP MSG [%i]: received MSG_INTERRUPT \n", _my_rank);
+	} else {
+		LOG(V0_CRIT, "SWEEP MSG WARN/ERROR [%i]: received unexpected mpiTag %i with msg.tag %i \n", _my_rank, mpiTag, msg.tag);
+		// assert(log_return_false("ERROR SWEEP MSG, unexpected mpiTag\n"));
 	}
 }
 
 void SweepJob::appl_terminate() {
-	LOG(V2_INFO, "SWEEP JOB id #%i rank [%i] got TERMINATE signal \n", getId(), _my_rank);
+	LOG(V2_INFO, "SWEEP JOB id #%i rank [%i] got TERMINATE signal (appl_terminate()) \n", getId(), _my_rank);
 	_terminate_all = true;
 	_external_termination = true;
 	gentlyTerminateSolvers();
@@ -142,26 +152,33 @@ void SweepJob::appl_terminate() {
 void SweepJob::createAndStartNewShweeper(int localId) {
 	LOG(V2_INFO, "SWEEP JOB [%i](%i) queuing background worker thread\n", _my_rank, localId);
 	_bg_workers[localId]->run([this, localId]() {
+		LOG(V2_INFO, "SWEEP JOB [%i](%i) BG_WORKER START \n", _my_rank, localId);
 		// std::future<void> fut_shweeper = ProcessWideThreadPool::get().addTask([this, localId]() { //Changed from [&] to [this, shweeper] back to [&] to [this, localId] !! (nicco)
 		//passing localId by value to this lambda, because the thread might only execute after createAndStartNewShweeper is already gone
-
 		if (_terminate_all) {
 			// _bg_workers[localId]->stop();
 			LOG(V2_INFO, "SWEEP [%i](%i) terminated before creation\n", _my_rank, localId);
 			return;
 		}
+		_running_shweepers_count++;
 
 		auto shweeper = createNewShweeper(localId);
 
 		loadFormula(shweeper);
 		LOG(V2_INFO, "SWEEP JOB [%i](%i) solve() START \n", _my_rank, localId);
-		_running_shweepers_count++;
 		_shweepers[localId] = shweeper; //signal to the remaining system that this solver now exists
 		int res = shweeper->solve(0, nullptr);
 		LOG(V2_INFO, "SWEEP JOB [%i](%i) solve() FINISH. Result %i \n", _my_rank, localId, res);
 
 		//on the root node we need to know which solver has copied its final formula to mallob, unless there has been an external termination, in which case we don't need any result
-		assert( ! _is_root || _dimacsReport_localId->load() != -1 || _external_termination);
+		//we can continue if: either we are not on the root node,
+		//or there exists a valid reported id on the root node,
+		//or the sweeper was terminated externally, so we are not interested in the result
+		//or the sweeper got inconsistent and did not report a formula (this should eventually not happen anymore, but hotfix for now to focus on Mallob-specific problems)
+		assert( ! _is_root || _dimacsReport_localId->load() != -1 || _external_termination || kissat_is_inconsistent(shweeper->solver));
+		if (kissat_is_inconsistent(shweeper->solver)) {
+			LOG(V2_INFO, "SWEEP JOB [%i](%i) bypassing readResult because solver became inconsistent \n", _my_rank, localId);
+		}
 		if (_is_root && localId == _dimacsReport_localId->load()) {
 			readResult(shweeper, true);
 			//todo: also read result if there is external termination?
@@ -169,7 +186,8 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 		_running_shweepers_count--;
 		_shweepers[localId]->cleanUp(); //write kissat timing profile
 		_shweepers[localId] = nullptr;  //signal that this solver doesnt exist anymore
-		// );
+		LOG(V2_INFO, "SWEEP JOB [%i](%i) BG_WORKER EXIT\n", _my_rank, localId);
+
 	});
 	// _fut_shweepers.push_back(std::move(fut_shweeper));
 }
@@ -245,7 +263,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	shweeper->set_option("mallob_rank", _my_rank);
 	shweeper->set_option("mallob_is_root", _is_root);
 	shweeper->set_option("mallob_resweep_chance", _params.sweepResweepChance.val);
-	shweeper->set_option("mallob_staggered_logs", 0); //set to 1 to have spatially separated logs, useful for verbose runs with 2-16 threads total
+	shweeper->set_option("mallob_staggered_logs", 1); //set to 1 to have spatially separated logs, useful for verbose runs with 2-16 threads total
 
 
 	//Own options of Kissat
@@ -265,6 +283,8 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 }
 
 void SweepJob::readResult(KissatPtr shweeper, bool withStats = true) {
+
+	LOG(V2_INFO, "SWEEP JOB [%i](%i) read Result\n", _my_rank, shweeper->getLocalId());
 	_internal_result.id = getId();
 	_internal_result.revision = getRevision();
 	_internal_result.result=SAT; //technically the result is not SAT but just *some* information, but it helps to mark it SAT to seamlessly pass though the higher abstraction layers (UNKNOWN result for example might not even try to copy the solution formula)
@@ -318,10 +338,10 @@ void SweepJob::readStats(KissatPtr shweeper) {
 
 	for (int i=0; i < _sharing_start_ping_timestamps.size() && i < _sharing_receive_result_timestamps.size(); i++) {
 		float start = _sharing_start_ping_timestamps[i];
-		float end = _sharing_receive_result_timestamps[i];
+		float end   = _sharing_receive_result_timestamps[i];
 		LOG(V2_INFO, "RESULT SWEEP_SHARING_LATENCY  %f ms   (ping->result  %f --> %f) \n", (end-start)*1000, start, end);
 	}
-	for (int i=0; i < _sharing_start_ping_timestamps.size() -1; i++) {
+	for (int i=0; ! _sharing_start_ping_timestamps.empty() && i < _sharing_start_ping_timestamps.size() -1; i++) {
 		LOG(V2_INFO, "RESULT SWEEP_SHARING_PERIOD_REAL  %f ms \n", (_sharing_start_ping_timestamps[i+1] - _sharing_start_ping_timestamps[i])*1000);
 	}
 
@@ -330,6 +350,8 @@ void SweepJob::readStats(KissatPtr shweeper) {
 		LOG(V3_VERB, "RESULT Sweep Formula peek %i: %i \n", i, _internal_result.getSolution(i));
 	}
 
+
+	LOG(V2_INFO, "SWEEP JOB [%i](%i) completed readStats \n", _my_rank, shweeper->getLocalId());
 }
 
 
@@ -384,10 +406,13 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 
 	//loop until we find work or the whole sweeping is terminated
 	while (true) {
+		LOG(V5_DEBG, "Sweeper [%i](%i) in search work loop\n", _my_rank, localId);
+
 		if (_terminate_all) {
 			//this is the signal for the solver to terminate itself, by sending it a work array of size 0
 			shweeper->work_received_from_steal = {};
 			shweeper->shweeper_is_idle = true;
+			LOG(V3_VERB, "Sweeper [%i](%i) steal loop - exit, node got terminate signal \n", _my_rank, localId);
 			break;
 		}
 		 /*
@@ -442,11 +467,13 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 			LOG(V3_VERB, "SWEEP SKIP Delaying global steal request, my own rank %i (index %i) is not yet in JobComm \n", _my_rank, _my_index);
 			// LOG(V2_INFO, " with _my_index %i \n", _my_index);
 			// LOG(V2_INFO, " with JobComm().size %i \n", getJobComm().size());
-			usleep(1000);
+			usleep(10000);
 			continue;
 		}
 
 		//Unsuccessful steal locally. Go global via MPI message
+
+		assert(getVolume()>=1 || log_return_false("SWEEP ERROR [%i](%i) in workstealing: getVolume()==%i, i.e. no volume available to steal from\n", _my_rank, localId, getVolume()));
 		int targetIndex = _rng.randomInRange(0,getVolume());
         int targetRank = getJobComm().getWorldRankOrMinusOne(targetIndex);
 
@@ -482,9 +509,19 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		// LOG(V3_VERB, "SWEEP  [%i](%i) searches work globally\n", _my_rank, localId);
 
 		//Wait here until we get back an MPI message
+		unsigned reps=0;
 		while( ! _worksteal_requests[localId].got_steal_response) {
 			usleep(100);
+			reps++;
+			if (reps%32==0) {
+				LOG(V5_DEBG, "Sweeper [%i](%i) steal loop: waits for MPI response\n", _my_rank, localId);
+			}
+			if (_terminate_all) {
+				LOG(V3_VERB, "Sweeper [%i](%i) steal loop: aborts waiting - node got terminate signal \n", _my_rank, localId);
+				break;
+			}
 		}
+
 
 		//Successful steal if size > 0
 		if ( ! _worksteal_requests[localId].stolen_work.empty()) {
@@ -494,16 +531,16 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		}
 		//Unsuccessful global steal, try again
 	}
-	//Found work (work_size>0) or terminated (work_size==0). Tell the kissat solver thread where it can find this work (or where it can read the zero, to terminate itself)
+	//Found work (if work_size>0) or got signal for termination (work_size==0).
+	//we control the memory on C++/Mallob Level, and only tell the kissat solver where it can find the work (or where it can read the zero)
+	//the solver will also write on this array, but only within the allocated bounds provided by C++/Mallob
 	*work = reinterpret_cast<unsigned int*>(shweeper->work_received_from_steal.data());
 	*work_size = shweeper->work_received_from_steal.size();
 	assert(*work_size>=0);
 	if (*work_size>0) {
-		shweeper->shweeper_is_idle = false; //in case of termination (work_size==0) we interpret the shweeper of remaining idle
+		shweeper->shweeper_is_idle = false; //we keep solver marked as "idle" once the whole solving is terminated, otherwise race-conditions can occur where suddenly the solver is treated as active again
 	}
-
 	//The thread now returns to the kissat solver
-	//work_size==0 set here is there interpreted as the termination signal
 }
 
 
@@ -850,34 +887,42 @@ void SweepJob::loadFormula(KissatPtr shweeper) {
 }
 
 void SweepJob::gentlyTerminateSolvers() {
-	LOG(V2_INFO, "SWEEP JOB DELETE #%i on rank [%i]: interrupting solvers\n", getId(), _my_rank);
+	LOG(V2_INFO, "SWEEP JOB TERM #%i [%i] interrupting solvers\n", getId(), _my_rank);
 	//each sweeper checks constantly for the interruption signal (on the ms scale or faster), allow for gentle own exit
-	int i=0;
-	for (auto &shweeper : _shweepers) {
-		if (shweeper) {
-			shweeper->setSolverInterrupt();
+	while (_running_shweepers_count>0) {
+		LOG(V2_INFO, "SWEEP JOB TERM #%i [%i] still %i solvers running\n", getId(), _my_rank, _running_shweepers_count.load());
+		int i=0;
+		for (auto &shweeper : _shweepers) {
+			if (shweeper) {
+				shweeper->setShweepTerminate();
+				LOG(V2_INFO, "SWEEP JOB TERM #%i [%i] terminating solver (%i)\n", getId(), _my_rank, i);
+			}
 			i++;
 		}
+		usleep(1000);
 	}
-	LOG(V2_INFO, "SWEEP JOB DELETED #%i on rank [%i]: interrupted %i solvers \n", getId(), _my_rank, i);
+	LOG(V2_INFO, "SWEEP JOB TERM #%i [%i] no more solvers running\n", getId(), _my_rank);
 
 	usleep(2000);
 
-	i=0;
-	LOG(V2_INFO, "SWEEP JOB DELETE #%i on rank [%i]: joining bg_workers \n",  getId(),_my_rank);
+	int i=0;
+	LOG(V2_INFO, "SWEEP JOB TERM #%i [%i] joining bg_workers \n",  getId(),_my_rank);
 	for (auto &bg_worker : _bg_workers) {
 		if (bg_worker->isRunning()) {
+			LOG(V2_INFO, "SWEEP JOB TERM #%i [%i] joining bg_worker (%i) \n",  getId(),_my_rank, i);
 			bg_worker->stop();
-			i++;
+			LOG(V2_INFO, "SWEEP JOB TERM #%i [%i] joined  bg_worker (%i) \n",  getId(),_my_rank, i);
 		}
+		i++;
 	}
-	LOG(V2_INFO, "SWEEP JOB DELETE #%i on rank [%i]: joined %i bg_workers \n", getId(),_my_rank,  i);
+	LOG(V2_INFO, "SWEEP JOB TERM #%i [%i] joined all bg_workers \n", getId(),_my_rank);
+	LOG(V2_INFO, "SWEEP JOB TERM #%i [%i] DONE \n", getId(),_my_rank);
 }
 
 SweepJob::~SweepJob() {
-	LOG(V2_INFO, "DELETE SWEEP JOB\n");
+	LOG(V2_INFO, "SWEEP JOB DESTRUCTOR ENTERED \n");
 	gentlyTerminateSolvers();
-	LOG(V2_INFO, "DELETED SWEEP JOB\n");
+	LOG(V2_INFO, "SWEEP JOB DESTRUCTOR DONE\n");
 }
 
 

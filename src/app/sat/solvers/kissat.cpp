@@ -385,6 +385,10 @@ void Kissat::setSolverInterrupt() {
     if (interruptionInitialized) kissat_terminate (solver);
 }
 
+void Kissat::setShweepTerminate() {
+    shweep_terminate(solver);
+}
+
 void Kissat::unsetSolverInterrupt() {
 	interrupted = false;
 }

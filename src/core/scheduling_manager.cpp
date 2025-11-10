@@ -179,13 +179,16 @@ void SchedulingManager::execute(Job& job, int source) {
         // Restart job
         job.resume();
     }
+    LOG(V5_DEBG, "STARTED %s (#%i) \n", job.toStr(), job.getId());
 
     int demand = job.getDemand();
     _balancer.onActivate(job, demand);
     job.setLastDemand(demand);
 
+    LOG(V5_DEBG, "Looping through post-execution hooks for job #%i \n", job.getId());
     // execute post-execution hooks once, then delete them
     if (_job_execution_hooks.count(jobId)) {
+        LOG(V5_DEBG, "Execute %i post-execution hooks for job #%i \n", _job_execution_hooks.count(jobId), job.getId());
         auto funs = std::move(_job_execution_hooks[jobId]);
         _job_execution_hooks.erase(jobId);
         for (auto& fun : funs) fun();
@@ -670,8 +673,15 @@ void SchedulingManager::handleJobInterruption(MessageHandle& handle) {
     int rev = vec[1];
     JobInterruptReason reason = static_cast<JobInterruptReason>(vec[2]);
 
+    LOG(V3_VERB, "Got Interruption msg for job #%i, rev %i \n", jobId, rev);
+
     if (!has(jobId) || get(jobId).getState() != ACTIVE || get(jobId).getRevision() < rev) {
         // defer message until the job is ACTIVE in revision "rev"
+        LOG(V3_VERB, "Defer interrupt message for job #%i \n", jobId);
+        if (!has(jobId)) LOG(V3_VERB, " defer because: has(jobId) == %i \n", has(jobId));
+        if (get(jobId).getState() != ACTIVE) LOG(V3_VERB, " defer because: get(jobId).getState() == %s \n", JOB_STATE_STRINGS[(int)get(jobId).getState()]);
+        if (get(jobId).getRevision() < rev) LOG(V3_VERB, " defer because: get(jobId).getRevision() == %i < rev == %i \n", get(jobId).getRevision(), rev);
+
         _job_execution_hooks[jobId].push_back([&, h = std::move(handle)]() mutable {
             LOG(V4_VVER, "#%i post-exec hook : interrupt\n", Serializable::get<IntVec>(h.getRecvData())[0]);
             handleJobInterruption(h);
@@ -1238,6 +1248,7 @@ void SchedulingManager::terminate(Job& job) {
 
 void SchedulingManager::interruptJob(int jobId, bool doTerminate, bool reckless) {
 
+    LOG(V4_VVER, "Interrupt Job #%i \n", jobId);
     int msgTag;
     if (doTerminate && reckless) msgTag = MSG_NOTIFY_JOB_ABORTING;
     else if (doTerminate) msgTag = MSG_NOTIFY_JOB_TERMINATING;
@@ -1250,6 +1261,7 @@ void SchedulingManager::interruptJob(int jobId, bool doTerminate, bool reckless)
             if (rank == MyMpi::rank(MPI_COMM_WORLD) || rank < 0) continue;
             MyMpi::isend(rank, msgTag, IntVec({jobId, JobInterruptReason::DONE}));
             LOG_ADD_DEST(V4_VVER, "Propagate termination of #%i ...", rank, jobId);
+            // LOG(V4_VVER, "Propagate termination of job #%i to rank %i \n", jobId, rank);
         }
         _orphaned_child_nodes.erase(jobId);
     }
@@ -1273,8 +1285,9 @@ void SchedulingManager::interruptJob(int jobId, bool doTerminate, bool reckless)
     if (job.getJobTree().hasRightChild()) destinations.insert(job.getJobTree().getRightChildNodeRank());
     for (auto childRank : destinations) {
         if (childRank < 0) continue;
-        MyMpi::isend(childRank, msgTag, IntVec({jobId, JobInterruptReason::DONE}));
         LOG_ADD_DEST(V4_VVER, "Propagate interruption of %s ...", childRank, job.toStr());
+        MyMpi::isend(childRank, msgTag, IntVec({jobId, JobInterruptReason::DONE}));
+        // LOG(V4_VVER, "Propagate interruption of job #%i to rank %i \n", jobId, childRank);
     }
     if (doTerminate) job.getJobTree().getPastChildren().clear();
 
