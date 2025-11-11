@@ -672,7 +672,7 @@ void SchedulingManager::handleJobInterruption(MessageHandle& handle) {
         return;
     }
     auto& job = get(jobId);
-    if (job.getRevision() > rev) {
+    if (rev >= 0 && job.getRevision() > rev) {
         LOG(V3_VERB, "#%i interrupt concerns old revision %i (rev. %i now)\n",
             jobId, rev, job.getRevision());
         return;
@@ -1241,7 +1241,7 @@ void SchedulingManager::interruptJob(int jobId, bool doTerminate, bool reckless)
         // Forward the termination message to them
         for (int rank : _orphaned_child_nodes.at(jobId)) {
             if (rank == MyMpi::rank(MPI_COMM_WORLD) || rank < 0) continue;
-            MyMpi::isend(rank, msgTag, IntVec({jobId, JobInterruptReason::DONE}));
+            MyMpi::isend(rank, msgTag, IntVec({jobId, -1, JobInterruptReason::DONE}));
             LOG_ADD_DEST(V4_VVER, "Propagate termination of #%i ...", rank, jobId);
         }
         _orphaned_child_nodes.erase(jobId);
@@ -1266,7 +1266,7 @@ void SchedulingManager::interruptJob(int jobId, bool doTerminate, bool reckless)
     if (job.getJobTree().hasRightChild()) destinations.insert(job.getJobTree().getRightChildNodeRank());
     for (auto childRank : destinations) {
         if (childRank < 0) continue;
-        MyMpi::isend(childRank, msgTag, IntVec({jobId, JobInterruptReason::DONE}));
+        MyMpi::isend(childRank, msgTag, IntVec({jobId, job.getRevision(), JobInterruptReason::DONE}));
         LOG_ADD_DEST(V4_VVER, "Propagate interruption of %s ...", childRank, job.toStr());
     }
     if (doTerminate) job.getJobTree().getPastChildren().clear();
