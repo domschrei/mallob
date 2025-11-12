@@ -1,7 +1,7 @@
 #!/bin/bash
 
-NPROCS=4
-THREADS=3
+NPROCS=2
+THREADS=1
 
 OUT_DIR="$HOME/PhD/logsntraces/"
 # INST_PATH="$HOME/PhD/instances/miter/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf"

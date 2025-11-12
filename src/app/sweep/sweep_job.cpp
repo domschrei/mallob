@@ -69,6 +69,9 @@ void SweepJob::appl_start() {
 		createAndStartNewShweeper(localId);
 	}
 
+	_internal_result.id = getId(); //might aswell already set them now
+	_internal_result.revision = getRevision();
+
 	LOG(V2_INFO, "SWEEP JOB appl_start() FINISHED\n");
 }
 
@@ -175,19 +178,34 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 		//or there exists a valid reported id on the root node,
 		//or the sweeper was terminated externally, so we are not interested in the result
 		//or the sweeper got inconsistent and did not report a formula (this should eventually not happen anymore, but hotfix for now to focus on Mallob-specific problems)
-		assert( ! _is_root || _dimacsReport_localId->load() != -1 || _external_termination || kissat_is_inconsistent(shweeper->solver));
-		if (kissat_is_inconsistent(shweeper->solver)) {
-			LOG(V2_INFO, "SWEEP JOB [%i](%i) bypassing readResult because solver became inconsistent \n", _my_rank, localId);
+
+		if (res==20) {
+			//Found UNSAT
+			if (! kissat_is_inconsistent(shweeper->solver))
+				log_return_false("SWEEP WARN: Solver returned UNSAT 20 but is not in inconsistent state!\n");
+			int unset_state = -1;
+			//Check whether we are the very first solver to report anything. If we are, report and block others
+			if (_reporting_localId->compare_exchange_strong(unset_state, localId)) {
+				reportStats(shweeper, UNSAT);
+				_internal_result.result = UNSAT;
+				_solved_status = UNSAT;
+				//no formula is read, since we are directly UNSAT
+			}
 		}
-		if (_is_root && localId == _dimacsReport_localId->load()) {
-			readResult(shweeper, true);
-			//todo: also read result if there is external termination?
+		//Check whether we are the specific solver that already exported the improved formula from solver to Mallob level
+		if (shweeper->hasReportedSweepDimacs()) {
+			assert(res==0);
+			readResultFormula(shweeper);
+			reportStats(shweeper, SAT);
+			_internal_result.result = SAT ; //technically the result is not SAT but just *some* information, but to seamlessly pass though the higher abstraction layers of Mallob we label it as SAT (in comparison, with UNKNOWN, the solution formula might not be read/forwarded)
+			_solved_status = SAT;
 		}
+		assert( res==20 || res==0 || log_return_false("SWEEP ERROR: solver unexpected returned with signal %i \n"), res);
+
 		_running_shweepers_count--;
 		_shweepers[localId]->cleanUp(); //write kissat timing profile
 		_shweepers[localId] = nullptr;  //signal that this solver doesnt exist anymore
 		LOG(V2_INFO, "SWEEP JOB [%i](%i) BG_WORKER EXIT\n", _my_rank, localId);
-
 	});
 	// _fut_shweepers.push_back(std::move(fut_shweeper));
 }
@@ -243,13 +261,13 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	if (_is_root) {
 		//read out final formula only at the root node
 		shweeper->shweepSetReportCallback();
-		shweeper->shweepSetDimacsReportPtr(_dimacsReport_localId);
+		shweeper->shweepSetReportingPtr(_reporting_localId);
 	}
 
     //Basic configuration
-    shweeper->set_option("quiet", 1);  //suppress any standard kissat messages
+    shweeper->set_option("quiet", 0);  //suppress any standard kissat messages
     shweeper->set_option("verbose", 0);//the native kissat verbosity
-    // _shweeper->set_option("log", 0);//extensive logging
+    shweeper->set_option("log", 0);    //potentially extensive logging
     shweeper->set_option("check", 0);  // do not check model or derived clauses, because we import anyways units and equivalences without proof tracking
     shweeper->set_option("statistics", 1);  //print full statistics
     shweeper->set_option("profile", _params.satProfilingLevel.val); // do detailed profiling how much time we spent where
@@ -272,7 +290,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	shweeper->set_option("preprocess", 0); //skip other preprocessing stuff after shweep finished
 	// shweeper->set_option("probe", 1);   //there is some cleanup-probing at the end of the sweeping. keep it? (apparently the probe option is used nowhere anyways)
 	shweeper->set_option("substitute", 1); //apply equivalence substitutions after sweeping (kissat default 1, but keep here explicitly to remember it)
-	shweeper->set_option("substituterounds", 2); //default is 2, and changing that has currently no effect, because all substitutions happen in round 1, and already in round 2 zero substitutions are found, so it exits there.
+	shweeper->set_option("substituterounds", 2); //default is 2, and changing that has currently no effect, virtually all substitutions happen in round 1, and already in round 2 zero or single substitutions are found, and it exits there.
 	// shweeper->set_option("substituteeffort", 1000); //modification doesnt seem to have much effect...
 	// shweeper->set_option("substituterounds", 10);
 	shweeper->set_option("luckyearly", 0); //skip
@@ -282,26 +300,16 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	return shweeper;
 }
 
-void SweepJob::readResult(KissatPtr shweeper, bool withStats = true) {
-
-	LOG(V2_INFO, "SWEEP JOB [%i](%i) read Result\n", _my_rank, shweeper->getLocalId());
-	_internal_result.id = getId();
-	_internal_result.revision = getRevision();
-	_internal_result.result=SAT; //technically the result is not SAT but just *some* information, but it helps to mark it SAT to seamlessly pass though the higher abstraction layers (UNKNOWN result for example might not even try to copy the solution formula)
-	// if (shweeper->hasPreprocessedFormula()) {
-	std::vector<int> formula = shweeper->extractPreprocessedFormula(); //Can be either empty (size==0) if no progress was made, or format [Clauses, #Vars, #Clauses] otherwise
+void SweepJob::readResultFormula(KissatPtr shweeper) {
+	LOG(V2_INFO, "SWEEP JOB [%i](%i) serializing result formula from solver \n", _my_rank, shweeper->getLocalId());
+	assert(shweeper->hasPreprocessedFormula());
+	std::vector<int> formula = shweeper->extractPreprocessedFormula(); //format is [Clauses, #Vars, #Clauses], i.e. clauses followed by two metadata-ints at the end. Or empty, if the solver found UNSAT or made no progress at all
 	_internal_result.setSolutionToSerialize(formula.data(), formula.size());
-	// } else {
-		// _internal_result.setSolutionToSerialize(formula.data(), formula.size()); //Format: [Clauses, #Vars, #Clauses], the last two integers are pushed at the end of the literal reporting
-	// }
-	//This flag tells the system that the result is actually ready
-	_solved_status = SAT;
-
-	if (withStats)
-		readStats(shweeper);
 }
 
-void SweepJob::readStats(KissatPtr shweeper) {
+}
+
+void SweepJob::reportStats(KissatPtr shweeper, int res) {
 	auto stats = shweeper->getSolverStats();
 	int units_orig = stats.shweep_total_units - stats.shweep_new_units;
 	int total_orig = stats.shweep_active_orig + units_orig;
@@ -309,13 +317,13 @@ void SweepJob::readStats(KissatPtr shweeper) {
 	//actual_done is a slightly conservative count, because we only include the units found by the sweeping algorithm itself,
 	//and dont include some stray units found while propagating the sweep decisions (that would be stats.shweep_new_units)
 	int actual_remaining = total_orig - actual_done;
-
 	//printf("SWEEP finished\n");
 	// printf("[%i](%i) RESULT SWEEP: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
 		// _my_rank, _dimacsReport_localId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
-	LOG(V2_INFO, "RESULT SWEEP [%i](%i):  %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
-		_my_rank, _dimacsReport_localId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
-	LOG(V2_INFO, "RESULT SWEEP [%i](%i): %i Processes, %f seconds \n", _my_rank, _dimacsReport_localId->load(), getVolume(), Timer::elapsedSeconds() - _start_shweep_timestamp);
+	LOG(V2_INFO, "RESULT SWEEP [%i](%i)       %i res code\n", res);
+	LOG(V2_INFO, "RESULT SWEEP [%i](%i)       %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
+		_my_rank, _reporting_localId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
+	LOG(V2_INFO, "RESULT SWEEP [%i](%i):      %i Processes, %f seconds \n", _my_rank, _reporting_localId->load(), getVolume(), Timer::elapsedSeconds() - _start_shweep_timestamp);
 	LOG(V2_INFO, "RESULT SWEEP_PRIORITY       %f\n", _params.preprocessSweepPriority.val);
 	LOG(V2_INFO, "RESULT SWEEP_PROCESSES      %i\n", getVolume());
 	LOG(V2_INFO, "RESULT SWEEP_THREADS_PER_P  %i\n", _params.numThreadsPerProcess.val);
@@ -345,7 +353,7 @@ void SweepJob::readStats(KissatPtr shweeper) {
 		LOG(V2_INFO, "RESULT SWEEP_SHARING_PERIOD_REAL  %f ms \n", (_sharing_start_ping_timestamps[i+1] - _sharing_start_ping_timestamps[i])*1000);
 	}
 
-	LOG(V3_VERB, "RESULT SWEEP [%i](%i) Serialized final formula to SolutionSize=%i\n", _my_rank, _dimacsReport_localId->load(), _internal_result.getSolutionSize());
+	LOG(V3_VERB, "RESULT SWEEP [%i](%i) Serialized final formula to SolutionSize=%i\n", _my_rank, _reporting_localId->load(), _internal_result.getSolutionSize());
 	for (int i=0; i<15 && i<_internal_result.getSolutionSize(); i++) {
 		LOG(V3_VERB, "RESULT Sweep Formula peek %i: %i \n", i, _internal_result.getSolution(i));
 	}

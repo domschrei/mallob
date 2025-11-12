@@ -56,7 +56,8 @@ private:
 	std::vector<int> work_received_from_steal;
 
 	bool shweeper_is_idle = false;
-	std::shared_ptr<std::atomic<int>> shweepDimacsReportLocalId;
+	std::shared_ptr<std::atomic<int>> shweepReportingLocalId;
+	bool has_reported_sweep_dimacs = false;
 
 	// std::vector<char> stolen_done;
 	// std::vector<int> formulaForShweeping;
@@ -140,9 +141,10 @@ public:
 	friend void shweep_export_unit(void *state, int unit);
 	friend void shweep_import_eqs(void* state, int** equivalences, int *eqs_size);
 	friend void shweep_import_units(void *state, int **units, int *unit_count);
-	void shweepSetDimacsReportPtr(std::shared_ptr<std::atomic<int>> field);
+	void shweepSetReportingPtr(std::shared_ptr<std::atomic<int>> field);
 	void setToShweeper();
 	void setShweepTerminate();
+	bool hasReportedSweepDimacs() const;
 
 	//Pass-through
 	bool set_option(const std::string &option_name, int value);
@@ -156,6 +158,7 @@ private:
 	void shweepSetReportCallback();
     bool isPreprocessingAcceptable(int vars, int cls);
     void addLiteralFromPreprocessing(int lit);
+	void getSweeperStats();
 
     bool shouldTerminate();
 

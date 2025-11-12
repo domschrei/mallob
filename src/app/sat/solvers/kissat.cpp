@@ -576,30 +576,40 @@ void Kissat::configureBoundedVariableAddition() {
     kissat_set_option(solver, "factorexport", 1);
 }
 
+    //For Sweeping only: Only a single solver needs to report the formula. We choose the first solver on the root node that arrives here
+    //Only solvers on the root node are provided this callback, so if we are here we are guaranteed to be on root
+void Kissat::getSweeperStats() {
+    auto &stats = getSolverStatsRef();
+    stats.shweep_vars_orig = _setup.numVars;
+    stats.shweep_clauses_orig = _setup.numOriginalClauses;
+    shweep_get_sweep_stats(solver, &stats.shweep_eqs, &stats.shweep_sweep_units, &stats.shweep_new_units, &stats.shweep_total_units, &stats.shweep_eliminated, &stats.shweep_active_orig, &stats.shweep_active_end);
+}
+
 //Callback Called from both sequential preprocessing as well as the shared sweeping.
 bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
     bool accept = nbVars != _setup.numVars || nbClauses != _setup.numOriginalClauses;
 
-    //For Sweeping only: Only a single solver needs to report the formula. We choose the first solver on the root node that arrives here
-    //Only solvers on the root node are provided this callback, so if we are here we are guaranteed to be on root
     if (is_shweeper) {
-        int expected_unset = -1;
-        bool weAreFirst = shweepDimacsReportLocalId->compare_exchange_strong(expected_unset, getLocalId());
-        if (weAreFirst) {
-            LOG(V2_INFO, "SWEEP [root](%i) first to ask to report dimacs result\n", getLocalId());
-            auto &stats = getSolverStatsRef();
-            stats.shweep_vars_orig = _setup.numVars;
-            stats.shweep_clauses_orig = _setup.numOriginalClauses;
-            stats.shweep_vars_end = nbVars;
-            stats.shweep_clauses_end = nbClauses;
-            shweep_get_sweep_stats(solver, &stats.shweep_eqs, &stats.shweep_sweep_units, &stats.shweep_new_units, &stats.shweep_total_units, &stats.shweep_eliminated, &stats.shweep_active_orig, &stats.shweep_active_end);
-            if (accept)
-                LOG(V2_INFO, "SATWP ACCEPTS SWEEP dimacs formula.  progress:  (%i --> %i vars) (%i --> %i clauses) \n", _setup.numVars, nbVars, _setup.numOriginalClauses, nbClauses);
-            else
-                LOG(V2_INFO, "SWEEP DECLINES SWEEP dimacs formula. no progress: (%i --> %i vars) (%i --> %i clauses) \n", _setup.numVars, nbVars, _setup.numOriginalClauses, nbClauses);
+        auto &stats = getSolverStatsRef();
+        stats.shweep_vars_orig = _setup.numVars;
+        stats.shweep_clauses_orig = _setup.numOriginalClauses;
+        stats.shweep_vars_end = nbVars;
+        stats.shweep_clauses_end = nbClauses;
 
+        int unset_state = -1;
+        bool weAreFirst = shweepReportingLocalId->compare_exchange_strong(unset_state, getLocalId());
+        if (weAreFirst) {
+            LOG(V2_INFO, "SWEEP [root](%i) first to report dimacs result\n", getLocalId());
+            if (accept) {
+                LOG(V2_INFO, "SATWP ACCEPTS SWEEP dimacs formula: ");
+                has_reported_sweep_dimacs = true;
+            }
+            else {
+                LOG(V2_INFO, "SATWP DECLINES SWEEP dimacs formula: ");
+            }
+            LOG(V2_INFO, "SATWP sees from SWEEP: (%i --> %i vars) (%i --> %i clauses) \n", _setup.numVars, nbVars, _setup.numOriginalClauses, nbClauses);
         } else {
-            LOG(V2_INFO, "SWEEP [root](%i) denied report request, already taken by (%i) \n", getLocalId(), shweepDimacsReportLocalId->load());
+            LOG(V2_INFO, "SWEEP [root](%i) got formula report request denied, already taken by (%i) \n", getLocalId(), shweepReportingLocalId->load());
             accept = false;
         }
     }
@@ -609,6 +619,11 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
         nbPreprocessedClausesAdvertised = nbClauses;
     } else setSolverInterrupt();
     return accept;
+}
+
+
+bool Kissat::hasReportedSweepDimacs() const {
+    return has_reported_sweep_dimacs;
 }
 
 void Kissat::addLiteralFromPreprocessing(int lit) {
@@ -630,8 +645,8 @@ void Kissat::addLiteralFromPreprocessing(int lit) {
 }
 
 
-void Kissat::shweepSetDimacsReportPtr(std::shared_ptr<std::atomic<int>> ptr) {
-    shweepDimacsReportLocalId = ptr;
+void Kissat::shweepSetReportingPtr(std::shared_ptr<std::atomic<int>> ptr) {
+    shweepReportingLocalId = ptr;
 }
 
 
