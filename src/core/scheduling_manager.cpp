@@ -212,8 +212,6 @@ void SchedulingManager::handleDemandUpdate(Job& job, int demand) {
 
 void SchedulingManager::checkActiveJob() {
 
-    // printf("ß SchedMan Check Active Job\n");
-
     Job &job = _job_registry.getActive();
     int id = job.getId();
     bool isRoot = job.getJobTree().isRoot();
@@ -401,8 +399,6 @@ void SchedulingManager::handleIncomingJobRequest(MessageHandle& handle, JobReque
 
 void SchedulingManager::handleAdoptionOffer(MessageHandle& handle) {
 
-    // printf("ß Handle Adoption Offer\n");
-
     JobAdoptionOffer offer = Serializable::get<JobAdoptionOffer>(handle.getRecvData());
     auto& req = offer.request;
     LOG_ADD_SRC(V4_VVER, "Adoption offer for %s", handle.source, 
@@ -501,8 +497,6 @@ void SchedulingManager::handleRejectionOfDirectedRequest(MessageHandle& handle) 
 }
 
 void SchedulingManager::handleAnswerToAdoptionOffer(MessageHandle& handle) {
-
-    // printf("ß in Scheduling Manager: handle Answer\n");
 
     IntVec vec = Serializable::get<IntVec>(handle.getRecvData());
     int jobId = vec[0];
@@ -689,7 +683,7 @@ void SchedulingManager::handleJobInterruption(MessageHandle& handle) {
         return;
     }
     auto& job = get(jobId);
-    if (job.getRevision() > rev) {
+    if (rev >= 0 && job.getRevision() > rev) {
         LOG(V3_VERB, "#%i interrupt concerns old revision %i (rev. %i now)\n",
             jobId, rev, job.getRevision());
         return;
@@ -1259,9 +1253,8 @@ void SchedulingManager::interruptJob(int jobId, bool doTerminate, bool reckless)
         // Forward the termination message to them
         for (int rank : _orphaned_child_nodes.at(jobId)) {
             if (rank == MyMpi::rank(MPI_COMM_WORLD) || rank < 0) continue;
-            MyMpi::isend(rank, msgTag, IntVec({jobId, JobInterruptReason::DONE}));
+            MyMpi::isend(rank, msgTag, IntVec({jobId, -1, JobInterruptReason::DONE}));
             LOG_ADD_DEST(V4_VVER, "Propagate termination of #%i ...", rank, jobId);
-            // LOG(V4_VVER, "Propagate termination of job #%i to rank %i \n", jobId, rank);
         }
         _orphaned_child_nodes.erase(jobId);
     }
@@ -1285,9 +1278,8 @@ void SchedulingManager::interruptJob(int jobId, bool doTerminate, bool reckless)
     if (job.getJobTree().hasRightChild()) destinations.insert(job.getJobTree().getRightChildNodeRank());
     for (auto childRank : destinations) {
         if (childRank < 0) continue;
+        MyMpi::isend(childRank, msgTag, IntVec({jobId, job.getRevision(), JobInterruptReason::DONE}));
         LOG_ADD_DEST(V4_VVER, "Propagate interruption of %s ...", childRank, job.toStr());
-        MyMpi::isend(childRank, msgTag, IntVec({jobId, JobInterruptReason::DONE}));
-        // LOG(V4_VVER, "Propagate interruption of job #%i to rank %i \n", jobId, childRank);
     }
     if (doTerminate) job.getJobTree().getPastChildren().clear();
 
