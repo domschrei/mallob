@@ -34,7 +34,7 @@ private:
 
 
 	//Workstealing
-    bool _root_provided_initial_work=false;
+    std::atomic_bool _root_provided_initial_work=false;
 	SplitMix64Rng _rng;
 	struct WorkstealRequest {
 		int localId{-1};

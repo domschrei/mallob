@@ -406,7 +406,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 
 	//loop until we find work or the whole sweeping is terminated
 	while (true) {
-		LOG(V5_DEBG, "Sweeper [%i](%i) in search work loop\n", _my_rank, localId);
+		LOG(V5_DEBG, "Sweeper [%i](%i) in steal loop\n", _my_rank, localId);
 
 		if (_terminate_all) {
 			//this is the signal for the solver to terminate itself, by sending it a work array of size 0
@@ -420,7 +420,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		  */
 		if (_is_root && ! _root_provided_initial_work) {
 			_root_provided_initial_work = true;
-			shweeper->shweeper_is_idle = false; //to prevent race condition, already set non-idle here (otherwhise solver might already be initialized, but still deemed idle while the initial work is being provided)
+			shweeper->shweeper_is_idle = false; //already set non-idle here to prevent case where solver is already initialized, non-idle, but still has no work cause its just being copied, and then a sharing operation starts right now, terminating everything wrongly early
 			//We need to know how much space to allocate to store each variable "idx" at the array position work[idx].
 			//i.e. we need to know max(idx).
 			//We assume that the maximum variable index corresponds to the total number of variables
@@ -447,6 +447,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		  * At that point they anyways schedule a global sweep, and some sweepers stealing globally before cant stop that
 		  */
 
+		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop --> local steal \n", _my_rank, localId);
 		shweeper->shweeper_is_idle = true;
 		// if (first_local) {
 		auto stolen_work = stealWorkFromAnyLocalSolver();
@@ -457,6 +458,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 			LOG(V3_VERB, "SWEEP WORK [%i] ---%i---> (%i) \n", _my_rank, shweeper->work_received_from_steal.size(), localId);
 			break;
 		}
+		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop <-- local steal failed \n", _my_rank, localId);
 		// } else {
 			// LOG(V2_INFO, "SWEEP STEAL [%i](%i) go immediately for global steal\n", _my_rank, localId);
 		// }
@@ -501,6 +503,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 
 		//Request will be handled by the MPI main thread, which will send an MPI message on our behalf
 		//because here we are in code executed by the kissat thread, which can cause problems for sending MPI messages
+		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop --> global steal to [%i] \n", _my_rank, localId, targetRank);
 		WorkstealRequest request;
 		request.localId = localId;
 		request.targetIndex = targetIndex;
@@ -529,6 +532,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 			LOG(V3_VERB, "SWEEP WORK via MPI [%i] ---%i---> [%i](%i) \n", targetRank, shweeper->work_received_from_steal.size(), _my_rank, localId);
 			break;
 		}
+		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop <-- global steal to [%i] failed \n", _my_rank, localId, targetRank);
 		//Unsuccessful global steal, try again
 	}
 	//Found work (if work_size>0) or got signal for termination (work_size==0).
@@ -861,6 +865,7 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	// LOG(V3_VERB, "[%i] stealing from (%i), expecting max %i  \n", _my_rank, localId, max_steal_amount);
 	int actually_stolen = shweep_steal_from_this_solver(shweeper->solver, reinterpret_cast<unsigned int*>(stolen_work.data()), max_steal_amount);
 	// LOG(V3_VERB, "ß Steal request got %i actually stolen\n", actually_stolen);
+	// LOG(V3_VERB, "SWEEP WORK actually stolen ---%i---> from [%i](%i)\n", localId, stolen_work.size());
 	if (actually_stolen == 0)
 		return {};
 	//We sized he provided array to be maximally conservative,
@@ -871,7 +876,7 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 
 std::vector<int> SweepJob::getRandomIdPermutation() {
 	auto permutation = _list_of_ids; //copy
-	static thread_local std::mt19937 rng(std::random_device{}()); //created/seeded once per thread, then only advancing calls
+	static thread_local std::mt19937 rng(std::random_device{}()); //created/seeded only once per thread, then just advancing rng calls
 	std::shuffle(permutation.begin(), permutation.end(), rng);
 	return permutation;
 }
