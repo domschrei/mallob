@@ -185,7 +185,7 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
     }
 
     LOG(V0_CRIT, "[WARN] UNEXPECTED JOB MESSAGE - NORMAL CODE WOULD HAVE ASSERTED HERE!\n");
-    LOG(V0_CRIT, "[WOULD-BE-ERROR] Unexpected job message mpitag=%i inttag=%i jobId=%i ctx_id_sender=%i <= [%i]\n", mpiTag, msg.tag, msg.jobId, msg.contextIdOfSender, source);
+    LOG(V0_CRIT, "[WARN/Error] Unexpected job message mpitag=%i inttag=%i jobId=%i ctx_id_sender=%i <= [%i]\n", mpiTag, msg.tag, msg.jobId, msg.contextIdOfSender, source);
     // assert(log_return_false("[ERROR] Unexpected job message mpitag=%i inttag=%i jobId=%i ctx_id_sender=%i <= [%i]\n", mpiTag, msg.tag, msg.jobId, msg.contextIdOfSender, source));
 }
 
