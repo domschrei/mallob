@@ -102,7 +102,7 @@ private:
 
 	void reportStats(KissatPtr shweeper, int res);
 	// void readResult(KissatPtr shweeper, bool withStats);
-	void readResultFormula(KissatPtr shweeper);
+	void serializeResultFormula(KissatPtr shweeper);
 
 	void gentlyTerminateSolvers();
 

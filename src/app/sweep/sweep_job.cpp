@@ -173,12 +173,6 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 		int res = shweeper->solve(0, nullptr);
 		LOG(V2_INFO, "SWEEP JOB [%i](%i) solve() FINISH. Result %i \n", _my_rank, localId, res);
 
-		//on the root node we need to know which solver has copied its final formula to mallob, unless there has been an external termination, in which case we don't need any result
-		//we can continue if: either we are not on the root node,
-		//or there exists a valid reported id on the root node,
-		//or the sweeper was terminated externally, so we are not interested in the result
-		//or the sweeper got inconsistent and did not report a formula (this should eventually not happen anymore, but hotfix for now to focus on Mallob-specific problems)
-
 		if (res==20) {
 			//Found UNSAT
 			if (! kissat_is_inconsistent(shweeper->solver))
@@ -186,21 +180,24 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 			int unset_state = -1;
 			//Check whether we are the very first solver to report anything. If we are, report and block others
 			if (_reporting_localId->compare_exchange_strong(unset_state, localId)) {
+				assert(_solved_status==-1);
+				serializeResultFormula(shweeper); //there is no result formula, but serialization adds some required metadata to the job result
 				reportStats(shweeper, UNSAT);
 				_internal_result.result = UNSAT;
 				_solved_status = UNSAT;
 				//no formula is read, since we are directly UNSAT
 			}
 		}
-		//Check whether we are the specific solver that already exported the improved formula from solver to Mallob level
+		//Might have made some progress. Check whether we are the specific solver that already exported the improved formula from solver to Mallob level
 		if (shweeper->hasReportedSweepDimacs()) {
 			assert(res==0);
-			readResultFormula(shweeper);
-			reportStats(shweeper, SAT);
-			_internal_result.result = SAT ; //technically the result is not SAT but just *some* information, but to seamlessly pass though the higher abstraction layers of Mallob we label it as SAT (in comparison, with UNKNOWN, the solution formula might not be read/forwarded)
+			assert(_solved_status==-1);
+			serializeResultFormula(shweeper);
+			reportStats(shweeper, SAT); //technically not SAT but just *some* progress, but to not confuse the overall job handling machinery and to get it through we declare it SAT
+			_internal_result.result = SAT;
 			_solved_status = SAT;
 		}
-		assert( res==20 || res==0 || log_return_false("SWEEP ERROR: solver unexpected returned with signal %i \n"), res);
+		assert( res==20 || res==0 || log_return_false("SWEEP ERROR: solver has unexpected return signal %i \n", res));
 
 		_running_shweepers_count--;
 		_shweepers[localId]->cleanUp(); //write kissat timing profile
@@ -300,16 +297,15 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	return shweeper;
 }
 
-void SweepJob::readResultFormula(KissatPtr shweeper) {
+void SweepJob::serializeResultFormula(KissatPtr shweeper) {
 	LOG(V2_INFO, "SWEEP JOB [%i](%i) serializing result formula from solver \n", _my_rank, shweeper->getLocalId());
-	assert(shweeper->hasPreprocessedFormula());
+	// assert(shweeper->hasPreprocessedFormula());
 	std::vector<int> formula = shweeper->extractPreprocessedFormula(); //format is [Clauses, #Vars, #Clauses], i.e. clauses followed by two metadata-ints at the end. Or empty, if the solver found UNSAT or made no progress at all
-	_internal_result.setSolutionToSerialize(formula.data(), formula.size());
-}
-
+	_internal_result.setSolutionToSerialize(formula.data(), formula.size()); //we always need to serialize, even an empty formula, because serialization adds some required metadata in front
 }
 
 void SweepJob::reportStats(KissatPtr shweeper, int res) {
+	shweeper->getSweeperStats();
 	auto stats = shweeper->getSolverStats();
 	int units_orig = stats.shweep_total_units - stats.shweep_new_units;
 	int total_orig = stats.shweep_active_orig + units_orig;
@@ -320,10 +316,10 @@ void SweepJob::reportStats(KissatPtr shweeper, int res) {
 	//printf("SWEEP finished\n");
 	// printf("[%i](%i) RESULT SWEEP: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
 		// _my_rank, _dimacsReport_localId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
-	LOG(V2_INFO, "RESULT SWEEP [%i](%i)       %i res code\n", res);
-	LOG(V2_INFO, "RESULT SWEEP [%i](%i)       %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
-		_my_rank, _reporting_localId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
-	LOG(V2_INFO, "RESULT SWEEP [%i](%i):      %i Processes, %f seconds \n", _my_rank, _reporting_localId->load(), getVolume(), Timer::elapsedSeconds() - _start_shweep_timestamp);
+	LOG(V2_INFO, "RESULT SWEEP_CODE			  %i res code\n", res);
+	// LOG(V2_INFO, "RESULT SWEEP [%i](%i)       %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
+		// _my_rank, _reporting_localId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
+	LOG(V2_INFO, "RESULT SWEEP_TIME           %f seconds \n", Timer::elapsedSeconds() - _start_shweep_timestamp);
 	LOG(V2_INFO, "RESULT SWEEP_PRIORITY       %f\n", _params.preprocessSweepPriority.val);
 	LOG(V2_INFO, "RESULT SWEEP_PROCESSES      %i\n", getVolume());
 	LOG(V2_INFO, "RESULT SWEEP_THREADS_PER_P  %i\n", _params.numThreadsPerProcess.val);
@@ -342,7 +338,7 @@ void SweepJob::reportStats(KissatPtr shweeper, int res) {
 	LOG(V2_INFO, "RESULT SWEEP_UNITS_SWEEP    %i\n", stats.shweep_sweep_units);
 	LOG(V2_INFO, "RESULT SWEEP_ACTUAL_DONE    %i / %i (%.2f %)\n", actual_done, total_orig, 100*actual_done/(float)total_orig);
 	LOG(V2_INFO, "RESULT SWEEP_ACTUAL_REMAIN  %i / %i (%.2f %)\n", actual_remaining, total_orig, 100*actual_remaining/(float)total_orig);
-	LOG(V2_INFO, "RESULT SWEEP_TIME           %f sec\n", Timer::elapsedSeconds() - _start_shweep_timestamp);
+	// LOG(V2_INFO, "RESULT SWEEP_TIME           %f sec\n", Timer::elapsedSeconds() - _start_shweep_timestamp);
 
 	for (int i=0; i < _sharing_start_ping_timestamps.size() && i < _sharing_receive_result_timestamps.size(); i++) {
 		float start = _sharing_start_ping_timestamps[i];

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-NPROCS=2
-THREADS=1
+NPROCS=4
+THREADS=3
 
 OUT_DIR="$HOME/PhD/logsntraces/"
 # INST_PATH="$HOME/PhD/instances/miter/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf"
@@ -74,7 +74,7 @@ if $SWEEP; then
     MALLOB_OPTIONS="$MALLOB_OPTIONS \
       -preprocess-sweep \
       -sweep-sharing-period=20 \
-      -sweep-solver-verbosity=4 \
+      -sweep-solver-verbosity=3 \
       -preprocess-sweep-priority=$SWEEP_PRIO"
 else
     echo "SWEEP Preprocessing SKIPPED !"

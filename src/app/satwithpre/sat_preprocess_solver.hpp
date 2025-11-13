@@ -101,14 +101,20 @@ public:
                 LOG(V3_VERB, "SATWP SWEEP done\n");
                 res = jsonToJobResult(_sweep_job_response, false); //eventually probably convert = true to reconstruct solution if necessary
                 _sweep_job_digested = true;
-                LOG(V3_VERB, "SATWP SWEEP read JobResult from json, SolutionSize=%i\n", res.getSolutionSize());
-                if (res.getSolutionSize() > 0) {
-                    LOG(V3_VERB, "SATWP SWEEP has improved formula\n");
-                    _sweep_job_has_improved_formula = true;
-                } else {
-                    LOG(V1_WARN, "WARN: SATWP SWEEP did not improve formula! (Solution size 0). Not starting Preprocessed SAT job, instead leaving all resources to already running SAT job\n");
+                if (res.result==SAT) {
+                    if (res.getSolutionSize() > 0) {
+                        assert(res.result == SAT); //technically its just *some* information and not SAT yet, but to bypass the higher abstraction layers easier we denoted it as SAT
+                        LOG(V3_VERB, "SATWP SWEEP has improved formula\n");
+                        LOG(V3_VERB, "SATWP SWEEP has read JobResult from json, SolutionSize=%i\n", res.getSolutionSize());
+                        _sweep_job_has_improved_formula = true;
+                    } else {
+                        LOG(V1_WARN, "WARN: SATWP SWEEP did not improve formula, Solution size 0 ! Leaving all resources to the running base SAT job, not starting a preprocessed job\n");
+                    }
                 }
-                //todo: break if sweep solves the problem completeley to SAT/UNSAT?
+                if (res.result==UNSAT) {
+                    LOG(V3_VERB, "SATWP SWEEP reported result UNSATISFIABLE\n");
+                    break;
+                }
             }
 
             if (_preprod_job_done && !_preprod_job_digested) {
@@ -128,10 +134,11 @@ public:
                     break;
                 }
 
-                //special case: sequential preprocessing was unsuccessful but we still want to do distributed sweeping as another preprocessing step
-                //the preprocessing doesnt return a formula in that case that we could pipe into Sweep, so we need to get the original formula instead
+                //if sequential preprocessing was unsuccessful, we still might want to schedule distributed sweeping as another preprocessing step
+                //in that case that we need to get the original formula, as prepro didnt report any
+                // todo before that: check how often preprocessor makes no progress at all, grep for SKIPPING
                 if (_params.preprocessSweep.val && ! _prepro.hasPreprocessedFormula()) {
-                    LOG(V1_WARN, "SATWP preprocessor done, but failed to find any improvement. Not continuing with Sweep\n");
+                    LOG(V1_WARN, "SATWP preprocessor done, didnt find any improvement. For now: SKIPPING Sweep. Future: May still want to schedule sweep now.\n");
                 }
             }
 
@@ -148,8 +155,6 @@ public:
                 submitSweepJob(_prepro.extractPreprocessedFormula());
             }
 
-
-            //todo: we probably still want to submit SWEEP even if _prepro does no progress at all?
             //continue from SWEEP to preprocessed SAT
             if (_sweep_job_digested && _sweep_job_has_improved_formula && !_sweep_job_submitted_sat) {
                 LOG(V3_VERB, "SATWP submit preprocessed SAT task (via providing SWEEP results)\n");
