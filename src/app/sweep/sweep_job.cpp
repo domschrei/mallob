@@ -416,7 +416,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 			//this is the signal for the solver to terminate itself, by sending it a work array of size 0
 			shweeper->work_received_from_steal = {};
 			shweeper->shweeper_is_idle = true;
-			LOG(V3_VERB, "Sweeper [%i](%i) steal loop - exit, node got terminate signal \n", _my_rank, localId);
+			LOG(V3_VERB, "Sweeper [%i](%i) steal loop - node got terminate signal, exit loop\n", _my_rank, localId);
 			break;
 		}
 		 /*
@@ -480,13 +480,19 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		//Unsuccessful steal locally. Go global via MPI message
 
 		assert(getVolume()>=1 || log_return_false("SWEEP ERROR [%i](%i) in workstealing: getVolume()==%i, i.e. no volume available to steal from\n", _my_rank, localId, getVolume()));
+
+		if (getVolume()==1) {
+			LOG(V5_DEBG, "SWEEP WORK SKIP [%i](%i) steal loop --> we are the only MPI rank, no global steal \n", _my_rank, localId);
+			usleep(500);
+			continue;
+		}
+
 		int targetIndex = _rng.randomInRange(0,getVolume());
         int targetRank = getJobComm().getWorldRankOrMinusOne(targetIndex);
 
-
         if (targetRank == -1) {
         	//target rank not yet in JobTree, might need some more milliseconds to update, try again
-			LOG(V3_VERB, "SWEEP SKIP targetIndex %i, targetRank %i not yet in JobComm\n", targetIndex, targetRank);
+			LOG(V3_VERB, "SWEEP WORK SKIP targetIndex %i, targetRank %i not yet in JobComm\n", targetIndex, targetRank);
 			usleep(500);
         	continue;
         }
@@ -497,7 +503,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		}
 
 		if (getJobComm().getContextIdOrZero(targetIndex)==0) {
-			LOG(V3_VERB, "SWEEP SKIP Context ID of target is missing. getVolume()=%i, rndTargetIndex=%i, rndTargetRank=%i, myIndex=%i, myRank=%i \n", getVolume(), targetIndex, targetRank, _my_index, _my_rank);
+			LOG(V3_VERB, "SWEEP WORK SKIP Context ID of target is missing. getVolume()=%i, rndTargetIndex=%i, rndTargetRank=%i, myIndex=%i, myRank=%i \n", getVolume(), targetIndex, targetRank, _my_index, _my_rank);
 			//target is not yet listed in address list. Might happen for a short period just after it is spawned
 			usleep(500);
 			continue;
@@ -521,10 +527,10 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 			usleep(100);
 			reps++;
 			if (reps%32==0) {
-				LOG(V5_DEBG, "Sweeper [%i](%i) steal loop: waits for MPI response\n", _my_rank, localId);
+				LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop: waits for MPI response\n", _my_rank, localId);
 			}
 			if (_terminate_all) {
-				LOG(V3_VERB, "Sweeper [%i](%i) steal loop: aborts waiting - node got terminate signal \n", _my_rank, localId);
+				LOG(V3_VERB, "SWEEP WORK [%i](%i) steal loop: aborts waiting for MPI response - node got terminate signal \n", _my_rank, localId);
 				break;
 			}
 		}
