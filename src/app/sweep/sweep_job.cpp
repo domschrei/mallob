@@ -473,7 +473,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 			LOG(V3_VERB, "SWEEP SKIP Delaying global steal request, my own rank %i (index %i) is not yet in JobComm \n", _my_rank, _my_index);
 			// LOG(V2_INFO, " with _my_index %i \n", _my_index);
 			// LOG(V2_INFO, " with JobComm().size %i \n", getJobComm().size());
-			usleep(10000);
+			usleep(500);
 			continue;
 		}
 
@@ -487,7 +487,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
         if (targetRank == -1) {
         	//target rank not yet in JobTree, might need some more milliseconds to update, try again
 			LOG(V3_VERB, "SWEEP SKIP targetIndex %i, targetRank %i not yet in JobComm\n", targetIndex, targetRank);
-			usleep(1000);
+			usleep(500);
         	continue;
         }
 
@@ -499,7 +499,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		if (getJobComm().getContextIdOrZero(targetIndex)==0) {
 			LOG(V3_VERB, "SWEEP SKIP Context ID of target is missing. getVolume()=%i, rndTargetIndex=%i, rndTargetRank=%i, myIndex=%i, myRank=%i \n", getVolume(), targetIndex, targetRank, _my_index, _my_rank);
 			//target is not yet listed in address list. Might happen for a short period just after it is spawned
-			usleep(1000);
+			usleep(500);
 			continue;
 		}
 

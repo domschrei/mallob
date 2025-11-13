@@ -672,9 +672,10 @@ void SchedulingManager::handleJobInterruption(MessageHandle& handle) {
     if (!has(jobId) || get(jobId).getState() != ACTIVE || get(jobId).getRevision() < rev) {
         // defer message until the job is ACTIVE in revision "rev"
         LOG(V3_VERB, "Defer interrupt message for job #%i \n", jobId);
-        if (!has(jobId)) LOG(V3_VERB, " defer because: has(jobId) == %i \n", has(jobId));
-        if (get(jobId).getState() != ACTIVE) LOG(V3_VERB, " defer because: get(jobId).getState() == %s \n", JOB_STATE_STRINGS[(int)get(jobId).getState()]);
-        if (get(jobId).getRevision() < rev) LOG(V3_VERB, " defer because: get(jobId).getRevision() == %i < rev == %i \n", get(jobId).getRevision(), rev);
+        //careful: when logging only do second test if first test succeeds, otherwise segfault!
+        // if (!has(jobId)) LOG(V3_VERB, " defer because: has(jobId) == %i \n", has(jobId));
+        // if (get(jobId).getState() != ACTIVE) LOG(V3_VERB, " defer because: get(jobId).getState() == %s \n", JOB_STATE_STRINGS[(int)get(jobId).getState()]);
+        // if (get(jobId).getRevision() < rev) LOG(V3_VERB, " defer because: get(jobId).getRevision() == %i < rev == %i \n", get(jobId).getRevision(), rev);
 
         _job_execution_hooks[jobId].push_back([&, h = std::move(handle)]() mutable {
             LOG(V4_VVER, "#%i post-exec hook : interrupt\n", Serializable::get<IntVec>(h.getRecvData())[0]);
