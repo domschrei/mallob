@@ -171,6 +171,12 @@ void Kissat::diversify(int seed) {
             kissat_set_option(solver, "sweepcomplete", 1);
         // if (_setup.shared_sweeping) {
             // kissat_set_option(solver, "mallob_shared_sweeping", 1);
+
+        //For debugging: The prpeprocessing solver should also log some things
+        kissat_set_option(solver, "quiet", 0);
+        kissat_set_option(solver, "verbose", 0);
+        kissat_set_option(solver, "log", 0);
+
         // }
         //kissat_set_option(solver, "luckyearly", 0); // lucky before preprocess can take very long
         seedSet = true;
@@ -601,11 +607,11 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
         if (weAreFirst) {
             LOG(V2_INFO, "SWEEP [root](%i) first to report dimacs result\n", getLocalId());
             if (accept) {
-                LOG(V2_INFO, "SATWP ACCEPTS SWEEP dimacs formula: ");
+                LOG(V2_INFO, "SATWP ACCEPTS SWEEP dimacs formula\n");
                 has_reported_sweep_dimacs = true;
             }
             else {
-                LOG(V2_INFO, "SATWP DECLINES SWEEP dimacs formula: ");
+                LOG(V2_INFO, "SATWP DECLINES SWEEP dimacs formula\n");
             }
             LOG(V2_INFO, "SATWP sees from SWEEP: (%i --> %i vars) (%i --> %i clauses) \n", _setup.numVars, nbVars, _setup.numOriginalClauses, nbClauses);
         } else {

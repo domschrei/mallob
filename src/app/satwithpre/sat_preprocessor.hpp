@@ -52,14 +52,14 @@ public:
         _kissat.reset(new Kissat(setup));
         float t1 = Timer::elapsedSeconds();
 
-        LOG(V3_VERB, "SATWP start sequential preprocessor\n");
-        LOG(V2_INFO, "STARTUP (PREPRO) Kissat init duration: %f ms \n", (t1-t0)*1000);
+        LOG(V3_VERB, "SATWP Starting sequential preprocessor\n");
+        LOG(V2_INFO, "SATWP STARTUP (PREPRO) Kissat init duration: %f ms \n", (t1-t0)*1000);
         _nb_running++;
         _fut_kissat = ProcessWideThreadPool::get().addTask([&]() {
             loadFormulaToSolver(_kissat.get());
-            LOG(V2_INFO, "PREPRO running Kissat\n");
+            LOG(V2_INFO, "SATWP PREPRO running kissat\n");
             int res = _kissat->solve(0, nullptr);
-            LOG(V2_INFO, "PREPRO Kissat done, result %i\n", res);
+            LOG(V2_INFO, "SATWP PREPRO kissat done, result %i\n", res);
             if (res != RESULT_UNKNOWN) {
                 int expected = 0;
                 if (_solver_result.compare_exchange_strong(expected, res)) {
@@ -75,9 +75,9 @@ public:
             _nb_running++;
             _fut_lingeling = ProcessWideThreadPool::get().addTask([&]() {
                 loadFormulaToSolver(_lingeling.get());
-                LOG(V2_INFO, "PREPRO running Lingeling\n");
+                LOG(V2_INFO, "SATWP PREPRO running Lingeling\n");
                 int res = _lingeling->solve(0, nullptr);
-                LOG(V2_INFO, "PREPRO Lingeling done, result %i\n", res);
+                LOG(V2_INFO, "SATWP PREPRO Lingeling done, result %i\n", res);
                 if (res != RESULT_UNKNOWN) {
                     int expected = 0;
                     if (_solver_result.compare_exchange_strong(expected, res)) {

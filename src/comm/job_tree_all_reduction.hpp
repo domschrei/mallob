@@ -148,7 +148,7 @@ private:
     // Process an incoming message and advance the all-reduction accordingly.
     bool receive(int source, int tag, JobMessage& msg) {
 
-        assert(tag == MSG_JOB_TREE_MODULAR_REDUCE || tag == MSG_JOB_TREE_MODULAR_BROADCAST || tag == MSG_JOB_TREE_PARENT_IS_READY || printf("Assertion Error in job_tree_all_reduction: Unexpected tag %i \n", tag));
+        assert(tag == MSG_JOB_TREE_MODULAR_REDUCE || tag == MSG_JOB_TREE_MODULAR_BROADCAST || tag == MSG_JOB_TREE_PARENT_IS_READY || log_return_false("SWEEP ERROR/Error: Unexpected tag %i (msg.tag %i) in JobTreeAllReduction receive(...) from source %i\n", tag, msg.tag, source));
 
         if (!_care_about_parent_status)
             LOG(V2_INFO, "TRY REDUCE %i %i %i %i %i\n", tag, msg.epoch, _base_msg.epoch, msg.tag, _base_msg.tag);
@@ -159,7 +159,7 @@ private:
         if (!accept) return false;
 
         if (msg.returnedToSender) {
-            LOG(V2_INFO, "REDUCE returnedToSender\n");
+            LOG(V2_INFO, "WARN REDUCE returnedToSender\n");
             return true;
         }
 
@@ -202,7 +202,16 @@ public:
 
         if (_finished) return *this;
 
-        LOG(V4_VVER, "SWEEP SHARE expected child elems %i, actual child elems %i \n", _num_expected_child_elems, _child_elems.size());
+        LOG(V4_VVER, "SWEEP SHARE expected child elems %i, actual child elems %i, local elem %i \n", _num_expected_child_elems, _child_elems.size(), _local_elem.has_value());
+        // if (_child_elems.size() > _num_expected_child_elems) {
+           // for (auto &child : _child_elems) {
+                // LOG(V4_VVER, "SWEEP ERROR/Error: Unexpected child elem with size %i from source %i \n", child.elem.size(), child.source);
+           // }
+        // }
+        // assert(_child_elems.size() <= _num_expected_child_elems || log_return_false("SWEEP ERROR/Error: Job Tree All Reduction Rank got too many child elements! expected %i, got %i \n", _num_expected_child_elems, _child_elems.size()));
+
+        //at child_elems == expected_elems we briefly add our own element to the children, so then we have one more child element than expected, but thats no longer an issue to the propagate the combined aggregated element
+
         if (_child_elems.size() == _num_expected_child_elems && _local_elem.has_value()) {
 
             LOG(V4_VVER, "SWEEP SHARE AGGR queuing aggregation thread\n");
@@ -221,12 +230,11 @@ public:
             });
         }
 
-        LOG(V4_VVER, "SWEEP SHARE: aggregating %i, future_aggregate.valid() %i, parent_is_ready %i\n",
-            _aggregating, _future_aggregate.valid(), _parent_is_ready);
+        LOG(V4_VVER, "SWEEP SHARE: aggregating %i, future_aggregate.valid() %i, parent_is_ready %i, reduction_locally_done %i (already send aggregated element) \n", _aggregating, _future_aggregate.valid(), _parent_is_ready, _reduction_locally_done);
 
         if (!_aggregating && _future_aggregate.valid() && _parent_is_ready) {
             // Aggregation done
-            LOG(V5_DEBG, "CS got aggregation\n");
+            // LOG(V5_DEBG, "CS got aggregation\n");
             LOG(V4_VVER, "SWEEP SHARE advancing to parent or broadcasting result\n");
 
             _future_aggregate.get();

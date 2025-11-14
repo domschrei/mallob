@@ -5,7 +5,8 @@ THREADS=3
 
 OUT_DIR="$HOME/PhD/logsntraces/"
 # INST_PATH="$HOME/PhD/instances/miter/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf"
-INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/nusmvdme1d3multi.cnf.xz"
+# INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/nusmvdme1d3multi.cnf.xz"
+INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf.xz"
 
 
 SWEEP=true
@@ -74,7 +75,7 @@ if $SWEEP; then
     MALLOB_OPTIONS="$MALLOB_OPTIONS \
       -preprocess-sweep \
       -sweep-sharing-period=20 \
-      -sweep-solver-verbosity=3 \
+      -sweep-solver-verbosity=2 \
       -preprocess-sweep-priority=$SWEEP_PRIO"
 else
     echo "SWEEP Preprocessing SKIPPED !"

@@ -70,7 +70,7 @@ public:
     }
 
     JobResult solve() {
-        LOG(V1_WARN, "Starting SATWITHPRE app\n");
+        LOG(V1_WARN, "SATWP Starting SATWITHPRE app\n");
         _time_of_activation = Timer::elapsedSeconds();
 
         if (_params.preprocessBalancing() >= 0) submitBaseJob();
@@ -138,7 +138,7 @@ public:
                 //in that case that we need to get the original formula, as prepro didnt report any
                 // todo before that: check how often preprocessor makes no progress at all, grep for SKIPPING
                 if (_params.preprocessSweep.val && ! _prepro.hasPreprocessedFormula()) {
-                    LOG(V1_WARN, "SATWP preprocessor done, didnt find any improvement. For now: SKIPPING Sweep. Future: May still want to schedule sweep now.\n");
+                    LOG(V1_WARN, "SATWP WARN preprocessor done, didnt find any improvement. For now: SKIPPING Sweep. Future: May still want to schedule sweep now.\n");
                 }
             }
 
@@ -168,6 +168,8 @@ public:
             }
             usleep(3*1000);
         }
+
+        LOG(V3_VERB, "SATWP exited solving loop. Now interrupting remaining jobs.\n");
 
         // Terminate sub-jobs
         if (_base_job_submitted && !_base_job_done) {

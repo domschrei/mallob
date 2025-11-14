@@ -160,7 +160,7 @@ void Client::readIncomingJobs() {
                     foundJob.description->getStatistics().parseTime = time;
 
                     const int appId = foundJob.description->getApplicationId();
-                    LOGGER(log, V4_VVER, "NEWJOB found %s #%i <#%i> \n", foundJob.jobName.c_str(), foundJob.description->getId(), appId);
+                    LOGGER(log, V4_VVER, "NEWJOB %s #%i <#%i> \n", foundJob.jobName.c_str(), foundJob.description->getId(), appId);
                     if (app_registry::isClientSide(appId)) {
                         // Launch client-side program
                         LOGGER(log, V4_VVER, "NEWJOB #%i <#%i> is client side\n", foundJob.description->getId(), appId);

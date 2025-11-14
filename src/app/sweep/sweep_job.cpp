@@ -34,6 +34,7 @@ void SweepJob::appl_start() {
 	LOG(V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d\n",
 		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _params.numThreadsPerProcess.val);
 	// LOG(V2_INFO,"SWEEP JOB sweep-sharing-period: %i ms\n", _params.sweepSharingPeriod_ms.val);
+	// LOG(V2_INFO, "New SweepJob rank %i working on %i vars in %i clauses \n", getJobTree().getRank(), );
     _metadata = getSerializedDescription(0)->data();
 	_start_shweep_timestamp = Timer::elapsedSeconds();
 	_last_sharing_start_timestamp = Timer::elapsedSeconds();
@@ -59,17 +60,18 @@ void SweepJob::appl_start() {
 	//the ping detects the current tree structure and provides a callback to contribute to the all-reduction
 	// LOG(V2_INFO, "[SWEEP] initialize broadcast object\n");
 
-	LOG(V4_VVER, "SWEEP SHARE [%i] RESET BCAST\n", _my_rank);
+	// LOG(V4_VVER, "SWEEP SHARE [%i] RESET BCAST\n", _my_rank);
 	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
 
 	//Start individual Kissat threads (those then immediately jump into the sweep algorithm)
 	//To keep appl_start() responsive, everything is outsourced to the individual threads
 	//(Improvement form earlier initialization which was still done by the main thread, takes ca. 4ms per solver, with x32 threads this resulted in being stuck here for 150ms!
+	LOG(V2_INFO,"SWEEP JOB Create solvers\n");
 	for (int localId=0; localId < _params.numThreadsPerProcess.val; localId++) {
 		createAndStartNewShweeper(localId);
 	}
 
-	_internal_result.id = getId(); //might aswell already set them now
+	_internal_result.id = getId(); //might as well already set them now
 	_internal_result.revision = getRevision();
 
 	LOG(V2_INFO, "SWEEP JOB appl_start() FINISHED\n");
@@ -579,7 +581,6 @@ void SweepJob::initiateNewSharingRound() {
 	_last_sharing_start_timestamp = Timer::elapsedSeconds();
 	_sharing_start_ping_timestamps.push_back(_last_sharing_start_timestamp);
 	LOG(V3_VERB, "SWEEP SHARE BCAST Initiating Sharing via Ping\n");
-	//todo: maybe reset bcast here, to prevent initiating with the same object twice, maybe prevent pingpong?
 	JobMessage msg = getMessageTemplate();
 	msg.tag = _bcast->getMessageTag();
 	msg.payload = {};
@@ -609,6 +610,7 @@ void SweepJob::cbContributeToAllReduce() {
 
 	JobMessage baseMsg = getMessageTemplate();
 	baseMsg.tag = TAG_ALLRED;
+	LOG(V4_VVER, "SWEEP SHARE [%i] RESET AllReduction, to prepare contributing local data. \n", _my_rank);
 	_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateEqUnitContributions));
 
 
@@ -652,7 +654,7 @@ void SweepJob::cbContributeToAllReduce() {
 	// LOG(V3_VERB, "SWEEP Aggregate contributions within process\n");
 	auto aggregation_element = aggregateEqUnitContributions(contribs);
 
-	LOG(V3_VERB, "SWEEP SHARE REDUCE [%i]: size %i (+%i) to sharing\n", _my_rank, aggregation_element.size()-NUM_METADATA_FIELDS, NUM_METADATA_FIELDS);
+	LOG(V3_VERB, "SWEEP SHARE REDUCE [%i]: contribute size %i (+%i) to sharing\n", _my_rank, aggregation_element.size()-NUM_METADATA_FIELDS, NUM_METADATA_FIELDS);
 
 	if (_terminate_all) {
 		LOG(V4_VVER, "SWEEP SHARE BCAST skip contribution, seen already _terminate_all\n");
@@ -692,6 +694,8 @@ void SweepJob::advanceAllReduction() {
 	//For convenience, we copy the received data into each solver individually.
 	//This makes importing the E/U data into each thread easier and less cumbersome to code, at the cost of slightly more memory usage
 	//Per Solver we write to a queue, to not mess with the fixed allocated memory that Mallob is currently providing to the kissat solver
+
+	//todo: weird stuff is happening when this is running parallel to the sweepers all exiting their loop due to termination and reading for a last time their queue import data!
 
 	//For maximum memory efficiency one would have all kissat threads directly read from a single vector belonging to this SweepJob
 	int id=-1; //for debugging
