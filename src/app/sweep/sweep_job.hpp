@@ -20,10 +20,11 @@ private:
 	int _numVars{0};
 
 	//Local Solvers
+	int _nThreads{0};
 	typedef std::shared_ptr<Kissat> KissatPtr;
 	std::vector<KissatPtr> _shweepers;
 	std::vector<std::unique_ptr<BackgroundWorker>> _bg_workers;
-	std::vector<std::future<void>> _fut_shweepers;
+	// std::vector<std::future<void>> _fut_shweepers;
     std::atomic_int _running_shweepers_count {0};
 	std::vector<int> _list_of_ids;
 
@@ -57,16 +58,26 @@ private:
     const int TAG_ALLRED = 1004;
 	//Positions where the metadata is stored in each shared element. Format [ <actual data> , eqs_size, units_size, all_idle]
 	static const int NUM_METADATA_FIELDS = 3; //three integers at the end of an aggregation element
-	static const int METADATA_EQ_COUNT_POS = 3;
-	static const int METADATA_UNIT_COUNT_POS = 2;
+	static const int METADATA_EQ_SIZE_POS = 3;
+	static const int METADATA_UNIT_SIZE_POS = 2;
 	static const int METADATA_IDLE_FLAG_POS = 1;
-    std::vector<int> _eqs_from_broadcast;  //store received equivalences at rank level to copy to individual solvers
-	std::vector<int> _units_from_broadcast;
+
+	//Distribute Eqs and Units that we received from sharing broadcast to local solvers
+	// std::atomic<std::shared_ptr<std::vector<int>>> _EQS_to_import { std::make_shared<std::vector<int>>() };
+	// std::atomic<std::shared_ptr<std::vector<int>>> _UNITS_to_import { std::make_shared<std::vector<int>>() };
+	std::vector<int> _EQS_to_import {};
+	std::vector<int> _UNITS_to_import {};
+	std::vector<std::atomic_int> _unread_count_EQS_to_import {}; //a count per thread
+	std::vector<std::atomic_int> _unread_count_UNITS_to_import {};
+	static const unsigned INVALID_LIT = UINT_MAX; //Internal literals count unsigned 0,1,2,..., the largest number marks an invalid literal. see further: https://github.com/arminbiere/satch/blob/master/satch.c#L1017
+
+    // std::vector<int> _eqs_from_broadcast;  //store received equivalences at rank level to copy to individual solvers
+	// std::vector<int> _units_from_broadcast;
 
 
 	//Termination. Determined during workstealing, broadcasted via sharing
 	volatile bool _terminate_all=false; //termination (on this node) due to sharing consensus that there is no more work
-	volatile bool _external_termination=false; //termination because somebody else told us (Job interrupted, ...)
+	volatile bool _external_termination=false; //termination because somebody else told us to (for example Job interrupted because Base Job already found a solution, ...)
 
 
 	//Keep track which solver reports the final formula, we only use one
@@ -91,6 +102,8 @@ public:
     void appl_memoryPanic() override {}
 
     friend void cb_search_work_in_tree(void* SweepJob_state, unsigned **work, int *work_size, int local_id);
+	friend void cb_import_eq(void *SweepJobState, int *lit1, int *lit2, int localId);
+	friend void cb_import_unit(void *SweepJobState, int *lit, int localId);
 
 
 private:
@@ -120,7 +133,9 @@ private:
 	std::vector<int> stealWorkFromAnyLocalSolver();
     std::vector<int> stealWorkFromSpecificLocalSolver(int localId);
     void cbSearchWorkInTree(unsigned **work, int *work_size, int localId);
-	void importNextEquivalence(int *last_imported_round, int eq_nr, unsigned *lit1, unsigned *lit2);
+	void cbImportEq(int *ilit1, int *ilit2, int localId);
+	void cbImportUnit(int *lit, int localId);
+	// void importNextEquivalence(int *last_imported_round, int eq_nr, unsigned *lit1, unsigned *lit2);
 
 	virtual ~SweepJob();
 

@@ -26,13 +26,25 @@ void cb_search_work_in_tree(void *SweepJob_state, unsigned **work, int *work_siz
     ((SweepJob*) SweepJob_state)->cbSearchWorkInTree(work, work_size, local_id);
 }
 
+void cb_import_eq(void *SweepJobState, int *lit1, int *lit2, int localId) {
+	((SweepJob*) SweepJobState)->cbImportEq(lit1, lit2, localId);
+}
+
+void cb_import_unit(void *SweepJobState, int *lit, int localId) {
+	((SweepJob*) SweepJobState)->cbImportUnit(lit, localId);
+
+}
+
+// void shweep_set_SweepJob_eq_import_callback(kissat *solver, void *SweepJobState, void (*import_callback) (void *SweepJobState, int localId, int *lit1, int *lit2));
+
 
 void SweepJob::appl_start() {
 	_my_rank = getJobTree().getRank();
 	_my_index = getJobTree().getIndex();
 	_is_root = getJobTree().isRoot();
+	_nThreads = _params.numThreadsPerProcess.val;
 	LOG(V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d\n",
-		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _params.numThreadsPerProcess.val);
+		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _nThreads);
 	// LOG(V2_INFO,"SWEEP JOB sweep-sharing-period: %i ms\n", _params.sweepSharingPeriod_ms.val);
 	// LOG(V2_INFO, "New SweepJob rank %i working on %i vars in %i clauses \n", getJobTree().getRank(), );
     _metadata = getSerializedDescription(0)->data();
@@ -40,38 +52,42 @@ void SweepJob::appl_start() {
 	_last_sharing_start_timestamp = Timer::elapsedSeconds();
 
 	//do not trigger a send on the initial dummy worksteal requests
-	_worksteal_requests.resize(_params.numThreadsPerProcess.val);
+	_worksteal_requests.resize(_nThreads);
 	for (auto &request : _worksteal_requests) {
 		request.sent = true;
 	}
 
-	//the local IDs will be shuffled for each workstealing request
-	for (int localId=0; localId < _params.numThreadsPerProcess.val; ++localId) {
+	//Remember for each solver how many entries of the Eqs/Units he has not yet read, i.e. not yet imported
+	_unread_count_EQS_to_import = std::vector<std::atomic_int>(_nThreads);
+	_unread_count_UNITS_to_import = std::vector<std::atomic_int>(_nThreads);
+	// Now assign 0 to each element
+	for (auto& atomic : _unread_count_EQS_to_import) {atomic.store(0);}
+	for (auto& atomic : _unread_count_UNITS_to_import) {atomic.store(0);}
+
+	//To randomize workstealing on a rank level, we will shuffle the localIds to determine read order
+	for (int localId=0; localId < _nThreads; ++localId) {
 		_list_of_ids.push_back(localId);
 	}
-	_shweepers.resize(_params.numThreadsPerProcess.val);
 
-	_bg_workers.reserve(_params.numThreadsPerProcess.val);
-	for (int i = 0; i < _params.numThreadsPerProcess.val; ++i) {
+	//Will hold pointers to the kissat solvers
+	_shweepers.resize(_nThreads);
+
+	//Initialize the background workers, each will run one kissat thread
+	_bg_workers.reserve(_nThreads);
+	for (int i = 0; i < _nThreads; ++i) {
 		_bg_workers.emplace_back(std::make_unique<BackgroundWorker>());
 	}
 
-	//a broadcast object is used to initiate an all-reduction by first pinging each processes currently reachable by the root node
-	//the ping detects the current tree structure and provides a callback to contribute to the all-reduction
-	// LOG(V2_INFO, "[SWEEP] initialize broadcast object\n");
-
-	// LOG(V4_VVER, "SWEEP SHARE [%i] RESET BCAST\n", _my_rank);
 	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
 
 	//Start individual Kissat threads (those then immediately jump into the sweep algorithm)
-	//To keep appl_start() responsive, everything is outsourced to the individual threads
-	//(Improvement form earlier initialization which was still done by the main thread, takes ca. 4ms per solver, with x32 threads this resulted in being stuck here for 150ms!
 	LOG(V2_INFO,"SWEEP JOB Create solvers\n");
-	for (int localId=0; localId < _params.numThreadsPerProcess.val; localId++) {
+	for (int localId=0; localId < _nThreads; localId++) {
 		createAndStartNewShweeper(localId);
 	}
 
-	_internal_result.id = getId(); //might as well already set them now
+	//might as well already set some result metadata information now
+	_internal_result.id = getId();
 	_internal_result.revision = getRevision();
 
 	LOG(V2_INFO, "SWEEP JOB appl_start() FINISHED\n");
@@ -218,7 +234,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	setup.numVars = desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
 	setup.numOriginalClauses = desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
 	setup.localId = localId;
-	setup.globalId = _my_rank * _params.numThreadsPerProcess.val + localId;
+	setup.globalId = _my_rank * _nThreads + localId;
 
 	if (_params.satProfilingLevel() >= 0) {
 		setup.profilingBaseDir = _params.satProfilingDir();
@@ -256,6 +272,8 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 
 	shweeper->shweepSetImportExportCallbacks();
     shweep_set_search_work_callback(shweeper->solver, this, cb_search_work_in_tree); //here we connect directly between SweepJob and kissat-solver, bypassing Kissat::
+	shweep_set_SweepJob_eq_import_callback(shweeper->solver, this, cb_import_eq);
+	shweep_set_SweepJob_unit_import_callback(shweeper->solver, this, cb_import_unit);
 
 	if (_is_root) {
 		//read out final formula only at the root node
@@ -280,7 +298,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	shweeper->set_option("mallob_rank", _my_rank);
 	shweeper->set_option("mallob_is_root", _is_root);
 	shweeper->set_option("mallob_resweep_chance", _params.sweepResweepChance.val);
-	shweeper->set_option("mallob_staggered_logs", 1); //set to 1 to have spatially separated logs, useful for verbose runs with 2-16 threads total
+	shweeper->set_option("mallob_staggered_logs", 1); //set to 1 to have spatially separated logs, useful for verbose runs with 2-16 threads
 
 
 	//Own options of Kissat
@@ -324,7 +342,7 @@ void SweepJob::reportStats(KissatPtr shweeper, int res) {
 	LOG(V2_INFO, "RESULT SWEEP_TIME           %f seconds \n", Timer::elapsedSeconds() - _start_shweep_timestamp);
 	LOG(V2_INFO, "RESULT SWEEP_PRIORITY       %f\n", _params.preprocessSweepPriority.val);
 	LOG(V2_INFO, "RESULT SWEEP_PROCESSES      %i\n", getVolume());
-	LOG(V2_INFO, "RESULT SWEEP_THREADS_PER_P  %i\n", _params.numThreadsPerProcess.val);
+	LOG(V2_INFO, "RESULT SWEEP_THREADS_PER_P  %i\n", _nThreads);
 	LOG(V2_INFO, "RESULT SWEEP_SHARING_PERIOD %i ms \n", _params.sweepSharingPeriod_ms.val);
 	LOG(V2_INFO, "RESULT SWEEP_VARS_ORIG      %i\n", stats.shweep_vars_orig);
 	LOG(V2_INFO, "RESULT SWEEP_VARS_END       %i\n", stats.shweep_vars_end);
@@ -404,6 +422,47 @@ void SweepJob::sendMPIWorkstealRequests() {
 		}
 	}
 }
+
+void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
+	int unread_count = _unread_count_EQS_to_import[localId];
+	if (unread_count == 0) {
+		*ilit1 = 0;
+		*ilit2 = 0;
+		return;
+	}
+	// auto EQS_snapshot = _EQS_to_import.load(std::memory_order_acquire);
+	int size = _EQS_to_import.size();
+	assert(unread_count <= size);
+	//We still want to read the array from front to back for prefetching efficiency, so we invert the reading index
+	//We stored unread instead of read, because via unread==0 we can quickly tell whether we are done, whereas with read we would need to compare with the array size each time
+	int idx = size - unread_count;
+	// *ilit1 = EQS_snapshot->at(idx);
+	// *ilit2 = EQS_snapshot->at(idx+1);
+	*ilit1 = _EQS_to_import[idx];
+	*ilit2 = _EQS_to_import[idx+1];
+	_unread_count_EQS_to_import[localId] -= 2; //have processed these two literals
+	assert(*ilit1 < *ilit2);
+	//now returning to kissat solver
+}
+
+void SweepJob::cbImportUnit(int *ilit, int localId) {
+	int unread_count = _unread_count_UNITS_to_import[localId];
+	if (unread_count == 0) {
+		*ilit = INVALID_LIT;
+		return;
+	}
+	// auto UNITS_snapshot = _UNITS_to_import.load(std::memory_order_acquire);
+	// int size = UNITS_snapshot->size();
+	int size = _UNITS_to_import.size();
+	assert(unread_count <= size);
+	//see comment in function above on why we reverse the reading index
+	int idx = size - unread_count;
+	// *ilit = UNITS_snapshot->at(idx);
+	*ilit = _UNITS_to_import[idx];
+	_unread_count_UNITS_to_import[localId]--; //have processed that lit
+	//now returning to kissat solver
+}
+
 
 void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) {
 	KissatPtr shweeper = _shweepers[localId]; //array access safe (we know the sweeper exists) because this callback is called by this sweeper itself
@@ -624,8 +683,7 @@ void SweepJob::cbContributeToAllReduce() {
 			continue;
 		}
 
-		//quickly move the arrays away from the shweepers, such that concurrent threads that keep pushing onto them don't interfere
-		//also implicitly clears them, so we are sure to not pull any of that data twice
+		//Mutex, because the solvers are asynchronously pushing new eqs/units into these vectors all the time (including reallocations after push_back), make sure that doesn't happen while we copy/move
 		std::vector<int> eqs, units;
 		{
 			std::lock_guard<std::mutex> lock(shweeper->shweep_sharing_mutex);
@@ -672,43 +730,63 @@ void SweepJob::advanceAllReduction() {
 	if (!_red->hasResult()) return;
 
 	// LOG(V3_VERB, "[sweep] all-reduction complete\n");
-
-	//Extract, unserialize and distribute shared Equivalences and units
 	_sharing_receive_result_timestamps.push_back(Timer::elapsedSeconds());
-	auto shared = _red->extractResult();
-	const int eq_size = shared[shared.size()-METADATA_EQ_COUNT_POS];
-	const int unit_size = shared[shared.size()-METADATA_UNIT_COUNT_POS];
-	const int all_idle = shared[shared.size()-METADATA_IDLE_FLAG_POS];
-	LOG(V3_VERB, "SWEEP SHARE REDUCE RECEIVED %i equivalences, %i units\n", eq_size/2, unit_size);
-	LOG(V3_VERB, "SWEEP SHARE REDUCE RECEIVED ALL IDLE %i \n", all_idle);
-	if (all_idle) {
-		_terminate_all = true;
-		LOG(V1_WARN, "ß # \n # \n # --- ALL SWEEPERS IDLE - CAN TERMINATE -- \n # \n");
+
+	//Extract shared data
+	auto data = _red->extractResult();
+	const int eq_size = data[data.size()-METADATA_EQ_SIZE_POS];
+	const int unit_size = data[data.size()-METADATA_UNIT_SIZE_POS];
+	const int all_idle = data[data.size()-METADATA_IDLE_FLAG_POS];
+	LOG(V3_VERB, "SWEEP SHARE REDUCE RECEIVED: %i EQS, %i UNITS\n", eq_size/2, unit_size);
+	LOG(V3_VERB, "SWEEP SHARE REDUCE RECEIVED: %i ALL IDLE \n", all_idle);
+
+	// auto received_eqs = std::make_shared<std::vector<int>>();
+	// auto received_units = std::make_shared<std::vector<int>>();
+
+	//Extract equivalences and units from broadcast
+	// received_eqs->assign(data.begin(),             data.begin() + eq_size);
+	// received_units->assign(data.begin() + eq_size, data.end() - NUM_METADATA_FIELDS);
+
+	//Publish new data for local solver to see
+	// _EQS_to_import.store(received_eqs, std::memory_order_release);
+	// _UNITS_to_import.store(received_units, std::memory_order_release);
+
+	 /*
+	  * We want to prevent concurrent read/write on EQS_to_import vector
+	  * Sadly C++ 17 does not allow std::atomic<std::shared_ptr<...>> yet, which would allow lock-free reads
+	  * so as a first solution, prevent concurrent access via timings
+	  * this vector is only written once every >=20 ms, and then immediately afterwards read only once by the solvers
+	  * so as long as the solvers dont need >=20ms to propagate the Equivalences and Units, we are still fine
+	  *
+	  * a proper solution would probably use a mutex, but would be probably overkill here
+	  */
+
+	//todo: technically we are reallocating vectors here on which the solvers might still be reading on
+	//however
+	_EQS_to_import.assign(data.begin(),             data.begin() + eq_size);
+	_UNITS_to_import.assign(data.begin() + eq_size, data.end() - NUM_METADATA_FIELDS);
+
+	//signal the solvers that there is new data to read
+	for (int i=0; i < _nThreads; i++) {
+		_unread_count_EQS_to_import[i] = eq_size;
+		_unread_count_UNITS_to_import[i] = unit_size;
 	}
 
-	_eqs_from_broadcast.assign(shared.begin(),             shared.begin() + eq_size);
-	_units_from_broadcast.assign(shared.begin() + eq_size, shared.end() - NUM_METADATA_FIELDS);
-	// _eqs_from_broadcast.insert(_eqs_from_broadcast.end(),	  shared.begin(),                     shared.begin() + eq_size);
-	// _units_from_broadcast.insert(_units_from_broadcast.end(), shared.begin() + eq_size, shared.end() - NUM_SHARING_METADATA);
 
-	//For convenience, we copy the received data into each solver individually.
-	//This makes importing the E/U data into each thread easier and less cumbersome to code, at the cost of slightly more memory usage
-	//Per Solver we write to a queue, to not mess with the fixed allocated memory that Mallob is currently providing to the kissat solver
 
-	//todo: weird stuff is happening when this is running parallel to the sweepers all exiting their loop due to termination and reading for a last time their queue import data!
 
 	//For maximum memory efficiency one would have all kissat threads directly read from a single vector belonging to this SweepJob
-	int id=-1; //for debugging
-	for (auto shweeper : _shweepers) {
-		id++;
-		if (!shweeper) {
-			LOG(V4_VVER, "[WARN] SWEEP SHARE REDUCE [%i](%i) not yet initialized, skipped importing results!\n", _my_rank, id);
-			continue;
-		}
-		//todo: mutex, because the queue might be just std::move'd by some importing solver right now?
-		shweeper->eqs_from_broadcast_queued.insert(shweeper->eqs_from_broadcast_queued.end(), _eqs_from_broadcast.begin(), _eqs_from_broadcast.end());
-		shweeper->units_from_broadcast_queued.insert(shweeper->units_from_broadcast_queued.end(), _units_from_broadcast.begin(), _units_from_broadcast.end());
-	}
+	// int id=-1; //for debugging
+	// for (auto shweeper : _shweepers) {
+		// id++;
+		// if (!shweeper) {
+			// LOG(V4_VVER, "[WARN] SWEEP SHARE REDUCE [%i](%i) not yet initialized, skipped importing results!\n", _my_rank, id);
+			// continue;
+		// }
+		// todo: mutex, because the queue might be just std::move'd by some importing solver right now?
+		// shweeper->eqs_from_broadcast_queued.insert(shweeper->eqs_from_broadcast_queued.end(), _eqs_from_broadcast.begin(), _eqs_from_broadcast.end());
+		// shweeper->units_from_broadcast_queued.insert(shweeper->units_from_broadcast_queued.end(), _units_from_broadcast.begin(), _units_from_broadcast.end());
+	// }
 
 	//Now we can reset the root node, because the sharing operation (broadcast + allreduce) is finished and can prepare a new one
 	if (_is_root) {
@@ -719,6 +797,12 @@ void SweepJob::advanceAllReduction() {
 
 	LOG(V4_VVER, "SWEEP SHARE [%i] RESET REDUCE\n", _my_rank);
 	_red.reset();
+
+	//Publish termination signal only AFTER we copied the Eqs&Units, as the solvers will immediately try to import these last E&U after exiting their main loop
+	if (all_idle) {
+		_terminate_all = true;
+		LOG(V1_WARN, "ß # \n # \n # --- ALL SWEEPERS IDLE - CAN TERMINATE -- \n # \n");
+	}
 }
 
 
@@ -736,8 +820,8 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 
 	//sanity check whether each contribution contains coherent size information about itself
 	for (const auto& contrib : contribs) {
-		int claimed_eq_size = contrib[contrib.size()- METADATA_EQ_COUNT_POS];
-		int claimed_unit_size = contrib[contrib.size()- METADATA_UNIT_COUNT_POS];
+		int claimed_eq_size = contrib[contrib.size()- METADATA_EQ_SIZE_POS];
+		int claimed_unit_size = contrib[contrib.size()- METADATA_UNIT_SIZE_POS];
 		int claimed_total_size = claimed_eq_size + claimed_unit_size + NUM_METADATA_FIELDS;
 		assert(contrib.size() == claimed_total_size ||
 			log_return_false("ERROR in AllReduce, Bad Element Format: Claims total size %i != %i actual contrib.size() (claims: eq_size %i,  units size %i, metadata %i)", claimed_total_size, contrib.size(), claimed_eq_size, claimed_unit_size, NUM_METADATA_FIELDS)
@@ -769,28 +853,23 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	//Fill equivalences
 	size_t aggr_eq_size = 0;
     for (const auto &contrib : contribs) {
-    	int eq_size = contrib[contrib.size()-METADATA_EQ_COUNT_POS];
+    	int eq_size = contrib[contrib.size()-METADATA_EQ_SIZE_POS];
     	aggr_eq_size += eq_size;
-		// LOG(V3_VERB, "SWEEP AGGR Element: %i eq_size \n", eq_size);
         aggregated.insert(aggregated.end(), contrib.begin(), contrib.begin()+eq_size);
 		oss_e << "| " << i << ":" << eq_size << " "	;
     	i++;
     }
-
-
 
 	LOG(V4_VVER, "%s \n", oss_e.str().c_str());
 	std::ostringstream oss_u;
 	oss_u << "Unit sizes: ";
 	i=0;
 
-
-
 	//Fill units
 	size_t aggr_unit_size = 0;
     for (const auto &contrib : contribs) {
-    	int eq_size = contrib[contrib.size()-METADATA_EQ_COUNT_POS];  //need to know where the eq ends, i.e. where the units start
-    	int unit_size = contrib[contrib.size()-METADATA_UNIT_COUNT_POS];
+    	int eq_size = contrib[contrib.size()-METADATA_EQ_SIZE_POS];  //need to know where the eq ends, i.e. where the units start
+    	int unit_size = contrib[contrib.size()-METADATA_UNIT_SIZE_POS];
 		aggr_unit_size += unit_size;
 		// LOG(V3_VERB, "SWEEP AGGR Element: %i unit_size \n", unit_size);
         aggregated.insert(aggregated.end(), contrib.begin()+eq_size, contrib.end()-NUM_METADATA_FIELDS); //not copying the metadata at the end
