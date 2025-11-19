@@ -735,13 +735,26 @@ void SweepJob::advanceAllReduction() {
 	// LOG(V3_VERB, "[sweep] all-reduction complete\n");
 	_sharing_receive_result_timestamps.push_back(Timer::elapsedSeconds());
 
+	//technically could set unreads to zero to stop still-importing solvers at their next import
+	//unless they just imported but are now in the unread-- operation, which would put it into invalid -1
+	//though that would be a REALLY tight race
+	// for (int i=0; i < _nThreads; i++) {
+		// _unread_count_EQS_to_import[i] = 0;
+		// _unread_count_UNITS_to_import[i] = 0;
+	// }
+
+	//todo: Filter out duplicates during aggregating...
+
 	//Extract shared data
 	auto data = _red->extractResult();
 	const int eq_size = data[data.size()-METADATA_EQ_SIZE_POS];
 	const int unit_size = data[data.size()-METADATA_UNIT_SIZE_POS];
 	const int all_idle = data[data.size()-METADATA_IDLE_FLAG_POS];
-	LOG(V3_VERB, "SWEEP SHARE REDUCE RECEIVED: %i EQS, %i UNITS\n", eq_size/2, unit_size);
-	LOG(V3_VERB, "SWEEP SHARE REDUCE RECEIVED: %i ALL IDLE \n", all_idle);
+	if (_is_root)
+		LOG(V2_INFO, "SWEEP SHARE REDUCE RECEIVED: %i EQS, %i UNITS\n", eq_size/2, unit_size);
+	else
+		LOG(V3_VERB, "SWEEP SHARE REDUCE RECEIVED: %i EQS, %i UNITS\n", eq_size/2, unit_size);
+	// LOG(V3_VERB, "SWEEP SHARE REDUCE RECEIVED: %i ALL IDLE \n", all_idle);
 
 	// auto received_eqs = std::make_shared<std::vector<int>>();
 	// auto received_units = std::make_shared<std::vector<int>>();
@@ -770,6 +783,7 @@ void SweepJob::advanceAllReduction() {
 	_UNITS_to_import.assign(data.begin() + eq_size, data.end() - NUM_METADATA_FIELDS);
 
 	//signal the solvers that there is new data to read
+
 	for (int i=0; i < _nThreads; i++) {
 		_unread_count_EQS_to_import[i] = eq_size;
 		_unread_count_UNITS_to_import[i] = unit_size;
