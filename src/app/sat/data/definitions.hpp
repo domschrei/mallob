@@ -7,6 +7,7 @@ namespace Mallob { struct Clause; }
 enum SatResult {
 	SAT = 10,
 	UNSAT = 20,
+	IMPROVED = 40,
 	UNKNOWN = 0
 };
 

@@ -46,7 +46,7 @@ private:
     volatile bool _sweep_job_done {false};
     bool _sweep_job_digested {false};
     bool _sweep_job_has_improved_formula {false};
-    bool _sweep_job_submitted_sat {false};
+    bool _sweep_job_submitted_preprod {false};
     nlohmann::json _sweep_job_submission;
     nlohmann::json _sweep_job_response;
 
@@ -101,24 +101,24 @@ public:
                 LOG(V3_VERB, "SATWP SWEEP done\n");
                 res = jsonToJobResult(_sweep_job_response, false); //eventually probably convert = true to reconstruct solution if necessary
                 _sweep_job_digested = true;
-                if (res.result==SAT) {
-                    if (res.getSolutionSize() > 0) {
-                        assert(res.result == SAT); //technically its just *some* information and not SAT yet, but to bypass the higher abstraction layers easier we denoted it as SAT
-                        LOG(V3_VERB, "SATWP SWEEP has improved formula\n");
-                        LOG(V3_VERB, "SATWP SWEEP has read JobResult from json, SolutionSize=%i\n", res.getSolutionSize());
-                        _sweep_job_has_improved_formula = true;
-                    } else {
-                        LOG(V1_WARN, "WARN: SATWP SWEEP did not improve formula, Solution size 0 ! Leaving all resources to the running base SAT job, not starting a preprocessed job\n");
-                    }
-                }
                 if (res.result==UNSAT) {
-                    LOG(V3_VERB, "SATWP SWEEP reported result UNSATISFIABLE\n");
+                    LOG(V3_VERB, "SATWP SWEEP reported UNSAT!\n");
                     break;
+                }
+                else if (res.result==IMPROVED) {
+                    assert(res.getSolutionSize() > 0);
+                    LOG(V3_VERB, "SATWP SWEEP has improved formula\n");
+                    LOG(V3_VERB, "SATWP SWEEP reading json SolutionSize=%i\n", res.getSolutionSize());
+                    _sweep_job_has_improved_formula = true;
+                } else {
+                    //todo: start preprocessed SAT job even if sweep didnt find an improvemnt
+                    assert(res.result==UNKNOWN);
+                    LOG(V1_WARN, "WARN: SATWP SWEEP did not improve formula! Leaving all resources to the running base SAT job, not starting a preprocessed job\n");
                 }
             }
 
             if (_preprod_job_done && !_preprod_job_digested) {
-                LOG(V3_VERB, "SATWP preprod done\n");
+                LOG(V3_VERB, "SATWP preprod SAT done\n");
                 res = jsonToJobResult(_preprod_job_response, true);
                 _preprod_job_digested = true;
                 if (res.result != 0) break;
@@ -126,9 +126,9 @@ public:
 
             if (_prepro.done()) {
                 // Preprocess solver(s) terminated.
-                LOG(V3_VERB, "SATWP preprocessor done\n");
+                LOG(V3_VERB, "SATWP sequential preprocessor done\n");
                 if (_prepro.getResultCode() != 0) {
-                    LOG(V3_VERB, "SATWP preprocessor reported result %i\n", _prepro.getResultCode());
+                    LOG(V3_VERB, "SATWP sequential preprocessor reported result %i\n", _prepro.getResultCode());
                     res.result = _prepro.getResultCode();
                     res.setSolution(std::move(_prepro.getSolution()));
                     break;
@@ -136,7 +136,8 @@ public:
 
                 //if sequential preprocessing was unsuccessful, we still might want to schedule distributed sweeping as another preprocessing step
                 //in that case that we need to get the original formula, as prepro didnt report any
-                // todo before that: check how often preprocessor makes no progress at all, grep for SKIPPING
+                //before that: check how often preprocessor makes no progress at all, grep for SKIPPING
+                //todo: start sweep even if prepro didnt improve anything?
                 if (_params.preprocessSweep.val && ! _prepro.hasPreprocessedFormula()) {
                     LOG(V1_WARN, "SATWP WARN preprocessor done, didnt find any improvement. For now: SKIPPING Sweep. Future: May still want to schedule sweep now.\n");
                 }
@@ -155,12 +156,17 @@ public:
                 submitSweepJob(_prepro.extractPreprocessedFormula());
             }
 
-            //continue from SWEEP to preprocessed SAT
-            if (_sweep_job_digested && _sweep_job_has_improved_formula && !_sweep_job_submitted_sat) {
+            //continue from successful SWEEP to preprocessed SAT
+            if (_sweep_job_digested &&  !_sweep_job_submitted_preprod &&_sweep_job_has_improved_formula) {
                 LOG(V3_VERB, "SATWP submit preprocessed SAT task (via providing SWEEP results)\n");
                 submitPreprocessedJob(res.extractSolution());
-                _sweep_job_submitted_sat = true; //prevent multiple submissions from SWEEP to SAT
+                _sweep_job_submitted_preprod = true; //prevent multiple submissions from SWEEP to SAT
             }
+
+            //continue from unsuccessfull SWEEP to preprocessed SAT
+            // if (_sweep_job_digested && !_sweep_job_submitted_preprod && ! _sweep_job_has_improved_formula) {
+
+            // }
 
             if (!_base_job_done && _time_of_retraction_end > 0 && Timer::elapsedSeconds() >= _time_of_retraction_end) {
                 LOG(V3_VERB, "SATWP Interrupting base job due to retraction\n");
@@ -169,7 +175,7 @@ public:
             usleep(3*1000);
         }
 
-        LOG(V3_VERB, "SATWP exited solving loop. Now interrupting remaining jobs.\n");
+        LOG(V3_VERB, "SATWP exited main solving loop. Now interrupting remaining jobs.\n");
 
         // Terminate sub-jobs
         if (_base_job_submitted && !_base_job_done) {

@@ -205,22 +205,24 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 				_solved_status = UNSAT;
 				//no formula is read, since we are directly UNSAT
 			}
+		} else if (res==0) {
+			//might have made some progress
+			if (shweeper->hasReportedSweepDimacs()) {
+				//made some progress, and this is the specific solver that reported the final formula
+				assert(_solved_status==-1);
+				serializeResultFormula(shweeper);
+				reportStats(shweeper, IMPROVED);
+				_internal_result.result = IMPROVED;
+				_solved_status = IMPROVED;
+			}
+		} else {
+			assert(log_return_false("SWEEP ERROR: solver has unexpected return signal %i \n", res));
 		}
-		//Might have made some progress. Check whether we are the specific solver that already exported the improved formula from solver to Mallob level
-		if (shweeper->hasReportedSweepDimacs()) {
-			assert(res==0);
-			assert(_solved_status==-1);
-			serializeResultFormula(shweeper);
-			reportStats(shweeper, SAT); //technically not SAT but just *some* progress, but to not confuse the overall job handling machinery and to get it through we declare it SAT
-			_internal_result.result = SAT;
-			_solved_status = SAT;
-		}
-		assert( res==20 || res==0 || log_return_false("SWEEP ERROR: solver has unexpected return signal %i \n", res));
 
 		_running_shweepers_count--;
 		_shweepers[localId]->cleanUp(); //write kissat timing profile
 		_shweepers[localId] = nullptr;  //signal that this solver doesnt exist anymore
-		LOG(V2_INFO, "SWEEP JOB [%i](%i) BG_WORKER EXIT\n", _my_rank, localId);
+		LOG(V2_INFO, "SWEEP JOB [%i](%i) WORKER EXIT\n", _my_rank, localId);
 	});
 	// _fut_shweepers.push_back(std::move(fut_shweeper));
 }

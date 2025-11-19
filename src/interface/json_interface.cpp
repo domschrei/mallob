@@ -293,7 +293,7 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobProcessingStatist
     j["internal_revision"] = result.revision;
     j["result"] = { 
         { "resultcode", result.result }, 
-        { "resultstring", result.result == RESULT_SAT ? "SAT" : result.result == RESULT_UNSAT ? "UNSAT" : "UNKNOWN" }
+        { "resultstring", result.result == RESULT_SAT ? "SAT" : result.result == RESULT_UNSAT ? "UNSAT" : result.result == RESULT_IMPROVED ? " IMPROVED" : "UNKNOWN" }
     };
     if (useSolutionFile) {
         j["result"]["solution-file"] = solutionFile;
