@@ -338,12 +338,8 @@ void SweepJob::reportStats(KissatPtr shweeper, int res) {
 	// double vars_remain_percent = 100*vars_remain/(float)total_orig;
 	double clauses_removed = stats.shweep_clauses_orig - stats.shweep_clauses_end;
 	double clauses_removed_percent = 100*clauses_removed/(double)stats.shweep_clauses_orig;
-	//printf("SWEEP finished\n");
-	// printf("[%i](%i) RESULT SWEEP: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
-		// _my_rank, _dimacsReport_localId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
+
 	LOG(V2_INFO, "RESULT SWEEP_CODE			  %i res code\n", res);
-	// LOG(V2_INFO, "RESULT SWEEP [%i](%i)       %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
-		// _my_rank, _reporting_localId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
 	LOG(V2_INFO, "RESULT SWEEP_TIME           %f seconds \n", Timer::elapsedSeconds() - _start_shweep_timestamp);
 	LOG(V2_INFO, "RESULT SWEEP_PRIORITY       %f\n", _params.preprocessSweepPriority.val);
 	LOG(V2_INFO, "RESULT SWEEP_PROCESSES      %i\n", getVolume());
@@ -363,10 +359,9 @@ void SweepJob::reportStats(KissatPtr shweeper, int res) {
 	LOG(V2_INFO, "RESULT SWEEP_UNITS_SWEEP    %i\n", stats.shweep_sweep_units);
 	LOG(V2_INFO, "RESULT SWEEP_VARS_REMAIN_N    %i / %i (%.2f %)\n", vars_remain, total_orig, vars_fixed_percent);
 	LOG(V2_INFO, "RESULT SWEEP_VARS_FIXED_N     %i / %i (%.2f %)\n", vars_fixed, total_orig, vars_fixed_percent);
-	LOG(V2_INFO, "RESULT SWEEP_VARS_FIXED_PRCNT %.2f ", vars_fixed_percent);
-	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_REMOVED_N %i ", clauses_removed);
-	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_REMOVED_PRCNT %.2f ", clauses_removed_percent);
-	// LOG(V2_INFO, "RESULT SWEEP_TIME           %f sec\n", Timer::elapsedSeconds() - _start_shweep_timestamp);
+	LOG(V2_INFO, "RESULT SWEEP_VARS_FIXED_PRCNT %.2f \n", vars_fixed_percent);
+	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_REMOVED_N %i \n", clauses_removed);
+	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_REMOVED_PRCNT %.2f \n", clauses_removed_percent);
 
 	for (int i=0; i < _sharing_start_ping_timestamps.size() && i < _sharing_receive_result_timestamps.size(); i++) {
 		float start = _sharing_start_ping_timestamps[i];

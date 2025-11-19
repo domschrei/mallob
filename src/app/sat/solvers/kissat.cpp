@@ -615,7 +615,7 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
             }
             LOG(V2_INFO, "SATWP sees from SWEEP: (%i --> %i vars) (%i --> %i clauses) \n", _setup.numVars, nbVars, _setup.numOriginalClauses, nbClauses);
         } else {
-            LOG(V2_INFO, "SWEEP [root](%i) got formula report request denied, already taken by (%i) \n", getLocalId(), shweepReportingLocalId->load());
+            LOG(V3_VERB, "SWEEP [root](%i) got formula report request denied, already taken by (%i) \n", getLocalId(), shweepReportingLocalId->load());
             accept = false;
         }
     }
