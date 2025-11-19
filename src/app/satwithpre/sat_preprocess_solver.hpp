@@ -90,19 +90,19 @@ public:
           */
         while (!isTimeoutHit()) {
             if (_base_job_done && !_base_job_digested) {
-                LOG(V3_VERB, "SATWP base done\n");
+                LOG(V2_INFO, "SATWP base done\n");
                 res = jsonToJobResult(_base_job_response, false);
-                LOG(V3_VERB, "SATWP base done, result code %i\n", res.result);
+                LOG(V2_INFO, "SATWP RESULT BASE done, result code %i\n", res.result);//grepped in postprocessing
                 _base_job_digested = true;
                 if (res.result != 0) break;
             }
 
             if (_sweep_job_done && !_sweep_job_digested) {
-                LOG(V3_VERB, "SATWP SWEEP done\n");
+                LOG(V2_INFO, "SATWP SWEEP done\n");
                 res = jsonToJobResult(_sweep_job_response, false); //eventually probably convert = true to reconstruct solution if necessary
                 _sweep_job_digested = true;
                 if (res.result==UNSAT) {
-                    LOG(V3_VERB, "SATWP SWEEP reported UNSAT!\n");
+                    LOG(V2_INFO, "SATWP RESULT SWEEP reported UNSAT!\n");//grepped in postprocessing
                     break;
                 }
                 else if (res.result==IMPROVED) {
@@ -118,7 +118,7 @@ public:
             }
 
             if (_preprod_job_done && !_preprod_job_digested) {
-                LOG(V3_VERB, "SATWP preprod SAT done\n");
+                LOG(V2_INFO, "SATWP RESULT PREPROD-SAT done\n");//grepped in postprocessing
                 res = jsonToJobResult(_preprod_job_response, true);
                 _preprod_job_digested = true;
                 if (res.result != 0) break;
@@ -126,9 +126,9 @@ public:
 
             if (_prepro.done()) {
                 // Preprocess solver(s) terminated.
-                LOG(V3_VERB, "SATWP sequential preprocessor done\n");
+                LOG(V2_INFO, "SATWP sequential preprocessor done\n");
                 if (_prepro.getResultCode() != 0) {
-                    LOG(V3_VERB, "SATWP sequential preprocessor reported result %i\n", _prepro.getResultCode());
+                    LOG(V2_INFO, "SATWP RESULT SEQ-PREPRO reported result %i\n", _prepro.getResultCode());//grepped in postprocessing
                     res.result = _prepro.getResultCode();
                     res.setSolution(std::move(_prepro.getSolution()));
                     break;

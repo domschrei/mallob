@@ -331,10 +331,14 @@ void SweepJob::reportStats(KissatPtr shweeper, int res) {
 	auto stats = shweeper->getSolverStats();
 	int units_orig = stats.shweep_total_units - stats.shweep_new_units;
 	int total_orig = stats.shweep_active_orig + units_orig;
-	int actual_done = stats.shweep_eqs + stats.shweep_sweep_units;
+	int vars_fixed = stats.shweep_eqs + stats.shweep_sweep_units;
 	//actual_done is a slightly conservative count, because we only include the units found by the sweeping algorithm itself,
 	//and dont include some stray units found while propagating the sweep decisions (that would be stats.shweep_new_units)
-	int actual_remaining = total_orig - actual_done;
+	int vars_remain = total_orig - vars_fixed;
+	double vars_fixed_percent = 100*vars_fixed/(double)total_orig;
+	// double vars_remain_percent = 100*vars_remain/(float)total_orig;
+	double clauses_removed = stats.shweep_clauses_orig - stats.shweep_clauses_end;
+	double clauses_removed_percent = 100*clauses_removed/(double)stats.shweep_clauses_orig;
 	//printf("SWEEP finished\n");
 	// printf("[%i](%i) RESULT SWEEP: %i Eqs, %i sweep_units, %i new units, %i total units, %i eliminated \n",
 		// _my_rank, _dimacsReport_localId->load(), stats.shweep_eqs, stats.shweep_sweep_units, stats.shweep_new_units, stats.shweep_total_units, stats.shweep_eliminated);
@@ -358,8 +362,11 @@ void SweepJob::reportStats(KissatPtr shweeper, int res) {
 	LOG(V2_INFO, "RESULT SWEEP_ELIMINATED     %i\n", stats.shweep_eliminated);
 	LOG(V2_INFO, "RESULT SWEEP_EQUIVALENCES   %i\n", stats.shweep_eqs);
 	LOG(V2_INFO, "RESULT SWEEP_UNITS_SWEEP    %i\n", stats.shweep_sweep_units);
-	LOG(V2_INFO, "RESULT SWEEP_ACTUAL_DONE    %i / %i (%.2f %)\n", actual_done, total_orig, 100*actual_done/(float)total_orig);
-	LOG(V2_INFO, "RESULT SWEEP_ACTUAL_REMAIN  %i / %i (%.2f %)\n", actual_remaining, total_orig, 100*actual_remaining/(float)total_orig);
+	LOG(V2_INFO, "RESULT SWEEP_VARS_REMAIN_N    %i / %i (%.2f %)\n", vars_remain, total_orig, vars_fixed_percent);
+	LOG(V2_INFO, "RESULT SWEEP_VARS_FIXED_N     %i / %i (%.2f %)\n", vars_fixed, total_orig, vars_fixed_percent);
+	LOG(V2_INFO, "RESULT SWEEP_VARS_FIXED_PRCNT %.2f ", vars_fixed_percent);
+	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_REMOVED_N %i ", clauses_removed);
+	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_REMOVED_PRCNT %.2f ", clauses_removed_percent);
 	// LOG(V2_INFO, "RESULT SWEEP_TIME           %f sec\n", Timer::elapsedSeconds() - _start_shweep_timestamp);
 
 	for (int i=0; i < _sharing_start_ping_timestamps.size() && i < _sharing_receive_result_timestamps.size(); i++) {
@@ -498,7 +505,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 			for (int idx = 0; idx < VARS; idx++) {
 				shweeper->work_received_from_steal[idx] = idx;
 			}
-			LOG(V2_INFO, "SWEEP WORK First shweeper at [%i](%i) got all %u variables\n", _my_rank, localId, VARS);
+			LOG(V2_INFO, "SWEEP WORK PROVIDED: All work --------------%u---------------->sweeper [%i](%i)\n", VARS, _my_rank, localId);
 			break;
 
 		}
