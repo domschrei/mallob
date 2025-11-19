@@ -131,7 +131,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 	-jcup=0.05 \
 	-preprocess-sweep \
 	-sweep-sharing-period=20 \
-	-sweep-solver-verbosity=2 \
+	-sweep-solver-verbosity=1 \
   -preprocess-sweep-priority=1.0"
 
 
