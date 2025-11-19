@@ -101,8 +101,8 @@ if echo $solvers|grep -q "k" && [ ! -f kissat/libkissat.a ]; then
     echo "Building Kissat ..."
 
     cd kissat
-    ##Need manual -O3 on the server!
-    ##Because there ./configure doesn't regex-match the gcc compiler, and falls back to only -O
+    ##Might need manual -O3 on the server!
+    ##Because ./configure fails to detect gcc compiler via regex-matching, and falls back to slow -O
     ./configure -O3
     make -j 16
     cp build/libkissat.a .
