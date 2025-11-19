@@ -118,8 +118,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		LOG(V1_WARN, "WARN SWEEP MSG [%i] got unexpected message with mpiTag=%i, msg.tag=%i  (instead of MSG_SEND_APPLICATION_MESSAGE mpiTag == 30)\n", _my_rank, mpiTag, msg.tag);
 	}
 	if (msg.returnedToSender) {
-		LOG(V0_CRIT, "SWEEP MSG WARN/ERROR [%i]: received unexpected returnedToSender message during Sweep Job Workstealing!\n", _my_rank);
-		LOG(V0_CRIT, "SWEEP MSG WARN/ERROR [%i]: source=%i mpiTag=%i, msg.tag=%i treeIdxOfSender=%i, treeIdxOfDestination=%i \n", _my_rank, sourceRank, mpiTag, msg.tag, msg.treeIndexOfSender, msg.treeIndexOfDestination);
+		LOG(V0_CRIT, "SWEEP MSG WARN/ERROR [%i]: received unexpected returnedToSender message during Sweep Job Workstealing! source=%i mpiTag=%i, msg.tag=%i treeIdxOfSender=%i, treeIdxOfDestination=%i \n", _my_rank, sourceRank, mpiTag, msg.tag, msg.treeIndexOfSender, msg.treeIndexOfDestination);
 		// assert(log_return_false("SWEEP MSG ERROR, got msg.returnToSender"));
 	}
 	else if (msg.tag == TAG_SEARCHING_WORK) {
@@ -171,14 +170,14 @@ void SweepJob::appl_terminate() {
 
 
 void SweepJob::createAndStartNewShweeper(int localId) {
-	LOG(V2_INFO, "SWEEP JOB [%i](%i) queuing background worker thread\n", _my_rank, localId);
+	LOG(V3_VERB, "SWEEP JOB [%i](%i) queuing background worker thread\n", _my_rank, localId);
 	_bg_workers[localId]->run([this, localId]() {
-		LOG(V2_INFO, "SWEEP JOB [%i](%i) BG_WORKER START \n", _my_rank, localId);
+		LOG(V3_VERB, "SWEEP JOB [%i](%i) WORKER START \n", _my_rank, localId);
 		// std::future<void> fut_shweeper = ProcessWideThreadPool::get().addTask([this, localId]() { //Changed from [&] to [this, shweeper] back to [&] to [this, localId] !! (nicco)
 		//passing localId by value to this lambda, because the thread might only execute after createAndStartNewShweeper is already gone
 		if (_terminate_all) {
 			// _bg_workers[localId]->stop();
-			LOG(V2_INFO, "SWEEP [%i](%i) terminated before creation\n", _my_rank, localId);
+			LOG(V3_VERB, "SWEEP [%i](%i) terminated before creation\n", _my_rank, localId);
 			return;
 		}
 		_running_shweepers_count++;
@@ -186,10 +185,10 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 		auto shweeper = createNewShweeper(localId);
 
 		loadFormula(shweeper);
-		LOG(V2_INFO, "SWEEP JOB [%i](%i) solve() START \n", _my_rank, localId);
+		LOG(V3_VERB, "SWEEP JOB [%i](%i) solve() START \n", _my_rank, localId);
 		_shweepers[localId] = shweeper; //signal to the remaining system that this solver now exists
 		int res = shweeper->solve(0, nullptr);
-		LOG(V2_INFO, "SWEEP JOB [%i](%i) solve() FINISH. Result %i \n", _my_rank, localId, res);
+		LOG(V3_VERB, "SWEEP JOB [%i](%i) solve() FINISH. Result %i \n", _my_rank, localId, res);
 
 		if (res==20) {
 			//Found UNSAT
@@ -222,7 +221,7 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 		_running_shweepers_count--;
 		_shweepers[localId]->cleanUp(); //write kissat timing profile
 		_shweepers[localId] = nullptr;  //signal that this solver doesnt exist anymore
-		LOG(V2_INFO, "SWEEP JOB [%i](%i) WORKER EXIT\n", _my_rank, localId);
+		LOG(V3_VERB, "SWEEP JOB [%i](%i) WORKER EXIT\n", _my_rank, localId);
 	});
 	// _fut_shweepers.push_back(std::move(fut_shweeper));
 }
@@ -257,9 +256,9 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	float t1 = Timer::elapsedSeconds();
 	float init_dur_ms =  (t1 - t0)*1000;
 	const float WARN_init_dur = 50; //Usual initializations take 0.2ms in the Sat Solver Subprocess and 4-25ms  in the sweep job (for some weird reasons), but should never be above ~30ms
-	LOG(V2_INFO, "SWEEP STARTUP [%i](%i) kissat init %f ms\n", _my_rank, localId, init_dur_ms);
+	LOG(V3_VERB, "SWEEP STARTUP [%i](%i) kissat init %f ms\n", _my_rank, localId, init_dur_ms);
 	if (init_dur_ms > WARN_init_dur) {
-		LOG(V1_WARN, "WARN SWEEP STARTUP [%i](%i): kissat init took unusally long, %f ms !\n", _my_rank, localId, init_dur_ms);
+		LOG(V1_WARN, "WARN SWEEP STARTUP [%i](%i): kissat init took unusually long, %f ms !\n", _my_rank, localId, init_dur_ms);
 	}
 
 	//Dangerous to immediately return here! because kissat is already initialized, can't just forget it, need to properly release it
@@ -994,42 +993,42 @@ void SweepJob::loadFormula(KissatPtr shweeper) {
 }
 
 void SweepJob::gentlyTerminateSolvers() {
-	LOG(V2_INFO, "SWEEP JOB TERM #%i [%i] interrupting solvers\n", getId(), _my_rank);
+	LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] interrupting solvers\n", getId(), _my_rank);
 	//each sweeper checks constantly for the interruption signal (on the ms scale or faster), allow for gentle own exit
 	while (_running_shweepers_count>0) {
-		LOG(V2_INFO, "SWEEP JOB TERM #%i [%i] still %i solvers running\n", getId(), _my_rank, _running_shweepers_count.load());
+		LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] still %i solvers running\n", getId(), _my_rank, _running_shweepers_count.load());
 		int i=0;
 		for (auto &shweeper : _shweepers) {
 			if (shweeper) {
 				shweeper->setShweepTerminate();
-				LOG(V2_INFO, "SWEEP JOB TERM #%i [%i] terminating solver (%i)\n", getId(), _my_rank, i);
+				LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] terminating solver (%i)\n", getId(), _my_rank, i);
 			}
 			i++;
 		}
 		usleep(1000);
 	}
-	LOG(V2_INFO, "SWEEP JOB TERM #%i [%i] no more solvers running\n", getId(), _my_rank);
+	LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] no more solvers running\n", getId(), _my_rank);
 
 	usleep(2000);
 
 	int i=0;
-	LOG(V2_INFO, "SWEEP JOB TERM #%i [%i] joining bg_workers \n",  getId(),_my_rank);
+	LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] joining bg_workers \n",  getId(),_my_rank);
 	for (auto &bg_worker : _bg_workers) {
 		if (bg_worker->isRunning()) {
-			LOG(V2_INFO, "SWEEP JOB TERM #%i [%i] joining bg_worker (%i) \n",  getId(),_my_rank, i);
+			LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] joining bg_worker (%i) \n",  getId(),_my_rank, i);
 			bg_worker->stop();
-			LOG(V2_INFO, "SWEEP JOB TERM #%i [%i] joined  bg_worker (%i) \n",  getId(),_my_rank, i);
+			LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] joined  bg_worker (%i) \n",  getId(),_my_rank, i);
 		}
 		i++;
 	}
-	LOG(V2_INFO, "SWEEP JOB TERM #%i [%i] joined all bg_workers \n", getId(),_my_rank);
-	LOG(V2_INFO, "SWEEP JOB TERM #%i [%i] DONE \n", getId(),_my_rank);
+	LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] joined all bg_workers \n", getId(),_my_rank);
+	LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] DONE \n", getId(),_my_rank);
 }
 
 SweepJob::~SweepJob() {
-	LOG(V2_INFO, "SWEEP JOB DESTRUCTOR ENTERED \n");
+	LOG(V3_VERB, "SWEEP JOB DESTRUCTOR ENTERED \n");
 	gentlyTerminateSolvers();
-	LOG(V2_INFO, "SWEEP JOB DESTRUCTOR DONE\n");
+	LOG(V3_VERB, "SWEEP JOB DESTRUCTOR DONE\n");
 }
 
 
