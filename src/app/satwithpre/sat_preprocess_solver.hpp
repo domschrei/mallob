@@ -92,7 +92,7 @@ public:
             if (_base_job_done && !_base_job_digested) {
                 LOG(V2_INFO, "SATWP base done\n");
                 res = jsonToJobResult(_base_job_response, false);
-                LOG(V2_INFO, "SATWP RESULT BASE done, result code %i\n", res.result);//grepped in postprocessing
+                LOG(V2_INFO, "SATWP RESULT BASE SOLVER done, result code %i\n", res.result);//grepped in postprocessing
                 _base_job_digested = true;
                 if (res.result != 0) break;
             }
@@ -102,7 +102,7 @@ public:
                 res = jsonToJobResult(_sweep_job_response, false); //eventually probably convert = true to reconstruct solution if necessary
                 _sweep_job_digested = true;
                 if (res.result==UNSAT) {
-                    LOG(V2_INFO, "SATWP RESULT SWEEP reported UNSAT!\n");//grepped in postprocessing
+                    LOG(V2_INFO, "SATWP RESULT SWEEP SOLVER reported UNSAT!\n");//grepped in postprocessing
                     break;
                 }
                 else if (res.result==IMPROVED) {
@@ -118,7 +118,7 @@ public:
             }
 
             if (_preprod_job_done && !_preprod_job_digested) {
-                LOG(V2_INFO, "SATWP RESULT PREPROD-SAT done\n");//grepped in postprocessing
+                LOG(V2_INFO, "SATWP RESULT PREPRODJOB SOLVER done\n");//grepped in postprocessing
                 res = jsonToJobResult(_preprod_job_response, true);
                 _preprod_job_digested = true;
                 if (res.result != 0) break;
@@ -128,7 +128,7 @@ public:
                 // Preprocess solver(s) terminated.
                 LOG(V2_INFO, "SATWP sequential preprocessor done\n");
                 if (_prepro.getResultCode() != 0) {
-                    LOG(V2_INFO, "SATWP RESULT SEQ-PREPRO reported result %i\n", _prepro.getResultCode());//grepped in postprocessing
+                    LOG(V2_INFO, "SATWP RESULT SEQPREPRO SOLVER reported result %i\n", _prepro.getResultCode());//grepped in postprocessing
                     res.result = _prepro.getResultCode();
                     res.setSolution(std::move(_prepro.getSolution()));
                     break;
