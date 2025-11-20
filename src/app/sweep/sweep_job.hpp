@@ -83,6 +83,9 @@ private:
 	//Keep track which solver reports the final formula, we only use one
 	std::shared_ptr<std::atomic<int>> _reporting_localId = std::make_shared<std::atomic<int>>(-1);
 
+	std::vector<int> _worksweeps{};
+	std::vector<int> _resweeps_in{};
+	std::vector<int> _resweeps_out{};
 
 
 public:
@@ -122,6 +125,7 @@ private:
 
 	void sendMPIWorkstealRequests();
 	void printIdleFraction();
+	void printResweeps();
 
     void initiateNewSharingRound();
     void cbContributeToAllReduce();

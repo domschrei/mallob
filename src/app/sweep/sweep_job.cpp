@@ -60,6 +60,11 @@ void SweepJob::appl_start() {
 	//Remember for each solver how many entries of the Eqs/Units he has not yet read, i.e. not yet imported
 	_unread_count_EQS_to_import = std::vector<std::atomic_int>(_nThreads);
 	_unread_count_UNITS_to_import = std::vector<std::atomic_int>(_nThreads);
+
+	_worksweeps = std::vector<int>(_nThreads, -1);
+	_resweeps_in = std::vector<int>(_nThreads, -1);
+	_resweeps_out = std::vector<int>(_nThreads, -1);
+
 	// Now assign 0 to each element
 	for (auto& atomic : _unread_count_EQS_to_import) {atomic.store(0);}
 	for (auto& atomic : _unread_count_UNITS_to_import) {atomic.store(0);}
@@ -182,34 +187,41 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		}
 		_running_sweepers_count++;
 
-		auto shweeper = createNewSweeper(localId);
+		auto sweeper = createNewSweeper(localId);
 
-		loadFormula(shweeper);
+		loadFormula(sweeper);
 		LOG(V3_VERB, "SWEEP JOB [%i](%i) solve() START \n", _my_rank, localId);
-		_sweepers[localId] = shweeper; //signal to the remaining system that this solver now exists
-		int res = shweeper->solve(0, nullptr);
+		_sweepers[localId] = sweeper; //signal to the remaining system that this solver now exists
+		int res = sweeper->solve(0, nullptr);
 		LOG(V3_VERB, "SWEEP JOB [%i](%i) solve() FINISH. Result %i \n", _my_rank, localId, res);
+
+		//transfer some solver-specific statistics
+		sweeper->fetchSweeperStats();
+		auto stats = sweeper->getSolverStatsRef();
+		_worksweeps[localId] = stats.sw.worksweeps;
+		_resweeps_in[localId] = stats.sw.resweeps_in;
+		_resweeps_out[localId] = stats.sw.resweeps_out;
 
 		if (res==20) {
 			//Found UNSAT
-			assert(kissat_is_inconsistent(shweeper->solver) || log_return_false("SWEEP ERROR: Solver returned UNSAT 20 but is not in inconsistent (==UNSAT) state!\n"));
+			assert(kissat_is_inconsistent(sweeper->solver) || log_return_false("SWEEP ERROR: Solver returned UNSAT 20 but is not in inconsistent (==UNSAT) state!\n"));
 			int unset_state = -1;
 			//Check whether we are the very first solver to report anything. If we are, report and block others
 			if (_reporting_localId->compare_exchange_strong(unset_state, localId)) {
 				assert(_solved_status==-1);
-				serializeResultFormula(shweeper); //there is no result formula, but serialization adds some required metadata to the job result
-				reportStats(shweeper, UNSAT);
+				serializeResultFormula(sweeper); //there is no result formula, but serialization adds some required metadata to the job result
+				reportStats(sweeper, UNSAT);
 				_internal_result.result = UNSAT;
 				_solved_status = UNSAT;
 				//no formula is read, since we are directly UNSAT
 			}
 		} else if (res==0) {
 			//might have made some progress
-			if (shweeper->hasReportedSweepDimacs()) {
+			if (sweeper->hasReportedSweepDimacs()) {
 				//made some progress, and this is the specific solver that reported the final formula
 				assert(_solved_status==-1);
-				serializeResultFormula(shweeper);
-				reportStats(shweeper, IMPROVED);
+				serializeResultFormula(sweeper);
+				reportStats(sweeper, IMPROVED);
 				_internal_result.result = IMPROVED;
 				_solved_status = IMPROVED;
 			}
@@ -221,6 +233,12 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		_sweepers[localId]->cleanUp(); //write kissat timing profile
 		_sweepers[localId] = nullptr;  //signal that this solver doesnt exist anymore
 		LOG(V3_VERB, "SWEEP JOB [%i](%i) WORKER EXIT\n", _my_rank, localId);
+
+		if (_running_sweepers_count==0) {
+			//we are the very last solver, so by now all stats from all solvers should be collected
+			//doing this here ensures that this will be printed regardless of how exactly the SweepJob terminated (by itself or externally)
+			printResweeps();
+		}
 	});
 	// _fut_shweepers.push_back(std::move(fut_shweeper));
 }
@@ -316,7 +334,6 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	sweeper->set_option("luckyearly", 0); //skip
 	sweeper->set_option("luckylate", 0);  //skip
 	sweeper->interruptionInitialized = true;
-
 	return sweeper;
 }
 
@@ -328,7 +345,7 @@ void SweepJob::serializeResultFormula(KissatPtr sweeper) {
 }
 
 void SweepJob::reportStats(KissatPtr sweeper, int res) {
-	sweeper->getSweeperStats();
+	sweeper->fetchSweeperStats();
 	auto stats = sweeper->getSolverStats();
 	//As "vars" we are only interested in variables that we still active (not fixed) at the start of Sweep. The "VAR" counter is much larger, but most of these variables are often already fixed.
 	int units_orig = stats.sw.total_units - stats.sw.new_units;
@@ -405,6 +422,27 @@ void SweepJob::printIdleFraction() {
 		}
 	}
 	LOG(V3_VERB, "SWEEP IDLE  %i/%i : %s \n", idles, active, oss.str().c_str());
+}
+
+void SweepJob::printResweeps() {
+	std::ostringstream oss;
+	int worksweeps = 0;
+	int resweeps_in = 0;
+	int resweeps_out = 0;
+	for (int i=0; i<_nThreads; i++) {
+		oss << " (id=" << i
+		<<" ws=" << _worksweeps[i]
+		<<" rsi=" << _resweeps_in[i]
+		<<" rso=" << _resweeps_out[i]
+		<<") ";
+		worksweeps += _worksweeps[i];
+		resweeps_in += _resweeps_in[i];
+		resweeps_out += _resweeps_out[i];
+	}
+	LOG(V2_INFO, "RESULT %i SWEEP WORKSWEEPS,RESWEEPS: %s \n", _my_rank, oss.str().c_str());
+	LOG(V2_INFO, "RESULT %i SWEEP_WORKSWEEPS %i \n", _my_rank, worksweeps);
+	LOG(V2_INFO, "RESULT %i SWEEP_RESWEEPS_IN %i \n", _my_rank, resweeps_in);
+	LOG(V2_INFO, "RESULT %i SWEEP_RESWEEPS_OUT %i \n", _my_rank, resweeps_out);
 }
 
 void SweepJob::sendMPIWorkstealRequests() {
@@ -728,31 +766,15 @@ void SweepJob::advanceAllReduction() {
 		LOG(V2_INFO, "SWEEP SHARE REDUCE RECEIVED: %i EQS, %i UNITS\n", eq_size/2, unit_size);
 	else
 		LOG(V3_VERB, "SWEEP SHARE REDUCE RECEIVED: %i EQS, %i UNITS\n", eq_size/2, unit_size);
-	// LOG(V3_VERB, "SWEEP SHARE REDUCE RECEIVED: %i ALL IDLE \n", all_idle);
-
-	// auto received_eqs = std::make_shared<std::vector<int>>();
-	// auto received_units = std::make_shared<std::vector<int>>();
-
-	//Extract equivalences and units from broadcast
-	// received_eqs->assign(data.begin(),             data.begin() + eq_size);
-	// received_units->assign(data.begin() + eq_size, data.end() - NUM_METADATA_FIELDS);
-
-	//Publish new data for local solver to see
-	// _EQS_to_import.store(received_eqs, std::memory_order_release);
-	// _UNITS_to_import.store(received_units, std::memory_order_release);
 
 	 /*
 	  * We want to prevent concurrent read/write on EQS_to_import vector
-	  * Sadly C++ 17 does not allow std::atomic<std::shared_ptr<...>> yet, which would allow lock-free reads
-	  * so as a first solution, prevent concurrent access via timings
-	  * this vector is only written once every >=20 ms, and then immediately afterwards read only once by the solvers
-	  * so as long as the solvers dont need >=20ms to propagate the Equivalences and Units, we are still fine
-	  *
-	  * a proper solution would probably use a mutex, but would be probably overkill here
+	  * Right now the solution is that we have the atomic "unread" flag, as a kind of signal
+	  * Together with the 10us sleep above, this should be more than enough time for the solvers to see it
+	  * The last potential problem occurs if onread=0 is set AFTER the solvers have acced a valid array element but BEFORE they decrement their unread points
+	  * but that would require a race-condition within nanoseconds, which shouldnt occur in our benign usecase
 	  */
 
-	//todo: technically some solvers could still be in the process of reading from the old array, but since we only share every >=20ms this should not be the case
-	//as the solvers should be able to incorporate the units and equivalences in few microseconds, and then never look at this vector again until we set the unreads's again to != 0
 	_EQS_to_import.assign(data.begin(),             data.begin() + eq_size);
 	_UNITS_to_import.assign(data.begin() + eq_size, data.end() - NUM_METADATA_FIELDS);
 

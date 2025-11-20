@@ -158,7 +158,7 @@ private:
 	void sweepSetReportCallback();
     bool isPreprocessingAcceptable(int vars, int cls);
     void addLiteralFromPreprocessing(int lit);
-	void getSweeperStats();
+	void fetchSweeperStats();
 
     bool shouldTerminate();
 

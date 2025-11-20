@@ -574,11 +574,11 @@ void Kissat::configureBoundedVariableAddition() {
 
     //For Sweeping only: Only a single solver needs to report the formula. We choose the first solver on the root node that arrives here
     //Only solvers on the root node are provided this callback, so if we are here we are guaranteed to be on root
-void Kissat::getSweeperStats() {
+void Kissat::fetchSweeperStats() {
     auto &stats = getSolverStatsRef();
     stats.sw.vars_orig = _setup.numVars;
     stats.sw.clauses_orig = _setup.numOriginalClauses;
-    shweep_get_sweep_stats(solver, &stats.sw.eqs, &stats.sw.sweep_units, &stats.sw.new_units, &stats.sw.total_units, &stats.sw.eliminated, &stats.sw.active_orig, &stats.sw.active_end, &stats.sw.worksweeps, &stats.sw.resweeps);
+    shweep_get_sweep_stats(solver, &stats.sw.eqs, &stats.sw.sweep_units, &stats.sw.new_units, &stats.sw.total_units, &stats.sw.eliminated, &stats.sw.active_orig, &stats.sw.active_end, &stats.sw.worksweeps, &stats.sw.resweeps_in, &stats.sw.resweeps_out);
 }
 
 //Callback Called from both sequential preprocessing as well as the shared sweeping.
@@ -586,6 +586,8 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
     bool accept = nbVars != _setup.numVars || nbClauses != _setup.numOriginalClauses;
 
     if (is_sweeper) {
+        //we arrive here for every sweeper, this ensures that we also fetch the statistics of every sweeper into Mallob
+        fetchSweeperStats();
         auto &stats = getSolverStatsRef();
         stats.sw.vars_orig = _setup.numVars;
         stats.sw.clauses_orig = _setup.numOriginalClauses;
@@ -623,9 +625,6 @@ bool Kissat::hasReportedSweepDimacs() const {
 }
 
 void Kissat::addLiteralFromPreprocessing(int lit) {
-    // if (preprocessedFormula.size()<30) {
-        // LOG(V2_INFO, "Piped Formula peek %i: %i \n", preprocessedFormula.size(), lit);
-    // }
 
     preprocessedFormula.push_back(lit);
     if (lit == 0) nbPreprocessedClausesReceived++;

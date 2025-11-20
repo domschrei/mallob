@@ -43,7 +43,8 @@ struct SolverStatistics {
 		int active_orig{-1};
 		int active_end{-1};
 		int worksweeps{-1};
-		int resweeps{-1};
+		int resweeps_in{-1};
+		int resweeps_out{-1};
 	};
 	sweep sw;
 
