@@ -328,15 +328,17 @@ void SweepJob::serializeResultFormula(KissatPtr shweeper) {
 void SweepJob::reportStats(KissatPtr shweeper, int res) {
 	shweeper->getSweeperStats();
 	auto stats = shweeper->getSolverStats();
+	//As "vars" we are only interested in variables that we still active (not fixed) at the start of Sweep. The "VAR" counter is much larger, but most of these variables are often already fixed.
 	int units_orig = stats.shweep_total_units - stats.shweep_new_units;
-	int total_orig = stats.shweep_active_orig + units_orig;
+	int vars_orig = stats.shweep_active_orig + units_orig;
 	int vars_fixed = stats.shweep_eqs + stats.shweep_sweep_units;
 	//actual_done is a slightly conservative count, because we only include the units found by the sweeping algorithm itself,
 	//and dont include some stray units found while propagating the sweep decisions (that would be stats.shweep_new_units)
-	int vars_remain = total_orig - vars_fixed;
-	double vars_fixed_percent = 100*vars_fixed/(double)total_orig;
-	// double vars_remain_percent = 100*vars_remain/(float)total_orig;
-	double clauses_removed = stats.shweep_clauses_orig - stats.shweep_clauses_end;
+	int vars_remain = vars_orig - vars_fixed;
+	int clauses_removed = stats.shweep_clauses_orig - stats.shweep_clauses_end;
+
+	double vars_fixed_percent = 100*vars_fixed/(double)vars_orig;
+	double vars_remain_percent = 100*vars_remain/(double)vars_orig;
 	double clauses_removed_percent = 100*clauses_removed/(double)stats.shweep_clauses_orig;
 
 	LOG(V2_INFO, "RESULT SWEEP_CODE			  %i res code\n", res);
@@ -357,8 +359,8 @@ void SweepJob::reportStats(KissatPtr shweeper, int res) {
 	LOG(V2_INFO, "RESULT SWEEP_ELIMINATED     %i\n", stats.shweep_eliminated);
 	LOG(V2_INFO, "RESULT SWEEP_EQUIVALENCES   %i\n", stats.shweep_eqs);
 	LOG(V2_INFO, "RESULT SWEEP_UNITS_SWEEP    %i\n", stats.shweep_sweep_units);
-	LOG(V2_INFO, "RESULT SWEEP_VARS_REMAIN_N    %i / %i (%.2f %)\n", vars_remain, total_orig, vars_fixed_percent);
-	LOG(V2_INFO, "RESULT SWEEP_VARS_FIXED_N     %i / %i (%.2f %)\n", vars_fixed, total_orig, vars_fixed_percent);
+	LOG(V2_INFO, "RESULT SWEEP_VARS_REMAIN_N    %i / %i (%.2f %)\n", vars_remain, vars_orig, vars_remain_percent);
+	LOG(V2_INFO, "RESULT SWEEP_VARS_FIXED_N     %i / %i (%.2f %)\n", vars_fixed, vars_orig, vars_fixed_percent);
 	LOG(V2_INFO, "RESULT SWEEP_VARS_FIXED_PRCNT %.2f \n", vars_fixed_percent);
 	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_REMOVED_N %i \n", clauses_removed);
 	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_REMOVED_PRCNT %.2f \n", clauses_removed_percent);
@@ -777,8 +779,8 @@ void SweepJob::advanceAllReduction() {
 	  * a proper solution would probably use a mutex, but would be probably overkill here
 	  */
 
-	//todo: technically we are reallocating vectors here on which the solvers might still be reading on
-	//however
+	//todo: technically some solvers could still be in the process of reading from the old array, but since we only share every >=20ms this should not be the case
+	//as the solvers should be able to incorporate the units and equivalences in few microseconds, and then never look at this vector again until we set the unreads's again to != 0
 	_EQS_to_import.assign(data.begin(),             data.begin() + eq_size);
 	_UNITS_to_import.assign(data.begin() + eq_size, data.end() - NUM_METADATA_FIELDS);
 
