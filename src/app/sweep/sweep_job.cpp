@@ -115,10 +115,10 @@ void SweepJob::appl_communicate() {
 void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 	// LOG(V2_INFO, "Shweep rank %i: received custom message from source %i, mpiTag %i, msg.tag %i \n", _my_rank, source, mpiTag, msg.tag);
 	if (mpiTag != MSG_SEND_APPLICATION_MESSAGE) {
-		LOG(V1_WARN, "WARN SWEEP MSG [%i] got unexpected message with mpiTag=%i, msg.tag=%i  (instead of MSG_SEND_APPLICATION_MESSAGE mpiTag == 30)\n", _my_rank, mpiTag, msg.tag);
+		LOG(V1_WARN, "SWEEP MSG Warn [%i] got unexpected message with mpiTag=%i, msg.tag=%i  (instead of MSG_SEND_APPLICATION_MESSAGE mpiTag == 30)\n", _my_rank, mpiTag, msg.tag);
 	}
 	if (msg.returnedToSender) {
-		LOG(V0_CRIT, "SWEEP MSG WARN/ERROR [%i]: received unexpected returnedToSender message during Sweep Job Workstealing! source=%i mpiTag=%i, msg.tag=%i treeIdxOfSender=%i, treeIdxOfDestination=%i \n", _my_rank, sourceRank, mpiTag, msg.tag, msg.treeIndexOfSender, msg.treeIndexOfDestination);
+		LOG(V1_WARN, "SWEEP MSG Warn [%i]: received unexpected returnedToSender message during Sweep Job Workstealing! source=%i mpiTag=%i, msg.tag=%i treeIdxOfSender=%i, treeIdxOfDestination=%i \n", _my_rank, sourceRank, mpiTag, msg.tag, msg.treeIndexOfSender, msg.treeIndexOfDestination);
 		// assert(log_return_false("SWEEP MSG ERROR, got msg.returnToSender"));
 	}
 	else if (msg.tag == TAG_SEARCHING_WORK) {
@@ -138,7 +138,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		msg.treeIndexOfDestination = sourceIndex;
 		msg.contextIdOfDestination = getJobComm().getContextIdOrZero(sourceIndex);
 		assert(msg.contextIdOfDestination != 0 ||
-			log_return_false("SWEEP STEAL Error in TAG_RETURNING_STEAL_REQUEST! Want to return an message, but invalid contextIdOfDestination==0. "
+			log_return_false("SWEEP STEAL ERROR in TAG_RETURNING_STEAL_REQUEST! Want to return an message, but invalid contextIdOfDestination==0. "
 					"With sourceRank=%i, sourceIndex=%i, payload.size()=%i \n", sourceRank, sourceIndex, msg.payload.size()));
 		getJobTree().send(sourceRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 	}
@@ -150,13 +150,13 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		LOG(V3_VERB, "SWEEP MSG to [%i](%i) received steal answer --%i-- from [%i]\n", _my_rank, localId, _worksteal_requests[localId].stolen_work.size(), sourceRank );
 	}
 	else if (mpiTag == MSG_NOTIFY_JOB_ABORTING)  {
-		LOG(V1_WARN, "SWEEP MSG [%i]: received NOTIFY_JOB_ABORTING \n", _my_rank);
+		LOG(V1_WARN, "SWEEP MSG Warn [%i]: received NOTIFY_JOB_ABORTING \n", _my_rank);
 	} else if (mpiTag == MSG_NOTIFY_JOB_TERMINATING) {
-		LOG(V1_WARN, "SWEEP MSG [%i]: received NOTIFY_JOB_TERMINATING \n", _my_rank);
+		LOG(V1_WARN, "SWEEP MSG Warn [%i]: received NOTIFY_JOB_TERMINATING \n", _my_rank);
 	} else if (mpiTag == MSG_INTERRUPT) {
-		LOG(V1_WARN, "SWEEP MSG [%i]: received MSG_INTERRUPT \n", _my_rank);
+		LOG(V1_WARN, "SWEEP MSG Warn [%i]: received MSG_INTERRUPT \n", _my_rank);
 	} else {
-		LOG(V0_CRIT, "SWEEP MSG WARN/ERROR [%i]: received unexpected mpiTag %i with msg.tag %i \n", _my_rank, mpiTag, msg.tag);
+		LOG(V1_WARN, "SWEEP MSG Warn [%i]: received unexpected mpiTag %i with msg.tag %i \n", _my_rank, mpiTag, msg.tag);
 		// assert(log_return_false("ERROR SWEEP MSG, unexpected mpiTag\n"));
 	}
 }
@@ -192,8 +192,7 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 
 		if (res==20) {
 			//Found UNSAT
-			if (! kissat_is_inconsistent(shweeper->solver))
-				log_return_false("SWEEP WARN: Solver returned UNSAT 20 but is not in inconsistent state!\n");
+			assert(kissat_is_inconsistent(shweeper->solver) || log_return_false("SWEEP ERROR: Solver returned UNSAT 20 but is not in inconsistent (==UNSAT) state!\n");
 			int unset_state = -1;
 			//Check whether we are the very first solver to report anything. If we are, report and block others
 			if (_reporting_localId->compare_exchange_strong(unset_state, localId)) {
@@ -258,7 +257,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 	const float WARN_init_dur = 50; //Usual initializations take 0.2ms in the Sat Solver Subprocess and 4-25ms  in the sweep job (for some weird reasons), but should never be above ~30ms
 	LOG(V3_VERB, "SWEEP STARTUP [%i](%i) kissat init %f ms\n", _my_rank, localId, init_dur_ms);
 	if (init_dur_ms > WARN_init_dur) {
-		LOG(V1_WARN, "WARN SWEEP STARTUP [%i](%i): kissat init took unusually long, %f ms !\n", _my_rank, localId, init_dur_ms);
+		LOG(V1_WARN, "SWEEP Warn STARTUP [%i](%i): kissat init took unusually long, %f ms !\n", _my_rank, localId, init_dur_ms);
 	}
 
 	//Dangerous to immediately return here! because kissat is already initialized, can't just forget it, need to properly release it
@@ -418,7 +417,7 @@ void SweepJob::sendMPIWorkstealRequests() {
 			msg.treeIndexOfDestination = request.targetIndex;
 			msg.contextIdOfDestination = getJobComm().getContextIdOrZero(request.targetIndex);
 
-			assert(msg.contextIdOfDestination != 0 || log_return_false("SWEEP Error: contextIdOfDestination==0 in workstealing request! Source rank=%i, targetRank %i \n", _my_rank, request.targetRank));
+			assert(msg.contextIdOfDestination != 0 || log_return_false("SWEEP ERROR: contextIdOfDestination==0 in workstealing request! Source rank=%i, targetRank %i \n", _my_rank, request.targetRank));
 			msg.payload = {request.localId};
 			// LOG(V2_INFO, "Rank %i asks rank %i for work\n", _my_rank, recv_rank, n);
 			// LOG(V2_INFO, "  with destionation ctx_id %i \n", msg.contextIdOfDestination);
@@ -435,18 +434,16 @@ void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
 		*ilit2 = 0;
 		return;
 	}
-	// auto EQS_snapshot = _EQS_to_import.load(std::memory_order_acquire);
 	int size = _EQS_to_import.size();
-	assert(unread_count <= size);
+	assert(unread_count <= size || log_return_false("SWEEP ERROR: in cbImportEq: unread_count %i !<= %i size EQS_to_import \n", unread_count, size));
 	//We still want to read the array from front to back for prefetching efficiency, so we invert the reading index
 	//We stored unread instead of read, because via unread==0 we can quickly tell whether we are done, whereas with read we would need to compare with the array size each time
 	int idx = size - unread_count;
-	// *ilit1 = EQS_snapshot->at(idx);
-	// *ilit2 = EQS_snapshot->at(idx+1);
 	*ilit1 = _EQS_to_import[idx];
 	*ilit2 = _EQS_to_import[idx+1];
 	_unread_count_EQS_to_import[localId] -= 2; //have processed these two literals
-	assert(*ilit1 < *ilit2);
+	assert(*ilit1 < *ilit2 || log_return_false("SWEEP ERROR: in cbImportEq: *ilit1 %i !< %i *ilit2, should be sorted\n", *ilit1, *ilit2));
+	assert(_unread_count_EQS_to_import[localId] >= 0 || log_return_false("SWEEP ERROR: in cbImportEq: negative unread count, %i \n", _unread_count_EQS_to_import[localId]));
 	//now returning to kissat solver
 }
 
@@ -456,15 +453,13 @@ void SweepJob::cbImportUnit(int *ilit, int localId) {
 		*ilit = INVALID_LIT;
 		return;
 	}
-	// auto UNITS_snapshot = _UNITS_to_import.load(std::memory_order_acquire);
-	// int size = UNITS_snapshot->size();
-	int size = _UNITS_to_import.size();
-	assert(unread_count <= size);
 	//see comment in function above on why we reverse the reading index
+	int size = _UNITS_to_import.size();
+	assert(unread_count <= size || log_return_false("SWEEP ERROR: in cbImportUnits: unread_count %i !<= %i size UNITS_to_import \n", unread_count, size));
 	int idx = size - unread_count;
-	// *ilit = UNITS_snapshot->at(idx);
 	*ilit = _UNITS_to_import[idx];
 	_unread_count_UNITS_to_import[localId]--; //have processed that lit
+	assert(_unread_count_UNITS_to_import[localId] >= 0 || log_return_false("SWEEP ERROR: in cbImportUnit: negative unread count , %i \n", _unread_count_UNITS_to_import[localId]));
 	//now returning to kissat solver
 }
 
@@ -507,11 +502,6 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		}
 
 		//Try to steal locally from shared memory
-
-		// int rnd_percent = _rng.randomInRange(0,100);
-		// LOG(V2_INFO, "SWEEP STEAL [%i](%i) rnd_percent = %i \n", _my_rank, localId, rnd_percent);
-		// bool first_local =  rnd_percent <= SEARCH_FIRST_LOCAL_PERCENT;
-
 		 /*
 		  * Going for some direct global steals doesnt do much here, because the big rally happens anyways the moment all are depleted locally
 		  * At that point they anyways schedule a global sweep, and some sweepers stealing globally before cant stop that
@@ -519,8 +509,8 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 
 		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop --> local steal \n", _my_rank, localId);
 		shweeper->shweeper_is_idle = true;
-		// if (first_local) {
 		auto stolen_work = stealWorkFromAnyLocalSolver();
+
 		//Successful local steal
 		if ( ! stolen_work.empty()) {
 			//store steal data persistently in C++, such that C can keep operating on that memory segment
@@ -529,54 +519,37 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 			break;
 		}
 		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop <-- local steal failed \n", _my_rank, localId);
-		// } else {
-			// LOG(V2_INFO, "SWEEP STEAL [%i](%i) go immediately for global steal\n", _my_rank, localId);
-		// }
-
 		int my_comm_rank = getJobComm().getWorldRankOrMinusOne(_my_index);
-
 		if (my_comm_rank == -1) {
 			LOG(V3_VERB, "SWEEP SKIP Delaying global steal request, my own rank %i (index %i) is not yet in JobComm \n", _my_rank, _my_index);
-			// LOG(V2_INFO, " with _my_index %i \n", _my_index);
-			// LOG(V2_INFO, " with JobComm().size %i \n", getJobComm().size());
 			usleep(500);
 			continue;
 		}
-
 		//Unsuccessful steal locally. Go global via MPI message
-
 		assert(getVolume()>=1 || log_return_false("SWEEP ERROR [%i](%i) in workstealing: getVolume()==%i, i.e. no volume available to steal from\n", _my_rank, localId, getVolume()));
-
 		if (getVolume()==1) {
 			LOG(V5_DEBG, "SWEEP WORK SKIP [%i](%i) steal loop --> we are the only MPI rank, no global steal \n", _my_rank, localId);
 			usleep(500);
 			continue;
 		}
-
 		int targetIndex = _rng.randomInRange(0,getVolume());
         int targetRank = getJobComm().getWorldRankOrMinusOne(targetIndex);
-
         if (targetRank == -1) {
         	//target rank not yet in JobTree, might need some more milliseconds to update, try again
 			LOG(V3_VERB, "SWEEP WORK SKIP targetIndex %i, targetRank %i not yet in JobComm\n", targetIndex, targetRank);
 			usleep(500);
         	continue;
         }
-
 		if (targetRank == _my_rank) {
 			// not stealing from ourselves, try again
 			continue;
 		}
-
 		if (getJobComm().getContextIdOrZero(targetIndex)==0) {
 			LOG(V3_VERB, "SWEEP WORK SKIP Context ID of target is missing. getVolume()=%i, rndTargetIndex=%i, rndTargetRank=%i, myIndex=%i, myRank=%i \n", getVolume(), targetIndex, targetRank, _my_index, _my_rank);
 			//target is not yet listed in address list. Might happen for a short period just after it is spawned
 			usleep(500);
 			continue;
 		}
-
-		// LOG(V3_VERB, "SWEEP Global steal request to targetIndex %i, targetRank=%i \n", targetIndex, targetRank);
-
 		//Request will be handled by the MPI main thread, which will send an MPI message on our behalf
 		//because here we are in code executed by the kissat thread, which can cause problems for sending MPI messages
 		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop --> global steal to [%i] \n", _my_rank, localId, targetRank);
@@ -585,8 +558,6 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		request.targetIndex = targetIndex;
 		request.targetRank = targetRank;
 		_worksteal_requests[localId] = request;
-		// LOG(V3_VERB, "SWEEP  [%i](%i) searches work globally\n", _my_rank, localId);
-
 		//Wait here until we get back an MPI message
 		unsigned reps=0;
 		while( ! _worksteal_requests[localId].got_steal_response) {
@@ -600,8 +571,6 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 				break;
 			}
 		}
-
-
 		//Successful steal if size > 0
 		if ( ! _worksteal_requests[localId].stolen_work.empty()) {
 			shweeper->work_received_from_steal = std::move(_worksteal_requests[localId].stolen_work);
@@ -626,7 +595,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 
 void SweepJob::initiateNewSharingRound() {
 	if (!_bcast) {
-		LOG(V1_WARN, "[WARN] SWEEP SHARE BCAST root couldn't initiate sharing round, _bcast is Null\n");
+		LOG(V1_WARN, "SWEEP Warn : SHARE BCAST root couldn't initiate sharing round, _bcast is Null\n");
 		return;
 	}
 
@@ -745,6 +714,13 @@ void SweepJob::advanceAllReduction() {
 		// _unread_count_UNITS_to_import[i] = 0;
 	// }
 
+	//signal to the solvers that they should temporarily not read from the vector because we are reallocating it
+	for (int i=0; i < _nThreads; i++) {
+		_unread_count_EQS_to_import[i] = 0;
+		_unread_count_UNITS_to_import[i] = 0;
+	}
+
+	usleep(10); //give solver some short time to recognize that we set unread to zero
 	//todo: Filter out duplicates during aggregating...
 
 	//Extract shared data
@@ -820,7 +796,7 @@ void SweepJob::advanceAllReduction() {
 	//Publish termination signal only AFTER we copied the Eqs&Units, as the solvers will immediately try to import these last E&U after exiting their main loop
 	if (all_idle) {
 		_terminate_all = true;
-		LOG(V1_WARN, "ß # \n # \n # --- ALL SWEEPERS IDLE - CAN TERMINATE -- \n # \n");
+		LOG(V1_WARN, "# \n # \n # --- ALL SWEEPERS IDLE - CAN TERMINATE -- \n # \n");
 	}
 }
 
@@ -917,7 +893,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	LOG(V3_VERB, "SWEEP SHARE REDUCE aggregated %i equivalences, %i units, %i all_idle\n", aggr_eq_size/2, aggr_unit_size, all_idle);
 	int individual_sum =  aggr_eq_size + aggr_unit_size + NUM_METADATA_FIELDS;
 	assert(total_aggregated_size == individual_sum ||
-		log_return_false("ERROR in SWEEP: aggregated element assert failed: total_size %i != %i individual_sum (total_eq_size %i + total_unit_size %i + metadata %i) ",
+		log_return_false("SWEEP ERROR: aggregated element assert failed: total_size %i != %i individual_sum (total_eq_size %i + total_unit_size %i + metadata %i) ",
 			total_aggregated_size, individual_sum, aggr_eq_size, aggr_unit_size, NUM_METADATA_FIELDS));
     return aggregated;
 }
@@ -967,8 +943,8 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 		return {};
 
 	// LOG(V2_INFO, "ß %i max_steal_amount\n", max_steal_amount);
-	assert(max_steal_amount > 0 || log_return_false("SWEEP STEAL Error [%i](%i): negative max steal amount %i, maybe segfault into non-initialized kissat solver \n", _my_rank, localId, max_steal_amount));
-	assert(max_steal_amount < 2*_numVars || log_return_false("SWEEP STEAL Error [%i](%i): too large max steal amount %i >= 2*NUM_VARS, maybe segfault into non-initialized kissat solver \n", _my_rank, localId, max_steal_amount));
+	assert(max_steal_amount > 0 || log_return_false("SWEEP STEAL ERROR [%i](%i): negative max steal amount %i, maybe segfault into non-initialized kissat solver \n", _my_rank, localId, max_steal_amount));
+	assert(max_steal_amount < 2*_numVars || log_return_false("SWEEP STEAL ERROR [%i](%i): too large max steal amount %i >= 2*NUM_VARS, maybe segfault into non-initialized kissat solver \n", _my_rank, localId, max_steal_amount));
 
 	//There is something to steal
 	//Allocate memory for the steal here in C++, and pass the array location to kissat such that it can fill it with the stolen work

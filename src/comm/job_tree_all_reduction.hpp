@@ -148,7 +148,7 @@ private:
     // Process an incoming message and advance the all-reduction accordingly.
     bool receive(int source, int tag, JobMessage& msg) {
 
-        assert(tag == MSG_JOB_TREE_MODULAR_REDUCE || tag == MSG_JOB_TREE_MODULAR_BROADCAST || tag == MSG_JOB_TREE_PARENT_IS_READY || log_return_false("SWEEP ERROR/Error: Unexpected tag %i (msg.tag %i) in JobTreeAllReduction receive(...) from source %i\n", tag, msg.tag, source));
+        assert(tag == MSG_JOB_TREE_MODULAR_REDUCE || tag == MSG_JOB_TREE_MODULAR_BROADCAST || tag == MSG_JOB_TREE_PARENT_IS_READY || log_return_false("SWEEP Warn: Unexpected tag %i (msg.tag %i) in JobTreeAllReduction receive(...) from source %i\n", tag, msg.tag, source));
 
         if (!_care_about_parent_status)
             LOG(V2_INFO, "TRY REDUCE %i %i %i %i %i\n", tag, msg.epoch, _base_msg.epoch, msg.tag, _base_msg.tag);
@@ -159,7 +159,7 @@ private:
         if (!accept) return false;
 
         if (msg.returnedToSender) {
-            LOG(V2_INFO, "WARN REDUCE returnedToSender\n");
+            LOG(V2_INFO, "Warn REDUCE returnedToSender\n");
             return true;
         }
 

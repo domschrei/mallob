@@ -70,7 +70,7 @@ public:
     }
 
     JobResult solve() {
-        LOG(V1_WARN, "SATWP Starting SATWITHPRE app\n");
+        LOG(V2_INFO, "SATWP Starting SATWITHPRE app\n");
         _time_of_activation = Timer::elapsedSeconds();
 
         if (_params.preprocessBalancing() >= 0) submitBaseJob();
@@ -92,9 +92,12 @@ public:
             if (_base_job_done && !_base_job_digested) {
                 LOG(V2_INFO, "SATWP base done\n");
                 res = jsonToJobResult(_base_job_response, false);
-                LOG(V2_INFO, "SATWP RESULT BASE SOLVER done, result code %i\n", res.result);//grepped in postprocessing
                 _base_job_digested = true;
-                if (res.result != 0) break;
+                if (res.result != 0) {
+                    LOG(V2_INFO, "SATWP RESULT BASE SOLVER done, result code %i\n", res.result);//capslock grepped in postprocessing
+                    break;
+                }
+
             }
 
             if (_sweep_job_done && !_sweep_job_digested) {
@@ -102,13 +105,13 @@ public:
                 res = jsonToJobResult(_sweep_job_response, false); //eventually probably convert = true to reconstruct solution if necessary
                 _sweep_job_digested = true;
                 if (res.result==UNSAT) {
-                    LOG(V2_INFO, "SATWP RESULT SWEEP SOLVER reported UNSAT!\n");//grepped in postprocessing
+                    LOG(V2_INFO, "SATWP RESULT SWEEP SOLVER , result code %i\n", res.result);//capslock grepped in postprocessing
                     break;
                 }
                 else if (res.result==IMPROVED) {
                     assert(res.getSolutionSize() > 0);
-                    LOG(V3_VERB, "SATWP SWEEP has improved formula\n");
-                    LOG(V3_VERB, "SATWP SWEEP reading json SolutionSize=%i\n", res.getSolutionSize());
+                    LOG(V2_INFO, "SATWP SWEEP has improved formula\n");
+                    LOG(V2_INFO, "SATWP SWEEP reading json SolutionSize=%i\n", res.getSolutionSize());
                     _sweep_job_has_improved_formula = true;
                 } else {
                     //todo: start preprocessed SAT job even if sweep didnt find an improvemnt
@@ -118,17 +121,20 @@ public:
             }
 
             if (_preprod_job_done && !_preprod_job_digested) {
-                LOG(V2_INFO, "SATWP RESULT PREPRODJOB SOLVER done\n");//grepped in postprocessing
+                LOG(V2_INFO, "SATWP PREPRODJOB done\n");//grepped in postprocessing
                 res = jsonToJobResult(_preprod_job_response, true);
                 _preprod_job_digested = true;
-                if (res.result != 0) break;
+                if (res.result != 0) {
+                    LOG(V2_INFO, "SATWP RESULT PREPRODJOB SOLVER , result code %i\n", res.result);//capslock grepped in postprocessing
+                    break;
+                }
             }
 
             if (_prepro.done()) {
                 // Preprocess solver(s) terminated.
                 LOG(V2_INFO, "SATWP sequential preprocessor done\n");
                 if (_prepro.getResultCode() != 0) {
-                    LOG(V2_INFO, "SATWP RESULT SEQPREPRO SOLVER reported result %i\n", _prepro.getResultCode());//grepped in postprocessing
+                    LOG(V2_INFO, "SATWP RESULT SEQPREPRO SOLVER , result code %i\n", _prepro.getResultCode());//capslock grepped in postprocessing
                     res.result = _prepro.getResultCode();
                     res.setSolution(std::move(_prepro.getSolution()));
                     break;
@@ -145,20 +151,20 @@ public:
 
             //old route without sweep: continue directly from prepro to prepro'd SAT
             if (_prepro.hasPreprocessedFormula() && ! _params.preprocessSweep.val) {
-                LOG(V3_VERB, "SATWP submit preprocessed SAT task, skip SWEEP\n");
+                LOG(V2_INFO, "SATWP submit preprocessed SAT task, skip SWEEP\n");
                 submitPreprocessedJob(_prepro.extractPreprocessedFormula());
             }
 
             //new route: continue from prepro to SWEEP
             //does NOT yet start the retraction of the base job, as we are still doing preprocessing
             if (_prepro.hasPreprocessedFormula() && _params.preprocessSweep.val && ! _sweep_job_submitted) {
-                LOG(V3_VERB, "SATWP Submit SWEEP\n");
+                LOG(V2_INFO, "SATWP Submit SWEEP\n");
                 submitSweepJob(_prepro.extractPreprocessedFormula());
             }
 
             //continue from successful SWEEP to preprocessed SAT
             if (_sweep_job_digested &&  !_sweep_job_submitted_preprod &&_sweep_job_has_improved_formula) {
-                LOG(V3_VERB, "SATWP submit preprocessed SAT task (via providing SWEEP results)\n");
+                LOG(V2_INFO, "SATWP submit preprocessed SAT task (via providing SWEEP results)\n");
                 submitPreprocessedJob(res.extractSolution());
                 _sweep_job_submitted_preprod = true; //prevent multiple submissions from SWEEP to SAT
             }
@@ -169,13 +175,13 @@ public:
             // }
 
             if (!_base_job_done && _time_of_retraction_end > 0 && Timer::elapsedSeconds() >= _time_of_retraction_end) {
-                LOG(V3_VERB, "SATWP Interrupting base job due to retraction\n");
+                LOG(V2_INFO, "SATWP Interrupting base job due to retraction\n");
                 interrupt(_base_job_submission, _base_job_done);
             }
             usleep(3*1000);
         }
 
-        LOG(V3_VERB, "SATWP exited main solving loop. Now interrupting remaining jobs.\n");
+        LOG(V2_INFO, "SATWP exited main solving loop. Now interrupting remaining jobs.\n");
 
         // Terminate sub-jobs
         if (_base_job_submitted && !_base_job_done) {
@@ -229,8 +235,8 @@ private:
         if (_desc.getCpuLimit() > 0)
             json["cpu-limit"] = std::to_string(_desc.getCpuLimit() - getAgeSinceActivation()) + "s";
 
-        LOG(V3_VERB, "SATWP Starting Base Job: %d Vars\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NV"));
-        LOG(V3_VERB, "SATWP Starting Base Job: %d Clauses\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
+        LOG(V2_INFO, "SATWP Starting Base Job: %d Vars\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NV"));
+        LOG(V2_INFO, "SATWP Starting Base Job: %d Clauses\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
 
     	// int base_procs = 2;
         // json["max-demand"] = 2; //Test: Manually/hardcoded control number of PEs
@@ -291,8 +297,8 @@ private:
         // json["configuration"]["t"] = std::to_string(2); //Test: Only two threads per sweep worker
         // LOG(V3_VERB, "SATWP Starting SWEEP Job: %d MPI Processes/Ranks allocated\n", sweep_procs);
 
-        LOG(V3_VERB, "SATWP Starting SWEEP Job: %d Vars\n", nbVars);
-        LOG(V3_VERB, "SATWP Starting SWEEP Job: %d Clauses\n", nbClauses);
+        LOG(V2_INFO, "SATWP Starting SWEEP Job: %d Vars\n", nbVars);
+        LOG(V2_INFO, "SATWP Starting SWEEP Job: %d Clauses\n", nbClauses);
 
         // Obtain API and submit the job
         auto copiedJson = json;
@@ -339,7 +345,7 @@ private:
             totalRetractionDuration = 0.001;
         _retraction_round_duration = totalRetractionDuration / std::sqrt(MyMpi::size(MPI_COMM_WORLD));
         if (_params.preprocessBalancing() == 1) {
-            LOG(V3_VERB, "SATWP %s : Retracting base job over ~%.3fs\n", toStr(), totalRetractionDuration);
+            LOG(V2_INFO, "SATWP %s : Retracting base job over ~%.3fs\n", toStr(), totalRetractionDuration);
             _time_of_retraction_end = _time_of_retraction_start + 1.1f * totalRetractionDuration;
         }
 
@@ -364,8 +370,8 @@ private:
             json["cpu-limit"] = std::to_string(_desc.getCpuLimit() - getAgeSinceActivation()) + "s";
 
 
-        LOG(V3_VERB, "SATWP Starting SAT Job: %d Vars\n", nbVars);
-        LOG(V3_VERB, "SATWP Starting SAT Job: %d Clauses\n", nbClauses);
+        LOG(V2_INFO, "SATWP Starting SAT Job: %d Vars\n", nbVars);
+        LOG(V2_INFO, "SATWP Starting SAT Job: %d Clauses\n", nbClauses);
 
         // Obtain API and submit the job
         auto copiedJson = json;
@@ -380,7 +386,7 @@ private:
     }
 
     void interrupt(nlohmann::json& json, volatile bool& doneFlag) {
-        LOG(V3_VERB, "SATWP Interrupt %s\n", json["name"].get<std::string>().c_str());
+        LOG(V2_INFO, "SATWP Interrupt %s\n", json["name"].get<std::string>().c_str());
         nlohmann::json jsonInterrupt {
             {"name", json["name"]},
             {"user", json["user"]},
@@ -399,7 +405,7 @@ private:
         res.id = _desc.getId();
         res.revision = 0;
         res.result = json["result"]["resultcode"];
-        LOG(V3_VERB, "SATWP Extract result of %s  (result code %i)\n", json["name"].get<std::string>().c_str(), res.result);
+        LOG(V2_INFO, "SATWP Extract result of %s  (result code %i)\n", json["name"].get<std::string>().c_str(), res.result);
         if (res.result == RESULT_UNKNOWN) return res;
         std::vector<int> solution;
         if (_params.compressModels() && res.result == RESULT_SAT) {
@@ -408,15 +414,15 @@ private:
             solution = json["result"]["solution"].get<std::vector<int>>();
         }
         if (convert && res.result == RESULT_SAT) {
-            LOG(V3_VERB, "SATWP reconstruct original solution\n");
+            LOG(V2_INFO, "SATWP reconstruct original solution\n");
             assert(solution.size() >= 1 && solution[0] == 0);
             _prepro.join(true);
             _prepro.reconstructSolution(solution);
-            LOG(V3_VERB, "SATWP original solution reconstructed\n");
+            LOG(V2_INFO, "SATWP original solution reconstructed\n");
         }
         res.setSolution(std::move(solution));
         // LOG(V3_VERB, "SATWP %s extracted\n", json["name"].get<std::string>().c_str());
-        LOG(V3_VERB, "SATWP %s extracted  Solution Size %i\n", json["name"].get<std::string>().c_str(), res.getSolutionSize());
+        LOG(V2_INFO, "SATWP %s extracted  Solution Size %i\n", json["name"].get<std::string>().c_str(), res.getSolutionSize());
         return res;
     }
 
