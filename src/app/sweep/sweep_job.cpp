@@ -443,7 +443,7 @@ void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
 	*ilit2 = _EQS_to_import[idx+1];
 	_unread_count_EQS_to_import[localId] -= 2; //have processed these two literals
 	assert(*ilit1 < *ilit2 || log_return_false("SWEEP ERROR: in cbImportEq: *ilit1 %i !< %i *ilit2, should be sorted\n", *ilit1, *ilit2));
-	assert(_unread_count_EQS_to_import[localId] >= 0 || log_return_false("SWEEP ERROR: in cbImportEq: negative unread count, %i \n", _unread_count_EQS_to_import[localId]));
+	assert(_unread_count_EQS_to_import[localId] >= 0 || log_return_false("SWEEP ERROR: in cbImportEq: negative unread count, %i \n", _unread_count_EQS_to_import[localId].load()));
 	//now returning to kissat solver
 }
 
@@ -459,7 +459,7 @@ void SweepJob::cbImportUnit(int *ilit, int localId) {
 	int idx = size - unread_count;
 	*ilit = _UNITS_to_import[idx];
 	_unread_count_UNITS_to_import[localId]--; //have processed that lit
-	assert(_unread_count_UNITS_to_import[localId] >= 0 || log_return_false("SWEEP ERROR: in cbImportUnit: negative unread count , %i \n", _unread_count_UNITS_to_import[localId]));
+	assert(_unread_count_UNITS_to_import[localId] >= 0 || log_return_false("SWEEP ERROR: in cbImportUnit: negative unread count , %i \n", _unread_count_UNITS_to_import[localId].load()));
 	//now returning to kissat solver
 }
 
