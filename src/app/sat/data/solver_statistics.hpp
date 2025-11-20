@@ -30,17 +30,22 @@ struct SolverStatistics {
 	unsigned long receivedClausesDropped = 0;
 
 	//Shared Sweeping
-	int shweep_eqs{-1};
-	int shweep_sweep_units{-1};
-	int shweep_new_units{-1};
-	int shweep_total_units{-1}; //includes also those already present before sweeping
-	int shweep_eliminated{-1};
-	int shweep_vars_orig{-1};
-	int shweep_vars_end{-1};
-	int shweep_clauses_orig{-1};
-	int shweep_clauses_end{-1};
-	int shweep_active_orig{-1};
-	int shweep_active_end{-1};
+	struct sweep {
+		int eqs{-1};
+		int sweep_units{-1};
+		int new_units{-1};
+		int total_units{-1}; //includes also those already present before sweeping
+		int eliminated{-1};
+		int vars_orig{-1};
+		int vars_end{-1};
+		int clauses_orig{-1};
+		int clauses_end{-1};
+		int active_orig{-1};
+		int active_end{-1};
+		int worksweeps{-1};
+		int resweeps{-1};
+	};
+	sweep sw;
 
 	std::string getReport() const {
 		return "pps:" + std::to_string(propagations)

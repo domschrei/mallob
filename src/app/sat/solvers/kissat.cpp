@@ -33,31 +33,24 @@ void consume_clause(void* state, int** clause, int* size, int* glue) {
 }
 
 
-void shweep_export_eq(void *state) {
-    ((Kissat*) state)->shweepExportEq();
+void sweep_export_eq(void *state) {
+    ((Kissat*) state)->sweepExportEq();
 }
 
-void shweep_export_unit(void *state, int unit) {
-    ((Kissat*) state)->shweepExportUnit(unit);
-}
-
-
-void shweep_import_eqs(void* state, int** equivalences, int *eqs_size) {
-    ((Kissat*) state)->shweepImportEqs(equivalences, eqs_size);
+void sweep_export_unit(void *state, int unit) {
+    ((Kissat*) state)->sweepExportUnit(unit);
 }
 
 
-void shweep_import_units(void *state, int **units, int *unit_count) {
-    ((Kissat*) state)->shweepImportUnits(units, unit_count);
+void sweep_import_eqs(void* state, int** equivalences, int *eqs_size) {
+    ((Kissat*) state)->sweepImportEqs(equivalences, eqs_size);
 }
 
-// void start_sweep_app_callback(void *state) {
-    // ((Kissat*) state)->startSweepAppCallback();
-// }
 
-// void shweep_solver_searches_work(void *state, unsigned **work, unsigned *size) {
-    // ((Kissat*) state)->shweep_solverSearchesWork(work, size);
-// }
+void sweep_import_units(void *state, int **units, int *unit_count) {
+    ((Kissat*) state)->sweepImportUnits(units, unit_count);
+}
+
 
 
 int terminate_callback(void* state) {
@@ -392,7 +385,7 @@ void Kissat::setSolverInterrupt() {
     if (interruptionInitialized) kissat_terminate (solver);
 }
 
-void Kissat::setShweepTerminate() {
+void Kissat::setSweepTerminate() {
     shweep_terminate(solver);
 }
 
@@ -452,16 +445,12 @@ void Kissat::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
 }
 
 
-void Kissat::shweepSetImportExportCallbacks() {
-    shweep_set_equivalence_export_callback(solver, this, eq_up_buffer.data(), &shweep_export_eq);
-    shweep_set_equivalence_import_callback(solver, this, &shweep_import_eqs);
-    shweep_set_unit_export_callback(solver, this, &shweep_export_unit);
-    shweep_set_unit_import_callback(solver, this, &shweep_import_units);
+void Kissat::sweepSetImportExportCallbacks() {
+    shweep_set_equivalence_export_callback(solver, this, eq_up_buffer.data(), &sweep_export_eq);
+    shweep_set_equivalence_import_callback(solver, this, &sweep_import_eqs);
+    shweep_set_unit_export_callback(solver, this, &sweep_export_unit);
+    shweep_set_unit_import_callback(solver, this, &sweep_import_units);
 }
-
-// void Kissat::shweepSetWorkstealingCallback(void *SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, int *work_size, int local_id)) {
-    // shweep_set_search_work_callback(solver, SweepJob_state, search_callback);
-// }
 
 
 
@@ -496,9 +485,9 @@ void Kissat::consumeClause(int** clause, int* size, int* lbd) {
 }
 
 
-void Kissat::shweepExportEq() {
+void Kissat::sweepExportEq() {
     {
-        std::lock_guard<std::mutex> lock(shweep_sharing_mutex); //dont push something when the aggregation thread is just touching the eqs_to_share vector
+        std::lock_guard<std::mutex> lock(sweep_sharing_mutex); //dont push something when the aggregation thread is just touching the eqs_to_share vector
         const int lit1 = eq_up_buffer[0];
         const int lit2 = eq_up_buffer[1];
         eqs_to_share.push_back(lit1);
@@ -506,14 +495,14 @@ void Kissat::shweepExportEq() {
     }
 }
 
-void Kissat::shweepExportUnit(int unit) {
+void Kissat::sweepExportUnit(int unit) {
     {
-        std::lock_guard<std::mutex> lock(shweep_sharing_mutex);
+        std::lock_guard<std::mutex> lock(sweep_sharing_mutex);
         units_to_share.push_back(unit);
     }
 }
 
-void Kissat::shweepImportEqs(int **equivalences, int *eqs_size) {
+void Kissat::sweepImportEqs(int **equivalences, int *eqs_size) {
     if (eqs_from_broadcast_queued.empty()) {
         //dont even move the empty queue, reduce danger of concurrent touching. The main thread might just be copying something into the array
        *eqs_size = 0;
@@ -527,7 +516,7 @@ void Kissat::shweepImportEqs(int **equivalences, int *eqs_size) {
 }
 
 
-void Kissat::shweepImportUnits(int **units, int *unit_count) {
+void Kissat::sweepImportUnits(int **units, int *unit_count) {
     //if we already imported the units from the queue, the queue is empty and we import size==0
     if (units_from_broadcast_queued.empty()) {
        *unit_count = 0;
@@ -540,7 +529,7 @@ void Kissat::shweepImportUnits(int **units, int *unit_count) {
     //todo: mutex? there might be concurrent std::move and std::insert...
 }
 
-void Kissat::shweepSetReportCallback() {
+void Kissat::sweepSetReportCallback() {
     kissat_set_preprocessing_report_callback(solver, this, begin_formula_report, report_preprocessed_lit);
 }
 
@@ -587,24 +576,24 @@ void Kissat::configureBoundedVariableAddition() {
     //Only solvers on the root node are provided this callback, so if we are here we are guaranteed to be on root
 void Kissat::getSweeperStats() {
     auto &stats = getSolverStatsRef();
-    stats.shweep_vars_orig = _setup.numVars;
-    stats.shweep_clauses_orig = _setup.numOriginalClauses;
-    shweep_get_sweep_stats(solver, &stats.shweep_eqs, &stats.shweep_sweep_units, &stats.shweep_new_units, &stats.shweep_total_units, &stats.shweep_eliminated, &stats.shweep_active_orig, &stats.shweep_active_end);
+    stats.sw.vars_orig = _setup.numVars;
+    stats.sw.clauses_orig = _setup.numOriginalClauses;
+    shweep_get_sweep_stats(solver, &stats.sw.eqs, &stats.sw.sweep_units, &stats.sw.new_units, &stats.sw.total_units, &stats.sw.eliminated, &stats.sw.active_orig, &stats.sw.active_end, &stats.sw.worksweeps, &stats.sw.resweeps);
 }
 
 //Callback Called from both sequential preprocessing as well as the shared sweeping.
 bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
     bool accept = nbVars != _setup.numVars || nbClauses != _setup.numOriginalClauses;
 
-    if (is_shweeper) {
+    if (is_sweeper) {
         auto &stats = getSolverStatsRef();
-        stats.shweep_vars_orig = _setup.numVars;
-        stats.shweep_clauses_orig = _setup.numOriginalClauses;
-        stats.shweep_vars_end = nbVars;
-        stats.shweep_clauses_end = nbClauses;
+        stats.sw.vars_orig = _setup.numVars;
+        stats.sw.clauses_orig = _setup.numOriginalClauses;
+        stats.sw.vars_end = nbVars;
+        stats.sw.clauses_end = nbClauses;
 
         int unset_state = -1;
-        bool weAreFirst = shweepReportingLocalId->compare_exchange_strong(unset_state, getLocalId());
+        bool weAreFirst = sweepReportingLocalId->compare_exchange_strong(unset_state, getLocalId());
         if (weAreFirst) {
             LOG(V2_INFO, "SWEEP [root](%i) first to report dimacs result\n", getLocalId());
             if (accept) {
@@ -616,7 +605,7 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
             }
             LOG(V2_INFO, "SATWP sees from SWEEP: (%i --> %i vars) (%i --> %i clauses) \n", _setup.numVars, nbVars, _setup.numOriginalClauses, nbClauses);
         } else {
-            LOG(V3_VERB, "SWEEP [root](%i) got formula report request denied, already taken by (%i) \n", getLocalId(), shweepReportingLocalId->load());
+            LOG(V3_VERB, "SWEEP [root](%i) got formula report request denied, already taken by (%i) \n", getLocalId(), sweepReportingLocalId->load());
             accept = false;
         }
     }
@@ -652,13 +641,13 @@ void Kissat::addLiteralFromPreprocessing(int lit) {
 }
 
 
-void Kissat::shweepSetReportingPtr(std::shared_ptr<std::atomic<int>> ptr) {
-    shweepReportingLocalId = ptr;
+void Kissat::sweepSetReportingPtr(std::shared_ptr<std::atomic<int>> ptr) {
+    sweepReportingLocalId = ptr;
 }
 
 
-void Kissat::setToShweeper() {
-    is_shweeper = true;
+void Kissat::setToSweeper() {
+    is_sweeper = true;
 }
 
 // void Kissat::setSweepJob(const std::shared_ptr<SweepJob> sweepJob) {

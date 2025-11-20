@@ -48,7 +48,7 @@ void SweepJob::appl_start() {
 	// LOG(V2_INFO,"SWEEP JOB sweep-sharing-period: %i ms\n", _params.sweepSharingPeriod_ms.val);
 	// LOG(V2_INFO, "New SweepJob rank %i working on %i vars in %i clauses \n", getJobTree().getRank(), );
     _metadata = getSerializedDescription(0)->data();
-	_start_shweep_timestamp = Timer::elapsedSeconds();
+	_start_sweep_timestamp = Timer::elapsedSeconds();
 	_last_sharing_start_timestamp = Timer::elapsedSeconds();
 
 	//do not trigger a send on the initial dummy worksteal requests
@@ -70,7 +70,7 @@ void SweepJob::appl_start() {
 	}
 
 	//Will hold pointers to the kissat solvers
-	_shweepers.resize(_nThreads);
+	_sweepers.resize(_nThreads);
 
 	//Initialize the background workers, each will run one kissat thread
 	_bg_workers.reserve(_nThreads);
@@ -83,7 +83,7 @@ void SweepJob::appl_start() {
 	//Start individual Kissat threads (those then immediately jump into the sweep algorithm)
 	LOG(V2_INFO,"SWEEP JOB Create solvers\n");
 	for (int localId=0; localId < _nThreads; localId++) {
-		createAndStartNewShweeper(localId);
+		createAndStartNewSweeper(localId);
 	}
 
 	//might as well already set some result metadata information now
@@ -169,7 +169,7 @@ void SweepJob::appl_terminate() {
 }
 
 
-void SweepJob::createAndStartNewShweeper(int localId) {
+void SweepJob::createAndStartNewSweeper(int localId) {
 	LOG(V3_VERB, "SWEEP JOB [%i](%i) queuing background worker thread\n", _my_rank, localId);
 	_bg_workers[localId]->run([this, localId]() {
 		LOG(V3_VERB, "SWEEP JOB [%i](%i) WORKER START \n", _my_rank, localId);
@@ -180,13 +180,13 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 			LOG(V3_VERB, "SWEEP [%i](%i) terminated before creation\n", _my_rank, localId);
 			return;
 		}
-		_running_shweepers_count++;
+		_running_sweepers_count++;
 
-		auto shweeper = createNewShweeper(localId);
+		auto shweeper = createNewSweeper(localId);
 
 		loadFormula(shweeper);
 		LOG(V3_VERB, "SWEEP JOB [%i](%i) solve() START \n", _my_rank, localId);
-		_shweepers[localId] = shweeper; //signal to the remaining system that this solver now exists
+		_sweepers[localId] = shweeper; //signal to the remaining system that this solver now exists
 		int res = shweeper->solve(0, nullptr);
 		LOG(V3_VERB, "SWEEP JOB [%i](%i) solve() FINISH. Result %i \n", _my_rank, localId, res);
 
@@ -217,20 +217,20 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 			assert(log_return_false("SWEEP ERROR: solver has unexpected return signal %i \n", res));
 		}
 
-		_running_shweepers_count--;
-		_shweepers[localId]->cleanUp(); //write kissat timing profile
-		_shweepers[localId] = nullptr;  //signal that this solver doesnt exist anymore
+		_running_sweepers_count--;
+		_sweepers[localId]->cleanUp(); //write kissat timing profile
+		_sweepers[localId] = nullptr;  //signal that this solver doesnt exist anymore
 		LOG(V3_VERB, "SWEEP JOB [%i](%i) WORKER EXIT\n", _my_rank, localId);
 	});
 	// _fut_shweepers.push_back(std::move(fut_shweeper));
 }
 
 
-std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
+std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	const JobDescription& desc = getDescription();
 	SolverSetup setup;
 	setup.logger = &Logger::getMainInstance();
-	setup.jobname = "shweep-"+to_string(_my_index);
+	setup.jobname = "sweep-"+to_string(_my_index);
 	setup.numVars = desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
 	setup.numOriginalClauses = desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
 	setup.localId = localId;
@@ -251,7 +251,7 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 
 	// LOG(V2_INFO, "SWEEP JOB [%i](%i) create kissat shweeper \n", _my_rank, localId);
 	float t0 = Timer::elapsedSeconds();
-	std::shared_ptr<Kissat> shweeper(new Kissat(setup));
+	std::shared_ptr<Kissat> sweeper(new Kissat(setup));
 	float t1 = Timer::elapsedSeconds();
 	float init_dur_ms =  (t1 - t0)*1000;
 	const float WARN_init_dur = 50; //Usual initializations take 0.2ms in the Sat Solver Subprocess and 4-25ms  in the sweep job (for some weird reasons), but should never be above ~30ms
@@ -268,96 +268,99 @@ std::shared_ptr<Kissat> SweepJob::createNewShweeper(int localId) {
 		// return shweeper;
 	// }
 
-	shweeper->setToShweeper();
+	sweeper->setToSweeper();
 
-	shweeper->shweepSetImportExportCallbacks();
-    shweep_set_search_work_callback(shweeper->solver, this, cb_search_work_in_tree); //here we connect directly between SweepJob and kissat-solver, bypassing Kissat::
-	shweep_set_SweepJob_eq_import_callback(shweeper->solver, this, cb_import_eq);
-	shweep_set_SweepJob_unit_import_callback(shweeper->solver, this, cb_import_unit);
+	//Connecting kissat to Kissat
+	sweeper->sweepSetImportExportCallbacks();
+
+	//Connecting kissat directly to SweepJob
+    shweep_set_search_work_callback(sweeper->solver, this, cb_search_work_in_tree);
+	shweep_set_SweepJob_eq_import_callback(sweeper->solver, this, cb_import_eq);
+	shweep_set_SweepJob_unit_import_callback(sweeper->solver, this, cb_import_unit);
 
 	if (_is_root) {
 		//read out final formula only at the root node
-		shweeper->shweepSetReportCallback();
-		shweeper->shweepSetReportingPtr(_reporting_localId);
+		sweeper->sweepSetReportCallback();
+		sweeper->sweepSetReportingPtr(_reporting_localId);
 	}
 
     //Basic configuration
-    shweeper->set_option("quiet", 0);  //suppress any standard kissat messages
-    shweeper->set_option("verbose", 0);//the native kissat verbosity
-    shweeper->set_option("log", 0);    //potentially extensive logging
-    shweeper->set_option("check", 0);  // do not check model or derived clauses, because we import anyways units and equivalences without proof tracking
-    shweeper->set_option("statistics", 1);  //print full statistics
-    shweeper->set_option("profile", _params.satProfilingLevel.val); // do detailed profiling how much time we spent where
-	shweeper->set_option("seed", 0);   //Sweeping should not contain any RNG part
+    sweeper->set_option("quiet", 0);  //suppress any standard kissat messages
+    sweeper->set_option("verbose", 0);//the native kissat verbosity
+    sweeper->set_option("log", 0);    //potentially extensive logging
+    sweeper->set_option("check", 0);  // do not check model or derived clauses, because we import anyways units and equivalences without proof tracking
+    sweeper->set_option("statistics", 1);  //print full statistics
+    sweeper->set_option("profile", _params.satProfilingLevel.val); // do detailed profiling how much time we spent where
+	sweeper->set_option("seed", 0);   //Sweeping should not contain any RNG part
 
 	//Specific due to Mallob
 	// printf("Mallob sweep Solver verbosity %i \n", _params.sweepSolverVerbosity.val);
-	shweeper->set_option("mallob_custom_sweep_verbosity", _params.sweepSolverVerbosity.val); //Shweeper verbosity 0..4
-	shweeper->set_option("mallob_is_shweeper", 1); //Make this Kissat solver a pure Distributed Sweeping Solver. Jumps directly to distributed sweeping and bypasses everything else
-	shweeper->set_option("mallob_local_id", localId);
-	shweeper->set_option("mallob_rank", _my_rank);
-	shweeper->set_option("mallob_is_root", _is_root);
-	shweeper->set_option("mallob_resweep_chance", _params.sweepResweepChance.val);
-	shweeper->set_option("mallob_staggered_logs", 1); //set to 1 to have spatially separated logs, useful for verbose runs with 2-16 threads
+	sweeper->set_option("mallob_custom_sweep_verbosity", _params.sweepSolverVerbosity.val); //Shweeper verbosity 0..4
+	sweeper->set_option("mallob_is_shweeper", 1); //Make this Kissat solver a pure Distributed Sweeping Solver. Jumps directly to distributed sweeping and bypasses everything else
+	sweeper->set_option("mallob_local_id", localId);
+	sweeper->set_option("mallob_rank", _my_rank);
+	sweeper->set_option("mallob_is_root", _is_root);
+	sweeper->set_option("mallob_resweep_chance", _params.sweepResweepChance.val);
+	sweeper->set_option("mallob_staggered_logs", 1); //set to 1 to have spatially separated logs, useful for verbose runs with 2-16 threads
 
 
 	//Own options of Kissat
-	shweeper->set_option("sweepcomplete", 1);      //deactivates checking for time limits during sweeping, so we dont get kicked out due to some limits
+	sweeper->set_option("sweepcomplete", 1);      //deactivates checking for time limits during sweeping, so we dont get kicked out due to some limits
 	//Specific for clean sweep run
-	shweeper->set_option("preprocess", 0); //skip other preprocessing stuff after shweep finished
+	sweeper->set_option("preprocess", 0); //skip other preprocessing stuff after shweep finished
 	// shweeper->set_option("probe", 1);   //there is some cleanup-probing at the end of the sweeping. keep it? (apparently the probe option is used nowhere anyways)
-	shweeper->set_option("substitute", 1); //apply equivalence substitutions after sweeping (kissat default 1, but keep here explicitly to remember it)
-	shweeper->set_option("substituterounds", 2); //default is 2, and changing that has currently no effect, virtually all substitutions happen in round 1, and already in round 2 zero or single substitutions are found, and it exits there.
+	sweeper->set_option("substitute", 1); //apply equivalence substitutions after sweeping (kissat default 1, but keep here explicitly to remember it)
+	sweeper->set_option("substituterounds", 2); //default is 2, and changing that has currently no effect, virtually all substitutions happen in round 1, and already in round 2 zero or single substitutions are found, and it exits there.
 	// shweeper->set_option("substituteeffort", 1000); //modification doesnt seem to have much effect...
 	// shweeper->set_option("substituterounds", 10);
-	shweeper->set_option("luckyearly", 0); //skip
-	shweeper->set_option("luckylate", 0);  //skip
-	shweeper->interruptionInitialized = true;
+	sweeper->set_option("luckyearly", 0); //skip
+	sweeper->set_option("luckylate", 0);  //skip
+	sweeper->interruptionInitialized = true;
 
-	return shweeper;
+	return sweeper;
 }
 
-void SweepJob::serializeResultFormula(KissatPtr shweeper) {
-	LOG(V2_INFO, "SWEEP JOB [%i](%i) serializing result formula from solver \n", _my_rank, shweeper->getLocalId());
+void SweepJob::serializeResultFormula(KissatPtr sweeper) {
+	LOG(V2_INFO, "SWEEP JOB [%i](%i) serializing result formula from solver \n", _my_rank, sweeper->getLocalId());
 	// assert(shweeper->hasPreprocessedFormula());
-	std::vector<int> formula = shweeper->extractPreprocessedFormula(); //format is [Clauses, #Vars, #Clauses], i.e. clauses followed by two metadata-ints at the end. Or empty, if the solver found UNSAT or made no progress at all
+	std::vector<int> formula = sweeper->extractPreprocessedFormula(); //format is [Clauses, #Vars, #Clauses], i.e. clauses followed by two metadata-ints at the end. Or empty, if the solver found UNSAT or made no progress at all
 	_internal_result.setSolutionToSerialize(formula.data(), formula.size()); //we always need to serialize, even an empty formula, because serialization adds some required metadata in front
 }
 
-void SweepJob::reportStats(KissatPtr shweeper, int res) {
-	shweeper->getSweeperStats();
-	auto stats = shweeper->getSolverStats();
+void SweepJob::reportStats(KissatPtr sweeper, int res) {
+	sweeper->getSweeperStats();
+	auto stats = sweeper->getSolverStats();
 	//As "vars" we are only interested in variables that we still active (not fixed) at the start of Sweep. The "VAR" counter is much larger, but most of these variables are often already fixed.
-	int units_orig = stats.shweep_total_units - stats.shweep_new_units;
-	int vars_orig = stats.shweep_active_orig + units_orig;
-	int vars_fixed = stats.shweep_eqs + stats.shweep_sweep_units;
+	int units_orig = stats.sw.total_units - stats.sw.new_units;
+	int vars_orig = stats.sw.active_orig + units_orig;
+	int vars_fixed = stats.sw.eqs + stats.sw.sweep_units;
 	//actual_done is a slightly conservative count, because we only include the units found by the sweeping algorithm itself,
 	//and dont include some stray units found while propagating the sweep decisions (that would be stats.shweep_new_units)
 	int vars_remain = vars_orig - vars_fixed;
-	int clauses_removed = stats.shweep_clauses_orig - stats.shweep_clauses_end;
+	int clauses_removed = stats.sw.clauses_orig - stats.sw.clauses_end;
 
 	double vars_fixed_percent = 100*vars_fixed/(double)vars_orig;
 	double vars_remain_percent = 100*vars_remain/(double)vars_orig;
-	double clauses_removed_percent = 100*clauses_removed/(double)stats.shweep_clauses_orig;
+	double clauses_removed_percent = 100*clauses_removed/(double)stats.sw.clauses_orig;
 
 	LOG(V2_INFO, "RESULT SWEEP_CODE			  %i res code\n", res);
-	LOG(V2_INFO, "RESULT SWEEP_TIME           %f seconds \n", Timer::elapsedSeconds() - _start_shweep_timestamp);
+	LOG(V2_INFO, "RESULT SWEEP_TIME           %f seconds \n", Timer::elapsedSeconds() - _start_sweep_timestamp);
 	LOG(V2_INFO, "RESULT SWEEP_PRIORITY       %f\n", _params.preprocessSweepPriority.val);
 	LOG(V2_INFO, "RESULT SWEEP_PROCESSES      %i\n", getVolume());
 	LOG(V2_INFO, "RESULT SWEEP_THREADS_PER_P  %i\n", _nThreads);
 	LOG(V2_INFO, "RESULT SWEEP_SHARING_PERIOD %i ms \n", _params.sweepSharingPeriod_ms.val);
-	LOG(V2_INFO, "RESULT SWEEP_VARS_ORIG      %i\n", stats.shweep_vars_orig);
-	LOG(V2_INFO, "RESULT SWEEP_VARS_END       %i\n", stats.shweep_vars_end);
-	LOG(V2_INFO, "RESULT SWEEP_ACTIVE_ORIG    %i\n", stats.shweep_active_orig);
-	LOG(V2_INFO, "RESULT SWEEP_ACTIVE_END     %i\n", stats.shweep_active_end);
-	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_ORIG   %i\n", stats.shweep_clauses_orig);
-	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_END    %i\n", stats.shweep_clauses_end);
+	LOG(V2_INFO, "RESULT SWEEP_VARS_ORIG      %i\n", stats.sw.vars_orig);
+	LOG(V2_INFO, "RESULT SWEEP_VARS_END       %i\n", stats.sw.vars_end);
+	LOG(V2_INFO, "RESULT SWEEP_ACTIVE_ORIG    %i\n", stats.sw.active_orig);
+	LOG(V2_INFO, "RESULT SWEEP_ACTIVE_END     %i\n", stats.sw.active_end);
+	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_ORIG   %i\n", stats.sw.clauses_orig);
+	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_END    %i\n", stats.sw.clauses_end);
 	LOG(V2_INFO, "RESULT SWEEP_UNITS_ORIG     %i\n", units_orig);
-	LOG(V2_INFO, "RESULT SWEEP_UNITS_NEW      %i\n", stats.shweep_new_units);
-	LOG(V2_INFO, "RESULT SWEEP_UNITS_TOTAL    %i\n", stats.shweep_total_units);
-	LOG(V2_INFO, "RESULT SWEEP_ELIMINATED     %i\n", stats.shweep_eliminated);
-	LOG(V2_INFO, "RESULT SWEEP_EQUIVALENCES   %i\n", stats.shweep_eqs);
-	LOG(V2_INFO, "RESULT SWEEP_UNITS_SWEEP    %i\n", stats.shweep_sweep_units);
+	LOG(V2_INFO, "RESULT SWEEP_UNITS_NEW      %i\n", stats.sw.new_units);
+	LOG(V2_INFO, "RESULT SWEEP_UNITS_TOTAL    %i\n", stats.sw.total_units);
+	LOG(V2_INFO, "RESULT SWEEP_ELIMINATED     %i\n", stats.sw.eliminated);
+	LOG(V2_INFO, "RESULT SWEEP_EQUIVALENCES   %i\n", stats.sw.eqs);
+	LOG(V2_INFO, "RESULT SWEEP_UNITS_SWEEP    %i\n", stats.sw.sweep_units);
 	LOG(V2_INFO, "RESULT SWEEP_VARS_REMAIN_N    %i / %i (%.2f %)\n", vars_remain, vars_orig, vars_remain_percent);
 	LOG(V2_INFO, "RESULT SWEEP_VARS_FIXED_N     %i / %i (%.2f %)\n", vars_fixed, vars_orig, vars_fixed_percent);
 	LOG(V2_INFO, "RESULT SWEEP_VARS_FIXED_PRCNT %.2f \n", vars_fixed_percent);
@@ -379,7 +382,7 @@ void SweepJob::reportStats(KissatPtr shweeper, int res) {
 	}
 
 
-	LOG(V2_INFO, "SWEEP JOB [%i](%i) completed readStats \n", _my_rank, shweeper->getLocalId());
+	LOG(V2_INFO, "SWEEP JOB [%i](%i) completed readStats \n", _my_rank, sweeper->getLocalId());
 }
 
 
@@ -392,12 +395,12 @@ void SweepJob::printIdleFraction() {
 	int idles = 0;
 	int active = 0;
 	std::ostringstream oss;
-	for (auto shweeper : _shweepers) {
-		if (shweeper) {
+	for (auto sweeper : _sweepers) {
+		if (sweeper) {
 			active++;
-			if (shweeper->shweeper_is_idle) {
+			if (sweeper->sweeper_is_idle) {
 				idles++;
-				oss << "(" << shweeper->getLocalId() << ") ";
+				oss << "(" << sweeper->getLocalId() << ") ";
 			}
 		}
 	}
@@ -465,9 +468,9 @@ void SweepJob::cbImportUnit(int *ilit, int localId) {
 
 
 void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) {
-	KissatPtr shweeper = _shweepers[localId]; //array access safe (we know the sweeper exists) because this callback is called by this sweeper itself
+	KissatPtr sweeper = _sweepers[localId]; //array access safe (we know the sweeper exists) because this callback is called by this sweeper itself
 	//shweeper->shweeper_is_idle = true; //made idle flag more fine grained, because it caused a race condition here for the very first solver that was marked idle while it was receiving the initial work
-	shweeper->work_received_from_steal = {};
+	sweeper->work_received_from_steal = {};
 
 	//loop until we find work or the whole sweeping is terminated
 	while (true) {
@@ -475,8 +478,8 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 
 		if (_terminate_all) {
 			//this is the signal for the solver to terminate itself, by sending it a work array of size 0
-			shweeper->work_received_from_steal = {};
-			shweeper->shweeper_is_idle = true;
+			sweeper->work_received_from_steal = {};
+			sweeper->sweeper_is_idle = true;
 			LOG(V3_VERB, "Sweeper [%i](%i) steal loop - node got terminate signal, exit loop\n", _my_rank, localId);
 			break;
 		}
@@ -485,16 +488,16 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		  */
 		if (_is_root && ! _root_provided_initial_work) {
 			_root_provided_initial_work = true;
-			shweeper->shweeper_is_idle = false; //already set non-idle here to prevent case where solver is already initialized, non-idle, but still has no work cause its just being copied, and then a sharing operation starts right now, terminating everything wrongly early
+			sweeper->sweeper_is_idle = false; //already set non-idle here to prevent case where solver is already initialized, non-idle, but still has no work cause its just being copied, and then a sharing operation starts right now, terminating everything wrongly early
 			//We need to know how much space to allocate to store each variable "idx" at the array position work[idx].
 			//i.e. we need to know max(idx).
 			//We assume that the maximum variable index corresponds to the total number of variables
 			//i.e. that there are no holes in kissats internal numbering. This is an assumption that standard Kissat makes all the time, so we also do it here
-			const unsigned VARS = shweep_get_num_vars(shweeper->solver); //this value can be different from numVars here in C++ !! Because kissat might havel aready propagated some units, etc.
-			shweeper->work_received_from_steal = std::vector<int>(VARS);
+			const unsigned VARS = shweep_get_num_vars(sweeper->solver); //this value can be different from numVars here in C++ !! Because kissat might havel aready propagated some units, etc.
+			sweeper->work_received_from_steal = std::vector<int>(VARS);
 			//the initial work is all variables
 			for (int idx = 0; idx < VARS; idx++) {
-				shweeper->work_received_from_steal[idx] = idx;
+				sweeper->work_received_from_steal[idx] = idx;
 			}
 			LOG(V2_INFO, "SWEEP WORK PROVIDED: All work --------------%u---------------->sweeper [%i](%i)\n", VARS, _my_rank, localId);
 			break;
@@ -508,14 +511,14 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		  */
 
 		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop --> local steal \n", _my_rank, localId);
-		shweeper->shweeper_is_idle = true;
+		sweeper->sweeper_is_idle = true;
 		auto stolen_work = stealWorkFromAnyLocalSolver();
 
 		//Successful local steal
 		if ( ! stolen_work.empty()) {
 			//store steal data persistently in C++, such that C can keep operating on that memory segment
-			shweeper->work_received_from_steal = std::move(stolen_work);
-			LOG(V3_VERB, "SWEEP WORK [%i] ---%i---> (%i) \n", _my_rank, shweeper->work_received_from_steal.size(), localId);
+			sweeper->work_received_from_steal = std::move(stolen_work);
+			LOG(V3_VERB, "SWEEP WORK [%i] ---%i---> (%i) \n", _my_rank, sweeper->work_received_from_steal.size(), localId);
 			break;
 		}
 		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop <-- local steal failed \n", _my_rank, localId);
@@ -573,8 +576,8 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		}
 		//Successful steal if size > 0
 		if ( ! _worksteal_requests[localId].stolen_work.empty()) {
-			shweeper->work_received_from_steal = std::move(_worksteal_requests[localId].stolen_work);
-			LOG(V3_VERB, "SWEEP WORK via MPI [%i] ---%i---> [%i](%i) \n", targetRank, shweeper->work_received_from_steal.size(), _my_rank, localId);
+			sweeper->work_received_from_steal = std::move(_worksteal_requests[localId].stolen_work);
+			LOG(V3_VERB, "SWEEP WORK via MPI [%i] ---%i---> [%i](%i) \n", targetRank, sweeper->work_received_from_steal.size(), _my_rank, localId);
 			break;
 		}
 		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop <-- global steal to [%i] failed \n", _my_rank, localId, targetRank);
@@ -583,11 +586,11 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 	//Found work (if work_size>0) or got signal for termination (work_size==0).
 	//we control the memory on C++/Mallob Level, and only tell the kissat solver where it can find the work (or where it can read the zero)
 	//the solver will also write on this array, but only within the allocated bounds provided by C++/Mallob
-	*work = reinterpret_cast<unsigned int*>(shweeper->work_received_from_steal.data());
-	*work_size = shweeper->work_received_from_steal.size();
+	*work = reinterpret_cast<unsigned int*>(sweeper->work_received_from_steal.data());
+	*work_size = sweeper->work_received_from_steal.size();
 	assert(*work_size>=0);
 	if (*work_size>0) {
-		shweeper->shweeper_is_idle = false; //we keep solver marked as "idle" once the whole solving is terminated, otherwise race-conditions can occur where suddenly the solver is treated as active again
+		sweeper->sweeper_is_idle = false; //we keep solver marked as "idle" once the whole solving is terminated, otherwise race-conditions can occur where suddenly the solver is treated as active again
 	}
 	//The thread now returns to the kissat solver
 }
@@ -650,9 +653,9 @@ void SweepJob::cbContributeToAllReduce() {
 	//Bring individual data per thread in the sharing element format: [Equivalences, Units, eq_size, unit_size, all_idle]
 	std::list<std::vector<int>> contribs;
 	int id=-1; //for debugging
-	for (auto &shweeper : _shweepers) {
+	for (auto &sweeper : _sweepers) {
 		id++;
-		if (!shweeper) {
+		if (!sweeper) {
 			LOG(V4_VVER, "SWEEP SHARE [%i](%i) not yet initialized, skipped in contribution aggregation \n", _my_rank, id);
 			continue;
 		}
@@ -660,9 +663,9 @@ void SweepJob::cbContributeToAllReduce() {
 		//Mutex, because the solvers are asynchronously pushing new eqs/units into these vectors all the time (including reallocations after push_back), make sure that doesn't happen while we copy/move
 		std::vector<int> eqs, units;
 		{
-			std::lock_guard<std::mutex> lock(shweeper->shweep_sharing_mutex);
-			eqs = std::move(shweeper->eqs_to_share);
-			units = std::move(shweeper->units_to_share);
+			std::lock_guard<std::mutex> lock(sweeper->sweep_sharing_mutex);
+			eqs = std::move(sweeper->eqs_to_share);
+			units = std::move(sweeper->units_to_share);
 		}
 
 		int eq_size = eqs.size();
@@ -670,12 +673,12 @@ void SweepJob::cbContributeToAllReduce() {
 		assert(eq_size%2==0 || log_return_false("ERROR in AGGR: Non-even number %i of equivalence literals, should always come in pairs", eq_size)); //equivalences come always in pairs
 		//we need to glue together equivalences and units. can use move on the equivalences to save a copying of them, and only need to copy the units
 		//moved logging before the actions, because this code triggered std::bad_alloc once, might give some more info next time
-		LOG(V4_VVER, "SWEEP SHARE REDUCE (%i): %i eq_size, %i units, %i idle \n", shweeper->getLocalId(), eq_size, unit_size, shweeper->shweeper_is_idle);
+		LOG(V4_VVER, "SWEEP SHARE REDUCE (%i): %i eq_size, %i units, %i idle \n", sweeper->getLocalId(), eq_size, unit_size, sweeper->sweeper_is_idle);
 		std::vector<int> contrib = std::move(eqs);
 		contrib.insert(contrib.end(), units.begin(), units.end());
 		contrib.push_back(eq_size);
 		contrib.push_back(unit_size);
-		contrib.push_back(shweeper->shweeper_is_idle);
+		contrib.push_back(sweeper->sweeper_is_idle);
 
 		contribs.push_back(contrib);
 
@@ -706,22 +709,15 @@ void SweepJob::advanceAllReduction() {
 	// LOG(V3_VERB, "[sweep] all-reduction complete\n");
 	_sharing_receive_result_timestamps.push_back(Timer::elapsedSeconds());
 
-	//technically could set unreads to zero to stop still-importing solvers at their next import
-	//unless they just imported but are now in the unread-- operation, which would put it into invalid -1
-	//though that would be a REALLY tight race
-	// for (int i=0; i < _nThreads; i++) {
-		// _unread_count_EQS_to_import[i] = 0;
-		// _unread_count_UNITS_to_import[i] = 0;
-	// }
 
 	//signal to the solvers that they should temporarily not read from the vector because we are reallocating it
 	for (int i=0; i < _nThreads; i++) {
 		_unread_count_EQS_to_import[i] = 0;
 		_unread_count_UNITS_to_import[i] = 0;
 	}
-
 	usleep(10); //give solver some short time to recognize that we set unread to zero
-	//todo: Filter out duplicates during aggregating...
+
+	//todo: Filter out duplicates during aggregating?
 
 	//Extract shared data
 	auto data = _red->extractResult();
@@ -761,27 +757,10 @@ void SweepJob::advanceAllReduction() {
 	_UNITS_to_import.assign(data.begin() + eq_size, data.end() - NUM_METADATA_FIELDS);
 
 	//signal the solvers that there is new data to read
-
 	for (int i=0; i < _nThreads; i++) {
 		_unread_count_EQS_to_import[i] = eq_size;
 		_unread_count_UNITS_to_import[i] = unit_size;
 	}
-
-
-
-
-	//For maximum memory efficiency one would have all kissat threads directly read from a single vector belonging to this SweepJob
-	// int id=-1; //for debugging
-	// for (auto shweeper : _shweepers) {
-		// id++;
-		// if (!shweeper) {
-			// LOG(V4_VVER, "[WARN] SWEEP SHARE REDUCE [%i](%i) not yet initialized, skipped importing results!\n", _my_rank, id);
-			// continue;
-		// }
-		// todo: mutex, because the queue might be just std::move'd by some importing solver right now?
-		// shweeper->eqs_from_broadcast_queued.insert(shweeper->eqs_from_broadcast_queued.end(), _eqs_from_broadcast.begin(), _eqs_from_broadcast.end());
-		// shweeper->units_from_broadcast_queued.insert(shweeper->units_from_broadcast_queued.end(), _units_from_broadcast.begin(), _units_from_broadcast.end());
-	// }
 
 	//Now we can reset the root node, because the sharing operation (broadcast + allreduce) is finished and can prepare a new one
 	if (_is_root) {
@@ -924,12 +903,12 @@ std::vector<int> SweepJob::stealWorkFromAnyLocalSolver() {
 std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	if (_terminate_all) //sweeping finished globally, nothing to steal anymore
 		return {};
-	if ( ! _shweepers[localId]) {
+	if ( ! _sweepers[localId]) {
 		// LOG(V3_VERB, "SWEEP STEAL stealing from [%i](%i), shweeper does not exist yet\n", _my_rank, localId);
 		return {};
 	}
-	KissatPtr shweeper = _shweepers[localId];
-	if ( ! shweeper->solver) {
+	KissatPtr sweeper = _sweepers[localId];
+	if ( ! sweeper->solver) {
 		// LOG(V3_VERB, "SWEEP STEAL stealing from [%i](%i), shweeper->solver does not exist yet \n", _my_rank, localId);
 		return {};
 	}
@@ -938,7 +917,7 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	//It can also be that the solver we want to steal from is not fully initialized yet
 	//For that in the C code there are further guards against unfinished initialization, all returning 0 in that case
 	// LOG(V3_VERB, "SWEEP STEAL [%i] getting max steal info from (%i) \n", _my_rank, localId);
-	int max_steal_amount = shweep_get_max_steal_amount(shweeper->solver);
+	int max_steal_amount = shweep_get_max_steal_amount(sweeper->solver);
 	if (max_steal_amount == 0)
 		return {};
 
@@ -951,7 +930,7 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	std::vector<int> stolen_work = std::vector<int>(max_steal_amount);
 
 	// LOG(V3_VERB, "[%i] stealing from (%i), expecting max %i  \n", _my_rank, localId, max_steal_amount);
-	int actually_stolen = shweep_steal_from_this_solver(shweeper->solver, reinterpret_cast<unsigned int*>(stolen_work.data()), max_steal_amount);
+	int actually_stolen = shweep_steal_from_this_solver(sweeper->solver, reinterpret_cast<unsigned int*>(stolen_work.data()), max_steal_amount);
 	// LOG(V3_VERB, "ß Steal request got %i actually stolen\n", actually_stolen);
 	// LOG(V3_VERB, "SWEEP WORK actually stolen ---%i---> from [%i](%i)\n", localId, stolen_work.size());
 	if (actually_stolen == 0)
@@ -970,24 +949,24 @@ std::vector<int> SweepJob::getRandomIdPermutation() {
 }
 
 
-void SweepJob::loadFormula(KissatPtr shweeper) {
+void SweepJob::loadFormula(KissatPtr sweeper) {
 	const int* lits = getDescription().getFormulaPayload(0);
 	const int payload_size = getDescription().getFormulaPayloadSize(0);
 	// LOG(V2_INFO, "SWEEP Loading Formula, size %i \n", payload_size);
 	for (int i = 0; i < payload_size ; i++) {
-		shweeper->addLiteral(lits[i]);
+		sweeper->addLiteral(lits[i]);
 	}
 }
 
 void SweepJob::gentlyTerminateSolvers() {
 	LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] interrupting solvers\n", getId(), _my_rank);
 	//each sweeper checks constantly for the interruption signal (on the ms scale or faster), allow for gentle own exit
-	while (_running_shweepers_count>0) {
-		LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] still %i solvers running\n", getId(), _my_rank, _running_shweepers_count.load());
+	while (_running_sweepers_count>0) {
+		LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] still %i solvers running\n", getId(), _my_rank, _running_sweepers_count.load());
 		int i=0;
-		for (auto &shweeper : _shweepers) {
-			if (shweeper) {
-				shweeper->setShweepTerminate();
+		for (auto &sweeper : _sweepers) {
+			if (sweeper) {
+				sweeper->setSweepTerminate();
 				LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] terminating solver (%i)\n", getId(), _my_rank, i);
 			}
 			i++;

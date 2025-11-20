@@ -38,7 +38,7 @@ private:
 
 	//#################################################
 	//Shweep
-	bool is_shweeper = false;
+	bool is_sweeper = false;
 	friend class SweepJob; //fwd
 	std::vector<int> eq_up_buffer;    //transfer a single equivalence from C to C++
 
@@ -50,13 +50,13 @@ private:
 
     std::vector<int> eqs_to_share;    //accumulate exported equivalences for sharing
 	std::vector<int> units_to_share;
-	std::mutex shweep_sharing_mutex; //need to lock "eqs_to_share" and "units_to_share" when extracting them for sharing, because solver thread can be concurrently pushing new data onto them
+	std::mutex sweep_sharing_mutex; //need to lock "eqs_to_share" and "units_to_share" when extracting them for sharing, because solver thread can be concurrently pushing new data onto them
 	// std::mutex shweep_unit_mutex;
 
 	std::vector<int> work_received_from_steal;
 
-	bool shweeper_is_idle = false;
-	std::shared_ptr<std::atomic<int>> shweepReportingLocalId;
+	bool sweeper_is_idle = false;
+	std::shared_ptr<std::atomic<int>> sweepReportingLocalId;
 	bool has_reported_sweep_dimacs = false;
 
 	// std::vector<char> stolen_done;
@@ -137,13 +137,13 @@ public:
     friend int terminate_callback(void* state);
 
 	//Shared Sweeping / SWEEP App
-	friend void shweep_export_eq(void *state);
-	friend void shweep_export_unit(void *state, int unit);
-	friend void shweep_import_eqs(void* state, int** equivalences, int *eqs_size);
-	friend void shweep_import_units(void *state, int **units, int *unit_count);
-	void shweepSetReportingPtr(std::shared_ptr<std::atomic<int>> field);
-	void setToShweeper();
-	void setShweepTerminate();
+	friend void sweep_export_eq(void *state);
+	friend void sweep_export_unit(void *state, int unit);
+	friend void sweep_import_eqs(void* state, int** equivalences, int *eqs_size);
+	friend void sweep_import_units(void *state, int **units, int *unit_count);
+	void sweepSetReportingPtr(std::shared_ptr<std::atomic<int>> field);
+	void setToSweeper();
+	void setSweepTerminate();
 	bool hasReportedSweepDimacs() const;
 
 	//Pass-through
@@ -155,7 +155,7 @@ private:
     void consumeClause(int** clause, int* size, int* lbd);
 
 
-	void shweepSetReportCallback();
+	void sweepSetReportCallback();
     bool isPreprocessingAcceptable(int vars, int cls);
     void addLiteralFromPreprocessing(int lit);
 	void getSweeperStats();
@@ -163,13 +163,13 @@ private:
     bool shouldTerminate();
 
 	//Shared Sweeping
-	void shweepExportEq();
-	void shweepExportUnit(int unit);
-	void shweepImportEqs(int** equivalences, int *eqs_size);
-	void shweepImportUnits(int **units, int *unit_count);
+	void sweepExportEq();
+	void sweepExportUnit(int unit);
+	void sweepImportEqs(int** equivalences, int *eqs_size);
+	void sweepImportUnits(int **units, int *unit_count);
     // void addLiteralToShweepJob(int lit);
 
-	void shweepSetImportExportCallbacks();
+	void sweepSetImportExportCallbacks();
 	// void shweepSetWorkstealingCallback(void* SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, int *work_size, int local_id));
 
 	// void startSweepAppCallback();

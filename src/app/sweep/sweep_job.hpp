@@ -22,14 +22,14 @@ private:
 	//Local Solvers
 	int _nThreads{0};
 	typedef std::shared_ptr<Kissat> KissatPtr;
-	std::vector<KissatPtr> _shweepers;
+	std::vector<KissatPtr> _sweepers;
 	std::vector<std::unique_ptr<BackgroundWorker>> _bg_workers;
 	// std::vector<std::future<void>> _fut_shweepers;
-    std::atomic_int _running_shweepers_count {0};
+    std::atomic_int _running_sweepers_count {0};
 	std::vector<int> _list_of_ids;
 
 	//Timing
-	float _start_shweep_timestamp;
+	float _start_sweep_timestamp;
 	std::vector<float> _sharing_start_ping_timestamps;
 	std::vector<float> _sharing_receive_result_timestamps;
 
@@ -108,14 +108,14 @@ public:
 
 private:
     // void advanceSweepMessage(JobMessage& msg);
-	KissatPtr createNewShweeper(int localId);
+	KissatPtr createNewSweeper(int localId);
 
-	void createAndStartNewShweeper(int localId);
-    void loadFormula(KissatPtr shweeper);
+	void createAndStartNewSweeper(int localId);
+    void loadFormula(KissatPtr sweeper);
 
-	void reportStats(KissatPtr shweeper, int res);
+	void reportStats(KissatPtr sweeper, int res);
 	// void readResult(KissatPtr shweeper, bool withStats);
-	void serializeResultFormula(KissatPtr shweeper);
+	void serializeResultFormula(KissatPtr sweeper);
 
 	void gentlyTerminateSolvers();
 
