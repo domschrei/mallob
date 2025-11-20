@@ -192,7 +192,7 @@ void SweepJob::createAndStartNewShweeper(int localId) {
 
 		if (res==20) {
 			//Found UNSAT
-			assert(kissat_is_inconsistent(shweeper->solver) || log_return_false("SWEEP ERROR: Solver returned UNSAT 20 but is not in inconsistent (==UNSAT) state!\n");
+			assert(kissat_is_inconsistent(shweeper->solver) || log_return_false("SWEEP ERROR: Solver returned UNSAT 20 but is not in inconsistent (==UNSAT) state!\n"));
 			int unset_state = -1;
 			//Check whether we are the very first solver to report anything. If we are, report and block others
 			if (_reporting_localId->compare_exchange_strong(unset_state, localId)) {
