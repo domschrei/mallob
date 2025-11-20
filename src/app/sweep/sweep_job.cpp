@@ -636,7 +636,7 @@ void SweepJob::initiateNewSharingRound() {
 
 	//make sure that only one sharing operation is going on at a time
 	if (_bcast->hasReceivedBroadcast()) {
-		LOG(V1_WARN, "[WARN] SWEEP SHARE BCAST: Would like to initiate new sharing round, but old round is not completed yet\n");
+		LOG(V3_VERB, "SWEEP SHARE BCAST: Would like to initiate new sharing round, but old round is not completed yet\n");
 		return;
 	}
 	//Broadcast a ping to all workers to initiate an AllReduce
