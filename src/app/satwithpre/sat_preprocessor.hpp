@@ -30,6 +30,7 @@ private:
     std::atomic_int _solver_result {0};
     std::atomic_int _nb_running {0};
     std::vector<int> _solution;
+    bool _interrupted {false};
 
 public:
     SatPreprocessor(const Parameters& params, JobDescription& desc, bool runLingeling) :
@@ -58,11 +59,12 @@ public:
         _fut_kissat = ProcessWideThreadPool::get().addTask([&]() {
             loadFormulaToSolver(_kissat.get());
             LOG(V2_INFO, "SATWP PREPRO running kissat\n");
-            t0 = Timer::elapsedSeconds();
+            float T0 = Timer::elapsedSeconds();
             int res = _kissat->solve(0, nullptr);
-            t1 = Timer::elapsedSeconds();
+            float T1 = Timer::elapsedSeconds();
             LOG(V2_INFO, "SATWP PREPRO kissat done, result %i\n", res);
-            LOG(V2_INFO, "SATWP SEQPREPRO_TIME %f sec\n", t1-t0);
+            if (!_interrupted)
+                LOG(V2_INFO, "SATWP SEQPREPRO_TIME %f sec\n", T1-T0); //time is irrelevant if we got interrupted, means we timed out
             if (res != RESULT_UNKNOWN) {
                 int expected = 0;
                 if (_solver_result.compare_exchange_strong(expected, res)) {
@@ -121,6 +123,7 @@ public:
 
     // Interrupt any preprocessing, no more need for a result
     void interrupt() {
+        _interrupted = true;
         _kissat->interrupt();
         if (_lingeling) _lingeling->interrupt();
     }
