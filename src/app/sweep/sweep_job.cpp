@@ -58,16 +58,19 @@ void SweepJob::appl_start() {
 	}
 
 	//Remember for each solver how many entries of the Eqs/Units he has not yet read, i.e. not yet imported
-	_unread_count_EQS_to_import = std::vector<std::atomic_int>(_nThreads);
-	_unread_count_UNITS_to_import = std::vector<std::atomic_int>(_nThreads);
+	// _unread_count_EQS_to_import = std::vector<std::atomic_int>(_nThreads);
+	// _unread_count_UNITS_to_import = std::vector<std::atomic_int>(_nThreads);
+	_solver_unread_EQS_count.resize(_nThreads);
+	_solver_unread_UNITS_count.resize(_nThreads);
+	_solver_import_round.resize(_nThreads);
 
 	_worksweeps = std::vector<int>(_nThreads, -1);
 	_resweeps_in = std::vector<int>(_nThreads, -1);
 	_resweeps_out = std::vector<int>(_nThreads, -1);
 
 	// Now assign 0 to each element
-	for (auto& atomic : _unread_count_EQS_to_import) {atomic.store(0);}
-	for (auto& atomic : _unread_count_UNITS_to_import) {atomic.store(0);}
+	// for (auto& atomic : _solver_unread_EQS_count) {atomic.store(0);}
+	// for (auto& atomic : _solver_unread_UNITS_count) {atomic.store(0);}
 
 	//To randomize workstealing on a rank level, we will shuffle the localIds to determine read order
 	for (int localId=0; localId < _nThreads; ++localId) {
@@ -469,38 +472,63 @@ void SweepJob::sendMPIWorkstealRequests() {
 }
 
 void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
-	int unread_count = _unread_count_EQS_to_import[localId];
-	if (unread_count == 0) {
-		*ilit1 = 0;
-		*ilit2 = 0;
+	if (_solver_unread_EQS_count[localId] == 0) {
+		// *ilit1 = 0;
+		// *ilit2 = 0;
 		return;
 	}
-	int size = _EQS_to_import.size();
-	assert(unread_count <= size || log_return_false("SWEEP ERROR: in cbImportEq: unread_count %i !<= %i size EQS_to_import \n", unread_count, size));
-	//We still want to read the array from front to back for prefetching efficiency, so we invert the reading index
-	//We stored unread instead of read, because via unread==0 we can quickly tell whether we are done, whereas with read we would need to compare with the array size each time
-	int idx = size - unread_count;
-	*ilit1 = _EQS_to_import[idx];
-	*ilit2 = _EQS_to_import[idx+1];
-	_unread_count_EQS_to_import[localId] -= 2; //have processed these two literals
-	assert(*ilit1 < *ilit2 || log_return_false("SWEEP ERROR: in cbImportEq: *ilit1 %i !< %i *ilit2, should be sorted\n", *ilit1, *ilit2));
-	assert(_unread_count_EQS_to_import[localId] >= 0 || log_return_false("SWEEP ERROR: in cbImportEq: negative unread count, %i \n", _unread_count_EQS_to_import[localId].load()));
+
+	{
+		std::shared_lock<std::shared_mutex> lock(_EQS_import_mutex);
+		int size = 	_EQS_to_import.size();
+		assert(_rank_import_round >= _solver_import_round[localId] || log_return_false("SWEEP ERROR: in cbImportEq: solver_import_round (%i) larger than rank_import_round (%i) \n", _rank_import_round, _solver_import_round[localId]));
+		if (_rank_import_round > _solver_import_round[localId]) {
+			_solver_import_round[localId] = _rank_import_round;
+			_solver_unread_EQS_count[localId] = size;
+			if (size==0)
+				return;
+		}
+		int unread = _solver_unread_EQS_count[localId];
+
+		assert(unread <= size || log_return_false("SWEEP ERROR: in cbImportEq: unread (%i) larger than EQS_to_import size (%i) \n", unread, size));
+		//We still want to read the array from front to back for prefetching efficiency, so we invert the reading index
+		//We stored unread instead of read, because via unread==0 we can quickly tell whether we are done, whereas with read we would need to compare with the array size each time
+		int idx = size - unread;
+		assert((idx >= 0 && idx+1 < size) || log_return_false("SWEEP ERROR: in cbImportEq: read idx (%i) out of bounds (size %i)\n", idx, size));
+		*ilit1 = _EQS_to_import[idx];
+		*ilit2 = _EQS_to_import[idx+1];
+		_solver_unread_EQS_count[localId] -= 2; //have processed these two literals
+		assert(*ilit1 < *ilit2 || log_return_false("SWEEP ERROR: in cbImportEq: *ilit1 %i !< %i *ilit2, should be sorted\n", *ilit1, *ilit2));
+		assert(_solver_unread_EQS_count[localId] >= 0 || log_return_false("SWEEP ERROR: in cbImportEq: negative unread count %i \n", _solver_unread_EQS_count[localId]));
+	}
 	//now returning to kissat solver
 }
 
 void SweepJob::cbImportUnit(int *ilit, int localId) {
-	int unread_count = _unread_count_UNITS_to_import[localId];
-	if (unread_count == 0) {
-		*ilit = INVALID_LIT;
+	// int unread_count = _solver_unread_UNITS_count[localId];
+	if ( _solver_unread_UNITS_count[localId]== 0) {
+		// *ilit = INVALID_LIT;
 		return;
 	}
-	//see comment in function above on why we reverse the reading index
-	int size = _UNITS_to_import.size();
-	assert(unread_count <= size || log_return_false("SWEEP ERROR: in cbImportUnits: unread_count %i !<= %i size UNITS_to_import \n", unread_count, size));
-	int idx = size - unread_count;
-	*ilit = _UNITS_to_import[idx];
-	_unread_count_UNITS_to_import[localId]--; //have processed that lit
-	assert(_unread_count_UNITS_to_import[localId] >= 0 || log_return_false("SWEEP ERROR: in cbImportUnit: negative unread count , %i \n", _unread_count_UNITS_to_import[localId].load()));
+
+	{
+		std::shared_lock<std::shared_mutex> lock(_UNITS_import_mutex);
+		int size = _UNITS_to_import.size();
+		assert(_rank_import_round >= _solver_import_round[localId] || log_return_false("SWEEP ERROR: in cbImportUnit: solver_import_round (%i) larger than rank_import_round (%i) \n", _rank_import_round, _solver_import_round[localId]));
+		if (_rank_import_round > _solver_import_round[localId]) {
+			_solver_import_round[localId] = _rank_import_round;
+			_solver_unread_UNITS_count[localId] = size;
+			if (size==0)
+				return;
+		}
+		int unread = _solver_unread_UNITS_count[localId];
+		assert(unread <= size || log_return_false("SWEEP ERROR: in cbImportUnit: unread (%i) larger than UNITS_to_import size (%i) \n", unread, size));
+		int idx = size - unread;
+		assert((idx >= 0 && idx+1 < size) || log_return_false("SWEEP ERROR: in cbImportUnit: read idx (%i) out of bounds (size %i)\n", idx, size));
+		*ilit = _UNITS_to_import[idx];
+		_solver_unread_UNITS_count[localId]--;
+		assert(_solver_unread_UNITS_count[localId] >= 0 || log_return_false("SWEEP ERROR: in cbImportUnit: negative unread count , %i \n", _solver_unread_UNITS_count[localId]));
+	}
 	//now returning to kissat solver
 }
 
@@ -749,11 +777,15 @@ void SweepJob::advanceAllReduction() {
 
 
 	//signal to the solvers that they should temporarily not read from the vector because we are reallocating it
-	for (int i=0; i < _nThreads; i++) {
-		_unread_count_EQS_to_import[i] = 0;
-		_unread_count_UNITS_to_import[i] = 0;
-	}
-	usleep(10); //give solver some short time to recognize that we set unread to zero
+	// for (int i=0; i < _nThreads; i++) {
+		// if (_unread_count_EQS_to_import[i] != 0)
+			// LOG(V3_VERB, "SWEEP Warn: Solver %i is still reading Eqs (%i left) while we want to update them! \n", i, _unread_count_EQS_to_import[i].load());
+		// if (_unread_count_UNITS_to_import[i] != 0)
+			// LOG(V3_VERB, "SWEEP Warn: Solver %i is still reading units (%i left) while we want to update them! \n", i, _unread_count_UNITS_to_import[i].load());
+		// _unread_count_EQS_to_import[i] = 0;
+		// _unread_count_UNITS_to_import[i] = 0;
+	// }
+	// usleep(10); //give solver some short time to recognize that we set unread to zero
 
 	//todo: Filter out duplicates during aggregating?
 
@@ -774,15 +806,21 @@ void SweepJob::advanceAllReduction() {
 	  * The last potential problem occurs if onread=0 is set AFTER the solvers have acced a valid array element but BEFORE they decrement their unread points
 	  * but that would require a race-condition within nanoseconds, which shouldnt occur in our benign usecase
 	  */
-
-	_EQS_to_import.assign(data.begin(),             data.begin() + eq_size);
-	_UNITS_to_import.assign(data.begin() + eq_size, data.end() - NUM_METADATA_FIELDS);
-
-	//signal the solvers that there is new data to read
-	for (int i=0; i < _nThreads; i++) {
-		_unread_count_EQS_to_import[i] = eq_size;
-		_unread_count_UNITS_to_import[i] = unit_size;
+	{
+		std::unique_lock<std::shared_mutex> lock(_EQS_import_mutex);
+		std::unique_lock<std::shared_mutex> lock2(_UNITS_import_mutex);
+		_EQS_to_import.assign(data.begin(),             data.begin() + eq_size);
+		_UNITS_to_import.assign(data.begin() + eq_size, data.end() - NUM_METADATA_FIELDS);
+		_rank_import_round++;
 	}
+
+		// for (int i=0; i < _nThreads; i++) {
+			// _unread_count_EQS_to_import[i] = eq_size;
+		// }
+		// for (int i=0; i < _nThreads; i++) {
+			// _unread_count_EQS_to_import[i] = eq_size;
+		// }
+	//signal the solvers that there is new data to read
 
 	//Now we can reset the root node, because the sharing operation (broadcast + allreduce) is finished and can prepare a new one
 	if (_is_root) {
