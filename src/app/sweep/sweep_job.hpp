@@ -10,6 +10,8 @@
 #include "comm/job_tree_broadcast.hpp"
 
 
+#define IMPORT_TECHNIQUE 3
+
 class SweepJob : public Job {
 private:
     JobResult _internal_result;
@@ -67,15 +69,31 @@ private:
 	//Distribute Eqs and Units that we received from sharing broadcast to local solvers
 	// std::atomic<std::shared_ptr<std::vector<int>>> _EQS_to_import { std::make_shared<std::vector<int>>() };
 	// std::atomic<std::shared_ptr<std::vector<int>>> _UNITS_to_import { std::make_shared<std::vector<int>>() };
+	static const unsigned INVALID_LIT = UINT_MAX; //Internal literals count unsigned 0,1,2,..., the largest number marks an invalid literal. see further: https://github.com/arminbiere/satch/blob/master/satch.c#L1017
+	std::atomic_int _published_import_round{0};
+	std::atomic_int _EQS_import_size{0};
+	std::atomic_int _UNITS_import_size{0};
+#if IMPORT_TECHNIQUE==1
+	// std::vector<std::atomic_int> _EQS_to_import {};
+	// std::vector<std::atomic_int> _UNITS_to_import {};
 	std::vector<int> _EQS_to_import {};
 	std::vector<int> _UNITS_to_import {};
-	static const unsigned INVALID_LIT = UINT_MAX; //Internal literals count unsigned 0,1,2,..., the largest number marks an invalid literal. see further: https://github.com/arminbiere/satch/blob/master/satch.c#L1017
+#elif IMPORT_TECHNIQUE==2
+	std::atomic<std::shared_ptr<const std::vector<int>>> _EQS_snap{std::make_shared<std::vector<int>>()};
+	std::atomic<std::shared_ptr<const std::vector<int>>> _UNITS_snap{std::make_shared<std::vector<int>>()};
+#elif IMPORT_TECHNIQUE==3
+	std::vector<int> _EQS_to_import {};
+	std::vector<int> _UNITS_to_import {};
+#else
+	std::vector<int> _EQS_to_import {};
+	std::vector<int> _UNITS_to_import {};
+#endif
 	std::shared_mutex _EQS_import_mutex;
 	std::shared_mutex _UNITS_import_mutex;
-	int _rank_import_round{0};
 	std::vector<int> _solver_import_round{}; //a round number per thread
 	std::vector<int> _solver_unread_EQS_count {}; //a count per thread
 	std::vector<int> _solver_unread_UNITS_count {};
+
 
     // std::vector<int> _eqs_from_broadcast;  //store received equivalences at rank level to copy to individual solvers
 	// std::vector<int> _units_from_broadcast;
@@ -143,6 +161,7 @@ private:
 	std::vector<int> stealWorkFromAnyLocalSolver();
     std::vector<int> stealWorkFromSpecificLocalSolver(int localId);
     void cbSearchWorkInTree(unsigned **work, int *work_size, int localId);
+	void checkForNewImportRound(KissatPtr sweeper);
 	void cbImportEq(int *ilit1, int *ilit2, int localId);
 	void cbImportUnit(int *lit, int localId);
 	// void importNextEquivalence(int *last_imported_round, int eq_nr, unsigned *lit1, unsigned *lit2);

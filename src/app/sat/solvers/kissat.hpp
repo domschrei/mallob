@@ -50,14 +50,19 @@ private:
 
     std::vector<int> eqs_to_share;    //accumulate exported equivalences for sharing
 	std::vector<int> units_to_share;
-	std::mutex sweep_sharing_mutex; //need to lock "eqs_to_share" and "units_to_share" when extracting them for sharing, because solver thread can be concurrently pushing new data onto them
-	// std::mutex shweep_unit_mutex;
-
+	std::mutex sweep_sharing_mutex; //when exporting data from the solver to Mallob, need to lock them when extracting them for global sharing, otherwise the solver threads might continue concurrently pushing new data onto them
 	std::vector<int> work_received_from_steal;
 
 	bool sweeper_is_idle = false;
 	std::shared_ptr<std::atomic<int>> sweepReportingLocalId;
 	bool has_reported_sweep_dimacs = false;
+
+	std::atomic_int sweep_import_round{0};
+	std::atomic_int sweep_EQS_index{0};
+	std::atomic_int sweep_EQS_size{0};
+	std::atomic_int sweep_UNITS_index{0};
+	std::atomic_int sweep_UNITS_size{0};
+	// int sweep_unread_EQS_count{0};
 
 	// std::vector<char> stolen_done;
 	// std::vector<int> formulaForShweeping;

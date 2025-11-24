@@ -75,7 +75,7 @@ if $SWEEP; then
     MALLOB_OPTIONS="$MALLOB_OPTIONS \
       -preprocess-sweep \
       -sweep-sharing-period=20 \
-      -sweep-solver-verbosity=0 \
+      -sweep-solver-verbosity=2 \
       -preprocess-sweep-priority=$SWEEP_PRIO"
 else
     echo "SWEEP Preprocessing SKIPPED !"

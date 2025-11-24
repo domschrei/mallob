@@ -1,4 +1,3 @@
-
 #include "sweep_job.hpp"
 
 #include "app/job.hpp"
@@ -35,7 +34,6 @@ void cb_import_unit(void *SweepJobState, int *lit, int localId) {
 
 }
 
-// void shweep_set_SweepJob_eq_import_callback(kissat *solver, void *SweepJobState, void (*import_callback) (void *SweepJobState, int localId, int *lit1, int *lit2));
 
 
 void SweepJob::appl_start() {
@@ -57,6 +55,15 @@ void SweepJob::appl_start() {
 		request.sent = true;
 	}
 
+#if IMPORT_TECHNIQUE==1
+	_EQS_to_import = std::vector<std::atomic_int>(100'000);	//fixed size <1 MB per rank, so that reallocations are no longer necessary, simplifies concurrent operations
+	_UNITS_to_import = std::vector<std::atomic_int>(100'000);
+	for (auto &atomic : _EQS_to_import) {atomic.store(0);}
+	for (auto &atomic : _UNITS_to_import) {atomic.store(0);}
+#elif IMPORT_TECHNIQUE==3
+	_EQS_to_import.resize(100'000);
+	_UNITS_to_import.resize(100'000);
+#endif
 	//Remember for each solver how many entries of the Eqs/Units he has not yet read, i.e. not yet imported
 	// _unread_count_EQS_to_import = std::vector<std::atomic_int>(_nThreads);
 	// _unread_count_UNITS_to_import = std::vector<std::atomic_int>(_nThreads);
@@ -471,12 +478,58 @@ void SweepJob::sendMPIWorkstealRequests() {
 	}
 }
 
+void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
+	int publish_round = _published_import_round.load(std::memory_order_relaxed);
+	if (publish_round != sweeper->sweep_import_round) [[unlikely]] {
+		publish_round = _published_import_round.load(std::memory_order_acquire);
+		assert(sweeper->sweep_import_round <= publish_round);
+		sweeper->sweep_import_round  = publish_round;
+		if (sweeper->sweep_EQS_index != sweeper->sweep_EQS_size)
+			LOG(V1_WARN, "SWEEP Warn: Solver [%i](%i) couldn't finish reading previous equivalence imports! now skipping remaining  %i/%i \n", _my_rank, sweeper->getLocalId(), sweeper->sweep_EQS_index.load(), sweeper->sweep_EQS_size.load());
+		if (sweeper->sweep_UNITS_index != sweeper->sweep_UNITS_size)
+			LOG(V1_WARN, "SWEEP Warn: Solver [%i](%i) couldn't finish reading previous unit imports! now skipping remaining  %i/%i \n", _my_rank, sweeper->getLocalId(), sweeper->sweep_UNITS_index.load(), sweeper->sweep_UNITS_size.load());
+		sweeper->sweep_EQS_size = _EQS_import_size.load(std::memory_order_relaxed);
+		sweeper->sweep_UNITS_size = _UNITS_import_size.load(std::memory_order_relaxed);
+		sweeper->sweep_EQS_index = 0;
+		sweeper->sweep_UNITS_index = 0;
+		LOG(V2_INFO, "Solver [%i](%i) updates to new round %i with eq_size %i, unit_size %i \n", _my_rank, sweeper->getLocalId(), publish_round, sweeper->sweep_EQS_size.load(), sweeper->sweep_UNITS_size.load());
+	}
+}
+
 void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
-	if (_solver_unread_EQS_count[localId] == 0) {
-		// *ilit1 = 0;
-		// *ilit2 = 0;
+
+	// LOG(V2_INFO, "solver [%i](%i) eq callback \n",_my_rank ,localId);
+#if IMPORT_TECHNIQUE==1 || IMPORT_TECHNIQUE==3
+	KissatPtr sweeper = _sweepers[localId];
+	checkForNewImportRound(sweeper);
+
+	// LOG(V2_INFO, "solver [%i](%i) eq callback sees index %i and size %i \n",_my_rank, localId, sweeper->sweep_curr_EQS_index.load(), sweeper->sweep_curr_EQS_size.load());
+	if (sweeper->sweep_EQS_index == sweeper->sweep_EQS_size) {
+		// *ilit1 = INVALID_LIT; leave untouched
+		// *ilit2 = INVALID_LIT;
 		return;
 	}
+
+	assert(sweeper->sweep_EQS_index < sweeper->sweep_EQS_size || log_return_false("SWEEP ERROR: in Equivalence Import: curr index %i is larger than expected size %i\n", sweeper->sweep_EQS_index.load(), sweeper->sweep_EQS_size.load()));
+	int idx = sweeper->sweep_EQS_index.load();
+	*ilit1 = _EQS_to_import[idx];
+	*ilit2 = _EQS_to_import[idx+1];
+	sweeper->sweep_EQS_index +=2;
+	assert(*ilit1 !=0 || *ilit2 !=0 || log_return_false("SWEEP ERROR: in cbImportEq: sending invalid empty *ilit1=%i, *ilit2=0 to the solvers\n", *ilit1, *ilit2));
+	assert(*ilit1 < *ilit2 || log_return_false("SWEEP ERROR: in cbImportEq: *ilit1 %i is larger than %i *ilit2, but they should be sorted\n", *ilit1, *ilit2));
+	assert(sweeper->sweep_EQS_index <= sweeper->sweep_EQS_size || log_return_false("SWEEP ERROR: in Equivalence Import: index %i is now beyond size %i \n", sweeper->sweep_EQS_index.load(), sweeper->sweep_EQS_size.load()));
+	// LOG(V2_INFO, "Sending Eq %i==%i (index %i) to solver (%i)\n", *ilit1, *ilit2, idx, localId);
+
+#elif IMPORT_TECHNIQUE==2
+	KissatPtr sweeper = _sweepers[localId];
+	if (sweeper->sweep_curr_EQS_index == sweeper->sweep_curr_EQS_size) {
+		// *ilit1 = INVALID_LIT; //leave untouched
+		// *ilit2 = INVALID_LIT;
+		return;
+	}
+
+
+#else
 
 	{
 		std::shared_lock<std::shared_mutex> lock(_EQS_import_mutex);
@@ -502,9 +555,29 @@ void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
 		assert(_solver_unread_EQS_count[localId] >= 0 || log_return_false("SWEEP ERROR: in cbImportEq: negative unread count %i \n", _solver_unread_EQS_count[localId]));
 	}
 	//now returning to kissat solver
+#endif
 }
 
 void SweepJob::cbImportUnit(int *ilit, int localId) {
+
+	// LOG(V2_INFO, "solver [%i](%i) unit callback \n",_my_rank ,localId);
+#if IMPORT_TECHNIQUE==1 || IMPORT_TECHNIQUE==3
+	KissatPtr sweeper = _sweepers[localId];
+	checkForNewImportRound(sweeper);
+	if (sweeper->sweep_UNITS_index == sweeper->sweep_UNITS_size) {
+		// *ilit = INVALID_LIT; leave untouched
+		return;
+	}
+
+	assert(sweeper->sweep_UNITS_index < sweeper->sweep_UNITS_size || log_return_false("SWEEP ERROR: in Unit Import: curr index %i is larger than expected size %i\n", sweeper->sweep_UNITS_index.load(), sweeper->sweep_UNITS_size.load()));
+	int idx = sweeper->sweep_UNITS_index.load();
+	*ilit = _UNITS_to_import[idx];
+	// LOG(V2_INFO, "Sending Unit %i (index %i) to solver (%i)\n", *ilit, idx, localId);
+	sweeper->sweep_UNITS_index++;
+	// assert(*ilit1 < *ilit2 || log_return_false("SWEEP ERROR: in cbImportEq: *ilit1 %i is larger than %i *ilit2, but they should be sorted\n", *ilit1, *ilit2));
+	assert(sweeper->sweep_UNITS_index <= sweeper->sweep_UNITS_size || log_return_false("SWEEP ERROR: in Unit Import: index %i is now beyond size %i \n", sweeper->sweep_UNITS_index.load(), sweeper->sweep_UNITS_size.load()));
+
+#else
 	// int unread_count = _solver_unread_UNITS_count[localId];
 	if ( _solver_unread_UNITS_count[localId]== 0) {
 		// *ilit = INVALID_LIT;
@@ -514,9 +587,9 @@ void SweepJob::cbImportUnit(int *ilit, int localId) {
 	{
 		std::shared_lock<std::shared_mutex> lock(_UNITS_import_mutex);
 		int size = _UNITS_to_import.size();
-		assert(_rank_import_round >= _solver_import_round[localId] || log_return_false("SWEEP ERROR: in cbImportUnit: solver_import_round (%i) larger than rank_import_round (%i) \n", _rank_import_round, _solver_import_round[localId]));
-		if (_rank_import_round > _solver_import_round[localId]) {
-			_solver_import_round[localId] = _rank_import_round;
+		assert(_import_round >= _solver_import_round[localId] || log_return_false("SWEEP ERROR: in cbImportUnit: solver_import_round (%i) larger than rank_import_round (%i) \n", _import_round, _solver_import_round[localId]));
+		if (_import_round > _solver_import_round[localId]) {
+			_solver_import_round[localId] = _import_round;
 			_solver_unread_UNITS_count[localId] = size;
 			if (size==0)
 				return;
@@ -529,6 +602,7 @@ void SweepJob::cbImportUnit(int *ilit, int localId) {
 		_solver_unread_UNITS_count[localId]--;
 		assert(_solver_unread_UNITS_count[localId] >= 0 || log_return_false("SWEEP ERROR: in cbImportUnit: negative unread count , %i \n", _solver_unread_UNITS_count[localId]));
 	}
+#endif
 	//now returning to kissat solver
 }
 
@@ -794,10 +868,34 @@ void SweepJob::advanceAllReduction() {
 	const int eq_size = data[data.size()-METADATA_EQ_SIZE_POS];
 	const int unit_size = data[data.size()-METADATA_UNIT_SIZE_POS];
 	const int all_idle = data[data.size()-METADATA_IDLE_FLAG_POS];
-	if (_is_root)
-		LOG(V2_INFO, "SWEEP SHARE REDUCE RECEIVED: %i EQS, %i UNITS\n", eq_size/2, unit_size);
-	else
-		LOG(V3_VERB, "SWEEP SHARE REDUCE RECEIVED: %i EQS, %i UNITS\n", eq_size/2, unit_size);
+	assert(eq_size%2==0 || log_return_false("ERROR: Import Equality size not even, but %i\n", eq_size));
+
+	// _EQS_import_size = 0;
+	// _UNITS_import_size = 0;
+	// _published_import_round++; //goes to odd value, is an "empty" round such that  we are writing
+
+#if IMPORT_TECHNIQUE==1 || IMPORT_TECHNIQUE==3
+	for (int i=0; i<eq_size; i++) {
+		_EQS_to_import[i] = data[i];
+	}
+
+	for (int i=eq_size; i<data.size()-NUM_METADATA_FIELDS; i++) {
+		_UNITS_to_import[i-eq_size] = data[i];
+	}
+	// _EQS_import_size = eq_size;
+	// _UNITS_import_size = unit_size;
+#elif IMPORT_TECHNIQUE==2
+
+	std::vector<int> EQS{}, UNITS{};
+	EQS.assign(data.begin(),             data.begin() + eq_size);
+	UNITS.assign(data.begin() + eq_size, data.end() - NUM_METADATA_FIELDS);
+	auto EQS_snap   = std::make_shared<const std::vector<int>>(std::move(EQS));
+	auto UNITS_snap = std::make_shared<const std::vector<int>>(std::move(UNITS));
+	//publish
+	std::atomic_store(&_EQS_snap, EQS_snap);
+	std::atomic_store(&_UNITS_snap, UNITS_snap);
+
+#else
 
 	 /*
 	  * We want to prevent concurrent read/write on EQS_to_import vector
@@ -811,8 +909,21 @@ void SweepJob::advanceAllReduction() {
 		std::unique_lock<std::shared_mutex> lock2(_UNITS_import_mutex);
 		_EQS_to_import.assign(data.begin(),             data.begin() + eq_size);
 		_UNITS_to_import.assign(data.begin() + eq_size, data.end() - NUM_METADATA_FIELDS);
-		_rank_import_round++;
 	}
+
+#endif
+
+	// _EQS_import_size = eq_size;
+	// _UNITS_import_size = unit_size;
+	// _published_import_round++;
+	_EQS_import_size.store(eq_size, std::memory_order_relaxed);
+	_UNITS_import_size.store(unit_size, std::memory_order_relaxed);
+	_published_import_round.store(_published_import_round+1, std::memory_order_release);
+
+	if (_is_root)
+		LOG(V2_INFO, "SWEEP SHARE REDUCE RECEIVED import round %i: %i EQS, %i UNITS\n", _published_import_round.load(), eq_size/2, unit_size);
+	else
+		LOG(V3_VERB, "SWEEP SHARE REDUCE RECEIVED: %i EQS, %i UNITS\n", eq_size/2, unit_size);
 
 		// for (int i=0; i < _nThreads; i++) {
 			// _unread_count_EQS_to_import[i] = eq_size;
