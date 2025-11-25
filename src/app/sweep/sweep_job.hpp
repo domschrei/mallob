@@ -10,7 +10,7 @@
 #include "comm/job_tree_broadcast.hpp"
 
 
-#define IMPORT_TECHNIQUE 3
+// #define IMPORT_TECHNIQUE 3
 
 class SweepJob : public Job {
 private:
@@ -70,29 +70,30 @@ private:
 	// std::atomic<std::shared_ptr<std::vector<int>>> _EQS_to_import { std::make_shared<std::vector<int>>() };
 	// std::atomic<std::shared_ptr<std::vector<int>>> _UNITS_to_import { std::make_shared<std::vector<int>>() };
 	static const unsigned INVALID_LIT = UINT_MAX; //Internal literals count unsigned 0,1,2,..., the largest number marks an invalid literal. see further: https://github.com/arminbiere/satch/blob/master/satch.c#L1017
+	static const int MAX_IMPORT_SIZE = 100'000;
 	std::atomic_int _published_import_round{0};
 	std::atomic_int _EQS_import_size{0};
 	std::atomic_int _UNITS_import_size{0};
-#if IMPORT_TECHNIQUE==1
+	std::vector<int> _EQS_to_import {};
+	std::vector<int> _UNITS_to_import {};
+// #if IMPORT_TECHNIQUE==1
 	// std::vector<std::atomic_int> _EQS_to_import {};
 	// std::vector<std::atomic_int> _UNITS_to_import {};
-	std::vector<int> _EQS_to_import {};
-	std::vector<int> _UNITS_to_import {};
-#elif IMPORT_TECHNIQUE==2
-	std::atomic<std::shared_ptr<const std::vector<int>>> _EQS_snap{std::make_shared<std::vector<int>>()};
-	std::atomic<std::shared_ptr<const std::vector<int>>> _UNITS_snap{std::make_shared<std::vector<int>>()};
-#elif IMPORT_TECHNIQUE==3
-	std::vector<int> _EQS_to_import {};
-	std::vector<int> _UNITS_to_import {};
-#else
-	std::vector<int> _EQS_to_import {};
-	std::vector<int> _UNITS_to_import {};
-#endif
-	std::shared_mutex _EQS_import_mutex;
-	std::shared_mutex _UNITS_import_mutex;
-	std::vector<int> _solver_import_round{}; //a round number per thread
-	std::vector<int> _solver_unread_EQS_count {}; //a count per thread
-	std::vector<int> _solver_unread_UNITS_count {};
+	// std::vector<int> _EQS_to_import {};
+	// std::vector<int> _UNITS_to_import {};
+// #elif IMPORT_TECHNIQUE==2
+	// std::atomic<std::shared_ptr<const std::vector<int>>> _EQS_snap{std::make_shared<std::vector<int>>()};
+	// std::atomic<std::shared_ptr<const std::vector<int>>> _UNITS_snap{std::make_shared<std::vector<int>>()};
+// #elif IMPORT_TECHNIQUE==3
+// #else
+	// std::vector<int> _EQS_to_import {};
+	// std::vector<int> _UNITS_to_import {};
+// #endif
+	// std::shared_mutex _EQS_import_mutex;
+	// std::shared_mutex _UNITS_import_mutex;
+	// std::vector<int> _solver_import_round{}; //a round number per thread
+	// std::vector<int> _solver_unread_EQS_count {}; //a count per thread
+	// std::vector<int> _solver_unread_UNITS_count {};
 
 
     // std::vector<int> _eqs_from_broadcast;  //store received equivalences at rank level to copy to individual solvers
@@ -107,7 +108,7 @@ private:
 	//Keep track which solver reports the final formula, we only use one
 	std::shared_ptr<std::atomic<int>> _reporting_localId = std::make_shared<std::atomic<int>>(-1);
 
-	std::vector<int> _worksweeps{};
+	std::vector<int> _worksweeps{}; //to collect statistics
 	std::vector<int> _resweeps_in{};
 	std::vector<int> _resweeps_out{};
 
