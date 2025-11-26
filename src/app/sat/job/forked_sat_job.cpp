@@ -186,7 +186,7 @@ int ForkedSatJob::appl_solved() {
         _done_locally = true;
 
         if (ClauseMetadata::enabled() && result == RESULT_UNSAT
-                && _params.proofOutputFile.isSet() && _params.distributedProofAssembly()) {
+                && _params.proofOutputFile.isSet() && !_params.palRup() && _params.distributedProofAssembly()) {
             // Unsatisfiability: handle separately.
             int finalEpoch = _clause_comm->getCurrentEpoch();
             int winningInstance = _internal_result.winningInstanceId;

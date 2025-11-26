@@ -94,6 +94,14 @@ Cadical::Cadical(const SolverSetup& setup)
 					LOGGER(_logger, V2_INFO, "CONCLUSION ID %lu\n", unsatConclusionId);
 				}
 			);
+		} else if (_setup.usePalRupFormat) {
+			// Production of parallel (PalRUP) files: Initialize tracer that outputs to a file.
+			// Clause export for sharing is separate, set up in setLearnedClauseCallback.
+			okay = solver->set("lratpalrup", 1); // enable PalRUP proof output
+			okay = solver->set("binary", 1); assert(okay); // set proof logging mode to binary format
+			okay = solver->set("lratdeletelines", 1); assert(okay); // do enable printing deletion lines
+			proofFileString = _setup.proofDir + "/proof." + std::to_string(_setup.globalId) + ".palrup";
+			okay = solver->trace_proof(proofFileString.c_str()); assert(okay);
 		} else {
 			// Monolithic proof production: LRAT tracer that outputs to a file.
 			// Clause export for sharing is separate, set up in setLearnedClauseCallback.

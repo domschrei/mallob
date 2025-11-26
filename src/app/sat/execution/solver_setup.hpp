@@ -99,6 +99,7 @@ struct SolverSetup {
 	bool certifiedUnsat {false};
 	// This solver's proof information is checked on-the-fly.
 	bool onTheFlyChecking {false};
+	bool usePalRupFormat {false};
 	// If on-the-fly checking is enabled: this solver also seeks to have a found satisfying assignment checked.
 	bool onTheFlyCheckModel {false};
 	bool trustedParserForced {false};
