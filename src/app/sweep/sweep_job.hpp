@@ -143,7 +143,8 @@ private:
 	void createAndStartNewSweeper(int localId);
     void loadFormula(KissatPtr sweeper);
 
-	void reportStats(KissatPtr sweeper, int res);
+	void reportResultFromSolver(KissatPtr sweeper, int res);
+	void printSweepStats(KissatPtr sweeper, int res);
 	// void readResult(KissatPtr shweeper, bool withStats);
 	void serializeResultFormula(KissatPtr sweeper);
 

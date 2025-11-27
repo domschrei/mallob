@@ -58,27 +58,10 @@ void SweepJob::appl_start() {
 	//pre-allocate a fixed array from where solver can concurrently import the received equalities and units
 	_EQS_to_import.resize(MAX_IMPORT_SIZE);
 	_UNITS_to_import.resize(MAX_IMPORT_SIZE);
-// #if IMPORT_TECHNIQUE==1
-	// _EQS_to_import = std::vector<std::atomic_int>(100'000);	//fixed size <1 MB per rank, so that reallocations are no longer necessary, simplifies concurrent operations
-	// _UNITS_to_import = std::vector<std::atomic_int>(100'000);
-	// for (auto &atomic : _EQS_to_import) {atomic.store(0);}
-	// for (auto &atomic : _UNITS_to_import) {atomic.store(0);}
-// #elif IMPORT_TECHNIQUE==3
-// #endif
-	//Remember for each solver how many entries of the Eqs/Units he has not yet read, i.e. not yet imported
-	// _unread_count_EQS_to_import = std::vector<std::atomic_int>(_nThreads);
-	// _unread_count_UNITS_to_import = std::vector<std::atomic_int>(_nThreads);
-	// _solver_unread_EQS_count.resize(_nThreads);
-	// _solver_unread_UNITS_count.resize(_nThreads);
-	// _solver_import_round.resize(_nThreads);
 
 	_worksweeps = std::vector<int>(_nThreads, -1);
 	_resweeps_in = std::vector<int>(_nThreads, -1);
 	_resweeps_out = std::vector<int>(_nThreads, -1);
-
-	// Now assign 0 to each element
-	// for (auto& atomic : _solver_unread_EQS_count) {atomic.store(0);}
-	// for (auto& atomic : _solver_unread_UNITS_count) {atomic.store(0);}
 
 	//To randomize workstealing on a rank level, we will shuffle the localIds to determine read order
 	for (int localId=0; localId < _nThreads; ++localId) {
@@ -165,16 +148,10 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		_worksteal_requests[localId].got_steal_response = true;
 		LOG(V3_VERB, "SWEEP MSG to [%i](%i) received steal answer --%i-- from [%i]\n", _my_rank, localId, _worksteal_requests[localId].stolen_work.size(), sourceRank );
 	}
-	else if (mpiTag == MSG_NOTIFY_JOB_ABORTING)  {
-		LOG(V1_WARN, "SWEEP MSG Warn [%i]: received NOTIFY_JOB_ABORTING \n", _my_rank);
-	} else if (mpiTag == MSG_NOTIFY_JOB_TERMINATING) {
-		LOG(V1_WARN, "SWEEP MSG Warn [%i]: received NOTIFY_JOB_TERMINATING \n", _my_rank);
-	} else if (mpiTag == MSG_INTERRUPT) {
-		LOG(V1_WARN, "SWEEP MSG Warn [%i]: received MSG_INTERRUPT \n", _my_rank);
-	} else {
-		LOG(V1_WARN, "SWEEP MSG Warn [%i]: received unexpected mpiTag %i with msg.tag %i \n", _my_rank, mpiTag, msg.tag);
-		// assert(log_return_false("ERROR SWEEP MSG, unexpected mpiTag\n"));
-	}
+	else if (mpiTag == MSG_NOTIFY_JOB_ABORTING)    {LOG(V1_WARN, "SWEEP MSG Warn [%i]: received NOTIFY_JOB_ABORTING \n", _my_rank);}
+	else if (mpiTag == MSG_NOTIFY_JOB_TERMINATING) {LOG(V1_WARN, "SWEEP MSG Warn [%i]: received NOTIFY_JOB_TERMINATING \n", _my_rank);}
+	else if (mpiTag == MSG_INTERRUPT)			   {LOG(V1_WARN, "SWEEP MSG Warn [%i]: received MSG_INTERRUPT \n", _my_rank);}
+	else {LOG(V1_WARN, "SWEEP MSG Warn [%i]: received unexpected mpiTag %i with msg.tag %i \n", _my_rank, mpiTag, msg.tag);}
 }
 
 void SweepJob::appl_terminate() {
@@ -184,6 +161,13 @@ void SweepJob::appl_terminate() {
 	gentlyTerminateSolvers();
 }
 
+void SweepJob::reportResultFromSolver(KissatPtr sweeper, int res) {
+	assert(_solved_status==-1);
+	serializeResultFormula(sweeper); //there is no result formula, but we need to to serialization anyways since it adds some metadata to the json job result
+	printSweepStats(sweeper, res);
+	_internal_result.result = res;
+	_solved_status = res;
+}
 
 void SweepJob::createAndStartNewSweeper(int localId) {
 	LOG(V3_VERB, "SWEEP JOB [%i](%i) queuing background worker thread\n", _my_rank, localId);
@@ -221,25 +205,15 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			int unset_state = -1;
 			//Check whether we are the very first solver to report anything. If we are, report and block others
 			if (_reporting_localId->compare_exchange_strong(unset_state, localId)) {
-				assert(_solved_status==-1);
-				serializeResultFormula(sweeper); //there is no result formula, but serialization adds some required metadata to the job result
-				reportStats(sweeper, UNSAT);
-				_internal_result.result = UNSAT;
-				_solved_status = UNSAT;
-				//no formula is read, since we are directly UNSAT
+				reportResultFromSolver(sweeper, UNSAT);
 			}
 		} else if (res==0) {
 			//might have made some progress
 			if (sweeper->hasReportedSweepDimacs()) {
-				//made some progress, and this is the specific solver that reported the final formula
-				assert(_solved_status==-1);
-				serializeResultFormula(sweeper);
-				reportStats(sweeper, IMPROVED);
-				_internal_result.result = IMPROVED;
-				_solved_status = IMPROVED;
+				reportResultFromSolver(sweeper, IMPROVED);
 			}
 		} else {
-			assert(log_return_false("SWEEP ERROR: solver has unexpected return signal %i \n", res));
+			assert(log_return_false("SWEEP ERROR: solver has returned with unexpected signal %i \n", res));
 		}
 
 		_running_sweepers_count--;
@@ -357,19 +331,10 @@ void SweepJob::serializeResultFormula(KissatPtr sweeper) {
 	_internal_result.setSolutionToSerialize(formula.data(), formula.size()); //we always need to serialize, even an empty formula, because serialization adds some required metadata in front
 }
 
-void SweepJob::reportStats(KissatPtr sweeper, int res) {
-	// sweeper->fetchSweepStats();
-	// auto stats = sweeper->getSolverStats();
-	auto stats = sweeper->getSweepStats();
-	//As "vars" we are only interested in variables that we still active (not fixed) at the start of Sweep. The "VAR" counter is much larger, but most of these variables are often already fixed.
-	// int units_orig = stats.total_units - stats.new_units;
-	// int vars_orig = stats.vars_active_orig + stats.units_orig;
+void SweepJob::printSweepStats(KissatPtr sweeper, int res) {
+	auto stats = sweeper->fetchSweepStats();
+	//As "vars" we are only interested in variables that are active (not fixed) at the start of Sweep. The "VAR" counter is much larger, but most of these variables are often already fixed.
 	int vars_fixed_end = stats.sweep_eqs + stats.units_new;
-	//actual_done is a slightly conservative count, because we only include the units found by the sweeping algorithm itself,
-
-	// assert(units_orig == stats.units_orig);
-	// assert(vars_orig == sweeper->_setup.numVars);
-	//and dont include some stray units found while propagating the sweep decisions (that would be stats.shweep_new_units)
 	int vars_remain_end = stats.vars_active_orig - vars_fixed_end;
 	int clauses_removed = sweeper->_setup.numOriginalClauses - stats.clauses_end;
 
@@ -458,9 +423,9 @@ void SweepJob::printResweeps() {
 		resweeps_in += _resweeps_in[i];
 		resweeps_out += _resweeps_out[i];
 	}
-	LOG(V2_INFO, "RESULT %i SWEEP WORKSWEEPS,RESWEEPS: %s \n", _my_rank, oss.str().c_str());
-	LOG(V2_INFO, "RESULT %i SWEEP_WORKSWEEPS %i \n", _my_rank, worksweeps);
-	LOG(V2_INFO, "RESULT %i SWEEP_RESWEEPS_IN %i \n", _my_rank, resweeps_in);
+	LOG(V2_INFO, "RESULT %i SWEEP WORKSWEEPS,RESWEEPS: %s \n", _my_rank, oss.str().c_str()); //information for each individual thread
+	LOG(V2_INFO, "RESULT %i SWEEP_WORKSWEEPS   %i \n", _my_rank, worksweeps);
+	LOG(V2_INFO, "RESULT %i SWEEP_RESWEEPS_IN  %i \n", _my_rank, resweeps_in);
 	LOG(V2_INFO, "RESULT %i SWEEP_RESWEEPS_OUT %i \n", _my_rank, resweeps_out);
 }
 
@@ -507,8 +472,6 @@ void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
 
 void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
 
-	// LOG(V2_INFO, "solver [%i](%i) eq callback \n",_my_rank ,localId);
-// #if IMPORT_TECHNIQUE==1 || IMPORT_TECHNIQUE==3
 	KissatPtr sweeper = _sweepers[localId];
 	checkForNewImportRound(sweeper);
 
@@ -527,57 +490,17 @@ void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
 	assert(*ilit1 !=0 || *ilit2 !=0								|| log_return_false("SWEEP ERROR: in cbImportEq: sending invalid empty *ilit1=%i, *ilit2=0 to the solvers\n", *ilit1, *ilit2));
 	assert(*ilit1 < *ilit2										|| log_return_false("SWEEP ERROR: in cbImportEq: *ilit1 %i is larger than %i *ilit2, but they should be sorted\n", *ilit1, *ilit2));
 	assert(sweeper->sweep_EQS_index <= sweeper->sweep_EQS_size	|| log_return_false("SWEEP ERROR: in Equivalence Import: index %i is now beyond size %i \n", sweeper->sweep_EQS_index.load(), sweeper->sweep_EQS_size.load()));
-	// LOG(V2_INFO, "Sending Eq %i==%i (index %i) to solver (%i)\n", *ilit1, *ilit2, idx, localId);
-
-// #elif IMPORT_TECHNIQUE==2
-	// KissatPtr sweeper = _sweepers[localId];
-	// if (sweeper->sweep_curr_EQS_index == sweeper->sweep_curr_EQS_size) {
-		// *ilit1 = INVALID_LIT; //leave untouched
-		// *ilit2 = INVALID_LIT;
-		// return;
-	// }
-
-
-// #else
-
-	// {
-		// std::shared_lock<std::shared_mutex> lock(_EQS_import_mutex);
-		// int size = 	_EQS_to_import.size();
-		// assert(_rank_import_round >= _solver_import_round[localId] || log_return_false("SWEEP ERROR: in cbImportEq: solver_import_round (%i) larger than rank_import_round (%i) \n", _rank_import_round, _solver_import_round[localId]));
-		// if (_rank_import_round > _solver_import_round[localId]) {
-			// _solver_import_round[localId] = _rank_import_round;
-			// _solver_unread_EQS_count[localId] = size;
-			// if (size==0)
-				// return;
-		// }
-		// int unread = _solver_unread_EQS_count[localId];
-
-		// assert(unread <= size || log_return_false("SWEEP ERROR: in cbImportEq: unread (%i) larger than EQS_to_import size (%i) \n", unread, size));
-		// We still want to read the array from front to back for prefetching efficiency, so we invert the reading index
-		// We stored unread instead of read, because via unread==0 we can quickly tell whether we are done, whereas with read we would need to compare with the array size each time
-		// int idx = size - unread;
-		// assert((idx >= 0 && idx+1 < size) || log_return_false("SWEEP ERROR: in cbImportEq: read idx (%i) out of bounds (size %i)\n", idx, size));
-		// *ilit1 = _EQS_to_import[idx];
-		// *ilit2 = _EQS_to_import[idx+1];
-		// _solver_unread_EQS_count[localId] -= 2; //have processed these two literals
-		// assert(*ilit1 < *ilit2 || log_return_false("SWEEP ERROR: in cbImportEq: *ilit1 %i !< %i *ilit2, should be sorted\n", *ilit1, *ilit2));
-		// assert(_solver_unread_EQS_count[localId] >= 0 || log_return_false("SWEEP ERROR: in cbImportEq: negative unread count %i \n", _solver_unread_EQS_count[localId]));
-	// }
 	//now returning to kissat solver
-// #endif
 }
 
 void SweepJob::cbImportUnit(int *ilit, int localId) {
 
-	// LOG(V2_INFO, "solver [%i](%i) unit callback \n",_my_rank ,localId);
-// #if IMPORT_TECHNIQUE==1 || IMPORT_TECHNIQUE==3
 	KissatPtr sweeper = _sweepers[localId];
 	checkForNewImportRound(sweeper);
 	if (sweeper->sweep_UNITS_index == sweeper->sweep_UNITS_size) {
 		// *ilit = INVALID_LIT; leave untouched
 		return;
 	}
-
 	assert(sweeper->sweep_UNITS_index < sweeper->sweep_UNITS_size || log_return_false("SWEEP ERROR: in Unit Import: curr index %i is larger than expected size %i\n", sweeper->sweep_UNITS_index.load(), sweeper->sweep_UNITS_size.load()));
 	int idx = sweeper->sweep_UNITS_index.load();
 	*ilit = _UNITS_to_import[idx];
@@ -586,32 +509,6 @@ void SweepJob::cbImportUnit(int *ilit, int localId) {
 	// assert(*ilit1 < *ilit2 || log_return_false("SWEEP ERROR: in cbImportEq: *ilit1 %i is larger than %i *ilit2, but they should be sorted\n", *ilit1, *ilit2));
 	assert(sweeper->sweep_UNITS_index <= sweeper->sweep_UNITS_size || log_return_false("SWEEP ERROR: in Unit Import: index %i is now beyond size %i \n", sweeper->sweep_UNITS_index.load(), sweeper->sweep_UNITS_size.load()));
 
-// #else
-	// int unread_count = _solver_unread_UNITS_count[localId];
-	// if ( _solver_unread_UNITS_count[localId]== 0) {
-		// *ilit = INVALID_LIT;
-		// return;
-	// }
-
-	// {
-		// std::shared_lock<std::shared_mutex> lock(_UNITS_import_mutex);
-		// int size = _UNITS_to_import.size();
-		// assert(_import_round >= _solver_import_round[localId] || log_return_false("SWEEP ERROR: in cbImportUnit: solver_import_round (%i) larger than rank_import_round (%i) \n", _import_round, _solver_import_round[localId]));
-		// if (_import_round > _solver_import_round[localId]) {
-			// _solver_import_round[localId] = _import_round;
-			// _solver_unread_UNITS_count[localId] = size;
-			// if (size==0)
-				// return;
-		// }
-		// int unread = _solver_unread_UNITS_count[localId];
-		// assert(unread <= size || log_return_false("SWEEP ERROR: in cbImportUnit: unread (%i) larger than UNITS_to_import size (%i) \n", unread, size));
-		// int idx = size - unread;
-		// assert((idx >= 0 && idx+1 < size) || log_return_false("SWEEP ERROR: in cbImportUnit: read idx (%i) out of bounds (size %i)\n", idx, size));
-		// *ilit = _UNITS_to_import[idx];
-		// _solver_unread_UNITS_count[localId]--;
-		// assert(_solver_unread_UNITS_count[localId] >= 0 || log_return_false("SWEEP ERROR: in cbImportUnit: negative unread count , %i \n", _solver_unread_UNITS_count[localId]));
-	// }
-// #endif
 	//now returning to kissat solver
 }
 
@@ -640,8 +537,8 @@ void SweepJob::provideInitialWork(KissatPtr sweeper) {
 
 void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) {
 	KissatPtr sweeper = _sweepers[localId]; //array access safe (we know the sweeper exists) because this callback is called by this sweeper itself
-	//shweeper->shweeper_is_idle = true; //made idle flag more fine grained, because it caused a race condition here for the very first solver that was marked idle while it was receiving the initial work
 	sweeper->work_received_from_steal = {};
+	//setting this sweeper to idle is done more fine grained in the following lines, because it caused a race condition here for the very first solver that was marked idle while it was receiving the initial work
 
 	//loop until we find work or the whole sweeping is terminated
 	while (true) {
@@ -867,18 +764,6 @@ void SweepJob::advanceAllReduction() {
 	// LOG(V3_VERB, "[sweep] all-reduction complete\n");
 	_sharing_receive_result_timestamps.push_back(Timer::elapsedSeconds());
 
-
-	//signal to the solvers that they should temporarily not read from the vector because we are reallocating it
-	// for (int i=0; i < _nThreads; i++) {
-		// if (_unread_count_EQS_to_import[i] != 0)
-			// LOG(V3_VERB, "SWEEP Warn: Solver %i is still reading Eqs (%i left) while we want to update them! \n", i, _unread_count_EQS_to_import[i].load());
-		// if (_unread_count_UNITS_to_import[i] != 0)
-			// LOG(V3_VERB, "SWEEP Warn: Solver %i is still reading units (%i left) while we want to update them! \n", i, _unread_count_UNITS_to_import[i].load());
-		// _unread_count_EQS_to_import[i] = 0;
-		// _unread_count_UNITS_to_import[i] = 0;
-	// }
-	// usleep(10); //give solver some short time to recognize that we set unread to zero
-
 	//todo: Filter out duplicates during aggregating?
 
 	//Extract shared data
@@ -888,11 +773,6 @@ void SweepJob::advanceAllReduction() {
 	const int all_idle = data[data.size()-METADATA_IDLE_FLAG_POS];
 	assert(eq_size%2==0 || log_return_false("ERROR: Import Equality size not even, but %i\n", eq_size));
 
-	// _EQS_import_size = 0;
-	// _UNITS_import_size = 0;
-	// _published_import_round++; //goes to odd value, is an "empty" round such that  we are writing
-
-// #if IMPORT_TECHNIQUE==1 || IMPORT_TECHNIQUE==3
 	for (int i=0; i<eq_size; i++) {
 		_EQS_to_import[i] = data[i];
 	}
@@ -900,40 +780,7 @@ void SweepJob::advanceAllReduction() {
 	for (int i=eq_size; i<data.size()-NUM_METADATA_FIELDS; i++) {
 		_UNITS_to_import[i-eq_size] = data[i];
 	}
-	// _EQS_import_size = eq_size;
-	// _UNITS_import_size = unit_size;
-// #elif IMPORT_TECHNIQUE==2
 
-	// std::vector<int> EQS{}, UNITS{};
-	// EQS.assign(data.begin(),             data.begin() + eq_size);
-	// UNITS.assign(data.begin() + eq_size, data.end() - NUM_METADATA_FIELDS);
-	// auto EQS_snap   = std::make_shared<const std::vector<int>>(std::move(EQS));
-	// auto UNITS_snap = std::make_shared<const std::vector<int>>(std::move(UNITS));
-	//publish
-	// std::atomic_store(&_EQS_snap, EQS_snap);
-	// std::atomic_store(&_UNITS_snap, UNITS_snap);
-
-// #else
-
-	 /*
-	  * We want to prevent concurrent read/write on EQS_to_import vector
-	  * Right now the solution is that we have the atomic "unread" flag, as a kind of signal
-	  * Together with the 10us sleep above, this should be more than enough time for the solvers to see it
-	  * The last potential problem occurs if onread=0 is set AFTER the solvers have acced a valid array element but BEFORE they decrement their unread points
-	  * but that would require a race-condition within nanoseconds, which shouldnt occur in our benign usecase
-	  */
-	// {
-		// std::unique_lock<std::shared_mutex> lock(_EQS_import_mutex);
-		// std::unique_lock<std::shared_mutex> lock2(_UNITS_import_mutex);
-		// _EQS_to_import.assign(data.begin(),             data.begin() + eq_size);
-		// _UNITS_to_import.assign(data.begin() + eq_size, data.end() - NUM_METADATA_FIELDS);
-	// }
-
-// #endif
-
-	// _EQS_import_size = eq_size;
-	// _UNITS_import_size = unit_size;
-	// _published_import_round++;
 	_EQS_import_size.store(eq_size, std::memory_order_relaxed);
 	_UNITS_import_size.store(unit_size, std::memory_order_relaxed);
 	_published_import_round.store(_published_import_round+1, std::memory_order_release);
@@ -942,14 +789,6 @@ void SweepJob::advanceAllReduction() {
 		LOG(V2_INFO, "SWEEP SHARE REDUCE RECEIVED import round %i: %i EQS, %i UNITS\n", _published_import_round.load(), eq_size/2, unit_size);
 	else
 		LOG(V3_VERB, "SWEEP SHARE REDUCE RECEIVED: %i EQS, %i UNITS\n", eq_size/2, unit_size);
-
-		// for (int i=0; i < _nThreads; i++) {
-			// _unread_count_EQS_to_import[i] = eq_size;
-		// }
-		// for (int i=0; i < _nThreads; i++) {
-			// _unread_count_EQS_to_import[i] = eq_size;
-		// }
-	//signal the solvers that there is new data to read
 
 	//Now we can reset the root node, because the sharing operation (broadcast + allreduce) is finished and can prepare a new one
 	if (_is_root) {
@@ -1041,7 +880,6 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
     	int eq_size = contrib[contrib.size()-METADATA_EQ_SIZE_POS];  //need to know where the eq ends, i.e. where the units start
     	int unit_size = contrib[contrib.size()-METADATA_UNIT_SIZE_POS];
 		aggr_unit_size += unit_size;
-		// LOG(V3_VERB, "SWEEP AGGR Element: %i unit_size \n", unit_size);
         aggregated.insert(aggregated.end(), contrib.begin()+eq_size, contrib.end()-NUM_METADATA_FIELDS); //not copying the metadata at the end
     	oss_u << "| " << i << ":" << unit_size << " "	;
     	i++;
@@ -1054,11 +892,10 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
     for (const auto &contrib : contribs) {
 		bool idle = contrib[contrib.size()-METADATA_IDLE_FLAG_POS];
     	all_idle &= idle;
-		// LOG(V3_VERB, "SWEEP AGGR Element: idle == %i \n", idle);
     }
 
 	if (contribs.empty()) {
-		all_idle = false; //edge-case: not a single solver is initialized yet, we are waiting for them to come online, they are not idle
+		all_idle = false; //edge-case: if not a single solver is initialized yet, we are waiting for them to come online, so they are not idle
 	}
 
 	//these are the three fields we account for with SHARING_METADATA_FIELDS
