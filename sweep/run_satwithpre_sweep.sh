@@ -59,7 +59,7 @@ echo "PREPROCESS_SEQUENTIAL_SWEEPCOMPLETE: $PREPROCESS_SEQUENTIAL_SWEEPCOMPLETE"
 
 MALLOB_OPTIONS="-t=$THREADS \
   -mono-app=SATWITHPRE \
-  -v=3 \
+  -v=2 \
   -satsolver=[k_]w \
   -colors \
   -jcup=0.05 \
@@ -78,7 +78,7 @@ if $SWEEP; then
       -sweep-solver-verbosity=0 \
       -preprocess-sweep-priority=$SWEEP_PRIO \
       -sweep-resweep-chance=1000 \
-      -sweep-iterations=3"
+      -sweep-iterations=5"
 else
     echo "SWEEP Preprocessing SKIPPED !"
 fi
