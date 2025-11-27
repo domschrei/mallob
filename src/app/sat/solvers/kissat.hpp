@@ -64,7 +64,7 @@ private:
 	std::atomic_int sweep_UNITS_size{0};
 	// int sweep_unread_EQS_count{0};
 
-	struct shweep_statistics shweep_stats;
+	struct shweep_statistics sweep_stats;
 	// std::vector<char> stolen_done;
 	// std::vector<int> formulaForShweeping;
 	//##################################################

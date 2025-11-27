@@ -31,6 +31,7 @@ private:
 	// std::vector<std::future<void>> _fut_shweepers;
     std::atomic_int _running_sweepers_count {0};
 	std::vector<int> _list_of_ids;
+	bool _started_solving{false};
 
 	//Timing
 	float _start_sweep_timestamp;
@@ -144,7 +145,7 @@ private:
     void loadFormula(KissatPtr sweeper);
 
 	void reportResultFromSolver(KissatPtr sweeper, int res);
-	void printSweepStats(KissatPtr sweeper, int res);
+	void printSweepStats(KissatPtr sweeper, bool full, int res);
 	// void readResult(KissatPtr shweeper, bool withStats);
 	void serializeResultFormula(KissatPtr sweeper);
 

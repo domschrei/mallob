@@ -35,7 +35,6 @@ void cb_import_unit(void *SweepJobState, int *lit, int localId) {
 }
 
 
-
 void SweepJob::appl_start() {
 	_my_rank = getJobTree().getRank();
 	_my_index = getJobTree().getIndex();
@@ -164,7 +163,7 @@ void SweepJob::appl_terminate() {
 void SweepJob::reportResultFromSolver(KissatPtr sweeper, int res) {
 	assert(_solved_status==-1);
 	serializeResultFormula(sweeper); //there is no result formula, but we need to to serialization anyways since it adds some metadata to the json job result
-	printSweepStats(sweeper, res);
+	printSweepStats(sweeper, true, res);
 	_internal_result.result = res;
 	_solved_status = res;
 }
@@ -180,13 +179,22 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			LOG(V3_VERB, "SWEEP [%i](%i) terminated before creation\n", _my_rank, localId);
 			return;
 		}
-		_running_sweepers_count++;
 
 		auto sweeper = createNewSweeper(localId);
 
 		loadFormula(sweeper);
-		LOG(V3_VERB, "SWEEP JOB [%i](%i) solve() START \n", _my_rank, localId);
 		_sweepers[localId] = sweeper; //signal to the remaining system that this solver now exists
+		_running_sweepers_count++;
+
+	#if STARTUP_TYPE==2
+		while (_running_sweepers_count < _nThreads) {
+			LOG(V3_VERB, "SWEEP JOB [%i](%i) waiting for other solvers to come online (%i/%i)\n", _my_rank, localId, _running_sweepers_count.load(), _nThreads);
+			usleep(500);
+		}
+	#endif
+		_started_solving = true; //multiple threads will write non-thread-safe to this bool, but all only monotonically to "true"
+
+		LOG(V3_VERB, "SWEEP JOB [%i](%i) solve() START \n", _my_rank, localId);
 		int res = sweeper->solve(0, nullptr);
 		LOG(V3_VERB, "SWEEP JOB [%i](%i) solve() FINISH. Result %i \n", _my_rank, localId, res);
 
@@ -199,22 +207,26 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		_resweeps_in[localId] = stats.resweeps_in;
 		_resweeps_out[localId] = stats.resweeps_out;
 
-		if (res==20) {
-			//Found UNSAT
-			assert(kissat_is_inconsistent(sweeper->solver) || log_return_false("SWEEP ERROR: Solver returned UNSAT 20 but is not in inconsistent (==UNSAT) state!\n"));
-			int unset_state = -1;
-			//Check whether we are the very first solver to report anything. If we are, report and block others
-			if (_reporting_localId->compare_exchange_strong(unset_state, localId)) {
-				reportResultFromSolver(sweeper, UNSAT);
+
+		if (_is_root) { //we only report results from solvers on the root node, to prevent additional communication/agreement across ranks
+			if (res==20) {
+				//Found UNSAT
+				assert(kissat_is_inconsistent(sweeper->solver) || log_return_false("SWEEP ERROR: Solver returned UNSAT 20 but is not in inconsistent (==UNSAT) state!\n"));
+				int unset_state = -1;
+				//Check whether we are the very first solver to report anything. If we are, report and block others
+				if (_reporting_localId->compare_exchange_strong(unset_state, localId)) {
+					reportResultFromSolver(sweeper, UNSAT);
+				}
+			} else if (res==0) {
+				//might have made some progress
+				if (sweeper->hasReportedSweepDimacs()) {
+					reportResultFromSolver(sweeper, IMPROVED);
+				}
 			}
-		} else if (res==0) {
-			//might have made some progress
-			if (sweeper->hasReportedSweepDimacs()) {
-				reportResultFromSolver(sweeper, IMPROVED);
-			}
-		} else {
-			assert(log_return_false("SWEEP ERROR: solver has returned with unexpected signal %i \n", res));
 		}
+
+		assert(res==UNKNOWN || res==UNSAT || log_return_false("SWEEP ERROR: solver has returned with unexpected signal %i \n", res));
+		//If no solver sets UNSAT or IMPROVED, the job will be returned by default as UNKNOWN
 
 		_running_sweepers_count--;
 		_sweepers[localId]->cleanUp(); //write kissat timing profile
@@ -264,14 +276,6 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	if (init_dur_ms > WARN_init_dur) {
 		LOG(V1_WARN, "SWEEP Warn STARTUP [%i](%i): kissat init took unusually long, %f ms !\n", _my_rank, localId, init_dur_ms);
 	}
-
-	//Dangerous to immediately return here! because kissat is already initialized, can't just forget it, need to properly release it
-	//releasing could potentially be done directly here with kissat_release(...) ....
-	//for now leaving it to finish initialising and receiving termination through the normal procedure
-	// if (_terminate_all) {
-		// LOG(V2_INFO, "SWEEP [%i](%i) terminated during creation \n", _my_rank, localId);
-		// return shweeper;
-	// }
 
 	sweeper->setToSweeper();
 
@@ -331,7 +335,7 @@ void SweepJob::serializeResultFormula(KissatPtr sweeper) {
 	_internal_result.setSolutionToSerialize(formula.data(), formula.size()); //we always need to serialize, even an empty formula, because serialization adds some required metadata in front
 }
 
-void SweepJob::printSweepStats(KissatPtr sweeper, int res) {
+void SweepJob::printSweepStats(KissatPtr sweeper, bool full, int res=0) {
 	auto stats = sweeper->fetchSweepStats();
 	//As "vars" we are only interested in variables that are active (not fixed) at the start of Sweep. The "VAR" counter is much larger, but most of these variables are often already fixed.
 	int vars_fixed_end = stats.sweep_eqs + stats.units_new;
@@ -342,48 +346,56 @@ void SweepJob::printSweepStats(KissatPtr sweeper, int res) {
 	double vars_remain_percent = 100*vars_remain_end/(double)stats.vars_active_orig;
 	double clauses_removed_percent = 100*clauses_removed/(double)sweeper->_setup.numOriginalClauses;
 
-	LOG(V2_INFO, "RESULT SWEEP_CODE			  %i res code\n", res);
-	LOG(V2_INFO, "RESULT SWEEP_TIME           %f seconds \n", Timer::elapsedSeconds() - _start_sweep_timestamp);
-	LOG(V2_INFO, "RESULT SWEEP_PRIORITY       %f\n", _params.preprocessSweepPriority.val);
-	LOG(V2_INFO, "RESULT SWEEP_PROCESSES      %i\n", getVolume());
-	LOG(V2_INFO, "RESULT SWEEP_THREADS_PER_P  %i\n", _nThreads);
-	LOG(V2_INFO, "RESULT SWEEP_SHARING_PERIOD %i ms \n", _params.sweepSharingPeriod_ms.val);
-	LOG(V2_INFO, "RESULT SWEEP_VARS_ORIG      %i\n", sweeper->_setup.numVars);
-	LOG(V2_INFO, "RESULT SWEEP_VARS_END       %i\n", stats.vars_end);
-	LOG(V2_INFO, "RESULT SWEEP_ACTIVE_ORIG    %i\n", stats.vars_active_orig);
-	LOG(V2_INFO, "RESULT SWEEP_ACTIVE_END     %i\n", vars_remain_end);
-	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_ORIG   %i\n", sweeper->_setup.numOriginalClauses);
-	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_END    %i\n", stats.clauses_end);
-	LOG(V2_INFO, "RESULT SWEEP_UNITS_ORIG     %i\n", stats.units_orig);
-	LOG(V2_INFO, "RESULT SWEEP_UNITS_NEW      %i\n", stats.units_new);
-	LOG(V2_INFO, "RESULT SWEEP_UNITS_END      %i\n", stats.units_end);
-	LOG(V2_INFO, "RESULT SWEEP_ELIMINATED     %i\n", stats.eliminated);
-	LOG(V2_INFO, "RESULT SWEEP_EQUIVALENCES   %i\n", stats.sweep_eqs);
-	LOG(V2_INFO, "RESULT SWEEP_UNITS_SWEEP    %i\n", stats.sweep_units);
-	LOG(V2_INFO, "RESULT SWEEP_VARS_FIXED_N     %i / %i (%.2f %)\n", vars_fixed_end, stats.vars_active_orig, vars_fixed_percent);
-	LOG(V2_INFO, "RESULT SWEEP_VARS_REMAIN_N    %i / %i (%.2f %)\n", vars_remain_end, stats.vars_active_orig, vars_remain_percent);
-	LOG(V2_INFO, "RESULT SWEEP_VARS_FIXED_PRCNT %.2f \n", vars_fixed_percent);
-	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_REMOVED_N %i \n", clauses_removed);
-	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_REMOVED_PRCNT %.2f \n", clauses_removed_percent);
-	LOG(V2_INFO, "RESULT SWEEP_IMPORT_EQS_USEFUL   %i / %i \n", stats.eqs_useful, stats.eqs_seen); //representative for the reporting solver
-	LOG(V2_INFO, "RESULT SWEEP_IMPORT_UNITS_USEFUL %i / %i \n", stats.units_useful, stats.units_seen);
+	LOG(V2_INFO, "RESULT Reported by [%i](%i) \n", _my_rank, sweeper->getLocalId());
+	LOG(V2_INFO, "RESULT SWEEP ITERATION			%i / %i \n", _curr_sweep_iteration, _params.sweepIterations());
+	if (full)
+		LOG(V2_INFO, "RESULT SWEEP_RESULT_CODE			%i == %s \n", res, res==40 ? "IMPROVED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
+	LOG(V2_INFO, "RESULT SWEEP_TIME					%f seconds \n", Timer::elapsedSeconds() - _start_sweep_timestamp);
+	LOG(V2_INFO, "RESULT SWEEP_IMPORT_EQS_USEFUL	%i / %i \n", stats.eqs_useful, stats.eqs_seen); //representative for the reporting solver
+	LOG(V2_INFO, "RESULT SWEEP_IMPORT_UNITS_USEFUL	%i / %i \n", stats.units_useful, stats.units_seen);
+	LOG(V2_INFO, "RESULT SWEEP_EQUIVALENCES			%i\n", stats.sweep_eqs);
+	LOG(V2_INFO, "RESULT SWEEP_UNITS_NEW			%i\n", stats.units_new);
+	LOG(V2_INFO, "RESULT SWEEP_VARS_FIXED_N			%i / %i (%.2f %)\n", vars_fixed_end, stats.vars_active_orig, vars_fixed_percent);
 
-	for (int i=0; i < _sharing_start_ping_timestamps.size() && i < _sharing_receive_result_timestamps.size(); i++) {
-		float start = _sharing_start_ping_timestamps[i];
-		float end   = _sharing_receive_result_timestamps[i];
-		LOG(V2_INFO, "RESULT SWEEP_SHARING_LATENCY  %f ms   (ping->result  %f --> %f) \n", (end-start)*1000, start, end);
-	}
-	for (int i=0; ! _sharing_start_ping_timestamps.empty() && i < _sharing_start_ping_timestamps.size() -1; i++) {
-		LOG(V2_INFO, "RESULT SWEEP_SHARING_PERIOD_REAL  %f ms \n", (_sharing_start_ping_timestamps[i+1] - _sharing_start_ping_timestamps[i])*1000);
+	if (full) {
+		LOG(V2_INFO, "RESULT SWEEP_PRIORITY       %f\n", _params.preprocessSweepPriority.val);
+		LOG(V2_INFO, "RESULT SWEEP_PROCESSES      %i\n", getVolume());
+		LOG(V2_INFO, "RESULT SWEEP_THREADS_PER_P  %i\n", _nThreads);
+		LOG(V2_INFO, "RESULT SWEEP_SHARING_PERIOD %i ms \n", _params.sweepSharingPeriod_ms.val);
+		LOG(V2_INFO, "RESULT SWEEP_VARS_ORIG      %i\n", sweeper->_setup.numVars);
+		LOG(V2_INFO, "RESULT SWEEP_VARS_END       %i\n", stats.vars_end);
+		LOG(V2_INFO, "RESULT SWEEP_ACTIVE_ORIG    %i\n", stats.vars_active_orig);
+		LOG(V2_INFO, "RESULT SWEEP_ACTIVE_END     %i\n", vars_remain_end);
+		LOG(V2_INFO, "RESULT SWEEP_CLAUSES_ORIG   %i\n", sweeper->_setup.numOriginalClauses);
+		LOG(V2_INFO, "RESULT SWEEP_CLAUSES_END    %i\n", stats.clauses_end);
+		LOG(V2_INFO, "RESULT SWEEP_UNITS_ORIG     %i\n", stats.units_orig);
+		LOG(V2_INFO, "RESULT SWEEP_UNITS_END      %i\n", stats.units_end);
+		LOG(V2_INFO, "RESULT SWEEP_ELIMINATED     %i\n", stats.eliminated);
+		LOG(V2_INFO, "RESULT SWEEP_UNITS_SWEEP    %i\n", stats.sweep_units);
+		LOG(V2_INFO, "RESULT SWEEP_CLAUSES_REMOVED_N %i \n", clauses_removed);
+		LOG(V2_INFO, "RESULT SWEEP_CLAUSES_REMOVED_PRCNT %.2f \n", clauses_removed_percent);
+		LOG(V2_INFO, "RESULT SWEEP_VARS_REMAIN_N    %i / %i (%.2f %)\n", vars_remain_end, stats.vars_active_orig, vars_remain_percent);
+		LOG(V2_INFO, "RESULT SWEEP_VARS_FIXED_PRCNT		%.2f \n", vars_fixed_percent);
 	}
 
-	LOG(V3_VERB, "RESULT SWEEP [%i](%i) Serialized final formula to SolutionSize=%i\n", _my_rank, _reporting_localId->load(), _internal_result.getSolutionSize());
-	for (int i=0; i<15 && i<_internal_result.getSolutionSize(); i++) {
-		LOG(V3_VERB, "RESULT Sweep Formula peek %i: %i \n", i, _internal_result.getSolution(i));
+	if (full) {
+		for (int i=0; i < _sharing_start_ping_timestamps.size() && i < _sharing_receive_result_timestamps.size(); i++) {
+			float start = _sharing_start_ping_timestamps[i];
+			float end   = _sharing_receive_result_timestamps[i];
+			LOG(V2_INFO, "RESULT SWEEP_SHARING_LATENCY  %f ms   (ping->result  %f --> %f) \n", (end-start)*1000, start, end);
+		}
+		for (int i=0; ! _sharing_start_ping_timestamps.empty() && i < _sharing_start_ping_timestamps.size() -1; i++) {
+			LOG(V2_INFO, "RESULT SWEEP_SHARING_PERIOD_REAL  %f ms \n", (_sharing_start_ping_timestamps[i+1] - _sharing_start_ping_timestamps[i])*1000);
+		}
+
+		LOG(V3_VERB, "RESULT SWEEP [%i](%i) Serialized final formula to SolutionSize=%i\n", _my_rank, _reporting_localId->load(), _internal_result.getSolutionSize());
+		for (int i=0; i<15 && i<_internal_result.getSolutionSize(); i++) {
+			LOG(V3_VERB, "RESULT Sweep Formula peek %i: %i \n", i, _internal_result.getSolution(i));
+		}
 	}
 
 
-	LOG(V2_INFO, "SWEEP JOB [%i](%i) completed readStats \n", _my_rank, sweeper->getLocalId());
+	// LOG(V2_INFO, "SWEEP JOB [%i](%i) completed readStats \n", _my_rank, sweeper->getLocalId());
 }
 
 
@@ -405,7 +417,8 @@ void SweepJob::printIdleFraction() {
 			}
 		}
 	}
-	LOG(V3_VERB, "SWEEP IDLE  %i/%i : %s \n", idles, active, oss.str().c_str());
+	if (active>0)
+		LOG(V3_VERB, "SWEEP IDLE  %i/%i : %s \n", idles, active, oss.str().c_str());
 }
 
 void SweepJob::printResweeps() {
@@ -515,7 +528,9 @@ void SweepJob::cbImportUnit(int *ilit, int localId) {
 void SweepJob::provideInitialWork(KissatPtr sweeper) {
 	assert(!_root_provided_initial_work);
 	assert(sweeper->work_received_from_steal.empty());
+	assert(_is_root);
 	// assert(sweeper->sweeper_is_idle);
+
 
 	_root_provided_initial_work = true;
 	sweeper->sweeper_is_idle = false; //already set non-idle here to prevent case where solver is already initialized, non-idle, but still has no work cause its just being copied, and then a sharing operation starts right now, terminating everything wrongly early
@@ -657,9 +672,18 @@ void SweepJob::initiateNewSharingRound() {
 		return;
 	}
 
-	if (Timer::elapsedSeconds() < _last_sharing_start_timestamp + _params.sweepSharingPeriod_ms.val/1000.0) //convert to seconds
-		return;
 
+	if (Timer::elapsedSeconds() < _last_sharing_start_timestamp + _params.sweepSharingPeriod_ms.val/1000.0) {
+		//not yet time for next sharing round
+		return;
+	}
+
+#if STARTUP_TYPE == 2
+	if (!_started_solving) {
+		LOG(V3_VERB, "SWEEP SHARE BCAST: Delaying first sharing operation, not all solvers online yet (%i/%i) \n", _running_sweepers_count.load(), _nThreads);
+		return;
+	}
+#endif
 
 	//make sure that only one sharing operation is going on at a time
 	if (_bcast->hasReceivedBroadcast()) {
@@ -757,6 +781,7 @@ void SweepJob::cbContributeToAllReduce() {
 
 void SweepJob::advanceAllReduction() {
 	if (!_red) return;
+	if (!_started_solving) return;
 	LOG(V3_VERB, "SWEEP SHARE REDUCE ADVANCE [%i]\n", _my_rank);
 	_red->advance();
 	if (!_red->hasResult()) return;
@@ -804,6 +829,12 @@ void SweepJob::advanceAllReduction() {
 	if (all_idle) {
 		LOG(V1_WARN, "[%i] SWEEP ITERATION %i/%i FINISHED \n", _my_rank, _curr_sweep_iteration, _params.sweepIterations());
 		if (_curr_sweep_iteration < _params.sweepIterations()) {
+			if (_is_root) {
+				printSweepStats(_sweepers[0], false); //we use the sweeper with local_id 0 as the representative to report statistics
+			}
+			//todo: the sweep iteration should not be incremented by each rank individually, but broadcasted by the root
+			//otherwise, new ranks might be out-of-sync, since they might not have seen the earlier iterations
+			//and would carry on and miss the termination
 			_curr_sweep_iteration++;
 			LOG(V1_WARN, "[%i] SWEEP ITERATION %i/%i STARTED \n", _my_rank, _curr_sweep_iteration, _params.sweepIterations());
 			_root_provided_initial_work = false; //will trigger another iteration by providing new full work to the solvers

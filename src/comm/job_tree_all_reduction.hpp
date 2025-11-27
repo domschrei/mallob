@@ -76,7 +76,7 @@ public:
             return receive(h.source, h.tag, msg);
         }),
         _sub_broadcast(MSG_JOB_TREE_MODULAR_BROADCAST, [this](MessageHandle& h) {
-            LOG(V2_INFO, "BROADCAST\n");
+            LOG(V3_VERB, "BROADCAST\n");
             JobMessage msg = Serializable::get<JobMessage>(h.getRecvData());
             return receive(h.source, h.tag, msg);
         }),
@@ -151,7 +151,7 @@ private:
         assert(tag == MSG_JOB_TREE_MODULAR_REDUCE || tag == MSG_JOB_TREE_MODULAR_BROADCAST || tag == MSG_JOB_TREE_PARENT_IS_READY || log_return_false("SWEEP Warn: Unexpected tag %i (msg.tag %i) in JobTreeAllReduction receive(...) from source %i\n", tag, msg.tag, source));
 
         if (!_care_about_parent_status)
-            LOG(V2_INFO, "TRY REDUCE %i %i %i %i %i\n", tag, msg.epoch, _base_msg.epoch, msg.tag, _base_msg.tag);
+            LOG(V3_VERB, "TRY REDUCE %i %i %i %i %i\n", tag, msg.epoch, _base_msg.epoch, msg.tag, _base_msg.tag);
 
         bool accept = msg.epoch == _base_msg.epoch
                     //&& msg.revision == _base_msg.revision
@@ -164,7 +164,7 @@ private:
         }
 
         if (tag == MSG_JOB_TREE_MODULAR_REDUCE) {
-            LOG(V2_INFO, "REDUCE\n");
+            LOG(V3_VERB, "REDUCE\n");
 
             if (_aggregating || _future_aggregate.valid() || _reduction_locally_done)
                 return false; // already internally aggregating elements (or already done)!
@@ -184,7 +184,7 @@ private:
             advance();
         }
         if (tag == MSG_JOB_TREE_MODULAR_BROADCAST && _broadcast_enabled) {
-            LOG(V2_INFO, "BROADCAST\n");
+            LOG(V3_VERB, "BROADCAST\n");
             receiveAndForwardFinalElem(std::move(msg.payload));
         }
         if (tag == MSG_JOB_TREE_PARENT_IS_READY) {

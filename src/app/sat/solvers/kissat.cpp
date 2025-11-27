@@ -6,6 +6,7 @@
 #include <cmath>
 #include <functional>
 #include <random>
+#include <utility>
 
 #include "app/sat/data/clause_metadata.hpp"
 #include "util/logger.hpp"
@@ -572,36 +573,26 @@ void Kissat::configureBoundedVariableAddition() {
     kissat_set_option(solver, "factorexport", 1);
 }
 
-    //For Sweeping only: Only a single solver needs to report the formula. We choose the first solver on the root node that arrives here
-    //Only solvers on the root node are provided this callback, so if we are here we are guaranteed to be on root
 shweep_statistics Kissat::fetchSweepStats() {
-    shweep_stats = shweep_get_statistics(solver);
-    return shweep_stats;
-    // auto &stats = getSolverStatsRef();
-    // stats.sw.vars_orig = _setup.numVars;
-    // stats.sw.clauses_orig = _setup.numOriginalClauses;
-    // shweep_get_sweep_stats(solver, &stats.sw.eqs, &stats.sw.sweep_units, &stats.sw.new_units, &stats.sw.total_units, &stats.sw.eliminated, &stats.sw.active_orig, &stats.sw.active_end, &stats.sw.worksweeps, &stats.sw.resweeps_in, &stats.sw.resweeps_out);
+    sweep_stats = shweep_get_statistics(solver);
+    return sweep_stats;
 }
 
-shweep_statistics Kissat::getSweepStats() {
-   return shweep_stats;
-}
+// shweep_statistics Kissat::getSweepStats() {
+   // return shweep_stats;
+// }
 
 //Callback Called from both sequential preprocessing as well as the shared sweeping.
 bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
     bool accept = nbVars != _setup.numVars || nbClauses != _setup.numOriginalClauses;
 
     if (is_sweeper) {
-        //we arrive here for every sweeper, this ensures that we also fetch the statistics of every sweeper into Mallob
-        // fetchSweeperStats();
-        // auto &stats = getSolverStatsRef();
-        // stats.sw.vars_orig = _setup.numVars;
-        // stats.sw.clauses_orig = _setup.numOriginalClauses;
-        // stats.sw.vars_end = nbVars;
-        // stats.sw.clauses_end = nbClauses;
-
+#if SWEEP_STARTTYPE==2
+        bool weAreFirst = (getLocalId()== 0); //by arriving here we already know that the sweeper is on the root node
+#else
         int unset_state = -1;
         bool weAreFirst = sweepReportingLocalId->compare_exchange_strong(unset_state, getLocalId());
+#endif
         if (weAreFirst) {
             LOG(V2_INFO, "SWEEP [root](%i) first to report dimacs result\n", getLocalId());
             if (accept) {

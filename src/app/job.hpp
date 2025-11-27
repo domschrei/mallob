@@ -31,6 +31,8 @@
 #include "util/robin_hood.hpp"
 #include "util/sys/timer.hpp"
 
+#define SWEEP_STARTTYPE 2
+
 struct IntPairHasher;
 
 typedef std::function<void(JobRequest& req, int tag, bool left, int dest)> EmitDirectedJobRequestCallback;
