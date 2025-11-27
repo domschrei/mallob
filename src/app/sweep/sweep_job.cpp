@@ -207,11 +207,13 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		LOG(V3_VERB, "SWEEP JOB [%i](%i) solve() FINISH. Result %i \n", _my_rank, localId, res);
 
 		//transfer some solver-specific statistics
-		sweeper->fetchSweeperStats();
-		auto stats = sweeper->getSolverStatsRef();
-		_worksweeps[localId] = stats.sw.worksweeps;
-		_resweeps_in[localId] = stats.sw.resweeps_in;
-		_resweeps_out[localId] = stats.sw.resweeps_out;
+		auto stats = sweeper->fetchSweepStats();
+		// auto stats = sweeper->getSweepStats();
+		// auto stats = sweeper->getSolverStatsRef();
+		// auto stats = sweeper->
+		_worksweeps[localId] = stats.worksweeps;
+		_resweeps_in[localId] = stats.resweeps_in;
+		_resweeps_out[localId] = stats.resweeps_out;
 
 		if (res==20) {
 			//Found UNSAT
@@ -314,7 +316,7 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	}
 
     //Basic configuration
-    sweeper->set_option("quiet", 0);  //suppress any standard kissat messages
+    sweeper->set_option("quiet", 1);  //suppress any standard kissat messages
     sweeper->set_option("verbose", 0);//the native kissat verbosity
     sweeper->set_option("log", 0);    //potentially extensive logging
     sweeper->set_option("check", 0);  // do not check model or derived clauses, because we import anyways units and equivalences without proof tracking
@@ -356,20 +358,24 @@ void SweepJob::serializeResultFormula(KissatPtr sweeper) {
 }
 
 void SweepJob::reportStats(KissatPtr sweeper, int res) {
-	sweeper->fetchSweeperStats();
-	auto stats = sweeper->getSolverStats();
+	// sweeper->fetchSweepStats();
+	// auto stats = sweeper->getSolverStats();
+	auto stats = sweeper->getSweepStats();
 	//As "vars" we are only interested in variables that we still active (not fixed) at the start of Sweep. The "VAR" counter is much larger, but most of these variables are often already fixed.
-	int units_orig = stats.sw.total_units - stats.sw.new_units;
-	int vars_orig = stats.sw.active_orig + units_orig;
-	int vars_fixed = stats.sw.eqs + stats.sw.sweep_units;
+	// int units_orig = stats.total_units - stats.new_units;
+	// int vars_orig = stats.vars_active_orig + stats.units_orig;
+	int vars_fixed_end = stats.sweep_eqs + stats.units_new;
 	//actual_done is a slightly conservative count, because we only include the units found by the sweeping algorithm itself,
-	//and dont include some stray units found while propagating the sweep decisions (that would be stats.shweep_new_units)
-	int vars_remain = vars_orig - vars_fixed;
-	int clauses_removed = stats.sw.clauses_orig - stats.sw.clauses_end;
 
-	double vars_fixed_percent = 100*vars_fixed/(double)vars_orig;
-	double vars_remain_percent = 100*vars_remain/(double)vars_orig;
-	double clauses_removed_percent = 100*clauses_removed/(double)stats.sw.clauses_orig;
+	// assert(units_orig == stats.units_orig);
+	// assert(vars_orig == sweeper->_setup.numVars);
+	//and dont include some stray units found while propagating the sweep decisions (that would be stats.shweep_new_units)
+	int vars_remain_end = stats.vars_active_orig - vars_fixed_end;
+	int clauses_removed = sweeper->_setup.numOriginalClauses - stats.clauses_end;
+
+	double vars_fixed_percent = 100*vars_fixed_end/(double)stats.vars_active_orig;
+	double vars_remain_percent = 100*vars_remain_end/(double)stats.vars_active_orig;
+	double clauses_removed_percent = 100*clauses_removed/(double)sweeper->_setup.numOriginalClauses;
 
 	LOG(V2_INFO, "RESULT SWEEP_CODE			  %i res code\n", res);
 	LOG(V2_INFO, "RESULT SWEEP_TIME           %f seconds \n", Timer::elapsedSeconds() - _start_sweep_timestamp);
@@ -377,20 +383,20 @@ void SweepJob::reportStats(KissatPtr sweeper, int res) {
 	LOG(V2_INFO, "RESULT SWEEP_PROCESSES      %i\n", getVolume());
 	LOG(V2_INFO, "RESULT SWEEP_THREADS_PER_P  %i\n", _nThreads);
 	LOG(V2_INFO, "RESULT SWEEP_SHARING_PERIOD %i ms \n", _params.sweepSharingPeriod_ms.val);
-	LOG(V2_INFO, "RESULT SWEEP_VARS_ORIG      %i\n", stats.sw.vars_orig);
-	LOG(V2_INFO, "RESULT SWEEP_VARS_END       %i\n", stats.sw.vars_end);
-	LOG(V2_INFO, "RESULT SWEEP_ACTIVE_ORIG    %i\n", stats.sw.active_orig);
-	LOG(V2_INFO, "RESULT SWEEP_ACTIVE_END     %i\n", stats.sw.active_end);
-	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_ORIG   %i\n", stats.sw.clauses_orig);
-	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_END    %i\n", stats.sw.clauses_end);
-	LOG(V2_INFO, "RESULT SWEEP_UNITS_ORIG     %i\n", units_orig);
-	LOG(V2_INFO, "RESULT SWEEP_UNITS_NEW      %i\n", stats.sw.new_units);
-	LOG(V2_INFO, "RESULT SWEEP_UNITS_TOTAL    %i\n", stats.sw.total_units);
-	LOG(V2_INFO, "RESULT SWEEP_ELIMINATED     %i\n", stats.sw.eliminated);
-	LOG(V2_INFO, "RESULT SWEEP_EQUIVALENCES   %i\n", stats.sw.eqs);
-	LOG(V2_INFO, "RESULT SWEEP_UNITS_SWEEP    %i\n", stats.sw.sweep_units);
-	LOG(V2_INFO, "RESULT SWEEP_VARS_FIXED_N     %i / %i (%.2f %)\n", vars_fixed, vars_orig, vars_fixed_percent);
-	LOG(V2_INFO, "RESULT SWEEP_VARS_REMAIN_N    %i / %i (%.2f %)\n", vars_remain, vars_orig, vars_remain_percent);
+	LOG(V2_INFO, "RESULT SWEEP_VARS_ORIG      %i\n", sweeper->_setup.numVars);
+	LOG(V2_INFO, "RESULT SWEEP_VARS_END       %i\n", stats.vars_end);
+	LOG(V2_INFO, "RESULT SWEEP_ACTIVE_ORIG    %i\n", stats.vars_active_orig);
+	LOG(V2_INFO, "RESULT SWEEP_ACTIVE_END     %i\n", vars_remain_end);
+	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_ORIG   %i\n", sweeper->_setup.numOriginalClauses);
+	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_END    %i\n", stats.clauses_end);
+	LOG(V2_INFO, "RESULT SWEEP_UNITS_ORIG     %i\n", stats.units_orig);
+	LOG(V2_INFO, "RESULT SWEEP_UNITS_NEW      %i\n", stats.units_new);
+	LOG(V2_INFO, "RESULT SWEEP_UNITS_END      %i\n", stats.units_end);
+	LOG(V2_INFO, "RESULT SWEEP_ELIMINATED     %i\n", stats.eliminated);
+	LOG(V2_INFO, "RESULT SWEEP_EQUIVALENCES   %i\n", stats.sweep_eqs);
+	LOG(V2_INFO, "RESULT SWEEP_UNITS_SWEEP    %i\n", stats.sweep_units);
+	LOG(V2_INFO, "RESULT SWEEP_VARS_FIXED_N     %i / %i (%.2f %)\n", vars_fixed_end, stats.vars_active_orig, vars_fixed_percent);
+	LOG(V2_INFO, "RESULT SWEEP_VARS_REMAIN_N    %i / %i (%.2f %)\n", vars_remain_end, stats.vars_active_orig, vars_remain_percent);
 	LOG(V2_INFO, "RESULT SWEEP_VARS_FIXED_PRCNT %.2f \n", vars_fixed_percent);
 	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_REMOVED_N %i \n", clauses_removed);
 	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_REMOVED_PRCNT %.2f \n", clauses_removed_percent);

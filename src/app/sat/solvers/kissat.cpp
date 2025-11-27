@@ -166,8 +166,8 @@ void Kissat::diversify(int seed) {
         // if (_setup.shared_sweeping) {
             // kissat_set_option(solver, "mallob_shared_sweeping", 1);
 
-        //For debugging: The prpeprocessing solver should also log some things
-        kissat_set_option(solver, "quiet", 0);
+        //For debugging: The prpeprocessing solver should also log some things (quiet=0)
+        kissat_set_option(solver, "quiet", 1);
         kissat_set_option(solver, "verbose", 0);
         kissat_set_option(solver, "log", 0);
 
@@ -574,11 +574,17 @@ void Kissat::configureBoundedVariableAddition() {
 
     //For Sweeping only: Only a single solver needs to report the formula. We choose the first solver on the root node that arrives here
     //Only solvers on the root node are provided this callback, so if we are here we are guaranteed to be on root
-void Kissat::fetchSweeperStats() {
-    auto &stats = getSolverStatsRef();
-    stats.sw.vars_orig = _setup.numVars;
-    stats.sw.clauses_orig = _setup.numOriginalClauses;
-    shweep_get_sweep_stats(solver, &stats.sw.eqs, &stats.sw.sweep_units, &stats.sw.new_units, &stats.sw.total_units, &stats.sw.eliminated, &stats.sw.active_orig, &stats.sw.active_end, &stats.sw.worksweeps, &stats.sw.resweeps_in, &stats.sw.resweeps_out);
+shweep_statistics Kissat::fetchSweepStats() {
+    shweep_stats = shweep_get_statistics(solver);
+    return shweep_stats;
+    // auto &stats = getSolverStatsRef();
+    // stats.sw.vars_orig = _setup.numVars;
+    // stats.sw.clauses_orig = _setup.numOriginalClauses;
+    // shweep_get_sweep_stats(solver, &stats.sw.eqs, &stats.sw.sweep_units, &stats.sw.new_units, &stats.sw.total_units, &stats.sw.eliminated, &stats.sw.active_orig, &stats.sw.active_end, &stats.sw.worksweeps, &stats.sw.resweeps_in, &stats.sw.resweeps_out);
+}
+
+shweep_statistics Kissat::getSweepStats() {
+   return shweep_stats;
 }
 
 //Callback Called from both sequential preprocessing as well as the shared sweeping.
@@ -587,12 +593,12 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
 
     if (is_sweeper) {
         //we arrive here for every sweeper, this ensures that we also fetch the statistics of every sweeper into Mallob
-        fetchSweeperStats();
-        auto &stats = getSolverStatsRef();
-        stats.sw.vars_orig = _setup.numVars;
-        stats.sw.clauses_orig = _setup.numOriginalClauses;
-        stats.sw.vars_end = nbVars;
-        stats.sw.clauses_end = nbClauses;
+        // fetchSweeperStats();
+        // auto &stats = getSolverStatsRef();
+        // stats.sw.vars_orig = _setup.numVars;
+        // stats.sw.clauses_orig = _setup.numOriginalClauses;
+        // stats.sw.vars_end = nbVars;
+        // stats.sw.clauses_end = nbClauses;
 
         int unset_state = -1;
         bool weAreFirst = sweepReportingLocalId->compare_exchange_strong(unset_state, getLocalId());

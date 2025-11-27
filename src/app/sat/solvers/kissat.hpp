@@ -64,6 +64,7 @@ private:
 	std::atomic_int sweep_UNITS_size{0};
 	// int sweep_unread_EQS_count{0};
 
+	struct shweep_statistics shweep_stats;
 	// std::vector<char> stolen_done;
 	// std::vector<int> formulaForShweeping;
 	//##################################################
@@ -150,6 +151,7 @@ public:
 	void setToSweeper();
 	void setSweepTerminate();
 	bool hasReportedSweepDimacs() const;
+	shweep_statistics getSweepStats();
 
 	//Pass-through
 	bool set_option(const std::string &option_name, int value);
@@ -163,7 +165,8 @@ private:
 	void sweepSetReportCallback();
     bool isPreprocessingAcceptable(int vars, int cls);
     void addLiteralFromPreprocessing(int lit);
-	void fetchSweeperStats();
+	shweep_statistics fetchSweepStats();
+
 
     bool shouldTerminate();
 
