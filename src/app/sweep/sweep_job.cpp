@@ -400,6 +400,8 @@ void SweepJob::reportStats(KissatPtr sweeper, int res) {
 	LOG(V2_INFO, "RESULT SWEEP_VARS_FIXED_PRCNT %.2f \n", vars_fixed_percent);
 	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_REMOVED_N %i \n", clauses_removed);
 	LOG(V2_INFO, "RESULT SWEEP_CLAUSES_REMOVED_PRCNT %.2f \n", clauses_removed_percent);
+	LOG(V2_INFO, "RESULT SWEEP_IMPORT_EQS_USEFUL   %i / %i \n", stats.eqs_useful, stats.eqs_seen); //representative for the reporting solver
+	LOG(V2_INFO, "RESULT SWEEP_IMPORT_UNITS_USEFUL %i / %i \n", stats.units_useful, stats.units_seen);
 
 	for (int i=0; i < _sharing_start_ping_timestamps.size() && i < _sharing_receive_result_timestamps.size(); i++) {
 		float start = _sharing_start_ping_timestamps[i];
@@ -613,6 +615,28 @@ void SweepJob::cbImportUnit(int *ilit, int localId) {
 	//now returning to kissat solver
 }
 
+void SweepJob::provideInitialWork(KissatPtr sweeper) {
+	assert(!_root_provided_initial_work);
+	assert(sweeper->work_received_from_steal.empty());
+	// assert(sweeper->sweeper_is_idle);
+
+	_root_provided_initial_work = true;
+	sweeper->sweeper_is_idle = false; //already set non-idle here to prevent case where solver is already initialized, non-idle, but still has no work cause its just being copied, and then a sharing operation starts right now, terminating everything wrongly early
+
+	//We need to know how much space to allocate to store each variable "idx" at the array position work[idx].
+	//i.e. we need to know max(idx).
+	//We assume that the maximum variable index corresponds to the total number of variables
+	//i.e. that there are no holes in kissats internal numbering. This is an assumption that standard Kissat makes all the time, so we also do it here
+
+	const unsigned VARS = shweep_get_num_vars(sweeper->solver); //this value can be different from numVars here in C++ !! Because kissat might havel aready propagated some units, etc.
+	sweeper->work_received_from_steal = std::vector<int>(VARS);
+	//the initial work is all variables
+	for (int idx = 0; idx < VARS; idx++) {
+		sweeper->work_received_from_steal[idx] = idx;
+	}
+	LOG(V2_INFO, "SWEEP WORK PROVIDED: All work --------------%u---------------->sweeper [%i](%i)\n", VARS, _my_rank, sweeper->getLocalId());
+}
+
 
 void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) {
 	KissatPtr sweeper = _sweepers[localId]; //array access safe (we know the sweeper exists) because this callback is called by this sweeper itself
@@ -634,21 +658,8 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		  * At the root node we serve the initial work to whichever solver asks first
 		  */
 		if (_is_root && ! _root_provided_initial_work) {
-			_root_provided_initial_work = true;
-			sweeper->sweeper_is_idle = false; //already set non-idle here to prevent case where solver is already initialized, non-idle, but still has no work cause its just being copied, and then a sharing operation starts right now, terminating everything wrongly early
-			//We need to know how much space to allocate to store each variable "idx" at the array position work[idx].
-			//i.e. we need to know max(idx).
-			//We assume that the maximum variable index corresponds to the total number of variables
-			//i.e. that there are no holes in kissats internal numbering. This is an assumption that standard Kissat makes all the time, so we also do it here
-			const unsigned VARS = shweep_get_num_vars(sweeper->solver); //this value can be different from numVars here in C++ !! Because kissat might havel aready propagated some units, etc.
-			sweeper->work_received_from_steal = std::vector<int>(VARS);
-			//the initial work is all variables
-			for (int idx = 0; idx < VARS; idx++) {
-				sweeper->work_received_from_steal[idx] = idx;
-			}
-			LOG(V2_INFO, "SWEEP WORK PROVIDED: All work --------------%u---------------->sweeper [%i](%i)\n", VARS, _my_rank, localId);
+			provideInitialWork(sweeper);
 			break;
-
 		}
 
 		//Try to steal locally from shared memory
@@ -952,8 +963,15 @@ void SweepJob::advanceAllReduction() {
 
 	//Publish termination signal only AFTER we copied the Eqs&Units, as the solvers will immediately try to import these last E&U after exiting their main loop
 	if (all_idle) {
-		_terminate_all = true;
-		LOG(V1_WARN, "# \n # \n # --- ALL SWEEPERS IDLE - CAN TERMINATE -- \n # \n");
+		LOG(V1_WARN, "[%i] SWEEP ITERATION %i/%i FINISHED \n", _my_rank, _curr_sweep_iteration, _params.sweepIterations());
+		if (_curr_sweep_iteration < _params.sweepIterations()) {
+			_curr_sweep_iteration++;
+			LOG(V1_WARN, "[%i] SWEEP ITERATION %i/%i STARTED \n", _my_rank, _curr_sweep_iteration, _params.sweepIterations());
+			_root_provided_initial_work = false; //will trigger another iteration by providing new full work to the solvers
+		} else {
+			_terminate_all = true;
+			LOG(V1_WARN, "# \n # \n # --- [%i] ALL SWEEPERS IDLE - CAN TERMINATE -- \n # \n", _my_rank);
+		}
 	}
 }
 

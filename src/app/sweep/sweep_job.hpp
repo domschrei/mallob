@@ -99,6 +99,8 @@ private:
     // std::vector<int> _eqs_from_broadcast;  //store received equivalences at rank level to copy to individual solvers
 	// std::vector<int> _units_from_broadcast;
 
+	//We want to test multiple iterations of full sweeping, to see whether and how fast there is diminishing returns
+	int _curr_sweep_iteration = 1;
 
 	//Termination. Determined during workstealing, broadcasted via sharing
 	volatile bool _terminate_all=false; //termination (on this node) due to sharing consensus that there is no more work
@@ -159,6 +161,7 @@ private:
 
 	std::vector<int> getRandomIdPermutation();
 
+	void provideInitialWork(KissatPtr sweeper);
 	std::vector<int> stealWorkFromAnyLocalSolver();
     std::vector<int> stealWorkFromSpecificLocalSolver(int localId);
     void cbSearchWorkInTree(unsigned **work, int *work_size, int localId);

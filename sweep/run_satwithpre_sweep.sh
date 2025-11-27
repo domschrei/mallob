@@ -76,7 +76,9 @@ if $SWEEP; then
       -preprocess-sweep \
       -sweep-sharing-period=20 \
       -sweep-solver-verbosity=0 \
-      -preprocess-sweep-priority=$SWEEP_PRIO"
+      -preprocess-sweep-priority=$SWEEP_PRIO \
+      -sweep-resweep-chance=1000 \
+      -sweep-iterations=3"
 else
     echo "SWEEP Preprocessing SKIPPED !"
 fi
