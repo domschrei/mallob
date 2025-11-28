@@ -180,20 +180,26 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		//passing localId by value to this lambda, because the thread might only execute after createAndStartNewShweeper is already gone
 		if (_terminate_all) {
 			// _bg_workers[localId]->stop();
-			LOG(V3_VERB, "SWEEP [%i](%i) terminated before creation\n", _my_rank, localId);
+			LOG(V1_WARN, "Warn SWEEP [%i](%i): terminated before creation\n", _my_rank, localId);
 			return;
 		}
 
 		auto sweeper = createNewSweeper(localId);
 
 		loadFormula(sweeper);
-		_sweepers[localId] = sweeper; //signal to the remaining system that this solver now exists
 		_running_sweepers_count++;
-
+		/*
+		 *  Syncronization! - we wait here until all other solvers are also initialized, and only then start solving
+		 */
 		while (_running_sweepers_count < _nThreads) {
 			LOG(V3_VERB, "SWEEP JOB [%i](%i) waiting for other solvers to come online (%i/%i)\n", _my_rank, localId, _running_sweepers_count.load(), _nThreads);
 			usleep(500);
+			if (_terminate_all || _external_termination) {
+				LOG(V1_WARN, "Warn SWEEP [%i](%i): terminated while waiting in synchronization \n", _my_rank, localId);
+				return;
+			}
 		}
+		_sweepers[localId] = sweeper; //only now expose the solver to the rest of the system, now that we know we start solving
 		_started_solving = true; //multiple threads will write non-thread-safe to this bool, but all only monotonically to "true"
 
 		LOG(V3_VERB, "SWEEP JOB [%i](%i) solve() START \n", _my_rank, localId);
@@ -236,7 +242,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 
 		_running_sweepers_count--;
 		_sweepers[localId]->cleanUp(); //write kissat timing profile
-		_sweepers[localId] = nullptr;  //signal that this solver doesnt exist anymore
+		_sweepers[localId].reset();  //this should delete the only persistent shared pointer on the solver, and thus trigger its destructor soon now
 		LOG(V3_VERB, "SWEEP JOB [%i](%i) WORKER EXIT\n", _my_rank, localId);
 
 		if (_running_sweepers_count==0) {
