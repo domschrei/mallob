@@ -185,17 +185,19 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		}
 
 		auto sweeper = createNewSweeper(localId);
-
 		loadFormula(sweeper);
 		_running_sweepers_count++;
+
 		/*
-		 *  Syncronization! - we wait here until all other solvers are also initialized, and only then start solving
+		 *  Syncronization Layer!
+		 *  We wait here until all other solvers are also initialized, and only then start solving
 		 */
 		while (_running_sweepers_count < _nThreads) {
 			LOG(V3_VERB, "SWEEP JOB [%i](%i) waiting for other solvers to come online (%i/%i)\n", _my_rank, localId, _running_sweepers_count.load(), _nThreads);
-			usleep(500);
+			usleep(2000);
 			if (_terminate_all || _external_termination) {
 				LOG(V1_WARN, "Warn SWEEP [%i](%i): terminated while waiting in synchronization \n", _my_rank, localId);
+				_running_sweepers_count--;
 				return;
 			}
 		}
