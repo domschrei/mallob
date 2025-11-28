@@ -210,22 +210,22 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		_resweeps_out[localId] = stats.resweeps_out;
 
 
-		if (_is_root) { //we only report results from solvers on the root node, to prevent additional communication/agreement across ranks
-			if (res==20) {
-				//Found UNSAT
-				assert(kissat_is_inconsistent(sweeper->solver) || log_return_false("SWEEP ERROR: Solver returned UNSAT 20 but is not in inconsistent (==UNSAT) state!\n"));
-				int unset_state = -1;
-				//Check whether we are the very first solver to report anything. If we are, report and block others
-				if (_reporting_localId->compare_exchange_strong(unset_state, localId)) {
-					reportResultFromSolver(sweeper, UNSAT);
-				}
-			} else if (res==0) {
-				//might have made some progress
-				if (sweeper->hasReportedSweepDimacs()) {
-					reportResultFromSolver(sweeper, IMPROVED);
-				}
+		// if (_is_root) { //we only report results from solvers on the root node, to prevent additional communication/agreement across ranks
+		if (res==20) {
+			//Found UNSAT
+			assert(kissat_is_inconsistent(sweeper->solver) || log_return_false("SWEEP ERROR: Solver returned UNSAT 20 but is not in inconsistent (==UNSAT) state!\n"));
+			int unset_state = -1;
+			//Check whether we are the very first solver to report anything. If we are, report and block others
+			if (_reporting_localId->compare_exchange_strong(unset_state, localId)) {
+				reportResultFromSolver(sweeper, UNSAT);
+			}
+		} else if (res==0) {
+			//might have made some progress
+			if (sweeper->hasReportedSweepDimacs()) {
+				reportResultFromSolver(sweeper, IMPROVED);
 			}
 		}
+	// }
 
 		assert(res==UNKNOWN || res==UNSAT || log_return_false("SWEEP ERROR: solver has returned with unexpected signal %i \n", res));
 		//If no solver sets UNSAT or IMPROVED, the job will be returned by default as UNKNOWN
@@ -531,6 +531,7 @@ void SweepJob::provideInitialWork(KissatPtr sweeper) {
 	assert(!_root_provided_initial_work);
 	assert(sweeper->work_received_from_steal.empty());
 	assert(_is_root);
+	assert(sweeper->getLocalId()==0);
 	// assert(sweeper->sweeper_is_idle);
 
 
@@ -569,9 +570,9 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 			break;
 		}
 		 /*
-		  * At the root node we serve the initial work to whichever solver asks first
+		  * At the root node we serve the initial work exclusively to solver 0 (to prevent any potentially concurrent business, if multiple ask almost at the same time)
 		  */
-		if (_is_root && ! _root_provided_initial_work) {
+		if (_is_root && ! _root_provided_initial_work && localId==0) {
 			provideInitialWork(sweeper);
 			break;
 		}
