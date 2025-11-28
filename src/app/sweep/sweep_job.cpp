@@ -308,7 +308,8 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	}
 
     //Basic configuration
-    sweeper->set_option("quiet", 1);  //suppress any standard kissat messages
+	// int quiet = _params.sweepSolverVerbosity()==0 ? 1 : 0;
+    sweeper->set_option("quiet", _params.sweepSolverQuiet());  //suppress any standard kissat messages
     sweeper->set_option("verbose", 0);//the native kissat verbosity
     sweeper->set_option("log", 0);    //potentially extensive logging
     sweeper->set_option("check", 0);  // do not check model or derived clauses, because we import anyways units and equivalences without proof tracking

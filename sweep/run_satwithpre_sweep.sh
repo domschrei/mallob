@@ -76,6 +76,7 @@ if $SWEEP; then
       -preprocess-sweep \
       -sweep-sharing-period=20 \
       -sweep-solver-verbosity=0 \
+      -sweep-solver-quiet=0 \
       -preprocess-sweep-priority=$SWEEP_PRIO \
       -sweep-resweep-chance=1000 \
       -sweep-iterations=5"
