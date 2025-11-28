@@ -209,8 +209,12 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		_resweeps_in[localId] = stats.resweeps_in;
 		_resweeps_out[localId] = stats.resweeps_out;
 
+		// if (res==20 && !_is_root)
+			// LOG(V1_WARN, "SWEEP JOB [%i](%i) RESULT UNSAT FOUND BY NON-ROOT SOLVER!\n", _my_rank, localId);
 
 		// if (_is_root) { //we only report results from solvers on the root node, to prevent additional communication/agreement across ranks
+		//todo: we need to recognize non-root UNSAT results, but they might not have the full timing info as root
+		//maybe split reporting, such that non-solving root solver still prints his stats, to be consistent with prior rounds
 		if (res==20) {
 			//Found UNSAT
 			assert(kissat_is_inconsistent(sweeper->solver) || log_return_false("SWEEP ERROR: Solver returned UNSAT 20 but is not in inconsistent (==UNSAT) state!\n"));
@@ -438,7 +442,7 @@ void SweepJob::printResweeps() {
 		resweeps_in += _resweeps_in[i];
 		resweeps_out += _resweeps_out[i];
 	}
-	LOG(V2_INFO, "RESULT %i SWEEP WORKSWEEPS,RESWEEPS: %s \n", _my_rank, oss.str().c_str()); //information for each individual thread
+	LOG(V3_VERB, "RESULT %i SWEEP WORKSWEEPS,RESWEEPS: %s \n", _my_rank, oss.str().c_str()); //information for each individual thread
 	LOG(V2_INFO, "RESULT %i SWEEP_WORKSWEEPS   %i \n", _my_rank, worksweeps);
 	LOG(V2_INFO, "RESULT %i SWEEP_RESWEEPS_IN  %i \n", _my_rank, resweeps_in);
 	LOG(V2_INFO, "RESULT %i SWEEP_RESWEEPS_OUT %i \n", _my_rank, resweeps_out);
