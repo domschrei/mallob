@@ -587,12 +587,12 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
     bool accept = nbVars != _setup.numVars || nbClauses != _setup.numOriginalClauses;
 
     if (is_sweeper) {
-#if SWEEP_STARTTYPE==2
+// #if SWEEP_STARTTYPE==2
         bool weAreFirst = (getLocalId()== 0); //by arriving here we already know that the sweeper is on the root node
-#else
-        int unset_state = -1;
-        bool weAreFirst = sweepReportingLocalId->compare_exchange_strong(unset_state, getLocalId());
-#endif
+// #else
+        // int unset_state = -1;
+        // bool weAreFirst = sweepReportingLocalId->compare_exchange_strong(unset_state, getLocalId());
+// #endif
         if (weAreFirst) {
             LOG(V2_INFO, "SWEEP [root](%i) first to report dimacs result\n", getLocalId());
             if (accept) {

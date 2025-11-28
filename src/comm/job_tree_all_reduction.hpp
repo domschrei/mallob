@@ -257,7 +257,7 @@ public:
                 _base_msg.payload = std::move(_aggregated_elem.value());
                 _base_msg.treeIndexOfDestination = _parent_index;
                 _base_msg.contextIdOfDestination = _parent_ctx_id;
-                LOG(V3_VERB, "SWEEP SHARE REDUCE send MPI element to parent rank [%i]\n", _parent_rank);
+                LOG(V3_VERB, "SWEEP SHARE REDUCE [%i] ~~~%i~~~> parent [%i]\n",_tree.nodeRank, _base_msg.payload.size(), _parent_rank);
                 assert(_base_msg.contextIdOfDestination != 0);
                 MyMpi::isend(_parent_rank, MSG_JOB_TREE_MODULAR_REDUCE, _base_msg);
                 if (_care_about_parent_status) {

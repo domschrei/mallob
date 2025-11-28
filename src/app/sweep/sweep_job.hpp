@@ -164,7 +164,7 @@ private:
 	std::vector<int> getRandomIdPermutation();
 
 	void provideInitialWork(KissatPtr sweeper);
-	std::vector<int> stealWorkFromAnyLocalSolver();
+	std::vector<int> stealWorkFromAnyLocalSolver(int asking_rank, int asking_localId); //parameters only for verbose logging
     std::vector<int> stealWorkFromSpecificLocalSolver(int localId);
     void cbSearchWorkInTree(unsigned **work, int *work_size, int localId);
 	void checkForNewImportRound(KissatPtr sweeper);

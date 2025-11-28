@@ -124,8 +124,8 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		int localId = msg.payload.front();
 		msg.payload.clear();
 
-		LOG(V3_VERB, "SWEEP MSG [%i] received steal request from [%i](%i) \n", _my_rank, sourceRank, localId);
-		auto locally_stolen_work = stealWorkFromAnyLocalSolver();
+		LOG(V3_VERB, "SWEEP MSG [%i] <---?---- [%i](%i) \n", _my_rank, sourceRank, localId);
+		auto locally_stolen_work = stealWorkFromAnyLocalSolver(sourceRank, localId);
 
 		msg.payload = std::move(locally_stolen_work);
 		msg.payload.push_back(localId);
@@ -138,6 +138,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		assert(msg.contextIdOfDestination != 0 ||
 			log_return_false("SWEEP STEAL ERROR in TAG_RETURNING_STEAL_REQUEST! Want to return an message, but invalid contextIdOfDestination==0. "
 					"With sourceRank=%i, sourceIndex=%i, payload.size()=%i \n", sourceRank, sourceIndex, msg.payload.size()));
+
 		getJobTree().send(sourceRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 	}
 	else if (msg.tag == TAG_RETURNING_STEAL_REQUEST) {
@@ -145,7 +146,10 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		msg.payload.pop_back();
 		_worksteal_requests[localId].stolen_work = std::move(msg.payload);
 		_worksteal_requests[localId].got_steal_response = true;
-		LOG(V3_VERB, "SWEEP MSG to [%i](%i) received steal answer --%i-- from [%i]\n", _my_rank, localId, _worksteal_requests[localId].stolen_work.size(), sourceRank );
+		if (_worksteal_requests[localId].stolen_work.size() > 0)
+			LOG(V3_VERB, "SWEEP MSG [%i](%i) <==%i==== [%i]\n", _my_rank, localId, _worksteal_requests[localId].stolen_work.size(), sourceRank );
+		else
+			LOG(V3_VERB, "SWEEP MSG [%i](%i) <---0---- [%i]\n", _my_rank, localId, _worksteal_requests[localId].stolen_work.size(), sourceRank );
 	}
 	else if (mpiTag == MSG_NOTIFY_JOB_ABORTING)    {LOG(V1_WARN, "SWEEP MSG Warn [%i]: received NOTIFY_JOB_ABORTING \n", _my_rank);}
 	else if (mpiTag == MSG_NOTIFY_JOB_TERMINATING) {LOG(V1_WARN, "SWEEP MSG Warn [%i]: received NOTIFY_JOB_TERMINATING \n", _my_rank);}
@@ -186,12 +190,10 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		_sweepers[localId] = sweeper; //signal to the remaining system that this solver now exists
 		_running_sweepers_count++;
 
-	#if STARTUP_TYPE==2
 		while (_running_sweepers_count < _nThreads) {
 			LOG(V3_VERB, "SWEEP JOB [%i](%i) waiting for other solvers to come online (%i/%i)\n", _my_rank, localId, _running_sweepers_count.load(), _nThreads);
 			usleep(500);
 		}
-	#endif
 		_started_solving = true; //multiple threads will write non-thread-safe to this bool, but all only monotonically to "true"
 
 		LOG(V3_VERB, "SWEEP JOB [%i](%i) solve() START \n", _my_rank, localId);
@@ -272,7 +274,7 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	float t1 = Timer::elapsedSeconds();
 	float init_dur_ms =  (t1 - t0)*1000;
 	const float WARN_init_dur = 50; //Usual initializations take 0.2ms in the Sat Solver Subprocess and 4-25ms  in the sweep job (for some weird reasons), but should never be above ~30ms
-	LOG(V3_VERB, "SWEEP STARTUP [%i](%i) kissat init %f ms\n", _my_rank, localId, init_dur_ms);
+	LOG(V3_VERB, "SWEEP STARTUP [%i](%i) kissat init %f ms (%i/%i online)\n", _my_rank, localId, init_dur_ms, _running_sweepers_count.load(), _nThreads);
 	if (init_dur_ms > WARN_init_dur) {
 		LOG(V1_WARN, "SWEEP Warn STARTUP [%i](%i): kissat init took unusually long, %f ms !\n", _my_rank, localId, init_dur_ms);
 	}
@@ -459,7 +461,7 @@ void SweepJob::sendMPIWorkstealRequests() {
 			msg.payload = {request.localId};
 			// LOG(V2_INFO, "Rank %i asks rank %i for work\n", _my_rank, recv_rank, n);
 			// LOG(V2_INFO, "  with destionation ctx_id %i \n", msg.contextIdOfDestination);
-			LOG(V3_VERB, "SWEEP MSG sending MPI request [%i](%i) -> [%i] \n", _my_rank, request.localId, request.targetRank);
+			LOG(V3_VERB, "SWEEP MSG [%i](%i) ---?---> [%i] \n", _my_rank, request.localId, request.targetRank);
 			getJobTree().send(request.targetRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 		}
 	}
@@ -582,13 +584,13 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 
 		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop --> local steal \n", _my_rank, localId);
 		sweeper->sweeper_is_idle = true;
-		auto stolen_work = stealWorkFromAnyLocalSolver();
+		auto stolen_work = stealWorkFromAnyLocalSolver(_my_rank, localId);
 
 		//Successful local steal
 		if ( ! stolen_work.empty()) {
 			//store steal data persistently in C++, such that C can keep operating on that memory segment
 			sweeper->work_received_from_steal = std::move(stolen_work);
-			LOG(V3_VERB, "SWEEP WORK [%i] ---%i---> (%i) \n", _my_rank, sweeper->work_received_from_steal.size(), localId);
+			LOG(V3_VERB, "SWEEP WORK [%i](%i) <==%i==== [%i]  (local) \n", localId, _my_rank, sweeper->work_received_from_steal.size(), _my_rank);
 			break;
 		}
 		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop <-- local steal failed \n", _my_rank, localId);
@@ -647,7 +649,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		//Successful steal if size > 0
 		if ( ! _worksteal_requests[localId].stolen_work.empty()) {
 			sweeper->work_received_from_steal = std::move(_worksteal_requests[localId].stolen_work);
-			LOG(V3_VERB, "SWEEP WORK via MPI [%i] ---%i---> [%i](%i) \n", targetRank, sweeper->work_received_from_steal.size(), _my_rank, localId);
+			LOG(V4_VVER, "SWEEP MPI WORK [%i](%i) <==%i=== [%i] \n",  _my_rank, localId, sweeper->work_received_from_steal.size(), targetRank);
 			break;
 		}
 		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop <-- global steal to [%i] failed \n", _my_rank, localId, targetRank);
@@ -678,16 +680,16 @@ void SweepJob::initiateNewSharingRound() {
 		return;
 	}
 
-#if STARTUP_TYPE == 2
+// #if STARTUP_TYPE == 2
 	if (!_started_solving) {
 		LOG(V3_VERB, "SWEEP SHARE BCAST: Delaying first sharing operation, not all solvers online yet (%i/%i) \n", _running_sweepers_count.load(), _nThreads);
 		return;
 	}
-#endif
+// #endif
 
 	//make sure that only one sharing operation is going on at a time
 	if (_bcast->hasReceivedBroadcast()) {
-		LOG(V3_VERB, "SWEEP SHARE BCAST: Would like to initiate new sharing round, but old round is not completed yet\n");
+		LOG(V3_VERB, "SWEEP SHARE BCAST: New sharing round delayed, old round is not completed yet\n");
 		return;
 	}
 	//Broadcast a ping to all workers to initiate an AllReduce
@@ -768,7 +770,7 @@ void SweepJob::cbContributeToAllReduce() {
 	// LOG(V3_VERB, "SWEEP Aggregate contributions within process\n");
 	auto aggregation_element = aggregateEqUnitContributions(contribs);
 
-	LOG(V3_VERB, "SWEEP SHARE REDUCE [%i]: contribute size %i (+%i) to sharing\n", _my_rank, aggregation_element.size()-NUM_METADATA_FIELDS, NUM_METADATA_FIELDS);
+	LOG(V4_VVER, "SWEEP SHARE REDUCE [%i] ~~~%i~~~(+%i)~~> to sharing \n", _my_rank, aggregation_element.size()-NUM_METADATA_FIELDS, NUM_METADATA_FIELDS);
 
 	if (_terminate_all) {
 		LOG(V4_VVER, "SWEEP SHARE BCAST skip contribution, seen already _terminate_all\n");
@@ -782,7 +784,7 @@ void SweepJob::cbContributeToAllReduce() {
 void SweepJob::advanceAllReduction() {
 	if (!_red) return;
 	if (!_started_solving) return;
-	LOG(V3_VERB, "SWEEP SHARE REDUCE ADVANCE [%i]\n", _my_rank);
+	LOG(V4_VVER, "SWEEP SHARE REDUCE ADVANCE [%i]\n", _my_rank);
 	_red->advance();
 	if (!_red->hasResult()) return;
 
@@ -810,10 +812,10 @@ void SweepJob::advanceAllReduction() {
 	_UNITS_import_size.store(unit_size, std::memory_order_relaxed);
 	_published_import_round.store(_published_import_round+1, std::memory_order_release);
 
-	if (_is_root)
-		LOG(V2_INFO, "SWEEP SHARE REDUCE RECEIVED import round %i: %i EQS, %i UNITS\n", _published_import_round.load(), eq_size/2, unit_size);
-	else
-		LOG(V3_VERB, "SWEEP SHARE REDUCE RECEIVED: %i EQS, %i UNITS\n", eq_size/2, unit_size);
+	// if (_is_root)
+	LOG(V2_INFO, "SWEEP SHARE import round %i GOT: %i EQS, %i UNITS\n", _published_import_round.load(), eq_size/2, unit_size);
+	// else
+		// LOG(V3_VERB, "SWEEP SHARE import round %i GOT: %i EQS, %i UNITS\n", _published_import_round.load(), eq_size/2, unit_size);
 
 	//Now we can reset the root node, because the sharing operation (broadcast + allreduce) is finished and can prepare a new one
 	if (_is_root) {
@@ -869,7 +871,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	}
 
 
-	LOG(V3_VERB, "SWEEP AGGR %i contributions \n", contribs.size());
+	LOG(V4_VVER, "SWEEP AGGR %i contributions \n", contribs.size());
 	size_t total_aggregated_size = NUM_METADATA_FIELDS; //the new element will contain the metadata once at the end
 	int i=0;
     for (const auto& contrib : contribs) {
@@ -933,7 +935,8 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	aggregated.push_back(aggr_eq_size);
 	aggregated.push_back(aggr_unit_size);
 	aggregated.push_back(all_idle);
-	LOG(V3_VERB, "SWEEP SHARE REDUCE aggregated %i equivalences, %i units, %i all_idle\n", aggr_eq_size/2, aggr_unit_size, all_idle);
+	if (contribs.size()>1)
+		LOG(V3_VERB, "SWEEP SHARE REDUCE aggr %i contribs: %i EQ, %i UNITS, %i ALL_IDLE\n", contribs.size(), aggr_eq_size/2, aggr_unit_size, all_idle);
 	int individual_sum =  aggr_eq_size + aggr_unit_size + NUM_METADATA_FIELDS;
 	assert(total_aggregated_size == individual_sum ||
 		log_return_false("SWEEP ERROR: aggregated element assert failed: total_size %i != %i individual_sum (total_eq_size %i + total_unit_size %i + metadata %i) ",
@@ -943,20 +946,13 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 
 
 
-std::vector<int> SweepJob::stealWorkFromAnyLocalSolver() {
+std::vector<int> SweepJob::stealWorkFromAnyLocalSolver(int asking_rank, int asking_localId) { //Parameters are only used for verbose logging, don't influence function behaviour
 	auto rand_permutation = getRandomIdPermutation();
-
-	// std::ostringstream oss;
-	// oss << "Steal permutation: ";
-	// for (int id : rand_permutation) {
-		// oss << id << ' ';
-	// }
-	// LOG(V4_VVER, "%s \n", oss.str().c_str());
 
 	for (int localId : rand_permutation) {
 		auto stolen_work = stealWorkFromSpecificLocalSolver(localId);
 		if ( ! stolen_work.empty()) {
-			LOG(V3_VERB, "SWEEP WORK (%i) ---%i---> \n", localId, stolen_work.size());
+			LOG(V3_VERB, "SWEEP WORK [%i](%i) ====%i==> [%i](%i) \n",_my_rank, localId, stolen_work.size(), asking_rank, asking_localId);
 			return stolen_work;
 		}
 	}
