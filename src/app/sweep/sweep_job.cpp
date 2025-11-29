@@ -89,6 +89,7 @@ void SweepJob::appl_start() {
 	_internal_result.revision = getRevision();
 
 	LOG(V2_INFO, "SWEEP JOB appl_start() FINISHED\n");
+	// _finished_job_setup = true;
 }
 
 
@@ -178,15 +179,16 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		LOG(V3_VERB, "SWEEP JOB [%i](%i) WORKER START \n", _my_rank, localId);
 		// std::future<void> fut_shweeper = ProcessWideThreadPool::get().addTask([this, localId]() { //Changed from [&] to [this, shweeper] back to [&] to [this, localId] !! (nicco)
 		//passing localId by value to this lambda, because the thread might only execute after createAndStartNewShweeper is already gone
-		if (_terminate_all) {
+		// if (_terminate_all) {
 			// _bg_workers[localId]->stop();
-			LOG(V1_WARN, "Warn SWEEP [%i](%i): terminated before creation\n", _my_rank, localId);
-			return;
-		}
+			// LOG(V1_WARN, "Warn SWEEP [%i](%i): terminated before creation\n", _my_rank, localId);
+			// return;
+		// }
 
 		auto sweeper = createNewSweeper(localId);
 		loadFormula(sweeper);
-		_running_sweepers_count++;
+		_started_sweepers_count++; //only additive, monotonically increasing, going from 0...nThreads-1 and never decreased
+		_running_sweepers_count++; //tracks actual number of running solvers at any given moment in time
 
 		/*
 		 *  Syncronization Layer!
@@ -202,7 +204,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			}
 		}
 		_sweepers[localId] = sweeper; //only now expose the solver to the rest of the system, now that we know we start solving
-		_started_solving = true; //multiple threads will write non-thread-safe to this bool, but all only monotonically to "true"
+		_started_synchronized_solving = true; //multiple threads will write non-thread-safe to this bool, but all only monotonically to "true"
 
 		LOG(V3_VERB, "SWEEP JOB [%i](%i) solve() START \n", _my_rank, localId);
 		int res = sweeper->solve(0, nullptr);
@@ -695,7 +697,7 @@ void SweepJob::initiateNewSharingRound() {
 	}
 
 // #if STARTUP_TYPE == 2
-	if (!_started_solving) {
+	if (!_started_synchronized_solving) {
 		LOG(V3_VERB, "SWEEP SHARE BCAST: Delaying first sharing operation, not all solvers online yet (%i/%i) \n", _running_sweepers_count.load(), _nThreads);
 		return;
 	}
@@ -797,7 +799,7 @@ void SweepJob::cbContributeToAllReduce() {
 
 void SweepJob::advanceAllReduction() {
 	if (!_red) return;
-	if (!_started_solving) return;
+	if (!_started_synchronized_solving) return;
 	LOG(V4_VVER, "SWEEP SHARE REDUCE ADVANCE [%i]\n", _my_rank);
 	_red->advance();
 	if (!_red->hasResult()) return;
@@ -1034,6 +1036,11 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 
 void SweepJob::gentlyTerminateSolvers() {
 	LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] interrupting solvers\n", getId(), _my_rank);
+	while (_started_sweepers_count < _nThreads) {
+		LOG(V1_WARN, "Warn SWEEP JOB [%i]: delaying destructors until sweepers are all cleanly initialized (currently started %i/%i)\n",
+			getId(), _my_rank, _started_sweepers_count.load(), _nThreads);
+		usleep(500);
+	}
 	//each sweeper checks constantly for the interruption signal (on the ms scale or faster), allow for gentle own exit
 	while (_running_sweepers_count>0) {
 		LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] still %i solvers running\n", getId(), _my_rank, _running_sweepers_count.load());
@@ -1057,7 +1064,7 @@ void SweepJob::gentlyTerminateSolvers() {
 		if (bg_worker->isRunning()) {
 			LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] joining bg_worker (%i) \n",  getId(),_my_rank, i);
 			bg_worker->stop();
-			LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] joined  bg_worker (%i) \n",  getId(),_my_rank, i);
+			LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] joined  bg_worker    (%i) \n",  getId(),_my_rank, i);
 		}
 		i++;
 	}

@@ -29,9 +29,11 @@ private:
 	std::vector<KissatPtr> _sweepers;
 	std::vector<std::unique_ptr<BackgroundWorker>> _bg_workers;
 	// std::vector<std::future<void>> _fut_shweepers;
+    std::atomic_int _started_sweepers_count {0};
     std::atomic_int _running_sweepers_count {0};
 	std::vector<int> _list_of_ids;
-	bool _started_solving{false};
+	// std::atomic_bool _finished_job_setup{false};
+	bool _started_synchronized_solving{false};
 
 	//Timing
 	float _start_sweep_timestamp;
@@ -104,8 +106,8 @@ private:
 	int _curr_sweep_iteration = 1;
 
 	//Termination. Determined during workstealing, broadcasted via sharing
-	volatile bool _terminate_all=false; //termination (on this node) due to sharing consensus that there is no more work
-	volatile bool _external_termination=false; //termination because somebody else told us to (for example Job interrupted because Base Job already found a solution, ...)
+	std::atomic_bool _terminate_all=false; //termination (on this node) due to sharing consensus that there is no more work
+	std::atomic_bool _external_termination=false; //termination because somebody else told us to (for example Job interrupted because Base Job already found a solution, ...)
 
 
 	//Keep track which solver reports the final formula, we only use one
