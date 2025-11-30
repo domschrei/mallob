@@ -366,52 +366,55 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full, int res=0) {
 	double clauses_removed_percent = 100*clauses_removed/(double)sweeper->_setup.numOriginalClauses;
 
 
-	LOGGER(_reslogger, V2_INFO, "RESULT Reported by [%i](%i) \n", _my_rank, sweeper->getLocalId());
-	LOG(V2_INFO, "RESULT Reported by [%i](%i) \n", _my_rank, sweeper->getLocalId());
-	LOG(V2_INFO, "RESULT SWEEP ITERATION			%i / %i \n", _curr_sweep_iteration, _params.sweepIterations());
+	LOG(			   V2_INFO, "SWEEP RESULT, reported by [%i](%i) in .sweep file \n", _my_rank, sweeper->getLocalId());
+	LOGGER(_reslogger, V2_INFO, "Reported by [%i](%i) \n", _my_rank, sweeper->getLocalId());
+	LOGGER(_reslogger, V2_INFO, "Reported by [%i](%i) \n", _my_rank, sweeper->getLocalId());
+	LOGGER(_reslogger, V2_INFO, "SWEEP ITERATION			%i / %i \n", _curr_sweep_iteration, _params.sweepIterations());
 	if (full)
-		LOG(V2_INFO, "RESULT SWEEP_RESULT_CODE			%i == %s \n", res, res==40 ? "IMPROVED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
-	LOG(V2_INFO, "RESULT SWEEP_TIME					%f seconds \n", Timer::elapsedSeconds() - _start_sweep_timestamp);
-	LOG(V2_INFO, "RESULT SWEEP_IMPORT_EQS_USEFUL	%i / %i \n", stats.eqs_useful, stats.eqs_seen); //representative for the reporting solver
-	LOG(V2_INFO, "RESULT SWEEP_IMPORT_UNITS_USEFUL	%i / %i \n", stats.units_useful, stats.units_seen);
-	LOG(V2_INFO, "RESULT SWEEP_EQUIVALENCES			%i\n", stats.sweep_eqs);
-	LOG(V2_INFO, "RESULT SWEEP_UNITS_NEW			%i\n", stats.units_new);
-	LOG(V2_INFO, "RESULT SWEEP_VARS_FIXED_N			%i / %i (%.2f %)\n", vars_fixed_end, stats.vars_active_orig, vars_fixed_percent);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_RESULT_CODE			%i == %s \n", res, res==40 ? "IMPROVED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
+
+	LOGGER(_reslogger,V2_INFO, "SWEEP_TIME				 %f seconds \n", Timer::elapsedSeconds() - _start_sweep_timestamp);
+	LOGGER(_reslogger,V2_INFO, "SWEEP_IMPORT_EQS_USEFUL	 %i / %i \n", stats.eqs_useful, stats.eqs_seen); //representative for the reporting solver
+	LOGGER(_reslogger,V2_INFO, "SWEEP_IMPORT_UNITS_USEFUL %i / %i \n", stats.units_useful, stats.units_seen);
+	LOGGER(_reslogger,V2_INFO, "SWEEP_EQUIVALENCES		%i\n", stats.sweep_eqs);
+	LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_NEW			%i\n", stats.units_new);
+	LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_FIXED_N		%i / %i (%.2f %)\n", vars_fixed_end, stats.vars_active_orig, vars_fixed_percent);
 
 	if (full) {
-		LOG(V2_INFO, "RESULT SWEEP_PRIORITY       %f\n", _params.preprocessSweepPriority.val);
-		LOG(V2_INFO, "RESULT SWEEP_PROCESSES      %i\n", getVolume());
-		LOG(V2_INFO, "RESULT SWEEP_THREADS_PER_P  %i\n", _nThreads);
-		LOG(V2_INFO, "RESULT SWEEP_SHARING_PERIOD %i ms \n", _params.sweepSharingPeriod_ms.val);
-		LOG(V2_INFO, "RESULT SWEEP_VARS_ORIG      %i\n", sweeper->_setup.numVars);
-		LOG(V2_INFO, "RESULT SWEEP_VARS_END       %i\n", stats.vars_end);
-		LOG(V2_INFO, "RESULT SWEEP_ACTIVE_ORIG    %i\n", stats.vars_active_orig);
-		LOG(V2_INFO, "RESULT SWEEP_ACTIVE_END     %i\n", vars_remain_end);
-		LOG(V2_INFO, "RESULT SWEEP_CLAUSES_ORIG   %i\n", sweeper->_setup.numOriginalClauses);
-		LOG(V2_INFO, "RESULT SWEEP_CLAUSES_END    %i\n", stats.clauses_end);
-		LOG(V2_INFO, "RESULT SWEEP_UNITS_ORIG     %i\n", stats.units_orig);
-		LOG(V2_INFO, "RESULT SWEEP_UNITS_END      %i\n", stats.units_end);
-		LOG(V2_INFO, "RESULT SWEEP_ELIMINATED     %i\n", stats.eliminated);
-		LOG(V2_INFO, "RESULT SWEEP_UNITS_SWEEP    %i\n", stats.sweep_units);
-		LOG(V2_INFO, "RESULT SWEEP_CLAUSES_REMOVED_N	 %i \n", clauses_removed);
-		LOG(V2_INFO, "RESULT SWEEP_CLAUSES_REMOVED_PRCNT %.6f \n", clauses_removed_percent);
-		LOG(V2_INFO, "RESULT SWEEP_VARS_REMAIN_N		 %i / %i (%.6f %)\n", vars_remain_end, stats.vars_active_orig, vars_remain_percent);
-		LOG(V2_INFO, "RESULT SWEEP_VARS_FIXED_PRCNT		 %.6f \n", vars_fixed_percent);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_PRIORITY       %f\n", _params.preprocessSweepPriority.val);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_PROCESSES      %i\n", getVolume());
+		LOGGER(_reslogger,V2_INFO, "SWEEP_THREADS_PER_P  %i\n", _nThreads);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_PERIOD %i ms \n", _params.sweepSharingPeriod_ms.val);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_ORIG      %i\n", sweeper->_setup.numVars);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_END       %i\n", stats.vars_end);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_ACTIVE_ORIG    %i\n", stats.vars_active_orig);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_ACTIVE_END     %i\n", vars_remain_end);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_CLAUSES_ORIG   %i\n", sweeper->_setup.numOriginalClauses);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_CLAUSES_END    %i\n", stats.clauses_end);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_ORIG     %i\n", stats.units_orig);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_END      %i\n", stats.units_end);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_ELIMINATED     %i\n", stats.eliminated);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_SWEEP    %i\n", stats.sweep_units);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_CLAUSES_REMOVED_N		%i \n", clauses_removed);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_CLAUSES_REMOVED_PRCNT	%.6f \n", clauses_removed_percent);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_REMAIN_N			%i / %i (%.6f %)\n", vars_remain_end, stats.vars_active_orig, vars_remain_percent);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_FIXED_PRCNT		%.6f \n", vars_fixed_percent);
 	}
 
 	if (full) {
 		for (int i=0; i < _sharing_start_ping_timestamps.size() && i < _sharing_receive_result_timestamps.size(); i++) {
 			float start = _sharing_start_ping_timestamps[i];
 			float end   = _sharing_receive_result_timestamps[i];
-			LOG(V2_INFO, "RESULT SWEEP_SHARING_LATENCY  %f ms   (ping->result  %f --> %f) \n", (end-start)*1000, start, end);
+			LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_LATENCY  %f ms   (ping->result  %f --> %f) \n", (end-start)*1000, start, end);
 		}
 		for (int i=0; ! _sharing_start_ping_timestamps.empty() && i < _sharing_start_ping_timestamps.size() -1; i++) {
-			LOG(V2_INFO, "RESULT SWEEP_SHARING_PERIOD_REAL  %f ms \n", (_sharing_start_ping_timestamps[i+1] - _sharing_start_ping_timestamps[i])*1000);
+			LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_PERIOD_REAL  %f ms \n", (_sharing_start_ping_timestamps[i+1] - _sharing_start_ping_timestamps[i])*1000);
 		}
 
 		LOG(V3_VERB, "RESULT SWEEP [%i](%i) Serialized final formula to SolutionSize=%i\n", _my_rank, _reporting_localId->load(), _internal_result.getSolutionSize());
+		LOGGER(_reslogger, V3_VERB, "RESULT SWEEP [%i](%i) Serialized final formula to SolutionSize=%i\n", _my_rank, _reporting_localId->load(), _internal_result.getSolutionSize());
 		for (int i=0; i<15 && i<_internal_result.getSolutionSize(); i++) {
-			LOG(V3_VERB, "RESULT Sweep Formula peek %i: %i \n", i, _internal_result.getSolution(i));
+			LOGGER(_reslogger,V3_VERB, "RESULT Sweep Formula peek %i: %i \n", i, _internal_result.getSolution(i));
 		}
 	}
 
