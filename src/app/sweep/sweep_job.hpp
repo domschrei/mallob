@@ -14,6 +14,7 @@
 
 class SweepJob : public Job {
 private:
+
     JobResult _internal_result;
     int _solved_status{-1};
 
@@ -22,6 +23,8 @@ private:
     bool _is_root{false};
     uint8_t* _metadata; //serialized description
 	int _numVars{0};
+
+
 
 	//Local Solvers
 	int _nThreads{0};
@@ -117,6 +120,7 @@ private:
 	std::vector<int> _resweeps_in{};
 	std::vector<int> _resweeps_out{};
 
+	Logger _reslogger;
 
 public:
     SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table);

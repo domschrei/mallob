@@ -12,7 +12,7 @@ extern "C" {
 
 
 SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table)
-    : Job(params, setup, table)
+    : Job(params, setup, table), _reslogger(Logger::getMainInstance().copy("<RESULT>", ".sweep"))
 {
 	assert(_params.jobCommUpdatePeriod() > 0 || log_return_false("[ERROR] For this application to work,"
             " you must explicitly enable job communicators with the -jcup option, e.g., -jcup=0.1\n"));
@@ -47,6 +47,8 @@ void SweepJob::appl_start() {
     _metadata = getSerializedDescription(0)->data();
 	_start_sweep_timestamp = Timer::elapsedSeconds();
 	_last_sharing_start_timestamp = Timer::elapsedSeconds();
+
+    _reslogger = Logger::getMainInstance().copy("<RESULT>", ".sweep");
 
 	//do not trigger a send on the initial dummy worksteal requests
 	_worksteal_requests.resize(_nThreads);
@@ -363,6 +365,8 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full, int res=0) {
 	double vars_remain_percent = 100*vars_remain_end/(double)stats.vars_active_orig;
 	double clauses_removed_percent = 100*clauses_removed/(double)sweeper->_setup.numOriginalClauses;
 
+
+	LOGGER(_reslogger, V2_INFO, "RESULT Reported by [%i](%i) \n", _my_rank, sweeper->getLocalId());
 	LOG(V2_INFO, "RESULT Reported by [%i](%i) \n", _my_rank, sweeper->getLocalId());
 	LOG(V2_INFO, "RESULT SWEEP ITERATION			%i / %i \n", _curr_sweep_iteration, _params.sweepIterations());
 	if (full)
@@ -389,10 +393,10 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full, int res=0) {
 		LOG(V2_INFO, "RESULT SWEEP_UNITS_END      %i\n", stats.units_end);
 		LOG(V2_INFO, "RESULT SWEEP_ELIMINATED     %i\n", stats.eliminated);
 		LOG(V2_INFO, "RESULT SWEEP_UNITS_SWEEP    %i\n", stats.sweep_units);
-		LOG(V2_INFO, "RESULT SWEEP_CLAUSES_REMOVED_N %i \n", clauses_removed);
-		LOG(V2_INFO, "RESULT SWEEP_CLAUSES_REMOVED_PRCNT %.2f \n", clauses_removed_percent);
-		LOG(V2_INFO, "RESULT SWEEP_VARS_REMAIN_N    %i / %i (%.2f %)\n", vars_remain_end, stats.vars_active_orig, vars_remain_percent);
-		LOG(V2_INFO, "RESULT SWEEP_VARS_FIXED_PRCNT		%.2f \n", vars_fixed_percent);
+		LOG(V2_INFO, "RESULT SWEEP_CLAUSES_REMOVED_N	 %i \n", clauses_removed);
+		LOG(V2_INFO, "RESULT SWEEP_CLAUSES_REMOVED_PRCNT %.6f \n", clauses_removed_percent);
+		LOG(V2_INFO, "RESULT SWEEP_VARS_REMAIN_N		 %i / %i (%.6f %)\n", vars_remain_end, stats.vars_active_orig, vars_remain_percent);
+		LOG(V2_INFO, "RESULT SWEEP_VARS_FIXED_PRCNT		 %.6f \n", vars_fixed_percent);
 	}
 
 	if (full) {
