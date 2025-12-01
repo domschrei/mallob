@@ -68,17 +68,21 @@ private:
     const int TAG_BCAST_INIT = 1003;
     const int TAG_ALLRED = 1004;
 	//Positions where the metadata is stored in each shared element. Format [ <actual data> , eqs_size, units_size, all_idle]
-	static const int NUM_METADATA_FIELDS = 3; //three integers at the end of an aggregation element
-	static const int METADATA_EQ_SIZE_POS = 3;
-	static const int METADATA_UNIT_SIZE_POS = 2;
-	static const int METADATA_IDLE_FLAG_POS = 1;
+
+	static const int NUM_METADATA_FIELDS = 4; //we have integers as metadata at the end of an aggregation element
+		//which are the following:
+		static const int METADATA_POS_TERMINATE_FLAG  = 4;
+		static const int METADATA_POS_IDLE_FLAG		 = 3;
+		static const int METADATA_POS_UNIT_SIZE	    = 2;
+		static const int METADATA_POS_EQ_SIZE	   = 1;
+
 
 	//Distribute Eqs and Units that we received from sharing broadcast to local solvers
 	// std::atomic<std::shared_ptr<std::vector<int>>> _EQS_to_import { std::make_shared<std::vector<int>>() };
 	// std::atomic<std::shared_ptr<std::vector<int>>> _UNITS_to_import { std::make_shared<std::vector<int>>() };
 	static const unsigned INVALID_LIT = UINT_MAX; //Internal literals count unsigned 0,1,2,..., the largest number marks an invalid literal. see further: https://github.com/arminbiere/satch/blob/master/satch.c#L1017
 	static const int MAX_IMPORT_SIZE = 100'000;
-	std::atomic_int _published_import_round{0};
+	std::atomic_int _rank_import_round{0}; //counts the number of import rounds on this rank. Polled by solvers to detect whether there is something new to import
 	std::atomic_int _EQS_import_size{0};
 	std::atomic_int _UNITS_import_size{0};
 	std::vector<int> _EQS_to_import {};
@@ -106,8 +110,8 @@ private:
     // std::vector<int> _eqs_from_broadcast;  //store received equivalences at rank level to copy to individual solvers
 	// std::vector<int> _units_from_broadcast;
 
-	//We want to test multiple iterations of full sweeping, to see whether and how fast there is diminishing returns
-	int _curr_sweep_iteration = 1;
+	//We want to test multiple rounds of full sweeping, to see whether and how fast there is diminishing returns
+	int _root_sweep_round = 1;
 
 	//Termination. Determined during workstealing, broadcasted via sharing
 	std::atomic_bool _terminate_all=false; //termination (on this node) due to sharing consensus that there is no more work
@@ -122,6 +126,21 @@ private:
 	std::vector<int> _resweeps_out{};
 
 	Logger _reslogger;
+
+	//Decide at the root of the AllReduction whether the shared data should contain the termination signal
+    const std::function<std::vector<int>(const std::vector<int>&)> _rootTransform = [&](const std::vector<int>& payload) {
+    	assert(_is_root);
+    	bool ALL_IDLE = payload[payload.size() - METADATA_POS_IDLE_FLAG];
+    	bool WAS_LAST_ROUND = (_root_sweep_round == _params.sweepRounds());
+    	if (ALL_IDLE && WAS_LAST_ROUND) {
+    		LOG(V1_WARN, "SWEEP [%i]: Job finished! All rounds done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_round, _params.sweepRounds());
+    		auto terminating_payload = payload;
+    		terminating_payload[payload.size() - METADATA_POS_TERMINATE_FLAG] = 1;
+    		return terminating_payload;
+    	}
+    	return payload;
+    };
+
 
 public:
     SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table);
@@ -151,10 +170,10 @@ private:
 	void createAndStartNewSweeper(int localId);
     void loadFormula(KissatPtr sweeper);
 
-	void reportResultFromSolver(KissatPtr sweeper, int res);
-	void printSweepStats(KissatPtr sweeper, bool full, int res);
+	void reportSolverResult(KissatPtr sweeper, int res);
+	void printSweepStats(KissatPtr sweeper, bool full);
 	// void readResult(KissatPtr shweeper, bool withStats);
-	void serializeResultFormula(KissatPtr sweeper);
+	// void serializeResultFormula(KissatPtr sweeper);
 
 	void gentlyTerminateSolvers();
 
@@ -166,6 +185,7 @@ private:
     void initiateNewSharingRound();
     void cbContributeToAllReduce();
     static std::vector<int> aggregateEqUnitContributions(std::list<std::vector<int>> &contribs);
+	static void appendMetadataToReductionElement(std::vector<int> &contrib, int is_idle, int unit_size, int eq_size);
 	void advanceAllReduction();
 
 	std::vector<int> getRandomIdPermutation();
@@ -174,7 +194,7 @@ private:
 	std::vector<int> stealWorkFromAnyLocalSolver(int asking_rank, int asking_localId); //parameters only for verbose logging
     std::vector<int> stealWorkFromSpecificLocalSolver(int localId);
     void cbSearchWorkInTree(unsigned **work, int *work_size, int localId);
-	void checkForNewImportRound(KissatPtr sweeper);
+	void pollForNewImportRange(KissatPtr sweeper);
 	void cbImportEq(int *ilit1, int *ilit2, int localId);
 	void cbImportUnit(int *lit, int localId);
 	// void importNextEquivalence(int *last_imported_round, int eq_nr, unsigned *lit1, unsigned *lit2);

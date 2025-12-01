@@ -54,7 +54,7 @@ private:
 	std::vector<int> work_received_from_steal;
 
 	bool sweeper_is_idle = false;
-	std::shared_ptr<std::atomic<int>> sweepReportingLocalId;
+	// std::shared_ptr<std::atomic<int>> sweepReportingLocalId;
 	bool has_reported_sweep_dimacs = false;
 
 	std::atomic_int sweep_import_round{0};
@@ -147,7 +147,7 @@ public:
 	friend void sweep_export_unit(void *state, int unit);
 	friend void sweep_import_eqs(void* state, int** equivalences, int *eqs_size);
 	friend void sweep_import_units(void *state, int **units, int *unit_count);
-	void sweepSetReportingPtr(std::shared_ptr<std::atomic<int>> field);
+	// void sweepSetReportingPtr(std::shared_ptr<std::atomic<int>> field);
 	void setToSweeper();
 	void setSweepTerminate();
 	bool hasReportedSweepDimacs() const;

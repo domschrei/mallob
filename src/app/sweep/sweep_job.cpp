@@ -167,12 +167,22 @@ void SweepJob::appl_terminate() {
 	gentlyTerminateSolvers();
 }
 
-void SweepJob::reportResultFromSolver(KissatPtr sweeper, int res) {
+void SweepJob::reportSolverResult(KissatPtr sweeper, int res) {
 	assert(_solved_status==-1);
-	serializeResultFormula(sweeper); //there is no result formula, but we need to to serialization anyways since it adds some metadata to the json job result
-	printSweepStats(sweeper, true, res);
+
+	//serializing result formula
+	LOG(V2_INFO, "SWEEP JOB [%i](%i) serializing result formula from solver \n", _my_rank, sweeper->getLocalId());
+	//format is [Clauses, #Vars, #Clauses], i.e. clauses followed by two metadata-ints at the end. Or empty, if the solver found UNSAT or made no progress at all
+	std::vector<int> formula = sweeper->extractPreprocessedFormula();
+	//we always need to serialize, even an empty formula, because serialization adds some required metadata anyways
+	_internal_result.setSolutionToSerialize(formula.data(), formula.size());
+
+	// serializeResultFormula(sweeper); //there is no result formula, but we need to to serialization anyways since it adds some metadata to the json job result
+	// printSweepStats(sweeper, true, res);
+	LOGGER(_reslogger,V2_INFO, "SWEEP_RESULT_CODE			%i == %s \n", res, res==40 ? "IMPROVED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
 	_internal_result.result = res;
 	_solved_status = res;
+	//_solved_status != -1 will be noticed by the main thread and triggers the termination of this job
 }
 
 void SweepJob::createAndStartNewSweeper(int localId) {
@@ -227,20 +237,27 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		// if (_is_root) { //we only report results from solvers on the root node, to prevent additional communication/agreement across ranks
 		//todo: we need to recognize non-root UNSAT results, but they might not have the full timing info as root
 		//maybe split reporting, such that non-solving root solver still prints his stats, to be consistent with prior rounds
+
 		if (res==20) {
 			//Found UNSAT
 			assert(kissat_is_inconsistent(sweeper->solver) || log_return_false("SWEEP ERROR: Solver returned UNSAT 20 but is not in inconsistent (==UNSAT) state!\n"));
 			int unset_state = -1;
-			//Check whether we are the very first solver to report anything. If we are, report and block others
+			//if we are the very first solver to report anything, report and block others
 			if (_reporting_localId->compare_exchange_strong(unset_state, localId)) {
-				reportResultFromSolver(sweeper, UNSAT);
+				reportSolverResult(sweeper, UNSAT);
 			}
 		} else if (res==0) {
 			//might have made some progress
-			if (sweeper->hasReportedSweepDimacs()) {
-				reportResultFromSolver(sweeper, IMPROVED);
+			if (sweeper->hasReportedSweepDimacs()) { //by design the only sweeper that might have reported smth is the representative one with localId==0
+				reportSolverResult(sweeper, IMPROVED);
 			}
 		}
+
+		//A dedicated solver on the root node print his stats as a representative of all other solvers. Their stats differ slightly between solvers, but especially these global stats are very similar between all of them, so we don't bother aggregating/averaging them
+		if (_is_root && localId == _representative_localId) {
+			printSweepStats(sweeper, true);
+		}
+
 	// }
 
 		assert(res==UNKNOWN || res==UNSAT || log_return_false("SWEEP ERROR: solver has returned with unexpected signal %i \n", res));
@@ -304,9 +321,9 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	shweep_set_SweepJob_unit_import_callback(sweeper->solver, this, cb_import_unit);
 
 	if (_is_root) {
-		//read out final formula only at the root node
+		//we want to read out the final formula at the root node for convenience, so we provide this callback only to root-node solvers in the first place
 		sweeper->sweepSetReportCallback();
-		sweeper->sweepSetReportingPtr(_reporting_localId);
+		// sweeper->sweepSetReportingPtr(_reporting_localId);
 	}
 
     //Basic configuration
@@ -345,14 +362,10 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	return sweeper;
 }
 
-void SweepJob::serializeResultFormula(KissatPtr sweeper) {
-	LOG(V2_INFO, "SWEEP JOB [%i](%i) serializing result formula from solver \n", _my_rank, sweeper->getLocalId());
-	// assert(shweeper->hasPreprocessedFormula());
-	std::vector<int> formula = sweeper->extractPreprocessedFormula(); //format is [Clauses, #Vars, #Clauses], i.e. clauses followed by two metadata-ints at the end. Or empty, if the solver found UNSAT or made no progress at all
-	_internal_result.setSolutionToSerialize(formula.data(), formula.size()); //we always need to serialize, even an empty formula, because serialization adds some required metadata in front
-}
+void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
+	assert(_is_root);
+	assert(sweeper->getLocalId() == _representative_localId);
 
-void SweepJob::printSweepStats(KissatPtr sweeper, bool full, int res=0) {
 	auto stats = sweeper->fetchSweepStats();
 	//As "vars" we are only interested in variables that are active (not fixed) at the start of Sweep. The "VAR" counter is much larger, but most of these variables are often already fixed.
 	int vars_fixed_end = stats.sweep_eqs + stats.units_new;
@@ -364,18 +377,16 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full, int res=0) {
 	double clauses_removed_percent = 100*clauses_removed/(double)sweeper->_setup.numOriginalClauses;
 
 
-	LOG(			   V2_INFO, "SWEEP RESULT, reported by [%i](%i) in .sweep file \n", _my_rank, sweeper->getLocalId());
+	LOG(			   V2_INFO, "SWEEP solver [%i](%i) reports statistics of in .sweep file \n", _my_rank, sweeper->getLocalId());
 	LOGGER(_reslogger, V2_INFO, "Reported by [%i](%i) \n", _my_rank, sweeper->getLocalId());
-	LOGGER(_reslogger, V2_INFO, "SWEEP ITERATION			%i / %i \n", _curr_sweep_iteration, _params.sweepIterations());
-	if (full)
-		LOGGER(_reslogger,V2_INFO, "SWEEP_RESULT_CODE			%i == %s \n", res, res==40 ? "IMPROVED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
+	LOGGER(_reslogger, V2_INFO, "SWEEP_ROUND			%i / %i \n", _root_sweep_round, _params.sweepRounds());
 
 	LOGGER(_reslogger,V2_INFO, "SWEEP_TIME				 %f seconds \n", Timer::elapsedSeconds() - _start_sweep_timestamp);
 	LOGGER(_reslogger,V2_INFO, "SWEEP_IMPORT_EQS_USEFUL	 %i / %i \n", stats.eqs_useful, stats.eqs_seen); //representative for the reporting solver
 	LOGGER(_reslogger,V2_INFO, "SWEEP_IMPORT_UNITS_USEFUL %i / %i \n", stats.units_useful, stats.units_seen);
 	LOGGER(_reslogger,V2_INFO, "SWEEP_EQUIVALENCES		%i\n", stats.sweep_eqs);
 	LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_NEW			%i\n", stats.units_new);
-	LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_FIXED_N		%i / %i (%.2f %)\n", vars_fixed_end, stats.vars_active_orig, vars_fixed_percent);
+	LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_FIXED_N		%i / %i (%.3f %)\n", vars_fixed_end, stats.vars_active_orig, vars_fixed_percent);
 
 	if (full) {
 		LOGGER(_reslogger,V2_INFO, "SWEEP_PRIORITY       %f\n", _params.preprocessSweepPriority.val);
@@ -486,20 +497,22 @@ void SweepJob::sendMPIWorkstealRequests() {
 	}
 }
 
-void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
-	int publish_round = _published_import_round.load(std::memory_order_relaxed);
+void SweepJob::pollForNewImportRange(KissatPtr sweeper) {
+	int publish_round = _rank_import_round.load(std::memory_order_relaxed);
 	if (publish_round != sweeper->sweep_import_round) [[unlikely]] {
-		publish_round = _published_import_round.load(std::memory_order_acquire);
+		//there is new data from a new sharing round
+		publish_round = _rank_import_round.load(std::memory_order_acquire);
 		assert(sweeper->sweep_import_round <= publish_round);
 		sweeper->sweep_import_round  = publish_round;
 		if (sweeper->sweep_EQS_index != sweeper->sweep_EQS_size)
 			LOG(V1_WARN, "SWEEP Warn: Solver [%i](%i) couldn't finish reading previous equivalence imports! now skipping remaining  %i/%i \n", _my_rank, sweeper->getLocalId(), sweeper->sweep_EQS_index.load(), sweeper->sweep_EQS_size.load());
 		if (sweeper->sweep_UNITS_index != sweeper->sweep_UNITS_size)
 			LOG(V1_WARN, "SWEEP Warn: Solver [%i](%i) couldn't finish reading previous unit imports! now skipping remaining  %i/%i \n", _my_rank, sweeper->getLocalId(), sweeper->sweep_UNITS_index.load(), sweeper->sweep_UNITS_size.load());
-		sweeper->sweep_EQS_size = _EQS_import_size.load(std::memory_order_relaxed);
-		sweeper->sweep_UNITS_size = _UNITS_import_size.load(std::memory_order_relaxed);
-		sweeper->sweep_EQS_index = 0;
+		//tell the solver where in the fixed array the data starts and where it ends
+		sweeper->sweep_EQS_index   = 0;
 		sweeper->sweep_UNITS_index = 0;
+		sweeper->sweep_EQS_size    = _EQS_import_size.load(std::memory_order_relaxed);
+		sweeper->sweep_UNITS_size  = _UNITS_import_size.load(std::memory_order_relaxed);
 		// LOG(V2_INFO, "Solver [%i](%i) updates to new round %i with eq_size %i, unit_size %i \n", _my_rank, sweeper->getLocalId(), publish_round, sweeper->sweep_EQS_size.load(), sweeper->sweep_UNITS_size.load());
 	}
 }
@@ -507,12 +520,11 @@ void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
 void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
 
 	KissatPtr sweeper = _sweepers[localId];
-	checkForNewImportRound(sweeper);
+	pollForNewImportRange(sweeper);
 
 	// LOG(V2_INFO, "solver [%i](%i) eq callback sees index %i and size %i \n",_my_rank, localId, sweeper->sweep_curr_EQS_index.load(), sweeper->sweep_curr_EQS_size.load());
 	if (sweeper->sweep_EQS_index == sweeper->sweep_EQS_size) {
-		// *ilit1 = INVALID_LIT; leave untouched
-		// *ilit2 = INVALID_LIT;
+		//leave *ilit's untouched
 		return;
 	}
 
@@ -530,9 +542,9 @@ void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
 void SweepJob::cbImportUnit(int *ilit, int localId) {
 
 	KissatPtr sweeper = _sweepers[localId];
-	checkForNewImportRound(sweeper);
+	pollForNewImportRange(sweeper);
 	if (sweeper->sweep_UNITS_index == sweeper->sweep_UNITS_size) {
-		// *ilit = INVALID_LIT; leave untouched
+		// leave *ilit untouched
 		return;
 	}
 	assert(sweeper->sweep_UNITS_index < sweeper->sweep_UNITS_size || log_return_false("SWEEP ERROR: in Unit Import: curr index %i is larger than expected size %i\n", sweeper->sweep_UNITS_index.load(), sweeper->sweep_UNITS_size.load()));
@@ -724,6 +736,17 @@ void SweepJob::initiateNewSharingRound() {
 	_bcast->broadcast(std::move(msg));
 }
 
+void SweepJob::appendMetadataToReductionElement(std::vector<int> &contrib, int is_idle, int unit_size, int eq_size) {
+	contrib.insert(contrib.end(), NUM_METADATA_FIELDS, 0); //Make space for the upcoming metadata
+	int size = contrib.size();
+	int n=0;
+	n++; contrib[size - METADATA_POS_TERMINATE_FLAG]  = 0;  //The termination signal will be eventually set during reduction in the rootTransform
+	n++; contrib[size - METADATA_POS_IDLE_FLAG]       = is_idle;
+	n++; contrib[size - METADATA_POS_UNIT_SIZE]       = unit_size;
+	n++; contrib[size - METADATA_POS_EQ_SIZE]         = eq_size;
+	assert(n==NUM_METADATA_FIELDS);
+}
+
 void SweepJob::cbContributeToAllReduce() {
 	assert(_bcast);
 	assert(_bcast->hasResult());
@@ -749,6 +772,8 @@ void SweepJob::cbContributeToAllReduce() {
 	baseMsg.tag = TAG_ALLRED;
 	LOG(V4_VVER, "SWEEP SHARE [%i] RESET AllReduction, to prepare contributing local data. \n", _my_rank);
 	_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateEqUnitContributions));
+	if (_is_root)
+		_red->setTransformationOfElementAtRoot(_rootTransform);
 
 
 	//Bring individual data per thread in the sharing element format: [Equivalences, Units, eq_size, unit_size, all_idle]
@@ -777,9 +802,13 @@ void SweepJob::cbContributeToAllReduce() {
 		LOG(V4_VVER, "SWEEP SHARE REDUCE (%i): %i eq_size, %i units, %i idle \n", sweeper->getLocalId(), eq_size, unit_size, sweeper->sweeper_is_idle);
 		std::vector<int> contrib = std::move(eqs);
 		contrib.insert(contrib.end(), units.begin(), units.end());
-		contrib.push_back(eq_size);
-		contrib.push_back(unit_size);
-		contrib.push_back(sweeper->sweeper_is_idle);
+
+		appendMetadataToReductionElement(contrib, sweeper->sweeper_is_idle, unit_size, eq_size);
+		// contrib.push_back(eq_size);
+		// contrib.push_back(unit_size);
+		// contrib.push_back(sweeper->sweeper_is_idle);
+		// contrib.push_back(_root_sweep_round);
+		// contrib.push_back(0);
 
 		contribs.push_back(contrib);
 
@@ -815,9 +844,10 @@ void SweepJob::advanceAllReduction() {
 
 	//Extract shared data
 	auto data = _red->extractResult();
-	const int eq_size = data[data.size()-METADATA_EQ_SIZE_POS];
-	const int unit_size = data[data.size()-METADATA_UNIT_SIZE_POS];
-	const int all_idle = data[data.size()-METADATA_IDLE_FLAG_POS];
+	const int terminate   = data[data.size()-METADATA_POS_TERMINATE_FLAG];
+	const int all_idle    = data[data.size()-METADATA_POS_IDLE_FLAG];
+	const int unit_size   = data[data.size()-METADATA_POS_UNIT_SIZE];
+	const int eq_size     = data[data.size()-METADATA_POS_EQ_SIZE];
 	assert(eq_size%2==0 || log_return_false("ERROR: Import Equality size not even, but %i\n", eq_size));
 
 	for (int i=0; i<eq_size; i++) {
@@ -830,10 +860,10 @@ void SweepJob::advanceAllReduction() {
 
 	_EQS_import_size.store(eq_size, std::memory_order_relaxed);
 	_UNITS_import_size.store(unit_size, std::memory_order_relaxed);
-	_published_import_round.store(_published_import_round+1, std::memory_order_release);
+	_rank_import_round.store(_rank_import_round+1, std::memory_order_release);
 
 	// if (_is_root)
-	LOG(V2_INFO, "SWEEP SHARE import round %i GOT: %i EQS, %i UNITS\n", _published_import_round.load(), eq_size/2, unit_size);
+	LOG(V2_INFO, "SWEEP SHARE import round %i GOT: %i EQS, %i UNITS\n", _rank_import_round.load(), eq_size/2, unit_size);
 	// else
 		// LOG(V3_VERB, "SWEEP SHARE import round %i GOT: %i EQS, %i UNITS\n", _published_import_round.load(), eq_size/2, unit_size);
 
@@ -847,25 +877,25 @@ void SweepJob::advanceAllReduction() {
 	LOG(V4_VVER, "SWEEP SHARE [%i] RESET REDUCE\n", _my_rank);
 	_red.reset();
 
-	//Publish termination signal only AFTER we copied the Eqs&Units, as the solvers will immediately try to import these last E&U after exiting their main loop
+	//Only now check for termination, AFTER we copied the Eqs & Units. The solvers will immediately after receiving the termination signal read the last imported E&U, now they are ready to be served
 	if (all_idle) {
-		LOG(V1_WARN, "[%i] SWEEP ITERATION %i/%i FINISHED \n", _my_rank, _curr_sweep_iteration, _params.sweepIterations());
-		if (_curr_sweep_iteration < _params.sweepIterations()) {
-			if (_is_root) {
-				printSweepStats(_sweepers[_representative_localId], false); //report some intermediate statistics about this round
-			}
-			//todo: the sweep iteration should not be incremented by each rank individually, but broadcasted by the root
-			//otherwise, new ranks might be out-of-sync, since they might not have seen the earlier iterations
-			//and would carry on and miss the termination
-			_curr_sweep_iteration++;
-			LOG(V1_WARN, "[%i] SWEEP ITERATION %i/%i STARTED \n", _my_rank, _curr_sweep_iteration, _params.sweepIterations());
-			_root_provided_initial_work = false; //will trigger another iteration by providing new full work to the solvers
-		} else {
+		LOG(V1_WARN, "[%i] SWEEP ROUND FINISHED \n", _my_rank);
+		if (_is_root)
+			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i FINISHED \n", _my_rank, _root_sweep_round, _params.sweepRounds());
+		//the root node takes care of tracking how many sweep rounds we already had
+		if (_is_root && _root_sweep_round < _params.sweepRounds()) {
+			printSweepStats(_sweepers[_representative_localId], false); //report some intermediate statistics about this round
+			_root_sweep_round++;
+			_root_provided_initial_work = false; //will trigger another round of sweeping by providing again work to the solvers
+			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i STARTED \n", _my_rank, _root_sweep_round, _params.sweepRounds());
+		}
+		if (terminate) { //will be set eventually by rootTransform in AllReduction
 			_terminate_all = true;
-			LOG(V1_WARN, "# \n # \n # --- [%i] ALL SWEEPERS IDLE - CAN TERMINATE -- \n # \n", _my_rank);
+			LOG(V1_WARN, "# \n # \n # --- [%i] GOT GLOBAL TERMINATE FLAG -- TERMINATING \n # \n", _my_rank);
 		}
 	}
 }
+
 
 
 
@@ -882,8 +912,8 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 
 	//sanity check whether each contribution contains coherent size information about itself
 	for (const auto& contrib : contribs) {
-		int claimed_eq_size = contrib[contrib.size()- METADATA_EQ_SIZE_POS];
-		int claimed_unit_size = contrib[contrib.size()- METADATA_UNIT_SIZE_POS];
+		int claimed_eq_size = contrib[contrib.size()- METADATA_POS_EQ_SIZE];
+		int claimed_unit_size = contrib[contrib.size()- METADATA_POS_UNIT_SIZE];
 		int claimed_total_size = claimed_eq_size + claimed_unit_size + NUM_METADATA_FIELDS;
 		assert(contrib.size() == claimed_total_size ||
 			log_return_false("ERROR in AllReduce, Bad Element Format: Claims total size %i != %i actual contrib.size() (claims: eq_size %i,  units size %i, metadata %i)", claimed_total_size, contrib.size(), claimed_eq_size, claimed_unit_size, NUM_METADATA_FIELDS)
@@ -915,7 +945,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	//Fill equivalences
 	size_t aggr_eq_size = 0;
     for (const auto &contrib : contribs) {
-    	int eq_size = contrib[contrib.size()-METADATA_EQ_SIZE_POS];
+    	int eq_size = contrib[contrib.size()-METADATA_POS_EQ_SIZE];
     	aggr_eq_size += eq_size;
         aggregated.insert(aggregated.end(), contrib.begin(), contrib.begin()+eq_size);
 		oss_e << "| " << i << ":" << eq_size << " "	;
@@ -930,8 +960,8 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	//Fill units
 	size_t aggr_unit_size = 0;
     for (const auto &contrib : contribs) {
-    	int eq_size = contrib[contrib.size()-METADATA_EQ_SIZE_POS];  //need to know where the eq ends, i.e. where the units start
-    	int unit_size = contrib[contrib.size()-METADATA_UNIT_SIZE_POS];
+    	int eq_size = contrib[contrib.size()-METADATA_POS_EQ_SIZE];  //need to know where the eq ends, i.e. where the units start
+    	int unit_size = contrib[contrib.size()-METADATA_POS_UNIT_SIZE];
 		aggr_unit_size += unit_size;
         aggregated.insert(aggregated.end(), contrib.begin()+eq_size, contrib.end()-NUM_METADATA_FIELDS); //not copying the metadata at the end
     	oss_u << "| " << i << ":" << unit_size << " "	;
@@ -943,18 +973,20 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	//See whether all solvers are idle
 	bool all_idle = true;
     for (const auto &contrib : contribs) {
-		bool idle = contrib[contrib.size()-METADATA_IDLE_FLAG_POS];
+		bool idle = contrib[contrib.size()-METADATA_POS_IDLE_FLAG];
     	all_idle &= idle;
     }
 
 	if (contribs.empty()) {
-		all_idle = false; //edge-case: if not a single solver is initialized yet, we are waiting for them to come online, so they are not idle
+		all_idle = false; //edge-case: if not a single solver is initialized yet, we are waiting for them to come online, so they are not really idle
 	}
 
+	appendMetadataToReductionElement(aggregated, all_idle, aggr_unit_size, aggr_eq_size);
 	//these are the three fields we account for with SHARING_METADATA_FIELDS
-	aggregated.push_back(aggr_eq_size);
-	aggregated.push_back(aggr_unit_size);
-	aggregated.push_back(all_idle);
+	// aggregated.push_back(aggr_eq_size);
+	// aggregated.push_back(aggr_unit_size);
+	// aggregated.push_back(all_idle);
+
 	if (contribs.size()>1)
 		LOG(V3_VERB, "SWEEP SHARE REDUCE aggr %i contribs: %i EQ, %i UNITS, %i ALL_IDLE\n", contribs.size(), aggr_eq_size/2, aggr_unit_size, all_idle);
 	int individual_sum =  aggr_eq_size + aggr_unit_size + NUM_METADATA_FIELDS;
@@ -1041,8 +1073,8 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 void SweepJob::gentlyTerminateSolvers() {
 	LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] interrupting solvers\n", getId(), _my_rank);
 	while (_started_sweepers_count < _nThreads) {
-		LOG(V1_WARN, "Warn SWEEP JOB [%i]: delaying destructors until sweepers are all cleanly initialized (currently started %i/%i)\n",
-			getId(), _my_rank, _started_sweepers_count.load(), _nThreads);
+		LOG(V1_WARN, "Warn SWEEP JOB [%i]: delaying destructors until sweepers are all cleanly initialized (until now init %i/%i)\n",
+			_my_rank, _started_sweepers_count.load(), _nThreads);
 		usleep(500);
 	}
 	//each sweeper checks constantly for the interruption signal (on the ms scale or faster), allow for gentle own exit

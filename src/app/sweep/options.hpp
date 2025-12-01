@@ -10,4 +10,4 @@ OPT_INT(sweepSharingPeriod_ms, "swpsp", "sweep-sharing-period", 250, 1, LARGE_IN
 OPT_INT(sweepSolverVerbosity, "swpvrb", "sweep-solver-verbosity", 0, 0, 5, "verbosity of the kissat sweeping solvers in the SWEEP app")
 OPT_INT(sweepSolverQuiet, "swpqt", "sweep-solver-quiet", 1, 0, 1, "whether the solver-native messages should be completely disabled (kissat quiet option)")
 OPT_INT(sweepResweepChance, "swprc", "sweep-resweep-chance", 1e4, 0, 1e4, "chance that a solver resweeps a variable from a found equivalence (in per mille)")
-OPT_INT(sweepIterations, "swpit", "sweep-iterations", 1, 0, LARGE_INT, "number of iterative full sweeps over all variables")
+OPT_INT(sweepRounds, "swprds", "sweep-rounds", 1, 0, LARGE_INT, "number of full sweep rounds over all variables")

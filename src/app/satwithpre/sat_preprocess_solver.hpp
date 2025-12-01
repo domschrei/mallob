@@ -373,8 +373,8 @@ private:
             json["cpu-limit"] = std::to_string(_desc.getCpuLimit() - getAgeSinceActivation()) + "s";
 
 
-        LOG(V2_INFO, "SATWP Starting SAT Job: %d Vars\n", nbVars);
-        LOG(V2_INFO, "SATWP Starting SAT Job: %d Clauses\n", nbClauses);
+        LOG(V2_INFO, "SATWP Starting Preprocessed SAT Job: %d Vars\n", nbVars);
+        LOG(V2_INFO, "SATWP Starting Preprocessed SAT Job: %d Clauses\n", nbClauses);
 
         // Obtain API and submit the job
         auto copiedJson = json;

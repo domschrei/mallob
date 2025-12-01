@@ -587,13 +587,9 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
     bool accept = nbVars != _setup.numVars || nbClauses != _setup.numOriginalClauses;
 
     if (is_sweeper) {
-// #if SWEEP_STARTTYPE==2
-        bool weAreFirst = (getLocalId()== 0); //by arriving here we already know that the sweeper is on the root node
-// #else
-        // int unset_state = -1;
-        // bool weAreFirst = sweepReportingLocalId->compare_exchange_strong(unset_state, getLocalId());
-// #endif
-        if (weAreFirst) {
+        //by arriving here we already know that the sweeper is on the root node
+        bool is_representative_solver = (getLocalId()== 0);  //we take the localId==0 solver to be the representative one that reports the clause to us
+        if (is_representative_solver) {
             LOG(V2_INFO, "SWEEP [root](%i) first to report dimacs result\n", getLocalId());
             if (accept) {
                 LOG(V2_INFO, "SATWP ACCEPTS SWEEP dimacs formula\n");
@@ -604,7 +600,7 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
             }
             LOG(V2_INFO, "SATWP sees from SWEEP: (%i --> %i vars) (%i --> %i clauses) \n", _setup.numVars, nbVars, _setup.numOriginalClauses, nbClauses);
         } else {
-            LOG(V3_VERB, "SWEEP [root](%i) got formula report request denied, already taken by (%i) \n", getLocalId(), sweepReportingLocalId->load());
+            // LOG(V3_VERB, "SWEEP [root](%i) formula report request denied, already taken by (%i) \n", getLocalId(), sweepReportingLocalId->load());
             accept = false;
         }
     }
@@ -637,9 +633,9 @@ void Kissat::addLiteralFromPreprocessing(int lit) {
 }
 
 
-void Kissat::sweepSetReportingPtr(std::shared_ptr<std::atomic<int>> ptr) {
-    sweepReportingLocalId = ptr;
-}
+// void Kissat::sweepSetReportingPtr(std::shared_ptr<std::atomic<int>> ptr) {
+    // sweepReportingLocalId = ptr;
+// }
 
 
 void Kissat::setToSweeper() {
