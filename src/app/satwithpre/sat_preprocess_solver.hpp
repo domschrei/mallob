@@ -199,8 +199,8 @@ public:
 
         _prepro.interrupt();
 
-        // if (res.result==IMPROVED) //doesnt help us here at the end that the Sweeping found some improvement, final result is still unknown
-            // res.result = UNKNOWN;
+        if (res.result==IMPROVED) //if the only thing we got back is an improvement by the sweeping, the final result is still unknown
+            res.result = UNKNOWN;
 
         LOG(V2_INFO, "#%i SATWP RES ~%i~\n", _desc.getId(), res.result);
         return res;

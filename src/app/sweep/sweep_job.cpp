@@ -368,7 +368,6 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full, int res=0) {
 
 	LOG(			   V2_INFO, "SWEEP RESULT, reported by [%i](%i) in .sweep file \n", _my_rank, sweeper->getLocalId());
 	LOGGER(_reslogger, V2_INFO, "Reported by [%i](%i) \n", _my_rank, sweeper->getLocalId());
-	LOGGER(_reslogger, V2_INFO, "Reported by [%i](%i) \n", _my_rank, sweeper->getLocalId());
 	LOGGER(_reslogger, V2_INFO, "SWEEP ITERATION			%i / %i \n", _curr_sweep_iteration, _params.sweepIterations());
 	if (full)
 		LOGGER(_reslogger,V2_INFO, "SWEEP_RESULT_CODE			%i == %s \n", res, res==40 ? "IMPROVED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
