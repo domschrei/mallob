@@ -25,6 +25,7 @@ private:
 	int _numVars{0};
 
 
+	int _representative_localId{0}; //the dedicated solver that reports its statistics to us. They will ever so slightly differ between solvers, but instead of doing more complicated averaging we just report this one
 
 	//Local Solvers
 	int _nThreads{0};

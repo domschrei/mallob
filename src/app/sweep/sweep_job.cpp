@@ -251,9 +251,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		_sweepers[localId].reset();  //this should delete the only persistent shared pointer on the solver, and thus trigger its destructor soon now
 		LOG(V3_VERB, "SWEEP JOB [%i](%i) WORKER EXIT\n", _my_rank, localId);
 
-		if (_running_sweepers_count==0) {
-			//we are the very last solver, so by now all stats from all solvers should be collected
-			//doing this here ensures that this will be printed regardless of how exactly the SweepJob terminated (by itself or externally)
+		if (localId==_representative_localId) {
 			printResweeps();
 		}
 	});
@@ -552,7 +550,7 @@ void SweepJob::provideInitialWork(KissatPtr sweeper) {
 	assert(!_root_provided_initial_work);
 	assert(sweeper->work_received_from_steal.empty());
 	assert(_is_root);
-	assert(sweeper->getLocalId()==0);
+	assert(sweeper->getLocalId()==_representative_localId);
 	// assert(sweeper->sweeper_is_idle);
 
 
@@ -587,13 +585,13 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 			//this is the signal for the solver to terminate itself, by sending it a work array of size 0
 			sweeper->work_received_from_steal = {};
 			sweeper->sweeper_is_idle = true;
-			LOG(V3_VERB, "Sweeper [%i](%i) steal loop - node got terminate signal, exit loop\n", _my_rank, localId);
+			LOG(V3_VERB, "Sweeper [%i](%i) exit steal loop\n", _my_rank, localId);
 			break;
 		}
 		 /*
-		  * At the root node we serve the initial work exclusively to solver 0 (to prevent any potentially concurrent business, if multiple ask almost at the same time)
+		  * We serve the initial work exclusively to solver 0 at the root node. This hardcoded target prevents any concurrency/communication problems at this stage.
 		  */
-		if (_is_root && ! _root_provided_initial_work && localId==0) {
+		if (_is_root && ! _root_provided_initial_work && localId==_representative_localId) {
 			provideInitialWork(sweeper);
 			break;
 		}
@@ -664,7 +662,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 				LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop: waits for MPI response\n", _my_rank, localId);
 			}
 			if (_terminate_all) {
-				LOG(V3_VERB, "SWEEP WORK [%i](%i) steal loop: aborts waiting for MPI response - node got terminate signal \n", _my_rank, localId);
+				LOG(V3_VERB, "SWEEP WORK [%i](%i) exit wait loop\n", _my_rank, localId);
 				break;
 			}
 		}
@@ -854,7 +852,7 @@ void SweepJob::advanceAllReduction() {
 		LOG(V1_WARN, "[%i] SWEEP ITERATION %i/%i FINISHED \n", _my_rank, _curr_sweep_iteration, _params.sweepIterations());
 		if (_curr_sweep_iteration < _params.sweepIterations()) {
 			if (_is_root) {
-				printSweepStats(_sweepers[0], false); //we use the sweeper with local_id 0 as the representative to report statistics
+				printSweepStats(_sweepers[_representative_localId], false); //report some intermediate statistics about this round
 			}
 			//todo: the sweep iteration should not be incremented by each rank individually, but broadcasted by the root
 			//otherwise, new ranks might be out-of-sync, since they might not have seen the earlier iterations
