@@ -413,7 +413,7 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 		for (int i=0; i < _sharing_start_ping_timestamps.size() && i < _sharing_receive_result_timestamps.size(); i++) {
 			float start = _sharing_start_ping_timestamps[i];
 			float end   = _sharing_receive_result_timestamps[i];
-			LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_LATENCY  %f ms   (ping->result  %f --> %f) \n", (end-start)*1000, start, end);
+			LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_LATENCY  %f ms  \n", (end-start)*1000);
 		}
 		for (int i=0; ! _sharing_start_ping_timestamps.empty() && i < _sharing_start_ping_timestamps.size() -1; i++) {
 			LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_PERIOD_REAL  %f ms \n", (_sharing_start_ping_timestamps[i+1] - _sharing_start_ping_timestamps[i])*1000);
@@ -1072,13 +1072,14 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 
 void SweepJob::gentlyTerminateSolvers() {
 	LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] interrupting solvers\n", getId(), _my_rank);
-	while (_started_sweepers_count < _nThreads) {
-		LOG(V1_WARN, "Warn SWEEP JOB [%i]: delaying destructors until sweepers are all cleanly initialized (until now init %i/%i)\n",
-			_my_rank, _started_sweepers_count.load(), _nThreads);
-		usleep(500);
-	}
+
+	// while () {
+		// LOG(V1_WARN, "Warn SWEEP JOB [%i]: delaying destructors until sweepers are all cleanly initialized (until now init %i/%i)\n",
+			// _my_rank, _started_sweepers_count.load(), _nThreads);
+		// usleep(500);
+	// }
 	//each sweeper checks constantly for the interruption signal (on the ms scale or faster), allow for gentle own exit
-	while (_running_sweepers_count>0) {
+	while (_started_sweepers_count < _nThreads || _running_sweepers_count>0) {
 		LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] still %i solvers running\n", getId(), _my_rank, _running_sweepers_count.load());
 		int i=0;
 		for (auto &sweeper : _sweepers) {
@@ -1088,11 +1089,11 @@ void SweepJob::gentlyTerminateSolvers() {
 			}
 			i++;
 		}
-		usleep(1000);
+		usleep(500);
 	}
 	LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] no more solvers running\n", getId(), _my_rank);
 
-	usleep(2000);
+	usleep(500);
 
 	int i=0;
 	LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] joining bg_workers \n",  getId(),_my_rank);
