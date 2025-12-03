@@ -215,17 +215,6 @@ void Cadical::setPhase(const int var, const bool phase) {
 // return 10 for SAT, 20 for UNSAT, 0 for UNKNOWN
 SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
 
-	// add the learned clauses
-	learnMutex.lock();
-	for (auto clauseToAdd : learnedClauses) {
-		for (auto litToAdd : clauseToAdd) {
-			addLiteral(litToAdd);
-		}
-		addLiteral(0);
-	}
-	learnedClauses.clear();
-	learnMutex.unlock();
-
 	// set the assumptions
 	this->assumptions.clear();
 	//clearConditionalLits();

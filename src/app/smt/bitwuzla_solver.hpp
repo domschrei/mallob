@@ -27,10 +27,19 @@ private:
     std::string _name;
 
     struct BzllobTerminator : public bitwuzla::Terminator {
-        std::function<bool()> cb;
-        BzllobTerminator(std::function<bool()> cb) : cb(cb) {}
-        virtual bool terminate() {
-            return cb();
+        BitwuzlaSolver& inst;
+        const Parameters& params;
+        JobDescription& desc;
+        float endTime = INT32_MAX;
+        BzllobTerminator(BitwuzlaSolver& inst, const Parameters& params, JobDescription& desc, float startTime) :
+            inst(inst), params(params), desc(desc) {
+            updateStartTime(startTime);
+        }
+        void updateStartTime(float startTime) {
+            endTime = std::min(endTime, getEndTime(&params, &desc, startTime));
+        }
+        inline bool terminate() {
+            return inst.isTimeoutHit(&params, &desc, endTime);
         }
     } _terminator;
 
@@ -38,7 +47,7 @@ public:
     BitwuzlaSolver(const Parameters& params, APIConnector& api, JobDescription& desc, const std::string& problemFile) :
             _params(params), _api(api), _desc(desc), _problem_file(problemFile),
             _name("#" + std::to_string(desc.getId()) + "(SMT)"),
-            _terminator([&]() {return isTimeoutHit(&_params, &_desc, _start_time);}) {
+            _terminator(*this, _params, _desc, _start_time) {
 
         LOG(V2_INFO,"SMT Bitwuzla+Mallob %s\n", _name.c_str());
     }
@@ -48,6 +57,7 @@ public:
 
     JobResult solve() {
         _start_time = Timer::elapsedSeconds();
+        _terminator.updateStartTime(_start_time);
 
         bitwuzla::Options options;
         bitwuzla::TermManager tm;
@@ -173,10 +183,10 @@ public:
         return params.smtOutputFile() + (params.monoFilename.isSet() ? "" : "." + std::to_string(jobId));
     }
 
-    static bool isTimeoutHit(const Parameters* params, JobDescription* desc, float startTime) {
+    static inline bool isTimeoutHit(const Parameters* params, JobDescription* desc, float endTime) {
         if (Terminator::isTerminating())
             return true;
-        if (Timer::elapsedSeconds() > getEndTime(params, desc, startTime))
+        if (Timer::elapsedSeconds() > endTime)
             return true;
         return false;
     }

@@ -36,7 +36,7 @@ public:
         sat->setCleanupCallback([&, i = solverPointers.size()-1]() {
             solversCleanedUp[i] = true;
         });
-        sat->configure_terminator(&_term);
+        sat->configure_ext_terminator(&_term);
         return std::unique_ptr<bitwuzla::SatSolver>(sat);
     }
     /** Determine if configured SAT solver has terminator support. */

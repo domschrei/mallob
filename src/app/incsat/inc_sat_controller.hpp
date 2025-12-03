@@ -38,6 +38,9 @@ private:
     DTaskTracker _dtask_tracker;
     std::unique_ptr<WrappedSatJobStream> _stream;
 
+    std::function<bool()> _cb_terminate;
+    bool _replace_default_terminator {false};
+
 public:
     IncSatController(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& dTaskTracker) :
             _params(params), _api(api), _desc(desc), _stream_id(getNextStreamId()),
@@ -123,9 +126,9 @@ public:
         return _stream->stream.getNonblockingSolveResult();
     }
 
-    std::function<bool()> _cb_terminate;
-    void setInnerTerminator(std::function<bool()> cb) {
+    void setInnerTerminator(std::function<bool()> cb, bool replaceDefaultTerminator) {
         _cb_terminate = cb;
+        _replace_default_terminator = replaceDefaultTerminator;
     }
 
     void finalize() {
@@ -171,6 +174,7 @@ private:
         _stream->stream.setTerminator([&, str=&_stream->stream, params=&_params, desc=&_desc, startTime=_start_time]() {
             if (str->finalizing()) return true;
             if (_cb_terminate && _cb_terminate()) return true;
+            if (_replace_default_terminator) return false; // skip default terminator
             return isTimeoutHit(params, desc, startTime);
         });
 
