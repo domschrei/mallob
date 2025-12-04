@@ -6,6 +6,7 @@
 #include <memory>
 #include <mutex>
 #include <set>
+#include <unistd.h>
 
 #include "comm/mympi.hpp"
 #include "mpi.h"
@@ -35,7 +36,7 @@ public:
             // If we're cleaning up, nothing concurrent should happen any more,
             // so we don't put a lock around these top level checks.
             if (status == ACTIVE) suspend();
-            if (status == DEPLOYED) yield();
+            if (status == DEPLOYED) yield(false);
         }
 
         void setCallbackOnEvict(std::function<void()> cb) {
@@ -61,11 +62,11 @@ public:
             status = DEPLOYED;
             parent.onDTaskEvictable(*this, Timer::elapsedSeconds() - timeOfStart);
         }
-        void yield() {
+        void yield(bool lockAlreadyHeld) {
             assert(status == DEPLOYED);
             lastStatus = status;
             status = NONE;
-            parent.onDTaskRemove(*this);
+            parent.onDTaskRemove(*this, lockAlreadyHeld);
             if (cbEvict) {
                 LOG(V4_VVER, "DTASK %i cbEvict\n", id);
                 cbEvict();
@@ -87,8 +88,9 @@ public:
     };
 
 private:
+    Mutex mtx;
     std::set<DTaskSlot*, CompareDTask> evictableTasks;
-    int nbFreeSlots = 0;
+    volatile int nbFreeSlots = 0;
 
 public:
     DTaskTracker(const Parameters& params) {
@@ -106,28 +108,57 @@ public:
 
     void onDTaskDeploy(DTaskSlot& slot) {
         LOG(V5_DEBG, "DTASK %i deploy (%i free slots)\n", slot.id, nbFreeSlots);
-        if (nbFreeSlots == 0) {
+        auto lock = mtx.getLock();
+        while (nbFreeSlots == 0) {
+            // Look for a task to evict
             auto it = evictableTasks.begin();
-            assert(it != evictableTasks.end());
-            assert((*it)->status == DTaskSlot::DEPLOYED);
-            (*it)->yield();
+            while (it == evictableTasks.end()) {
+                // None present - wait (with mutex unlocked) for one to become present
+                lock.unlock();
+                usleep(1000);
+                lock.lock();
+                it = evictableTasks.begin();
+            }
+            // Found a task
+            {
+                auto& slot = **it;
+                // Obtain lock for the task's slot
+                auto slotLock = slot.getLock();
+                if (slot.status != DTaskSlot::DEPLOYED) {
+                    // Corner case where task is not in the right state (because it's being removed!):
+                    // Yield locks and sleep before retrying to find a task
+                    slotLock.unlock();
+                    lock.unlock();
+                    usleep(1000);
+                    lock.lock();
+                    continue;
+                }
+                // Task is in the right state: Can forward "yield" signal
+                // (which shortens the "evictableTasks" list with the lock already held)
+                (*it)->yield(true);
+            }
         }
+        // Slot is free / available for this task
         assert(nbFreeSlots > 0);
         nbFreeSlots--;
     }
     void onDTaskEvictable(DTaskSlot& slot, float timeToAdd) {
         LOG(V5_DEBG, "DTASK %i evictable\n", slot.id);
+        auto lock = mtx.getLock();
         evictableTasks.erase(&slot);
         slot.totalActiveTime += timeToAdd;
         evictableTasks.insert(&slot);
     }
     void onDTaskNonEvictable(DTaskSlot& slot) {
         LOG(V5_DEBG, "DTASK %i nonevictable\n", slot.id);
+        auto lock = mtx.getLock();
         evictableTasks.erase(&slot);
     }
-    void onDTaskRemove(DTaskSlot& slot) {
+    void onDTaskRemove(DTaskSlot& slot, bool lockAlreadyHeld) {
+        if (!lockAlreadyHeld) mtx.lock();
         LOG(V5_DEBG, "DTASK %i remove (%i free slots)\n", slot.id, nbFreeSlots);
         evictableTasks.erase(&slot);
         nbFreeSlots++;
+        if (!lockAlreadyHeld) mtx.unlock();
     }
 };

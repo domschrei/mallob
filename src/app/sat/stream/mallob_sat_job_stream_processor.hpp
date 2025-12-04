@@ -88,12 +88,6 @@ public:
         _backlog_task.integrate(task);
         auto& t = _backlog_task;
 
-        auto lock = _slot->getLock();
-        if (_slot->wasEvicted()) {
-            yield();
-            return;
-        }
-
         if (_task_pending) {
             // A previous interruption is still ongoing.
             // We need to wait for it to complete before we can submit the next revision.
@@ -106,13 +100,18 @@ public:
             LOG(V4_VVER, "%s ... ready\n", _name.c_str());
         }
 
+        auto lock = _slot->getLock();
+        if (_slot->wasEvicted()) {
+            yield();
+            return;
+        }
+
         if (!_finalized && !_began_nontrivial_solving) {
-            assert(!_slot->wasEvicted());
 
             // If no distributed job was submitted yet, we try to avoid this overhead;
             // we wait for a short while if a more lightweight solver finds a solution immediately.
             time = Timer::elapsedSeconds() - time;
-            usleep(1'000'000 * std::max(0.0, 0.05 - time)); // 50 ms minus the time taken to copy the literals
+            usleep(1'000'000 * std::max(0.0, 0.025 - time)); // 25 ms minus the time taken to copy the literals
             if (_terminator(t.rev)) {
                 return; // Task has become obsolete in the meantime, so skip solving
             }
@@ -120,8 +119,6 @@ public:
             LOG(V2_INFO, "%s awakes for rev. %i\n", _name.c_str(), t.rev);
             _began_nontrivial_solving = true;
             _slot->deploy();
-
-            //JobSlotRegistry::acquireSlot(_job_slot);
 
             int jobSlots = _params.jobSlots() > 0 ? _params.jobSlots() : MyMpi::size(MPI_COMM_WORLD);
             int numConcStreams = std::min(jobSlots, MyMpi::size(MPI_COMM_WORLD));
@@ -219,7 +216,6 @@ public:
                 concludeRevision(_pending_rev, 0, {});
                 _task_pending = false;
             }
-            //_job_slot->startActiveTime();
         } catch (...) {
             LOG(V0_CRIT, "[ERROR] uncaught exception while submitting JSON\n");
             abort();
@@ -231,9 +227,8 @@ public:
             usleep(sleepInterval);
             sleepInterval = std::min(2500UL, (unsigned long) std::ceil(1.2*sleepInterval));
         }
-        //_job_slot->endActiveTime();
 
-        lock = _slot->getLock();
+        lock.lock();
         _slot->suspend();
         LOG(V5_DEBG, "MSJS %s call ended\n", _name.c_str());
 
@@ -245,7 +240,10 @@ public:
         _finalized = true;
         SatJobStreamProcessor::finalize();
         if (!_began_nontrivial_solving) return;
-        _slot->yield();
+        {
+            auto lock = _slot->getLock();
+            if (_slot->status == DTaskTracker::DTaskSlot::DEPLOYED) _slot->yield(false);
+        }
         while (_task_pending) usleep(3000);
         if (!_incremental) return;
         if (!_json_base.contains("name")) return;
@@ -257,7 +255,6 @@ public:
         LOG(V4_VVER, "%s closing API\n", _name.c_str());
         _api.submit(copy, [&](nlohmann::json& result) {assert(false);});
         LOG(V4_VVER, "%s closed API\n", _name.c_str());
-        //_job_slot->release();
     }
 
     void yield() {
