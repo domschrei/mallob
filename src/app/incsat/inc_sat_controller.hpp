@@ -35,7 +35,7 @@ private:
     std::string _name;
 
     float _start_time = -1;
-    DTaskTracker _dtask_tracker;
+    DTaskTracker& _dtask_tracker;
     std::unique_ptr<WrappedSatJobStream> _stream;
 
     std::function<bool()> _cb_terminate;

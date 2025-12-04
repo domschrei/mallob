@@ -931,7 +931,7 @@ void SchedulingManager::updateVolume(int jobId, int volume, int balancingEpoch, 
 
     // If the job is not in the database, there might be a root request to activate 
     if (!has(jobId)) {
-        _req_mgr.activateRootRequest(jobId);
+        _req_mgr.tryActivateRootRequest(jobId);
         return;
     }
 

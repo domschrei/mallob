@@ -66,7 +66,10 @@ public:
             lastStatus = status;
             status = NONE;
             parent.onDTaskRemove(*this);
-            if (cbEvict) cbEvict();
+            if (cbEvict) {
+                LOG(V4_VVER, "DTASK %i cbEvict\n", id);
+                cbEvict();
+            }
         }
         bool wasEvicted() {
             return lastStatus == DEPLOYED && status == NONE;
@@ -96,10 +99,13 @@ public:
     }
 
     std::unique_ptr<DTaskSlot> createDTask() {
-        return std::unique_ptr<DTaskSlot> {new DTaskSlot(*this)};
+        auto slot = std::unique_ptr<DTaskSlot> {new DTaskSlot(*this)};
+        LOG(V5_DEBG, "DTASK %i new\n", slot->id);
+        return slot;
     }
 
     void onDTaskDeploy(DTaskSlot& slot) {
+        LOG(V5_DEBG, "DTASK %i deploy (%i free slots)\n", slot.id, nbFreeSlots);
         if (nbFreeSlots == 0) {
             auto it = evictableTasks.begin();
             assert(it != evictableTasks.end());
@@ -110,14 +116,17 @@ public:
         nbFreeSlots--;
     }
     void onDTaskEvictable(DTaskSlot& slot, float timeToAdd) {
+        LOG(V5_DEBG, "DTASK %i evictable\n", slot.id);
         evictableTasks.erase(&slot);
         slot.totalActiveTime += timeToAdd;
         evictableTasks.insert(&slot);
     }
     void onDTaskNonEvictable(DTaskSlot& slot) {
+        LOG(V5_DEBG, "DTASK %i nonevictable\n", slot.id);
         evictableTasks.erase(&slot);
     }
     void onDTaskRemove(DTaskSlot& slot) {
+        LOG(V5_DEBG, "DTASK %i remove (%i free slots)\n", slot.id, nbFreeSlots);
         evictableTasks.erase(&slot);
         nbFreeSlots++;
     }

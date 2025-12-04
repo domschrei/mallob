@@ -41,7 +41,7 @@ private:
     nlohmann::json _json_result;
     std::string _expected_result_job_name;
 
-    bool _task_pending {false};
+    volatile bool _task_pending {false};
     int _pending_rev {-1};
     bool _pending_task_interrupted {false};
 
@@ -93,6 +93,19 @@ public:
             yield();
             return;
         }
+
+        if (_task_pending) {
+            // A previous interruption is still ongoing.
+            // We need to wait for it to complete before we can submit the next revision.
+            LOG(V4_VVER, "%s pending ...\n", _name.c_str());
+            unsigned long sleepInterval {1};
+            while (_task_pending) {
+                usleep(sleepInterval);
+                sleepInterval = std::min(2500UL, (unsigned long) std::ceil(1.2*sleepInterval));
+            }
+            LOG(V4_VVER, "%s ... ready\n", _name.c_str());
+        }
+
         if (!_finalized && !_began_nontrivial_solving) {
             assert(!_slot->wasEvicted());
 
@@ -214,7 +227,7 @@ public:
         lock.unlock();
 
         unsigned long sleepInterval {1};
-        while (checkTaskPending(t.rev)) {
+        while (continueWaitingForTask(t.rev)) {
             usleep(sleepInterval);
             sleepInterval = std::min(2500UL, (unsigned long) std::ceil(1.2*sleepInterval));
         }
@@ -285,9 +298,9 @@ public:
     }
 
 private:
-    bool checkTaskPending(int rev) {
+    bool continueWaitingForTask(int rev) {
         if (!_task_pending) return false;
-        if (_pending_task_interrupted) return true;
+        if (_pending_task_interrupted) return false; // do NOT wait for interrupted call to return
         auto lock = _slot->getLock();
         if (!_terminator(rev) && !_slot->wasEvicted()) return true;
         lock.unlock();
@@ -307,8 +320,7 @@ private:
         if (response == JsonInterface::Result::DISCARD) {
             concludeRevision(_pending_rev, 0, {});
             _task_pending = false;
-            return false;
         }
-        return true;
+        return false; // do NOT wait for interrupted call to return
     }
 };

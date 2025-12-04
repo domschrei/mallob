@@ -121,7 +121,7 @@ public:
         MyMpi::isend(dest, tag, req);
     }
 
-    void activateRootRequest(int jobId) {
+    void tryActivateRootRequest(int jobId) {
         LOG(V5_DEBG, "Try activate #%i\n", jobId);
         auto optReq = getRootRequest(jobId);
         if (!optReq.has_value()) return;

@@ -139,10 +139,12 @@ public:
         return _load;
     }
 
-    bool hasDormantRoot() const {
+    bool hasDormantRoot(int* outIdOrNull = nullptr) const {
         for (auto& [_, job] : _jobs) {
-            if (job->getJobTree().isRoot() && job->getState() == SUSPENDED) 
+            if (job->getJobTree().isRoot() && job->getState() == SUSPENDED) {
+                if (outIdOrNull) *outIdOrNull = job->getId();
                 return true;
+            }
         }
         return false;
     }
