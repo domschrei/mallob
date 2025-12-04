@@ -26,6 +26,7 @@ private:
     volatile bool _finalizing {false};
     volatile bool _idle {true};
 
+    Mutex _mtx_complete_task;
     SatJobStreamProcessor::SatTask _complete_task;
     bool _initialized_complete_task {false};
 
@@ -44,7 +45,11 @@ public:
     // Transfers ownership of the pointer.
     void addProcessor(SatJobStreamProcessor* processor) {
         processor->setName(_name);
-        processor->setRetrieveFullTaskCallback([this]() -> const SatJobStreamProcessor::SatTask& {return _complete_task;});
+        processor->setRetrieveFullTaskCallback([this]() -> const SatJobStreamProcessor::SatTask& {
+            assert(_initialized_complete_task);
+            auto lock = _mtx_complete_task.getLock();
+            return _complete_task;
+        });
         Processor p {std::unique_ptr<SatJobStreamProcessor>(processor), std::unique_ptr<BackgroundWorker>(new BackgroundWorker())};
         p.second->run([&, processor = p.first.get(), bgWorker = p.second.get()]() {
             SatJobStreamProcessor::SatTask accumulatedTask;
@@ -90,14 +95,17 @@ public:
         assert(_sync.resultQueue.empty());
         task.rev = _active_rev;
 
-        for (auto& [proc, worker] : _processors) {
-            proc->submit(task);
-        }
         if (!_initialized_complete_task) {
             _complete_task.type = task.type;
             _initialized_complete_task = true;
         }
-        _complete_task.integrate(std::move(task));
+        for (auto& [proc, worker] : _processors) {
+            proc->submit(task);
+        }
+        {
+            auto lock = _mtx_complete_task.getLock();
+            _complete_task.integrate(std::move(task));
+        }
         _idle = false;
     }
     bool isIdle() const {

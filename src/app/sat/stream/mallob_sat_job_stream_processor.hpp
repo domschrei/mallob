@@ -46,6 +46,7 @@ private:
     bool _pending_task_interrupted {false};
 
     bool _began_nontrivial_solving {false};
+    bool _retrieve_complete_task {false};
     SatTask _backlog_task {SatTask::RAW};
     bool _initialized_backlog_task {false};
     bool _finalized {false};
@@ -85,7 +86,24 @@ public:
             _backlog_task.type = task.type;
             _initialized_backlog_task = true;
         }
-        _backlog_task.integrate(task);
+        if (_retrieve_complete_task) {
+            // Flag set to retrieve the complete task again
+            _retrieve_complete_task = false;
+            _backlog_task = _cb_retrieve_full_task();
+            if (_backlog_task.rev < task.rev) {
+                // Incoming task directly (!) succeeds the retrieved backlog task: just integrate
+                assert(_backlog_task.rev + 1 == task.rev);
+                _backlog_task.integrate(task);
+            } else if (_backlog_task.rev == task.rev) {
+                // Incoming task is exactly the retrieved backlog task
+                assert(_backlog_task.assumptions == task.assumptions);
+            } else {
+                // Incoming task precedes the retrieved backlog task: incoming task obsolete!
+                return;
+            }
+        } else {
+            _backlog_task.integrate(task);
+        }
         auto& t = _backlog_task;
 
         if (_task_pending) {
@@ -276,7 +294,7 @@ public:
         LOG(V4_VVER, "%s closed API\n", _name.c_str());
 
         _began_nontrivial_solving = false;
-        _backlog_task = _cb_retrieve_full_task();
+        _retrieve_complete_task = true;
         _json_base = {};
     }
 
