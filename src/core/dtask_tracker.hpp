@@ -19,13 +19,15 @@ class DTaskTracker {
 
 public:
     struct DTaskSlot {
+    private:
+        Mutex mtx;
+    public:
         int id;
         DTaskTracker& parent;
         enum Status {NONE, DEPLOYED, ACTIVE} status;
         Status lastStatus;
         float timeOfStart;
         float totalActiveTime {0};
-        Mutex mtx;
         std::function<void()> cbEvict;
 
         DTaskSlot(DTaskTracker& parent) : parent(parent), status(NONE), lastStatus(status) {
@@ -44,28 +46,49 @@ public:
         }
 
         void deploy() {
-            assert(status == NONE);
-            lastStatus = status;
-            status = DEPLOYED;
-            parent.onDTaskDeploy(*this);
+            {
+                auto lock = mtx.getLock();
+                assert(status == NONE);
+                lastStatus = status;
+                status = DEPLOYED;
+            }
+            parent.onDTaskDeploy();
         }
         void resume() {
-            assert(status == DEPLOYED);
-            lastStatus = status;
-            status = ACTIVE;
-            timeOfStart = Timer::elapsedSeconds();
+            {
+                auto lock = mtx.getLock();
+                assert(status == DEPLOYED);
+                lastStatus = status;
+                status = ACTIVE;
+                timeOfStart = Timer::elapsedSeconds();
+            }
             parent.onDTaskNonEvictable(*this);
         }
         void suspend() {
-            assert(status == ACTIVE);
-            lastStatus = status;
-            status = DEPLOYED;
+            {
+                auto lock = mtx.getLock();
+                assert(status == ACTIVE);
+                lastStatus = status;
+                status = DEPLOYED;
+            }
             parent.onDTaskEvictable(*this, Timer::elapsedSeconds() - timeOfStart);
         }
+        bool tryYield(bool parentLockAlreadyHeld, bool returnIfBusy) {
+            {
+                auto lock = returnIfBusy ? mtx.getTryLock() : mtx.getLock();
+                if (!lock.owns_lock()) return false;
+                if (status != DEPLOYED) return false;
+            }
+            yield(parentLockAlreadyHeld);
+            return true;
+        }
         void yield(bool lockAlreadyHeld) {
-            assert(status == DEPLOYED);
-            lastStatus = status;
-            status = NONE;
+            {
+                auto lock = mtx.getLock();
+                assert(status == DEPLOYED);
+                lastStatus = status;
+                status = NONE;
+            }
             parent.onDTaskRemove(*this, lockAlreadyHeld);
             if (cbEvict) {
                 LOG(V4_VVER, "DTASK %i cbEvict\n", id);
@@ -73,10 +96,8 @@ public:
             }
         }
         bool wasEvicted() {
+            auto lock = mtx.getLock();
             return lastStatus == DEPLOYED && status == NONE;
-        }
-        std::unique_lock<std::mutex> getLock() {
-            return mtx.getLock();
         }
     };
     struct CompareDTask {
@@ -106,8 +127,8 @@ public:
         return slot;
     }
 
-    void onDTaskDeploy(DTaskSlot& slot) {
-        LOG(V5_DEBG, "DTASK %i deploy (%i free slots)\n", slot.id, nbFreeSlots);
+    void onDTaskDeploy() {
+        LOG(V5_DEBG, "DTASK deploy (%i free slots)\n", nbFreeSlots);
         auto lock = mtx.getLock();
         while (nbFreeSlots == 0) {
             // Look for a task to evict
@@ -122,20 +143,17 @@ public:
             // Found a task
             {
                 auto& slot = **it;
-                // Obtain lock for the task's slot
-                auto slotLock = slot.getLock();
-                if (slot.status != DTaskSlot::DEPLOYED) {
+                // If the task is in the right state, we can forward "yield" signal
+                // (which shortens the "evictableTasks" list with the lock already held)
+                bool success = slot.tryYield(true, true);
+                if (!success) {
                     // Corner case where task is not in the right state (because it's being removed!):
                     // Yield locks and sleep before retrying to find a task
-                    slotLock.unlock();
                     lock.unlock();
                     usleep(1000);
                     lock.lock();
                     continue;
                 }
-                // Task is in the right state: Can forward "yield" signal
-                // (which shortens the "evictableTasks" list with the lock already held)
-                (*it)->yield(true);
             }
         }
         // Slot is free / available for this task

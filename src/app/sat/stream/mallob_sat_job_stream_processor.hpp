@@ -76,7 +76,6 @@ public:
     }
 
     virtual void loop() override {
-        auto lock = _slot->getLock();
         if (_slot->wasEvicted()) yield();
     }
 
@@ -99,6 +98,7 @@ public:
                 assert(_backlog_task.assumptions == task.assumptions);
             } else {
                 // Incoming task precedes the retrieved backlog task: incoming task obsolete!
+                LOG(V3_VERB, "%s task with int. rev %i obsolete\n", _name.c_str(), task.rev);
                 return;
             }
         } else {
@@ -118,7 +118,6 @@ public:
             LOG(V4_VVER, "%s ... ready\n", _name.c_str());
         }
 
-        auto lock = _slot->getLock();
         if (_slot->wasEvicted()) {
             yield();
             return;
@@ -238,7 +237,6 @@ public:
             LOG(V0_CRIT, "[ERROR] uncaught exception while submitting JSON\n");
             abort();
         }
-        lock.unlock();
 
         unsigned long sleepInterval {1};
         while (continueWaitingForTask(t.rev)) {
@@ -246,7 +244,6 @@ public:
             sleepInterval = std::min(2500UL, (unsigned long) std::ceil(1.2*sleepInterval));
         }
 
-        lock.lock();
         _slot->suspend();
         LOG(V5_DEBG, "MSJS %s call ended\n", _name.c_str());
 
@@ -258,10 +255,7 @@ public:
         _finalized = true;
         SatJobStreamProcessor::finalize();
         if (!_began_nontrivial_solving) return;
-        {
-            auto lock = _slot->getLock();
-            if (_slot->status == DTaskTracker::DTaskSlot::DEPLOYED) _slot->yield(false);
-        }
+        _slot->tryYield(false, false);
         while (_task_pending) usleep(3000);
         if (!_incremental) return;
         if (!_json_base.contains("name")) return;
@@ -316,9 +310,7 @@ private:
     bool continueWaitingForTask(int rev) {
         if (!_task_pending) return false;
         if (_pending_task_interrupted) return false; // do NOT wait for interrupted call to return
-        auto lock = _slot->getLock();
         if (!_terminator(rev) && !_slot->wasEvicted()) return true;
-        lock.unlock();
 
         _pending_task_interrupted = true;
         nlohmann::json jsonInterrupt {
