@@ -135,7 +135,7 @@ private:
         watchdog.setWarningPeriod(1000);
         // Need to decide on aborting based on warning ticks instead of realtime
         // because this process can be suspended for an indeterminate amount of time.
-        watchdog.setAbortTicks(1 + _params.watchdogAbortMillis() / 1000);
+        watchdog.setAbortTicks(100);
 
         // Main loop
         while (true) {
