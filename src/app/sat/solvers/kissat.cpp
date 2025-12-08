@@ -428,8 +428,9 @@ void Kissat::reconstructSolutionFromPreprocessing(std::vector<int>& model) {
     model.resize(_setup.numVars+1);
     for (int v = 1; v <= _setup.numVars; v++) {
         int val = kissat_value(solver, v);
+        LOGGER(_logger, V4_VVER, "v=%i: val=%i \n", v, val);
         if (std::abs(val) == v) model[v] = val;
-        assert(model[v] != 0);
+        assert(model[v] != 0 || log_return_false("ERROR: Model reconstruction failed at var %i, has val %i \n", v, val));
         //assert(std::abs(model[v]) == v || LOG_RETURN_FALSE("[ERROR] value of variable %i returned %i\n", v, model[v]));
     }
 }
