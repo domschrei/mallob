@@ -168,10 +168,12 @@ void Kissat::diversify(int seed) {
             // kissat_set_option(solver, "mallob_shared_sweeping", 1);
 
         //For debugging: The prpeprocessing solver should also log some things (quiet=0)
-        kissat_set_option(solver, "quiet", 1);
+        kissat_set_option(solver, "quiet", 0);
         kissat_set_option(solver, "verbose", 0);
-        kissat_set_option(solver, "log", 0);
+        kissat_set_option(solver, "log", 1);
 
+        //todo Reintroduce Sweeping in Seq Preprocessor! Just here to reduce logs during debugging
+        kissat_set_option(solver, "sweep", 0);
         // }
         //kissat_set_option(solver, "luckyearly", 0); // lucky before preprocess can take very long
         seedSet = true;
@@ -424,13 +426,27 @@ std::vector<int> Kissat::getSolution() {
 }
 
 void Kissat::reconstructSolutionFromPreprocessing(std::vector<int>& model) {
+
+    for (int i : model) {
+        LOGGER(_logger, V3_VERB, "orig model %i \n", i);
+    }
+    LOGGER(_logger, V3_VERB, "Model to reconstruct starts with size %i \n", model.size());
     kissat_import_model(solver, model.data(), model.size());
     model.resize(_setup.numVars+1);
-    for (int v = 1; v <= _setup.numVars; v++) {
-        int val = kissat_value(solver, v);
-        LOGGER(_logger, V4_VVER, "v=%i: val=%i \n", v, val);
-        if (std::abs(val) == v) model[v] = val;
-        assert(model[v] != 0 || log_return_false("ERROR: Model reconstruction failed at var %i, has val %i \n", v, val));
+    LOGGER(_logger, V3_VERB, "_setup.numVars= %i \n", _setup.numVars);
+    for (int idx = 1; idx <= _setup.numVars; idx++) {
+        int val = kissat_value(solver, idx);
+        LOGGER(_logger, V3_VERB, "idx=%i: val=%i, model[idx]=%i \n", idx, val, model[idx]);
+        if (val!=0 && val!=model[idx])
+            LOGGER(_logger, V3_VERB, " difference from orig model to prepro kissat! \n");
+        if (std::abs(val) == idx) model[idx] = val;
+
+        if (model[idx] == 0) {
+            LOGGER(_logger, V1_WARN, "eidx %i not known by last job - means it was (hopefully) completely eliminated by an earlier job - so its ok to assign any value, we we assign default negative \n", idx);
+            model[idx] = -idx;
+        }
+
+        assert(model[idx] != 0 || log_return_false("ERROR: Model reconstruction failed at var %i, has val %i \n", idx, val));
         //assert(std::abs(model[v]) == v || LOG_RETURN_FALSE("[ERROR] value of variable %i returned %i\n", v, model[v]));
     }
 }
@@ -609,6 +625,10 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
     if (accept) {
         nbPreprocessedVariables = nbVars;
         nbPreprocessedClausesAdvertised = nbClauses;
+        //todo: Attention: here we write the *current* number of existing variables into the solution!
+        //If some variables have been eliminated bc they never occurred in the formula at some point, this value here is different from the original number of variables, obviously,
+        //if this result is then propagated through further Jobs, they no longer know the original number of variables! For an eventual reconstruction, we are then reliant on the previous Jobs to know the original variable count
+        //alternatively, we could write into the formula just the original number of variables, and dont include the info how many where potentially eliminated
     } else setSolverInterrupt();
     return accept;
 }

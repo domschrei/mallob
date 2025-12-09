@@ -273,6 +273,12 @@ private:
         }
 
         //NOT copying the retraction code, because we are not retracting the base job yet
+        // for (int i : fPre) {
+            // if (i==0)
+                // LOG(V2_INFO, "0 \n");
+            // else
+                // LOG(V2_INFO, "(%i) ", i);
+        // }
 
         // Prepare job submission data
         auto& json = _sweep_job_submission;
