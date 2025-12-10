@@ -177,7 +177,7 @@ private:
 	void sweepImportUnits(int **units, int *unit_count);
     // void addLiteralToShweepJob(int lit);
 
-	void sweepSetImportExportCallbacks();
+	void sweepSetExportCallbacks();
 	// void shweepSetWorkstealingCallback(void* SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, int *work_size, int local_id));
 
 	// void startSweepAppCallback();

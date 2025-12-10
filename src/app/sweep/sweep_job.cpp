@@ -313,7 +313,7 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	sweeper->setToSweeper();
 
 	//Connecting kissat to Kissat
-	sweeper->sweepSetImportExportCallbacks();
+	sweeper->sweepSetExportCallbacks();
 
 	//Connecting kissat directly to SweepJob
     shweep_set_search_work_callback(sweeper->solver, this, cb_search_work_in_tree);

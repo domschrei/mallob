@@ -43,14 +43,15 @@ void sweep_export_unit(void *state, int unit) {
 }
 
 
-void sweep_import_eqs(void* state, int** equivalences, int *eqs_size) {
-    ((Kissat*) state)->sweepImportEqs(equivalences, eqs_size);
-}
+//Importing Sweep Equivalences/Units is directly controlled by the SweepJob:: Process, not by each Kissat:: Object
+// void sweep_import_eqs(void* state, int** equivalences, int *eqs_size) {
+    // ((Kissat*) state)->sweepImportEqs(equivalences, eqs_size);
+// }
 
 
-void sweep_import_units(void *state, int **units, int *unit_count) {
-    ((Kissat*) state)->sweepImportUnits(units, unit_count);
-}
+// void sweep_import_units(void *state, int **units, int *unit_count) {
+    // ((Kissat*) state)->sweepImportUnits(units, unit_count);
+// }
 
 
 
@@ -170,10 +171,10 @@ void Kissat::diversify(int seed) {
         //For debugging: The prpeprocessing solver should also log some things (quiet=0)
         kissat_set_option(solver, "quiet", 0);
         kissat_set_option(solver, "verbose", 0);
-        kissat_set_option(solver, "log", 1);
+        kissat_set_option(solver, "log", 0);
 
-        //todo Reintroduce Sweeping in Seq Preprocessor! Just here to reduce logs during debugging
-        kissat_set_option(solver, "sweep", 0);
+        //Briefly deactivated seq. sweeping to not be inundated with logs
+        // kissat_set_option(solver, "sweep", 0);
         // }
         //kissat_set_option(solver, "luckyearly", 0); // lucky before preprocess can take very long
         seedSet = true;
@@ -426,27 +427,26 @@ std::vector<int> Kissat::getSolution() {
 }
 
 void Kissat::reconstructSolutionFromPreprocessing(std::vector<int>& model) {
-
-    for (int i : model) {
-        LOGGER(_logger, V3_VERB, "orig model %i \n", i);
-    }
-    LOGGER(_logger, V3_VERB, "Model to reconstruct starts with size %i \n", model.size());
+    // for (int i : model) {
+        // LOGGER(_logger, V3_VERB, "orig model %i \n", i);
+    // }
+    LOGGER(_logger, V3_VERB, "Latest Model only contains variables up to var %i \n", model.size()-1); //first entry is dummy zero
     kissat_import_model(solver, model.data(), model.size());
     model.resize(_setup.numVars+1);
-    LOGGER(_logger, V3_VERB, "_setup.numVars= %i \n", _setup.numVars);
+    LOGGER(_logger, V3_VERB, "Original formula contained variables up to var %i \n", _setup.numVars);
     for (int idx = 1; idx <= _setup.numVars; idx++) {
         int val = kissat_value(solver, idx);
-        LOGGER(_logger, V3_VERB, "idx=%i: val=%i, model[idx]=%i \n", idx, val, model[idx]);
-        if (val!=0 && val!=model[idx])
-            LOGGER(_logger, V3_VERB, " difference from orig model to prepro kissat! \n");
+        // LOGGER(_logger, V3_VERB, "idx=%i: val=%i, model[idx]=%i \n", idx, val, model[idx]);
+        // if (val!=0 && val!=model[idx])
+            // LOGGER(_logger, V3_VERB, " difference from orig model to prepro kissat! \n");
         if (std::abs(val) == idx) model[idx] = val;
 
         if (model[idx] == 0) {
-            LOGGER(_logger, V1_WARN, "eidx %i not known by last job - means it was (hopefully) completely eliminated by an earlier job - so its ok to assign any value, we we assign default negative \n", idx);
+            LOGGER(_logger, V1_WARN, "[Warn] Reconstructing var %i to (arbitrary) default negative value %i \n", idx, -idx); //because an earlier processing step completely eliminated it, and didnt even bother setting any value of it
             model[idx] = -idx;
         }
 
-        assert(model[idx] != 0 || log_return_false("ERROR: Model reconstruction failed at var %i, has val %i \n", idx, val));
+        assert(model[idx] != 0 || log_return_false("ERROR: Model reconstruction failed at var %i, has undecided val %i \n", idx, val));
         //assert(std::abs(model[v]) == v || LOG_RETURN_FALSE("[ERROR] value of variable %i returned %i\n", v, model[v]));
     }
 }
@@ -463,11 +463,9 @@ void Kissat::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
 }
 
 
-void Kissat::sweepSetImportExportCallbacks() {
+void Kissat::sweepSetExportCallbacks() {
     shweep_set_equivalence_export_callback(solver, this, eq_up_buffer.data(), &sweep_export_eq);
-    shweep_set_equivalence_import_callback(solver, this, &sweep_import_eqs);
     shweep_set_unit_export_callback(solver, this, &sweep_export_unit);
-    shweep_set_unit_import_callback(solver, this, &sweep_import_units);
 }
 
 
@@ -520,6 +518,7 @@ void Kissat::sweepExportUnit(int unit) {
     }
 }
 
+/*
 void Kissat::sweepImportEqs(int **equivalences, int *eqs_size) {
     if (eqs_from_broadcast_queued.empty()) {
         //dont even move the empty queue, reduce danger of concurrent touching. The main thread might just be copying something into the array
@@ -530,7 +529,6 @@ void Kissat::sweepImportEqs(int **equivalences, int *eqs_size) {
         *equivalences = eqs_from_broadcast.data(); //this array is owned by this Mallob Kissat object, and the solver is only reading through it, it must persist until the solver calls this function again
         *eqs_size = eqs_from_broadcast.size();
     }
-    //todo: also mutex here? move is not atomic, in theory a sharing result might just be copied into the queue the moment we move it here
 }
 
 
@@ -544,8 +542,8 @@ void Kissat::sweepImportUnits(int **units, int *unit_count) {
         *units = units_from_broadcast.data();
         *unit_count = units_from_broadcast.size();
     }
-    //todo: mutex? there might be concurrent std::move and std::insert...
 }
+*/
 
 void Kissat::sweepSetReportCallback() {
     kissat_set_preprocessing_report_callback(solver, this, begin_formula_report, report_preprocessed_lit);
