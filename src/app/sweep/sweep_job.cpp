@@ -167,6 +167,11 @@ void SweepJob::appl_terminate() {
 	gentlyTerminateSolvers();
 }
 
+
+void SweepJob::appl_memoryPanic() {
+	LOG(V1_WARN, "[WARN] SWEEP [%i]: Memory panic! \n",_my_rank);
+}
+
 void SweepJob::reportSolverResult(KissatPtr sweeper, int res) {
 	assert(_solved_status==-1);
 
@@ -349,11 +354,24 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 
 	//Own options of Kissat
 	sweeper->set_option("sweepcomplete", 1);      //deactivates checking for time limits during sweeping, so we dont get kicked out due to some limits
+
+  	// sweeper->set_option("sweepclauses", 1024 * 4);		//	1024, 0, INT_MAX,	"environment clauses")
+  	// sweeper->set_option("sweepdepth", 3);			//, 2,    0, INT_MAX,	"environment depth")
+  	// sweeper->set_option("sweepfliprounds", 2);		//	1,    0, INT_MAX,	"flipping rounds")
+  	// sweeper->set_option("sweepmaxclauses", 32768 * 4);		//	32768,2, INT_MAX,	"maximum environment clauses")
+  	// sweeper->set_option("sweepmaxdepth", 4);		//	3,    1, INT_MAX,	"maximum environment depth")
+  	// sweeper->set_option("sweepmaxvars", 8192 * 4);		//	8192, 2, INT_MAX,	"maximum environment variables")
+  	// sweeper->set_option("sweeprand", 0);			//  0,    0,    1,		"randomize sweeping environment")
+  	// sweeper->set_option("sweepvars", 256 * 4);			//  256,  0, INT_MAX,	"environment variables")
+
 	//Specific for clean sweep run
 	sweeper->set_option("preprocess", 0); //skip other preprocessing stuff after shweep finished
 	// shweeper->set_option("probe", 1);   //there is some cleanup-probing at the end of the sweeping. keep it? (apparently the probe option is used nowhere anyways)
 	sweeper->set_option("substitute", 1); //apply equivalence substitutions after sweeping (kissat default 1, but keep here explicitly to remember it)
 	sweeper->set_option("substituterounds", 2); //default is 2, and changing that has currently no effect, virtually all substitutions happen in round 1, and already in round 2 zero or single substitutions are found, and it exits there.
+
+
+
 	// shweeper->set_option("substituteeffort", 1000); //modification doesnt seem to have much effect...
 	// shweeper->set_option("substituterounds", 10);
 	sweeper->set_option("luckyearly", 0); //skip
@@ -740,11 +758,12 @@ void SweepJob::appendMetadataToReductionElement(std::vector<int> &contrib, int i
 	contrib.insert(contrib.end(), NUM_METADATA_FIELDS, 0); //Make space for the upcoming metadata
 	int size = contrib.size();
 	int n=0;
-	n++; contrib[size - METADATA_POS_TERMINATE_FLAG]  = 0;  //The termination signal will be eventually set during reduction in the rootTransform
+	n++; contrib[size - METADATA_POS_TERMINATE_FLAG]  = 0;  //dummy, will be set by root transformation
+	n++; contrib[size - METADATA_POS_ROUND_FLAG]      = 0;  //dummy, will be set by root transformation
 	n++; contrib[size - METADATA_POS_IDLE_FLAG]       = is_idle;
 	n++; contrib[size - METADATA_POS_UNIT_SIZE]       = unit_size;
 	n++; contrib[size - METADATA_POS_EQ_SIZE]         = eq_size;
-	assert(n==NUM_METADATA_FIELDS);
+	assert(n==NUM_METADATA_FIELDS || log_return_false("SWEEP ERROR: Added metadata count (%i) doesnt match expected number (%i) \n", n, NUM_METADATA_FIELDS));
 }
 
 void SweepJob::cbContributeToAllReduce() {
@@ -773,7 +792,7 @@ void SweepJob::cbContributeToAllReduce() {
 	LOG(V4_VVER, "SWEEP SHARE [%i] RESET AllReduction, to prepare contributing local data. \n", _my_rank);
 	_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateEqUnitContributions));
 	if (_is_root)
-		_red->setTransformationOfElementAtRoot(_rootTransform);
+		_red->setInplaceTransformationOfElementAtRoot(_inplace_rootTransform);
 
 
 	//Bring individual data per thread in the sharing element format: [Equivalences, Units, eq_size, unit_size, all_idle]
@@ -903,8 +922,8 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	//Each contribution has the format [Equivalences,Units, eq_size,unit_size,all_idle].
 	//									-----data---------  ------metadata------------
 
-	std::ostringstream oss_tot;
-	oss_tot << "Contrib sizes: ";
+	// std::ostringstream oss_tot;
+	// oss_tot << "Contrib sizes: ";
 	// for (int id : rand_permutation) {
 		// oss << id << ' ';
 	// }
@@ -927,16 +946,16 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
     for (const auto& contrib : contribs) {
 	    total_aggregated_size += contrib.size()-NUM_METADATA_FIELDS; //we will copy everything but the metadata from each contribution
 		LOG(V4_VVER, "SWEEP AGGR Element %i: contrib.size() %i, w/o metadata %i, curr summed size %i \n", i, contrib.size(), contrib.size()-NUM_METADATA_FIELDS, total_aggregated_size);
-		oss_tot << "| " << i << ":" << contrib.size() << " "	;
+		// oss_tot << "| " << i << ":" << contrib.size() << " "	;
 		i++;
     	assert(contrib.size() >= NUM_METADATA_FIELDS || log_return_false("ERROR in Aggregating: contrib with too small size() == %i < %i SHARING_METADATA_FIELDS", contrib.size(), NUM_METADATA_FIELDS));
     }
 
 
 
-	LOG(V4_VVER, "%s \n", oss_tot.str().c_str());
-	std::ostringstream oss_e;
-	oss_e << "Eq sizes: ";
+	// LOG(V4_VVER, "%s \n", oss_tot.str().c_str());
+	// std::ostringstream oss_e;
+	// oss_e << "Eq sizes: ";
 	i=0;
 
 
@@ -948,13 +967,13 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
     	int eq_size = contrib[contrib.size()-METADATA_POS_EQ_SIZE];
     	aggr_eq_size += eq_size;
         aggregated.insert(aggregated.end(), contrib.begin(), contrib.begin()+eq_size);
-		oss_e << "| " << i << ":" << eq_size << " "	;
+		// oss_e << "| " << i << ":" << eq_size << " "	;
     	i++;
     }
 
-	LOG(V4_VVER, "%s \n", oss_e.str().c_str());
-	std::ostringstream oss_u;
-	oss_u << "Unit sizes: ";
+	// LOG(V4_VVER, "%s \n", oss_e.str().c_str());
+	// std::ostringstream oss_u;
+	// oss_u << "Unit sizes: ";
 	i=0;
 
 	//Fill units
@@ -964,11 +983,11 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
     	int unit_size = contrib[contrib.size()-METADATA_POS_UNIT_SIZE];
 		aggr_unit_size += unit_size;
         aggregated.insert(aggregated.end(), contrib.begin()+eq_size, contrib.end()-NUM_METADATA_FIELDS); //not copying the metadata at the end
-    	oss_u << "| " << i << ":" << unit_size << " "	;
+    	// oss_u << "| " << i << ":" << unit_size << " "	;
     	i++;
     }
 
-	LOG(V4_VVER, "%s \n", oss_u.str().c_str());
+	// LOG(V4_VVER, "%s \n", oss_u.str().c_str());
 
 	//See whether all solvers are idle
 	bool all_idle = true;
@@ -981,11 +1000,10 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 		all_idle = false; //edge-case: if not a single solver is initialized yet, we are waiting for them to come online, so they are not really idle
 	}
 
+	//Get round
+	// int _sweep_round =
+
 	appendMetadataToReductionElement(aggregated, all_idle, aggr_unit_size, aggr_eq_size);
-	//these are the three fields we account for with SHARING_METADATA_FIELDS
-	// aggregated.push_back(aggr_eq_size);
-	// aggregated.push_back(aggr_unit_size);
-	// aggregated.push_back(all_idle);
 
 	if (contribs.size()>1)
 		LOG(V3_VERB, "SWEEP SHARE REDUCE aggr %i contribs: %i EQ, %i UNITS, %i ALL_IDLE\n", contribs.size(), aggr_eq_size/2, aggr_unit_size, all_idle);

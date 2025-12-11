@@ -69,9 +69,10 @@ private:
     const int TAG_ALLRED = 1004;
 	//Positions where the metadata is stored in each shared element. Format [ <actual data> , eqs_size, units_size, all_idle]
 
-	static const int NUM_METADATA_FIELDS = 4; //we have integers as metadata at the end of an aggregation element
-		//which are the following:
-		static const int METADATA_POS_TERMINATE_FLAG  = 4;
+	static const int NUM_METADATA_FIELDS = 5; //we have integers as metadata at the end of an aggregation element
+		//which are:
+		static const int METADATA_POS_TERMINATE_FLAG   = 5;
+		static const int METADATA_POS_ROUND_FLAG      = 4;
 		static const int METADATA_POS_IDLE_FLAG		 = 3;
 		static const int METADATA_POS_UNIT_SIZE	    = 2;
 		static const int METADATA_POS_EQ_SIZE	   = 1;
@@ -113,6 +114,7 @@ private:
 	//We want to test multiple rounds of full sweeping, to see whether and how fast there is diminishing returns
 	int _root_sweep_round = 1;
 
+
 	//Termination. Determined during workstealing, broadcasted via sharing
 	std::atomic_bool _terminate_all=false; //termination (on this node) due to sharing consensus that there is no more work
 	std::atomic_bool _external_termination=false; //termination because somebody else told us to (for example Job interrupted because Base Job already found a solution, ...)
@@ -128,17 +130,41 @@ private:
 	Logger _reslogger;
 
 	//Decide at the root of the AllReduction whether the shared data should contain the termination signal
-    const std::function<std::vector<int>(const std::vector<int>&)> _rootTransform = [&](const std::vector<int>& payload) {
-    	assert(_is_root);
-    	bool ALL_IDLE = payload[payload.size() - METADATA_POS_IDLE_FLAG];
-    	bool WAS_LAST_ROUND = (_root_sweep_round == _params.sweepRounds());
-    	if (ALL_IDLE && WAS_LAST_ROUND) {
-    		LOG(V1_WARN, "SWEEP [%i]: Job finished! All rounds done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_round, _params.sweepRounds());
-    		auto terminating_payload = payload;
-    		terminating_payload[payload.size() - METADATA_POS_TERMINATE_FLAG] = 1;
-    		return terminating_payload;
-    	}
-    	return payload;
+    // const std::function<std::vector<int>(const std::vector<int>&)> _rootTransform = [&](const std::vector<int>& payload) {
+    	// assert(_is_root);
+    	//Inject current round
+    	// payload[payload.size() - METADATA_POS_ROUND_FLAG] = _root_sweep_round;
+
+
+    	// bool ALL_IDLE = payload[payload.size() - METADATA_POS_IDLE_FLAG];
+    	// bool WAS_LAST_ROUND = (_root_sweep_round == _params.sweepRounds());
+    	// if (ALL_IDLE && WAS_LAST_ROUND) {
+    		// LOG(V1_WARN, "SWEEP [%i]: Job finished! All rounds done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_round, _params.sweepRounds());
+    		// auto terminating_payload = payload;
+    		// terminating_payload[payload.size() - METADATA_POS_TERMINATE_FLAG] = 1;
+    		// return terminating_payload;
+    	// }
+    	// return payload;
+    // };
+
+
+	std::function<void(std::vector<int>&)> _inplace_rootTransform = [&](std::vector<int>& payload) {
+			assert(_is_root);
+			//The root node is the only one keeping track of the current sweep round number, tells the the other nodes
+    		payload[payload.size() - METADATA_POS_ROUND_FLAG] = _root_sweep_round;
+
+			//Terminate the sweep whole job if we are at the end of the last scheduled round
+			bool ALL_IDLE = payload[payload.size() - METADATA_POS_IDLE_FLAG];
+			bool WAS_LAST_ROUND = (_root_sweep_round == _params.sweepRounds());
+
+			if (ALL_IDLE && WAS_LAST_ROUND) {
+				LOG(V1_WARN, "SWEEP [%i]: Job finished! All rounds done (%i/%i). Broadcasting termination signal with sharing data.\n",
+					_my_rank, _root_sweep_round, _params.sweepRounds());
+
+				payload[payload.size() - METADATA_POS_TERMINATE_FLAG] = 1;
+			}
+
+			//no return, just transformed in-place
     };
 
 
@@ -156,7 +182,7 @@ public:
     void appl_resume() override {}
     void appl_dumpStats() override {}
     bool appl_isDestructible() override {return true;}
-    void appl_memoryPanic() override {}
+    void appl_memoryPanic() override;
 
     friend void cb_search_work_in_tree(void* SweepJob_state, unsigned **work, int *work_size, int local_id);
 	friend void cb_import_eq(void *SweepJobState, int *lit1, int *lit2, int localId);

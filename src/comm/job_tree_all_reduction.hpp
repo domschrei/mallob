@@ -53,6 +53,9 @@ private:
     bool _has_transformation_at_root = false;
     std::function<AllReduceElement(const AllReduceElement&)> _transformation_at_root;
 
+    bool _has_inplace_transformation_at_root = false;
+    std::function<void(AllReduceElement&)> _inplace_transformation_at_root;
+
     bool _contributed = false;
     bool _reduction_locally_done = false;
     bool _finished = false;
@@ -119,6 +122,17 @@ public:
     void setTransformationOfElementAtRoot(std::function<AllReduceElement(const AllReduceElement&)> transformation) {
         _transformation_at_root = transformation;
         _has_transformation_at_root = true;
+        if (_has_inplace_transformation_at_root) {
+            LOG(V1_WARN, "WARN: Setting copying rootTransformation when there already exists its inplace pendant!\n");
+        }
+    }
+
+    void setInplaceTransformationOfElementAtRoot(std::function<void(AllReduceElement&)> inplace_transformation) {
+        _inplace_transformation_at_root = inplace_transformation;
+        _has_inplace_transformation_at_root = true;
+        if (_has_transformation_at_root) {
+            LOG(V1_WARN, "WARN: Setting inplace rootTransformation when there already exists its coyping pendant!\n");
+        }
     }
 
     void enableBroadcast() {
@@ -244,6 +258,10 @@ public:
                 // Transform reduced element at root
                 if (_has_transformation_at_root) {
                     _aggregated_elem.emplace(_transformation_at_root(_aggregated_elem.value()));
+                }
+
+                if (_has_inplace_transformation_at_root) {
+                   _inplace_transformation_at_root(_aggregated_elem.value());
                 }
 
                 if (_broadcast_enabled) {// receive final elem and begin broadcast
