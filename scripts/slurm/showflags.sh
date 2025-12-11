@@ -4,7 +4,7 @@
 # echo ""
 echo ""
 # flags=$(grep -A 18 -- "build/mallob" "scripts/slurm/sbatch.sh")
-flags=$(grep -A 18 -- "build/mallob" "$1")
+flags=$(grep -A 25 -- "build/mallob" "$1")
 echo "$flags"
 echo ""
 
