@@ -442,7 +442,7 @@ void Kissat::reconstructSolutionFromPreprocessing(std::vector<int>& model) {
         if (std::abs(val) == idx) model[idx] = val;
 
         if (model[idx] == 0) {
-            LOGGER(_logger, V1_WARN, "[Warn] Reconstructing var %i to (arbitrary) default negative value %i \n", idx, -idx); //because an earlier processing step completely eliminated it, and didnt even bother setting any value of it
+            LOGGER(_logger, V1_WARN, "WARN: Reconstructing var %i to (arbitrary) default negative value %i \n", idx, -idx); //because an earlier processing step completely eliminated it, and didnt even bother setting any value of it
             model[idx] = -idx;
         }
 

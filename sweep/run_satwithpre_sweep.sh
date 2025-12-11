@@ -4,8 +4,8 @@ NPROCS=4
 THREADS=3
 
 OUT_DIR="$HOME/PhD/logsntraces/"
-INST_PATH="$HOME/PhD/instances/miter/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf"
-# INST_PATH="$HOME/PhD/instances/some2024/0d81711a3d73c828e8c6e12607eda82d-noL-11-20.sanitized.cnf.xz"
+# INST_PATH="$HOME/PhD/instances/miter/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf"
+INST_PATH="$HOME/PhD/instances/some2024/0d81711a3d73c828e8c6e12607eda82d-noL-11-20.sanitized.cnf.xz"
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/nusmvdme1d3multi.cnf.xz"
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf.xz"
 
@@ -60,7 +60,7 @@ echo "PREPROCESS_SEQUENTIAL_SWEEPCOMPLETE: $PREPROCESS_SEQUENTIAL_SWEEPCOMPLETE"
 
 MALLOB_OPTIONS="-t=$THREADS \
   -mono-app=SATWITHPRE \
-  -v=2 \
+  -v=3 \
   -satsolver=[k_]w \
   -colors \
   -jcup=0.05 \
@@ -76,11 +76,11 @@ if $SWEEP; then
     MALLOB_OPTIONS="$MALLOB_OPTIONS \
       -preprocess-sweep \
       -sweep-sharing-period=20 \
-      -sweep-solver-verbosity=1 \
+      -sweep-solver-verbosity=3 \
       -sweep-solver-quiet=1 \
       -preprocess-sweep-priority=$SWEEP_PRIO \
       -sweep-resweep-chance=1000 \
-      -sweep-rounds=3"
+      -sweep-rounds=5"
 else
     echo "SWEEP Preprocessing SKIPPED !"
 fi

@@ -24,18 +24,16 @@ private:
     uint8_t* _metadata; //serialized description
 	int _numVars{0};
 
-	int _representative_localId{0}; //the dedicated solver that reports its statistics to us. They will ever so slightly differ between solvers, but instead of doing more complicated averaging we just report this one
+	const int _representative_localId{0}; //the dedicated solver that reports its statistics to us. They will ever so slightly differ between solvers, but instead of doing more complicated averaging we just report this one
 
 	//Local Solvers
 	int _nThreads{0};
 	typedef std::shared_ptr<Kissat> KissatPtr;
 	std::vector<KissatPtr> _sweepers;
 	std::vector<std::unique_ptr<BackgroundWorker>> _bg_workers;
-	// std::vector<std::future<void>> _fut_shweepers;
     std::atomic_int _started_sweepers_count {0};
     std::atomic_int _running_sweepers_count {0};
 	std::vector<int> _list_of_ids;
-	// std::atomic_bool _finished_job_setup{false};
 	bool _started_synchronized_solving{false};
 
 	//Timing
@@ -44,8 +42,8 @@ private:
 	std::vector<float> _time_receive_allred;
 
 	//Workstealing
-    std::atomic_bool _root_provided_initial_work=false;
 	SplitMix64Rng _rng;
+    std::atomic_bool _root_provided_initial_work=false;
 	struct WorkstealRequest {
 		int localId{-1};
 		int targetIndex{-1};
@@ -65,9 +63,9 @@ private:
     std::unique_ptr<JobTreeAllReduction> _red;
     const int TAG_BCAST_INIT = 1003;
     const int TAG_ALLRED = 1004;
-	//Positions where the metadata is stored in each shared element. Format [ <actual data> , eqs_size, units_size, all_idle]
 
-	static const int NUM_METADATA_FIELDS = 5; //we have integers as metadata at the end of an aggregation element
+	//each aggregation element has some metadata integers at the end
+	static const int NUM_METADATA_FIELDS = 5;
 		//which are:
 		static const int METADATA_POS_TERMINATE_FLAG   = 5;
 		static const int METADATA_POS_ROUND_FLAG      = 4;
@@ -78,14 +76,16 @@ private:
 
 	//Distribute Eqs and Units that we received from sharing broadcast to local solvers
 	static const unsigned INVALID_LIT = UINT_MAX; //Internal literals count unsigned 0,1,2,..., the largest number marks an invalid literal. see further: https://github.com/arminbiere/satch/blob/master/satch.c#L1017
-	static const int MAX_IMPORT_SIZE = 100'000;
+	static const int MAX_IMPORT_SIZE = 100'000; //Fix the import to a known preallocated area, to simplify concurrent read and write
 	std::atomic_int _sharing_import_round{0}; //counts the number of import rounds on this rank. Polled by solvers to detect whether there is something new to import
 	std::atomic_int _EQS_import_size{0};
 	std::atomic_int _UNITS_import_size{0};
 	std::vector<int> _EQS_to_import {};
 	std::vector<int> _UNITS_to_import {};
+	int _shared_units_this_round = 0;
+	int _shared_eqs_this_round = 0;
 
-	//We want to test multiple rounds of full sweeping, to see whether and how fast there is diminishing returns
+	//Usually multiple full sweep rounds are done, tracked at the root node
 	int _root_sweep_round = 1;
 
 	//Termination. Determined during workstealing, broadcasted via sharing
@@ -103,19 +103,29 @@ private:
 
 	std::function<void(std::vector<int>&)> _inplace_rootTransform = [&](std::vector<int>& payload) {
 		assert(_is_root);
+
+		_shared_units_this_round += payload[payload.size() - METADATA_POS_UNIT_SIZE];
+		_shared_eqs_this_round   += payload[payload.size() - METADATA_POS_EQ_SIZE]/2;
 		bool all_idle = payload[payload.size() - METADATA_POS_IDLE_FLAG];
 
 		//A round is finished if all sweepers are idle, i.e. all finished their work.
 		if (all_idle) {
 			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i FINISHED (seen at root transform) \n", _my_rank, _root_sweep_round, _params.sweepRounds());
-			if (_root_sweep_round == _params.sweepRounds()) {
-				LOG(V1_WARN, "SWEEP [%i]: Job finished! All rounds done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_round, _params.sweepRounds());
-				payload[payload.size() - METADATA_POS_TERMINATE_FLAG] = 1;
+			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i had: %i EQS, %i UNITS  (this contains still many duplicates!)\n", _my_rank, _root_sweep_round, _params.sweepRounds(), _shared_eqs_this_round, _shared_units_this_round);
+			bool progress = _shared_eqs_this_round + _shared_units_this_round > 0;
+			bool lastround= _root_sweep_round == _params.sweepRounds();
+			if (lastround || !progress) {
+				if (lastround)LOG(V1_WARN, "SWEEP [%i]: Job finished! All rounds done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_round, _params.sweepRounds());
+				if (!progress)LOG(V1_WARN, "SWEEP [%i]: Job finished! No more progress in round %i/%i. Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_round, _params.sweepRounds());
 				//we DON'T yet set _terminate_all=1 here, because we want also the root solver to first import this last sharing information, which contains valuable equalities and units, before terminating the solvers
+				payload[payload.size() - METADATA_POS_TERMINATE_FLAG] = 1;
 			}
+
 			else {
 				printSweepStats(_sweepers[_representative_localId], false); //report some intermediate statistics about this round
 				_root_sweep_round++;
+				_shared_units_this_round = 0;
+				_shared_eqs_this_round = 0;
 				//The new round is started by providing the representative solver on the root node full work, i.e. all variables
 				_root_provided_initial_work = false;
 				LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i STARTED \n", _my_rank, _root_sweep_round, _params.sweepRounds());

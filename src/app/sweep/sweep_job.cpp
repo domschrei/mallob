@@ -264,7 +264,8 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		_sweepers[localId].reset();  //this should delete the only persistent shared pointer on the solver, and thus trigger its destructor soon now
 		LOG(V3_VERB, "SWEEP JOB [%i](%i) WORKER EXIT\n", _my_rank, localId);
 
-		if (localId==_representative_localId) {
+		// if (_localId==_representative_localId) {
+		if (_running_sweepers_count==0) { //the last solver should report resweeps, as only then they are gathered from all exited solvers
 			printResweeps();
 		}
 	});
