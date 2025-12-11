@@ -24,7 +24,6 @@ private:
     uint8_t* _metadata; //serialized description
 	int _numVars{0};
 
-
 	int _representative_localId{0}; //the dedicated solver that reports its statistics to us. They will ever so slightly differ between solvers, but instead of doing more complicated averaging we just report this one
 
 	//Local Solvers
@@ -43,7 +42,6 @@ private:
 	float _start_sweep_timestamp;
 	std::vector<float> _sharing_start_ping_timestamps;
 	std::vector<float> _sharing_receive_result_timestamps;
-
 
 	//Workstealing
     std::atomic_bool _root_provided_initial_work=false;
@@ -79,8 +77,6 @@ private:
 
 
 	//Distribute Eqs and Units that we received from sharing broadcast to local solvers
-	// std::atomic<std::shared_ptr<std::vector<int>>> _EQS_to_import { std::make_shared<std::vector<int>>() };
-	// std::atomic<std::shared_ptr<std::vector<int>>> _UNITS_to_import { std::make_shared<std::vector<int>>() };
 	static const unsigned INVALID_LIT = UINT_MAX; //Internal literals count unsigned 0,1,2,..., the largest number marks an invalid literal. see further: https://github.com/arminbiere/satch/blob/master/satch.c#L1017
 	static const int MAX_IMPORT_SIZE = 100'000;
 	std::atomic_int _rank_import_round{0}; //counts the number of import rounds on this rank. Polled by solvers to detect whether there is something new to import
@@ -88,37 +84,13 @@ private:
 	std::atomic_int _UNITS_import_size{0};
 	std::vector<int> _EQS_to_import {};
 	std::vector<int> _UNITS_to_import {};
-// #if IMPORT_TECHNIQUE==1
-	// std::vector<std::atomic_int> _EQS_to_import {};
-	// std::vector<std::atomic_int> _UNITS_to_import {};
-	// std::vector<int> _EQS_to_import {};
-	// std::vector<int> _UNITS_to_import {};
-// #elif IMPORT_TECHNIQUE==2
-	// std::atomic<std::shared_ptr<const std::vector<int>>> _EQS_snap{std::make_shared<std::vector<int>>()};
-	// std::atomic<std::shared_ptr<const std::vector<int>>> _UNITS_snap{std::make_shared<std::vector<int>>()};
-// #elif IMPORT_TECHNIQUE==3
-// #else
-	// std::vector<int> _EQS_to_import {};
-	// std::vector<int> _UNITS_to_import {};
-// #endif
-	// std::shared_mutex _EQS_import_mutex;
-	// std::shared_mutex _UNITS_import_mutex;
-	// std::vector<int> _solver_import_round{}; //a round number per thread
-	// std::vector<int> _solver_unread_EQS_count {}; //a count per thread
-	// std::vector<int> _solver_unread_UNITS_count {};
-
-
-    // std::vector<int> _eqs_from_broadcast;  //store received equivalences at rank level to copy to individual solvers
-	// std::vector<int> _units_from_broadcast;
 
 	//We want to test multiple rounds of full sweeping, to see whether and how fast there is diminishing returns
 	int _root_sweep_round = 1;
 
-
 	//Termination. Determined during workstealing, broadcasted via sharing
 	std::atomic_bool _terminate_all=false; //termination (on this node) due to sharing consensus that there is no more work
 	std::atomic_bool _external_termination=false; //termination because somebody else told us to (for example Job interrupted because Base Job already found a solution, ...)
-
 
 	//Keep track which solver reports the final formula, we only use one
 	std::shared_ptr<std::atomic<int>> _reporting_localId = std::make_shared<std::atomic<int>>(-1);
@@ -129,43 +101,35 @@ private:
 
 	Logger _reslogger;
 
-	//Decide at the root of the AllReduction whether the shared data should contain the termination signal
-    // const std::function<std::vector<int>(const std::vector<int>&)> _rootTransform = [&](const std::vector<int>& payload) {
-    	// assert(_is_root);
-    	//Inject current round
-    	// payload[payload.size() - METADATA_POS_ROUND_FLAG] = _root_sweep_round;
-
-
-    	// bool ALL_IDLE = payload[payload.size() - METADATA_POS_IDLE_FLAG];
-    	// bool WAS_LAST_ROUND = (_root_sweep_round == _params.sweepRounds());
-    	// if (ALL_IDLE && WAS_LAST_ROUND) {
-    		// LOG(V1_WARN, "SWEEP [%i]: Job finished! All rounds done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_round, _params.sweepRounds());
-    		// auto terminating_payload = payload;
-    		// terminating_payload[payload.size() - METADATA_POS_TERMINATE_FLAG] = 1;
-    		// return terminating_payload;
-    	// }
-    	// return payload;
-    // };
-
-
 	std::function<void(std::vector<int>&)> _inplace_rootTransform = [&](std::vector<int>& payload) {
-			assert(_is_root);
-			//The root node is the only one keeping track of the current sweep round number, tells the the other nodes
-    		payload[payload.size() - METADATA_POS_ROUND_FLAG] = _root_sweep_round;
+		assert(_is_root);
+		bool all_idle = payload[payload.size() - METADATA_POS_IDLE_FLAG];
 
-			//Terminate the sweep whole job if we are at the end of the last scheduled round
-			bool ALL_IDLE = payload[payload.size() - METADATA_POS_IDLE_FLAG];
-			bool WAS_LAST_ROUND = (_root_sweep_round == _params.sweepRounds());
-
-			if (ALL_IDLE && WAS_LAST_ROUND) {
-				LOG(V1_WARN, "SWEEP [%i]: Job finished! All rounds done (%i/%i). Broadcasting termination signal with sharing data.\n",
-					_my_rank, _root_sweep_round, _params.sweepRounds());
-
+		//A round is finished if all sweepers are idle, i.e. all finished their work.
+		if (all_idle) {
+			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i FINISHED (seen at root transform) \n", _my_rank, _root_sweep_round, _params.sweepRounds());
+			if (_root_sweep_round == _params.sweepRounds()) {
+				LOG(V1_WARN, "SWEEP [%i]: Job finished! All rounds done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_round, _params.sweepRounds());
 				payload[payload.size() - METADATA_POS_TERMINATE_FLAG] = 1;
+				//we DON'T yet set _terminate_all=1 here, because we want also the root solver to first import this last sharing information, which contains valuable equalities and units, before terminating the solvers
 			}
+			else {
+				printSweepStats(_sweepers[_representative_localId], false); //report some intermediate statistics about this round
+				_root_sweep_round++;
+				//The new round is started by providing the representative solver on the root node full work, i.e. all variables
+				_root_provided_initial_work = false;
+				LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i STARTED \n", _my_rank, _root_sweep_round, _params.sweepRounds());
+			}
+		}
+		//The root node (and only the root node) tracks the number of completed sweep rounds, and broadcasts this information. This way, also nodes that join later know which round we are in.
+		payload[payload.size() - METADATA_POS_ROUND_FLAG] = _root_sweep_round;
 
-			//no return, just transformed in-place
+		//no return, payload was just transformed in-place
     };
+
+	enum CustomQuery {
+		QUERY_SWEEP_ROUND = 1
+	};
 
 
 public:
@@ -187,6 +151,7 @@ public:
     friend void cb_search_work_in_tree(void* SweepJob_state, unsigned **work, int *work_size, int local_id);
 	friend void cb_import_eq(void *SweepJobState, int *lit1, int *lit2, int localId);
 	friend void cb_import_unit(void *SweepJobState, int *lit, int localId);
+	friend int cb_custom_query(void *SweeJobState, int query);
 
 
 private:
@@ -220,9 +185,10 @@ private:
 	std::vector<int> stealWorkFromAnyLocalSolver(int asking_rank, int asking_localId); //parameters only for verbose logging
     std::vector<int> stealWorkFromSpecificLocalSolver(int localId);
     void cbSearchWorkInTree(unsigned **work, int *work_size, int localId);
-	void pollForNewImportRange(KissatPtr sweeper);
+	void checkForNewImportRound(KissatPtr sweeper);
 	void cbImportEq(int *ilit1, int *ilit2, int localId);
 	void cbImportUnit(int *lit, int localId);
+	int cbCustomQuery(int query);
 	// void importNextEquivalence(int *last_imported_round, int eq_nr, unsigned *lit1, unsigned *lit2);
 
 	virtual ~SweepJob();

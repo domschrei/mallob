@@ -31,9 +31,11 @@ void cb_import_eq(void *SweepJobState, int *lit1, int *lit2, int localId) {
 
 void cb_import_unit(void *SweepJobState, int *lit, int localId) {
 	((SweepJob*) SweepJobState)->cbImportUnit(lit, localId);
-
 }
 
+int cb_custom_query(void *SweepJobState, int query) {
+	return ((SweepJob*)SweepJobState)->cbCustomQuery(query);
+}
 
 void SweepJob::appl_start() {
 	_my_rank = getJobTree().getRank();
@@ -229,19 +231,9 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 
 		//transfer some solver-specific statistics
 		auto stats = sweeper->fetchSweepStats();
-		// auto stats = sweeper->getSweepStats();
-		// auto stats = sweeper->getSolverStatsRef();
-		// auto stats = sweeper->
 		_worksweeps[localId] = stats.worksweeps;
 		_resweeps_in[localId] = stats.resweeps_in;
 		_resweeps_out[localId] = stats.resweeps_out;
-
-		// if (res==20 && !_is_root)
-			// LOG(V1_WARN, "SWEEP JOB [%i](%i) RESULT UNSAT FOUND BY NON-ROOT SOLVER!\n", _my_rank, localId);
-
-		// if (_is_root) { //we only report results from solvers on the root node, to prevent additional communication/agreement across ranks
-		//todo: we need to recognize non-root UNSAT results, but they might not have the full timing info as root
-		//maybe split reporting, such that non-solving root solver still prints his stats, to be consistent with prior rounds
 
 		if (res==20) {
 			//Found UNSAT
@@ -258,12 +250,11 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			}
 		}
 
-		//A dedicated solver on the root node print his stats as a representative of all other solvers. Their stats differ slightly between solvers, but especially these global stats are very similar between all of them, so we don't bother aggregating/averaging them
+		//A dedicated solver on the root node print his stats as a representative of all other solvers.
+		//Their stats differ slightly between solvers, but especially these global stats are very similar between all of them, so we don't bother aggregating/averaging them
 		if (_is_root && localId == _representative_localId) {
 			printSweepStats(sweeper, true);
 		}
-
-	// }
 
 		assert(res==UNKNOWN || res==UNSAT || log_return_false("SWEEP ERROR: solver has returned with unexpected signal %i \n", res));
 		//If no solver sets UNSAT or IMPROVED, the job will be returned by default as UNKNOWN
@@ -277,7 +268,6 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			printResweeps();
 		}
 	});
-	// _fut_shweepers.push_back(std::move(fut_shweeper));
 }
 
 
@@ -354,15 +344,14 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 
 	//Own options of Kissat
 	sweeper->set_option("sweepcomplete", 1);      //deactivates checking for time limits during sweeping, so we dont get kicked out due to some limits
-
-  	// sweeper->set_option("sweepclauses", 1024 * 4);		//	1024, 0, INT_MAX,	"environment clauses")
-  	// sweeper->set_option("sweepdepth", 3);			//, 2,    0, INT_MAX,	"environment depth")
-  	// sweeper->set_option("sweepfliprounds", 2);		//	1,    0, INT_MAX,	"flipping rounds")
-  	// sweeper->set_option("sweepmaxclauses", 32768 * 4);		//	32768,2, INT_MAX,	"maximum environment clauses")
-  	// sweeper->set_option("sweepmaxdepth", 4);		//	3,    1, INT_MAX,	"maximum environment depth")
-  	// sweeper->set_option("sweepmaxvars", 8192 * 4);		//	8192, 2, INT_MAX,	"maximum environment variables")
-  	// sweeper->set_option("sweeprand", 0);			//  0,    0,    1,		"randomize sweeping environment")
-  	// sweeper->set_option("sweepvars", 256 * 4);			//  256,  0, INT_MAX,	"environment variables")
+  	sweeper->set_option("sweepclauses", 1024);		//	1024, 0, INT_MAX,	"environment clauses")
+  	sweeper->set_option("sweepmaxclauses", 32768);	//	32768,2, INT_MAX,	"maximum environment clauses")
+  	sweeper->set_option("sweepdepth", 2);			//, 2,    0, INT_MAX,	"environment depth")
+  	sweeper->set_option("sweepmaxdepth", 3);		//	3,    1, INT_MAX,	"maximum environment depth")
+  	sweeper->set_option("sweepvars", 256);			//  256,  0, INT_MAX,	"environment variables")
+  	sweeper->set_option("sweepmaxvars", 8192);		//	8192, 2, INT_MAX,	"maximum environment variables")
+  	sweeper->set_option("sweepfliprounds", 2);		//	1,    0, INT_MAX,	"flipping rounds")
+  	sweeper->set_option("sweeprand", 0);			//  0,    0,    1,		"randomize sweeping environment")
 
 	//Specific for clean sweep run
 	sweeper->set_option("preprocess", 0); //skip other preprocessing stuff after shweep finished
@@ -515,7 +504,7 @@ void SweepJob::sendMPIWorkstealRequests() {
 	}
 }
 
-void SweepJob::pollForNewImportRange(KissatPtr sweeper) {
+void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
 	int publish_round = _rank_import_round.load(std::memory_order_relaxed);
 	if (publish_round != sweeper->sweep_import_round) [[unlikely]] {
 		//there is new data from a new sharing round
@@ -538,7 +527,7 @@ void SweepJob::pollForNewImportRange(KissatPtr sweeper) {
 void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
 
 	KissatPtr sweeper = _sweepers[localId];
-	pollForNewImportRange(sweeper);
+	checkForNewImportRound(sweeper);
 
 	// LOG(V2_INFO, "solver [%i](%i) eq callback sees index %i and size %i \n",_my_rank, localId, sweeper->sweep_curr_EQS_index.load(), sweeper->sweep_curr_EQS_size.load());
 	if (sweeper->sweep_EQS_index == sweeper->sweep_EQS_size) {
@@ -557,10 +546,17 @@ void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
 	//now returning to kissat solver
 }
 
-void SweepJob::cbImportUnit(int *ilit, int localId) {
+int SweepJob::cbCustomQuery(int query) {
+	if (query==QUERY_SWEEP_ROUND) {
+		return _root_sweep_round;
+	}
 
+	return 0;
+}
+
+void SweepJob::cbImportUnit(int *ilit, int localId) {
 	KissatPtr sweeper = _sweepers[localId];
-	pollForNewImportRange(sweeper);
+	checkForNewImportRound(sweeper);
 	if (sweeper->sweep_UNITS_index == sweeper->sweep_UNITS_size) {
 		// leave *ilit untouched
 		return;
@@ -805,12 +801,13 @@ void SweepJob::cbContributeToAllReduce() {
 			continue;
 		}
 
-		//Mutex, because the solvers are asynchronously pushing new eqs/units into these vectors all the time (including reallocations after push_back), make sure that doesn't happen while we copy/move
+		//Mutex, because the solvers are asynchronously pushing all the time new eqs&units into these vectors (including reallocations after push_back), make sure that doesn't happen while we copy/move
 		std::vector<int> eqs, units;
 		{
 			std::lock_guard<std::mutex> lock(sweeper->sweep_sharing_mutex);
 			eqs = std::move(sweeper->eqs_to_share);
 			units = std::move(sweeper->units_to_share);
+			//by moving we also clear their current position, i.e. prevents from sharing them twice
 		}
 
 		int eq_size = eqs.size();
@@ -823,19 +820,10 @@ void SweepJob::cbContributeToAllReduce() {
 		contrib.insert(contrib.end(), units.begin(), units.end());
 
 		appendMetadataToReductionElement(contrib, sweeper->sweeper_is_idle, unit_size, eq_size);
-		// contrib.push_back(eq_size);
-		// contrib.push_back(unit_size);
-		// contrib.push_back(sweeper->sweeper_is_idle);
-		// contrib.push_back(_root_sweep_round);
-		// contrib.push_back(0);
 
 		contribs.push_back(contrib);
-
-		// shweeper->units_to_share.clear();
-		// shweeper->eqs_to_share.clear(); //implicitly already happened due to move, but keep here for clarity
 	}
 
-	// LOG(V3_VERB, "SWEEP Aggregate contributions within process\n");
 	auto aggregation_element = aggregateEqUnitContributions(contribs);
 
 	LOG(V4_VVER, "SWEEP SHARE REDUCE [%i] ~~~%i~~~(+%i)~~> to sharing \n", _my_rank, aggregation_element.size()-NUM_METADATA_FIELDS, NUM_METADATA_FIELDS);
@@ -859,11 +847,12 @@ void SweepJob::advanceAllReduction() {
 	// LOG(V3_VERB, "[sweep] all-reduction complete\n");
 	_sharing_receive_result_timestamps.push_back(Timer::elapsedSeconds());
 
-	//todo: Filter out duplicates during aggregating?
+	//todo: Filter out duplicates during aggregating? Is it worth the effort?
 
 	//Extract shared data
 	auto data = _red->extractResult();
 	const int terminate   = data[data.size()-METADATA_POS_TERMINATE_FLAG];
+	const int sweep_round = data[data.size()-METADATA_POS_ROUND_FLAG];
 	const int all_idle    = data[data.size()-METADATA_POS_IDLE_FLAG];
 	const int unit_size   = data[data.size()-METADATA_POS_UNIT_SIZE];
 	const int eq_size     = data[data.size()-METADATA_POS_EQ_SIZE];
@@ -881,12 +870,15 @@ void SweepJob::advanceAllReduction() {
 	_UNITS_import_size.store(unit_size, std::memory_order_relaxed);
 	_rank_import_round.store(_rank_import_round+1, std::memory_order_release);
 
-	// if (_is_root)
-	LOG(V2_INFO, "SWEEP SHARE import round %i GOT: %i EQS, %i UNITS\n", _rank_import_round.load(), eq_size/2, unit_size);
-	// else
-		// LOG(V3_VERB, "SWEEP SHARE import round %i GOT: %i EQS, %i UNITS\n", _published_import_round.load(), eq_size/2, unit_size);
+	for (auto &sweeper : _sweepers) {
+		if (sweeper) {
+			shweep_set_sweep_round(sweeper->solver, sweep_round);
+		}
+	}
 
-	//Now we can reset the root node, because the sharing operation (broadcast + allreduce) is finished and can prepare a new one
+	LOG(V2_INFO, "SWEEP import round %i got: %i EQS, %i UNITS\n", sweep_round, eq_size/2, unit_size);
+
+	//Now we can prepare a new sharing operation starting from the root node, because the old sharing (broadcast + allreduce) is now finished
 	if (_is_root) {
 		LOG(V4_VVER, "SWEEP SHARE [%i] RESET root BCAST\n", _my_rank);
 		_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(),
@@ -896,23 +888,16 @@ void SweepJob::advanceAllReduction() {
 	LOG(V4_VVER, "SWEEP SHARE [%i] RESET REDUCE\n", _my_rank);
 	_red.reset();
 
-	//Only now check for termination, AFTER we copied the Eqs & Units. The solvers will immediately after receiving the termination signal read the last imported E&U, now they are ready to be served
+
 	if (all_idle) {
-		LOG(V1_WARN, "[%i] SWEEP ROUND FINISHED \n", _my_rank);
-		if (_is_root)
-			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i FINISHED \n", _my_rank, _root_sweep_round, _params.sweepRounds());
-		//the root node takes care of tracking how many sweep rounds we already had
-		if (_is_root && _root_sweep_round < _params.sweepRounds()) {
-			printSweepStats(_sweepers[_representative_localId], false); //report some intermediate statistics about this round
-			_root_sweep_round++;
-			_root_provided_initial_work = false; //will trigger another round of sweeping by providing again work to the solvers
-			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i STARTED \n", _my_rank, _root_sweep_round, _params.sweepRounds());
-		}
-		if (terminate) { //will be set eventually by rootTransform in AllReduction
-			_terminate_all = true;
-			LOG(V1_WARN, "# \n # \n # --- [%i] GOT GLOBAL TERMINATE FLAG -- TERMINATING \n # \n", _my_rank);
-		}
+		LOG(V1_WARN, "[%i] got sharing info: sweep round finished \n", _my_rank);
 	}
+
+	if (terminate) {
+		_terminate_all = true;
+		LOG(V1_WARN, "# \n # \n # --- [%i] got terminate flag, TERMINATING SWEEP JOB ---\n # \n", _my_rank);
+	}
+
 }
 
 
