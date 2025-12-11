@@ -169,7 +169,7 @@ void Kissat::diversify(int seed) {
             // kissat_set_option(solver, "mallob_shared_sweeping", 1);
 
         //For debugging: The prpeprocessing solver should also log some things (quiet=0)
-        kissat_set_option(solver, "quiet", 0);
+        kissat_set_option(solver, "quiet", 1);
         kissat_set_option(solver, "verbose", 0);
         kissat_set_option(solver, "log", 0);
 

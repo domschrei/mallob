@@ -76,7 +76,7 @@ if $SWEEP; then
     MALLOB_OPTIONS="$MALLOB_OPTIONS \
       -preprocess-sweep \
       -sweep-sharing-period=20 \
-      -sweep-solver-verbosity=2 \
+      -sweep-solver-verbosity=1 \
       -sweep-solver-quiet=1 \
       -preprocess-sweep-priority=$SWEEP_PRIO \
       -sweep-resweep-chance=1000 \

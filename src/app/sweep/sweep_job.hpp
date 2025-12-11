@@ -40,8 +40,8 @@ private:
 
 	//Timing
 	float _start_sweep_timestamp;
-	std::vector<float> _sharing_start_ping_timestamps;
-	std::vector<float> _sharing_receive_result_timestamps;
+	std::vector<float> _time_start_bcast;
+	std::vector<float> _time_receive_allred;
 
 	//Workstealing
     std::atomic_bool _root_provided_initial_work=false;
@@ -79,7 +79,7 @@ private:
 	//Distribute Eqs and Units that we received from sharing broadcast to local solvers
 	static const unsigned INVALID_LIT = UINT_MAX; //Internal literals count unsigned 0,1,2,..., the largest number marks an invalid literal. see further: https://github.com/arminbiere/satch/blob/master/satch.c#L1017
 	static const int MAX_IMPORT_SIZE = 100'000;
-	std::atomic_int _rank_import_round{0}; //counts the number of import rounds on this rank. Polled by solvers to detect whether there is something new to import
+	std::atomic_int _sharing_import_round{0}; //counts the number of import rounds on this rank. Polled by solvers to detect whether there is something new to import
 	std::atomic_int _EQS_import_size{0};
 	std::atomic_int _UNITS_import_size{0};
 	std::vector<int> _EQS_to_import {};

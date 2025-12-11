@@ -163,7 +163,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 }
 
 void SweepJob::appl_terminate() {
-	LOG(V2_INFO, "SWEEP JOB id #%i rank [%i] got TERMINATE signal (appl_terminate()) \n", getId(), _my_rank);
+	LOG(V2_INFO, "SWEEP [%i] (job #%i) got TERMINATE signal (appl_terminate()) \n", _my_rank,getId());
 	_terminate_all = true;
 	_external_termination = true;
 	gentlyTerminateSolvers();
@@ -375,7 +375,7 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 
 	auto stats = sweeper->fetchSweepStats();
 	//As "vars" we are only interested in variables that are active (not fixed) at the start of Sweep. The "VAR" counter is much larger, but most of these variables are often already fixed.
-	int vars_fixed_end = stats.sweep_eqs + stats.units_new;
+	int vars_fixed_end  = stats.sweep_eqs + stats.units_new;
 	int vars_remain_end = stats.vars_active_orig - vars_fixed_end;
 	int clauses_removed = sweeper->_setup.numOriginalClauses - stats.clauses_end;
 
@@ -384,19 +384,18 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 	double clauses_removed_percent = 100*clauses_removed/(double)sweeper->_setup.numOriginalClauses;
 
 
-	LOG(			   V2_INFO, "SWEEP solver [%i](%i) reports statistics of in .sweep file \n", _my_rank, sweeper->getLocalId());
-	LOGGER(_reslogger, V2_INFO, "Reported by [%i](%i) \n", _my_rank, sweeper->getLocalId());
-	LOGGER(_reslogger, V2_INFO, "SWEEP_ROUND			%i / %i \n", _root_sweep_round, _params.sweepRounds());
-
-	LOGGER(_reslogger,V2_INFO, "SWEEP_TIME				 %f seconds \n", Timer::elapsedSeconds() - _start_sweep_timestamp);
-	LOGGER(_reslogger,V2_INFO, "SWEEP_IMPORT_EQS_USEFUL	 %i / %i \n", stats.eqs_useful, stats.eqs_seen); //representative for the reporting solver
-	LOGGER(_reslogger,V2_INFO, "SWEEP_IMPORT_UNITS_USEFUL %i / %i \n", stats.units_useful, stats.units_seen);
-	LOGGER(_reslogger,V2_INFO, "SWEEP_EQUIVALENCES		%i\n", stats.sweep_eqs);
-	LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_NEW			%i\n", stats.units_new);
-	LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_FIXED_N		%i / %i (%.3f %)\n", vars_fixed_end, stats.vars_active_orig, vars_fixed_percent);
+	LOG(			  V2_INFO, "SWEEP solver [%i](%i) reports statistics of in .sweep file \n", _my_rank, sweeper->getLocalId());
+	LOGGER(_reslogger,V2_INFO, "Reported by [%i](%i) \n", _my_rank, sweeper->getLocalId());
+	LOGGER(_reslogger,V2_INFO, "SWEEP_ROUND					%i / %i \n", _root_sweep_round, _params.sweepRounds());
+	LOGGER(_reslogger,V2_INFO, "SWEEP_TIME					%f seconds \n", Timer::elapsedSeconds() - _start_sweep_timestamp);
+	LOGGER(_reslogger,V2_INFO, "SWEEP_IMPORT_EQS_USEFUL		%i / %i \n", stats.eqs_useful, stats.eqs_seen); //representative for the reporting solver
+	LOGGER(_reslogger,V2_INFO, "SWEEP_IMPORT_UNITS_USEFUL	%i / %i \n", stats.units_useful, stats.units_seen);
+	LOGGER(_reslogger,V2_INFO, "SWEEP_EQUIVALENCES	%i\n", stats.sweep_eqs);
+	LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_NEW		%i\n", stats.units_new);
+	LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_FIXED_N	%i / %i (%.3f %)\n", vars_fixed_end, stats.vars_active_orig, vars_fixed_percent);
 
 	if (full) {
-		LOGGER(_reslogger,V2_INFO, "SWEEP_PRIORITY       %f\n", _params.preprocessSweepPriority.val);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_PRIORITY       %.3f\n", _params.preprocessSweepPriority.val);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_PROCESSES      %i\n", getVolume());
 		LOGGER(_reslogger,V2_INFO, "SWEEP_THREADS_PER_P  %i\n", _nThreads);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_PERIOD %i ms \n", _params.sweepSharingPeriod_ms.val);
@@ -417,19 +416,35 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 	}
 
 	if (full) {
-		for (int i=0; i < _sharing_start_ping_timestamps.size() && i < _sharing_receive_result_timestamps.size(); i++) {
-			float start = _sharing_start_ping_timestamps[i];
-			float end   = _sharing_receive_result_timestamps[i];
-			LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_LATENCY  %f ms  \n", (end-start)*1000);
+		static const int DURATION_WARN_FACTOR=2;
+		float latency_sum = 0;
+		std::vector<float> latencies;
+		for (int i=0; i < _time_start_bcast.size() && i < _time_receive_allred.size(); i++) {
+			latencies.push_back(_time_receive_allred[i]-_time_start_bcast[i]);
+			latency_sum += latencies.back();
 		}
-		for (int i=0; ! _sharing_start_ping_timestamps.empty() && i < _sharing_start_ping_timestamps.size() -1; i++) {
-			LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_PERIOD_REAL  %f ms \n", (_sharing_start_ping_timestamps[i+1] - _sharing_start_ping_timestamps[i])*1000);
+		float latency_avg = latency_sum/latencies.size();
+		for (auto latency : latencies) {
+			if (latency > DURATION_WARN_FACTOR*latency_avg) {
+				LOGGER(_reslogger,V2_INFO, "[WARN] SWEEP_SHARING_LATENCY %f ms is factor >%i larger than the average sharing latency %f \n", latency, DURATION_WARN_FACTOR, latency_avg);
+			}
 		}
-
-		LOG(V3_VERB, "RESULT SWEEP [%i](%i) Serialized final formula to SolutionSize=%i\n", _my_rank, _reporting_localId->load(), _internal_result.getSolutionSize());
+		float period_avg = 0;
+		if (_time_start_bcast.size()>1) {
+			float period_sum = _time_start_bcast.back() - _time_start_bcast.front();
+			period_avg = period_sum / (_time_start_bcast.size()-1);
+			for (int i=0; i < _time_start_bcast.size()-1; i++) {
+				float period = _time_start_bcast[i+1] - _time_start_bcast[i];
+				if (period > DURATION_WARN_FACTOR*period_avg) {
+					LOGGER(_reslogger,V2_INFO, "[WARN] SWEEP_SHARING_PERIOD_REAL %f ms (share round %i) is factor >%i larger than the average sharing period \n", period, i, DURATION_WARN_FACTOR, period_avg);
+				}
+			}
+		}
+		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_LATENCY     %f ms (average) \n",latency_avg*1000);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_PERIOD_REAL %f ms (average) \n",period_avg*1000);
 		LOGGER(_reslogger, V3_VERB, "RESULT SWEEP [%i](%i) Serialized final formula to SolutionSize=%i\n", _my_rank, _reporting_localId->load(), _internal_result.getSolutionSize());
 		for (int i=0; i<15 && i<_internal_result.getSolutionSize(); i++) {
-			LOGGER(_reslogger,V3_VERB, "RESULT Sweep Formula peek %i: %i \n", i, _internal_result.getSolution(i));
+			LOGGER(_reslogger,V3_VERB, "RESULT Sweep Formula[%i] = %i \n", i, _internal_result.getSolution(i));
 		}
 	}
 
@@ -475,10 +490,11 @@ void SweepJob::printResweeps() {
 		resweeps_in += _resweeps_in[i];
 		resweeps_out += _resweeps_out[i];
 	}
-	LOG(V3_VERB, "RESULT %i SWEEP WORKSWEEPS,RESWEEPS: %s \n", _my_rank, oss.str().c_str()); //information for each individual thread
-	LOG(V2_INFO, "RESULT %i SWEEP_WORKSWEEPS   %i \n", _my_rank, worksweeps);
-	LOG(V2_INFO, "RESULT %i SWEEP_RESWEEPS_IN  %i \n", _my_rank, resweeps_in);
-	LOG(V2_INFO, "RESULT %i SWEEP_RESWEEPS_OUT %i \n", _my_rank, resweeps_out);
+	// LOG(V3_VERB, "SWEEP WORKSWEEPS,RESWEEPS: %s \n", _my_rank, oss.str().c_str()); //information for each individual thread
+	LOG(V2_INFO, "[%i] SWEEP_WORKSWEEPS   %i \n", _my_rank, worksweeps);
+	LOG(V2_INFO, "[%i] SWEEP_RESWEEPS_ALL %i \n", _my_rank, resweeps_in + resweeps_out);
+	LOG(V2_INFO, "[%i] SWEEP_RESWEEPS_IN  %i \n", _my_rank, resweeps_in);
+	LOG(V2_INFO, "[%i] SWEEP_RESWEEPS_OUT %i \n", _my_rank, resweeps_out);
 }
 
 void SweepJob::sendMPIWorkstealRequests() {
@@ -505,10 +521,10 @@ void SweepJob::sendMPIWorkstealRequests() {
 }
 
 void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
-	int publish_round = _rank_import_round.load(std::memory_order_relaxed);
+	int publish_round = _sharing_import_round.load(std::memory_order_relaxed);
 	if (publish_round != sweeper->sweep_import_round) [[unlikely]] {
 		//there is new data from a new sharing round
-		publish_round = _rank_import_round.load(std::memory_order_acquire);
+		publish_round = _sharing_import_round.load(std::memory_order_acquire);
 		assert(sweeper->sweep_import_round <= publish_round);
 		sweeper->sweep_import_round  = publish_round;
 		if (sweeper->sweep_EQS_index != sweeper->sweep_EQS_size)
@@ -742,7 +758,7 @@ void SweepJob::initiateNewSharingRound() {
 	//The broadcast includes all workers currently reachable by the root-node and informs them about their parent and potential children
 	//It then causes the leaf nodes to call the callback, initiating the AllReduce
 	_last_sharing_start_timestamp = Timer::elapsedSeconds();
-	_sharing_start_ping_timestamps.push_back(_last_sharing_start_timestamp);
+	_time_start_bcast.push_back(_last_sharing_start_timestamp);
 	LOG(V3_VERB, "SWEEP SHARE BCAST Initiating Sharing via Ping\n");
 	JobMessage msg = getMessageTemplate();
 	msg.tag = _bcast->getMessageTag();
@@ -845,7 +861,7 @@ void SweepJob::advanceAllReduction() {
 	if (!_red->hasResult()) return;
 
 	// LOG(V3_VERB, "[sweep] all-reduction complete\n");
-	_sharing_receive_result_timestamps.push_back(Timer::elapsedSeconds());
+	_time_receive_allred.push_back(Timer::elapsedSeconds());
 
 	//todo: Filter out duplicates during aggregating? Is it worth the effort?
 
@@ -868,7 +884,7 @@ void SweepJob::advanceAllReduction() {
 
 	_EQS_import_size.store(eq_size, std::memory_order_relaxed);
 	_UNITS_import_size.store(unit_size, std::memory_order_relaxed);
-	_rank_import_round.store(_rank_import_round+1, std::memory_order_release);
+	_sharing_import_round.store(_sharing_import_round+1, std::memory_order_release);
 
 	for (auto &sweeper : _sweepers) {
 		if (sweeper) {
@@ -876,7 +892,7 @@ void SweepJob::advanceAllReduction() {
 		}
 	}
 
-	LOG(V2_INFO, "SWEEP import round %i got: %i EQS, %i UNITS\n", sweep_round, eq_size/2, unit_size);
+	LOG(V2_INFO, "SWEEP sharing import round %i got: %i EQS, %i UNITS\n", _sharing_import_round.load(), eq_size/2, unit_size);
 
 	//Now we can prepare a new sharing operation starting from the root node, because the old sharing (broadcast + allreduce) is now finished
 	if (_is_root) {
@@ -1074,7 +1090,7 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 }
 
 void SweepJob::gentlyTerminateSolvers() {
-	LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] interrupting solvers\n", getId(), _my_rank);
+	LOG(V3_VERB, "SWEEP TERM #%i [%i] interrupting solvers\n", getId(), _my_rank);
 
 	// while () {
 		// LOG(V1_WARN, "Warn SWEEP JOB [%i]: delaying destructors until sweepers are all cleanly initialized (until now init %i/%i)\n",
@@ -1083,33 +1099,33 @@ void SweepJob::gentlyTerminateSolvers() {
 	// }
 	//each sweeper checks constantly for the interruption signal (on the ms scale or faster), allow for gentle own exit
 	while (_started_sweepers_count < _nThreads || _running_sweepers_count>0) {
-		LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] still %i solvers running\n", getId(), _my_rank, _running_sweepers_count.load());
+		LOG(V3_VERB, "SWEEP TERM #%i [%i] still %i solvers running\n", getId(), _my_rank, _running_sweepers_count.load());
 		int i=0;
 		for (auto &sweeper : _sweepers) {
 			if (sweeper) {
 				sweeper->setSweepTerminate();
-				LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] terminating solver (%i)\n", getId(), _my_rank, i);
+				LOG(V3_VERB, "SWEEP TERM #%i [%i] terminating solver (%i)\n", getId(), _my_rank, i);
 			}
 			i++;
 		}
 		usleep(500);
 	}
-	LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] no more solvers running\n", getId(), _my_rank);
+	LOG(V3_VERB, "SWEEP TERM #%i [%i] no more solvers running\n", getId(), _my_rank);
 
 	usleep(500);
 
 	int i=0;
-	LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] joining bg_workers \n",  getId(),_my_rank);
+	LOG(V3_VERB, "SWEEP TERM #%i [%i] joining bg_workers \n",  getId(),_my_rank);
 	for (auto &bg_worker : _bg_workers) {
 		if (bg_worker->isRunning()) {
-			LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] joining bg_worker (%i) \n",  getId(),_my_rank, i);
+			LOG(V3_VERB, "SWEEP TERM #%i [%i] joining bg_worker (%i) \n",  getId(),_my_rank, i);
 			bg_worker->stop();
-			LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] joined  bg_worker    (%i) \n",  getId(),_my_rank, i);
+			LOG(V3_VERB, "SWEEP TERM #%i [%i] joined  bg_worker    (%i) \n",  getId(),_my_rank, i);
 		}
 		i++;
 	}
-	LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] joined all bg_workers \n", getId(),_my_rank);
-	LOG(V3_VERB, "SWEEP JOB TERM #%i [%i] DONE \n", getId(),_my_rank);
+	LOG(V3_VERB, "SWEEP TERM #%i [%i] joined all bg_workers \n", getId(),_my_rank);
+	LOG(V3_VERB, "SWEEP TERM #%i [%i] DONE \n", getId(),_my_rank);
 }
 
 SweepJob::~SweepJob() {
