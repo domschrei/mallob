@@ -104,6 +104,7 @@ void SweepJob::appl_communicate() {
 
 	printIdleFraction();
 	sendMPIWorkstealRequests();
+	checkForUnsatResults();
 	if (_bcast && _is_root)// Root: Update job tree snapshot in case your children changed
 		_bcast->updateJobTree(getJobTree());
 
@@ -156,6 +157,16 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		else
 			LOG(V3_VERB, "SWEEP MSG [%i](%i) <---0---- [%i]\n", _my_rank, localId, _worksteal_requests[localId].stolen_work.size(), sourceRank );
 	}
+	else if (msg.tag == TAG_FOUND_UNSAT) {
+		LOG(V1_WARN, "SWEEP MSG [%i] <~~~ Found UNSAT! [%i]\n", _my_rank, sourceRank );
+		assert(_is_root);
+		bool expected = false;
+		//report exactly once to Mallob, ignore all additional internal UNSAT messages
+		if (_root_reported_unsat.compare_exchange_strong(expected, true)) {
+			reportSolverResult(nullptr, UNSAT);
+		}
+
+	}
 	else if (mpiTag == MSG_NOTIFY_JOB_ABORTING)    {LOG(V1_WARN, "SWEEP MSG Warn [%i]: received NOTIFY_JOB_ABORTING \n", _my_rank);}
 	else if (mpiTag == MSG_NOTIFY_JOB_TERMINATING) {LOG(V1_WARN, "SWEEP MSG Warn [%i]: received NOTIFY_JOB_TERMINATING \n", _my_rank);}
 	else if (mpiTag == MSG_INTERRUPT)			   {LOG(V1_WARN, "SWEEP MSG Warn [%i]: received MSG_INTERRUPT \n", _my_rank);}
@@ -174,44 +185,52 @@ void SweepJob::appl_memoryPanic() {
 	LOG(V1_WARN, "[WARN] SWEEP [%i]: Memory panic! \n",_my_rank);
 }
 
+void SweepJob::checkForUnsatResults() {
+	//It can be a mess when non-root node start to suddenly report (UNSAT) results to Mallob (maybe even concurrently), instead they only internaly inform the root node who then manages the reporting
+	//Technically this message would only be needed to be send once, but for additional robustness it will just keep sending once UNSAT is found. Can also be a self-message.
+	if (_do_report_UNSAT_to_root) {
+		auto msg = getMessageTemplate();
+		msg.tag = TAG_FOUND_UNSAT;
+		getJobTree().sendToRoot(msg);
+	}
+
+}
+
 void SweepJob::reportSolverResult(KissatPtr sweeper, int res) {
-	assert(_solved_status==-1);
-
-	//serializing result formula
-	LOG(V2_INFO, "SWEEP JOB [%i](%i) serializing result formula from solver \n", _my_rank, sweeper->getLocalId());
-	//format is [Clauses, #Vars, #Clauses], i.e. clauses followed by two metadata-ints at the end. Or empty, if the solver found UNSAT or made no progress at all
-	std::vector<int> formula = sweeper->extractPreprocessedFormula();
-	//we always need to serialize, even an empty formula, because serialization adds some required metadata anyways
+	LOG(V2_INFO, "SWEEP JOB [%i] reports sweep result %i to Mallob\n", _my_rank, res);
+	assert(_is_root);
+	assert(_solved_status == -1);
+	std::vector<int> formula;
+	if (res==UNSAT) {
+		assert(sweeper == nullptr);
+		formula = {};
+	} else if (res==IMPROVED){
+		assert(sweeper);
+		formula = sweeper->extractPreprocessedFormula();
+		LOG(V2_INFO, "SWEEP JOB [%i]: Solution Size %i\n", _my_rank, formula.size());
+	} else {
+		LOG(V1_WARN, "WARN SWEEP JOB [%i]: no improvement in final formula (result code %i) \n", _my_rank, res);
+	}
+	LOGGER(_reslogger,V2_INFO, "SWEEP_RESULT_CODE %i == %s \n", res, res==40 ? "IMPROVED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
 	_internal_result.setSolutionToSerialize(formula.data(), formula.size());
-
-	// serializeResultFormula(sweeper); //there is no result formula, but we need to to serialization anyways since it adds some metadata to the json job result
-	// printSweepStats(sweeper, true, res);
-	LOGGER(_reslogger,V2_INFO, "SWEEP_RESULT_CODE			%i == %s \n", res, res==40 ? "IMPROVED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
 	_internal_result.result = res;
-	_solved_status = res;
-	//_solved_status != -1 will be noticed by the main thread and triggers the termination of this job
+	_solved_status = res; //this change will be noticed by the main thread and triggers the termination of this job
 }
 
 void SweepJob::createAndStartNewSweeper(int localId) {
 	LOG(V3_VERB, "SWEEP JOB [%i](%i) queuing background worker thread\n", _my_rank, localId);
 	_bg_workers[localId]->run([this, localId]() {
 		LOG(V3_VERB, "SWEEP JOB [%i](%i) WORKER START \n", _my_rank, localId);
-		// std::future<void> fut_shweeper = ProcessWideThreadPool::get().addTask([this, localId]() { //Changed from [&] to [this, shweeper] back to [&] to [this, localId] !! (nicco)
-		//passing localId by value to this lambda, because the thread might only execute after createAndStartNewShweeper is already gone
-		// if (_terminate_all) {
-			// _bg_workers[localId]->stop();
-			// LOG(V1_WARN, "Warn SWEEP [%i](%i): terminated before creation\n", _my_rank, localId);
-			// return;
-		// }
 
 		auto sweeper = createNewSweeper(localId);
 		loadFormula(sweeper);
 		_started_sweepers_count++; //only additive, monotonically increasing, going from 0...nThreads-1 and never decreased
 		_running_sweepers_count++; //tracks actual number of running solvers at any given moment in time
-
 		/*
 		 *  Syncronization Layer!
 		 *  We wait here until all other solvers are also initialized, and only then start solving
+		 *  This is relevant for sweeping quality, as otherwise the solvers joining late might miss some of the equalities shared in the first rounds
+		 *  Alternatively, store all the shared information as a warmup-greeting-package for newly joining solvers, to maximize quality. But only relevant if the SweepJob grows with time, which is not currently the case.
 		 */
 		while (_running_sweepers_count < _nThreads) {
 			LOG(V3_VERB, "SWEEP JOB [%i](%i) waiting for other solvers to come online (%i/%i)\n", _my_rank, localId, _running_sweepers_count.load(), _nThreads);
@@ -238,15 +257,25 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		if (res==20) {
 			//Found UNSAT
 			assert(kissat_is_inconsistent(sweeper->solver) || log_return_false("SWEEP ERROR: Solver returned UNSAT 20 but is not in inconsistent (==UNSAT) state!\n"));
-			int unset_state = -1;
+			_do_report_UNSAT_to_root = true;
 			//if we are the very first solver to report anything, report and block others
-			if (_reporting_localId->compare_exchange_strong(unset_state, localId)) {
-				reportSolverResult(sweeper, UNSAT);
-			}
+			// todo: maybe easier to send quick MPI message to root node, instead of reporting directly here to Mallob? Would prevent double-reports more robustly...
+			// bool expected = false;
+			// if (_result_report_claimed.compare_exchange_strong(expected, true)) {
+				// reportSolverResult(sweeper, UNSAT);
+			// }
 		} else if (res==0) {
-			//might have made some progress
-			if (sweeper->hasReportedSweepDimacs()) { //by design the only sweeper that might have reported smth is the representative one with localId==0
-				reportSolverResult(sweeper, IMPROVED);
+			//There might be some progress in the formula, check.
+			//To reduce concurrency problems, only a single dedicated solver (localId==0 on the root node) might have even reported a formula
+			if (sweeper->hasPreprocessedFormula() ) { //by design the only sweeper that might have reported smth is the representative one with localId==0
+				assert(_is_root);
+				assert(sweeper->getLocalId()==0);
+				//
+				if (_root_reported_unsat) {
+					LOG(V1_WARN, "WARN/ERROR: SWEEP JOB [%i](%i): wanted to report improvement result, but stopped because other solvers deduced UNSAT\n", _my_rank, localId);
+				}  else {
+					reportSolverResult(sweeper, IMPROVED);
+				}
 			}
 		}
 
@@ -319,7 +348,7 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	if (_is_root) {
 		//we want to read out the final formula at the root node for convenience, so we provide this callback only to root-node solvers in the first place
 		sweeper->sweepSetReportCallback();
-		// sweeper->sweepSetReportingPtr(_reporting_localId);
+		sweeper->setRepresentativeLocalId(_representative_localId);
 	}
 
     //Basic configuration
@@ -362,7 +391,7 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 
 
 
-	// shweeper->set_option("substituteeffort", 1000); //modification doesnt seem to have much effect...
+	// shweeper->set_option("substituteeffort", 1000); //changes here dont seem to have much effect, basically all substituting already happens in the first round...
 	// shweeper->set_option("substituterounds", 10);
 	sweeper->set_option("luckyearly", 0); //skip
 	sweeper->set_option("luckylate", 0);  //skip
@@ -385,7 +414,7 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 	double clauses_removed_percent = 100*clauses_removed/(double)sweeper->_setup.numOriginalClauses;
 
 
-	LOG(			  V2_INFO, "SWEEP solver [%i](%i) reports statistics of in .sweep file \n", _my_rank, sweeper->getLocalId());
+	LOG(			  V2_INFO, "SWEEP solver [%i](%i) reports statistics in dedicated .sweep file \n", _my_rank, sweeper->getLocalId());
 	LOGGER(_reslogger,V2_INFO, "Reported by [%i](%i) \n", _my_rank, sweeper->getLocalId());
 	LOGGER(_reslogger,V2_INFO, "SWEEP_ROUND					%i / %i \n", _root_sweep_round, _params.sweepRounds());
 	LOGGER(_reslogger,V2_INFO, "SWEEP_TIME					%f seconds \n", Timer::elapsedSeconds() - _start_sweep_timestamp);
@@ -443,7 +472,7 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 		}
 		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_LATENCY     %f ms (average) \n",latency_avg*1000);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_PERIOD_REAL %f ms (average) \n",period_avg*1000);
-		LOGGER(_reslogger, V3_VERB, "RESULT SWEEP [%i](%i) Serialized final formula to SolutionSize=%i\n", _my_rank, _reporting_localId->load(), _internal_result.getSolutionSize());
+		// LOGGER(_reslogger, V3_VERB, "RESULT SWEEP [%i](%i) Serialized final formula to SolutionSize=%i\n", _my_rank, _first_UNSAT_reporting_localId.load(), _internal_result.getSolutionSize());
 		for (int i=0; i<15 && i<_internal_result.getSolutionSize(); i++) {
 			LOGGER(_reslogger,V3_VERB, "RESULT Sweep Formula[%i] = %i \n", i, _internal_result.getSolution(i));
 		}
@@ -452,11 +481,6 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 
 	// LOG(V2_INFO, "SWEEP JOB [%i](%i) completed readStats \n", _my_rank, sweeper->getLocalId());
 }
-
-
-
-
-
 
 
 void SweepJob::printIdleFraction() {
@@ -494,14 +518,13 @@ void SweepJob::printResweeps() {
 	// LOG(V3_VERB, "SWEEP WORKSWEEPS,RESWEEPS: %s \n", _my_rank, oss.str().c_str()); //information for each individual thread
 	LOG(V2_INFO, "[%i] SWEEP_WORKSWEEPS   %i \n", _my_rank, worksweeps);
 	LOG(V2_INFO, "[%i] SWEEP_RESWEEPS_ALL %i \n", _my_rank, resweeps_in + resweeps_out);
-	LOG(V2_INFO, "[%i] SWEEP_RESWEEPS_IN  %i \n", _my_rank, resweeps_in);
-	LOG(V2_INFO, "[%i] SWEEP_RESWEEPS_OUT %i \n", _my_rank, resweeps_out);
+	LOG(V3_VERB, "[%i] SWEEP_RESWEEPS_IN  %i \n", _my_rank, resweeps_in);
+	LOG(V3_VERB, "[%i] SWEEP_RESWEEPS_OUT %i \n", _my_rank, resweeps_out);
 }
 
 void SweepJob::sendMPIWorkstealRequests() {
 	//Worksteal requests need to be execute by the MPI main thread, as it can be problematic if the kissat-threads issue MPI messages in the callback on their own
-	//Thus the solver-threads only write a request in the callback, and that is picked up here by the main MPI thread
-
+	//Thus the solver-threads only write a request in shared memory, which is then picked up here by the main MPI thread
 	for (auto &request : _worksteal_requests) {
 		if (!request.sent) {
 			request.sent = true;
@@ -520,6 +543,7 @@ void SweepJob::sendMPIWorkstealRequests() {
 		}
 	}
 }
+
 
 void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
 	int publish_round = _sharing_import_round.load(std::memory_order_relaxed);
@@ -821,7 +845,7 @@ void SweepJob::cbContributeToAllReduce() {
 		//Mutex, because the solvers are asynchronously pushing all the time new eqs&units into these vectors (including reallocations after push_back), make sure that doesn't happen while we copy/move
 		std::vector<int> eqs, units;
 		{
-			std::lock_guard<std::mutex> lock(sweeper->sweep_sharing_mutex);
+			std::lock_guard<std::mutex> lock(sweeper->sweep_export_mutex);
 			eqs = std::move(sweeper->eqs_to_share);
 			units = std::move(sweeper->units_to_share);
 			//by moving we also clear their current position, i.e. prevents from sharing them twice
@@ -1104,7 +1128,7 @@ void SweepJob::gentlyTerminateSolvers() {
 		int i=0;
 		for (auto &sweeper : _sweepers) {
 			if (sweeper) {
-				sweeper->setSweepTerminate();
+				sweeper->triggerSweepTerminate();
 				LOG(V3_VERB, "SWEEP TERM #%i [%i] terminating solver (%i)\n", getId(), _my_rank, i);
 			}
 			i++;

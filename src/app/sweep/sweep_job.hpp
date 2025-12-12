@@ -17,6 +17,8 @@ private:
 
     JobResult _internal_result;
     int _solved_status{-1};
+	bool _do_report_UNSAT_to_root{false};
+	std::atomic_bool _root_reported_unsat{false};
 
     int _my_rank{0};
     int _my_index{0};
@@ -24,7 +26,7 @@ private:
     uint8_t* _metadata; //serialized description
 	int _numVars{0};
 
-	const int _representative_localId{0}; //the dedicated solver that reports its statistics to us. They will ever so slightly differ between solvers, but instead of doing more complicated averaging we just report this one
+	const int _representative_localId{0}; //a dedicated solver that reports its statistics to us
 
 	//Local Solvers
 	int _nThreads{0};
@@ -53,16 +55,18 @@ private:
 		std::vector<int> stolen_work{};
 	};
 	std::vector<WorkstealRequest> _worksteal_requests;
-    const int TAG_SEARCHING_WORK = 1001;
-    const int TAG_RETURNING_STEAL_REQUEST = 1002;
 
 
 	//Sharing Equivalences and Units
 	float _last_sharing_start_timestamp;
     std::unique_ptr<JobTreeBroadcast> _bcast;
     std::unique_ptr<JobTreeAllReduction> _red;
-    const int TAG_BCAST_INIT = 1003;
-    const int TAG_ALLRED = 1004;
+
+    const int TAG_SEARCHING_WORK= 1001;
+    const int TAG_RETURNING_STEAL_REQUEST = 1002;
+    const int TAG_BCAST_INIT	= 1003;
+    const int TAG_ALLRED		= 1004;
+	const int TAG_FOUND_UNSAT	= 1005;
 
 	//each aggregation element has some metadata integers at the end
 	static const int NUM_METADATA_FIELDS = 5;
@@ -92,15 +96,18 @@ private:
 	std::atomic_bool _terminate_all=false; //termination (on this node) due to sharing consensus that there is no more work
 	std::atomic_bool _external_termination=false; //termination because somebody else told us to (for example Job interrupted because Base Job already found a solution, ...)
 
-	//Keep track which solver reports the final formula, we only use one
-	std::shared_ptr<std::atomic<int>> _reporting_localId = std::make_shared<std::atomic<int>>(-1);
+	//An UNSAT result can occur suddenly from any solver. We make sure that only the very first reports the results to Mallob
+	// int _NO_UNSAT_REPORT_YET = -1;
+	// std::atomic_int  _first_UNSAT_reporting_localId = _NO_UNSAT_REPORT_YET;
 
 	std::vector<int> _worksweeps{}; //to collect statistics
 	std::vector<int> _resweeps_in{};
 	std::vector<int> _resweeps_out{};
 
-	Logger _reslogger;
+	Logger _reslogger; //Logging most important results in dedicated file, to not have them mangled by other verbose logs
 
+
+	//Some information is only tracked by the root node, but relevant for all nodes. Thus the root node injects it here into the sharing data.
 	std::function<void(std::vector<int>&)> _inplace_rootTransform = [&](std::vector<int>& payload) {
 		assert(_is_root);
 
@@ -171,6 +178,7 @@ private:
 	void createAndStartNewSweeper(int localId);
     void loadFormula(KissatPtr sweeper);
 
+	void checkForUnsatResults();
 	void reportSolverResult(KissatPtr sweeper, int res);
 	void printSweepStats(KissatPtr sweeper, bool full);
 	// void readResult(KissatPtr shweeper, bool withStats);

@@ -389,7 +389,7 @@ void Kissat::setSolverInterrupt() {
     if (interruptionInitialized) kissat_terminate (solver);
 }
 
-void Kissat::setSweepTerminate() {
+void Kissat::triggerSweepTerminate() {
     shweep_terminate(solver);
 }
 
@@ -503,7 +503,7 @@ void Kissat::consumeClause(int** clause, int* size, int* lbd) {
 
 void Kissat::sweepExportEq() {
     {
-        std::lock_guard<std::mutex> lock(sweep_sharing_mutex); //dont push something when the aggregation thread is just touching the eqs_to_share vector
+        std::lock_guard<std::mutex> lock(sweep_export_mutex); //dont push something when the aggregation thread is just touching the eqs_to_share vector
         const int lit1 = eq_up_buffer[0];
         const int lit2 = eq_up_buffer[1];
         eqs_to_share.push_back(lit1);
@@ -513,7 +513,7 @@ void Kissat::sweepExportEq() {
 
 void Kissat::sweepExportUnit(int unit) {
     {
-        std::lock_guard<std::mutex> lock(sweep_sharing_mutex);
+        std::lock_guard<std::mutex> lock(sweep_export_mutex);
         units_to_share.push_back(unit);
     }
 }
@@ -593,9 +593,6 @@ shweep_statistics Kissat::fetchSweepStats() {
     return sweep_stats;
 }
 
-// shweep_statistics Kissat::getSweepStats() {
-   // return shweep_stats;
-// }
 
 //Callback Called from both sequential preprocessing as well as the shared sweeping.
 bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
@@ -603,12 +600,12 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
 
     if (is_sweeper) {
         //by arriving here we already know that the sweeper is on the root node
-        bool is_representative_solver = (getLocalId()== 0);  //we take the localId==0 solver to be the representative one that reports the clause to us
+        //furthermore, we only accept formulas from the dedicated solver localId==0, to not have to deal with concurrent bussiness
+        bool is_representative_solver = (getLocalId()== representative_localId);
         if (is_representative_solver) {
             LOG(V2_INFO, "SWEEP [root](%i) first to report dimacs result\n", getLocalId());
             if (accept) {
                 LOG(V2_INFO, "SATWP ACCEPTS SWEEP dimacs formula\n");
-                has_reported_sweep_dimacs = true;
             }
             else {
                 LOG(V2_INFO, "SATWP DECLINES SWEEP dimacs formula\n");
@@ -623,18 +620,15 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
     if (accept) {
         nbPreprocessedVariables = nbVars;
         nbPreprocessedClausesAdvertised = nbClauses;
-        //todo: Attention: here we write the *current* number of existing variables into the solution!
-        //If some variables have been eliminated bc they never occurred in the formula at some point, this value here is different from the original number of variables, obviously,
-        //if this result is then propagated through further Jobs, they no longer know the original number of variables! For an eventual reconstruction, we are then reliant on the previous Jobs to know the original variable count
-        //alternatively, we could write into the formula just the original number of variables, and dont include the info how many where potentially eliminated
+        //todo: Attention: The choice here on what number of Variables we write can have some effects down the line on reconstruction.
+        //If some variables have been eliminated because they never occurred in the formula at some point, the value here is different from the original number of variables.
+        //Once this result is then propagated through further Jobs, they no longer know the original number of variables.
+        //If we then might want/need to do a full reconstruction, we are reliant on the previous Job knowing the original variable count. This is how it's currently done, sequential prepro Kissat know this value.
+        //Alternatively, one could write just the original number of variables, then we would not depend on any previous job objects
     } else setSolverInterrupt();
     return accept;
 }
 
-
-bool Kissat::hasReportedSweepDimacs() const {
-    return has_reported_sweep_dimacs;
-}
 
 void Kissat::addLiteralFromPreprocessing(int lit) {
 
@@ -652,22 +646,13 @@ void Kissat::addLiteralFromPreprocessing(int lit) {
 }
 
 
-// void Kissat::sweepSetReportingPtr(std::shared_ptr<std::atomic<int>> ptr) {
-    // sweepReportingLocalId = ptr;
-// }
-
-
 void Kissat::setToSweeper() {
     is_sweeper = true;
 }
 
-// void Kissat::setSweepJob(const std::shared_ptr<SweepJob> sweepJob) {
-   // _sweepJob = sweepJob;
-// }
-
-// void Kissat::addLiteralToShweepJob(int lit) {
-   // formulaForShweeping.push_back(lit);
-// }
+void Kissat::setRepresentativeLocalId(int localId) {
+    representative_localId = localId;
+}
 
 Kissat::~Kissat() {
     if (solver) {

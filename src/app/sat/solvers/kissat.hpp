@@ -39,6 +39,7 @@ private:
 	//#################################################
 	//Shweep
 	bool is_sweeper = false;
+	int representative_localId = 0;
 	friend class SweepJob; //fwd
 	std::vector<int> eq_up_buffer;    //transfer a single equivalence from C to C++
 
@@ -50,12 +51,11 @@ private:
 
     std::vector<int> eqs_to_share;    //accumulate exported equivalences for sharing
 	std::vector<int> units_to_share;
-	std::mutex sweep_sharing_mutex; //when exporting data from the solver to Mallob, need to lock them when extracting them for global sharing, otherwise the solver threads might continue concurrently pushing new data onto them
+	std::mutex sweep_export_mutex; //when exporting data from the solver to Mallob, need to lock them when extracting them for global sharing, otherwise the solver threads might continue concurrently pushing new data onto them
 	std::vector<int> work_received_from_steal;
 
 	bool sweeper_is_idle = false;
-	// std::shared_ptr<std::atomic<int>> sweepReportingLocalId;
-	bool has_reported_sweep_dimacs = false;
+	// bool has_reported_sweep_dimacs = false;
 
 	std::atomic_int sweep_import_round{0};
 	std::atomic_int sweep_EQS_index{0};
@@ -149,9 +149,10 @@ public:
 	friend void sweep_import_units(void *state, int **units, int *unit_count);
 	// void sweepSetReportingPtr(std::shared_ptr<std::atomic<int>> field);
 	void setToSweeper();
-	void setSweepTerminate();
-	bool hasReportedSweepDimacs() const;
-	shweep_statistics getSweepStats();
+	void triggerSweepTerminate();
+	void setRepresentativeLocalId(int localId);
+	// bool hasReportedSweepDimacs() const;
+	// shweep_statistics getSweepStats();
 
 	//Pass-through
 	bool set_option(const std::string &option_name, int value);
