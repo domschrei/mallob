@@ -272,7 +272,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 				assert(sweeper->getLocalId()==0);
 				//
 				if (_root_reported_unsat) {
-					LOG(V1_WARN, "WARN/ERROR: SWEEP JOB [%i](%i): wanted to report improvement result, but stopped because other solvers deduced UNSAT\n", _my_rank, localId);
+					LOG(V1_WARN, "SWEEP JOB [%i](%i): wanted to report improvement result, but stopped because other solvers already deduced UNSAT\n", _my_rank, localId);
 				}  else {
 					reportSolverResult(sweeper, IMPROVED);
 				}
@@ -413,8 +413,8 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 	double vars_remain_percent = 100*vars_remain_end/(double)stats.vars_active_orig;
 	double clauses_removed_percent = 100*clauses_removed/(double)sweeper->_setup.numOriginalClauses;
 
-
 	LOG(			  V2_INFO, "SWEEP solver [%i](%i) reports statistics in dedicated .sweep file \n", _my_rank, sweeper->getLocalId());
+	LOGGER(_reslogger,V2_INFO, "\n");
 	LOGGER(_reslogger,V2_INFO, "Reported by [%i](%i) \n", _my_rank, sweeper->getLocalId());
 	LOGGER(_reslogger,V2_INFO, "SWEEP_ROUND					%i / %i \n", _root_sweep_round, _params.sweepRounds());
 	LOGGER(_reslogger,V2_INFO, "SWEEP_TIME					%f seconds \n", Timer::elapsedSeconds() - _start_sweep_timestamp);
@@ -447,32 +447,38 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 
 	if (full) {
 		static const int DURATION_WARN_FACTOR=2;
-		float latency_sum = 0;
+		float latency_sum=0, latency_avg=0, period_sum=0, period_avg=0;
 		std::vector<float> latencies;
 		for (int i=0; i < _time_start_bcast.size() && i < _time_receive_allred.size(); i++) {
 			latencies.push_back(_time_receive_allred[i]-_time_start_bcast[i]);
 			latency_sum += latencies.back();
 		}
-		float latency_avg = latency_sum/latencies.size();
-		for (auto latency : latencies) {
-			if (latency > DURATION_WARN_FACTOR*latency_avg) {
-				LOGGER(_reslogger,V2_INFO, "[WARN] SWEEP_SHARING_LATENCY %f ms is factor >%i larger than the average sharing latency %f \n", latency, DURATION_WARN_FACTOR, latency_avg);
-			}
+		if (!latencies.empty()) {
+			latency_avg = latency_sum/latencies.size();
 		}
-		float period_avg = 0;
 		if (_time_start_bcast.size()>1) {
-			float period_sum = _time_start_bcast.back() - _time_start_bcast.front();
+			period_sum = _time_start_bcast.back() - _time_start_bcast.front();
 			period_avg = period_sum / (_time_start_bcast.size()-1);
+		}
+		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_LATENCY     %.1f ms (average) \n",latency_avg*1000);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_PERIOD_REAL %.1f ms (average) \n",period_avg*1000);
+
+
+		if (_time_start_bcast.size()>1) {
 			for (int i=0; i < _time_start_bcast.size()-1; i++) {
 				float period = _time_start_bcast[i+1] - _time_start_bcast[i];
 				if (period > DURATION_WARN_FACTOR*period_avg) {
-					LOGGER(_reslogger,V2_INFO, "[WARN] SWEEP_SHARING_PERIOD_REAL %f ms (share round %i) is factor >%i larger than the average sharing period \n", period, i, DURATION_WARN_FACTOR, period_avg);
+					LOGGER(_reslogger,V2_INFO, "[WARN] SWEEP_SHARING_PERIOD_REAL %.1f ms   (in share round %i) is much larger than average \n", period, i);
 				}
 			}
 		}
-		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_LATENCY     %f ms (average) \n",latency_avg*1000);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_PERIOD_REAL %f ms (average) \n",period_avg*1000);
-		// LOGGER(_reslogger, V3_VERB, "RESULT SWEEP [%i](%i) Serialized final formula to SolutionSize=%i\n", _my_rank, _first_UNSAT_reporting_localId.load(), _internal_result.getSolutionSize());
+
+		for (int i=0; i< latencies.size(); i++) {
+			if (latencies[i] > DURATION_WARN_FACTOR*latency_avg) {
+				LOGGER(_reslogger,V2_INFO, "[WARN] SWEEP_SHARING_LATENCY %.1f ms     (between share rounds %i,%i) is much larger than average \n", latencies[i], i, i+1);
+			}
+		}
+
 		for (int i=0; i<15 && i<_internal_result.getSolutionSize(); i++) {
 			LOGGER(_reslogger,V3_VERB, "RESULT Sweep Formula[%i] = %i \n", i, _internal_result.getSolution(i));
 		}
@@ -553,9 +559,9 @@ void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
 		assert(sweeper->sweep_import_round <= publish_round);
 		sweeper->sweep_import_round  = publish_round;
 		if (sweeper->sweep_EQS_index != sweeper->sweep_EQS_size)
-			LOG(V1_WARN, "SWEEP Warn: Solver [%i](%i) couldn't finish reading previous equivalence imports! now skipping remaining  %i/%i \n", _my_rank, sweeper->getLocalId(), sweeper->sweep_EQS_index.load(), sweeper->sweep_EQS_size.load());
+			LOG(V1_WARN, "WARN SWEEP: Solver [%i](%i) couldn't finish reading previous equivalence imports! now skipping remaining  %i/%i \n", _my_rank, sweeper->getLocalId(), sweeper->sweep_EQS_index.load(), sweeper->sweep_EQS_size.load());
 		if (sweeper->sweep_UNITS_index != sweeper->sweep_UNITS_size)
-			LOG(V1_WARN, "SWEEP Warn: Solver [%i](%i) couldn't finish reading previous unit imports! now skipping remaining  %i/%i \n", _my_rank, sweeper->getLocalId(), sweeper->sweep_UNITS_index.load(), sweeper->sweep_UNITS_size.load());
+			LOG(V1_WARN, "WARN SWEEP: Solver [%i](%i) couldn't finish reading previous unit imports! now skipping remaining  %i/%i \n", _my_rank, sweeper->getLocalId(), sweeper->sweep_UNITS_index.load(), sweeper->sweep_UNITS_size.load());
 		//tell the solver where in the fixed array the data starts and where it ends
 		sweeper->sweep_EQS_index   = 0;
 		sweeper->sweep_UNITS_index = 0;
