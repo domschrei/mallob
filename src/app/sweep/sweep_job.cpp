@@ -191,6 +191,7 @@ void SweepJob::checkForUnsatResults() {
 	if (_do_report_UNSAT_to_root) {
 		auto msg = getMessageTemplate();
 		msg.tag = TAG_FOUND_UNSAT;
+		LOG(V1_WARN, "SWEEP [%i] (job #%i) sending UNSAT to root \n", _my_rank,getId());
 		getJobTree().sendToRoot(msg);
 	}
 
@@ -257,13 +258,8 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		if (res==20) {
 			//Found UNSAT
 			assert(kissat_is_inconsistent(sweeper->solver) || log_return_false("SWEEP ERROR: Solver returned UNSAT 20 but is not in inconsistent (==UNSAT) state!\n"));
+			LOG(V1_WARN, "SWEEP [%i](%i) found UNSAT! \n", _my_rank, localId);
 			_do_report_UNSAT_to_root = true;
-			//if we are the very first solver to report anything, report and block others
-			// todo: maybe easier to send quick MPI message to root node, instead of reporting directly here to Mallob? Would prevent double-reports more robustly...
-			// bool expected = false;
-			// if (_result_report_claimed.compare_exchange_strong(expected, true)) {
-				// reportSolverResult(sweeper, UNSAT);
-			// }
 		} else if (res==0) {
 			//There might be some progress in the formula, check.
 			//To reduce concurrency problems, only a single dedicated solver (localId==0 on the root node) might have even reported a formula
