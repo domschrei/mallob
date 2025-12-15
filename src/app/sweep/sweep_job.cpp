@@ -103,10 +103,11 @@ void SweepJob::appl_communicate() {
 	LOG(V4_VVER, "SWEEP JOB appl_communicate() \n");
 
 	printIdleFraction();
-	sendMPIWorkstealRequests();
-	checkForUnsatResults();
 	if (_bcast && _is_root)// Root: Update job tree snapshot in case your children changed
 		_bcast->updateJobTree(getJobTree());
+
+	sendMPIWorkstealRequests();
+	checkForUnsatResults();
 
 	if (_is_root && ! _terminate_all)
 		initiateNewSharingRound();
