@@ -368,6 +368,10 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	sweeper->set_option("mallob_resweep_chance", _params.sweepResweepChance.val);
 	sweeper->set_option("mallob_staggered_logs", 1); //set to 1 to have spatially separated logs, useful for verbose runs with 2-16 threads
 
+	if (_is_root && localId==0) {
+		sweeper->set_option("mallob_is_shweeper",0);
+		sweeper->set_option("mallob_is_congruencer", 1);
+	}
 
 	//Own options of Kissat
 	sweeper->set_option("sweepcomplete", 1);      //deactivates checking for time limits during sweeping, so we dont get kicked out due to some limits
@@ -549,11 +553,16 @@ void SweepJob::sendMPIWorkstealRequests() {
 
 
 void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
-	int publish_round = _sharing_import_round.load(std::memory_order_relaxed);
-	if (publish_round != sweeper->sweep_import_round) [[unlikely]] {
+	int publish_round = _sharing_import_round.load(std::memory_order_acquire);
+	int my_round = sweeper->sweep_import_round;
+	if (publish_round != my_round) [[unlikely]] {
 		//there is new data from a new sharing round
-		publish_round = _sharing_import_round.load(std::memory_order_acquire);
-		assert(sweeper->sweep_import_round <= publish_round);
+		// publish_round = _sharing_import_round.load(std::memory_order_acquire);
+
+		assert(my_round <= publish_round);
+		if (my_round != publish_round - 1) {
+			LOG(V1_WARN, "WARN SWEEP: Solver [%i](%i) skipped some import rounds, went directly from %i to %i \n", _my_rank, sweeper->getLocalId(), my_round, publish_round);
+		}
 		sweeper->sweep_import_round  = publish_round;
 		if (sweeper->sweep_EQS_index != sweeper->sweep_EQS_size)
 			LOG(V1_WARN, "WARN SWEEP: Solver [%i](%i) couldn't finish reading previous equivalence imports! now skipping remaining  %i/%i \n", _my_rank, sweeper->getLocalId(), sweeper->sweep_EQS_index.load(), sweeper->sweep_EQS_size.load());
@@ -851,7 +860,7 @@ void SweepJob::cbContributeToAllReduce() {
 			std::lock_guard<std::mutex> lock(sweeper->sweep_export_mutex);
 			eqs = std::move(sweeper->eqs_to_share);
 			units = std::move(sweeper->units_to_share);
-			//by moving we also clear their current position, i.e. prevents from sharing them twice
+			//by moving we also clear their current position, i.e. prevents from sharing the data twice
 		}
 
 		int eq_size = eqs.size();
