@@ -39,6 +39,7 @@ private:
 	//#################################################
 	//Shweep
 	bool is_sweeper = false;
+	bool is_congruencer = false; //subtype of sweeper, that does congruence closure instead of sweeping
 	int representative_localId = 0;
 	friend class SweepJob; //fwd
 	std::vector<int> eq_up_buffer;    //transfer a single equivalence from C to C++
@@ -145,8 +146,8 @@ public:
 	//Shared Sweeping / SWEEP App
 	friend void sweep_export_eq(void *state);
 	friend void sweep_export_unit(void *state, int unit);
-	friend void sweep_import_eqs(void* state, int** equivalences, int *eqs_size);
-	friend void sweep_import_units(void *state, int **units, int *unit_count);
+	// friend void sweep_import_eqs(void* state, int** equivalences, int *eqs_size);
+	// friend void sweep_import_units(void *state, int **units, int *unit_count);
 	// void sweepSetReportingPtr(std::shared_ptr<std::atomic<int>> field);
 	void setToSweeper();
 	void triggerSweepTerminate();

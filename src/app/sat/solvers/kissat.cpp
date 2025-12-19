@@ -508,6 +508,7 @@ void Kissat::sweepExportEq() {
         const int lit2 = eq_up_buffer[1];
         eqs_to_share.push_back(lit1);
         eqs_to_share.push_back(lit2);
+        // LOG(V2_INFO, "(%i) exported ilit(%i)==ilit(%i)\n", getLocalId(), lit1, lit2);
     }
 }
 

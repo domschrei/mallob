@@ -27,6 +27,7 @@ private:
 	int _numVars{0};
 
 	const int _representative_localId{0}; //a dedicated solver that reports its statistics to us
+	const int _congruence_localId{1};
 
 	//Local Solvers
 	int _nThreads{0};
@@ -89,7 +90,7 @@ private:
 	int _shared_units_this_round = 0;
 	int _shared_eqs_this_round = 0;
 
-	//Usually multiple full sweep rounds are done, tracked at the root node
+	//Counter, tracking on the root node the current full sweeping round
 	int _root_sweep_round = 1;
 
 	//Termination. Determined during workstealing, broadcasted via sharing
@@ -103,6 +104,7 @@ private:
 	std::vector<int> _worksweeps{}; //to collect statistics
 	std::vector<int> _resweeps_in{};
 	std::vector<int> _resweeps_out{};
+	// shweep_statistics _congruence_stats{};
 
 	Logger _reslogger; //Logging most important results in dedicated file, to not have them mangled by other verbose logs
 
@@ -179,8 +181,10 @@ private:
     void loadFormula(KissatPtr sweeper);
 
 	void checkForUnsatResults();
+	void tryReportUnsat();
 	void reportSolverResult(KissatPtr sweeper, int res);
 	void printSweepStats(KissatPtr sweeper, bool full);
+	void printCongruenceStats(KissatPtr sweeper);
 	// void readResult(KissatPtr shweeper, bool withStats);
 	// void serializeResultFormula(KissatPtr sweeper);
 

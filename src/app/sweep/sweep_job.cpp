@@ -161,12 +161,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 	else if (msg.tag == TAG_FOUND_UNSAT) {
 		LOG(V1_WARN, "SWEEP MSG [%i] <~~~ Found UNSAT! [%i]\n", _my_rank, sourceRank );
 		assert(_is_root);
-		bool expected = false;
-		//report exactly once to Mallob, ignore all additional internal UNSAT messages
-		if (_root_reported_unsat.compare_exchange_strong(expected, true)) {
-			reportSolverResult(nullptr, UNSAT);
-		}
-
+		tryReportUnsat();
 	}
 	else if (mpiTag == MSG_NOTIFY_JOB_ABORTING)    {LOG(V1_WARN, "SWEEP MSG Warn [%i]: received NOTIFY_JOB_ABORTING \n", _my_rank);}
 	else if (mpiTag == MSG_NOTIFY_JOB_TERMINATING) {LOG(V1_WARN, "SWEEP MSG Warn [%i]: received NOTIFY_JOB_TERMINATING \n", _my_rank);}
@@ -196,6 +191,15 @@ void SweepJob::checkForUnsatResults() {
 		getJobTree().sendToRoot(msg);
 	}
 
+}
+
+void SweepJob::tryReportUnsat() {
+	assert(_is_root);
+	bool expected = false;
+	//report exactly once to Mallob, ignore all additional internal UNSAT messages
+	if (_root_reported_unsat.compare_exchange_strong(expected, true)) {
+		reportSolverResult(nullptr, UNSAT);
+	}
 }
 
 void SweepJob::reportSolverResult(KissatPtr sweeper, int res) {
@@ -256,17 +260,26 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		_resweeps_in[localId] = stats.resweeps_in;
 		_resweeps_out[localId] = stats.resweeps_out;
 
-		if (res==20) {
+		if (sweeper->is_congruencer) {
+			printCongruenceStats(sweeper);
+		}
+
+		if (res==UNSAT) {
 			//Found UNSAT
 			assert(kissat_is_inconsistent(sweeper->solver) || log_return_false("SWEEP ERROR: Solver returned UNSAT 20 but is not in inconsistent (==UNSAT) state!\n"));
 			LOG(V1_WARN, "SWEEP [%i](%i) found UNSAT! \n", _my_rank, localId);
-			_do_report_UNSAT_to_root = true;
-		} else if (res==0) {
+			if (_is_root) {
+				//there had been rare cases where sending a self-message on the root-node crashed the program, so in this case we skip the mpi message
+				tryReportUnsat();
+			} else {
+				_do_report_UNSAT_to_root = true;
+			}
+		} else if (res==UNKNOWN) {
 			//There might be some progress in the formula, check.
 			//To reduce concurrency problems, only a single dedicated solver (localId==0 on the root node) might have even reported a formula
 			if (sweeper->hasPreprocessedFormula() ) { //by design the only sweeper that might have reported smth is the representative one with localId==0
 				assert(_is_root);
-				assert(sweeper->getLocalId()==0);
+				assert(sweeper->getLocalId()==_representative_localId);
 				//
 				if (_root_reported_unsat) {
 					LOG(V1_WARN, "SWEEP JOB [%i](%i): wanted to report improvement result, but stopped because other solvers already deduced UNSAT\n", _my_rank, localId);
@@ -368,9 +381,16 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	sweeper->set_option("mallob_resweep_chance", _params.sweepResweepChance.val);
 	sweeper->set_option("mallob_staggered_logs", 1); //set to 1 to have spatially separated logs, useful for verbose runs with 2-16 threads
 
-	if (_is_root && localId==0) {
-		sweeper->set_option("mallob_is_shweeper",0);
+	if (_params.sweepCongruence() && _is_root && localId == _congruence_localId) {
+		//Do congruence closure instead of sweeping. I.e., syntactical instead of semantical search for equivalences.
+		//the congruencer does not participate in workstealing and might be out-of-sync with the sweepers in terms of rounds, so there is no sensible "idle" state
+		//we give authority to the sweepers and when they finish the congruencer must finish as well, implemented here by always marking it as idle
 		sweeper->set_option("mallob_is_congruencer", 1);
+		sweeper->set_option("mallob_is_shweeper",0);
+		sweeper->set_option("quiet", 0);
+		sweeper->set_option("log", 0);   //0..5
+		sweeper->sweeper_is_idle = true;
+		sweeper->is_congruencer = true;
 	}
 
 	//Own options of Kissat
@@ -419,10 +439,10 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 	LOGGER(_reslogger,V2_INFO, "Reported by [%i](%i) \n", _my_rank, sweeper->getLocalId());
 	LOGGER(_reslogger,V2_INFO, "SWEEP_ROUND					%i / %i \n", _root_sweep_round, _params.sweepRounds());
 	LOGGER(_reslogger,V2_INFO, "SWEEP_TIME					%f seconds \n", Timer::elapsedSeconds() - _start_sweep_timestamp);
+	LOGGER(_reslogger,V2_INFO, "SWEEP_EQUIVALENCES			%i / %i \n", stats.sweep_eqs, stats.vars_active_orig);
+	LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_NEW				%i / %i \n", stats.units_new, stats.vars_active_orig);
 	LOGGER(_reslogger,V2_INFO, "SWEEP_IMPORT_EQS_USEFUL		%i / %i \n", stats.eqs_useful, stats.eqs_seen); //representative for the reporting solver
 	LOGGER(_reslogger,V2_INFO, "SWEEP_IMPORT_UNITS_USEFUL	%i / %i \n", stats.units_useful, stats.units_seen);
-	LOGGER(_reslogger,V2_INFO, "SWEEP_EQUIVALENCES	%i\n", stats.sweep_eqs);
-	LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_NEW		%i\n", stats.units_new);
 	LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_FIXED_N	%i / %i (%.3f %)\n", vars_fixed_end, stats.vars_active_orig, vars_fixed_percent);
 
 	if (full) {
@@ -484,9 +504,12 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 			LOGGER(_reslogger,V3_VERB, "RESULT Sweep Formula[%i] = %i \n", i, _internal_result.getSolution(i));
 		}
 	}
+}
 
-
-	// LOG(V2_INFO, "SWEEP JOB [%i](%i) completed readStats \n", _my_rank, sweeper->getLocalId());
+void SweepJob::printCongruenceStats(KissatPtr sweeper) {
+	auto stats = sweeper->fetchSweepStats();
+	LOGGER(_reslogger, V2_INFO, "CONGRUENCE_EQUIVALENCES   %i \n", stats.congr_eqs);
+	LOGGER(_reslogger, V2_INFO, "CONGRUENCE_UNITS          %i \n", stats.congr_units);
 }
 
 
@@ -523,10 +546,10 @@ void SweepJob::printResweeps() {
 		resweeps_out += _resweeps_out[i];
 	}
 	// LOG(V3_VERB, "SWEEP WORKSWEEPS,RESWEEPS: %s \n", _my_rank, oss.str().c_str()); //information for each individual thread
-	LOG(V2_INFO, "[%i] SWEEP_WORKSWEEPS   %i \n", _my_rank, worksweeps);
-	LOG(V2_INFO, "[%i] SWEEP_RESWEEPS_ALL %i \n", _my_rank, resweeps_in + resweeps_out);
-	LOG(V3_VERB, "[%i] SWEEP_RESWEEPS_IN  %i \n", _my_rank, resweeps_in);
-	LOG(V3_VERB, "[%i] SWEEP_RESWEEPS_OUT %i \n", _my_rank, resweeps_out);
+	LOGGER(_reslogger, V2_INFO, "[%i] SWEEP_WORKSWEEPS   %i \n", _my_rank, worksweeps);
+	LOGGER(_reslogger, V2_INFO, "[%i] SWEEP_RESWEEPS_ALL %i \n", _my_rank, resweeps_in + resweeps_out);
+	LOGGER(_reslogger, V3_VERB, "[%i] SWEEP_RESWEEPS_IN  %i \n", _my_rank, resweeps_in);
+	LOGGER(_reslogger, V3_VERB, "[%i] SWEEP_RESWEEPS_OUT %i \n", _my_rank, resweeps_out);
 }
 
 void SweepJob::sendMPIWorkstealRequests() {
@@ -579,6 +602,7 @@ void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
 
 void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
 
+	//todo: this localId can also just be a congruencer! lives in the same array, interfaces the same way with eq/units
 	KissatPtr sweeper = _sweepers[localId];
 	checkForNewImportRound(sweeper);
 
@@ -773,7 +797,6 @@ void SweepJob::initiateNewSharingRound() {
 		return;
 	}
 
-
 	if (Timer::elapsedSeconds() < _last_sharing_start_timestamp + _params.sweepSharingPeriod_ms.val/1000.0) {
 		//not yet time for next sharing round
 		return;
@@ -860,6 +883,10 @@ void SweepJob::cbContributeToAllReduce() {
 			std::lock_guard<std::mutex> lock(sweeper->sweep_export_mutex);
 			eqs = std::move(sweeper->eqs_to_share);
 			units = std::move(sweeper->units_to_share);
+			if (!eqs.empty() || !units.empty()) {
+				LOG(V3_VERB, "        [%i](%i) Export:  %i E  %i U\n", _my_rank, sweeper->getLocalId(), eqs.size()/2, units.size());
+			}
+
 			//by moving we also clear their current position, i.e. prevents from sharing the data twice
 		}
 
@@ -1084,7 +1111,7 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	//We dont know yet how much there is to steal, so we ask for an upper bound
 	//It can also be that the solver we want to steal from is not fully initialized yet
 	//For that in the C code there are further guards against unfinished initialization, all returning 0 in that case
-	// LOG(V3_VERB, "SWEEP STEAL [%i] getting max steal info from (%i) \n", _my_rank, localId);
+	//The congruence closure solver will always return 0, as it doesnt operate on work and doesnt have any
 	int max_steal_amount = shweep_get_max_steal_amount(sweeper->solver);
 	if (max_steal_amount == 0)
 		return {};
