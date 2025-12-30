@@ -12,3 +12,4 @@ OPT_INT(sweepSolverQuiet,		"swpqt", 	"sweep-solver-quiet", 		1, 0, 1, "whether t
 OPT_INT(sweepResweepChance, 	"swprc", 	"sweep-resweep-chance", 	1e4, 0, 1e4, "chance that a solver resweeps a variable from a found equivalence (in per mille)")
 OPT_INT(sweepRounds, 			"swprds", 	"sweep-rounds", 			1, 0, LARGE_INT, "number of full sweep rounds over all variables")
 OPT_BOOL(sweepCongruence,  		"swpcg", 	"sweep-congruence", 		false, "One solver at the root node does clausal congruence closure instead of sweeping")
+OPT_BOOL(sweepGrowingEnvironments,"swpge", 	"sweep-growing-environments",true, "The sweepers increase the sweep environment after each full sweeping round")

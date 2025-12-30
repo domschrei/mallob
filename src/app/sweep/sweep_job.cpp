@@ -380,13 +380,14 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	sweeper->set_option("mallob_is_root", _is_root);
 	sweeper->set_option("mallob_resweep_chance", _params.sweepResweepChance.val);
 	sweeper->set_option("mallob_staggered_logs", 1); //set to 1 to have spatially separated logs, useful for verbose runs with 2-16 threads
+	sweeper->set_option("mallob_growing_environments", _params.sweepGrowingEnvironments.val);
 
 	if (_params.sweepCongruence() && _is_root && localId == _congruence_localId) {
 		//Do congruence closure instead of sweeping. I.e., syntactical instead of semantical search for equivalences.
 		//the congruencer does not participate in workstealing and might be out-of-sync with the sweepers in terms of rounds, so there is no sensible "idle" state
 		//we give authority to the sweepers and when they finish the congruencer must finish as well, implemented here by always marking it as idle
 		sweeper->set_option("mallob_is_congruencer", 1);
-		sweeper->set_option("mallob_is_shweeper",0);
+		sweeper->set_option("mallob_is_shweeper",1);
 		sweeper->set_option("quiet", 0);
 		sweeper->set_option("log", 0);   //0..5
 		sweeper->sweeper_is_idle = true;
@@ -510,6 +511,7 @@ void SweepJob::printCongruenceStats(KissatPtr sweeper) {
 	auto stats = sweeper->fetchSweepStats();
 	LOGGER(_reslogger, V2_INFO, "CONGRUENCE_EQUIVALENCES   %i \n", stats.congr_eqs);
 	LOGGER(_reslogger, V2_INFO, "CONGRUENCE_UNITS          %i \n", stats.congr_units);
+	LOGGER(_reslogger, V2_INFO, "CONGRUENCE_EQS_SKIPPED    %i / %i \n", stats.congr_eqs_skipped, stats.eqs_seen);
 }
 
 

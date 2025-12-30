@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.11.4)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 project (mallob)
 
 find_package(MPI REQUIRED)
@@ -204,7 +205,7 @@ target_link_directories(mallob_core PUBLIC ${BASE_LINK_DIRS})
 add_library(mallob_corepluscomm STATIC ${MALLOB_COREPLUSCOMM_SOURCES})
 target_include_directories(mallob_corepluscomm PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob_corepluscomm PRIVATE ${BASE_COMPILEFLAGS})
-target_link_libraries(mallob_corepluscomm ${MPI_CXX_LIBRARIES} ${MPI_CXX_LINK_FLAGS} mallob_core ${BASE_LIBS})
+target_link_libraries(mallob_corepluscomm ${MPI_CXX_LIBRARIES} ${MPI_CXX_LINK_FLAGS} MPI::MPI_CXX mallob_core ${BASE_LIBS})
 target_link_directories(mallob_corepluscomm PUBLIC ${BASE_LINK_DIRS})
 
 
@@ -214,7 +215,7 @@ target_link_directories(mallob_corepluscomm PUBLIC ${BASE_LINK_DIRS})
 add_executable(mallob src/core/client.cpp src/core/worker.cpp src/main.cpp)
 target_include_directories(mallob PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob PRIVATE ${BASE_COMPILEFLAGS})
-target_link_libraries(mallob mallob_corepluscomm)
+target_link_libraries(mallob MPI::MPI_CXX mallob_corepluscomm)
 
 # Mallob process dispatcher
 add_executable(mallob_process_dispatcher src/app/sat/main_dispatch.cpp)
