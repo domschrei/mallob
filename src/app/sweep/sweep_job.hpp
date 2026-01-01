@@ -38,6 +38,7 @@ private:
     std::atomic_int _running_sweepers_count {0};
 	std::vector<int> _list_of_ids;
 	bool _started_synchronized_solving{false};
+	int _lastIdleCount{0};
 
 	//Timing
 	float _start_sweep_timestamp;
@@ -70,19 +71,20 @@ private:
 	const int TAG_FOUND_UNSAT	= 1005;
 
 	//each aggregation element has some metadata integers at the end
-	static const int NUM_METADATA_FIELDS = 5;
+	static const int NUM_METADATA_FIELDS = 6;
 		//which are:
-		static const int METADATA_POS_TERMINATE_FLAG   = 5;
-		static const int METADATA_POS_ROUND_FLAG      = 4;
-		static const int METADATA_POS_IDLE_FLAG		 = 3;
-		static const int METADATA_POS_UNIT_SIZE	    = 2;
-		static const int METADATA_POS_EQ_SIZE	   = 1;
+		static const int METADATA_TERMINATE      = 6;
+		static const int METADATA_SWEEP_ROUND   = 5;
+		static const int METADATA_SHARING_ROUND  = 4;
+		static const int METADATA_IDLE		  = 3;
+		static const int METADATA_UNIT_SIZE	 = 2;
+		static const int METADATA_EQ_SIZE   = 1;
 
 
 	//Distribute Eqs and Units that we received from sharing broadcast to local solvers
 	static const unsigned INVALID_LIT = UINT_MAX; //Internal literals count unsigned 0,1,2,..., the largest number marks an invalid literal. see further: https://github.com/arminbiere/satch/blob/master/satch.c#L1017
 	static const int MAX_IMPORT_SIZE = 100'000; //Fix the import to a known preallocated area, to simplify concurrent read and write
-	std::atomic_int _sharing_import_round{0}; //counts the number of import rounds on this rank. Polled by solvers to detect whether there is something new to import
+	std::atomic_int _available_import_round{0}; //identifier for the newest import round that we received from the sharing operation
 	std::atomic_int _EQS_import_size{0};
 	std::atomic_int _UNITS_import_size{0};
 	std::vector<int> _EQS_to_import {};
@@ -90,8 +92,9 @@ private:
 	int _shared_units_this_round = 0;
 	int _shared_eqs_this_round = 0;
 
-	//Counter, tracking on the root node the current full sweeping round
-	int _root_sweep_round = 1;
+	//the root node tracks the number of sweep rounds and sharing rounds, distributes this information in the sharing operation
+	int _root_sweep_round = 1; //starts at 1
+	int _root_sharing_round = 1;
 
 	//Termination. Determined during workstealing, broadcasted via sharing
 	std::atomic_bool _terminate_all=false; //termination (on this node) due to sharing consensus that there is no more work
@@ -112,22 +115,23 @@ private:
 	//Some information is only tracked by the root node, but relevant for all nodes. Thus the root node injects it here into the sharing data.
 	std::function<void(std::vector<int>&)> _inplace_rootTransform = [&](std::vector<int>& payload) {
 		assert(_is_root);
+		_root_sharing_round++;
 
-		_shared_units_this_round += payload[payload.size() - METADATA_POS_UNIT_SIZE];
-		_shared_eqs_this_round   += payload[payload.size() - METADATA_POS_EQ_SIZE]/2;
-		bool all_idle = payload[payload.size() - METADATA_POS_IDLE_FLAG];
+		_shared_units_this_round += payload[payload.size() - METADATA_UNIT_SIZE];
+		_shared_eqs_this_round   += payload[payload.size() - METADATA_EQ_SIZE]/2;
+		bool all_idle = payload[payload.size() - METADATA_IDLE];
 
 		//A round is finished if all sweepers are idle, i.e. all finished their work.
 		if (all_idle) {
-			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i FINISHED (seen at root transform) \n", _my_rank, _root_sweep_round, _params.sweepRounds());
-			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i had: %i EQS, %i UNITS  (this contains still many duplicates!)\n", _my_rank, _root_sweep_round, _params.sweepRounds(), _shared_eqs_this_round, _shared_units_this_round);
+			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i FINISHED (seen at root transform) with sharing round %i \n", _my_rank, _root_sweep_round, _params.sweepRounds(), _root_sharing_round);
+			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i had: %i EQS, %i UNITS  (this count contains duplicates!)\n", _my_rank, _root_sweep_round, _params.sweepRounds(), _shared_eqs_this_round, _shared_units_this_round);
 			bool progress = _shared_eqs_this_round + _shared_units_this_round > 0;
 			bool lastround= _root_sweep_round == _params.sweepRounds();
 			if (lastround || !progress) {
 				if (lastround)LOG(V1_WARN, "SWEEP [%i]: Job finished! All rounds done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_round, _params.sweepRounds());
 				if (!progress)LOG(V1_WARN, "SWEEP [%i]: Job finished! No more progress in round %i/%i. Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_round, _params.sweepRounds());
 				//we DON'T yet set _terminate_all=1 here, because we want also the root solver to first import this last sharing information, which contains valuable equalities and units, before terminating the solvers
-				payload[payload.size() - METADATA_POS_TERMINATE_FLAG] = 1;
+				payload[payload.size() - METADATA_TERMINATE] = 1;
 			}
 
 			else {
@@ -141,7 +145,8 @@ private:
 			}
 		}
 		//The root node (and only the root node) tracks the number of completed sweep rounds, and broadcasts this information. This way, also nodes that join later know which round we are in.
-		payload[payload.size() - METADATA_POS_ROUND_FLAG] = _root_sweep_round;
+		payload[payload.size() - METADATA_SWEEP_ROUND] = _root_sweep_round;
+		payload[payload.size() - METADATA_SHARING_ROUND] = _root_sharing_round;
 
 		//no return, payload was just transformed in-place
     };

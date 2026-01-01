@@ -38,6 +38,10 @@ int cb_custom_query(void *SweepJobState, int query) {
 }
 
 void SweepJob::appl_start() {
+	if (_params.sweepRounds.val==0) {
+		LOG(V2_INFO,"Skip SWEEP JOB, as sweepRounds==0");
+		return;
+	}
 	_my_rank = getJobTree().getRank();
 	_my_index = getJobTree().getIndex();
 	_is_root = getJobTree().isRoot();
@@ -388,7 +392,7 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 		//we give authority to the sweepers and when they finish the congruencer must finish as well, implemented here by always marking it as idle
 		sweeper->set_option("mallob_is_congruencer", 1);
 		sweeper->set_option("mallob_is_shweeper",1);
-		sweeper->set_option("quiet", 0);
+		sweeper->set_option("quiet", 1);
 		sweeper->set_option("log", 0);   //0..5
 		sweeper->sweeper_is_idle = true;
 		sweeper->is_congruencer = true;
@@ -528,6 +532,7 @@ void SweepJob::printIdleFraction() {
 			}
 		}
 	}
+	_lastIdleCount = idles;
 	if (active>0)
 		LOG(V3_VERB, "SWEEP IDLE  %i/%i : %s \n", idles, active, oss.str().c_str());
 }
@@ -578,17 +583,17 @@ void SweepJob::sendMPIWorkstealRequests() {
 
 
 void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
-	int publish_round = _sharing_import_round.load(std::memory_order_acquire);
-	int my_round = sweeper->sweep_import_round;
-	if (publish_round != my_round) [[unlikely]] {
+	int available_import_round = _available_import_round.load(std::memory_order_acquire);
+	int my_last_import_round = sweeper->sweep_import_round;
+	if (available_import_round != my_last_import_round) [[unlikely]] {
 		//there is new data from a new sharing round
 		// publish_round = _sharing_import_round.load(std::memory_order_acquire);
 
-		assert(my_round <= publish_round);
-		if (my_round != publish_round - 1) {
-			LOG(V1_WARN, "WARN SWEEP: Solver [%i](%i) skipped some import rounds, went directly from %i to %i \n", _my_rank, sweeper->getLocalId(), my_round, publish_round);
+		assert(my_last_import_round <= available_import_round);
+		if (my_last_import_round!=0 && my_last_import_round != available_import_round - 1) {
+			LOG(V1_WARN, "WARN SWEEP: Solver [%i](%i) skipped some import rounds, went directly from %i to %i \n", _my_rank, sweeper->getLocalId(), my_last_import_round, available_import_round);
 		}
-		sweeper->sweep_import_round  = publish_round;
+		sweeper->sweep_import_round  = available_import_round;
 		if (sweeper->sweep_EQS_index != sweeper->sweep_EQS_size)
 			LOG(V1_WARN, "WARN SWEEP: Solver [%i](%i) couldn't finish reading previous equivalence imports! now skipping remaining  %i/%i \n", _my_rank, sweeper->getLocalId(), sweeper->sweep_EQS_index.load(), sweeper->sweep_EQS_size.load());
 		if (sweeper->sweep_UNITS_index != sweeper->sweep_UNITS_size)
@@ -832,11 +837,12 @@ void SweepJob::appendMetadataToReductionElement(std::vector<int> &contrib, int i
 	contrib.insert(contrib.end(), NUM_METADATA_FIELDS, 0); //Make space for the upcoming metadata
 	int size = contrib.size();
 	int n=0;
-	n++; contrib[size - METADATA_POS_TERMINATE_FLAG]  = 0;  //dummy, will be set by root transformation
-	n++; contrib[size - METADATA_POS_ROUND_FLAG]      = 0;  //dummy, will be set by root transformation
-	n++; contrib[size - METADATA_POS_IDLE_FLAG]       = is_idle;
-	n++; contrib[size - METADATA_POS_UNIT_SIZE]       = unit_size;
-	n++; contrib[size - METADATA_POS_EQ_SIZE]         = eq_size;
+	n++; contrib[size - METADATA_TERMINATE]		= 0;  //dummy, will be set by root transformation
+	n++; contrib[size - METADATA_SWEEP_ROUND]   = 0;  //dummy, will be set by root transformation
+	n++; contrib[size - METADATA_SHARING_ROUND]   = 0;  //dummy, will be set by root transformation
+	n++; contrib[size - METADATA_IDLE]       = is_idle;
+	n++; contrib[size - METADATA_UNIT_SIZE]  = unit_size;
+	n++; contrib[size - METADATA_EQ_SIZE]    = eq_size;
 	assert(n==NUM_METADATA_FIELDS || log_return_false("SWEEP ERROR: Added metadata count (%i) doesnt match expected number (%i) \n", n, NUM_METADATA_FIELDS));
 }
 
@@ -933,11 +939,12 @@ void SweepJob::advanceAllReduction() {
 
 	//Extract shared data
 	auto data = _red->extractResult();
-	const int terminate   = data[data.size()-METADATA_POS_TERMINATE_FLAG];
-	const int sweep_round = data[data.size()-METADATA_POS_ROUND_FLAG];
-	const int all_idle    = data[data.size()-METADATA_POS_IDLE_FLAG];
-	const int unit_size   = data[data.size()-METADATA_POS_UNIT_SIZE];
-	const int eq_size     = data[data.size()-METADATA_POS_EQ_SIZE];
+	const int terminate   = data[data.size()-METADATA_TERMINATE];
+	const int sweep_round = data[data.size()-METADATA_SWEEP_ROUND];
+	const int sharing_round= data[data.size()-METADATA_SHARING_ROUND];
+	const int all_idle    = data[data.size()-METADATA_IDLE];
+	const int unit_size   = data[data.size()-METADATA_UNIT_SIZE];
+	const int eq_size     = data[data.size()-METADATA_EQ_SIZE];
 	assert(eq_size%2==0 || log_return_false("ERROR: Import Equality size not even, but %i\n", eq_size));
 
 	for (int i=0; i<eq_size; i++) {
@@ -950,15 +957,17 @@ void SweepJob::advanceAllReduction() {
 
 	_EQS_import_size.store(eq_size, std::memory_order_relaxed);
 	_UNITS_import_size.store(unit_size, std::memory_order_relaxed);
-	_sharing_import_round.store(_sharing_import_round+1, std::memory_order_release);
+	_available_import_round.store(sharing_round, std::memory_order_release);
 
+	//the sweepers need to know the current sweep round to set the size of their sweep environments accordingly
+	//which grow with each round (if activated)
 	for (auto &sweeper : _sweepers) {
 		if (sweeper) {
 			shweep_set_sweep_round(sweeper->solver, sweep_round);
 		}
 	}
 
-	LOG(V2_INFO, "SWEEP sharing import round %i got: %i EQS, %i UNITS\n", _sharing_import_round.load(), eq_size/2, unit_size);
+	LOG(V2_INFO, "SWEEP import sharing round %i got: %i EQS, %i UNITS. idle: %i/%i \n", _available_import_round.load(), eq_size/2, unit_size, _lastIdleCount, _nThreads);
 
 	//Now we can prepare a new sharing operation starting from the root node, because the old sharing (broadcast + allreduce) is now finished
 	if (_is_root) {
@@ -998,8 +1007,8 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 
 	//sanity check whether each contribution contains coherent size information about itself
 	for (const auto& contrib : contribs) {
-		int claimed_eq_size = contrib[contrib.size()- METADATA_POS_EQ_SIZE];
-		int claimed_unit_size = contrib[contrib.size()- METADATA_POS_UNIT_SIZE];
+		int claimed_eq_size = contrib[contrib.size()- METADATA_EQ_SIZE];
+		int claimed_unit_size = contrib[contrib.size()- METADATA_UNIT_SIZE];
 		int claimed_total_size = claimed_eq_size + claimed_unit_size + NUM_METADATA_FIELDS;
 		assert(contrib.size() == claimed_total_size ||
 			log_return_false("ERROR in AllReduce, Bad Element Format: Claims total size %i != %i actual contrib.size() (claims: eq_size %i,  units size %i, metadata %i)", claimed_total_size, contrib.size(), claimed_eq_size, claimed_unit_size, NUM_METADATA_FIELDS)
@@ -1031,7 +1040,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	//Fill equivalences
 	size_t aggr_eq_size = 0;
     for (const auto &contrib : contribs) {
-    	int eq_size = contrib[contrib.size()-METADATA_POS_EQ_SIZE];
+    	int eq_size = contrib[contrib.size()-METADATA_EQ_SIZE];
     	aggr_eq_size += eq_size;
         aggregated.insert(aggregated.end(), contrib.begin(), contrib.begin()+eq_size);
 		// oss_e << "| " << i << ":" << eq_size << " "	;
@@ -1046,8 +1055,8 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	//Fill units
 	size_t aggr_unit_size = 0;
     for (const auto &contrib : contribs) {
-    	int eq_size = contrib[contrib.size()-METADATA_POS_EQ_SIZE];  //need to know where the eq ends, i.e. where the units start
-    	int unit_size = contrib[contrib.size()-METADATA_POS_UNIT_SIZE];
+    	int eq_size = contrib[contrib.size()-METADATA_EQ_SIZE];  //need to know where the eq ends, i.e. where the units start
+    	int unit_size = contrib[contrib.size()-METADATA_UNIT_SIZE];
 		aggr_unit_size += unit_size;
         aggregated.insert(aggregated.end(), contrib.begin()+eq_size, contrib.end()-NUM_METADATA_FIELDS); //not copying the metadata at the end
     	// oss_u << "| " << i << ":" << unit_size << " "	;
@@ -1059,7 +1068,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	//See whether all solvers are idle
 	bool all_idle = true;
     for (const auto &contrib : contribs) {
-		bool idle = contrib[contrib.size()-METADATA_POS_IDLE_FLAG];
+		bool idle = contrib[contrib.size()-METADATA_IDLE];
     	all_idle &= idle;
     }
 
