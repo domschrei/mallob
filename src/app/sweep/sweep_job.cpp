@@ -435,6 +435,11 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 	int vars_remain_end = stats.vars_active_orig - vars_fixed_end;
 	int clauses_removed = sweeper->_setup.numOriginalClauses - stats.clauses_end;
 
+	int ranks = getVolume();
+	int n_sweepers = ranks * _nThreads;
+	int eqs_per_sweeper = stats.sweep_eqs / n_sweepers;
+	int units_per_sweeper = stats.sweep_units / n_sweepers;
+
 	double vars_fixed_percent = 100*vars_fixed_end/(double)stats.vars_active_orig;
 	double vars_remain_percent = 100*vars_remain_end/(double)stats.vars_active_orig;
 	double clauses_removed_percent = 100*clauses_removed/(double)sweeper->_setup.numOriginalClauses;
@@ -448,9 +453,11 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 	LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_NEW				%i / %i \n", stats.units_new, stats.vars_active_orig);
 	LOGGER(_reslogger,V2_INFO, "SWEEP_IMPORT_EQS_USEFUL		%i / %i \n", stats.eqs_useful, stats.eqs_seen); //representative for the reporting solver
 	LOGGER(_reslogger,V2_INFO, "SWEEP_IMPORT_UNITS_USEFUL	%i / %i \n", stats.units_useful, stats.units_seen);
-	LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_FIXED_N	%i / %i (%.3f %)\n", vars_fixed_end, stats.vars_active_orig, vars_fixed_percent);
+	LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_FIXED_N			%i / %i (%.3f %)\n", vars_fixed_end, stats.vars_active_orig, vars_fixed_percent);
 
 	if (full) {
+		LOGGER(_reslogger,V2_INFO, "SWEEP_EQS_PER_SWEEPER   %i\n", eqs_per_sweeper);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_PER_SWEEPER %i \n", units_per_sweeper);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_PRIORITY       %.3f\n", _params.preprocessSweepPriority.val);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_PROCESSES      %i\n", getVolume());
 		LOGGER(_reslogger,V2_INFO, "SWEEP_THREADS_PER_P  %i\n", _nThreads);

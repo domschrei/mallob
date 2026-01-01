@@ -9,7 +9,7 @@ OUT_DIR="$HOME/PhD/logsntraces/"
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/nusmvdme1d3multi.cnf.xz" #0.1sec
 INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf.xz" # 6sec
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/iso/6s151.cnf.xz"  # 0.1sec
-# INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/bob12s01.cnf.xz"
+# INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/bob12s01.cnf.xz" # 30sec, 17% after 2 rounds
 
 SWEEP=true
 SWEEP_PRIO=1.0
@@ -88,7 +88,7 @@ if $SWEEP; then
       -sweep-solver-quiet=1 \
       -preprocess-sweep-priority=$SWEEP_PRIO \
       -sweep-resweep-chance=1000 \
-      -sweep-rounds=5 \
+      -sweep-rounds=2 \
       -sweep-congruence=1 \
       -sweep-growing-environments=1 \
 "
