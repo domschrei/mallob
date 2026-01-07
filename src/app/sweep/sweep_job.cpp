@@ -462,8 +462,8 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 		LOGGER(_reslogger,V2_INFO, "SWEEP_PROCESSES      %i\n", getVolume());
 		LOGGER(_reslogger,V2_INFO, "SWEEP_THREADS_PER_P  %i\n", _nThreads);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_PERIOD %i ms \n", _params.sweepSharingPeriod_ms.val);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_ORIG      %i\n", sweeper->_setup.numVars);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_END       %i\n", stats.vars_end);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_ORIG		 %i\n", sweeper->_setup.numVars);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_END		 %i\n", stats.vars_end);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_ACTIVE_ORIG    %i\n", stats.vars_active_orig);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_ACTIVE_END     %i\n", vars_remain_end);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_CLAUSES_ORIG   %i\n", sweeper->_setup.numOriginalClauses);
@@ -1172,7 +1172,7 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 }
 
 void SweepJob::gentlyTerminateSolvers() {
-	LOG(V3_VERB, "SWEEP TERM #%i [%i] interrupting solvers\n", getId(), _my_rank);
+	LOG(V4_VVER, "SWEEP TERM #%i [%i] interrupting solvers\n", getId(), _my_rank);
 
 	// while () {
 		// LOG(V1_WARN, "Warn SWEEP JOB [%i]: delaying destructors until sweepers are all cleanly initialized (until now init %i/%i)\n",
@@ -1181,39 +1181,39 @@ void SweepJob::gentlyTerminateSolvers() {
 	// }
 	//each sweeper checks constantly for the interruption signal (on the ms scale or faster), allow for gentle own exit
 	while (_started_sweepers_count < _nThreads || _running_sweepers_count>0) {
-		LOG(V3_VERB, "SWEEP TERM #%i [%i] still %i solvers running\n", getId(), _my_rank, _running_sweepers_count.load());
+		LOG(V4_VVER, "SWEEP TERM #%i [%i] still %i solvers running\n", getId(), _my_rank, _running_sweepers_count.load());
 		int i=0;
 		for (auto &sweeper : _sweepers) {
 			if (sweeper) {
 				sweeper->triggerSweepTerminate();
-				LOG(V3_VERB, "SWEEP TERM #%i [%i] terminating solver (%i)\n", getId(), _my_rank, i);
+				LOG(V4_VVER, "SWEEP TERM #%i [%i] terminating solver (%i)\n", getId(), _my_rank, i);
 			}
 			i++;
 		}
 		usleep(500);
 	}
-	LOG(V3_VERB, "SWEEP TERM #%i [%i] no more solvers running\n", getId(), _my_rank);
+	LOG(V4_VVER, "SWEEP TERM #%i [%i] no more solvers running\n", getId(), _my_rank);
 
 	usleep(500);
 
 	int i=0;
-	LOG(V3_VERB, "SWEEP TERM #%i [%i] joining bg_workers \n",  getId(),_my_rank);
+	LOG(V4_VVER, "SWEEP TERM #%i [%i] joining bg_workers \n",  getId(),_my_rank);
 	for (auto &bg_worker : _bg_workers) {
 		if (bg_worker->isRunning()) {
-			LOG(V3_VERB, "SWEEP TERM #%i [%i] joining bg_worker (%i) \n",  getId(),_my_rank, i);
+			LOG(V4_VVER, "SWEEP TERM #%i [%i] joining bg_worker (%i) \n",  getId(),_my_rank, i);
 			bg_worker->stop();
-			LOG(V3_VERB, "SWEEP TERM #%i [%i] joined  bg_worker    (%i) \n",  getId(),_my_rank, i);
+			LOG(V4_VVER, "SWEEP TERM #%i [%i] joined  bg_worker    (%i) \n",  getId(),_my_rank, i);
 		}
 		i++;
 	}
-	LOG(V3_VERB, "SWEEP TERM #%i [%i] joined all bg_workers \n", getId(),_my_rank);
-	LOG(V3_VERB, "SWEEP TERM #%i [%i] DONE \n", getId(),_my_rank);
+	LOG(V4_VVER, "SWEEP TERM #%i [%i] joined all bg_workers \n", getId(),_my_rank);
+	LOG(V4_VVER, "SWEEP TERM #%i [%i] DONE \n", getId(),_my_rank);
 }
 
 SweepJob::~SweepJob() {
-	LOG(V3_VERB, "SWEEP JOB DESTRUCTOR ENTERED \n");
+	LOG(V4_VVER, "SWEEP JOB DESTRUCTOR ENTERED \n");
 	gentlyTerminateSolvers();
-	LOG(V3_VERB, "SWEEP JOB DESTRUCTOR DONE\n");
+	LOG(V4_VVER, "SWEEP JOB DESTRUCTOR DONE\n");
 }
 
 
