@@ -137,7 +137,8 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 	-sweep-solver-quiet=1 \
   -sweep-congruence=1 \
   -sweep-growing-environments=1 \
-  -preprocess-sweep-priority=1.0"
+  -preprocess-sweep-priority=1.0 \
+"
 
 
     # Pre-create network-disk output directories to avoid many concurrent filesystem manips
