@@ -29,6 +29,7 @@ private:
     const Parameters& _params;
     APIConnector& _api;
     int _stream_id;
+    long _nontrivial_wait_millis;
 
     int _nb_vars {0};
     int _nb_clauses {0};
@@ -57,6 +58,7 @@ public:
     MallobSatJobStreamProcessor(const Parameters& params, APIConnector& api, JobDescription& desc,
             const std::string& baseUserName, int streamId, bool incremental, Synchronizer& sync) :
         SatJobStreamProcessor(sync), _params(params), _api(api), _stream_id(streamId),
+        _nontrivial_wait_millis(params.internalStreamProcessor() ? params.nontrivialSolvingDelay() : 0),
         _incremental(incremental), _username(baseUserName)
         //,_job_slot(new JobSlotRegistry::JobSlot(_username, [&]() {signalReinitialization();})) 
         {}
@@ -128,7 +130,7 @@ public:
             // If no distributed job was submitted yet, we try to avoid this overhead;
             // we wait for a short while if a more lightweight solver finds a solution immediately.
             time = Timer::elapsedSeconds() - time;
-            usleep(1'000'000 * std::max(0.0, 0.025 - time)); // 25 ms minus the time taken to copy the literals
+            usleep(1'000'000 * std::max(0.0, 0.001 * _nontrivial_wait_millis - time)); // X ms minus the time taken to copy the literals
             if (_terminator(t.rev)) {
                 return; // Task has become obsolete in the meantime, so skip solving
             }
