@@ -615,6 +615,11 @@ void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
 }
 
 void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
+	if (_terminate_all) { //can happen that we arrive here before the solver learned that we already terminated
+		//leave *ilit's untouched
+		return;
+	}
+
 
 	//todo: this localId can also just be a congruencer! lives in the same array, interfaces the same way with eq/units
 	KissatPtr sweeper = _sweepers[localId];
@@ -632,12 +637,12 @@ void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
 	*ilit2 = _EQS_to_import[idx+1];
 	sweeper->sweep_EQS_index +=2;
 	assert(*ilit1 !=0 || *ilit2 !=0								|| log_return_false("SWEEP ERROR: in cbImportEq: sending invalid empty *ilit1=%i, *ilit2=0 to the solvers\n", *ilit1, *ilit2));
-	assert(*ilit1 < *ilit2										|| log_return_false("SWEEP ERROR: in cbImportEq: *ilit1 %i is larger than %i *ilit2, but they should be sorted\n", *ilit1, *ilit2));
+	assert(*ilit1 < *ilit2										|| log_return_false("SWEEP ERROR: in cbImportEq: *ilit1 %i is larger than %i *ilit2, but they should be sorted (index %i, %i,)\n", *ilit1, *ilit2, idx, idx+1));
 	assert(sweeper->sweep_EQS_index <= sweeper->sweep_EQS_size	|| log_return_false("SWEEP ERROR: in Equivalence Import: index %i is now beyond size %i \n", sweeper->sweep_EQS_index.load(), sweeper->sweep_EQS_size.load()));
 	//now returning to kissat solver
 }
 
-int SweepJob::cbCustomQuery(int query) {
+int SweepJob::cbCustomQuery(int query) { //general interface to communicate some simple integers between solver and Mallob, without the need to declare yet another function each time
 	if (query==QUERY_SWEEP_ROUND) {
 		return _root_sweep_round;
 	}
@@ -646,6 +651,9 @@ int SweepJob::cbCustomQuery(int query) {
 }
 
 void SweepJob::cbImportUnit(int *ilit, int localId) {
+	if (_terminate_all) {
+		return;
+	}
 	KissatPtr sweeper = _sweepers[localId];
 	checkForNewImportRound(sweeper);
 	if (sweeper->sweep_UNITS_index == sweeper->sweep_UNITS_size) {
@@ -738,6 +746,14 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 			continue;
 		}
 		//Unsuccessful steal locally. Go global via MPI message
+
+		if (_terminate_all || getVolume()==0) { //check again for termination, can happen that it slips now in here
+			sweeper->work_received_from_steal = {};
+			sweeper->sweeper_is_idle = true;
+			LOG(V3_VERB, "Sweeper [%i](%i) exit steal loop (2nd check, getVolume()==%i)\n", _my_rank, localId, getVolume());
+			break;
+		}
+
 		assert(getVolume()>=1 || log_return_false("SWEEP ERROR [%i](%i) in workstealing: getVolume()==%i, i.e. no volume available to steal from\n", _my_rank, localId, getVolume()));
 		if (getVolume()==1) {
 			LOG(V5_DEBG, "SWEEP WORK SKIP [%i](%i) steal loop --> we are the only MPI rank, no global steal \n", _my_rank, localId);

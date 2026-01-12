@@ -508,6 +508,7 @@ void Kissat::sweepExportEq() {
         const int lit2 = eq_up_buffer[1];
         eqs_to_share.push_back(lit1);
         eqs_to_share.push_back(lit2);
+        assert(lit1 < lit2 || log_return_false("SWEEP ERROR: in exportEq: lit1 %i is larger than lit2 %i, but it should be smaller (buffersize: %i)\n", lit1, lit2, eq_up_buffer.size()));
         // LOG(V2_INFO, "(%i) exported ilit(%i)==ilit(%i)\n", getLocalId(), lit1, lit2);
     }
 }
