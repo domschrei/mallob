@@ -449,15 +449,17 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 	LOGGER(_reslogger,V2_INFO, "Reported by [%i](%i) \n", _my_rank, sweeper->getLocalId());
 	LOGGER(_reslogger,V2_INFO, "SWEEP_ROUND					%i / %i \n", _root_sweep_round, _params.sweepRounds());
 	LOGGER(_reslogger,V2_INFO, "SWEEP_TIME					%f seconds \n", Timer::elapsedSeconds() - _start_sweep_timestamp);
-	LOGGER(_reslogger,V2_INFO, "SWEEP_EQUIVALENCES			%i / %i \n", stats.sweep_eqs, stats.vars_active_orig);
-	LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_NEW				%i / %i \n", stats.units_new, stats.vars_active_orig);
-	LOGGER(_reslogger,V2_INFO, "SWEEP_IMPORT_EQS_USEFUL		%i / %i \n", stats.eqs_useful, stats.eqs_seen); //representative for the reporting solver
-	LOGGER(_reslogger,V2_INFO, "SWEEP_IMPORT_UNITS_USEFUL	%i / %i \n", stats.units_useful, stats.units_seen);
+	LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_NEW				%i \n", stats.units_new);
+	LOGGER(_reslogger,V2_INFO, "SWEEP_EQUIVALENCES			%i \n", stats.sweep_eqs);
 	LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_FIXED_N			%i / %i (%.3f %)\n", vars_fixed_end, stats.vars_active_orig, vars_fixed_percent);
+	// LOGGER(_reslogger,V2_INFO, "SWEEP_IMPORTED_UNITS		%i / %i \n", stats.units_useful, stats.units_seen);
+	// LOGGER(_reslogger,V2_INFO, "SWEEP_IMPORTED_EQS			%i / %i \n", stats.eqs_useful, stats.eqs_seen); //representative for the reporting solver
+	LOGGER(_reslogger,V2_INFO, "SWEEP_TOTAL_SHARED_UNITS %i \n", _total_shared_units);
+	LOGGER(_reslogger,V2_INFO, "SWEEP_TOTAL_SHARED_EQS   %i \n", _total_shared_eqs);
 
 	if (full) {
-		LOGGER(_reslogger,V2_INFO, "SWEEP_EQS_PER_SWEEPER   %i\n", eqs_per_sweeper);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_PER_SWEEPER %i \n", units_per_sweeper);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_EQS_PER_SWEEPER   %i\n", eqs_per_sweeper);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_PRIORITY       %.3f\n", _params.preprocessSweepPriority.val);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_PROCESSES      %i\n", getVolume());
 		LOGGER(_reslogger,V2_INFO, "SWEEP_THREADS_PER_P  %i\n", _nThreads);
@@ -636,6 +638,7 @@ void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
 	*ilit1 = _EQS_to_import[idx];
 	*ilit2 = _EQS_to_import[idx+1];
 	sweeper->sweep_EQS_index +=2;
+
 	assert(*ilit1 !=0 || *ilit2 !=0								|| log_return_false("SWEEP ERROR: in cbImportEq: sending invalid empty *ilit1=%i, *ilit2=0 to the solvers\n", *ilit1, *ilit2));
 	assert(*ilit1 < *ilit2										|| log_return_false("SWEEP ERROR: in cbImportEq: *ilit1 %i is larger than %i *ilit2, but they should be sorted (index %i, %i,)\n", *ilit1, *ilit2, idx, idx+1));
 	assert(sweeper->sweep_EQS_index <= sweeper->sweep_EQS_size	|| log_return_false("SWEEP ERROR: in Equivalence Import: index %i is now beyond size %i \n", sweeper->sweep_EQS_index.load(), sweeper->sweep_EQS_size.load()));
@@ -857,7 +860,7 @@ void SweepJob::initiateNewSharingRound() {
 }
 
 void SweepJob::appendMetadataToReductionElement(std::vector<int> &contrib, int is_idle, int unit_size, int eq_size) {
-	contrib.insert(contrib.end(), NUM_METADATA_FIELDS, 0); //Make space for the upcoming metadata
+	contrib.insert(contrib.end(), NUM_METADATA_FIELDS, 0); //Make space for the upcoming metadata, initialized with zero
 	int size = contrib.size();
 	int n=0;
 	n++; contrib[size - METADATA_TERMINATE]		= 0;  //dummy, will be set by root transformation
@@ -958,8 +961,6 @@ void SweepJob::advanceAllReduction() {
 	// LOG(V3_VERB, "[sweep] all-reduction complete\n");
 	_time_receive_allred.push_back(Timer::elapsedSeconds());
 
-	//todo: Filter out duplicates during aggregating? Is it worth the effort?
-
 	//Extract shared data
 	auto data = _red->extractResult();
 	const int terminate   = data[data.size()-METADATA_TERMINATE];
@@ -970,12 +971,20 @@ void SweepJob::advanceAllReduction() {
 	const int eq_size     = data[data.size()-METADATA_EQ_SIZE];
 	assert(eq_size%2==0 || log_return_false("ERROR: Import Equality size not even, but %i\n", eq_size));
 
-	for (int i=0; i<eq_size; i++) {
+	if (eq_size > MAX_IMPORT_SIZE) {
+		LOG(V1_WARN, "WARN -SWEEP too many equalities to import! %i, max %i\n", eq_size, MAX_IMPORT_SIZE);
+	}
+	if (unit_size > MAX_IMPORT_SIZE) {
+		LOG(V1_WARN, "WARN -SWEEP too many units to import! %i, max %i\n", unit_size, MAX_IMPORT_SIZE);
+	}
+
+	for (int i=0; i<eq_size && i < MAX_IMPORT_SIZE; i++) {
 		_EQS_to_import[i] = data[i];
 	}
 
-	for (int i=eq_size; i<data.size()-NUM_METADATA_FIELDS; i++) {
-		_UNITS_to_import[i-eq_size] = data[i];
+	// for (int i=eq_size; i<data.size()-NUM_METADATA_FIELDS; i++) {
+	for (int i=0; i<unit_size && i < MAX_IMPORT_SIZE; i++) {
+		_UNITS_to_import[i] = data[eq_size + i];
 	}
 
 	_EQS_import_size.store(eq_size, std::memory_order_relaxed);
@@ -1021,13 +1030,6 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	//Each contribution has the format [Equivalences,Units, eq_size,unit_size,all_idle].
 	//									-----data---------  ------metadata------------
 
-	// std::ostringstream oss_tot;
-	// oss_tot << "Contrib sizes: ";
-	// for (int id : rand_permutation) {
-		// oss << id << ' ';
-	// }
-	// LOG(V4_VVER, "%s \n", oss.str().c_str());
-
 	//sanity check whether each contribution contains coherent size information about itself
 	for (const auto& contrib : contribs) {
 		int claimed_eq_size = contrib[contrib.size()- METADATA_EQ_SIZE];
@@ -1038,17 +1040,19 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 			);
 	}
 
+#define DEDUPLICATE_CONTRIBS 1
+
+#if ! DEDUPLICATE_CONTRIBS
 
 	LOG(V4_VVER, "SWEEP AGGR %i contributions \n", contribs.size());
 	size_t total_aggregated_size = NUM_METADATA_FIELDS; //the new element will contain the metadata once at the end
 	int i=0;
-    for (const auto& contrib : contribs) {
-	    total_aggregated_size += contrib.size()-NUM_METADATA_FIELDS; //we will copy everything but the metadata from each contribution
+	for (const auto& contrib : contribs) {
+		total_aggregated_size += contrib.size()-NUM_METADATA_FIELDS; //we will copy everything but the metadata from each contribution
 		LOG(V4_VVER, "SWEEP AGGR Element %i: contrib.size() %i, w/o metadata %i, curr summed size %i \n", i, contrib.size(), contrib.size()-NUM_METADATA_FIELDS, total_aggregated_size);
-		// oss_tot << "| " << i << ":" << contrib.size() << " "	;
 		i++;
-    	assert(contrib.size() >= NUM_METADATA_FIELDS || log_return_false("ERROR in Aggregating: contrib with too small size() == %i < %i SHARING_METADATA_FIELDS", contrib.size(), NUM_METADATA_FIELDS));
-    }
+		assert(contrib.size() >= NUM_METADATA_FIELDS || log_return_false("ERROR in Aggregating: contrib with too small size() == %i < %i SHARING_METADATA_FIELDS", contrib.size(), NUM_METADATA_FIELDS));
+	}
 
 
 
@@ -1058,17 +1062,17 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	i=0;
 
 
-    std::vector<int> aggregated;
-    aggregated.reserve(total_aggregated_size);
+	std::vector<int> aggregated;
+	aggregated.reserve(total_aggregated_size);
 	//Fill equivalences
 	size_t aggr_eq_size = 0;
-    for (const auto &contrib : contribs) {
-    	int eq_size = contrib[contrib.size()-METADATA_EQ_SIZE];
-    	aggr_eq_size += eq_size;
-        aggregated.insert(aggregated.end(), contrib.begin(), contrib.begin()+eq_size);
+	for (const auto &contrib : contribs) {
+		int eq_size = contrib[contrib.size()-METADATA_EQ_SIZE];
+		aggr_eq_size += eq_size;
+		aggregated.insert(aggregated.end(), contrib.begin(), contrib.begin()+eq_size);
 		// oss_e << "| " << i << ":" << eq_size << " "	;
-    	i++;
-    }
+		i++;
+	}
 
 	// LOG(V4_VVER, "%s \n", oss_e.str().c_str());
 	// std::ostringstream oss_u;
@@ -1077,16 +1081,69 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 
 	//Fill units
 	size_t aggr_unit_size = 0;
-    for (const auto &contrib : contribs) {
-    	int eq_size = contrib[contrib.size()-METADATA_EQ_SIZE];  //need to know where the eq ends, i.e. where the units start
-    	int unit_size = contrib[contrib.size()-METADATA_UNIT_SIZE];
+	for (const auto &contrib : contribs) {
+		int eq_size = contrib[contrib.size()-METADATA_EQ_SIZE];  //need to know where the eq ends, i.e. where the units start
+		int unit_size = contrib[contrib.size()-METADATA_UNIT_SIZE];
 		aggr_unit_size += unit_size;
-        aggregated.insert(aggregated.end(), contrib.begin()+eq_size, contrib.end()-NUM_METADATA_FIELDS); //not copying the metadata at the end
-    	// oss_u << "| " << i << ":" << unit_size << " "	;
-    	i++;
-    }
+		aggregated.insert(aggregated.end(), contrib.begin()+eq_size, contrib.end()-NUM_METADATA_FIELDS); //not copying the metadata at the end
+		// oss_u << "| " << i << ":" << unit_size << " "	;
+		i++;
+	}
+#else
 
-	// LOG(V4_VVER, "%s \n", oss_u.str().c_str());
+	//Layout: contrib = [equivalences, units, metadata]
+
+	robin_hood::unordered_flat_set<int> dedup_units;
+	robin_hood::unordered_flat_set<uint64_t> dedup_eqs;
+
+	int orig_unit_size = 0;
+	int orig_eqs_size = 0;
+
+	//Deduplicate eq & units via hashing
+	//each eq-pair represented as one 64-bit key to have an easy datatype
+	for (const auto &contrib : contribs) {
+		const int eq_size = contrib[contrib.size()-METADATA_EQ_SIZE];
+		const int unit_size = contrib[contrib.size()-METADATA_UNIT_SIZE];
+		orig_unit_size += unit_size;
+		orig_eqs_size  +=eq_size;
+		for (int j=0; j < eq_size; j+=2) {
+			int lit1 = contrib[j];
+			int lit2 = contrib[j+1];
+			assert(lit1<lit2);
+			uint64_t litpair = (((uint64_t)lit1) << 32) | (uint64_t) lit2;
+			dedup_eqs.insert(litpair);
+		}
+		const int units_start = eq_size;
+		const int units_end   = units_start + unit_size;
+		for (int j=units_start; j< units_end; j++) {
+			dedup_units.insert(contrib[j]);
+		}
+	}
+
+	//Extract deduplicated units and equivalences
+	std::vector<int> aggregated;
+	int total_aggregated_size = 0;
+	int aggr_eq_size   = 2*dedup_eqs.size(); //each key is 64 bit, i.e. 2 literals
+	int aggr_unit_size = dedup_units.size();
+	int aggr_data_size = aggr_eq_size + aggr_unit_size;
+	aggregated.resize(aggr_data_size);
+	int j=0;
+	for (uint64_t litpair : dedup_eqs) {
+		uint32_t lit1 = litpair >> 32;
+		uint32_t lit2 = litpair & 0xffffffff;
+		assert(lit1 < lit2);
+		aggregated[j++] = lit1;
+		aggregated[j++] = lit2;
+	}
+	for (int unit : dedup_units) {
+		aggregated[j++] = unit;
+	}
+	assert(j==aggr_data_size);
+	total_aggregated_size = aggr_data_size + NUM_METADATA_FIELDS;
+
+	// cout << orig_unit_size - aggr_unit_size << " " << orig_eqs_size - aggr_eq_size << endl;
+
+#endif
 
 	//See whether all solvers are idle
 	bool all_idle = true;
@@ -1099,8 +1156,6 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 		all_idle = false; //edge-case: if not a single solver is initialized yet, we are waiting for them to come online, so they are not really idle
 	}
 
-	//Get round
-	// int _sweep_round =
 
 	appendMetadataToReductionElement(aggregated, all_idle, aggr_unit_size, aggr_eq_size);
 

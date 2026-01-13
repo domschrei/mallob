@@ -7,9 +7,9 @@ OUT_DIR="$HOME/PhD/logsntraces/"
 # INST_PATH="$HOME/PhD/instances/miter/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf" #0.8 sec
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/nusmvdme1d3multi.cnf.xz" #0.1sec
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/nusmvdme1d3multi.cnf.xz" #0.1sec
-# INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf.xz" # 6sec
+INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf.xz" # 6sec
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/iso/6s151.cnf.xz"  # 0.1sec
-INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/bob12s01.cnf.xz" # 30sec, 17% after 2 rounds
+# INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/bob12s01.cnf.xz" # 30sec, 17% after 2 rounds
 
 SWEEP=true
 SWEEP_PRIO=1.0

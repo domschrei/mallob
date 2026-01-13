@@ -83,14 +83,16 @@ private:
 
 	//Distribute Eqs and Units that we received from sharing broadcast to local solvers
 	static const unsigned INVALID_LIT = UINT_MAX; //Internal literals count unsigned 0,1,2,..., the largest number marks an invalid literal. see further: https://github.com/arminbiere/satch/blob/master/satch.c#L1017
-	static const int MAX_IMPORT_SIZE = 100'000; //Fix the import to a known preallocated area, to simplify concurrent read and write
+	static const int MAX_IMPORT_SIZE = 200'000; //Limiting the import to a known preallocated area, to simplify concurrent reads and writes (still neglectable with ~ 0.8 MB)
 	std::atomic_int _available_import_round{0}; //identifier for the newest import round that we received from the sharing operation
 	std::atomic_int _EQS_import_size{0};
 	std::atomic_int _UNITS_import_size{0};
 	std::vector<int> _EQS_to_import {};
 	std::vector<int> _UNITS_to_import {};
-	int _shared_units_this_round = 0;
-	int _shared_eqs_this_round = 0;
+	int _shared_units_this_sweep_round = 0;
+	int _shared_eqs_this_sweep_round = 0;
+	int _total_shared_eqs = 0;
+	int _total_shared_units = 0;
 
 	//the root node tracks the number of sweep rounds and sharing rounds, distributes this information in the sharing operation
 	int _root_sweep_round = 1; //starts at 1
@@ -117,18 +119,27 @@ private:
 		assert(_is_root);
 		_root_sharing_round++;
 
-		_shared_units_this_round += payload[payload.size() - METADATA_UNIT_SIZE];
-		_shared_eqs_this_round   += payload[payload.size() - METADATA_EQ_SIZE]/2;
+		int n_units = payload[payload.size() - METADATA_UNIT_SIZE];
+		int n_eqs   = payload[payload.size() - METADATA_EQ_SIZE] / 2;
+
+		_shared_units_this_sweep_round += n_units;
+		_shared_eqs_this_sweep_round   += n_eqs;
+
+		_total_shared_units += n_units;
+		_total_shared_eqs   += n_eqs;
+
+		// LOG(V1_WARN, "[%i] sharing round %i: %i cumul eqs, %i cumul units \n", _my_rank, _root_sharing_round, _total_shared_eqs, _total_shared_units);
+
 		bool all_idle = payload[payload.size() - METADATA_IDLE];
 
 		//A round is finished if all sweepers are idle, i.e. all finished their work.
 		if (all_idle) {
 			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i FINISHED (seen at root transform) with sharing round %i \n", _my_rank, _root_sweep_round, _params.sweepRounds(), _root_sharing_round);
-			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i had: %i EQS, %i UNITS  (this count contains duplicates!)\n", _my_rank, _root_sweep_round, _params.sweepRounds(), _shared_eqs_this_round, _shared_units_this_round);
-			bool progress = _shared_eqs_this_round + _shared_units_this_round > 0;
-			bool lastround= _root_sweep_round == _params.sweepRounds();
-			if (lastround || !progress) {
-				if (lastround)LOG(V1_WARN, "SWEEP [%i]: Job finished! All rounds done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_round, _params.sweepRounds());
+			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i had: %i EQS, %i UNITS  (this count contains duplicates!)\n", _my_rank, _root_sweep_round, _params.sweepRounds(), _shared_eqs_this_sweep_round, _shared_units_this_sweep_round);
+			bool progress = _shared_eqs_this_sweep_round + _shared_units_this_sweep_round > 0;
+			bool lastsweepround = (_root_sweep_round == _params.sweepRounds());
+			if (lastsweepround || !progress) {
+				if (lastsweepround)LOG(V1_WARN, "SWEEP [%i]: Job finished! All rounds done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_round, _params.sweepRounds());
 				if (!progress)LOG(V1_WARN, "SWEEP [%i]: Job finished! No more progress in round %i/%i. Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_round, _params.sweepRounds());
 				//we DON'T yet set _terminate_all=1 here, because we want also the root solver to first import this last sharing information, which contains valuable equalities and units, before terminating the solvers
 				payload[payload.size() - METADATA_TERMINATE] = 1;
@@ -137,8 +148,8 @@ private:
 			else {
 				printSweepStats(_sweepers[_representative_localId], false); //report some intermediate statistics about this round
 				_root_sweep_round++;
-				_shared_units_this_round = 0;
-				_shared_eqs_this_round = 0;
+				_shared_units_this_sweep_round = 0;
+				_shared_eqs_this_sweep_round = 0;
 				//The new round is started by providing the representative solver on the root node full work, i.e. all variables
 				_root_provided_initial_work = false;
 				LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i STARTED \n", _my_rank, _root_sweep_round, _params.sweepRounds());

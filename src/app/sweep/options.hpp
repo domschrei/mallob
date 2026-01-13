@@ -13,3 +13,5 @@ OPT_INT(sweepResweepChance, 	"swprc", 	"sweep-resweep-chance", 	1e4, 0, 1e4, "ch
 OPT_INT(sweepRounds, 			"swprds", 	"sweep-rounds", 			1, 0, LARGE_INT, "number of full sweep rounds over all variables")
 OPT_BOOL(sweepCongruence,  		"swpcg", 	"sweep-congruence", 		false, "One solver at the root node does clausal congruence closure instead of sweeping")
 OPT_BOOL(sweepGrowingEnvironments,"swpge", 	"sweep-growing-environments",true, "The sweepers increase the sweep environment after each full sweeping round")
+OPT_BOOL(sweepDeduplicate,		"swpdd", 	"sweep-deduplicate",		true,  "Deduplicate units and equivalences during sharing aggregation")
+
