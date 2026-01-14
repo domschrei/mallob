@@ -146,6 +146,8 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		int sourceIndex = getJobComm().getInternalRankOrMinusOne(sourceRank);
 		msg.treeIndexOfDestination = sourceIndex;
 		msg.contextIdOfDestination = getJobComm().getContextIdOrZero(sourceIndex);
+		//todo: solve situation when receiving rank doesnt know yet sending rank
+		//probably happens when sweep message slips right into the ongoing ranklist update that is periodically started as aggregating, in job.cpp 233
 		assert(msg.contextIdOfDestination != 0 ||
 			log_return_false("SWEEP STEAL ERROR in TAG_RETURNING_STEAL_REQUEST! Want to return an message, but invalid contextIdOfDestination==0. "
 					"With sourceRank=%i, sourceIndex=%i, payload.size()=%i \n", sourceRank, sourceIndex, msg.payload.size()));
@@ -246,7 +248,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			LOG(V3_VERB, "SWEEP JOB [%i](%i) waiting for other solvers to come online (%i/%i)\n", _my_rank, localId, _running_sweepers_count.load(), _nThreads);
 			usleep(2000);
 			if (_terminate_all || _external_termination) {
-				LOG(V1_WARN, "Warn SWEEP [%i](%i): terminated while waiting in synchronization \n", _my_rank, localId);
+				// LOG(V1_WARN, "Warn SWEEP [%i](%i): terminated while waiting in synchronization \n", _my_rank, localId);
 				_running_sweepers_count--;
 				return;
 			}

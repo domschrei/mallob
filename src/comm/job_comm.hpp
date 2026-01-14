@@ -61,6 +61,7 @@ public:
     }
     
     ctx_id_t getContextIdOrZero(int intRank) const {
+        //intRank == internal rank == index
         auto lock = _access_mutex.getLock();
         return (size_t)intRank < _address_list.list.size() ? _address_list.list[intRank].contextId : 0;
     }
