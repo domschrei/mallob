@@ -70,6 +70,8 @@ private:
     const int TAG_ALLRED		= 1004;
 	const int TAG_FOUND_UNSAT	= 1005;
 
+	const int NUM_SEARCHING_WORK_FIELDS = 2;
+
 	//each aggregation element has some metadata integers at the end
 	static const int NUM_METADATA_FIELDS = 6;
 		//which are:

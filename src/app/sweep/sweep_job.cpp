@@ -131,8 +131,10 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		// assert(log_return_false("SWEEP MSG ERROR, got msg.returnToSender"));
 	}
 	else if (msg.tag == TAG_SEARCHING_WORK) {
-		assert(msg.payload.size() == 1);
-		int localId = msg.payload.front();
+		assert(msg.payload.size() == NUM_SEARCHING_WORK_FIELDS);
+		int localId = msg.payload[0];
+		int sourceContextId = msg.payload[1];
+
 		msg.payload.clear();
 
 		LOG(V3_VERB, "SWEEP MSG [%i] <---?---- [%i](%i) \n", _my_rank, sourceRank, localId);
@@ -146,6 +148,13 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		int sourceIndex = getJobComm().getInternalRankOrMinusOne(sourceRank);
 		msg.treeIndexOfDestination = sourceIndex;
 		msg.contextIdOfDestination = getJobComm().getContextIdOrZero(sourceIndex);
+
+		if (msg.contextIdOfDestination != 0) {
+			assert(msg.contextIdOfDestination == sourceContextId);
+		} else {
+			msg.contextIdOfDestination = sourceContextId;
+			LOG(V1_WARN,"WARN SWEEP: SEARCHING_WORK receiver [%i] does not know contextIdOfDestination of sender [%i], fallback to id %i, provided by request msg itself\n", _my_rank, sourceRank, sourceContextId);
+		}
 		//todo: solve situation when receiving rank doesnt know yet sending rank
 		//probably happens when sweep message slips right into the ongoing ranklist update that is periodically started as aggregating, in job.cpp 233
 		assert(msg.contextIdOfDestination != 0 ||
@@ -581,9 +590,13 @@ void SweepJob::sendMPIWorkstealRequests() {
 			//Need to add these two fields because we are doing arbitrary point-to-point communication
 			msg.treeIndexOfDestination = request.targetIndex;
 			msg.contextIdOfDestination = getJobComm().getContextIdOrZero(request.targetIndex);
-
 			assert(msg.contextIdOfDestination != 0 || log_return_false("SWEEP ERROR: contextIdOfDestination==0 in workstealing request! Source rank=%i, targetRank %i \n", _my_rank, request.targetRank));
-			msg.payload = {request.localId};
+			//We also send our contextId. Because it can happen that the receiving rank does not yet know our contextId,
+			//which (probably) happens when a worksteal request is sent right when also the ranklist aggregation update is propagating through all ranks, where some (like this rank here) are already updated, while others (like the receiving rank) aren't.
+			//So as a backup for the receiving rank, we also provide our contextId
+			int myContexId = getJobComm().getContextIdOrZero(_my_index);
+			msg.payload = {request.localId, myContexId};
+			assert(msg.payload.size() == NUM_SEARCHING_WORK_FIELDS);
 			// LOG(V2_INFO, "Rank %i asks rank %i for work\n", _my_rank, recv_rank, n);
 			// LOG(V2_INFO, "  with destionation ctx_id %i \n", msg.contextIdOfDestination);
 			LOG(V3_VERB, "SWEEP MSG [%i](%i) ---?---> [%i] \n", _my_rank, request.localId, request.targetRank);
