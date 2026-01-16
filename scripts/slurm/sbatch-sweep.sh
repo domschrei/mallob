@@ -141,6 +141,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 	-sweep-solver-quiet=1 \
   -sweep-congruence=1 \
   -sweep-growing-environments=1 \
+  -restart-subproc-at-abort=1 \
   -preprocess-sweep-priority=1.0 \
 "
 
