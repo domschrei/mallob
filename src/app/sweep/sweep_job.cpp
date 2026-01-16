@@ -52,7 +52,7 @@ void SweepJob::appl_start() {
 	// LOG(V2_INFO, "New SweepJob rank %i working on %i vars in %i clauses \n", getJobTree().getRank(), );
     _metadata = getSerializedDescription(0)->data();
 	_start_sweep_timestamp = Timer::elapsedSeconds();
-	_last_sharing_start_timestamp = Timer::elapsedSeconds();
+	_root_last_sharing_start_timestamp = Timer::elapsedSeconds();
 
     _reslogger = Logger::getMainInstance().copy("<RESULT>", ".sweep");
 
@@ -107,6 +107,7 @@ void SweepJob::appl_communicate() {
 	LOG(V4_VVER, "SWEEP JOB appl_communicate() \n");
 
 	printIdleFraction();
+	checkSharingDelayHealth();
 	if (_bcast && _is_root)// Root: Update job tree snapshot in case your children changed
 		_bcast->updateJobTree(getJobTree());
 
@@ -557,6 +558,24 @@ void SweepJob::printIdleFraction() {
 		LOG(V3_VERB, "SWEEP IDLE  %i/%i : %s \n", idles, active, oss.str().c_str());
 }
 
+void SweepJob::checkSharingDelayHealth() {
+	constexpr float MAX_DELAY_FACTOR = 3;
+	float t = Timer::elapsedSeconds();
+	float period = _params.sweepSharingPeriod_ms.val/1000;
+	if (!_time_contribute.empty()) {
+		float delay = t - _time_contribute.back();
+		if (delay > period*MAX_DELAY_FACTOR) {
+			LOG(V1_WARN, "WARN SWEEPHEALTH [%i]: large delay since last sharing contribution! Delay %f s, factor %f \n", _my_rank, delay, delay/period);
+		}
+	}
+	if (!_time_receive_allred.empty()) {
+		float delay = t - _time_receive_allred.back();
+		if (delay > period*MAX_DELAY_FACTOR) {
+			LOG(V1_WARN, "WARN SWEEPHEALTH [%i]: large delay since last received sharing! Delay %f s, factor %f \n", _my_rank, delay, delay/period);
+		}
+	}
+}
+
 void SweepJob::printResweeps() {
 	std::ostringstream oss;
 	int worksweeps = 0;
@@ -760,7 +779,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		int my_comm_rank = getJobComm().getWorldRankOrMinusOne(_my_index);
 		if (my_comm_rank == -1) {
 			LOG(V3_VERB, "SWEEP SKIP Delaying global steal request, my own rank %i (index %i) is not yet in JobComm \n", _my_rank, _my_index);
-			usleep(500);
+			usleep(1000);
 			continue;
 		}
 		//Unsuccessful steal locally. Go global via MPI message
@@ -845,7 +864,7 @@ void SweepJob::initiateNewSharingRound() {
 		return;
 	}
 
-	if (Timer::elapsedSeconds() < _last_sharing_start_timestamp + _params.sweepSharingPeriod_ms.val/1000.0) {
+	if (Timer::elapsedSeconds() < _root_last_sharing_start_timestamp + _params.sweepSharingPeriod_ms.val/1000.0) {
 		//not yet time for next sharing round
 		return;
 	}
@@ -865,8 +884,8 @@ void SweepJob::initiateNewSharingRound() {
 	//Broadcast a ping to all workers to initiate an AllReduce
 	//The broadcast includes all workers currently reachable by the root-node and informs them about their parent and potential children
 	//It then causes the leaf nodes to call the callback, initiating the AllReduce
-	_last_sharing_start_timestamp = Timer::elapsedSeconds();
-	_time_start_bcast.push_back(_last_sharing_start_timestamp);
+	_root_last_sharing_start_timestamp = Timer::elapsedSeconds();
+	_time_start_bcast.push_back(_root_last_sharing_start_timestamp);
 	LOG(V3_VERB, "SWEEP SHARE BCAST Initiating Sharing via Ping\n");
 	JobMessage msg = getMessageTemplate();
 	msg.tag = _bcast->getMessageTag();
@@ -962,6 +981,8 @@ void SweepJob::cbContributeToAllReduce() {
 		return;
 	}
 
+	_time_contribute.push_back(Timer::elapsedSeconds());
+
 	_red->contribute(std::move(aggregation_element));
 
 }
@@ -1028,7 +1049,7 @@ void SweepJob::advanceAllReduction() {
 
 
 	if (all_idle) {
-		LOG(V1_WARN, "[%i] got sharing info: sweep round finished \n", _my_rank);
+		LOG(V1_WARN, "[%i] got sharing info: sweep round %i finished \n", _my_rank, sweep_round);
 	}
 
 	if (terminate) {

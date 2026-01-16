@@ -216,7 +216,7 @@ public:
 
         if (_finished) return *this;
 
-        LOG(V4_VVER, "SWEEP SHARE expected child elems %i, actual child elems %i, local elem %i \n", _num_expected_child_elems, _child_elems.size(), _local_elem.has_value());
+        LOG(V4_VVER, "SWEEP SHARE expected child elems %i, actual child elems %i, local elem %i. Childranks %i,%i \n", _num_expected_child_elems, _child_elems.size(), _local_elem.has_value(), _expected_child_ranks.first, _expected_child_ranks.second);
         // if (_child_elems.size() > _num_expected_child_elems) {
            // for (auto &child : _child_elems) {
                 // LOG(V4_VVER, "SWEEP ERROR/Error: Unexpected child elem with size %i from source %i \n", child.elem.size(), child.source);
@@ -228,14 +228,14 @@ public:
 
         if (_child_elems.size() == _num_expected_child_elems && _local_elem.has_value()) {
 
-            LOG(V4_VVER, "SWEEP SHARE AGGR queuing aggregation thread\n");
+            // LOG(V4_VVER, "SWEEP SHARE AGGR queuing aggregation thread\n");
             _child_elems.insert({-1, std::move(_local_elem.value())});
             _local_elem.reset();
 
             assert(!_future_aggregate.valid());
             _aggregating = true;
             _future_aggregate = ProcessWideThreadPool::get().addTask([&]() {
-                LOG(V4_VVER, "SWEEP SHARE AGGR started own aggregation thread\n");
+                // LOG(V4_VVER, "SWEEP SHARE AGGR started own aggregation thread\n");
                 std::list<AllReduceElement> elemsList;
                 for (auto& childElem : _child_elems) elemsList.push_back(std::move(childElem.elem));
                 _aggregated_elem = _aggregator(elemsList);
@@ -244,7 +244,7 @@ public:
             });
         }
 
-        LOG(V4_VVER, "SWEEP SHARE: aggregating %i, future_aggregate.valid() %i, parent_is_ready %i, reduction_locally_done %i (already send aggregated element) \n", _aggregating, _future_aggregate.valid(), _parent_is_ready, _reduction_locally_done);
+        // LOG(V4_VVER, "SWEEP SHARE ADV: aggregating %i, future_aggregate.valid() %i, reduction_locally_done %i (already send aggregated element) \n", _aggregating, _future_aggregate.valid(), _reduction_locally_done);
 
         if (!_aggregating && _future_aggregate.valid() && _parent_is_ready) {
             // Aggregation done

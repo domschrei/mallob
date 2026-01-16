@@ -44,6 +44,7 @@ private:
 	float _start_sweep_timestamp;
 	std::vector<float> _time_start_bcast;
 	std::vector<float> _time_receive_allred;
+	std::vector<float> _time_contribute;
 
 	//Workstealing
 	SplitMix64Rng _rng;
@@ -60,9 +61,13 @@ private:
 
 
 	//Sharing Equivalences and Units
-	float _last_sharing_start_timestamp;
+	float _root_last_sharing_start_timestamp;
     std::unique_ptr<JobTreeBroadcast> _bcast;
     std::unique_ptr<JobTreeAllReduction> _red;
+
+	//Sanity checks, Warn if periods get too large
+	float _last_received_sharing_time{0};
+	float _last_contribution_time{0};
 
     const int TAG_SEARCHING_WORK= 1001;
     const int TAG_RETURNING_STEAL_REQUEST = 1002;
@@ -154,6 +159,8 @@ private:
 				_shared_eqs_this_sweep_round = 0;
 				//The new round is started by providing the representative solver on the root node full work, i.e. all variables
 				_root_provided_initial_work = false;
+				//Prevent that workers see a round change of 2 when going from one sweepround to the next
+				_root_sharing_round--;
 				LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i STARTED \n", _my_rank, _root_sweep_round, _params.sweepRounds());
 			}
 		}
@@ -198,6 +205,7 @@ private:
 	void createAndStartNewSweeper(int localId);
     void loadFormula(KissatPtr sweeper);
 
+	void checkSharingDelayHealth();
 	void checkForUnsatResults();
 	void tryReportUnsat();
 	void reportSolverResult(KissatPtr sweeper, int res);
