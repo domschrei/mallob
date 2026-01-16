@@ -521,13 +521,20 @@ void SchedulingManager::handleAnswerToAdoptionOffer(MessageHandle& handle) {
     assert(has(jobId));
     Job& job = get(jobId);
 
+    LOG(V4_VVER, "Adoption offer on job id %i  \n", jobId);
+
     if (accepted) {
         // Adoption offer accepted
     
+        LOG(V4_VVER, "Adoption offer on job id %i accepted. Volume %i \n", jobId, job.getVolume());
         // Check and apply (if possible) the job's current volume
         initiateVolumeUpdate(job);
+
+        LOG(V4_VVER, "Updated volume: %i \n", job.getVolume());
+
         if (!job.hasCommitment()) {
             // Job shrunk: Commitment cancelled, abort job adoption
+            LOG(V4_VVER, "Commitment cancelled, job shrunk \n", jobId);
             return;
         }
 
@@ -537,6 +544,7 @@ void SchedulingManager::handleAnswerToAdoptionOffer(MessageHandle& handle) {
         int missingRev;
         if (job.hasDescription() && (job.hasAllDescriptionsForSolving(missingRev) || missingRev > 0)) {
             // At least the initial description is present: Begin to execute job
+            LOG(V4_VVER, "Job State: %s \n", job.getState());
             if (job.getState() == SUSPENDED) {
                 resume(job, req, handle.source);
             } else {
@@ -549,6 +557,7 @@ void SchedulingManager::handleAnswerToAdoptionOffer(MessageHandle& handle) {
         LOG_ADD_SRC(V4_VVER, "Rejected to become %s : uncommitting", handle.source, job.toStr());
         uncommit(job, /*leaving=*/true);
     }
+    LOG(V4_VVER, "Job %i (%s) exit handle adoption offer\n", jobId, job.toStr());
 }
 
 void SchedulingManager::handleIncomingJobDescription(MessageHandle& handle, bool deployNewRevision) {
@@ -1211,6 +1220,7 @@ void SchedulingManager::resume(Job& job, const JobRequest& req, int source) {
     job.resume();
 
     int demand = job.getDemand();
+    LOG(V4_VVER, "demand after resume = %i \n", demand);
     _balancer.onActivate(job, demand);
     job.setLastDemand(demand);
 }

@@ -255,7 +255,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		 */
 		while (_running_sweepers_count < _nThreads) {
 			LOG(V3_VERB, "SWEEP JOB [%i](%i) waiting for other solvers to come online (%i/%i)\n", _my_rank, localId, _running_sweepers_count.load(), _nThreads);
-			usleep(2000);
+			usleep(10000); //10ms
 			if (_terminate_all || _external_termination) {
 				// LOG(V1_WARN, "Warn SWEEP [%i](%i): terminated while waiting in synchronization \n", _my_rank, localId);
 				_running_sweepers_count--;
@@ -753,7 +753,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		if ( ! stolen_work.empty()) {
 			//store steal data persistently in C++, such that C can keep operating on that memory segment
 			sweeper->work_received_from_steal = std::move(stolen_work);
-			LOG(V3_VERB, "SWEEP WORK [%i](%i) <==%i==== [%i]  (local) \n", localId, _my_rank, sweeper->work_received_from_steal.size(), _my_rank);
+			LOG(V3_VERB, "SWEEP WORK [%i](%i) <==%i==== [%i]  (local) \n", _my_rank, localId, sweeper->work_received_from_steal.size(), _my_rank);
 			break;
 		}
 		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop <-- local steal failed \n", _my_rank, localId);
@@ -933,7 +933,7 @@ void SweepJob::cbContributeToAllReduce() {
 			eqs = std::move(sweeper->eqs_to_share);
 			units = std::move(sweeper->units_to_share);
 			if (!eqs.empty() || !units.empty()) {
-				LOG(V3_VERB, "        [%i](%i) Export:  %i E  %i U\n", _my_rank, sweeper->getLocalId(), eqs.size()/2, units.size());
+				LOG(V5_DEBG, "        [%i](%i) Export:  %i E  %i U\n", _my_rank, sweeper->getLocalId(), eqs.size()/2, units.size());
 			}
 
 			//by moving we also clear their current position, i.e. prevents from sharing the data twice
@@ -944,7 +944,7 @@ void SweepJob::cbContributeToAllReduce() {
 		assert(eq_size%2==0 || log_return_false("ERROR in AGGR: Non-even number %i of equivalence literals, should always come in pairs", eq_size)); //equivalences come always in pairs
 		//we need to glue together equivalences and units. can use move on the equivalences to save a copying of them, and only need to copy the units
 		//moved logging before the actions, because this code triggered std::bad_alloc once, might give some more info next time
-		LOG(V4_VVER, "SWEEP SHARE REDUCE (%i): %i eq_size, %i units, %i idle \n", sweeper->getLocalId(), eq_size, unit_size, sweeper->sweeper_is_idle);
+		LOG(V5_DEBG, "SWEEP SHARE REDUCE (%i): %i eq_size, %i units, %i idle \n", sweeper->getLocalId(), eq_size, unit_size, sweeper->sweeper_is_idle);
 		std::vector<int> contrib = std::move(eqs);
 		contrib.insert(contrib.end(), units.begin(), units.end());
 
@@ -1276,7 +1276,7 @@ void SweepJob::gentlyTerminateSolvers() {
 			}
 			i++;
 		}
-		usleep(500);
+		usleep(2000);
 	}
 	LOG(V4_VVER, "SWEEP TERM #%i [%i] no more solvers running\n", getId(), _my_rank);
 

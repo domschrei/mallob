@@ -132,16 +132,20 @@ void ForkedSatJob::appl_suspend() {
 }
 
 void ForkedSatJob::appl_resume() {
+    LOG(V4_VVER, "ForkedSatJob (%s) appl_resume() \n", toStr());
     if (!_initialized) return;
 
     if (_core_alloc.empty()) {
         _core_alloc.requestCores(getNumThreads());
         setNumThreads(_core_alloc.getNbAllocated());
     }
+    LOG(V4_VVER, "ForkedSatJob (%s) numThreads = %i \n", getNumThreads());
 
     _solver->setSolvingState(SolvingStates::ACTIVE);
     loadIncrements();
+    LOG(V4_VVER, "ForkedSatJob (%s) did load increments \n", toStr());
     _clause_comm->communicate();
+    LOG(V4_VVER, "ForkedSatJob (%s) did clausecomm communicate \n", toStr());
 }
 
 void ForkedSatJob::appl_terminate() {

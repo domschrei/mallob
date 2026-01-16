@@ -137,7 +137,7 @@ private:
 		//A round is finished if all sweepers are idle, i.e. all finished their work.
 		if (all_idle) {
 			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i FINISHED (seen at root transform) with sharing round %i \n", _my_rank, _root_sweep_round, _params.sweepRounds(), _root_sharing_round);
-			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i had: %i EQS, %i UNITS  (this count contains duplicates!)\n", _my_rank, _root_sweep_round, _params.sweepRounds(), _shared_eqs_this_sweep_round, _shared_units_this_sweep_round);
+			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i had: %i EQS, %i UNITS  \n", _my_rank, _root_sweep_round, _params.sweepRounds(), _shared_eqs_this_sweep_round, _shared_units_this_sweep_round);
 			bool progress = _shared_eqs_this_sweep_round + _shared_units_this_sweep_round > 0;
 			bool lastsweepround = (_root_sweep_round == _params.sweepRounds());
 			if (lastsweepround || !progress) {
