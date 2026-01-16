@@ -544,7 +544,7 @@ void SchedulingManager::handleAnswerToAdoptionOffer(MessageHandle& handle) {
         int missingRev;
         if (job.hasDescription() && (job.hasAllDescriptionsForSolving(missingRev) || missingRev > 0)) {
             // At least the initial description is present: Begin to execute job
-            LOG(V4_VVER, "Job State: %s \n", job.getState());
+            LOG(V4_VVER, "Job State: %s \n", job.jobStateToStr());
             if (job.getState() == SUSPENDED) {
                 resume(job, req, handle.source);
             } else {
