@@ -46,8 +46,7 @@ public:
 
     void startWithInterleavedMerging(std::vector<ProofMergeConnector*>* connectors) {
         _fut_begin_assembly = ProcessWideThreadPool::get().addTask([&, connectors]() {
-            createInstancesViaClauseEpochs(_params.proofDirectory() + "/proof#" + std::to_string(_job_id)
-                + "/clauseepochs." + std::to_string(_this_worker_index));
+            createInstancesViaClauseEpochs(getProofBaseDir() + "/clauseepochs." + std::to_string(_this_worker_index));
             if (connectors) assert(connectors->size() == _proof_instances.size() 
                 || log_return_false("%i != %i\n", connectors->size(), _proof_instances.size()));
             beginProofAssembly(connectors);
@@ -162,6 +161,11 @@ public:
     }
 
 private:
+
+    std::string getProofBaseDir() const {
+        return _params.injectProofData.isSet() ? _params.injectProofData() : _params.proofDirectory() + "/proof#" + std::to_string(_job_id);
+    }
+
     void createInstancesViaClauseEpochs(const std::string& filename) {
 
         std::vector<LratClauseId> globalIdStarts;
@@ -246,8 +250,7 @@ private:
         for (size_t i = 0; i < localIdStartsPerInstance.size(); i++) {
             int instanceId = _this_worker_index * _orig_threads_per_worker + i;
             int numInstances = _num_workers * _orig_threads_per_worker;
-            std::string proofFilenameBase = _params.proofDirectory() + "/proof#"
-                + std::to_string(_job_id) + "/proof." + std::to_string(instanceId);
+            std::string proofFilenameBase = getProofBaseDir() + "/proof." + std::to_string(instanceId);
 
             // if necessary, create directory for external memory disk files 
             FileUtils::mkdir(_params.extMemDiskDirectory());

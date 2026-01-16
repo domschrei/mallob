@@ -537,5 +537,29 @@ void AnytimeSatClauseCommunicator::setupProofProducer(JobMessage& msg) {
     setup.solvingTime = _solving_time;
     setup.jobAgeSinceActivation = _job->getAgeSinceActivation();
 
+    if (_params.injectProofData.isSet()) {
+        // Read proof information (final epoch) from injected proof data
+        std::ifstream ifs(_params.injectProofData() + "/final-epoch.txt");
+        std::string content( (std::istreambuf_iterator<char>(ifs)),
+            (std::istreambuf_iterator<char>()));
+        setup.finalEpoch = atoi(content.c_str());
+
+    } else if (_job->getJobTree().isRoot()) {
+        // Write proof information to proof directory (so that it can be injected in a later run)
+        std::string dir = _params.proofDirectory() + "/proof#" + std::to_string(setup.jobId) + "/";
+        {
+            std::ofstream ofs(dir + "winning-id.txt");
+            ofs << setup.winningInstance;
+        }
+        {
+            std::ofstream ofs(dir + "global-start-of-success-epoch.txt");
+            ofs << setup.globalStartOfSuccessEpoch;
+        }
+        {
+            std::ofstream ofs(dir + "final-epoch.txt");
+            ofs << setup.finalEpoch;
+        }
+    }
+
     _proof_producer.reset(new ProofProducer(_params, setup, _job->getJobTree()));
 }

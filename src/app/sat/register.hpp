@@ -67,7 +67,7 @@ void register_mallob_app_sat() {
         },
         // Resource cleaner
         [](const Parameters& params) {
-            if (!params.proofDirectory().empty()) {
+            if (!params.proofDirectory().empty() && !params.injectProofData.isSet()) {
                 for (auto file : FileUtils::glob(params.proofDirectory() + "/proof#*/")) {
                     FileUtils::rmrf(file);
                 }
