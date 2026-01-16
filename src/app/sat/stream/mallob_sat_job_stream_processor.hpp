@@ -78,7 +78,7 @@ public:
     }
 
     virtual void loop() override {
-        if (_slot->wasEvicted()) yield();
+        if (_slot->checkEvicted()) yield();
     }
 
     virtual void process(SatTask& task) override {
@@ -107,6 +107,7 @@ public:
             _backlog_task.integrate(task);
         }
         auto& t = _backlog_task;
+        LOG(V5_DEBG, "%s attempting to solve task ...\n", _name.c_str());
 
         if (_task_pending) {
             // A previous interruption is still ongoing.
@@ -120,7 +121,7 @@ public:
             LOG(V4_VVER, "%s ... ready\n", _name.c_str());
         }
 
-        if (_slot->wasEvicted()) {
+        if (_slot->checkEvicted()) {
             yield();
             return;
         }
@@ -226,9 +227,10 @@ public:
                 } else {
                     solution = result["result"]["solution"].get<std::vector<int>>();
                 }
+                const int solSize = solution.size();
                 bool winner = concludeRevision(rev, resultCode, std::move(solution));
                 if (winner) LOG(V2_INFO, "%s rev. %i (internally %i) won with res=%i solsize=%i\n",
-                    _name.c_str(), rev, subjob, resultCode, solution.size());
+                    _name.c_str(), rev, subjob, resultCode, solSize);
                 _task_pending = false;
             });
             if (response == JsonInterface::Result::DISCARD) {

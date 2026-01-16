@@ -95,9 +95,17 @@ public:
                 cbEvict();
             }
         }
+        // only checks whether an eviction took place
         bool wasEvicted() {
             auto lock = mtx.getLock();
             return lastStatus == DEPLOYED && status == NONE;
+        }
+        // checks whether an eviction took place and unmarks the eviction
+        bool checkEvicted() {
+            auto lock = mtx.getLock();
+            bool evicted = lastStatus == DEPLOYED && status == NONE;
+            if (evicted) lastStatus = NONE;
+            return evicted;
         }
     };
     struct CompareDTask {
