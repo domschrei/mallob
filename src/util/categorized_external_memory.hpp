@@ -14,7 +14,7 @@ class CategorizedExternalMemory {
 
 private:
     std::fstream _disk;
-    int _blocksize;
+    size_t _blocksize;
     size_t _num_blocks_in_disk = 0;
 
     struct Block {
@@ -92,7 +92,8 @@ public:
             } else {
                 // Read from disk
                 //LOG(V2_INFO, "- fetch from disk\n");
-                _disk.seekg(_blocksize*block.address, std::ios::beg);
+                unsigned long pos = _blocksize * block.address;
+                _disk.seekg(pos, std::ios::beg);
                 _disk.read((char*) insertionPoint, block.size);
             }
             _free_addresses.push_back(block.address);
@@ -108,7 +109,8 @@ private:
 
     void sync(Block& block) {
         assert(block.buffer.size() == block.size);
-        _disk.seekp(_blocksize*block.address, std::ios::beg);
+        unsigned long pos = _blocksize * block.address;
+        _disk.seekp(pos, std::ios::beg);
         _disk.write((const char*) block.buffer.data(), block.buffer.size());
         _disk.write((const char*) _empty_buffer.data(), _blocksize - block.buffer.size());
         block.buffer = std::vector<uint8_t>();
@@ -124,7 +126,8 @@ private:
     }
 
     void appendBlockToDisk() {
-        _disk.seekp(_blocksize*_num_blocks_in_disk, std::ios::beg);
+        unsigned long pos = _blocksize * _num_blocks_in_disk;
+        _disk.seekp(pos, std::ios::beg);
         _disk.write((const char*) _empty_buffer.data(), _empty_buffer.size());
         _free_addresses.push_back(_num_blocks_in_disk);
         _num_blocks_in_disk++;

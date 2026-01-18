@@ -140,6 +140,7 @@ private:
         int numSelfClauses = 0;
         for (size_t i = 0; i < clauseIdsSize; i++) {
             LratClauseId id = clauseIdsData[i];
+            assert(id > 0);
             if (isSelfProducedClause(id)) {
                 _frontier.push(id, getClauseEpoch(id));
                 numSelfClauses++;
@@ -218,6 +219,7 @@ private:
                 // Traverse clause hints
                 for (size_t i = 0; i < numHints; i++) {
                     auto hintId = hints[i];
+                    assert(hintId > 0);
                     int hintEpoch = getClauseEpoch(hintId);
                     if (isSelfProducedClause(hintId)) {
                         if (_debugging) outputLratId("FRT", hintId, dbgOfs);
