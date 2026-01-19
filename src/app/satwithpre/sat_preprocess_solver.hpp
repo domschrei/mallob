@@ -203,7 +203,7 @@ private:
             {"priority", _params.preprocessJobPriority()},
             {"application", "SAT"},
         };
-        if (_params.crossJobCommunication()) json["group-id"] = _desc.getGroupId();
+        if (_params.crossJobCommunication()) json["group-id"] = std::to_string(_desc.getGroupId());
         StaticStore<std::vector<int>>::insert(json["name"].get<std::string>(), std::move(fPre));
         json["internalliterals"] = json["name"].get<std::string>();
         json["configuration"]["__NV"] = std::to_string(nbVars);
