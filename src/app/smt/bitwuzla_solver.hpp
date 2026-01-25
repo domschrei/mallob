@@ -18,7 +18,7 @@
 class BitwuzlaSolver {
 
 private:
-    const Parameters& _params;
+    const Parameters _params;
     APIConnector& _api;
     JobDescription& _desc;
     std::string _problem_file;

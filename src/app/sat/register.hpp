@@ -38,31 +38,17 @@ void register_mallob_app_sat() {
         // Job solution formatter
         [](const Parameters& params, const JobResult& result, const JobProcessingStatistics& stat) {
             auto json = nlohmann::json::array();
-            /*std::stringstream modelString;
-            int numAdded = 0;
-            auto solSize = result.getSolutionSize();
-            for (size_t x = 1; x < solSize; x++) {
-                if (numAdded == 0) {
-                    modelString << "v ";
-                }
-                modelString << std::to_string(result.getSolution(x)) << " ";
-                numAdded++;
-                bool done = x+1 == solSize;
-                if (numAdded == 20 || done) {
-                    if (done) modelString << "0";
-                    modelString << "\n";
-                    json.push_back(modelString.str());
-                    modelString = std::stringstream();
-                    numAdded = 0;
-                }
-            }
-            */
             auto model = result.copySolution();
             if (result.result == SAT && params.compressModels()) {
                 json = ModelStringCompressor::compress(model);
             } else {
                 json = std::move(model);
             }
+            //std::stringstream modelString;
+            //modelString << "c parse_time " << stat.parseTime << "\n";
+            //modelString << "c process_time " << stat.processingTime << "\n";
+            //modelString << "c total_response_time " << stat.totalResponseTime << "\n";
+            //json.push_back(modelString.str());
             return json;
         },
         // Resource cleaner

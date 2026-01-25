@@ -8,6 +8,7 @@
 
 #include "robin_hash.h"
 #include "robin_map.h"
+#include "util/string_utils.hpp"
 
 namespace app_registry {
 
@@ -111,6 +112,18 @@ namespace app_registry {
         std::vector<ResourceCleaner> cleaners;
         for (auto& entry : _app_entries) cleaners.push_back(entry.cleaner);
         return cleaners;
+    }
+
+    void overrideProgramOptions(Parameters& params, JobDescription& desc) {
+        const auto appConf = desc.getAppConfiguration();
+        if (!appConf.map.count("options")) return;
+
+        std::string optOverrides = appConf.map.at("options");
+        std::replace(optOverrides.begin(), optOverrides.end(), '&', ' ');
+        std::istringstream buffer(optOverrides);
+        std::vector<std::string> args {std::istream_iterator<std::string>(buffer),
+                                std::istream_iterator<std::string>()};
+        params.init(args); // override
     }
 }
 

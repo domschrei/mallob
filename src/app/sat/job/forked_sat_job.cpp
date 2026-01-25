@@ -52,6 +52,7 @@ void ForkedSatJob::appl_start() {
 }
 
 void ForkedSatJob::doStartSolver() {
+    initializeWithDescriptionPresent();
 
     SatProcessConfig config = SatProcessConfigBuilder::get(_params, *this, _subproc_idx);
     Parameters hParams(_params);

@@ -14,23 +14,30 @@ class BaseSatJob : public Job, public ClauseSharingActor {
 
 public:
     BaseSatJob(const Parameters& params, const JobSetup& setup, AppMessageTable& appMsgTable) : 
-        Job(params, setup, appMsgTable), ClauseSharingActor(params) {
+        Job(params, setup, appMsgTable), ClauseSharingActor(getParams()) {}
+    virtual ~BaseSatJob() {
+        if (_estimate_shared_lits != -1.f) {
+            LOG(V3_VERB, "%s CS total expected=%lu exchanged=%lu ratio=%.3f\n", toStr(), 
+                _total_desired, _total_shared, _total_desired/(float)_total_shared);
+        }
+    }
 
+    void initializeWithDescriptionPresent() {
         // Launched in certified UNSAT mode?
-        if (params.proofOutputFile.isSet() || _params.onTheFlyChecking()) {
+        if (_params.proofOutputFile.isSet() || _params.onTheFlyChecking()) {
             
             // Check that the restrictions of this mode are met
-            if (params.proofOutputFile.isSet() && !params.monoFilename.isSet()) {
+            if (_params.proofOutputFile.isSet() && !_params.monoFilename.isSet()) {
                 LOG(V0_CRIT, "[ERROR] Mallob was launched with certified UNSAT support "
                     "which only supports -mono mode of operation.\n");
                 abort();
             }
-            if (params.proofOutputFile.isSet() && !params.proofDirectory.isSet()) {
+            if (_params.proofOutputFile.isSet() && !_params.proofDirectory.isSet()) {
                 LOG(V0_CRIT, "[ERROR] Mallob was launched with proof writing "
                     "which requires providing a proof directory (-proof-dir).\n");
                 abort();
             }
-            if (params.proofOutputFile.isSet() && params.onTheFlyChecking()) {
+            if (_params.proofOutputFile.isSet() && _params.onTheFlyChecking()) {
                 LOG(V0_CRIT, "[ERROR] Mallob does not yet support proof writing "
                     "and on-the-fly checking at the same time.\n");
                 abort();
@@ -41,12 +48,6 @@ public:
                 ClauseMetadata::enableClauseSignatures();
                 ClauseMetadata::enableIncrementalSignatures();
             }
-        }
-    }
-    virtual ~BaseSatJob() {
-        if (_estimate_shared_lits != -1.f) {
-            LOG(V3_VERB, "%s CS total expected=%lu exchanged=%lu ratio=%.3f\n", toStr(), 
-                _total_desired, _total_shared, _total_desired/(float)_total_shared);
         }
     }
 

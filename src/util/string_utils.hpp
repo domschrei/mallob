@@ -2,6 +2,7 @@
 #pragma once
 
 #include <string>
+#include <type_traits>
 #include <vector>
 
 class StringUtils {
@@ -21,7 +22,11 @@ public:
                 i = std::max(i, (int) size - (maxElems-halfwayPoint) - 1);
                 continue;
             }
-            summary += std::to_string(data[i]) + " ";
+            if constexpr (std::is_same<std::string, T>()) {
+                summary += data[i] + " ";
+            } else {
+                summary += std::to_string(data[i]) + " ";
+            }
         }
         return summary;
     }

@@ -49,4 +49,6 @@ namespace app_registry {
     JobCreator getJobCreator(int appId);
     ClientSideProgramCreator getClientSideProgramCreator(int appId);
     std::vector<ResourceCleaner> getCleaners();
+
+    void overrideProgramOptions(Parameters& params, JobDescription& desc);
 }

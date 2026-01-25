@@ -152,7 +152,7 @@ private:
     void readEpoch() {
 
         LOGGER(_log, V5_DEBG, "%i reading e.%i\n", _instance_id, _current_epoch);
-        int numReadLines = 0;
+        unsigned long numReadLines = 0;
 
         std::ofstream dbgOfs;
         if (_debugging) {
@@ -273,7 +273,7 @@ private:
             numSkippedLines = 0;
         }
 
-        LOGGER(_log, V4_VVER, "%i e.%i read:%i last:%s traced:%lu blg:%lu frt:%lu\n",
+        LOGGER(_log, V4_VVER, "%i e.%i read:%lu last:%s traced:%lu blg:%lu frt:%lu\n",
             _instance_id, _current_epoch, numReadLines, 
             numReadLines==0 ? "-" : std::to_string(formerId).c_str(), 
             _num_traced_clauses, _backlog.size(), _frontier.size());

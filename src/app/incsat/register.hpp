@@ -39,11 +39,17 @@ void register_mallob_app_incsat() {
         // Job solution formatter
         [](const Parameters& params, const JobResult& result, const JobProcessingStatistics& stat) {
             auto json = nlohmann::json::array();
-            std::stringstream modelString;
-            modelString << "c parse_time " << stat.parseTime << "\n";
-            modelString << "c process_time " << stat.processingTime << "\n";
-            modelString << "c total_response_time " << stat.totalResponseTime << "\n";
-            json.push_back(modelString.str());
+            auto model = result.copySolution();
+            if (result.result == SAT && params.compressModels()) {
+                json = (ModelStringCompressor::compress(model));
+            } else {
+                json = (std::move(model));
+            }
+            //std::stringstream modelString;
+            //modelString << "c parse_time " << stat.parseTime << "\n";
+            //modelString << "c process_time " << stat.processingTime << "\n";
+            //modelString << "c total_response_time " << stat.totalResponseTime << "\n";
+            //json.push_back(modelString.str());
             return json;
         }
     );
