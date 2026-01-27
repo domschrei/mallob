@@ -126,8 +126,8 @@ The workflow is as follows:
 
 * Generate the sbatch files as in the following example command (the last argument is the number of concurrent chains and must be smaller than the maximum number of allowed concurrent jobs per user at your cluster):
 
-    DS_NODES=4 DS_RUNTIME=360 DS_PARTITION=micro DS_SECONDSPERJOB=300 scripts/slurm/generate-job-chain.sh \
-    sat-profiling-newplain-4nodes scripts/slurm/run-sat-chained.sh 1 500 45
+    `DS_NODES=4 DS_RUNTIME=360 DS_PARTITION=micro DS_SECONDSPERJOB=300 scripts/slurm/generate-job-chain.sh \
+    sat-profiling-newplain-4nodes scripts/slurm/run-sat-chained.sh 1 500 45` 
 
 * Execute the command output by the previous command, then wait until all jobs have been executed.
 
