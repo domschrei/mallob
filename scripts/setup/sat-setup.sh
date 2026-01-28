@@ -12,6 +12,7 @@ cd lib
       cmake .. -DCMAKE_BUILD_TYPE=RELEASE -DIMPCHECK_WRITE_DIRECTIVES=0 -DIMPCHECK_FLUSH_ALWAYS=0 -DIMPCHECK_COMPRESS=1 ; make -j
     cd ..
   cd ..
+  mkdir -p ../build/
   cp impcheck/build/impcheck_* ../build/
 cd ..
 
