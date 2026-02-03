@@ -76,7 +76,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	std::string proofDirectory;
 
 	// Launched in some certified UNSAT mode?
-    if (_params.proofOutputFile.isSet() || _params.onTheFlyChecking()) {
+    if (_params.proofOutputFile.isSet() || _params.onTheFlyChecking() || _params.palRup()) {
 
 		// Override options
 		if (!portfolio.featuresProofOutput()) {
@@ -96,7 +96,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 			ClauseMetadata::enableIncrementalSignatures();
 		}
 
-		if (_params.proofOutputFile.isSet()) {
+		if (_params.proofOutputFile.isSet() || _params.palRup()) {
 			// Create directory for partial proofs
 			proofDirectory = params.proofDirectory() + "/proof" + config.getJobStr();
 			FileUtils::mkdir(proofDirectory);
@@ -294,13 +294,14 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		setup.solverType = item.baseSolver;
 		setup.flavour = item.flavour;
 		setup.doIncrementalSolving = setup.isJobIncremental && item.incremental;
-		setup.certifiedUnsat = item.outputProof && (params.proofOutputFile.isSet() || params.onTheFlyChecking());
+		setup.certifiedUnsat = item.outputProof && (params.proofOutputFile.isSet() || params.onTheFlyChecking() || _params.palRup());
 		setup.onTheFlyChecking = setup.certifiedUnsat && params.onTheFlyChecking();
 		setup.onTheFlyCheckModel = params.onTheFlyChecking() && params.onTheFlyCheckModel();
 		setup.usePalRupFormat = params.palRup();
+		setup.outputBinaryPalRup = params.palRupBinary();
 		setup.trustedParserForced = params.forceIncrementalTrustedParser();
 		setup.modelCheckingLratConnector = modelCheckingLratConnector;
-		setup.avoidUnsatParticipation = (params.proofOutputFile.isSet() || params.onTheFlyChecking()) && !item.outputProof;
+		setup.avoidUnsatParticipation = (params.proofOutputFile.isSet() || params.onTheFlyChecking() || _params.palRup()) && !item.outputProof;
 		setup.exportClauses = !setup.avoidUnsatParticipation;
 
 		_solver_interfaces.push_back(createSolver(setup));
