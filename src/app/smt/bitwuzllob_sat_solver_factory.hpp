@@ -24,8 +24,8 @@ private:
 
 public:
     BitwuzllobSatSolverFactory(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& tracker,
-        bitwuzla::Terminator& term, const std::string& name, const bitwuzla::Options &options)
-            : bitwuzla::SatSolverFactory(options),
+        bitwuzla::Terminator& term, const std::string& name)
+            : bitwuzla::SatSolverFactory(),
             _params(params), _api(api), _desc(desc), _tracker(tracker), _term(term), _name(name) {}
 
     virtual std::unique_ptr<bitwuzla::SatSolver> new_sat_solver() override {

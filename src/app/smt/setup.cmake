@@ -5,7 +5,7 @@ set(MALLOB_COREPLUSCOMM_SOURCES ${MALLOB_COREPLUSCOMM_SOURCES} ${SMT_MALLOB_SOUR
 
 # Include Bitwuzla as external library (Mallob-side interfaces are part of SMT_SOURCES)
 set(BASE_LINK_DIRS ${BASE_LINK_DIRS} lib/bitwuzla/build/src/ lib/bitwuzla/build/src/lib/ CACHE INTERNAL "")
-set(BASE_LIBS ${BASE_LIBS} bzlarng bitwuzla bitwuzlabv bitwuzlabb bitwuzlals bzlautil gmp CACHE INTERNAL "")
+set(BASE_LIBS ${BASE_LIBS} bzlarng bitwuzla bitwuzlabv bitwuzlabb bitwuzlals bzlautil gmp mpfr CACHE INTERNAL "")
 set(BASE_INCLUDES ${BASE_INCLUDES} lib/bitwuzla/include/ CACHE INTERNAL "") # need to include some solver code
 
 # Include external libraries as necessary

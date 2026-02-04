@@ -132,7 +132,7 @@ public:
 
             factory = std::make_unique<BitwuzllobSatSolverFactory>(
                 _params, _api, _desc, dTaskTracker,
-                _terminator, _name, options);
+                _terminator, _name);
 
             bitwuzla::parser::Parser parser(
                 tm, *factory.get(), options, language, out);
