@@ -369,6 +369,7 @@ public:
     }
 
     void setGroupId(const std::string& groupId, int minVar = -1, int maxVar = -1) {
+        _stream_wrapper->initInteractiveSolving();
         _stream_wrapper->getMallobProcessor()->setGroupId(groupId, minVar, maxVar);
     }
 
