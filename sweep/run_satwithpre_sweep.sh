@@ -83,7 +83,7 @@ if $SWEEP; then
     echo "SWEEP Preprocessing ADDED !"
     MALLOB_OPTIONS="$MALLOB_OPTIONS \
       -preprocess-sweep \
-      -sweep-sharing-period=20 \
+      -sweep-sharing-period=0.020 \
       -sweep-solver-verbosity=0 \
       -sweep-solver-quiet=1 \
       -preprocess-sweep-priority=$SWEEP_PRIO \

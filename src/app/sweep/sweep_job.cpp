@@ -475,7 +475,7 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 		LOGGER(_reslogger,V2_INFO, "SWEEP_PRIORITY       %.3f\n", _params.preprocessSweepPriority.val);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_PROCESSES      %i\n", getVolume());
 		LOGGER(_reslogger,V2_INFO, "SWEEP_THREADS_PER_P  %i\n", _nThreads);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_PERIOD %i ms \n", _params.sweepSharingPeriod_ms.val);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_PERIOD %i sec \n", _params.sweepSharingPeriod.val);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_ORIG		 %i\n", sweeper->_setup.numVars);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_END		 %i\n", stats.vars_end);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_ACTIVE_ORIG    %i\n", stats.vars_active_orig);
@@ -560,18 +560,18 @@ void SweepJob::printIdleFraction() {
 
 void SweepJob::checkSharingDelayHealth() {
 	constexpr float MAX_DELAY_FACTOR = 3;
-	float t = Timer::elapsedSeconds();
-	float period = _params.sweepSharingPeriod_ms.val/1000;
+	float time = Timer::elapsedSeconds();
+	float period = _params.sweepSharingPeriod.val;
 	if (!_time_contribute.empty()) {
-		float delay = t - _time_contribute.back();
+		float delay = time - _time_contribute.back();
 		if (delay > period*MAX_DELAY_FACTOR) {
-			LOG(V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: large delay since last sharing contribution! Delay %f s, factor %f \n", _my_rank, delay, delay/period);
+			LOG(V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: large delay since last sharing contribution! Delay %f sec (target period %f sec), delay factor %f \n", _my_rank, delay, period, delay/period);
 		}
 	}
 	if (!_time_receive_allred.empty()) {
-		float delay = t - _time_receive_allred.back();
+		float delay = time - _time_receive_allred.back();
 		if (delay > period*MAX_DELAY_FACTOR) {
-			LOG(V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: large delay since last received sharing! Delay %f s, factor %f \n", _my_rank, delay, delay/period);
+			LOG(V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: large delay since last received sharing! Delay %f sec (target period %f sec), factor %f \n", _my_rank, delay, period, delay/period);
 		}
 	}
 }
@@ -864,7 +864,7 @@ void SweepJob::initiateNewSharingRound() {
 		return;
 	}
 
-	if (Timer::elapsedSeconds() < _root_last_sharing_start_timestamp + _params.sweepSharingPeriod_ms.val/1000.0) {
+	if (Timer::elapsedSeconds() < _root_last_sharing_start_timestamp + _params.sweepSharingPeriod.val) {
 		//not yet time for next sharing round
 		return;
 	}
