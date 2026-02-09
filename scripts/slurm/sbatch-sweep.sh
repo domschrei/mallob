@@ -38,7 +38,7 @@ export RDMAV_FORK_SAFE=1
 export MALLOC_CONF="thp:always"
 
 # HOME
-globallogdir_base=logs/$DS_JOBNAME-$SLURM_JOB_ID
+globallogdir_base=$HOME/logs/$DS_JOBNAME-$SLURM_JOB_ID
 # WORK
 if [ -d "$WORK_$DS_PROJECTNAME" ]; then globallogdir_base="$WORK_$DS_PROJECTNAME/$globallogdir_base"; fi
 # SCRATCH
@@ -128,6 +128,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
   -os=1 \
   -iff=0 \
   -cm=0 \
+  -rspaa=1 \
 	-rpa=1 -pph=${SLURM_NTASKS_PER_NODE} -mlpt=50``000``000 -t=$((${SLURM_CPUS_PER_TASK} / 2)) \
 	-isp=0 -div-phases=1 -div-noise=0 -div-seeds=1 -div-elim=0 -div-native=0 -scsd=0 \
 	-scll=60 -slbdl=60 -qcll=60 -qlbdl=60 -csm=3 -cfm=3 -cfci=30 -mscf=5 -bem=1 -aim=1 \
@@ -144,7 +145,6 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 	-sweep-solver-quiet=1 \
   -sweep-congruence=1 \
   -sweep-growing-environments=1 \
-  -restart-subproc-at-abort=1 \
   -preprocess-sweep-priority=1.0 \
 "
 

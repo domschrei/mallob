@@ -565,13 +565,13 @@ void SweepJob::checkSharingDelayHealth() {
 	if (!_time_contribute.empty()) {
 		float delay = t - _time_contribute.back();
 		if (delay > period*MAX_DELAY_FACTOR) {
-			LOG(V1_WARN, "WARN SWEEPHEALTH [%i]: large delay since last sharing contribution! Delay %f s, factor %f \n", _my_rank, delay, delay/period);
+			LOG(V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: large delay since last sharing contribution! Delay %f s, factor %f \n", _my_rank, delay, delay/period);
 		}
 	}
 	if (!_time_receive_allred.empty()) {
 		float delay = t - _time_receive_allred.back();
 		if (delay > period*MAX_DELAY_FACTOR) {
-			LOG(V1_WARN, "WARN SWEEPHEALTH [%i]: large delay since last received sharing! Delay %f s, factor %f \n", _my_rank, delay, delay/period);
+			LOG(V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: large delay since last received sharing! Delay %f s, factor %f \n", _my_rank, delay, delay/period);
 		}
 	}
 }
