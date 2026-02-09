@@ -13,12 +13,14 @@ if [ -z "${1:-}" ]; then
 fi
 
 jobname="$1"
+# sourcedir="$HOME/logs/${jobname}"
 outdir="/hppfs/work/$projectname/$username/logs/${jobname}"
 
 echo "$jobname: moving results to unified $outdir"
 
 mkdir -p "$outdir/"
-for f in /hppfs/work/$projectname/$username/logs/${jobname}-*/*/.alldone ; do
+# for f in /hppfs/work/$projectname/$username/logs/${jobname}-*/*/.alldone ; do
+for f in $outdir-*/*/.alldone ; do
     if [ -d "$outdir/$(basename $(dirname $f))" ]; then continue; fi
     mv $(dirname $f) "$outdir/"
 done
@@ -26,7 +28,7 @@ done
 echo "$jobname: moving slurm-out's"
 
 mv sbatch/generated/${jobname}/sbatch.sh "$outdir/"
-echo /hppfs/work/$projectname/$username/logs/${jobname}-*/ | grep -oE "\-[0-9]{7}/" | grep -oE "[0-9]{7}" | while read slurmid; do
+echo $outdir-*/ | grep -oE "\-[0-9]{7}/" | grep -oE "[0-9]{7}" | while read slurmid; do
     mv slurm-${slurmid}.out "$outdir/"
 done
 
