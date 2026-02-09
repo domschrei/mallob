@@ -10,6 +10,9 @@
 #SBATCH --ear=off # Needed for profiling / benchmarking
 #SBATCH --switches=1 # Force a single island
 
+
+#SBATCH --licenses=work:0  #Dont use the WORK directory during the maintanence period
+
 # SBATCH --ear-mpi-dist=openmpi # For OpenMPI
 
 # SuperMUC has TWO processors with 24 physical cores each, totalling 48 physical cores (96 hwthreads)
