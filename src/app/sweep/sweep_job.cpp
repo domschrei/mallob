@@ -12,7 +12,9 @@ extern "C" {
 
 
 SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table)
-    : Job(params, setup, table), _reslogger(Logger::getMainInstance().copy("<RESULT>", ".sweep"))
+    : Job(params, setup, table),
+	_reslogger(Logger::getMainInstance().copy("<RESULT>", ".sweep")),
+	_warnlogger(Logger::getMainInstance().copy("<WARN>", ".warn"))
 {
 	assert(_params.jobCommUpdatePeriod() > 0 || log_return_false("[ERROR] For this application to work,"
             " you must explicitly enable job communicators with the -jcup option, e.g., -jcup=0.1\n"));
@@ -55,6 +57,7 @@ void SweepJob::appl_start() {
 	_root_last_sharing_start_timestamp = Timer::elapsedSeconds();
 
     _reslogger = Logger::getMainInstance().copy("<RESULT>", ".sweep");
+    _warnlogger = Logger::getMainInstance().copy("<WARN>", ".warn");
 
 	//do not trigger a send on the initial dummy worksteal requests
 	_worksteal_requests.resize(_nThreads);
@@ -565,13 +568,13 @@ void SweepJob::checkSharingDelayHealth() {
 	if (!_time_contribute.empty()) {
 		float delay = time - _time_contribute.back();
 		if (delay > period*MAX_DELAY_FACTOR) {
-			LOG(V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: large delay since last sharing contribution! Delay %f sec (target period %f sec), delay factor %f \n", _my_rank, delay, period, delay/period);
+			LOGGER(_warnlogger, V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since last contribution (target period %f sec), delay factor %.1f \n", _my_rank, delay, period, delay/period);
 		}
 	}
 	if (!_time_receive_allred.empty()) {
 		float delay = time - _time_receive_allred.back();
 		if (delay > period*MAX_DELAY_FACTOR) {
-			LOG(V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: large delay since last received sharing! Delay %f sec (target period %f sec), factor %f \n", _my_rank, delay, period, delay/period);
+			LOGGER(_warnlogger, V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since last receiving (target period %f sec), delay factor %.1f \n", _my_rank, delay, period, delay/period);
 		}
 	}
 }

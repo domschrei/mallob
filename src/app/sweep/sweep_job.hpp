@@ -119,6 +119,7 @@ private:
 	// shweep_statistics _congruence_stats{};
 
 	Logger _reslogger; //Logging most important results in dedicated file, to not have them mangled by other verbose logs
+	Logger _warnlogger; //Logging some warnings in a dedicated file, to avoid needing to grep later the whole large main log files for these warnings
 
 
 	//Some information is only tracked by the root node, but relevant for all nodes. Thus the root node injects it here into the sharing data.
