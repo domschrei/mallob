@@ -568,13 +568,17 @@ void SweepJob::checkSharingDelayHealth() {
 	if (!_time_contribute.empty()) {
 		float delay = time - _time_contribute.back();
 		if (delay > period*MAX_DELAY_FACTOR) {
+			//Log in the main log file to see it there chronologically correct and interleaved with the other information,
+			//and log it separately also in a .warn file, to easily grep it during evaluation, without needing to grep through the (much larger) main log file
+			LOG(				V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since last contribution (target period %f sec), delay factor %.1f \n", _my_rank, delay, period, delay/period);
 			LOGGER(_warnlogger, V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since last contribution (target period %f sec), delay factor %.1f \n", _my_rank, delay, period, delay/period);
 		}
 	}
 	if (!_time_receive_allred.empty()) {
 		float delay = time - _time_receive_allred.back();
 		if (delay > period*MAX_DELAY_FACTOR) {
-			LOGGER(_warnlogger, V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since last receiving (target period %f sec), delay factor %.1f \n", _my_rank, delay, period, delay/period);
+			LOG(			    V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since last receiving	 (target period %f sec), delay factor %.1f \n", _my_rank, delay, period, delay/period);
+			LOGGER(_warnlogger, V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since last receiving	 (target period %f sec), delay factor %.1f \n", _my_rank, delay, period, delay/period);
 		}
 	}
 }
