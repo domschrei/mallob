@@ -11,7 +11,7 @@
 #SBATCH --switches=1 # Force a single island
 
 
-#SBATCH --licenses=work:0  #Dont use the WORK directory during the maintanence period
+# - SBATCH --licenses=work:0  #Dont use the WORK directory during the maintanence period
 
 # SBATCH --ear-mpi-dist=openmpi # For OpenMPI
 
@@ -38,7 +38,7 @@ export RDMAV_FORK_SAFE=1
 export MALLOC_CONF="thp:always"
 
 # HOME
-globallogdir_base=$HOME/logs/$DS_JOBNAME-$SLURM_JOB_ID
+globallogdir_base="/logs/$DS_JOBNAME-$SLURM_JOB_ID"
 # WORK
 if [ -d "$WORK_$DS_PROJECTNAME" ]; then globallogdir_base="$WORK_$DS_PROJECTNAME/$globallogdir_base"; fi
 # SCRATCH
