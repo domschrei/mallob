@@ -139,6 +139,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		assert(msg.payload.size() == NUM_SEARCHING_WORK_FIELDS);
 		int localId = msg.payload[0];
 		int sourceContextId = msg.payload[1];
+		int sourceTreeIndex = msg.payload[2];
 
 		msg.payload.clear();
 
@@ -158,13 +159,25 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 			assert(msg.contextIdOfDestination == sourceContextId);
 		} else {
 			msg.contextIdOfDestination = sourceContextId;
-			LOG(V1_WARN,"WARN SWEEP: SEARCHING_WORK receiver [%i] does not know contextIdOfDestination of sender [%i], fallback to id %i, provided by request msg itself\n", _my_rank, sourceRank, sourceContextId);
+			LOG(V1_WARN,"WARN SWEEP: SEARCHING_WORK receiver [%i] does not know contextIdOfDestination of sender [%i], now using ContextId %i provided by incoming msg itself\n", _my_rank, sourceRank, sourceContextId);
 		}
+
+		if (msg.treeIndexOfDestination != -1) {
+			assert(msg.treeIndexOfDestination == sourceTreeIndex);
+		} else {
+			msg.treeIndexOfDestination = sourceTreeIndex;
+			LOG(V1_WARN,"WARN SWEEP: SEARCHING_WORK receiver [%i] does not know treeIndexOfDestination of sender [%i], now using treeIndex %i provided by incoming msg itself\n", _my_rank, sourceRank, sourceTreeIndex);
+		}
+
 		//todo: solve situation when receiving rank doesnt know yet sending rank
 		//probably happens when sweep message slips right into the ongoing ranklist update that is periodically started as aggregating, in job.cpp 233
 		assert(msg.contextIdOfDestination != 0 ||
-			log_return_false("SWEEP STEAL ERROR in TAG_RETURNING_STEAL_REQUEST! Want to return an message, but invalid contextIdOfDestination==0. "
+			log_return_false("SWEEP STEAL ERROR: invalid contextIdOfDestination==0. In TAG_RETURNING_STEAL_REQUEST, wanted to return an message"
 					"With sourceRank=%i, sourceIndex=%i, payload.size()=%i \n", sourceRank, sourceIndex, msg.payload.size()));
+
+		assert(msg.treeIndexOfDestination != -1 ||
+			log_return_false("SWEEP STEAL ERROR: treeIndexOfDestination==-1. In TAG_RETURNING_STEAL_REQUEST, wanted to return an message"
+					"With sourceRank=%i, sourceIndex=%i, contextIdOfDestination=%i, payload.size()=%i \n", sourceRank, sourceIndex, msg.contextIdOfDestination, msg.payload.size()));
 
 		getJobTree().send(sourceRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 	}
@@ -683,7 +696,8 @@ void SweepJob::sendMPIWorkstealRequests() {
 			//which (probably) happens when a worksteal request is sent right when also the ranklist aggregation update is propagating through all ranks, where some (like this rank here) are already updated, while others (like the receiving rank) aren't.
 			//So as a backup for the receiving rank, we also provide our contextId
 			int myContexId = getJobComm().getContextIdOrZero(_my_index);
-			msg.payload = {request.localId, myContexId};
+			//Update: and for similar reason we also send our treeIndex
+			msg.payload = {request.localId, myContexId, _my_index};
 			assert(msg.payload.size() == NUM_SEARCHING_WORK_FIELDS);
 			// LOG(V2_INFO, "Rank %i asks rank %i for work\n", _my_rank, recv_rank, n);
 			// LOG(V2_INFO, "  with destionation ctx_id %i \n", msg.contextIdOfDestination);

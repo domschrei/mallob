@@ -11,7 +11,7 @@
 #SBATCH --switches=1 # Force a single island
 
 
-# - SBATCH --licenses=work:0  #Dont use the WORK directory during the maintanence period
+#SBATCH --licenses=work:0  #Dont use the WORK directory during the maintanence period
 
 # SBATCH --ear-mpi-dist=openmpi # For OpenMPI
 
