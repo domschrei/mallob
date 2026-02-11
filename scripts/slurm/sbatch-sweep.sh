@@ -122,7 +122,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 	-mono-app=SATWITHPRE \
 	-satsolver=[k_]w \
 	-pb=1 -pjp=999999 -pef=1 -mono=$f \
-	-jwl=$timeout -T=$(($timeout+30)) -wam=60``000 -pre-cleanup=1 \
+	-jwl=$timeout -T=$(($timeout+30)) -wam=10``000 -pre-cleanup=1 \
 	-q=1 -log=$globallogdir -tmp=$localtmpdir -comment-outputlogdir=$outputlogdir \
 	-sro=${globallogdir}/processed-jobs.out -trace-dir=${globallogdir}/ \
   -os=1 \

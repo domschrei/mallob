@@ -203,14 +203,14 @@ void SweepJob::appl_memoryPanic() {
 
 bool SweepJob::appl_isDestructible() {
 
-	if (_red) {
-		LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? no. _red active \n",  getId(),_my_rank);
-		return false;
-	}
-	if (_bcast && _bcast->hasReceivedBroadcast()) {
-		LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? no. _bcast active \n",  getId(),_my_rank);
-		return false;
-	}
+	// if (_red) {
+		// LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? no. _red active \n",  getId(),_my_rank);
+		// return false;
+	// }
+	// if (_bcast && _bcast->hasReceivedBroadcast()) {
+		// LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? no. _bcast active \n",  getId(),_my_rank);
+		// return false;
+	// }
 
 	if (_running_sweepers_count>0) {
 		LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? no. %i running sweepers \n",  getId(),_my_rank, _running_sweepers_count.load());
@@ -989,10 +989,10 @@ void SweepJob::cbContributeToAllReduce() {
 		_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
 	}
 
-	// if (_terminate_all) {
-		// LOG(V4_VVER, "SWEEP SHARE BCAST skip reduction, status is already _terminate_all\n");
-		// return;
-	// }
+	if (_terminate_all) {
+		LOG(V4_VVER, "SWEEP SHARE BCAST skip reduction, status is already _terminate_all\n");
+		return;
+	}
 
 	JobMessage baseMsg = getMessageTemplate();
 	baseMsg.tag = TAG_ALLRED;
@@ -1043,10 +1043,10 @@ void SweepJob::cbContributeToAllReduce() {
 
 	LOG(V4_VVER, "SWEEP SHARE REDUCE [%i] ~~~%i~~~(+%i)~~> to sharing \n", _my_rank, aggregation_element.size()-NUM_METADATA_FIELDS, NUM_METADATA_FIELDS);
 
-	// if (_terminate_all) {
-		// LOG(V4_VVER, "SWEEP SHARE BCAST skip contribution, seen already _terminate_all\n");
-		// return;
-	// }
+	if (_terminate_all) {
+		LOG(V4_VVER, "SWEEP SHARE BCAST skip contribution, seen already _terminate_all\n");
+		return;
+	}
 
 	_time_contribute.push_back(Timer::elapsedSeconds());
 
