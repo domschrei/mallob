@@ -88,6 +88,7 @@ void SweepJob::appl_start() {
 	}
 
 	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
+	_red.reset();
 
 	//Start individual Kissat threads (those then immediately jump into the sweep algorithm)
 	LOG(V2_INFO,"SWEEP JOB Create solvers\n");
@@ -313,7 +314,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			LOG(V3_VERB, "SWEEP JOB [%i](%i) waiting for other solvers to come online (%i/%i)\n", _my_rank, localId, _running_sweepers_count.load(), _nThreads);
 			usleep(5000); //5ms
 			if (_terminate_all || _external_termination) {
-				// LOG(V1_WARN, "Warn SWEEP [%i](%i): terminated while waiting in synchronization \n", _my_rank, localId);
+				LOG(V4_VVER, "SWEEP [%i](%i): terminated while waiting in synchronization \n", _my_rank, localId);
 				_running_sweepers_count--;
 				return;
 			}
