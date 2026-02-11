@@ -68,6 +68,7 @@ private:
 	//Sanity checks, Warn if periods get too large
 	float _last_received_sharing_time{0};
 	float _last_contribution_time{0};
+	float _last_sharedelay_warning{0};
 
     const int TAG_SEARCHING_WORK= 1001;
     const int TAG_RETURNING_STEAL_REQUEST = 1002;
@@ -183,6 +184,7 @@ public:
     void appl_communicate() override;
     void appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) override;
     void appl_terminate() override;
+    bool appl_isDestructible() override;
 
     int appl_solved() override            {return _solved_status;}
     JobResult&& appl_getResult() override {return std::move(_internal_result);}
@@ -190,7 +192,6 @@ public:
     void appl_suspend() override {}
     void appl_resume() override {}
     void appl_dumpStats() override {}
-    bool appl_isDestructible() override {return true;}
     void appl_memoryPanic() override;
 
     friend void cb_search_work_in_tree(void* SweepJob_state, unsigned **work, int *work_size, int local_id);
@@ -215,7 +216,7 @@ private:
 	// void readResult(KissatPtr shweeper, bool withStats);
 	// void serializeResultFormula(KissatPtr sweeper);
 
-	void gentlyTerminateSolvers();
+	void triggerTerminations();
 
 
 	void sendMPIWorkstealRequests();

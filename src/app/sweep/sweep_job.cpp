@@ -111,7 +111,7 @@ void SweepJob::appl_communicate() {
 
 	printIdleFraction();
 	checkSharingDelayHealth();
-	if (_bcast && _is_root)// Root: Update job tree snapshot in case your children changed
+	if (_bcast && _is_root && !_terminate_all)// Root: Update job tree snapshot in case your children changed
 		_bcast->updateJobTree(getJobTree());
 
 	sendMPIWorkstealRequests();
@@ -192,13 +192,65 @@ void SweepJob::appl_terminate() {
 	LOG(V2_INFO, "SWEEP [%i] (job #%i) got TERMINATE signal (appl_terminate()) \n", _my_rank,getId());
 	_terminate_all = true;
 	_external_termination = true;
-	gentlyTerminateSolvers();
+	triggerTerminations();
 }
 
 
 void SweepJob::appl_memoryPanic() {
 	LOG(V1_WARN, "[WARN] SWEEP [%i]: Memory panic! \n",_my_rank);
 }
+
+bool SweepJob::appl_isDestructible() {
+
+	if (_red) {
+		LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? no. _red active \n",  getId(),_my_rank);
+		return false;
+	}
+	if (_bcast && _bcast->hasReceivedBroadcast()) {
+		LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? no. _bcast active \n",  getId(),_my_rank);
+		return false;
+	}
+
+	if (_running_sweepers_count>0) {
+		LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? no. %i running sweepers \n",  getId(),_my_rank, _running_sweepers_count.load());
+		return false;
+	}
+
+
+	//all background workers are completely done, so joining them now should happen immediately (even doing it sequentially)
+	LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? yes. now joining... \n",  getId(),_my_rank);
+	int i=0;
+	for (auto &bg_worker : _bg_workers) {
+		if (bg_worker->isRunning()) {
+			LOG(V4_VVER, "SWEEP TERM #%i [%i] joining bg_worker    (%i) \n",  getId(),_my_rank, i);
+			bg_worker->stop();
+			LOG(V4_VVER, "SWEEP TERM #%i [%i] joined  bg_worker (%i) \n",  getId(),_my_rank, i);
+		}
+		i++;
+	}
+	LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? yes. all joined \n",  getId(),_my_rank);
+	return true;
+
+	// return _running_sweepers_count==0;
+
+	//When a sweeper background thread is finished, it deletes (as its last operation) the sweeper reference from
+	// for (auto &sweeper : _sweepers) {
+		// if (sweeper) return false;
+	// }
+	// return true;
+	// LOG(V4_VVER, "SWEEP TERM #%i [%i] joining bg_workers \n",  getId(),_my_rank);
+	// for (auto &bg_worker : _bg_workers) {
+		// if (bg_worker->isRunning()) {
+			// LOG(V4_VVER, "SWEEP TERM #%i [%i] joining bg_worker (%i) \n",  getId(),_my_rank, i);
+			// bg_worker->stop();
+			// LOG(V4_VVER, "SWEEP TERM #%i [%i] joined  bg_worker    (%i) \n",  getId(),_my_rank, i);
+		// }
+		// i++;
+	// }
+	// LOG(V4_VVER, "SWEEP TERM #%i [%i] joined all bg_workers \n", getId(),_my_rank);
+	// LOG(V4_VVER, "SWEEP TERM #%i [%i] DONE \n", getId(),_my_rank);
+}
+
 
 void SweepJob::checkForUnsatResults() {
 	//It can be a mess when non-root node start to suddenly report (UNSAT) results to Mallob (maybe even concurrently), instead they only internaly inform the root node who then manages the reporting
@@ -259,7 +311,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		 */
 		while (_running_sweepers_count < _nThreads) {
 			LOG(V3_VERB, "SWEEP JOB [%i](%i) waiting for other solvers to come online (%i/%i)\n", _my_rank, localId, _running_sweepers_count.load(), _nThreads);
-			usleep(10000); //10ms
+			usleep(5000); //5ms
 			if (_terminate_all || _external_termination) {
 				// LOG(V1_WARN, "Warn SWEEP [%i](%i): terminated while waiting in synchronization \n", _my_rank, localId);
 				_running_sweepers_count--;
@@ -317,15 +369,16 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		assert(res==UNKNOWN || res==UNSAT || log_return_false("SWEEP ERROR: solver has returned with unexpected signal %i \n", res));
 		//If no solver sets UNSAT or IMPROVED, the job will be returned by default as UNKNOWN
 
-		_running_sweepers_count--;
-		_sweepers[localId]->cleanUp(); //write kissat timing profile
-		_sweepers[localId].reset();  //this should delete the only persistent shared pointer on the solver, and thus trigger its destructor soon now
-		LOG(V3_VERB, "SWEEP JOB [%i](%i) WORKER EXIT\n", _my_rank, localId);
-
-		// if (_localId==_representative_localId) {
-		if (_running_sweepers_count==0) { //the last solver should report resweeps, as only then they are gathered from all exited solvers
+		if (_running_sweepers_count==1) { //the last solver should report resweeps, as only then they are gathered from all exited solvers
 			printResweeps();
 		}
+
+		_sweepers[localId]->cleanUp(); //write kissat timing profile
+		_sweepers[localId].reset();  //this should delete the only persistent shared pointer on the solver, and thus trigger its destructor soon
+		_running_sweepers_count--;
+		LOG(V3_VERB, "SWEEP JOB [%i](%i) WORKER EXIT, %i left \n", _my_rank, localId, _running_sweepers_count.load());
+
+		// if (_localId==_representative_localId) {
 	});
 }
 
@@ -563,7 +616,15 @@ void SweepJob::printIdleFraction() {
 
 void SweepJob::checkSharingDelayHealth() {
 	constexpr float MAX_DELAY_FACTOR = 3;
+	constexpr float WARNING_PERIOD = 0.5;
 	float time = Timer::elapsedSeconds();
+
+	// if (time - _last_sharedelay_warning < WARNING_PERIOD) {
+		// return;
+	// }
+
+	// _last_sharedelay_warning = time;
+
 	float period = _params.sweepSharingPeriod.val;
 	if (!_time_contribute.empty()) {
 		float delay = time - _time_contribute.back();
@@ -606,10 +667,10 @@ void SweepJob::printResweeps() {
 }
 
 void SweepJob::sendMPIWorkstealRequests() {
-	//Worksteal requests need to be execute by the MPI main thread, as it can be problematic if the kissat-threads issue MPI messages in the callback on their own
-	//Thus the solver-threads only write a request in shared memory, which is then picked up here by the main MPI thread
+	//Worksteal requests need to be send by the MPI *main* thread, as it can be problematic if the kissat-threads themselves issue MPI messages on their own, since this clashes somehow with the MPI structure/hierarchy
+	//Instead, the solver-threads write a request in the shared memory, and the main MPI thread picks up the request and sends it
 	for (auto &request : _worksteal_requests) {
-		if (!request.sent) {
+		if (!request.sent && !_terminate_all) {
 			request.sent = true;
 			JobMessage msg = getMessageTemplate();
 			msg.tag = TAG_SEARCHING_WORK;
@@ -866,6 +927,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 
 
 void SweepJob::initiateNewSharingRound() {
+	assert(_is_root); //only the root node initiates sharing rounds
 	if (!_bcast) {
 		LOG(V1_WARN, "SWEEP Warn : SHARE BCAST root couldn't initiate sharing round, _bcast is Null\n");
 		return;
@@ -876,14 +938,13 @@ void SweepJob::initiateNewSharingRound() {
 		return;
 	}
 
-// #if STARTUP_TYPE == 2
 	if (!_started_synchronized_solving) {
 		LOG(V3_VERB, "SWEEP SHARE BCAST: Delaying first sharing operation, not all solvers online yet (%i/%i) \n", _running_sweepers_count.load(), _nThreads);
 		return;
 	}
-// #endif
 
 	//make sure that only one sharing operation is going on at a time
+	//on this root node, hasReceivedBroadcast is equivalent to asking whether this _bcast object has already started a broadcast
 	if (_bcast->hasReceivedBroadcast()) {
 		LOG(V3_VERB, "SWEEP SHARE BCAST: New sharing round delayed, old round is not completed yet\n");
 		return;
@@ -916,6 +977,7 @@ void SweepJob::appendMetadataToReductionElement(std::vector<int> &contrib, int i
 void SweepJob::cbContributeToAllReduce() {
 	assert(_bcast);
 	assert(_bcast->hasResult());
+	//bcast hasResult present means that this Process got responses from all its children, so the tree structure is correctly known, and we can continue with a contribution and reduction
 
 	LOG(V4_VVER, "SWEEP SHARE BCAST Callback to AllReduce\n");
 	auto snapshot = _bcast->getJobTreeSnapshot();
@@ -927,10 +989,8 @@ void SweepJob::cbContributeToAllReduce() {
 
 	if (! _is_root) {
 		LOG(V4_VVER, "SWEEP SHARE [%i] RESET non-root BCAST\n", _my_rank);
-		_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(),
-			[this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
-		//root is reset only after the whole reduction result is broadcasted, to prevent starting a new one while the old one is still running
-		//(might change this to add overlapping broadcasts later for faster turnovers, but for now keep only one for cleaner debugging)
+		//all non-root processes prepare their broadcast object to be ready to receive the next broadcast
+		_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
 	}
 
 
@@ -1044,7 +1104,7 @@ void SweepJob::advanceAllReduction() {
 
 	LOG(V2_INFO, "SWEEP import sharing round %i got: %i EQS, %i UNITS. idle: %i/%i \n", _available_import_round.load(), eq_size/2, unit_size, _lastIdleCount, _nThreads);
 
-	//Now we can prepare a new sharing operation starting from the root node, because the old sharing (broadcast + allreduce) is now finished
+	//Now we can prepare a new sharing operation, starting from the root node. because the old sharing (broadcast + allreduce) is now finished
 	if (_is_root) {
 		LOG(V4_VVER, "SWEEP SHARE [%i] RESET root BCAST\n", _my_rank);
 		_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(),
@@ -1052,6 +1112,8 @@ void SweepJob::advanceAllReduction() {
 	}
 
 	LOG(V4_VVER, "SWEEP SHARE [%i] RESET REDUCE\n", _my_rank);
+	//Reduction is finished. Contrary to the bcast, we dont need to directly re-create a new reduction object, but can leave it at null.
+	//The new reduction object will be only created when needed when a new broadcast is present (and completed)
 	_red.reset();
 
 
@@ -1059,6 +1121,7 @@ void SweepJob::advanceAllReduction() {
 		LOG(V1_WARN, "[%i] got sharing info: sweep round %i finished \n", _my_rank, sweep_round);
 	}
 
+	//We received the termination signal via the app-internal data sharing
 	if (terminate) {
 		_terminate_all = true;
 		LOG(V1_WARN, "# \n # \n # --- [%i] got terminate flag, TERMINATING SWEEP JOB ---\n # \n", _my_rank);
@@ -1285,48 +1348,40 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 	}
 }
 
-void SweepJob::gentlyTerminateSolvers() {
-	LOG(V4_VVER, "SWEEP TERM #%i [%i] interrupting solvers\n", getId(), _my_rank);
-
-	// while () {
-		// LOG(V1_WARN, "Warn SWEEP JOB [%i]: delaying destructors until sweepers are all cleanly initialized (until now init %i/%i)\n",
-			// _my_rank, _started_sweepers_count.load(), _nThreads);
-		// usleep(500);
-	// }
-	//each sweeper checks constantly for the interruption signal (on the ms scale or faster), allow for gentle own exit
-	while (_started_sweepers_count < _nThreads || _running_sweepers_count>0) {
-		LOG(V4_VVER, "SWEEP TERM #%i [%i] still %i solvers running\n", getId(), _my_rank, _running_sweepers_count.load());
-		int i=0;
-		for (auto &sweeper : _sweepers) {
-			if (sweeper) {
-				sweeper->triggerSweepTerminate();
-				LOG(V4_VVER, "SWEEP TERM #%i [%i] terminating solver (%i)\n", getId(), _my_rank, i);
-			}
-			i++;
-		}
-		usleep(2000);
-	}
-	LOG(V4_VVER, "SWEEP TERM #%i [%i] no more solvers running\n", getId(), _my_rank);
-
-	usleep(500);
+void SweepJob::triggerTerminations() {
+	LOG(V4_VVER, "SWEEP TERM #%i [%i] trigger solver terminations \n", getId(), _my_rank);
 
 	int i=0;
-	LOG(V4_VVER, "SWEEP TERM #%i [%i] joining bg_workers \n",  getId(),_my_rank);
-	for (auto &bg_worker : _bg_workers) {
-		if (bg_worker->isRunning()) {
-			LOG(V4_VVER, "SWEEP TERM #%i [%i] joining bg_worker (%i) \n",  getId(),_my_rank, i);
-			bg_worker->stop();
-			LOG(V4_VVER, "SWEEP TERM #%i [%i] joined  bg_worker    (%i) \n",  getId(),_my_rank, i);
+	for (auto &sweeper : _sweepers) {
+		if (sweeper) {
+			sweeper->triggerSweepTerminate();
+			LOG(V4_VVER, "SWEEP TERM #%i [%i] trigger solver (%i) termination \n", getId(), _my_rank, i);
 		}
 		i++;
 	}
-	LOG(V4_VVER, "SWEEP TERM #%i [%i] joined all bg_workers \n", getId(),_my_rank);
-	LOG(V4_VVER, "SWEEP TERM #%i [%i] DONE \n", getId(),_my_rank);
+
+	//each sweeper checks constantly for the interruption signal (on the ms scale or faster), allow for gentle own exit
+	// while (_started_sweepers_count < _nThreads || _running_sweepers_count>0) {
+		// LOG(V4_VVER, "SWEEP TERM #%i [%i] still %i solvers running\n", getId(), _my_rank, _running_sweepers_count.load());
+		// int i=0;
+		// for (auto &sweeper : _sweepers) {
+			// if (sweeper) {
+				// sweeper->triggerSweepTerminate();
+				// LOG(V4_VVER, "SWEEP TERM #%i [%i] terminating solver (%i)\n", getId(), _my_rank, i);
+			// }
+			// i++;
+		// }
+		// usleep(2000);
+	// }
+	// LOG(V4_VVER, "SWEEP TERM #%i [%i] no more solvers running\n", getId(), _my_rank);
+
+	// usleep(500);
+
 }
 
 SweepJob::~SweepJob() {
 	LOG(V4_VVER, "SWEEP JOB DESTRUCTOR ENTERED \n");
-	gentlyTerminateSolvers();
+	// triggerTerminations();
 	LOG(V4_VVER, "SWEEP JOB DESTRUCTOR DONE\n");
 }
 
