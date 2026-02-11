@@ -600,7 +600,7 @@ void SweepJob::printIdleFraction() {
 	int idles = 0;
 	int active = 0;
 	std::ostringstream oss;
-	for (auto sweeper : _sweepers) {
+	for (auto &sweeper : _sweepers) {
 		if (sweeper) {
 			active++;
 			if (sweeper->sweeper_is_idle) {
@@ -611,7 +611,7 @@ void SweepJob::printIdleFraction() {
 	}
 	_lastIdleCount = idles;
 	if (active>0)
-		LOG(V3_VERB, "SWEEP IDLE  %i/%i : %s \n", idles, active, oss.str().c_str());
+		LOG(V3_VERB, "SWEEP IDLE/Active/Running/Started %i/%i/%i/%i. idles %s \n", idles, active,_running_sweepers_count.load(), _started_sweepers_count.load(), oss.str().c_str());
 }
 
 void SweepJob::checkSharingDelayHealth() {
@@ -982,17 +982,16 @@ void SweepJob::cbContributeToAllReduce() {
 	LOG(V4_VVER, "SWEEP SHARE BCAST Callback to AllReduce\n");
 	auto snapshot = _bcast->getJobTreeSnapshot();
 
-	if (_terminate_all) {
-		LOG(V4_VVER, "SWEEP SHARE BCAST skip reduction, status is already _terminate_all\n");
-		return;
-	}
-
 	if (! _is_root) {
 		LOG(V4_VVER, "SWEEP SHARE [%i] RESET non-root BCAST\n", _my_rank);
-		//all non-root processes prepare their broadcast object to be ready to receive the next broadcast
+		//Prepare all non-root processes to be ready to receive the next broadcast
 		_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
 	}
 
+	// if (_terminate_all) {
+		// LOG(V4_VVER, "SWEEP SHARE BCAST skip reduction, status is already _terminate_all\n");
+		// return;
+	// }
 
 	JobMessage baseMsg = getMessageTemplate();
 	baseMsg.tag = TAG_ALLRED;
@@ -1043,10 +1042,10 @@ void SweepJob::cbContributeToAllReduce() {
 
 	LOG(V4_VVER, "SWEEP SHARE REDUCE [%i] ~~~%i~~~(+%i)~~> to sharing \n", _my_rank, aggregation_element.size()-NUM_METADATA_FIELDS, NUM_METADATA_FIELDS);
 
-	if (_terminate_all) {
-		LOG(V4_VVER, "SWEEP SHARE BCAST skip contribution, seen already _terminate_all\n");
-		return;
-	}
+	// if (_terminate_all) {
+		// LOG(V4_VVER, "SWEEP SHARE BCAST skip contribution, seen already _terminate_all\n");
+		// return;
+	// }
 
 	_time_contribute.push_back(Timer::elapsedSeconds());
 
@@ -1104,7 +1103,7 @@ void SweepJob::advanceAllReduction() {
 
 	LOG(V2_INFO, "SWEEP import sharing round %i got: %i EQS, %i UNITS. idle: %i/%i \n", _available_import_round.load(), eq_size/2, unit_size, _lastIdleCount, _nThreads);
 
-	//Now we can prepare a new sharing operation, starting from the root node. because the old sharing (broadcast + allreduce) is now finished
+	//prepare the next sharing round, which gets started from the root node
 	if (_is_root) {
 		LOG(V4_VVER, "SWEEP SHARE [%i] RESET root BCAST\n", _my_rank);
 		_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(),
