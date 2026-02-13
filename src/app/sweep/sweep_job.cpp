@@ -225,10 +225,10 @@ bool SweepJob::appl_isDestructible() {
 		// return false;
 	// }
 
-	if (! _finished_job_setup) {
-		LOG(V2_INFO, "SWEEP TERM #%i [%i] isDestructible? no. Job Setup not even finished \n",  getId(),_my_rank);
-		return false;
-	}
+	// if (! _finished_job_setup) {
+		// LOG(V2_INFO, "SWEEP TERM #%i [%i] isDestructible? no. Job Setup not even finished \n",  getId(),_my_rank);
+		// return false;
+	// }
 
 	if (_running_sweepers_count>0) {
 		LOG(V2_INFO, "SWEEP TERM #%i [%i] isDestructible? no. %i running sweepers \n",  getId(),_my_rank, _running_sweepers_count.load());

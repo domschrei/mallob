@@ -77,6 +77,10 @@ public:
 private:
     void run() {
 
+        //Nicco reminder
+        Watchdog _watchdog(true, 1'000);
+        _watchdog.setAbortPeriod(10'000);
+
         auto lg = Logger::getMainInstance().copy("<Janitor>", ".janitor");
         LOGGER(lg, V3_VERB, "tid=%lu\n", Proc::getTid());
         
@@ -113,6 +117,8 @@ private:
             }
 
             if (!_worker.continueRunning()) usleep(1000); // wait for last jobs to finish
+            _watchdog.reset();
         }
+
     }
 };
