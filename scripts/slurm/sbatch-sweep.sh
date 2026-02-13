@@ -40,9 +40,12 @@ export MALLOC_CONF="thp:always"
 # HOME
 globallogdir_base="/logs/$DS_JOBNAME-$SLURM_JOB_ID"
 # WORK
-if [ -d "$WORK_$DS_PROJECTNAME" ]; then globallogdir_base="$WORK_$DS_PROJECTNAME/$globallogdir_base"; fi
+# if [ -d "$WORK_$DS_PROJECTNAME" ]; then globallogdir_base="$WORK_$DS_PROJECTNAME/$globallogdir_base"; fi
 # SCRATCH
 #if [ -d "$SCRATCH" ]; then globallogdir_base="$SCRATCH/$globallogdir_base"; fi
+# HOME
+globallogdir_base="$HOME/$globallogdir_base"
+
 
 # Directories for writing and for storing logs
 localtmpdir_base=/tmp/$DS_JOBNAME-$SLURM_JOB_ID # fast local disk
