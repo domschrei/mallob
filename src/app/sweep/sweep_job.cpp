@@ -18,7 +18,7 @@ SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTa
 {
 	assert(_params.jobCommUpdatePeriod() > 0 || log_return_false("[ERROR] For this application to work,"
             " you must explicitly enable job communicators with the -jcup option, e.g., -jcup=0.1\n"));
-	LOG(V2_INFO, "New SweepJob MPI Process rank %i with %i threads\n", getJobTree().getRank(), params.numThreadsPerProcess.val);
+	LOG(V2_INFO, "New SweepJob MPI Process rank [%i] with %i threads\n", getJobTree().getRank(), params.numThreadsPerProcess.val);
 }
 
 
@@ -101,7 +101,7 @@ void SweepJob::appl_start() {
 	_internal_result.revision = getRevision();
 
 	LOG(V2_INFO, "SWEEP JOB appl_start() FINISHED\n");
-	// _finished_job_setup = true;
+	_finished_job_setup = true;
 }
 
 
@@ -225,14 +225,19 @@ bool SweepJob::appl_isDestructible() {
 		// return false;
 	// }
 
+	if (! _finished_job_setup) {
+		LOG(V2_INFO, "SWEEP TERM #%i [%i] isDestructible? no. Job Setup not even finished \n",  getId(),_my_rank);
+		return false;
+	}
+
 	if (_running_sweepers_count>0) {
-		LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? no. %i running sweepers \n",  getId(),_my_rank, _running_sweepers_count.load());
+		LOG(V2_INFO, "SWEEP TERM #%i [%i] isDestructible? no. %i running sweepers \n",  getId(),_my_rank, _running_sweepers_count.load());
 		return false;
 	}
 
 
 	//all background workers are completely done, so joining them now should happen immediately (even doing it sequentially)
-	LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? yes. now joining... \n",  getId(),_my_rank);
+	LOG(V2_INFO, "SWEEP TERM #%i [%i] isDestructible? yes. now joining... \n",  getId(),_my_rank);
 	int i=0;
 	for (auto &bg_worker : _bg_workers) {
 		if (bg_worker->isRunning()) {
@@ -643,8 +648,8 @@ void SweepJob::checkSharingDelayHealth() {
 	if (!_time_contribute.empty()) {
 		float delay = time - _time_contribute.back();
 		if (delay > period*MAX_DELAY_FACTOR) {
-			//Log in the main log file to see it there chronologically correct and interleaved with the other information,
-			//and log it separately also in a .warn file, to easily grep it during evaluation, without needing to grep through the (much larger) main log file
+			//We log two times. Once in the main log file to see the information chronologically correct interleaved with the other logs
+			//and onces separately in a .warn file for faster grepping during post-processing, where we would like to avoid to grep through the main logs
 			LOG(				V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since last contribution (target period %f sec), delay factor %.1f \n", _my_rank, delay, period, delay/period);
 			LOGGER(_warnlogger, V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since last contribution (target period %f sec), delay factor %.1f \n", _my_rank, delay, period, delay/period);
 		}
@@ -1363,7 +1368,7 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 }
 
 void SweepJob::triggerTerminations() {
-	LOG(V4_VVER, "SWEEP TERM #%i [%i] trigger solver terminations \n", getId(), _my_rank);
+	LOG(V2_INFO, "SWEEP TERM #%i [%i] trigger solver terminations \n", getId(), _my_rank);
 
 	int i=0;
 	for (auto &sweeper : _sweepers) {

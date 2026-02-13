@@ -19,6 +19,7 @@ private:
     int _solved_status{-1};
 	bool _do_report_UNSAT_to_root{false};
 	std::atomic_bool _root_reported_unsat{false};
+	bool _finished_job_setup{false};
 
     int _my_rank{0};
     int _my_index{0};
