@@ -79,13 +79,16 @@ private:
 
         //Nicco reminder
         Watchdog _watchdog(true, 1'000);
-        _watchdog.setAbortPeriod(10'000);
+        _watchdog.setAbortPeriod(5'000);
 
         auto lg = Logger::getMainInstance().copy("<Janitor>", ".janitor");
         LOGGER(lg, V3_VERB, "tid=%lu\n", Proc::getTid());
-        
+
+        LOG(V4_VVER, "JGC: entered, tid=%lu\n", Proc::getTid());
+
         while (_worker.continueRunning() || _num_stored_jobs > 0) {
 
+            LOG(V4_VVER, "JGC: _worker.continueRunning() %i, _num_stored_jobs %i \n", _worker.continueRunning(), _num_stored_jobs.load());
             std::list<Job*> copy;
             {
                 // Try to fetch the current jobs to free
@@ -105,18 +108,22 @@ private:
             }
 
             LOGGER(lg, V5_DEBG, "Found %i job(s) to delete\n", copy.size());
-            
+            LOG(V4_VVER, "JGC: Found %i job(s) to delete\n", copy.size());
+
             // Free each job
             for (Job* job : copy) {
                 int id = job->getId();
-                LOGGER(lg, V5_DEBG, "DELETE #%i\n", id);
+                LOGGER(lg, V4_VVER, "DELETE #%i\n", id);
                 delete job;
                 LOGGER(lg, V4_VVER, "DELETED #%i\n", id);
                 Logger::getMainInstance().mergeJobLogs(id);
                 _num_stored_jobs--;
+                LOG(V4_VVER, "JGC: Now %i _num_stored_jobs remaining \n", _num_stored_jobs.load());
             }
 
             if (!_worker.continueRunning()) usleep(1000); // wait for last jobs to finish
+
+            //Nicco reminder
             _watchdog.reset();
         }
 

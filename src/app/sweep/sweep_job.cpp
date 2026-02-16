@@ -18,7 +18,7 @@ SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTa
 {
 	assert(_params.jobCommUpdatePeriod() > 0 || log_return_false("[ERROR] For this application to work,"
             " you must explicitly enable job communicators with the -jcup option, e.g., -jcup=0.1\n"));
-	LOG(V2_INFO, "New SweepJob MPI Process rank [%i] with %i threads\n", getJobTree().getRank(), params.numThreadsPerProcess.val);
+	LOG(V2_INFO, "New SweepJob MPI Process rank [%i] with %i threads, ctx %i \n", getJobTree().getRank(), params.numThreadsPerProcess.val, getJobTree().getContextId());
 }
 
 
@@ -47,6 +47,7 @@ void SweepJob::appl_start() {
 	_started_appl_start = true;
 	_my_rank = getJobTree().getRank();
 	_my_index = getJobTree().getIndex();
+	_my_ctx_id = getJobTree().getContextId();
 	_is_root = getJobTree().isRoot();
 	_nThreads = _params.numThreadsPerProcess.val;
 	LOG(V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d\n",
@@ -1377,7 +1378,7 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 }
 
 void SweepJob::triggerTerminations() {
-	LOG(V2_INFO, "SWEEP TERM #%i [%i] trigger solver terminations \n", getId(), _my_rank);
+	LOG(V2_INFO, "SWEEP TERM #%i [%i] trigger solver terminations (ctx %i) \n", getId(), _my_rank, _my_ctx_id);
 
 	int i=0;
 	for (auto &sweeper : _sweepers) {
@@ -1408,7 +1409,7 @@ void SweepJob::triggerTerminations() {
 }
 
 SweepJob::~SweepJob() {
-	LOG(V4_VVER, "SWEEP JOB DESTRUCTOR ENTERED \n");
+	LOG(V4_VVER, "SWEEP JOB DESTRUCTOR ENTERED (ctx %i) \n", _my_ctx_id);
 	// triggerTerminations();
 	LOG(V4_VVER, "SWEEP JOB DESTRUCTOR DONE\n");
 }

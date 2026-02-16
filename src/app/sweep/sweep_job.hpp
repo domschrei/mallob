@@ -24,9 +24,11 @@ private:
 	bool _started_appl_start{false};
     int _my_rank{0};
     int _my_index{0};
+	int _my_ctx_id{0};
     bool _is_root{false};
     uint8_t* _metadata; //serialized description
 	int _numVars{0};
+
 
 	const int _representative_localId{0}; //a dedicated solver that reports its statistics to us
 	const int _congruence_localId{1};
