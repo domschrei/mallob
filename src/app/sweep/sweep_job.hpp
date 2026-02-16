@@ -21,6 +21,7 @@ private:
 	std::atomic_bool _root_reported_unsat{false};
 	bool _finished_job_setup{false};
 
+	bool _started_appl_start{false};
     int _my_rank{0};
     int _my_index{0};
     bool _is_root{false};
@@ -37,6 +38,7 @@ private:
 	std::vector<std::unique_ptr<BackgroundWorker>> _bg_workers;
     std::atomic_int _started_sweepers_count {0};
     std::atomic_int _running_sweepers_count {0};
+	std::atomic_int _finished_sweepers_count {0};
 	std::vector<int> _list_of_ids;
 	bool _started_synchronized_solving{false};
 	int _lastIdleCount{0};

@@ -93,7 +93,7 @@ void ForkedSatJob::loadIncrements() {
     int lastRev = desc.getRevision();
     std::vector<SatProcessAdapter::RevisionData> revisions;
     
-    LOG(V4_VVER, "§ Job (%i) loadIncrements: _last_imported_revision = %i, lastRev = %i  \n", getId(), _last_imported_revision, lastRev);
+    // LOG(V4_VVER, "§ Job (%i) loadIncrements: _last_imported_revision = %i, lastRev = %i  \n", getId(), _last_imported_revision, lastRev);
 
     while (_last_imported_revision < lastRev) {
         if (desc.isRevisionIncomplete(_last_imported_revision+1) && !canHandleIncompleteRevision(_last_imported_revision+1))
@@ -179,7 +179,7 @@ int ForkedSatJob::appl_solved() {
     // Did a solver find a result?
     _solver->setDesiredRevision(getDesiredRevision());
 
-    LOG(V4_VVER, "§ ForkedSatJob (%i) check() \n", getId());
+    // LOG(V4_VVER, "§ ForkedSatJob (%i) check() \n", getId());
     auto status = _solver->check();
     if (status == SatProcessAdapter::FOUND_RESULT) {
         _internal_result = std::move(_solver->getSolution());

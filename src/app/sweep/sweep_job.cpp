@@ -44,6 +44,7 @@ void SweepJob::appl_start() {
 		LOG(V2_INFO,"Skip SWEEP JOB, as sweepRounds==0");
 		return;
 	}
+	_started_appl_start = true;
 	_my_rank = getJobTree().getRank();
 	_my_index = getJobTree().getIndex();
 	_is_root = getJobTree().isRoot();
@@ -101,7 +102,7 @@ void SweepJob::appl_start() {
 	_internal_result.revision = getRevision();
 
 	LOG(V2_INFO, "SWEEP JOB appl_start() FINISHED\n");
-	_finished_job_setup = true;
+	// _finished_job_setup = true;
 }
 
 
@@ -230,8 +231,9 @@ bool SweepJob::appl_isDestructible() {
 		// return false;
 	// }
 
-	if (_running_sweepers_count>0) {
-		LOG(V2_INFO, "SWEEP TERM #%i [%i] isDestructible? no. %i running sweepers \n",  getId(),_my_rank, _running_sweepers_count.load());
+	int _running_sweepers = _started_sweepers_count - _finished_sweepers_count;
+	if (_finished_sweepers_count < _nThreads) {
+		LOG(V2_INFO, "SWEEP TERM #%i [%i] isDestructible? no. only %i/%i finished, %i running \n",  getId(),_my_rank, _finished_sweepers_count.load(), _nThreads, _running_sweepers);
 		return false;
 	}
 
@@ -328,12 +330,15 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		 *  This is relevant for sweeping quality, as otherwise the solvers joining late might miss some of the equalities shared in the first rounds
 		 *  Alternatively, store all the shared information as a warmup-greeting-package for newly joining solvers, to maximize quality. But only relevant if the SweepJob grows with time, which is not currently the case.
 		 */
-		while (_running_sweepers_count < _nThreads) {
-			LOG(V3_VERB, "SWEEP JOB [%i](%i) waiting for other solvers to come online (%i/%i)\n", _my_rank, localId, _running_sweepers_count.load(), _nThreads);
+		while (_started_sweepers_count < _nThreads) {
+			LOG(V3_VERB, "SWEEP JOB [%i](%i) waiting for other solvers to come online (started %i/%i)\n", _my_rank, localId, _started_sweepers_count.load(), _nThreads);
 			usleep(5000); //5ms
 			if (_terminate_all || _external_termination) {
 				LOG(V4_VVER, "SWEEP [%i](%i): terminated while waiting in synchronization \n", _my_rank, localId);
 				_running_sweepers_count--;
+				_finished_sweepers_count++;
+				//added this release, maybe we left some memory somewhere when terminating here early
+				kissat_release(sweeper->solver);
 				return;
 			}
 		}
@@ -395,6 +400,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		_sweepers[localId]->cleanUp(); //write kissat timing profile
 		_sweepers[localId].reset();  //this should delete the only persistent shared pointer on the solver, and thus trigger its destructor soon
 		_running_sweepers_count--;
+		_finished_sweepers_count++;
 		LOG(V3_VERB, "SWEEP JOB [%i](%i) WORKER EXIT, %i left \n", _my_rank, localId, _running_sweepers_count.load());
 
 		// if (_localId==_representative_localId) {
@@ -431,7 +437,7 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	float t1 = Timer::elapsedSeconds();
 	float init_dur_ms =  (t1 - t0)*1000;
 	const float WARN_init_dur = 50; //Usual initializations take 0.2ms in the Sat Solver Subprocess and 4-25ms  in the sweep job (for some weird reasons), but should never be above ~30ms
-	LOG(V3_VERB, "SWEEP STARTUP [%i](%i) kissat init %f ms (%i/%i online)\n", _my_rank, localId, init_dur_ms, _running_sweepers_count.load(), _nThreads);
+	LOG(V3_VERB, "SWEEP STARTUP [%i](%i) kissat init %.2f ms (%i/%i running, %i started)\n", _my_rank, localId, init_dur_ms, _running_sweepers_count.load(), _nThreads, _started_sweepers_count.load());
 	if (init_dur_ms > WARN_init_dur) {
 		LOG(V1_WARN, "SWEEP Warn STARTUP [%i](%i): kissat init took unusually long, %f ms !\n", _my_rank, localId, init_dur_ms);
 	}
@@ -630,14 +636,17 @@ void SweepJob::printIdleFraction() {
 	}
 	_lastIdleCount = idles;
 	if (active>0)
-		LOG(V3_VERB, "SWEEP IDLE/Active/Running/Started %i/%i/%i/%i. idles %s \n", idles, active,_running_sweepers_count.load(), _started_sweepers_count.load(), oss.str().c_str());
+		LOG(V3_VERB, "SWEEP Active %i, Running %i, Idle %i, Started %i. idle nrs: %s \n", active, _running_sweepers_count.load(), idles,  _started_sweepers_count.load(), oss.str().c_str());
 }
 
 void SweepJob::checkSharingDelayHealth() {
-	constexpr float MAX_DELAY_FACTOR = 3;
+	constexpr float MAX_DELAY_FACTOR = 6;
 	constexpr float WARNING_PERIOD = 0.5;
 	float time = Timer::elapsedSeconds();
 
+	// if (_terminate_all) {
+		// return; //nothing to check anymore
+	// }
 	// if (time - _last_sharedelay_warning < WARNING_PERIOD) {
 		// return;
 	// }

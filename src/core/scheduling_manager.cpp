@@ -1352,18 +1352,20 @@ void SchedulingManager::triggerMemoryPanic() {
 
 SchedulingManager::~SchedulingManager() {
 
+    LOG(V4_VVER, "SchedulingManager: enter destructor\n");
     // Suspend current job (if applicable) to compute last slice of busy time
     if (_job_registry.hasActiveJob()) 
         setLoad(0, _job_registry.getActive().getId());
 
     // Setup a watchdog to get feedback on hanging destructors
     Watchdog watchdog(/*enabled=*/_params.watchdog(), /*checkIntervMillis=*/300, false);
-    watchdog.setWarningPeriod(1100);
-    watchdog.setAbortPeriod(60*1000);
+    watchdog.setWarningPeriod(1000);
+    watchdog.setAbortPeriod(10*1000);
     
     // Forget each job, move raw pointer to destruct queue
     for (int jobId : _job_registry.collectAllJobs()) {
         eraseJobAndQueueForDeletion(get(jobId));
+        LOG(V4_VVER, "SchedulingManager: jobid %i to destruct queue \n", jobId);
         watchdog.reset();
     }
 
@@ -1373,6 +1375,7 @@ SchedulingManager::~SchedulingManager() {
     // (otherwise we might prevent another node from terminating).
     auto& q = MyMpi::getMessageQueue();
     while (_job_registry.hasJobsLeftToDelete() || q.hasOpenSends() || q.hasOpenRecvFragments()) {
+        LOG(V4_VVER, "SchedulingManager: looping in destruct queue \n");
         q.advance();
         checkOldJobs();
         forgetOldJobs();
