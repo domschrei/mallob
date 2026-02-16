@@ -64,8 +64,13 @@ void SweepJob::appl_start() {
     _reslogger = Logger::getMainInstance().copy("<RESULT>", ".sweep");
     _warnlogger = Logger::getMainInstance().copy("<WARN>", ".warn");
 
-	//do not trigger a send on the initial dummy worksteal requests
 	_worksteal_requests.resize(_nThreads);
+	// _worksteal_requests.resize(_nThreads);
+	// for (int i = 0; i < _nThreads; ++i) {
+		// _worksteal_requests.emplace_back();
+	// }
+
+	//do not send the initial placeholder worksteal requests
 	for (auto &request : _worksteal_requests) {
 		request.sent = true;
 	}
@@ -721,11 +726,11 @@ void SweepJob::sendMPIWorkstealRequests() {
 			//So as a backup for the receiving rank, we also provide our contextId
 			int myContexId = getJobComm().getContextIdOrZero(_my_index);
 			//Update: and for similar reason we also send our treeIndex
-			msg.payload = {request.localId, myContexId, _my_index};
+			msg.payload = {request.senderLocalId, myContexId, _my_index};
 			assert(msg.payload.size() == NUM_SEARCHING_WORK_FIELDS);
 			// LOG(V2_INFO, "Rank %i asks rank %i for work\n", _my_rank, recv_rank, n);
 			// LOG(V2_INFO, "  with destionation ctx_id %i \n", msg.contextIdOfDestination);
-			LOG(V3_VERB, "SWEEP MSG [%i](%i) ---?---> [%i] \n", _my_rank, request.localId, request.targetRank);
+			LOG(V3_VERB, "SWEEP MSG [%i](%i) ---?---> [%i] \n", _my_rank, request.senderLocalId, request.targetRank);
 			getJobTree().send(request.targetRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 		}
 	}
@@ -925,11 +930,13 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		//Request will be handled by the MPI main thread, which will send an MPI message on our behalf
 		//because here we are in code executed by the kissat thread, which can cause problems for sending MPI messages
 		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop --> global steal to [%i] \n", _my_rank, localId, targetRank);
-		WorkstealRequest request;
-		request.localId = localId;
-		request.targetIndex = targetIndex;
-		request.targetRank = targetRank;
-		_worksteal_requests[localId] = request;
+		// WorkstealRequest request;
+		// request.localId = localId;
+		// request.targetIndex = targetIndex;
+		// request.targetRank = targetRank;
+		// _worksteal_requests[localId] = request;
+		_worksteal_requests[localId].prepareNew(localId, targetIndex, targetRank);
+
 		//Wait here until we get back an MPI message
 		unsigned reps=0;
 		while( ! _worksteal_requests[localId].got_steal_response) {

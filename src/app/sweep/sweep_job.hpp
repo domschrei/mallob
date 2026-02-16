@@ -3,6 +3,7 @@
 #define DOMPASCH_MALLOB_SWEEP_JOB_HPP
 
 #include <shared_mutex>
+#include <deque>
 
 #include "app/job.hpp"
 #include "../sat/solvers/kissat.hpp"
@@ -55,14 +56,23 @@ private:
 	SplitMix64Rng _rng;
     std::atomic_bool _root_provided_initial_work=false;
 	struct WorkstealRequest {
-		int localId{-1};
+		int senderLocalId{-1};
 		int targetIndex{-1};
 		int targetRank{-1};
 		bool sent{false};
 		std::atomic_bool got_steal_response{false};
 		std::vector<int> stolen_work{};
+
+		void prepareNew(int _senderLocalId, int _targetIndex, int _targetRank) noexcept {
+				senderLocalId = _senderLocalId;
+				targetIndex = _targetIndex;
+				targetRank = _targetRank;
+				sent = false;
+				got_steal_response = false;
+				stolen_work.clear();
+		}
 	};
-	std::vector<WorkstealRequest> _worksteal_requests;
+	std::deque<WorkstealRequest> _worksteal_requests;
 
 
 	//Sharing Equivalences and Units
