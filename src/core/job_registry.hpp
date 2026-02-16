@@ -31,6 +31,7 @@ private:
     LatencyReport _latency_report;
 
     bool _memory_panic {false};
+    bool _terminating {false};
 
 public:
     JobRegistry(Parameters& params, MPI_Comm& comm) : _params(params), _comm(comm) {}
@@ -139,10 +140,12 @@ public:
         return _load;
     }
 
-    bool hasDormantRoot() const {
+    bool hasDormantRoot(int* outIdOrNull = nullptr) const {
         for (auto& [_, job] : _jobs) {
-            if (job->getJobTree().isRoot() && job->getState() == SUSPENDED) 
+            if (job->getJobTree().isRoot() && job->getState() == SUSPENDED) {
+                if (outIdOrNull) *outIdOrNull = job->getId();
                 return true;
+            }
         }
         return false;
     }
@@ -162,7 +165,7 @@ public:
     bool hasInactiveJobsWaitingForReactivation() const {
         if (!_params.reactivationScheduling()) return false;
         for (auto& [_, job] : _jobs) {
-            if (job->getState() == SUSPENDED && job->getJobTree().isWaitingForReactivation()) 
+            if (job->getState() == SUSPENDED && job->getJobTree().isWaitingForReactivation())
                 return true;
         }
         return false;
@@ -170,6 +173,9 @@ public:
 
     void setMemoryPanic(bool panic) {
         _memory_panic = panic;
+    }
+    void setTerminating() {
+        _terminating = true;
     }
 
     void checkOldJobs() {
@@ -196,13 +202,13 @@ public:
             if (job.hasDescription()) numJobsWithDescription++;
             if (job.hasCommitment()) continue;
             // Old inactive job
-            if (job.getState() == INACTIVE && job.getAge() >= 10) {
+            if (job.getState() == INACTIVE && (_terminating || job.getAge() >= 5)) {
                 jobsToForget.push_back(id);
                 continue;
             }
             // Suspended job: Forget w.r.t. age, but only if there is a limit on the job cache
-            if (job.getState() == SUSPENDED && getNumReactivators(id) == 0 
-                        && (_memory_panic || jobCacheSize > 0)) {
+            if (job.getState() == SUSPENDED && getNumReactivators(id) == 0
+                        && (_terminating || _memory_panic || jobCacheSize > 0)) {
                 // Job must not be rooted here
                 if (job.getJobTree().isRoot()) continue;
                 // Insert job into PQ according to its age
@@ -213,14 +219,15 @@ public:
 
         // Mark jobs as forgettable as long as job cache is exceeded
         // (mark ALL eligible jobs if memory panic is triggered)
-        while ((!suspendedQueue.empty() && _memory_panic) || (int)suspendedQueue.size() > jobCacheSize) {
+        while ((!suspendedQueue.empty() && (_memory_panic || _terminating))
+                || (int)suspendedQueue.size() > jobCacheSize) {
             jobsToForget.push_back(suspendedQueue.top().first);
             suspendedQueue.pop();
         }
 
         if (!_jobs.empty())
             LOG(V4_VVER, "contexts=%i descriptions=%i\n", _jobs.size(), numJobsWithDescription);
-        
+
         return jobsToForget;
     }
 
@@ -243,11 +250,6 @@ public:
 
     ~JobRegistry() {
         // Output total busy time
-        LOG(V4_VVER, "DELETE JobRegistry \n");
-        if (_current_job) {
-            LOG(V4_VVER, "DELETE JobRegistry, with _current_job [name %s, id %i, context %i] \n", _current_job->getId(), _current_job->getContextId(), _current_job->toStr());
-        }
         LOG(V3_VERB, "busytime=%.3f\n", _total_busy_time);
-        LOG(V4_VVER, "DELETED JobRegistry \n");
     }
 };

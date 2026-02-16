@@ -1369,6 +1369,11 @@ SchedulingManager::~SchedulingManager() {
         watchdog.reset();
     }
 
+    // For the corner case where a new job gets created during the below loop,
+    // we allow the job registry to clean it up immediately regardless of the
+    // job cache size and the job's age.
+    _job_registry.setTerminating();
+
     // Empty destruct queue into garbage for janitor to clean up.
     // We also need to make sure that any remaining open sends
     // and fragmented receives are completed before returning
