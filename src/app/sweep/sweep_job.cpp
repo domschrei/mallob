@@ -338,7 +338,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 				_running_sweepers_count--;
 				_finished_sweepers_count++;
 				//added this release, maybe we left some memory somewhere when terminating here early
-				kissat_release(sweeper->solver);
+				// kissat_release(sweeper->solver);
 				return;
 			}
 		}
