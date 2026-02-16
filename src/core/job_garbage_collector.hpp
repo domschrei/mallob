@@ -108,7 +108,7 @@ private:
             }
 
             LOGGER(lg, V5_DEBG, "Found %i job(s) to delete\n", copy.size());
-            LOG(V4_VVER, "JGC: Found %i job(s) to delete\n", copy.size());
+            // LOG(V4_VVER, "JGC: Found %i job(s) to delete\n", copy.size());
 
             // Free each job
             for (Job* job : copy) {
@@ -118,7 +118,7 @@ private:
                 LOGGER(lg, V4_VVER, "DELETED #%i\n", id);
                 Logger::getMainInstance().mergeJobLogs(id);
                 _num_stored_jobs--;
-                LOG(V4_VVER, "JGC: Now %i _num_stored_jobs remaining \n", _num_stored_jobs.load());
+                LOG(V4_VVER, "JGC: Now %i _num_stored_jobs \n", _num_stored_jobs.load());
             }
 
             if (!_worker.continueRunning()) usleep(1000); // wait for last jobs to finish

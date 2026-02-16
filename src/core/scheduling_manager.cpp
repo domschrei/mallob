@@ -1380,7 +1380,7 @@ SchedulingManager::~SchedulingManager() {
     // (otherwise we might prevent another node from terminating).
     auto& q = MyMpi::getMessageQueue();
     while (_job_registry.hasJobsLeftToDelete() || q.hasOpenSends() || q.hasOpenRecvFragments()) {
-        LOG(V4_VVER, "SchedulingManager: looping in destruct queue \n");
+        LOG(V4_VVER, "SchedulingManager: loop destruct queue \n");
         q.advance();
         checkOldJobs();
         forgetOldJobs();

@@ -59,7 +59,7 @@ private:
 		int targetIndex{-1};
 		int targetRank{-1};
 		bool sent{false};
-		bool got_steal_response{false};
+		std::atomic_bool got_steal_response{false};
 		std::vector<int> stolen_work{};
 	};
 	std::vector<WorkstealRequest> _worksteal_requests;

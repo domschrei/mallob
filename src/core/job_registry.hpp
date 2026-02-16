@@ -47,6 +47,7 @@ public:
 
         _jobs[jobId] = app_registry::getJobCreator(applicationId)(_params, setup, _app_msg_table);
         _job_gc.numStoredJobs()++;
+        LOG(V3_VERB, "Created new job (jobId #%i, appId %i), added to GC, now %i numStoredJobs() \n", jobId, applicationId, _job_gc.numStoredJobs().load());
         return *_jobs[jobId];
     }
 

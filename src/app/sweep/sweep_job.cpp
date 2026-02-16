@@ -18,7 +18,10 @@ SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTa
 {
 	assert(_params.jobCommUpdatePeriod() > 0 || log_return_false("[ERROR] For this application to work,"
             " you must explicitly enable job communicators with the -jcup option, e.g., -jcup=0.1\n"));
-	LOG(V2_INFO, "New SweepJob MPI Process rank [%i] with %i threads, ctx %i \n", getJobTree().getRank(), params.numThreadsPerProcess.val, getJobTree().getContextId());
+
+	LOG(V2_INFO, "## \n");
+	LOG(V2_INFO, "New SweepJob MPI Process on rank [%i] with %i threads, ctx %i \n", getJobTree().getRank(), params.numThreadsPerProcess.val, getJobTree().getContextId());
+	LOG(V2_INFO, "## \n");
 }
 
 
@@ -139,17 +142,23 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 	}
 	else if (msg.tag == TAG_SEARCHING_WORK) {
 		assert(msg.payload.size() == NUM_SEARCHING_WORK_FIELDS);
-		int localId = msg.payload[0];
+		int sourceLocalId = msg.payload[0];
 		int sourceContextId = msg.payload[1];
 		int sourceTreeIndex = msg.payload[2];
 
 		msg.payload.clear();
 
-		LOG(V3_VERB, "SWEEP MSG [%i] <---?---- [%i](%i) \n", _my_rank, sourceRank, localId);
-		auto locally_stolen_work = stealWorkFromAnyLocalSolver(sourceRank, localId);
+		LOG(V3_VERB, "SWEEP MSG [%i] <---?---- [%i](%i) \n", _my_rank, sourceRank, sourceLocalId);
+
+		if (_terminate_all) {
+			LOG(V3_VERB, "SWEEP Not answering to post-termination MPI steal request from [%i](%i) \n", sourceRank, sourceLocalId);
+			return;
+		}
+
+		auto locally_stolen_work = stealWorkFromAnyLocalSolver(sourceRank, sourceLocalId);
 
 		msg.payload = std::move(locally_stolen_work);
-		msg.payload.push_back(localId);
+		msg.payload.push_back(sourceLocalId);
 
 		//send back to source
 		msg.tag = TAG_RETURNING_STEAL_REQUEST;
@@ -198,10 +207,10 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		assert(_is_root);
 		tryReportUnsat();
 	}
-	else if (mpiTag == MSG_NOTIFY_JOB_ABORTING)    {LOG(V1_WARN, "SWEEP MSG Warn [%i]: received NOTIFY_JOB_ABORTING \n", _my_rank);}
-	else if (mpiTag == MSG_NOTIFY_JOB_TERMINATING) {LOG(V1_WARN, "SWEEP MSG Warn [%i]: received NOTIFY_JOB_TERMINATING \n", _my_rank);}
-	else if (mpiTag == MSG_INTERRUPT)			   {LOG(V1_WARN, "SWEEP MSG Warn [%i]: received MSG_INTERRUPT \n", _my_rank);}
-	else {LOG(V1_WARN, "SWEEP MSG Warn [%i]: received unexpected mpiTag %i with msg.tag %i \n", _my_rank, mpiTag, msg.tag);}
+	else if (mpiTag == MSG_NOTIFY_JOB_ABORTING)    {LOG(V1_WARN, "SWEEP MSG WARN [%i]: received NOTIFY_JOB_ABORTING \n", _my_rank);}
+	else if (mpiTag == MSG_NOTIFY_JOB_TERMINATING) {LOG(V1_WARN, "SWEEP MSG WARN [%i]: received NOTIFY_JOB_TERMINATING \n", _my_rank);}
+	else if (mpiTag == MSG_INTERRUPT)			   {LOG(V1_WARN, "SWEEP MSG WARN [%i]: received MSG_INTERRUPT \n", _my_rank);}
+	else {LOG(V1_WARN, "SWEEP MSG WARN [%i]: received unexpected mpiTag %i with msg.tag %i \n", _my_rank, mpiTag, msg.tag);}
 }
 
 void SweepJob::appl_terminate() {
@@ -927,15 +936,19 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 			usleep(100);
 			reps++;
 			if (reps%32==0) {
-				LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop: waits for MPI response\n", _my_rank, localId);
+				LOG(V5_DEBG, "SWEEP [%i](%i) steal loop: waits for MPI response\n", _my_rank, localId);
 			}
 			if (_terminate_all) {
-				LOG(V3_VERB, "SWEEP WORK [%i](%i) exit wait loop\n", _my_rank, localId);
+				LOG(V3_VERB, "SWEEP [%i](%i) exit wait loop\n", _my_rank, localId);
 				break;
 			}
 		}
+		if (_terminate_all) {
+			break;	 //skip touching the work array at all
+		}
+
 		//Successful steal if size > 0
-		if ( ! _worksteal_requests[localId].stolen_work.empty()) {
+		if (! _worksteal_requests[localId].stolen_work.empty()) {
 			sweeper->work_received_from_steal = std::move(_worksteal_requests[localId].stolen_work);
 			LOG(V4_VVER, "SWEEP MPI WORK [%i](%i) <==%i=== [%i] \n",  _my_rank, localId, sweeper->work_received_from_steal.size(), targetRank);
 			break;
@@ -952,6 +965,9 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 	if (*work_size>0) {
 		sweeper->sweeper_is_idle = false; //we keep solver marked as "idle" once the whole solving is terminated, otherwise race-conditions can occur where suddenly the solver is treated as active again
 	}
+	// if (_terminate_all) {
+		// LOG(V3_VERB, "SWEEP [%i](%i) returning to solver with termination info\n", _my_rank, localId);
+	// }
 	//The thread now returns to the kissat solver
 }
 

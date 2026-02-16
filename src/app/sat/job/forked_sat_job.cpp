@@ -147,7 +147,7 @@ void ForkedSatJob::appl_resume() {
     loadIncrements();
     LOG(V4_VVER, "§ ForkedSatJob (%i) loaded increments \n", getId());
     _clause_comm->communicate();
-    LOG(V4_VVER, "§ ForkedSatJob (%i) commincated clausecomm \n", getId());
+    LOG(V4_VVER, "§ ForkedSatJob (%i) _clause_comm->communicate() \n", getId());
 }
 
 void ForkedSatJob::appl_terminate() {
