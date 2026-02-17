@@ -45,6 +45,7 @@ public:
         // Find "forgotten" jobs in destruction queue which can now be destructed
         for (auto it = _job_destruct_queue.begin(); it != _job_destruct_queue.end(); ) {
             Job* job = *it;
+            LOG(V4_VVER, "JGC: check %s destructible\n", job->toStr());
             if (job->isDestructible()) {
                 LOG(V4_VVER, "%s ready for destruction\n", job->toStr());
                 // Move pointer to "free" queue emptied by janitor thread
@@ -78,8 +79,8 @@ private:
     void run() {
 
         //Nicco reminder
-        Watchdog _watchdog(true, 1'000);
-        _watchdog.setAbortPeriod(5'000);
+        Watchdog wdog(true, 1'000);
+        wdog.setAbortPeriod(5'000);
 
         auto lg = Logger::getMainInstance().copy("<Janitor>", ".janitor");
         LOGGER(lg, V3_VERB, "tid=%lu\n", Proc::getTid());
@@ -92,13 +93,13 @@ private:
             std::list<Job*> copy;
             {
                 // Try to fetch the current jobs to free
-                _watchdog.setActive(false);
+                wdog.setActive(false);
                 auto lock = _mtx.getLock();
                 _cond_var.waitWithLockedMutex(lock, [&]() {
                     return !_worker.continueRunning() || !_jobs_to_free.empty();
                 });
-                _watchdog.reset();
-                _watchdog.setActive(true);
+                wdog.reset();
+                wdog.setActive(true);
                 if (!_worker.continueRunning() && _jobs_to_free.empty() && _num_stored_jobs == 0)
                     break;
                 
@@ -124,8 +125,9 @@ private:
             if (!_worker.continueRunning()) usleep(1000); // wait for last jobs to finish
 
             //Nicco reminder
-            _watchdog.reset();
+            wdog.reset();
         }
+        LOG(V4_VVER, "JGC: exiting. \n");
 
     }
 };
