@@ -99,7 +99,6 @@ Cadical::Cadical(const SolverSetup& setup)
 			// Production of parallel (PalRUP) files: Initialize tracer that outputs to a file.
 			// Clause export for sharing is separate, set up in setLearnedClauseCallback.
 			_setup.proofDir += "/" + std::to_string(_setup.globalId);
-			FileUtils::mkdir(_setup.proofDir);
 			okay = solver->set("lratpalrup", 1); // enable PalRUP proof output
 			okay = solver->set("binary", _setup.outputBinaryPalRup ? 1 : 0); assert(okay); // set proof logging mode to binary format
 			okay = solver->set("lratdeletelines", 1); assert(okay); // do enable printing deletion lines

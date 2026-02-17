@@ -264,6 +264,14 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	}
 	setup.objectiveFunction = _objective;
 
+	// Pre-create PalRUP proof directories for *all* solver IDs, including cancelled ones.
+	if (params.palRup()) for (setup.localId = 0; setup.localId < numOrigSolvers; setup.localId++) {
+		setup.globalId = appRank * numOrigSolvers + setup.localId;
+		auto dir = setup.proofDir + "/" + std::to_string(setup.globalId);
+		LOG(V2_INFO, "MKDIR %s\n", dir.c_str());
+		FileUtils::mkdir(dir);
+	}
+
 	// Instantiate solvers according to the global solver IDs and diversification indices
 	int cyclePos = begunCyclePos;
 	for (setup.localId = 0; setup.localId < _num_solvers; setup.localId++) {
