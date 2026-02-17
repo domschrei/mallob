@@ -165,7 +165,7 @@ void Worker::checkJobs() {
 
     // printf("ß Worker Check Jobs\n");
 
-    LOG(V4_VVER, "WORKER check jobs\n");
+    LOG(V4_VVER, "WRKR check jobs\n");
     // Load and try to adopt pending root reactivation request
     _sched_man.tryAdoptPendingRootActivationRequest();
 
@@ -190,7 +190,7 @@ void Worker::checkJobs() {
     _sched_man.checkSuspendedJobs();
     _sched_man.checkOldJobs();
 
-    LOG(V4_VVER, "WORKER check jobs done \n");
+    LOG(V4_VVER, "WRKR check jobs done \n");
 }
 
 void Worker::checkActiveJob() {
@@ -200,14 +200,14 @@ void Worker::checkActiveJob() {
     int id = job.getId();
     bool isRoot = job.getJobTree().isRoot();
 
-    LOG(V4_VVER, "WORKER check active job %s\n", job.toStr());
+    LOG(V4_VVER, "WRKR check active job %s\n", job.toStr());
 
     _sys_state.setLocal(SYSSTATE_BUSYRATIO, 1.0f); // busy nodes
     _sys_state.setLocal(SYSSTATE_COMMITTEDRATIO, 0.0f); // committed nodes
     _sys_state.setLocal(SYSSTATE_NUMJOBS, isRoot ? 1.0f : 0.0f); // active jobs
 
     _sched_man.checkActiveJob();
-    LOG(V4_VVER, "WORKER check active job %s done\n", job.toStr());
+    LOG(V4_VVER, "WRKR check active job %s done\n", job.toStr());
 }
 
 void Worker::publishAndResetSysState() {

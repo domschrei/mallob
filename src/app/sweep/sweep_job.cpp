@@ -101,7 +101,7 @@ void SweepJob::appl_start() {
 	_red.reset();
 
 	//Start individual Kissat threads (those then immediately jump into the sweep algorithm)
-	LOG(V2_INFO,"SWEEP JOB Create solvers\n");
+	LOG(V2_INFO,"SWEEP Create solvers\n");
 	for (int localId=0; localId < _nThreads; localId++) {
 		createAndStartNewSweeper(localId);
 	}
@@ -110,7 +110,7 @@ void SweepJob::appl_start() {
 	_internal_result.id = getId();
 	_internal_result.revision = getRevision();
 
-	LOG(V2_INFO, "SWEEP JOB appl_start() FINISHED\n");
+	LOG(V2_INFO, "SWEEP appl_start() FINISHED\n");
 	// _finished_job_setup = true;
 }
 
@@ -118,7 +118,7 @@ void SweepJob::appl_start() {
 
 // Called periodically by the main thread to allow the worker to emit messages.
 void SweepJob::appl_communicate() {
-	LOG(V4_VVER, "SWEEP JOB appl_communicate() \n");
+	LOG(V4_VVER, "SWEEP appl_communicate() \n");
 
 	printIdleFraction();
 	checkSharingDelayHealth();
@@ -132,6 +132,8 @@ void SweepJob::appl_communicate() {
 		initiateNewSharingRound();
 
 	advanceAllReduction();
+
+	LOG(V4_VVER, "SWEEP appl_communicate() done \n");
 }
 
 
@@ -139,10 +141,10 @@ void SweepJob::appl_communicate() {
 void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 	// LOG(V2_INFO, "Shweep rank %i: received custom message from source %i, mpiTag %i, msg.tag %i \n", _my_rank, source, mpiTag, msg.tag);
 	if (mpiTag != MSG_SEND_APPLICATION_MESSAGE) {
-		LOG(V1_WARN, "SWEEP MSG Warn [%i] got unexpected message with mpiTag=%i, msg.tag=%i  (instead of MSG_SEND_APPLICATION_MESSAGE mpiTag == 30)\n", _my_rank, mpiTag, msg.tag);
+		LOG(V1_WARN, "SWEEP MSG WARN [%i] got unexpected message with mpiTag=%i, msg.tag=%i  (instead of MSG_SEND_APPLICATION_MESSAGE mpiTag == 30)\n", _my_rank, mpiTag, msg.tag);
 	}
 	if (msg.returnedToSender) {
-		LOG(V1_WARN, "SWEEP MSG Warn [%i]: received unexpected returnedToSender message during Sweep Job Workstealing! source=%i mpiTag=%i, msg.tag=%i treeIdxOfSender=%i, treeIdxOfDestination=%i \n", _my_rank, sourceRank, mpiTag, msg.tag, msg.treeIndexOfSender, msg.treeIndexOfDestination);
+		LOG(V1_WARN, "SWEEP MSG WARN [%i]: received unexpected returnedToSender message during Sweep Job Workstealing! source=%i mpiTag=%i, msg.tag=%i treeIdxOfSender=%i, treeIdxOfDestination=%i \n", _my_rank, sourceRank, mpiTag, msg.tag, msg.treeIndexOfSender, msg.treeIndexOfDestination);
 		// assert(log_return_false("SWEEP MSG ERROR, got msg.returnToSender"));
 	}
 	else if (msg.tag == TAG_SEARCHING_WORK) {
@@ -289,8 +291,9 @@ bool SweepJob::appl_isDestructible() {
 
 
 void SweepJob::checkForUnsatResults() {
-	//It can be a mess when non-root node start to suddenly report (UNSAT) results to Mallob (maybe even concurrently), instead they only internaly inform the root node who then manages the reporting
-	//Technically this message would only be needed to be send once, but for additional robustness it will just keep sending once UNSAT is found. Can also be a self-message.
+	//If we have an UNSAT result, send it to the root node
+	//Makes life easier when only the root node reports to Mallob and to the log files
+	//for additional robustness we keep sending this message repeatedly (Can also be a self-message), even though technically only sending it once should be enough
 	if (_do_report_UNSAT_to_root) {
 		auto msg = getMessageTemplate();
 		msg.tag = TAG_FOUND_UNSAT;
@@ -454,7 +457,7 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	const float WARN_init_dur = 50; //Usual initializations take 0.2ms in the Sat Solver Subprocess and 4-25ms  in the sweep job (for some weird reasons), but should never be above ~30ms
 	LOG(V3_VERB, "SWEEP STARTUP [%i](%i) kissat init %.2f ms (%i/%i running, %i started)\n", _my_rank, localId, init_dur_ms, _running_sweepers_count.load(), _nThreads, _started_sweepers_count.load());
 	if (init_dur_ms > WARN_init_dur) {
-		LOG(V1_WARN, "SWEEP Warn STARTUP [%i](%i): kissat init took unusually long, %f ms !\n", _my_rank, localId, init_dur_ms);
+		LOG(V1_WARN, "SWEEP WARN STARTUP [%i](%i): kissat init took unusually long, %f ms !\n", _my_rank, localId, init_dur_ms);
 	}
 
 	sweeper->setToSweeper();
@@ -637,6 +640,8 @@ void SweepJob::printCongruenceStats(KissatPtr sweeper) {
 
 
 void SweepJob::printIdleFraction() {
+	if (_terminate_all) return; //prevent segfault! the sweeper references are being concurrently deleted right now, no touching them
+
 	int idles = 0;
 	int active = 0;
 	std::ostringstream oss;
@@ -650,23 +655,17 @@ void SweepJob::printIdleFraction() {
 		}
 	}
 	_lastIdleCount = idles;
-	if (active>0)
-		LOG(V3_VERB, "SWEEP Active %i, Running %i, Idle %i, Started %i. idle nrs: %s \n", active, _running_sweepers_count.load(), idles,  _started_sweepers_count.load(), oss.str().c_str());
+	LOG(V3_VERB, "SWEEP Active %i, Running %i, Idle %i, Started %i. idle nrs: %s \n", active, _running_sweepers_count.load(), idles,  _started_sweepers_count.load(), oss.str().c_str());
+	// if (active>0)
+		// LOG(V3_VERB, "SWEEP Active %i, Running %i, Idle %i, Started %i. idle nrs: %s \n", active, _running_sweepers_count.load(), idles,  _started_sweepers_count.load(), oss.str().c_str());
 }
 
 void SweepJob::checkSharingDelayHealth() {
+	if (_terminate_all) return;
+
 	constexpr float MAX_DELAY_FACTOR = 6;
 	constexpr float WARNING_PERIOD = 0.5;
 	float time = Timer::elapsedSeconds();
-
-	// if (_terminate_all) {
-		// return; //nothing to check anymore
-	// }
-	// if (time - _last_sharedelay_warning < WARNING_PERIOD) {
-		// return;
-	// }
-
-	// _last_sharedelay_warning = time;
 
 	float period = _params.sweepSharingPeriod.val;
 	if (!_time_contribute.empty()) {
@@ -710,10 +709,11 @@ void SweepJob::printResweeps() {
 }
 
 void SweepJob::sendMPIWorkstealRequests() {
+	if (_terminate_all) return;
 	//Worksteal requests need to be send by the MPI *main* thread, as it can be problematic if the kissat-threads themselves issue MPI messages on their own, since this clashes somehow with the MPI structure/hierarchy
 	//Instead, the solver-threads write a request in the shared memory, and the main MPI thread picks up the request and sends it
 	for (auto &request : _worksteal_requests) {
-		if (!request.sent && !_terminate_all) {
+		if (!request.sent) {
 			request.sent = true;
 			JobMessage msg = getMessageTemplate();
 			msg.tag = TAG_SEARCHING_WORK;
@@ -982,7 +982,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 void SweepJob::initiateNewSharingRound() {
 	assert(_is_root); //only the root node initiates sharing rounds
 	if (!_bcast) {
-		LOG(V1_WARN, "SWEEP Warn : SHARE BCAST root couldn't initiate sharing round, _bcast is Null\n");
+		LOG(V1_WARN, "SWEEP WARN : SHARE BCAST root couldn't initiate sharing round, _bcast is Null\n");
 		return;
 	}
 
@@ -1109,7 +1109,7 @@ void SweepJob::cbContributeToAllReduce() {
 void SweepJob::advanceAllReduction() {
 	if (!_red) return;
 	if (!_started_synchronized_solving) return;
-	LOG(V4_VVER, "SWEEP SHARE REDUCE ADVANCE [%i]\n", _my_rank);
+	LOG(V4_VVER, "SWEEP REDUCE ADVANCE [%i]\n", _my_rank);
 	_red->advance();
 	if (!_red->hasResult()) return;
 
@@ -1148,9 +1148,11 @@ void SweepJob::advanceAllReduction() {
 
 	//the sweepers need to know the current sweep round to set the size of their sweep environments accordingly
 	//which grow with each round (if activated)
-	for (auto &sweeper : _sweepers) {
-		if (sweeper) {
-			shweep_set_sweep_round(sweeper->solver, sweep_round);
+	if (!_terminate_all) { //when sweepers are already being deleted we don't want to risk a segfault looping over them...
+		for (auto &sweeper : _sweepers) {
+			if (sweeper) {
+				shweep_set_sweep_round(sweeper->solver, sweep_round);
+			}
 		}
 	}
 
