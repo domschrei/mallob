@@ -138,7 +138,8 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 	-rlbd=0 -ilbd=1 -randlbd=0 -scramble-lbds=0 \
 	-seed=1 \
 	-v=2 \
-	-spd=${globallogdir}/ -spl=4 \
+	-spd=${globallogdir}/ \
+  -spl=-1 \
 	-jcup=0.05 \
 	-preprocess-sweep=1 \
 	-sweep-sharing-period=0.020 \
