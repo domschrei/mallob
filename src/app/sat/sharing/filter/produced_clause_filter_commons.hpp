@@ -21,8 +21,8 @@ typedef uint128_t cls_producers_bitset;
 #endif
 
 #ifndef MALLOB_EPOCH_BITWIDTH
-#define MALLOB_EPOCH_BITWIDTH 16
-#define MALLOB_EPOCH_NEVER_SHARED ((1 << MALLOB_EPOCH_BITWIDTH) - 1)
+#define MALLOB_EPOCH_BITWIDTH 24
+#define MALLOB_EPOCH_NEVER_SHARED ((1UL << MALLOB_EPOCH_BITWIDTH) - 1)
 #endif
 
 // Packed struct to get in all meta data for a produced clause.

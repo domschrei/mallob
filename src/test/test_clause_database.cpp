@@ -506,20 +506,20 @@ void testTreeMapVsHashMap() {
         clauses.push_back(c);
     }
 
-    std::map<ProducedLargeClause, int> treeMap;
-    tsl::robin_map<ProducedLargeClause, int, ProducedClauseHasher<ProducedLargeClause>, 
-        ProducedClauseEqualsIgnoringLBD<ProducedLargeClause>> hashMap;
+    std::map<ProducedClause, int> treeMap;
+    tsl::robin_map<ProducedClause, int, ProducedClauseHasher<ProducedClause>, 
+        ProducedClauseEqualsIgnoringLBD<ProducedClause>> hashMap;
     float time;
 
     time = Timer::elapsedSeconds();
     for (auto& c : clauses) {
-        treeMap.insert({ProducedLargeClause(c), 0});
+        treeMap.insert({ProducedClause(c), 0});
     }
     LOG(V2_INFO, "10000 clauses in tree map: %.5fs\n", Timer::elapsedSeconds()-time);
 
     time = Timer::elapsedSeconds();
     for (auto& c : clauses) {
-        hashMap.insert({ProducedLargeClause(c), 0});
+        hashMap.insert({ProducedClause(c), 0});
     }
     LOG(V2_INFO, "10000 clauses in hash map: %.5fs\n", Timer::elapsedSeconds()-time);
 }
