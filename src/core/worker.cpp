@@ -189,6 +189,8 @@ void Worker::checkJobs() {
     }
     _sched_man.checkSuspendedJobs();
     _sched_man.checkOldJobs();
+
+    LOG(V4_VVER, "WORKER check jobs done \n");
 }
 
 void Worker::checkActiveJob() {
@@ -205,6 +207,7 @@ void Worker::checkActiveJob() {
     _sys_state.setLocal(SYSSTATE_NUMJOBS, isRoot ? 1.0f : 0.0f); // active jobs
 
     _sched_man.checkActiveJob();
+    LOG(V4_VVER, "WORKER check active job %s done\n", job.toStr());
 }
 
 void Worker::publishAndResetSysState() {
