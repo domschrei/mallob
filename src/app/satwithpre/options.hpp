@@ -4,6 +4,7 @@
 #include "optionslist.hpp"
 #include "util/option.hpp"
 
+#define SATWITHPRE_OPT_OVERRIDES "-satsolver=k_k_l+[k_]{13} -ilbd=0 -rlbd=3"
 // Application-specific program options for SAT solving.
 // memberName                               short option name, long option name          default   min  max
 
@@ -17,3 +18,5 @@ OPT_BOOL(preprocessLingeling, "pl", "preprocess-lingeling", false, "Additionally
 OPT_BOOL(terminateAbruptly, "terminate-abruptly", "", false, "Upon termination, avoid waiting for preprocessors to finish")
 OPT_BOOL(preprocessSweep, "preprocess-sweep", "", false, "run the SWEEP app after the initial sequential kissat preprocessing, but still before the full SAT call")
 OPT_BOOL(preprocessSequentialSweepComplete, "pssc", "preprocess-single-sweep-complete", false, "run the single sequential kissat preprocessor with the -sweepcomplete flag, i.e. it sweeps all variables")
+OPT_BOOL(overrideSatOptions, "oso", "override-sat-options", true,
+    "In the SAT sub-tasks, override SAT solving options with \"" + std::string(SATWITHPRE_OPT_OVERRIDES) + "\"")
