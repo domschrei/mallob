@@ -14,13 +14,9 @@ extern "C" {
 }
 #include "util/sys/threading.hpp"
 
-
-
 struct kissat;
 struct SolverSetup;
 struct SolverStatistics;
-// class SweepJob;
-
 
 class Kissat : public PortfolioSolverInterface {
 
@@ -79,9 +75,6 @@ private:
     bool interrupted = false;
     unsigned int glueLimit;
 
-
-
-
 	std::vector<signed char> initialVariablePhases;
 	bool initialVariablePhasesLocked = false;
 
@@ -119,7 +112,7 @@ public:
 	int getVariablesCount() override;
 
 	int getNumOriginalDiversifications() override;
-
+	
 	// Get a variable suitable for search splitting
 	int getSplittingVariable() override;
 

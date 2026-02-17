@@ -52,6 +52,7 @@ void ForkedSatJob::appl_start() {
 }
 
 void ForkedSatJob::doStartSolver() {
+    initializeWithDescriptionPresent();
 
     SatProcessConfig config = SatProcessConfigBuilder::get(_params, *this, _subproc_idx);
     Parameters hParams(_params);
@@ -194,7 +195,7 @@ int ForkedSatJob::appl_solved() {
         _done_locally = true;
 
         if (ClauseMetadata::enabled() && result == RESULT_UNSAT
-                && _params.proofOutputFile.isSet() && _params.distributedProofAssembly()) {
+                && _params.proofOutputFile.isSet() && !_params.palRup() && _params.distributedProofAssembly()) {
             // Unsatisfiability: handle separately.
             int finalEpoch = _clause_comm->getCurrentEpoch();
             int winningInstance = _internal_result.winningInstanceId;

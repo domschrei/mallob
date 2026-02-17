@@ -9,13 +9,13 @@ set(MALLOB_COREPLUSCOMM_SOURCES ${MALLOB_COREPLUSCOMM_SOURCES} ${MAXSAT_MALLOB_S
 set(BASE_LINK_DIRS ${BASE_LINK_DIRS} lib/rustsat CACHE INTERNAL "")
 set(BASE_LIBS ${BASE_LIBS} rustsat dl CACHE INTERNAL "")
 set(BASE_INCLUDES ${BASE_INCLUDES} lib/rustsat/capi CACHE INTERNAL "")
-if(MALLOB_USE_MAXPRE)
+if(MALLOB_USE_MAXPRE EQUAL 0)
+    add_definitions(-DMALLOB_USE_MAXPRE=0)
+else()
     add_definitions(-DMALLOB_USE_MAXPRE=1)
     set(BASE_LINK_DIRS ${BASE_LINK_DIRS} lib/maxpre-mallob CACHE INTERNAL "")
     set(BASE_LIBS ${BASE_LIBS} maxpre CACHE INTERNAL "")
     set(BASE_INCLUDES ${BASE_INCLUDES} lib/maxpre-mallob/src CACHE INTERNAL "")
-else()
-    add_definitions(-DMALLOB_USE_MAXPRE=0)
 endif()
 
 # Add unit tests: for each $arg there must be a standalone cpp file under "test/test_${arg}.cpp".

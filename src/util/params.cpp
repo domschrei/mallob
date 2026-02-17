@@ -20,9 +20,51 @@ const char* BANNER = "\nMallob -- a parallel and distributed platform for job sc
 const char* BANNER_C_PREFIXED = "c \nc Mallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving\nc Copyright (C) 2019-2025 Dominik Schreiber, Karlsruhe Institute of Technology, Germany\nc ";
 const char* USAGE = "Usage: [mpiexec -np <num-mpi-processes> [mpi-options]] mallob [options]\n";
 
+// Create dictionary mapping long option names to short option names
+robin_hood::unordered_node_map<std::string, std::string> getLongToShortOptMap(OptMap& map) {
+    robin_hood::unordered_node_map<std::string, std::string> longToShortOpt;
+    for (const auto& [id, opt] : map) {
+        if (opt->hasLongOption()) {
+            longToShortOpt[opt->longid] = opt->id;
+        }
+    }
+    return longToShortOpt;
+}
+
 Parameters::Parameters(const Parameters& other) {
     for (const auto& [id, opt] : other._global_map) {
         _global_map.at(id)->copyValue(*opt);
+    }
+}
+
+void Parameters::process(const char* arg, const robin_hood::unordered_node_map<std::string, std::string>& longToShortOpt) {
+    // first option dash
+    if (arg[0] != '-') {
+        LOG(V1_WARN, "[WARN] Invalid argument \"%s\"\n", arg);
+        return;
+    }
+    arg = arg+1;
+    // optional second option dash
+    if (arg[0] == '-') arg = arg+1;
+
+    std::string argMut = arg; // mutable
+    char* eq = strchr(argMut.data(), '=');
+    if (eq == NULL) {
+        // No equals sign in this argument: set arg to 1 implicitly
+        const char* left = argMut.c_str();
+        if (longToShortOpt.count(left)) left = longToShortOpt.at(left).c_str();
+        if (_global_map.count(left)) {
+            _global_map.at(left)->setValAsString("1");
+        }
+    } else {
+        // Divide string at equals sign, set arg to given value
+        *eq = 0;
+        const char* left = argMut.c_str();
+        const char* right = eq+1;
+        if (longToShortOpt.count(left)) left = longToShortOpt.at(left).c_str();
+        if (_global_map.count(left)) {
+            _global_map.at(left)->setValAsString(right);
+        }
     }
 }
 
@@ -30,51 +72,19 @@ Parameters::Parameters(const Parameters& other) {
  * Taken partially from Hordesat:ParameterProcessor.h by Tomas Balyo.
  */
 void Parameters::init(int argc, char** argv) {
-
-    // Create dictionary mapping long option names to short option names
-    robin_hood::unordered_node_map<std::string, std::string> longToShortOpt;
-    for (const auto& [id, opt] : _global_map) {
-        if (opt->hasLongOption()) {
-            longToShortOpt[opt->longid] = opt->id;
-        }
-    }
-
+    auto longToShortOpt = getLongToShortOptMap(_global_map);
     // Iterate over all arguments
-    for (int i = 1; i < argc; i++) {
-        char* arg = argv[i];
-        
-        // first option dash
-        if (arg[0] != '-') {
-            LOG(V1_WARN, "[WARN] Invalid argument \"%s\"\n", arg);
-            continue;
-        }
-        arg = arg+1;
-        // optional second option dash
-        if (arg[0] == '-') arg = arg+1;
-
-        char* eq = strchr(arg, '=');
-        if (eq == NULL) {
-            // No equals sign in this argument: set arg to 1 implicitly
-            const char* left = arg;
-            if (longToShortOpt.count(left)) left = longToShortOpt[left].c_str();
-            if (_global_map.count(left)) {
-                _global_map.at(left)->setValAsString("1");
-            }
-        } else {
-            // Divide string at equals sign, set arg to given value
-            *eq = 0;
-            const char* left = arg;
-            const char* right = eq+1;
-            if (longToShortOpt.count(left)) left = longToShortOpt[left].c_str();
-            if (_global_map.count(left)) {
-                _global_map.at(left)->setValAsString(right);
-            }
-        }
-    }
-
+    for (int i = 1; i < argc; i++) process(argv[i], longToShortOpt);
     // Expand and propagate options as necessary
     expand();
+}
 
+void Parameters::init(const std::vector<std::string>& args)  {
+    auto longToShortOpt = getLongToShortOptMap(_global_map);
+    // Iterate over all arguments
+    for (auto arg : args) process(arg.c_str(), longToShortOpt);
+    // Expand and propagate options as necessary
+    expand();
 }
 
 void Parameters::expand() {
@@ -138,6 +148,20 @@ std::string Parameters::getParamsAsString() const {
     for (const auto& it : sortedParams) {
         if (!it.second.empty()) {
             out += "-" + it.first + "=" + it.second + " ";
+        }
+    }
+    return out;
+}
+
+std::vector<std::string> Parameters::getParamsAsStringList() const {
+    std::vector<std::string> out;
+    std::map<std::string, std::string> sortedParams;
+    for (const auto& [id, opt] : _global_map) {
+        sortedParams[id] = opt->getValAsString();
+    }
+    for (const auto& it : sortedParams) {
+        if (!it.second.empty()) {
+            out.push_back("-" + it.first + "=" + it.second);
         }
     }
     return out;

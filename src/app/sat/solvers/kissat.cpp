@@ -1,3 +1,4 @@
+
 #include <assert.h>
 #include <bits/std_abs.h>
 #include <stdlib.h>
@@ -67,9 +68,7 @@ void report_preprocessed_lit(void* state, int lit) {
     ((Kissat*) state)->addLiteralFromPreprocessing(lit);
 }
 
-// void report_database_lit(void *state, int lit) {
-    // ((Kissat*) state)->addLiteralToShweepJob(lit);
-// }
+
 
 
 
@@ -120,9 +119,6 @@ void Kissat::diversify(int seed) {
     kissat_set_option(solver, "factor", 0); // do not perform bounded variable addition
 
     kissat_set_option(solver, "profile", _setup.profilingLevel);
-
-    //For Equivalence Sweeping: Tell each kissat instance it's unique global ID
-    // kissat_set_option(solver, "globalId", _setup.globalId);
 
     // Set random seed
     kissat_set_option(solver, "seed", seed);
@@ -405,8 +401,7 @@ void Kissat::cleanUp() {
     if (_setup.profilingLevel > 0) {
         auto profileFileString = _setup.profilingBaseDir + "/profile." + _setup.jobname
             + "." + std::to_string(_setup.globalId);
-        // LOGGER(_logger, V4_VVER, "Kissat cleanup, jobname %s, filestring %s \n", _setup.jobname.c_str(), profileFileString.c_str());
-		// LOGGER(_logger, V4_VVER, "Writing profile ...\n");
+		LOGGER(_logger, V4_VVER, "Writing profile ...\n");
 		kissat_write_profile(solver, profileFileString.c_str());
 		LOGGER(_logger, V4_VVER, "Kissat %s : Profile written\n", profileFileString.c_str());
 	}
@@ -481,7 +476,6 @@ void Kissat::produceClause(int size, int lbd) {
     learntClause.begin = learntClauseBuffer.data();
     callback(learntClause, _setup.localId);
 }
-
 
 void Kissat::consumeClause(int** clause, int* size, int* lbd) {
     Mallob::Clause c;
@@ -631,9 +625,7 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
     return accept;
 }
 
-
 void Kissat::addLiteralFromPreprocessing(int lit) {
-
     preprocessedFormula.push_back(lit);
     if (lit == 0) nbPreprocessedClausesReceived++;
     if (nbPreprocessedClausesReceived == nbPreprocessedClausesAdvertised) {

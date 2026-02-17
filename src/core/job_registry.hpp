@@ -208,7 +208,7 @@ public:
                 continue;
             }
             // Suspended job: Forget w.r.t. age, but only if there is a limit on the job cache
-            if (job.getState() == SUSPENDED && getNumReactivators(id) == 0
+            if (job.getState() == SUSPENDED && getNumReactivators(id) == 0 
                         && (_terminating || _memory_panic || jobCacheSize > 0)) {
                 // Job must not be rooted here
                 if (job.getJobTree().isRoot()) continue;
@@ -228,7 +228,7 @@ public:
 
         if (!_jobs.empty())
             LOG(V4_VVER, "contexts=%i descriptions=%i\n", _jobs.size(), numJobsWithDescription);
-
+        
         return jobsToForget;
     }
 

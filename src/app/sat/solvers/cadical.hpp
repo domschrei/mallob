@@ -31,9 +31,6 @@ class Cadical : public PortfolioSolverInterface {
 private:
 	std::unique_ptr<CaDiCaL::Solver> solver;
 
-	Mutex learnMutex;
-
-	std::vector<std::vector<int>> learnedClauses;
 	std::vector<int> assumptions;
 	unsigned long unsatConclusionId {0};
 

@@ -37,7 +37,7 @@ You should now be able to autocomplete program options by pressing TAB once or t
 **Quick Start:**
 
 Run `build/mallob --help` for an overview of all Mallob options.
-E.g., to run MallobSat with a single (MPI) process with twelve Kissat threads, execute `build/mallob -mono=path/to/problem.cnf -t=12 -satsolver=k`. Make sure to execute Mallob from it's home directory, otherwise some relative paths might not work per default.
+E.g., to run MallobSat with a single (MPI) process with twelve Kissat threads, execute `build/mallob -mono=path/to/problem.cnf -t=12 -satsolver=k`. **Make sure to execute Mallob from its home directory**, otherwise some relative paths might not work per default.
 
 For trouble-shooting, see also [FAQ:Execution](docs/faq.md#execution).
 
@@ -142,13 +142,12 @@ If you make use of Mallob in an academic / scientific setting or in a competitiv
 ```
 #### Most recent SAT Competition solver description (TR)
 ```bibtex
-@inproceedings{schreiber2024mallob,
-	title={{MallobSat} and {MallobSat-ImpCheck} in the {SAT} Competition 2024},
-	author={Schreiber, Dominik},
-	booktitle={SAT Competition 2024: Solver, Benchmark and Proof Checker Descriptions},
-	year={2024},
-	pages={21--22},
-	url={http://hdl.handle.net/10138/584822},
+@inproceedings{schreiber2025mallobnaps,
+	title={{MallobSat} naps in the {SAT} Competition 2025},
+	author={Schreiber, Dominik and Rigi-Luperti, Niccol\`o and Biere, Armin},
+	booktitle={International SAT Competition 2025: Solver, Benchmark and Proof Checker Descriptions},
+	year={2025},
+	url={https://satres.kikit.kit.edu/papers/2025-mallob-naps.pdf},
 }
 ```
 #### Distributed Incremental SAT Solving (TR)

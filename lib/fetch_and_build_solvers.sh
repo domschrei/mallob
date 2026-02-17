@@ -11,7 +11,7 @@ elif [ x$DISABLE_FPU != x1 ]; then
 fi
 
 if [ -z $1 ]; then
-    solvers="k"
+    solvers="clyk"
     echo "Defaulting to solvers $solvers (supply another string to override solvers to build)"
 else
     solvers="$1"
@@ -103,8 +103,8 @@ if echo $solvers|grep -q "k" && [ ! -f kissat/libkissat.a ]; then
     cd kissat
     ##Might need manual -O3 on the server!
     ##Because ./configure fails to detect gcc compiler via regex-matching, and falls back to slow -O
-    ./configure -O3
-    make -j 16
+    ./configure --no-proofs -O3
+    make -j
     cp build/libkissat.a .
     cd ..
 fi
@@ -115,7 +115,7 @@ if echo $solvers|grep -q "c" && [ ! -f cadical/libcadical.a ]; then
 
     cd cadical
     ./configure
-    make -j 10
+    make -j
     cp build/libcadical.a .
     cd ..
 fi

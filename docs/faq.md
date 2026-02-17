@@ -48,6 +48,7 @@ As of yet, no.
 #### Mallob doesn't solve my problem, it runs indefinitely or crashes.
 
 * `[ERROR] execl returned errno 2`: Mallob was (most probably) not executed from it's home directory. In particular, Mallob needs to find the sub-process executables (`mallob_process_dispatcher`, `mallob_sat_process`, etc.) at the (relative) path provided via the build option `-DMALLOB_SUBPROC_PATH`. For most robust results, execute Mallob from its home directory. Alternatively, you can set the path to these sub-processes explictly.
+* `Handle (n=1) already finished!`: A SAT solver-thread (kissat, cadical, ...) might have entered Mallob via a callback and directly sent an MPI Message. This is not safe, only the MPI main process thread should send MPI messages. Have the callbacks only deposit such a request for the main thread to pick up. 
 * Make sure that the problem instance path you handed to Mallob exists; otherwise, Mallob may wait indefinitely for such a file to appear.
 * For RAM related issues, see the next question.
 

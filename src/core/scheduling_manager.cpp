@@ -952,7 +952,7 @@ void SchedulingManager::updateVolume(int jobId, int volume, int balancingEpoch, 
 
     // If the job is not in the database, there might be a root request to activate 
     if (!has(jobId)) {
-        _req_mgr.activateRootRequest(jobId);
+        _req_mgr.tryActivateRootRequest(jobId);
         return;
     }
 
@@ -1368,6 +1368,10 @@ SchedulingManager::~SchedulingManager() {
         LOG(V4_VVER, "SchedulingManager: jobid %i to destruct queue \n", jobId);
         watchdog.reset();
     }
+    // For the corner case where a new job gets created during the below loop,
+    // we allow the job registry to clean it up immediately regardless of the
+    // job cache size and the job's age.
+    _job_registry.setTerminating();
 
     // For the corner case where a new job gets created during the below loop,
     // we allow the job registry to clean it up immediately regardless of the

@@ -222,6 +222,27 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
     config.deserialize(_params.applicationConfiguration());
     if (json.contains("configuration")) {
         auto& jConfig = json["configuration"];
+        if (jConfig.contains("options")) {
+            if (!jConfig["options"].is_string()) {
+                auto warningMsg = "[\"configuration\"][\"options\"] must be a string - separate options via \" \".";
+                LOGGER(_logger, V1_WARN, baseErrorMsg, jobName.c_str(), warningMsg);
+                return DISCARD;
+            }
+            auto opts = jConfig["options"].get<std::string>();
+            // Check that the option overrides don't have any characters
+            // that would break the app configuration encoding
+            for (char c : {'&', ';'}) {
+                if (opts.find(c) != std::string::npos) {
+                    auto warningMsg = "Illegal character in [\"configuration\"][\"options\"]: \"" + std::string(1, c)
+                        + "\" - separate options via \" \".";
+                    LOGGER(_logger, V1_WARN, baseErrorMsg, jobName.c_str(), warningMsg.c_str());
+                    return DISCARD;
+                }
+            }
+            // Now replace all whitespaces with "&"
+            std::replace(opts.begin(), opts.end(), ' ', '&');
+            jConfig["options"] = opts;
+        }
         for (auto it = jConfig.begin(); it != jConfig.end(); ++it) {
             config.map[it.key()] = it.value();
         }

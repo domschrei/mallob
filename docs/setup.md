@@ -19,32 +19,23 @@ Some people have been developing and experimenting successfully with Mallob with
 
 Mallob is built using CMake.
 [`scripts/setup/build.sh`](../scripts/setup/build.sh) provides a default build script.
-We repeat its details here:
+We repeat its commands here:
 
 ```bash
 # Only needed if building with -DMALLOB_APP_SAT=1 (enabled by default).
-# For non-x86-64 architectures (ARM, POWER9, etc.), prepend `DISABLE_FPU=1` to "bash".
-( cd lib && bash fetch_and_build_solvers.sh kcly )
+# For non-x86-64 architectures (ARM, POWER9, etc.), prepend `export DISABLE_FPU=1;`.
+scripts/setup/sat-setup.sh
 
-# Only needed if building with -DMALLOB_APP_MAXSAT=1.
-# ( cd lib && bash fetch_and_build_maxsat_deps.sh )
+# Only needed if building with -DMALLOB_APP_MAXSAT=1 and -DMALLOB_APP_SMT=1, respectively.
+scripts/setup/maxsat-setup.sh
+scripts/setup/smt-setup.sh
 
-# Only needed if building with -DMALLOB_APP_SMT=1.
-# ( cd lib && bash fetch_and_build_smt_deps.sh )
-
-# Build Mallob
-# Specify `-DCMAKE_BUILD_TYPE=RELEASE` for a release build or `-DCMAKE_BUILD_TYPE=DEBUG` for a debug build.
-mkdir -p build
-cd build
-CC=$(which mpicc) CXX=$(which mpicxx) cmake -DCMAKE_BUILD_TYPE=RELEASE -DMALLOB_APP_SAT=1 -DMALLOB_USE_JEMALLOC=1 \
-  -DMALLOB_LOG_VERBOSITY=4 -DMALLOB_ASSERT=1 -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\" ..
-make; cd ..
-
-# Optional - only needed for on-the-fly LRAT checking
-# ( cd lib && bash fetch_and_build_impcheck.sh && cp impcheck/build/impcheck_* ../build/ )
+# Build Mallob. You can modify and/or append build options like -DMALLOB_APP_MAXSAT=1.
+# Find all build options at: docs/setup.md
+scripts/setup/cmake-make.sh build -DMALLOB_APP_MAXSAT=1 -DMALLOB_APP_SMT=1 -DMALLOB_APP_INCSAT=1 -DMALLOB_APP_SATWITHPRE=1 -DMALLOB_BUILD_LRAT_MODULES=1
 ```
 
-In the `cmake` call, you can use the following Mallob-specific build options:
+In the main build call, you can use the following Mallob-specific build options:
 
 | Usage                                       | Description                                                                                                |
 | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
@@ -56,7 +47,7 @@ In the `cmake` call, you can use the following Mallob-specific build options:
 | -DMALLOB_USE_GLUCOSE=<0/1>                  | Compile with support for Glucose SAT solver (disabled by default for licensing reasons, see below).        |
 | -DMALLOB_USE_JEMALLOC=<0/1>                 | Compile with Scalable Memory Allocator `jemalloc` instead of default `malloc`.                             |
 | -DMALLOB_APP_*=<0/1>                        | Compile with the according application.                                                                    |
-| -DMALLOB_USE_MAXPRE=<0/1>                   | For MaxSAT: Include a library of the preprocessor MaxPRE (note: not public yet)                            |
+| -DMALLOB_USE_MAXPRE=<0/1>                   | For MaxSAT: Include a library of the preprocessor MaxPRE (default=1)                                       |
 | -DMALLOB_MAX_N_APPTHREADS_PER_PROCESS=<N>   | Max. number of application threads (solver threads for SAT) per process to support. (max: 128)             |
 | -DMALLOB_BUILD_LRAT_MODULES=<0/1>           | Also build standalone LRAT checker                                                                         |
 

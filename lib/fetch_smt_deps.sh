@@ -5,7 +5,7 @@ set -e
 if [ ! -d bitwuzla ]; then
     if [ ! -f bitwuzla.zip ]; then
         # for fixing a branch instead of a commit, prepend "refs/heads/"
-        branchorcommit="5fa051170d2c5b3782fdb39960a06501e219592f" # external-sat-solver branch, updated 2025-10-26
+        branchorcommit="2b685c820e04dbb88edcd33349a5099c0fb24c75" # external-sat-solver-on-main branch, updated 2026-02-04
         wget -nc https://github.com/bitwuzla/bitwuzla/archive/${branchorcommit}.zip -O bitwuzla.zip
     fi
     unzip bitwuzla.zip

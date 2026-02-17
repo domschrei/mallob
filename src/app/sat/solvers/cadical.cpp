@@ -31,6 +31,7 @@
 #include "app/sat/solvers/cadical_clause_import.hpp"
 #include "app/sat/solvers/cadical_terminator.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
+#include "util/sys/fileutils.hpp"
 
 Cadical::Cadical(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup),
@@ -95,6 +96,17 @@ Cadical::Cadical(const SolverSetup& setup)
 					LOGGER(_logger, V2_INFO, "CONCLUSION ID %lu\n", unsatConclusionId);
 				}
 			);
+		} else if (_setup.usePalRupFormat) {
+			// Production of parallel (PalRUP) files: Initialize tracer that outputs to a file.
+			// Clause export for sharing is separate, set up in setLearnedClauseCallback.
+			_setup.proofDir += "/" + std::to_string(_setup.globalId);
+			FileUtils::mkdir(_setup.proofDir);
+			okay = solver->set("lratpalrup", 1); // enable PalRUP proof output
+			okay = solver->set("binary", _setup.outputBinaryPalRup ? 1 : 0); assert(okay); // set proof logging mode to binary format
+			okay = solver->set("lratdeletelines", 1); assert(okay); // do enable printing deletion lines
+			proofFileString = _setup.proofDir + "/out.palrup";
+			LOG(V2_INFO, "CADICAL PROOF DIR %s\n", proofFileString.c_str());
+			okay = solver->trace_proof(proofFileString.c_str()); assert(okay);
 		} else {
 			// Monolithic proof production: LRAT tracer that outputs to a file.
 			// Clause export for sharing is separate, set up in setLearnedClauseCallback.
@@ -207,17 +219,6 @@ void Cadical::setPhase(const int var, const bool phase) {
 // Solve the formula with a given set of assumptions
 // return 10 for SAT, 20 for UNSAT, 0 for UNKNOWN
 SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
-
-	// add the learned clauses
-	learnMutex.lock();
-	for (auto clauseToAdd : learnedClauses) {
-		for (auto litToAdd : clauseToAdd) {
-			addLiteral(litToAdd);
-		}
-		addLiteral(0);
-	}
-	learnedClauses.clear();
-	learnMutex.unlock();
 
 	// set the assumptions
 	this->assumptions.clear();

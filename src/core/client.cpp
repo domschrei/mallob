@@ -144,8 +144,11 @@ void Client::readIncomingJobs() {
                 auto filesList = foundJob.getFilesList();
                 foundJob.description->beginInitialization(foundJob.description->getRevision());
                 LOGGER(log, V3_VERB, "[T] Reading job #%i rev. %i %s ...\n", id, foundJob.description->getRevision(), filesList.c_str());
+
+                Parameters params(_params);
+                app_registry::overrideProgramOptions(params, *foundJob.description);
                 bool success = app_registry::getJobReader(foundJob.description->getApplicationId())(
-                    _params, foundJob.files, *foundJob.description
+                    params, foundJob.files, *foundJob.description
                 );
                 foundJob.description->endInitialization();
                 if (!success) {
@@ -171,6 +174,8 @@ void Client::readIncomingJobs() {
                         bool* done = &clientSideJob.done;
                         JobResult* res = &clientSideJob.result;
                         auto* desc = clientSideJob.desc.get();
+                        Parameters params(_params);
+                        app_registry::overrideProgramOptions(params, *desc);
                         // store "original" arrival time value as the job's submission time
                         desc->getStatistics().timeOfSubmission = desc->getArrival();
                         desc->getStatistics().timeOfScheduling = Timer::elapsedSeconds();
@@ -178,7 +183,7 @@ void Client::readIncomingJobs() {
                         LOGGER(log, V4_VVER, "NEWJOB #%i <#%i> reset registry\n", desc->getId(), appId);
                         //Set the program
                         clientSideJob.program.reset(
-                            app_registry::getClientSideProgramCreator(appId)(_params, APIRegistry::get(), *desc)
+                            app_registry::getClientSideProgramCreator(appId)(params, APIRegistry::get(), *desc)
                         );
                         LOGGER(log, V4_VVER, "NEWJOB #%i <#%i> launch\n", desc->getId(), appId);
                         //Run the program
@@ -648,15 +653,17 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     if (resultCode != 0) {
         _sys_state.addLocal(SYSSTATE_SUCCESSFUL_JOBS, 1);
     }
+    Parameters params(_params);
+    app_registry::overrideProgramOptions(params, desc);
 
     std::string resultString = "s " + resultCodeString + "\n";
     std::vector<std::string> modelStrings;
     // Decide whether we need to construct a string representing a solution.
     // - In "mono" mode of operation, we only want the original job, not a secondary one.
-    bool primaryJob = !_params.monoFilename.isSet() || jobId == _mono_job_id;
+    bool primaryJob = !params.monoFilename.isSet() || jobId == _mono_job_id;
     bool constructSolutionStrings = primaryJob;
     // - Some sort of output is in fact desired by the user.
-    constructSolutionStrings &= _params.solutionToFile.isSet() || (jobId == _mono_job_id && !_params.omitSolution());
+    constructSolutionStrings &= params.solutionToFile.isSet() || (jobId == _mono_job_id && !params.omitSolution());
     if (constructSolutionStrings) {
 
         // Disable all watchdogs to avoid crashes while printing a huge model
@@ -664,12 +671,12 @@ void Client::handleSendJobResult(MessageHandle& handle) {
         //     Watchdog::disableGlobally();
 
         auto json = app_registry::getJobSolutionFormatter(desc.getApplicationId())(
-            _params, jobResult, desc.getStatistics());
+            params, jobResult, desc.getStatistics());
         if (json.is_array() && (json.size()==0 || json[0].is_string())) {
             auto jsonArr = json.get<std::vector<std::string>>();
             for (auto&& str : jsonArr) modelStrings.push_back(std::move(str));
         } else if (json.is_string()) {
-            if (resultCode == RESULT_SAT && _params.compressModels()) {
+            if (resultCode == RESULT_SAT && params.compressModels()) {
                 auto vec = ModelStringCompressor::decompress(json.get<std::string>());
                 std::string modelStr = "v ";
                 for (int l : vec) if (l!=0) modelStr += std::to_string(l) + " ";
@@ -682,10 +689,10 @@ void Client::handleSendJobResult(MessageHandle& handle) {
             modelStrings.push_back(json.dump()+"\n");
         }
     }
-    if (constructSolutionStrings && _params.solutionToFile.isSet()) {
+    if (constructSolutionStrings && params.solutionToFile.isSet()) {
         // Write solution to file
         std::ofstream file;
-        std::string solPath = _params.solutionToFile();
+        std::string solPath = params.solutionToFile();
         if (jobId != _mono_job_id) solPath += "." + std::to_string(jobId) + "." + std::to_string(revision);
         file.open(solPath);
         if (!file.is_open()) {
@@ -699,14 +706,9 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     if (jobId == _mono_job_id) {
         // Mono job: log solution to stdout, write result hint if doing proof production
         LOG_OMIT_PREFIX(V0_CRIT, resultString.c_str());
-        if (constructSolutionStrings && !_params.solutionToFile.isSet()) {
+        if (constructSolutionStrings && !params.solutionToFile.isSet()) {
             for (auto& modelString : modelStrings)
                 LOG_OMIT_PREFIX(V0_CRIT, modelString.c_str());
-        }
-        if (_params.proofOutputFile.isSet()) {
-            std::ofstream resultFile(".mallob_result");
-            std::string resultCodeStr = std::to_string(resultCode);
-            if (resultFile.is_open()) resultFile.write(resultCodeStr.c_str(), resultCodeStr.size());
         }
     }
 

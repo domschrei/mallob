@@ -24,8 +24,8 @@ private:
 
 public:
     BitwuzllobSatSolverFactory(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& tracker,
-        bitwuzla::Terminator& term, const std::string& name, const bitwuzla::Options &options)
-            : bitwuzla::SatSolverFactory(options),
+        bitwuzla::Terminator& term, const std::string& name)
+            : bitwuzla::SatSolverFactory(),
             _params(params), _api(api), _desc(desc), _tracker(tracker), _term(term), _name(name) {}
 
     virtual std::unique_ptr<bitwuzla::SatSolver> new_sat_solver() override {
@@ -36,7 +36,7 @@ public:
         sat->setCleanupCallback([&, i = solverPointers.size()-1]() {
             solversCleanedUp[i] = true;
         });
-        sat->configure_terminator(&_term);
+        sat->configure_ext_terminator(&_term);
         return std::unique_ptr<bitwuzla::SatSolver>(sat);
     }
     /** Determine if configured SAT solver has terminator support. */

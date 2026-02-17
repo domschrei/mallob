@@ -35,7 +35,7 @@
 class MaxSatSolver {
 
 private:
-    const Parameters& _params; // configuration, cmd line arguments
+    const Parameters _params; // configuration, cmd line arguments
     APIConnector& _api; // for submitting jobs to Mallob
     JobDescription& _desc; // contains our instance to solve and all metadata
 

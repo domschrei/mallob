@@ -58,21 +58,21 @@ if echo $solvers|grep -q "l"; then
     fi
 fi
 
-
 # Kissat
 if echo $solvers|grep -q "k"; then
     if [ ! -d kissat ]; then
         if [ ! -f kissat.zip ]; then
             # for fixing a branch instead of a commit, prepend "refs/heads/"
             if [ $switch_to_sweep_kissat ]; then
-                echo "Fetching sweep kissat from Niccos repo!" 
+                echo "Fetching sweep kissat from Niccos repo!"
                 curl -L -o kissat.zip https://github.com/nrilu/kissat/archive/refs/heads/update24.zip
 #                 echo "Downloading Nicco's Kissat Fork for Equivalence Sweeping"
             else
-                echo "Fetching kissat from standard repo (no shared sweeping!)" 
-                branchorcommit="53b0ce61b0ce8b1d91e5c302d8060f8597364137" # updated 2024-04-02
+                echo "Fetching kissat from standard repo (no shared sweeping!)"
+                #branchorcommit="53b0ce61b0ce8b1d91e5c302d8060f8597364137" # updated 2024-04-02
+                #curl -L -o kissat.zip https://github.com/domschrei/kissat/archive/${branchorcommit}.zip
+                branchorcommit="b6871cff6001e299099f07df3b9c73af78a07d9c" # updated 2026-01-29
                 curl -L -o kissat.zip https://github.com/domschrei/kissat/archive/${branchorcommit}.zip
-            #wget -nc https://github.com/domschrei/kissat/archive/${branchorcommit}.zip -O kissat.zip
             fi
 		fi
         unzip kissat.zip
@@ -85,7 +85,7 @@ if echo $solvers|grep -q "c"; then
     if [ ! -d cadical ]; then
         if [ ! -f cadical.zip ]; then
             # for fixing a branch instead of a commit, prepend "refs/heads/"
-            branchorcommit="012ea87d63dac099454af0f66b252d8f195b1171" # updated 2025-10-22
+            branchorcommit="f7fc828365b9f94ff6b293d332ea3e08e2c9c99a" # updated 2026-02-05
             curl -L -o cadical.zip https://github.com/domschrei/cadical/archive/${branchorcommit}.zip
             #wget -nc https://github.com/domschrei/cadical/archive/${branchorcommit}.zip -O cadical.zip
         fi

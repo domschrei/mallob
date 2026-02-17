@@ -9,6 +9,7 @@
 #include "app/sat/stream/wrapped_sat_job_stream.hpp"
 #include "core/dtask_tracker.hpp"
 #include "data/job_description.hpp"
+#include "data/job_result.hpp"
 #include "interface/api/api_connector.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
@@ -19,7 +20,7 @@
 class IncSatController {
 
 private:
-    const Parameters& _params;
+    const Parameters _params;
     APIConnector& _api;
     JobDescription& _desc;
     std::string _problem_file;
@@ -35,8 +36,11 @@ private:
     std::string _name;
 
     float _start_time = -1;
-    DTaskTracker _dtask_tracker;
+    DTaskTracker& _dtask_tracker;
     std::unique_ptr<WrappedSatJobStream> _stream;
+
+    std::function<bool()> _cb_terminate;
+    bool _replace_default_terminator {false};
 
 public:
     IncSatController(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& dTaskTracker) :
@@ -56,23 +60,24 @@ public:
         assert(!_stream);
         initStream(false);
 
+        JobResult res;
         while (!isTimeoutHit(&_params, &_desc, _start_time)
                 && parseNextRevision()
                 && !isTimeoutHit(&_params, &_desc, _start_time)) {
             LOG(V3_VERB, "Parsed next revision\n");
             std::vector<int> payload(_desc.getFormulaPayload(_rev), _desc.getFormulaPayload(_rev)+_desc.getFormulaPayloadSize(_rev));
-            auto [res, sol] = _stream->stream.solve({SatJobStreamProcessor::SatTask::Type::RAW, std::move(payload)});
-            if (res == 0) break;
+            auto [resCode, sol] = _stream->stream.solve({SatJobStreamProcessor::SatTask::Type::RAW, std::move(payload)});
+            res.result = resCode;
+            if (resCode == 0) break;
+            res.setSolution(std::move(sol));
         }
 
         LOG(V4_VVER, "%s finalizing stream\n", _name.c_str());
         finalize();
         LOG(V3_VERB, "%s done\n", _name.c_str());
 
-        JobResult res;
         res.id = _desc.getId();
         res.revision = 0;
-        res.result = 10;
         return res;
     }
 
@@ -123,9 +128,9 @@ public:
         return _stream->stream.getNonblockingSolveResult();
     }
 
-    std::function<bool()> _cb_terminate;
-    void setInnerTerminator(std::function<bool()> cb) {
+    void setInnerTerminator(std::function<bool()> cb, bool replaceDefaultTerminator) {
         _cb_terminate = cb;
+        _replace_default_terminator = replaceDefaultTerminator;
     }
 
     void finalize() {
@@ -171,6 +176,7 @@ private:
         _stream->stream.setTerminator([&, str=&_stream->stream, params=&_params, desc=&_desc, startTime=_start_time]() {
             if (str->finalizing()) return true;
             if (_cb_terminate && _cb_terminate()) return true;
+            if (_replace_default_terminator) return false; // skip default terminator
             return isTimeoutHit(params, desc, startTime);
         });
 

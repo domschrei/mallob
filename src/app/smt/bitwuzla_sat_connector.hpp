@@ -48,7 +48,8 @@ private:
     std::unique_ptr<IncSatController> _incsat;
 
     std::function<void()> _cb_cleanup;
-    std::vector<bitwuzla::Terminator*> _bzla_terms;
+    bitwuzla::Terminator* _bzla_term {nullptr};
+    bitwuzla::Terminator* _ext_term {nullptr};
 
 public:
     BitwuzlaSatConnector(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& tracker, const std::string& name) :
@@ -57,9 +58,10 @@ public:
 
         _incsat.reset(new IncSatController(_params, api, _desc, tracker));
         _incsat->setInnerTerminator([&]() {
-            for (auto t : _bzla_terms) if (t->terminate()) return true;
+            if (_bzla_term && _bzla_term->terminate()) return true;
+            if (_ext_term && _ext_term->terminate()) return true;
             return false;
-        });
+        }, true);
     }
     virtual ~BitwuzlaSatConnector() {
         LOG(V2_INFO, "Done: %s\n", _name.c_str());
@@ -86,8 +88,10 @@ public:
     }
 
     virtual void configure_terminator(bitwuzla::Terminator* terminator) override {
-        if (!terminator) return;
-        _bzla_terms.push_back(terminator);
+        _bzla_term = terminator;
+    }
+    void configure_ext_terminator(bitwuzla::Terminator* terminator) {
+        _ext_term = terminator;
     }
 
     virtual bitwuzla::Result solve() override {

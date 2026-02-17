@@ -218,10 +218,14 @@ void Worker::publishAndResetSysState() {
                     (int)result[SYSSTATE_NUMJOBS], result[SYSSTATE_GLOBALMEM], (int)result[SYSSTATE_SPAWNEDREQUESTS], 
                     (int)result[SYSSTATE_NUMHOPS]);
     }
-    
-    if (!_job_registry.isBusyOrCommitted()) {
-        LOG(V4_VVER, "I am idle\n");
-    }
+
+    // Log the current status of this worker
+    int dormantRootId = 0;
+    if (_job_registry.isBusyOrCommitted()) LOG(V4_VVER, "STATUS busy/committed\n");
+    else if (_job_registry.hasInactiveJobsWaitingForReactivation()) LOG(V4_VVER, "STATUS wait reactivate\n");
+    else if (_job_registry.hasDormantRoot(&dormantRootId))
+        LOG(V4_VVER, "STATUS dormant root #%i\n", dormantRootId);
+    else LOG(V4_VVER, "STATUS idle\n");
 
     // Reset fields which are added to incrementally
     _sys_state.setLocal(SYSSTATE_NUMHOPS, 0);

@@ -26,6 +26,8 @@
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
 #include "util/option.hpp"
 #include <climits>
+#include <fstream>
+#include <iterator>
 
 class LratConnector;
 #if MALLOB_USE_MERGESAT
@@ -74,7 +76,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	std::string proofDirectory;
 
 	// Launched in some certified UNSAT mode?
-    if (_params.proofOutputFile.isSet() || _params.onTheFlyChecking()) {
+    if (_params.proofOutputFile.isSet() || _params.onTheFlyChecking() || _params.palRup()) {
 
 		// Override options
 		if (!portfolio.featuresProofOutput()) {
@@ -94,7 +96,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 			ClauseMetadata::enableIncrementalSignatures();
 		}
 
-		if (_params.proofOutputFile.isSet()) {
+		if (_params.proofOutputFile.isSet() || _params.palRup()) {
 			// Create directory for partial proofs
 			proofDirectory = params.proofDirectory() + "/proof" + config.getJobStr();
 			FileUtils::mkdir(proofDirectory);
@@ -292,12 +294,14 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		setup.solverType = item.baseSolver;
 		setup.flavour = item.flavour;
 		setup.doIncrementalSolving = setup.isJobIncremental && item.incremental;
-		setup.certifiedUnsat = item.outputProof && (params.proofOutputFile.isSet() || params.onTheFlyChecking());
+		setup.certifiedUnsat = item.outputProof && (params.proofOutputFile.isSet() || params.onTheFlyChecking() || _params.palRup());
 		setup.onTheFlyChecking = setup.certifiedUnsat && params.onTheFlyChecking();
 		setup.onTheFlyCheckModel = params.onTheFlyChecking() && params.onTheFlyCheckModel();
+		setup.usePalRupFormat = params.palRup();
+		setup.outputBinaryPalRup = params.palRupBinary();
 		setup.trustedParserForced = params.forceIncrementalTrustedParser();
 		setup.modelCheckingLratConnector = modelCheckingLratConnector;
-		setup.avoidUnsatParticipation = (params.proofOutputFile.isSet() || params.onTheFlyChecking()) && !item.outputProof;
+		setup.avoidUnsatParticipation = (params.proofOutputFile.isSet() || params.onTheFlyChecking() || _params.palRup()) && !item.outputProof;
 		setup.exportClauses = !setup.avoidUnsatParticipation;
 
 		_solver_interfaces.push_back(createSolver(setup));
@@ -436,6 +440,22 @@ void SatEngine::solve() {
 		for (size_t i = 0; i < std::min(_num_active_solvers, _solver_threads.size()); i++)
 			_solver_threads[i]->start();
 		_solvers_started = true;
+
+		if (_params.injectProofData.isSet()) {
+			// Read proof meta data to inject into solving
+			{
+				std::ifstream ifs(_params.injectProofData() + "/winning-id.txt");
+				std::string content( (std::istreambuf_iterator<char>(ifs)),
+					(std::istreambuf_iterator<char>()));
+				_result.winningInstanceId = atoi(content.c_str());
+			}
+			{
+				std::ifstream ifs(_params.injectProofData() + "/global-start-of-success-epoch.txt");
+				std::string content( (std::istreambuf_iterator<char>(ifs)),
+					(std::istreambuf_iterator<char>()));
+				_result.globalStartOfSuccessEpoch = atol(content.c_str());
+			}
+		}
 	}
 	_state = ACTIVE;
 }
@@ -459,7 +479,15 @@ int SatEngine::solveLoop() {
 	bool done = false;
 	bool preprocessingResult = false;
 	for (size_t i = 0; i < std::min(_num_active_solvers, _solver_threads.size()); i++) {
-		if (_solver_threads[i]->hasFoundResult(_revision)) {
+		if (_params.injectProofData.isSet()) {
+			// Inject solver result from the specified proof meta data
+			if (_solver_interfaces[i]->getGlobalId() == _result.winningInstanceId) {
+				done = true;
+				_result.result = UNSAT;
+				_result.revision = 0;
+				break;
+			}
+		} else if (_solver_threads[i]->hasFoundResult(_revision)) {
 
 			if (_params.deterministicSolving() && _solver_interfaces[i]->getGlobalId() != _winning_solver_id)
 				continue; // not the successful solver we're looking for
@@ -652,6 +680,7 @@ long long SatEngine::getBestFoundObjectiveCost() const {
 }
 
 void SatEngine::writeClauseEpochs() {
+	if (_params.injectProofData.isSet()) return;
 	std::string filename = _params.proofDirectory() + "/proof"
 		+ _config.getJobStr() + "/clauseepochs." + std::to_string(_config.apprank);
 	_sharing_manager->writeClauseEpochs(/*_solver_interfaces[0]->getSolverSetup().proofDir, 

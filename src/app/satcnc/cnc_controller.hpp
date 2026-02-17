@@ -21,7 +21,7 @@
 class CncController {
 
 private:
-    const Parameters& _params;
+    const Parameters _params;
     JobDescription& _desc;
     std::vector<int> _base_formula;
 

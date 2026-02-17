@@ -29,6 +29,7 @@ private:
     const Parameters& _params;
     APIConnector& _api;
     int _stream_id;
+    long _nontrivial_wait_millis;
 
     int _nb_vars {0};
     int _nb_clauses {0};
@@ -41,11 +42,12 @@ private:
     nlohmann::json _json_result;
     std::string _expected_result_job_name;
 
-    bool _task_pending {false};
+    volatile bool _task_pending {false};
     int _pending_rev {-1};
     bool _pending_task_interrupted {false};
 
     bool _began_nontrivial_solving {false};
+    bool _retrieve_complete_task {false};
     SatTask _backlog_task {SatTask::RAW};
     bool _initialized_backlog_task {false};
     bool _finalized {false};
@@ -56,6 +58,7 @@ public:
     MallobSatJobStreamProcessor(const Parameters& params, APIConnector& api, JobDescription& desc,
             const std::string& baseUserName, int streamId, bool incremental, Synchronizer& sync) :
         SatJobStreamProcessor(sync), _params(params), _api(api), _stream_id(streamId),
+        _nontrivial_wait_millis(params.internalStreamProcessor() ? params.nontrivialSolvingDelay() : 0),
         _incremental(incremental), _username(baseUserName)
         //,_job_slot(new JobSlotRegistry::JobSlot(_username, [&]() {signalReinitialization();})) 
         {}
@@ -75,8 +78,7 @@ public:
     }
 
     virtual void loop() override {
-        auto lock = _slot->getLock();
-        if (_slot->wasEvicted()) yield();
+        if (_slot->checkEvicted()) yield();
     }
 
     virtual void process(SatTask& task) override {
@@ -85,21 +87,51 @@ public:
             _backlog_task.type = task.type;
             _initialized_backlog_task = true;
         }
-        _backlog_task.integrate(task);
+        if (_retrieve_complete_task) {
+            // Flag set to retrieve the complete task again
+            _retrieve_complete_task = false;
+            _backlog_task = _cb_retrieve_full_task();
+            if (_backlog_task.rev < task.rev) {
+                // Incoming task directly (!) succeeds the retrieved backlog task: just integrate
+                assert(_backlog_task.rev + 1 == task.rev);
+                _backlog_task.integrate(task);
+            } else if (_backlog_task.rev == task.rev) {
+                // Incoming task is exactly the retrieved backlog task
+                assert(_backlog_task.assumptions == task.assumptions);
+            } else {
+                // Incoming task precedes the retrieved backlog task: incoming task obsolete!
+                LOG(V3_VERB, "%s task with int. rev %i obsolete\n", _name.c_str(), task.rev);
+                return;
+            }
+        } else {
+            _backlog_task.integrate(task);
+        }
         auto& t = _backlog_task;
+        LOG(V5_DEBG, "%s attempting to solve task ...\n", _name.c_str());
 
-        auto lock = _slot->getLock();
-        if (_slot->wasEvicted()) {
+        if (_task_pending) {
+            // A previous interruption is still ongoing.
+            // We need to wait for it to complete before we can submit the next revision.
+            LOG(V4_VVER, "%s pending ...\n", _name.c_str());
+            unsigned long sleepInterval {1};
+            while (_task_pending) {
+                usleep(sleepInterval);
+                sleepInterval = std::min(2500UL, (unsigned long) std::ceil(1.2*sleepInterval));
+            }
+            LOG(V4_VVER, "%s ... ready\n", _name.c_str());
+        }
+
+        if (_slot->checkEvicted()) {
             yield();
             return;
         }
+
         if (!_finalized && !_began_nontrivial_solving) {
-            assert(!_slot->wasEvicted());
 
             // If no distributed job was submitted yet, we try to avoid this overhead;
             // we wait for a short while if a more lightweight solver finds a solution immediately.
             time = Timer::elapsedSeconds() - time;
-            usleep(1'000'000 * std::max(0.0, 0.05 - time)); // 50 ms minus the time taken to copy the literals
+            usleep(1'000'000 * std::max(0.0, 0.001 * _nontrivial_wait_millis - time)); // X ms minus the time taken to copy the literals
             if (_terminator(t.rev)) {
                 return; // Task has become obsolete in the meantime, so skip solving
             }
@@ -107,8 +139,6 @@ public:
             LOG(V2_INFO, "%s awakes for rev. %i\n", _name.c_str(), t.rev);
             _began_nontrivial_solving = true;
             _slot->deploy();
-
-            //JobSlotRegistry::acquireSlot(_job_slot);
 
             int jobSlots = _params.jobSlots() > 0 ? _params.jobSlots() : MyMpi::size(MPI_COMM_WORLD);
             int numConcStreams = std::min(jobSlots, MyMpi::size(MPI_COMM_WORLD));
@@ -197,30 +227,27 @@ public:
                 } else {
                     solution = result["result"]["solution"].get<std::vector<int>>();
                 }
+                const int solSize = solution.size();
                 bool winner = concludeRevision(rev, resultCode, std::move(solution));
                 if (winner) LOG(V2_INFO, "%s rev. %i (internally %i) won with res=%i solsize=%i\n",
-                    _name.c_str(), rev, subjob, resultCode, solution.size());
+                    _name.c_str(), rev, subjob, resultCode, solSize);
                 _task_pending = false;
             });
             if (response == JsonInterface::Result::DISCARD) {
                 concludeRevision(_pending_rev, 0, {});
                 _task_pending = false;
             }
-            //_job_slot->startActiveTime();
         } catch (...) {
             LOG(V0_CRIT, "[ERROR] uncaught exception while submitting JSON\n");
             abort();
         }
-        lock.unlock();
 
         unsigned long sleepInterval {1};
-        while (checkTaskPending(t.rev)) {
+        while (continueWaitingForTask(t.rev)) {
             usleep(sleepInterval);
             sleepInterval = std::min(2500UL, (unsigned long) std::ceil(1.2*sleepInterval));
         }
-        //_job_slot->endActiveTime();
 
-        lock = _slot->getLock();
         _slot->suspend();
         LOG(V5_DEBG, "MSJS %s call ended\n", _name.c_str());
 
@@ -232,7 +259,7 @@ public:
         _finalized = true;
         SatJobStreamProcessor::finalize();
         if (!_began_nontrivial_solving) return;
-        _slot->yield();
+        _slot->tryYield(false, false);
         while (_task_pending) usleep(3000);
         if (!_incremental) return;
         if (!_json_base.contains("name")) return;
@@ -244,7 +271,6 @@ public:
         LOG(V4_VVER, "%s closing API\n", _name.c_str());
         _api.submit(copy, [&](nlohmann::json& result) {assert(false);});
         LOG(V4_VVER, "%s closed API\n", _name.c_str());
-        //_job_slot->release();
     }
 
     void yield() {
@@ -266,7 +292,7 @@ public:
         LOG(V4_VVER, "%s closed API\n", _name.c_str());
 
         _began_nontrivial_solving = false;
-        _backlog_task = _cb_retrieve_full_task();
+        _retrieve_complete_task = true;
         _json_base = {};
     }
 
@@ -285,12 +311,10 @@ public:
     }
 
 private:
-    bool checkTaskPending(int rev) {
+    bool continueWaitingForTask(int rev) {
         if (!_task_pending) return false;
-        if (_pending_task_interrupted) return true;
-        auto lock = _slot->getLock();
+        if (_pending_task_interrupted) return false; // do NOT wait for interrupted call to return
         if (!_terminator(rev) && !_slot->wasEvicted()) return true;
-        lock.unlock();
 
         _pending_task_interrupted = true;
         nlohmann::json jsonInterrupt {
@@ -307,8 +331,7 @@ private:
         if (response == JsonInterface::Result::DISCARD) {
             concludeRevision(_pending_rev, 0, {});
             _task_pending = false;
-            return false;
         }
-        return true;
+        return false; // do NOT wait for interrupted call to return
     }
 };
