@@ -483,7 +483,7 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
     sweeper->set_option("log", 0);    //potentially extensive logging
     sweeper->set_option("check", 0);  // do not check model or derived clauses, because we import anyways units and equivalences without proof tracking
     sweeper->set_option("statistics", 1);  //print full statistics
-    sweeper->set_option("profile", _params.satProfilingLevel.val); // do detailed profiling how much time we spent where
+    sweeper->set_option("profile", max(_params.satProfilingLevel.val, 0)); // do detailed profiling how much time we spent where. kissat allows down to 0, mallob down to -1
 	sweeper->set_option("seed", 0);   //Sweeping should not contain any RNG part
 
 	//Specific due to Mallob
