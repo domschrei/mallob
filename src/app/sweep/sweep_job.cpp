@@ -860,7 +860,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		if ( ! stolen_work.empty()) {
 			//store steal data persistently in C++, such that C can keep operating on that memory segment
 			sweeper->work_received_from_steal = std::move(stolen_work);
-			LOG(V3_VERB, "SWEEP WORK [%i](%i) <==%i==== [%i]  (local) \n", _my_rank, localId, sweeper->work_received_from_steal.size(), _my_rank);
+			LOG(V3_VERB, "SWEEP [%i](%i) <==%i==== local  \n", _my_rank, localId, sweeper->work_received_from_steal.size(), _my_rank);
 			break;
 		}
 		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop <-- local steal failed \n", _my_rank, localId);
@@ -870,7 +870,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 			usleep(1000);
 			continue;
 		}
-		//Unsuccessful steal locally. Go global via MPI message
+		//Couldnt find anything to steal locally. Now searching globally via MPI
 
 		if (_terminate_all || getVolume()==0) { //check again for termination, can happen that it slips now in here
 			sweeper->work_received_from_steal = {};
@@ -933,7 +933,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		//Successful steal if size > 0
 		if (! _worksteal_requests[localId].stolen_work.empty()) {
 			sweeper->work_received_from_steal = std::move(_worksteal_requests[localId].stolen_work);
-			LOG(V4_VVER, "SWEEP MPI WORK [%i](%i) <==%i=== [%i] \n",  _my_rank, localId, sweeper->work_received_from_steal.size(), targetRank);
+			LOG(V4_VVER, "SWEEP [%i](%i) <==%i=== [%i] \n",  _my_rank, localId, sweeper->work_received_from_steal.size(), targetRank);
 			break;
 		}
 		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop <-- global steal to [%i] failed \n", _my_rank, localId, targetRank);
