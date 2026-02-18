@@ -72,7 +72,7 @@ private:
 				stolen_work.clear();
 		}
 	};
-	std::deque<WorkstealRequest> _worksteal_requests;
+	std::deque<WorkstealRequest> _worksteal_requests; //deque, because they have an atomic member and are thus not copyable
 
 
 	//Sharing Equivalences and Units

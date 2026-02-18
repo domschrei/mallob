@@ -13,9 +13,11 @@ if [ -z "${1:-}" ]; then
 fi
 
 jobname="$1"
-# sourcedir="$HOME/logs/${jobname}"
-# outdir="/hppfs/work/$projectname/$username/logs/${jobname}"
-outdir="$HOME/logs/${jobname}"
+
+# WORK
+outdir="/hppfs/work/$projectname/$username/logs/${jobname}"
+# HOME
+# outdir="$HOME/logs/${jobname}"
 
 echo "$jobname: moving results to unified $outdir"
 

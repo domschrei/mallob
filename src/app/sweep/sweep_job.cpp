@@ -65,10 +65,6 @@ void SweepJob::appl_start() {
     _warnlogger = Logger::getMainInstance().copy("<WARN>", ".warn");
 
 	_worksteal_requests.resize(_nThreads);
-	// _worksteal_requests.resize(_nThreads);
-	// for (int i = 0; i < _nThreads; ++i) {
-		// _worksteal_requests.emplace_back();
-	// }
 
 	//do not send the initial placeholder worksteal requests
 	for (auto &request : _worksteal_requests) {
@@ -254,7 +250,6 @@ bool SweepJob::appl_isDestructible() {
 		return false;
 	}
 
-
 	//all background workers are completely done, so joining them now should happen immediately (even doing it sequentially)
 	LOG(V2_INFO, "SWEEP TERM #%i [%i] isDestructible? yes. now joining... \n",  getId(),_my_rank);
 	int i=0;
@@ -268,25 +263,6 @@ bool SweepJob::appl_isDestructible() {
 	}
 	LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? yes. all joined \n",  getId(),_my_rank);
 	return true;
-
-	// return _running_sweepers_count==0;
-
-	//When a sweeper background thread is finished, it deletes (as its last operation) the sweeper reference from
-	// for (auto &sweeper : _sweepers) {
-		// if (sweeper) return false;
-	// }
-	// return true;
-	// LOG(V4_VVER, "SWEEP TERM #%i [%i] joining bg_workers \n",  getId(),_my_rank);
-	// for (auto &bg_worker : _bg_workers) {
-		// if (bg_worker->isRunning()) {
-			// LOG(V4_VVER, "SWEEP TERM #%i [%i] joining bg_worker (%i) \n",  getId(),_my_rank, i);
-			// bg_worker->stop();
-			// LOG(V4_VVER, "SWEEP TERM #%i [%i] joined  bg_worker    (%i) \n",  getId(),_my_rank, i);
-		// }
-		// i++;
-	// }
-	// LOG(V4_VVER, "SWEEP TERM #%i [%i] joined all bg_workers \n", getId(),_my_rank);
-	// LOG(V4_VVER, "SWEEP TERM #%i [%i] DONE \n", getId(),_my_rank);
 }
 
 

@@ -37,14 +37,13 @@ export PATH="$build/:$PATH"
 export RDMAV_FORK_SAFE=1
 export MALLOC_CONF="thp:always"
 
-# HOME
 globallogdir_base="/logs/$DS_JOBNAME-$SLURM_JOB_ID"
 # WORK
-# if [ -d "$WORK_$DS_PROJECTNAME" ]; then globallogdir_base="$WORK_$DS_PROJECTNAME/$globallogdir_base"; fi
+if [ -d "$WORK_$DS_PROJECTNAME" ]; then globallogdir_base="$WORK_$DS_PROJECTNAME/$globallogdir_base"; fi
 # SCRATCH
 #if [ -d "$SCRATCH" ]; then globallogdir_base="$SCRATCH/$globallogdir_base"; fi
 # HOME
-globallogdir_base="$HOME/$globallogdir_base"
+# globallogdir_base="$HOME/$globallogdir_base"
 
 
 # Directories for writing and for storing logs
@@ -139,7 +138,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 	-seed=1 \
 	-v=2 \
 	-spd=${globallogdir}/ \
-  -spl=-1 \
+  -spl=2 \
 	-jcup=0.05 \
 	-preprocess-sweep=1 \
 	-sweep-sharing-period=0.020 \
