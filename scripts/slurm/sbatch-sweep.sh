@@ -128,7 +128,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 	-q=1 -log=$globallogdir -tmp=$localtmpdir -comment-outputlogdir=$outputlogdir \
 	-sro=${globallogdir}/processed-jobs.out -trace-dir=${globallogdir}/ \
   -os=1 \
-  -iff=1 \
+  -iff=0 \
   -cm=0 \
   -rspaa=1 \
 	-rpa=1 -pph=${SLURM_NTASKS_PER_NODE} -mlpt=50``000``000 -t=$((${SLURM_CPUS_PER_TASK} / 2)) \

@@ -7,18 +7,39 @@ echo "NPROCS $NPROCS"
 echo "threads per process $threads"
 
 OUT_DIR=$HOME/PhD/logsntraces/
-INST_DIR=$HOME/PhD/instances/miter/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf
+
+# INST_PATH=$HOME/PhD/instances/miter/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf
+INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/nusmvdme1d3multi.cnf.xz" #0.1sec
+# INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf.xz" # 6sec
+# INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/iso/6s151.cnf.xz"  # 0.1sec
+# INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/bob12s01.cnf.xz" # 30sec, 17% after 2 rounds
 
 MALLOB_OPTIONS="-t=$threads \
   -mono-app=SWEEP \
   -satsolver=k \
   -colors \
-  -v=3 \
-  -jcup=0.05 \
   -trace-dir=$OUT_DIR/traces/ \
   -log=$OUT_DIR/logs/ \
-  -mono=$INST_DIR \
-  -sweep-sharing-period=50"
+  -mono=$INST_PATH \
+  -os=1 \
+  -iff=0 \
+  -cm=0 \
+  -rspaa=1 \
+	-rpa=1 \
+	-seed=1 \
+	-v=2 \
+  -spl=2 \
+	-jcup=0.05 \
+	-preprocess-sweep=1 \
+	-sweep-sharing-period=0.020 \
+  -sweep-resweep-chance=1000 \
+  -sweep-rounds=2 \
+	-sweep-solver-verbosity=0 \
+	-sweep-solver-quiet=1 \
+  -sweep-congruence=0 \
+  -sweep-growing-environments=1 \
+  -preprocess-sweep-priority=1.0 \
+"
 
 
 #clean old logs and traces
