@@ -121,7 +121,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
   #
     timeout=$DS_SECONDSPERJOB
     cmd="$build/mallob \
-	-mono-app=SATWITHPRE \
+	-mono-app=SWEEP \
 	-satsolver=[k_]w \
 	-pb=1 -pjp=999999 -pef=1 -mono=$f \
 	-jwl=$timeout -T=$(($timeout+30)) -wam=10``000 -pre-cleanup=1 \
@@ -138,7 +138,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 	-seed=1 \
 	-v=2 \
 	-spd=${globallogdir}/ \
-  -spl=2 \
+  -spl=4 \
 	-jcup=0.05 \
 	-preprocess-sweep=1 \
 	-sweep-sharing-period=0.020 \
@@ -146,7 +146,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
   -sweep-rounds=2 \
 	-sweep-solver-verbosity=0 \
 	-sweep-solver-quiet=1 \
-  -sweep-congruence=1 \
+  -sweep-congruence=0 \
   -sweep-growing-environments=1 \
   -preprocess-sweep-priority=1.0 \
 "

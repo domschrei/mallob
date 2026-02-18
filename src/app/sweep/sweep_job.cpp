@@ -246,7 +246,7 @@ bool SweepJob::appl_isDestructible() {
 
 	int _running_sweepers = _started_sweepers_count - _finished_sweepers_count;
 	if (_finished_sweepers_count < _nThreads) {
-		LOG(V2_INFO, "SWEEP TERM #%i [%i] isDestructible? no. only %i/%i finished, %i running \n",  getId(),_my_rank, _finished_sweepers_count.load(), _nThreads, _running_sweepers);
+		LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? no. only %i/%i finished, %i running \n",  getId(),_my_rank, _finished_sweepers_count.load(), _nThreads, _running_sweepers);
 		return false;
 	}
 
@@ -550,7 +550,7 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 		LOGGER(_reslogger,V2_INFO, "SWEEP_PRIORITY       %.3f\n", _params.preprocessSweepPriority.val);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_PROCESSES      %i\n", getVolume());
 		LOGGER(_reslogger,V2_INFO, "SWEEP_THREADS_PER_P  %i\n", _nThreads);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_PERIOD %i sec \n", _params.sweepSharingPeriod.val);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_PERIOD %.3f sec \n", _params.sweepSharingPeriod.val);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_ORIG		 %i\n", sweeper->_setup.numVars);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_END		 %i\n", stats.vars_end);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_ACTIVE_ORIG    %i\n", stats.vars_active_orig);
@@ -722,7 +722,7 @@ void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
 
 		assert(my_last_import_round <= available_import_round);
 		if (my_last_import_round!=0 && my_last_import_round != available_import_round - 1) {
-			LOG(V1_WARN, "WARN SWEEP: Solver [%i](%i) skipped some import rounds, went directly from %i to %i \n", _my_rank, sweeper->getLocalId(), my_last_import_round, available_import_round);
+			LOG(V1_WARN, "WARN SWEEP: Solver [%i](%i) skipped import rounds, went %i -> %i \n", _my_rank, sweeper->getLocalId(), my_last_import_round, available_import_round);
 		}
 		sweeper->sweep_import_round  = available_import_round;
 		if (sweeper->sweep_EQS_index != sweeper->sweep_EQS_size)

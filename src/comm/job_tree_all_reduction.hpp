@@ -173,7 +173,7 @@ private:
         if (!accept) return false;
 
         if (msg.returnedToSender) {
-            LOG(V2_INFO, "Warn REDUCE returnedToSender\n");
+            LOG(V1_WARN, "WARN REDUCE returnedToSender (source %i, tag %i)\n", source, tag);
             return true;
         }
 
@@ -189,7 +189,7 @@ private:
             accept &= fromLeftChild || fromRightChild;
             if (!accept) return false;
 
-            LOG(V4_VVER, "SWEEP SHARE REDUCE received element from child rank [%i] with size %i \n", source, msg.payload.size());
+            LOG(V4_VVER, "SWEEP REDUCE received element from child [%i] w. size %i \n", source, msg.payload.size());
             // message accepted: store and check off
             _child_elems.insert({source, std::move(msg.payload)});
             if (fromLeftChild) _received_child_elems.first = true;
@@ -216,7 +216,7 @@ public:
 
         if (_finished) return *this;
 
-        LOG(V4_VVER, "SWEEP SHARE expected child elems %i, actual child elems %i, local elem %i. Childranks %i,%i \n", _num_expected_child_elems, _child_elems.size(), _local_elem.has_value(), _expected_child_ranks.first, _expected_child_ranks.second);
+        LOG(V4_VVER, "SWEEP REDUCE expected child elems %i, actual child elems %i, local elem %i. Childranks %i,%i \n", _num_expected_child_elems, _child_elems.size(), _local_elem.has_value(), _expected_child_ranks.first, _expected_child_ranks.second);
         // if (_child_elems.size() > _num_expected_child_elems) {
            // for (auto &child : _child_elems) {
                 // LOG(V4_VVER, "SWEEP ERROR/Error: Unexpected child elem with size %i from source %i \n", child.elem.size(), child.source);
