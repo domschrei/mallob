@@ -37,6 +37,8 @@ public:
             " NUM_SOLVERS=" + std::to_string(nbSolvers)
             + " NUM_NODES=" + std::to_string(nbHosts)
             + " NUM_PROCS_PER_NODE=" + std::to_string(nbProcsPerHost)
+            // FIXME replace monoFilename with path to *this specific job's* description
+            + " FORMULA_PATH=\"" + FileUtils::getAbsoluteFilePath(_params.monoFilename()) + "\""
             + " PROOF_PALRUP=\"" + proofInputDir + "\""
             + " PROOF_WORKING=\"" + proofWorkingDir + "\""
             + " LOG_DIR=\"" + logDir + "\""
