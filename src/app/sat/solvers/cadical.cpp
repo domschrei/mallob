@@ -7,6 +7,7 @@
 
 #include <assert.h>
 #include <cstdint>
+#include <cstdio>
 #include <stdint.h>
 #include <functional>
 #include <algorithm>
@@ -102,7 +103,7 @@ Cadical::Cadical(const SolverSetup& setup)
 			okay = solver->set("lratpalrup", 1); // enable PalRUP proof output
 			okay = solver->set("binary", _setup.outputBinaryPalRup ? 1 : 0); assert(okay); // set proof logging mode to binary format
 			okay = solver->set("lratdeletelines", 1); assert(okay); // do enable printing deletion lines
-			proofFileString = _setup.proofDir + "/out.palrup";
+			proofFileString = _setup.proofDir + "/out.palrup~";
 			LOG(V2_INFO, "CADICAL PROOF DIR %s\n", proofFileString.c_str());
 			okay = solver->trace_proof(proofFileString.c_str()); assert(okay);
 		} else {
@@ -326,6 +327,12 @@ void Cadical::cleanUp() {
 	if (_setup.certifiedUnsat) {
 		LOGGER(_logger, V4_VVER, "Closing proof output asynchronously\n");
 		solver->close_proof_asynchronously ();
+		if (_setup.usePalRupFormat) {
+			// Finalize the proof fragment by moving temporary to final file
+			std::string proofFileStringOld = _setup.proofDir + "/out.palrup~";
+			std::string proofFileStringNew = _setup.proofDir + "/out.palrup";
+			::rename(proofFileStringOld.c_str(), proofFileStringNew.c_str());
+		}
 	}
 	if (_setup.profilingLevel > 0) {
 		LOGGER(_logger, V4_VVER, "Writing profile ...\n");
