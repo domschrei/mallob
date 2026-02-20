@@ -186,7 +186,7 @@ public:
 
                 // Update local ranklist with new incoming entries
 
-                LOG(V4_VVER, "RANKLIST [%i] recv size %i \n", _job_tree.getRank(), ranklist.list.size());
+                LOG(V4_VVER, "RANKLIST [%i](%i) recv list size %i \n", _job_tree.getRank(), _job_tree.getIndex(), ranklist.list.size());
                 for (size_t i = 0; i < ranklist.list.size(); i++) {
                     if (_next_address_list.list.size() == i) _next_address_list.list.push_back({-1, 0});
                     if (ranklist.list[i].rank != -1) _next_address_list.list[i] = ranklist.list[i];
@@ -219,7 +219,7 @@ public:
             } else {
                 // Forward to parent
                 //log(LOG_ADD_DESTRANK | V3_VERB, "send Ranklist size %i", getJobTree().getParentNodeRank(), msg.payload.size());
-                LOG(V4_VVER, "RANKLIST [%i] send to parent [%i]<%i> \n", _job_tree.getRank(), _job_tree.getParentNodeRank(), _job_tree.getParentIndex());
+                LOG(V4_VVER, "RANKLIST [%i] send nextlist size %i to parent [%i](%i) \n", _job_tree.getRank(), _next_address_list.list.size(), _job_tree.getParentNodeRank(), _job_tree.getParentIndex());
                 _job_tree.sendToParent(msg);
             }
 
@@ -239,6 +239,7 @@ public:
                 updateMap();
             }
             _job_tree.sendToAnyChildren(msg);
+            LOG(V4_VVER, "RANKLIST [%i] list size now %i \n", _job_tree.getRank(), _address_list.list.size());
             return true;
         }
 

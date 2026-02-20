@@ -315,6 +315,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		LOG(V3_VERB, "SWEEP JOB [%i](%i) WORKER START \n", _my_rank, localId);
 
 		auto sweeper = createNewSweeper(localId);
+
 		loadFormula(sweeper);
 		_started_sweepers_count++; //only additive, monotonically increasing, going from 0...nThreads-1 and never decreased
 		_running_sweepers_count++; //tracks actual number of running solvers at any given moment in time
@@ -866,7 +867,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop <-- local steal failed \n", _my_rank, localId);
 		int my_comm_rank = getJobComm().getWorldRankOrMinusOne(_my_index);
 		if (my_comm_rank == -1) {
-			LOG(V3_VERB, "SWEEP SKIP Delaying global steal request, my own rank %i (index %i) is not yet in JobComm \n", _my_rank, _my_index);
+			LOG(V3_VERB, "SWEEP SKIP own rank %i (idx %i) <ctx %i> not yet in JobComm of size %i \n", _my_rank, _my_index, _my_ctx_id, getJobComm().size());
 			usleep(1000);
 			continue;
 		}
@@ -1312,7 +1313,7 @@ std::vector<int> SweepJob::stealWorkFromAnyLocalSolver(int asking_rank, int aski
 	for (int localId : rand_permutation) {
 		auto stolen_work = stealWorkFromSpecificLocalSolver(localId);
 		if ( ! stolen_work.empty()) {
-			LOG(V3_VERB, "SWEEP WORK [%i](%i) ====%i==> [%i](%i) \n",_my_rank, localId, stolen_work.size(), asking_rank, asking_localId);
+			LOG(V3_VERB, "SWEEP [%i](%i) ====%i==> [%i](%i) \n",_my_rank, localId, stolen_work.size(), asking_rank, asking_localId);
 			return stolen_work;
 		}
 	}
@@ -1373,9 +1374,15 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 	const int* lits = getDescription().getFormulaPayload(0);
 	const int payload_size = getDescription().getFormulaPayloadSize(0);
 	// LOG(V2_INFO, "SWEEP Loading Formula, size %i \n", payload_size);
+
+	float t0 = Timer::elapsedSeconds();
+
 	for (int i = 0; i < payload_size ; i++) {
 		sweeper->addLiteral(lits[i]);
 	}
+
+	float t1 = Timer::elapsedSeconds();
+	LOG(V4_VVER, "SWEEP [%i](%i) loaded formula in %.3f ms (%.3f MB) \n", _my_rank, sweeper->getLocalId(), (t1-t0)*1000, (payload_size*32/(1000.0*1000.0)));
 }
 
 void SweepJob::triggerTerminations() {

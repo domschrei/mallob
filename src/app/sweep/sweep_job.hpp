@@ -39,7 +39,7 @@ private:
 	typedef std::shared_ptr<Kissat> KissatPtr;
 	std::vector<KissatPtr> _sweepers;
 	std::vector<std::unique_ptr<BackgroundWorker>> _bg_workers;
-    std::atomic_int _started_sweepers_count {0};
+    std::atomic_int _started_sweepers_count {0}; //no. of initialized Kissat solvers with loaded formula. Monotonically 0..24
     std::atomic_int _running_sweepers_count {0};
 	std::atomic_int _finished_sweepers_count {0};
 	std::vector<int> _list_of_ids;
