@@ -53,8 +53,12 @@ void SweepJob::appl_start() {
 	_my_ctx_id = getJobTree().getContextId();
 	_is_root = getJobTree().isRoot();
 	_nThreads = _params.numThreadsPerProcess.val;
-	LOG(V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d\n",
-		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _nThreads);
+	const JobDescription& desc = getDescription();
+	int numVars = desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
+	int numClauses = desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
+
+	LOG(V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d, NumVars %i, NumClauses %i\n",
+		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _nThreads, numVars, numClauses);
 	// LOG(V2_INFO,"SWEEP JOB sweep-sharing-period: %i ms\n", _params.sweepSharingPeriod_ms.val);
 	// LOG(V2_INFO, "New SweepJob rank %i working on %i vars in %i clauses \n", getJobTree().getRank(), );
     _metadata = getSerializedDescription(0)->data();
@@ -1382,7 +1386,8 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 	}
 
 	float t1 = Timer::elapsedSeconds();
-	LOG(V4_VVER, "SWEEP [%i](%i) loaded formula in %.3f ms (%.3f MB) \n", _my_rank, sweeper->getLocalId(), (t1-t0)*1000, (payload_size*32/(1000.0*1000.0)));
+	constexpr int BITS_PER_MB = 8000000;
+	LOG(V4_VVER, "SWEEP [%i](%i) loaded formula in %.3f ms (%.3f MB) \n", _my_rank, sweeper->getLocalId(), (t1-t0)*1000, (payload_size*32/BITS_PER_MB));
 }
 
 void SweepJob::triggerTerminations() {
