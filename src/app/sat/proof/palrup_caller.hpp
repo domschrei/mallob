@@ -22,6 +22,7 @@ public:
 
     enum PalRupResult {DONE, VALIDATED, ERROR};
     PalRupResult callBlocking() {
+
         assert(_params.regularProcessDistribution());
         assert(_params.logDirectory.isSet());
         assert(_params.proofDirectory.isSet());
@@ -34,6 +35,17 @@ public:
         const std::string proofWorkingDir = FileUtils::getAbsoluteFilePath(_params.palRupCheckWorkdir());
         const std::string logDir = FileUtils::getAbsoluteFilePath(_params.logDirectory());
         FileUtils::mkdir(proofWorkingDir);
+
+        auto fileSuccess = logDir + "/success.palrup";
+        auto fileFailure = logDir + "/failure.palrup";
+        if (FileUtils::isRegularFile(fileSuccess)) {
+            LOG(V0_CRIT, "[ERROR] PalRUP success file exists before starting a checker!\n");
+            return ERROR;
+        }
+        if (FileUtils::isRegularFile(fileFailure)) {
+            LOG(V0_CRIT, "[ERROR] PalRUP failure file discovered immediately\n");
+            return ERROR;
+        }
 
         std::string palRupCall = "cd palrup;"
             " NUM_SOLVERS=" + std::to_string(nbSolvers)
@@ -50,8 +62,6 @@ public:
         const int retval = system(palRupCall.c_str());
         LOG(V4_VVER, "PalRUP checker returned, retval=%i\n", retval);
 
-        auto fileSuccess = logDir + "/success.palrup";
-        auto fileFailure = logDir + "/failure.palrup";
         if (retval != 0) {
             FileUtils::create(fileFailure);
             return ERROR;
