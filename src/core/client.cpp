@@ -4,7 +4,6 @@
 #include <fstream>
 #include <string>
 #include <list>
-#include <filesystem>
 #include <functional>
 #include <initializer_list>
 #include <utility>
@@ -267,9 +266,7 @@ void Client::init() {
         {
             // Write the available job submission path to an availability tmp file
             std::ofstream ofs(TmpDir::getGeneralTmpDir() + "/edu.kit.iti.mallob.apipath." + std::to_string(Proc::getPid()));
-            // Differentiate absolute vs. relative path
-            if (path[0] == '/') ofs << path;
-            else ofs << std::filesystem::current_path().string() + "/" + path;
+            ofs << path;
         }
         LOG(V2_INFO, "Set up filesystem interface at %s\n", path.c_str());
         // Tell JSON interface to output non-JSON result files to the interface path, too
@@ -308,7 +305,7 @@ int Client::getInternalRank() {
 }
 
 std::string Client::getFilesystemInterfacePath() {
-    return _params.apiDirectory() + "/jobs." + std::to_string(getInternalRank()) + "/";
+    return FileUtils::getAbsoluteFilePath(_params.apiDirectory() + "/jobs." + std::to_string(getInternalRank()) + "/");
 }
 
 std::string Client::getSocketPath() {

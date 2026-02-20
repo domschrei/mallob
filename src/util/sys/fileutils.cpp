@@ -106,6 +106,17 @@ int FileUtils::rmrf(const std::string& dir) {
     return system(cmd.c_str());
 }
 
+std::string FileUtils::getWorkingDirectory() {
+    return getenv("PWD");
+}
+
+std::string FileUtils::getAbsoluteFilePath(const std::string& path) {
+    if (path.empty()) return "";
+    if (path[0] == '/') return path;
+    return getWorkingDirectory() + "/" + path;
+}
+
+
 std::vector<std::string> FileUtils::glob(const std::string& pattern) {
     std::vector<std::string> files;
 

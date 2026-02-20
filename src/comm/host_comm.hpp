@@ -4,6 +4,7 @@
 #include <fstream>
 #include <atomic>
 #include <cmath>
+#include <sstream>
 
 #include "util/ctre.hpp"
 

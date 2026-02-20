@@ -8,6 +8,7 @@
 
 #include "app/app_message_subscription.hpp"
 #include "app/sat/job/sat_process_config_builder.hpp"
+#include "app/sat/proof/palrup_caller.hpp"
 #include "data/job_interrupt_reason.hpp"
 #include "interface/api/api_registry.hpp"
 #include "scheduling/core_allocator.hpp"
@@ -465,27 +466,7 @@ void ForkedSatJob::startDestructThreadIfNecessary() {
             // TODO weird place to call this ...
             if (_params.palRup() && _params.palRupCheck()) {
                 watchdog.setActive(false);
-
-                assert(_params.regularProcessDistribution());
-                const int nbProcsPerHost = _params.processesPerHost();
-                const int nbHosts = getGlobalNumWorkers() / nbProcsPerHost;
-                const int nbSolvers = _params.numThreadsPerProcess() * getGlobalNumWorkers();
-                const std::string proofWorkingDir = _params.palRupCheckWorkdir();
-                FileUtils::mkdir(proofWorkingDir);
-
-                std::string palRupCall = "cd palrup;"
-                    " NUM_SOLVERS=" + std::to_string(nbSolvers)
-                    + " NUM_NODES=" + std::to_string(nbHosts)
-                    + " NUM_PROCS_PER_NODE=" + std::to_string(nbProcsPerHost)
-                    + " PROOF_PALRUP=" + _params.proofDirectory() + "/proof#" + std::to_string(getId()) + "/"
-                    + " PROOF_WORKING=" + proofWorkingDir
-                    + " LOG_DIR=" + _params.logDirectory()
-                    + " bash scripts/pal_launcher.sh 2>&1 > "
-                    + _params.logDirectory() + "/palrup." + std::to_string(getId())
-                        + "." + std::to_string(MyMpi::rank(MPI_COMM_WORLD)) + ".out";
-                LOG(V4_VVER, "Calling PalRUP checker: %s\n", palRupCall.c_str());
-                int retval = system(palRupCall.c_str());
-                LOG(V4_VVER, "PalRUP checker returned, retval=%i\n", retval);
+                PalRupCaller(_params, getId(), getGlobalNumWorkers()).callBlocking();
             }
 
             _shmem_freed = true;
