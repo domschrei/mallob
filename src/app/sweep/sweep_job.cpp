@@ -699,7 +699,7 @@ void SweepJob::sendMPIWorkstealRequests() {
 			int senderLocalId = request.senderLocalId;
 			int my_comm_rank = getJobComm().getWorldRankOrMinusOne(_my_index);
 			if (my_comm_rank == -1) {
-				LOG(V3_VERB, "SWEEP SKIP own rank %i (idx %i) <ctx %i> not yet in JobComm of size %i \n", _my_rank, _my_index, _my_ctx_id, getJobComm().size());
+				LOG(V3_VERB, "SWEEP SKIP/RANKLIST: own rank [%i] (myindex %i) <ctx %i> not yet in JobComm of size %i \n", _my_rank, _my_index, _my_ctx_id, getJobComm().size());
 				continue;
 			}
 			if (_terminate_all || getVolume()==0) {
@@ -719,22 +719,23 @@ void SweepJob::sendMPIWorkstealRequests() {
 			assert(request.targetIndex==-1);
 			assert(request.targetRank==-1);
 
-			constexpr int RNG_ATTEMPTS = 8;
+			constexpr int RNG_ATTEMPTS = 4;
 			for (int i=0; i<RNG_ATTEMPTS; i++) {
 				int targetIndex = _rng.randomInRange(0,getVolume());
+				if (targetIndex==_my_index) {
+					// not stealing from ourselves, roll again, and don't count this roll
+					i--;
+					continue;
+				}
 				int targetRank = getJobComm().getWorldRankOrMinusOne(targetIndex);
 				if (targetRank == -1) {
 					//target rank of this targetIndex is not yet in JobTree, might need some more milliseconds to update, roll again
-					LOG(V3_VERB, "SWEEP SKIP targetIndex %i, targetRank %i not yet in JobComm\n", targetIndex, targetRank);
-					continue;
-				}
-				if (targetRank == _my_rank) {
-					// not stealing from ourselves, roll again
+					LOG(V3_VERB, "SWEEP SKIP/RANKLIST: targetIndex %i, targetRank %i not yet in JobComm <ctx %i> of size %i \n", targetIndex, targetRank, _my_ctx_id, getJobComm().size());
 					continue;
 				}
 				if (getJobComm().getContextIdOrZero(targetIndex)==0) {
 					//target is not yet listed in address list. Might happen for a short period just after it is spawned. roll again
-					LOG(V3_VERB, "SWEEP SKIP Context ID of target is missing. getVolume()=%i, rndTargetIndex=%i, rndTargetRank=%i, myIndex=%i, myRank=%i \n", getVolume(), targetIndex, targetRank, _my_index, _my_rank);
+					LOG(V3_VERB, "SWEEP SKIP/RANKLIST: ctx_id of target is missing. getVolume()=%i, rndTargetIndex=%i, rndTargetRank=%i, myIndex=%i, myRank=%i, JobComm size %i \n", getVolume(), targetIndex, targetRank, _my_index, _my_rank, getJobComm().size());
 					continue;
 				}
 				request.targetIndex = targetIndex;
