@@ -117,7 +117,7 @@ private:
             return true;
         }
 
-        LOG(V4_VVER, "BCAST received msg from sourceRank %i (local _received_broadcast=%i, leftChildRank %i, RightChildRank %i)\n",
+        LOG(V4_VVER, "BCAST received msg from sourceRank %i (local _tree state: _received_broadcast=%i, leftChild [%i], RightChild [%i])\n",
             h.source, _received_broadcast, _tree.leftChildNodeRank, _tree.rightChildNodeRank);
 
         // Response from child?

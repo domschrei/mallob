@@ -109,6 +109,9 @@ public:
         _is_root = _tree.index == 0;
         _base_msg.treeIndexOfSender = _tree.index;
         _base_msg.contextIdOfSender = _tree.contextId;
+
+
+        LOG(V3_VERB, "SWEEP New _red AllReduction. Snapshot: LeftChild [%i], RightChild [%i], num_expected %i.\n", leftRank, rightRank, _num_expected_child_elems);
     }
 
     // Contribute to the all-reduction.

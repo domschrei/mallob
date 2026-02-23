@@ -699,7 +699,7 @@ void SweepJob::sendMPIWorkstealRequests() {
 			int senderLocalId = request.senderLocalId;
 			int my_comm_rank = getJobComm().getWorldRankOrMinusOne(_my_index);
 			if (my_comm_rank == -1) {
-				LOG(V3_VERB, "SWEEP SKIP/RANKLIST: own rank [%i] (myindex %i) <ctx %i> not yet in JobComm of size %i \n", _my_rank, _my_index, _my_ctx_id, getJobComm().size());
+				LOG(V3_VERB, "SWEEP SKIP own rank [%i] (myindex %i) <ctx %i> not yet in JobComm of size %i \n", _my_rank, _my_index, _my_ctx_id, getJobComm().size());
 				continue;
 			}
 			if (_terminate_all || getVolume()==0) {
@@ -730,12 +730,12 @@ void SweepJob::sendMPIWorkstealRequests() {
 				int targetRank = getJobComm().getWorldRankOrMinusOne(targetIndex);
 				if (targetRank == -1) {
 					//target rank of this targetIndex is not yet in JobTree, might need some more milliseconds to update, roll again
-					LOG(V3_VERB, "SWEEP SKIP/RANKLIST: targetIndex %i, targetRank %i not yet in JobComm <ctx %i> of size %i \n", targetIndex, targetRank, _my_ctx_id, getJobComm().size());
+					LOG(V3_VERB, "SWEEP SKIP target idx %i not in JobComm (size %i) \n", targetIndex, targetRank, _my_ctx_id, getJobComm().size());
 					continue;
 				}
 				if (getJobComm().getContextIdOrZero(targetIndex)==0) {
 					//target is not yet listed in address list. Might happen for a short period just after it is spawned. roll again
-					LOG(V3_VERB, "SWEEP SKIP/RANKLIST: ctx_id of target is missing. getVolume()=%i, rndTargetIndex=%i, rndTargetRank=%i, myIndex=%i, myRank=%i, JobComm size %i \n", getVolume(), targetIndex, targetRank, _my_index, _my_rank, getJobComm().size());
+					LOG(V3_VERB, "SWEEP SKIP ctx_id of target is missing. getVolume()=%i, rndTargetIndex=%i, rndTargetRank=%i, myIndex=%i, myRank=%i, JobComm size %i \n", getVolume(), targetIndex, targetRank, _my_index, _my_rank, getJobComm().size());
 					continue;
 				}
 				request.targetIndex = targetIndex;
@@ -1028,23 +1028,26 @@ void SweepJob::cbContributeToAllReduce() {
 	assert(_bcast->hasResult());
 	//bcast hasResult present means that this Process got responses from all its children, so the tree structure is correctly known, and we can continue with a contribution and reduction
 
-	LOG(V4_VVER, "SWEEP SHARE BCAST Callback to AllReduce\n");
+	LOG(V4_VVER, "SWEEP BCAST Callback to AllReduce\n");
 	auto snapshot = _bcast->getJobTreeSnapshot();
 
+	LOG(V4_VVER, "SWEEP BCAST Callback, snapshot: nbChildren %i. leftChild (%i)[%i], rightChild (%i)[%i]  \n",
+		snapshot.leftChildIndex, snapshot.leftChildNodeRank, snapshot.rightChildIndex, snapshot.rightChildNodeRank);
+
 	if (! _is_root) {
-		LOG(V4_VVER, "SWEEP SHARE [%i] RESET non-root BCAST\n", _my_rank);
+		LOG(V4_VVER, "SWEEP [%i] RESET non-root BCAST, prepares for next sharing bcast \n", _my_rank);
 		//Prepare all non-root processes to be ready to receive the next broadcast
-		_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
+		_bcast.reset(new JobTreeBroadcast(getId(), snapshot, [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
 	}
 
 	if (_terminate_all) {
-		LOG(V4_VVER, "SWEEP SHARE BCAST skip reduction, status is already _terminate_all\n");
+		LOG(V4_VVER, "SWEEP BCAST skip reduction, status is already _terminate_all\n");
 		return;
 	}
 
 	JobMessage baseMsg = getMessageTemplate();
 	baseMsg.tag = TAG_ALLRED;
-	LOG(V4_VVER, "SWEEP SHARE [%i] RESET AllReduction, to prepare contributing local data. \n", _my_rank);
+	LOG(V4_VVER, "SWEEP [%i] RESET AllReduction, using bcast snapshot, to prepare contributing local data. \n", _my_rank);
 	_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateEqUnitContributions));
 	if (_is_root)
 		_red->setInplaceTransformationOfElementAtRoot(_inplace_rootTransform);
@@ -1056,7 +1059,7 @@ void SweepJob::cbContributeToAllReduce() {
 	for (auto &sweeper : _sweepers) {
 		id++;
 		if (!sweeper) {
-			LOG(V4_VVER, "SWEEP SHARE [%i](%i) not yet initialized, skipped in contribution aggregation \n", _my_rank, id);
+			LOG(V4_VVER, "SWEEP [%i](%i) not yet initialized, skipped in contribution aggregation \n", _my_rank, id);
 			continue;
 		}
 
@@ -1089,7 +1092,7 @@ void SweepJob::cbContributeToAllReduce() {
 
 	auto aggregation_element = aggregateEqUnitContributions(contribs);
 
-	LOG(V4_VVER, "SWEEP SHARE REDUCE [%i] ~~~%i~~~(+%i)~~> to sharing \n", _my_rank, aggregation_element.size()-NUM_METADATA_FIELDS, NUM_METADATA_FIELDS);
+	LOG(V4_VVER, "SWEEP SHARE REDUCE [%i] contributing ~~~%i~~~(+%i)~~> to _red \n", _my_rank, aggregation_element.size()-NUM_METADATA_FIELDS, NUM_METADATA_FIELDS);
 
 	if (_terminate_all) {
 		LOG(V4_VVER, "SWEEP SHARE BCAST skip contribution, seen already _terminate_all\n");
