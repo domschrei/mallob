@@ -63,10 +63,10 @@ private:
 		std::atomic_bool got_steal_response{false};
 		std::vector<int> stolen_work{};
 
-		void prepareNew(int _senderLocalId, int _targetIndex, int _targetRank) noexcept {
+		void newBlankRequest(int _senderLocalId) noexcept {
 				senderLocalId = _senderLocalId;
-				targetIndex = _targetIndex;
-				targetRank = _targetRank;
+				targetIndex = -1;
+				targetRank = -1;
 				sent = false;
 				got_steal_response = false;
 				stolen_work.clear();

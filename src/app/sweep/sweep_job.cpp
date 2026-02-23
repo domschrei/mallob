@@ -695,6 +695,58 @@ void SweepJob::sendMPIWorkstealRequests() {
 	//Instead, the solver-threads write a request in the shared memory, and the main MPI thread picks up the request and sends it
 	for (auto &request : _worksteal_requests) {
 		if (!request.sent) {
+
+			int senderLocalId = request.senderLocalId;
+			int my_comm_rank = getJobComm().getWorldRankOrMinusOne(_my_index);
+			if (my_comm_rank == -1) {
+				LOG(V3_VERB, "SWEEP SKIP own rank %i (idx %i) <ctx %i> not yet in JobComm of size %i \n", _my_rank, _my_index, _my_ctx_id, getJobComm().size());
+				continue;
+			}
+			if (_terminate_all || getVolume()==0) {
+				request.stolen_work = {};
+				request.sent = true;
+				request.got_steal_response = true;
+				LOG(V3_VERB, "Sweeper [%i](%i) exit steal loop (2nd check, getVolume()==%i)\n", _my_rank, senderLocalId, getVolume());
+				break;
+			}
+
+			assert(getVolume()>=1 || log_return_false("SWEEP ERROR [%i](%i) in workstealing: getVolume()==%i, i.e. no volume available to steal from\n", _my_rank, senderLocalId, getVolume()));
+			if (getVolume()==1) {
+				LOG(V4_VVER, "SWEEP SKIP [%i](%i) steal loop --> we are the only MPI rank, no global steal \n", _my_rank, senderLocalId);
+				continue;
+			}
+
+			assert(request.targetIndex==-1);
+			assert(request.targetRank==-1);
+
+			constexpr int RNG_ATTEMPTS = 8;
+			for (int i=0; i<RNG_ATTEMPTS; i++) {
+				int targetIndex = _rng.randomInRange(0,getVolume());
+				int targetRank = getJobComm().getWorldRankOrMinusOne(targetIndex);
+				if (targetRank == -1) {
+					//target rank of this targetIndex is not yet in JobTree, might need some more milliseconds to update, roll again
+					LOG(V3_VERB, "SWEEP SKIP targetIndex %i, targetRank %i not yet in JobComm\n", targetIndex, targetRank);
+					continue;
+				}
+				if (targetRank == _my_rank) {
+					// not stealing from ourselves, roll again
+					continue;
+				}
+				if (getJobComm().getContextIdOrZero(targetIndex)==0) {
+					//target is not yet listed in address list. Might happen for a short period just after it is spawned. roll again
+					LOG(V3_VERB, "SWEEP SKIP Context ID of target is missing. getVolume()=%i, rndTargetIndex=%i, rndTargetRank=%i, myIndex=%i, myRank=%i \n", getVolume(), targetIndex, targetRank, _my_index, _my_rank);
+					continue;
+				}
+				request.targetIndex = targetIndex;
+				request.targetRank = targetRank;
+				break;
+			}
+
+			if (request.targetIndex==-1 || request.targetRank==-1) {
+				//couldn't find a target for this request, skip it for now and process the next
+				continue;
+			}
+
 			request.sent = true;
 			JobMessage msg = getMessageTemplate();
 			msg.tag = TAG_SEARCHING_WORK;
@@ -706,11 +758,9 @@ void SweepJob::sendMPIWorkstealRequests() {
 			//which (probably) happens when a worksteal request is sent right when also the ranklist aggregation update is propagating through all ranks, where some (like this rank here) are already updated, while others (like the receiving rank) aren't.
 			//So as a backup for the receiving rank, we also provide our contextId
 			int myContexId = getJobComm().getContextIdOrZero(_my_index);
-			//Update: and for similar reason we also send our treeIndex
+			//Update: and we also send our treeIndex for the same reason, the receiver might not yet have our address data
 			msg.payload = {request.senderLocalId, myContexId, _my_index};
 			assert(msg.payload.size() == NUM_SEARCHING_WORK_FIELDS);
-			// LOG(V2_INFO, "Rank %i asks rank %i for work\n", _my_rank, recv_rank, n);
-			// LOG(V2_INFO, "  with destionation ctx_id %i \n", msg.contextIdOfDestination);
 			LOG(V3_VERB, "SWEEP MSG [%i](%i) ---?---> [%i] \n", _my_rank, request.senderLocalId, request.targetRank);
 			getJobTree().send(request.targetRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 		}
@@ -868,59 +918,21 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 			LOG(V3_VERB, "SWEEP [%i](%i) <==%i==== local  \n", _my_rank, localId, sweeper->work_received_from_steal.size(), _my_rank);
 			break;
 		}
-		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop <-- local steal failed \n", _my_rank, localId);
-		int my_comm_rank = getJobComm().getWorldRankOrMinusOne(_my_index);
-		if (my_comm_rank == -1) {
-			LOG(V3_VERB, "SWEEP SKIP own rank %i (idx %i) <ctx %i> not yet in JobComm of size %i \n", _my_rank, _my_index, _my_ctx_id, getJobComm().size());
-			usleep(1000);
-			continue;
-		}
-		//Couldnt find anything to steal locally. Now searching globally via MPI
 
-		if (_terminate_all || getVolume()==0) { //check again for termination, can happen that it slips now in here
-			sweeper->work_received_from_steal = {};
-			sweeper->sweeper_is_idle = true;
-			LOG(V3_VERB, "Sweeper [%i](%i) exit steal loop (2nd check, getVolume()==%i)\n", _my_rank, localId, getVolume());
-			break;
-		}
-
-		assert(getVolume()>=1 || log_return_false("SWEEP ERROR [%i](%i) in workstealing: getVolume()==%i, i.e. no volume available to steal from\n", _my_rank, localId, getVolume()));
-		if (getVolume()==1) {
-			LOG(V5_DEBG, "SWEEP WORK SKIP [%i](%i) steal loop --> we are the only MPI rank, no global steal \n", _my_rank, localId);
-			usleep(500);
-			continue;
-		}
-		int targetIndex = _rng.randomInRange(0,getVolume());
-        int targetRank = getJobComm().getWorldRankOrMinusOne(targetIndex);
-        if (targetRank == -1) {
-        	//target rank not yet in JobTree, might need some more milliseconds to update, try again
-			LOG(V3_VERB, "SWEEP WORK SKIP targetIndex %i, targetRank %i not yet in JobComm\n", targetIndex, targetRank);
-			usleep(500);
-        	continue;
-        }
-		if (targetRank == _my_rank) {
-			// not stealing from ourselves, try again
-			continue;
-		}
-		if (getJobComm().getContextIdOrZero(targetIndex)==0) {
-			LOG(V3_VERB, "SWEEP WORK SKIP Context ID of target is missing. getVolume()=%i, rndTargetIndex=%i, rndTargetRank=%i, myIndex=%i, myRank=%i \n", getVolume(), targetIndex, targetRank, _my_index, _my_rank);
-			//target is not yet listed in address list. Might happen for a short period just after it is spawned
-			usleep(500);
-			continue;
-		}
 		//Request will be handled by the MPI main thread, which will send an MPI message on our behalf
 		//because here we are in code executed by the kissat thread, which can cause problems for sending MPI messages
-		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop --> global steal to [%i] \n", _my_rank, localId, targetRank);
+
+		// LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop --> global steal to [%i] \n", _my_rank, localId, targetRank);
 		// WorkstealRequest request;
 		// request.localId = localId;
 		// request.targetIndex = targetIndex;
 		// request.targetRank = targetRank;
 		// _worksteal_requests[localId] = request;
-		_worksteal_requests[localId].prepareNew(localId, targetIndex, targetRank);
+		_worksteal_requests[localId].newBlankRequest(localId);
 
-		//Wait here until we get back an MPI message
+		//Wait here until we hear back via an MPI message
 		unsigned reps=0;
-		while( ! _worksteal_requests[localId].got_steal_response) {
+		while(_worksteal_requests[localId].got_steal_response == false) {
 			usleep(100);
 			reps++;
 			if (reps%32==0) {
@@ -931,8 +943,10 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 				break;
 			}
 		}
+
 		if (_terminate_all) {
-			break;	 //skip touching the work array at all
+			sweeper->sweeper_is_idle = true;
+			break;	 //skip touching the work array at all, weird stuff can happen when we are already in the termination stage
 		}
 
 		//Successful steal if size > 0
@@ -1351,7 +1365,7 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	assert(max_steal_amount < 2*_numVars || log_return_false("SWEEP STEAL ERROR [%i](%i): too large max steal amount %i >= 2*NUM_VARS, maybe segfault into non-initialized kissat solver \n", _my_rank, localId, max_steal_amount));
 
 	//There is something to steal
-	//Allocate memory for the steal here in C++, and pass the array location to kissat such that it can fill it with the stolen work
+	//Allocate memory for the steal here in C++, and pass the allocation to kissat such that it can fill it with the stolen work
 	std::vector<int> stolen_work = std::vector<int>(max_steal_amount);
 
 	// LOG(V3_VERB, "[%i] stealing from (%i), expecting max %i  \n", _my_rank, localId, max_steal_amount);
@@ -1360,8 +1374,8 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	// LOG(V3_VERB, "SWEEP WORK actually stolen ---%i---> from [%i](%i)\n", localId, stolen_work.size());
 	if (actually_stolen == 0)
 		return {};
-	//We sized he provided array to be maximally conservative,
-	//Now we learned how much there way actually to steal, shrink the array to have .size() match with the stolen amount
+	//We allocated the steal array as large as maximally needed, but that was only an upper limit estimate, often during stealing it turns out that we receive a bit less work than estimated
+	//So now we know the exact amount of work we stole, and shrink the array to have its .size() match with this stolen amount
 	stolen_work.resize(actually_stolen);
 	return stolen_work;
 }
