@@ -344,9 +344,9 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		_sweepers[localId] = sweeper; //only now expose the solver to the rest of the system, now that we know we start solving
 		_started_synchronized_solving = true; //multiple threads will write non-thread-safe to this bool, but all only monotonically to "true"
 
-		LOG(V3_VERB, "SWEEP JOB [%i](%i) solve() START \n", _my_rank, localId);
+		LOG(V3_VERB, "SWEEP [%i](%i) START solve() \n", _my_rank, localId);
 		int res = sweeper->solve(0, nullptr);
-		LOG(V3_VERB, "SWEEP JOB [%i](%i) solve() FINISH. Result %i \n", _my_rank, localId, res);
+		LOG(V3_VERB, "SWEEP [%i](%i) FINISH solve(). Result %i \n", _my_rank, localId, res);
 
 		//transfer some solver-specific statistics
 		auto stats = sweeper->fetchSweepStats();
@@ -376,7 +376,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 				assert(sweeper->getLocalId()==_representative_localId);
 				//
 				if (_root_reported_unsat) {
-					LOG(V1_WARN, "SWEEP JOB [%i](%i): wanted to report improvement result, but stopped because other solvers already deduced UNSAT\n", _my_rank, localId);
+					LOG(V1_WARN, "SWEEP [%i](%i): wanted to report improvement result, but stopped because other solvers already deduced UNSAT\n", _my_rank, localId);
 				}  else {
 					reportSolverResult(sweeper, IMPROVED);
 				}
@@ -436,7 +436,7 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	float t1 = Timer::elapsedSeconds();
 	float init_dur_ms =  (t1 - t0)*1000;
 	const float WARN_init_dur = 50; //Usual initializations take 0.2ms in the Sat Solver Subprocess and 4-25ms  in the sweep job (for some weird reasons), but should never be above ~30ms
-	LOG(V3_VERB, "SWEEP STARTUP [%i](%i) kissat init %.2f ms (%i/%i running, %i started)\n", _my_rank, localId, init_dur_ms, _running_sweepers_count.load(), _nThreads, _started_sweepers_count.load());
+	LOG(V3_VERB, "SWEEP [%i](%i) kissat init %.2f ms (%i/%i started)\n", _my_rank, localId, init_dur_ms, _started_sweepers_count.load(), _nThreads);
 	if (init_dur_ms > WARN_init_dur) {
 		LOG(V1_WARN, "SWEEP WARN STARTUP [%i](%i): kissat init took unusually long, %f ms !\n", _my_rank, localId, init_dur_ms);
 	}
@@ -643,6 +643,7 @@ void SweepJob::printIdleFraction() {
 
 void SweepJob::checkSharingDelayHealth() {
 	if (_terminate_all) return;
+	if (!_started_synchronized_solving) return;
 
 	constexpr float MAX_DELAY_FACTOR = 6;
 	constexpr float WARNING_PERIOD = 0.5;
@@ -1395,8 +1396,11 @@ std::vector<int> SweepJob::getRandomIdPermutation() {
 void SweepJob::loadFormula(KissatPtr sweeper) {
 	const int* lits = getDescription().getFormulaPayload(0);
 	const int payload_size = getDescription().getFormulaPayloadSize(0);
+	constexpr int BITS_PER_MB = 8000000;
+	float formula_in_MB = ((float)payload_size*32)/BITS_PER_MB);
 	// LOG(V2_INFO, "SWEEP Loading Formula, size %i \n", payload_size);
 
+	LOG(V4_VVER, "SWEEP [%i](%i) loading formula (%.3f MB) \n", _my_rank, sweeper->getLocalId(), formula_in_MB);
 	float t0 = Timer::elapsedSeconds();
 
 	for (int i = 0; i < payload_size ; i++) {
@@ -1404,8 +1408,7 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 	}
 
 	float t1 = Timer::elapsedSeconds();
-	constexpr int BITS_PER_MB = 8000000;
-	LOG(V4_VVER, "SWEEP [%i](%i) loaded formula in %.3f ms (%.3f MB) \n", _my_rank, sweeper->getLocalId(), (t1-t0)*1000, (payload_size*32/BITS_PER_MB));
+	LOG(V4_VVER, "SWEEP [%i](%i) loaded  formula (%.3f MB) in %.3f ms \n", _my_rank, sweeper->getLocalId(), formula_in_MB , (t1-t0)*1000,);
 }
 
 void SweepJob::triggerTerminations() {

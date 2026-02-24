@@ -28,7 +28,7 @@ public:
                 packed.resize(sizeBefore + 3);
                 packed[sizeBefore] = rank;
                 memcpy(packed.data()+sizeBefore+1, &ctxId, sizeof(ctx_id_t));
-                LOG(V4_VVER, "RANKLIST serialize ([%i],ctx %i) \n", rank, ctxId);
+                // LOG(V4_VVER, "RANKLIST serialize ([%i],ctx %i) \n", rank, ctxId);
             }
             return packed;
         }
@@ -41,7 +41,7 @@ public:
                 memcpy(&ctxId, packed.data()+i+1, sizeof(ctx_id_t));
                 list.push_back({rank, ctxId});
                 i += 3;
-                LOG(V4_VVER, "RANKLIST deserialized ([%i],ctx %i) \n", rank, ctxId);
+                // LOG(V4_VVER, "RANKLIST deserialized ([%i],ctx %i) \n", rank, ctxId);
             }
             return *this;
         }
@@ -186,7 +186,7 @@ public:
 
                 // Update local ranklist with new incoming entries
 
-                LOG(V4_VVER, "RANKLIST [%i](%i) recv list size %i \n", _job_tree.getRank(), _job_tree.getIndex(), ranklist.list.size());
+                // LOG(V4_VVER, "RANKLIST [%i](%i) recv list size %i \n", _job_tree.getRank(), _job_tree.getIndex(), ranklist.list.size());
                 for (size_t i = 0; i < ranklist.list.size(); i++) {
                     if (_next_address_list.list.size() == i) _next_address_list.list.push_back({-1, 0});
                     if (ranklist.list[i].rank != -1) _next_address_list.list[i] = ranklist.list[i];
@@ -219,7 +219,7 @@ public:
             } else {
                 // Forward to parent
                 //log(LOG_ADD_DESTRANK | V3_VERB, "send Ranklist size %i", getJobTree().getParentNodeRank(), msg.payload.size());
-                LOG(V4_VVER, "RANKLIST [%i] send nextlist size %i to parent [%i](%i) \n", _job_tree.getRank(), _next_address_list.list.size(), _job_tree.getParentNodeRank(), _job_tree.getParentIndex());
+                // LOG(V4_VVER, "RANKLIST [%i] send nextlist size %i to parent [%i](%i) \n", _job_tree.getRank(), _next_address_list.list.size(), _job_tree.getParentNodeRank(), _job_tree.getParentIndex());
                 _job_tree.sendToParent(msg);
             }
 
@@ -231,7 +231,7 @@ public:
 
         } else if (msg.tag == MSG_BROADCAST_RANKLIST) {
 
-            LOG(V4_VVER, "RANKLIST [%i] recv bcast \n", _job_tree.getRank());
+            // LOG(V4_VVER, "RANKLIST [%i] recv bcast \n", _job_tree.getRank());
             // Store locally and forward to children
             {
                 auto lock = _access_mutex.getLock();
@@ -239,7 +239,7 @@ public:
                 updateMap();
             }
             _job_tree.sendToAnyChildren(msg);
-            LOG(V4_VVER, "RANKLIST [%i] list size now %i \n", _job_tree.getRank(), _address_list.list.size());
+            // LOG(V4_VVER, "RANKLIST [%i] list size now %i \n", _job_tree.getRank(), _address_list.list.size());
             return true;
         }
 

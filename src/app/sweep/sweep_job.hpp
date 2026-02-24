@@ -43,7 +43,7 @@ private:
     std::atomic_int _running_sweepers_count {0};
 	std::atomic_int _finished_sweepers_count {0};
 	std::vector<int> _list_of_ids;
-	bool _started_synchronized_solving{false};
+	std::atomic_bool _started_synchronized_solving{false};
 	int _lastIdleCount{0};
 
 	//Timing
