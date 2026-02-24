@@ -129,6 +129,7 @@ void SweepJob::appl_communicate() {
 	// LOG(V4_VVER, "jobcomm size %i, volume() %i \n", getJobComm().size(), getVolume());
 	if (getJobComm().size() < getVolume()) {
 		LOG(V4_VVER, "SWEEP [%i] Skip jobcomm size %i < volume() %i: not starting with sharing yet \n", _my_rank, getJobComm().size(), getVolume());
+		return;
 	}
 
 	checkSharingDelayHealth();
