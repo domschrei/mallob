@@ -50,7 +50,7 @@ private:
 	float _start_sweep_timestamp;
 	std::vector<float> _time_start_bcast;
 	std::vector<float> _time_receive_allred;
-	std::vector<float> _time_contribute;
+	std::vector<float> _time_contributed;
 
 	//Workstealing
 	SplitMix64Rng _rng;

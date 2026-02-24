@@ -659,8 +659,8 @@ void SweepJob::checkSharingDelayHealth() {
 	float time = Timer::elapsedSeconds();
 
 	float period = _params.sweepSharingPeriod.val;
-	if (!_time_contribute.empty()) {
-		float delay = time - _time_contribute.back();
+	if (!_time_contributed.empty()) {
+		float delay = time - _time_contributed.back();
 		if (delay > period*MAX_DELAY_FACTOR) {
 			//We log two times. Once in the main log file to see the information chronologically correct interleaved with the other logs
 			//and onces separately in a .warn file for faster grepping during post-processing, where we would like to avoid to grep through the main logs
@@ -1118,7 +1118,10 @@ void SweepJob::cbContributeToAllReduce() {
 		return;
 	}
 
-	_time_contribute.push_back(Timer::elapsedSeconds());
+	if (_started_synchronized_solving) {
+		_time_contributed.push_back(Timer::elapsedSeconds());
+		//we dont want to track this contribution if it just a dummy element (solvers havent stared yet), it can cause fake Sharedelay warnings
+	}
 
 	_red->contribute(std::move(aggregation_element));
 
