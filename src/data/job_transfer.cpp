@@ -174,6 +174,10 @@ void JobMessage::returnToSender(int senderRank, int mpiTag) {
     if (returnedToSender) return;
     returnedToSender = true;
     // Do not swap the metadata, since an internal redirection of messages doesn't either
+    LOG(V1_WARN, "[WARN] JobMessage::return to sender. senderRank %i, mpiTag %i, jobId %i, "
+                 "idxsender %i, idxdest %i, ctxsender %i, ctxdest %i, tag %i \n", senderRank, mpiTag, jobId,
+                 treeIndexOfSender, treeIndexOfDestination, contextIdOfSender, contextIdOfDestination);
+
     MyMpi::isend(senderRank, mpiTag, *this);
 }
 

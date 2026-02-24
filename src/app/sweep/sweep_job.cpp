@@ -730,7 +730,7 @@ void SweepJob::sendMPIWorkstealRequests() {
 				int targetRank = getJobComm().getWorldRankOrMinusOne(targetIndex);
 				if (targetRank == -1) {
 					//target rank of this targetIndex is not yet in JobTree, might need some more milliseconds to update, roll again
-					LOG(V3_VERB, "SWEEP SKIP target idx %i not in JobComm (size %i) \n", targetIndex, targetRank, _my_ctx_id, getJobComm().size());
+					LOG(V3_VERB, "SWEEP SKIP target idx %i not in JobComm (size %i) \n", targetIndex, getJobComm().size());
 					continue;
 				}
 				if (getJobComm().getContextIdOrZero(targetIndex)==0) {
@@ -1032,7 +1032,7 @@ void SweepJob::cbContributeToAllReduce() {
 	auto snapshot = _bcast->getJobTreeSnapshot();
 
 	LOG(V4_VVER, "SWEEP BCAST Callback, snapshot: nbChildren %i. leftChild (%i)[%i], rightChild (%i)[%i]  \n",
-		snapshot.leftChildIndex, snapshot.leftChildNodeRank, snapshot.rightChildIndex, snapshot.rightChildNodeRank);
+		snapshot.nbChildren, snapshot.leftChildIndex, snapshot.leftChildNodeRank, snapshot.rightChildIndex, snapshot.rightChildNodeRank);
 
 	if (! _is_root) {
 		LOG(V4_VVER, "SWEEP [%i] RESET non-root BCAST, prepares for next sharing bcast \n", _my_rank);
@@ -1059,7 +1059,7 @@ void SweepJob::cbContributeToAllReduce() {
 	for (auto &sweeper : _sweepers) {
 		id++;
 		if (!sweeper) {
-			LOG(V4_VVER, "SWEEP [%i](%i) not yet initialized, skipped in contribution aggregation \n", _my_rank, id);
+			LOG(V5_DEBG, "SWEEP [%i](%i) not yet initialized, skipped in contribution aggregation \n", _my_rank, id);
 			continue;
 		}
 

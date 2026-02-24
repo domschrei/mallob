@@ -219,7 +219,9 @@ public:
 
         if (_finished) return *this;
 
-        LOG(V4_VVER, "SWEEP REDUCE expected child elems %i, actual child elems %i, local elem %i. Childranks %i,%i \n", _num_expected_child_elems, _child_elems.size(), _local_elem.has_value(), _expected_child_ranks.first, _expected_child_ranks.second);
+        LOG(V4_VVER, "SWEEP REDUCE expected child elems %i, actual child elems %i, local elem %i. Childranks %i,%i. left_ready?%i right_ready?%i \n",
+            _num_expected_child_elems, _child_elems.size(), _local_elem.has_value(), _expected_child_ranks.first, _expected_child_ranks.second,
+            _received_child_elems.first, _received_child_elems.second);
         // if (_child_elems.size() > _num_expected_child_elems) {
            // for (auto &child : _child_elems) {
                 // LOG(V4_VVER, "SWEEP ERROR/Error: Unexpected child elem with size %i from source %i \n", child.elem.size(), child.source);
