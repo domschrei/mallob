@@ -1397,7 +1397,7 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 	const int* lits = getDescription().getFormulaPayload(0);
 	const int payload_size = getDescription().getFormulaPayloadSize(0);
 	constexpr int BITS_PER_MB = 8000000;
-	float formula_in_MB = ((float)payload_size*32)/BITS_PER_MB);
+	float formula_in_MB = ((float)payload_size*32)/BITS_PER_MB;
 	// LOG(V2_INFO, "SWEEP Loading Formula, size %i \n", payload_size);
 
 	LOG(V4_VVER, "SWEEP [%i](%i) loading formula (%.3f MB) \n", _my_rank, sweeper->getLocalId(), formula_in_MB);
@@ -1408,7 +1408,7 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 	}
 
 	float t1 = Timer::elapsedSeconds();
-	LOG(V4_VVER, "SWEEP [%i](%i) loaded  formula (%.3f MB) in %.3f ms \n", _my_rank, sweeper->getLocalId(), formula_in_MB , (t1-t0)*1000,);
+	LOG(V4_VVER, "SWEEP [%i](%i) loaded  formula (%.3f MB) in %.3f ms \n", _my_rank, sweeper->getLocalId(), formula_in_MB , (t1-t0)*1000);
 }
 
 void SweepJob::triggerTerminations() {
