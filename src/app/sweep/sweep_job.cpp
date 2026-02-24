@@ -124,9 +124,13 @@ void SweepJob::appl_communicate() {
 	if (_bcast && _is_root && !_terminate_all)// Root: Update job tree snapshot in case your children changed
 		_bcast->updateJobTree(getJobTree());
 
-	LOG(V4_VVER, "jobcomm size %i, volume() %i \n", getJobComm().size(), getVolume());
-
 	printIdleFraction();
+
+	// LOG(V4_VVER, "jobcomm size %i, volume() %i \n", getJobComm().size(), getVolume());
+	if (getJobComm().size() < getVolume()) {
+		LOG(V4_VVER, "SWEEP [%i] Skip jobcomm size %i < volume() %i: not starting with sharing yet \n", _my_rank, getJobComm().size(), getVolume());
+	}
+
 	checkSharingDelayHealth();
 
 	sendMPIWorkstealRequests();
