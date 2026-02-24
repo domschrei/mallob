@@ -705,7 +705,6 @@ void SweepJob::sendMPIWorkstealRequests() {
 	//Instead, the solver-threads write a request in the shared memory, and the main MPI thread picks up the request and sends it
 	for (auto &request : _worksteal_requests) {
 		if (!request.sent) {
-
 			int senderLocalId = request.senderLocalId;
 			int my_comm_rank = getJobComm().getWorldRankOrMinusOne(_my_index);
 			if (my_comm_rank == -1) {
@@ -729,12 +728,18 @@ void SweepJob::sendMPIWorkstealRequests() {
 			assert(request.targetIndex==-1);
 			assert(request.targetRank==-1);
 
-			constexpr int RNG_ATTEMPTS = 4;
-			for (int i=0; i<RNG_ATTEMPTS; i++) {
-				int targetIndex = _rng.randomInRange(0,getVolume());
+
+			//we want randomized stealing to avoid any local buildup. To be sure that we check all possible other processes, we permute their list
+			std::vector<int> tree_indices = std::vector<int>(getVolume());
+			for (int i=0; i<getVolume(); i++) {
+				tree_indices[i] = i;
+			}
+			static thread_local std::mt19937 rng(std::random_device{}()); //created/seeded only once per main mallob thread, then just advancing rng calls
+			std::shuffle(tree_indices.begin(), tree_indices.end(), rng);
+
+			for (int targetIndex : tree_indices) {
 				if (targetIndex==_my_index) {
 					// not stealing from ourselves, roll again, and don't count this roll
-					i--;
 					continue;
 				}
 				int targetRank = getJobComm().getWorldRankOrMinusOne(targetIndex);
@@ -755,6 +760,7 @@ void SweepJob::sendMPIWorkstealRequests() {
 
 			if (request.targetIndex==-1 || request.targetRank==-1) {
 				//couldn't find a target for this request, skip it for now and process the next
+				LOG(V4_VVER, "SWEEP MSG [%i](%i) ------> X  (no target possible yet)  \n", _my_rank, request.senderLocalId, request.targetRank);
 				continue;
 			}
 
@@ -940,6 +946,8 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		// request.targetIndex = targetIndex;
 		// request.targetRank = targetRank;
 		// _worksteal_requests[localId] = request;
+
+		LOG(V3_VERB, "SWEEP [%i](%i) ----?---> glob  \n", _my_rank, localId);
 		_worksteal_requests[localId].newBlankRequest(localId);
 
 		//Wait here until we hear back via an MPI message
@@ -1414,6 +1422,7 @@ std::vector<int> SweepJob::getRandomIdPermutation() {
 	std::shuffle(permutation.begin(), permutation.end(), rng);
 	return permutation;
 }
+
 
 
 void SweepJob::loadFormula(KissatPtr sweeper) {
