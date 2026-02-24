@@ -120,10 +120,14 @@ void SweepJob::appl_start() {
 void SweepJob::appl_communicate() {
 	LOG(V5_DEBG, "SWEEP appl_communicate() \n");
 
-	printIdleFraction();
-	checkSharingDelayHealth();
+
 	if (_bcast && _is_root && !_terminate_all)// Root: Update job tree snapshot in case your children changed
 		_bcast->updateJobTree(getJobTree());
+
+	LOG(V4_VVER, "jobcomm size %i, volume() %i \n", getJobComm().size(), getVolume());
+
+	printIdleFraction();
+	checkSharingDelayHealth();
 
 	sendMPIWorkstealRequests();
 	checkForUnsatResults();

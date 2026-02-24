@@ -224,7 +224,7 @@ public:
 
         if (_finished) return *this;
 
-        LOG(V4_VVER, "SWEEP advance() ex: %i, actual %i, local %i. childranks [%i],[%i]. received_left(%i), received_right(%i) \n",
+        LOG(V4_VVER, "SWEEP advance() exp %i, recv %i, local %i. childranks [%i],[%i]. received_left(%i), received_right(%i) \n",
             _num_expected_child_elems, _child_elems.size(), _local_elem.has_value(), _expected_child_ranks.first, _expected_child_ranks.second,
             _received_child_elems.first, _received_child_elems.second);
         // if (_child_elems.size() > _num_expected_child_elems) {
