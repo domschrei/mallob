@@ -776,6 +776,7 @@ void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
 	if (available_import_round != my_last_import_round) [[unlikely]] {
 		//there is new data from a new sharing round
 		// publish_round = _sharing_import_round.load(std::memory_order_acquire);
+		LOG(V4_VVER, "SWEEP import round avail %i, last was %i", available_import_round, my_last_import_round);
 
 		assert(my_last_import_round <= available_import_round);
 		if (my_last_import_round!=0 && my_last_import_round != available_import_round - 1) {
@@ -1121,7 +1122,7 @@ void SweepJob::advanceAllReduction() {
 	const int terminate   = data[data.size()-METADATA_TERMINATE];
 	const int sweep_round = data[data.size()-METADATA_SWEEP_ROUND];
 	const int sharing_round= data[data.size()-METADATA_SHARING_ROUND];
-	const int all_idle    = data[data.size()-METADATA_IDLE];
+	// const int all_idle    = data[data.size()-METADATA_IDLE];
 	const int unit_size   = data[data.size()-METADATA_UNIT_SIZE];
 	const int eq_size     = data[data.size()-METADATA_EQ_SIZE];
 	assert(eq_size%2==0 || log_return_false("ERROR: Import Equality size not even, but %i\n", eq_size));
@@ -1156,7 +1157,7 @@ void SweepJob::advanceAllReduction() {
 		}
 	}
 
-	LOG(V2_INFO, "SWEEP import sharing round %i got: %i EQS, %i UNITS. idle: %i/%i \n", _available_import_round.load(), eq_size/2, unit_size, _lastIdleCount, _nThreads);
+	LOG(V2_INFO, "SWEEP sweep round %i sharing round %i import got: %i EQS, %i UNITS. idle: %i/%i \n", sweep_round, sharing_round, eq_size/2, unit_size, _lastIdleCount, _nThreads);
 
 	//prepare the next sharing round, which gets started from the root node
 	if (_is_root) {
@@ -1171,9 +1172,9 @@ void SweepJob::advanceAllReduction() {
 	_red.reset();
 
 
-	if (all_idle) {
-		LOG(V1_WARN, "[%i] got sharing info: sweep round %i finished \n", _my_rank, sweep_round);
-	}
+	// if (all_idle) {
+		// LOG(V1_WARN, "[%i] got sharing info: sweep round %i finished \n", _my_rank, sweep_round);
+	// }
 
 	//We received the termination signal via the app-internal data sharing
 	if (terminate) {
