@@ -173,7 +173,7 @@ private:
         assert(tag == MSG_JOB_TREE_MODULAR_REDUCE || tag == MSG_JOB_TREE_MODULAR_BROADCAST || tag == MSG_JOB_TREE_PARENT_IS_READY || log_return_false("SWEEP Warn: Unexpected tag %i (msg.tag %i) in JobTreeAllReduction receive(...) from source %i\n", tag, msg.tag, source));
 
         if (!_care_about_parent_status)
-            LOG(V3_VERB, "TRY REDUCE %i %i %i %i %i\n", tag, msg.epoch, _base_msg.epoch, msg.tag, _base_msg.tag);
+            LOG(V5_DEBG, "TRY REDUCE %i %i %i %i %i\n", tag, msg.epoch, _base_msg.epoch, msg.tag, _base_msg.tag);
 
         bool accept = msg.epoch == _base_msg.epoch
                     //&& msg.revision == _base_msg.revision
@@ -197,7 +197,7 @@ private:
             accept &= fromLeftChild || fromRightChild;
             if (!accept) return false;
 
-            LOG(V4_VVER, "SWEEP REDUCE received element from child [%i] w. size %i \n", source, msg.payload.size());
+            LOG(V4_VVER, "SWEEP REDUCE received elem from child [%i], size %i \n", source, msg.payload.size());
             // message accepted: store and check off
             _child_elems.insert({source, std::move(msg.payload)});
             if (fromLeftChild) _received_child_elems.first = true;
@@ -224,9 +224,9 @@ public:
 
         if (_finished) return *this;
 
-        LOG(V4_VVER, "SWEEP advance() exp %i, recv %i, local %i. childranks [%i],[%i]. received_left(%i), received_right(%i) \n",
+        LOG(V4_VVER, "SWEEP advance() exp %i, recv %i, local %i. childranks [%i],[%i]. recvd_left(%i), recvd_right(%i), aggregating %i, future_valid %i \n",
             _num_expected_child_elems, _child_elems.size(), _local_elem.has_value(), _expected_child_ranks.first, _expected_child_ranks.second,
-            _received_child_elems.first, _received_child_elems.second);
+            _received_child_elems.first, _received_child_elems.second, _aggregating, _future_aggregate.valid());
         // if (_child_elems.size() > _num_expected_child_elems) {
            // for (auto &child : _child_elems) {
                 // LOG(V4_VVER, "SWEEP ERROR/Error: Unexpected child elem with size %i from source %i \n", child.elem.size(), child.source);

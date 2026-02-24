@@ -73,6 +73,7 @@ private:
 		}
 	};
 	std::deque<WorkstealRequest> _worksteal_requests; //deque, because they have an atomic member and are thus not copyable
+	constexpr int MIN_STEAL_AMOUNT = 10; //creates to much overhead if we send around ridiculously small work packages
 
 
 	//Sharing Equivalences and Units

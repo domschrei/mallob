@@ -339,7 +339,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		 *  Alternatively, store all the shared information as a warmup-greeting-package for newly joining solvers, to maximize quality. But only relevant if the SweepJob grows with time, which is not currently the case.
 		 */
 		while (_started_sweepers_count < _nThreads) {
-			LOG(V3_VERB, "SWEEP JOB [%i](%i) waiting for other solvers to come online (started %i/%i)\n", _my_rank, localId, _started_sweepers_count.load(), _nThreads);
+			LOG(V5_DEBG, "SWEEP [%i](%i) waits for other solvers (started %i/%i)\n", _my_rank, localId, _started_sweepers_count.load(), _nThreads);
 			usleep(5000); //5ms
 			if (_terminate_all || _external_termination) {
 				LOG(V4_VVER, "SWEEP [%i](%i): terminated while waiting in synchronization \n", _my_rank, localId);
@@ -640,12 +640,12 @@ void SweepJob::printIdleFraction() {
 			active++;
 			if (sweeper->sweeper_is_idle) {
 				idles++;
-				oss << "(" << sweeper->getLocalId() << ") ";
+				oss << "," << sweeper->getLocalId();
 			}
 		}
 	}
 	_lastIdleCount = idles;
-	LOG(V3_VERB, "SWEEP Active %i, Running %i, Idle %i, Started %i. idle nrs: %s \n", active, _running_sweepers_count.load(), idles,  _started_sweepers_count.load(), oss.str().c_str());
+	LOG(V3_VERB, "SWEEP  Started %i, Active %i, Running %i, Idle %i: %s \n",  _started_sweepers_count.load(), active, _running_sweepers_count.load(), idles, oss.str().c_str());
 	// if (active>0)
 		// LOG(V3_VERB, "SWEEP Active %i, Running %i, Idle %i, Started %i. idle nrs: %s \n", active, _running_sweepers_count.load(), idles,  _started_sweepers_count.load(), oss.str().c_str());
 }
@@ -791,7 +791,7 @@ void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
 	if (available_import_round != my_last_import_round) [[unlikely]] {
 		//there is new data from a new sharing round
 		// publish_round = _sharing_import_round.load(std::memory_order_acquire);
-		LOG(V4_VVER, "SWEEP import round avail %i, last was %i \n", available_import_round, my_last_import_round);
+		LOG(V4_VVER, "SWEEP checked %i --> %i \n", my_last_import_round, available_import_round);
 
 		assert(my_last_import_round <= available_import_round);
 		if (my_last_import_round!=0 && my_last_import_round != available_import_round - 1) {
@@ -933,7 +933,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		if ( ! stolen_work.empty()) {
 			//store steal data persistently in C++, such that C can keep operating on that memory segment
 			sweeper->work_received_from_steal = std::move(stolen_work);
-			LOG(V3_VERB, "SWEEP [%i](%i) <==%i==== local  \n", _my_rank, localId, sweeper->work_received_from_steal.size(), _my_rank);
+			LOG(V3_VERB, "SWEEP MSG [%i](%i) <==%i==== local  \n", _my_rank, localId, sweeper->work_received_from_steal.size(), _my_rank);
 			break;
 		}
 
@@ -947,7 +947,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		// request.targetRank = targetRank;
 		// _worksteal_requests[localId] = request;
 
-		LOG(V3_VERB, "SWEEP [%i](%i) ----?---> glob  \n", _my_rank, localId);
+		LOG(V3_VERB, "SWEEP MSG [%i](%i) ----?---> glob  \n", _my_rank, localId);
 		_worksteal_requests[localId].newBlankRequest(localId);
 
 		//Wait here until we hear back via an MPI message
@@ -956,7 +956,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 			usleep(100);
 			reps++;
 			if (reps%32==0) {
-				LOG(V5_DEBG, "SWEEP [%i](%i) steal loop: waits for MPI response\n", _my_rank, localId);
+				LOG(V5_DEBG, "SWEEP MSG [%i](%i) steal loop: waits for MPI response\n", _my_rank, localId);
 			}
 			if (_terminate_all) {
 				LOG(V3_VERB, "SWEEP [%i](%i) exit wait loop\n", _my_rank, localId);
@@ -972,7 +972,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		//Successful steal if size > 0
 		if (! _worksteal_requests[localId].stolen_work.empty()) {
 			sweeper->work_received_from_steal = std::move(_worksteal_requests[localId].stolen_work);
-			LOG(V4_VVER, "SWEEP [%i](%i) <==%i=== [%i] \n",  _my_rank, localId, sweeper->work_received_from_steal.size(), _worksteal_requests[localId].targetRank);
+			LOG(V4_VVER, "SWEEP MSG [%i](%i) <==%i=== [%i] \n",  _my_rank, localId, sweeper->work_received_from_steal.size(), _worksteal_requests[localId].targetRank);
 			break;
 		}
 		// LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop <-- global steal to [%i] failed \n", _my_rank, localId, targetRank);
@@ -1111,7 +1111,7 @@ void SweepJob::cbContributeToAllReduce() {
 
 	auto aggregation_element = aggregateEqUnitContributions(contribs);
 
-	LOG(V4_VVER, "SWEEP SHARE REDUCE [%i] contributing ~~~%i~~~(+%i)~~> to _red \n", _my_rank, aggregation_element.size()-NUM_METADATA_FIELDS, NUM_METADATA_FIELDS);
+	LOG(V4_VVER, "SWEEP [%i] contributing ~~~%i~~~(+%i)~~> to _red \n", _my_rank, aggregation_element.size()-NUM_METADATA_FIELDS, NUM_METADATA_FIELDS);
 
 	if (_terminate_all) {
 		LOG(V4_VVER, "SWEEP SHARE BCAST skip contribution, seen already _terminate_all\n");
@@ -1129,7 +1129,7 @@ void SweepJob::cbContributeToAllReduce() {
 
 void SweepJob::advanceAllReduction() {
 	if (!_red) return;
-	LOG(V4_VVER, "SWEEP REDUCE ADVANCE [%i]\n", _my_rank);
+	LOG(V4_VVER, "SWEEP [%i] advance() \n", _my_rank);
 	//we always keep the global reduction advancing, independently of the state of the local solvers
 	_red->advance();
 	if (!_red->hasResult()) return;
@@ -1142,10 +1142,10 @@ void SweepJob::advanceAllReduction() {
 	const int terminate   = data[data.size()-METADATA_TERMINATE];
 	const int sweep_round = data[data.size()-METADATA_SWEEP_ROUND];
 	const int sharing_round= data[data.size()-METADATA_SHARING_ROUND];
-	// const int all_idle    = data[data.size()-METADATA_IDLE];
+	const int all_idle    = data[data.size()-METADATA_IDLE];
 	const int unit_size   = data[data.size()-METADATA_UNIT_SIZE];
 	const int eq_size     = data[data.size()-METADATA_EQ_SIZE];
-	assert(eq_size%2==0 || log_return_false("ERROR: Import Equality size not even, but %i\n", eq_size));
+	assert(eq_size%2==0 || log_return_false("SWEEP ERROR: Import Equality size not even, but %i\n", eq_size));
 
 
 	//in case our local solvers are not fully initialised yet, we ignore the global sharing data
@@ -1190,16 +1190,16 @@ void SweepJob::advanceAllReduction() {
 		}
 	}
 
-	LOG(V2_INFO, "SWEEP sweep round %i sharing round %i import got: %i EQS, %i UNITS. idle: %i/%i \n", sweep_round, sharing_round, eq_size/2, unit_size, _lastIdleCount, _nThreads);
+	LOG(V2_INFO, "SWEEP sweep round %i sharing round %i got: %i EQS, %i UNITS, all_idle(%i), term(%i). #locally idle: %i/%i \n", sweep_round, sharing_round, eq_size/2, unit_size, all_idle, terminate _lastIdleCount, _nThreads);
 
 	//prepare the next sharing round, which gets started from the root node
 	if (_is_root) {
-		LOG(V4_VVER, "SWEEP SHARE [%i] RESET root BCAST\n", _my_rank);
+		LOG(V4_VVER, "SWEEP root: rest bcast listen for next sharing round\n", _my_rank);
 		_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(),
 			[this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
 	}
 
-	LOG(V4_VVER, "SWEEP SHARE [%i] RESET REDUCE\n", _my_rank);
+	// LOG(V4_VVER, "SWEEP SHARE [%i] RESET REDUCE\n", _my_rank);
 	//Reduction is finished. Contrary to the bcast, we dont need to directly re-create a new reduction object, but can leave it at null.
 	//The new reduction object will be only created when needed when a new broadcast is present (and completed)
 	_red.reset();
@@ -1370,7 +1370,7 @@ std::vector<int> SweepJob::stealWorkFromAnyLocalSolver(int asking_rank, int aski
 	for (int localId : rand_permutation) {
 		auto stolen_work = stealWorkFromSpecificLocalSolver(localId);
 		if ( ! stolen_work.empty()) {
-			LOG(V3_VERB, "SWEEP [%i](%i) ====%i==> [%i](%i) \n",_my_rank, localId, stolen_work.size(), asking_rank, asking_localId);
+			LOG(V3_VERB, "SWEEP MSG [%i](%i) ====%i==> [%i](%i) \n",_my_rank, localId, stolen_work.size(), asking_rank, asking_localId);
 			return stolen_work;
 		}
 	}
@@ -1396,7 +1396,7 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	//For that in the C code there are further guards against unfinished initialization, all returning 0 in that case
 	//The congruence closure solver will always return 0, as it doesnt operate on work and doesnt have any
 	int max_steal_amount = shweep_get_max_steal_amount(sweeper->solver);
-	if (max_steal_amount == 0)
+	if (max_steal_amount < MIN_STEAL_AMOUNT)
 		return {};
 
 	// LOG(V2_INFO, "ß %i max_steal_amount\n", max_steal_amount);
