@@ -106,11 +106,15 @@ private:
             // prune child
             LOG(V4_VVER, "BCAST returnToSender received from sourceRank %i\n", h.source);
             if (h.source == _tree.leftChildNodeRank) {
+                assert(_tree.nbChildren>0 || log_return_false("ERROR JobTreeBroadcast: Left child [%i] should be pruned, but _tree.nbChildren already %i", _tree.leftChildNodeRank, _tree.nbChildren));
                 _tree.leftChildNodeRank = -1;
+                _tree.nbChildren--;
                 _received_response_left = true;
             }
             if (h.source == _tree.rightChildNodeRank) {
+                assert(_tree.nbChildren>0 || log_return_false("ERROR JobTreeBroadcast: Right child [%i] should be pruned, but _tree.nbChildren already %i", _tree.leftChildNodeRank, _tree.nbChildren));
                 _tree.rightChildNodeRank = -1;
+                _tree.nbChildren--;
                 _received_response_right = true;
             }
             if (hasResult()) _cb(); // callback
