@@ -224,7 +224,7 @@ public:
 
         if (_finished) return *this;
 
-        LOG(V4_VVER, "SWEEP REDUCE expected child elems %i, actual child elems %i, local elem %i. Childranks %i,%i. left_ready?%i right_ready?%i \n",
+        LOG(V4_VVER, "SWEEP advance() ex: %i, actual %i, local %i. childranks [%i],[%i]. received_left(%i), received_right(%i) \n",
             _num_expected_child_elems, _child_elems.size(), _local_elem.has_value(), _expected_child_ranks.first, _expected_child_ranks.second,
             _received_child_elems.first, _received_child_elems.second);
         // if (_child_elems.size() > _num_expected_child_elems) {
@@ -250,7 +250,7 @@ public:
                 for (auto& childElem : _child_elems) elemsList.push_back(std::move(childElem.elem));
                 _aggregated_elem = _aggregator(elemsList);
                 _aggregating = false;
-                LOG(V4_VVER, "SWEEP SHARE AGGR finished own aggregation thread\n");
+                // LOG(V4_VVER, "SWEEP SHARE AGGR finished own aggregation thread\n");
             });
         }
 
@@ -259,7 +259,7 @@ public:
         if (!_aggregating && _future_aggregate.valid() && _parent_is_ready) {
             // Aggregation done
             // LOG(V5_DEBG, "CS got aggregation\n");
-            LOG(V4_VVER, "SWEEP SHARE advancing to parent or broadcasting result\n");
+            // LOG(V4_VVER, "SWEEP SHARE advancing to parent or broadcasting result\n");
 
             _future_aggregate.get();
             _reduction_locally_done = true;
@@ -285,7 +285,7 @@ public:
                 _base_msg.payload = std::move(_aggregated_elem.value());
                 _base_msg.treeIndexOfDestination = _parent_index;
                 _base_msg.contextIdOfDestination = _parent_ctx_id;
-                LOG(V3_VERB, "SWEEP SHARE REDUCE [%i] ~~~%i~~~> parent [%i]\n",_tree.nodeRank, _base_msg.payload.size(), _parent_rank);
+                LOG(V3_VERB, "SWEEP [%i] advance ~~~%i~~~> to parent [%i]\n",_tree.nodeRank, _base_msg.payload.size(), _parent_rank);
                 assert(_base_msg.contextIdOfDestination != 0);
                 MyMpi::isend(_parent_rank, MSG_JOB_TREE_MODULAR_REDUCE, _base_msg);
                 if (_care_about_parent_status) {

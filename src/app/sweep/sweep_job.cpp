@@ -118,7 +118,7 @@ void SweepJob::appl_start() {
 
 // Called periodically by the main thread to allow the worker to emit messages.
 void SweepJob::appl_communicate() {
-	LOG(V4_VVER, "SWEEP appl_communicate() \n");
+	LOG(V5_DEBG, "SWEEP appl_communicate() \n");
 
 	printIdleFraction();
 	checkSharingDelayHealth();
@@ -133,7 +133,7 @@ void SweepJob::appl_communicate() {
 
 	advanceAllReduction();
 
-	LOG(V4_VVER, "SWEEP appl_communicate() done \n");
+	LOG(V5_DEBG, "SWEEP appl_communicate() done \n");
 }
 
 
@@ -776,7 +776,7 @@ void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
 	if (available_import_round != my_last_import_round) [[unlikely]] {
 		//there is new data from a new sharing round
 		// publish_round = _sharing_import_round.load(std::memory_order_acquire);
-		LOG(V4_VVER, "SWEEP import round avail %i, last was %i", available_import_round, my_last_import_round);
+		LOG(V4_VVER, "SWEEP import round avail %i, last was %i \n", available_import_round, my_last_import_round);
 
 		assert(my_last_import_round <= available_import_round);
 		if (my_last_import_round!=0 && my_last_import_round != available_import_round - 1) {
@@ -990,14 +990,14 @@ void SweepJob::initiateNewSharingRound() {
 	}
 
 	if (!_started_synchronized_solving) {
-		LOG(V3_VERB, "SWEEP SHARE BCAST: Delaying first sharing operation, not all solvers online yet (%i/%i) \n", _running_sweepers_count.load(), _nThreads);
+		LOG(V3_VERB, "SWEEP root: Delaying first sharing round, not all solvers online yet (%i/%i) \n", _started_sweepers_count.load(), _nThreads);
 		return;
 	}
 
 	//make sure that only one sharing operation is going on at a time
 	//on this root node, hasReceivedBroadcast is equivalent to asking whether this _bcast object has already started a broadcast
 	if (_bcast->hasReceivedBroadcast()) {
-		LOG(V3_VERB, "SWEEP SHARE BCAST: New sharing round delayed, old round is not completed yet\n");
+		LOG(V3_VERB, "SWEEP root: Delaying next sharing round, old one is not completed yet\n");
 		return;
 	}
 	//Broadcast a ping to all workers to initiate an AllReduce
@@ -1005,7 +1005,7 @@ void SweepJob::initiateNewSharingRound() {
 	//It then causes the leaf nodes to call the callback, initiating the AllReduce
 	_root_last_sharing_start_timestamp = Timer::elapsedSeconds();
 	_time_start_bcast.push_back(_root_last_sharing_start_timestamp);
-	LOG(V3_VERB, "SWEEP SHARE BCAST Initiating Sharing via Ping\n");
+	LOG(V3_VERB, "SWEEP root: Initiating new sharing round via modular broadcast\n");
 	JobMessage msg = getMessageTemplate();
 	msg.tag = _bcast->getMessageTag();
 	msg.payload = {};
@@ -1109,8 +1109,8 @@ void SweepJob::cbContributeToAllReduce() {
 
 void SweepJob::advanceAllReduction() {
 	if (!_red) return;
-	if (!_started_synchronized_solving) return;
 	LOG(V4_VVER, "SWEEP REDUCE ADVANCE [%i]\n", _my_rank);
+	//we always keep the global reduction advancing, independently of the state of the local solvers
 	_red->advance();
 	if (!_red->hasResult()) return;
 
@@ -1126,6 +1126,19 @@ void SweepJob::advanceAllReduction() {
 	const int unit_size   = data[data.size()-METADATA_UNIT_SIZE];
 	const int eq_size     = data[data.size()-METADATA_EQ_SIZE];
 	assert(eq_size%2==0 || log_return_false("ERROR: Import Equality size not even, but %i\n", eq_size));
+
+
+	//in case our local solvers are not fully initialised yet, we ignore the global sharing data
+	//(we still read the metadata, just for informational warning/logging purposes )
+	if (!_started_synchronized_solving && (eq_size>0 || unit_size>0))  {
+		LOG(V3_VERB, "SWEEP WARN [%i] (round %i,%i): Skipping %i eqs, %i units bc local solvers are not all init'd yet \n", _my_rank, sweep_round, sharing_round, eq_size/2, unit_size);
+	}
+
+	if (!_started_synchronized_solving) return;
+
+
+
+
 
 	if (eq_size > MAX_IMPORT_SIZE) {
 		LOG(V1_WARN, "WARN -SWEEP too many equalities to import! %i, max %i\n", eq_size, MAX_IMPORT_SIZE);
