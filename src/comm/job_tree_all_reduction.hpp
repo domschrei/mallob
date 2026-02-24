@@ -110,8 +110,13 @@ public:
         _base_msg.treeIndexOfSender = _tree.index;
         _base_msg.contextIdOfSender = _tree.contextId;
 
-
-        LOG(V3_VERB, "SWEEP New _red AllReduction. Snapshot: LeftChild [%i], RightChild [%i], num_expected %i.\n", leftRank, rightRank, _num_expected_child_elems);
+        int act_num_children = 0;
+        if (leftRank>=0) act_num_children++;
+        if (rightRank>=0) act_num_children++;
+        LOG(V3_VERB, "SWEEP New _red AllReduction. Snapshot: LeftChild [%i], RightChild [%i], _tree.nbChildren %i.\n", leftRank, rightRank, _tree.nbChildren);
+        if (act_num_children != _tree.nbChildren) {
+            LOG(V1_WARN, "WARN SWEEP: AllReduction got Snapshot with _tree.nbChildren %i, but actual child ranks [%i]&[%i] give %i actual children! \n", _tree.nbChildren, leftRank, rightRank, act_num_children);
+        }
     }
 
     // Contribute to the all-reduction.
