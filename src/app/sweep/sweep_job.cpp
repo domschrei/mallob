@@ -906,35 +906,33 @@ void SweepJob::provideInitialWork(KissatPtr sweeper) {
 }
 
 
+/*
 void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) {
-	KissatPtr sweeper = _sweepers[localId]; //array access safe (we know the sweeper exists) because this callback is called by this sweeper itself
+	KissatPtr sweeper = _sweepers[localId]; //this array access is safe because the callback is called by this sweeper itself
 	sweeper->work_received_from_steal = {};
-	//setting this sweeper to idle is done more fine grained in the following lines, because it caused a race condition here for the very first solver that was marked idle while it was receiving the initial work
 
-	//loop until we find work or the whole sweeping is terminated
+	//setting this sweeper to idle is no longer done directly here, because it caused a race condition for the very first solver that was marked idle while it was receiving the initial work
+
+	//try to find work
+	//if we fail, this callback will be called again by the kissat solver - so the main search loop is in the solver, not here
 	while (true) {
-		LOG(V5_DEBG, "Sweeper [%i](%i) in steal loop\n", _my_rank, localId);
+		// LOG(V5_DEBG, "Sweeper [%i](%i) in steal loop\n", _my_rank, localId);
 
 		if (_terminate_all) {
-			//this is the signal for the solver to terminate itself, by sending it a work array of size 0
 			sweeper->work_received_from_steal = {};
 			sweeper->sweeper_is_idle = true;
 			LOG(V3_VERB, "Sweeper [%i](%i) exit steal loop\n", _my_rank, localId);
 			break;
 		}
-		 /*
-		  * We serve the initial work exclusively to solver 0 at the root node. This hardcoded target prevents any concurrency/communication problems at this stage.
-		  */
+		//We serve the initial work exclusively to solver 0 at the root node. This hardcoded target prevents any concurrency/communication problems at this stage.
 		if (_is_root && ! _root_provided_initial_work && localId==_representative_localId) {
 			provideInitialWork(sweeper);
 			break;
 		}
 
 		//Try to steal locally from shared memory
-		 /*
-		  * Going for some direct global steals doesnt do much here, because the big rally happens anyways the moment all are depleted locally
-		  * At that point they anyways schedule a global sweep, and some sweepers stealing globally before cant stop that
-		  */
+		//Going for some direct global steals doesnt do much here, because the big rally happens anyways the moment all are depleted locally
+		//At that point they anyways schedule a global sweep, and some sweepers stealing globally before cant stop that
 
 		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop --> local steal \n", _my_rank, localId);
 		sweeper->sweeper_is_idle = true;
@@ -1003,7 +1001,95 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 	// }
 	//The thread now returns to the kissat solver
 }
+*/
 
+
+void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) {
+	KissatPtr sweeper = _sweepers[localId]; //this array access is safe because the callback is called by this sweeper itself
+	sweeper->work_received_from_steal = {};
+
+	//setting this sweeper to idle is no longer done directly here, because it caused a race condition for the very first solver that was marked idle while it was receiving the initial work
+
+	//fake loop, only used to break out and jump to the bottom at many points, i.e. gotos
+	while (true) {
+		if (_terminate_all) {
+			sweeper->work_received_from_steal = {};
+			sweeper->sweeper_is_idle = true;
+			LOG(V3_VERB, "Sweeper [%i](%i) exit steal loop\n", _my_rank, localId);
+			break;
+		}
+		//Initial work is served exclusively to the representative solver (typically localId 0) at the root node.
+		//This hardcoded target prevents any concurrency problems during this initialisation
+		if (_is_root && ! _root_provided_initial_work && localId==_representative_localId) {
+			provideInitialWork(sweeper);
+			break;
+		}
+
+		//First strategy: steal locally from shared memory
+		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop --> local steal \n", _my_rank, localId);
+		sweeper->sweeper_is_idle = true;
+		auto stolen_work = stealWorkFromAnyLocalSolver(_my_rank, localId);
+
+		if ( ! stolen_work.empty()) {
+			//Successful local steal
+			//store the steal data persistently in C++, such that C can keep operating on that memory segment
+			sweeper->work_received_from_steal = std::move(stolen_work);
+			LOG(V3_VERB, "SWEEP MSG [%i](%i) <==%i==== local  \n", _my_rank, localId, sweeper->work_received_from_steal.size(), _my_rank);
+			break;
+		}
+
+		//Second strategy: steal globally via MPI
+		//We deposit a request for an MPI message via shared memory, and the main MPI thread of this process will pick up the request and actually send it via MPI
+		//This extra step is necessary, because the thread is just "some" solver-thread and it can cause problems it it start sending MPI messages on it's own
+
+		LOG(V3_VERB, "SWEEP MSG [%i](%i) ----?---> req  \n", _my_rank, localId);
+		_worksteal_requests[localId].newBlankRequest(localId);
+
+		//Wait here until we hear back
+		//To receive a worksteal answer, main MPI thread scans for incoming messages and passes it to us via shared memory
+		constexpr unsigned WAIT_MICROSEC=100;
+		unsigned reps=0;
+		while(_worksteal_requests[localId].got_steal_response == false) {
+			usleep(WAIT_MICROSEC);
+			reps++;
+			if (reps%64==0) {
+				LOG(V1_WARN, "SWEEP WARN [%i](%i) steal loop waits for MPI response since %i reps (%i ms) \n", _my_rank, localId, reps, (reps*WAIT_MICROSEC)/1000);
+			}
+			if (_terminate_all) {
+				LOG(V3_VERB, "SWEEP [%i](%i) exit wait loop\n", _my_rank, localId);
+				break;
+			}
+		}
+
+		if (_terminate_all) {
+			sweeper->sweeper_is_idle = true;
+			break;	 //skip touching the work array at all, weird stuff can happen when we are already in the termination stage
+		}
+
+		//Successful steal if size > 0
+		if (_worksteal_requests[localId].stolen_work.size()>0) {
+			sweeper->work_received_from_steal = std::move(_worksteal_requests[localId].stolen_work);
+			LOG(V4_VVER, "SWEEP MSG [%i](%i) <==%i=== [%i] \n",  _my_rank, localId, sweeper->work_received_from_steal.size(), _worksteal_requests[localId].targetRank);
+			break;
+		}
+		//always exit this fake loop. the real loop is in the kissat solver, which continuously calls this function
+		break;
+	}
+
+	//we control the memory on C++/Mallob Level, and only tell the kissat solver where it can find the work (or where it can read the zero)
+	//the solver will also write on this array, but only within the allocated bounds provided by C++/Mallob
+	*work = reinterpret_cast<unsigned int*>(sweeper->work_received_from_steal.data());
+	*work_size = sweeper->work_received_from_steal.size();
+	assert(*work_size>=0);
+	if (*work_size>0) {
+		sweeper->sweeper_is_idle = false; //we keep solver marked as "idle" once the whole solving is terminated, otherwise race-conditions can occur where suddenly the solver is treated as active again
+	}
+	//update: we no longer send the termination information via this worksteal callback, but separately
+	// if (_terminate_all) {
+		// LOG(V3_VERB, "SWEEP [%i](%i) returning to solver with termination info\n", _my_rank, localId);
+	// }
+	//The thread now returns to the kissat solver
+}
 
 void SweepJob::initiateNewSharingRound() {
 	assert(_is_root); //only the root node initiates sharing rounds
@@ -1170,7 +1256,6 @@ void SweepJob::advanceAllReduction() {
 
 
 
-
 	if (eq_size > MAX_IMPORT_SIZE) {
 		LOG(V1_WARN, "WARN -SWEEP too many equalities to import! %i, max %i\n", eq_size, MAX_IMPORT_SIZE);
 	}
@@ -1223,6 +1308,8 @@ void SweepJob::advanceAllReduction() {
 	//We received the termination signal via the app-internal data sharing
 	if (terminate) {
 		_terminate_all = true;
+		//update: we now trigger terminations here directly, no longer indirectly via the worksteal callback
+		triggerTerminations();
 		LOG(V1_WARN, "# \n # \n # --- [%i] got terminate flag, TERMINATING SWEEP JOB ---\n # \n", _my_rank);
 	}
 
