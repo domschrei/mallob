@@ -89,7 +89,9 @@ public:
 
         unsigned long keySeed = ImpCheck::getKeySeed(_base_seed);
         moreArgs += " -key-seed=" + std::to_string(keySeed);
-        moreArgs += " -heap-mbs=" + std::to_string(std::round(_memory_factor * 2048));
+        int heapMbs = std::round(_memory_factor * 2048);
+        LOG(V4_VVER, "Set CakeML heap size to %iMB\n", heapMbs);
+        moreArgs += " -heap-mbs=" + std::to_string(heapMbs);
 
         _subproc = new Subprocess(params, "impcheck_check", moreArgs);
         _child_pid = _subproc->start();
