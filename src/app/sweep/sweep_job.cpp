@@ -304,17 +304,24 @@ void SweepJob::tryReportUnsat() {
 void SweepJob::reportSolverResult(KissatPtr sweeper, int res) {
 	LOG(V2_INFO, "SWEEP JOB [%i] reports sweep result %i to Mallob\n", _my_rank, res);
 	assert(_is_root);
-	assert(_solved_status == -1);
+	assert(_solved_status == -1); //something would be off if we called this function more than once
 	std::vector<int> formula;
 	if (res==UNSAT) {
+		//an UNSAT result doesnt come with a proof and can arrive via MPI from another process, so we don't have access to that particular reporting sweeper, nor do we need it
 		assert(sweeper == nullptr);
 		formula = {};
 	} else if (res==IMPROVED){
 		assert(sweeper);
 		formula = sweeper->extractPreprocessedFormula();
 		LOG(V2_INFO, "SWEEP JOB [%i]: Solution Size %i\n", _my_rank, formula.size());
+	} else if (res==UNKNOWN) {
+		//Design choice: we don't even send a formula back. if we couldn't improve anything in it
+		//since, in the SWEEP app, we stop anyways after sweeping ends
+		//and in the SATWITHPRE app, we don't use any reported formula in this case of no progress
+		assert(sweeper);
+		formula = {};
 	} else {
-		LOG(V1_WARN, "WARN SWEEP JOB [%i]: no improvement in final formula (result code %i) \n", _my_rank, res);
+		LOG(V1_WARN, "WARN SWEEP [%i]: unexpected result code %i when reporting to mallob \n", _my_rank, res);
 	}
 	LOGGER(_reslogger,V2_INFO, "SWEEP_RESULT_CODE %i == %s \n", res, res==40 ? "IMPROVED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
 	_internal_result.setSolutionToSerialize(formula.data(), formula.size());
@@ -377,20 +384,25 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			} else {
 				_do_report_UNSAT_to_root = true;
 			}
-		} else if (res==UNKNOWN) {
-			//There might be some progress in the formula, check.
-			//To reduce concurrency problems, only a single dedicated solver (localId==0 on the root node) might have even reported a formula
-			if (sweeper->hasPreprocessedFormula() ) { //by design the only sweeper that might have reported smth is the representative one with localId==0
+		} else if (res==UNKNOWN && sweeper->getLocalId()==_representative_localId) {
+			//Found either IMPROVED or UNKNOWN
+			//To reduce concurrency problems, only a single representative solver on the root node is allowed to report this
+			if (sweeper->hasPreprocessedFormula() ) { //by design only the representative sweeper might have a preprocessed (Improved) formula
 				assert(_is_root);
-				assert(sweeper->getLocalId()==_representative_localId);
-				//
 				if (_root_reported_unsat) {
+					//in rare cases, it can happen that an UNSAT result is found in some other solver, but almost at the same time the root solver also ends and doesnt know this information yet, catch this case here
 					LOG(V1_WARN, "SWEEP [%i](%i): wanted to report improvement result, but stopped because other solvers already deduced UNSAT\n", _my_rank, localId);
 				}  else {
+					//we found an Improved formula via Sweeping
 					reportSolverResult(sweeper, IMPROVED);
 				}
+			} else {
+				//we didnt find any equivalences or units via sweeping
+				reportSolverResult(sweeper, UNKNOWN);
 			}
 		}
+
+		assert(res==UNKNOWN || res==UNSAT || log_return_false("SWEEP ERROR: solver has returned with unexpected signal %i \n", res));
 
 		//A dedicated solver on the root node print his stats as a representative of all other solvers.
 		//Their stats differ slightly between solvers, but especially these global stats are very similar between all of them, so we don't bother aggregating/averaging them
@@ -398,7 +410,6 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			printSweepStats(sweeper, true);
 		}
 
-		assert(res==UNKNOWN || res==UNSAT || log_return_false("SWEEP ERROR: solver has returned with unexpected signal %i \n", res));
 		//If no solver sets UNSAT or IMPROVED, the job will be returned by default as UNKNOWN
 
 		if (_running_sweepers_count==1) { //the last solver should report resweeps, as only then they are gathered from all exited solvers
