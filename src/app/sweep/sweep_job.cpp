@@ -1190,7 +1190,7 @@ void SweepJob::advanceAllReduction() {
 		}
 	}
 
-	LOG(V2_INFO, "SWEEP sweep round %i sharing round %i got: %i EQS, %i UNITS, all_idle(%i), term(%i). #locally idle: %i/%i \n", sweep_round, sharing_round, eq_size/2, unit_size, all_idle, terminate _lastIdleCount, _nThreads);
+	LOG(V2_INFO, "SWEEP sweep round %i sharing round %i got: %i EQS, %i UNITS, all_idle(%i), term(%i). #locally idle: %i/%i \n", sweep_round, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastIdleCount, _nThreads);
 
 	//prepare the next sharing round, which gets started from the root node
 	if (_is_root) {
