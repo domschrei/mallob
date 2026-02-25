@@ -31,6 +31,7 @@ public:
         const int nbProcsPerHost = _params.processesPerHost();
         const int nbHosts = _global_num_workers / nbProcsPerHost;
         const int nbSolvers = _params.numThreadsPerProcess() * _global_num_workers;
+        const int jwl = _params.jobWallclockLimit();
         const std::string proofInputDir = FileUtils::getAbsoluteFilePath(_proofdir);
         const std::string proofWorkingDir = FileUtils::getAbsoluteFilePath(_params.palRupCheckWorkdir());
         const std::string logDir = FileUtils::getAbsoluteFilePath(_params.logDirectory());
@@ -56,6 +57,7 @@ public:
             + " PROOF_PALRUP=\"" + proofInputDir + "\""
             + " PROOF_WORKING=\"" + proofWorkingDir + "\""
             + " LOG_DIR=\"" + logDir + "\""
+            + " TIMEOUT=" + std::to_string(jwl > 0 ? jwl : 9999999)
             + " bash scripts/pal_launcher.sh";
 
         LOG(V4_VVER, "Calling PalRUP checker: %s\n", palRupCall.c_str());

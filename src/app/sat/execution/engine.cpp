@@ -703,7 +703,7 @@ void SatEngine::cleanUp(bool hardTermination) {
 		// Create (empty) proof files where none were created
 		if (_params.palRup()) for (int localId = 0; localId < _params.numThreadsPerProcess(); localId++) {
 			int globalId = _config.apprank * _params.numThreadsPerProcess() + localId;
-			auto dir = setup.proofDir + "/" + std::to_string(setup.globalId);
+			auto dir = setup.proofDir + "/../" + std::to_string(globalId);
 			FileUtils::create(dir + "/out.palrup");
 		}
 		LOGGER(_logger, V4_VVER, "[engine-cleanup] done - hard exit pending\n");
