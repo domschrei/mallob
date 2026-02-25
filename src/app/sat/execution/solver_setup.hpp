@@ -112,6 +112,11 @@ struct SolverSetup {
 	int nbSkippedIdEpochs {0};
 
 
+	// E.g., if 16 SAT threads should be spawned but only 3 are spawned due to memory shortage,
+	// this factor is 16/3 = 5.333.
+	float memoryFactor;
+
+
 	// Optimization and theories
 
 	std::vector<std::pair<long, int>> objectiveFunction;

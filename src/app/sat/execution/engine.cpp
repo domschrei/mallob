@@ -253,6 +253,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		FileUtils::mkdir(setup.profilingBaseDir);
 		setup.profilingLevel = params.satProfilingLevel();
 	}
+	setup.memoryFactor = numOrigSolvers / (float)_num_active_solvers;
 	setup.objectiveFunction = _objective;
 
 	// Instantiate solvers according to the global solver IDs and diversification indices

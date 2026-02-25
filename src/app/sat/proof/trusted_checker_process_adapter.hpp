@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -51,10 +52,12 @@ private:
     std::vector<int> _model;
     Mutex _mtx_model;
 
+    float _memory_factor;
+
 public:
-    TrustedCheckerProcessAdapter(Logger& logger, int baseSeed, int solverId, int nbVars, bool checkModel) :
+    TrustedCheckerProcessAdapter(Logger& logger, int baseSeed, int solverId, int nbVars, bool checkModel, float memoryFactor) :
             _base_seed(baseSeed), _logger(logger), _solver_id(solverId), _nb_vars(nbVars),
-            _check_model(checkModel), _op_queue(1<<14) {}
+            _check_model(checkModel), _op_queue(1<<14), _memory_factor(memoryFactor) {}
 
     ~TrustedCheckerProcessAdapter() {
         if (!_f_directives) return;
@@ -86,6 +89,7 @@ public:
 
         unsigned long keySeed = ImpCheck::getKeySeed(_base_seed);
         moreArgs += " -key-seed=" + std::to_string(keySeed);
+        moreArgs += " -heap-mbs=" + std::to_string(std::round(_memory_factor * 2048));
 
         _subproc = new Subprocess(params, "impcheck_check", moreArgs);
         _child_pid = _subproc->start();
