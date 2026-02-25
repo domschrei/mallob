@@ -303,8 +303,8 @@ void SweepJob::tryReportUnsat() {
 
 void SweepJob::reportSolverResult(KissatPtr sweeper, int res) {
 	LOG(V2_INFO, "SWEEP JOB [%i] reports sweep result %i to Mallob\n", _my_rank, res);
-	assert(_is_root);
-	assert(_solved_status == -1); //something would be off if we called this function more than once
+	assert(_is_root || log_return_false("SWEEP ERROR: non-root tries to report result to mallob\n"));
+	assert(_solved_status == -1 || log_return_false("SWEEP ERROR: duplicate attempt to report result to mallob")); //something would be off if we called this function more than once
 	std::vector<int> formula;
 	if (res==UNSAT) {
 		//an UNSAT result doesnt come with a proof and can arrive via MPI from another process, so we don't have access to that particular reporting sweeper, nor do we need it
@@ -384,11 +384,11 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			} else {
 				_do_report_UNSAT_to_root = true;
 			}
-		} else if (res==UNKNOWN && sweeper->getLocalId()==_representative_localId) {
+		} else if (res==UNKNOWN && _is_root && sweeper->getLocalId()==_representative_localId) {
 			//Found either IMPROVED or UNKNOWN
 			//To reduce concurrency problems, only a single representative solver on the root node is allowed to report this
+			assert(_is_root);
 			if (sweeper->hasPreprocessedFormula() ) { //by design only the representative sweeper might have a preprocessed (Improved) formula
-				assert(_is_root);
 				if (_root_reported_unsat) {
 					//in rare cases, it can happen that an UNSAT result is found in some other solver, but almost at the same time the root solver also ends and doesnt know this information yet, catch this case here
 					LOG(V1_WARN, "SWEEP [%i](%i): wanted to report improvement result, but stopped because other solvers already deduced UNSAT\n", _my_rank, localId);
@@ -397,7 +397,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 					reportSolverResult(sweeper, IMPROVED);
 				}
 			} else {
-				//we didnt find any equivalences or units via sweeping
+				//The whole sweeping didn't yield any improvements
 				reportSolverResult(sweeper, UNKNOWN);
 			}
 		}
@@ -420,7 +420,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		_sweepers[localId].reset();  //this should delete the only persistent shared pointer on the solver, and thus trigger its destructor soon
 		_running_sweepers_count--;
 		_finished_sweepers_count++;
-		LOG(V3_VERB, "SWEEP JOB [%i](%i) WORKER EXIT, %i left \n", _my_rank, localId, _running_sweepers_count.load());
+		LOG(V3_VERB, "SWEEP [%i](%i) WORKER EXIT, %i left \n", _my_rank, localId, _running_sweepers_count.load());
 
 		// if (_localId==_representative_localId) {
 	});
