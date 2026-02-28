@@ -219,6 +219,7 @@ bool SatReader::parseInternally(JobDescription& desc) {
 
 bool SatReader::read(JobDescription& desc) {
 
+	LOG(V2_INFO, "SatReader start. fsize %i, payloadsize %i\n", desc.getFSize(), desc.getFormulaPayloadSize(0));
 	std::optional<std::future<void>> optFuture;
 	std::vector<int> litsToParse;
 	if (_files.empty()) {
@@ -242,8 +243,9 @@ bool SatReader::read(JobDescription& desc) {
 			std::ofstream& ofs = _tppa->getFormulaToParserStream();
 
 			//Nicco reminder
-			int counter=0;
-			constexpr int interval = 1<<17;
+			// int counter=0;
+			// constexpr int interval = 1<<17;
+			LOG(V2_INFO, "SatReader ofstream: started reading \n");
 
 			for (int lit : litsToParse) {
 				if (lit == INT32_MIN) break;
@@ -254,12 +256,13 @@ bool SatReader::read(JobDescription& desc) {
 				ofs << " " << lit;
 				if (lit == 0) ofs << "\n";
 
-				counter++;
-				if (counter%interval==0) {
-					LOG(V2_INFO, "SatReader: parsed %i lits\n", counter);
-				}
+				// counter++;
+				// if (counter%interval==0) {
+					// LOG(V2_INFO, "SatReader: parsed %i lits\n", counter);
+				// }
 
 			}
+			LOG(V2_INFO, "SatReader ofstream: finished reading \n");
 			ofs.flush();
 		});
 	}
