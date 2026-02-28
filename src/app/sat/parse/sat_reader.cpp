@@ -86,6 +86,7 @@ bool SatReader::parseAndCompress(JobDescription& desc) {
 
 bool SatReader::parseInternally(JobDescription& desc) {
 
+	LOG(V2_INFO, "SatReader parseInternally\n");
 	_raw_content_mode = desc.getAppConfiguration().map.count("content-mode")
 		&& desc.getAppConfiguration().map.at("content-mode") == "raw";
 
@@ -142,6 +143,7 @@ bool SatReader::parseInternally(JobDescription& desc) {
 		desc.reserveSize(size / sizeof(int));
 		void* mmapped = mmap(0, size, PROT_READ, MAP_PRIVATE, fd, 0);
 
+		LOG(V2_INFO, "SatReader process\n");
 		if (_raw_content_mode) {
 			int* f = (int*) mmapped;
 			for (long i = 0; i < size; i++) {
@@ -241,12 +243,6 @@ bool SatReader::read(JobDescription& desc) {
 		optFuture = ProcessWideThreadPool::get().addTask([&]() {
 			// Output formula increment to the pipe file
 			std::ofstream& ofs = _tppa->getFormulaToParserStream();
-
-			//Nicco reminder
-			// int counter=0;
-			// constexpr int interval = 1<<17;
-			LOG(V2_INFO, "SatReader ofstream: started reading \n");
-
 			for (int lit : litsToParse) {
 				if (lit == INT32_MIN) break;
 				if (lit == INT32_MAX) {
@@ -255,14 +251,7 @@ bool SatReader::read(JobDescription& desc) {
 				}
 				ofs << " " << lit;
 				if (lit == 0) ofs << "\n";
-
-				// counter++;
-				// if (counter%interval==0) {
-					// LOG(V2_INFO, "SatReader: parsed %i lits\n", counter);
-				// }
-
 			}
-			LOG(V2_INFO, "SatReader ofstream: finished reading \n");
 			ofs.flush();
 		});
 	}
@@ -271,6 +260,8 @@ bool SatReader::read(JobDescription& desc) {
 		_filename = _files.front();
 	}
 
+
+	LOG(V2_INFO, "SatReader setAppConfigEntry\n");
 	const std::string NC_DEFAULT_VAL = "BMMMKKK111";
 	desc.setAppConfigurationEntry("__NC", NC_DEFAULT_VAL);
 	desc.setAppConfigurationEntry("__NV", NC_DEFAULT_VAL);
