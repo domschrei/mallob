@@ -2,6 +2,10 @@
 
 #include "app/job.hpp"
 #include "app/job_tree.hpp"
+#include "app/sat/job/anytime_sat_clause_communicator.hpp"
+#include "app/sat/job/base_sat_job.hpp"
+#include "app/sat/job/clause_sharing_session.hpp"
+#include "app/sat/sharing/buffer/buffer_builder.hpp"
 #include "util/ctre.hpp"
 #include "util/logger.hpp"
 #include "util/sys/tmpdir.hpp"
@@ -12,7 +16,7 @@ extern "C" {
 
 
 SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table)
-    : Job(params, setup, table), _reslogger(Logger::getMainInstance().copy("<RESULT>", ".sweep"))
+    : BaseSatJob(params, setup, table), _reslogger(Logger::getMainInstance().copy("<RESULT>", ".sweep"))
 {
 	assert(_params.jobCommUpdatePeriod() > 0 || log_return_false("[ERROR] For this application to work,"
             " you must explicitly enable job communicators with the -jcup option, e.g., -jcup=0.1\n"));
@@ -46,6 +50,9 @@ void SweepJob::appl_start() {
 	_my_index = getJobTree().getIndex();
 	_is_root = getJobTree().isRoot();
 	_nThreads = _params.numThreadsPerProcess.val;
+
+	_clause_comm.reset(new AnytimeSatClauseCommunicator(_params, this));
+
 	LOG(V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d\n",
 		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _nThreads);
 	// LOG(V2_INFO,"SWEEP JOB sweep-sharing-period: %i ms\n", _params.sweepSharingPeriod_ms.val);
@@ -106,6 +113,22 @@ void SweepJob::appl_start() {
 void SweepJob::appl_communicate() {
 	LOG(V4_VVER, "SWEEP JOB appl_communicate() \n");
 
+	// TODO(Nicco) This is how you feed gathered results to XTCS:
+	//std::vector<int> units; // coming from sweepers
+	// build buffer
+	//BufferBuilder bb(-1, 10, false);
+	//for (int unit : units) bb.append({&unit, 1, 1});
+	//std::vector<int> buffer = bb.extractBuffer();
+	// feed buffer to XTCS
+	//_clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
+
+	if (_clause_comm) _clause_comm->communicate();
+	while (hasDeferredMessage()) {
+        auto deferredMsg = getDeferredMessage();
+        _clause_comm->handle(
+            deferredMsg.source, deferredMsg.mpiTag, deferredMsg.msg);
+    }
+
 	printIdleFraction();
 	checkSharingDelayHealth();
 	if (_bcast && _is_root)// Root: Update job tree snapshot in case your children changed
@@ -123,6 +146,13 @@ void SweepJob::appl_communicate() {
 
 // React to an incoming message. (This becomes relevant only if you send custom messages)
 void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
+
+	if (!_clause_comm) {
+		LOG(V1_WARN, " [WARN] Return to sender: ForkedSatJob::appl_communicate(): not initialized! \n");
+        msg.returnToSender(sourceRank, mpiTag);
+		return;
+	} else if (_clause_comm->handle(sourceRank, mpiTag, msg)) return;
+
 	// LOG(V2_INFO, "Shweep rank %i: received custom message from source %i, mpiTag %i, msg.tag %i \n", _my_rank, source, mpiTag, msg.tag);
 	if (mpiTag != MSG_SEND_APPLICATION_MESSAGE) {
 		LOG(V1_WARN, "SWEEP MSG Warn [%i] got unexpected message with mpiTag=%i, msg.tag=%i  (instead of MSG_SEND_APPLICATION_MESSAGE mpiTag == 30)\n", _my_rank, mpiTag, msg.tag);
@@ -236,6 +266,7 @@ void SweepJob::reportSolverResult(KissatPtr sweeper, int res) {
 	LOGGER(_reslogger,V2_INFO, "SWEEP_RESULT_CODE %i == %s \n", res, res==40 ? "IMPROVED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
 	_internal_result.setSolutionToSerialize(formula.data(), formula.size());
 	_internal_result.result = res;
+
 	_solved_status = res; //this change will be noticed by the main thread and triggers the termination of this job
 }
 
@@ -267,6 +298,11 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		_started_synchronized_solving = true; //multiple threads will write non-thread-safe to this bool, but all only monotonically to "true"
 
 		LOG(V3_VERB, "SWEEP JOB [%i](%i) solve() START \n", _my_rank, localId);
+
+		// TODO(Nicco) Get a callback into the sweepers so that learned equivalences and units
+		// arrive in this class "in realtime" (or per round/iteration) and can be added to XTCS.
+		// See appl_communicate() for handling the arriving clauses (which must happen in the main thread).
+
 		int res = sweeper->solve(0, nullptr);
 		LOG(V3_VERB, "SWEEP JOB [%i](%i) solve() FINISH. Result %i \n", _my_rank, localId, res);
 

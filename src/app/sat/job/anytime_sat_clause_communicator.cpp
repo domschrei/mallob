@@ -11,6 +11,8 @@
 #include "app/sat/job/historic_clause_storage.hpp"
 #include "app/sat/job/inplace_sharing_aggregation.hpp"
 #include "app/sat/job/inter_job_clause_sharer.hpp"
+#include "app/sat/sharing/buffer/buffer_builder.hpp"
+#include "app/sat/sharing/buffer/buffer_reducer.hpp"
 #include "comm/job_tree_snapshot.hpp"
 #include "comm/msgtags.h"
 #include "data/app_configuration.hpp"
@@ -41,7 +43,7 @@ void advanceCollective(BaseSatJob* job, JobMessage& msg, int broadcastTag) {
     }
 }
 
-AnytimeSatClauseCommunicator::AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job) : 
+AnytimeSatClauseCommunicator::AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job, bool internalSharing) : 
     _params(params), _job(job),
     _cls_history(!params.collectClauseHistory() ? nullptr :
         new HistoricClauseStorage([&]() {
@@ -55,7 +57,8 @@ AnytimeSatClauseCommunicator::AnytimeSatClauseCommunicator(const Parameters& par
     ),
     _cross_job_clause_sharer(_job->getDescription().getGroupId() > 0 && _job->getJobTree().isRoot() ?
         new InterJobClauseSharer(_params, job->getDescription().getGroupId(), job->getContextId(), job->toStr()) : nullptr),
-    _sent_cert_unsat_ready_msg(!params.proofOutputFile.isSet() && !params.deterministicSolving()) {
+    _sent_cert_unsat_ready_msg(!params.proofOutputFile.isSet() && !params.deterministicSolving()),
+    _internal_sharing(internalSharing) {
 
     _time_of_last_epoch_initiation = Timer::elapsedSecondsCached();
     if (_cross_job_clause_sharer) initCrossSharer();
@@ -136,7 +139,14 @@ void AnytimeSatClauseCommunicator::communicate() {
 
         if (_current_session) _current_session->setAdditionalClauseListener(
             [&, session = _current_session.get()](std::vector<int>& clauses) {
-                feedLocalClausesIntoCrossSharing(clauses, session);
+                if (_params.crossShareAll()) {
+                    feedLocalClausesIntoCrossSharing(clauses, session);
+                } else {
+                    // Forward an empty set of clauses so that XTCS is still performed.
+                    BufferBuilder bb(_cross_job_clause_sharer->getBufferBuilder(-1));
+                    auto cls = bb.extractBuffer();
+                    feedLocalClausesIntoCrossSharing(cls, session);
+                }
             }
         );
     }
@@ -150,7 +160,7 @@ void AnytimeSatClauseCommunicator::communicate() {
     }
 }
 
-void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& msg) {
+bool AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& msg) {
 
     if (msg.returnedToSender) {
         // Message was sent by myself but was then returned.
@@ -163,30 +173,33 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
             if (_current_session) {
                 _current_session->pruneChild(source);
             }
+            return true;
         }
         if (msg.tag == MSG_INITIATE_CROSS_JOB_CLAUSE_SHARING) {
             if (_cross_sharing_session) {
                 _cross_sharing_session->pruneChild(source);
             }
+            return true;
         }
 
-        return;
+        return false;
     }
 
-    if (handleClauseHistoryMessage(source, mpiTag, msg)) return;
-    if (handleProofProductionMessage(source, mpiTag, msg)) return;
-    if (handleClauseSharingMessage(source, mpiTag, msg)) return;
+    if (handleClauseHistoryMessage(source, mpiTag, msg)) return true;
+    if (handleProofProductionMessage(source, mpiTag, msg)) return true;
+    if (handleClauseSharingMessage(source, mpiTag, msg)) return true;
 
     if (msg.tag == MSG_BROADCAST_CLAUSES_STATELESS) {
-        if (_job->getState() != ACTIVE) return;
+        if (_job->getState() != ACTIVE) return true;
         _job->getJobTree().sendToAnyChildren(msg);
         _job->digestSharingWithoutFilter(0, std::move(msg.payload), true);
-        return;
+        return true;
     }
 
-    LOG(V0_CRIT, "[WARN] UNEXPECTED JOB MESSAGE - NORMAL CODE WOULD HAVE ASSERTED HERE!\n");
-    LOG(V0_CRIT, "[Warn] Unexpected job message mpitag=%i inttag=%i jobId=%i ctx_id_sender=%i <= [%i]\n", mpiTag, msg.tag, msg.jobId, msg.contextIdOfSender, source);
+    //LOG(V0_CRIT, "[WARN] UNEXPECTED JOB MESSAGE - NORMAL CODE WOULD HAVE ASSERTED HERE!\n");
+    //LOG(V0_CRIT, "[Warn] Unexpected job message mpitag=%i inttag=%i jobId=%i ctx_id_sender=%i <= [%i]\n", mpiTag, msg.tag, msg.jobId, msg.contextIdOfSender, source);
     // assert(log_return_false("[ERROR] Unexpected job message mpitag=%i inttag=%i jobId=%i ctx_id_sender=%i <= [%i]\n", mpiTag, msg.tag, msg.jobId, msg.contextIdOfSender, source));
+    return false;
 }
 
 bool AnytimeSatClauseCommunicator::handleClauseHistoryMessage(int source, int mpiTag, JobMessage& msg) {
@@ -360,7 +373,8 @@ void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg, int so
 }
 
 void AnytimeSatClauseCommunicator::feedLocalClausesIntoCrossSharing(std::vector<int>& clauses, ClauseSharingSession* session) {
-    _cross_job_clause_sharer->updateBestFoundSolutionCost(session->getBestFoundSolutionCost());
+    if (session)
+        _cross_job_clause_sharer->updateBestFoundSolutionCost(session->getBestFoundSolutionCost());
     if (!_params.crossJobCommunication()) return;
     _cross_job_clause_sharer->addInternalSharedClauses(clauses);
     auto& comm = _job->getGroupComm();
@@ -442,6 +456,7 @@ bool AnytimeSatClauseCommunicator::tryInitiateSharing() {
 
     if (_job->getState() != ACTIVE) return false;
     if (_proof_producer || !_sent_cert_unsat_ready_msg) return false;
+    if (!_internal_sharing) return false;
 
     auto time = Timer::elapsedSecondsCached();
     bool nextEpochDue = _params.appCommPeriod() > 0 &&

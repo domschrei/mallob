@@ -227,7 +227,7 @@ private:
             {"priority", 1.000},
             {"application", "SAT"}
         };
-        if (_params.crossJobCommunication()) json["group-id"] = "1";
+        if (_params.crossJobCommunication()) json["group-id"] = _desc.getGroupId();
         StaticStore<std::vector<int>>::insert(json["name"].get<std::string>(),
             std::vector<int>(_desc.getFormulaPayload(0), _desc.getFormulaPayload(0)+_desc.getFormulaPayloadSize(0)));
         json["internalliterals"] = json["name"].get<std::string>();

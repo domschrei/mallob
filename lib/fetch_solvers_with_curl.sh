@@ -68,6 +68,7 @@ if echo $solvers|grep -q "k"; then
                 echo "Fetching sweep kissat from Niccos repo!" 
                 curl -L -o kissat.zip https://github.com/nrilu/kissat/archive/refs/heads/update24.zip
 #                 echo "Downloading Nicco's Kissat Fork for Equivalence Sweeping"
+                mv kissat-update24 kissat
             else
                 echo "Fetching kissat from standard repo (no shared sweeping!)" 
                 branchorcommit="53b0ce61b0ce8b1d91e5c302d8060f8597364137" # updated 2024-04-02

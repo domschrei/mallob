@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "app/sat/data/clause_histogram.hpp"
+#include "app/sat/sharing/buffer/buffer_builder.hpp"
 #include "app/sat/sharing/buffer/buffer_reader.hpp"
 
 #define MALLOB_CLAUSE_STORE_STATIC_BY_LENGTH_MIXED_LBD -1
@@ -34,6 +35,7 @@ public:
         std::function<void(int*)> clauseDataConverter = [](int*){}) = 0;
     virtual std::vector<int> readBuffer() = 0;
 
+    virtual BufferBuilder getBufferBuilder(int limit) const = 0;
     virtual BufferReader getBufferReader(int* data, size_t buflen, bool useChecksums = false) const = 0;
     virtual int getMaxAdmissibleEffectiveClauseLength() const {return _max_eff_clause_length;}
     virtual void setClauseDeletionCallback(std::function<void(Mallob::Clause&)> cb) {}

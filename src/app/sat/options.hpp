@@ -81,6 +81,7 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
  OPT_INT(incrementalVariableDomainHeuristic, "ivdh", "incremental-variable-domain-heuristic", 0, 0, 2,
    ">=1: Replace LBD values with a rating based on how many clause literals are in the original (0th increment) variable range; 1=for cross-sharing only, 2=always. "
    ">=1 also overrides -lbdpi=1 -lbdpo=1 -pbbm=1 for cross-sharing ONLY.")
+ OPT_BOOL(crossShareAll, "csa", "cross-share-all", true, "Cross-share (-cjc=1) clauses from intra-job sharing automatically")
 
 OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversification options")
  OPT_INT(diversifyElimination,              "div-elim", "",                              0,        0,   3,
