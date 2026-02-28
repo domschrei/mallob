@@ -13,7 +13,8 @@ void register_mallob_app_sweep() {
         // Job reader
         [](const Parameters& params, const std::vector<std::string>& files, JobDescription& desc) {
             // return SweepReader::read(files, desc);
-            return SatReader(params, files, params.forceIncrementalTrustedParser()).read(desc);
+	        LOG(V2_INFO, "Calling SAT Reader for job id %i  \n", desc.getId());
+            return SatReader(params, files).read(desc);
         },
         // Job creator
         [](const Parameters& params, const Job::JobSetup& setup, AppMessageTable& table) -> Job* {
