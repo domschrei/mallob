@@ -51,7 +51,7 @@ void SweepJob::appl_start() {
 	_is_root = getJobTree().isRoot();
 	_nThreads = _params.numThreadsPerProcess.val;
 
-	_clause_comm.reset(new AnytimeSatClauseCommunicator(_params, this));
+	_clause_comm.reset(new AnytimeSatClauseCommunicator(_params, this, false));
 
 	LOG(V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d\n",
 		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _nThreads);
