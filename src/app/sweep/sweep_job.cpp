@@ -52,7 +52,10 @@ void SweepJob::appl_start() {
 	_my_index = getJobTree().getIndex();
 	_my_ctx_id = getJobTree().getContextId();
 	_is_root = getJobTree().isRoot();
-	_nThreads = _params.numThreadsPerProcess.val;
+	_nThreads = min( getNumThreads(), _params.numThreadsPerProcess.val);
+	if (_nThreads < _params.numThreadsPerProcess.val) {
+		LOG(V1_WARN,"SWEEP WARN cut down threads to %i \n", _nThreads);
+	}
 	const JobDescription& desc = getDescription();
 	int numVars = desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
 	int numClauses = desc.getAppConfiguration().fixedSizeEntryToInt("__NC");

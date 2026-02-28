@@ -28,14 +28,14 @@ MALLOB_OPTIONS="-t=$threads \
   -rspaa=1 \
 	-rpa=1 \
 	-seed=1 \
-	-v=2 \
+	-v=4 \
   -spl=4 \
 	-jcup=0.05 \
 	-preprocess-sweep=1 \
 	-sweep-sharing-period=0.020 \
   -sweep-resweep-chance=1000 \
   -sweep-rounds=2 \
-	-sweep-solver-verbosity=0 \
+	-sweep-solver-verbosity=2 \
 	-sweep-solver-quiet=1 \
   -sweep-congruence=0 \
   -sweep-growing-environments=1 \
