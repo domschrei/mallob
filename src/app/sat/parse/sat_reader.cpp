@@ -240,6 +240,11 @@ bool SatReader::read(JobDescription& desc) {
 		optFuture = ProcessWideThreadPool::get().addTask([&]() {
 			// Output formula increment to the pipe file
 			std::ofstream& ofs = _tppa->getFormulaToParserStream();
+
+			//Nicco reminder
+			int counter=0;
+			constexpr int interval = 1<<17;
+
 			for (int lit : litsToParse) {
 				if (lit == INT32_MIN) break;
 				if (lit == INT32_MAX) {
@@ -248,6 +253,12 @@ bool SatReader::read(JobDescription& desc) {
 				}
 				ofs << " " << lit;
 				if (lit == 0) ofs << "\n";
+
+				counter++;
+				if (counter%interval==0) {
+					LOG(V2_INFO, "SatReader: parsed %i lits\n", counter);
+				}
+
 			}
 			ofs.flush();
 		});
