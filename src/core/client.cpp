@@ -75,7 +75,7 @@ void Client::readIncomingJobs() {
         bool foundAJob = false;
         for (auto& data : _incoming_job_queue) {
 
-            LOGGER(log, V3_VERB, "NEWJOB %s (#%i) from incoming job queue", data.jobName.c_str(), data.description->getId());
+            LOGGER(log, V3_VERB, "NEWJOB %s (#%i) from incoming job queue \n", data.jobName.c_str(), data.description->getId());
             // printf("ß looping through incoming job queue\n");
             // Jobs are sorted by arrival:
             // If this job has not arrived yet, then none have arrived yet
