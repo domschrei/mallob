@@ -176,12 +176,12 @@ private:
 		if (all_idle) {
 			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i FINISHED (seen at root transform) with sharing round %i \n", _my_rank, _root_sweep_round, _params.sweepRounds(), _root_sharing_round);
 			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i had: %i EQS, %i UNITS  \n", _my_rank, _root_sweep_round, _params.sweepRounds(), _shared_eqs_this_sweep_round, _shared_units_this_sweep_round);
-			LOG(V2_INFO, "[%i] SHARE_ROUNDS_THIS_ITERATION %i   \n", _my_rank, _share_rounds_this_iteration);
-			LOG(V2_INFO, "[%i] ZEROSHAREROUNDS_BEFORE_PROGRESS %i   \n", _my_rank, _zerosharerounds_before_progress);
-
 
 			printSweepStats(_sweepers[_representative_localId], false); //report some intermediate statistics about this round
 			bool progress = _shared_eqs_this_sweep_round + _shared_units_this_sweep_round > 0;
+			LOGGER(_reslogger, V2_INFO, "SWEEP_SHARE_ROUNDS_THIS_ITERATION     %i   \n", _my_rank, _share_rounds_this_iteration);
+			LOGGER(_reslogger, V2_INFO, "SWEEP_ZEROSHAREROUNDS_BEFORE_PROGRESS %i   \n", _my_rank, _zerosharerounds_before_progress);
+			LOGGER(_reslogger, V2_INFO, "SWEEP_PROGRESS %i   \n", _my_rank, progress);
 			bool lastsweepround = (_root_sweep_round == _params.sweepRounds());
 			if (lastsweepround || !progress) {
 				if (lastsweepround)LOG(V1_WARN, "SWEEP [%i]: Job finished! All rounds done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_round, _params.sweepRounds());
