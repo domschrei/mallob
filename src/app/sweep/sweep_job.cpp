@@ -569,15 +569,17 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 	LOG(			  V2_INFO, "SWEEP solver [%i](%i) reports statistics in dedicated .sweep file \n", _my_rank, sweeper->getLocalId());
 	LOGGER(_reslogger,V2_INFO, "\n");
 	LOGGER(_reslogger,V2_INFO, "Reported by [%i](%i) \n", _my_rank, sweeper->getLocalId());
-	LOGGER(_reslogger,V2_INFO, "SWEEP_ROUND					%i / %i \n", _root_sweep_round, _params.sweepRounds());
-	LOGGER(_reslogger,V2_INFO, "SWEEP_TIME					%f seconds \n", Timer::elapsedSeconds() - _start_sweep_timestamp);
-	LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_NEW				%i \n", stats.units_new);
-	LOGGER(_reslogger,V2_INFO, "SWEEP_EQUIVALENCES			%i \n", stats.sweep_eqs);
-	LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_FIXED_N			%i / %i (%.3f %)\n", vars_fixed_end, stats.vars_active_orig, vars_fixed_percent);
-	// LOGGER(_reslogger,V2_INFO, "SWEEP_IMPORTED_UNITS		%i / %i \n", stats.units_useful, stats.units_seen);
-	// LOGGER(_reslogger,V2_INFO, "SWEEP_IMPORTED_EQS			%i / %i \n", stats.eqs_useful, stats.eqs_seen); //representative for the reporting solver
-	LOGGER(_reslogger,V2_INFO, "SWEEP_TOTAL_SHARED_UNITS %i \n", _total_shared_units);
-	LOGGER(_reslogger,V2_INFO, "SWEEP_TOTAL_SHARED_EQS   %i \n", _total_shared_eqs);
+	if (!full) {
+		LOGGER(_reslogger,V2_INFO, "SWEEP_ROUND					%i / %i \n", _root_sweep_round, _params.sweepRounds());
+		LOGGER(_reslogger,V2_INFO, "SWEEP_TIME					%f seconds \n", Timer::elapsedSeconds() - _start_sweep_timestamp);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_NEW				%i \n", stats.units_new);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_EQUIVALENCES			%i \n", stats.sweep_eqs);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_FIXED_N			%i / %i (%.3f %)\n", vars_fixed_end, stats.vars_active_orig, vars_fixed_percent);
+		// LOGGER(_reslogger,V2_INFO, "SWEEP_IMPORTED_UNITS		%i / %i \n", stats.units_useful, stats.units_seen);
+		// LOGGER(_reslogger,V2_INFO, "SWEEP_IMPORTED_EQS			%i / %i \n", stats.eqs_useful, stats.eqs_seen); //representative for the reporting solver
+		LOGGER(_reslogger,V2_INFO, "SWEEP_TOTAL_SHARED_UNITS %i \n", _total_shared_units);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_TOTAL_SHARED_EQS   %i \n", _total_shared_eqs);
+	}
 
 	if (full) {
 		LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_PER_SWEEPER %i \n", units_per_sweeper);
