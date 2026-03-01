@@ -162,6 +162,7 @@ bool SatReader::parseInternally(JobDescription& desc) {
 	} else if (_namedpipe != -1) {
 		// Read formula over named pipe
 
+		LOG(V2_INFO, "SatReader read formula over named pipe \n");
 		int iteration = 0;
 		if (_raw_content_mode) {
 			int buffer[1024] = {0};
@@ -191,6 +192,7 @@ bool SatReader::parseInternally(JobDescription& desc) {
 
 	} else {
 		// Read file over pipe
+		LOG(V2_INFO, "SatReader read file over pipe \n");
 		if (_raw_content_mode) {
 			int iteration = 0;
 			int buffer[1024] = {0};

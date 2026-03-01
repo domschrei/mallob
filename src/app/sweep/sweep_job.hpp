@@ -169,6 +169,7 @@ private:
 		if (all_idle) {
 			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i FINISHED (seen at root transform) with sharing round %i \n", _my_rank, _root_sweep_round, _params.sweepRounds(), _root_sharing_round);
 			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i had: %i EQS, %i UNITS  \n", _my_rank, _root_sweep_round, _params.sweepRounds(), _shared_eqs_this_sweep_round, _shared_units_this_sweep_round);
+			printSweepStats(_sweepers[_representative_localId], false); //report some intermediate statistics about this round
 			bool progress = _shared_eqs_this_sweep_round + _shared_units_this_sweep_round > 0;
 			bool lastsweepround = (_root_sweep_round == _params.sweepRounds());
 			if (lastsweepround || !progress) {
@@ -177,9 +178,7 @@ private:
 				//we DON'T yet set _terminate_all=1 here, because we want also the root solver to first import this last sharing information, which contains valuable equalities and units, before terminating the solvers
 				terminate = true;
 			}
-
 			else {
-				printSweepStats(_sweepers[_representative_localId], false); //report some intermediate statistics about this round
 				// _root_sweep_round++;
 				_root_did_just_finish_sweep_round = true;
 				_shared_units_this_sweep_round = 0;

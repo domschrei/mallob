@@ -514,14 +514,21 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	}
 
 	//Own options of Kissat
+	//identical to standard options right now
 	sweeper->set_option("sweepcomplete", 1);      //deactivates checking for time limits during sweeping, so we dont get kicked out due to some limits
+
+	//this grows exponentially for 6 rounds!
   	sweeper->set_option("sweepclauses", 1024);		//	1024, 0, INT_MAX,	"environment clauses")
   	sweeper->set_option("sweepmaxclauses", 32768);	//	32768,2, INT_MAX,	"maximum environment clauses")
+
   	sweeper->set_option("sweepdepth", 2);			//, 2,    0, INT_MAX,	"environment depth")
   	sweeper->set_option("sweepmaxdepth", 3);		//	3,    1, INT_MAX,	"maximum environment depth")
+
+	//this grows exponentially for 5 rounds!
   	sweeper->set_option("sweepvars", 256);			//  256,  0, INT_MAX,	"environment variables")
   	sweeper->set_option("sweepmaxvars", 8192);		//	8192, 2, INT_MAX,	"maximum environment variables")
-  	sweeper->set_option("sweepfliprounds", 2);		//	1,    0, INT_MAX,	"flipping rounds")
+
+  	sweeper->set_option("sweepfliprounds", 1);		//	1,    0, INT_MAX,	"flipping rounds")
   	sweeper->set_option("sweeprand", 0);			//  0,    0,    1,		"randomize sweeping environment")
 
 	//Specific for clean sweep run
@@ -1281,7 +1288,7 @@ void SweepJob::advanceAllReduction() {
 
 	//the sweepers need to know the current sweep round to set the size of their sweep environments accordingly
 	//which grow with each round (if activated)
-	if (!_terminate_all) { //when sweepers are already being deleted we don't want to risk a segfault looping over them...
+	if (!_terminate_all && sweep_round <= _params.sweepMaxGrowthRound.val) { //when sweepers are already being deleted we don't want to risk a segfault looping over them...
 		for (auto &sweeper : _sweepers) {
 			if (sweeper) {
 				shweep_set_sweep_round(sweeper->solver, sweep_round);
