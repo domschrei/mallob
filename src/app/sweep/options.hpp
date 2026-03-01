@@ -14,5 +14,5 @@ OPT_INT(sweepRounds, 			"swprds", 	"sweep-rounds", 			1, 0, LARGE_INT, "number o
 OPT_BOOL(sweepCongruence,  		"swpcg", 	"sweep-congruence", 		false, "One solver at the root node does clausal congruence closure instead of sweeping")
 OPT_BOOL(sweepGrowingEnvironments,"swpge", 	"sweep-growing-environments",true, "The sweepers increase the sweep environment after each full sweeping round")
 OPT_BOOL(sweepDeduplicate,		"swpdd", 	"sweep-deduplicate",		true,  "Deduplicate units and equivalences during sharing aggregation")
-OPT_INT(sweepMaxGrowthRound, 	"swmgr", 	"sweep-max-growth-round", 	2, 0, LARGE_INT, "the last round where the kissat sweeping size (#clauses, #vars, depth) is increased ")
+OPT_INT(sweepMaxGrowthRound, 	"swmgr", 	"sweep-max-growth-round", 	2, 0, LARGE_INT, "the last round where the kissat sweeping environment size (#clauses, #vars, depth) is increased ")
 

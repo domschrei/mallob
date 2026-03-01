@@ -143,11 +143,12 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 	-preprocess-sweep=1 \
 	-sweep-sharing-period=0.020 \
   -sweep-resweep-chance=1000 \
-  -sweep-rounds=2 \
+  -sweep-rounds=5 \
 	-sweep-solver-verbosity=0 \
 	-sweep-solver-quiet=1 \
   -sweep-congruence=0 \
   -sweep-growing-environments=1 \
+  -sweep-max-growth-round=2 \
   -preprocess-sweep-priority=1.0 \
 "
 
