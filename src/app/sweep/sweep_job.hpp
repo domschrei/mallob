@@ -117,11 +117,13 @@ private:
 	int _shared_eqs_this_sweep_round = 0;
 	int _total_shared_eqs = 0;
 	int _total_shared_units = 0;
+	int _zerosharerounds_before_progress=0;
+	int _share_rounds_this_iteration = 0;
 
 	//the root node tracks the number of sweep rounds and sharing rounds, distributes this information in the sharing operation
 	int _root_sweep_round = 0;
 	int _root_sharing_round = 0;
-	bool _root_did_just_finish_sweep_round = true;
+	bool _root_did_just_finish_sweep_round = true; //remember for the next sharing round that we entered a new sweep round/iteration
 
 	//Termination. Determined during workstealing, broadcasted via sharing
 	std::atomic_bool _terminate_all=false; //termination (on this node) due to sharing consensus that there is no more work
@@ -150,12 +152,17 @@ private:
 		}
 
 		_root_sharing_round++;
+		_share_rounds_this_iteration++;
 
 		int n_units = payload[payload.size() - METADATA_UNIT_SIZE];
 		int n_eqs   = payload[payload.size() - METADATA_EQ_SIZE] / 2;
 
 		_shared_units_this_sweep_round += n_units;
 		_shared_eqs_this_sweep_round   += n_eqs;
+
+		if (_shared_units_this_sweep_round==0 && _shared_eqs_this_sweep_round==0 && n_units==0 && n_eqs ==0) {
+			_zerosharerounds_before_progress++;
+		}
 
 		_total_shared_units += n_units;
 		_total_shared_eqs   += n_eqs;
@@ -169,6 +176,10 @@ private:
 		if (all_idle) {
 			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i FINISHED (seen at root transform) with sharing round %i \n", _my_rank, _root_sweep_round, _params.sweepRounds(), _root_sharing_round);
 			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i had: %i EQS, %i UNITS  \n", _my_rank, _root_sweep_round, _params.sweepRounds(), _shared_eqs_this_sweep_round, _shared_units_this_sweep_round);
+			LOG(V2_INFO, "[%i] SHARE_ROUNDS_THIS_ITERATION %i   \n", _my_rank, _share_rounds_this_iteration);
+			LOG(V2_INFO, "[%i] ZEROSHAREROUNDS_BEFORE_PROGRESS %i   \n", _my_rank, _zerosharerounds_before_progress);
+
+
 			printSweepStats(_sweepers[_representative_localId], false); //report some intermediate statistics about this round
 			bool progress = _shared_eqs_this_sweep_round + _shared_units_this_sweep_round > 0;
 			bool lastsweepround = (_root_sweep_round == _params.sweepRounds());
@@ -183,6 +194,8 @@ private:
 				_root_did_just_finish_sweep_round = true;
 				_shared_units_this_sweep_round = 0;
 				_shared_eqs_this_sweep_round = 0;
+				_zerosharerounds_before_progress = 0;
+				_share_rounds_this_iteration=0;
 				//The new round is started by providing the representative solver on the root node full work, i.e. all variables
 				_root_provided_initial_work = false;
 				//Prevent that workers see a round change of 2 when going from one sweepround to the next
