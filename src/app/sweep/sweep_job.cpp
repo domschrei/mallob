@@ -43,8 +43,8 @@ int cb_custom_query(void *SweepJobState, int query) {
 }
 
 void SweepJob::appl_start() {
-	if (_params.sweepRounds.val==0) {
-		LOG(V2_INFO,"Skip SWEEP JOB, as sweepRounds==0");
+	if (_params.sweepIterations.val==0) {
+		LOG(V2_INFO,"Skip SWEEP JOB, as sweepIterations==0");
 		return;
 	}
 	_started_appl_start = true;
@@ -499,7 +499,7 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	sweeper->set_option("mallob_is_root", _is_root);
 	sweeper->set_option("mallob_resweep_chance", _params.sweepResweepChance.val);
 	sweeper->set_option("mallob_staggered_logs", 1); //set to 1 to have spatially separated logs, useful for verbose runs with 2-16 threads
-	sweeper->set_option("mallob_growing_environments", _params.sweepGrowingEnvironments.val);
+	sweeper->set_option("mallob_growing_environments", _params.sweepMaxGrowthIteration.val > 1);
 
 	if (_params.sweepCongruence() && _is_root && localId == _congruence_localId) {
 		//Do congruence closure instead of sweeping. I.e., syntactical instead of semantical search for equivalences.
@@ -570,7 +570,7 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 	LOGGER(_reslogger,V2_INFO, "\n");
 	LOGGER(_reslogger,V2_INFO, "Reported by [%i](%i) \n", _my_rank, sweeper->getLocalId());
 	if (!full) {
-		LOGGER(_reslogger,V2_INFO, "SWEEP_ROUND					%i / %i \n", _root_sweep_round, _params.sweepRounds());
+		LOGGER(_reslogger,V2_INFO, "SWEEP_ITERATION					%i / %i \n", _root_sweep_iteration, _params.sweepIterations());
 		LOGGER(_reslogger,V2_INFO, "SWEEP_TIME					%f seconds \n", Timer::elapsedSeconds() - _start_sweep_timestamp);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_NEW				%i \n", stats.units_new);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_EQUIVALENCES			%i \n", stats.sweep_eqs);
@@ -864,8 +864,8 @@ void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
 }
 
 int SweepJob::cbCustomQuery(int query) { //general interface to communicate some simple integers between solver and Mallob, without the need to declare yet another function each time
-	if (query==QUERY_SWEEP_ROUND) {
-		return _root_sweep_round;
+	if (query==QUERY_SWEEP_ITERATION) {
+		return _root_sweep_iteration;
 	}
 
 	return 0;
@@ -1142,8 +1142,8 @@ void SweepJob::appendMetadataToReductionElement(std::vector<int> &contrib, int i
 	contrib.insert(contrib.end(), NUM_METADATA_FIELDS, 0); //Make space for the upcoming metadata, initialized with zero
 	int size = contrib.size();
 	int n=0;
-	n++; contrib[size - METADATA_TERMINATE]		= 0;  //dummy, will be set by root transformation
-	n++; contrib[size - METADATA_SWEEP_ROUND]   = 0;  //dummy, will be set by root transformation
+	n++; contrib[size - METADATA_TERMINATE]		= 0;  //dummy, will be set by root transformation, here just for completeness
+	n++; contrib[size - METADATA_SWEEP_ITERATION]   = 0;  //dummy, will be set by root transformation
 	n++; contrib[size - METADATA_SHARING_ROUND]   = 0;  //dummy, will be set by root transformation
 	n++; contrib[size - METADATA_IDLE]       = is_idle;
 	n++; contrib[size - METADATA_UNIT_SIZE]  = unit_size;
@@ -1249,7 +1249,7 @@ void SweepJob::advanceAllReduction() {
 	//Extract shared data
 	auto data = _red->extractResult();
 	const int terminate   = data[data.size()-METADATA_TERMINATE];
-	const int sweep_round = data[data.size()-METADATA_SWEEP_ROUND];
+	const int sweep_iteration = data[data.size()-METADATA_SWEEP_ITERATION];
 	const int sharing_round= data[data.size()-METADATA_SHARING_ROUND];
 	const int all_idle    = data[data.size()-METADATA_IDLE];
 	const int unit_size   = data[data.size()-METADATA_UNIT_SIZE];
@@ -1260,7 +1260,7 @@ void SweepJob::advanceAllReduction() {
 	//in case our local solvers are not fully initialised yet, we ignore the global sharing data
 	//(we still read the metadata, just for informational warning/logging purposes )
 	if (!_started_synchronized_solving && (eq_size>0 || unit_size>0))  {
-		LOG(V3_VERB, "SWEEP WARN [%i] (round %i,%i): Skipping %i eqs, %i units bc local solvers are not all init'd yet \n", _my_rank, sweep_round, sharing_round, eq_size/2, unit_size);
+		LOG(V3_VERB, "SWEEP WARN [%i] (iter %i round %i): Skipping %i eqs, %i units bc local solvers are not all init'd yet \n", _my_rank, sweep_iteration, sharing_round, eq_size/2, unit_size);
 	}
 
 	if (!_started_synchronized_solving) return;
@@ -1288,17 +1288,17 @@ void SweepJob::advanceAllReduction() {
 	_UNITS_import_size.store(unit_size, std::memory_order_relaxed);
 	_available_import_round.store(sharing_round, std::memory_order_release);
 
-	//the sweepers need to know the current sweep round to set the size of their sweep environments accordingly
+	//the sweepers need to know the current sweep iteration to set the size of their sweep environments accordingly
 	//which grow with each round (if activated)
-	if (!_terminate_all && sweep_round <= _params.sweepMaxGrowthRound.val) { //when sweepers are already being deleted we don't want to risk a segfault looping over them...
+	if (!_terminate_all && sweep_iteration <= _params.sweepMaxGrowthIteration.val) { //when sweepers are already being deleted we don't want to risk a segfault looping over them...
 		for (auto &sweeper : _sweepers) {
 			if (sweeper) {
-				shweep_set_sweep_round(sweeper->solver, sweep_round);
+				shweep_set_sweep_round(sweeper->solver, sweep_iteration);
 			}
 		}
 	}
 
-	LOG(V2_INFO, "SWEEP sweep round %i sharing round %i got: %i EQS, %i UNITS, all_idle(%i), term(%i). #locally idle: %i/%i \n", sweep_round, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastIdleCount, _nThreads);
+	LOG(V2_INFO, "SWEEP sweep iteration %i sharing round %i got: %i EQS, %i UNITS, all_idle(%i), term(%i). #locally idle: %i/%i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastIdleCount, _nThreads);
 
 	//prepare the next sharing round, which gets started from the root node
 	if (_is_root) {
@@ -1307,15 +1307,10 @@ void SweepJob::advanceAllReduction() {
 			[this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
 	}
 
-	// LOG(V4_VVER, "SWEEP SHARE [%i] RESET REDUCE\n", _my_rank);
 	//Reduction is finished. Contrary to the bcast, we dont need to directly re-create a new reduction object, but can leave it at null.
 	//The new reduction object will be only created when needed when a new broadcast is present (and completed)
 	_red.reset();
 
-
-	// if (all_idle) {
-		// LOG(V1_WARN, "[%i] got sharing info: sweep round %i finished \n", _my_rank, sweep_round);
-	// }
 
 	//We received the termination signal via the app-internal data sharing
 	if (terminate) {
@@ -1326,7 +1321,6 @@ void SweepJob::advanceAllReduction() {
 	}
 
 }
-
 
 
 

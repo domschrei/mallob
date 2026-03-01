@@ -98,7 +98,7 @@ private:
 	static const int NUM_METADATA_FIELDS = 6;
 		//which are:
 		static const int METADATA_TERMINATE      = 6;
-		static const int METADATA_SWEEP_ROUND   = 5;
+		static const int METADATA_SWEEP_ITERATION   = 5;
 		static const int METADATA_SHARING_ROUND  = 4;
 		static const int METADATA_IDLE		  = 3;
 		static const int METADATA_UNIT_SIZE	 = 2;
@@ -113,17 +113,18 @@ private:
 	std::atomic_int _UNITS_import_size{0};
 	std::vector<int> _EQS_to_import {};
 	std::vector<int> _UNITS_to_import {};
-	int _shared_units_this_sweep_round = 0;
-	int _shared_eqs_this_sweep_round = 0;
+
+	//the root node tracks the number of sweep iterations and sharing rounds, distributes this information in the sharing operation
+	int _shared_units_this_iteration = 0;
+	int _shared_eqs_this_iteration = 0;
 	int _total_shared_eqs = 0;
 	int _total_shared_units = 0;
-	int _zerosharerounds_before_progress=0;
-	int _share_rounds_this_iteration = 0;
+	int _emptyrounds_before_progress=0;
+	int _rounds_this_iteration = 0;
 
-	//the root node tracks the number of sweep rounds and sharing rounds, distributes this information in the sharing operation
-	int _root_sweep_round = 0;
+	int _root_sweep_iteration = 0;
 	int _root_sharing_round = 0;
-	bool _root_did_just_finish_sweep_round = true; //remember for the next sharing round that we entered a new sweep round/iteration
+	bool _root_did_just_finish_iteration = true; //remember for the next sharing round that we entered a new sweep iteration
 
 	//Termination. Determined during workstealing, broadcasted via sharing
 	std::atomic_bool _terminate_all=false; //termination (on this node) due to sharing consensus that there is no more work
@@ -146,22 +147,22 @@ private:
 	std::function<void(std::vector<int>&)> _inplace_rootTransform = [&](std::vector<int>& payload) {
 		assert(_is_root);
 
-		if (_root_did_just_finish_sweep_round) {
-			_root_sweep_round++;
-			_root_did_just_finish_sweep_round = false;
+		if (_root_did_just_finish_iteration) {
+			_root_sweep_iteration++;
+			_root_did_just_finish_iteration = false;
 		}
 
 		_root_sharing_round++;
-		_share_rounds_this_iteration++;
+		_rounds_this_iteration++;
 
 		int n_units = payload[payload.size() - METADATA_UNIT_SIZE];
 		int n_eqs   = payload[payload.size() - METADATA_EQ_SIZE] / 2;
 
-		_shared_units_this_sweep_round += n_units;
-		_shared_eqs_this_sweep_round   += n_eqs;
+		_shared_units_this_iteration += n_units;
+		_shared_eqs_this_iteration   += n_eqs;
 
-		if (_shared_units_this_sweep_round==0 && _shared_eqs_this_sweep_round==0 && n_units==0 && n_eqs ==0) {
-			_zerosharerounds_before_progress++;
+		if (_shared_units_this_iteration==0 && _shared_eqs_this_iteration==0 && n_units==0 && n_eqs ==0) {
+			_emptyrounds_before_progress++;
 		}
 
 		_total_shared_units += n_units;
@@ -174,46 +175,49 @@ private:
 
 		//A round is finished if all sweepers are idle, i.e. all finished their work.
 		if (all_idle) {
-			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i FINISHED (seen at root transform) with sharing round %i \n", _my_rank, _root_sweep_round, _params.sweepRounds(), _root_sharing_round);
-			LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i had: %i EQS, %i UNITS  \n", _my_rank, _root_sweep_round, _params.sweepRounds(), _shared_eqs_this_sweep_round, _shared_units_this_sweep_round);
+			LOG(V1_WARN, "[%i] SWEEP ITERATION %i/%i FINISHED (seen at root transform) with sharing round %i \n", _my_rank, _root_sweep_iteration, _params.sweepIterations(), _root_sharing_round);
+			LOG(V1_WARN, "[%i] SWEEP ITERATION %i/%i had: %i EQS, %i UNITS  \n", _my_rank, _root_sweep_iteration, _params.sweepIterations(), _shared_eqs_this_iteration, _shared_units_this_iteration);
 
-			printSweepStats(_sweepers[_representative_localId], false); //report some intermediate statistics about this round
-			bool progress = _shared_eqs_this_sweep_round + _shared_units_this_sweep_round > 0;
-			LOGGER(_reslogger, V2_INFO, "SWEEP_SHARE_ROUNDS_THIS_ITERATION     %i   \n", _my_rank, _share_rounds_this_iteration);
-			LOGGER(_reslogger, V2_INFO, "SWEEP_ZEROSHAREROUNDS_BEFORE_PROGRESS %i   \n", _my_rank, _zerosharerounds_before_progress);
+			printSweepStats(_sweepers[_representative_localId], false); //report some intermediate statistics about this iteration
+			bool progress = _shared_eqs_this_iteration + _shared_units_this_iteration > 0;
+			if (!progress) {
+				_emptyrounds_before_progress=0; //there never has been progress, so there was never any last round before we found progress
+			}
+			LOGGER(_reslogger, V2_INFO, "SWEEP_ROUNDS_THIS_ITERATION     %i   \n", _my_rank, _rounds_this_iteration);
+			LOGGER(_reslogger, V2_INFO, "SWEEP_EMPTYROUNDS_BEFORE_PROGRESS %i   \n", _my_rank, _emptyrounds_before_progress);
 			LOGGER(_reslogger, V2_INFO, "SWEEP_PROGRESS %i   \n", _my_rank, progress);
-			bool lastsweepround = (_root_sweep_round == _params.sweepRounds());
+			bool lastsweepround = (_root_sweep_iteration == _params.sweepIterations());
 			if (lastsweepround || !progress) {
-				if (lastsweepround)LOG(V1_WARN, "SWEEP [%i]: Job finished! All rounds done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_round, _params.sweepRounds());
-				if (!progress)LOG(V1_WARN, "SWEEP [%i]: Job finished! No more progress in round %i/%i. Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_round, _params.sweepRounds());
+				if (lastsweepround)LOG(V1_WARN, "SWEEP [%i]: Job finished! All iterations done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_iteration, _params.sweepIterations());
+				if (!progress)LOG(V1_WARN, "SWEEP [%i]: Job finished! No more progress in iteration %i/%i. Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_iteration, _params.sweepIterations());
 				//we DON'T yet set _terminate_all=1 here, because we want also the root solver to first import this last sharing information, which contains valuable equalities and units, before terminating the solvers
 				terminate = true;
 			}
 			else {
 				// _root_sweep_round++;
-				_root_did_just_finish_sweep_round = true;
-				_shared_units_this_sweep_round = 0;
-				_shared_eqs_this_sweep_round = 0;
-				_zerosharerounds_before_progress = 0;
-				_share_rounds_this_iteration=0;
-				//The new round is started by providing the representative solver on the root node full work, i.e. all variables
+				_root_did_just_finish_iteration = true;
+				_shared_units_this_iteration = 0;
+				_shared_eqs_this_iteration = 0;
+				_emptyrounds_before_progress = 0;
+				_rounds_this_iteration=0;
+				//The new iteration is started by providing  all variables as new work to one solver
 				_root_provided_initial_work = false;
 				//Prevent that workers see a round change of 2 when going from one sweepround to the next
 				// _root_sharing_round--;
-				LOG(V1_WARN, "[%i] SWEEP ROUND %i/%i STARTED \n", _my_rank, _root_sweep_round, _params.sweepRounds());
+				LOG(V1_WARN, "[%i] SWEEP ITERATION %i/%i STARTED \n", _my_rank, _root_sweep_iteration, _params.sweepIterations());
 			}
 		}
 		//The root node (and only the root node) tracks the number of completed sweep rounds, and broadcasts this information. This way, also nodes that join later know which round we are in.
-		payload[payload.size() - METADATA_SWEEP_ROUND] = _root_sweep_round;
+		payload[payload.size() - METADATA_SWEEP_ITERATION] = _root_sweep_iteration;
 		payload[payload.size() - METADATA_SHARING_ROUND] = _root_sharing_round;
 		payload[payload.size() - METADATA_TERMINATE] = terminate;
 
-		LOG(V3_VERB, "SWEEP root info: Broadcasting SweepRound %i, Sharing round %i: Eqs %i, Units %i, flags: all_idle(%i), terminate(%i)   \n", _root_sweep_round, _root_sharing_round, n_eqs, n_units, all_idle, terminate);
+		LOG(V3_VERB, "SWEEP root info: Broadcasting SweepIteration %i, Sharing round %i: Eqs %i, Units %i, flags: all_idle(%i), terminate(%i)   \n", _root_sweep_iteration, _root_sharing_round, n_eqs, n_units, all_idle, terminate);
 		//no return, payload was just transformed in-place
     };
 
 	enum CustomQuery {
-		QUERY_SWEEP_ROUND = 1
+		QUERY_SWEEP_ITERATION = 1
 	};
 
 

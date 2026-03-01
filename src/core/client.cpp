@@ -75,7 +75,7 @@ void Client::readIncomingJobs() {
         bool foundAJob = false;
         for (auto& data : _incoming_job_queue) {
 
-            LOGGER(log, V3_VERB, "NEWJOB %s (#%i) from incoming job queue \n", data.jobName.c_str(), data.description->getId());
+            // LOGGER(log, V3_VERB, "NEWJOB %s (#%i) from incoming job queue \n", data.jobName.c_str(), data.description->getId());
             // printf("ß looping through incoming job queue\n");
             // Jobs are sorted by arrival:
             // If this job has not arrived yet, then none have arrived yet
@@ -127,7 +127,7 @@ void Client::readIncomingJobs() {
             }
 
             // Job can be read: Enqueue reader task into thread pool
-            LOGGER(log, V4_VVER, "NEWJOB ENQUEUE id #%i\n", data.description->getId());
+            // LOGGER(log, V4_VVER, "NEWJOB ENQUEUE id #%i\n", data.description->getId());
             unreadyJobs.erase(std::pair<int, int>(data.description->getId(), data.description->getRevision()));
             if (_params.monoFilename.isSet() && _mono_job_id < 0) _mono_job_id = data.description->getId();
 
