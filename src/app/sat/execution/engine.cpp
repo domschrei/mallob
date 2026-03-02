@@ -252,7 +252,9 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.maxNumSolvers = config.mpisize * params.numThreadsPerProcess();
 	setup.numVars = numVars;
 	setup.numOriginalClauses = numClauses;
-	setup.proofDir = proofDirectory;
+	int sqrt = std::ceil(std::sqrt((double) setup.maxNumSolvers));
+	setup.proofDir = proofDirectory + "/" + (_params.palRup() ? std::to_string(sqrt) + "/" : "");
+
 	LratConnector* modelCheckingLratConnector {nullptr};
 	setup.nbSkippedIdEpochs = std::max(0, epochOffset + epochModulus * config.nbPreviousBalancingEpochs);
 	if (params.satProfilingLevel() >= 0) {
