@@ -14,4 +14,5 @@ OPT_INT(sweepIterations, 		"swpite", 	"sweep-iterations", 			1, 0, LARGE_INT, "n
 OPT_BOOL(sweepCongruence,  		"swpcg", 	"sweep-congruence", 		false, "One solver at the root node does clausal congruence closure instead of sweeping")
 OPT_BOOL(sweepDeduplicate,		"swpdd", 	"sweep-deduplicate",		true,  "Deduplicate units and equivalences during sharing aggregation")
 OPT_INT(sweepMaxGrowthIteration, "swmgi", 	"sweep-max-growth-iteration", 	2, 0, LARGE_INT, "the last iteration where the kissat sweeping environment size is increased (#clauses, #vars, depth) ")
+OPT_INT(sweepMaxEmptyRounds,    "swpmer",   "sweep-max-empty-rounds",    3, 1, LARGE_INT, "the maximum number of tolerated empty rounds (not a single unit or eqs found) before sweeping is terminated early")
 

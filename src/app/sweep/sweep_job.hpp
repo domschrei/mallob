@@ -138,6 +138,7 @@ private:
 	int _root_total_shared_units = 0;
 	int _root_emptyrounds_before_progress=0;
 	int _root_rounds_this_iteration = 0;
+	const int MAX_TOLERATED_EMPTYROUNDS = _params.sweepMaxEmptyRounds.val;
 
 	int _root_sweep_iteration = 0;
 	int _root_sharing_round = 0;
@@ -167,16 +168,24 @@ private:
 			LOG(V4_VVER, "EMPTYROUND %i  \n", _root_emptyrounds_before_progress);
 		}
 
+
 		_root_total_shared_units += n_units;
 		_root_total_shared_eqs   += n_eqs;
 
 		// LOG(V1_WARN, "[%i] sharing round %i: %i cumul eqs, %i cumul units \n", _my_rank, _root_sharing_round, _total_shared_eqs, _total_shared_units);
 
+		bool terminate_due_to_emptyrounds = false;
 		bool all_idle = payload[payload.size() - METADATA_IDLE];
 		bool terminate = false;
 
+
+		if (_root_emptyrounds_before_progress > MAX_TOLERATED_EMPTYROUNDS) {
+			terminate_due_to_emptyrounds = true;
+			LOG(V1_WARN, "[%i] SWEEP EARLYSTOP in iteration %i . More than %i empty rounds\n", _my_rank, _root_sweep_iteration, MAX_TOLERATED_EMPTYROUNDS);
+		}
+
 		//A round is finished if all sweepers are idle, i.e. all finished their work.
-		if (all_idle) {
+		if (all_idle || terminate_due_to_emptyrounds) {
 			LOG(V1_WARN, "[%i] SWEEP ITERATION %i/%i FINISHED (seen at root transform) with sharing round %i \n", _my_rank, _root_sweep_iteration, _params.sweepIterations(), _root_sharing_round);
 			LOG(V1_WARN, "[%i] SWEEP ITERATION %i/%i had: %i EQS, %i UNITS  \n", _my_rank, _root_sweep_iteration, _params.sweepIterations(), _root_shared_eqs_this_iteration, _root_shared_units_this_iteration);
 			printSweepStats(_sweepers[_representative_localId], false); //report some intermediate statistics about this iteration
@@ -213,6 +222,7 @@ private:
 		payload[payload.size() - METADATA_SHARING_ROUND] = _root_sharing_round;
 		payload[payload.size() - METADATA_TERMINATE] = terminate;
 
+		assert(!terminate_due_to_emptyrounds || terminate || log_return_false("ERROR unexpected: Sweep root didnt send out terminate signal eventhough it should due to too many emptyrounds "));
 		LOG(V3_VERB, "SWEEP root info: Broadcasting SweepIteration %i, Sharing round %i: Eqs %i, Units %i, flags: all_idle(%i), terminate(%i)   \n", _root_sweep_iteration, _root_sharing_round, n_eqs, n_units, all_idle, terminate);
 		//no return, payload was just transformed in-place
     };
