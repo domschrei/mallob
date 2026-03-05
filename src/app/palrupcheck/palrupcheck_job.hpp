@@ -3,6 +3,7 @@
 
 #include "app/job.hpp"
 #include "app/sat/proof/palrup_caller.hpp"
+#include "util/logger.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "util/sys/threading.hpp"
 
@@ -12,6 +13,7 @@ private:
     // Struct for the final result of the task.
     JobResult _result;
     std::future<void> _fut_done;
+    volatile bool _terminate_signal = false;
 
 public:
     // Standard constructor. During construction, no job description is present yet.
@@ -28,6 +30,45 @@ public:
     // Begin your local computation
     void appl_start() override {
         _fut_done = ProcessWideThreadPool::get().addTask([&]() {
+
+            // Wait until this node's job logs have been cleaned up, i.e., merged,
+            // to ensure as little strain as possible on the FS during checking.
+
+            int rankBegin = getMyMpiRank();
+            if (!_params.regularProcessDistribution() || !_params.processesPerHost.isNonzero()) {
+                LOG(V0_CRIT, "[ERROR] For PalRUPCheck, -rpa and -pph must be set.\n");
+                abort();
+            }
+            while (rankBegin % _params.processesPerHost() != 0) rankBegin--;
+            int rankEnd = rankBegin + _params.processesPerHost();
+            LOG(V2_INFO, "[PalRUP] Waiting for ranks [%i,%i) to clean up job logs ...\n", rankBegin, rankEnd);
+            float time = Timer::elapsedSeconds();
+
+            while (!_terminate_signal) {
+                bool ready = true;
+                for (int rank = rankBegin; rank < rankEnd; rank++) {
+                    std::string dir = _params.logDirectory() + "/" + std::to_string(rank) + "/";
+                    if (!FileUtils::isDirectory(dir))
+                        continue; // directory not available / local from here
+                    if (!FileUtils::glob(dir + "subproc." + std::to_string(rank) + ".#*").empty()) {
+                        ready = false; // non-final log files still hanging around
+                        break;
+                    }
+                }
+                if (ready) {
+                    LOG(V2_INFO, "[PalRUP] Ready - all local job logs cleaned up\n");
+                    break;
+                }
+                usleep(1000 * 100);
+                // Timeout of 10s
+                if (Timer::elapsedSeconds() - time > 10.f) {
+                    LOG(V1_WARN, "[WARN] [PalRUP] Timeout while waiting for local job logs to be merged\n");
+                    break;
+                }
+            }
+            if (_terminate_signal) return;
+
+            // Run PalRUPCheck
             const std::string cnfPath = getDescription().getAppConfiguration().map.at("__chkcnf");
             const std::string proofDir = getDescription().getAppConfiguration().map.at("__chkproofdir");
             auto res = PalRupCaller(_params, getGlobalNumWorkers(), cnfPath, proofDir).callBlocking();
@@ -68,7 +109,10 @@ public:
     void appl_resume() override {}
     // Terminate this worker unrecoverably.
     // We acknowledge this implicitly by having background threads check for getState().
-    void appl_terminate() override {if (_fut_done.valid()) _fut_done.get();}
+    void appl_terminate() override {
+        _terminate_signal = true;
+        if (_fut_done.valid()) _fut_done.get();
+    }
     // React to an incoming message. (This becomes relevant only if you send custom messages)
     void appl_communicate(int source, int mpiTag, JobMessage& msg) override {}
     // Print out application-specific statistics (called periodically)
