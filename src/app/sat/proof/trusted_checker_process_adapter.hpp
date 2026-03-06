@@ -132,19 +132,21 @@ public:
     }
 
     inline void submit(LratOp& op) {
-        auto type = op.getType();
-        if (type == LratOp::DERIVATION) submitProduceClause(op.getId(), op.getLits(), op.getNbLits(), op.getHints(), op.getNbHints(), op.getGlue() > 0);
-        else if (type == LratOp::IMPORT) submitImportClause(op.getId(), op.getLits(), op.getNbLits(), op.getSignature());
-        else if (type == LratOp::DELETION) submitDeleteClauses(op.getHints(), op.getNbHints());
-        else if (type == LratOp::VALIDATION_UNSAT) submitValidateUnsat();
-        else if (type == LratOp::VALIDATION_SAT) submitValidateSat();
-        else if (type == LratOp::TERMINATION) submitTerminate();
+        if (_f_directives) {
+            auto type = op.getType();
+            if (type == LratOp::DERIVATION) submitProduceClause(op.getId(), op.getLits(), op.getNbLits(), op.getHints(), op.getNbHints(), op.getGlue() > 0);
+            else if (type == LratOp::IMPORT) submitImportClause(op.getId(), op.getLits(), op.getNbLits(), op.getSignature());
+            else if (type == LratOp::DELETION) submitDeleteClauses(op.getHints(), op.getNbHints());
+            else if (type == LratOp::VALIDATION_UNSAT) submitValidateUnsat();
+            else if (type == LratOp::VALIDATION_SAT) submitValidateSat();
+            else if (type == LratOp::TERMINATION) submitTerminate();
+        }
         _op_queue.pushBlocking(op);
     }
 
     inline bool accept(LratOp& op, bool& res, u8* sig) {
         bool ok = _op_queue.pollBlocking(op);
-        if (!ok) return false;
+        if (!ok || !_f_directives) return false;
         auto type = op.getType();
         if (type == LratOp::DERIVATION) res = acceptProduceClause(sig, op.getGlue() > 0);
         else if (type == LratOp::IMPORT) res = acceptImportClause();
