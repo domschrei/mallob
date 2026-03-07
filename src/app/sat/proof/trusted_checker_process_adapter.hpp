@@ -131,6 +131,12 @@ public:
         return true;
     }
 
+    inline bool trySubmit(LratOp& op) {
+        if (_op_queue.full()) return false;
+        submit(op);
+        return true;
+    }
+
     inline void submit(LratOp& op) {
         if (_f_directives) {
             auto type = op.getType();

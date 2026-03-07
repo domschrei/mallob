@@ -139,9 +139,15 @@ public:
     bool empty() const {
         return size() == 0;
     }
+    bool full() const {
+        return size() == _buffer_size;
+    }
 
     bool exhausted() const {
         return _input_exhausted;
+    }
+    bool terminated() const {
+        return _terminated;
     }
 
 private:

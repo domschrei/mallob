@@ -14,6 +14,7 @@
 
 #include "util/string_utils.hpp"
 #include "util/sys/bidirectional_anytime_pipe_shmem.hpp"
+#include "util/sys/thread_pool.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
@@ -348,6 +349,16 @@ private:
     bool checkTerminate(SatEngine& engine, bool force, int exitStatus = 0, std::function<void()> cbAtForcedExit = [](){}) {
         bool terminate = Terminator::isTerminating(true);
         if (terminate && force) {
+
+            // Failsafe in case proper termination hangs or freezes
+            std::thread killer([&]() {
+                usleep(1000UL * 1000 * 10); // 10 s
+                LOGGER(_log, V0_CRIT, "[ERROR] Freeze during cleanup - terminating children and self\n");
+                _log.flush();
+                Process::forwardTerminateToChildren();
+                Process::doExit(1);
+            });
+
             // clean up all resources which MUST be cleaned up (e.g., child processes)
             engine.cleanUp(true);
             cbAtForcedExit();
@@ -356,7 +367,7 @@ private:
             assert(exitStatus != 9); // not hard-killed - wouldn't make sense
             LOGGER(_log, V4_VVER, "Exiting\n");
             _log.flush();
-            Process::doExit(exitStatus);
+            Process::doExit(exitStatus); // does not return
         }
         return terminate;
     }

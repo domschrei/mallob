@@ -282,6 +282,7 @@ void Cadical::writeStatistics(SolverStatistics& stats) {
 }
 
 void Cadical::cleanUp() {
+
 	// Clean up proof output pipeline *while the solver may still be running*
 	if (_setup.certifiedUnsat) {
 		LOGGER(_logger, V4_VVER, "Closing proof output asynchronously\n");
