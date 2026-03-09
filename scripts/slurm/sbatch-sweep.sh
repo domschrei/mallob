@@ -148,6 +148,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 	-sweep-solver-quiet=1 \
   -sweep-congruence=0 \
   -sweep-max-growth-iteration=2 \
+  -sweep-max-empty-rounds=3 \
   -preprocess-sweep-priority=1.0 \
 "
 

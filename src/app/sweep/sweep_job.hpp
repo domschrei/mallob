@@ -97,9 +97,9 @@ private:
 	//each aggregation element has some metadata integers at the end
 	static const int NUM_METADATA_FIELDS = 6;
 		//which are:
-		static const int METADATA_TERMINATE      = 6;
-		static const int METADATA_SWEEP_ITERATION   = 5;
-		static const int METADATA_SHARING_ROUND  = 4;
+		static const int METADATA_TERMINATE			= 6;
+		static const int METADATA_SWEEP_ITERATION = 5;
+		static const int METADATA_SHARING_ROUND = 4;
 		static const int METADATA_IDLE		  = 3;
 		static const int METADATA_UNIT_SIZE	 = 2;
 		static const int METADATA_EQ_SIZE   = 1;
@@ -163,9 +163,14 @@ private:
 		_root_shared_units_this_iteration += n_units;
 		_root_shared_eqs_this_iteration   += n_eqs;
 
+		//Check whether this is yet another round with continued uninterrupted zero progress. Makes only sense to check this once the solvers actually got their work provided.
 		if (_root_shared_units_this_iteration==0 && _root_shared_eqs_this_iteration==0) {
-			_root_emptyrounds_before_progress++;
-			LOG(V4_VVER, "EMPTYROUND %i  \n", _root_emptyrounds_before_progress);
+			if (_root_provided_initial_work) {
+				_root_emptyrounds_before_progress++;
+				LOG(V4_VVER, "EMPTYROUND no. %i (iteration %i, sharing round %i)  \n", _root_emptyrounds_before_progress, _root_sweep_iteration, _root_sharing_round);
+			} else {
+				LOG(V4_VVER, "EMPTYROUND fake, bc. solvers didnt receive work yet (iteration %i, sharing round %i)  \n", _root_sweep_iteration, _root_sharing_round);
+			}
 		}
 
 
@@ -181,7 +186,7 @@ private:
 
 		if (_root_emptyrounds_before_progress > MAX_TOLERATED_EMPTYROUNDS) {
 			terminate_due_to_emptyrounds = true;
-			LOG(V1_WARN, "[%i] SWEEP EARLYSTOP in iteration %i . More than %i empty rounds\n", _my_rank, _root_sweep_iteration, MAX_TOLERATED_EMPTYROUNDS);
+			LOG(V1_WARN, "[%i] SWEEP EARLYSTOP in iteration %i, round %i: now %i empty rounds in a row \n", _my_rank, _root_sweep_iteration, _root_sharing_round, _root_emptyrounds_before_progress);
 		}
 
 		//A round is finished if all sweepers are idle, i.e. all finished their work.

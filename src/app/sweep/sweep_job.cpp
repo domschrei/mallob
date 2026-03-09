@@ -900,7 +900,6 @@ void SweepJob::provideInitialWork(KissatPtr sweeper) {
 	// assert(sweeper->sweeper_is_idle);
 
 
-	_root_provided_initial_work = true;
 	sweeper->sweeper_is_idle = false; //already set non-idle here to prevent case where solver is already initialized, non-idle, but still has no work cause its just being copied, and then a sharing operation starts right now, terminating everything wrongly early
 
 	//We need to know how much space to allocate to store each variable "idx" at the array position work[idx].
@@ -915,6 +914,7 @@ void SweepJob::provideInitialWork(KissatPtr sweeper) {
 		sweeper->work_received_from_steal[idx] = idx;
 	}
 	LOG(V2_INFO, "SWEEP WORK PROVIDED: All work --------------%u---------------->sweeper [%i](%i)\n", VARS, _my_rank, sweeper->getLocalId());
+	_root_provided_initial_work = true;
 }
 
 
