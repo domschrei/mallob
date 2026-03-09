@@ -142,9 +142,7 @@ void SweepJob::appl_communicate() {
 
 	checkSharingDelayHealth();
 
-	LOG(V3_VERB, "SWEEP enter MPI worksteal requests \n");
 	sendMPIWorkstealRequests();
-	LOG(V3_VERB, "SWEEP exit  MPI worksteal requests \n");
 
 	checkForUnsatResults();
 
@@ -943,10 +941,14 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 			LOG(V3_VERB, "Sweeper [%i](%i) exit steal loop\n", _my_rank, localId);
 			break;
 		}
-		//Initial work is served exclusively to the representative solver (typically localId 0) at the root node.
-		//This hardcoded target prevents any concurrency problems during this initialisation
-		if (_is_root && ! _root_provided_initial_work && localId==_representative_localId) {
-			provideInitialWork(sweeper);
+
+		//Skip stealing if there hasn't been work provided, would be pointless to search for it
+		//Furthermore, serve initial work to the representative solver (typically localId 0) at the root node.
+		//This is hardcoded to prevent any concurrency problems that would occur if the representative solver would be deduced during runtime. the [root](0) solver is always assumed to exist
+		if (_is_root && ! _root_provided_initial_work) {
+			if (localId==_representative_localId) {
+				provideInitialWork(sweeper);
+			}
 			break;
 		}
 
@@ -963,6 +965,11 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 			break;
 		}
 
+
+		if ( ! _started_communication) {
+			LOG(V3_VERB, "SWEEP [%i](%i) Skip MPI request, not communicating yet\n");
+			break;
+		}
 		//Second strategy: steal globally via MPI
 		//We deposit a request for an MPI message via shared memory, and the main MPI thread of this process will pick up the request and actually send it via MPI
 		//This extra step is necessary, because the thread is just "some" solver-thread and it can cause problems it it start sending MPI messages on it's own
