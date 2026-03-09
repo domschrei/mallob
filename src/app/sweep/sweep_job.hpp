@@ -107,7 +107,7 @@ private:
 
 	//Distribute Eqs and Units that we received from sharing broadcast to local solvers
 	static const unsigned INVALID_LIT = UINT_MAX; //Internal literals count unsigned 0,1,2,..., the largest number marks an invalid literal. see further: https://github.com/arminbiere/satch/blob/master/satch.c#L1017
-	static const int MAX_IMPORT_SIZE = 200'000; //Limiting the import to a known preallocated area, to simplify concurrent reads and writes (still neglectable with ~ 0.8 MB)
+	static const int MAX_IMPORT_SIZE = 400'000; //Limiting the import to a known preallocated area, to simplify concurrent reads and writes (still neglectable with ~ 1.6 MB)
 	std::atomic_int _available_import_round{0}; //identifier for the newest import round that we received from the sharing operation
 	std::atomic_int _EQS_import_size{0};
 	std::atomic_int _UNITS_import_size{0};
