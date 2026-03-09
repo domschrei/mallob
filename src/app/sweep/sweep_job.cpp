@@ -137,7 +137,7 @@ void SweepJob::appl_communicate() {
 
 	if (!_started_communication) {
 		_started_communication = true;
-		LOG(V4_VVER, "SWEEP [%i] started communicating with other ranks \n", _my_rank);
+		LOG(V3_VERB, "SWEEP [%i] started communicating with other ranks \n", _my_rank);
 	}
 
 	checkSharingDelayHealth();
@@ -932,7 +932,9 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 
 	//setting this sweeper to idle is no longer done directly here, because it caused a race condition for the very first solver that was marked idle while it was receiving the initial work
 
-	LOG(V3_VERB, "SWEEP [%i](%i) searching work \n", _my_rank, localId);
+	if (_is_root && localId==_representative_localId) {
+		LOG(V3_VERB, "SWEEP [%i](%i) searching work \n", _my_rank, localId);
+	}
 	//This is a fake loop, we only traverse it once. we use the loop syntax to easily allow us to break out at several points and jump to the bottom, i.e. makeshift gotos
 	while (true) {
 		if (_terminate_all) {
@@ -1415,7 +1417,7 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 		return {};
 	}
 
-	// LOG(V3_VERB, "SWEEP trying to steal from [%i](%i)\n", _my_rank, localId);
+	LOG(V3_VERB, "SWEEP stealattempt on [%i](%i)\n", _my_rank, localId);
 	//We dont know yet how much there is to steal, so we ask for an upper bound
 	//It can also be that the solver we want to steal from is not fully initialized yet
 	//For that in the C code there are further guards against unfinished initialization, all returning 0 in that case
