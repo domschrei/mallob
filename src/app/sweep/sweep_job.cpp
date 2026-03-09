@@ -131,13 +131,21 @@ void SweepJob::appl_communicate() {
 
 	// LOG(V4_VVER, "jobcomm size %i, volume() %i \n", getJobComm().size(), getVolume());
 	if (getJobComm().size() < getVolume()) {
-		LOG(V4_VVER, "SWEEP [%i] Skip jobcomm size %i < volume() %i: not starting with sharing yet \n", _my_rank, getJobComm().size(), getVolume());
+		LOG(V4_VVER, "SWEEP [%i] Skip jobcomm size %i < volume %i: not starting with sharing yet \n", _my_rank, getJobComm().size(), getVolume());
 		return;
+	}
+
+	if (!_started_communication) {
+		_started_communication = true;
+		LOG(V4_VVER, "SWEEP [%i] started communicating with other ranks \n", _my_rank);
 	}
 
 	checkSharingDelayHealth();
 
+	LOG(V3_VERB, "SWEEP enter MPI worksteal requests \n");
 	sendMPIWorkstealRequests();
+	LOG(V3_VERB, "SWEEP exit  MPI worksteal requests \n");
+
 	checkForUnsatResults();
 
 	if (_is_root && ! _terminate_all)
@@ -1064,7 +1072,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		while(_worksteal_requests[localId].got_steal_response == false) {
 			usleep(WAIT_MICROSEC);
 			reps++;
-			if (reps%64==0) {
+			if (reps%512==0) {
 				LOG(V1_WARN, "SWEEP WARN [%i](%i) steal loop waits for MPI response since %i reps (%i ms) \n", _my_rank, localId, reps, (reps*WAIT_MICROSEC)/1000);
 			}
 			if (_terminate_all) {

@@ -21,6 +21,7 @@ private:
 	bool _do_report_UNSAT_to_root{false};
 	std::atomic_bool _root_reported_unsat{false};
 	bool _finished_job_setup{false};
+	bool _started_communication{false};
 
 	bool _started_appl_start{false};
     int _my_rank{0};
@@ -139,7 +140,6 @@ private:
 	int _root_emptyrounds_before_progress=0;
 	int _root_rounds_this_iteration = 0;
 	const int MAX_TOLERATED_EMPTYROUNDS = _params.sweepMaxEmptyRounds.val;
-
 	int _root_sweep_iteration = 0;
 	int _root_sharing_round = 0;
 	bool _root_did_just_finish_iteration = true; //remember for the next sharing round that we entered a new sweep iteration
