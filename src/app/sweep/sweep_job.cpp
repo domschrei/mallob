@@ -969,7 +969,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 
 
 		if ( ! _started_communication) {
-			LOG(V3_VERB, "SWEEP [%i](%i) Skip MPI request, not communicating yet\n");
+			LOG(V3_VERB, "SWEEP [%i](%i) Skip MPI request, not communicating yet\n", _my_rank, localId);
 			break;
 		}
 		//Second strategy: steal globally via MPI
@@ -1016,6 +1016,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 	*work_size = sweeper->work_received_from_steal.size();
 	assert(*work_size>=0);
 	if (*work_size>0) {
+		LOG(V3_VERB, "SWEEP [%i](%i) received %i work \n", _my_rank, localId, *work_size);
 		sweeper->sweeper_is_idle = false; //we keep solver marked as "idle" once the whole solving is terminated, otherwise race-conditions can occur where suddenly the solver is treated as active again
 	}
 	//update: we no longer send the termination information via this worksteal callback, but separately
@@ -1417,7 +1418,7 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 		return {};
 	}
 
-	LOG(V3_VERB, "SWEEP stealattempt on [%i](%i)\n", _my_rank, localId);
+	// LOG(V3_VERB, "SWEEP stealattempt on [%i](%i)\n", _my_rank, localId);
 	//We dont know yet how much there is to steal, so we ask for an upper bound
 	//It can also be that the solver we want to steal from is not fully initialized yet
 	//For that in the C code there are further guards against unfinished initialization, all returning 0 in that case

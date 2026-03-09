@@ -13,7 +13,9 @@ OUT_DIR=$HOME/PhD/logsntraces/
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf.xz" # 6sec
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/iso/6s151.cnf.xz"  # 0.1sec
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/bob12s01.cnf.xz" # 30sec, 17% after 2 rounds
-INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/cmudme1.cnf.xz" # 30sec, 17% after 2 rounds
+# INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/cmudme1.cnf.xz" # 30sec, 17% after 2 rounds
+INST_PATH="$HOME/PhD/instances/some2024/39fba35826ce8c87cd8e8de1969b2dd2-SGI_30_80_26_70_4-log.shuffled-as.sat03-208.cnf.xz" # 30sec, 17% after 2 rounds
+
 
 MALLOB_OPTIONS="-t=$threads \
   -mono-app=SWEEP \
@@ -34,11 +36,12 @@ MALLOB_OPTIONS="-t=$threads \
 	-preprocess-sweep=1 \
 	-sweep-sharing-period=0.020 \
   -sweep-resweep-chance=1000 \
-  -sweep-rounds=2 \
-	-sweep-solver-verbosity=2 \
+  -sweep-iterations=5 \
+	-sweep-solver-verbosity=4 \
 	-sweep-solver-quiet=1 \
   -sweep-congruence=0 \
-  -sweep-growing-environments=1 \
+  -sweep-max-growth-iteration=2 \
+  -sweep-max-empty-rounds=3 \
   -preprocess-sweep-priority=1.0 \
 "
 
