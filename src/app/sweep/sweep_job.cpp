@@ -926,102 +926,6 @@ void SweepJob::provideInitialWork(KissatPtr sweeper) {
 }
 
 
-/*
-void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) {
-	KissatPtr sweeper = _sweepers[localId]; //this array access is safe because the callback is called by this sweeper itself
-	sweeper->work_received_from_steal = {};
-
-	//setting this sweeper to idle is no longer done directly here, because it caused a race condition for the very first solver that was marked idle while it was receiving the initial work
-
-	//try to find work
-	//if we fail, this callback will be called again by the kissat solver - so the main search loop is in the solver, not here
-	while (true) {
-		// LOG(V5_DEBG, "Sweeper [%i](%i) in steal loop\n", _my_rank, localId);
-
-		if (_terminate_all) {
-			sweeper->work_received_from_steal = {};
-			sweeper->sweeper_is_idle = true;
-			LOG(V3_VERB, "Sweeper [%i](%i) exit steal loop\n", _my_rank, localId);
-			break;
-		}
-		//We serve the initial work exclusively to solver 0 at the root node. This hardcoded target prevents any concurrency/communication problems at this stage.
-		if (_is_root && ! _root_provided_initial_work && localId==_representative_localId) {
-			provideInitialWork(sweeper);
-			break;
-		}
-
-		//Try to steal locally from shared memory
-		//Going for some direct global steals doesnt do much here, because the big rally happens anyways the moment all are depleted locally
-		//At that point they anyways schedule a global sweep, and some sweepers stealing globally before cant stop that
-
-		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop --> local steal \n", _my_rank, localId);
-		sweeper->sweeper_is_idle = true;
-		auto stolen_work = stealWorkFromAnyLocalSolver(_my_rank, localId);
-
-		//Successful local steal
-		if ( ! stolen_work.empty()) {
-			//store steal data persistently in C++, such that C can keep operating on that memory segment
-			sweeper->work_received_from_steal = std::move(stolen_work);
-			LOG(V3_VERB, "SWEEP MSG [%i](%i) <==%i==== local  \n", _my_rank, localId, sweeper->work_received_from_steal.size(), _my_rank);
-			break;
-		}
-
-		//Request will be handled by the MPI main thread, which will send an MPI message on our behalf
-		//because here we are in code executed by the kissat thread, which can cause problems for sending MPI messages
-
-		// LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop --> global steal to [%i] \n", _my_rank, localId, targetRank);
-		// WorkstealRequest request;
-		// request.localId = localId;
-		// request.targetIndex = targetIndex;
-		// request.targetRank = targetRank;
-		// _worksteal_requests[localId] = request;
-
-		LOG(V3_VERB, "SWEEP MSG [%i](%i) ----?---> glob  \n", _my_rank, localId);
-		_worksteal_requests[localId].newBlankRequest(localId);
-
-		//Wait here until we hear back via an MPI message
-		unsigned reps=0;
-		while(_worksteal_requests[localId].got_steal_response == false) {
-			usleep(100);
-			reps++;
-			if (reps%32==0) {
-				LOG(V5_DEBG, "SWEEP MSG [%i](%i) steal loop: waits for MPI response\n", _my_rank, localId);
-			}
-			if (_terminate_all) {
-				LOG(V3_VERB, "SWEEP [%i](%i) exit wait loop\n", _my_rank, localId);
-				break;
-			}
-		}
-
-		if (_terminate_all) {
-			sweeper->sweeper_is_idle = true;
-			break;	 //skip touching the work array at all, weird stuff can happen when we are already in the termination stage
-		}
-
-		//Successful steal if size > 0
-		if (! _worksteal_requests[localId].stolen_work.empty()) {
-			sweeper->work_received_from_steal = std::move(_worksteal_requests[localId].stolen_work);
-			LOG(V4_VVER, "SWEEP MSG [%i](%i) <==%i=== [%i] \n",  _my_rank, localId, sweeper->work_received_from_steal.size(), _worksteal_requests[localId].targetRank);
-			break;
-		}
-		// LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop <-- global steal to [%i] failed \n", _my_rank, localId, targetRank);
-		//Unsuccessful global steal, try again
-	}
-	//Found work (if work_size>0) or got signal for termination (work_size==0).
-	//we control the memory on C++/Mallob Level, and only tell the kissat solver where it can find the work (or where it can read the zero)
-	//the solver will also write on this array, but only within the allocated bounds provided by C++/Mallob
-	*work = reinterpret_cast<unsigned int*>(sweeper->work_received_from_steal.data());
-	*work_size = sweeper->work_received_from_steal.size();
-	assert(*work_size>=0);
-	if (*work_size>0) {
-		sweeper->sweeper_is_idle = false; //we keep solver marked as "idle" once the whole solving is terminated, otherwise race-conditions can occur where suddenly the solver is treated as active again
-	}
-	// if (_terminate_all) {
-		// LOG(V3_VERB, "SWEEP [%i](%i) returning to solver with termination info\n", _my_rank, localId);
-	// }
-	//The thread now returns to the kissat solver
-}
-*/
 
 
 void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) {
@@ -1504,7 +1408,7 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 		return {};
 	}
 
-	LOG(V3_VERB, "SWEEP trying to steal from [%i](%i)\n", _my_rank, localId);
+	// LOG(V3_VERB, "SWEEP trying to steal from [%i](%i)\n", _my_rank, localId);
 	//We dont know yet how much there is to steal, so we ask for an upper bound
 	//It can also be that the solver we want to steal from is not fully initialized yet
 	//For that in the C code there are further guards against unfinished initialization, all returning 0 in that case
