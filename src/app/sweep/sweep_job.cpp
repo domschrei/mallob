@@ -1030,7 +1030,8 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 
 	//setting this sweeper to idle is no longer done directly here, because it caused a race condition for the very first solver that was marked idle while it was receiving the initial work
 
-	//fake loop, only used to break out and jump to the bottom at many points, i.e. gotos
+	LOG(V3_VERB, "SWEEP [%i](%i) searching work \n", _my_rank, localId);
+	//This is a fake loop, we only traverse it once. we use the loop syntax to easily allow us to break out at several points and jump to the bottom, i.e. makeshift gotos
 	while (true) {
 		if (_terminate_all) {
 			sweeper->work_received_from_steal = {};
@@ -1073,7 +1074,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 			usleep(WAIT_MICROSEC);
 			reps++;
 			if (reps%512==0) {
-				LOG(V1_WARN, "SWEEP WARN [%i](%i) steal loop waits for MPI response since %i reps (%i ms) \n", _my_rank, localId, reps, (reps*WAIT_MICROSEC)/1000);
+				LOG(V1_WARN, "SWEEP WARN [%i](%i) waiting for MPI steal response since %i ms \n", _my_rank, localId, (reps*WAIT_MICROSEC)/1000);
 			}
 			if (_terminate_all) {
 				LOG(V3_VERB, "SWEEP [%i](%i) exit wait loop\n", _my_rank, localId);
@@ -1476,13 +1477,13 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 
 
 
-std::vector<int> SweepJob::stealWorkFromAnyLocalSolver(int asking_rank, int asking_localId) { //Parameters are only used for verbose logging, don't influence function behaviour
+std::vector<int> SweepJob::stealWorkFromAnyLocalSolver(int asking_rank, int asking_sourceLocalId) { //Parameters are only used for verbose logging, don't influence function behaviour
 	auto rand_permutation = getRandomIdPermutation();
 
 	for (int localId : rand_permutation) {
 		auto stolen_work = stealWorkFromSpecificLocalSolver(localId);
 		if ( ! stolen_work.empty()) {
-			LOG(V3_VERB, "SWEEP MSG [%i](%i) ====%i==> [%i](%i) \n",_my_rank, localId, stolen_work.size(), asking_rank, asking_localId);
+			LOG(V3_VERB, "SWEEP MSG [%i](%i) ====%i==> [%i](%i) \n",_my_rank, localId, stolen_work.size(), asking_rank, asking_sourceLocalId);
 			return stolen_work;
 		}
 	}
@@ -1503,6 +1504,7 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 		return {};
 	}
 
+	LOG(V3_VERB, "SWEEP trying to steal from [%i](%i)\n", _my_rank, localId);
 	//We dont know yet how much there is to steal, so we ask for an upper bound
 	//It can also be that the solver we want to steal from is not fully initialized yet
 	//For that in the C code there are further guards against unfinished initialization, all returning 0 in that case
