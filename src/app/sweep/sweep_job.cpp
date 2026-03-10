@@ -740,15 +740,17 @@ void SweepJob::sendMPIWorkstealRequests() {
 		if (!request.sent) {
 			int senderLocalId = request.senderLocalId;
 
-			//try again local steal first
+			//It might be that there is again work locally available since the time the request has been filed
+			//Thus check first locally again for work before sending a more expensive MPI message
 			auto stolen_work = stealWorkFromAnyLocalSolver(_my_rank, senderLocalId);
-
 			if ( ! stolen_work.empty()) {
 				request.stolen_work = std::move(stolen_work);
 				request.sent = true;
 				request.got_steal_response = true;
+				request.targetRank = _my_rank; //just for cleaner logging
+				request.targetIndex = _my_index;
 				//Successful local steal
-				LOG(V3_VERB, "SWEEP MSG [%i](%i) <==%i==== localsteal via Mainthread  \n", _my_rank, senderLocalId);
+				LOG(V3_VERB, "SWEEP MSG [%i](%i) <==%i==== localsteal via mainthread  \n", _my_rank, senderLocalId, request.stolen_work.size());
 				continue;
 			}
 
@@ -1024,7 +1026,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		//Successful steal if size > 0
 		if (_worksteal_requests[localId].stolen_work.size()>0) {
 			sweeper->work_received_from_steal = std::move(_worksteal_requests[localId].stolen_work);
-			LOG(V4_VVER, "SWEEP MSG [%i](%i) <==%i=== [%i] \n",  _my_rank, localId, sweeper->work_received_from_steal.size(), _worksteal_requests[localId].targetRank);
+			LOG(V4_VVER, "SWEEP recv [%i](%i) <==%i==== [%i] \n",  _my_rank, localId, sweeper->work_received_from_steal.size(), _worksteal_requests[localId].targetRank);
 			break;
 		}
 		//always exit this fake loop. the real loop is in the kissat solver, which continuously calls this function
@@ -1037,7 +1039,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 	*work_size = sweeper->work_received_from_steal.size();
 	assert(*work_size>=0);
 	if (*work_size>0) {
-		LOG(V3_VERB, "SWEEP [%i](%i) received %i work \n", _my_rank, localId, *work_size);
+		// LOG(V3_VERB, "SWEEP [%i](%i) received %i work \n", _my_rank, localId, *work_size);
 		sweeper->sweeper_is_idle = false; //we keep solver marked as "idle" once the whole solving is terminated, otherwise race-conditions can occur where suddenly the solver is treated as active again
 	}
 	//update: we no longer send the termination information via this worksteal callback, but separately
