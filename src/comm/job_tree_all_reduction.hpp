@@ -303,7 +303,7 @@ public:
                 }
 
                 if (_broadcast_enabled) {// receive final elem and begin broadcast
-                    LOG(V3_VERB, "SWEEP RED broadcasting result \n");
+                    LOG(V3_VERB, "SWEEP RED SHARE broadcasting result \n");
                     receiveAndForwardFinalElem(std::move(_aggregated_elem.value()));
                 } else { // only receive final elem
                     receiveFinalElem(std::move(_aggregated_elem.value()));
@@ -401,20 +401,20 @@ private:
     }
 
     void receiveAndForwardFinalElem(AllReduceElement&& elem) {
-        LOG(V3_VERB, "SWEEP RED got final element (size %i) \n", elem.size());
+        LOG(V3_VERB, "SWEEP SHARE got final element (size %i) \n", elem.size());
         receiveFinalElem(std::move(elem));
         if (_expected_child_ranks.first >= 0) {
             _base_msg.treeIndexOfDestination = _expected_child_indices.first;
             _base_msg.contextIdOfDestination = _expected_child_ctx_ids.first;
             assert(_base_msg.contextIdOfDestination != 0);
-            LOG(V3_VERB, "SWEEP RED got final element (size %i), further broadcasting left [%i] \n", _base_msg.payload.size(), _expected_child_ranks.first);
+            LOG(V3_VERB, "SWEEP RED SHARE got final element (size %i), further broadcasting left [%i] \n", _base_msg.payload.size(), _expected_child_ranks.first);
             MyMpi::isend(_expected_child_ranks.first, MSG_JOB_TREE_MODULAR_BROADCAST, _base_msg);
         }
         if (_expected_child_ranks.second >= 0) {
             _base_msg.treeIndexOfDestination = _expected_child_indices.second;
             _base_msg.contextIdOfDestination = _expected_child_ctx_ids.second;
             assert(_base_msg.contextIdOfDestination != 0);
-            LOG(V3_VERB, "SWEEP RED got final element (size %i), further broadcasting right [%i] \n", _base_msg.payload.size(), _expected_child_ranks.second);
+            LOG(V3_VERB, "SWEEP RED SHARE got final element (size %i), further broadcasting right [%i] \n", _base_msg.payload.size(), _expected_child_ranks.second);
             MyMpi::isend(_expected_child_ranks.second, MSG_JOB_TREE_MODULAR_BROADCAST, _base_msg);
         }
     }

@@ -1182,7 +1182,7 @@ void SweepJob::cbContributeToAllReduce() {
 void SweepJob::advanceAllReduction() {
 	if (!_red)
 		return;
-	// LOG(V4_VVER, "SWEEP [%i] advance() \n", _my_rank);
+	LOG(V4_VVER, "SWEEP [%i] RED advance() \n", _my_rank);
 	//we always keep the global reduction advancing, independently of the state of the local solvers
 	_red->advance();
 	if (!_red->hasResult())
@@ -1198,13 +1198,14 @@ void SweepJob::advanceAllReduction() {
 	const int eq_size     = data[data.size()-METADATA_EQ_SIZE];
 	assert(eq_size%2==0 || log_return_false("SWEEP ERROR: Import Equality size not even, but %i\n", eq_size));
 
+	LOG(V2_INFO, "SWEEP RED SHARE: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)term. #locally idle: %i/%i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastIdleCount, _nThreads);
 	if (okToTrackSharingDelay())
 		_time_receive_allred.push_back(Timer::elapsedSeconds());
 
 	//if our local solvers are not fully initialised yet we ignore the global sharing data
 	if (!_started_synchronized_solving) {
 		if (eq_size>0 || unit_size>0)  {
-			LOG(V3_VERB, "SWEEP WARN [%i] (iter %i round %i): Skipping %i eqs, %i units bc local solvers are not all init'd yet \n", _my_rank, sweep_iteration, sharing_round, eq_size/2, unit_size);
+			LOG(V3_VERB, "SWEEP WARN RED SHARE [%i] (iter %i round %i): Skipping %i eqs, %i units bc local solvers are not all init'd yet \n", _my_rank, sweep_iteration, sharing_round, eq_size/2, unit_size);
 		}
 		return;
 	}
@@ -1240,7 +1241,7 @@ void SweepJob::advanceAllReduction() {
 		}
 	}
 
-	LOG(V2_INFO, "SWEEP RED iter(%i) round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)term. #locally idle: %i/%i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastIdleCount, _nThreads);
+	LOG(V2_INFO, "SWEEP RED SHARE: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)term. #locally idle: %i/%i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastIdleCount, _nThreads);
 
 	//prepare the next sharing round, which gets started from the root node
 	if (_is_root) {
