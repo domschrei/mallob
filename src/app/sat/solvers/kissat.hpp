@@ -33,7 +33,7 @@ private:
 
 
 	//#################################################
-	//Shweep
+	//Sweeping
 	bool is_sweeper = false;
 	bool is_congruencer = false; //subtype of sweeper, that does congruence closure instead of sweeping
 	int representative_localId = 0;
@@ -62,6 +62,9 @@ private:
 	// int sweep_unread_EQS_count{0};
 
 	struct shweep_statistics sweep_stats;
+
+	static constexpr int WARN_ON_REPEATED_MISSED_TERMINATION=64;
+	int count_repeated_missed_termination=0;
 	// std::vector<char> stolen_done;
 	// std::vector<int> formulaForShweeping;
 	//##################################################

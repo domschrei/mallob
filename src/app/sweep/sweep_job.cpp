@@ -941,6 +941,13 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 			sweeper->work_received_from_steal = {};
 			sweeper->sweeper_is_idle = true;
 			LOG(V3_VERB, "Sweeper [%i](%i) exit steal loop\n", _my_rank, localId);
+			//make extra sure that this sweeper receives the termination signal (yet again)
+			sweeper->triggerSweepTerminate();
+			sweeper->count_repeated_missed_termination++;
+			if (sweeper->count_repeated_missed_termination % sweeper->WARN_ON_REPEATED_MISSED_TERMINATION==0) {
+				LOG(V3_VERB, "WARN Sweeper [%i](%i) in %i-th worksteal loop after termination\n", _my_rank, localId, sweeper->count_repeated_missed_termination);
+			}
+
 			break;
 		}
 
@@ -1475,13 +1482,14 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 }
 
 void SweepJob::triggerTerminations() {
-	LOG(V2_INFO, "SWEEP TERM #%i [%i] trigger solver terminations (ctx %i) \n", getId(), _my_rank, _my_ctx_id);
-
+	LOG(V2_INFO, "SWEEP TERM #%i [%i] trigger solver terminations (ctx %i). State before: Running %i, Finished %i \n", getId(), _my_rank, _my_ctx_id, _running_sweepers_count.load(), _finished_sweepers_count.load());
 	int i=0;
 	for (auto &sweeper : _sweepers) {
 		if (sweeper) {
 			sweeper->triggerSweepTerminate();
-			LOG(V4_VVER, "SWEEP TERM #%i [%i] trigger solver (%i) termination \n", getId(), _my_rank, i);
+			LOG(V4_VVER, "SWEEP TERM #%i [%i] trigger termination of solver (%i) \n", getId(), _my_rank, i);
+		} else {
+			LOG(V4_VVER, "SWEEP TERM #%i [%i] skip    termination of solver (%i), already null \n", getId(), _my_rank, i);
 		}
 		i++;
 	}

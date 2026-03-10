@@ -74,7 +74,7 @@ private:
 		}
 	};
 	std::deque<WorkstealRequest> _worksteal_requests; //deque, because they have an atomic member and are thus not copyable
-	const int MIN_STEAL_AMOUNT = 10; //creates to much overhead if we send around ridiculously small work packages
+	const int MIN_STEAL_AMOUNT = 10; //avoid to much overhead at the very end when there is almost no work left, avoid sending around ridiculously small work packages
 
 
 	//Sharing Equivalences and Units
@@ -93,11 +93,11 @@ private:
     const int TAG_ALLRED		= 1004;
 	const int TAG_FOUND_UNSAT	= 1005;
 
-	const int NUM_SEARCHING_WORK_FIELDS = 3;
+	const int NUM_SEARCHING_WORK_FIELDS = 3; //must match with the number of fields we actually provide at that point (follow symbol)
 
 	//each aggregation element has some metadata integers at the end
 	static const int NUM_METADATA_FIELDS = 6;
-		//which are:
+		//field indices must be unique numbers exactly filling 1..NUM_METADATA_FIELDS !
 		static const int METADATA_TERMINATE			= 6;
 		static const int METADATA_SWEEP_ITERATION = 5;
 		static const int METADATA_SHARING_ROUND = 4;
@@ -145,7 +145,10 @@ private:
 	bool _root_did_just_finish_iteration = true; //remember for the next sharing round that we entered a new sweep iteration
 
 
-	//Some information is only tracked by the root node, but relevant for all nodes. Thus the root node injects it here into the sharing data.
+	//The root node (and only the root node) tracks progress over the sharing rounds and sweeping iterations
+	//It decides whether sharing should continue or whether it should end (either because the last iteration is reached, or because no progress has been made)
+	//It broadcasts this decision to all othe ranks, along with general information about the current iteration and round
+	//On a technical level, This information is injected here via an inplace root transform at the end of the sharing aggregation, before broadcasting it
 	std::function<void(std::vector<int>&)> _inplace_rootTransform = [&](std::vector<int>& payload) {
 		assert(_is_root);
 
