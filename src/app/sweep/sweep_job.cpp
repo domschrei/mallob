@@ -126,7 +126,7 @@ void SweepJob::appl_communicate() {
 		_bcast->updateJobTree(getJobTree());
 
 	advanceAllReduction(); //always advance
-	TryWorkstealLocal();
+	//TryWorkstealLocal(); can take a long time in the current setup...
 	TryWorkstealMPI();
 	rootInitiateNewSharingRound();
 
@@ -733,7 +733,7 @@ void SweepJob::TryWorkstealLocal() {
 	}
 }
 
-bool SweepJob::skipForNowMPI() {
+bool SweepJob::skip_MPI_forNow() {
 	return (getJobComm().size() < getVolume());
 	// LOG(V4_VVER, "SWEEP [%i] Skip MPI workstealing, jobcomm size %i < volume %i\n", _my_rank, getJobComm().size(), getVolume());
 }
@@ -749,7 +749,7 @@ void SweepJob::TryWorkstealMPI() {
 
 			//if we are still in the phase where MPI sends are not done, we short-fuse the requests to a zero dummy and return them to the solver threads
 			//same if the whole job is terminated
-			if (skipForNowMPI() || _terminate_all || getVolume()==0) {
+			if (skip_MPI_forNow() || _terminate_all || getVolume()==0) {
 				request.stolen_work = {};
 				request.sent = true;
 				request.got_steal_response = true;
@@ -1399,8 +1399,8 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 
 	appendMetadataToReductionElement(aggregated, all_idle, aggr_unit_size, aggr_eq_size);
 
-	if (contribs.size()>1)
-		LOG(V3_VERB, "SWEEP RED aggr %i contribs: %i EQ, %i UNITS, %i ALL_IDLE\n", contribs.size(), aggr_eq_size/2, aggr_unit_size, all_idle);
+	// if (contribs.size()>1)
+		// LOG(V3_VERB, "SWEEP RED aggr %i contribs: %i EQ, %i UNITS, %i ALL_IDLE\n", contribs.size(), aggr_eq_size/2, aggr_unit_size, all_idle);
 	int individual_sum =  aggr_eq_size + aggr_unit_size + NUM_METADATA_FIELDS;
 	assert(total_aggregated_size == individual_sum ||
 		log_return_false("SWEEP ERROR: aggregated element assert failed: total_size %i != %i individual_sum (total_eq_size %i + total_unit_size %i + metadata %i) ",
