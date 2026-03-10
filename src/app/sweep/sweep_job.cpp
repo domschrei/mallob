@@ -1117,9 +1117,15 @@ void SweepJob::cbContributeToAllReduce() {
 		return;
 	}
 
+
+	//todo: EXTRACT SHARED RESULT FROM _red before we reset it!!!
+	if (_red->hasResult()) {
+		LOG(V1_WARN, ">>>> WARN SWEEP [%i] RED SHARE RESET: We are about to reset _red while it still has a valid result! <<<<< \n", _my_rank);
+	}
+
 	JobMessage baseMsg = getMessageTemplate();
 	baseMsg.tag = TAG_ALLRED;
-	LOG(V4_VVER, "SWEEP [%i] RED RESET AllReduction, using bcast snapshot, to prepare contributing local data. \n", _my_rank);
+	LOG(V4_VVER, "SWEEP [%i] RED SHARE RESET AllReduction, using bcast snapshot, to prepare contributing local data. \n", _my_rank);
 	_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateEqUnitContributions));
 	if (_is_root)
 		_red->setInplaceTransformationOfElementAtRoot(_inplace_rootTransform);
