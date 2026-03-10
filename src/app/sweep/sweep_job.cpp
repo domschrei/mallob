@@ -1405,7 +1405,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	appendMetadataToReductionElement(aggregated, all_idle, aggr_unit_size, aggr_eq_size);
 
 	if (contribs.size()>1)
-		LOG(V3_VERB, "SWEEP SHARE REDUCE aggr %i contribs: %i EQ, %i UNITS, %i ALL_IDLE\n", contribs.size(), aggr_eq_size/2, aggr_unit_size, all_idle);
+		LOG(V3_VERB, "SWEEP RED aggr %i contribs: %i EQ, %i UNITS, %i ALL_IDLE\n", contribs.size(), aggr_eq_size/2, aggr_unit_size, all_idle);
 	int individual_sum =  aggr_eq_size + aggr_unit_size + NUM_METADATA_FIELDS;
 	assert(total_aggregated_size == individual_sum ||
 		log_return_false("SWEEP ERROR: aggregated element assert failed: total_size %i != %i individual_sum (total_eq_size %i + total_unit_size %i + metadata %i) ",

@@ -46,6 +46,10 @@ private:
     ctx_id_t _parent_ctx_id;
 
     bool _aggregating = false;
+    bool _aggregated_logging = false; //just for logging purposes
+    bool _have_unanswered_returnToSender=false;
+    std::vector<int> _returnToSender_payload{};
+
     std::future<void> _future_aggregate;
     std::function<AllReduceElement(std::list<AllReduceElement>&)> _aggregator;
     std::optional<AllReduceElement> _aggregated_elem;
@@ -181,7 +185,9 @@ private:
         if (!accept) return false;
 
         if (msg.returnedToSender) {
-            LOG(V1_WARN, "WARN REDUCE returnedToSender (source %i, tag %i)\n", source, tag);
+            LOG(V1_WARN, "WARN RED REDUCE returnedToSender (source %i, tag %i, msg.tag %i, msg.size %i)\n", source, tag, msg.tag, msg.payload.size());
+            _returnToSender_payload = std::move(msg.payload);
+            _have_unanswered_returnToSender = true;
             return true;
         }
 
@@ -197,7 +203,7 @@ private:
             accept &= fromLeftChild || fromRightChild;
             if (!accept) return false;
 
-            LOG(V4_VVER, "SWEEP REDUCE received elem from child [%i], size %i \n", source, msg.payload.size());
+            LOG(V4_VVER, "SWEEP RED received elem from child [%i], size %i \n", source, msg.payload.size());
             // message accepted: store and check off
             _child_elems.insert({source, std::move(msg.payload)});
             if (fromLeftChild) _received_child_elems.first = true;
@@ -224,21 +230,38 @@ public:
 
         if (_finished) return *this;
 
-        LOG(V4_VVER, "SWEEP advance() exp.childs=%i, recv=%i (incl. local), local=%i. childranks [%i],[%i]. (%i)recvd_left, (%i)recvd_right,  (%i)aggregating, (%i)future_valid \n",
+        LOG(V4_VVER, "SWEEP RED advance() exp.childs=%i, elems=%i, local=%i. childranks [%i],[%i]. (%i)recvd_left, (%i)recvd_right,  (%i)aggregating, (%i)aggregated, (%i)future_valid \n",
             _num_expected_child_elems, _child_elems.size(), _local_elem.has_value(), _expected_child_ranks.first, _expected_child_ranks.second,
-            _received_child_elems.first, _received_child_elems.second, _aggregating, _future_aggregate.valid());
-        // if (_child_elems.size() > _num_expected_child_elems) {
-           // for (auto &child : _child_elems) {
-                // LOG(V4_VVER, "SWEEP ERROR/Error: Unexpected child elem with size %i from source %i \n", child.elem.size(), child.source);
-           // }
-        // }
-        // assert(_child_elems.size() <= _num_expected_child_elems || log_return_false("SWEEP ERROR/Error: Job Tree All Reduction Rank got too many child elements! expected %i, got %i \n", _num_expected_child_elems, _child_elems.size()));
+            _received_child_elems.first, _received_child_elems.second, _aggregating, _aggregated_logging, _future_aggregate.valid());
+
+
+
+        //It can happen that a reduction sent to the parent gets returned via the returnToSender error.
+        //Afaik, this can happen (in rare cases) with combined modular BCAST+ALLRED, the following way
+        // 1.A Parent sends a BCAST out
+        // 2.One of its leaf nodes reacts extremely quickly to this BCAST. It sends its BCAST information back and immediately creates an ALLRED object and has it contribute to the parent ALLRED
+        // 3.The parent node, more or less concurrently, now also receives all the BCAST information and creates an ALLRED object, filled with the correct snapshot
+        // 4.Since the parent node might have been a bit slower, the ALLRED message from the leaf node had not corresponding ALLRED object to arrive and, and gets returnedToSender
+
+        //We resolve this problem by remembering a returnToSender error at the child, and retrying to sending it again
+        if (_have_unanswered_returnToSender) {
+            LOG(V1_WARN, "WARN SWEEP RED retrying to send to parent again after last returnedToSender \n");
+            _base_msg.payload = std::move(_returnToSender_payload);
+            _base_msg.treeIndexOfDestination = _parent_index;
+            _base_msg.contextIdOfDestination = _parent_ctx_id;
+            assert(_base_msg.contextIdOfDestination != 0);
+            LOG(V3_VERB, "SWEEP RED [%i] advance ~~~%i~~~> to parent [%i]\n",_tree.nodeRank, _base_msg.payload.size(), _parent_rank);
+            MyMpi::isend(_parent_rank, MSG_JOB_TREE_MODULAR_REDUCE, _base_msg);
+            //Now that we re-send, the problem is no longer pending -- unless we get the error again, which would repeat this cycle
+            _have_unanswered_returnToSender = false;
+            return *this;
+        }
+
 
         //at child_elems == expected_elems we briefly add our own element to the children, so then we have one more child element than expected, but thats no longer an issue to the propagate the combined aggregated element
-
         if (_child_elems.size() == _num_expected_child_elems && _local_elem.has_value()) {
 
-            LOG(V4_VVER, "SWEEP RED queued agg\n");
+            // LOG(V4_VVER, "SWEEP RED queued agg\n");
             // LOG(V4_VVER, "SWEEP SHARE AGGR queuing aggregation thread\n");
             _child_elems.insert({-1, std::move(_local_elem.value())});
             _local_elem.reset();
@@ -247,12 +270,13 @@ public:
             _aggregating = true;
             _future_aggregate = ProcessWideThreadPool::get().addTask([&]() {
                 // LOG(V4_VVER, "SWEEP SHARE AGGR started own aggregation thread\n");
-                LOG(V4_VVER, "SWEEP RED started agg\n");
+                // LOG(V4_VVER, "SWEEP RED started agg\n");
                 std::list<AllReduceElement> elemsList;
                 for (auto& childElem : _child_elems) elemsList.push_back(std::move(childElem.elem));
                 _aggregated_elem = _aggregator(elemsList);
                 _aggregating = false;
-                LOG(V4_VVER, "SWEEP RED done agg\n");
+                _aggregated_logging = true;
+                // LOG(V4_VVER, "SWEEP RED done agg\n");
             });
         }
 
