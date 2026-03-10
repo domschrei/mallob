@@ -132,9 +132,8 @@ void SweepJob::appl_communicate() {
 		_bcast->updateJobTree(getJobTree());
 
 
-	// LOG(V4_VVER, "jobcomm size %i, volume() %i \n", getJobComm().size(), getVolume());
-	if (getJobComm().size() < getVolume()) {
-		LOG(V4_VVER, "SWEEP [%i] Skip jobcomm size %i < volume %i: not starting with sharing yet \n", _my_rank, getJobComm().size(), getVolume());
+	if (getJobComm().size() < getVolume() || !_started_synchronized_solving) {
+		LOG(V4_VVER, "SWEEP [%i] Skip appl_communicate: Jobcomm size %i <= volume %i and/or started only %i/%i solvers \n", _my_rank, getJobComm().size(), getVolume(), _started_sweepers_count.load(), _nThreads);
 		printIdleFraction();
 		return;
 	}
