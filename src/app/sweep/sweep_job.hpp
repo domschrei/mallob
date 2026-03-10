@@ -155,6 +155,7 @@ private:
 		if (_root_did_just_finish_iteration) {
 			_root_sweep_iteration++;
 			_root_did_just_finish_iteration = false;
+			LOG(V1_WARN, "[%i] SWEEP ITERATION %i/%i STARTED \n", _my_rank, _root_sweep_iteration, _params.sweepIterations());
 		}
 
 		_root_sharing_round++;
@@ -222,7 +223,6 @@ private:
 				_root_provided_initial_work = false;
 				//Prevent that workers see a round change of 2 when going from one sweepround to the next
 				// _root_sharing_round--;
-				LOG(V1_WARN, "[%i] SWEEP ITERATION %i/%i STARTED \n", _my_rank, _root_sweep_iteration, _params.sweepIterations());
 			}
 		}
 		//The root node (and only the root node) tracks the number of completed sweep rounds, and broadcasts this information. This way, also nodes that join later know which round we are in.

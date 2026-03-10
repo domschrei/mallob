@@ -735,6 +735,19 @@ void SweepJob::sendMPIWorkstealRequests() {
 	for (auto &request : _worksteal_requests) {
 		if (!request.sent) {
 			int senderLocalId = request.senderLocalId;
+
+			//try again local steal first
+			auto stolen_work = stealWorkFromAnyLocalSolver(_my_rank, senderLocalId);
+
+			if ( ! stolen_work.empty()) {
+				request.stolen_work = std::move(stolen_work);
+				request.sent = true;
+				request.got_steal_response = true;
+				//Successful local steal
+				LOG(V3_VERB, "SWEEP MSG [%i](%i) <==%i==== localsteal via Mainthread  \n", _my_rank, senderLocalId);
+				continue;
+			}
+
 			int my_comm_rank = getJobComm().getWorldRankOrMinusOne(_my_index);
 			if (my_comm_rank == -1) {
 				LOG(V3_VERB, "SWEEP SKIP own rank [%i] (myindex %i) <ctx %i> not yet in JobComm of size %i \n", _my_rank, _my_index, _my_ctx_id, getJobComm().size());
@@ -744,7 +757,7 @@ void SweepJob::sendMPIWorkstealRequests() {
 				request.stolen_work = {};
 				request.sent = true;
 				request.got_steal_response = true;
-				LOG(V3_VERB, "Sweeper [%i](%i) exit steal loop (2nd check, getVolume()==%i)\n", _my_rank, senderLocalId, getVolume());
+				LOG(V3_VERB, "SWEEP [%i](%i) exit steal loop (2nd check, getVolume()==%i)\n", _my_rank, senderLocalId, getVolume());
 				break;
 			}
 
@@ -970,7 +983,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 			//Successful local steal
 			//store the steal data persistently in C++, such that C can keep operating on that memory segment
 			sweeper->work_received_from_steal = std::move(stolen_work);
-			LOG(V3_VERB, "SWEEP MSG [%i](%i) <==%i==== local  \n", _my_rank, localId, sweeper->work_received_from_steal.size(), _my_rank);
+			LOG(V3_VERB, "SWEEP MSG [%i](%i) <==%i==== localsteal direct  \n", _my_rank, localId, sweeper->work_received_from_steal.size(), _my_rank);
 			break;
 		}
 
@@ -1072,9 +1085,9 @@ void SweepJob::appendMetadataToReductionElement(std::vector<int> &contrib, int i
 	contrib.insert(contrib.end(), NUM_METADATA_FIELDS, 0); //Make space for the upcoming metadata, initialized with zero
 	int size = contrib.size();
 	int n=0;
-	n++; contrib[size - METADATA_TERMINATE]		= 0;  //dummy, will be set by root transformation, here just for completeness
-	n++; contrib[size - METADATA_SWEEP_ITERATION]   = 0;  //dummy, will be set by root transformation
-	n++; contrib[size - METADATA_SHARING_ROUND]   = 0;  //dummy, will be set by root transformation
+	n++; contrib[size - METADATA_TERMINATE]      = 0;  //dummy, will be set by root transformation, here just for completeness
+	n++; contrib[size - METADATA_SWEEP_ITERATION]= 0;  //dummy, ""
+	n++; contrib[size - METADATA_SHARING_ROUND]  = 0;  //dummy, ""
 	n++; contrib[size - METADATA_IDLE]       = is_idle;
 	n++; contrib[size - METADATA_UNIT_SIZE]  = unit_size;
 	n++; contrib[size - METADATA_EQ_SIZE]    = eq_size;
