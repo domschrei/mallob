@@ -224,7 +224,7 @@ public:
 
         if (_finished) return *this;
 
-        LOG(V4_VVER, "SWEEP advance() exp childs %i, recv %i (incl. local), local %i. childranks [%i],[%i]. recvd_left(%i), recvd_right(%i), aggregating %i, future_valid %i \n",
+        LOG(V4_VVER, "SWEEP advance() exp.childs=%i, recv=%i (incl. local), local=%i. childranks [%i],[%i]. (%i)recvd_left, (%i)recvd_right,  (%i)aggregating, (%i)future_valid \n",
             _num_expected_child_elems, _child_elems.size(), _local_elem.has_value(), _expected_child_ranks.first, _expected_child_ranks.second,
             _received_child_elems.first, _received_child_elems.second, _aggregating, _future_aggregate.valid());
         // if (_child_elems.size() > _num_expected_child_elems) {
@@ -238,6 +238,7 @@ public:
 
         if (_child_elems.size() == _num_expected_child_elems && _local_elem.has_value()) {
 
+            LOG(V4_VVER, "SWEEP RED queued agg\n");
             // LOG(V4_VVER, "SWEEP SHARE AGGR queuing aggregation thread\n");
             _child_elems.insert({-1, std::move(_local_elem.value())});
             _local_elem.reset();
@@ -246,11 +247,12 @@ public:
             _aggregating = true;
             _future_aggregate = ProcessWideThreadPool::get().addTask([&]() {
                 // LOG(V4_VVER, "SWEEP SHARE AGGR started own aggregation thread\n");
+                LOG(V4_VVER, "SWEEP RED started agg\n");
                 std::list<AllReduceElement> elemsList;
                 for (auto& childElem : _child_elems) elemsList.push_back(std::move(childElem.elem));
                 _aggregated_elem = _aggregator(elemsList);
                 _aggregating = false;
-                // LOG(V4_VVER, "SWEEP SHARE AGGR finished own aggregation thread\n");
+                LOG(V4_VVER, "SWEEP RED done agg\n");
             });
         }
 
@@ -259,7 +261,7 @@ public:
         if (!_aggregating && _future_aggregate.valid() && _parent_is_ready) {
             // Aggregation done
             // LOG(V5_DEBG, "CS got aggregation\n");
-            // LOG(V4_VVER, "SWEEP SHARE advancing to parent or broadcasting result\n");
+            // LOG(V4_VVER, "SWEEP RED advancing to parent or broadcasting \n");
 
             _future_aggregate.get();
             _reduction_locally_done = true;
@@ -275,7 +277,7 @@ public:
                 }
 
                 if (_broadcast_enabled) {// receive final elem and begin broadcast
-                    LOG(V3_VERB, "SWEEP SHARE broadcasting result \n");
+                    LOG(V3_VERB, "SWEEP RED broadcasting result \n");
                     receiveAndForwardFinalElem(std::move(_aggregated_elem.value()));
                 } else { // only receive final elem
                     receiveFinalElem(std::move(_aggregated_elem.value()));
@@ -285,7 +287,7 @@ public:
                 _base_msg.payload = std::move(_aggregated_elem.value());
                 _base_msg.treeIndexOfDestination = _parent_index;
                 _base_msg.contextIdOfDestination = _parent_ctx_id;
-                LOG(V3_VERB, "SWEEP [%i] advance ~~~%i~~~> to parent [%i]\n",_tree.nodeRank, _base_msg.payload.size(), _parent_rank);
+                LOG(V3_VERB, "SWEEP RED [%i] advance ~~~%i~~~> to parent [%i]\n",_tree.nodeRank, _base_msg.payload.size(), _parent_rank);
                 assert(_base_msg.contextIdOfDestination != 0);
                 MyMpi::isend(_parent_rank, MSG_JOB_TREE_MODULAR_REDUCE, _base_msg);
                 if (_care_about_parent_status) {

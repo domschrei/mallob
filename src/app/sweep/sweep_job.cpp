@@ -131,11 +131,11 @@ void SweepJob::appl_communicate() {
 	if (_bcast && _is_root && !_terminate_all)// Root: Update job tree snapshot in case your children changed
 		_bcast->updateJobTree(getJobTree());
 
-	printIdleFraction();
 
 	// LOG(V4_VVER, "jobcomm size %i, volume() %i \n", getJobComm().size(), getVolume());
 	if (getJobComm().size() < getVolume()) {
 		LOG(V4_VVER, "SWEEP [%i] Skip jobcomm size %i < volume %i: not starting with sharing yet \n", _my_rank, getJobComm().size(), getVolume());
+		printIdleFraction();
 		return;
 	}
 
@@ -147,6 +147,8 @@ void SweepJob::appl_communicate() {
 	checkSharingDelayHealth();
 
 	sendMPIWorkstealRequests();
+
+	printIdleFraction();
 
 	checkForUnsatResults();
 
@@ -740,8 +742,8 @@ void SweepJob::sendMPIWorkstealRequests() {
 		if (!request.sent) {
 			int senderLocalId = request.senderLocalId;
 
-			//It might be that there is again work locally available since the time the request has been filed
-			//Thus check first locally again for work before sending a more expensive MPI message
+			//First check locally again for work before sending a more expensive MPI message
+			//Because It might be that there is work available again since the time the request has been filed
 			auto stolen_work = stealWorkFromAnyLocalSolver(_my_rank, senderLocalId);
 			if ( ! stolen_work.empty()) {
 				request.stolen_work = std::move(stolen_work);
@@ -754,6 +756,7 @@ void SweepJob::sendMPIWorkstealRequests() {
 				continue;
 			}
 
+			//There was no local work available, now we prepare to send out an MPI message
 			int my_comm_rank = getJobComm().getWorldRankOrMinusOne(_my_index);
 			if (my_comm_rank == -1) {
 				LOG(V3_VERB, "SWEEP SKIP own rank [%i] (myindex %i) <ctx %i> not yet in JobComm of size %i \n", _my_rank, _my_index, _my_ctx_id, getJobComm().size());
@@ -999,7 +1002,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		//We deposit a request for an MPI message via shared memory, and the main MPI thread of this process will pick up the request and actually send it via MPI
 		//This extra step is necessary, because the thread is just "some" solver-thread and it can cause problems it it start sending MPI messages on it's own
 
-		LOG(V3_VERB, "SWEEP MSG [%i](%i) ----?---> req  \n", _my_rank, localId);
+		// LOG(V3_VERB, "SWEEP MSG [%i](%i) ----?---> req  \n", _my_rank, localId);
 		_worksteal_requests[localId].newBlankRequest(localId);
 
 		//Wait here until we hear back
@@ -1184,15 +1187,12 @@ void SweepJob::cbContributeToAllReduce() {
 
 void SweepJob::advanceAllReduction() {
 	if (!_red) return;
-	LOG(V4_VVER, "SWEEP [%i] advance() \n", _my_rank);
+	// LOG(V4_VVER, "SWEEP [%i] advance() \n", _my_rank);
 	//we always keep the global reduction advancing, independently of the state of the local solvers
 	_red->advance();
 	if (!_red->hasResult()) return;
 
-	// LOG(V3_VERB, "[sweep] all-reduction complete\n");
-	_time_receive_allred.push_back(Timer::elapsedSeconds());
-
-	//Extract shared data
+	//There is data from global aggregation, extract it
 	auto data = _red->extractResult();
 	const int terminate   = data[data.size()-METADATA_TERMINATE];
 	const int sweep_iteration = data[data.size()-METADATA_SWEEP_ITERATION];
@@ -1202,9 +1202,10 @@ void SweepJob::advanceAllReduction() {
 	const int eq_size     = data[data.size()-METADATA_EQ_SIZE];
 	assert(eq_size%2==0 || log_return_false("SWEEP ERROR: Import Equality size not even, but %i\n", eq_size));
 
+	_time_receive_allred.push_back(Timer::elapsedSeconds());
 
-	//in case our local solvers are not fully initialised yet, we ignore the global sharing data
-	//(we still read the metadata, just for informational warning/logging purposes )
+	//if our local solvers are not fully initialised yet we ignore the global sharing data
+	//but we still read the metadata to log itj
 	if (!_started_synchronized_solving && (eq_size>0 || unit_size>0))  {
 		LOG(V3_VERB, "SWEEP WARN [%i] (iter %i round %i): Skipping %i eqs, %i units bc local solvers are not all init'd yet \n", _my_rank, sweep_iteration, sharing_round, eq_size/2, unit_size);
 	}
@@ -1244,7 +1245,7 @@ void SweepJob::advanceAllReduction() {
 		}
 	}
 
-	LOG(V2_INFO, "SWEEP sweep iteration %i sharing round %i got: %i EQS, %i UNITS, all_idle(%i), term(%i). #locally idle: %i/%i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastIdleCount, _nThreads);
+	LOG(V2_INFO, "SWEEP RED iter(%i) round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)term. #locally idle: %i/%i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastIdleCount, _nThreads);
 
 	//prepare the next sharing round, which gets started from the root node
 	if (_is_root) {
