@@ -1119,7 +1119,7 @@ void SweepJob::cbContributeToAllReduce() {
 
 	JobMessage baseMsg = getMessageTemplate();
 	baseMsg.tag = TAG_ALLRED;
-	LOG(V4_VVER, "SWEEP [%i] RESET AllReduction, using bcast snapshot, to prepare contributing local data. \n", _my_rank);
+	LOG(V4_VVER, "SWEEP [%i] RED RESET AllReduction, using bcast snapshot, to prepare contributing local data. \n", _my_rank);
 	_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateEqUnitContributions));
 	if (_is_root)
 		_red->setInplaceTransformationOfElementAtRoot(_inplace_rootTransform);
@@ -1182,9 +1182,10 @@ void SweepJob::cbContributeToAllReduce() {
 void SweepJob::advanceAllReduction() {
 	if (!_red)
 		return;
-	LOG(V4_VVER, "SWEEP [%i] RED advance() \n", _my_rank);
 	//we always keep the global reduction advancing, independently of the state of the local solvers
 	_red->advance();
+
+	LOG(V4_VVER, "SWEEP [%i] SHARE hasResult() %i \n", _red->hasResult());
 	if (!_red->hasResult())
 		return;
 
