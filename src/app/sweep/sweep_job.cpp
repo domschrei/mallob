@@ -87,9 +87,13 @@ void SweepJob::appl_start() {
 	_resweeps_out = std::vector<int>(_nThreads, -1);
 
 	//To randomize workstealing on a rank level, we will shuffle the localIds to determine read order
-	for (int localId=0; localId < _nThreads; ++localId) {
+
+	std::ostringstream oss;
+	for (int localId=0; localId < _nThreads; localId++) {
 		_list_of_ids.push_back(localId);
+		oss << "," << localId;
 	}
+	LOG(V2_INFO,"SWEEP LIST_OF_LOCAL_IDS: %s \n", oss.str().c_str());
 
 	//Will hold pointers to the kissat solvers
 	_sweepers.resize(_nThreads);
@@ -945,9 +949,6 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 
 	//setting this sweeper to idle is no longer done directly here, because it caused a race condition for the very first solver that was marked idle while it was receiving the initial work
 
-	if (_is_root && localId==_representative_localId) {
-		LOG(V3_VERB, "SWEEP [%i](%i) searching work \n", _my_rank, localId);
-	}
 	//This is a fake loop, we only traverse it once. we use the loop syntax to easily allow us to break out at several points and jump to the bottom, i.e. makeshift gotos
 	while (true) {
 		if (_terminate_all) {
