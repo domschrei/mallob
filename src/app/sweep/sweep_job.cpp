@@ -127,35 +127,17 @@ void SweepJob::appl_start() {
 void SweepJob::appl_communicate() {
 	LOG(V5_DEBG, "SWEEP appl_communicate() \n");
 
-
-	if (_bcast && _is_root && !_terminate_all)// Root: Update job tree snapshot in case your children changed
+	if (_bcast && _is_root && !_terminate_all)
 		_bcast->updateJobTree(getJobTree());
 
+	advanceAllReduction(); //always advance
+	TryWorkstealLocal();
+	TryWorkstealMPI();
+	rootInitiateNewSharingRound();
 
-	if (getJobComm().size() < getVolume() || !_started_synchronized_solving) {
-		LOG(V4_VVER, "SWEEP [%i] Skip appl_communicate: Jobcomm size %i <= volume %i and/or started only %i/%i solvers \n", _my_rank, getJobComm().size(), getVolume(), _started_sweepers_count.load(), _nThreads);
-		printIdleFraction();
-		return;
-	}
-
-	if (!_started_communication) {
-		_started_communication = true;
-		LOG(V3_VERB, "SWEEP [%i] started communicating with other ranks \n", _my_rank);
-	}
-
-	checkSharingDelayHealth();
-
-	sendMPIWorkstealRequests();
-
+	checkSharingDelay();
 	printIdleFraction();
-
 	checkForUnsatResults();
-
-	if (_is_root && ! _terminate_all)
-		initiateNewSharingRound();
-
-	advanceAllReduction();
-
 	LOG(V5_DEBG, "SWEEP appl_communicate() done \n");
 }
 
@@ -256,20 +238,6 @@ void SweepJob::appl_memoryPanic() {
 }
 
 bool SweepJob::appl_isDestructible() {
-
-	// if (_red) {
-		// LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? no. _red active \n",  getId(),_my_rank);
-		// return false;
-	// }
-	// if (_bcast && _bcast->hasReceivedBroadcast()) {
-		// LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? no. _bcast active \n",  getId(),_my_rank);
-		// return false;
-	// }
-
-	// if (! _finished_job_setup) {
-		// LOG(V2_INFO, "SWEEP TERM #%i [%i] isDestructible? no. Job Setup not even finished \n",  getId(),_my_rank);
-		// return false;
-	// }
 
 	int _running_sweepers = _started_sweepers_count - _finished_sweepers_count;
 	if (_finished_sweepers_count < _nThreads) {
@@ -684,7 +652,7 @@ void SweepJob::printIdleFraction() {
 		// LOG(V3_VERB, "SWEEP Active %i, Running %i, Idle %i, Started %i. idle nrs: %s \n", active, _running_sweepers_count.load(), idles,  _started_sweepers_count.load(), oss.str().c_str());
 }
 
-void SweepJob::checkSharingDelayHealth() {
+void SweepJob::checkSharingDelay() {
 	if (_terminate_all) return;
 	if (!_started_synchronized_solving) return;
 
@@ -698,17 +666,28 @@ void SweepJob::checkSharingDelayHealth() {
 		if (delay > period*MAX_DELAY_FACTOR) {
 			//We log two times. Once in the main log file to see the information chronologically correct interleaved with the other logs
 			//and onces separately in a .warn file for faster grepping during post-processing, where we would like to avoid to grep through the main logs
-			LOG(				V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since last contribution (target period %f sec), delay factor %.1f \n", _my_rank, delay, period, delay/period);
-			LOGGER(_warnlogger, V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since last contribution (target period %f sec), delay factor %.1f \n", _my_rank, delay, period, delay/period);
+			LOG(				V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since contrib, factor %.1f \n", _my_rank, delay, delay/period);
+			LOGGER(_warnlogger, V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since contrib, factor %.1f \n", _my_rank, delay, delay/period);
 		}
 	}
 	if (!_time_receive_allred.empty()) {
 		float delay = time - _time_receive_allred.back();
 		if (delay > period*MAX_DELAY_FACTOR) {
-			LOG(			    V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since last receiving	 (target period %f sec), delay factor %.1f \n", _my_rank, delay, period, delay/period);
-			LOGGER(_warnlogger, V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since last receiving	 (target period %f sec), delay factor %.1f \n", _my_rank, delay, period, delay/period);
+			LOG(			    V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since recv, factor %.1f \n", _my_rank, delay, delay/period);
+			LOGGER(_warnlogger, V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since recv, factor %.1f \n", _my_rank, delay, delay/period);
 		}
 	}
+}
+
+bool SweepJob::okToTrackSharingDelay() {
+	//we would get false positives if we already start timing when the solvers haven't even started yet
+	if (!_started_synchronized_solving)
+		return false;
+	//we also would get false positive if the solvers have technically started, but haven't received any initial work yet
+	//this second consideration only works at the root node, the other nodes don't have such a live update whether the work for this iteration has been provided yet
+	if (_is_root && !_root_provided_initial_work)
+		return false;
+	return true;
 }
 
 void SweepJob::printResweeps() {
@@ -733,16 +712,13 @@ void SweepJob::printResweeps() {
 	LOGGER(_reslogger, V3_VERB, "[%i] SWEEP_RESWEEPS_OUT %i \n", _my_rank, resweeps_out);
 }
 
-void SweepJob::sendMPIWorkstealRequests() {
+void SweepJob::TryWorkstealLocal() {
 	if (_terminate_all) return;
-	//Worksteal requests need to be send by the MPI *main* thread, as it can be problematic if the kissat-threads themselves issue MPI messages on their own, since this clashes somehow with the MPI structure/hierarchy
-	//Instead, the solver-threads write a request in the shared memory, and the main MPI thread picks up the request and sends it
+	//We try to find local work for the requests, if it succeeds it avoids any MPI messaging
+	//Can find work if new local work appeared from the time the request was posted to now
 	for (auto &request : _worksteal_requests) {
 		if (!request.sent) {
 			int senderLocalId = request.senderLocalId;
-
-			//First check locally again for work before sending a more expensive MPI message
-			//Because It might be that there is work available again since the time the request has been filed
 			auto stolen_work = stealWorkFromAnyLocalSolver(_my_rank, senderLocalId);
 			if ( ! stolen_work.empty()) {
 				request.stolen_work = std::move(stolen_work);
@@ -752,8 +728,24 @@ void SweepJob::sendMPIWorkstealRequests() {
 				request.targetIndex = _my_index;
 				//Successful local steal
 				LOG(V3_VERB, "SWEEP MSG [%i](%i) <==%i==== localsteal via mainthread  \n", _my_rank, senderLocalId, request.stolen_work.size());
-				continue;
 			}
+		}
+	}
+}
+
+void SweepJob::TryWorkstealMPI() {
+	if (_terminate_all) return;
+
+	if (getJobComm().size() < getVolume()) {
+		LOG(V4_VVER, "SWEEP [%i] Skip MPI workstealing, jobcomm size %i < volume %i\n", _my_rank, getJobComm().size(), getVolume());
+		return;
+	}
+
+	//Worksteal requests need to be send by the MPI *main* thread, as it can be problematic if the kissat-threads themselves issue MPI messages on their own, since this clashes somehow with the MPI structure/hierarchy
+	//Each solver-thread writes a request in the shared memory, and the main MPI thread picks up the request and sends it
+	for (auto &request : _worksteal_requests) {
+		if (!request.sent) {
+			int senderLocalId = request.senderLocalId;
 
 			//There was no local work available, now we prepare to send out an MPI message
 			int my_comm_rank = getJobComm().getWorldRankOrMinusOne(_my_index);
@@ -1051,7 +1043,12 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 	//The thread now returns to the kissat solver
 }
 
-void SweepJob::initiateNewSharingRound() {
+void SweepJob::rootInitiateNewSharingRound() {
+	if (!_is_root)
+		return;
+	if (_terminate_all)
+		return;
+
 	assert(_is_root); //only the root node initiates sharing rounds
 	if (!_bcast) {
 		LOG(V1_WARN, "SWEEP WARN : SHARE BCAST root couldn't initiate sharing round, _bcast is Null\n");
@@ -1071,7 +1068,7 @@ void SweepJob::initiateNewSharingRound() {
 	//make sure that only one sharing operation is going on at a time
 	//on this root node, hasReceivedBroadcast is equivalent to asking whether this _bcast object has already started a broadcast
 	if (_bcast->hasReceivedBroadcast()) {
-		LOG(V3_VERB, "SWEEP root: Delaying next sharing round, old one is not completed yet\n");
+		LOG(V3_VERB, "SWEEP root: Delaying new sharing round, old round is still ongoing\n");
 		return;
 	}
 	//Broadcast a ping to all workers to initiate an AllReduce
@@ -1175,9 +1172,8 @@ void SweepJob::cbContributeToAllReduce() {
 		return;
 	}
 
-	if (_started_synchronized_solving) {
+	if (okToTrackSharingDelay()) {
 		_time_contributed.push_back(Timer::elapsedSeconds());
-		//we dont want to track this contribution if it just a dummy element (solvers havent stared yet), it can cause fake Sharedelay warnings
 	}
 
 	_red->contribute(std::move(aggregation_element));
@@ -1185,11 +1181,13 @@ void SweepJob::cbContributeToAllReduce() {
 }
 
 void SweepJob::advanceAllReduction() {
-	if (!_red) return;
+	if (!_red)
+		return;
 	// LOG(V4_VVER, "SWEEP [%i] advance() \n", _my_rank);
 	//we always keep the global reduction advancing, independently of the state of the local solvers
 	_red->advance();
-	if (!_red->hasResult()) return;
+	if (!_red->hasResult())
+		return;
 
 	//There is data from global aggregation, extract it
 	auto data = _red->extractResult();
@@ -1201,17 +1199,18 @@ void SweepJob::advanceAllReduction() {
 	const int eq_size     = data[data.size()-METADATA_EQ_SIZE];
 	assert(eq_size%2==0 || log_return_false("SWEEP ERROR: Import Equality size not even, but %i\n", eq_size));
 
-	_time_receive_allred.push_back(Timer::elapsedSeconds());
 
-	//if our local solvers are not fully initialised yet we ignore the global sharing data
-	//but we still read the metadata to log itj
 	if (!_started_synchronized_solving && (eq_size>0 || unit_size>0))  {
 		LOG(V3_VERB, "SWEEP WARN [%i] (iter %i round %i): Skipping %i eqs, %i units bc local solvers are not all init'd yet \n", _my_rank, sweep_iteration, sharing_round, eq_size/2, unit_size);
 	}
 
-	if (!_started_synchronized_solving) return;
+	//if our local solvers are not fully initialised yet we ignore the global sharing data
+	//but we still read the metadata before to log it
+	if (!_started_synchronized_solving)
+		return;
 
-
+	if (okToTrackSharingDelay())
+		_time_receive_allred.push_back(Timer::elapsedSeconds());
 
 
 	if (eq_size > MAX_IMPORT_SIZE) {

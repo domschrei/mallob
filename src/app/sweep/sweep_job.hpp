@@ -269,7 +269,8 @@ private:
 	void createAndStartNewSweeper(int localId);
     void loadFormula(KissatPtr sweeper);
 
-	void checkSharingDelayHealth();
+	bool okToTrackSharingDelay();
+	void checkSharingDelay();
 	void checkForUnsatResults();
 	void tryReportUnsat();
 	void reportSolverResult(KissatPtr sweeper, int res);
@@ -281,11 +282,13 @@ private:
 	void triggerTerminations();
 
 
-	void sendMPIWorkstealRequests();
+
+	void TryWorkstealLocal();
+	void TryWorkstealMPI();
 	void printIdleFraction();
 	void printResweeps();
 
-    void initiateNewSharingRound();
+    void rootInitiateNewSharingRound();
     void cbContributeToAllReduce();
     static std::vector<int> aggregateEqUnitContributions(std::list<std::vector<int>> &contribs);
 	static void appendMetadataToReductionElement(std::vector<int> &contrib, int is_idle, int unit_size, int eq_size);
