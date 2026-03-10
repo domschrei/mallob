@@ -733,13 +733,13 @@ void SweepJob::TryWorkstealLocal() {
 	}
 }
 
+bool SweepJob::skipForNowMPI() {
+	return (getJobComm().size() < getVolume());
+	// LOG(V4_VVER, "SWEEP [%i] Skip MPI workstealing, jobcomm size %i < volume %i\n", _my_rank, getJobComm().size(), getVolume());
+}
+
 void SweepJob::TryWorkstealMPI() {
 	if (_terminate_all) return;
-
-	if (getJobComm().size() < getVolume()) {
-		LOG(V4_VVER, "SWEEP [%i] Skip MPI workstealing, jobcomm size %i < volume %i\n", _my_rank, getJobComm().size(), getVolume());
-		return;
-	}
 
 	//Worksteal requests need to be send by the MPI *main* thread, as it can be problematic if the kissat-threads themselves issue MPI messages on their own, since this clashes somehow with the MPI structure/hierarchy
 	//Each solver-thread writes a request in the shared memory, and the main MPI thread picks up the request and sends it
@@ -747,18 +747,21 @@ void SweepJob::TryWorkstealMPI() {
 		if (!request.sent) {
 			int senderLocalId = request.senderLocalId;
 
+			//if we are still in the phase where MPI sends are not done, we short-fuse the requests to a zero dummy and return them to the solver threads
+			//same if the whole job is terminated
+			if (skipForNowMPI() || _terminate_all || getVolume()==0) {
+				request.stolen_work = {};
+				request.sent = true;
+				request.got_steal_response = true;
+				// LOG(V3_VERB, "SWEEP [%i](%i) exit steal loop (2nd check, getVolume()==%i)\n", _my_rank, senderLocalId, getVolume());
+				break;
+			}
+
 			//There was no local work available, now we prepare to send out an MPI message
 			int my_comm_rank = getJobComm().getWorldRankOrMinusOne(_my_index);
 			if (my_comm_rank == -1) {
 				LOG(V3_VERB, "SWEEP SKIP own rank [%i] (myindex %i) <ctx %i> not yet in JobComm of size %i \n", _my_rank, _my_index, _my_ctx_id, getJobComm().size());
 				continue;
-			}
-			if (_terminate_all || getVolume()==0) {
-				request.stolen_work = {};
-				request.sent = true;
-				request.got_steal_response = true;
-				LOG(V3_VERB, "SWEEP [%i](%i) exit steal loop (2nd check, getVolume()==%i)\n", _my_rank, senderLocalId, getVolume());
-				break;
 			}
 
 			assert(getVolume()>=1 || log_return_false("SWEEP ERROR [%i](%i) in workstealing: getVolume()==%i, i.e. no volume available to steal from\n", _my_rank, senderLocalId, getVolume()));
@@ -961,13 +964,13 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 			break;
 		}
 
-		//Skip stealing if there hasn't been work provided, would be pointless to search for it
-		//Furthermore, serve initial work to the representative solver (typically localId 0) at the root node.
-		//This is hardcoded to prevent any concurrency problems that would occur if the representative solver would be deduced during runtime. the [root](0) solver is always assumed to exist
+		//Serve initial work to the representative solver (typically localId 0 at the root node)
+		//This solver selection is hardcoded to prevent any concurrency problems. solver [root](0) is assumed to always exist
 		if (_is_root && ! _root_provided_initial_work) {
 			if (localId==_representative_localId) {
 				provideInitialWork(sweeper);
 			}
+			//Skip stealing if there hasn't been any work provided yet, would be pointless to search for it
 			break;
 		}
 
@@ -985,10 +988,10 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		}
 
 
-		if ( ! _started_communication) {
-			LOG(V3_VERB, "SWEEP [%i](%i) Skip MPI request, not communicating yet\n", _my_rank, localId);
-			break;
-		}
+		// if ( ! _started_communication) {
+			// LOG(V3_VERB, "SWEEP [%i](%i) Skip MPI request, not communicating yet\n", _my_rank, localId);
+			// break;
+		// }
 		//Second strategy: steal globally via MPI
 		//We deposit a request for an MPI message via shared memory, and the main MPI thread of this process will pick up the request and actually send it via MPI
 		//This extra step is necessary, because the thread is just "some" solver-thread and it can cause problems it it start sending MPI messages on it's own
@@ -1033,13 +1036,9 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 	*work_size = sweeper->work_received_from_steal.size();
 	assert(*work_size>=0);
 	if (*work_size>0) {
-		// LOG(V3_VERB, "SWEEP [%i](%i) received %i work \n", _my_rank, localId, *work_size);
-		sweeper->sweeper_is_idle = false; //we keep solver marked as "idle" once the whole solving is terminated, otherwise race-conditions can occur where suddenly the solver is treated as active again
+		sweeper->sweeper_is_idle = false;
+		//we keep solver marked as "idle" once the whole solving is terminated, otherwise race-conditions can occur where suddenly the solver is treated as active again
 	}
-	//update: we no longer send the termination information via this worksteal callback, but separately
-	// if (_terminate_all) {
-		// LOG(V3_VERB, "SWEEP [%i](%i) returning to solver with termination info\n", _my_rank, localId);
-	// }
 	//The thread now returns to the kissat solver
 }
 
