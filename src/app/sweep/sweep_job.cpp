@@ -62,8 +62,6 @@ void SweepJob::appl_start() {
 
 	LOG(V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d, NumVars %i, NumClauses %i\n",
 		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _nThreads, numVars, numClauses);
-	// LOG(V2_INFO,"SWEEP JOB sweep-sharing-period: %i ms\n", _params.sweepSharingPeriod_ms.val);
-	// LOG(V2_INFO, "New SweepJob rank %i working on %i vars in %i clauses \n", getJobTree().getRank(), );
     _metadata = getSerializedDescription(0)->data();
 	_start_sweep_timestamp = Timer::elapsedSeconds();
 	_root_last_sharing_start_timestamp = Timer::elapsedSeconds();
@@ -72,12 +70,10 @@ void SweepJob::appl_start() {
     _warnlogger = Logger::getMainInstance().copy("<WARN>", ".warn");
 
 	_worksteal_requests.resize(_nThreads);
-
 	//do not send the initial placeholder worksteal requests
 	for (auto &request : _worksteal_requests) {
 		request.sent = true;
 	}
-
 	//pre-allocate a fixed array from where solver can concurrently import the received equalities and units
 	_EQS_to_import.resize(MAX_IMPORT_SIZE);
 	_UNITS_to_import.resize(MAX_IMPORT_SIZE);
@@ -86,8 +82,7 @@ void SweepJob::appl_start() {
 	_resweeps_in = std::vector<int>(_nThreads, -1);
 	_resweeps_out = std::vector<int>(_nThreads, -1);
 
-	//To randomize workstealing on a rank level, we will shuffle the localIds to determine read order
-
+	//To randomize workstealing on a given rank, we create a list of all ids that will be then shuffled each time
 	std::ostringstream oss;
 	for (int localId=0; localId < _nThreads; localId++) {
 		_list_of_ids.push_back(localId);
@@ -113,19 +108,19 @@ void SweepJob::appl_start() {
 		createAndStartNewSweeper(localId);
 	}
 
-	//might as well already set some result metadata information now
+	//set some general metadata information
 	_internal_result.id = getId();
 	_internal_result.revision = getRevision();
 
 	LOG(V2_INFO, "SWEEP appl_start() FINISHED\n");
-	// _finished_job_setup = true;
 }
 
 
 
-// Called periodically by the main thread to allow the worker to emit messages.
+// Called periodically by the main thread to allow the worker to emit messages. Must exit quickly.
 void SweepJob::appl_communicate() {
 	LOG(V5_DEBG, "SWEEP appl_communicate() \n");
+	float t0 = Timer::elapsedSeconds();
 
 	if (_bcast && _is_root && !_terminate_all)
 		_bcast->updateJobTree(getJobTree());
@@ -138,6 +133,9 @@ void SweepJob::appl_communicate() {
 	checkSharingDelay();
 	printIdleFraction();
 	checkForUnsatResults();
+
+	float t1 = Timer::elapsedSeconds();
+	LOG(V4_VVER, "SWEEP appl_communicate(): %.3f ms \n", (t1-t0)*1000.0);
 	LOG(V5_DEBG, "SWEEP appl_communicate() done \n");
 }
 
@@ -654,32 +652,34 @@ void SweepJob::printIdleFraction() {
 
 void SweepJob::checkSharingDelay() {
 	if (_terminate_all) return;
-	if (!_started_synchronized_solving) return;
+	// if (!_started_synchronized_solving) return;
 
 	constexpr float MAX_DELAY_FACTOR = 6;
 	constexpr float WARNING_PERIOD = 0.5;
 	float time = Timer::elapsedSeconds();
 
-	float period = _params.sweepSharingPeriod.val;
+	float expected_period = _params.sweepSharingPeriod.val; //in seconds
 	if (!_time_contributed.empty()) {
 		float delay = time - _time_contributed.back();
-		if (delay > period*MAX_DELAY_FACTOR) {
+		if (delay > expected_period*MAX_DELAY_FACTOR) {
 			//We log two times. Once in the main log file to see the information chronologically correct interleaved with the other logs
 			//and onces separately in a .warn file for faster grepping during post-processing, where we would like to avoid to grep through the main logs
-			LOG(				V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since contrib, factor %.1f \n", _my_rank, delay, delay/period);
-			LOGGER(_warnlogger, V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since contrib, factor %.1f \n", _my_rank, delay, delay/period);
+			LOG(				V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since contrib, factor %.1f \n", _my_rank, delay, delay/expected_period);
+			LOGGER(_warnlogger, V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since contrib, factor %.1f \n", _my_rank, delay, delay/expected_period);
 		}
 	}
 	if (!_time_receive_allred.empty()) {
 		float delay = time - _time_receive_allred.back();
-		if (delay > period*MAX_DELAY_FACTOR) {
-			LOG(			    V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since recv, factor %.1f \n", _my_rank, delay, delay/period);
-			LOGGER(_warnlogger, V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since recv, factor %.1f \n", _my_rank, delay, delay/period);
+		if (delay > expected_period*MAX_DELAY_FACTOR) {
+			LOG(			    V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since recv, factor %.1f \n", _my_rank, delay, delay/expected_period);
+			LOGGER(_warnlogger, V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since recv, factor %.1f \n", _my_rank, delay, delay/expected_period);
 		}
 	}
 }
 
 bool SweepJob::okToTrackSharingDelay() {
+	return true; //with always advance it should no longer be an issue to also immediately track any sharings...
+
 	//we would get false positives if we already start timing when the solvers haven't even started yet
 	if (!_started_synchronized_solving)
 		return false;
@@ -727,7 +727,7 @@ void SweepJob::TryWorkstealLocal() {
 				request.targetRank = _my_rank; //just for cleaner logging
 				request.targetIndex = _my_index;
 				//Successful local steal
-				LOG(V3_VERB, "SWEEP MSG [%i](%i) <==%i==== localsteal via mainthread  \n", _my_rank, senderLocalId, request.stolen_work.size());
+				LOG(V3_VERB, "SWEEP [%i](%i) <==%i==== localsteal via mainthread  \n", _my_rank, senderLocalId, request.stolen_work.size());
 			}
 		}
 	}
@@ -1199,18 +1199,16 @@ void SweepJob::advanceAllReduction() {
 	const int eq_size     = data[data.size()-METADATA_EQ_SIZE];
 	assert(eq_size%2==0 || log_return_false("SWEEP ERROR: Import Equality size not even, but %i\n", eq_size));
 
-
-	if (!_started_synchronized_solving && (eq_size>0 || unit_size>0))  {
-		LOG(V3_VERB, "SWEEP WARN [%i] (iter %i round %i): Skipping %i eqs, %i units bc local solvers are not all init'd yet \n", _my_rank, sweep_iteration, sharing_round, eq_size/2, unit_size);
-	}
-
-	//if our local solvers are not fully initialised yet we ignore the global sharing data
-	//but we still read the metadata before to log it
-	if (!_started_synchronized_solving)
-		return;
-
 	if (okToTrackSharingDelay())
 		_time_receive_allred.push_back(Timer::elapsedSeconds());
+
+	//if our local solvers are not fully initialised yet we ignore the global sharing data
+	if (!_started_synchronized_solving) {
+		if (eq_size>0 || unit_size>0)  {
+			LOG(V3_VERB, "SWEEP WARN [%i] (iter %i round %i): Skipping %i eqs, %i units bc local solvers are not all init'd yet \n", _my_rank, sweep_iteration, sharing_round, eq_size/2, unit_size);
+		}
+		return;
+	}
 
 
 	if (eq_size > MAX_IMPORT_SIZE) {
@@ -1238,7 +1236,7 @@ void SweepJob::advanceAllReduction() {
 	if (!_terminate_all && sweep_iteration <= _params.sweepMaxGrowthIteration.val) { //when sweepers are already being deleted we don't want to risk a segfault looping over them...
 		for (auto &sweeper : _sweepers) {
 			if (sweeper) {
-				shweep_set_sweep_round(sweeper->solver, sweep_iteration);
+				shweep_set_sweep_iteration(sweeper->solver, sweep_iteration);
 			}
 		}
 	}
