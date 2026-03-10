@@ -49,6 +49,7 @@ private:
     bool _aggregated_logging = false; //just for logging purposes
     bool _have_unanswered_returnToSender=false;
     std::vector<int> _returnToSender_payload{};
+    int _returnToSender_counter=0;
 
     std::future<void> _future_aggregate;
     std::function<AllReduceElement(std::list<AllReduceElement>&)> _aggregator;
@@ -185,7 +186,8 @@ private:
         if (!accept) return false;
 
         if (msg.returnedToSender) {
-            LOG(V1_WARN, "WARN RED REDUCE returnedToSender (source %i, tag %i, msg.tag %i, msg.size %i)\n", source, tag, msg.tag, msg.payload.size());
+            _returnToSender_counter++;
+            LOG(V1_WARN, "WARN RED REDUCE : got %i-th returnedToSender (source %i, tag %i, msg.tag %i, msg.size %i)\n", _returnToSender_counter, source, tag, msg.tag, msg.payload.size());
             _returnToSender_payload = std::move(msg.payload);
             _have_unanswered_returnToSender = true;
             return true;
@@ -245,7 +247,7 @@ public:
 
         //We resolve this problem by remembering a returnToSender error at the child, and retrying to sending it again
         if (_have_unanswered_returnToSender) {
-            LOG(V1_WARN, "WARN SWEEP RED retrying to send to parent again after last returnedToSender \n");
+            LOG(V1_WARN, "WARN RED : sending %i-th fixing message to parent after returnedToSender \n", _returnToSender_counter);
             _base_msg.payload = std::move(_returnToSender_payload);
             _base_msg.treeIndexOfDestination = _parent_index;
             _base_msg.contextIdOfDestination = _parent_ctx_id;
