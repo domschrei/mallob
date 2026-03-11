@@ -64,7 +64,9 @@ void SweepJob::appl_start() {
 		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _nThreads, numVars, numClauses);
     _metadata = getSerializedDescription(0)->data();
 	_start_sweep_timestamp = Timer::elapsedSeconds();
-	_root_last_sharing_start_timestamp = Timer::elapsedSeconds();
+
+	_root_time_start_bcast.push_back(Timer::elapsedSeconds());
+	// _root_last_sharing_start_timestamp = Timer::elapsedSeconds();
 
     _reslogger = Logger::getMainInstance().copy("<RESULT>", ".sweep");
     _warnlogger = Logger::getMainInstance().copy("<WARN>", ".warn");
@@ -135,6 +137,7 @@ void SweepJob::appl_communicate() {
 	checkForUnsatResults();
 
 	float t1 = Timer::elapsedSeconds();
+	_appl_communicate_duration.push_back(t1-t0);
 	LOG(V4_VVER, "SWEEP appl_communicate(): %.6f sec \n", (t1-t0));
 	LOG(V5_DEBG, "SWEEP appl_communicate() done \n");
 }
@@ -585,24 +588,24 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 		static const int DURATION_WARN_FACTOR=2;
 		float latency_sum=0, latency_avg=0, period_sum=0, period_avg=0;
 		std::vector<float> latencies;
-		for (int i=0; i < _time_start_bcast.size() && i < _time_receive_allred.size(); i++) {
-			latencies.push_back(_time_receive_allred[i]-_time_start_bcast[i]);
+		for (int i=0; i < _root_time_start_bcast.size() && i < _time_receive_allred.size(); i++) {
+			latencies.push_back(_time_receive_allred[i]-_root_time_start_bcast[i]);
 			latency_sum += latencies.back();
 		}
 		if (!latencies.empty()) {
 			latency_avg = latency_sum/latencies.size();
 		}
-		if (_time_start_bcast.size()>1) {
-			period_sum = _time_start_bcast.back() - _time_start_bcast.front();
-			period_avg = period_sum / (_time_start_bcast.size()-1);
+		if (_root_time_start_bcast.size()>1) {
+			period_sum = _root_time_start_bcast.back() - _root_time_start_bcast.front();
+			period_avg = period_sum / (_root_time_start_bcast.size()-1);
 		}
 		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_LATENCY     %.4f sec (average) \n",latency_avg);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_PERIOD_REAL %.4f sec (average) \n",period_avg);
 
 
-		if (_time_start_bcast.size()>1) {
-			for (int i=0; i < _time_start_bcast.size()-1; i++) {
-				float period = _time_start_bcast[i+1] - _time_start_bcast[i];
+		if (_root_time_start_bcast.size()>1) {
+			for (int i=0; i < _root_time_start_bcast.size()-1; i++) {
+				float period = _root_time_start_bcast[i+1] - _root_time_start_bcast[i];
 				if (period > DURATION_WARN_FACTOR*period_avg) {
 					LOGGER(_reslogger,V2_INFO, "[WARN] SWEEP_SHARING_PERIOD_REAL %.4f sec   (in share round %i) is much larger than average \n", period, i);
 				}
@@ -1049,32 +1052,38 @@ void SweepJob::rootInitiateNewSharingRound() {
 		return;
 
 	assert(_is_root); //only the root node initiates sharing rounds
+
 	if (!_bcast) {
 		LOG(V1_WARN, "SWEEP WARN : SHARE BCAST root couldn't initiate sharing round, _bcast is Null\n");
 		return;
 	}
 
-	if (Timer::elapsedSeconds() < _root_last_sharing_start_timestamp + _params.sweepSharingPeriod.val) {
+	if (Timer::elapsedSeconds() < _root_time_start_bcast.back() + _params.sweepSharingPeriod.val) {
 		//not yet time for next sharing round
 		return;
 	}
 
 	if (!_started_synchronized_solving) {
-		LOG(V3_VERB, "SWEEP root: Delaying first sharing round, not all solvers online yet (%i/%i) \n", _started_sweepers_count.load(), _nThreads);
+		LOG(V3_VERB, "SWEEP root: Delay first round, not all solvers online yet (%i/%i) \n", _started_sweepers_count.load(), _nThreads);
+		return;
+	}
+
+	if (! _root_provided_initial_work) {
+		LOG(V3_VERB, "SWEEP root: Wait next round, initial work not provided yet\n");
 		return;
 	}
 
 	//make sure that only one sharing operation is going on at a time
 	//on this root node, hasReceivedBroadcast is equivalent to asking whether this _bcast object has already started a broadcast
 	if (_bcast->hasReceivedBroadcast()) {
-		LOG(V3_VERB, "SWEEP root: Delaying new sharing round, old round is still ongoing\n");
+		LOG(V3_VERB, "SWEEP root: Delay next round, current %i still ongoing\n", _root_sharing_round);
 		return;
 	}
 	//Broadcast a ping to all workers to initiate an AllReduce
 	//The broadcast includes all workers currently reachable by the root-node and informs them about their parent and potential children
 	//It then causes the leaf nodes to call the callback, initiating the AllReduce
-	_root_last_sharing_start_timestamp = Timer::elapsedSeconds();
-	_time_start_bcast.push_back(_root_last_sharing_start_timestamp);
+	// _root_last_sharing_start_timestamp = Timer::elapsedSeconds();
+	_root_time_start_bcast.push_back(Timer::elapsedSeconds());
 	LOG(V3_VERB, "SWEEP root: Initiating new sharing round via modular broadcast\n");
 	JobMessage msg = getMessageTemplate();
 	msg.tag = _bcast->getMessageTag();
@@ -1190,7 +1199,7 @@ void SweepJob::advanceAllReduction() {
 		return;
 	//always keep the global reduction advancing, independently of the state of the local solvers
 	_red->advance();
-	LOG(V4_VVER, "SWEEP [%i] SHARE hasResult() %i \n", _my_rank, _red->hasResult());
+	// LOG(V4_VVER, "SWEEP [%i] SHARE hasResult() %i \n", _my_rank, _red->hasResult());
 	if (_red->hasResult()) {
 		extractAllReductionResult();
 	}

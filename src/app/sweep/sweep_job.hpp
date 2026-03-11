@@ -49,9 +49,10 @@ private:
 
 	//Timing
 	float _start_sweep_timestamp;
-	std::vector<float> _time_start_bcast;
+	std::vector<float> _root_time_start_bcast;
 	std::vector<float> _time_receive_allred;
 	std::vector<float> _time_contributed;
+	std::vector<float> _appl_communicate_duration;
 
 	//Workstealing
 	SplitMix64Rng _rng;
@@ -78,7 +79,7 @@ private:
 
 
 	//Sharing Equivalences and Units
-	float _root_last_sharing_start_timestamp;
+	// float _root_last_sharing_start_timestamp;
     std::unique_ptr<JobTreeBroadcast> _bcast;
     std::unique_ptr<JobTreeAllReduction> _red;
 
