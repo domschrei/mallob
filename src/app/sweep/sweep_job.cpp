@@ -715,26 +715,6 @@ void SweepJob::printResweeps() {
 	LOGGER(_reslogger, V3_VERB, "[%i] SWEEP_RESWEEPS_OUT %i \n", _my_rank, resweeps_out);
 }
 
-// void SweepJob::TryWorkstealLocal() {
-	// if (_terminate_all) return;
-	//We try to find local work for the requests, if it succeeds it avoids any MPI messaging
-	//Can find work if new local work appeared from the time the request was posted to now
-	// for (auto &request : _worksteal_requests) {
-		// if (!request.sent) {
-			// int senderLocalId = request.senderLocalId;
-			// auto stolen_work = stealWorkFromAnyLocalSolver(_my_rank, senderLocalId);
-			// if ( ! stolen_work.empty()) {
-				// request.stolen_work = std::move(stolen_work);
-				// request.sent = true;
-				// request.got_steal_response = true;
-				// request.targetRank = _my_rank; //just for cleaner logging
-				// request.targetIndex = _my_index;
-				// Successful local steal
-				// LOG(V3_VERB, "SWEEP [%i](%i) <==%i==== localsteal via mainthread  \n", _my_rank, senderLocalId, request.stolen_work.size());
-			// }
-		// }
-	// }
-// }
 
 bool SweepJob::skip_MPI_forNow() {
 	return (getJobComm().size() < getVolume());
@@ -991,7 +971,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	if ( ! stolen_work.empty()) {
 		//Successful local steal
 		sweeper->work_received_from_steal = std::move(stolen_work);
-		LOG(V3_VERB, "SWEEP MSG [%i](%i) <==%i==== localsteal direct  \n", _my_rank, localId, sweeper->work_received_from_steal.size(), _my_rank);
+		LOG(V3_VERB, "SWEEP lcl [%i](%i) <==%i==== localsteal direct  \n", _my_rank, localId, sweeper->work_received_from_steal.size(), _my_rank);
 		return;
 	}
 
@@ -1007,40 +987,6 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	//If we make it until here we are waiting for work and have have nothing else to do for now. Sufficient to poll for new work every ~millisecond.
 	usleep(1000);
 
-
-
-		// LOG(V3_VERB, "SWEEP MSG [%i](%i) ----?---> req  \n", _my_rank, localId);
-
-		//Wait here until we hear back
-		//To receive a worksteal answer, main MPI thread scans for incoming messages and passes it to us via shared memory
-		// constexpr unsigned WAIT_MICROSEC=100;
-		// unsigned reps=0;
-		// while(_worksteal_requests[localId].got_steal_response == false) {
-			// usleep(WAIT_MICROSEC);
-			// reps++;
-			// if (reps%512==0) {
-				// LOG(V1_WARN, "SWEEP WARN [%i](%i) waiting for MPI steal response since %i ms \n", _my_rank, localId, (reps*WAIT_MICROSEC)/1000);
-			// }
-			// if (_terminate_all) {
-				// LOG(V3_VERB, "SWEEP [%i](%i) exit wait loop\n", _my_rank, localId);
-				// break;
-			// }
-		// }
-
-		// if (_terminate_all) {
-			// sweeper->sweeper_is_idle = true;
-			// break;	 //skip touching the work array at all, weird stuff can happen when we are already in the termination stage
-		// }
-
-		// Successful steal if size > 0
-		// if (_worksteal_requests[localId].stolen_work.size()>0) {
-			// sweeper->work_received_from_steal = std::move(_worksteal_requests[localId].stolen_work);
-			// LOG(V4_VVER, "SWEEP recv [%i](%i) <==%i==== [%i] \n",  _my_rank, localId, sweeper->work_received_from_steal.size(), _worksteal_requests[localId].targetRank);
-			// break;
-		// }
-		// always exit this fake loop. the real loop is in the kissat solver, which continuously calls this function
-		// break;
-	// }
 }
 
 void SweepJob::cbStealWorkNew(unsigned **work, int *work_size, int localId) {
@@ -1055,111 +1001,6 @@ void SweepJob::cbStealWorkNew(unsigned **work, int *work_size, int localId) {
 		sweeper->sweeper_is_idle = false;
 	}
 	//callback ends, kissat thread returns back to its C solver code
-}
-
-void SweepJob::cbStealWork(unsigned **work, int *work_size, int localId) {
-
-	 /*
-	  * OUTDATED, now using cbStealWorkNew !
-	  */
-
-	KissatPtr sweeper = _sweepers[localId]; //this access is safe because this function (callback) is called by the sweeper itself
-	sweeper->work_received_from_steal = {};
-
-	//setting this sweeper to idle is no longer done directly here, because it caused a race condition for the very first solver that was marked idle while it was receiving the initial work
-
-	//This is a fake loop, we only traverse it once. we use the loop syntax to easily allow us to break out at several points and jump to the bottom, i.e. makeshift gotos
-	while (true) {
-		if (_terminate_all) {
-			sweeper->work_received_from_steal = {};
-			sweeper->sweeper_is_idle = true;
-			LOG(V3_VERB, "Sweeper [%i](%i) exit steal loop\n", _my_rank, localId);
-			//make extra sure that this sweeper receives the termination signal (yet again)
-			sweeper->triggerSweepTerminate();
-			sweeper->count_repeated_missed_termination++;
-			if (sweeper->count_repeated_missed_termination % sweeper->WARN_ON_REPEATED_MISSED_TERMINATION==0) {
-				LOG(V3_VERB, "WARN Sweeper [%i](%i) in %i-th worksteal loop after termination\n", _my_rank, localId, sweeper->count_repeated_missed_termination);
-			}
-
-			break;
-		}
-
-		//Serve initial work to the representative solver (typically localId 0 at the root node)
-		//This solver selection is hardcoded to prevent any concurrency problems. solver [root](0) is assumed to always exist
-		if (_is_root && ! _root_provided_initial_work) {
-			if (localId==_representative_localId) {
-				provideInitialWork(sweeper);
-			}
-			//Skip stealing if there hasn't been any work provided yet, would be pointless to search for it
-			break;
-		}
-
-		//First strategy: steal locally from shared memory
-		LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop --> local steal \n", _my_rank, localId);
-		sweeper->sweeper_is_idle = true;
-		auto stolen_work = stealWorkFromAnyLocalSolver(_my_rank, localId);
-
-		if ( ! stolen_work.empty()) {
-			//Successful local steal
-			//store the steal data persistently in C++, such that C can keep operating on that memory segment
-			sweeper->work_received_from_steal = std::move(stolen_work);
-			LOG(V3_VERB, "SWEEP MSG [%i](%i) <==%i==== localsteal direct  \n", _my_rank, localId, sweeper->work_received_from_steal.size(), _my_rank);
-			break;
-		}
-
-
-		// if ( ! _started_communication) {
-			// LOG(V3_VERB, "SWEEP [%i](%i) Skip MPI request, not communicating yet\n", _my_rank, localId);
-			// break;
-		// }
-		//Second strategy: steal globally via MPI
-		//We deposit a request for an MPI message via shared memory, and the main MPI thread of this process will pick up the request and actually send it via MPI
-		//This extra step is necessary, because the thread is just "some" solver-thread and it can cause problems it it start sending MPI messages on it's own
-
-		// LOG(V3_VERB, "SWEEP MSG [%i](%i) ----?---> req  \n", _my_rank, localId);
-		_worksteal_requests[localId].newQueuedRequest(localId);
-
-		//Wait here until we hear back
-		//To receive a worksteal answer, main MPI thread scans for incoming messages and passes it to us via shared memory
-		constexpr unsigned WAIT_MICROSEC=100;
-		unsigned reps=0;
-		while(_worksteal_requests[localId].got_steal_response == false) {
-			usleep(WAIT_MICROSEC);
-			reps++;
-			if (reps%512==0) {
-				LOG(V1_WARN, "SWEEP WARN [%i](%i) waiting for MPI steal response since %i ms \n", _my_rank, localId, (reps*WAIT_MICROSEC)/1000);
-			}
-			if (_terminate_all) {
-				LOG(V3_VERB, "SWEEP [%i](%i) exit wait loop\n", _my_rank, localId);
-				break;
-			}
-		}
-
-		if (_terminate_all) {
-			sweeper->sweeper_is_idle = true;
-			break;	 //skip touching the work array at all, weird stuff can happen when we are already in the termination stage
-		}
-
-		//Successful steal if size > 0
-		if (_worksteal_requests[localId].stolen_work.size()>0) {
-			sweeper->work_received_from_steal = std::move(_worksteal_requests[localId].stolen_work);
-			LOG(V4_VVER, "SWEEP recv [%i](%i) <==%i==== [%i] \n",  _my_rank, localId, sweeper->work_received_from_steal.size(), _worksteal_requests[localId].targetRank);
-			break;
-		}
-		//always exit this fake loop. the real loop is in the kissat solver, which continuously calls this function
-		break;
-	}
-
-	//we control the memory on C++/Mallob Level, and only tell the kissat solver where it can find the work (or where it can read the zero)
-	//the solver will also write on this array, but only within the allocated bounds provided by C++/Mallob
-	*work = reinterpret_cast<unsigned int*>(sweeper->work_received_from_steal.data());
-	*work_size = sweeper->work_received_from_steal.size();
-	assert(*work_size>=0);
-	if (*work_size>0) {
-		sweeper->sweeper_is_idle = false;
-		//we keep solver marked as "idle" once the whole solving is terminated, otherwise race-conditions can occur where suddenly the solver is treated as active again
-	}
-	//The thread now returns to the kissat solver
 }
 
 void SweepJob::rootStartNewSharingRound() {
@@ -1416,58 +1257,9 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 			);
 	}
 
-#define DEDUPLICATE_CONTRIBS 1
-
-#if ! DEDUPLICATE_CONTRIBS
-
-	LOG(V4_VVER, "SWEEP AGGR %i contributions \n", contribs.size());
-	size_t total_aggregated_size = NUM_METADATA_FIELDS; //the new element will contain the metadata once at the end
-	int i=0;
-	for (const auto& contrib : contribs) {
-		total_aggregated_size += contrib.size()-NUM_METADATA_FIELDS; //we will copy everything but the metadata from each contribution
-		LOG(V4_VVER, "SWEEP AGGR Element %i: contrib.size() %i, w/o metadata %i, curr summed size %i \n", i, contrib.size(), contrib.size()-NUM_METADATA_FIELDS, total_aggregated_size);
-		i++;
-		assert(contrib.size() >= NUM_METADATA_FIELDS || log_return_false("ERROR in Aggregating: contrib with too small size() == %i < %i SHARING_METADATA_FIELDS", contrib.size(), NUM_METADATA_FIELDS));
-	}
-
-
-
-	// LOG(V4_VVER, "%s \n", oss_tot.str().c_str());
-	// std::ostringstream oss_e;
-	// oss_e << "Eq sizes: ";
-	i=0;
-
-
-	std::vector<int> aggregated;
-	aggregated.reserve(total_aggregated_size);
-	//Fill equivalences
-	size_t aggr_eq_size = 0;
-	for (const auto &contrib : contribs) {
-		int eq_size = contrib[contrib.size()-METADATA_EQ_SIZE];
-		aggr_eq_size += eq_size;
-		aggregated.insert(aggregated.end(), contrib.begin(), contrib.begin()+eq_size);
-		// oss_e << "| " << i << ":" << eq_size << " "	;
-		i++;
-	}
-
-	// LOG(V4_VVER, "%s \n", oss_e.str().c_str());
-	// std::ostringstream oss_u;
-	// oss_u << "Unit sizes: ";
-	i=0;
-
-	//Fill units
-	size_t aggr_unit_size = 0;
-	for (const auto &contrib : contribs) {
-		int eq_size = contrib[contrib.size()-METADATA_EQ_SIZE];  //need to know where the eq ends, i.e. where the units start
-		int unit_size = contrib[contrib.size()-METADATA_UNIT_SIZE];
-		aggr_unit_size += unit_size;
-		aggregated.insert(aggregated.end(), contrib.begin()+eq_size, contrib.end()-NUM_METADATA_FIELDS); //not copying the metadata at the end
-		// oss_u << "| " << i << ":" << unit_size << " "	;
-		i++;
-	}
-#else
-
 	//Layout: contrib = [equivalences, units, metadata]
+
+	//Deduplication
 
 	robin_hood::unordered_flat_set<int> dedup_units;
 	robin_hood::unordered_flat_set<uint64_t> dedup_eqs;
@@ -1517,10 +1309,6 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	assert(j==aggr_data_size);
 	total_aggregated_size = aggr_data_size + NUM_METADATA_FIELDS;
 
-	// cout << orig_unit_size - aggr_unit_size << " " << orig_eqs_size - aggr_eq_size << endl;
-
-#endif
-
 	//See whether all solvers are idle
 	bool all_idle = true;
     for (const auto &contrib : contribs) {
@@ -1531,7 +1319,6 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	if (contribs.empty()) {
 		all_idle = false; //edge-case: if not a single solver is initialized yet, we are waiting for them to come online, so they are not really idle
 	}
-
 
 	appendMetadataToReductionElement(aggregated, all_idle, aggr_unit_size, aggr_eq_size);
 
@@ -1552,7 +1339,7 @@ std::vector<int> SweepJob::stealWorkFromAnyLocalSolver(int asking_rank, int aski
 	for (int localId : rand_permutation) {
 		auto stolen_work = stealWorkFromSpecificLocalSolver(localId);
 		if ( ! stolen_work.empty()) {
-			LOG(V3_VERB, "SWEEP MSG [%i](%i) ====%i==> [%i](%i) \n",_my_rank, localId, stolen_work.size(), asking_rank, asking_sourceLocalId);
+			LOG(V3_VERB, "SWEEP giv [%i](%i) ===%i===> [%i](%i) \n",_my_rank, localId, stolen_work.size(), asking_rank, asking_sourceLocalId);
 			return stolen_work;
 		}
 	}
@@ -1642,22 +1429,6 @@ void SweepJob::triggerTerminations() {
 		i++;
 	}
 
-	//each sweeper checks constantly for the interruption signal (on the ms scale or faster), allow for gentle own exit
-	// while (_started_sweepers_count < _nThreads || _running_sweepers_count>0) {
-		// LOG(V4_VVER, "SWEEP TERM #%i [%i] still %i solvers running\n", getId(), _my_rank, _running_sweepers_count.load());
-		// int i=0;
-		// for (auto &sweeper : _sweepers) {
-			// if (sweeper) {
-				// sweeper->triggerSweepTerminate();
-				// LOG(V4_VVER, "SWEEP TERM #%i [%i] terminating solver (%i)\n", getId(), _my_rank, i);
-			// }
-			// i++;
-		// }
-		// usleep(2000);
-	// }
-	// LOG(V4_VVER, "SWEEP TERM #%i [%i] no more solvers running\n", getId(), _my_rank);
-
-	// usleep(500);
 
 }
 
