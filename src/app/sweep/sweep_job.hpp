@@ -294,6 +294,7 @@ private:
     static std::vector<int> aggregateEqUnitContributions(std::list<std::vector<int>> &contribs);
 	static void appendMetadataToReductionElement(std::vector<int> &contrib, int is_idle, int unit_size, int eq_size);
 	void advanceAllReduction();
+	void extractAllReductionResult();
 
 	std::vector<int> getRandomIdPermutation();
 

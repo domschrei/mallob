@@ -1118,9 +1118,9 @@ void SweepJob::cbContributeToAllReduce() {
 	}
 
 
-	//todo: EXTRACT SHARED RESULT FROM _red before we reset it!!!
 	if (_red->hasResult()) {
-		LOG(V1_WARN, ">>>> WARN SWEEP [%i] RED SHARE RESET: We are about to reset _red while it still has a valid result! <<<<< \n", _my_rank);
+		// LOG(V1_WARN, ">>>> WARN SWEEP [%i] RED SHARE RESET: We are about to reset _red while it still has a valid result! <<<<< \n", _my_rank);
+		extractAllReductionResult();
 	}
 
 	JobMessage baseMsg = getMessageTemplate();
@@ -1188,14 +1188,19 @@ void SweepJob::cbContributeToAllReduce() {
 void SweepJob::advanceAllReduction() {
 	if (!_red)
 		return;
-	//we always keep the global reduction advancing, independently of the state of the local solvers
+	//always keep the global reduction advancing, independently of the state of the local solvers
 	_red->advance();
-
 	LOG(V4_VVER, "SWEEP [%i] SHARE hasResult() %i \n", _red->hasResult());
-	if (!_red->hasResult())
-		return;
+	if (_red->hasResult()) {
+		extractAllReductionResult();
+	}
+}
 
+void SweepJob::extractAllReductionResult() {
 	//There is data from global aggregation, extract it
+	assert(_red);
+	assert(_red->hasResult());
+
 	auto data = _red->extractResult();
 	const int terminate   = data[data.size()-METADATA_TERMINATE];
 	const int sweep_iteration = data[data.size()-METADATA_SWEEP_ITERATION];
@@ -1205,24 +1210,24 @@ void SweepJob::advanceAllReduction() {
 	const int eq_size     = data[data.size()-METADATA_EQ_SIZE];
 	assert(eq_size%2==0 || log_return_false("SWEEP ERROR: Import Equality size not even, but %i\n", eq_size));
 
-	LOG(V2_INFO, "SWEEP RED SHARE: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)term. #locally idle: %i/%i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastIdleCount, _nThreads);
 	if (okToTrackSharingDelay())
 		_time_receive_allred.push_back(Timer::elapsedSeconds());
 
 	//if our local solvers are not fully initialised yet we ignore the global sharing data
 	if (!_started_synchronized_solving) {
-		if (eq_size>0 || unit_size>0)  {
-			LOG(V3_VERB, "SWEEP WARN RED SHARE [%i] (iter %i round %i): Skipping %i eqs, %i units bc local solvers are not all init'd yet \n", _my_rank, sweep_iteration, sharing_round, eq_size/2, unit_size);
-		}
+		if (eq_size>0 || unit_size>0)  { LOG(V3_VERB, "SWEEP WARN RED SHARE [%i] (iter %i round %i): Skipping %i eqs, %i units bc local solvers are not all init'd yet \n", _my_rank, sweep_iteration, sharing_round, eq_size/2, unit_size); }
+
+		LOG(V2_INFO, "SWEEP RED SHARE SKIP: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)term. #locally idle: %i/%i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastIdleCount, _nThreads);
 		return;
 	}
 
+	//All solvers are initialised, we can make use of the data
 
 	if (eq_size > MAX_IMPORT_SIZE) {
-		LOG(V1_WARN, "WARN -SWEEP too many equalities to import! %i, max %i\n", eq_size, MAX_IMPORT_SIZE);
+		LOG(V1_WARN, "WARN SWEEP too many equalities to import! %i, max %i\n", eq_size, MAX_IMPORT_SIZE);
 	}
 	if (unit_size > MAX_IMPORT_SIZE) {
-		LOG(V1_WARN, "WARN -SWEEP too many units to import! %i, max %i\n", unit_size, MAX_IMPORT_SIZE);
+		LOG(V1_WARN, "WARN SWEEP too many units to import! %i, max %i\n", unit_size, MAX_IMPORT_SIZE);
 	}
 
 	for (int i=0; i<eq_size && i < MAX_IMPORT_SIZE; i++) {
@@ -1252,15 +1257,14 @@ void SweepJob::advanceAllReduction() {
 
 	//prepare the next sharing round, which gets started from the root node
 	if (_is_root) {
-		LOG(V4_VVER, "SWEEP root: rest bcast listen for next sharing round\n", _my_rank);
+		LOG(V4_VVER, "SWEEP root: RESET BCAST for next sharing round\n", _my_rank);
 		_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(),
 			[this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
 	}
 
-	//Reduction is finished. Contrary to the bcast, we dont need to directly re-create a new reduction object, but can leave it at null.
-	//The new reduction object will be only created when needed when a new broadcast is present (and completed)
+	//Reduction is finished. we dont need to directly re-create a new reduction object, but can leave it at null (Contrary to the bcast)
+	//The new reduction object will be created by the next bcast round when needed
 	_red.reset();
-
 
 	//We received the termination signal via the app-internal data sharing
 	if (terminate) {
@@ -1269,9 +1273,7 @@ void SweepJob::advanceAllReduction() {
 		triggerTerminations();
 		LOG(V1_WARN, "# \n # \n # --- [%i] got terminate flag, TERMINATING SWEEP JOB ---\n # \n", _my_rank);
 	}
-
 }
-
 
 
 std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<int>> &contribs) {
