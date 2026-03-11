@@ -135,7 +135,7 @@ void SweepJob::appl_communicate() {
 	checkForUnsatResults();
 
 	float t1 = Timer::elapsedSeconds();
-	LOG(V4_VVER, "SWEEP appl_communicate(): %.3f ms \n", (t1-t0)*1000.0);
+	LOG(V4_VVER, "SWEEP appl_communicate(): %.6f sec \n", (t1-t0));
 	LOG(V5_DEBG, "SWEEP appl_communicate() done \n");
 }
 
@@ -434,11 +434,11 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	float t0 = Timer::elapsedSeconds();
 	std::shared_ptr<Kissat> sweeper(new Kissat(setup));
 	float t1 = Timer::elapsedSeconds();
-	float init_dur_ms =  (t1 - t0)*1000;
-	const float WARN_init_dur = 50; //Usual initializations take 0.2ms in the Sat Solver Subprocess and 4-25ms  in the sweep job (for some weird reasons), but should never be above ~30ms
-	LOG(V3_VERB, "SWEEP [%i](%i) kissat init %.2f ms (%i/%i started)\n", _my_rank, localId, init_dur_ms, _started_sweepers_count.load(), _nThreads);
-	if (init_dur_ms > WARN_init_dur) {
-		LOG(V1_WARN, "SWEEP WARN STARTUP [%i](%i): kissat init took unusually long, %f ms !\n", _my_rank, localId, init_dur_ms);
+	float init_dur =  (t1 - t0);
+	const float WARN_init_dur = 0.050; //Usual initializations take 0.2ms in the Sat Solver Subprocess and 4-25ms  in the sweep job (for some weird reasons), but should never be above ~30ms, we warn at >50ms
+	LOG(V3_VERB, "SWEEP [%i](%i) kissat init %.6f sec (%i/%i started)\n", _my_rank, localId, init_dur, _started_sweepers_count.load(), _nThreads);
+	if (init_dur > WARN_init_dur) {
+		LOG(V1_WARN, "SWEEP WARN STARTUP [%i](%i): kissat init took unusually long, %.6f sec !\n", _my_rank, localId, init_dur);
 	}
 
 	sweeper->setToSweeper();
@@ -596,22 +596,22 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 			period_sum = _time_start_bcast.back() - _time_start_bcast.front();
 			period_avg = period_sum / (_time_start_bcast.size()-1);
 		}
-		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_LATENCY     %.1f ms (average) \n",latency_avg*1000);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_PERIOD_REAL %.1f ms (average) \n",period_avg*1000);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_LATENCY     %.4f sec (average) \n",latency_avg);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_PERIOD_REAL %.4f sec (average) \n",period_avg);
 
 
 		if (_time_start_bcast.size()>1) {
 			for (int i=0; i < _time_start_bcast.size()-1; i++) {
 				float period = _time_start_bcast[i+1] - _time_start_bcast[i];
 				if (period > DURATION_WARN_FACTOR*period_avg) {
-					LOGGER(_reslogger,V2_INFO, "[WARN] SWEEP_SHARING_PERIOD_REAL %.1f ms   (in share round %i) is much larger than average \n", period, i);
+					LOGGER(_reslogger,V2_INFO, "[WARN] SWEEP_SHARING_PERIOD_REAL %.4f sec   (in share round %i) is much larger than average \n", period, i);
 				}
 			}
 		}
 
 		for (int i=0; i< latencies.size(); i++) {
 			if (latencies[i] > DURATION_WARN_FACTOR*latency_avg) {
-				LOGGER(_reslogger,V2_INFO, "[WARN] SWEEP_SHARING_LATENCY %.1f ms     (between share rounds %i,%i) is much larger than average \n", latencies[i], i, i+1);
+				LOGGER(_reslogger,V2_INFO, "[WARN] SWEEP_SHARING_LATENCY %.4f sec     (between share rounds %i,%i) is much larger than average \n", latencies[i], i, i+1);
 			}
 		}
 
@@ -836,7 +836,7 @@ void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
 	if (available_import_round != my_last_import_round) [[unlikely]] {
 		//there is new data from a new sharing round
 		// publish_round = _sharing_import_round.load(std::memory_order_acquire);
-		LOG(V4_VVER, "SWEEP checked %i --> %i \n", my_last_import_round, available_import_round);
+		LOG(V4_VVER, "SWEEP [%i](%i) see round %i --> %i \n", _my_rank, sweeper->getLocalId(), my_last_import_round, available_import_round);
 
 		assert(my_last_import_round <= available_import_round);
 		if (my_last_import_round!=0 && my_last_import_round != available_import_round - 1) {
@@ -1190,7 +1190,7 @@ void SweepJob::advanceAllReduction() {
 		return;
 	//always keep the global reduction advancing, independently of the state of the local solvers
 	_red->advance();
-	LOG(V4_VVER, "SWEEP [%i] SHARE hasResult() %i \n", _red->hasResult());
+	LOG(V4_VVER, "SWEEP [%i] SHARE hasResult() %i \n", _my_rank, _red->hasResult());
 	if (_red->hasResult()) {
 		extractAllReductionResult();
 	}
@@ -1500,7 +1500,7 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 	}
 
 	float t1 = Timer::elapsedSeconds();
-	LOG(V4_VVER, "SWEEP [%i](%i) loaded  formula (%.3f MB) in %.3f ms \n", _my_rank, sweeper->getLocalId(), formula_in_MB , (t1-t0)*1000);
+	LOG(V4_VVER, "SWEEP [%i](%i) loaded  formula (%.3f MB) in %.6f sec \n", _my_rank, sweeper->getLocalId(), formula_in_MB , (t1-t0));
 }
 
 void SweepJob::triggerTerminations() {
