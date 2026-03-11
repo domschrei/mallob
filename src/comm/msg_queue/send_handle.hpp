@@ -182,7 +182,7 @@ struct SendHandle {
             msglen>=3*sizeof(int) ? *(int*)(data.data()+msglen - 3*sizeof(int)) : 0, 
             msglen>=2*sizeof(int) ? *(int*)(data.data()+msglen - 2*sizeof(int)) : 0, 
             msglen>=1*sizeof(int) ? *(int*)(data.data()+msglen - 1*sizeof(int)) : 0);
-        assert(dest >= 0 && dest < 1'000'000);
+        assert((dest >= 0 && dest < 1'000'000) || log_return_false("ERROR : msg dest %i \n", dest));
     }
 
     void printBatchArrived() const {

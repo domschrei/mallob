@@ -118,7 +118,7 @@ public:
         int act_num_children = 0;
         if (leftRank>=0) act_num_children++;
         if (rightRank>=0) act_num_children++;
-        LOG(V3_VERB, "SWEEP New _red AllReduction. Snapshot: LeftChild [%i], RightChild [%i], _tree.nbChildren %i.\n", leftRank, rightRank, _tree.nbChildren);
+        LOG(V3_VERB, "SWEEP New RED. (%i)children [%i],[%i] \n", _tree.nbChildren, leftRank, rightRank);
         if (act_num_children != _tree.nbChildren) {
             LOG(V1_WARN, "WARN SWEEP: AllReduction got Snapshot with _tree.nbChildren %i, but actual child ranks [%i]&[%i] give %i actual children! \n", _tree.nbChildren, leftRank, rightRank, act_num_children);
         }

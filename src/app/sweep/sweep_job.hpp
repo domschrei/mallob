@@ -61,20 +61,22 @@ private:
 		int senderLocalId{-1};
 		int targetIndex{-1};
 		int targetRank{-1};
-		bool sent{false};
+		std::atomic_bool wait_for_send{false};
+		// std::atomic_bool sent{false};
 		std::atomic_bool got_steal_response{false};
 		std::vector<int> stolen_work{};
 
-		void newBlankRequest(int _senderLocalId) noexcept {
+		void newQueuedRequest(int _senderLocalId) noexcept {
 				senderLocalId = _senderLocalId;
 				targetIndex = -1;
 				targetRank = -1;
-				sent = false;
+				wait_for_send = true;
+				// sent = false;
 				got_steal_response = false;
 				stolen_work.clear();
 		}
 	};
-	std::deque<WorkstealRequest> _worksteal_requests; //deque, because they have an atomic member and are thus not copyable
+	std::deque<WorkstealRequest> _worksteal_requests; //deque, because each object has an atomic member and thus isnt copyable (which vector would require)
 	const int MIN_STEAL_AMOUNT = 10; //avoid to much overhead at the very end when there is almost no work left, avoid sending around ridiculously small work packages
 
 
@@ -285,12 +287,14 @@ private:
 
 	bool skip_MPI_forNow();
 
-	void TryWorkstealLocal();
-	void TryWorkstealMPI();
+
+	void solverGoStealing(KissatPtr sweeper);
+	// void TryWorkstealLocal();
+	void sendWorkstealsViaMPI();
 	void printIdleFraction();
 	void printResweeps();
 
-    void rootInitiateNewSharingRound();
+    void rootStartNewSharingRound();
     void cbContributeToAllReduce();
     static std::vector<int> aggregateEqUnitContributions(std::list<std::vector<int>> &contribs);
 	static void appendMetadataToReductionElement(std::vector<int> &contrib, int is_idle, int unit_size, int eq_size);
@@ -302,7 +306,8 @@ private:
 	void provideInitialWork(KissatPtr sweeper);
 	std::vector<int> stealWorkFromAnyLocalSolver(int asking_rank, int asking_sourceLocalId); //parameters only for verbose logging
     std::vector<int> stealWorkFromSpecificLocalSolver(int localId);
-    void cbSearchWorkInTree(unsigned **work, int *work_size, int localId);
+    void cbStealWork(unsigned **work, int *work_size, int localId);
+	void cbStealWorkNew(unsigned **work, int *work_size, int localId);
 	void checkForNewImportRound(KissatPtr sweeper);
 	void cbImportEq(int *ilit1, int *ilit2, int localId);
 	void cbImportUnit(int *lit, int localId);

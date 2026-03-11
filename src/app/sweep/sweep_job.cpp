@@ -27,7 +27,7 @@ SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTa
 
 //callback from kissat
 void cb_search_work_in_tree(void *SweepJob_state, unsigned **work, int *work_size, int local_id) {
-    ((SweepJob*) SweepJob_state)->cbSearchWorkInTree(work, work_size, local_id);
+    ((SweepJob*) SweepJob_state)->cbStealWorkNew(work, work_size, local_id);
 }
 
 void cb_import_eq(void *SweepJobState, int *lit1, int *lit2, int localId) {
@@ -63,8 +63,8 @@ void SweepJob::appl_start() {
 	LOG(V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d, NumVars %i, NumClauses %i\n",
 		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _nThreads, numVars, numClauses);
     _metadata = getSerializedDescription(0)->data();
-	_start_sweep_timestamp = Timer::elapsedSeconds();
 
+	_start_sweep_timestamp = Timer::elapsedSeconds();
 	_root_time_start_bcast.push_back(Timer::elapsedSeconds());
 	// _root_last_sharing_start_timestamp = Timer::elapsedSeconds();
 
@@ -74,7 +74,8 @@ void SweepJob::appl_start() {
 	_worksteal_requests.resize(_nThreads);
 	//do not send the initial placeholder worksteal requests
 	for (auto &request : _worksteal_requests) {
-		request.sent = true;
+		request.wait_for_send = false;
+		// request.sent = true;
 	}
 	//pre-allocate a fixed array from where solver can concurrently import the received equalities and units
 	_EQS_to_import.resize(MAX_IMPORT_SIZE);
@@ -129,8 +130,8 @@ void SweepJob::appl_communicate() {
 
 	advanceAllReduction(); //always advance
 	//TryWorkstealLocal(); can take a long time in the current setup...
-	TryWorkstealMPI();
-	rootInitiateNewSharingRound();
+	sendWorkstealsViaMPI();
+	rootStartNewSharingRound();
 
 	checkSharingDelay();
 	printIdleFraction();
@@ -193,14 +194,13 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 			LOG(V1_WARN,"WARN SWEEP: SEARCHING_WORK receiver [%i] does not know treeIndexOfDestination of sender [%i], now using treeIndex %i provided by incoming msg itself\n", _my_rank, sourceRank, sourceTreeIndex);
 		}
 
-		//todo: solve situation when receiving rank doesnt know yet sending rank
 		//probably happens when sweep message slips right into the ongoing ranklist update that is periodically started as aggregating, in job.cpp 233
 		assert(msg.contextIdOfDestination != 0 ||
 			log_return_false("SWEEP STEAL ERROR: invalid contextIdOfDestination==0. In TAG_RETURNING_STEAL_REQUEST, wanted to return an message"
 					"With sourceRank=%i, sourceIndex=%i, payload.size()=%i \n", sourceRank, sourceIndex, msg.payload.size()));
 
-		assert(msg.treeIndexOfDestination != -1 ||
-			log_return_false("SWEEP STEAL ERROR: treeIndexOfDestination==-1. In TAG_RETURNING_STEAL_REQUEST, wanted to return an message"
+		assert(msg.treeIndexOfDestination >= 0 ||
+			log_return_false("SWEEP STEAL ERROR: treeIndexOfDestination < 0 . In TAG_RETURNING_STEAL_REQUEST, wanted to return an message"
 					"With sourceRank=%i, sourceIndex=%i, contextIdOfDestination=%i, payload.size()=%i \n", sourceRank, sourceIndex, msg.contextIdOfDestination, msg.payload.size()));
 
 		getJobTree().send(sourceRank, MSG_SEND_APPLICATION_MESSAGE, msg);
@@ -715,46 +715,47 @@ void SweepJob::printResweeps() {
 	LOGGER(_reslogger, V3_VERB, "[%i] SWEEP_RESWEEPS_OUT %i \n", _my_rank, resweeps_out);
 }
 
-void SweepJob::TryWorkstealLocal() {
-	if (_terminate_all) return;
+// void SweepJob::TryWorkstealLocal() {
+	// if (_terminate_all) return;
 	//We try to find local work for the requests, if it succeeds it avoids any MPI messaging
 	//Can find work if new local work appeared from the time the request was posted to now
-	for (auto &request : _worksteal_requests) {
-		if (!request.sent) {
-			int senderLocalId = request.senderLocalId;
-			auto stolen_work = stealWorkFromAnyLocalSolver(_my_rank, senderLocalId);
-			if ( ! stolen_work.empty()) {
-				request.stolen_work = std::move(stolen_work);
-				request.sent = true;
-				request.got_steal_response = true;
-				request.targetRank = _my_rank; //just for cleaner logging
-				request.targetIndex = _my_index;
-				//Successful local steal
-				LOG(V3_VERB, "SWEEP [%i](%i) <==%i==== localsteal via mainthread  \n", _my_rank, senderLocalId, request.stolen_work.size());
-			}
-		}
-	}
-}
+	// for (auto &request : _worksteal_requests) {
+		// if (!request.sent) {
+			// int senderLocalId = request.senderLocalId;
+			// auto stolen_work = stealWorkFromAnyLocalSolver(_my_rank, senderLocalId);
+			// if ( ! stolen_work.empty()) {
+				// request.stolen_work = std::move(stolen_work);
+				// request.sent = true;
+				// request.got_steal_response = true;
+				// request.targetRank = _my_rank; //just for cleaner logging
+				// request.targetIndex = _my_index;
+				// Successful local steal
+				// LOG(V3_VERB, "SWEEP [%i](%i) <==%i==== localsteal via mainthread  \n", _my_rank, senderLocalId, request.stolen_work.size());
+			// }
+		// }
+	// }
+// }
 
 bool SweepJob::skip_MPI_forNow() {
 	return (getJobComm().size() < getVolume());
 	// LOG(V4_VVER, "SWEEP [%i] Skip MPI workstealing, jobcomm size %i < volume %i\n", _my_rank, getJobComm().size(), getVolume());
 }
 
-void SweepJob::TryWorkstealMPI() {
+void SweepJob::sendWorkstealsViaMPI() {
 	if (_terminate_all) return;
 
-	//Worksteal requests need to be send by the MPI *main* thread, as it can be problematic if the kissat-threads themselves issue MPI messages on their own, since this clashes somehow with the MPI structure/hierarchy
-	//Each solver-thread writes a request in the shared memory, and the main MPI thread picks up the request and sends it
+	//Worksteal requests need to be sent by the MPI *main* thread. If kissat-threads themselves send MPI messages, things can crash, since they clash somehow with the MPI hierarchy
+	//So each solver-thread queues a steal-request to shared memory, where the main MPI thread can pick it up (here) and send an MPI msg on behalf of the solver
 	for (auto &request : _worksteal_requests) {
-		if (!request.sent) {
+		if (request.wait_for_send) {
 			int senderLocalId = request.senderLocalId;
 
 			//if we are still in the phase where MPI sends are not done, we short-fuse the requests to a zero dummy and return them to the solver threads
 			//same if the whole job is terminated
 			if (skip_MPI_forNow() || _terminate_all || getVolume()==0) {
 				request.stolen_work = {};
-				request.sent = true;
+				request.wait_for_send = false;
+				// request.sent = true;
 				request.got_steal_response = true;
 				// LOG(V3_VERB, "SWEEP [%i](%i) exit steal loop (2nd check, getVolume()==%i)\n", _my_rank, senderLocalId, getVolume());
 				break;
@@ -812,13 +813,14 @@ void SweepJob::TryWorkstealMPI() {
 				continue;
 			}
 
-			request.sent = true;
+			// request.sent = true;
 			JobMessage msg = getMessageTemplate();
 			msg.tag = TAG_SEARCHING_WORK;
 			//Need to add these two fields because we are doing arbitrary point-to-point communication
 			msg.treeIndexOfDestination = request.targetIndex;
 			msg.contextIdOfDestination = getJobComm().getContextIdOrZero(request.targetIndex);
 			assert(msg.contextIdOfDestination != 0 || log_return_false("SWEEP ERROR: contextIdOfDestination==0 in workstealing request! Source rank=%i, targetRank %i \n", _my_rank, request.targetRank));
+			assert(msg.treeIndexOfDestination >= 0 || log_return_false("SWEEP ERROR: treeIndexOfDestination < 0 in workstealing request! Source rank=%i, targetRank %i \n", _my_rank, request.targetRank));
 			//We also send our contextId. Because it can happen that the receiving rank does not yet know our contextId,
 			//which (probably) happens when a worksteal request is sent right when also the ranklist aggregation update is propagating through all ranks, where some (like this rank here) are already updated, while others (like the receiving rank) aren't.
 			//So as a backup for the receiving rank, we also provide our contextId
@@ -828,6 +830,9 @@ void SweepJob::TryWorkstealMPI() {
 			assert(msg.payload.size() == NUM_SEARCHING_WORK_FIELDS);
 			LOG(V3_VERB, "SWEEP MSG [%i](%i) ---?---> [%i] \n", _my_rank, request.senderLocalId, request.targetRank);
 			getJobTree().send(request.targetRank, MSG_SEND_APPLICATION_MESSAGE, msg);
+			//CRUCIAL that this flag is only set now, after we did everything with it.
+			//because after resetting this flag, a workstealing solver could immediately concurrently modify this request, by resetting it
+			request.wait_for_send = false;
 		}
 	}
 }
@@ -942,11 +947,123 @@ void SweepJob::provideInitialWork(KissatPtr sweeper) {
 	_root_provided_initial_work = true;
 }
 
+void SweepJob::solverGoStealing(KissatPtr sweeper) {
+	int localId = sweeper->getLocalId();
+	sweeper->work_received_from_steal = {};
+
+	if (_terminate_all) {
+		sweeper->sweeper_is_idle = true;
+		LOG(V3_VERB, "Sweeper [%i](%i) exit steal loop\n", _my_rank, localId);
+		sweeper->triggerSweepTerminate(); //just to be safe, send another termination to itself
+		sweeper->count_repeated_missed_termination++;
+		if (sweeper->count_repeated_missed_termination % sweeper->WARN_ON_REPEATED_MISSED_TERMINATION==0) {
+			LOG(V3_VERB, "WARN Sweeper [%i](%i) in %i-th worksteal loop after termination\n", _my_rank, localId, sweeper->count_repeated_missed_termination);
+		}
+		return;
+	}
+
+	if (_is_root && ! _root_provided_initial_work) {
+		if (localId==_representative_localId) {
+			//Serve initial work to the representative solver (typically localId 0 at the root node)
+			//This solver selection is hardcoded to prevent any concurrency problems. solver [root](0) is assumed to always exist
+			provideInitialWork(sweeper);
+		}
+		//Anyways, if there hasn't been any work provided yet, skip searching, would be pointless
+		return;
+	}
+
+	sweeper->sweeper_is_idle = true;
+
+	//Check whether a previously queued MPI request has been answered successfully
+	if (_worksteal_requests[localId].got_steal_response) {
+		if (_worksteal_requests[localId].stolen_work.size()>0) {
+			sweeper->work_received_from_steal = std::move(_worksteal_requests[localId].stolen_work);
+			LOG(V4_VVER, "SWEEP recv [%i](%i) <==%i==== [%i] \n",  _my_rank, localId, sweeper->work_received_from_steal.size(), _worksteal_requests[localId].targetRank);
+			return;
+		}
+		_worksteal_requests[localId].got_steal_response = false; //to no read it a second time
+	}
+
+	//No success via MPI (either there was no answer, or the answer hat no work).
+	//Next try: steal locally
+	// LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop --> local steal \n", _my_rank, localId);
+	auto stolen_work = stealWorkFromAnyLocalSolver(_my_rank, localId);
+	if ( ! stolen_work.empty()) {
+		//Successful local steal
+		sweeper->work_received_from_steal = std::move(stolen_work);
+		LOG(V3_VERB, "SWEEP MSG [%i](%i) <==%i==== localsteal direct  \n", _my_rank, localId, sweeper->work_received_from_steal.size(), _my_rank);
+		return;
+	}
+
+	//Did not find work locally. Deposit an MPI request in case there isn't one yet.
+	//We deposit a request for an MPI message via shared memory, and the main MPI thread of this process will pick up the request and actually send it via MPI
+	//This extra step is necessary, because the thread is just "some" solver-thread and it can cause problems it it start sending MPI messages on it's own
+	if (_worksteal_requests[localId].wait_for_send==false) {
+		//careful, this is close to creating a race-condition with the main-thread, if it just so happens to also read this request right now
+		//to prevent the race-condition, the main-thread sets .wait_for_send only to false after it already send out the msg. i.e. this code here can no longer corrupt the outwards send
+		_worksteal_requests[localId].newQueuedRequest(localId);
+	}
+
+	//If we make it until here we are waiting for work and have have nothing else to do for now. Sufficient to poll for new work every ~millisecond.
+	usleep(1000);
 
 
 
-void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) {
+		// LOG(V3_VERB, "SWEEP MSG [%i](%i) ----?---> req  \n", _my_rank, localId);
+
+		//Wait here until we hear back
+		//To receive a worksteal answer, main MPI thread scans for incoming messages and passes it to us via shared memory
+		// constexpr unsigned WAIT_MICROSEC=100;
+		// unsigned reps=0;
+		// while(_worksteal_requests[localId].got_steal_response == false) {
+			// usleep(WAIT_MICROSEC);
+			// reps++;
+			// if (reps%512==0) {
+				// LOG(V1_WARN, "SWEEP WARN [%i](%i) waiting for MPI steal response since %i ms \n", _my_rank, localId, (reps*WAIT_MICROSEC)/1000);
+			// }
+			// if (_terminate_all) {
+				// LOG(V3_VERB, "SWEEP [%i](%i) exit wait loop\n", _my_rank, localId);
+				// break;
+			// }
+		// }
+
+		// if (_terminate_all) {
+			// sweeper->sweeper_is_idle = true;
+			// break;	 //skip touching the work array at all, weird stuff can happen when we are already in the termination stage
+		// }
+
+		// Successful steal if size > 0
+		// if (_worksteal_requests[localId].stolen_work.size()>0) {
+			// sweeper->work_received_from_steal = std::move(_worksteal_requests[localId].stolen_work);
+			// LOG(V4_VVER, "SWEEP recv [%i](%i) <==%i==== [%i] \n",  _my_rank, localId, sweeper->work_received_from_steal.size(), _worksteal_requests[localId].targetRank);
+			// break;
+		// }
+		// always exit this fake loop. the real loop is in the kissat solver, which continuously calls this function
+		// break;
+	// }
+}
+
+void SweepJob::cbStealWorkNew(unsigned **work, int *work_size, int localId) {
 	KissatPtr sweeper = _sweepers[localId]; //this array access is safe because the callback is called by this sweeper itself
+	solverGoStealing(sweeper);
+	//We store the steal data persistently in the C++ vector sweeper->work_received_from_steal, allocated and managed in C++
+	//The kissat solver (and other solver threads) will then be allowed to read and write(!) within this fixed allocated memory.
+	*work = reinterpret_cast<unsigned int*>(sweeper->work_received_from_steal.data());
+	*work_size = sweeper->work_received_from_steal.size();
+	assert(*work_size>=0);
+	if (*work_size>0) {
+		sweeper->sweeper_is_idle = false;
+	}
+	//callback ends, kissat thread returns back to its C solver code
+}
+
+void SweepJob::cbStealWork(unsigned **work, int *work_size, int localId) {
+
+	 /*
+	  * OUTDATED, now using cbStealWorkNew !
+	  */
+
+	KissatPtr sweeper = _sweepers[localId]; //this access is safe because this function (callback) is called by the sweeper itself
 	sweeper->work_received_from_steal = {};
 
 	//setting this sweeper to idle is no longer done directly here, because it caused a race condition for the very first solver that was marked idle while it was receiving the initial work
@@ -1000,7 +1117,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 		//This extra step is necessary, because the thread is just "some" solver-thread and it can cause problems it it start sending MPI messages on it's own
 
 		// LOG(V3_VERB, "SWEEP MSG [%i](%i) ----?---> req  \n", _my_rank, localId);
-		_worksteal_requests[localId].newBlankRequest(localId);
+		_worksteal_requests[localId].newQueuedRequest(localId);
 
 		//Wait here until we hear back
 		//To receive a worksteal answer, main MPI thread scans for incoming messages and passes it to us via shared memory
@@ -1045,7 +1162,7 @@ void SweepJob::cbSearchWorkInTree(unsigned **work, int *work_size, int localId) 
 	//The thread now returns to the kissat solver
 }
 
-void SweepJob::rootInitiateNewSharingRound() {
+void SweepJob::rootStartNewSharingRound() {
 	if (!_is_root)
 		return;
 	if (_terminate_all)
@@ -1109,14 +1226,14 @@ void SweepJob::cbContributeToAllReduce() {
 	assert(_bcast->hasResult());
 	//bcast hasResult present means that this Process got responses from all its children, so the tree structure is correctly known, and we can continue with a contribution and reduction
 
-	LOG(V4_VVER, "SWEEP BCAST Callback to AllReduce\n");
+	// LOG(V4_VVER, "SWEEP BCAST Callback to AllReduce\n");
 	auto snapshot = _bcast->getJobTreeSnapshot();
 
-	LOG(V4_VVER, "SWEEP BCAST Callback, snapshot: nbChildren %i. leftChild (%i)[%i], rightChild (%i)[%i]  \n",
-		snapshot.nbChildren, snapshot.leftChildIndex, snapshot.leftChildNodeRank, snapshot.rightChildIndex, snapshot.rightChildNodeRank);
+	LOG(V4_VVER, "SWEEP [%i] BCAST complete, now spawning RED. (%i)children: (%i)[%i] , (%i)[%i]  \n",
+		_my_rank, snapshot.nbChildren, snapshot.leftChildIndex, snapshot.leftChildNodeRank, snapshot.rightChildIndex, snapshot.rightChildNodeRank);
 
 	if (! _is_root) {
-		LOG(V4_VVER, "SWEEP [%i] RESET non-root BCAST, prepares for next sharing bcast \n", _my_rank);
+		LOG(V4_VVER, "SWEEP [%i] BCAST RESET non-root \n", _my_rank);
 		//Prepare all non-root processes to be ready to receive the next broadcast
 		_bcast.reset(new JobTreeBroadcast(getId(), snapshot, [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
 	}
@@ -1134,7 +1251,7 @@ void SweepJob::cbContributeToAllReduce() {
 
 	JobMessage baseMsg = getMessageTemplate();
 	baseMsg.tag = TAG_ALLRED;
-	LOG(V4_VVER, "SWEEP [%i] RED SHARE RESET AllReduction, using bcast snapshot, to prepare contributing local data. \n", _my_rank);
+	LOG(V4_VVER, "SWEEP [%i] RED SHARE RESET\n", _my_rank);
 	_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateEqUnitContributions));
 	if (_is_root)
 		_red->setInplaceTransformationOfElementAtRoot(_inplace_rootTransform);

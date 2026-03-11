@@ -21,7 +21,7 @@ struct JobTreeSnapshot {
     void sendToParent(JobMessage& msg, int mpiTag) const {
         msg.contextIdOfDestination = parentContextId;
         msg.treeIndexOfDestination = parentIndex;
-        LOG(V4_VVER, "BCAST send to parent, parentIndex %i , parentNodeRank %i \n", parentIndex, parentNodeRank);
+        LOG(V4_VVER, "BCAST (%i)[%i] --> (%i)[%i] to parent \n", index, nodeRank, parentIndex, parentNodeRank);
         send(parentNodeRank, mpiTag, msg);
     }
     void sendToLeftChild(JobMessage& msg, int mpiTag) const {
@@ -31,7 +31,7 @@ struct JobTreeSnapshot {
             // || log_return_false("Error in Brodcast! Want to send to left child but its contextId is 0! mpiTag %i, msgTag %i, senderIdx %i, destinationIdx %i \n",
                 // mpiTag, msg.tag, msg.treeIndexOfSender, msg.treeIndexOfDestination));
 
-        LOG(V4_VVER, "BCAST send to left child  (%i)[%i] \n", leftChildIndex, leftChildNodeRank);
+        LOG(V4_VVER, "BCAST (%i)[%i] --> (%i)[%i] left \n", index, nodeRank, leftChildIndex, leftChildNodeRank);
         send(leftChildNodeRank, mpiTag, msg);
     }
     void sendToRightChild(JobMessage& msg, int mpiTag) const {
@@ -41,7 +41,7 @@ struct JobTreeSnapshot {
             // || log_return_false("Error in Brodcast! Want to send to right child but its contextId is 0! mpiTag %i, msgTag %i, senderIdx %i, destinationIdx %i \n",
                 // mpiTag, msg.tag, msg.treeIndexOfSender, msg.treeIndexOfDestination));
 
-        LOG(V4_VVER, "BCAST send to right child  (%i)[%i] \n", rightChildIndex, rightChildNodeRank);
+        LOG(V4_VVER, "BCAST (%i)[%i] --> (%i)[%i] right \n", index, nodeRank, rightChildIndex, rightChildNodeRank);
         send(rightChildNodeRank, mpiTag, msg);
     }
     void sendToAnyChildren(JobMessage& msg, int mpiTag) const {
