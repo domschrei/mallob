@@ -1118,7 +1118,7 @@ void SweepJob::cbContributeToAllReduce() {
 	}
 
 
-	if (_red->hasResult()) {
+	if (_red && _red->hasResult()) {
 		// LOG(V1_WARN, ">>>> WARN SWEEP [%i] RED SHARE RESET: We are about to reset _red while it still has a valid result! <<<<< \n", _my_rank);
 		extractAllReductionResult();
 	}
