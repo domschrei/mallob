@@ -45,7 +45,7 @@ private:
 	std::atomic_int _finished_sweepers_count {0};
 	std::vector<int> _list_of_ids;
 	std::atomic_bool _started_synchronized_solving{false};
-	int _lastIdleCount{0};
+	int _lastLongtermIdleCount{0};
 
 	//Timing
 	float _start_sweep_timestamp;

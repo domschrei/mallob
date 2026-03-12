@@ -124,7 +124,7 @@ private:
         }
 
         if (_received_broadcast) {
-            LOG(V4_VVER, "BCAST [%i] <-- [%i] child response (are [%i],[%i])\n",
+            LOG(V4_VVER, "BCAST [%i] <-- [%i] child response (either [%i],[%i])\n",
                 _tree.nodeRank, h.source, _tree.leftChildNodeRank, _tree.rightChildNodeRank);
         }
 

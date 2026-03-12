@@ -641,22 +641,30 @@ void SweepJob::printIdleFraction() {
 	  *
 	  */
 
+
 	int idles = 0;
+	int longterm_idles = 0;
 	int active = 0;
 	std::ostringstream oss;
 	for (auto &sweeper : _sweepers) {
 		if (sweeper) {
 			active++;
+			if (sweeper->sweeper_longterm_idle) {
+				longterm_idles++;
+				oss << "," << sweeper->getLocalId();
+			}
+
 			if (sweeper->sweeper_is_idle) {
 				idles++;
-				oss << "," << sweeper->getLocalId();
+				sweeper->sweeper_longterm_idle = true; //those solvers which are idle right now are candicates for being also longterm idle
 			}
 		}
 	}
-	_lastIdleCount = idles;
-	LOG(V3_VERB, "SWEEP  Started %i, Active %i, Running %i, Idle %i: %s \n",  _started_sweepers_count.load(), active, _running_sweepers_count.load(), idles, oss.str().c_str());
+	_lastLongtermIdleCount = longterm_idles;
+	LOG(V3_VERB, "SWEEP  Started %i, Active %i, Running %i, NowIdle %i, LongtermIdle %i: %s \n",  _started_sweepers_count.load(), active, _running_sweepers_count.load(), idles, longterm_idles, oss.str().c_str());
 	// if (active>0)
 		// LOG(V3_VERB, "SWEEP Active %i, Running %i, Idle %i, Started %i. idle nrs: %s \n", active, _running_sweepers_count.load(), idles,  _started_sweepers_count.load(), oss.str().c_str());
+
 }
 
 void SweepJob::checkSharingDelay() {
@@ -917,6 +925,7 @@ void SweepJob::provideInitialWork(KissatPtr sweeper) {
 
 
 	sweeper->sweeper_is_idle = false; //already set non-idle here to prevent case where solver is already initialized, non-idle, but still has no work cause its just being copied, and then a sharing operation starts right now, terminating everything wrongly early
+	sweeper->sweeper_longterm_idle = false;
 
 	//We need to know how much space to allocate to store each variable "idx" at the array position work[idx].
 	//i.e. we need to know max(idx).
@@ -924,13 +933,13 @@ void SweepJob::provideInitialWork(KissatPtr sweeper) {
 	//i.e. that there are no holes in kissats internal numbering. This is an assumption that standard Kissat makes all the time, so we also do it here
 
 	const unsigned VARS = shweep_get_num_vars(sweeper->solver); //this value can be different from numVars here in C++ !! Because kissat might havel aready propagated some units, etc.
-	LOG(V2_INFO, "SWEEP WORK: Start providing -----%u------- work \n", VARS);
+	LOG(V2_INFO, "SWEEP WORK PROVIDING --------------%u---------------- \n", VARS);
 	sweeper->work_received_from_steal = std::vector<int>(VARS);
 	//the initial work is all variables
 	for (int idx = 0; idx < VARS; idx++) {
 		sweeper->work_received_from_steal[idx] = idx;
 	}
-	LOG(V2_INFO, "SWEEP WORK PROVIDED: All work --------------%u---------------->sweeper [%i](%i)\n", VARS, _my_rank, sweeper->getLocalId());
+	LOG(V2_INFO, "SWEEP WORK PROVIDED  --------------%u----------------> to sweeper [%i](%i)\n", VARS, _my_rank, sweeper->getLocalId());
 	_root_provided_initial_work = true;
 }
 
@@ -973,12 +982,11 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 
 	//No success via MPI (either there was no answer, or the answer hat no work).
 	//Next try: steal locally
-	// LOG(V5_DEBG, "SWEEP WORK [%i](%i) steal loop --> local steal \n", _my_rank, localId);
 	auto stolen_work = stealWorkFromAnyLocalSolver(_my_rank, localId);
 	if ( ! stolen_work.empty()) {
 		//Successful local steal
 		sweeper->work_received_from_steal = std::move(stolen_work);
-		LOG(V3_VERB, "SWEEP lcl [%i](%i) <==%i==== localsteal direct  \n", _my_rank, localId, sweeper->work_received_from_steal.size(), _my_rank);
+		LOG(V3_VERB, "SWEEP gt  [%i](%i) <==%i==== local   \n", _my_rank, localId, sweeper->work_received_from_steal.size(), _my_rank);
 		return;
 	}
 
@@ -1003,9 +1011,10 @@ void SweepJob::cbStealWorkNew(unsigned **work, int *work_size, int localId) {
 	//The kissat solver (and other solver threads) will then be allowed to read and write(!) within this fixed allocated memory.
 	*work = reinterpret_cast<unsigned int*>(sweeper->work_received_from_steal.data());
 	*work_size = sweeper->work_received_from_steal.size();
-	assert(*work_size>=0);
+	assert(*work_size>=0 || log_return_false("SWEEP ERRROR : work size %i \n", *work_size));
 	if (*work_size>0) {
 		sweeper->sweeper_is_idle = false;
+		sweeper->sweeper_longterm_idle = false;
 	}
 	//callback ends, kissat thread returns back to its C solver code
 }
@@ -1041,7 +1050,7 @@ void SweepJob::rootStartNewSharingRound() {
 	//make sure that only one sharing operation is going on at a time
 	//on this root node, hasReceivedBroadcast is equivalent to asking whether this _bcast object has already started a broadcast
 	if (_bcast->hasReceivedBroadcast()) {
-		LOG(V3_VERB, "SWEEP root: Delay next round, current %i still ongoing\n", _root_sharing_round);
+		LOG(V3_VERB, "SWEEP root: Delay next round. round %i still ongoing\n", _root_sharing_round);
 		return;
 	}
 	//Broadcast a ping to all workers to initiate an AllReduce
@@ -1191,7 +1200,7 @@ void SweepJob::extractAllReductionResult() {
 	if (!_started_synchronized_solving) {
 		if (eq_size>0 || unit_size>0)  { LOG(V3_VERB, "SWEEP WARN RED SHARE [%i] (iter %i round %i): Skipping %i eqs, %i units bc local solvers are not all init'd yet \n", _my_rank, sweep_iteration, sharing_round, eq_size/2, unit_size); }
 
-		LOG(V2_INFO, "SWEEP RED SHARE SKIP: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)term. #locally idle: %i/%i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastIdleCount, _nThreads);
+		LOG(V2_INFO, "SWEEP RED SHARE SKIP: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)term. #longterm idle: %i/%i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastLongtermIdleCount, _nThreads);
 		return;
 	}
 
@@ -1227,7 +1236,7 @@ void SweepJob::extractAllReductionResult() {
 		}
 	}
 
-	LOG(V2_INFO, "SWEEP RED SHARE: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)term. #locally idle: %i/%i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastIdleCount, _nThreads);
+	LOG(V2_INFO, "SWEEP RED SHARE: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)term. #longterm idle: %i/%i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastLongtermIdleCount, _nThreads);
 
 	//prepare the next sharing round, which gets started from the root node
 	if (_is_root) {
@@ -1398,14 +1407,14 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 		return {};
 
 	// LOG(V2_INFO, "ß %i max_steal_amount\n", max_steal_amount);
-	assert(max_steal_amount > 0 || log_return_false("SWEEP STEAL ERROR [%i](%i): negative max steal amount %i, maybe segfault into non-initialized kissat solver \n", _my_rank, localId, max_steal_amount));
+	assert(max_steal_amount > 0			 || log_return_false("SWEEP STEAL ERROR [%i](%i): negative max steal amount %i, maybe segfault into non-initialized kissat solver \n", _my_rank, localId, max_steal_amount));
 	assert(max_steal_amount < 2*_numVars || log_return_false("SWEEP STEAL ERROR [%i](%i): too large max steal amount %i >= 2*NUM_VARS, maybe segfault into non-initialized kissat solver \n", _my_rank, localId, max_steal_amount));
 
 	//There is something to steal
 
 	//We want only one solver at a time to steal from a given solver. Especially relevant at the beginning, when 23 solvers try to steal from one solver.
 
-	scoped_guard steal_guard(sweeper->is_steal_victim_lock);
+	scoped_guard steal_guard(sweeper->steal_victim_lock);
 	if (!steal_guard.acquired())
 		return {};
 
