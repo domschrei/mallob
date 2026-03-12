@@ -6,9 +6,12 @@
 #include "app/sat/data/model_string_compressor.hpp"
 #include "app/sat/proof/incremental_trusted_parser_store.hpp"
 #include "data/job_processing_statistics.hpp"
+#include "interface/api/api_registry.hpp"
 #include "job/forked_sat_job.hpp"
 #include "parse/sat_reader.hpp"
 #include "robin_map.h"
+#include "util/static_store.hpp"
+#include "util/sys/thread_pool.hpp"
 
 void register_mallob_app_sat() {
     app_registry::registerApplication("SAT",
@@ -29,6 +32,7 @@ void register_mallob_app_sat() {
                 if (!IncrementalTrustedParserStore::map.count(desc.getId()))
                     IncrementalTrustedParserStore::map[desc.getId()] = reader.getTrustedParser();
             }
+            StaticStore<std::string>::insert("cnf-#" + std::to_string(desc.getId()), files[0]);
             return res;
         },
         // Job creator
@@ -44,6 +48,7 @@ void register_mallob_app_sat() {
             } else {
                 json = std::move(model);
             }
+
             //std::stringstream modelString;
             //modelString << "c parse_time " << stat.parseTime << "\n";
             //modelString << "c process_time " << stat.processingTime << "\n";
@@ -62,6 +67,24 @@ void register_mallob_app_sat() {
                 for (auto file : FileUtils::glob(params.extMemDiskDirectory() + "/disk.*.*")) {
                     FileUtils::rmrf(file);
                 }
+            }
+        },
+        // Epilog
+        [](const Parameters& params, const JobResult& result) {
+            auto cnfPathOpt = StaticStore<std::string>::extractMaybe("cnf-#" + std::to_string(result.id));
+            if (cnfPathOpt.has_value() && params.palRupCheck() && result.result == UNSAT) {
+                auto cnfPath = cnfPathOpt.value();
+                nlohmann::json jsonJob = {
+                    {"user", "internal"},
+                    {"name", "palrupchk-" + std::to_string(result.id)},
+                    {"files",
+                        {cnfPath, 
+                        params.proofDirectory() + "/proof#" + std::to_string(result.id) + "/"}},
+                    {"priority", 1.000},
+                    {"application", "PALRUPCHECK"},
+                    {"incremental", false}
+                };
+                auto jsonPalrupResult = APIRegistry::get().processBlocking(jsonJob);
             }
         }
     );

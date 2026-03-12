@@ -70,7 +70,11 @@ Cadical::Cadical(const SolverSetup& setup)
 		okay = solver->set("lrat", 1); assert(okay); // enable LRAT proof logging
 		okay = solver->set("lratsolverid", solverRank); assert(okay); // set this solver instance's ID
 		okay = solver->set("lratsolvercount", maxNumSolvers); assert(okay); // set # solvers
-		okay = solver->set("lratorigclscount", INT32_MAX); assert(okay);
+		okay = solver->set("lratorigclscount",
+			// For incremental real-time proof checking we need to reserve entire 32-bit domain.
+			// For persistent proof logging, smaller assigned IDs result in smaller proofs.
+			_lrat ? INT32_MAX : setup.numOriginalClauses
+		); assert(okay);
 		okay = solver->set("lratskippedepochs", setup.nbSkippedIdEpochs); assert(okay);
 		//okay = solver->set("log", 1); assert(okay); // need to compile CaDiCaL with -l (logging enabled)
 

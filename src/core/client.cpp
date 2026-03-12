@@ -15,6 +15,7 @@
 #include "data/job_interrupt_reason.hpp"
 #include "interface/api/api_registry.hpp"
 #include "util/string_utils.hpp"
+#include "util/sys/threading.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
 #include "util/permutation.hpp"
@@ -448,6 +449,14 @@ void Client::advance() {
             _pending_subtasks.pop_front();
         }
     }
+
+    for (auto it = _epiloging_jobs.begin(); it != _epiloging_jobs.end(); ) {
+        auto& [fut, res] = *it;
+        if (Future::isValidAndReady(fut)) {
+            handleSendJobResultInternal(std::move(res));
+            it = _epiloging_jobs.erase(it);
+        } else ++it;
+    }
 }
 
 int Client::getMaxNumParallelJobs() {
@@ -579,11 +588,13 @@ void Client::handleJobDone(MessageHandle& handle) {
     if (!_active_jobs.count(stats.jobId)) return; // user-side terminated in the meantime?
     JobDescription& desc = *_active_jobs[stats.jobId];
     if (desc.getRevision() > stats.revision) return; // revision obsolete!
-    LOG_ADD_SRC(V4_VVER, "Will receive job result for job #%i rev. %i", handle.source, stats.jobId, stats.revision);
-    MyMpi::isendCopy(stats.successfulRank, MSG_QUERY_JOB_RESULT, handle.getRecvData());
+
     desc.getStatistics().usedWallclockSeconds = stats.usedWallclockSeconds;
     desc.getStatistics().usedCpuSeconds = stats.usedCpuSeconds;
     desc.getStatistics().latencyOf1stVolumeUpdate = stats.latencyOf1stVolumeUpdate;
+
+    LOG_ADD_SRC(V4_VVER, "Will receive job result for job #%i rev. %i", handle.source, stats.jobId, stats.revision);
+    MyMpi::isendCopy(stats.successfulRank, MSG_QUERY_JOB_RESULT, handle.getRecvData());
 }
 
 void Client::handleSendJobResult(MessageHandle& handle) {
@@ -596,6 +607,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     JobDescription* descPtr = getActiveJob(jobId);
     if (!descPtr) return; // user-side terminated in the meantime?
     JobDescription& desc = *descPtr;
+
     if (desc.getRevision() > revision) return; // revision obsolete!
     int surrogateId = desc.getAppConfiguration().map.count("__surrogate") ?
         desc.getAppConfiguration().fixedSizeEntryToInt("__surrogate") : 0;
@@ -611,6 +623,28 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     const float now = Timer::elapsedSeconds();
     desc.getStatistics().processingTime = now - desc.getStatistics().timeOfScheduling + timeOfParentTask;
     desc.getStatistics().totalResponseTime = now - desc.getStatistics().timeOfSubmission + timeOfParentTask;
+
+    auto optEpilog = app_registry::getJobEpilog(desc.getApplicationId());
+    if (optEpilog) {
+        auto futEpilog = ProcessWideThreadPool::get().addTask([&, epilog = optEpilog.value(), res = jobResult]() {
+            epilog(_params, res);
+        });
+        _epiloging_jobs.push_back({std::move(futEpilog), std::move(jobResult)});
+        return;
+    }
+
+    handleSendJobResultInternal(std::move(jobResult));
+}
+
+void Client::handleSendJobResultInternal(JobResult&& jobResult) {
+
+    int& jobId = jobResult.id;
+    int resultCode = jobResult.result;
+    int revision = jobResult.revision;
+
+    JobDescription* descPtr = getActiveJob(jobId);
+    if (!descPtr) return; // user-side terminated in the meantime?
+    JobDescription& desc = *descPtr;
 
     std::string resultCodeString = "UNKNOWN";
     if (resultCode == RESULT_SAT) resultCodeString = "SATISFIABLE";
