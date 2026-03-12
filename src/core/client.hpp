@@ -140,6 +140,8 @@ private:
     std::list<ClientSideJob> _client_side_jobs;
     std::list<ClientSideJob> _done_client_side_jobs;
 
+    std::list<std::pair<std::future<void>, JobResult>> _epiloging_jobs;
+
 public:
     Client(MPI_Comm comm, Parameters& params)
         : _comm(comm), _world_rank(MyMpi::rank(MPI_COMM_WORLD)), 
@@ -154,6 +156,7 @@ public:
     int getInternalRank();
     std::string getFilesystemInterfacePath();
     std::string getSocketPath();
+    int getNbActiveJobs() const {return _active_jobs.size();}
 
 private:
     void readIncomingJobs();
@@ -164,6 +167,7 @@ private:
     void handleJobDone(MessageHandle& handle);
     void handleAbort(MessageHandle& handle);
     void handleSendJobResult(MessageHandle& handle);
+    void handleSendJobResultInternal(JobResult&& result);
     void handleClientFinished(MessageHandle& handle);
 
     int getMaxNumParallelJobs();

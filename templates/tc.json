@@ -1,0 +1,38 @@
+{
+    "comment": [
+        "For each of the below properties, a random distribution to draw the property from can be configured.",
+        "The 'type' can be set to 'constant' (just a constant value VAL), 'uniform' (draw uniformly at random from an interval),",
+        "'normal' (simplified normal distribution where values are capped at provided interval borders), or",
+        "'exponential' (exponential distribution with rate parameter lambda: higher lambda leads to smaller values, exp. value 1/lambda).",
+        "Depending on the type, the following 'params' are expected as a list of numbers:",
+        "constant: [VAL]; uniform: [MIN,MAX]; normal: [MEAN,STDDEV,MIN,MAX]; exponential: [LAMBDA].",
+
+        "When running Mallob with several clients (-c=<>), note that you can create different client files named like tc.json.0, tc.json.1, ... and then specify -job-template=tc.json so that the i-th client will use the file tc.json.<i>."
+    ],
+
+    "priority": {
+        "comment": "The priority of a job.",
+        "type": "constant",
+        "params": [1]
+    },
+    "maxdemand": {
+        "comment": "The maximum demand (= number of processes) a job desires. (0 = unlimited)",
+        "type": "constant",
+        "params": [0]
+    },
+    "wallclock-limit": {
+        "comment": "The wallclock time which may be spent computing until a job is cancelled. (0 = unlimited)",
+        "type": "constant",
+        "params": [0]
+    },
+    "arrival": {
+        "comment": "The arrival of a job, given in seconds since the previous job's arrival (or since system start).",
+        "type": "constant",
+        "params": [0]
+    },
+    "burstsize": {
+        "comment": "The number of jobs arriving simultaneously at each arrival event.",
+        "type": "constant",
+        "params": [1]
+    }
+}

@@ -12,6 +12,7 @@
 #include <fstream>
 #include <utility>
 
+#include "util/assert.hpp"
 #include "util/logger.hpp"
 
 bool FileUtils::exists(const std::string& file) {
@@ -66,15 +67,21 @@ int errfunc(const char* epath, int eerrno) {
 }
 
 int FileUtils::mergeFiles(const std::string& globstr, const std::string& dest, bool removeOriginals) {
-    
-    // For each file matched
-    for (const auto& file : glob(globstr)) {
-        int status = append(file, dest);
-        if (status == 0 && removeOriginals) {
-            rm(file);
-        }
+
+    // Retrieve all matching files
+    auto globbedFiles = glob(globstr);
+
+    // For each file matched: append content to destination
+    int status = 0;
+    for (const auto& file : globbedFiles) {
+        int s = append(file, dest);
+        if (s != 0) status = s;
     }
-    return 0;
+    // Remove originals if desired and if all went well
+    if (status == 0 && removeOriginals) {
+        for (const auto& file : globbedFiles) rm(file);
+    }
+    return status;
 }
 
 int FileUtils::append(const std::string& srcFile, const std::string& destFile) {
@@ -106,6 +113,17 @@ int FileUtils::rmrf(const std::string& dir) {
     return system(cmd.c_str());
 }
 
+std::string FileUtils::getWorkingDirectory() {
+    return getenv("PWD");
+}
+
+std::string FileUtils::getAbsoluteFilePath(const std::string& path) {
+    if (path.empty()) return "";
+    if (path[0] == '/') return path;
+    return getWorkingDirectory() + "/" + path;
+}
+
+
 std::vector<std::string> FileUtils::glob(const std::string& pattern) {
     std::vector<std::string> files;
 
@@ -115,6 +133,7 @@ std::vector<std::string> FileUtils::glob(const std::string& pattern) {
     if (status == GLOB_NOMATCH) {
         // This is not an error: The set of files to merge is merely empty.
         globfree(&result);
+        assert(files.empty());
         return files;
     }
     if (status == GLOB_ABORTED || status == GLOB_NOSPACE) {

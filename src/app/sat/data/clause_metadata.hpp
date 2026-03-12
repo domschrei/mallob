@@ -9,6 +9,7 @@ class ClauseMetadata {
 	static int metadataSize;
 	static bool idsEnabled;
 	static bool signaturesEnabled;
+	static bool incrementalEnabled;
 
 public:
 	static void enableClauseIds() {
@@ -20,6 +21,11 @@ public:
 		if (signaturesEnabled) return;
 		metadataSize += 4; // 4 32-bit integers = 128 bit signature
 		signaturesEnabled = true;
+	}
+	static void enableIncrementalSignatures() {
+		if (incrementalEnabled) return;
+		metadataSize++;
+		incrementalEnabled = true;
 	}
 
 	static inline int numInts() {

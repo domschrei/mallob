@@ -1,0 +1,6 @@
+r3sat_200.cnf
+r3sat_300.cnf
+r3unknown_10k.cnf
+r3unsat_200.cnf
+r3unsat_250.cnf
+r3unsat_300.cnf

@@ -3,35 +3,56 @@
 
 #include <atomic>
 #include <cmath>
+#include <cstdint>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "app/sat/proof/trusted/trusted_utils.hpp"
 #include "data/checksum.hpp"
 #include "util/spsc_blocking_ringbuffer.hpp"
+#include "util/string_utils.hpp"
 
 class SatJobStreamProcessor {
 
 public:
     struct SatTask {
-        int rev {-1};
+        enum Type {RAW, SPLIT} type {SPLIT};
         std::vector<int> lits;
         std::vector<int> assumptions;
         std::string descLabel;
         float priority;
         Checksum chksum;
-        void integrate(SatTask& other) {
+        int rev {-1};
+        void integrate(const SatTask& other) {
+            integrate(SatTask(other));
+        }
+        void integrate(SatTask&& other) {
             assert(other.rev != rev);
+            assert(type == other.type);
             if (other.rev > rev) {
                 rev = other.rev;
                 descLabel = std::move(other.descLabel);
-                priority = other.priority;
                 assumptions = std::move(other.assumptions);
+                priority = other.priority;
                 // TODO handle checksum
                 chksum = other.chksum;
             }
             if (lits.empty()) lits = std::move(other.lits);
-            else for (int lit : other.lits) lits.push_back(lit);
+            else {
+                if (type == RAW) {
+                    // Truncate away old fingerprint and assumptions
+                    assert(lits.back() == INT32_MIN || log_return_false("[ERROR] unexpected lits structure: %s", StringUtils::getSummary(lits, INT32_MAX).c_str()));
+                    lits.resize(lits.size() - 1 - SIG_SIZE_BYTES/sizeof(int));
+                    while (!lits.empty() && lits.back() != INT32_MAX) lits.pop_back();
+                    assert(!lits.empty());
+                    lits.pop_back();
+                    assert(lits.empty() || lits.back() == 0);
+                    //for (int l : lits) assert(l != INT32_MAX && l != INT32_MIN);
+                }
+                // Append new clauses, fingerprint, and assumptions
+                for (int lit : other.lits) lits.push_back(lit);
+            }
         }
     };
     struct SatTaskResult {
@@ -55,6 +76,7 @@ public:
 protected:
     std::string _name;
     std::function<bool(int)> _terminator;
+    std::function<const SatTask&()> _cb_retrieve_full_task;
 
 private:
     Synchronizer& _sync;
@@ -67,11 +89,18 @@ public:
     virtual void setName(const std::string& baseName) {
         _name = baseName + ":base";
     }
-
+    virtual void setRetrieveFullTaskCallback(std::function<const SatTask&()> cb) {
+        _cb_retrieve_full_task = cb;
+    }
     virtual void setTerminator(const std::function<bool(int)>& terminator) {
         _terminator = terminator;
     }
 
+    std::string getName() const {
+        return _name;
+    }
+
+    virtual void loop() {}
     virtual void process(SatTask& task) = 0;
 
     virtual void finalize() {
@@ -80,10 +109,11 @@ public:
         _queue.markTerminated();
     }
 
-    void submit(int revision, std::vector<int>&& newLiterals, const std::vector<int>& assumptions,
-            const std::string& descriptionLabel = "", float priority = 0, Checksum chksum = {}) {
-
-        SatTask task {revision, newLiterals, assumptions, "", 1, {}};
+    void submit(const SatTask& task) {
+        submit(SatTask(task));
+    }
+    void submit(SatTask&& task) {
+        //SatTask task {revision, newLiterals, assumptions, "", 1, {}};
         _queue.pushBlocking(task);
     }
 

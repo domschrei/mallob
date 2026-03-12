@@ -4,7 +4,6 @@
 #include <fstream>
 #include <string>
 #include <list>
-#include <filesystem>
 #include <functional>
 #include <initializer_list>
 #include <utility>
@@ -16,6 +15,7 @@
 #include "data/job_interrupt_reason.hpp"
 #include "interface/api/api_registry.hpp"
 #include "util/string_utils.hpp"
+#include "util/sys/threading.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
 #include "util/permutation.hpp"
@@ -139,15 +139,15 @@ void Client::readIncomingJobs() {
                 // Read job
                 int id = foundJob.description->getId();
                 float time = Timer::elapsedSeconds();
-                bool success = true;
                 auto filesList = foundJob.getFilesList();
                 foundJob.description->beginInitialization(foundJob.description->getRevision());
-                if (foundJob.hasFiles()) {
-                    LOGGER(log, V3_VERB, "[T] Reading job #%i rev. %i %s ...\n", id, foundJob.description->getRevision(), filesList.c_str());
-                    success = app_registry::getJobReader(foundJob.description->getApplicationId())(
-                        _params, foundJob.files, *foundJob.description
-                    );
-                }
+                LOGGER(log, V3_VERB, "[T] Reading job #%i rev. %i %s ...\n", id, foundJob.description->getRevision(), filesList.c_str());
+
+                Parameters params(_params);
+                app_registry::overrideProgramOptions(params, *foundJob.description);
+                bool success = app_registry::getJobReader(foundJob.description->getApplicationId())(
+                    params, foundJob.files, *foundJob.description
+                );
                 foundJob.description->endInitialization();
                 if (!success) {
                     LOGGER(log, V1_WARN, "[T] [WARN] Unsuccessful read - skipping #%i\n", id);
@@ -170,11 +170,13 @@ void Client::readIncomingJobs() {
                         bool* done = &clientSideJob.done;
                         JobResult* res = &clientSideJob.result;
                         auto* desc = clientSideJob.desc.get();
+                        Parameters params(_params);
+                        app_registry::overrideProgramOptions(params, *desc);
                         // store "original" arrival time value as the job's submission time
                         desc->getStatistics().timeOfSubmission = desc->getArrival();
                         desc->getStatistics().timeOfScheduling = Timer::elapsedSeconds();
                         clientSideJob.program.reset(
-                            app_registry::getClientSideProgramCreator(appId)(_params, APIRegistry::get(), *desc)
+                            app_registry::getClientSideProgramCreator(appId)(params, APIRegistry::get(), *desc)
                         );
                         clientSideJob.thread->run([&, prog = clientSideJob.program.get(), done, res]() {
                             *res = prog->function();
@@ -265,9 +267,7 @@ void Client::init() {
         {
             // Write the available job submission path to an availability tmp file
             std::ofstream ofs(TmpDir::getGeneralTmpDir() + "/edu.kit.iti.mallob.apipath." + std::to_string(Proc::getPid()));
-            // Differentiate absolute vs. relative path
-            if (path[0] == '/') ofs << path;
-            else ofs << std::filesystem::current_path().string() + "/" + path;
+            ofs << path;
         }
         LOG(V2_INFO, "Set up filesystem interface at %s\n", path.c_str());
         // Tell JSON interface to output non-JSON result files to the interface path, too
@@ -306,7 +306,7 @@ int Client::getInternalRank() {
 }
 
 std::string Client::getFilesystemInterfacePath() {
-    return _params.apiDirectory() + "/jobs." + std::to_string(getInternalRank()) + "/";
+    return FileUtils::getAbsoluteFilePath(_params.apiDirectory() + "/jobs." + std::to_string(getInternalRank()) + "/");
 }
 
 std::string Client::getSocketPath() {
@@ -449,6 +449,14 @@ void Client::advance() {
             _pending_subtasks.pop_front();
         }
     }
+
+    for (auto it = _epiloging_jobs.begin(); it != _epiloging_jobs.end(); ) {
+        auto& [fut, res] = *it;
+        if (Future::isValidAndReady(fut)) {
+            handleSendJobResultInternal(std::move(res));
+            it = _epiloging_jobs.erase(it);
+        } else ++it;
+    }
 }
 
 int Client::getMaxNumParallelJobs() {
@@ -580,11 +588,13 @@ void Client::handleJobDone(MessageHandle& handle) {
     if (!_active_jobs.count(stats.jobId)) return; // user-side terminated in the meantime?
     JobDescription& desc = *_active_jobs[stats.jobId];
     if (desc.getRevision() > stats.revision) return; // revision obsolete!
-    LOG_ADD_SRC(V4_VVER, "Will receive job result for job #%i rev. %i", handle.source, stats.jobId, stats.revision);
-    MyMpi::isendCopy(stats.successfulRank, MSG_QUERY_JOB_RESULT, handle.getRecvData());
+
     desc.getStatistics().usedWallclockSeconds = stats.usedWallclockSeconds;
     desc.getStatistics().usedCpuSeconds = stats.usedCpuSeconds;
     desc.getStatistics().latencyOf1stVolumeUpdate = stats.latencyOf1stVolumeUpdate;
+
+    LOG_ADD_SRC(V4_VVER, "Will receive job result for job #%i rev. %i", handle.source, stats.jobId, stats.revision);
+    MyMpi::isendCopy(stats.successfulRank, MSG_QUERY_JOB_RESULT, handle.getRecvData());
 }
 
 void Client::handleSendJobResult(MessageHandle& handle) {
@@ -597,6 +607,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     JobDescription* descPtr = getActiveJob(jobId);
     if (!descPtr) return; // user-side terminated in the meantime?
     JobDescription& desc = *descPtr;
+
     if (desc.getRevision() > revision) return; // revision obsolete!
     int surrogateId = desc.getAppConfiguration().map.count("__surrogate") ?
         desc.getAppConfiguration().fixedSizeEntryToInt("__surrogate") : 0;
@@ -613,6 +624,28 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     desc.getStatistics().processingTime = now - desc.getStatistics().timeOfScheduling + timeOfParentTask;
     desc.getStatistics().totalResponseTime = now - desc.getStatistics().timeOfSubmission + timeOfParentTask;
 
+    auto optEpilog = app_registry::getJobEpilog(desc.getApplicationId());
+    if (optEpilog) {
+        auto futEpilog = ProcessWideThreadPool::get().addTask([&, epilog = optEpilog.value(), res = jobResult]() {
+            epilog(_params, res);
+        });
+        _epiloging_jobs.push_back({std::move(futEpilog), std::move(jobResult)});
+        return;
+    }
+
+    handleSendJobResultInternal(std::move(jobResult));
+}
+
+void Client::handleSendJobResultInternal(JobResult&& jobResult) {
+
+    int& jobId = jobResult.id;
+    int resultCode = jobResult.result;
+    int revision = jobResult.revision;
+
+    JobDescription* descPtr = getActiveJob(jobId);
+    if (!descPtr) return; // user-side terminated in the meantime?
+    JobDescription& desc = *descPtr;
+
     std::string resultCodeString = "UNKNOWN";
     if (resultCode == RESULT_SAT) resultCodeString = "SATISFIABLE";
     if (resultCode == RESULT_UNSAT) resultCodeString = "UNSATISFIABLE";
@@ -626,15 +659,17 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     if (resultCode != 0) {
         _sys_state.addLocal(SYSSTATE_SUCCESSFUL_JOBS, 1);
     }
+    Parameters params(_params);
+    app_registry::overrideProgramOptions(params, desc);
 
     std::string resultString = "s " + resultCodeString + "\n";
     std::vector<std::string> modelStrings;
     // Decide whether we need to construct a string representing a solution.
     // - In "mono" mode of operation, we only want the original job, not a secondary one.
-    bool primaryJob = !_params.monoFilename.isSet() || jobId == _mono_job_id;
+    bool primaryJob = !params.monoFilename.isSet() || jobId == _mono_job_id;
     bool constructSolutionStrings = primaryJob;
     // - Some sort of output is in fact desired by the user.
-    constructSolutionStrings &= _params.solutionToFile.isSet() || (jobId == _mono_job_id && !_params.omitSolution());
+    constructSolutionStrings &= params.solutionToFile.isSet() || (jobId == _mono_job_id && !params.omitSolution());
     if (constructSolutionStrings) {
 
         // Disable all watchdogs to avoid crashes while printing a huge model
@@ -642,12 +677,12 @@ void Client::handleSendJobResult(MessageHandle& handle) {
         //     Watchdog::disableGlobally();
 
         auto json = app_registry::getJobSolutionFormatter(desc.getApplicationId())(
-            _params, jobResult, desc.getStatistics());
+            params, jobResult, desc.getStatistics());
         if (json.is_array() && (json.size()==0 || json[0].is_string())) {
             auto jsonArr = json.get<std::vector<std::string>>();
             for (auto&& str : jsonArr) modelStrings.push_back(std::move(str));
         } else if (json.is_string()) {
-            if (resultCode == RESULT_SAT && _params.compressModels()) {
+            if (resultCode == RESULT_SAT && params.compressModels()) {
                 auto vec = ModelStringCompressor::decompress(json.get<std::string>());
                 std::string modelStr = "v ";
                 for (int l : vec) if (l!=0) modelStr += std::to_string(l) + " ";
@@ -660,10 +695,10 @@ void Client::handleSendJobResult(MessageHandle& handle) {
             modelStrings.push_back(json.dump()+"\n");
         }
     }
-    if (constructSolutionStrings && _params.solutionToFile.isSet()) {
+    if (constructSolutionStrings && params.solutionToFile.isSet()) {
         // Write solution to file
         std::ofstream file;
-        std::string solPath = _params.solutionToFile();
+        std::string solPath = params.solutionToFile();
         if (jobId != _mono_job_id) solPath += "." + std::to_string(jobId) + "." + std::to_string(revision);
         file.open(solPath);
         if (!file.is_open()) {
@@ -677,14 +712,9 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     if (jobId == _mono_job_id) {
         // Mono job: log solution to stdout, write result hint if doing proof production
         LOG_OMIT_PREFIX(V0_CRIT, resultString.c_str());
-        if (constructSolutionStrings && !_params.solutionToFile.isSet()) {
+        if (constructSolutionStrings && !params.solutionToFile.isSet()) {
             for (auto& modelString : modelStrings)
                 LOG_OMIT_PREFIX(V0_CRIT, modelString.c_str());
-        }
-        if (_params.proofOutputFile.isSet()) {
-            std::ofstream resultFile(".mallob_result");
-            std::string resultCodeStr = std::to_string(resultCode);
-            if (resultFile.is_open()) resultFile.write(resultCodeStr.c_str(), resultCodeStr.size());
         }
     }
 
@@ -787,7 +817,7 @@ Client::~Client() {
 
     Watchdog watchdog(_params.watchdog(), 1'000, true);
     watchdog.setWarningPeriod(1'000);
-    watchdog.setAbortPeriod(20'000);
+    watchdog.setAbortPeriod(_params.watchdogAbortMillis());
 
     for (auto& pending : _pending_subtasks) pending.future.get();
 

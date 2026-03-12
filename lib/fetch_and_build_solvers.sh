@@ -87,8 +87,8 @@ if echo $solvers|grep -q "k" && [ ! -f kissat/libkissat.a ]; then
     echo "Building Kissat ..."
 
     cd kissat
-    ./configure --no-proofs
-    make
+    ./configure -O3 --no-proofs
+    make -j
     cp build/libkissat.a .
     cd ..
 fi
@@ -99,7 +99,7 @@ if echo $solvers|grep -q "c" && [ ! -f cadical/libcadical.a ]; then
 
     cd cadical
     ./configure
-    make
+    make -j
     cp build/libcadical.a .
     cd ..
 fi

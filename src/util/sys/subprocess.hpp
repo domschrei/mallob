@@ -31,14 +31,15 @@ private:
     const Parameters& _params;
     const std::string _cmd;
     const std::string _additional_args;
+    const bool _append_opts;
 
 public:
-    Subprocess(const Parameters& params, const std::string& cmd) :
-            _params(params), _cmd(cmd) {
+    Subprocess(const Parameters& params, const std::string& cmd, bool appendOptions) :
+            _params(params), _cmd(cmd), _append_opts(appendOptions) {
         assert(!_cmd.empty());
     }
-    Subprocess(const Parameters& params, const std::string& cmd, const std::string& additionalArgs) :
-            _params(params), _cmd(cmd), _additional_args(additionalArgs) {
+    Subprocess(const Parameters& params, const std::string& cmd, const std::string& additionalArgs, bool appendOptions) :
+            _params(params), _cmd(cmd), _additional_args(additionalArgs), _append_opts(appendOptions) {
         assert(!_cmd.empty());
     }
 
@@ -46,6 +47,7 @@ public:
 
         // FORK: Create a child process
         const pid_t res = Process::createChild();
+        assert(res >= 0);
         if (res == 0) {
             // [child process]
             // Danger zone: Do not touch any memory.
@@ -64,7 +66,7 @@ public:
         if (_cmd[0] == '/') executable = _cmd;
         else executable = std::string(MALLOB_SUBPROC_DISPATCH_PATH) + _cmd;
         //char* const* argv = _params.asCArgs(executable.c_str());
-        std::string command = _params.getSubprocCommandAsString(executable.c_str()) + " ";
+        std::string command = _params.getSubprocCommandAsString(executable.c_str(), _append_opts) + " ";
         if (!_additional_args.empty()) command += _additional_args + " ";
 
         // Write command to tmp file (to be read by child process)

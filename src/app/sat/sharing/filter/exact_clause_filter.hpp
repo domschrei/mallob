@@ -2,54 +2,17 @@
 #pragma once
 
 #include <atomic>
-#include <variant>
 
 #include "app/sat/data/clause.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
 #include "app/sat/sharing/filter/generic_clause_filter.hpp"
+#include "robin_map.h"
 #include "util/logger.hpp"
-#include "util/tsl/robin_map.h"
 #include "../../data/produced_clause.hpp"
 #include "../../data/produced_clause_candidate.hpp"
 #include "util/sys/threading.hpp"
 #include "produced_clause_filter_commons.hpp"
 #include "util/sys/timer.hpp"
-
-typedef std::variant<ProducedUnitClause, ProducedBinaryClause, ProducedLargeClause> AnyProducedClause;
-
-struct AnyProducedClauseHasher {
-    std::size_t inline operator()(const AnyProducedClause& anyPC) const {
-        switch (anyPC.index()) {
-        case 0:
-            return Mallob::nonCommutativeHash(prod_cls::data(std::get<0>(anyPC)),
-                prod_cls::size(std::get<0>(anyPC)), 1);
-        case 1:
-            return Mallob::nonCommutativeHash(prod_cls::data(std::get<1>(anyPC)),
-                prod_cls::size(std::get<1>(anyPC)), 2);
-        case 2:
-        default:
-            return Mallob::nonCommutativeHash(prod_cls::data(std::get<2>(anyPC)),
-                prod_cls::size(std::get<2>(anyPC)), 3);
-        }
-    }
-};
-struct AnyProducedClauseEquals {
-    bool inline operator()(const AnyProducedClause& a, const AnyProducedClause& b) const {
-        static ProducedClauseEquals<ProducedUnitClause> equalsUnit;
-        static ProducedClauseEquals<ProducedBinaryClause> equalsBinary;
-        static ProducedClauseEquals<ProducedLargeClause> equalsLarge;
-        if (a.index() != b.index()) return false;
-        switch (a.index()) {
-        case 0:
-            return equalsUnit(std::get<0>(a), std::get<0>(b));
-        case 1:
-            return equalsBinary(std::get<1>(a), std::get<1>(b));
-        case 2:
-        default:
-            return equalsLarge(std::get<2>(a), std::get<2>(b));
-        }
-    }
-};
 
 // Exact data structure which remembers clauses which were successfully exported by a solver.
 // For each incoming clause, the structure can then be used to decide (a) if the clause should 
@@ -57,7 +20,7 @@ struct AnyProducedClauseEquals {
 // subset of solvers should receive the clauses (because they did not export it themselves).
 class ExactClauseFilter : public GenericClauseFilter {
 
-using ProducedMap = tsl::robin_map<AnyProducedClause, ClauseInfo, AnyProducedClauseHasher, AnyProducedClauseEquals>;
+using ProducedMap = tsl::robin_map<ProducedClause, ClauseInfo, ProducedClauseHasher, ProducedClauseEquals>;
 
 private:
     const int _epoch_horizon;
@@ -84,13 +47,13 @@ public:
     ExportResult tryRegisterAndInsert(ProducedClauseCandidate&& c, GenericClauseStore* storeOrNullptr = nullptr) override {
         Mallob::Clause cls;
 
-        AnyProducedClause apc = getAnyProducedClause(c);
-        int* data = getLiteralData(apc);
+        ProducedClause pc = getProducedClause(c);
+        int* data = pc.data;
 
         ExportResult result;
 
         auto& slot = getSlot(c.size);
-        auto it = slot._map.find(apc);
+        auto it = slot._map.find(pc);
         bool contained = it != slot._map.end();
         bool filtered = false;
 
@@ -99,7 +62,7 @@ public:
             auto& info = it->second;
             if (!info.isAdmissibleForInsertion(c.epoch, _epoch_horizon)) {
                 // filtered! add new producer, return.
-                updateClauseInfo(c, apc, it, false);
+                updateClauseInfo(c, pc, it, false);
                 result = FILTERED;
                 filtered = true;
             }
@@ -110,11 +73,11 @@ public:
             auto clauseStore = storeOrNullptr ? storeOrNullptr : &_clause_store;
             if (clauseStore->addClause(cls)) {
                 // Success!
-                updateClauseInfo(c, apc, it, true); // create if nonexistent
+                updateClauseInfo(c, pc, it, true); // create if nonexistent
                 result = ADMITTED;
             } else {
                 // No space left in database: drop clause
-                if (contained) updateClauseInfo(c, apc, it, false); // update if existent
+                if (contained) updateClauseInfo(c, pc, it, false); // update if existent
                 result = DROPPED;
             }
         }
@@ -130,6 +93,10 @@ public:
         int epoch = _epoch.load(std::memory_order_relaxed);
         if (epoch - _last_gc_epoch < _epoch_horizon) return false;
         _last_gc_epoch = epoch;
+        size_t nbKept = 0;
+        size_t nbRemoved = 0;
+
+        auto startTime = Timer::elapsedSeconds();
 
         for (size_t i = 0; i < _slots.size(); i++) {
             auto& slot = *_slots.at(i);
@@ -140,41 +107,43 @@ public:
             slot._mtx_map.lock();
 
             // Remove all old clauses
-            size_t nbRemoved = 0;
             size_t mapSize = slot._map.size();
             for (auto it = slot._map.begin(); it != slot._map.end();) {
                 auto& [apc, info] = *it;
-                if (epoch - info.lastSharedEpoch > _epoch_horizon
-                    && epoch - info.lastProducedEpoch > _epoch_horizon) {
+                if (epoch - info.lastProducedEpoch > _epoch_horizon &&
+                        (!info.wasSharedBefore() || epoch - info.lastSharedEpoch > _epoch_horizon)) {
                     it = slot._map.erase(it);
                     nbRemoved++;
-                } else ++it;
+                } else {
+                    ++it;
+                    nbKept++;
+                }
             }
 
             time = Timer::elapsedSeconds() - time;
-            LOGGER(logger, V5_DEBG, "filter-gc clslen=%i epoch=%i removed=%lu/%lu time=%.4f\n",
-                i+1-ClauseMetadata::numInts(), epoch, nbRemoved, mapSize, time);
+            LOGGER(logger, V5_DEBG, "filter-gc clslen=%i epoch=%i size=%lu time=%.4f\n",
+                i+1-ClauseMetadata::numInts(), epoch, mapSize, time);
 
             // Allow inserting threads to successfully tryGetSharedLock() again
             slot._mtx_map.unlock();
         }
 
-        LOGGER(logger, V4_VVER, "pcb size=%ld %s\n", _clause_store.getCurrentlyUsedLiterals(),
-                _clause_store.getCurrentlyUsedLiteralsReport().c_str());
+        LOGGER(logger, V4_VVER, "filter-gc del=%lu size=%lu t=%.4f\n",
+            nbRemoved, nbKept, Timer::elapsedSeconds() - startTime);
         return true;
     }
 
     cls_producers_bitset confirmSharingAndGetProducers(Mallob::Clause& c, int epoch) override {
-        auto apc = getAnyProducedClause(c);
-        auto producers = confirmSharingAndGetProducers(apc, c.size, c.lbd, epoch);
-        if (apc.index() == 2) std::get<2>(apc).data = nullptr;
+        auto pc = getProducedClause(c);
+        auto producers = confirmSharingAndGetProducers(pc, c.size, c.lbd, epoch);
+        pc.data = nullptr;
         return producers;
     }
 
     bool admitSharing(Mallob::Clause& c, int epoch) override {
-        auto apc = getAnyProducedClause(c);
-        bool admitted = admitSharing(apc, c.size, c.lbd, epoch);
-        if (apc.index() == 2) std::get<2>(apc).data = nullptr;
+        auto pc = getProducedClause(c);
+        bool admitted = admitSharing(pc, c.size, c.lbd, epoch);
+        pc.data = nullptr;
         return admitted;
     }
 
@@ -221,8 +190,8 @@ public:
         for (size_t i = 0; i < _slots.size(); i++) releaseLock(i+1);
     }
 
-    void erase(ProducedClauseCandidate& c) {
-        getSlot(c.size)._map.erase(getAnyProducedClause(c));
+    void erase(ProducedClauseCandidate&& c) {
+        getSlot(c.size)._map.erase(getProducedClause(c));
     }
 
 private:
@@ -233,62 +202,29 @@ private:
     }
 
     void erase(Mallob::Clause& c) {
-        auto apc = getAnyProducedClause(c);
-        getSlot(c.size)._map.erase(apc);
-        if (apc.index() == 2) std::get<2>(apc).data = nullptr;
+        auto pc = getProducedClause(c);
+        getSlot(c.size)._map.erase(pc);
+        pc.data = nullptr;
     }
 
-    AnyProducedClause getAnyProducedClause(ProducedClauseCandidate& c) {
-        AnyProducedClause apc;
-        if (c.size == 1) {
-            ProducedUnitClause pc;
-            pc.literal = *c.begin;
-            apc = std::move(pc);
-        } else if (c.size == 2) {
-            ProducedBinaryClause pc;
-            pc.literals[0] = std::min(c.begin[0], c.begin[1]);
-            pc.literals[1] = std::max(c.begin[0], c.begin[1]);
-            apc = std::move(pc);
-        } else {
-            ProducedLargeClause pc;
-            pc.size = c.size;
-            pc.data = c.releaseData();
-            apc = std::move(pc);
-        }
-        return apc;
+    ProducedClause getProducedClause(ProducedClauseCandidate& c) {
+        ProducedClause pc;
+        pc.size = c.size;
+        pc.data = c.releaseData();
+        return pc;
     }
-    AnyProducedClause getAnyProducedClause(Mallob::Clause& c) {
-        AnyProducedClause apc;
-        if (c.size == 1) {
-            apc = ProducedUnitClause(c);
-        } else if (c.size == 2) {
-            apc = ProducedBinaryClause(c);
-        } else {
-            ProducedLargeClause pc;
-            pc.size = c.size;
-            pc.data = c.begin;
-            apc = std::move(pc);
-            pc.data = nullptr;
-        }
-        return apc;
-    }
-    int* getLiteralData(AnyProducedClause& apc) {
-        switch (apc.index()) {
-        case 0:
-            return &std::get<0>(apc).literal;
-        case 1:
-            return std::get<1>(apc).literals;
-        case 2:
-        default:
-            return std::get<2>(apc).data;
-        }
+    ProducedClause getProducedClause(Mallob::Clause& c) {
+        ProducedClause pc;
+        pc.size = c.size;
+        pc.data = c.begin;
+        return pc;
     }
 
     ClauseInfo getDefaultClauseInfo(const ProducedClauseCandidate& c) {
         return ClauseInfo(c);
     }
 
-    void updateClauseInfo(const ProducedClauseCandidate& c, const AnyProducedClause& apc, ProducedMap::iterator& it,
+    void updateClauseInfo(const ProducedClauseCandidate& c, const ProducedClause& pc, ProducedMap::iterator& it,
             bool updateProducedEpoch) {
 
         auto& slot = getSlot(c.size);
@@ -298,13 +234,13 @@ private:
         if (updateProducedEpoch && c.epoch > info.lastProducedEpoch) info.lastProducedEpoch = c.epoch;
         // Add producing solver as a producer
         info.producers |= (1 << c.producerId);
-        slot._map.insert_or_assign(it, apc, std::move(info));
+        slot._map.insert_or_assign(it, pc, std::move(info));
     }
 
-    inline bool admitSharing(const AnyProducedClause& apc, int size, int lbd, int epoch) {
+    inline bool admitSharing(const ProducedClause& pc, int size, int lbd, int epoch) {
 
         auto& slot = getSlot(size);
-        auto it = slot._map.find(apc);
+        auto it = slot._map.find(pc);
         if (it == slot._map.end()) return true;
 
         const ClauseInfo& info = it->second;
@@ -318,10 +254,10 @@ private:
         return true;
     }
 
-    inline cls_producers_bitset confirmSharingAndGetProducers(const AnyProducedClause& apc, int size, int lbd, int epoch) {
+    inline cls_producers_bitset confirmSharingAndGetProducers(const ProducedClause& pc, int size, int lbd, int epoch) {
 
         auto& slot = getSlot(size);
-        auto it = slot._map.find(apc);
+        auto it = slot._map.find(pc);
         if (it == slot._map.end()) return 0;
         ClauseInfo info = it->second;
         info.lastSharedEpoch = epoch;
@@ -330,7 +266,7 @@ private:
             (_epoch_horizon >= 0 && epoch - info.lastProducedEpoch > _epoch_horizon) ?
             0 : info.producers;
         info.producers = 0; // reset producers in any case
-        slot._map.insert_or_assign(it, apc, std::move(info));
+        slot._map.insert_or_assign(it, pc, std::move(info));
         return producers;
     }
 };

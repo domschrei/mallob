@@ -374,6 +374,10 @@ private:
         in.preSorted = preSorted;
         bool assumptions = false;
         for (size_t i = 0; i < size; i++) {
+            if (data[i] == INT32_MIN) {
+                // end reached
+                break;
+            }
             if (data[i] == INT32_MAX) {
                 // separator for assumptions!
                 assumptions = true;

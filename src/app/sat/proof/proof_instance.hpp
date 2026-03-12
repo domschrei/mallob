@@ -10,6 +10,7 @@
 #include "app/sat/proof/serialized_lrat_line.hpp"
 #include "external_id_priority_queue.hpp"
 #include "util/logger.hpp"
+#include "util/string_utils.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "app/sat/proof/lrat_utils.hpp"
 #include "merging/proof_merge_connector.hpp"
@@ -58,6 +59,8 @@ private:
     unsigned long _num_parsed_clauses = 0;
     unsigned long _num_traced_clauses = 0;
     unsigned long _num_output_lines = 0;
+    unsigned long _num_total_skipped_lines = 0;
+    int _max_epoch_with_skipped_lines = 0;
 
     bool _interleave_merging {false};
     ProofMergeConnector* _merge_connector;
@@ -137,6 +140,7 @@ private:
         int numSelfClauses = 0;
         for (size_t i = 0; i < clauseIdsSize; i++) {
             LratClauseId id = clauseIdsData[i];
+            assert(id > 0);
             if (isSelfProducedClause(id)) {
                 _frontier.push(id, getClauseEpoch(id));
                 numSelfClauses++;
@@ -148,7 +152,7 @@ private:
     void readEpoch() {
 
         LOGGER(_log, V5_DEBG, "%i reading e.%i\n", _instance_id, _current_epoch);
-        int numReadLines = 0;
+        unsigned long numReadLines = 0;
 
         std::ofstream dbgOfs;
         if (_debugging) {
@@ -215,6 +219,7 @@ private:
                 // Traverse clause hints
                 for (size_t i = 0; i < numHints; i++) {
                     auto hintId = hints[i];
+                    assert(hintId > 0);
                     int hintEpoch = getClauseEpoch(hintId);
                     if (isSelfProducedClause(hintId)) {
                         if (_debugging) outputLratId("FRT", hintId, dbgOfs);
@@ -263,10 +268,12 @@ private:
         if (numSkippedLines > 0) {
             LOGGER(_log, V1_WARN, "[WARN] Proof %i: skipped %i lines from future epoch > %i\n", 
                 _instance_id, numSkippedLines, _current_epoch);
+            _num_total_skipped_lines += numSkippedLines;
+            _max_epoch_with_skipped_lines = std::max(_max_epoch_with_skipped_lines, _current_epoch);
             numSkippedLines = 0;
         }
 
-        LOGGER(_log, V4_VVER, "%i e.%i read:%i last:%s traced:%lu blg:%lu frt:%lu\n",
+        LOGGER(_log, V4_VVER, "%i e.%i read:%lu last:%s traced:%lu blg:%lu frt:%lu\n",
             _instance_id, _current_epoch, numReadLines, 
             numReadLines==0 ? "-" : std::to_string(formerId).c_str(), 
             _num_traced_clauses, _backlog.size(), _frontier.size());
@@ -276,13 +283,26 @@ private:
         if (_current_epoch == 0) {
             // End of the procedure reached!
             
+            _num_total_skipped_lines += numSkippedLines;
+            numSkippedLines = 0;
+
+            std::vector<unsigned long> frontierContent;
+            while (!_frontier.empty()) frontierContent.push_back(_frontier.pop());
+            std::vector<unsigned long> backlogContent;
+            while (!_backlog.empty()) backlogContent.push_back(_backlog.pop());
+            LOGGER(_log, V2_INFO, "END_OF_PROOF_INST %i skippedlines=%i maxepochwithskippedlines=%i frontier=%lu:{%s} backlog=%lu:{%s}\n",
+                _instance_id, _num_total_skipped_lines, _max_epoch_with_skipped_lines,
+                frontierContent.size(), StringUtils::getSummary(frontierContent, 100).c_str(),
+                backlogContent.size(), StringUtils::getSummary(backlogContent, 100).c_str());
+            _log.flush();
+
             // -- the proof file must have been read completely
             assert(!_current_line.valid());
             assert(!_parser.getNextLine(_current_line));
 
             // -- there may not be any underived clauses left
-            assert(_frontier.empty());
-            assert(_backlog.empty());
+            assert(frontierContent.empty());
+            assert(backlogContent.empty());
 
             if (_interleave_merging) {
 
@@ -372,7 +392,7 @@ private:
     }
     bool isSelfProducedClause(LratClauseId clauseId) {
         if (isOriginalClause(clauseId)) return false;
-        return _instance_id == (clauseId-_original_num_clauses) % _num_instances;
+        return _instance_id == (clauseId % _num_instances);
     }
     
     int getUnalignedClauseEpoch(LratClauseId clauseId) {

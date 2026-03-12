@@ -46,8 +46,8 @@ private:
     int _num_ready_msgs_from_children = 0;
 
     JobMessage _msg_unsat_found;
-    std::list<JobMessage> _deferred_sharing_initiation_msgs;
-    std::list<JobMessage> _deferred_cross_sharing_initiation_msgs;
+    std::list<std::pair<int, JobMessage>> _deferred_sharing_initiation_msgs;
+    std::list<std::pair<int, JobMessage>> _deferred_cross_sharing_initiation_msgs;
 
     bool _initiated_proof_assembly = false;
     std::unique_ptr<ProofProducer> _proof_producer;

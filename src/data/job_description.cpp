@@ -11,6 +11,7 @@ void JobDescription::beginInitialization(int revision) {
     _data_per_revision[_revision].reset(new std::vector<uint8_t>(
         getMetadataSize()
     ));
+    getRevisionData(_revision)->resize(getMetadataSize());
     _f_size = 0;
 }
 
@@ -105,12 +106,14 @@ size_t JobDescription::getTransferSize(int revision) const {
 
 
 int JobDescription::getMetadataSize() const {
-    return 10*sizeof(int)
+    int size = 10*sizeof(int)
            +1*sizeof(size_t)
            +3*sizeof(float)
            +sizeof(bool)
            +sizeof(Checksum)
            +sizeof(int)+_app_config.getSerializedSize();
+    while (size % sizeof(int) > 0) size++;
+    return size;
 }
 
 

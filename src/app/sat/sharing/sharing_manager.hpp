@@ -133,7 +133,7 @@ public:
 	int getLastNumAdmittedClausesToImport() const {return _last_num_admitted_cls_to_import;}
 	int getLastNumAdmittedLitsToImport() const {return _last_num_admitted_lits_to_import;}
 
-	int getGlobalStartOfSuccessEpoch() {
+	unsigned long getGlobalStartOfSuccessEpoch() {
 		return !_id_alignment ? 0 : _id_alignment->getGlobalStartOfSuccessEpoch();
 	}
 	void writeClauseEpochs(const std::string& filename) {

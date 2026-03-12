@@ -11,6 +11,7 @@
 #include "app/sat/data/revision_data.hpp"
 #include "app/sat/job/sat_constants.h"
 #include "solver_thread.hpp"
+#include "app/sat/solvers/solving_replay.hpp"
 #include "util/logger.hpp"
 #include "util/random.hpp"
 #include "util/string_utils.hpp"
@@ -20,8 +21,6 @@
 #include "app/sat/data/definitions.hpp"
 #include "app/sat/job/sat_process_config.hpp"
 #include "app/sat/parse/serialized_formula_parser.hpp"
-#include "app/sat/proof/trusted/trusted_utils.hpp"
-#include "app/sat/proof/trusted_checker_process_adapter.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
 #include "util/option.hpp"
 #include "util/params.hpp"
@@ -38,7 +37,8 @@ SolverThread::SolverThread(const Parameters& params, const SatProcessConfig& con
     _portfolio_size = config.mpisize;
     _local_solvers_count = config.threads;
 
-    appendRevision(0, firstRevision);
+    if (firstRevision.fLits)
+        appendRevision(0, firstRevision);
     _result.result = UNKNOWN;
 
     if (_lrat && _params.derivationErrorChancePerMille() > 0) {
@@ -58,31 +58,13 @@ void SolverThread::init() {
     LOGGER(_logger, V5_DEBG, "tid %ld\n", _tid);
     std::string threadName = "SATSolver#" + std::to_string(_local_id);
     Proc::nameThisThread(threadName.c_str());
-    
+
+    if (_lrat) _lrat->init();
+    if (_solver.getSolverSetup().owningModelCheckingLratConnector)
+        _solver.getSolverSetup().modelCheckingLratConnector->init();
+
     _active_revision = 0;
     _imported_lits_curr_revision = 0;
-
-    if (_lrat || _solver.getSolverSetup().owningModelCheckingLratConnector) {
-        // Convert hex string back to byte array
-        signature target;
-        {
-            std::string sigStr = _solver.getSolverSetup().sigFormula;
-            const char* src = sigStr.c_str();
-            uint8_t* dest = target;
-            while(*src && src[1]) {
-                char c1 = src[0];
-                int i1 = (c1 >= '0' && c1 <= '9') ? (c1 - '0') : (c1 - 'a' + 10);
-                char c2 = src[1];
-                int i2 = (c2 >= '0' && c2 <= '9') ? (c2 - '0') : (c2 - 'a' + 10);
-                *(dest++) = i1*16 + i2;
-                src += 2;
-            }
-        }
-        if (_lrat) _lrat->getChecker().init(target);
-        if (_solver.getSolverSetup().owningModelCheckingLratConnector)
-            _solver.getSolverSetup().modelCheckingLratConnector->getChecker().init(target);
-    }
-
     _initialized = true;
 }
 
@@ -112,22 +94,25 @@ void* SolverThread::run() {
 
 bool SolverThread::readFormula() {
 
-    SerializedFormulaParser* fParser;
+    std::shared_ptr<SerializedFormulaParser> fParser;
 
     while (true) {
         // Fetch the next formula to read
         {
             auto lock = _state_mutex.getLock();
             assert(_active_revision < (int)_pending_formulae.size());
-            fParser = _pending_formulae[_active_revision].get();
+            fParser = _pending_formulae[_active_revision];
+            assert(fParser);
         }
 
         // Forward raw formula data to LRAT connectors
-        if (_lrat) {
-            _lrat->launch(*fParser);
-        }
-        if (_solver.getSolverSetup().owningModelCheckingLratConnector) {
-            _solver.getSolverSetup().modelCheckingLratConnector->launch(*fParser);
+        if (_imported_lits_curr_revision == 0) {
+            if (_lrat) {
+                _lrat->initiateRevision(_active_revision, *fParser);
+            }
+            if (_solver.getSolverSetup().owningModelCheckingLratConnector) {
+                _solver.getSolverSetup().modelCheckingLratConnector->initiateRevision(_active_revision, *fParser);
+            }
         }
 
         LOGGER(_logger, V4_VVER, "Reading rev. %i, start %i\n", (int)_active_revision, (int)_imported_lits_curr_revision);
@@ -139,11 +124,13 @@ bool SolverThread::readFormula() {
             if (std::abs(lit) > (1<<30)) {
                 LOGGER(_logger, V0_CRIT, "[ERROR] Invalid literal %i at rev. %i pos. %ld/%ld.\n",
                     lit, (int)_active_revision, _imported_lits_curr_revision, fParser->getPayloadSize());
+                _logger.flush();
                 abort();
             }
             if (lit == 0 && _last_read_lit_zero) {
                 LOGGER(_logger, V0_CRIT, "[ERROR] Empty clause at rev. %i pos. %ld/%ld.\n", 
                     (int)_active_revision, _imported_lits_curr_revision, fParser->getPayloadSize());
+                _logger.flush();
                 abort();
             }
             _solver.addLiteral(lit);
@@ -175,11 +162,12 @@ bool SolverThread::readFormula() {
                     // Adjust _max_var according to assumptions as well
                     _max_var = std::max(_max_var, std::abs(lit));
                 }
-            
+
                 LOGGER(_logger, V4_VVER, "Reading done @ rev. %i (%lu lits, %lu assumptions)\n", (int)_active_revision,
                     _imported_lits_curr_revision, _pending_assumptions.size());
                 return true;
             }
+            _pending_formulae[_active_revision].reset(); // revision data no longer needed
             _active_revision++;
             _imported_lits_curr_revision = 0;
         }
@@ -190,17 +178,19 @@ void SolverThread::appendRevision(int revision, RevisionData data) {
     {
         auto lock = _state_mutex.getLock();
         _pending_formulae.emplace_back(
-            new SerializedFormulaParser(_logger, data.fLits, data.fSize)
+            new SerializedFormulaParser(_logger, data.fLits, _solver.getSolverSetup().onTheFlyChecking
+                || _solver.getSolverSetup().trustedParserForced)
         );
         if (_params.compressFormula()) {
             _pending_formulae.back()->setCompressed();
-            LOGGER(_logger, V4_VVER, "Received compressed formula of size %i\n", data.fSize);
+            LOGGER(_logger, V4_VVER, "Received compressed formula of size %i\n", data.fLits->size());
         } else {
-            LOGGER(_logger, V4_VVER, "Received %i literals: %s\n", data.fSize, StringUtils::getSummary(data.fLits, data.fSize).c_str());
+            if (_solver.getSolverSetup().globalId == 0)
+                LOGGER(_logger, V4_VVER, "Received %i literals: %s\n", data.fLits->size(),
+                    StringUtils::getSummary(*data.fLits, 10).c_str());
         }
         _latest_revision = revision;
         _latest_checksum = data.chksum;
-        _found_result = false;
         assert(_latest_revision+1 == (int)_pending_formulae.size() 
             || LOG_RETURN_FALSE("%i != %i", _latest_revision+1, _pending_formulae.size()));
         if (_in_solve_call) {
@@ -259,13 +249,8 @@ void SolverThread::runOnce() {
         aLits = _pending_assumptions.data();
         aSize = _pending_assumptions.size();
         _in_solve_call = true;
-        if (revision < _latest_revision) {
-            _solver.interrupt(); // revision obsolete: stop solving immediately
-            performSolving = false; // actually just "pretend" to solve ...
-        } else {
-            _solver.uninterrupt(); // make sure solver isn't in an interrupted state
-            chksum = _latest_checksum; // this checksum belongs to _latest_revision.
-        }
+        _solver.uninterrupt(); // make sure solver isn't in an interrupted state
+        performSolving = revision == _latest_revision; // obsolete revision? just "pretend" to solve ...
     }
 
     // append assumption literals to formula hash
@@ -296,6 +281,14 @@ void SolverThread::runOnce() {
         }
         res = performSolving ? _solver.solve(0, nullptr) : UNKNOWN;
     }
+
+    if (performSolving) {
+        if (_solver.getReplay().getMode() == SolvingReplay::RECORD)
+            _solver.getReplay().recordReturnFromSolve(res);
+        if (_solver.getReplay().getMode() == SolvingReplay::REPLAY)
+            res = SatResult(_solver.getReplay().replayReturnFromSolve(res));
+    }
+
     // Uninterrupt solver (if it was interrupted)
     {
         auto lock = _state_mutex.getLock();
@@ -319,7 +312,7 @@ void SolverThread::runOnce() {
 }
 
 void SolverThread::waitWhileSolved() {
-    waitUntil([&]{return _terminated || !_found_result;});
+    waitUntil([&]{return _terminated || _latest_revision > _found_result_rev;});
 }
 
 void SolverThread::waitUntil(std::function<bool()> predicate) {
@@ -329,7 +322,7 @@ void SolverThread::waitUntil(std::function<bool()> predicate) {
 
 void SolverThread::reportResult(int res, int revision) {
 
-    if (res == 0 || _found_result) return;
+    if (res == 0 || _found_result_rev >= revision) return;
     const char* resultString = res==SAT?"SAT":"UNSAT";
 
     {
@@ -353,22 +346,24 @@ void SolverThread::reportResult(int res, int revision) {
         auto lrat = _solver.getSolverSetup().modelCheckingLratConnector;
         if (lrat) {
             LOGGER(_logger, V3_VERB, "Validating SAT ...\n");
+            _logger.flush();
             // omit first "0" in solution vector
-            lrat->setSolution(solution.data()+1, solution.size()-1);
+            lrat->push(LratOp(solution.data()+1, solution.size()-1), true, revision);
             // Whether or not this was successful (another thread might have been earlier),
             // wait until SAT was validated.
-            lrat->waitForSatValidation();
+            lrat->waitForConclusion(revision);
         }
         _state_mutex.lock();
         _result.setSolutionToSerialize(solution.data(), solution.size());
     } else {
-        if (_lrat) {
-            LOGGER(_logger, V3_VERB, "Validating UNSAT ...\n");
-            _lrat->push({20});
-            _lrat->waitForUnsatValidation();
-        }
         auto failed = _solver.getFailedAssumptions();
         auto failedVec = std::vector<int>(failed.begin(), failed.end());
+        if (_lrat) {
+            LOGGER(_logger, V3_VERB, "Validating UNSAT ...\n");
+            _logger.flush();
+            _lrat->push(LratOp(_solver.getUnsatConclusionId(), failedVec.data(), failedVec.size()), true, revision);
+            _lrat->waitForConclusion(revision);
+        }
         _state_mutex.lock();
         _result.setSolutionToSerialize(failedVec.data(), failedVec.size());
     }
@@ -376,7 +371,7 @@ void SolverThread::reportResult(int res, int revision) {
     _result.revision = revision;
     LOGGER(_logger, V3_VERB, "found result %s for rev. %i\n", resultString, revision);
 
-    _found_result = true;
+    _found_result_rev = revision;
     _solver.setFoundResult();
     _state_mutex.unlock();
 }

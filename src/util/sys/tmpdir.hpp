@@ -1,7 +1,6 @@
 
 #pragma once
 
-#include <filesystem>
 #include <string>
 #include <cstdlib>
 
@@ -16,8 +15,8 @@ private:
 public:
     static void init(int rank, const std::string& generalTmpDir) {
         _tmpdir = generalTmpDir;
-        auto rankSpecificDir = _tmpdir + "/" + std::to_string(rank);
-        if (std::filesystem::is_directory(rankSpecificDir)) {
+        std::string rankSpecificDir = _tmpdir + "/" + std::to_string(rank);
+        if (FileUtils::isDirectory(rankSpecificDir)) {
             _tmpdir = rankSpecificDir;
         }
     }

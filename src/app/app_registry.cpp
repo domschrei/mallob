@@ -8,6 +8,7 @@
 
 #include "robin_hash.h"
 #include "robin_map.h"
+#include "util/string_utils.hpp"
 
 namespace app_registry {
 
@@ -20,6 +21,7 @@ namespace app_registry {
             JobCreator creator;
             ClientSideProgramCreator clientSideProgramCreator;
             JobSolutionFormatter solutionFormatter;
+            std::optional<JobEpilog> epilog;
             ResourceCleaner cleaner;
         };
 
@@ -36,7 +38,8 @@ namespace app_registry {
         JobReader reader, 
         JobCreator creator,
         JobSolutionFormatter solutionFormatter,
-        ResourceCleaner cleaner
+        ResourceCleaner cleaner,
+        std::optional<JobEpilog> epilog
     ) {
         int appId = _app_entries.size();
         _app_key_to_app_id[key] = appId;
@@ -47,6 +50,7 @@ namespace app_registry {
         entry.reader = reader;
         entry.creator = creator;
         entry.solutionFormatter = solutionFormatter;
+        entry.epilog = epilog;
         entry.cleaner = cleaner;
         _app_entries.push_back(std::move(entry));
     }
@@ -106,11 +110,27 @@ namespace app_registry {
         getAppKey(appId); // check existence
         return _app_entries.at(appId).clientSideProgramCreator;
     }
+    std::optional<JobEpilog> getJobEpilog(int appId) {
+        getAppKey(appId);
+        return _app_entries.at(appId).epilog;
+    }
 
     std::vector<ResourceCleaner> getCleaners() {
         std::vector<ResourceCleaner> cleaners;
         for (auto& entry : _app_entries) cleaners.push_back(entry.cleaner);
         return cleaners;
+    }
+
+    void overrideProgramOptions(Parameters& params, JobDescription& desc) {
+        const auto appConf = desc.getAppConfiguration();
+        if (!appConf.map.count("options")) return;
+
+        std::string optOverrides = appConf.map.at("options");
+        std::replace(optOverrides.begin(), optOverrides.end(), '&', ' ');
+        std::istringstream buffer(optOverrides);
+        std::vector<std::string> args {std::istream_iterator<std::string>(buffer),
+                                std::istream_iterator<std::string>()};
+        params.init(args); // override
     }
 }
 

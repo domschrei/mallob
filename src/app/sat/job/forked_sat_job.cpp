@@ -8,6 +8,7 @@
 
 #include "app/app_message_subscription.hpp"
 #include "app/sat/job/sat_process_config_builder.hpp"
+#include "app/sat/proof/palrup_caller.hpp"
 #include "data/job_interrupt_reason.hpp"
 #include "interface/api/api_registry.hpp"
 #include "scheduling/core_allocator.hpp"
@@ -52,6 +53,7 @@ void ForkedSatJob::appl_start() {
 }
 
 void ForkedSatJob::doStartSolver() {
+    initializeWithDescriptionPresent();
 
     SatProcessConfig config = SatProcessConfigBuilder::get(_params, *this, _subproc_idx);
     Parameters hParams(_params);
@@ -186,7 +188,7 @@ int ForkedSatJob::appl_solved() {
         _done_locally = true;
 
         if (ClauseMetadata::enabled() && result == RESULT_UNSAT
-                && _params.proofOutputFile.isSet() && _params.distributedProofAssembly()) {
+                && _params.proofOutputFile.isSet() && !_params.palRup() && _params.distributedProofAssembly()) {
             // Unsatisfiability: handle separately.
             int finalEpoch = _clause_comm->getCurrentEpoch();
             int winningInstance = _internal_result.winningInstanceId;
@@ -302,10 +304,18 @@ bool ForkedSatJob::appl_isDestructible() {
     // Wrong state?
     if (getState() != PAST) return false;
     // Not initialized (yet)?
-    if (!_initialized) return true;
+    if (!_initialized) {
+        // In this state, we still need to clear any deferred messages,
+        // which we'll never be able to process properly.
+        while (hasDeferredMessage()) {
+            auto msg = getDeferredMessage();
+            msg.msg.returnToSender(msg.source, msg.mpiTag);
+        }
+        return true;
+    }
     // SAT comm. present which is not destructible (yet)?
     if (!_clause_comm->isDestructible()) {
-        _clause_comm->communicate(); // may advance destructibility
+        for (int i = 0; i < 10; i++) _clause_comm->communicate(); // may advance destructibility
         return false;
     }
     // Destructible!
@@ -342,7 +352,7 @@ void ForkedSatJob::appl_communicate() {
 }
 
 void ForkedSatJob::appl_communicate(int source, int mpiTag, JobMessage& msg) {
-    if (!_initialized && (ClauseMetadata::enabled() || _params.deterministicSolving()) 
+    if (!_initialized && (_params.proofOutputFile.isSet() || _params.deterministicSolving())
             && msg.tag == MSG_INITIATE_CLAUSE_SHARING) {
         LOG(V2_INFO, "DEFER MSG <= [%i]\n", source);
         deferMessage(source, mpiTag, msg);

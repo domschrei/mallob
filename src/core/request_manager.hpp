@@ -4,6 +4,7 @@
 #include <list>
 #include <map>
 #include <optional>
+#include "util/logger.hpp"
 #include "util/robin_hood.hpp"
 #include "data/job_transfer.hpp"
 #include "comm/mympi.hpp"
@@ -106,7 +107,7 @@ public:
             dest = nextNodeRank;
         }
 
-        LOG_ADD_DEST(V3_VERB, "%s growing: %s", dest, job.toStr(), req.toStr().c_str());
+        LOG_ADD_DEST(V4_VVER, "%s growing: %s", dest, job.toStr(), req.toStr().c_str());
         _sys_state.addLocal(SYSSTATE_SPAWNEDREQUESTS, 1);
         auto time = Timer::elapsedSeconds();
         if (left) job.getJobTree().setDesireLeft(time);
@@ -120,7 +121,7 @@ public:
         MyMpi::isend(dest, tag, req);
     }
 
-    void activateRootRequest(int jobId) {
+    void tryActivateRootRequest(int jobId) {
         LOG(V5_DEBG, "Try activate #%i\n", jobId);
         auto optReq = getRootRequest(jobId);
         if (!optReq.has_value()) return;

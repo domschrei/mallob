@@ -24,7 +24,7 @@ public:
     static std::set<pid_t> _children;
     static long _main_tid;
 
-    static std::atomic_bool _exit_signal_caught;
+    static volatile bool _exit_signal_caught;
     static std::atomic_int _exit_signal;
     static std::atomic_long _signal_tid;
     static std::atomic_bool _exit_signal_digested;

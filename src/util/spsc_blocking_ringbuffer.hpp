@@ -14,7 +14,7 @@ private:
     std::atomic_int _num_elems {0};
     
     std::vector<T> _buffer;
-    size_t _buffer_size {0};
+    volatile size_t _buffer_size {0};
 
     int _read_pos {0};
     int _write_pos {0};
@@ -22,8 +22,10 @@ private:
     Mutex _buffer_mutex;
     ConditionVariable _buffer_cond_var;
     
-    bool _input_exhausted {false};
-    bool _terminated {false};
+    volatile bool _input_exhausted {false};
+    volatile bool _exhausted_is_one_time_signal {false};
+
+    volatile bool _terminated {false};
 
 public:
     SPSCBlockingRingbuffer() : _buffer(0) {}
@@ -60,8 +62,8 @@ public:
         // If the buffer was empty before pushing the element,
         // then it may be possible that a notification is required.
         // If it was NOT empty, then the other thread did not begin waiting.
-        if (numElemsBefore == 0) {
-            _buffer_mutex.getLock(); // lock buffer and immediately release it, for cond. var.
+        if (numElemsBefore <= 1) {
+            {_buffer_mutex.getLock();} // lock buffer and immediately release it, for cond. var.
             _buffer_cond_var.notify();
         }
         //LOG(V2_INFO, "SPSC notify nonempty\n");
@@ -78,6 +80,15 @@ public:
 
     inline bool pollBlocking(T& out, bool returnIfEmpty) {
 
+        if (_input_exhausted && _exhausted_is_one_time_signal) {
+            auto lock = _buffer_mutex.getLock();
+            if (_input_exhausted && _exhausted_is_one_time_signal) {
+                _input_exhausted = false;
+                _exhausted_is_one_time_signal = false;
+                return false;
+            }
+        }
+
         if (empty()) {
             if (returnIfEmpty) return false;
 
@@ -90,7 +101,16 @@ public:
                 return _input_exhausted || !empty();
             });
             //LOG(V2_INFO, "SPSC wait nonempty or exhausted done\n");
-            
+
+            if (_input_exhausted && _exhausted_is_one_time_signal) {
+                auto lock = _buffer_mutex.getLock();
+                if (_input_exhausted && _exhausted_is_one_time_signal) {
+                    _input_exhausted = false;
+                    _exhausted_is_one_time_signal = false;
+                    return false;
+                }
+            }
+
             // still no elements? => fully exhausted.
             if (empty()) return false;
         }
@@ -103,8 +123,8 @@ public:
         // If the buffer was full before removing the element,
         // then it may be possible that a notification is required.
         // If it was NOT full, then the other thread did not begin waiting.
-        if (numElemsBefore == _buffer_size) {
-            _buffer_mutex.getLock(); // lock buffer and immediately release it, for cond. var.
+        if (numElemsBefore >= _buffer_size-1) {
+            {_buffer_mutex.getLock();} // lock buffer and immediately release it, for cond. var.
             _buffer_cond_var.notify();
         }
 
@@ -115,9 +135,21 @@ public:
         {
             auto lock = _buffer_mutex.getLock();
             _input_exhausted = true;
+            _exhausted_is_one_time_signal = false;
         }
         _buffer_cond_var.notify();
         //LOG(V2_INFO, "SPSC notify exhausted\n");
+    }
+
+    void interrupt() {
+        {
+            auto lock = _buffer_mutex.getLock();
+            if (_input_exhausted) return;
+            _input_exhausted = true;
+            assert(!_exhausted_is_one_time_signal);
+            _exhausted_is_one_time_signal = true;
+        }
+        _buffer_cond_var.notify();
     }
 
     void markTerminated() {
@@ -139,9 +171,15 @@ public:
     bool empty() const {
         return size() == 0;
     }
+    bool full() const {
+        return size() == _buffer_size;
+    }
 
     bool exhausted() const {
         return _input_exhausted;
+    }
+    bool terminated() const {
+        return _terminated;
     }
 
 private:

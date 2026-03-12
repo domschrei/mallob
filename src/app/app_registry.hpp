@@ -24,6 +24,7 @@ namespace app_registry {
     typedef std::function<bool(const Parameters&, const std::vector<std::string>&, JobDescription&)> JobReader;
     typedef std::function<Job*(const Parameters&, const Job::JobSetup&, AppMessageTable&)> JobCreator;
     typedef std::function<ClientSideProgram*(const Parameters&, APIConnector&, JobDescription&)> ClientSideProgramCreator;
+    typedef std::function<void(const Parameters&, const JobResult&)> JobEpilog;
     typedef std::function<nlohmann::json(const Parameters&, const JobResult&, const JobProcessingStatistics&)> JobSolutionFormatter;
     typedef std::function<void(const Parameters&)> ResourceCleaner;
 
@@ -31,7 +32,8 @@ namespace app_registry {
         JobReader reader, 
         JobCreator creator, 
         JobSolutionFormatter resultPrinter,
-        ResourceCleaner cleaner = [](const Parameters&) {}
+        ResourceCleaner cleaner = [](const Parameters&) {},
+        std::optional<JobEpilog> epilog = {}
     );
     void registerClientSideApplication(const std::string& key,
         JobReader reader,
@@ -48,5 +50,8 @@ namespace app_registry {
     bool isClientSide(int appId);
     JobCreator getJobCreator(int appId);
     ClientSideProgramCreator getClientSideProgramCreator(int appId);
+    std::optional<JobEpilog> getJobEpilog(int appId);
     std::vector<ResourceCleaner> getCleaners();
+
+    void overrideProgramOptions(Parameters& params, JobDescription& desc);
 }

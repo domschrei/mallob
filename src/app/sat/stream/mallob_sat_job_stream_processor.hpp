@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <cstring>
 #include <stdlib.h>
 #include <string>
 #include <unistd.h>
@@ -11,6 +12,7 @@
 
 #include "app/sat/data/formula_compressor.hpp"
 #include "app/sat/data/model_string_compressor.hpp"
+#include "core/dtask_tracker.hpp"
 #include "data/job_description.hpp"
 #include "interface/api/api_connector.hpp"
 #include "interface/json_interface.hpp"
@@ -19,7 +21,6 @@
 #include "util/logger.hpp"
 #include "util/params.hpp"
 #include "util/static_store.hpp"
-#include "util/assert.hpp"
 #include "util/sys/timer.hpp"
 
 class MallobSatJobStreamProcessor : public SatJobStreamProcessor {
@@ -28,6 +29,7 @@ private:
     const Parameters& _params;
     APIConnector& _api;
     int _stream_id;
+    long _nontrivial_wait_millis;
 
     int _nb_vars {0};
     int _nb_clauses {0};
@@ -40,18 +42,26 @@ private:
     nlohmann::json _json_result;
     std::string _expected_result_job_name;
 
-    bool _task_pending {false};
+    volatile bool _task_pending {false};
     int _pending_rev {-1};
     bool _pending_task_interrupted {false};
 
     bool _began_nontrivial_solving {false};
-    std::vector<int> _backlog_lits;
+    bool _retrieve_complete_task {false};
+    SatTask _backlog_task {SatTask::RAW};
+    bool _initialized_backlog_task {false};
+    bool _finalized {false};
+
+    std::unique_ptr<DTaskTracker::DTaskSlot> _slot;
 
 public:
     MallobSatJobStreamProcessor(const Parameters& params, APIConnector& api, JobDescription& desc,
             const std::string& baseUserName, int streamId, bool incremental, Synchronizer& sync) :
         SatJobStreamProcessor(sync), _params(params), _api(api), _stream_id(streamId),
-        _incremental(incremental), _username(baseUserName) {}
+        _nontrivial_wait_millis(params.internalStreamProcessor() ? params.nontrivialSolvingDelay() : 0),
+        _incremental(incremental), _username(baseUserName)
+        //,_job_slot(new JobSlotRegistry::JobSlot(_username, [&]() {signalReinitialization();})) 
+        {}
 
     ~MallobSatJobStreamProcessor() override {}
 
@@ -62,31 +72,82 @@ public:
         _nb_vars = nbVars;
         _nb_clauses = nbClauses;
     }
+    void setDTaskSlot(std::unique_ptr<DTaskTracker::DTaskSlot>&& slot) {
+        _slot = std::move(slot);
+        _slot->setCallbackOnEvict([&]() {getQueue().interrupt();});
+    }
+
+    virtual void loop() override {
+        if (_slot->checkEvicted()) yield();
+    }
 
     virtual void process(SatTask& task) override {
+        auto time = Timer::elapsedSeconds();
+        if (!_initialized_backlog_task) {
+            _backlog_task.type = task.type;
+            _initialized_backlog_task = true;
+        }
+        if (_retrieve_complete_task) {
+            // Flag set to retrieve the complete task again
+            _retrieve_complete_task = false;
+            _backlog_task = _cb_retrieve_full_task();
+            if (_backlog_task.rev < task.rev) {
+                // Incoming task directly (!) succeeds the retrieved backlog task: just integrate
+                assert(_backlog_task.rev + 1 == task.rev);
+                _backlog_task.integrate(task);
+            } else if (_backlog_task.rev == task.rev) {
+                // Incoming task is exactly the retrieved backlog task
+                assert(_backlog_task.assumptions == task.assumptions);
+            } else {
+                // Incoming task precedes the retrieved backlog task: incoming task obsolete!
+                LOG(V3_VERB, "%s task with int. rev %i obsolete\n", _name.c_str(), task.rev);
+                return;
+            }
+        } else {
+            _backlog_task.integrate(task);
+        }
+        auto& t = _backlog_task;
+        LOG(V5_DEBG, "%s attempting to solve task ...\n", _name.c_str());
 
-        if (!_began_nontrivial_solving) {
+        if (_task_pending) {
+            // A previous interruption is still ongoing.
+            // We need to wait for it to complete before we can submit the next revision.
+            LOG(V4_VVER, "%s pending ...\n", _name.c_str());
+            unsigned long sleepInterval {1};
+            while (_task_pending) {
+                usleep(sleepInterval);
+                sleepInterval = std::min(2500UL, (unsigned long) std::ceil(1.2*sleepInterval));
+            }
+            LOG(V4_VVER, "%s ... ready\n", _name.c_str());
+        }
+
+        if (_slot->checkEvicted()) {
+            yield();
+            return;
+        }
+
+        if (!_finalized && !_began_nontrivial_solving) {
+
             // If no distributed job was submitted yet, we try to avoid this overhead;
             // we wait for a short while if a more lightweight solver finds a solution immediately.
-            auto time = Timer::elapsedSeconds();
-            _backlog_lits.insert(_backlog_lits.end(), task.lits.begin(), task.lits.end());
             time = Timer::elapsedSeconds() - time;
-            usleep(1'000'000 * std::max(0.0, 0.05 - time)); // 50 ms minus the time taken to copy the literals
-            if (_terminator(task.rev)) {
+            usleep(1'000'000 * std::max(0.0, 0.001 * _nontrivial_wait_millis - time)); // X ms minus the time taken to copy the literals
+            if (_terminator(t.rev)) {
                 return; // Task has become obsolete in the meantime, so skip solving
             }
             // Task is not (yet) obsolete after the wait, so we now begin proper distributed solving
-            LOG(V2_INFO, "%s awakes for rev. %i\n", _name.c_str(), task.rev);
+            LOG(V2_INFO, "%s awakes for rev. %i\n", _name.c_str(), t.rev);
             _began_nontrivial_solving = true;
-            task.lits = std::move(_backlog_lits);
+            _slot->deploy();
+
+            int jobSlots = _params.jobSlots() > 0 ? _params.jobSlots() : MyMpi::size(MPI_COMM_WORLD);
+            int numConcStreams = std::min(jobSlots, MyMpi::size(MPI_COMM_WORLD));
 
             _base_job_name = "satjob-" + std::to_string(_stream_id) + "-rev-";
-            _json_base = nlohmann::json {
-                {"user", _username},
-                {"incremental", _incremental},
-                {"priority", 1},
-                {"application", "SAT"}
-            };
+            _json_base["user"] = _username;
+            _json_base["incremental"] = _incremental;
+            _json_base["priority"] = 1;
+            _json_base["application"] = "SAT";
             _json_base["files"] = std::vector<std::string>();
             if (!_json_base["configuration"].count("__XL"))
                 _json_base["configuration"]["__XL"] = "-1";
@@ -94,16 +155,19 @@ public:
                 _json_base["configuration"]["__XU"] = "-1";
             _json_base["configuration"]["__NV"] = std::to_string(_nb_vars);
             _json_base["configuration"]["__NC"] = std::to_string(_nb_clauses);
+            _json_base["configuration"]["__EO"] = std::to_string(_stream_id);
+            _json_base["configuration"]["__EM"] = std::to_string(numConcStreams);
         }
 
-        auto& newLiterals = task.lits;
-        const auto& assumptions = task.assumptions;
-        auto chksum = task.chksum;
-        const auto& descriptionLabel = task.descLabel;
-        float priority = task.priority;
+        auto& newLiterals = t.lits;
+        const auto& assumptions = t.assumptions;
+        auto chksum = t.chksum;
+        const auto& descriptionLabel = t.descLabel;
+        float priority = t.priority;
+
+        if (_finalized || !_began_nontrivial_solving) return;
 
         if (_params.useChecksums()) _json_base["checksum"] = {chksum.count(), chksum.get()};
-
         if (_incremental && _json_base.contains("name")) {
             _json_base["precursor"] = _username + std::string(".") + _json_base["name"].get<std::string>();
         }
@@ -122,26 +186,32 @@ public:
             }
         }*/
         nlohmann::json copy(_json_base);
+
         if (_params.compressFormula()) {
             auto out = FormulaCompressor::compress(newLiterals.data(), newLiterals.size(),
                 assumptions.data(), assumptions.size());
             newLiterals = std::move(*out.vec);
-        } else {
+        } else if (t.type == SatJobStreamProcessor::SatTask::SPLIT) {
             newLiterals.push_back(INT32_MAX);
             for (int a : assumptions) newLiterals.push_back(a);
             newLiterals.push_back(0);
+            newLiterals.push_back(INT32_MIN);
         }
-        StaticStore<std::vector<int>>::insert(_json_base["name"].get<std::string>(), std::move(newLiterals));
-        copy["internalliterals"] = _json_base["name"].get<std::string>();
+
+        StaticStore<std::vector<int>>::insert(copy["name"].get<std::string>(), std::move(newLiterals));
+        copy["internalliterals"] = copy["name"].get<std::string>();
         if (!descriptionLabel.empty()) {
             copy["description-id"] = descriptionLabel;
         }
         _expected_result_job_name = copy["name"].get<std::string>();
 
+        LOG(V5_DEBG, "MSJS %s begin call\n", _name.c_str());
+        _slot->resume();
         _task_pending = true;
-        _pending_rev = task.rev;
+        _pending_rev = t.rev;
         _pending_task_interrupted = false;
         try {
+            LOG(V4_VVER, "%s SUBMIT %s\n", _name.c_str(), copy["name"].get<std::string>().c_str());
             auto response = _api.submit(copy, [&, rev = _pending_rev, subjob](nlohmann::json& result) {
 
                 if (result["name"].get<std::string>() != _expected_result_job_name) {
@@ -157,8 +227,10 @@ public:
                 } else {
                     solution = result["result"]["solution"].get<std::vector<int>>();
                 }
+                const int solSize = solution.size();
                 bool winner = concludeRevision(rev, resultCode, std::move(solution));
-                if (winner) LOG(V2_INFO, "%s rev. %i (internally %i) won with res=%i\n", _name.c_str(), rev, subjob, resultCode);
+                if (winner) LOG(V2_INFO, "%s rev. %i (internally %i) won with res=%i solsize=%i\n",
+                    _name.c_str(), rev, subjob, resultCode, solSize);
                 _task_pending = false;
             });
             if (response == JsonInterface::Result::DISCARD) {
@@ -171,15 +243,23 @@ public:
         }
 
         unsigned long sleepInterval {1};
-        while (checkTaskPending(task.rev)) {
+        while (continueWaitingForTask(t.rev)) {
             usleep(sleepInterval);
             sleepInterval = std::min(2500UL, (unsigned long) std::ceil(1.2*sleepInterval));
         }
+
+        _slot->suspend();
+        LOG(V5_DEBG, "MSJS %s call ended\n", _name.c_str());
+
+        _backlog_task = SatTask{_backlog_task.type};
     }
 
     virtual void finalize() override {
+        LOG(V4_VVER, "%s do finalize\n", _name.c_str());
+        _finalized = true;
         SatJobStreamProcessor::finalize();
         if (!_began_nontrivial_solving) return;
+        _slot->tryYield(false, false);
         while (_task_pending) usleep(3000);
         if (!_incremental) return;
         if (!_json_base.contains("name")) return;
@@ -188,13 +268,36 @@ public:
         nlohmann::json copy(_json_base);
         copy["done"] = true;
         // The callback is never called.
-        LOG(V2_INFO, "%s closing API\n", _name.c_str());
+        LOG(V4_VVER, "%s closing API\n", _name.c_str());
         _api.submit(copy, [&](nlohmann::json& result) {assert(false);});
-        LOG(V2_INFO, "%s closed API\n", _name.c_str());
+        LOG(V4_VVER, "%s closed API\n", _name.c_str());
+    }
+
+    void yield() {
+
+        // already (in the process of being) finalized?
+        if (_finalized || !_began_nontrivial_solving) return;
+
+        LOG(V3_VERB, "%s evicted: yielding\n", _name.c_str());
+        while (_task_pending) usleep(1000);
+        if (!_incremental) return;
+        if (!_json_base.contains("name")) return;
+        _json_base["precursor"] = _username + std::string(".") + _json_base["name"].get<std::string>();
+        _json_base["name"] = _base_job_name + std::to_string(_subjob_counter++);
+        nlohmann::json copy(_json_base);
+        copy["done"] = true;
+        // The callback is never called.
+        LOG(V4_VVER, "%s closing API\n", _name.c_str());
+        _api.submit(copy, [&](nlohmann::json& result) {assert(false);});
+        LOG(V4_VVER, "%s closed API\n", _name.c_str());
+
+        _began_nontrivial_solving = false;
+        _retrieve_complete_task = true;
+        _json_base = {};
     }
 
     void setGroupId(const std::string& groupId, int minVar = -1, int maxVar = -1) {
-        LOG(V2_INFO, "MAXSAT %s group ID %s V=[%i,%i]\n", _base_job_name.c_str(), groupId.c_str(), minVar, maxVar);
+        LOG(V2_INFO, "%s group ID %s V=[%i,%i]\n", _base_job_name.c_str(), groupId.c_str(), minVar, maxVar);
         _json_base["group-id"] = groupId;
         _json_base["configuration"]["__XL"] = std::to_string(minVar);
         _json_base["configuration"]["__XU"] = std::to_string(maxVar);
@@ -208,10 +311,10 @@ public:
     }
 
 private:
-    bool checkTaskPending(int rev) {
+    bool continueWaitingForTask(int rev) {
         if (!_task_pending) return false;
-        if (_pending_task_interrupted) return true;
-        if (!_terminator(rev)) return true;
+        if (_pending_task_interrupted) return false; // do NOT wait for interrupted call to return
+        if (!_terminator(rev) && !_slot->wasEvicted()) return true;
 
         _pending_task_interrupted = true;
         nlohmann::json jsonInterrupt {
@@ -223,12 +326,12 @@ private:
         };
         // In this particular case, the callback is never called.
         // Instead, the callback of the job's original submission is called.
+        LOG(V4_VVER, "%s interrupt\n", _name.c_str());
         auto response = _api.submit(jsonInterrupt, [&](nlohmann::json& result) {assert(false);});
         if (response == JsonInterface::Result::DISCARD) {
             concludeRevision(_pending_rev, 0, {});
             _task_pending = false;
-            return false;
         }
-        return true;
+        return false; // do NOT wait for interrupted call to return
     }
 };

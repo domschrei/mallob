@@ -36,12 +36,12 @@ private:
     volatile char* _data_in_left;
     volatile char* _data_in_right;
 
-    bool _out_concurrent;
-    bool _in_concurrent;
+    volatile size_t _msg_counter {0};
 
     struct InPlaceData {
-        volatile bool available;
         volatile size_t size;
+        volatile size_t counter;
+        volatile bool available;
         volatile bool toBeContinued;
         volatile char tag;
         static InPlaceData* getMetadata(volatile char* buffer) {return (InPlaceData*) buffer;}
@@ -54,80 +54,92 @@ private:
 
     struct Message {
         char tag {0};
+        size_t counter {0};
         std::vector<int> userData;
     };
 
-    // Internal method to read a single message, possibly buffered across multiple chunks.
-    // Uses the provided buffers, of equal provided size, for double buffering.
-    // Can be configured to be blocking or non-blocking initially; however, once reading
-    // the initial block of data succeeds, the call always blocks until completion.
-    bool readData(volatile char* shmemLeft, volatile char* shmemRight, size_t shmemCap, bool blocking, Message& outMsg) {
+    struct IOTask {
+        volatile char* shmemLeft;
+        volatile char* shmemRight;
+        size_t shmemCap;
 
-        // message always begins in the left buffer
+        InPlaceData* shmemMeta;
+        volatile char* shmemBuf;
+        unsigned long shmemSize;
+
+        Message msg;
+        bool ongoing;
         bool left = true;
-        InPlaceData* shmemMeta = InPlaceData::getMetadata(shmemLeft);
-        auto [shmemBuf, shmemSize] = InPlaceData::getDataBuffer(shmemLeft, shmemCap/2);
+        bool done;
+        size_t posInMsg;
 
-        if (!blocking && !shmemMeta->available) return false;
-        while (!shmemMeta->available && !_terminate) usleep(1000);
-        while (!_terminate) {
-            outMsg.tag = shmemMeta->tag;
+        IOTask(volatile char* shmemLeft, volatile char* shmemRight, size_t shmemCap)
+            : shmemLeft(shmemLeft), shmemRight(shmemRight), shmemCap(shmemCap) {reset();}
+        void reset() {
+            ongoing = false;
+            done = false;
+            msg = {};
+            posInMsg = 0;
+            // initialize shmem fields by toggling "left" twice ...
+            left = !left;
+            switchBuffers();
+        }
+        void continueRead() {
+            if (!shmemMeta->available) return;
+
+            if (!ongoing) {
+                ongoing = true;
+                msg.tag = shmemMeta->tag;
+                msg.counter = shmemMeta->counter;
+            }
             assert(shmemMeta->size <= shmemSize ||
                 log_return_false("[ERROR] prompted to read %lu bytes into buffer of length %lu!\n", shmemMeta->size, shmemSize));
-            size_t oldMsgNbInts = outMsg.userData.size();
-            outMsg.userData.resize(outMsg.userData.size() + shmemMeta->size / sizeof(int));
-            memcpy(outMsg.userData.data() + oldMsgNbInts, (char*)shmemBuf, shmemMeta->size);
+            size_t oldMsgNbInts = msg.userData.size();
+            msg.userData.resize(msg.userData.size() + shmemMeta->size / sizeof(int));
+            memcpy(msg.userData.data() + oldMsgNbInts, (char*)shmemBuf, shmemMeta->size);
             bool tbc = shmemMeta->toBeContinued;
             shmemMeta->available = false;
 
-            if (!tbc) break; // done!
+            switchBuffers();
 
-            // switch buffers
-            left = !left;
-            shmemMeta = InPlaceData::getMetadata(left ? shmemLeft : shmemRight);
-            auto pair = InPlaceData::getDataBuffer(left ? shmemLeft : shmemRight, shmemCap/2);
-            shmemBuf = pair.first; shmemSize = pair.second;
+            if (!tbc) {
+                done = true;
+                ongoing = false;
+                return;
+            }
 
-            while (!shmemMeta->available && !_terminate) {} // busy waiting since the other thread is on it
         }
-        return true;
-    }
-    // Internal method to write a single message, possibly buffered across multiple chunks.
-    // Uses the provided buffers, of equal provided size, for double buffering.
-    // Can be configured to be blocking or non-blocking initially; however, once writing
-    // the initial block of data succeeds, the call always blocks until completion.
-    bool writeData(volatile char* shmemLeft, volatile char* shmemRight, size_t shmemCap, bool blocking, const Message& inMsg) {
-        size_t posInMsg = 0;
+        void continueWrite() {
+            if (shmemMeta->available) return;
 
-        // message always begins in the left buffer
-        bool left = true;
-        InPlaceData* shmemMeta = InPlaceData::getMetadata(shmemLeft);
-        auto [shmemBuf, shmemSize] = InPlaceData::getDataBuffer(shmemLeft, shmemCap/2);
-
-        if (!blocking && shmemMeta->available) return false;
-        while (shmemMeta->available && !_terminate) usleep(1000);
-        while (!_terminate) {
-            shmemMeta->tag = inMsg.tag;
-            size_t endInMsg = std::min(posInMsg + shmemSize/sizeof(int), inMsg.userData.size());
+            if (!ongoing) {
+                ongoing = true;
+                shmemMeta->tag = msg.tag;
+                shmemMeta->counter = msg.counter;
+            }
+            size_t endInMsg = std::min(posInMsg + shmemSize/sizeof(int), msg.userData.size());
             shmemMeta->size = (endInMsg-posInMsg) * sizeof(int);
-            memcpy((char*)shmemBuf, inMsg.userData.data() + posInMsg, shmemMeta->size);
-            bool tbc = (posInMsg < inMsg.userData.size());
+            memcpy((char*)shmemBuf, msg.userData.data() + posInMsg, shmemMeta->size);
+            bool tbc = (posInMsg < msg.userData.size());
             shmemMeta->toBeContinued = tbc;
             posInMsg += shmemMeta->size / sizeof(int);
             shmemMeta->available = true;
 
-            if (!tbc) break; // done!
+            switchBuffers();
 
-            // switch buffers
+            if (!tbc) {
+                done = true;
+                ongoing = false;
+                return;
+            }
+        }
+        void switchBuffers() {
             left = !left;
             shmemMeta = InPlaceData::getMetadata(left ? shmemLeft : shmemRight);
             auto pair = InPlaceData::getDataBuffer(left ? shmemLeft : shmemRight, shmemCap/2);
             shmemBuf = pair.first; shmemSize = pair.second;
-
-            while (shmemMeta->available && !_terminate) {} // busy waiting since the other thread is on it
         }
-        return true;
-    }
+    };
 
     BackgroundWorker _bg_worker;
     SPSCBlockingRingbuffer<Message> _buf_in;
@@ -139,12 +151,10 @@ public:
     struct ChannelConfig {
         char* data; // the shared-memory data to use for this channel
         size_t capacity; // the size of the shared-memory data in bytes
-        bool concurrent; // whether to perform reading/writing in a background thread
     };
     BiDirectionalAnytimePipeShmem(ChannelConfig out, ChannelConfig in, bool parent) :
         _data_out(out.data), _cap_out(out.capacity), _data_in(in.data), _cap_in(in.capacity),
-        _out_concurrent(out.concurrent), _in_concurrent(in.concurrent),
-        _buf_in(64), _buf_out(64) {
+        _buf_in(512), _buf_out(512) {
 
         // double buffer method
         _data_in_left = _data_in;
@@ -165,57 +175,44 @@ public:
         // An exception is made for the case where the SPSC ringbuffer for incoming
         // messages runs full (in which case the user does not fetch messages with
         // appropriate frequency), which *can* cause stagnation.
-        if (_in_concurrent || _out_concurrent) _bg_worker.run([&]() {
+        _bg_worker.run([&]() {
             Proc::nameThisThread("ShmemPipeIO");
-            Message msgToRead;
-            Message msgToWrite;
-            const bool bothConcurrent = _in_concurrent && _out_concurrent;
+            IOTask readTask(_data_in_left, _data_in_right, _cap_in);
+            IOTask writeTask(_data_out_left, _data_out_right, _cap_out);
+            size_t readCounter = _msg_counter;
             while (!_terminate) { // run indefinitely until you should terminate
-                if (_in_concurrent) {
-                    // read message from the shmem pipe
-                    bool success = readData(_data_in_left, _data_in_right, _cap_in,
-                        !bothConcurrent, msgToRead);
-                    if (success && msgToRead.tag != 0) {
-                        // message read over pipe: push to incoming messages queue
-                        success = _buf_in.pushBlocking(msgToRead);
-                        if (!success) break;
+                readTask.continueRead();
+                if (readTask.done) {
+                    // message read over pipe: push to incoming messages queue
+                    auto c = readTask.msg.counter;
+                    bool success = readTask.msg.tag == 0 || _buf_in.pushBlocking(readTask.msg);
+                    if (!success) break;
+                    assert(c == readCounter);
+                    readCounter++;
+                    readTask.reset();
+                }
+                // no outgoing message present yet?
+                bool success = writeTask.msg.tag != 0 || _buf_out.pollNonblocking(writeTask.msg);
+                if (success && writeTask.msg.tag != 0) {
+                    // try to write message to the shmem pipe
+                    writeTask.continueWrite();
+                    if (writeTask.done) {
+                        _nb_written++;
+                        writeTask.reset();
                     }
                 }
-                if (_out_concurrent) { // run until terminating
-                    // no outgoing message present yet?
-                    if (msgToWrite.tag == 0) {
-                        // poll message from outgoing messages queue
-                        bothConcurrent ? _buf_out.pollNonblocking(msgToWrite) : _buf_out.pollBlocking(msgToWrite);
-                    }
-                    // outgoing message present by now?
-                    if (msgToWrite.tag != 0) {
-                        // try to write message to the shmem pipe
-                        bool success = writeData(_data_out_left, _data_out_right, _cap_out,
-                            !bothConcurrent, msgToWrite);
-                        if (success) {
-                            _nb_written++;
-                            msgToWrite.tag = 0; // reset
-                        }
-                    }
-                }
-                // if the calls are all non-blocking, we should sleep for a little while
-                if (bothConcurrent) usleep(1000);
+                // if no calls are actively ongoing, we should sleep for a little while
+                if (!readTask.ongoing && !writeTask.ongoing) usleep(1000);
             }
         });
     }
 
     // non-blocking "peek" for available data; non-zero at success
     char pollForData() {
-        if (!_in_concurrent) {
-            bool success = readData(_data_in_left, _data_in_right, _cap_in,
-                false, _msg_to_read);
-            if (!success) return 0;
-            return _msg_to_read.tag;
-        }
         if (_buf_in.empty()) return 0;
         bool ok = _buf_in.pollNonblocking(_msg_to_read);
         if (!ok) return 0;
-        LOG(V5_DEBG, "PIPE read %c\n", _msg_to_read.tag);
+        LOG(V4_VVER, "PIPE read %c#%lu\n", _msg_to_read.tag, _msg_to_read.counter);
         return _msg_to_read.tag;
     }
     // immediately returns the available data prepared via a successful pollForData()
@@ -224,6 +221,10 @@ public:
         contentTag = _msg_to_read.tag;
         assert(expectedTag == contentTag);
         return std::move(_msg_to_read.userData);
+    }
+
+    void terminateAsynchronously() {
+        _terminate = true;
     }
 
     // Send a piece of data, can be blocking and copies the data.
@@ -237,13 +238,9 @@ public:
     }
     // Send a piece of data, can be blocking and moves the data.
     bool writeData(std::vector<int>&& data, char contentTag) {
-        LOG(V5_DEBG, "PIPE write %c\n", contentTag);
-        Message msg {contentTag, std::move(data)};
-        if (!_out_concurrent) {
-            bool success = writeData(_data_out_left, _data_out_right, _cap_out,
-                true, msg);
-            return success;
-        }
+        LOG(V4_VVER, "PIPE write %c#%lu\n", contentTag, _msg_counter);
+        assert(contentTag != 0);
+        Message msg {contentTag, _msg_counter++, std::move(data)};
         bool success = _buf_out.pushBlocking(msg);
         if (success) _nb_to_write++;
         return success;
@@ -251,14 +248,10 @@ public:
     // Send a piece of data built from concatenating the two provided arrays (for convenience),
     // can be blocking and moves/copies the data.
     bool writeData(std::vector<int>&& data1, const std::vector<int>& data2, char contentTag) {
-        LOG(V5_DEBG, "PIPE write %c\n", contentTag);
+        LOG(V4_VVER, "PIPE write %c#%lu\n", contentTag, _msg_counter);
+        assert(contentTag != 0);
         data1.insert(data1.end(), data2.begin(), data2.end());
-        Message msg {contentTag, std::move(data1)};
-        if (!_out_concurrent) {
-            bool success = writeData(_data_out_left, _data_out_right, _cap_out,
-                true, msg);
-            return success;
-        }
+        Message msg {contentTag, _msg_counter++, std::move(data1)};
         bool success = _buf_out.pushBlocking(msg);
         if (success) _nb_to_write++;
         return success;
@@ -267,8 +260,11 @@ public:
     // If writing happens concurrently, wait until all messages have been fully written.
     // Has no effect otherwise.
     void flush() {
-        if (!_out_concurrent) return;
         while (!_terminate && _nb_written < _nb_to_write) usleep(3*1000);
+    }
+
+    bool hasSpaceForWriting() {
+        return !_buf_out.full();
     }
 
     ~BiDirectionalAnytimePipeShmem() {

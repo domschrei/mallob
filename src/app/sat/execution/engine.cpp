@@ -6,6 +6,7 @@
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "app/sat/data/revision_data.hpp"
 #include "app/sat/data/theories/theory_specification.hpp"
+#include "app/sat/solvers/solving_replay.hpp"
 #include "util/logger.hpp"
 #include "util/sys/fileutils.hpp"
 #include "util/sys/thread_pool.hpp"
@@ -25,6 +26,8 @@
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
 #include "util/option.hpp"
 #include <climits>
+#include <fstream>
+#include <iterator>
 
 class LratConnector;
 #if MALLOB_USE_MERGESAT
@@ -73,7 +76,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	std::string proofDirectory;
 
 	// Launched in some certified UNSAT mode?
-    if (_params.proofOutputFile.isSet() || _params.onTheFlyChecking()) {
+    if (_params.proofOutputFile.isSet() || _params.onTheFlyChecking() || _params.palRup()) {
 
 		// Override options
 		if (!portfolio.featuresProofOutput()) {
@@ -90,9 +93,10 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		ClauseMetadata::enableClauseIds();
 		if (_params.onTheFlyChecking()) {
 			ClauseMetadata::enableClauseSignatures();
+			ClauseMetadata::enableIncrementalSignatures();
 		}
 
-		if (_params.proofOutputFile.isSet()) {
+		if (_params.proofOutputFile.isSet() || _params.palRup()) {
 			// Create directory for partial proofs
 			proofDirectory = params.proofDirectory() + "/proof" + config.getJobStr();
 			FileUtils::mkdir(proofDirectory);
@@ -119,12 +123,15 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	const int divOffsetPrefix = appConfig.map.count(keyPrefix) ? atoi(appConfig.map[keyPrefix].c_str()) : 0;
 	const int divOffsetCycle = appConfig.map.count(keyCycle) ? atoi(appConfig.map[keyCycle].c_str()) : 0;
 	// Read # clauses and # vars from app config
-	int numClauses, numVars;
+	int numClauses, numVars, epochOffset, epochModulus;
 	std::vector<std::pair<int*, std::string>> fields {
 		{&numClauses, "__NC"},
-		{&numVars, "__NV"}
+		{&numVars, "__NV"},
+		{&epochOffset, "__EO"},
+		{&epochModulus, "__EM"},
 	};
 	for (auto [out, id] : fields) {
+		if (!appConfig.map.count(id)) continue;
 		std::string str = appConfig.map[id];
 		while (str[str.size()-1] == '.') 
 			str.resize(str.size()-1);
@@ -188,8 +195,11 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	SolverSetup setup;
 	setup.logger = &_logger;
 	setup.jobname = config.getJobStr();
+	setup.jobId = config.jobid;
 	setup.baseSeed = params.seed();
 	setup.isJobIncremental = config.incremental;
+	setup.replayMode = _params.replay() == 1 ? SolvingReplay::RECORD :
+		(_params.replay() == 2 ? SolvingReplay::REPLAY : SolvingReplay::NONE);
 	setup.strictMaxLitsPerClause = params.strictClauseLengthLimit();
 	setup.strictLbdLimit = params.strictLbdLimit();
 	setup.qualityMaxLitsPerClause = params.qualityClauseLengthLimit();
@@ -242,10 +252,11 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.maxNumSolvers = config.mpisize * params.numThreadsPerProcess();
 	setup.numVars = numVars;
 	setup.numOriginalClauses = numClauses;
-	setup.proofDir = proofDirectory;
-	setup.sigFormula = appConfig.map["__SIG"];
+	int sqrt = std::ceil(std::sqrt((double) setup.maxNumSolvers));
+	setup.proofDir = proofDirectory + "/" + (_params.palRup() ? std::to_string(sqrt) + "/" : "");
+
 	LratConnector* modelCheckingLratConnector {nullptr};
-	setup.nbSkippedIdEpochs = config.nbPreviousBalancingEpochs;
+	setup.nbSkippedIdEpochs = std::max(0, epochOffset + epochModulus * config.nbPreviousBalancingEpochs);
 	if (params.satProfilingLevel() >= 0) {
 		setup.profilingBaseDir = params.satProfilingDir();
 		if (setup.profilingBaseDir.empty()) setup.profilingBaseDir = TmpDir::getGeneralTmpDir();
@@ -255,6 +266,14 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	}
 	setup.memoryFactor = numOrigSolvers / (float)_num_active_solvers;
 	setup.objectiveFunction = _objective;
+
+	// Pre-create PalRUP proof directories for *all* solver IDs, including cancelled ones.
+	if (params.palRup()) for (setup.localId = 0; setup.localId < numOrigSolvers; setup.localId++) {
+		setup.globalId = appRank * numOrigSolvers + setup.localId;
+		auto dir = setup.proofDir + "/" + std::to_string(setup.globalId);
+		LOG(V2_INFO, "MKDIR %s\n", dir.c_str());
+		FileUtils::mkdir(dir);
+	}
 
 	// Instantiate solvers according to the global solver IDs and diversification indices
 	int cyclePos = begunCyclePos;
@@ -286,11 +305,14 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		setup.solverType = item.baseSolver;
 		setup.flavour = item.flavour;
 		setup.doIncrementalSolving = setup.isJobIncremental && item.incremental;
-		setup.certifiedUnsat = item.outputProof && (params.proofOutputFile.isSet() || params.onTheFlyChecking());
+		setup.certifiedUnsat = item.outputProof && (params.proofOutputFile.isSet() || params.onTheFlyChecking() || _params.palRup());
 		setup.onTheFlyChecking = setup.certifiedUnsat && params.onTheFlyChecking();
 		setup.onTheFlyCheckModel = params.onTheFlyChecking() && params.onTheFlyCheckModel();
+		setup.usePalRupFormat = params.palRup();
+		setup.outputBinaryPalRup = params.palRupBinary();
+		setup.trustedParserForced = params.forceIncrementalTrustedParser();
 		setup.modelCheckingLratConnector = modelCheckingLratConnector;
-		setup.avoidUnsatParticipation = (params.proofOutputFile.isSet() || params.onTheFlyChecking()) && !item.outputProof;
+		setup.avoidUnsatParticipation = (params.proofOutputFile.isSet() || params.onTheFlyChecking() || _params.palRup()) && !item.outputProof;
 		setup.exportClauses = !setup.avoidUnsatParticipation;
 
 		_solver_interfaces.push_back(createSolver(setup));
@@ -358,11 +380,11 @@ std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSe
 
 void SatEngine::appendRevision(int revision, RevisionData data, bool lastRevisionForNow) {
 	
-	LOGGER(_logger, V4_VVER, "Import rev. %i: size %lu\n", revision, data.fSize);
+	LOGGER(_logger, V4_VVER, "Import rev. %i: size %lu\n", revision, data.fLits->size());
 	assert(_revision+1 == revision);
 	_revision_data.push_back(data);
 	_sharing_manager->setImportedRevision(revision);
-	_prefilter.notifyFormula(data.fLits, data.fSize);
+	_prefilter.notifyFormula(data.fLits->data(), data.fLits->size());
 	
 	for (size_t i = 0; i < _num_active_solvers; i++) {
 		if (revision == 0) {
@@ -411,6 +433,7 @@ void SatEngine::appendRevision(int revision, RevisionData data, bool lastRevisio
 			}
 		}
 	}
+	_revision_data.back().fLits.reset(); // formula increment no longer needed here
 	_revision = revision;
 }
 
@@ -423,6 +446,22 @@ void SatEngine::solve() {
 		for (size_t i = 0; i < std::min(_num_active_solvers, _solver_threads.size()); i++)
 			_solver_threads[i]->start();
 		_solvers_started = true;
+
+		if (_params.injectProofData.isSet()) {
+			// Read proof meta data to inject into solving
+			{
+				std::ifstream ifs(_params.injectProofData() + "/winning-id.txt");
+				std::string content( (std::istreambuf_iterator<char>(ifs)),
+					(std::istreambuf_iterator<char>()));
+				_result.winningInstanceId = atoi(content.c_str());
+			}
+			{
+				std::ifstream ifs(_params.injectProofData() + "/global-start-of-success-epoch.txt");
+				std::string content( (std::istreambuf_iterator<char>(ifs)),
+					(std::istreambuf_iterator<char>()));
+				_result.globalStartOfSuccessEpoch = atol(content.c_str());
+			}
+		}
 	}
 	_state = ACTIVE;
 }
@@ -446,7 +485,15 @@ int SatEngine::solveLoop() {
 	bool done = false;
 	bool preprocessingResult = false;
 	for (size_t i = 0; i < std::min(_num_active_solvers, _solver_threads.size()); i++) {
-		if (_solver_threads[i]->hasFoundResult(_revision)) {
+		if (_params.injectProofData.isSet()) {
+			// Inject solver result from the specified proof meta data
+			if (_solver_interfaces[i]->getGlobalId() == _result.winningInstanceId) {
+				done = true;
+				_result.result = UNSAT;
+				_result.revision = 0;
+				break;
+			}
+		} else if (_solver_threads[i]->hasFoundResult(_revision)) {
 
 			if (_params.deterministicSolving() && _solver_interfaces[i]->getGlobalId() != _winning_solver_id)
 				continue; // not the successful solver we're looking for
@@ -553,16 +600,16 @@ void SatEngine::setActiveThreadCount(int nbThreads) {
 		_sharing_manager->stopClauseImport(i);
 		SolverSetup s = _solver_interfaces[i]->getSolverSetup();
 		s.solverRevision++;
-		_solver_threads[i]->setTerminate(true);
+		_solver_threads[i]->setTerminate(false);
 		auto movedSolver = std::move(_solver_interfaces[i]);
 		_solver_interfaces[i] = createSolver(s);
 		auto movedThread = std::move(_solver_threads[i]);
 		_solver_threads[i] = std::shared_ptr<SolverThread>(new SolverThread(
 			_params, _config, _solver_interfaces[i], {}, i
 		));
-		_solver_threads[i]->setTerminate();
 		_num_active_solvers--;
 		_solver_thread_cleanups.push_back(ProcessWideThreadPool::get().addTask([thread = std::move(movedThread), solver = std::move(movedSolver)]() mutable {
+			thread->cleanUpAsynchronously();
 			thread->tryJoin();
 			thread.reset();
 			solver.reset();
@@ -639,6 +686,7 @@ long long SatEngine::getBestFoundObjectiveCost() const {
 }
 
 void SatEngine::writeClauseEpochs() {
+	if (_params.injectProofData.isSet()) return;
 	std::string filename = _params.proofDirectory() + "/proof"
 		+ _config.getJobStr() + "/clauseepochs." + std::to_string(_config.apprank);
 	_sharing_manager->writeClauseEpochs(/*_solver_interfaces[0]->getSolverSetup().proofDir, 
@@ -651,9 +699,16 @@ void SatEngine::cleanUp(bool hardTermination) {
 	LOGGER(_logger, V4_VVER, "[engine-cleanup] enter\n");
 
 	// Terminate any remaining running threads
+	auto setup = _solver_interfaces.front()->getSolverSetup();
 	terminateSolvers(hardTermination);
 	if (hardTermination) {
 		if (_params.proofOutputFile.isSet()) writeClauseEpochs();
+		// Create (empty) proof files where none were created
+		if (_params.palRup()) for (int localId = 0; localId < _params.numThreadsPerProcess(); localId++) {
+			int globalId = _config.apprank * _params.numThreadsPerProcess() + localId;
+			auto dir = setup.proofDir + "/../" + std::to_string(globalId);
+			FileUtils::create(dir + "/out.palrup");
+		}
 		LOGGER(_logger, V4_VVER, "[engine-cleanup] done - hard exit pending\n");
 		return;
 	}

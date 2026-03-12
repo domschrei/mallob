@@ -1,0 +1,17 @@
+{
+    "comment": [
+        "This file is a valid example for a job template file to be provided with the Mallob option -job-template=<>. You may add any JSON fields of a usual job submission file and change the existing fields. Certain scheduling-specific fields will be overwritten by the job streamer when instantiating individual jobs.",
+        "When running Mallob with several clients (-c=<>), note that you can create different template files named like tj.json.0, tj.json.1, ... and then specify -job-template=tj.json so that the i-th client will use the file tj.json.<i>."
+    ],
+
+    "application": "SAT", 
+    "arrival": 0, 
+    "dependencies": [], 
+    "user": "admin", 
+    "name": "templated-job",
+    "priority": 1, 
+    "wallclock-limit": "0", 
+    "cpu-limit": "0", 
+    "max-demand": 0, 
+    "configuration": {} 
+}

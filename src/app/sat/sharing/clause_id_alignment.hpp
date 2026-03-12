@@ -124,10 +124,10 @@ public:
 	}
 
 	int getProducingLocalSolverIndex(unsigned long clauseId) {
-		return (clauseId-_num_original_clauses) % _max_nb_threads_per_process;
+		return clauseId % _max_nb_threads_per_process;
 	}
 	int getProducingInstanceId(unsigned long clauseId) {
-		return (clauseId-_num_original_clauses) % _solvers[0]->getSolverSetup().maxNumSolvers;
+		return clauseId % _solvers[0]->getSolverSetup().maxNumSolvers;
 	}
 
     void alignClauseId(int* clauseData) {

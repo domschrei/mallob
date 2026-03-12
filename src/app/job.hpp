@@ -42,7 +42,7 @@ protected:
     /*
     The parameters the application was started with.
     */
-    const Parameters& _params;
+    Parameters _params;
     
 public:
     // BEGIN of interface to implement as an application.
@@ -276,6 +276,7 @@ public:
 
     // Getter methods and simple queries
 
+    const Parameters& getParams() const {return _params;}
     JobState getState() const {return _state;};
     void assertState(JobState state) const {assert(_state == state || LOG_RETURN_FALSE("State of %s : %s\n", toStr(), jobStateToStr()));};
     int getVolume() const {return _volume;}
@@ -349,6 +350,7 @@ public:
         _latest_balancing_epoch = std::max(_latest_balancing_epoch, latestEpoch);
         if (getJobTree().isRoot() && hasDescription() && getDescription().getFirstBalancingEpoch() < 0) {
             _description.setFirstBalancingEpoch(_latest_balancing_epoch);
+            _description.writeMetadata();
         }
     }
     int getLatestJobBalancingEpoch() const {return _latest_balancing_epoch;}

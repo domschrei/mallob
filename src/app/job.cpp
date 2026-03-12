@@ -1,10 +1,13 @@
 
 #include <cmath>
 #include <cstdlib>
+#include <iterator>
 #include <limits>
 
 #include "app/job.hpp"
+#include "app/app_registry.hpp"
 #include "util/logger.hpp"
+#include "util/string_utils.hpp"
 #include "util/sys/timer.hpp"
 #include "comm/msgtags.h"
 
@@ -63,6 +66,10 @@ void Job::pushRevision(const std::shared_ptr<std::vector<uint8_t>>& data) {
         _max_demand = _max_demand == 0 ? 
             _description.getMaxDemand() // no global max. demand defined
             : std::min(_max_demand, _description.getMaxDemand()); // both limits defined
+    }
+    if (!_has_description) {
+        // First time receiving a description: Apply any option overrides from the app configuration
+        app_registry::overrideProgramOptions(_params, _description);
     }
 
     _sum_of_description_sizes += data->size() / sizeof(int);

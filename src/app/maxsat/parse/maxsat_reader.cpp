@@ -114,10 +114,6 @@ bool MaxSatReader::read(JobDescription& desc) {
 	config.updateFixedSizeEntry("__NO", 0);
 	config.updateFixedSizeEntry("__XL", 0);
 	config.updateFixedSizeEntry("__XU", 0);
-	if (_params.onTheFlyChecking()) {
-		std::string placeholder(32, 'x');
-		desc.setAppConfigurationEntry("__SIG", placeholder.c_str());
-	}
 	desc.beginInitialization(desc.getRevision());
 
 	// Compressed (*.xz) input?

@@ -1,5 +1,5 @@
 ################### Build Mallob
-FROM ubuntu:23.04
+FROM ubuntu:24.04
 USER root
 #  Install required softwares
 RUN apt-get update
