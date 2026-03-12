@@ -171,6 +171,8 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 
 		auto locally_stolen_work = stealWorkFromAnyLocalSolver(sourceRank, sourceLocalId);
 
+		int stolen_count = locally_stolen_work.size();
+
 		msg.payload = std::move(locally_stolen_work);
 		msg.payload.push_back(sourceLocalId);
 
@@ -180,6 +182,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		msg.treeIndexOfDestination = sourceIndex;
 		msg.contextIdOfDestination = getJobComm().getContextIdOrZero(sourceIndex);
 
+		//in case we don't have full tree information about the origin of the message we can still send it back, because we can use metadata in the message itself as a backup
 		if (msg.contextIdOfDestination != 0) {
 			assert(msg.contextIdOfDestination == sourceContextId);
 		} else {
@@ -197,21 +200,28 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		//probably happens when sweep message slips right into the ongoing ranklist update that is periodically started as aggregating, in job.cpp 233
 		assert(msg.contextIdOfDestination != 0 ||
 			log_return_false("SWEEP STEAL ERROR: invalid contextIdOfDestination==0. In TAG_RETURNING_STEAL_REQUEST, wanted to return an message"
-					"With sourceRank=%i, sourceIndex=%i, payload.size()=%i \n", sourceRank, sourceIndex, msg.payload.size()));
+					"With sourceRank=%i, sourceIndex=%i, payload.size()=%zu \n", sourceRank, sourceIndex, msg.payload.size()));
 
 		assert(msg.treeIndexOfDestination >= 0 ||
 			log_return_false("SWEEP STEAL ERROR: treeIndexOfDestination < 0 . In TAG_RETURNING_STEAL_REQUEST, wanted to return an message"
-					"With sourceRank=%i, sourceIndex=%i, contextIdOfDestination=%i, payload.size()=%i \n", sourceRank, sourceIndex, msg.contextIdOfDestination, msg.payload.size()));
+					"With sourceRank=%i, sourceIndex=%i, contextIdOfDestination=%i, payload.size()=%zu \n", sourceRank, sourceIndex, msg.contextIdOfDestination, msg.payload.size()));
+
+		if (stolen_count>0) {
+			LOG(V3_VERB, "SWEEP MSG [%i] ===%i===> [%i](%i) \n", _my_rank, stolen_count, sourceRank, sourceLocalId);
+		}
 
 		getJobTree().send(sourceRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 	}
 	else if (msg.tag == TAG_RETURNING_STEAL_REQUEST) {
 		int stealingLocalId = msg.payload.back();
 		msg.payload.pop_back();
+		assert(_worksteal_requests[stealingLocalId].got_steal_response == false || log_return_false("SWEEP ERROR : got MPI steal answer, but already request.got_steal_response==true.  sourceRank %i, stealingLocalId %i, payload.size %zu ", sourceRank, stealingLocalId, msg.payload.size()));
+		assert(_worksteal_requests[stealingLocalId].to_send == false			|| log_return_false("SWEEP ERROR : got MPI steal answer, but still   request.to_send==true.             sourceRank %i, stealingLocalId %i, payload.size %zu ", sourceRank, stealingLocalId, msg.payload.size()));
+
 		_worksteal_requests[stealingLocalId].stolen_work = std::move(msg.payload);
 		_worksteal_requests[stealingLocalId].got_steal_response = true;
 		if (_worksteal_requests[stealingLocalId].stolen_work.size() > 0)
-			LOG(V3_VERB, "SWEEP MSG [%i](%i) <==%i==== [%i]\n", _my_rank, stealingLocalId, _worksteal_requests[stealingLocalId].stolen_work.size(), sourceRank );
+			LOG(V3_VERB, "SWEEP MSG [%i](%i) <==%zu==== [%i]\n", _my_rank, stealingLocalId, _worksteal_requests[stealingLocalId].stolen_work.size(), sourceRank );
 		else
 			LOG(V3_VERB, "SWEEP MSG [%i](%i) <---0---- [%i]\n", _my_rank, stealingLocalId, sourceRank );
 	}
@@ -296,7 +306,7 @@ void SweepJob::reportSolverResult(KissatPtr sweeper, int res) {
 	} else if (res==IMPROVED){
 		assert(sweeper);
 		formula = sweeper->extractPreprocessedFormula();
-		LOG(V2_INFO, "SWEEP JOB [%i]: Solution Size %i\n", _my_rank, formula.size());
+		LOG(V2_INFO, "SWEEP JOB [%i]: Solution Size %zu\n", _my_rank, formula.size());
 	} else if (res==UNKNOWN) {
 		//Design choice: we don't even send a formula back. if we couldn't improve anything in it
 		//since, in the SWEEP app, we stop anyways after sweeping ends
@@ -757,7 +767,7 @@ void SweepJob::sendWorkstealsViaMPI() {
 			//There was no local work available, now we prepare to send out an MPI message
 			int my_comm_rank = getJobComm().getWorldRankOrMinusOne(_my_index);
 			if (my_comm_rank == -1) {
-				LOG(V3_VERB, "SWEEP SKIP own rank [%i] (myindex %i) <ctx %i> not yet in JobComm of size %i \n", _my_rank, _my_index, _my_ctx_id, getJobComm().size());
+				LOG(V3_VERB, "SWEEP SKIP own rank [%i] (myindex %i) <ctx %i> not yet in JobComm of size %zu \n", _my_rank, _my_index, _my_ctx_id, getJobComm().size());
 				continue;
 			}
 
@@ -791,12 +801,12 @@ void SweepJob::sendWorkstealsViaMPI() {
 				int targetRank = getJobComm().getWorldRankOrMinusOne(targetIndex);
 				if (targetRank == -1) {
 					//target rank of this targetIndex is not yet in JobTree, might need some more milliseconds to update, roll again
-					LOG(V3_VERB, "SWEEP SKIP target idx %i not in JobComm (size %i) \n", targetIndex, getJobComm().size());
+					LOG(V3_VERB, "SWEEP SKIP target idx %i not in JobComm (size %zu) \n", targetIndex, getJobComm().size());
 					continue;
 				}
 				if (getJobComm().getContextIdOrZero(targetIndex)==0) {
 					//target is not yet listed in address list. Might happen for a short period just after it is spawned. roll again
-					LOG(V3_VERB, "SWEEP SKIP ctx_id of target is missing. getVolume()=%i, rndTargetIndex=%i, rndTargetRank=%i, myIndex=%i, myRank=%i, JobComm size %i \n", getVolume(), targetIndex, targetRank, _my_index, _my_rank, getJobComm().size());
+					LOG(V3_VERB, "SWEEP SKIP ctx_id of target is missing. getVolume()=%i, rndTargetIndex=%i, rndTargetRank=%i, myIndex=%i, myRank=%i, JobComm size %zu \n", getVolume(), targetIndex, targetRank, _my_index, _my_rank, getJobComm().size());
 					continue;
 				}
 				foundRank = targetRank;
@@ -985,7 +995,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	if (_worksteal_requests[localId].got_steal_response) {
 		if (_worksteal_requests[localId].stolen_work.size()>0) {
 			sweeper->work_received_from_steal = std::move(_worksteal_requests[localId].stolen_work);
-			LOG(V4_VVER, "SWEEP recv [%i](%i) <==%i==== [%i] \n",  _my_rank, localId, (int)sweeper->work_received_from_steal.size(), _worksteal_requests[localId].targetRank);
+			LOG(V4_VVER, "SWEEP recv [%i](%i) <==%zu==== [%i] \n",  _my_rank, localId, (int)sweeper->work_received_from_steal.size(), _worksteal_requests[localId].targetRank);
 			return;
 		}
 		_worksteal_requests[localId].got_steal_response = false; //to no read it a second time
@@ -997,7 +1007,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	if ( ! stolen_work.empty()) {
 		//Successful local steal
 		sweeper->work_received_from_steal = std::move(stolen_work);
-		LOG(V3_VERB, "SWEEP gt  [%i](%i) <==%i==== local   \n", _my_rank, localId, sweeper->work_received_from_steal.size(), _my_rank);
+		LOG(V3_VERB, "SWEEP gt  [%i](%i) <==%zu==== local   \n", _my_rank, localId, sweeper->work_received_from_steal.size(), _my_rank);
 		return;
 	}
 
@@ -1164,7 +1174,7 @@ void SweepJob::cbContributeToAllReduce() {
 
 	auto aggregation_element = aggregateEqUnitContributions(contribs);
 
-	LOG(V4_VVER, "SWEEP [%i] contributing ~~~%i~~~(+%i)~~> to _red \n", _my_rank, aggregation_element.size()-NUM_METADATA_FIELDS, NUM_METADATA_FIELDS);
+	LOG(V4_VVER, "SWEEP [%i] contributing ~~~%zu~~~(+%i)~~> to _red \n", _my_rank, aggregation_element.size()-NUM_METADATA_FIELDS, NUM_METADATA_FIELDS);
 
 	if (_terminate_all) {
 		LOG(V4_VVER, "SWEEP SHARE BCAST skip contribution, seen already _terminate_all\n");
@@ -1280,7 +1290,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 		int claimed_unit_size = contrib[contrib.size()- METADATA_UNIT_SIZE];
 		int claimed_total_size = claimed_eq_size + claimed_unit_size + NUM_METADATA_FIELDS;
 		assert(contrib.size() == claimed_total_size ||
-			log_return_false("ERROR in AllReduce, Bad Element Format: Claims total size %i != %i actual contrib.size() (claims: eq_size %i,  units size %i, metadata %i)", claimed_total_size, contrib.size(), claimed_eq_size, claimed_unit_size, NUM_METADATA_FIELDS)
+			log_return_false("ERROR in AllReduce, Bad Element Format: Claims total size %i != %zu actual contrib.size() (claims: eq_size %i,  units size %i, metadata %i)", claimed_total_size, contrib.size(), claimed_eq_size, claimed_unit_size, NUM_METADATA_FIELDS)
 			);
 	}
 
@@ -1366,7 +1376,7 @@ std::vector<int> SweepJob::stealWorkFromAnyLocalSolver(int asking_rank, int aski
 	for (int localId : rand_permutation) {
 		auto stolen_work = stealWorkFromSpecificLocalSolver(localId);
 		if ( ! stolen_work.empty()) {
-			LOG(V3_VERB, "SWEEP giv [%i](%i) ===%i===> [%i](%i) \n",_my_rank, localId, stolen_work.size(), asking_rank, asking_sourceLocalId);
+			LOG(V3_VERB, "SWEEP giv [%i](%i) ===%zu===> [%i](%i) \n",_my_rank, localId, stolen_work.size(), asking_rank, asking_sourceLocalId);
 			return stolen_work;
 		}
 	}
