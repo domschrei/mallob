@@ -206,14 +206,14 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		getJobTree().send(sourceRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 	}
 	else if (msg.tag == TAG_RETURNING_STEAL_REQUEST) {
-		int localId = msg.payload.back();
+		int stealingLocalId = msg.payload.back();
 		msg.payload.pop_back();
-		_worksteal_requests[localId].stolen_work = std::move(msg.payload);
-		_worksteal_requests[localId].got_steal_response = true;
-		if (_worksteal_requests[localId].stolen_work.size() > 0)
-			LOG(V3_VERB, "SWEEP MSG [%i](%i) <==%i==== [%i]\n", _my_rank, localId, _worksteal_requests[localId].stolen_work.size(), sourceRank );
+		_worksteal_requests[stealingLocalId].stolen_work = std::move(msg.payload);
+		_worksteal_requests[stealingLocalId].got_steal_response = true;
+		if (_worksteal_requests[stealingLocalId].stolen_work.size() > 0)
+			LOG(V3_VERB, "SWEEP MSG [%i](%i) <==%i==== [%i]\n", _my_rank, stealingLocalId, _worksteal_requests[stealingLocalId].stolen_work.size(), sourceRank );
 		else
-			LOG(V3_VERB, "SWEEP MSG [%i](%i) <---0---- [%i]\n", _my_rank, localId, _worksteal_requests[localId].stolen_work.size(), sourceRank );
+			LOG(V3_VERB, "SWEEP MSG [%i](%i) <---0---- [%i]\n", _my_rank, stealingLocalId, sourceRank );
 	}
 	else if (msg.tag == TAG_FOUND_UNSAT) {
 		LOG(V1_WARN, "SWEEP MSG [%i] <~~~ Found UNSAT! [%i]\n", _my_rank, sourceRank );
