@@ -53,8 +53,8 @@ private:
 
 	std::atomic_flag steal_victim_lock = ATOMIC_FLAG_INIT;
 
-	bool sweeper_is_idle = false; //current idle-status
-	bool sweeper_longterm_idle = false; //whether the sweeper remained idle through a whole period of checking
+	std::atomic_bool sweeper_is_idle = false; //current idle-status
+	std::atomic_bool sweeper_longterm_idle = false; //whether the sweeper remained idle through a whole period of checking
 
 	// bool has_reported_sweep_dimacs = false;
 

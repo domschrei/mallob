@@ -671,7 +671,7 @@ void SweepJob::printIdleFraction() {
 		}
 	}
 	_lastLongtermIdleCount = longterm_idles;
-	LOG(V3_VERB, "SWEEP  Started %i, Active %i, Running %i, NowIdle %i, LongtermIdle %i: %s \n",  _started_sweepers_count.load(), active, _running_sweepers_count.load(), idles, longterm_idles, oss.str().c_str());
+	LOG(V3_VERB, "SWEEP IDLE (%i)Started (%i)Active (%i)Running (%i)NowIdle (%i)longtermIdle: %s \n",  _started_sweepers_count.load(), active, _running_sweepers_count.load(), idles, longterm_idles, oss.str().c_str());
 	// if (active>0)
 		// LOG(V3_VERB, "SWEEP Active %i, Running %i, Idle %i, Started %i. idle nrs: %s \n", active, _running_sweepers_count.load(), idles,  _started_sweepers_count.load(), oss.str().c_str());
 
@@ -1031,7 +1031,10 @@ void SweepJob::cbStealWorkNew(unsigned **work, int *work_size, int localId) {
 	//We store the steal data persistently in the C++ vector sweeper->work_received_from_steal, allocated and managed in C++
 	//The kissat solver (and other solver threads) will then be allowed to read and write(!) within this fixed allocated memory.
 	*work = reinterpret_cast<unsigned int*>(sweeper->work_received_from_steal.data());
-	*work_size = sweeper->work_received_from_steal.size();
+	*work_size = (int)sweeper->work_received_from_steal.size();
+	if (*work_size != sweeper->work_received_from_steal.size()) {
+		LOG(V1_WARN, "SWEEP WARN ERROR : weird work discrepancy: *work_size==%i, work.size()==%zu \n", *work_size, sweeper->work_received_from_steal.size());
+	}
 	assert(*work_size>=0 || log_return_false("SWEEP ERROR : work size %i \n", *work_size));
 	if (*work_size>0) {
 		sweeper->sweeper_is_idle = false;
@@ -1221,7 +1224,7 @@ void SweepJob::extractAllReductionResult() {
 	if (!_started_synchronized_solving) {
 		if (eq_size>0 || unit_size>0)  { LOG(V3_VERB, "SWEEP WARN RED SHARE [%i] (iter %i round %i) SKIP %i eqs, %i units bc local solvers are not all init'd yet \n", _my_rank, sweep_iteration, sharing_round, eq_size/2, unit_size); }
 
-		LOG(V2_INFO, "SWEEP RED SHARE SKIP: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)term. #longterm idle: %i/%i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastLongtermIdleCount, _nThreads);
+		LOG(V2_INFO, "SWEEP RED SHARE SKIP: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)term. #longterm idle: %i / %i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastLongtermIdleCount, _nThreads);
 		return;
 	}
 
@@ -1257,7 +1260,7 @@ void SweepJob::extractAllReductionResult() {
 		}
 	}
 
-	LOG(V2_INFO, "SWEEP RED SHARE: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)term. #longterm idle: %i/%i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastLongtermIdleCount, _nThreads);
+	LOG(V2_INFO, "SWEEP RED SHARE: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)term. #longterm idle: %i / %i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastLongtermIdleCount, _nThreads);
 
 	//prepare the next sharing round, which gets started from the root node
 	if (_is_root) {
