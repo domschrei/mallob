@@ -51,6 +51,8 @@ private:
 	std::mutex sweep_export_mutex; //when exporting data from the solver to Mallob, need to lock them when extracting them for global sharing, otherwise the solver threads might continue concurrently pushing new data onto them
 	std::vector<int> work_received_from_steal;
 
+	std::atomic_flag is_steal_victim_lock = ATOMIC_FLAG_INIT;
+
 	bool sweeper_is_idle = false;
 	// bool has_reported_sweep_dimacs = false;
 

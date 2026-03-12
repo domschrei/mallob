@@ -635,6 +635,12 @@ void SweepJob::printCongruenceStats(KissatPtr sweeper) {
 void SweepJob::printIdleFraction() {
 	if (_terminate_all) return; //prevent segfault! the sweeper references are being concurrently deleted right now, no touching them
 
+
+	 /*
+	  * TODO: new idle-tracker that tracks Continously_Idle_since_last_check. Would be more robust than the snapshot idle status at any given moment
+	  *
+	  */
+
 	int idles = 0;
 	int active = 0;
 	std::ostringstream oss;
@@ -918,6 +924,7 @@ void SweepJob::provideInitialWork(KissatPtr sweeper) {
 	//i.e. that there are no holes in kissats internal numbering. This is an assumption that standard Kissat makes all the time, so we also do it here
 
 	const unsigned VARS = shweep_get_num_vars(sweeper->solver); //this value can be different from numVars here in C++ !! Because kissat might havel aready propagated some units, etc.
+	LOG(V2_INFO, "SWEEP WORK: Start providing -----%u------- work \n", VARS);
 	sweeper->work_received_from_steal = std::vector<int>(VARS);
 	//the initial work is all variables
 	for (int idx = 0; idx < VARS; idx++) {
@@ -984,7 +991,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 		_worksteal_requests[localId].newQueuedRequest(localId);
 	}
 
-	//If we make it until here we are waiting for work and have have nothing else to do for now. Sufficient to poll for new work every ~millisecond.
+	//If we make it until here we are waiting for work and have have nothing else to do for now. Can wait for  ~1 millisecond until we check the system again.
 	usleep(1000);
 
 }
@@ -1347,6 +1354,21 @@ std::vector<int> SweepJob::stealWorkFromAnyLocalSolver(int asking_rank, int aski
 	return {};
 }
 
+//Syntatic sugar to automatically clear a flag again when it goes out of scope, so we don't have to do it manually
+struct scoped_guard {
+    std::atomic_flag& flag;
+    bool active;
+
+    scoped_guard(std::atomic_flag& f) : flag(f), active(!f.test_and_set(std::memory_order_acquire)) {}
+    ~scoped_guard() {
+        if (active)
+            flag.clear(std::memory_order_release);
+    }
+
+    bool acquired() const { return active; }
+};
+
+
 std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	if (_terminate_all) //sweeping finished globally, nothing to steal anymore
 		return {};
@@ -1359,6 +1381,12 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 		// LOG(V3_VERB, "SWEEP STEAL stealing from [%i](%i), shweeper->solver does not exist yet \n", _my_rank, localId);
 		return {};
 	}
+
+
+	/*
+	 * TODO: Some atomic/mutex block, such that only one solver at a time can steal
+	 * otherwise with 24 solvers stealing concurrently right at the start, we have duplication of work of non-negligible amounts (up to ~10%)
+	 */
 
 	// LOG(V3_VERB, "SWEEP stealattempt on [%i](%i)\n", _my_rank, localId);
 	//We dont know yet how much there is to steal, so we ask for an upper bound
@@ -1374,19 +1402,25 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	assert(max_steal_amount < 2*_numVars || log_return_false("SWEEP STEAL ERROR [%i](%i): too large max steal amount %i >= 2*NUM_VARS, maybe segfault into non-initialized kissat solver \n", _my_rank, localId, max_steal_amount));
 
 	//There is something to steal
-	//Allocate memory for the steal here in C++, and pass the allocation to kissat such that it can fill it with the stolen work
+
+	//We want only one solver at a time to steal from a given solver. Especially relevant at the beginning, when 23 solvers try to steal from one solver.
+
+	scoped_guard steal_guard(sweeper->is_steal_victim_lock);
+	if (!steal_guard.acquired())
+		return {};
+
+	//Allocate memory for the steal here in C++, and pass the allocation to kissat for filling
 	std::vector<int> stolen_work = std::vector<int>(max_steal_amount);
 
 	// LOG(V3_VERB, "[%i] stealing from (%i), expecting max %i  \n", _my_rank, localId, max_steal_amount);
 	int actually_stolen = shweep_steal_from_this_solver(sweeper->solver, reinterpret_cast<unsigned int*>(stolen_work.data()), max_steal_amount);
-	// LOG(V3_VERB, "ß Steal request got %i actually stolen\n", actually_stolen);
-	// LOG(V3_VERB, "SWEEP WORK actually stolen ---%i---> from [%i](%i)\n", localId, stolen_work.size());
-	if (actually_stolen == 0)
-		return {};
+	assert(actually_stolen >= 0 || log_return_false("SWEEP ERROR : negative stolen amount %i \n", actually_stolen));
 	//We allocated the steal array as large as maximally needed, but that was only an upper limit estimate, often during stealing it turns out that we receive a bit less work than estimated
 	//So now we know the exact amount of work we stole, and shrink the array to have its .size() match with this stolen amount
 	stolen_work.resize(actually_stolen);
+
 	return stolen_work;
+	//lock is freed up now automatically by going out of scope
 }
 
 std::vector<int> SweepJob::getRandomIdPermutation() {
