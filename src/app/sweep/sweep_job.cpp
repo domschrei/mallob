@@ -140,7 +140,7 @@ void SweepJob::appl_communicate() {
 
 	float t1 = Timer::elapsedSeconds();
 	_appl_communicate_duration.push_back(t1-t0);
-	LOG(V4_VVER, "SWEEP appl_communicate(): %.6f sec \n", (t1-t0));
+	LOG(V5_DEBG, "SWEEP appl_communicate(): %.6f sec \n", (t1-t0));
 	LOG(V5_DEBG, "SWEEP appl_communicate() done \n");
 }
 
@@ -208,7 +208,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 					"With sourceRank=%i, sourceIndex=%i, contextIdOfDestination=%i, payload.size()=%zu \n", sourceRank, sourceIndex, msg.contextIdOfDestination, msg.payload.size()));
 
 		if (stolen_count>0) {
-			LOG(V3_VERB, "SWEEP MSG [%i] ===%i===> [%i](%i) \n", _my_rank, stolen_count, sourceRank, sourceLocalId);
+			LOG(V3_VERB, "SWEEP snd [%i] >>>>%i>>>> [%i](%i) \n", _my_rank, stolen_count, sourceRank, sourceLocalId);
 		}
 
 		getJobTree().send(sourceRank, MSG_SEND_APPLICATION_MESSAGE, msg);
@@ -222,9 +222,9 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		_worksteal_requests[stealingLocalId].stolen_work = std::move(msg.payload);
 		_worksteal_requests[stealingLocalId].got_steal_response = true;
 		if (_worksteal_requests[stealingLocalId].stolen_work.size() > 0)
-			LOG(V3_VERB, "SWEEP MSG [%i](%i) <==%zu==== [%i]\n", _my_rank, stealingLocalId, _worksteal_requests[stealingLocalId].stolen_work.size(), sourceRank );
+			LOG(V3_VERB, "SWEEP rcv [%i](%i) <<<%zu<<<< [%i]\n", _my_rank, stealingLocalId, _worksteal_requests[stealingLocalId].stolen_work.size(), sourceRank );
 		else
-			LOG(V3_VERB, "SWEEP MSG [%i](%i) <---0---- [%i]\n", _my_rank, stealingLocalId, sourceRank );
+			LOG(V3_VERB, "SWEEP rcv [%i](%i) <---0---- [%i]\n", _my_rank, stealingLocalId, sourceRank );
 	}
 	else if (msg.tag == TAG_FOUND_UNSAT) {
 		LOG(V1_WARN, "SWEEP MSG [%i] <~~~ Found UNSAT! [%i]\n", _my_rank, sourceRank );
@@ -1009,7 +1009,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	if ( ! stolen_work.empty()) {
 		//Successful local steal
 		sweeper->work_received_from_steal = std::move(stolen_work);
-		LOG(V3_VERB, "SWEEP gt  [%i](%i) <==%zu==== local   \n", _my_rank, localId, sweeper->work_received_from_steal.size(), _my_rank);
+		LOG(V3_VERB, "SWEEP lcl [%i](%i) <==%zu====  \n", _my_rank, localId, sweeper->work_received_from_steal.size(), _my_rank);
 		return;
 	}
 
@@ -1224,9 +1224,9 @@ void SweepJob::extractAllReductionResult() {
 
 	//if our local solvers are not fully initialised yet we ignore the global sharing data
 	if (!_started_synchronized_solving) {
-		if (eq_size>0 || unit_size>0)  { LOG(V3_VERB, "SWEEP WARN RED SHARE [%i] (iter %i round %i) SKIP %i eqs, %i units bc local solvers are not all init'd yet \n", _my_rank, sweep_iteration, sharing_round, eq_size/2, unit_size); }
+		// if (eq_size>0 || unit_size>0)  { LOG(V3_VERB, "SWEEP WARN RED SHARE [%i] (iter %i round %i) SKIP %i eqs, %i units bc local solvers are not all init'd yet \n", _my_rank, sweep_iteration, sharing_round, eq_size/2, unit_size); }
 
-		LOG(V2_INFO, "SWEEP RED SHARE SKIP: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)term. #longterm idle: %i / %i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastLongtermIdleCount, _nThreads);
+		LOG(V2_INFO, "SWEEP RED SHARE SKIP bc not all init'd yet: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)term. #longterm idle: %i / %i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastLongtermIdleCount, _nThreads);
 		return;
 	}
 

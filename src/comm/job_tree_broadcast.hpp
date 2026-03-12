@@ -106,7 +106,7 @@ private:
         // Undeliverable message being returned?
         if (msg.returnedToSender) {
             // prune child
-            LOG(V4_VVER, "BCAST [%i] got returnToSender <--- [%i]\n", _tree.nodeRank, h.source);
+            LOG(V4_VVER, "BCAST [%i] got returnedToSender <--- [%i]\n", _tree.nodeRank, h.source);
             if (h.source == _tree.leftChildNodeRank) {
                 assert(_tree.nbChildren>0 || log_return_false("ERROR JobTreeBroadcast: Left child [%i] should be pruned, but _tree.nbChildren already %i", _tree.leftChildNodeRank, _tree.nbChildren));
                 _tree.leftChildNodeRank = -1;
