@@ -672,7 +672,7 @@ void SweepJob::printIdleFraction() {
 		}
 	}
 	_lastLongtermIdleCount = longterm_idles;
-	LOG(V3_VERB, "SWEEP IDLE (%i)Started (%i)Active (%i)Running (%i)NowIdle (%i)longtermIdle: %s \n",  _started_sweepers_count.load(), active, _running_sweepers_count.load(), idles, longterm_idles, oss.str().c_str());
+	LOG(V3_VERB, "SWEEP IDLE (%i)Started (%i)Active (%i)Running (%i)NowIdle (%i)LongIdle: %s \n",  _started_sweepers_count.load(), active, _running_sweepers_count.load(), idles, longterm_idles, oss.str().c_str());
 	// if (active>0)
 		// LOG(V3_VERB, "SWEEP Active %i, Running %i, Idle %i, Started %i. idle nrs: %s \n", active, _running_sweepers_count.load(), idles,  _started_sweepers_count.load(), oss.str().c_str());
 
@@ -1222,49 +1222,48 @@ void SweepJob::extractAllReductionResult() {
 	if (okToTrackSharingDelay())
 		_time_receive_allred.push_back(Timer::elapsedSeconds());
 
-	//if our local solvers are not fully initialised yet we ignore the global sharing data
-	if (!_started_synchronized_solving) {
-		// if (eq_size>0 || unit_size>0)  { LOG(V3_VERB, "SWEEP WARN RED SHARE [%i] (iter %i round %i) SKIP %i eqs, %i units bc local solvers are not all init'd yet \n", _my_rank, sweep_iteration, sharing_round, eq_size/2, unit_size); }
 
-		LOG(V2_INFO, "SWEEP RED SHARE SKIP bc not all init'd yet: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)term. #longterm idle: %i / %i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastLongtermIdleCount, _nThreads);
-		return;
-	}
+	LOG(V2_INFO, "SWEEP RED SHARE GOTT: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)terminate. #longidle: %i / %i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastLongtermIdleCount, _nThreads);
+	// LOG(V2_INFO, "SWEEP RED SHARE SKIP bc not all init'd yet: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)terminate. #longidle: %i / %i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastLongtermIdleCount, _nThreads);
 
-	//All solvers are initialised, we can make use of the data
+	//if our local solvers are not fully initialised yet we ignore the global sharing data, is cleaner than going hot solver-by-solver
+	if (_started_synchronized_solving) {
+		//All solvers are initialised, we can make use of the shared data
 
-	if (eq_size > MAX_IMPORT_SIZE) {
-		LOG(V1_WARN, "WARN SWEEP too many equalities to import! %i, max %i\n", eq_size, MAX_IMPORT_SIZE);
-	}
-	if (unit_size > MAX_IMPORT_SIZE) {
-		LOG(V1_WARN, "WARN SWEEP too many units to import! %i, max %i\n", unit_size, MAX_IMPORT_SIZE);
-	}
+		if (eq_size > MAX_IMPORT_SIZE) {
+			LOG(V1_WARN, "WARN SWEEP too many equalities to import! %i, max %i\n", eq_size, MAX_IMPORT_SIZE);
+		}
+		if (unit_size > MAX_IMPORT_SIZE) {
+			LOG(V1_WARN, "WARN SWEEP too many units to import! %i, max %i\n", unit_size, MAX_IMPORT_SIZE);
+		}
 
-	for (int i=0; i<eq_size && i < MAX_IMPORT_SIZE; i++) {
-		_EQS_to_import[i] = data[i];
-	}
+		for (int i=0; i<eq_size && i < MAX_IMPORT_SIZE; i++) {
+			_EQS_to_import[i] = data[i];
+		}
 
-	// for (int i=eq_size; i<data.size()-NUM_METADATA_FIELDS; i++) {
-	for (int i=0; i<unit_size && i < MAX_IMPORT_SIZE; i++) {
-		_UNITS_to_import[i] = data[eq_size + i];
-	}
+		// for (int i=eq_size; i<data.size()-NUM_METADATA_FIELDS; i++) {
+		for (int i=0; i<unit_size && i < MAX_IMPORT_SIZE; i++) {
+			_UNITS_to_import[i] = data[eq_size + i];
+		}
 
-	_EQS_import_size.store(eq_size, std::memory_order_relaxed);
-	_UNITS_import_size.store(unit_size, std::memory_order_relaxed);
-	_available_import_round.store(sharing_round, std::memory_order_release);
+		_EQS_import_size.store(eq_size, std::memory_order_relaxed);
+		_UNITS_import_size.store(unit_size, std::memory_order_relaxed);
+		_available_import_round.store(sharing_round, std::memory_order_release);
 
-	//the sweepers need to know the current sweep iteration to set the size of their sweep environments accordingly
-	//which grow with each round (if activated)
-	if (!_terminate_all && sweep_iteration <= _params.sweepMaxGrowthIteration.val) { //when sweepers are already being deleted we don't want to risk a segfault looping over them...
-		for (auto &sweeper : _sweepers) {
-			if (sweeper) {
-				shweep_set_sweep_iteration(sweeper->solver, sweep_iteration);
+		//the sweepers need to know the current sweep iteration to set the size of their sweep environments accordingly
+		//which grow with each round (if activated)
+		if (!_terminate_all && sweep_iteration <= _params.sweepMaxGrowthIteration.val) { //when sweepers are already being deleted we don't want to risk a segfault looping over them...
+			for (auto &sweeper : _sweepers) {
+				if (sweeper) {
+					shweep_set_sweep_iteration(sweeper->solver, sweep_iteration);
+				}
 			}
 		}
+	} else {
+		LOG(V2_INFO, "SWEEP RED SHARE GOTT: iter(%i),round(%i) SKIP. not all solvers init'd yet (%i / %i)\n", sweep_iteration, sharing_round, _started_sweepers_count.load(),  _nThreads);
 	}
 
-	LOG(V2_INFO, "SWEEP RED SHARE: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)term. #longterm idle: %i / %i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastLongtermIdleCount, _nThreads);
-
-	//prepare the next sharing round, which gets started from the root node
+	//the root node is special in that it is the only node that initiates sharing rounds. Prepare for a new one, since we just extracted all the shared data from the current round.
 	if (_is_root) {
 		LOG(V4_VVER, "SWEEP root: RESET BCAST for next sharing round\n", _my_rank);
 		_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(),
@@ -1275,7 +1274,8 @@ void SweepJob::extractAllReductionResult() {
 	//The new reduction object will be created by the next bcast round when needed
 	_red.reset();
 
-	//We received the termination signal via the app-internal data sharing
+	//Check whether the whole sweep job sould be terminated.
+	//We do this check chronologically last in this function, because there might still be useful shared data that we want to import before terminating, and having an earlier termination signal only increases risks for concurrency problems
 	if (terminate) {
 		_terminate_all = true;
 		//update: we now trigger terminations here directly, no longer indirectly via the worksteal callback
