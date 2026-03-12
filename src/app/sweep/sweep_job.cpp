@@ -72,10 +72,11 @@ void SweepJob::appl_start() {
     _warnlogger = Logger::getMainInstance().copy("<WARN>", ".warn");
 
 	_worksteal_requests.resize(_nThreads);
-	//do not send the initial placeholder worksteal requests
+
+	//Need to mark them as empty initially, such that the solvers can turn them into actual requests when required.
+	//Once the chain started, the solvers will mark their processed request as empty again on their own
 	for (auto &request : _worksteal_requests) {
-		request.to_send = false;
-		// request.sent = true;
+		request.is_inactive = true;
 	}
 	//pre-allocate a fixed array from where solver can concurrently import the received equalities and units
 	_EQS_to_import.resize(MAX_IMPORT_SIZE);
@@ -999,6 +1000,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 			return;
 		}
 		_worksteal_requests[localId].got_steal_response = false; //to no read it a second time
+		_worksteal_requests[localId].is_inactive = true; //request was fully processed, the slot is now effectively empty
 	}
 
 	//No success via MPI (either there was no answer, or the answer hat no work).
@@ -1012,9 +1014,9 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	}
 
 	//Did not find work locally. Deposit an MPI request in case there isn't one yet.
-	//We deposit a request for an MPI message via shared memory, and the main MPI thread of this process will pick up the request and actually send it via MPI
+	//We deposit a request for an MPI message via shared memory and the main MPI thread of this process will pick up the request and actually send it via MPI
 	//This extra step is necessary, because the thread is just "some" solver-thread and it can cause problems it it start sending MPI messages on it's own
-	if (_worksteal_requests[localId].to_send==false) {
+	if (_worksteal_requests[localId].is_inactive) {
 		//careful, this is close to creating a race-condition with the main-thread, if it just so happens to also read this request right now
 		//to prevent the race-condition, the main-thread sets .wait_for_send only to false after it already send out the msg. i.e. this code here can no longer corrupt the outwards send
 		_worksteal_requests[localId].newQueuedRequest(localId);
