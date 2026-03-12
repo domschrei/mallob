@@ -205,7 +205,7 @@ private:
             accept &= fromLeftChild || fromRightChild;
             if (!accept) return false;
 
-            LOG(V4_VVER, "SWEEP RED <--%i--- child [%i] \n", msg.payload.size(), source);
+            LOG(V4_VVER, "SWEEP RED <--%i--- [%i] child \n", msg.payload.size(), source);
             // message accepted: store and check off
             _child_elems.insert({source, std::move(msg.payload)});
             if (fromLeftChild) _received_child_elems.first = true;

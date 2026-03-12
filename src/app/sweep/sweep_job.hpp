@@ -61,7 +61,7 @@ private:
 		int senderLocalId{-1};
 		int targetIndex{-1};
 		int targetRank{-1};
-		std::atomic_bool wait_for_send{false};
+		std::atomic_bool to_send{false};
 		// std::atomic_bool sent{false};
 		std::atomic_bool got_steal_response{false};
 		std::vector<int> stolen_work{};
@@ -70,10 +70,9 @@ private:
 				senderLocalId = _senderLocalId;
 				targetIndex = -1;
 				targetRank = -1;
-				wait_for_send = true;
-				// sent = false;
-				got_steal_response = false;
 				stolen_work.clear();
+				got_steal_response = false;
+				to_send = true; //atomic flag last, order might matter
 		}
 	};
 	std::deque<WorkstealRequest> _worksteal_requests; //deque, because each object has an atomic member and thus isnt copyable (which vector would require)

@@ -74,7 +74,7 @@ void SweepJob::appl_start() {
 	_worksteal_requests.resize(_nThreads);
 	//do not send the initial placeholder worksteal requests
 	for (auto &request : _worksteal_requests) {
-		request.wait_for_send = false;
+		request.to_send = false;
 		// request.sent = true;
 	}
 	//pre-allocate a fixed array from where solver can concurrently import the received equalities and units
@@ -741,18 +741,17 @@ void SweepJob::sendWorkstealsViaMPI() {
 	//Worksteal requests need to be sent by the MPI *main* thread. If kissat-threads themselves send MPI messages, things can crash, since they clash somehow with the MPI hierarchy
 	//So each solver-thread queues a steal-request to shared memory, where the main MPI thread can pick it up (here) and send an MPI msg on behalf of the solver
 	for (auto &request : _worksteal_requests) {
-		if (request.wait_for_send) {
+		if (request.to_send) {
 			int senderLocalId = request.senderLocalId;
 
 			//if we are still in the phase where MPI sends are not done, we short-fuse the requests to a zero dummy and return them to the solver threads
 			//same if the whole job is terminated
 			if (skip_MPI_forNow() || _terminate_all || getVolume()==0) {
-				request.stolen_work = {};
-				request.wait_for_send = false;
-				// request.sent = true;
+				// request.stolen_work = {}; //remains empty from request initialization
+				request.to_send = false;
 				request.got_steal_response = true;
-				// LOG(V3_VERB, "SWEEP [%i](%i) exit steal loop (2nd check, getVolume()==%i)\n", _my_rank, senderLocalId, getVolume());
-				break;
+				LOG(V3_VERB, "SWEEP [%i] mainthread SKIP MPI-steal request by (%i) \n", _my_rank, senderLocalId);
+				continue;
 			}
 
 			//There was no local work available, now we prepare to send out an MPI message
@@ -780,6 +779,10 @@ void SweepJob::sendWorkstealsViaMPI() {
 			static thread_local std::mt19937 rng(std::random_device{}()); //created/seeded only once per main mallob thread, then just advancing rng calls
 			std::shuffle(tree_indices.begin(), tree_indices.end(), rng);
 
+			//verbose dummy variables to make sure we really only touch the request once we have a valid index+rank combo
+			int foundIndex = -1;
+			int foundRank = -1;
+
 			for (int targetIndex : tree_indices) {
 				if (targetIndex==_my_index) {
 					// not stealing from ourselves, roll again, and don't count this roll
@@ -796,16 +799,24 @@ void SweepJob::sendWorkstealsViaMPI() {
 					LOG(V3_VERB, "SWEEP SKIP ctx_id of target is missing. getVolume()=%i, rndTargetIndex=%i, rndTargetRank=%i, myIndex=%i, myRank=%i, JobComm size %i \n", getVolume(), targetIndex, targetRank, _my_index, _my_rank, getJobComm().size());
 					continue;
 				}
-				request.targetIndex = targetIndex;
-				request.targetRank = targetRank;
+				foundRank = targetRank;
+				foundIndex = targetIndex;
+				// request.targetIndex = targetIndex;
+				// request.targetRank = targetRank;
 				break;
 			}
 
-			if (request.targetIndex==-1 || request.targetRank==-1) {
+			if (foundIndex==-1 || foundRank==-1) {
 				//couldn't find a target for this request, skip it for now and process the next
-				LOG(V4_VVER, "SWEEP MSG [%i](%i) ------> X  (no target possible yet)  \n", _my_rank, request.senderLocalId, request.targetRank);
+				LOG(V4_VVER, "SWEEP MSG [%i](%i) SKIP ------ no target possible yet  \n", _my_rank, request.senderLocalId);
 				continue;
 			}
+
+			request.targetIndex = foundIndex;
+			request.targetRank = foundRank;
+
+			assert(request.targetIndex>=0 || log_return_false("SWEEP ERROR: request.targetIndex %i \n", request.targetIndex));
+			assert(request.targetRank>=0  || log_return_false("SWEEP ERROR: request.targetRank %i \n", request.targetIndex));
 
 			// request.sent = true;
 			JobMessage msg = getMessageTemplate();
@@ -826,7 +837,7 @@ void SweepJob::sendWorkstealsViaMPI() {
 			getJobTree().send(request.targetRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 			//CRUCIAL that this flag is only set now, after we did everything with it.
 			//because after resetting this flag, a workstealing solver could immediately concurrently modify this request, by resetting it
-			request.wait_for_send = false;
+			request.to_send = false;
 		}
 	}
 }
@@ -842,7 +853,7 @@ void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
 
 		assert(my_last_import_round <= available_import_round);
 		if (my_last_import_round!=0 && my_last_import_round != available_import_round - 1) {
-			LOG(V1_WARN, "WARN SWEEP: Solver [%i](%i) skipped import rounds, went %i -> %i \n", _my_rank, sweeper->getLocalId(), my_last_import_round, available_import_round);
+			LOG(V1_WARN, "WARN SWEEP: Solver [%i](%i) SKIP import rounds, went %i -> %i \n", _my_rank, sweeper->getLocalId(), my_last_import_round, available_import_round);
 		}
 		sweeper->sweep_import_round  = available_import_round;
 		if (sweeper->sweep_EQS_index != sweeper->sweep_EQS_size)
@@ -974,7 +985,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	if (_worksteal_requests[localId].got_steal_response) {
 		if (_worksteal_requests[localId].stolen_work.size()>0) {
 			sweeper->work_received_from_steal = std::move(_worksteal_requests[localId].stolen_work);
-			LOG(V4_VVER, "SWEEP recv [%i](%i) <==%i==== [%i] \n",  _my_rank, localId, sweeper->work_received_from_steal.size(), _worksteal_requests[localId].targetRank);
+			LOG(V4_VVER, "SWEEP recv [%i](%i) <==%i==== [%i] \n",  _my_rank, localId, (int)sweeper->work_received_from_steal.size(), _worksteal_requests[localId].targetRank);
 			return;
 		}
 		_worksteal_requests[localId].got_steal_response = false; //to no read it a second time
@@ -993,7 +1004,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	//Did not find work locally. Deposit an MPI request in case there isn't one yet.
 	//We deposit a request for an MPI message via shared memory, and the main MPI thread of this process will pick up the request and actually send it via MPI
 	//This extra step is necessary, because the thread is just "some" solver-thread and it can cause problems it it start sending MPI messages on it's own
-	if (_worksteal_requests[localId].wait_for_send==false) {
+	if (_worksteal_requests[localId].to_send==false) {
 		//careful, this is close to creating a race-condition with the main-thread, if it just so happens to also read this request right now
 		//to prevent the race-condition, the main-thread sets .wait_for_send only to false after it already send out the msg. i.e. this code here can no longer corrupt the outwards send
 		_worksteal_requests[localId].newQueuedRequest(localId);
@@ -1011,7 +1022,7 @@ void SweepJob::cbStealWorkNew(unsigned **work, int *work_size, int localId) {
 	//The kissat solver (and other solver threads) will then be allowed to read and write(!) within this fixed allocated memory.
 	*work = reinterpret_cast<unsigned int*>(sweeper->work_received_from_steal.data());
 	*work_size = sweeper->work_received_from_steal.size();
-	assert(*work_size>=0 || log_return_false("SWEEP ERRROR : work size %i \n", *work_size));
+	assert(*work_size>=0 || log_return_false("SWEEP ERROR : work size %i \n", *work_size));
 	if (*work_size>0) {
 		sweeper->sweeper_is_idle = false;
 		sweeper->sweeper_longterm_idle = false;
@@ -1096,7 +1107,7 @@ void SweepJob::cbContributeToAllReduce() {
 	}
 
 	if (_terminate_all) {
-		LOG(V4_VVER, "SWEEP BCAST skip reduction, status is already _terminate_all\n");
+		LOG(V4_VVER, "SWEEP BCAST SKIP reduction, status is already _terminate_all\n");
 		return;
 	}
 
@@ -1198,7 +1209,7 @@ void SweepJob::extractAllReductionResult() {
 
 	//if our local solvers are not fully initialised yet we ignore the global sharing data
 	if (!_started_synchronized_solving) {
-		if (eq_size>0 || unit_size>0)  { LOG(V3_VERB, "SWEEP WARN RED SHARE [%i] (iter %i round %i): Skipping %i eqs, %i units bc local solvers are not all init'd yet \n", _my_rank, sweep_iteration, sharing_round, eq_size/2, unit_size); }
+		if (eq_size>0 || unit_size>0)  { LOG(V3_VERB, "SWEEP WARN RED SHARE [%i] (iter %i round %i) SKIP %i eqs, %i units bc local solvers are not all init'd yet \n", _my_rank, sweep_iteration, sharing_round, eq_size/2, unit_size); }
 
 		LOG(V2_INFO, "SWEEP RED SHARE SKIP: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)term. #longterm idle: %i/%i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastLongtermIdleCount, _nThreads);
 		return;
