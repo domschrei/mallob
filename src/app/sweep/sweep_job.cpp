@@ -677,12 +677,12 @@ void SweepJob::checkSharingDelay() {
 	//We insert manually a first timestamp to detect cases where NO communication happened at all for a specific rank (due to a programming bug in the job tree handling)
 	//With the manual insertions we have a reference against which delays can be detected, and can be sure that we are warned if this rank does not participate in the overall communication. i
 	//Otherwise the timing-vectors could have remained completely empty and no delay-difference would be detected
-	if (!_started_sharedelay_tracking && _started_synchronized_solving) {
-		float t = Timer::elapsedSeconds();
-		_timestamp_contributed_to_sharing.push_back(t);
-		_timestamp_receive_sharing_result.push_back(t);
-		_started_sharedelay_tracking = true;
-	}
+	// if (!_started_sharedelay_tracking && _started_synchronized_solving) {
+		// float t = Timer::elapsedSeconds();
+		// _timestamp_contributed_to_sharing.push_back(t);
+		// _timestamp_receive_sharing_result.push_back(t);
+		// _started_sharedelay_tracking = true;
+	// }
 
 	constexpr float MAX_DELAY_FACTOR = 6;
 	float time = Timer::elapsedSeconds();
@@ -1610,6 +1610,9 @@ SweepJob::~SweepJob() {
 	LOG(V4_VVER, "SWEEP JOB DESTRUCTOR ENTERED (ctx %i) \n", _my_ctx_id);
 	if (_lastClearedRound != _lastImportedRound) {
 		LOG(V1_WARN, "SWEEP [%i] WARN : didn't clear all imported rounds! lastCleared %i, lastImported %i \n", _my_rank, _lastClearedRound, _lastImportedRound.load());
+	}
+	if (_lastImportedRound==0) {
+		LOG(V1_WARN, "SWEEP [%i] WARN : rank didn't receive a single sharing round! \n", _my_rank);
 	}
 	// triggerTerminations();
 	LOG(V4_VVER, "SWEEP JOB DESTRUCTOR DONE\n");

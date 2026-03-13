@@ -261,7 +261,7 @@ public:
             _base_msg.treeIndexOfDestination = _parent_index;
             _base_msg.contextIdOfDestination = _parent_ctx_id;
             assert(_base_msg.contextIdOfDestination != 0);
-            LOG(V3_VERB, "SWEEP [%i] RED advance ~~~%i~~~> [%i] to parent \n",_tree.nodeRank, _base_msg.payload.size(), _parent_rank);
+            LOG(V3_VERB, "SWEEP [%i] RED ~~~%i~~~> [%i] to parent \n",_tree.nodeRank, _base_msg.payload.size(), _parent_rank);
             MyMpi::isend(_parent_rank, MSG_JOB_TREE_MODULAR_REDUCE, _base_msg);
             //Now that we re-send, the problem is no longer pending -- unless we get the error again, which would repeat this cycle
             _have_unanswered_returnToSender = false;
@@ -322,7 +322,7 @@ public:
                 _base_msg.payload = std::move(_aggregated_elem.value());
                 _base_msg.treeIndexOfDestination = _parent_index;
                 _base_msg.contextIdOfDestination = _parent_ctx_id;
-                LOG(V3_VERB, "SWEEP [%i] RED advance ~~~%i~~~> [%i] to parent \n",_tree.nodeRank, _base_msg.payload.size(), _parent_rank);
+                LOG(V3_VERB, "SWEEP [%i] RED ~~~%i~~~> [%i] to parent \n",_tree.nodeRank, _base_msg.payload.size(), _parent_rank);
                 assert(_base_msg.contextIdOfDestination != 0);
                 MyMpi::isend(_parent_rank, MSG_JOB_TREE_MODULAR_REDUCE, _base_msg);
                 if (_care_about_parent_status) {
