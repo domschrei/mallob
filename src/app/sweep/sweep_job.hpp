@@ -45,6 +45,7 @@ private:
 	std::atomic_int _finished_sweepers_count {0};
 	std::vector<int> _list_of_ids;
 	std::atomic_bool _started_synchronized_solving{false};
+	std::atomic_bool _terminated_while_synchronizing{false};
 	bool _started_sharedelay_tracking{false};
 	int _lastLongtermIdleCount{0};
 

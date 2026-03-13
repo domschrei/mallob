@@ -350,6 +350,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			LOG(V3_VERB, "SWEEP [%i](%i): terminated while waiting in synchronization \n", _my_rank, localId);
 			_running_sweepers_count--;
 			_finished_sweepers_count++;
+			_terminated_while_synchronizing = true;
 			// maybe this release helps with memory?
 			// kissat_release(sweeper->solver);
 			return;
@@ -1634,7 +1635,10 @@ SweepJob::~SweepJob() {
 	for (int i=0; i<5; i++) {
 		clearImportedRound();
 	}
-	if (_lastClearedRound + 2 < _lastImportedRound) {
+	if (_terminated_while_synchronizing) {
+		LOG(V1_WARN, "SWEEP [%i] Warn : rank was terminated while synchronizing \n", _my_rank);
+	}
+	if (!_terminated_while_synchronizing && (_lastClearedRound + 2 < _lastImportedRound)) {
 		LOG(V1_WARN, "SWEEP [%i] WARN : didn't clear all imported rounds! lastCleared %i, lastImported %i \n", _my_rank, _lastClearedRound, _lastImportedRound.load());
 	}
 	if (_lastImportedRound==0) {
