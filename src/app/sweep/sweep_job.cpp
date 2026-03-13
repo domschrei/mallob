@@ -895,10 +895,10 @@ void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
 #define SWEEP_NEW_IMPORT_VERSION 1
 
 void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
-	if (_terminate_all) { //can happen that we arrive here before the solver learned that we already terminated
+	// if (_terminate_all) { //can happen that we arrive here before the solver learned that we already terminated
 		//leave *ilit's untouched
-		return;
-	}
+		// return;
+	// }
 
 	KissatPtr sweeper = _sweepers[localId];
 
@@ -956,9 +956,9 @@ void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
 
 
 void SweepJob::cbImportUnit(int *ilit, int localId) {
-	if (_terminate_all) {
-		return;
-	}
+	// if (_terminate_all) {
+		// return;
+	// }
 	KissatPtr sweeper = _sweepers[localId];
 
 
@@ -1608,7 +1608,10 @@ void SweepJob::triggerTerminations() {
 
 SweepJob::~SweepJob() {
 	LOG(V4_VVER, "SWEEP JOB DESTRUCTOR ENTERED (ctx %i) \n", _my_ctx_id);
-	if (_lastClearedRound != _lastImportedRound) {
+	for (int i=0; i<5; i++) {
+		clearImportedRound();
+	}
+	if (_lastClearedRound + 2 < _lastImportedRound) {
 		LOG(V1_WARN, "SWEEP [%i] WARN : didn't clear all imported rounds! lastCleared %i, lastImported %i \n", _my_rank, _lastClearedRound, _lastImportedRound.load());
 	}
 	if (_lastImportedRound==0) {
