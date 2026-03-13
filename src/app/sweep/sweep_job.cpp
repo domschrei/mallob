@@ -1140,10 +1140,10 @@ void SweepJob::rootStartNewSharingRound() {
 		return;
 	}
 
-	if (! _root_provided_initial_work.load(std::memory_order_relaxed)) {
-		LOG(V3_VERB, "SWEEP root: Wait next round, initial work not provided yet\n");
-		return;
-	}
+	// if (! _root_provided_initial_work.load(std::memory_order_relaxed)) {
+		// LOG(V3_VERB, "SWEEP root: Wait next round, initial work not provided yet\n");
+		// return;
+	// }
 
 
 	//make sure that only one sharing operation is going on at a time

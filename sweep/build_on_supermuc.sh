@@ -42,6 +42,6 @@ cmake -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
     -DMALLOB_JEMALLOC_DIR="$HOME/jemalloc-5.2.1/lib/" \
     -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\" ..
 
-make clean
+# make clean
 make -j 30; cd ..
 
