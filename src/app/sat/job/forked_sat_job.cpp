@@ -462,13 +462,6 @@ void ForkedSatJob::startDestructThreadIfNecessary() {
                 obj.data = nullptr;
             }
             LOG(V4_VVER, "%s : FSJ mem freed\n", toStr());
-
-            // TODO weird place to call this ...
-            if (_params.palRup() && _params.palRupCheck()) {
-                watchdog.setActive(false);
-                PalRupCaller(_params, getId(), getGlobalNumWorkers()).callBlocking();
-            }
-
             _shmem_freed = true;
         });
     }

@@ -252,7 +252,9 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.maxNumSolvers = config.mpisize * params.numThreadsPerProcess();
 	setup.numVars = numVars;
 	setup.numOriginalClauses = numClauses;
-	setup.proofDir = proofDirectory;
+	int sqrt = std::ceil(std::sqrt((double) setup.maxNumSolvers));
+	setup.proofDir = proofDirectory + "/" + (_params.palRup() ? std::to_string(sqrt) + "/" : "");
+
 	LratConnector* modelCheckingLratConnector {nullptr};
 	setup.nbSkippedIdEpochs = std::max(0, epochOffset + epochModulus * config.nbPreviousBalancingEpochs);
 	if (params.satProfilingLevel() >= 0) {
@@ -696,9 +698,16 @@ void SatEngine::cleanUp(bool hardTermination) {
 	LOGGER(_logger, V4_VVER, "[engine-cleanup] enter\n");
 
 	// Terminate any remaining running threads
+	auto setup = _solver_interfaces.front()->getSolverSetup();
 	terminateSolvers(hardTermination);
 	if (hardTermination) {
 		if (_params.proofOutputFile.isSet()) writeClauseEpochs();
+		// Create (empty) proof files where none were created
+		if (_params.palRup()) for (int localId = 0; localId < _params.numThreadsPerProcess(); localId++) {
+			int globalId = _config.apprank * _params.numThreadsPerProcess() + localId;
+			auto dir = setup.proofDir + "/../" + std::to_string(globalId);
+			FileUtils::create(dir + "/out.palrup");
+		}
 		LOGGER(_logger, V4_VVER, "[engine-cleanup] done - hard exit pending\n");
 		return;
 	}
