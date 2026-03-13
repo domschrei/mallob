@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 
 #include "app/sat/proof/impcheck.hpp"
+#include "app/sat/proof/impcheck_program_lookup.hpp"
 #include "trusted/trusted_utils.hpp"
 #include "util/sys/fileutils.hpp"
 #include "util/sys/proc.hpp"
@@ -46,7 +47,9 @@ public:
             + " -output=" + pathParsedFormula;
 
         LOG(V3_VERB, "TPPA Parsing ...\n");
-        _subproc = new Subprocess(Parameters(), "impcheck_parse", moreArgs, false);
+        _subproc = new Subprocess(Parameters(), 
+            ImpCheckProgramLookup::getParserExecutablePath(false),
+            moreArgs, false);
         _child_pid = _subproc->start();
 
         _f_parsed_formula = fopen(pathParsedFormula.c_str(), "r");

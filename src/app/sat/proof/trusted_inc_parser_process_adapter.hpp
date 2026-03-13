@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include "app/sat/proof/impcheck.hpp"
+#include "app/sat/proof/impcheck_program_lookup.hpp"
 #include "trusted/trusted_utils.hpp"
 #include "util/logger.hpp"
 #include "util/sys/fileutils.hpp"
@@ -72,7 +73,8 @@ public:
             + " -output=" + _path_parsed_formula
             + " -input-log=" + (Logger::getMainInstance().getLogDir().empty() ? "." : Logger::getMainInstance().getLogDir())
                 + "/parser-input." + _name;
-        _subproc = new Subprocess(params, "impcheck_parse", moreArgs, false);
+        _subproc = new Subprocess(params, ImpCheckProgramLookup::getParserExecutablePath(true),
+            moreArgs, false);
         _child_pid = _subproc->start();
         // Non-blocking reading so that we can read until the end of an increment
         int fd = open(_path_parsed_formula.c_str(), O_RDONLY | O_NONBLOCK);

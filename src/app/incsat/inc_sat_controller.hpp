@@ -2,7 +2,7 @@
 #pragma once
 
 #include "app/sat/execution/solver_setup.hpp"
-#include "app/sat/proof/trusted_parser_process_adapter.hpp"
+#include "app/sat/proof/trusted_inc_parser_process_adapter.hpp"
 #include "app/sat/stream/internal_sat_job_stream_processor.hpp"
 #include "app/sat/stream/mallob_sat_job_stream_processor.hpp"
 #include "app/sat/stream/sat_job_stream_processor.hpp"
@@ -13,6 +13,7 @@
 #include "interface/api/api_connector.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
+#include "util/sys/terminator.hpp"
 #include "util/sys/tmpdir.hpp"
 #include <string>
 #include <sys/stat.h>
@@ -26,7 +27,7 @@ private:
     std::string _problem_file;
 
     int _rev {-1};
-    std::unique_ptr<TrustedParserProcessAdapter> _tppa;
+    std::unique_ptr<TrustedIncParserProcessAdapter> _tppa;
 
     static int getNextStreamId() {
         static int _stream_id = 1;
@@ -168,6 +169,7 @@ private:
             setup.isJobIncremental = true;
             setup.onTheFlyChecking = _params.onTheFlyChecking();
             setup.onTheFlyCheckModel = _params.onTheFlyChecking() && _params.onTheFlyCheckModel();
+            setup.incrementalImpCheck = _params.onTheFlyCheckIncremental();
             auto internalProcessor = new InternalSatJobStreamProcessor(
                 setup, _stream->stream.getSynchronizer());
             _stream->stream.addProcessor(internalProcessor);
@@ -181,7 +183,7 @@ private:
         });
 
         if (!_problem_file.empty()) {
-            _tppa.reset(new TrustedParserProcessAdapter(_params.seed(), _name));
+            _tppa.reset(new TrustedIncParserProcessAdapter(_params.seed(), _name));
             _tppa->setup(_problem_file.c_str(), createProblemFileAsPipe);
         }
     }

@@ -74,20 +74,22 @@ You can use the [`drat-trim`](https://github.com/marijnheule/drat-trim) tool sui
 
 ### Real-time Proof Checking
 
-Proof production can be costly and bottlenecked by the I/O bandwidth of the single process which needs to write the entire proof. A more scalable approach is to check all proof information on-the-fly, without writing it to disk, and to transfer clause soundness guarantees across machines via cryptographic signatures. This is explained in detail in our [2024 SAT publication](https://dominikschreiber.de/papers/2024-sat-trusted-pre.pdf).
+Proof production can be costly and bottlenecked by the I/O bandwidth of the single process which needs to write the entire proof. A more scalable approach is to check all proof information on-the-fly, without writing it to disk, and to transfer clause soundness guarantees across machines via hash-based fingerprints. This is explained in detail in our [2024 SAT publication](https://dominikschreiber.de/papers/2024-sat-trusted-pre.pdf) and our [2026 TACAS publication](https://satres.kikit.kit.edu/papers/2026-tacas-distrincproof.pdf), where we extend the framework to incremental SAT solving.
 
-Execute the command chain fetching and building [ImpCheck](https://github.com/domschrei/impcheck) in [`scripts/setup/build.sh`](../scripts/setup/build.sh). Then just use Mallob's option `-otfc=1` (without any `-proof*` options) to enable on-the-fly checking. Again, only CaDiCaL is supported for UNSAT whereas any solver can be employed for boosting satisfying assignments. By default, found satisfying assignments are also validated, which can be disabled via `-otfcm=0`.
+To enable the setup involving the latest, incremental ImpCheck (which is also more efficient than original ImpCheck), execute the command chain fetching and building ImpCheck in [`scripts/setup/sat-setup.sh`](../scripts/setup/sat-setup.sh). Then use Mallob's option `-otfc=1` (without any `-proof*` options) to enable on-the-fly checking and `-otfci=1` to ensure that Mallob expects the _incremental_ ImpCheck programs. Again, only CaDiCaL is supported for UNSAT whereas any solver can be employed for boosting satisfying assignments. By default, found satisfying assignments are also validated, which can be disabled via `-otfcm=0`.
 
-Log lines of the following shape are reporting a trusted result from a proof checking process:
+Let's assume you get the following output from a proof checking process:
 ```
-c 0.851 0 <#11606> S0.0 TRUSTED checker reported UNSAT - sig c6c0a823f35ce38cdb31c9483dc98143
-c 0.851 0 <#11606> S0.0 TRUSTED checker reported SAT - sig a43e47d81715035d79290d1a6acf05e8
+c 0.059 0 <Reader> [T] Initialized job #230 {instances/r3unsat_300.cnf} in 0.004s: size 5127
+...
+c 6.164 1 <#230> S6.0 IMPCHK_CONFIRM 1280 20 8791e38feb111d9094da61be8651478a
+c 6.164 1 <#230> S6.0 Use iimpcheck_confirm -key-seed=13805254743912277295 to confirm fingerprint
 ```
-To be extra safe (e.g., if you are suspecting garbled or tampered-with logging output), execute the following command to validate the output signature:
+The `IMPCHK_CONFIRM` line indicates that ImpCheck validated a result of code 20 (UNSAT, 10=SAT) on a formula with 1280 clauses; the appended fingerprint serves as a witness for this result.
+To be extra safe (e.g., if you are suspecting garbled or tampered-with logging output), accordingly execute a command like this to validate the output fingerprint:
 ```bash
-build/impcheck_confirm -formula-input=path/to/input.cnf -result=X -result-sig=SIG
+build/iimpcheck_confirm -key-seed=13805254743912277295 -formula=instances/r3unsat_300.cnf -result=20 -sig=8791e38feb111d9094da61be8651478a
 ```
-where `X` is either 10 (for SAT) or 20 (for UNSAT), and `SIG` is the reported signature.
 
 **Note:** On-the-fly checking can also be used in Mallob's scheduled mode of operation. Globally unique clause IDs are ensured by adding a large offset times $x$ to a new solver thread's clause ID counter if the job has already experienced $x$ _balancing epochs_, i.e., received $x$ volume updates, since its initialization. The offset is chosen in such a way that 10,000 solvers each producing 10,000 clauses per second can run for 10,000 seconds before they may begin overlapping with clause IDs from the next balancing epoch. `ImpCheck` notices and reports any errors that would result from such a corner case.
 

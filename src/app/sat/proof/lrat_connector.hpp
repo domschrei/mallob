@@ -12,6 +12,7 @@
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/parse/serialized_formula_parser.hpp"
 #include "app/sat/proof/impcheck.hpp"
+#include "app/sat/proof/impcheck_program_lookup.hpp"
 #include "app/sat/proof/lrat_op_tamperer.hpp"
 #include "app/sat/proof/trusted/trusted_checker_defs.hpp"
 #include "app/sat/proof/trusted_checker_process_adapter.hpp"
@@ -335,18 +336,20 @@ private:
             } else if (op.isUnsatValidation() || op.isSatValidation()) {
                 // SAT / UNSAT result
                 _last_concluded_rev = _accepted_revision;
-                if (_last_concluded_rev == 0)
-                    LOGGER(_logger, V2_INFO, "Use impcheck_confirm -key-seed=%lu to confirm fingerprint\n",
-                        ImpCheck::getKeySeed(_base_seed));
                 u32 code = op.isSatValidation() ? 10 : 20;
                 if (op.isUnsatValidation())
                     assumptions = std::vector(op.data.concludeUnsat.failed, op.data.concludeUnsat.failed + op.data.concludeUnsat.nbFailed);
                 std::string litStr;
                 for (int lit : assumptions) litStr += " " + std::to_string(lit);
-                if (_out_path.empty()) {
+                if (_out_path.empty() || _last_concluded_rev == 0) {
                     LOGGER(_logger, V0_CRIT, "IMPCHK_CONFIRM %u %u %s%s\n", cidx, code,
                         Logger::dataToHexStr(sig, SIG_SIZE_BYTES).c_str(), litStr.c_str());
-                } else {
+                    if (_last_concluded_rev == 0)
+                        LOGGER(_logger, V2_INFO, "Use %s -key-seed=%lu to confirm fingerprint\n",
+                            ImpCheckProgramLookup::getConfirmerExecutablePath(_incremental).c_str(),
+                            ImpCheck::getKeySeed(_base_seed));
+                }
+                if (!_out_path.empty()) {
                     std::ofstream ofs(_out_path, std::ios_base::app);
                     ofs << cidx << " " << code << " " << Logger::dataToHexStr(sig, SIG_SIZE_BYTES) << litStr << std::endl;
                 }

@@ -93,7 +93,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		ClauseMetadata::enableClauseIds();
 		if (_params.onTheFlyChecking()) {
 			ClauseMetadata::enableClauseSignatures();
-			ClauseMetadata::enableIncrementalSignatures();
+			if (_params.onTheFlyCheckIncremental())
+				ClauseMetadata::enableIncrementalSignatures();
 		}
 
 		if (_params.proofOutputFile.isSet() || _params.palRup()) {
@@ -308,6 +309,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		setup.certifiedUnsat = item.outputProof && (params.proofOutputFile.isSet() || params.onTheFlyChecking() || _params.palRup());
 		setup.onTheFlyChecking = setup.certifiedUnsat && params.onTheFlyChecking();
 		setup.onTheFlyCheckModel = params.onTheFlyChecking() && params.onTheFlyCheckModel();
+		setup.incrementalImpCheck = params.onTheFlyCheckIncremental();
 		setup.usePalRupFormat = params.palRup();
 		setup.outputBinaryPalRup = params.palRupBinary();
 		setup.trustedParserForced = params.forceIncrementalTrustedParser();

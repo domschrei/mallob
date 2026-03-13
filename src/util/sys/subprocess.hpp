@@ -3,7 +3,6 @@
 
 #include "util/logger.hpp"
 #include "util/params.hpp"
-#include "util/sys/fileutils.hpp"
 #include "util/sys/process.hpp"
 #include "util/assert.hpp"
 #include "util/sys/tmpdir.hpp"

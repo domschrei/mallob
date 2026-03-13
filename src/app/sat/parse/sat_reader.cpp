@@ -15,7 +15,8 @@
 
 #include "app/sat/data/formula_compressor.hpp"
 #include "app/sat/proof/trusted/trusted_utils.hpp"
-#include "app/sat/proof/trusted_parser_process_adapter.hpp"
+#include "app/sat/proof/trusted_inc_parser_process_adapter.hpp"
+#include "app/sat/proof/trusted_noninc_parser_process_adapter.hpp"
 #include "sat_reader.hpp"
 #include "data/job_description.hpp"
 #include "util/logger.hpp"
@@ -35,10 +36,44 @@ void handleUnsat(const Parameters& _params) {
 	}
 }
 
-bool SatReader::parseWithTrustedParser(JobDescription& desc) {
+
+bool SatReader::parseWithTrustedNonincrementalParser(JobDescription& desc) {
+	// Parse and sign in a separate subprocess
+	TrustedNonincParserProcessAdapter tp(_params.seed(), desc.getId());
+	uint8_t* sig;
+	std::vector<unsigned char> plain;
+	std::vector<unsigned char>* out;
+	if (_params.compressFormula()) out = &plain;
+	else out = desc.getRevisionData(desc.getRevision()).get();
+
+	bool ok = tp.parseAndSign(_filename.c_str(), *out, sig);
+	if (!ok) return false;
+
+	std::string sigStr = Logger::dataToHexStr(sig, SIG_SIZE_BYTES);
+	_max_var = tp.getNbVars();
+	_num_read_clauses = tp.getNbClauses();
+	desc.setFSize(tp.getFSize());
+	LOG(V2_INFO, "IMPCHK noninc parser -key-seed=%lu read %i vars, %i cls - sig %s\n",
+		ImpCheck::getKeySeed(_params.seed()), _max_var, _num_read_clauses, sigStr.c_str());
+
+	if (_params.compressFormula()) {
+		auto vec = desc.getRevisionData(desc.getRevision()).get();
+		auto outSizeBytesBefore = vec->size();
+		FormulaCompressor::VectorFormulaOutput cOut(vec);
+		FormulaCompressor::compress((const int*) out->data(), out->size() / sizeof(int), 0, 0, cOut, true);
+		desc.setFSize((cOut.vec->size() - outSizeBytesBefore) / sizeof(int));
+	}
+
+	_input_finished = true;
+	_input_invalid = false;
+	return true;
+}
+
+
+bool SatReader::parseWithTrustedIncrementalParser(JobDescription& desc) {
 	// Parse and sign in a separate subprocess
 	if (!_tppa) {
-		_tppa.reset(new TrustedParserProcessAdapter(_params.seed(), std::to_string(desc.getId())));
+		_tppa.reset(new TrustedIncParserProcessAdapter(_params.seed(), std::to_string(desc.getId())));
 		_tppa->setup(_filename.c_str(), false);
 	}
 
@@ -55,7 +90,7 @@ bool SatReader::parseWithTrustedParser(JobDescription& desc) {
 	_max_var = _tppa->getNbVars();
 	_num_read_clauses = _tppa->getNbClauses();
 	desc.setFSize(_tppa->getFSize());
-	LOG(V2_INFO, "IMPCHK parser -key-seed=%lu read %i vars, %i cls, %i asmpt - sig %s\n",
+	LOG(V2_INFO, "IMPCHK inc parser -key-seed=%lu read %i vars, %i cls, %i asmpt - sig %s\n",
 		ImpCheck::getKeySeed(_params.seed()), _max_var, _num_read_clauses, _tppa->getNbAssumptions(), sigStr.c_str());
 
 	if (_params.compressFormula()) {
@@ -231,7 +266,7 @@ bool SatReader::read(JobDescription& desc) {
 			+ ".tsinput." + std::to_string(desc.getId());
 		if (!_tppa) {
 			// Create a new parser adapter for this job
-			_tppa.reset(new TrustedParserProcessAdapter(_params.seed(), std::to_string(desc.getId())));
+			_tppa.reset(new TrustedIncParserProcessAdapter(_params.seed(), std::to_string(desc.getId())));
 			_tppa->setup(_filename.c_str(), true);
 		}
 		// Write formula to the pipe in a side thread
@@ -262,10 +297,13 @@ bool SatReader::read(JobDescription& desc) {
 	desc.setAppConfigurationEntry("__NV", NC_DEFAULT_VAL);
 	desc.beginInitialization(desc.getRevision());
 
-	if (_force_incremental_parser) {
-		auto ok = parseWithTrustedParser(desc);
+	if ((_params.onTheFlyChecking() && _params.onTheFlyCheckIncremental())
+			|| _force_incremental_parser) {
+		auto ok = parseWithTrustedIncrementalParser(desc);
 		if (optFuture.has_value()) optFuture->get();
 		if (!ok) return false;
+	} else if (_params.onTheFlyChecking()) {
+		if (!parseWithTrustedNonincrementalParser(desc)) return false;
 	} else if (_params.compressFormula()) {
 		if (!parseAndCompress(desc)) return false;
 	} else {

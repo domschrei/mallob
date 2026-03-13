@@ -15,6 +15,7 @@ struct LratOp {
     union LratOpData {
         struct LratOpDataBeginLoad {
             u8 sig[SIG_SIZE_BYTES];
+            int nbVars;
         } beginLoad;
         struct LratOpDataLoad {
             int* lits;
@@ -89,8 +90,9 @@ struct LratOp {
         memcpy(data.remove.hints, hints, sizeof(u64) * nbHints);
     }
     // Begin load
-    LratOp(const u8* sig) {
+    LratOp(int nbVars, const u8* sig) {
         type = TRUSTED_CHK_BEGIN_LOAD;
+        data.beginLoad.nbVars = nbVars;
         memcpy(data.beginLoad.sig, sig, SIG_SIZE_BYTES);
     }
     // Load and end-load

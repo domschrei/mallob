@@ -12,6 +12,7 @@
 #include <thread>
 #include <vector>
 
+#include "app/sat/proof/impcheck_program_lookup.hpp"
 #include "comm/distributed_termination.hpp"
 #include "comm/mympi.hpp"
 #include "core/mono_job.hpp"
@@ -245,10 +246,13 @@ int main(int argc, char *argv[]) {
         LOG(V2_INFO, "Cleaning up pre-execution\n");
 
         for (std::string subprocName : {
-            MALLOB_SUBPROC_DISPATCH_PATH"mallob_sat_process",
-            MALLOB_SUBPROC_DISPATCH_PATH"impcheck_parse",
-            MALLOB_SUBPROC_DISPATCH_PATH"impcheck_check",
-            MALLOB_SUBPROC_DISPATCH_PATH"impcheck_confirm",
+            std::string(MALLOB_SUBPROC_DISPATCH_PATH"mallob_sat_process"),
+            MALLOB_SUBPROC_DISPATCH_PATH + ImpCheckProgramLookup::getParserExecutablePath(true),
+            MALLOB_SUBPROC_DISPATCH_PATH + ImpCheckProgramLookup::getParserExecutablePath(false),
+            MALLOB_SUBPROC_DISPATCH_PATH + ImpCheckProgramLookup::getCheckerExecutablePath(true),
+            MALLOB_SUBPROC_DISPATCH_PATH + ImpCheckProgramLookup::getCheckerExecutablePath(false),
+            MALLOB_SUBPROC_DISPATCH_PATH + ImpCheckProgramLookup::getConfirmerExecutablePath(true),
+            MALLOB_SUBPROC_DISPATCH_PATH + ImpCheckProgramLookup::getConfirmerExecutablePath(false)
         }) {
             std::string cmd = "killall -9 " + subprocName + " 2>/dev/null";
             LOG(V2_INFO, "Killing old subprocesses: \"%s\"\n", cmd.c_str());

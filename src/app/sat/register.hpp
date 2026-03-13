@@ -10,6 +10,7 @@
 #include "job/forked_sat_job.hpp"
 #include "parse/sat_reader.hpp"
 #include "robin_map.h"
+#include "util/logger.hpp"
 #include "util/static_store.hpp"
 #include "util/sys/thread_pool.hpp"
 
@@ -21,18 +22,21 @@ void register_mallob_app_sat() {
             // For incremental real-time checking, we need to inject a persisting
             // parser adapter instance into the new SatReader object or in turn
             // extract it after the first parsing.
-            if (params.onTheFlyChecking() || params.forceIncrementalTrustedParser()) {
+            bool incParser = (params.onTheFlyChecking() && params.onTheFlyCheckIncremental())
+                || params.forceIncrementalTrustedParser();
+            if (incParser) {
                 auto lock = IncrementalTrustedParserStore::mtxMap.getLock();
                 if (IncrementalTrustedParserStore::map.count(desc.getId()))
                     reader.setTrustedParser(IncrementalTrustedParserStore::map.at(desc.getId()));
             }
             auto res = reader.read(desc);
-            if (params.onTheFlyChecking() || params.forceIncrementalTrustedParser()) {
+            if (incParser) {
                 auto lock = IncrementalTrustedParserStore::mtxMap.getLock();
                 if (!IncrementalTrustedParserStore::map.count(desc.getId()))
                     IncrementalTrustedParserStore::map[desc.getId()] = reader.getTrustedParser();
             }
-            StaticStore<std::string>::insert("cnf-#" + std::to_string(desc.getId()), files[0]);
+            if (params.palRup())
+                StaticStore<std::string>::insert("cnf-#" + std::to_string(desc.getId()), files[0]);
             return res;
         },
         // Job creator

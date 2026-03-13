@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include "app/sat/proof/impcheck.hpp"
+#include "app/sat/proof/impcheck_program_lookup.hpp"
 #include "app/sat/proof/lrat_op.hpp"
 #include "trusted/trusted_utils.hpp"
 #include "trusted/trusted_checker_defs.hpp"
@@ -103,7 +104,8 @@ public:
             moreArgs += " -heap-mbs=" + std::to_string(heapMbs);
         }
 
-        _subproc = new Subprocess(params, "impcheck_check", moreArgs, false);
+        std::string executable = ImpCheckProgramLookup::getCheckerExecutablePath(_incremental);
+        _subproc = new Subprocess(params, executable, moreArgs, false);
         _child_pid = _subproc->start();
         assert(_child_pid != getpid());
 

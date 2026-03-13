@@ -46,7 +46,8 @@ public:
             ClauseMetadata::enableClauseIds();
             if (_params.onTheFlyChecking()) {
                 ClauseMetadata::enableClauseSignatures();
-                ClauseMetadata::enableIncrementalSignatures();
+                if (_params.onTheFlyCheckIncremental())
+                    ClauseMetadata::enableIncrementalSignatures();
             }
         }
     }
