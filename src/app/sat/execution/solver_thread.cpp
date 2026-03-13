@@ -351,10 +351,19 @@ void SolverThread::reportResult(int res, int revision) {
             lrat->push(LratOp(solution.data()+1, solution.size()-1), true, revision);
             // Whether or not this was successful (another thread might have been earlier),
             // wait until SAT was validated.
-            lrat->waitForConclusion(revision);
+            LratConnector::Witness w = lrat->waitForConclusion(revision);
+            if (w.valid()) {
+                auto wPacked = w.serialize();
+                solution.push_back(INT32_MAX);
+                solution.insert(solution.end(), (int*) wPacked.data(), (int*) (wPacked.data()+wPacked.size()));
+                solution.push_back(wPacked.size());
+                solution.push_back(INT32_MAX);
+                _state_mutex.lock();
+            } else return; // another thread reports the result
+        } else {
+            _state_mutex.lock();
+            _result.setSolutionToSerialize(solution.data(), solution.size());
         }
-        _state_mutex.lock();
-        _result.setSolutionToSerialize(solution.data(), solution.size());
     } else {
         auto failed = _solver.getFailedAssumptions();
         auto failedVec = std::vector<int>(failed.begin(), failed.end());
@@ -362,10 +371,19 @@ void SolverThread::reportResult(int res, int revision) {
             LOGGER(_logger, V3_VERB, "Validating UNSAT ...\n");
             _logger.flush();
             _lrat->push(LratOp(_solver.getUnsatConclusionId(), failedVec.data(), failedVec.size()), true, revision);
-            _lrat->waitForConclusion(revision);
+            LratConnector::Witness w = _lrat->waitForConclusion(revision);
+            if (w.valid()) {
+                auto wPacked = w.serialize();
+                failedVec.push_back(INT32_MAX);
+                failedVec.insert(failedVec.end(), (int*) wPacked.data(), (int*) (wPacked.data()+wPacked.size()));
+                failedVec.push_back(wPacked.size());
+                failedVec.push_back(INT32_MAX);
+                _state_mutex.lock();
+            } else return; // another thread reports the result
+        } else {
+            _state_mutex.lock();
+            _result.setSolutionToSerialize(failedVec.data(), failedVec.size());
         }
-        _state_mutex.lock();
-        _result.setSolutionToSerialize(failedVec.data(), failedVec.size());
     }
     _result.result = SatResult(res);
     _result.revision = revision;
