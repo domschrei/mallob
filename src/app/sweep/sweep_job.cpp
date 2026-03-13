@@ -90,7 +90,7 @@ void SweepJob::appl_start() {
 		_list_of_ids.push_back(localId);
 		oss << "," << localId;
 	}
-	LOG(V4_VVER,"SWEEP LIST_OF_LOCAL_IDS: %s \n", oss.str().c_str());
+	LOG(V3_VERB,"SWEEP LIST_OF_LOCAL_IDS: %s \n", oss.str().c_str());
 
 	//Will hold pointers to the kissat solvers
 	_sweepers.resize(_nThreads);
@@ -239,7 +239,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 void SweepJob::appl_terminate() {
 	LOG(V2_INFO, "SWEEP [%i] (job #%i) got TERMINATE signal (appl_terminate()) \n", _my_rank,getId());
 	_terminate_all = true;
-	_external_termination = true;
+	// _external_termination = true;
 	triggerTerminations();
 }
 
@@ -340,16 +340,21 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		 */
 		while (_started_sweepers_count < _nThreads) {
 			LOG(V5_DEBG, "SWEEP [%i](%i) waits for other solvers (started %i/%i)\n", _my_rank, localId, _started_sweepers_count.load(), _nThreads);
-			usleep(5000); //5ms
-			if (_terminate_all || _external_termination) {
-				LOG(V4_VVER, "SWEEP [%i](%i): terminated while waiting in synchronization \n", _my_rank, localId);
-				_running_sweepers_count--;
-				_finished_sweepers_count++;
-				//added this release, maybe we left some memory somewhere when terminating here early
-				// kissat_release(sweeper->solver);
-				return;
+			usleep(2000); //2ms
+			if (_terminate_all) {
+				break;
 			}
 		}
+
+		if (_terminate_all) {
+			LOG(V3_VERB, "SWEEP [%i](%i): terminated while waiting in synchronization \n", _my_rank, localId);
+			_running_sweepers_count--;
+			_finished_sweepers_count++;
+			// maybe this release helps with memory?
+			// kissat_release(sweeper->solver);
+			return;
+		}
+
 		_sweepers[localId] = sweeper; //only now expose the solver to the rest of the system, now that we know we start solving
 		_started_synchronized_solving = true; //multiple threads will write non-thread-safe to this bool, but all only monotonically to "true"
 
@@ -1579,15 +1584,29 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 	float formula_in_MB = ((float)payload_size*32)/BITS_PER_MB;
 	// LOG(V2_INFO, "SWEEP Loading Formula, size %i \n", payload_size);
 
-	LOG(V4_VVER, "SWEEP [%i](%i) loading formula (%.3f MB) \n", _my_rank, sweeper->getLocalId(), formula_in_MB);
+	LOG(V3_VERB, "SWEEP [%i](%i) loading formula (%.3f MB) \n", _my_rank, sweeper->getLocalId(), formula_in_MB);
 	float t0 = Timer::elapsedSeconds();
 
-	for (int i = 0; i < payload_size ; i++) {
+	// for (int i = 0; i < payload_size ; i++) {
+		// sweeper->addLiteral(lits[i]);
+	// }
+
+	constexpr int CHECK_INTERVAL = 50000;
+	int counter = CHECK_INTERVAL;
+	for (int i = 0; i < payload_size; i++) {
 		sweeper->addLiteral(lits[i]);
+
+		if (--counter == 0) {
+			counter = CHECK_INTERVAL;
+			if (_terminate_all.load(std::memory_order_relaxed)) {
+				LOG(V1_WARN, "SWEEP WARN [%i](%i) aborted loading formula at payload lit %i / %i  \n", _my_rank, sweeper->getLocalId(), i, payload_size);
+				break;
+			}
+		}
 	}
 
 	float t1 = Timer::elapsedSeconds();
-	LOG(V4_VVER, "SWEEP [%i](%i) loaded  formula (%.3f MB) in %.6f sec \n", _my_rank, sweeper->getLocalId(), formula_in_MB , (t1-t0));
+	LOG(V3_VERB, "SWEEP [%i](%i) loaded  formula (%.3f MB) in %.6f sec \n", _my_rank, sweeper->getLocalId(), formula_in_MB , (t1-t0));
 }
 
 void SweepJob::triggerTerminations() {
@@ -1596,9 +1615,9 @@ void SweepJob::triggerTerminations() {
 	for (auto &sweeper : _sweepers) {
 		if (sweeper) {
 			sweeper->triggerSweepTerminate();
-			LOG(V4_VVER, "SWEEP TERM #%i [%i] trigger termination of solver (%i) \n", getId(), _my_rank, i);
+			LOG(V3_VERB, "SWEEP TERM #%i [%i] trigger termination of solver (%i) \n", getId(), _my_rank, i);
 		} else {
-			LOG(V4_VVER, "SWEEP TERM #%i [%i] skip    termination of solver (%i), already null \n", getId(), _my_rank, i);
+			LOG(V3_VERB, "SWEEP TERM #%i [%i] skip    termination of solver (%i), already null \n", getId(), _my_rank, i);
 		}
 		i++;
 	}
@@ -1607,7 +1626,7 @@ void SweepJob::triggerTerminations() {
 }
 
 SweepJob::~SweepJob() {
-	LOG(V4_VVER, "SWEEP JOB DESTRUCTOR ENTERED (ctx %i) \n", _my_ctx_id);
+	LOG(V3_VERB, "SWEEP JOB DESTRUCTOR ENTERED (ctx %i) \n", _my_ctx_id);
 	for (int i=0; i<5; i++) {
 		clearImportedRound();
 	}
@@ -1618,7 +1637,7 @@ SweepJob::~SweepJob() {
 		LOG(V1_WARN, "SWEEP [%i] WARN : rank didn't receive a single sharing round! \n", _my_rank);
 	}
 	// triggerTerminations();
-	LOG(V4_VVER, "SWEEP JOB DESTRUCTOR DONE\n");
+	LOG(V3_VERB, "SWEEP JOB DESTRUCTOR DONE\n");
 }
 
 

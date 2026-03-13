@@ -142,7 +142,7 @@ private:
 
 	//Termination. Determined during workstealing, broadcasted via sharing
 	std::atomic_bool _terminate_all=false; //termination (on this node) due to sharing consensus that there is no more work
-	std::atomic_bool _external_termination=false; //termination because somebody else told us to (for example Job interrupted because Base Job already found a solution, ...)
+	// std::atomic_bool _external_termination=false; //termination because somebody else told us to (for example Job interrupted because Base Job already found a solution, ...)
 
 	//An UNSAT result can occur suddenly from any solver. We make sure that only the very first reports the results to Mallob
 	// int _NO_UNSAT_REPORT_YET = -1;
