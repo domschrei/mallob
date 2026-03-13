@@ -646,36 +646,29 @@ void SweepJob::printCongruenceStats(KissatPtr sweeper) {
 void SweepJob::printIdleFraction() {
 	if (_terminate_all) return; //prevent segfault! the sweeper references are being concurrently deleted right now, no touching them
 
-
-	 /*
-	  * TODO: new idle-tracker that tracks Continously_Idle_since_last_check. Would be more robust than the snapshot idle status at any given moment
-	  *
-	  */
-
-
 	int idles = 0;
 	int longterm_idles = 0;
-	int active = 0;
-	std::ostringstream oss;
+	int open = 0;
+	std::ostringstream oss_idles;
+	std::ostringstream oss_work;
 	for (auto &sweeper : _sweepers) {
 		if (sweeper) {
-			active++;
+			open++;
 			if (sweeper->sweeper_longterm_idle) {
 				longterm_idles++;
-				oss << "," << sweeper->getLocalId();
+				oss_idles  << sweeper->getLocalId() << ",";
 			}
-
 			if (sweeper->sweeper_is_idle) {
 				idles++;
 				sweeper->sweeper_longterm_idle = true; //those solvers which are idle right now are candicates for being also longterm idle
 			}
+			oss_work << shweep_get_work_estimate(sweeper->solver) << ",";
+		} else {
+			oss_work << "--,";
 		}
 	}
 	_lastLongtermIdleCount = longterm_idles;
-	LOG(V3_VERB, "SWEEP IDLE (%i)Started (%i)Active (%i)Running (%i)NowIdle (%i)LongIdle: %s \n",  _started_sweepers_count.load(), active, _running_sweepers_count.load(), idles, longterm_idles, oss.str().c_str());
-	// if (active>0)
-		// LOG(V3_VERB, "SWEEP Active %i, Running %i, Idle %i, Started %i. idle nrs: %s \n", active, _running_sweepers_count.load(), idles,  _started_sweepers_count.load(), oss.str().c_str());
-
+	LOG(V3_VERB, "SWEEP [%i] Status: (%i)Started (%i)Running (%i)Open (%i)Idle (%i)LongIdle: %s   Work[%i]: %s\n", _my_rank,  _started_sweepers_count.load(), _running_sweepers_count.load(), open, idles, longterm_idles, oss_idles.str().c_str(), _my_rank, oss_work.str().c_str());
 }
 
 void SweepJob::checkSharingDelay() {
