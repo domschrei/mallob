@@ -189,7 +189,7 @@ private:
 
         if (msg.returnedToSender) {
             _returnToSender_counter++;
-            LOG(V1_WARN, "WARN RED REDUCE : got %i-th returnedToSender (source %i, tag %i, msg.tag %i, msg.size %i)\n", _returnToSender_counter, source, tag, msg.tag, msg.payload.size());
+            LOG(V1_WARN, " Warn RED REDUCE : got %i-th returnedToSender (source %i, tag %i, msg.tag %i, msg.size %i)\n", _returnToSender_counter, source, tag, msg.tag, msg.payload.size());
             _returnToSender_payload = std::move(msg.payload);
             _have_unanswered_returnToSender = true;
             return true;

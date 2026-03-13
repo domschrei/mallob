@@ -1603,7 +1603,7 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 		if (--counter == 0) {
 			counter = CHECK_INTERVAL;
 			if (_terminate_all.load(std::memory_order_relaxed)) {
-				LOG(V1_WARN, "SWEEP WARN [%i](%i) aborted loading formula at payload lit %i / %i  \n", _my_rank, sweeper->getLocalId(), i, payload_size);
+				LOG(V1_WARN, "SWEEP Warn [%i](%i) stopped loading formula due to termination  (at payload lit %i / %i) \n", _my_rank, sweeper->getLocalId(), i, payload_size);
 				break;
 			}
 		}
