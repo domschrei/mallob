@@ -56,7 +56,7 @@ Afterwards, we explain Mallob's other modes of operation (solving multiple insta
 ### Input Formats
 
 The input can be provided (a) as a plain DIMACS CNF text file, (b) as a compressed (.lzma / .xz) DIMACS CNF file, or (c) as a compact binary file.
-CNF files may contain a single line of the form `a <lit1> <lit2> ... 0` **after all regular clauses**, where `<lit1>`, `<lit2>` etc. are assumption literals for incremental solving.
+CNF files may contain lines of the form `a <lit1> <lit2> ... 0` to indicate an **incremental SAT call**, where `<lit1>`, `<lit2>` etc. are assumption literals for incremental solving.
 For binary files, Mallob reads clauses as integer sequences with separation zeroes in between; the special integer INT32_MAX (2147483647) separates the clause literals from the sequence of assumption integers, and then another zero signals that the description is complete. This integer sequence is also how the field "literals" in manual job submission JSONs should be used (see below at [Introducing a job](#introducing-a-job)).
 
 ### Producing Monolithic Proofs of Unsatisfiability
@@ -90,8 +90,18 @@ To be extra safe (e.g., if you are suspecting garbled or tampered-with logging o
 ```bash
 build/iimpcheck_confirm -key-seed=13805254743912277295 -formula=instances/r3unsat_300.cnf -result=20 -sig=8791e38feb111d9094da61be8651478a
 ```
+For incremental problems, Mallob will write a file `witness.#<jobid>` to the directory specified via the `-log` option (if existent) and a subsequent check of all results works as follows:
+```bash
+build/iimpcheck_confirm -key-seed=13805254743912277295 -formula=instances/r3unsat_300.cnf -witness=path/to/witness.#*
+```
 
 **Note:** On-the-fly checking can also be used in Mallob's scheduled mode of operation. Globally unique clause IDs are ensured by adding a large offset times $x$ to a new solver thread's clause ID counter if the job has already experienced $x$ _balancing epochs_, i.e., received $x$ volume updates, since its initialization. The offset is chosen in such a way that 10,000 solvers each producing 10,000 clauses per second can run for 10,000 seconds before they may begin overlapping with clause IDs from the next balancing epoch. `ImpCheck` notices and reports any errors that would result from such a corner case.
+
+### Streamlined SAT Setup
+
+In the context of our [SAT'25 publication](https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.SAT.2025.27), we developed an alternative setup for distributed SAT solving where a single process performs preprocessing while all other processes run plain search-only threads (i.e., without pre-/inprocessing). When the result from preprocessing is available, another task on the preprocessed formula is launched.
+
+Compile Mallob with `-DMALLOB_APP_SATWITHPRE=1` and then set `-mono-app=SATWITHPRE` to use this setup, which will (by default) also override the SAT solver configuration accordingly.
 
 ### Portfolio Tweaking
 

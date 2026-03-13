@@ -176,7 +176,7 @@ private:
         // We want the job to retract over sqrt(p) rounds
         // with a total duration of the job's wallclock time so far.
         float totalRetractionDuration;
-        if (_params.preprocessBalancing() == 0) {
+        if (_params.preprocessBalancing() == 0 || MyMpi::size(MPI_COMM_WORLD) == 1) {
             // drop original immediately
             totalRetractionDuration = 0.001;
             _time_of_retraction_end = _time_of_retraction_start;
@@ -190,7 +190,7 @@ private:
         if (currentSize > 100'000'000 && preprocessedSize/(double)currentSize < 0.75)
             totalRetractionDuration = 0.001;
         _retraction_round_duration = totalRetractionDuration / std::sqrt(MyMpi::size(MPI_COMM_WORLD));
-        if (_params.preprocessBalancing() == 1) {
+        if (_params.preprocessBalancing() == 1 && MyMpi::size(MPI_COMM_WORLD) > 1) {
             LOG(V3_VERB, "SATWP %s : Retracting base job over ~%.3fs\n", toStr(), totalRetractionDuration);
             _time_of_retraction_end = _time_of_retraction_start + 1.1f * totalRetractionDuration;
         }
@@ -208,7 +208,7 @@ private:
         json["internalliterals"] = json["name"].get<std::string>();
         json["configuration"]["__NV"] = std::to_string(nbVars);
         json["configuration"]["__NC"] = std::to_string(nbClauses);
-        if (_params.preprocessBalancing() == 1)
+        if (_params.preprocessBalancing() == 1 && MyMpi::size(MPI_COMM_WORLD) > 1)
             json["configuration"]["__growprd"] = std::to_string(_retraction_round_duration);
         if (_desc.getWallclockLimit() > 0)
             json["wallclock-limit"] = std::to_string(_desc.getWallclockLimit() - getAgeSinceActivation()) + "s";
