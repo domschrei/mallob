@@ -118,6 +118,13 @@ public:
     inline void submit(LratOp&& op) {
         submit(op);
     }
+
+    inline bool trySubmit(LratOp& op) {
+        if (_op_queue.full()) return false;
+        submit(op);
+        return true;
+    }
+
     inline void submit(LratOp& op) {
         if (!_f_directives) return;
         if (op.isDerivation()) submitProduceClause(op.data.produce);
