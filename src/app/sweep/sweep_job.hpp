@@ -119,6 +119,25 @@ private:
 	std::vector<int> _EQS_to_import {};
 	std::vector<int> _UNITS_to_import {};
 
+	//New Version of Importing, via separated vectors per round
+	struct importedRound {
+		std::vector<int> eqs{};
+		std::vector<int> units{};
+	};
+	struct finishedCounter {
+		std::atomic_int threads_finished_eqs=0;
+		std::atomic_int threads_finished_units=0;
+	};
+
+	static constexpr int MAX_IMPORT_ROUNDS = 50 * 1000; //Max 50 per seconds (~20ms period), max 1000 seconds
+	std::vector<importedRound> _imported_EQS_UNITS{MAX_IMPORT_ROUNDS};
+	std::vector<finishedCounter> _finishedRoundCounters{MAX_IMPORT_ROUNDS}; //technically atomics in std::vector, but we only construct once with a fixed size and never push_back or resize, so it compiles and should be fine
+	std::atomic_int _lastImportedRound = 0;
+	int _lastClearedRound = 0;
+
+
+
+
 
 	//Termination. Determined during workstealing, broadcasted via sharing
 	std::atomic_bool _terminate_all=false; //termination (on this node) due to sharing consensus that there is no more work
@@ -290,7 +309,6 @@ private:
 
 
 	void solverGoStealing(KissatPtr sweeper);
-	// void TryWorkstealLocal();
 	void sendWorkstealsViaMPI();
 	void printIdleFraction();
 	void printResweeps();
@@ -307,13 +325,13 @@ private:
 	void provideInitialWork(KissatPtr sweeper);
 	std::vector<int> stealWorkFromAnyLocalSolver(int asking_rank, int asking_sourceLocalId); //parameters only for verbose logging
     std::vector<int> stealWorkFromSpecificLocalSolver(int localId);
-    void cbStealWork(unsigned **work, int *work_size, int localId);
+    // void cbStealWork(unsigned **work, int *work_size, int localId);
 	void cbStealWorkNew(unsigned **work, int *work_size, int localId);
 	void checkForNewImportRound(KissatPtr sweeper);
 	void cbImportEq(int *ilit1, int *ilit2, int localId);
 	void cbImportUnit(int *lit, int localId);
 	int cbCustomQuery(int query);
-	// void importNextEquivalence(int *last_imported_round, int eq_nr, unsigned *lit1, unsigned *lit2);
+	void clearNextFinishedRound();
 
 	virtual ~SweepJob();
 

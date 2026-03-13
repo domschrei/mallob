@@ -130,13 +130,13 @@ void SweepJob::appl_communicate() {
 		_bcast->updateJobTree(getJobTree());
 
 	advanceAllReduction(); //always advance
-	//TryWorkstealLocal(); can take a long time in the current setup...
 	sendWorkstealsViaMPI();
 	rootStartNewSharingRound();
 
 	checkSharingDelay();
 	printIdleFraction();
 	checkForUnsatResults();
+	clearNextFinishedRound();
 
 	float t1 = Timer::elapsedSeconds();
 	_appl_communicate_duration.push_back(t1-t0);
@@ -618,14 +618,14 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 			for (int i=0; i < _root_time_start_bcast.size()-1; i++) {
 				float period = _root_time_start_bcast[i+1] - _root_time_start_bcast[i];
 				if (period > DURATION_WARN_FACTOR*period_avg) {
-					LOGGER(_reslogger,V2_INFO, "[WARN] SWEEP_SHARING_PERIOD_REAL %.4f sec   (in share round %i) is much larger than average \n", period, i);
+					LOGGER(_reslogger,V2_INFO, "[WARN] SWEEP_SHARING_PERIOD_REAL %.4f sec   (round %i) is much larger than average \n", period, i);
 				}
 			}
 		}
 
 		for (int i=0; i< latencies.size(); i++) {
 			if (latencies[i] > DURATION_WARN_FACTOR*latency_avg) {
-				LOGGER(_reslogger,V2_INFO, "[WARN] SWEEP_SHARING_LATENCY %.4f sec     (between share rounds %i,%i) is much larger than average \n", latencies[i], i, i+1);
+				LOGGER(_reslogger,V2_INFO, "[WARN] SWEEP_SHARING_LATENCY %.4f sec     (between rounds %i,%i) is much larger than average \n", latencies[i], i, i+1);
 			}
 		}
 
@@ -854,6 +854,17 @@ void SweepJob::sendWorkstealsViaMPI() {
 }
 
 
+//For development purposes: A simple interface to communicate some integers between solver and Mallob without the need to declare dedicated new functions each time
+int SweepJob::cbCustomQuery(int query) {
+	if (query==QUERY_SWEEP_ITERATION) {
+		return _root_sweep_iteration;
+	}
+
+	return 0;
+}
+
+
+
 void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
 	int available_import_round = _available_import_round.load(std::memory_order_acquire);
 	int my_last_import_round = sweeper->sweep_import_round;
@@ -864,13 +875,13 @@ void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
 
 		assert(my_last_import_round <= available_import_round);
 		if (my_last_import_round!=0 && my_last_import_round != available_import_round - 1) {
-			LOG(V1_WARN, "WARN SWEEP: Solver [%i](%i) SKIP import rounds, went %i -> %i \n", _my_rank, sweeper->getLocalId(), my_last_import_round, available_import_round);
+			LOG(V1_WARN, "SWEEP WARN SKIP: Solver [%i](%i) skipped import rounds, went %i -> %i \n", _my_rank, sweeper->getLocalId(), my_last_import_round, available_import_round);
 		}
 		sweeper->sweep_import_round  = available_import_round;
 		if (sweeper->sweep_EQS_index != sweeper->sweep_EQS_size)
-			LOG(V1_WARN, "WARN SWEEP: Solver [%i](%i) couldn't finish reading previous equivalence imports! now skipping remaining  %i/%i \n", _my_rank, sweeper->getLocalId(), sweeper->sweep_EQS_index.load(), sweeper->sweep_EQS_size.load());
+			LOG(V1_WARN, "SWEEP WARN SKIP: Solver [%i](%i) couldn't finish reading previous eqs  imports (of round %i)! now skipping remaining  %i/%i \n", _my_rank, sweeper->getLocalId(), my_last_import_round, sweeper->sweep_EQS_index.load(), sweeper->sweep_EQS_size.load());
 		if (sweeper->sweep_UNITS_index != sweeper->sweep_UNITS_size)
-			LOG(V1_WARN, "WARN SWEEP: Solver [%i](%i) couldn't finish reading previous unit imports! now skipping remaining  %i/%i \n", _my_rank, sweeper->getLocalId(), sweeper->sweep_UNITS_index.load(), sweeper->sweep_UNITS_size.load());
+			LOG(V1_WARN, "SWEEP WARN SKIP: Solver [%i](%i) couldn't finish reading previous unit imports (of round %i)! now skipping remaining  %i/%i \n", _my_rank, sweeper->getLocalId(), my_last_import_round, sweeper->sweep_UNITS_index.load(), sweeper->sweep_UNITS_size.load());
 		//tell the solver where in the fixed array the data starts and where it ends
 		sweeper->sweep_EQS_index   = 0;
 		sweeper->sweep_UNITS_index = 0;
@@ -880,15 +891,18 @@ void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
 	}
 }
 
+#define SWEEP_NEW_IMPORT_VERSION 1
+
 void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
 	if (_terminate_all) { //can happen that we arrive here before the solver learned that we already terminated
 		//leave *ilit's untouched
 		return;
 	}
 
-
-	//todo: this localId can also just be a congruencer! lives in the same array, interfaces the same way with eq/units
 	KissatPtr sweeper = _sweepers[localId];
+
+#if SWEEP_NEW_IMPORT_VERSION == 0
+
 	checkForNewImportRound(sweeper);
 
 	// LOG(V2_INFO, "solver [%i](%i) eq callback sees index %i and size %i \n",_my_rank, localId, sweeper->sweep_curr_EQS_index.load(), sweeper->sweep_curr_EQS_size.load());
@@ -903,25 +917,52 @@ void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
 	*ilit2 = _EQS_to_import[idx+1];
 	sweeper->sweep_EQS_index +=2;
 
+	assert(sweeper->sweep_EQS_index <= sweeper->sweep_EQS_size	|| log_return_false("SWEEP ERROR: in Equivalence Import: index %i is now beyond size %i \n", sweeper->sweep_EQS_index.load(), sweeper->sweep_EQS_size.load()));
 	assert(*ilit1 !=0 || *ilit2 !=0								|| log_return_false("SWEEP ERROR: in cbImportEq: sending invalid empty *ilit1=%i, *ilit2=0 to the solvers\n", *ilit1, *ilit2));
 	assert(*ilit1 < *ilit2										|| log_return_false("SWEEP ERROR: in cbImportEq: *ilit1 %i is larger than %i *ilit2, but they should be sorted (index %i, %i,)\n", *ilit1, *ilit2, idx, idx+1));
-	assert(sweeper->sweep_EQS_index <= sweeper->sweep_EQS_size	|| log_return_false("SWEEP ERROR: in Equivalence Import: index %i is now beyond size %i \n", sweeper->sweep_EQS_index.load(), sweeper->sweep_EQS_size.load()));
-	//now returning to kissat solver
-}
 
-int SweepJob::cbCustomQuery(int query) { //general interface to communicate some simple integers between solver and Mallob, without the need to declare yet another function each time
-	if (query==QUERY_SWEEP_ITERATION) {
-		return _root_sweep_iteration;
+#else
+
+	const int idx   = sweeper->curr_eq_index;
+	const int round = sweeper->curr_eq_round;
+	std::vector<int> &eqs = _imported_EQS_UNITS[round].eqs;
+	//Try to (continue) importing from the round we are currently reading from
+	if (idx < eqs.size()) {
+		*ilit1 = eqs[idx];
+		*ilit2 = eqs[idx+1];
+		sweeper->curr_eq_index+=2;
+		assert(*ilit1 !=0 || *ilit2 !=0		|| log_return_false("SWEEP ERROR: in cbImportEq: sending invalid empty *ilit1=%i, *ilit2=0 to the solvers\n", *ilit1, *ilit2));
+		assert(*ilit1 < *ilit2				|| log_return_false("SWEEP ERROR: in cbImportEq: *ilit1 %i is larger than %i *ilit2, but they should be sorted (index %i, %i,)\n", *ilit1, *ilit2, idx, idx+1));
+		if (sweeper->curr_eq_index == eqs.size()) {
+			LOG(V4_VVER, "SWEEP [%i](%i) ((( < %i > E %i \n", _my_rank, sweeper->getLocalId(),  round, eqs.size()/2);
+		}
+	}
+	//Check if there is a next round to import
+	else if (round < _lastImportedRound) {
+		if (eqs.size()==0) { //for completeness we also log the edge-case where there was nothing to import
+			LOG(V4_VVER, "SWEEP [%i](%i) ((( < %i > E %i \n", _my_rank, sweeper->getLocalId(), round,  eqs.size()/2);
+		}
+		//Advance to import from the next stored round data. This does not necessarily need to be the latest round, if there are be multiple rounds stored we might need to catch up sequentially through all of them
+		//Keep track how many threads have finished reading this round, such that it can be deleted after all threads have read it
+		_finishedRoundCounters[round].threads_finished_eqs++;
+		sweeper->curr_eq_round++;
+		sweeper->curr_eq_index=0;
 	}
 
-	return 0;
+#endif
+	//now returning to the kissat solver
 }
+
 
 void SweepJob::cbImportUnit(int *ilit, int localId) {
 	if (_terminate_all) {
 		return;
 	}
 	KissatPtr sweeper = _sweepers[localId];
+
+
+#if SWEEP_NEW_IMPORT_VERSION == 0
+
 	checkForNewImportRound(sweeper);
 	if (sweeper->sweep_UNITS_index == sweeper->sweep_UNITS_size) {
 		// leave *ilit untouched
@@ -930,10 +971,30 @@ void SweepJob::cbImportUnit(int *ilit, int localId) {
 	assert(sweeper->sweep_UNITS_index < sweeper->sweep_UNITS_size || log_return_false("SWEEP ERROR: in Unit Import: curr index %i is larger than expected size %i\n", sweeper->sweep_UNITS_index.load(), sweeper->sweep_UNITS_size.load()));
 	int idx = sweeper->sweep_UNITS_index.load();
 	*ilit = _UNITS_to_import[idx];
-	// LOG(V2_INFO, "Sending Unit %i (index %i) to solver (%i)\n", *ilit, idx, localId);
 	sweeper->sweep_UNITS_index++;
-	// assert(*ilit1 < *ilit2 || log_return_false("SWEEP ERROR: in cbImportEq: *ilit1 %i is larger than %i *ilit2, but they should be sorted\n", *ilit1, *ilit2));
 	assert(sweeper->sweep_UNITS_index <= sweeper->sweep_UNITS_size || log_return_false("SWEEP ERROR: in Unit Import: index %i is now beyond size %i \n", sweeper->sweep_UNITS_index.load(), sweeper->sweep_UNITS_size.load()));
+
+#else
+	//For comments see cbImportEq (the analog method for importing equalities)
+	const int idx   = sweeper->curr_unit_index;
+	const int round = sweeper->curr_unit_round;
+	std::vector<int> &units = _imported_EQS_UNITS[round].units;
+	if (idx < units.size()) {
+		*ilit = units[idx];
+		sweeper->curr_unit_index++;
+		if (sweeper->curr_unit_index == units.size()) {
+			LOG(V4_VVER, "SWEEP [%i](%i) ((( < %i > U %i \n", _my_rank, sweeper->getLocalId(), round, units.size() );
+		}
+	}
+	else if (round < _lastImportedRound) {
+		if (units.size()==0) {
+			LOG(V4_VVER, "SWEEP [%i](%i) ((( < %i > U %i \n", _my_rank, sweeper->getLocalId(), round, units.size());
+		}
+		_finishedRoundCounters[round].threads_finished_units++;
+		sweeper->curr_unit_round++;
+		sweeper->curr_unit_index=0;
+	}
+#endif
 
 	//now returning to kissat solver
 }
@@ -1217,15 +1278,16 @@ void SweepJob::extractAllReductionResult() {
 	const int all_idle    = data[data.size()-METADATA_IDLE];
 	const int unit_size   = data[data.size()-METADATA_UNIT_SIZE];
 	const int eq_size     = data[data.size()-METADATA_EQ_SIZE];
-	assert(eq_size%2==0 || log_return_false("SWEEP ERROR: Import Equality size not even, but %i\n", eq_size));
+	assert(eq_size%2==0 || log_return_false("SWEEP ERROR: Import Equality size %i not even\n", eq_size));
 
 	if (okToTrackSharingDelay())
 		_time_receive_allred.push_back(Timer::elapsedSeconds());
 
 
-	LOG(V2_INFO, "SWEEP RED SHARE GOTT: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)terminate. #longidle: %i / %i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastLongtermIdleCount, _nThreads);
+	LOG(V2_INFO, "SWEEP RED SHARE GOTT: iter(%i)round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)terminate. #longidle: %i / %i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastLongtermIdleCount, _nThreads);
 	// LOG(V2_INFO, "SWEEP RED SHARE SKIP bc not all init'd yet: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)terminate. #longidle: %i / %i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastLongtermIdleCount, _nThreads);
 
+#if SWEEP_NEW_IMPORT_VERSION == 0
 	//if our local solvers are not fully initialised yet we ignore the global sharing data, is cleaner than going hot solver-by-solver
 	if (_started_synchronized_solving) {
 		//All solvers are initialised, we can make use of the shared data
@@ -1260,8 +1322,32 @@ void SweepJob::extractAllReductionResult() {
 			}
 		}
 	} else {
-		LOG(V2_INFO, "SWEEP RED SHARE GOTT: iter(%i),round(%i) SKIP. not all solvers init'd yet (%i / %i)\n", sweep_iteration, sharing_round, _started_sweepers_count.load(),  _nThreads);
+		LOG(V2_INFO, "SWEEP RED SHARE GOTT SKIP: iter(%i),round(%i): not all solvers init'd yet (%i / %i)\n", sweep_iteration, sharing_round, _started_sweepers_count.load(),  _nThreads);
 	}
+
+#else
+
+	assert(sharing_round > _lastImportedRound.load() || log_return_false("SWEEP ERROR : unexpected round number when importing shared data. got round %i, while lastImportedRound %i \n", sharing_round, _lastImportedRound.load()));
+
+	assert(_imported_EQS_UNITS[sharing_round].eqs.empty()   || log_return_false("SWEEP ERROR : want to store %i shared eq   integers, but already importedRounds[%i].eqs.size()==%zu nonempty ", eq_size,  sharing_round, _imported_EQS_UNITS[sharing_round].eqs.size()));
+	assert(_imported_EQS_UNITS[sharing_round].units.empty() || log_return_false("SWEEP ERROR : want to store %i shared unit integers, but already importedRounds[%i].units.size()==%zu nonempty", unit_size,  sharing_round, _imported_EQS_UNITS[sharing_round].units.size()));
+
+	_imported_EQS_UNITS[sharing_round].eqs   = std::vector<int>(data.begin()		  , data.begin() + eq_size);
+	_imported_EQS_UNITS[sharing_round].units = std::vector<int>(data.begin() + eq_size, data.begin() + eq_size + unit_size);
+	_lastImportedRound = sharing_round;
+
+	//Sweepers can increase the size of their sweeping environments in later sweep iterations (analog to kissats own increasing environments)
+	//We tell them the current iteration, so that they can adjust accordingly
+	//We might want to limit the environment increase, since this SweepApp arrives typically at higher iteration numbers than a sequential kissat run, and thus just ever increasing the environments might be too costly or inefficient
+	if (!_terminate_all && sweep_iteration <= _params.sweepMaxGrowthIteration.val) {
+		for (auto &sweeper : _sweepers) {
+			if (sweeper) {
+				shweep_set_sweep_iteration(sweeper->solver, sweep_iteration);
+			}
+		}
+	}
+
+#endif
 
 	//the root node is special in that it is the only node that initiates sharing rounds. Prepare for a new one, since we just extracted all the shared data from the current round.
 	if (_is_root) {
@@ -1281,6 +1367,22 @@ void SweepJob::extractAllReductionResult() {
 		//update: we now trigger terminations here directly, no longer indirectly via the worksteal callback
 		triggerTerminations();
 		LOG(V1_WARN, "# \n # \n # --- [%i] got terminate flag, TERMINATING SWEEP JOB ---\n # \n", _my_rank);
+	}
+}
+
+void SweepJob::clearNextFinishedRound() {
+	//We store data from multiple past import rounds, as long as some threads have not imported them yet.
+	//Eventually we want and should delete this data, as it consumes (some small) memory.
+	//We delete a round data once all its  Eqs and Units have been imported by all threads
+	//This function only clears one round per invocation, this suffices since its called more often than new rounds are added
+	int r = _lastClearedRound + 1; //try to clear the next stored and uncleared round
+	assert(_finishedRoundCounters[r].threads_finished_eqs   <= _nThreads);
+	assert(_finishedRoundCounters[r].threads_finished_units <= _nThreads);
+	if (_finishedRoundCounters[r].threads_finished_eqs == _nThreads && _finishedRoundCounters[r].threads_finished_units == _nThreads) {
+		_imported_EQS_UNITS[r].eqs.clear();
+		_imported_EQS_UNITS[r].units.clear();
+		LOG(V3_VERB, "SWEEP [%i] CLEARED round %i data \n", _my_rank, r);
+		_lastClearedRound = r;
 	}
 }
 
@@ -1417,13 +1519,6 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 		return {};
 	}
 
-
-	/*
-	 * TODO: Some atomic/mutex block, such that only one solver at a time can steal
-	 * otherwise with 24 solvers stealing concurrently right at the start, we have duplication of work of non-negligible amounts (up to ~10%)
-	 */
-
-	// LOG(V3_VERB, "SWEEP stealattempt on [%i](%i)\n", _my_rank, localId);
 	//We dont know yet how much there is to steal, so we ask for an upper bound
 	//It can also be that the solver we want to steal from is not fully initialized yet
 	//For that in the C code there are further guards against unfinished initialization, all returning 0 in that case
@@ -1437,9 +1532,9 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	assert(max_steal_amount < 2*_numVars || log_return_false("SWEEP STEAL ERROR [%i](%i): too large max steal amount %i >= 2*NUM_VARS, maybe segfault into non-initialized kissat solver \n", _my_rank, localId, max_steal_amount));
 
 	//There is something to steal
-
-	//We want only one solver at a time to steal from a given solver. Especially relevant at the beginning, when 23 solvers try to steal from one solver.
-
+	//Prevent that multiple solvers can steal concurrently from the same solver, because that can duplicate work (two threads copying an index it at the very same moment)
+	//While duplication of work doesnt affect the overall correctness, such concurrent reads are still a pretty uncontrolled thing, and on top it just creates more work that has to be processed.
+	//It also seemed that 23 threads stealing at the same time delayed the first stealing, maybe since the hardware had to constantly synchronize all their cachelines
 	scoped_guard steal_guard(sweeper->steal_victim_lock);
 	if (!steal_guard.acquired())
 		return {};

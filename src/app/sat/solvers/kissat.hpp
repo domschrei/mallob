@@ -65,6 +65,13 @@ private:
 	std::atomic_int sweep_UNITS_size{0};
 	// int sweep_unread_EQS_count{0};
 
+	//New Import Version with dedicated vectors per round
+	int curr_eq_round{0};
+	int curr_eq_index{0};
+	int curr_unit_round{0};
+	int curr_unit_index{0};
+
+
 	struct shweep_statistics sweep_stats;
 
 	static constexpr int WARN_ON_REPEATED_MISSED_TERMINATION=64;

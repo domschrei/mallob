@@ -165,7 +165,7 @@ void Worker::checkJobs() {
 
     // printf("ß Worker Check Jobs\n");
 
-    LOG(V4_VVER, "WRKR check jobs\n");
+    LOG(V5_DEBG, "WRKR check jobs\n");
     // Load and try to adopt pending root reactivation request
     _sched_man.tryAdoptPendingRootActivationRequest();
 
