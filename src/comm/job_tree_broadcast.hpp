@@ -8,6 +8,8 @@
 #include "comm/msgtags.h"
 #include "data/job_transfer.hpp"
 
+#define VERB_BCAST V4_VVER
+
 class JobTreeBroadcast {
 
 private:
@@ -98,7 +100,7 @@ private:
         //received on MSG_JOB_TREE_MODULAR_BROADCAST mpiTag (via _sub_broadcast(...))
         JobMessage msg = Serializable::get<JobMessage>(h.getRecvData());
 
-        LOG(V4_VVER, "BCAST [%i] <-- [%i] \n", _tree.nodeRank, h.source);
+        LOG(VERB_BCAST, "BCAST [%i] <-- [%i] \n", _tree.nodeRank, h.source);
         // Right recipient?
         if (msg.jobId != _job_id) return false;
         if (_internal_msg_tag >= 0 && msg.tag != _internal_msg_tag) return false;
@@ -106,7 +108,7 @@ private:
         // Undeliverable message being returned?
         if (msg.returnedToSender) {
             // prune child
-            LOG(V4_VVER, "BCAST [%i] got returnedToSender <--- [%i]\n", _tree.nodeRank, h.source);
+            LOG(V3_VERB, "BCAST [%i] got returnedToSender <--- [%i]\n", _tree.nodeRank, h.source);
             if (h.source == _tree.leftChildNodeRank) {
                 assert(_tree.nbChildren>0 || log_return_false("ERROR JobTreeBroadcast: Left child [%i] should be pruned, but _tree.nbChildren already %i", _tree.leftChildNodeRank, _tree.nbChildren));
                 _tree.leftChildNodeRank = -1;
@@ -124,7 +126,7 @@ private:
         }
 
         if (_received_broadcast) {
-            LOG(V4_VVER, "BCAST [%i] <-- [%i] child response (either [%i],[%i])\n",
+            LOG(VERB_BCAST, "BCAST [%i] <-- [%i] child response (either [%i],[%i])\n",
                 _tree.nodeRank, h.source, _tree.leftChildNodeRank, _tree.rightChildNodeRank);
         }
 

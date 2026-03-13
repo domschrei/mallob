@@ -54,7 +54,7 @@ void SweepJob::appl_start() {
 	_is_root = getJobTree().isRoot();
 	_nThreads = min( getNumThreads(), _params.numThreadsPerProcess.val);
 	if (_nThreads < _params.numThreadsPerProcess.val) {
-		LOG(V1_WARN,"SWEEP WARN cut down threads to %i \n", _nThreads);
+		LOG(V1_WARN,"SWEEP WARN : cut down threads to %i \n", _nThreads);
 	}
 	const JobDescription& desc = getDescription();
 	int numVars = desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
@@ -65,8 +65,6 @@ void SweepJob::appl_start() {
     _metadata = getSerializedDescription(0)->data();
 
 	_start_sweep_timestamp = Timer::elapsedSeconds();
-	_root_time_start_bcast.push_back(Timer::elapsedSeconds());
-	// _root_last_sharing_start_timestamp = Timer::elapsedSeconds();
 
     _reslogger = Logger::getMainInstance().copy("<RESULT>", ".sweep");
     _warnlogger = Logger::getMainInstance().copy("<WARN>", ".warn");
@@ -92,7 +90,7 @@ void SweepJob::appl_start() {
 		_list_of_ids.push_back(localId);
 		oss << "," << localId;
 	}
-	LOG(V2_INFO,"SWEEP LIST_OF_LOCAL_IDS: %s \n", oss.str().c_str());
+	LOG(V4_VVER,"SWEEP LIST_OF_LOCAL_IDS: %s \n", oss.str().c_str());
 
 	//Will hold pointers to the kissat solvers
 	_sweepers.resize(_nThreads);
@@ -107,7 +105,7 @@ void SweepJob::appl_start() {
 	_red.reset();
 
 	//Start individual Kissat threads (those then immediately jump into the sweep algorithm)
-	LOG(V2_INFO,"SWEEP Create solvers\n");
+	LOG(V3_VERB,"SWEEP Create solvers\n");
 	for (int localId=0; localId < _nThreads; localId++) {
 		createAndStartNewSweeper(localId);
 	}
@@ -116,7 +114,7 @@ void SweepJob::appl_start() {
 	_internal_result.id = getId();
 	_internal_result.revision = getRevision();
 
-	LOG(V2_INFO, "SWEEP appl_start() FINISHED\n");
+	LOG(V3_VERB, "SWEEP appl_start() FINISHED\n");
 }
 
 
@@ -136,10 +134,11 @@ void SweepJob::appl_communicate() {
 	checkSharingDelay();
 	printIdleFraction();
 	checkForUnsatResults();
-	clearNextFinishedRound();
+	clearImportedRound();
+
 
 	float t1 = Timer::elapsedSeconds();
-	_appl_communicate_duration.push_back(t1-t0);
+	_duration_appl_communicate.push_back(t1-t0);
 	LOG(V5_DEBG, "SWEEP appl_communicate(): %.6f sec \n", (t1-t0));
 	LOG(V5_DEBG, "SWEEP appl_communicate() done \n");
 }
@@ -163,7 +162,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 
 		msg.payload.clear();
 
-		LOG(V3_VERB, "SWEEP MSG [%i] <---?---- [%i](%i) \n", _my_rank, sourceRank, sourceLocalId);
+		LOG(V4_VVER, "SWEEP MSG [%i] <---?---- [%i](%i) \n", _my_rank, sourceRank, sourceLocalId);
 
 		if (_terminate_all) {
 			LOG(V3_VERB, "SWEEP Not answering to post-termination MPI steal request from [%i](%i) \n", sourceRank, sourceLocalId);
@@ -208,7 +207,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 					"With sourceRank=%i, sourceIndex=%i, contextIdOfDestination=%i, payload.size()=%zu \n", sourceRank, sourceIndex, msg.contextIdOfDestination, msg.payload.size()));
 
 		if (stolen_count>0) {
-			LOG(V3_VERB, "SWEEP snd [%i] >>>>%i>>>> [%i](%i) \n", _my_rank, stolen_count, sourceRank, sourceLocalId);
+			LOG(V4_VVER, "SWEEP snd [%i] >>>>%i>>>> [%i](%i) \n", _my_rank, stolen_count, sourceRank, sourceLocalId);
 		}
 
 		getJobTree().send(sourceRank, MSG_SEND_APPLICATION_MESSAGE, msg);
@@ -222,12 +221,12 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		_worksteal_requests[stealingLocalId].stolen_work = std::move(msg.payload);
 		_worksteal_requests[stealingLocalId].got_steal_response = true;
 		if (_worksteal_requests[stealingLocalId].stolen_work.size() > 0)
-			LOG(V3_VERB, "SWEEP rcv [%i](%i) <<<%zu<<<< [%i]\n", _my_rank, stealingLocalId, _worksteal_requests[stealingLocalId].stolen_work.size(), sourceRank );
+			LOG(V4_VVER, "SWEEP rcv [%i](%i) <<<%zu<<<< [%i]\n", _my_rank, stealingLocalId, _worksteal_requests[stealingLocalId].stolen_work.size(), sourceRank );
 		else
-			LOG(V3_VERB, "SWEEP rcv [%i](%i) <---0---- [%i]\n", _my_rank, stealingLocalId, sourceRank );
+			LOG(V4_VVER, "SWEEP rcv [%i](%i) <---0---- [%i]\n", _my_rank, stealingLocalId, sourceRank );
 	}
 	else if (msg.tag == TAG_FOUND_UNSAT) {
-		LOG(V1_WARN, "SWEEP MSG [%i] <~~~ Found UNSAT! [%i]\n", _my_rank, sourceRank );
+		LOG(V2_INFO, "SWEEP MSG [%i] <~~~ Found UNSAT! [%i]\n", _my_rank, sourceRank );
 		assert(_is_root);
 		tryReportUnsat();
 	}
@@ -258,7 +257,7 @@ bool SweepJob::appl_isDestructible() {
 	}
 
 	//all background workers are completely done, so joining them now should happen immediately (even doing it sequentially)
-	LOG(V2_INFO, "SWEEP TERM #%i [%i] isDestructible? yes. now joining... \n",  getId(),_my_rank);
+	LOG(V3_VERB, "SWEEP TERM #%i [%i] isDestructible? yes. now joining... \n",  getId(),_my_rank);
 	int i=0;
 	for (auto &bg_worker : _bg_workers) {
 		if (bg_worker->isRunning()) {
@@ -280,7 +279,7 @@ void SweepJob::checkForUnsatResults() {
 	if (_do_report_UNSAT_to_root) {
 		auto msg = getMessageTemplate();
 		msg.tag = TAG_FOUND_UNSAT;
-		LOG(V1_WARN, "SWEEP [%i] (job #%i) sending UNSAT to root \n", _my_rank,getId());
+		LOG(V2_INFO, "SWEEP [%i] (job #%i) sending UNSAT to root \n", _my_rank,getId());
 		getJobTree().sendToRoot(msg);
 	}
 
@@ -324,7 +323,7 @@ void SweepJob::reportSolverResult(KissatPtr sweeper, int res) {
 }
 
 void SweepJob::createAndStartNewSweeper(int localId) {
-	LOG(V3_VERB, "SWEEP JOB [%i](%i) queuing background worker thread\n", _my_rank, localId);
+	LOG(V4_VVER, "SWEEP JOB [%i](%i) queuing background worker thread\n", _my_rank, localId);
 	_bg_workers[localId]->run([this, localId]() {
 		LOG(V3_VERB, "SWEEP JOB [%i](%i) WORKER START \n", _my_rank, localId);
 
@@ -371,7 +370,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		if (res==UNSAT) {
 			//Found UNSAT
 			assert(kissat_is_inconsistent(sweeper->solver) || log_return_false("SWEEP ERROR: Solver returned UNSAT 20 but is not in inconsistent (==UNSAT) state!\n"));
-			LOG(V1_WARN, "SWEEP [%i](%i) found UNSAT! \n", _my_rank, localId);
+			LOG(V2_INFO, "SWEEP [%i](%i) found UNSAT! \n", _my_rank, localId);
 			if (_is_root) {
 				//there had been rare cases where sending a self-message on the root-node crashed the program, so in this case we skip the mpi message
 				tryReportUnsat();
@@ -598,36 +597,36 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 	if (full) {
 		static const int DURATION_WARN_FACTOR=2;
 		float latency_sum=0, latency_avg=0, period_sum=0, period_avg=0;
-		std::vector<float> latencies;
-		for (int i=0; i < _root_time_start_bcast.size() && i < _time_receive_allred.size(); i++) {
-			latencies.push_back(_time_receive_allred[i]-_root_time_start_bcast[i]);
-			latency_sum += latencies.back();
+		// std::vector<float> latencies;
+		// for (int i=0; i < _timestamp_root_started_bcast.size() && i < _timestamp_receive_sharing_result.size(); i++) {
+			// latencies.push_back(_timestamp_receive_sharing_result[i]-_timestamp_root_started_bcast[i]);
+			// latency_sum += latencies.back();
+		// }
+		// if (!latencies.empty()) {
+			// latency_avg = latency_sum/latencies.size();
+		// }
+		if (_timestamp_root_started_bcast.size()>1) {
+			period_sum = _timestamp_root_started_bcast.back() - _timestamp_root_started_bcast.front();
+			period_avg = period_sum / (_timestamp_root_started_bcast.size()-1);
 		}
-		if (!latencies.empty()) {
-			latency_avg = latency_sum/latencies.size();
-		}
-		if (_root_time_start_bcast.size()>1) {
-			period_sum = _root_time_start_bcast.back() - _root_time_start_bcast.front();
-			period_avg = period_sum / (_root_time_start_bcast.size()-1);
-		}
-		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_LATENCY     %.4f sec (average) \n",latency_avg);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_PERIOD_REAL %.4f sec (average) \n",period_avg);
+		// LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_LATENCY     %.4f sec (average) \n",latency_avg);
+		// LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_PERIOD_REAL %.4f sec (average) \n",period_avg);
 
 
-		if (_root_time_start_bcast.size()>1) {
-			for (int i=0; i < _root_time_start_bcast.size()-1; i++) {
-				float period = _root_time_start_bcast[i+1] - _root_time_start_bcast[i];
+		if (_timestamp_root_started_bcast.size()>1) {
+			for (int i=0; i < _timestamp_root_started_bcast.size()-1; i++) {
+				float period = _timestamp_root_started_bcast[i+1] - _timestamp_root_started_bcast[i];
 				if (period > DURATION_WARN_FACTOR*period_avg) {
 					LOGGER(_reslogger,V2_INFO, "[WARN] SWEEP_SHARING_PERIOD_REAL %.4f sec   (round %i) is much larger than average \n", period, i);
 				}
 			}
 		}
 
-		for (int i=0; i< latencies.size(); i++) {
-			if (latencies[i] > DURATION_WARN_FACTOR*latency_avg) {
-				LOGGER(_reslogger,V2_INFO, "[WARN] SWEEP_SHARING_LATENCY %.4f sec     (between rounds %i,%i) is much larger than average \n", latencies[i], i, i+1);
-			}
-		}
+		// for (int i=0; i< latencies.size(); i++) {
+			// if (latencies[i] > DURATION_WARN_FACTOR*latency_avg) {
+				// LOGGER(_reslogger,V2_INFO, "[WARN] SWEEP_SHARING_LATENCY %.4f sec     (between rounds %i,%i) is much larger than average \n", latencies[i], i, i+1);
+			// }
+		// }
 
 		for (int i=0; i<15 && i<_internal_result.getSolutionSize(); i++) {
 			LOGGER(_reslogger,V3_VERB, "RESULT Sweep Formula[%i] = %i \n", i, _internal_result.getSolution(i));
@@ -673,15 +672,24 @@ void SweepJob::printIdleFraction() {
 
 void SweepJob::checkSharingDelay() {
 	if (_terminate_all) return;
-	// if (!_started_synchronized_solving) return;
+
+
+	//We insert manually a first timestamp to detect cases where NO communication happened at all for a specific rank (due to a programming bug in the job tree handling)
+	//With the manual insertions we have a reference against which delays can be detected, and can be sure that we are warned if this rank does not participate in the overall communication. i
+	//Otherwise the timing-vectors could have remained completely empty and no delay-difference would be detected
+	if (!_started_sharedelay_tracking && _started_synchronized_solving) {
+		float t = Timer::elapsedSeconds();
+		_timestamp_contributed_to_sharing.push_back(t);
+		_timestamp_receive_sharing_result.push_back(t);
+		_started_sharedelay_tracking = true;
+	}
 
 	constexpr float MAX_DELAY_FACTOR = 6;
-	constexpr float WARNING_PERIOD = 0.5;
 	float time = Timer::elapsedSeconds();
 
 	float expected_period = _params.sweepSharingPeriod.val; //in seconds
-	if (!_time_contributed.empty()) {
-		float delay = time - _time_contributed.back();
+	if (!_timestamp_contributed_to_sharing.empty()) {
+		float delay = time - _timestamp_contributed_to_sharing.back();
 		if (delay > expected_period*MAX_DELAY_FACTOR) {
 			//We log two times. Once in the main log file to see the information chronologically correct interleaved with the other logs
 			//and onces separately in a .warn file for faster grepping during post-processing, where we would like to avoid to grep through the main logs
@@ -689,8 +697,8 @@ void SweepJob::checkSharingDelay() {
 			LOGGER(_warnlogger, V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since contrib, factor %.1f \n", _my_rank, delay, delay/expected_period);
 		}
 	}
-	if (!_time_receive_allred.empty()) {
-		float delay = time - _time_receive_allred.back();
+	if (!_timestamp_receive_sharing_result.empty()) {
+		float delay = time - _timestamp_receive_sharing_result.back();
 		if (delay > expected_period*MAX_DELAY_FACTOR) {
 			LOG(			    V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since recv, factor %.1f \n", _my_rank, delay, delay/expected_period);
 			LOGGER(_warnlogger, V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since recv, factor %.1f \n", _my_rank, delay, delay/expected_period);
@@ -837,7 +845,7 @@ void SweepJob::sendWorkstealsViaMPI() {
 			//Update: and we also send our treeIndex for the same reason, the receiver might not yet have our address data
 			msg.payload = {request.senderLocalId, myContexId, _my_index};
 			assert(msg.payload.size() == NUM_SEARCHING_WORK_FIELDS);
-			LOG(V3_VERB, "SWEEP MSG [%i](%i) ---?---> [%i] \n", _my_rank, request.senderLocalId, request.targetRank);
+			LOG(V4_VVER, "SWEEP MSG [%i](%i) ---?---> [%i] \n", _my_rank, request.senderLocalId, request.targetRank);
 			getJobTree().send(request.targetRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 			//CRUCIAL that this flag is only set now, after we did everything with it.
 			//because after resetting this flag, a workstealing solver could immediately concurrently modify this request, by resetting it
@@ -927,13 +935,13 @@ void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
 		assert(*ilit1 !=0 || *ilit2 !=0		|| log_return_false("SWEEP ERROR: in cbImportEq: sending invalid empty *ilit1=%i, *ilit2=0 to the solvers\n", *ilit1, *ilit2));
 		assert(*ilit1 < *ilit2				|| log_return_false("SWEEP ERROR: in cbImportEq: *ilit1 %i is larger than %i *ilit2, but they should be sorted (index %i, %i,)\n", *ilit1, *ilit2, idx, idx+1));
 		if (sweeper->curr_eq_index == eqs.size()) {
-			LOG(V4_VVER, "SWEEP [%i](%i) ((( < %i > E %i \n", _my_rank, sweeper->getLocalId(),  round, eqs.size()/2);
+			LOG(V5_DEBG, "SWEEP [%i](%i) ((( < %i > E %i \n", _my_rank, sweeper->getLocalId(),  round, eqs.size()/2);
 		}
 	}
 	//Check if there is a next round to import
 	else if (round < _lastImportedRound) {
 		if (eqs.size()==0) { //for completeness we also log the edge-case where there was nothing to import
-			LOG(V4_VVER, "SWEEP [%i](%i) ((( < %i > E %i \n", _my_rank, sweeper->getLocalId(), round,  eqs.size()/2);
+			LOG(V5_DEBG, "SWEEP [%i](%i) ((( < %i > E %i \n", _my_rank, sweeper->getLocalId(), round,  eqs.size()/2);
 		}
 		//Advance to import from the next stored round data. This does not necessarily need to be the latest round, if there are be multiple rounds stored we might need to catch up sequentially through all of them
 		//Keep track how many threads have finished reading this round, such that it can be deleted after all threads have read it
@@ -976,12 +984,12 @@ void SweepJob::cbImportUnit(int *ilit, int localId) {
 		*ilit = units[idx];
 		sweeper->curr_unit_index++;
 		if (sweeper->curr_unit_index == units.size()) {
-			LOG(V4_VVER, "SWEEP [%i](%i) ((( < %i > U %i \n", _my_rank, sweeper->getLocalId(), round, units.size() );
+			LOG(V5_DEBG, "SWEEP [%i](%i) ((( < %i > U %i \n", _my_rank, sweeper->getLocalId(), round, units.size() );
 		}
 	}
 	else if (round < _lastImportedRound) {
 		if (units.size()==0) {
-			LOG(V4_VVER, "SWEEP [%i](%i) ((( < %i > U %i \n", _my_rank, sweeper->getLocalId(), round, units.size());
+			LOG(V5_DEBG, "SWEEP [%i](%i) ((( < %i > U %i \n", _my_rank, sweeper->getLocalId(), round, units.size());
 		}
 		_finishedRoundCounters[round].threads_finished_units++;
 		sweeper->curr_unit_round++;
@@ -1025,11 +1033,11 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 
 	if (_terminate_all) {
 		sweeper->sweeper_is_idle = true;
-		LOG(V3_VERB, "Sweeper [%i](%i) exit steal loop\n", _my_rank, localId);
+		LOG(V4_VVER, "Sweeper [%i](%i) exit steal loop\n", _my_rank, localId);
 		sweeper->triggerSweepTerminate(); //just to be safe, send another termination to itself
 		sweeper->count_repeated_missed_termination++;
 		if (sweeper->count_repeated_missed_termination % sweeper->WARN_ON_REPEATED_MISSED_TERMINATION==0) {
-			LOG(V3_VERB, "WARN Sweeper [%i](%i) in %i-th worksteal loop after termination\n", _my_rank, localId, sweeper->count_repeated_missed_termination);
+			LOG(V1_WARN, "SWEEP WARN : Sweeper [%i](%i) in %i-th worksteal loop after termination\n", _my_rank, localId, sweeper->count_repeated_missed_termination);
 		}
 		return;
 	}
@@ -1063,7 +1071,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	if ( ! stolen_work.empty()) {
 		//Successful local steal
 		sweeper->work_received_from_steal = std::move(stolen_work);
-		LOG(V3_VERB, "SWEEP lcl [%i](%i) <==%zu====  \n", _my_rank, localId, sweeper->work_received_from_steal.size(), _my_rank);
+		LOG(V4_VVER, "SWEEP lcl [%i](%i) <==%zu====  \n", _my_rank, localId, sweeper->work_received_from_steal.size(), _my_rank);
 		return;
 	}
 
@@ -1112,7 +1120,7 @@ void SweepJob::rootStartNewSharingRound() {
 		return;
 	}
 
-	if (Timer::elapsedSeconds() < _root_time_start_bcast.back() + _params.sweepSharingPeriod.val) {
+	if (_timestamp_root_started_bcast.size()>0 &&  Timer::elapsedSeconds() < _timestamp_root_started_bcast.back() + _params.sweepSharingPeriod.val) {
 		//not yet time for next sharing round
 		return;
 	}
@@ -1127,18 +1135,19 @@ void SweepJob::rootStartNewSharingRound() {
 		return;
 	}
 
+
 	//make sure that only one sharing operation is going on at a time
 	//on this root node, hasReceivedBroadcast is equivalent to asking whether this _bcast object has already started a broadcast
 	if (_bcast->hasReceivedBroadcast()) {
-		LOG(V3_VERB, "SWEEP root: Delay next round. round %i still ongoing\n", _root_sharing_round);
+		LOG(V4_VVER, "SWEEP root: Delay next round. round %i still ongoing\n", _root_sharing_round);
 		return;
 	}
 	//Broadcast a ping to all workers to initiate an AllReduce
 	//The broadcast includes all workers currently reachable by the root-node and informs them about their parent and potential children
 	//It then causes the leaf nodes to call the callback, initiating the AllReduce
 	// _root_last_sharing_start_timestamp = Timer::elapsedSeconds();
-	_root_time_start_bcast.push_back(Timer::elapsedSeconds());
-	LOG(V3_VERB, "SWEEP root: Initiating new sharing round via modular broadcast\n");
+	_timestamp_root_started_bcast.push_back(Timer::elapsedSeconds());
+	LOG(V4_VVER, "SWEEP root: Initiating new sharing round via modular broadcast\n");
 	JobMessage msg = getMessageTemplate();
 	msg.tag = _bcast->getMessageTag();
 	msg.payload = {};
@@ -1172,7 +1181,15 @@ void SweepJob::cbContributeToAllReduce() {
 	if (! _is_root) {
 		LOG(V4_VVER, "SWEEP [%i] BCAST RESET non-root \n", _my_rank);
 		//Prepare all non-root processes to be ready to receive the next broadcast
-		_bcast.reset(new JobTreeBroadcast(getId(), snapshot, [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
+		//CRUCIAL:
+		//	getJobTree().getSnapshot()
+		//		instead of
+		//	snapshot !!
+		//
+		//	Only via getJobTree().. we get the most up-to-date tree, as updated in appl_communicate
+		//  Instead with our own snapshot object, we would just re-use the one from last round, i.e. re-use the one from the very first round and never get any updates in, and remain stuck tree-wise
+		_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
+		// _bcast.reset(new JobTreeBroadcast(getId(), snapshot, [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT)); <<-- remains stuck at the very initial tree snapshot !
 	}
 
 	if (_terminate_all) {
@@ -1241,7 +1258,7 @@ void SweepJob::cbContributeToAllReduce() {
 	}
 
 	if (okToTrackSharingDelay()) {
-		_time_contributed.push_back(Timer::elapsedSeconds());
+		_timestamp_contributed_to_sharing.push_back(Timer::elapsedSeconds());
 	}
 
 	_red->contribute(std::move(aggregation_element));
@@ -1274,7 +1291,7 @@ void SweepJob::extractAllReductionResult() {
 	assert(eq_size%2==0 || log_return_false("SWEEP ERROR: Import Equality size %i not even\n", eq_size));
 
 	if (okToTrackSharingDelay())
-		_time_receive_allred.push_back(Timer::elapsedSeconds());
+		_timestamp_receive_sharing_result.push_back(Timer::elapsedSeconds());
 
 
 	LOG(V2_INFO, "SWEEP RED SHARE GOTT: iter(%i)round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)terminate. #longidle: %i / %i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastLongtermIdleCount, _nThreads);
@@ -1363,7 +1380,7 @@ void SweepJob::extractAllReductionResult() {
 	}
 }
 
-void SweepJob::clearNextFinishedRound() {
+void SweepJob::clearImportedRound() {
 	//We store data from multiple past import rounds, as long as some threads have not imported them yet.
 	//Eventually we want and should delete this data, as it consumes (some small) memory.
 	//We delete a round data once all its  Eqs and Units have been imported by all threads
@@ -1374,7 +1391,7 @@ void SweepJob::clearNextFinishedRound() {
 	if (_finishedRoundCounters[r].threads_finished_eqs == _nThreads && _finishedRoundCounters[r].threads_finished_units == _nThreads) {
 		_imported_EQS_UNITS[r].eqs.clear();
 		_imported_EQS_UNITS[r].units.clear();
-		LOG(V3_VERB, "SWEEP [%i] CLEARED round %i data \n", _my_rank, r);
+		LOG(V4_VVER, "SWEEP [%i] CLEARED round %i data \n", _my_rank, r);
 		_lastClearedRound = r;
 	}
 }
@@ -1476,7 +1493,7 @@ std::vector<int> SweepJob::stealWorkFromAnyLocalSolver(int asking_rank, int aski
 	for (int localId : rand_permutation) {
 		auto stolen_work = stealWorkFromSpecificLocalSolver(localId);
 		if ( ! stolen_work.empty()) {
-			LOG(V3_VERB, "SWEEP giv [%i](%i) ===%zu===> [%i](%i) \n",_my_rank, localId, stolen_work.size(), asking_rank, asking_sourceLocalId);
+			LOG(V4_VVER, "SWEEP giv [%i](%i) ===%zu===> [%i](%i) \n",_my_rank, localId, stolen_work.size(), asking_rank, asking_sourceLocalId);
 			return stolen_work;
 		}
 	}
@@ -1591,6 +1608,9 @@ void SweepJob::triggerTerminations() {
 
 SweepJob::~SweepJob() {
 	LOG(V4_VVER, "SWEEP JOB DESTRUCTOR ENTERED (ctx %i) \n", _my_ctx_id);
+	if (_lastClearedRound != _lastImportedRound) {
+		LOG(V1_WARN, "SWEEP [%i] WARN : didn't clear all imported rounds! lastCleared %i, lastImported %i \n", _my_rank, _lastClearedRound, _lastImportedRound.load());
+	}
 	// triggerTerminations();
 	LOG(V4_VVER, "SWEEP JOB DESTRUCTOR DONE\n");
 }

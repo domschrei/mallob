@@ -12,6 +12,8 @@
 #include "util/sys/thread_pool.hpp"
 #include "data/job_transfer.hpp"
 
+#define VERB_ALLRED V4_VVER
+
 class JobTreeAllReduction {
 
 public:
@@ -118,7 +120,7 @@ public:
         int act_num_children = 0;
         if (leftRank>=0) act_num_children++;
         if (rightRank>=0) act_num_children++;
-        LOG(V3_VERB, "SWEEP New RED. (%i)children [%i],[%i] \n", _tree.nbChildren, leftRank, rightRank);
+        LOG(VERB_ALLRED, "SWEEP New RED. (%i)children [%i],[%i] \n", _tree.nbChildren, leftRank, rightRank);
         if (act_num_children != _tree.nbChildren) {
             LOG(V1_WARN, "WARN SWEEP: AllReduction got Snapshot with _tree.nbChildren %i, but actual child ranks [%i]&[%i] give %i actual children! \n", _tree.nbChildren, leftRank, rightRank, act_num_children);
         }
@@ -194,7 +196,7 @@ private:
         }
 
         if (tag == MSG_JOB_TREE_MODULAR_REDUCE) {
-            LOG(V3_VERB, "REDUCE\n");
+            LOG(VERB_ALLRED, "REDUCE\n");
 
             if (_aggregating || _future_aggregate.valid() || _reduction_locally_done)
                 return false; // already internally aggregating elements (or already done)!
@@ -205,7 +207,7 @@ private:
             accept &= fromLeftChild || fromRightChild;
             if (!accept) return false;
 
-            LOG(V4_VVER, "SWEEP RED <--%i--- [%i] child \n", msg.payload.size(), source);
+            LOG(VERB_ALLRED, "SWEEP RED <--%i--- [%i] child \n", msg.payload.size(), source);
             // message accepted: store and check off
             _child_elems.insert({source, std::move(msg.payload)});
             if (fromLeftChild) _received_child_elems.first = true;
@@ -232,7 +234,8 @@ public:
 
         if (_finished) return *this;
 
-        LOG(V4_VVER, "SWEEP RED advance() exp(%i) got(%i) loc(%i) childs[%i][%i] rcvleft(%i) rcvright(%i) a'ing(%i) a'ed(%i) fvalid(%i) \n",
+        LOG(V3_VERB, "SWEEP [%i] RED advance() exp(%i) got(%i) loc(%i) childr[%i][%i] rcvleft(%i) rcvright(%i) a'ing(%i) a'ed(%i) fvalid(%i) \n",
+            _tree.nodeRank,
             _num_expected_child_elems, _child_elems.size(), _local_elem.has_value(), _expected_child_ranks.first, _expected_child_ranks.second,
             _received_child_elems.first, _received_child_elems.second, _aggregating, _aggregated_logging, _future_aggregate.valid());
 
@@ -252,7 +255,7 @@ public:
             _base_msg.treeIndexOfDestination = _parent_index;
             _base_msg.contextIdOfDestination = _parent_ctx_id;
             assert(_base_msg.contextIdOfDestination != 0);
-            LOG(V3_VERB, "SWEEP RED [%i] advance ~~~%i~~~> to parent [%i]\n",_tree.nodeRank, _base_msg.payload.size(), _parent_rank);
+            LOG(V3_VERB, "SWEEP [%i] RED advance ~~~%i~~~> [%i] to parent \n",_tree.nodeRank, _base_msg.payload.size(), _parent_rank);
             MyMpi::isend(_parent_rank, MSG_JOB_TREE_MODULAR_REDUCE, _base_msg);
             //Now that we re-send, the problem is no longer pending -- unless we get the error again, which would repeat this cycle
             _have_unanswered_returnToSender = false;
@@ -303,7 +306,7 @@ public:
                 }
 
                 if (_broadcast_enabled) {// receive final elem and begin broadcast
-                    LOG(V3_VERB, "SWEEP RED SHARE broadcasting result \n");
+                    LOG(VERB_ALLRED, "SWEEP RED SHARE broadcasting result \n");
                     receiveAndForwardFinalElem(std::move(_aggregated_elem.value()));
                 } else { // only receive final elem
                     receiveFinalElem(std::move(_aggregated_elem.value()));
@@ -313,7 +316,7 @@ public:
                 _base_msg.payload = std::move(_aggregated_elem.value());
                 _base_msg.treeIndexOfDestination = _parent_index;
                 _base_msg.contextIdOfDestination = _parent_ctx_id;
-                LOG(V3_VERB, "SWEEP RED [%i] advance ~~~%i~~~> to parent [%i]\n",_tree.nodeRank, _base_msg.payload.size(), _parent_rank);
+                LOG(V3_VERB, "SWEEP [%i] RED advance ~~~%i~~~> [%i] to parent \n",_tree.nodeRank, _base_msg.payload.size(), _parent_rank);
                 assert(_base_msg.contextIdOfDestination != 0);
                 MyMpi::isend(_parent_rank, MSG_JOB_TREE_MODULAR_REDUCE, _base_msg);
                 if (_care_about_parent_status) {
@@ -346,7 +349,7 @@ public:
         if (_expected_child_ranks.first >= 0) {
             _base_msg.treeIndexOfDestination = _expected_child_indices.first;
             _base_msg.contextIdOfDestination = _expected_child_ctx_ids.first;
-            LOG(V3_VERB, "      tell child %i I'm ready\n", _expected_child_indices.first);
+            LOG(VERB_ALLRED, "      tell child %i I'm ready\n", _expected_child_indices.first);
             assert(_base_msg.contextIdOfDestination != 0);
             MyMpi::isend(_expected_child_ranks.first, MSG_JOB_TREE_PARENT_IS_READY, _base_msg);
 
@@ -354,7 +357,7 @@ public:
         if (_expected_child_ranks.second >= 0) {
             _base_msg.treeIndexOfDestination = _expected_child_indices.second;
             _base_msg.contextIdOfDestination = _expected_child_ctx_ids.second;
-            LOG(V3_VERB, "      tell child %i I'm ready \n", _expected_child_indices.second);
+            LOG(VERB_ALLRED, "      tell child %i I'm ready \n", _expected_child_indices.second);
             assert(_base_msg.contextIdOfDestination != 0);
             MyMpi::isend(_expected_child_ranks.second, MSG_JOB_TREE_PARENT_IS_READY, _base_msg);
         }
@@ -401,20 +404,20 @@ private:
     }
 
     void receiveAndForwardFinalElem(AllReduceElement&& elem) {
-        LOG(V3_VERB, "SWEEP SHARE got final element (size %i) \n", elem.size());
+        LOG(VERB_ALLRED, "SWEEP SHARE got final element (size %i) \n", elem.size());
         receiveFinalElem(std::move(elem));
         if (_expected_child_ranks.first >= 0) {
             _base_msg.treeIndexOfDestination = _expected_child_indices.first;
             _base_msg.contextIdOfDestination = _expected_child_ctx_ids.first;
             assert(_base_msg.contextIdOfDestination != 0);
-            LOG(V3_VERB, "SWEEP RED SHARE forward ---%i---> left [%i] \n", _base_msg.payload.size(), _expected_child_ranks.first);
+            LOG(VERB_ALLRED, "SWEEP RED SHARE forward ---%i---> left [%i] \n", _base_msg.payload.size(), _expected_child_ranks.first);
             MyMpi::isend(_expected_child_ranks.first, MSG_JOB_TREE_MODULAR_BROADCAST, _base_msg);
         }
         if (_expected_child_ranks.second >= 0) {
             _base_msg.treeIndexOfDestination = _expected_child_indices.second;
             _base_msg.contextIdOfDestination = _expected_child_ctx_ids.second;
             assert(_base_msg.contextIdOfDestination != 0);
-            LOG(V3_VERB, "SWEEP RED SHARE forward ---%i---> right [%i] \n", _base_msg.payload.size(), _expected_child_ranks.second);
+            LOG(VERB_ALLRED, "SWEEP RED SHARE forward ---%i---> right [%i] \n", _base_msg.payload.size(), _expected_child_ranks.second);
             MyMpi::isend(_expected_child_ranks.second, MSG_JOB_TREE_MODULAR_BROADCAST, _base_msg);
         }
     }

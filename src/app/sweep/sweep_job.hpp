@@ -45,14 +45,15 @@ private:
 	std::atomic_int _finished_sweepers_count {0};
 	std::vector<int> _list_of_ids;
 	std::atomic_bool _started_synchronized_solving{false};
+	bool _started_sharedelay_tracking{false};
 	int _lastLongtermIdleCount{0};
 
 	//Timing
 	float _start_sweep_timestamp;
-	std::vector<float> _root_time_start_bcast;
-	std::vector<float> _time_receive_allred;
-	std::vector<float> _time_contributed;
-	std::vector<float> _appl_communicate_duration;
+	std::vector<float> _timestamp_root_started_bcast;
+	std::vector<float> _timestamp_receive_sharing_result;
+	std::vector<float> _timestamp_contributed_to_sharing;
+	std::vector<float> _duration_appl_communicate;
 
 	//Workstealing
 	SplitMix64Rng _rng;
@@ -331,7 +332,7 @@ private:
 	void cbImportEq(int *ilit1, int *ilit2, int localId);
 	void cbImportUnit(int *lit, int localId);
 	int cbCustomQuery(int query);
-	void clearNextFinishedRound();
+	void clearImportedRound();
 
 	virtual ~SweepJob();
 
