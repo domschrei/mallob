@@ -17,6 +17,7 @@
 #include "app/sat/proof/trusted/trusted_checker_defs.hpp"
 #include "app/sat/proof/trusted_checker_process_adapter.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
+#include "data/serializable.hpp"
 #include "robin_map.h"
 #include "trusted/trusted_utils.hpp"
 #include "util/assert.hpp"
@@ -25,6 +26,37 @@
 #include "util/sys/background_worker.hpp"
 
 class LratConnector {
+
+public:
+    struct Witness : public Serializable {
+        int cidx = 0;
+        int result = 0;
+        char data[SIG_SIZE_BYTES];
+        std::vector<int> asmpt;
+
+        bool valid() const {return cidx != 0 || result != 0;}
+        virtual std::vector<uint8_t> serialize() const {
+            std::vector<uint8_t> out(sizeof(int)*2 + SIG_SIZE_BYTES + sizeof(int)*asmpt.size());
+            int i = 0, n;
+            n = sizeof(int); memcpy(out.data()+i, &cidx, n); i += n;
+            n = sizeof(int); memcpy(out.data()+i, &result, n); i += n;
+            n = SIG_SIZE_BYTES; memcpy(out.data()+i, data, n); i += n;
+            n = sizeof(int)*asmpt.size(); memcpy(out.data()+i, asmpt.data(), n); i += n;
+            return out;
+        }
+        virtual Serializable& deserialize(const std::vector<uint8_t>& in) {
+            int i = 0, n;
+            n = sizeof(int); memcpy(&cidx, in.data()+i, n); i += n;
+            n = sizeof(int); memcpy(&result, in.data()+i, n); i += n;
+            n = SIG_SIZE_BYTES; memcpy(data, in.data()+i, n); i += n;
+            int remainingBytes = in.size() - i;
+            int asmptSize = remainingBytes / sizeof(int);
+            asmpt.resize(asmptSize);
+            n = remainingBytes; memcpy(asmpt.data(), in.data()+i, n); i += n;
+            assert(i == in.size());
+            return *this;
+        }
+    };
 
 private:
     Logger& _logger;
@@ -63,6 +95,9 @@ private:
     float _tampering_chance_per_mille {0};
 
     tsl::robin_map<int, std::shared_ptr<LratOp>> _deferred_conclusion_ops;
+
+    Mutex _mtx_witnesses;
+    tsl::robin_map<int, Witness> _witness_by_revision;
 
 public:
     LratConnector(TrustedCheckerProcessAdapter::TrustedCheckerProcessSetup& setup) :
@@ -178,7 +213,9 @@ public:
         if (acquireLock) _mtx_submit.unlock();
         return true;
     }
-    void waitForConclusion(int revision) {
+    Witness waitForConclusion(int revision) {
+
+        // Wait for revision to conclude
         _mtx_submit.lock();
         u64 sleepMicrosecs = 100;
         while (_last_concluded_rev < revision) {
@@ -188,7 +225,16 @@ public:
             _mtx_submit.lock();
         }
         _mtx_submit.unlock();
-        return;
+
+        // Try to retrieve witness
+        Witness w;
+        _mtx_witnesses.lock();
+        auto it = _witness_by_revision.find(revision);
+        if (it != _witness_by_revision.end()) {
+            w = std::move(it->second);
+            _witness_by_revision.erase(it);
+        }
+        return w;
     }
     bool checkForConclusion(int revision) {
         auto lock = _mtx_submit.getLock();
@@ -353,6 +399,13 @@ private:
                     std::ofstream ofs(_out_path, std::ios_base::app);
                     ofs << cidx << " " << code << " " << Logger::dataToHexStr(sig, SIG_SIZE_BYTES) << litStr << std::endl;
                 }
+                Witness w;
+                w.cidx = cidx;
+                w.result = code;
+                memcpy(w.data, sig, SIG_SIZE_BYTES);
+                w.asmpt = assumptions;
+                auto lock = _mtx_witnesses.getLock();
+                _witness_by_revision[(int) _last_concluded_rev] = std::move(w);
             } else if (op.isBeginLoad()) {
                 if (cidx == 0) continue;
                 // obsolete "unknown" result (not actually unknown)
