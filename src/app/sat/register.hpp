@@ -5,6 +5,7 @@
 #include "app/app_registry.hpp"
 #include "app/sat/data/model_string_compressor.hpp"
 #include "app/sat/proof/incremental_trusted_parser_store.hpp"
+#include "app/sat/proof/trusted/trusted_utils.hpp"
 #include "data/job_processing_statistics.hpp"
 #include "interface/api/api_registry.hpp"
 #include "job/forked_sat_job.hpp"
@@ -13,6 +14,7 @@
 #include "util/logger.hpp"
 #include "util/static_store.hpp"
 #include "util/sys/thread_pool.hpp"
+#include <ios>
 
 void register_mallob_app_sat() {
     app_registry::registerApplication("SAT",
@@ -89,6 +91,21 @@ void register_mallob_app_sat() {
                     {"incremental", false}
                 };
                 auto jsonPalrupResult = APIRegistry::get().processBlocking(jsonJob);
+            }
+        },
+        // Job result transformer
+        [](const Parameters& params, JobResult& res) {
+            auto sol = res.copySolution();
+            Witness w = Witness::extractWitnessFromSolutionVector(sol);
+            res.setSolutionToSerialize(sol.data(), sol.size());
+            if (w.valid() && params.logDirectory.isSet()) {
+                std::ofstream ofs(params.logDirectory() + "/witness.#" + std::to_string(res.id), ios_base::app);
+                ofs << w.cidx << " " << w.result << " "
+                    << Logger::dataToHexStr((const u8*) w.data, SIG_SIZE_BYTES);
+                if (!w.asmpt.empty()) {
+                    for (int a : w.asmpt) ofs << " " << a;
+                }
+                ofs << "\n";
             }
         }
     );

@@ -642,9 +642,13 @@ void Client::handleSendJobResultInternal(JobResult&& jobResult) {
     int resultCode = jobResult.result;
     int revision = jobResult.revision;
 
+
     JobDescription* descPtr = getActiveJob(jobId);
     if (!descPtr) return; // user-side terminated in the meantime?
     JobDescription& desc = *descPtr;
+
+    auto optTransformer = app_registry::getJobResultTransformer(desc.getApplicationId());
+    if (optTransformer) optTransformer.value()(_params, jobResult);
 
     std::string resultCodeString = "UNKNOWN";
     if (resultCode == RESULT_SAT) resultCodeString = "SATISFIABLE";

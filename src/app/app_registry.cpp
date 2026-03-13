@@ -21,8 +21,9 @@ namespace app_registry {
             JobCreator creator;
             ClientSideProgramCreator clientSideProgramCreator;
             JobSolutionFormatter solutionFormatter;
-            std::optional<JobEpilog> epilog;
             ResourceCleaner cleaner;
+            std::optional<JobEpilog> epilog;
+            std::optional<JobResultTransformer> jobResultTransformer;
         };
 
         std::vector<AppEntry> _app_entries;
@@ -39,7 +40,8 @@ namespace app_registry {
         JobCreator creator,
         JobSolutionFormatter solutionFormatter,
         ResourceCleaner cleaner,
-        std::optional<JobEpilog> epilog
+        std::optional<JobEpilog> epilog,
+        std::optional<JobResultTransformer> jobResultTransformer
     ) {
         int appId = _app_entries.size();
         _app_key_to_app_id[key] = appId;
@@ -51,6 +53,7 @@ namespace app_registry {
         entry.creator = creator;
         entry.solutionFormatter = solutionFormatter;
         entry.epilog = epilog;
+        entry.jobResultTransformer = jobResultTransformer;
         entry.cleaner = cleaner;
         _app_entries.push_back(std::move(entry));
     }
@@ -109,6 +112,10 @@ namespace app_registry {
     ClientSideProgramCreator getClientSideProgramCreator(int appId) {
         getAppKey(appId); // check existence
         return _app_entries.at(appId).clientSideProgramCreator;
+    }
+    std::optional<JobResultTransformer> getJobResultTransformer(int appId) {
+        getAppKey(appId);
+        return _app_entries.at(appId).jobResultTransformer;
     }
     std::optional<JobEpilog> getJobEpilog(int appId) {
         getAppKey(appId);

@@ -16,6 +16,7 @@
 #include "app/sat/proof/lrat_op_tamperer.hpp"
 #include "app/sat/proof/trusted/trusted_checker_defs.hpp"
 #include "app/sat/proof/trusted_checker_process_adapter.hpp"
+#include "app/sat/proof/witness.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
 #include "data/serializable.hpp"
 #include "robin_map.h"
@@ -27,37 +28,6 @@
 
 class LratConnector {
 
-public:
-    struct Witness : public Serializable {
-        int cidx = 0;
-        int result = 0;
-        char data[SIG_SIZE_BYTES];
-        std::vector<int> asmpt;
-
-        bool valid() const {return cidx != 0 || result != 0;}
-        virtual std::vector<uint8_t> serialize() const {
-            std::vector<uint8_t> out(sizeof(int)*2 + SIG_SIZE_BYTES + sizeof(int)*asmpt.size());
-            int i = 0, n;
-            n = sizeof(int); memcpy(out.data()+i, &cidx, n); i += n;
-            n = sizeof(int); memcpy(out.data()+i, &result, n); i += n;
-            n = SIG_SIZE_BYTES; memcpy(out.data()+i, data, n); i += n;
-            n = sizeof(int)*asmpt.size(); memcpy(out.data()+i, asmpt.data(), n); i += n;
-            return out;
-        }
-        virtual Serializable& deserialize(const std::vector<uint8_t>& in) {
-            int i = 0, n;
-            n = sizeof(int); memcpy(&cidx, in.data()+i, n); i += n;
-            n = sizeof(int); memcpy(&result, in.data()+i, n); i += n;
-            n = SIG_SIZE_BYTES; memcpy(data, in.data()+i, n); i += n;
-            int remainingBytes = in.size() - i;
-            int asmptSize = remainingBytes / sizeof(int);
-            asmpt.resize(asmptSize);
-            n = remainingBytes; memcpy(asmpt.data(), in.data()+i, n); i += n;
-            assert(i == in.size());
-            return *this;
-        }
-    };
-
 private:
     Logger& _logger;
     const int _base_seed;
@@ -66,7 +36,6 @@ private:
     const int _job_id;
     const int _orig_nb_vars;
     bool _incremental;
-    std::string _out_path;
 
     Mutex _mtx_submit;
     SPSCBlockingRingbuffer<LratOp> _ringbuf;
@@ -108,11 +77,6 @@ public:
     void init(const std::string& witnessSuffix = "") {
         assert(!_launched);
         _checker.init();
-        if (_incremental) {
-            std::string outPath = (_logger.getLogDir().empty() ? "." : _logger.getLogDir())
-                + "/witness-trace." + std::to_string(_job_id) + "." + std::to_string(_global_id) + witnessSuffix + ".txt";
-            _out_path = outPath;
-        }
         _bg_emitter.run([&]() {runEmitter();});
         _bg_acceptor.run([&]() {runAcceptor();});
         _launched = true;
@@ -228,7 +192,7 @@ public:
 
         // Try to retrieve witness
         Witness w;
-        _mtx_witnesses.lock();
+        auto lock = _mtx_witnesses.getLock();
         auto it = _witness_by_revision.find(revision);
         if (it != _witness_by_revision.end()) {
             w = std::move(it->second);
@@ -387,17 +351,13 @@ private:
                     assumptions = std::vector(op.data.concludeUnsat.failed, op.data.concludeUnsat.failed + op.data.concludeUnsat.nbFailed);
                 std::string litStr;
                 for (int lit : assumptions) litStr += " " + std::to_string(lit);
-                if (_out_path.empty() || _last_concluded_rev == 0) {
+                if (_last_concluded_rev == 0) {
                     LOGGER(_logger, V0_CRIT, "IMPCHK_CONFIRM %u %u %s%s\n", cidx, code,
                         Logger::dataToHexStr(sig, SIG_SIZE_BYTES).c_str(), litStr.c_str());
                     if (_last_concluded_rev == 0)
                         LOGGER(_logger, V2_INFO, "Use %s -key-seed=%lu to confirm fingerprint\n",
                             ImpCheckProgramLookup::getConfirmerExecutablePath(_incremental).c_str(),
                             ImpCheck::getKeySeed(_base_seed));
-                }
-                if (!_out_path.empty()) {
-                    std::ofstream ofs(_out_path, std::ios_base::app);
-                    ofs << cidx << " " << code << " " << Logger::dataToHexStr(sig, SIG_SIZE_BYTES) << litStr << std::endl;
                 }
                 Witness w;
                 w.cidx = cidx;
@@ -412,12 +372,6 @@ private:
                 if (_last_concluded_rev == _accepted_revision) continue;
                 // UNKNOWN result
                 _last_concluded_rev = _accepted_revision;
-                if (_out_path.empty()) {
-                    LOGGER(_logger, V0_CRIT, "IMPCHK_CONFIRM %u %u\n", cidx, 0);
-                } else {
-                    std::ofstream ofs(_out_path, std::ios_base::app);
-                    ofs << cidx << " 0" << std::endl;
-                }
             } else if (op.isEndLoad()) {
                 _accepted_revision++; // next revision reached
                 LOGGER(_logger, V4_VVER, "IMPCHK in rev. %i\n", _accepted_revision);

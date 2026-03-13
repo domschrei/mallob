@@ -321,12 +321,13 @@ void SolverThread::waitUntil(std::function<bool()> predicate) {
 }
 
 void SolverThread::reportResult(int res, int revision) {
+    if (_found_result_rev >= revision) return;
 
-    if (res == 0 || _found_result_rev >= revision) return;
     const char* resultString = res==SAT?"SAT":"UNSAT";
 
     {
         auto lock = _state_mutex.getLock();
+        _found_result_rev = revision;
 
         if (revision != _latest_revision) {
             LOGGER(_logger, V4_VVER, "discard obsolete result %s for rev. %i\n", resultString, revision);
@@ -338,6 +339,8 @@ void SolverThread::reportResult(int res, int revision) {
             _terminated = true;
             return;
         }
+
+        if (res == 0) return;
     }
 
     if (res == SAT) {
@@ -345,45 +348,31 @@ void SolverThread::reportResult(int res, int revision) {
             _solver.getOptimizer()->get_solution() : _solver.getSolution();
         auto lrat = _solver.getSolverSetup().modelCheckingLratConnector;
         if (lrat) {
-            LOGGER(_logger, V3_VERB, "Validating SAT ...\n");
+            LOGGER(_logger, V3_VERB, "Validating SAT (rev. %i) ...\n", revision);
             _logger.flush();
             // omit first "0" in solution vector
             lrat->push(LratOp(solution.data()+1, solution.size()-1), true, revision);
             // Whether or not this was successful (another thread might have been earlier),
             // wait until SAT was validated.
-            LratConnector::Witness w = lrat->waitForConclusion(revision);
-            if (w.valid()) {
-                auto wPacked = w.serialize();
-                solution.push_back(INT32_MAX);
-                solution.insert(solution.end(), (int*) wPacked.data(), (int*) (wPacked.data()+wPacked.size()));
-                solution.push_back(wPacked.size());
-                solution.push_back(INT32_MAX);
-                _state_mutex.lock();
-            } else return; // another thread reports the result
-        } else {
-            _state_mutex.lock();
-            _result.setSolutionToSerialize(solution.data(), solution.size());
+            Witness w = lrat->waitForConclusion(revision);
+            if (w.valid()) w.appendToSolutionVector(solution);
+            else return; // another thread reports the result
         }
+        _state_mutex.lock();
+        _result.setSolutionToSerialize(solution.data(), solution.size());
     } else {
         auto failed = _solver.getFailedAssumptions();
         auto failedVec = std::vector<int>(failed.begin(), failed.end());
         if (_lrat) {
-            LOGGER(_logger, V3_VERB, "Validating UNSAT ...\n");
+            LOGGER(_logger, V3_VERB, "Validating UNSAT (rev. %i) ...\n", revision);
             _logger.flush();
             _lrat->push(LratOp(_solver.getUnsatConclusionId(), failedVec.data(), failedVec.size()), true, revision);
-            LratConnector::Witness w = _lrat->waitForConclusion(revision);
-            if (w.valid()) {
-                auto wPacked = w.serialize();
-                failedVec.push_back(INT32_MAX);
-                failedVec.insert(failedVec.end(), (int*) wPacked.data(), (int*) (wPacked.data()+wPacked.size()));
-                failedVec.push_back(wPacked.size());
-                failedVec.push_back(INT32_MAX);
-                _state_mutex.lock();
-            } else return; // another thread reports the result
-        } else {
-            _state_mutex.lock();
-            _result.setSolutionToSerialize(failedVec.data(), failedVec.size());
+            Witness w = _lrat->waitForConclusion(revision);
+            if (w.valid()) w.appendToSolutionVector(failedVec);
+            else return; // another thread reports the result
         }
+        _state_mutex.lock();
+        _result.setSolutionToSerialize(failedVec.data(), failedVec.size());
     }
     _result.result = SatResult(res);
     _result.revision = revision;
