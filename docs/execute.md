@@ -91,6 +91,17 @@ where `X` is either 10 (for SAT) or 20 (for UNSAT), and `SIG` is the reported si
 
 **Note:** On-the-fly checking can also be used in Mallob's scheduled mode of operation. Globally unique clause IDs are ensured by adding a large offset times $x$ to a new solver thread's clause ID counter if the job has already experienced $x$ _balancing epochs_, i.e., received $x$ volume updates, since its initialization. The offset is chosen in such a way that 10,000 solvers each producing 10,000 clauses per second can run for 10,000 seconds before they may begin overlapping with clause IDs from the next balancing epoch. `ImpCheck` notices and reports any errors that would result from such a corner case.
 
+
+### Producing Distributed Proofs of Unsatisfiability
+
+<!-- -proof-dir=$proof_palrup -palrup=1 | -palrup-binary=1 | -palrup-check=1 -palrup-check-dir=$proof_working" -->
+To enable proof production in the PalRUP framework set the options `-palrup=1 -proof-dir=path/to/palrup/proof`. The given path can be on local disks, if Mallob is run on a distributed system. To output the proof in a readable text format (instead of variable byte length coded binary format) set the option `-palrup-binary=0`.
+
+Mallob supports checking a produced PalRUP proof immediatly after solving. To enable proof checking, build Mallob with the `-DMALLOB_APP_PALRUPCHECK=1` option. Mallob then expects a built [Impcheck](https://github.com/rubenGoetz/impcheck/tree/external_sort) in the subdirectory `mallob/palrup`. Specifically, it expects the Impcheck binaries in `palrup/build` and all `pal*.sh` scripts in `palrup/scripts`. To check a PalRUP proof run Mallob with the options `-palrup-check=1 -palrup-check-dir=path/to/communication/`. The given path must be accessable by all processes, i.e. located in a parallel file system if run on distributed systems. If the PalRUP proof is stored on distributed disks, set the `use_local_disks="true"` flag in `palrup/scripts/pal_launcher.sh`.
+After a proof was validated successfully (unsuccessfully), a `success.palrup` (`failure.palrup`) file will be created in Mallob's log directory.
+
+**Note:** If you decide to change Impchecks default secret keys, you will have to generate a new `out.palrup_import.dummy`.
+
 ### Portfolio Tweaking
 
 Mallob allows to customize the employed SAT solver backends and some of their flavors. This is done with the `-satsolver` option, which expects a string representing the solver backends to cycle over. The option also allows to specify a "lasso word", i.e., a regex-like expression that consists of a finite prefix followed by an infinitely looping sequence. Here are some examples:
