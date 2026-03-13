@@ -234,12 +234,18 @@ public:
 
         if (_finished) return *this;
 
-        LOG(V3_VERB, "SWEEP [%i] RED advance() exp(%i) got(%i) loc(%i) childr[%i][%i] rcvleft(%i) rcvright(%i) a'ing(%i) a'ed(%i) fvalid(%i) \n",
-            _tree.nodeRank,
-            _num_expected_child_elems, _child_elems.size(), _local_elem.has_value(), _expected_child_ranks.first, _expected_child_ranks.second,
-            _received_child_elems.first, _received_child_elems.second, _aggregating, _aggregated_logging, _future_aggregate.valid());
+        // LOG(V3_VERB, "SWEEP [%i] RED exp(%i) got(%i) loc(%i) childr[%i][%i]\n",
+            // _tree.nodeRank, _num_expected_child_elems, _child_elems.size(), _local_elem.has_value(), _expected_child_ranks.first, _expected_child_ranks.second);
 
+        // LOG(V3_VERB, "SWEEP [%i] RED recvd(%i,%i), ag'ing(%i) ag'ed(%i) fuvalid(%i) \n",
+            // _tree.nodeRank, _received_child_elems.first, _received_child_elems.second, _aggregating, _aggregated_logging, _future_aggregate.valid());
 
+        LOG(V3_VERB, "SWEEP [%i] RED g(%i) ex(%i) lc(%i) ch[%i][%i] rcvd(%i,%i)\n",
+            _tree.nodeRank,  _child_elems.size(), _num_expected_child_elems, _local_elem.has_value(), _expected_child_ranks.first, _expected_child_ranks.second,
+            _received_child_elems.first, _received_child_elems.second);
+
+        // LOG(V3_VERB, "SWEEP [%i] RED recvd(%i,%i), ag'ing(%i) ag'ed(%i) fuvalid(%i) \n",
+            // _tree.nodeRank, _received_child_elems.first, _received_child_elems.second, _aggregating, _aggregated_logging, _future_aggregate.valid());
 
         //It can happen that a reduction sent to the parent gets returned via the returnToSender error.
         //Afaik, this can happen (in rare cases) with combined modular BCAST+ALLRED, the following way

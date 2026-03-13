@@ -667,7 +667,7 @@ void SweepJob::printIdleFraction() {
 		}
 	}
 	_lastLongtermIdleCount = longterm_idles;
-	LOG(V3_VERB, "SWEEP [%i] Status: (%i)Started (%i)Running (%i)Open (%i)Idle (%i)LongIdle: %s   Work[%i]: %s\n", _my_rank,  _started_sweepers_count.load(), _running_sweepers_count.load(), open, idles, longterm_idles, oss_idles.str().c_str(), _my_rank, oss_work.str().c_str());
+	LOG(V3_VERB, "SWEEP [%i]     (%i)std (%i)rng (%i)opn (%i)idle (%i)lidle %s   Work[%i]: %s\n", _my_rank,  _started_sweepers_count.load(), _running_sweepers_count.load(), open, idles, longterm_idles, oss_idles.str().c_str(), _my_rank, oss_work.str().c_str());
 }
 
 void SweepJob::checkSharingDelay() {
@@ -1294,7 +1294,7 @@ void SweepJob::extractAllReductionResult() {
 		_timestamp_receive_sharing_result.push_back(Timer::elapsedSeconds());
 
 
-	LOG(V2_INFO, "SWEEP RED SHARE GOTT: iter(%i)round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)terminate. #longidle: %i / %i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastLongtermIdleCount, _nThreads);
+	LOG(V2_INFO, "SWEEP RED SHARE GOTT: iter(%i)round(%i): (%i)all_idle, (%i)terminate. E %i, U %i  \n", sweep_iteration, sharing_round, all_idle, terminate, eq_size/2, unit_size);
 	// LOG(V2_INFO, "SWEEP RED SHARE SKIP bc not all init'd yet: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)terminate. #longidle: %i / %i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastLongtermIdleCount, _nThreads);
 
 #if SWEEP_NEW_IMPORT_VERSION == 0

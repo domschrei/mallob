@@ -31,7 +31,7 @@ MALLOB_OPTIONS="-t=$threads \
   -rspaa=1 \
 	-rpa=1 \
 	-seed=1 \
-	-v=4 \
+	-v=3 \
   -spl=4 \
 	-jcup=0.05 \
 	-preprocess-sweep=1 \
