@@ -74,7 +74,7 @@ private:
 
 	struct shweep_statistics sweep_stats;
 
-	static constexpr int WARN_ON_REPEATED_MISSED_TERMINATION=64;
+	static constexpr int WARN_ON_REPEATED_MISSED_TERMINATION=32;
 	int count_repeated_missed_termination=0;
 	// std::vector<char> stolen_done;
 	// std::vector<int> formulaForShweeping;

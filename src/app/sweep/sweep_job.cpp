@@ -124,7 +124,7 @@ void SweepJob::appl_communicate() {
 	LOG(V5_DEBG, "SWEEP appl_communicate() \n");
 	float t0 = Timer::elapsedSeconds();
 
-	if (_bcast && _is_root && !_terminate_all)
+	if (_bcast && _is_root && !_terminate_all.load(std::memory_order_relaxed))
 		_bcast->updateJobTree(getJobTree());
 
 	advanceAllReduction(); //always advance
@@ -164,7 +164,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 
 		LOG(V4_VVER, "SWEEP MSG [%i] <---?---- [%i](%i) \n", _my_rank, sourceRank, sourceLocalId);
 
-		if (_terminate_all) {
+		if (_terminate_all.load(std::memory_order_relaxed)) {
 			LOG(V3_VERB, "SWEEP Not answering to post-termination MPI steal request from [%i](%i) \n", sourceRank, sourceLocalId);
 			return;
 		}
@@ -648,7 +648,8 @@ void SweepJob::printCongruenceStats(KissatPtr sweeper) {
 
 
 void SweepJob::printIdleFraction() {
-	if (_terminate_all) return; //prevent segfault! the sweeper references are being concurrently deleted right now, no touching them
+	if (_terminate_all.load(std::memory_order_relaxed))
+		return; //prevent segfault! when termination is triggered, the sweeper references might suddenly become invalid. no touching them
 
 	int idles = 0;
 	int longterm_idles = 0;
@@ -676,7 +677,8 @@ void SweepJob::printIdleFraction() {
 }
 
 void SweepJob::checkSharingDelay() {
-	if (_terminate_all) return;
+	if (_terminate_all.load(std::memory_order_relaxed))
+		return;
 
 
 	//We insert manually a first timestamp to detect cases where NO communication happened at all for a specific rank (due to a programming bug in the job tree handling)
@@ -753,7 +755,8 @@ bool SweepJob::skip_MPI_forNow() {
 }
 
 void SweepJob::sendWorkstealsViaMPI() {
-	if (_terminate_all) return;
+	if (_terminate_all.load(std::memory_order_relaxed))
+		return;
 
 	//Worksteal requests need to be sent by the MPI *main* thread. If kissat-threads themselves send MPI messages, things can crash, since they clash somehow with the MPI hierarchy
 	//So each solver-thread queues a steal-request to shared memory, where the main MPI thread can pick it up (here) and send an MPI msg on behalf of the solver
@@ -763,7 +766,8 @@ void SweepJob::sendWorkstealsViaMPI() {
 
 			//if we are still in the phase where MPI sends are not done, we short-fuse the requests to a zero dummy and return them to the solver threads
 			//same if the whole job is terminated
-			if (skip_MPI_forNow() || _terminate_all || getVolume()==0) {
+			// if (skip_MPI_forNow() || _terminate_all || getVolume()==0) {
+			if (skip_MPI_forNow()) {
 				// request.stolen_work = {}; //remains empty from request initialization
 				request.to_send = false;
 				request.got_steal_response = true;
@@ -1036,7 +1040,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	int localId = sweeper->getLocalId();
 	sweeper->work_received_from_steal = {};
 
-	if (_terminate_all) {
+	if (_terminate_all.load(std::memory_order_relaxed)) {
 		sweeper->sweeper_is_idle = true;
 		LOG(V4_VVER, "Sweeper [%i](%i) exit steal loop\n", _my_rank, localId);
 		sweeper->triggerSweepTerminate(); //just to be safe, send another termination to itself
@@ -1115,7 +1119,7 @@ void SweepJob::cbStealWorkNew(unsigned **work, int *work_size, int localId) {
 void SweepJob::rootStartNewSharingRound() {
 	if (!_is_root)
 		return;
-	if (_terminate_all)
+	if (_terminate_all.load(std::memory_order_relaxed))
 		return;
 
 	assert(_is_root); //only the root node initiates sharing rounds
@@ -1130,12 +1134,12 @@ void SweepJob::rootStartNewSharingRound() {
 		return;
 	}
 
-	if (!_started_synchronized_solving) {
+	if (!_started_synchronized_solving.load(std::memory_order_relaxed)) {
 		LOG(V3_VERB, "SWEEP root: Delay first round, not all solvers online yet (%i/%i) \n", _started_sweepers_count.load(), _nThreads);
 		return;
 	}
 
-	if (! _root_provided_initial_work) {
+	if (! _root_provided_initial_work.load(std::memory_order_relaxed)) {
 		LOG(V3_VERB, "SWEEP root: Wait next round, initial work not provided yet\n");
 		return;
 	}
@@ -1197,7 +1201,7 @@ void SweepJob::cbContributeToAllReduce() {
 		// _bcast.reset(new JobTreeBroadcast(getId(), snapshot, [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT)); <<-- remains stuck at the very initial tree snapshot !
 	}
 
-	if (_terminate_all) {
+	if (_terminate_all.load(std::memory_order_relaxed)) {
 		LOG(V4_VVER, "SWEEP BCAST SKIP reduction, status is already _terminate_all\n");
 		return;
 	}
@@ -1257,7 +1261,7 @@ void SweepJob::cbContributeToAllReduce() {
 
 	LOG(V4_VVER, "SWEEP [%i] contributing ~~~%zu~~~(+%i)~~> to _red \n", _my_rank, aggregation_element.size()-NUM_METADATA_FIELDS, NUM_METADATA_FIELDS);
 
-	if (_terminate_all) {
+	if (_terminate_all.load(std::memory_order_relaxed)) {
 		LOG(V4_VVER, "SWEEP SHARE BCAST skip contribution, seen already _terminate_all\n");
 		return;
 	}
@@ -1354,7 +1358,7 @@ void SweepJob::extractAllReductionResult() {
 	//Sweepers can increase the size of their sweeping environments in later sweep iterations (analog to kissats own increasing environments)
 	//We tell them the current iteration, so that they can adjust accordingly
 	//We might want to limit the environment increase, since this SweepApp arrives typically at higher iteration numbers than a sequential kissat run, and thus just ever increasing the environments might be too costly or inefficient
-	if (!_terminate_all && sweep_iteration <= _params.sweepMaxGrowthIteration.val) {
+	if (!_terminate_all.load(std::memory_order_relaxed) && sweep_iteration <= _params.sweepMaxGrowthIteration.val) {
 		for (auto &sweeper : _sweepers) {
 			if (sweeper) {
 				shweep_set_sweep_iteration(sweeper->solver, sweep_iteration);
@@ -1522,7 +1526,7 @@ struct scoped_guard {
 
 
 std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
-	if (_terminate_all) //sweeping finished globally, nothing to steal anymore
+	if (_terminate_all.load(std::memory_order_relaxed)) //sweeping finished globally, nothing to steal anymore
 		return {};
 	if ( ! _sweepers[localId]) {
 		// LOG(V3_VERB, "SWEEP STEAL stealing from [%i](%i), shweeper does not exist yet\n", _my_rank, localId);
