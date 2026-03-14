@@ -11,7 +11,7 @@
 #include "app/sat/parse/serialized_formula_parser.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
 #include "app/sat/solvers/cadical.hpp"
-#ifdef MALLOB_USE_MINISAT
+#if MALLOB_USE_MINISAT
 #include "app/sat/solvers/minisat.hpp"
 #endif
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
@@ -45,9 +45,11 @@ public:
         setup.solverType = 'C';
         setup.exportClauses = false;
         if (setup.onTheFlyChecking) setup.certifiedUnsat = true;
+#if MALLOB_USE_MINISAT
         if (_solvertype == MINISAT) {
             _solver.reset(new MiniSat(setup));
         }
+#endif
         if (_solvertype == CADICAL) {
             auto cadical = new Cadical(setup);
             cadical->getTerminator().setExternalTerminator([&]() {
@@ -56,6 +58,7 @@ public:
             _solver.reset(cadical);
             _lrat = setup.onTheFlyChecking ? _solver->getLratConnector() : nullptr;
         }
+        assert(_solver);
 
         _solver->setLearnedClauseCallback([&](const Mallob::Clause&, int) {});
         if (_lrat) _lrat->init(".seq");
