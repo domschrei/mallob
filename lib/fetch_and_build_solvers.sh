@@ -17,8 +17,7 @@ else
     solvers="$1"
 fi
 
-#bash fetch_solvers.sh $solvers
-bash fetch_solvers_with_curl.sh $solvers
+bash fetch_solvers.sh $solvers
 
 # MergeSAT
 if echo $solvers|grep -q "m" && [ ! -f mergesat/libmergesat.a ]; then
