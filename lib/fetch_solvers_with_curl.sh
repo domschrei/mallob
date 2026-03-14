@@ -26,6 +26,18 @@ if echo $solvers|grep -q "g"; then
     fi
 fi
 
+# Minisat
+if echo $solvers|grep -q "n"; then
+    if [ ! -d minisat ]; then
+        if [ ! -f minisat.zip ]; then
+            branchorcommit="125490f4c81b5cada9a91cf6a5702259b9c722bb"
+            curl -L -o minisat.zip https://github.com/domschrei/minisat/archive/${branchorcommit}.zip
+        fi
+        unzip minisat.zip
+        mv minisat-* minisat
+    fi
+fi
+
 # YalSAT
 if echo $solvers|grep -q "y"; then
     if [ ! -d yalsat ]; then

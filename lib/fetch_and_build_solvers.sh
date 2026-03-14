@@ -11,7 +11,7 @@ elif [ x$DISABLE_FPU != x1 ]; then
 fi
 
 if [ -z $1 ]; then
-    solvers="clyk"
+    solvers="clykn"
     echo "Defaulting to solvers $solvers (supply another string to override solvers to build)"
 else
     solvers="$1"
@@ -51,6 +51,17 @@ if echo $solvers|grep -q "g" && [ ! -f glucose/libglucose.a ]; then
     make libr
     cp lib.a ../libglucose.a
     cd ../..
+fi
+
+# Minisat
+if echo $solvers|grep -q "n" && [ ! -f minisat/build/libminisat.a ]; then
+    echo "Building Minisat ..."
+    cd minisat
+    mkdir -p build
+    cd build
+    cmake ..
+    make -j
+    cd ..
 fi
 
 # YalSAT

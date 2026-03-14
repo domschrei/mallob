@@ -11,23 +11,32 @@
 #include "app/sat/parse/serialized_formula_parser.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
 #include "app/sat/solvers/cadical.hpp"
+#ifdef MALLOB_USE_MINISAT
+#include "app/sat/solvers/minisat.hpp"
+#endif
+#include "app/sat/solvers/portfolio_solver_interface.hpp"
 #include "sat_job_stream_processor.hpp"
 #include "scheduling/core_allocator.hpp"
 #include "util/logger.hpp"
 
 class InternalSatJobStreamProcessor : public SatJobStreamProcessor {
 
+public:
+    enum SeqSolver {CADICAL, MINISAT};
+
 private:
-    std::unique_ptr<Cadical> _solver;
+    std::unique_ptr<PortfolioSolverInterface> _solver;
     int _current_rev {-1};
     int _internal_rev {-1};
     volatile bool _pending {false};
 
-    LratConnector* _lrat ;
+    LratConnector* _lrat {nullptr};
+
+    SeqSolver _solvertype;
 
 public:
-    InternalSatJobStreamProcessor(SolverSetup setup, Synchronizer& sync) :
-        SatJobStreamProcessor(sync) {
+    InternalSatJobStreamProcessor(SolverSetup setup, Synchronizer& sync, SeqSolver solverType) :
+        SatJobStreamProcessor(sync), _solvertype(solverType) {
 
         setup.logger = &Logger::getMainInstance();
         setup.localId = 0;
@@ -36,13 +45,19 @@ public:
         setup.solverType = 'C';
         setup.exportClauses = false;
         if (setup.onTheFlyChecking) setup.certifiedUnsat = true;
-        _solver.reset(new Cadical(setup));
-        _lrat = setup.onTheFlyChecking ? _solver->getLratConnector() : nullptr;
+        if (_solvertype == MINISAT) {
+            _solver.reset(new MiniSat(setup));
+        }
+        if (_solvertype == CADICAL) {
+            auto cadical = new Cadical(setup);
+            cadical->getTerminator().setExternalTerminator([&]() {
+                return _terminator(_current_rev);
+            });
+            _solver.reset(cadical);
+            _lrat = setup.onTheFlyChecking ? _solver->getLratConnector() : nullptr;
+        }
 
         _solver->setLearnedClauseCallback([&](const Mallob::Clause&, int) {});
-        _solver->getTerminator().setExternalTerminator([&]() {
-            return _terminator(_current_rev);
-        });
         if (_lrat) _lrat->init(".seq");
     }
 

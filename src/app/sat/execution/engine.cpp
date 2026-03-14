@@ -30,6 +30,9 @@
 #include <iterator>
 
 class LratConnector;
+#if MALLOB_USE_MINISAT
+#include "../solvers/minisat.hpp"
+#endif
 #if MALLOB_USE_MERGESAT
 #include "../solvers/mergesat.hpp"
 #endif
@@ -163,6 +166,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	int numGlu = 0;
 	int numCdc = 0;
 	int numMrg = 0;
+	int numMini = 0;
 	int numKis = 0;
 	int numBVA = 0;
 	int numPre = 0;
@@ -181,6 +185,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		case PortfolioSequence::GLUCOSE: solverToAdd = &numGlu; break;
 		case PortfolioSequence::CADICAL: solverToAdd = &numCdc; break;
 		case PortfolioSequence::MERGESAT: solverToAdd = &numMrg; break;
+		case PortfolioSequence::MINISAT: solverToAdd = &numMini; break;
 		case PortfolioSequence::KISSAT: solverToAdd = &numKis; break;
 		case PortfolioSequence::VARIABLE_ADDITION: solverToAdd = &numBVA; break;
 		case PortfolioSequence::PREPROCESSOR: solverToAdd = &numPre; break;
@@ -296,6 +301,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 			case PortfolioSequence::LINGELING: setup.diversificationIndex = numLgl++; break;
 			case PortfolioSequence::CADICAL: setup.diversificationIndex = numCdc++; break;
 			case PortfolioSequence::MERGESAT: setup.diversificationIndex = numMrg++; break;
+			case PortfolioSequence::MINISAT: setup.diversificationIndex = numMini++; break;
 			case PortfolioSequence::GLUCOSE: setup.diversificationIndex = numGlu++; break;
 			case PortfolioSequence::KISSAT: setup.diversificationIndex = numKis++; break;
 			case PortfolioSequence::VARIABLE_ADDITION: setup.diversificationIndex = numBVA++; break;
@@ -368,6 +374,14 @@ std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSe
 		// Glucose
 		LOGGER(_logger, V4_VVER, "S%i: Glucose-%i\n", setup.globalId, setup.diversificationIndex);
 		solver.reset(new MGlucose(setup));
+		break;
+#endif
+#ifdef MALLOB_USE_MINISAT
+	case 'n':
+	case 'N':
+		// Minisat
+		LOGGER(_logger, V4_VVER, "S%i: Minisat-%i\n", setup.globalId, setup.diversificationIndex);
+		solver.reset(new MiniSat(setup));
 		break;
 #endif
 	default:

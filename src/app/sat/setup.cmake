@@ -14,6 +14,13 @@ set(BASE_LIBS ${BASE_LIBS} lgl yals cadical kissat CACHE INTERNAL "")
 set(BASE_INCLUDES ${BASE_INCLUDES} lib CACHE INTERNAL "") # need to include some solver code
 
 # Add new non-default solvers here
+if(MALLOB_USE_MINISAT)
+    set(BASE_LINK_DIRS ${BASE_LINK_DIRS} lib/minisat/build CACHE INTERNAL "")
+    set(SAT_SUBPROC_SOURCES ${SAT_SUBPROC_SOURCES} src/app/sat/solvers/minisat.cpp CACHE INTERNAL "")
+    set(BASE_LIBS ${BASE_LIBS} minisat CACHE INTERNAL "")
+    set(BASE_INCLUDES ${BASE_INCLUDES} lib/minisat CACHE INTERNAL "")
+    add_definitions(-DMALLOB_USE_MINISAT)
+endif()
 if(MALLOB_USE_GLUCOSE)
     set(BASE_LINK_DIRS ${BASE_LINK_DIRS} lib/glucose CACHE INTERNAL "")
     set(SAT_SUBPROC_SOURCES ${SAT_SUBPROC_SOURCES} src/app/sat/solvers/glucose.cpp CACHE INTERNAL "")

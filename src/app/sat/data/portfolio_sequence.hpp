@@ -13,6 +13,7 @@ struct PortfolioSequence {
         LINGELING = 'l',
         GLUCOSE = 'g',
         MERGESAT = 'm',
+        MINISAT = 'n',
         PREPROCESSOR = 'p',
         VARIABLE_ADDITION = 'v'
     };
@@ -91,6 +92,9 @@ private:
                 break;
             case 'm':
                 next.baseSolver = MERGESAT;
+                break;
+            case 'n':
+                next.baseSolver = MINISAT;
                 break;
             case 'v':
                 next.baseSolver = VARIABLE_ADDITION;

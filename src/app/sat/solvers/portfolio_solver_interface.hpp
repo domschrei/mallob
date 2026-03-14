@@ -98,7 +98,6 @@ public:
 
 	virtual void cleanUp() = 0;
 
-protected:
 	// Interrupt the SAT solving, solving cannot continue until interrupt is unset.
 	virtual void setSolverInterrupt() = 0;
 

@@ -171,7 +171,8 @@ private:
             setup.onTheFlyCheckModel = _params.onTheFlyChecking() && _params.onTheFlyCheckModel();
             setup.incrementalImpCheck = _params.onTheFlyCheckIncremental();
             auto internalProcessor = new InternalSatJobStreamProcessor(
-                setup, _stream->stream.getSynchronizer());
+                setup, _stream->stream.getSynchronizer(), _params.trivialSolverType() == 0 ?
+                    InternalSatJobStreamProcessor::MINISAT : InternalSatJobStreamProcessor::CADICAL);
             _stream->stream.addProcessor(internalProcessor);
         }
 

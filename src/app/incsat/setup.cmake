@@ -1,6 +1,6 @@
 
 # Add MaxSAT-specific sources to main Mallob executable
-set(INCSAT_MALLOB_SOURCES src/app/sat/solvers/cadical.cpp src/app/sat/solvers/portfolio_solver_interface.cpp src/app/sat/stream/sat_job_stream_garbage_collector.cpp)
+set(INCSAT_MALLOB_SOURCES src/app/sat/solvers/cadical.cpp src/app/sat/solvers/minisat.cpp src/app/sat/solvers/portfolio_solver_interface.cpp src/app/sat/stream/sat_job_stream_garbage_collector.cpp)
 set(MALLOB_COREPLUSCOMM_SOURCES ${MALLOB_COREPLUSCOMM_SOURCES} ${INCSAT_MALLOB_SOURCES} CACHE INTERNAL "")
 
 # Include Bitwuzla as external library (Mallob-side interfaces are part of SMT_SOURCES)
