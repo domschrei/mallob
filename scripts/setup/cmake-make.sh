@@ -8,7 +8,12 @@ builddir="$1"
 shift 1
 
 mkdir -p "$builddir"
+priordir=$(pwd)
 cd "$builddir"
+
 cmake -DMALLOB_SUBPROC_DISPATCH_PATH=\""$builddir"/\" $@ ..
+
+#VERBOSE=1 \
 make -j
-cd ..
+
+cd "$priordir"

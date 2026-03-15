@@ -12,14 +12,16 @@ if [ ! -f configure.sh ]; then
     unzip lingeling.zip
     mv lingeling-*/* lingeling-*/.* ./
     rmdir lingeling-*/
+
+    for f in *.c *.h ; do
+        sed -i 's/exit ([01])/abort()/g' $f
+    done
+
+    ./configure.sh
 else
     echo "Assuming solver sources are present"
 fi
 
 echo "Building"
-for f in *.c *.h ; do
-    sed -i 's/exit ([01])/abort()/g' $f
-done
-./configure.sh
 make
 echo "Solver built"

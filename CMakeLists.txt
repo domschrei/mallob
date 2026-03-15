@@ -67,10 +67,6 @@ if(MALLOB_USE_JEMALLOC)
     set(BASE_LIBS jemalloc ${BASE_LIBS})
 endif()
 
-# Default application
-if(NOT DEFINED MALLOB_APP_SAT)
-    set(MALLOB_APP_SAT 1)
-endif()
 
 
 # Libraries and includes
@@ -82,6 +78,7 @@ set(BASE_INCLUDES src src/util/tsl lib
     ${MPI_C_INCLUDE_PATH} ${MPI_C_INCLUDE_DIRS} ${MPI_CXX_INCLUDE_PATH} ${MPI_CXX_INCLUDE_DIRS}
     CACHE INTERNAL "")
 set(BASE_COMPILEFLAGS CACHE INTERNAL "")
+set(MALLOB_CORE_DEPS CACHE INTERNAL "")
 
 
 # Base source files
@@ -108,10 +105,10 @@ set(MALLOB_COREPLUSCOMM_SOURCES ${MALLOB_CORE_SOURCES}
 #message("mallob CORE+COMM sources pre application registration: ${MALLOB_COREPLUSCOMM_SOURCES}")
 
 
-# Define test function
 
+# Function to add a unit test
 function(new_test testname includes linklibs)
-    message("Adding test: ${testname}")
+    message("* Adding test: ${testname}")
     add_executable(test_${testname} src/test/test_${testname}.cpp)
     target_include_directories(test_${testname} PRIVATE ${includes})
     target_compile_options(test_${testname} PRIVATE ${BASE_COMPILEFLAGS})
@@ -121,11 +118,9 @@ function(new_test testname includes linklibs)
     add_test(NAME test_${testname} COMMAND test_${testname})
 endfunction()
 
-
-
-# Function to add a solver backend to Mallob's core (and hence also the SAT subprocess)
+# Function to add a library dependency to Mallob's core
 function(add_lib_dep depname basedir libdir libname sources)
-    message("Registering dependency ${depname}")
+    message("* Registering dependency ${depname}")
 
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${basedir}/${libdir}/lib${libname}.a
@@ -144,7 +139,7 @@ function(add_lib_dep depname basedir libdir libname sources)
     set(BASE_INCLUDES ${BASE_INCLUDES} ${basedir} CACHE INTERNAL "")
 
     string(TOUPPER ${depname} depallcaps)
-    add_definitions(-DMALLOB_USE_${depallcaps})
+    add_definitions(-DMALLOB_USE_${depallcaps}=1)
 endfunction()
 
 
@@ -179,35 +174,31 @@ endfunction()
 
 # Include applications
 register_mallob_app("dummy") # always register the "no-op" application
-if(MALLOB_APP_KMEANS)
-    register_mallob_app("kmeans")
+if(NOT MALLOB_APP_SAT EQUAL 0) # included by default
+register_mallob_app("sat")
 endif()
-if(MALLOB_APP_SAT) 
-    register_mallob_app("sat")
+if(NOT MALLOB_APP_INCSAT EQUAL 0) # included by default
+register_mallob_app("incsat")
 endif()
-if(MALLOB_APP_INCSAT)
-    register_mallob_app("incsat")
+if(NOT MALLOB_APP_SATWITHPRE EQUAL 0) # included by default
+register_mallob_app("satwithpre")
 endif()
-if(MALLOB_APP_MAXSAT)
+if(NOT MALLOB_APP_PALRUPCHECK EQUAL 0) # included by default
+register_mallob_app("palrupcheck")
+endif()
+if(MALLOB_APP_SATCNC EQUAL 1)
+register_mallob_app("satcnc")
+endif()
+if(MALLOB_APP_MAXSAT EQUAL 1)
 register_mallob_app("maxsat")
 endif()
-if(MALLOB_APP_SMT)
-    register_mallob_app("smt")
+if(MALLOB_APP_SMT EQUAL 1)
+register_mallob_app("smt")
 endif()
-if(MALLOB_APP_SATWITHPRE)
-    register_mallob_app("satwithpre")
+if(MALLOB_APP_KMEANS EQUAL 1)
+    register_mallob_app("kmeans")
 endif()
-if(MALLOB_APP_SATCNC)
-    register_mallob_app("satcnc")
-endif()
-if(MALLOB_APP_PALRUPCHECK)
-    register_mallob_app("palrupcheck")
-endif()
-# Include further applications here:
-#if(MALLOB_APP_YOURAPP)
-#    register_mallob_app("yourapp")
-#endif()
-# ...
+# Include further applications here!
 publish_app_registry_changes()
 
 

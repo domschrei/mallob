@@ -12,18 +12,19 @@ if [ ! -f configure.sh ]; then
     unzip yalsat-03v.zip
     mv yalsat-*/* yalsat-*/.* ./
     rmdir yalsat-*/
+
+    for f in *.c *.h ; do
+        sed -i 's/exit ([01])/abort()/g' $f
+    done
+    if $disable_fpu; then
+        sed -i 's/#ifdef __linux__/#if 0/g' yals.c
+    fi
+    
+    ./configure.sh
 else
     echo "Assuming solver sources are present"
 fi
 
 echo "Building"
-for f in *.c *.h ; do
-    sed -i 's/exit ([01])/abort()/g' $f
-done
-if $disable_fpu; then
-    sed -i 's/#ifdef __linux__/#if 0/g' yals.c
-fi
-./configure.sh
 make
-cd ..
 echo "Solver built"

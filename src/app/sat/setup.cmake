@@ -21,20 +21,50 @@ set(MALLOB_COREPLUSCOMM_SOURCES ${MALLOB_COREPLUSCOMM_SOURCES} ${SAT_MALLOB_SOUR
 #message("commons+SAT sources: ${BASE_SOURCES}") # Use to debug
 
 
-
-if(MALLOB_USE_MINISAT)
+# SAT solver backends. All included by default (i.e., unless explicitly disabled).
+if(NOT MALLOB_USE_MINISAT EQUAL 0)
     add_lib_dep("minisat" lib/minisat build/ minisat "src/app/sat/solvers/minisat.cpp")
 endif()
-if(MALLOB_USE_LINGELING)
-    add_lib_dep("yalsat" lib/yalsat ./ yals "")
+if(NOT MALLOB_USE_LINGELING EQUAL 0)
     add_lib_dep("lingeling" lib/lingeling ./ lgl "src/app/sat/solvers/lingeling.cpp")
+    add_lib_dep("yalsat" lib/yalsat ./ yals "")
     add_dependencies(dep_lingeling dep_yalsat)
 endif()
-if(MALLOB_USE_CADICAL)
+if(NOT MALLOB_USE_CADICAL EQUAL 0)
     add_lib_dep("cadical" lib/cadical build/ cadical "src/app/sat/solvers/cadical.cpp")
 endif()
-if(MALLOB_USE_KISSAT)
+if(NOT MALLOB_USE_KISSAT EQUAL 0)
     add_lib_dep("kissat" lib/kissat build/ kissat "src/app/sat/solvers/kissat.cpp")
+endif()
+
+
+# ImpCheck binaries for real-time proof checking.
+if(MALLOB_BUILD_IMPCHECK EQUAL 1)
+    add_definitions(-DMALLOB_USE_IMPCHECK=1)
+
+    # Incremental ImpCheck (IImpCheck)
+    message("* Registering dependency IImpCheck (incremental ImpCheck)")
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/iimpcheck_confirm
+        COMMAND bash fetch-and-build.sh ${CMAKE_CURRENT_BINARY_DIR}
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/lib/iimpcheck/
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib/iimpcheck/
+        COMMENT "Building dependency IImpCheck"
+    )
+    add_custom_target(dep_iimpcheck DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/iimpcheck_confirm)
+    set(MALLOB_CORE_DEPS ${MALLOB_CORE_DEPS} dep_iimpcheck CACHE INTERNAL "")
+
+    # Verified ImpCheck (ImpCake)
+    message("* Registering dependency ImpCake (verified ImpCheck)")
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/impcake_confirm
+        COMMAND bash fetch-and-build.sh ${CMAKE_CURRENT_BINARY_DIR}
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/lib/impcake/
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib/impcake/
+        COMMENT "Building dependency ImpCake"
+    )
+    add_custom_target(dep_impcake DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/impcake_confirm)
+    set(MALLOB_CORE_DEPS ${MALLOB_CORE_DEPS} dep_impcake CACHE INTERNAL "")
 endif()
 
 
@@ -51,13 +81,14 @@ target_include_directories(mallob_sat_process PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob_sat_process PRIVATE ${BASE_COMPILEFLAGS})
 target_link_libraries(mallob_sat_process mallob_sat_subproc)
 
-if(MALLOB_BUILD_LRAT_MODULES)
-    # Executable of standalone LRAT checker
+# Optional executable of standalone LRAT checker (included by default)
+if(NOT MALLOB_BUILD_CHECKER EQUAL 0)
     add_executable(standalone_lrat_checker src/app/sat/proof/standalone_checker.cpp)
     target_include_directories(standalone_lrat_checker PRIVATE ${BASE_INCLUDES})
     target_compile_options(standalone_lrat_checker PRIVATE ${BASE_COMPILEFLAGS})
     target_link_libraries(standalone_lrat_checker mallob_corepluscomm)
 endif()
+
 
 # Add unit tests
 new_test(hashing "${BASE_INCLUDES}" mallob_sat_subproc)
