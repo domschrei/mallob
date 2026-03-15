@@ -11,7 +11,7 @@ if [ ! -f CMakeLists.txt ]; then
     fi
     echo "[iimpcheck] Extracting sources ..."
     unzip impcheck.zip
-    mv impcheck-*/* impcheck-*/.* ./
+    mv impcheck-*/* impcheck-*/.* ./ || :
     rmdir impcheck-*/
 else
     echo "[iimpcheck] Assuming sources are present"
