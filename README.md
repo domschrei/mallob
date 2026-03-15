@@ -18,7 +18,7 @@ Mallob is the first distributed system that supports _incremental SAT solving_, 
 
 Mallob uses MPI (Message Passing Interface) and is built using CMake.
 
-For a default build for full featured SAT solving, execute [`bash scripts/setup/cmake-make.sh build`](scripts/setup/build.sh).  
+For a default build for full featured SAT solving, execute [`bash scripts/setup/cmake-make.sh build`](scripts/setup/build.sh).
 For a complete build with MaxSAT and SMT solving features, execute `bash scripts/setup/cmake-make.sh build -DMALLOB_APP_{MAXSAT,SMT}=1`.
 
 [**Find detailed instructions at docs/setup.md.**](docs/setup.md)

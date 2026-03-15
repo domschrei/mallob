@@ -11,9 +11,8 @@ Some people have been developing and experimenting successfully with Mallob with
 * CMake ≥ 3.11.4
 * An MPI implementation including development files, e.g., Open MPI
 * GDB
-* [jemalloc](https://github.com/jemalloc/jemalloc)
-    * optional but recommended - available in common package repositories like `apt`
-    * If you use a non system level installation of jemalloc, you can use `-DMALLOB_JEMALLOC_DIR` (see below) to set the correct path.
+
+For a full list of system level dependencies, see the packages installed in [Mallob's Dockerfile](../docker/Dockerfile).
 
 ## General Build Instructions
 
