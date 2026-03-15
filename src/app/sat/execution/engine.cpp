@@ -12,9 +12,15 @@
 #include "util/sys/thread_pool.hpp"
 #include "util/sys/timer.hpp"
 #include "data/app_configuration.hpp"
+#if MALLOB_USE_CADICAL
 #include "../solvers/cadical.hpp"
+#endif
+#if MALLOB_USE_LINGELING
 #include "../solvers/lingeling.hpp"
+#endif
+#if MALLOB_USE_KISSAT
 #include "../solvers/kissat.hpp"
+#endif
 #include "app/sat/data/clause_histogram.hpp"
 #include "app/sat/data/definitions.hpp"
 #include "app/sat/data/sharing_statistics.hpp"

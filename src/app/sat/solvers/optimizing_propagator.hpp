@@ -103,7 +103,6 @@ public:
     delete[] ass_map;
   }
 
-#if MALLOB_USE_CADICAL
 
   int nb_solutions_found() const {return sol_cnt;}
 
@@ -145,6 +144,7 @@ public:
     return result;
   }
 
+#if MALLOB_USE_CADICAL
   void notify_assignment (const vector<int>& lits) override {
 
     // cerr << "Calling notify_assignment" << endl;
