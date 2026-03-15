@@ -18,38 +18,21 @@ Some people have been developing and experimenting successfully with Mallob with
 ## General Build Instructions
 
 Mallob is built using CMake.
-[`scripts/setup/build.sh`](../scripts/setup/build.sh) provides a default build script.
-We repeat its commands here:
+The default build command is `bash scripts/setup/cmake-make.sh build` (see [here](../scripts/setup/cmake-make.sh)), which fetches all dependencies in `lib/` and creates a build of Mallob in `build/`.
 
-```bash
-# Only needed if building with -DMALLOB_APP_SAT=1 (enabled by default).
-# For non-x86-64 architectures (ARM, POWER9, etc.), prepend `export DISABLE_FPU=1;`.
-scripts/setup/sat-setup.sh
+By default, the above call creates a build that includes the most common SAT solving functionalities of Mallob. You can append the following arguments to the call to customize your build:
 
-# Only needed if building with -DMALLOB_APP_MAXSAT=1 and -DMALLOB_APP_SMT=1, respectively.
-scripts/setup/maxsat-setup.sh
-scripts/setup/smt-setup.sh
-
-# Build Mallob. You can modify and/or append build options like -DMALLOB_APP_MAXSAT=1.
-# Find all build options at: docs/setup.md
-scripts/setup/cmake-make.sh build -DMALLOB_APP_MAXSAT=1 -DMALLOB_APP_SMT=1 -DMALLOB_APP_INCSAT=1 -DMALLOB_APP_SATWITHPRE=1 -DMALLOB_BUILD_LRAT_MODULES=1
-```
-
-In the main build call, you can use the following Mallob-specific build options:
-
-| Usage                                       | Description                                                                                                |
-| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| -DMALLOB_ASSERT=<0/1>                       | Turn on assertions (even on release builds). Setting to 0 limits assertions to debug builds.               |
-| -DMALLOB_JEMALLOC_DIR=path                  | If necessary, provide a path to a local installation of `jemalloc` where `libjemalloc.*` is located.       |
-| -DMALLOB_LOG_VERBOSITY=<0..6>               | Only compile logging messages of the provided maximum verbosity and discard more verbose log calls.        |
-| -DMALLOB_SUBPROC_DISPATCH_PATH=\\"path\\"   | Subprocess executables must be located under <path> for Mallob to find. (Use `\"build/\"` by default.)     |
-| -DMALLOB_USE_ASAN=<0/1>                     | Compile with Address Sanitizer for debugging purposes.                                                     |
-| -DMALLOB_USE_GLUCOSE=<0/1>                  | Compile with support for Glucose SAT solver (disabled by default for licensing reasons, see below).        |
-| -DMALLOB_USE_JEMALLOC=<0/1>                 | Compile with Scalable Memory Allocator `jemalloc` instead of default `malloc`.                             |
-| -DMALLOB_APP_*=<0/1>                        | Compile with the according application.                                                                    |
-| -DMALLOB_USE_MAXPRE=<0/1>                   | For MaxSAT: Include a library of the preprocessor MaxPRE (default=1)                                       |
-| -DMALLOB_MAX_N_APPTHREADS_PER_PROCESS=<N>   | Max. number of application threads (solver threads for SAT) per process to support. (max: 128)             |
-| -DMALLOB_BUILD_LRAT_MODULES=<0/1>           | Also build standalone LRAT checker                                                                         |
+* `-DMALLOB_APP_<app>` for `<app>` = DUMMY, SAT, INCSAT, KMEANS, MAXSAT, SMT, PALRUPCHECK, SATCNC, SATWITHPRE
+    - This includes or excludes specific application engines in/from your Mallob build. Some applications depend on each another (e.g., most depend on SAT) and the building script will raise an error if a dependency is not present.
+* `-DMALLOB_BUILD_<mod>` for `<mod>` = IMPCHECK, CHECKER
+    - Build certain standalone executables for use together with Mallob: IMPCHECK for the ImpCheck real-time proof checking suite (in two versions, incremental and verified) and CHECKER for a standalone efficient LRUP checker.
+* `-DMALLOB_USE_<dep>` for `<dep>` = ASAN, JEMALLOC, MINISAT, CADICAL, LINGELING, KISSAT, RUSTSAT, MAXPRE
+    - Include or exclude certain internal dependencies from linkage into Mallob. This concerns AdressSanitizer (ASAN) for debugging, JEMALLOC for more scalable memory allocation (enabled by default), and various SAT and MaxSAT backends (which are enabled by default for their respective application).
+* `-DMALLOB_MAX_N_APPTHREADS_PER_PROCESS=<t>` for `<t>` = 32, 64, (128)
+    - Setting this as low as possible allows the SAT solving process to save a little bit of memory for each clause.
+        - Note: Values beyond 64 are not recommended since too many solver threads per process might lead to performance issues; spawn more MPI processes with fewer solver threads instead. 
+* `-DMALLOB_LOG_VERBOSITY=<v>` for `<v>` = 0, ..., 6
+    - 0 means absolutely no logging except for critical output; 6 compiles _all_ logging calls into Mallob. Note that you still need to set the Mallob program option -v to an according value to actually see the respective log messages. The default level is 4.
 
 ## Testing
 
