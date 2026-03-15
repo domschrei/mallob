@@ -16,7 +16,7 @@ if(MALLOB_USE_MAXPRE EQUAL 0)
     add_definitions(-DMALLOB_USE_MAXPRE=0)
 else()
     add_definitions(-DMALLOB_USE_MAXPRE=1)
-    add_lib_dep("maxpre" lib/maxpre-mallob ./ maxpre "")
+    add_lib_dep("maxpre" lib/maxpre-mallob src/lib maxpre "")
     set(BASE_INCLUDES ${BASE_INCLUDES} lib/maxpre-mallob/src CACHE INTERNAL "")
 endif()
 

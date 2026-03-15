@@ -10,7 +10,7 @@ if [ ! -f configure.sh ]; then
     fi
     echo "[lingeling:yalsat] Extracting sources ..."
     unzip yalsat-03v.zip
-    mv yalsat-*/* yalsat-*/.* ./
+    mv yalsat-*/* ./
     rmdir yalsat-*/
 
     for f in *.c *.h ; do

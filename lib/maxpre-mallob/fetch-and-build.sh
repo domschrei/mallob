@@ -7,7 +7,7 @@ if [ ! -f Makefile ]; then
     if [ ! -f maxpre-mallob.zip ]; then
         # for fixing a branch instead of a commit, prepend "refs/heads/"
         branchorcommit="ccd759aab16dae3d8e74f021d0955d17c424ed38"
-        wget -nc https://github.com/jezberg/maxpre-mallob/archive/${branchorcommit}.zip -O maxpre-mallob.zip
+        curl -L -o maxpre-mallob.zip https://github.com/jezberg/maxpre-mallob/archive/${branchorcommit}.zip
     fi
     echo "[maxpre] Extracting sources ..."
     unzip maxpre-mallob.zip
