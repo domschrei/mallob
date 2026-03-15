@@ -5,10 +5,10 @@ disable_fpu=false
 
 if [ ! -f configure.sh ]; then
     if [ ! -f yalsat-*.zip ]; then
-        echo "Fetching solver sources ..."
+        echo "[lingeling:yalsat] Fetching sources ..."
         curl -L -o yalsat-03v.zip -C - http://fmv.jku.at/yalsat/yalsat-03v.zip
     fi
-    echo "Extracting solver sources ..."
+    echo "[lingeling:yalsat] Extracting sources ..."
     unzip yalsat-03v.zip
     mv yalsat-*/* yalsat-*/.* ./
     rmdir yalsat-*/
@@ -22,9 +22,9 @@ if [ ! -f configure.sh ]; then
     
     ./configure.sh
 else
-    echo "Assuming solver sources are present"
+    echo "[lingeling:yalsat] Assuming sources are present"
 fi
 
-echo "Building"
+echo "[lingeling:yalsat] Building ..."
 make
-echo "Solver built"
+echo "[lingeling:yalsat] Build complete"

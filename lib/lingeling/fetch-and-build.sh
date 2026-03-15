@@ -4,11 +4,11 @@ set -e
 
 if [ ! -f configure.sh ]; then
     if [ ! -f lingeling.zip ]; then
-        echo "Fetching solver sources ..."
+        echo "[lingeling] Fetching sources ..."
         branchorcommit="89a167d0d2efe98d983c87b5b84175b40ea55842" # version 1.0.0, March 2024
         curl -L -o lingeling.zip https://github.com/arminbiere/lingeling/archive/${branchorcommit}.zip
     fi
-    echo "Extracting solver sources ..."
+    echo "[lingeling] Extracting sources ..."
     unzip lingeling.zip
     mv lingeling-*/* lingeling-*/.* ./
     rmdir lingeling-*/
@@ -19,9 +19,9 @@ if [ ! -f configure.sh ]; then
 
     ./configure.sh
 else
-    echo "Assuming solver sources are present"
+    echo "[lingeling] Assuming sources are present"
 fi
 
-echo "Building"
+echo "[lingeling] Building ..."
 make
-echo "Solver built"
+echo "[lingeling] Build complete"
