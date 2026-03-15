@@ -76,7 +76,7 @@ public:
     virtual const char* get_name() const override {return "MallobSat-internal";}
     virtual const char* get_version() const override {return "N/A";}
 
-    virtual void add(int32_t lit) override {
+    virtual void add(int32_t lit, int64_t cgroup_id = 0) override {
         _in_solved_state = false;
         _lits.push_back(lit);
         _nb_vars = std::max(_nb_vars, std::abs(lit));

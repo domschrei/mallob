@@ -7,7 +7,7 @@ if [ ! -f configure.py ]; then
 
     if [ ! -f bitwuzla.zip ]; then
         # for fixing a branch instead of a commit, prepend "refs/heads/"
-        branchorcommit="2b685c820e04dbb88edcd33349a5099c0fb24c75" # external-sat-solver-on-main branch, updated 2026-02-04
+        branchorcommit="1177124ddc7e6ea9ce7eaf464da199d141146f04" # main branch, updated 2026-03-15
         wget -nc https://github.com/bitwuzla/bitwuzla/archive/${branchorcommit}.zip -O bitwuzla.zip
     fi
     echo "[bitwuzla] Extracting sources ..."
