@@ -29,20 +29,23 @@ namespace app_registry {
     typedef std::function<nlohmann::json(const Parameters&, const JobResult&, const JobProcessingStatistics&)> JobSolutionFormatter;
     typedef std::function<void(const Parameters&)> ResourceCleaner;
 
-    void registerApplication(const std::string& key,
-        JobReader reader, 
-        JobCreator creator, 
-        JobSolutionFormatter resultPrinter,
-        ResourceCleaner cleaner = [](const Parameters&) {},
-        std::optional<JobEpilog> epilog = {},
-        std::optional<JobResultTransformer> jobResultTransformer = [](const Parameters&, JobResult&) {}
-    );
-    void registerClientSideApplication(const std::string& key,
-        JobReader reader,
-        ClientSideProgramCreator programCreator,
-        JobSolutionFormatter solutionFormatter,
-        ResourceCleaner cleaner = [](const Parameters&) {}
-    );
+    struct AppEntry {
+        std::string key;
+        // Can remain empty. If not empty, end with "\n".
+        // In case of multi-line content, use "\nc " for each new line.
+        std::string copyrightInformation;
+        enum Type {DISTRIBUTED, CLIENT_SIDE} type;
+
+        JobReader reader;
+        JobCreator creator;
+        ClientSideProgramCreator clientSideProgramCreator;
+        JobSolutionFormatter solutionFormatter;
+        ResourceCleaner cleaner = [](const Parameters&) {};
+        std::optional<JobEpilog> epilog;
+        std::optional<JobResultTransformer> jobResultTransformer;
+    };
+
+    void registerApplication(const AppEntry& appEntry);
 
     int getAppId(const std::string& key);
     const std::string& getAppKey(int appId);
@@ -55,6 +58,7 @@ namespace app_registry {
     std::optional<JobResultTransformer> getJobResultTransformer(int appId);
     std::optional<JobEpilog> getJobEpilog(int appId);
     std::vector<ResourceCleaner> getCleaners();
+    std::string getCombinedCopyrightInformation();
 
     void overrideProgramOptions(Parameters& params, JobDescription& desc);
 }

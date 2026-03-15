@@ -174,6 +174,18 @@ void longStartupWarnMsg(int rank, const char* msg) {
         std::cout << Timer::elapsedSeconds() << " " << rank << " " << std::string(msg) << std::endl;
 }
 
+void printBanner() {
+    // Output program banner (only the PE of rank zero)
+    LOG_OMIT_PREFIX(V2_INFO, "c \nc Mallob - Malleable Load Balancer - Massively Parallel Logic Backend\n"
+        "c \nc Core system:\n"
+        "c (C) 2018-2026 Dominik Schreiber, Karlsruhe Institute of Technology\n"
+        "c (C) 2025-2026 Niccolò Rigi-Luperti, Karlsruhe Institute of Technology\n");
+    auto copyrightInfo = app_registry::getCombinedCopyrightInformation();
+    if (!copyrightInfo.empty()) {
+        LOG_OMIT_PREFIX(V2_INFO, "%s", copyrightInfo.c_str());
+    }
+}
+
 int main(int argc, char *argv[]) {
     
     MyMpi::init();
@@ -187,9 +199,12 @@ int main(int argc, char *argv[]) {
 
     longStartupWarnMsg(rank, "Init'd MPI");
 
+    // Register all applications which were compiled into Mallob
+    #include "app/.register_commands.h"
+
     Parameters params;
     params.init(argc, argv);
-    if (rank == 0 && !params.quiet()) params.printBanner();
+    if (rank == 0 && !params.quiet()) printBanner();
 
     longStartupWarnMsg(rank, "Init'd params");
 
@@ -218,9 +233,6 @@ int main(int argc, char *argv[]) {
     MyMpi::setOptions(params);
 
     longStartupWarnMsg(rank, "Init'd message queue");
-
-    // Register all applications which were compiled into Mallob
-    #include "app/.register_commands.h"
 
     if (rank == 0)
         LOG(V2_INFO, "Program options: %s\n", params.getParamsAsString().c_str());

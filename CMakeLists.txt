@@ -103,6 +103,7 @@ endif()
 # Base source files
 
 set(MALLOB_CORE_SOURCES
+    src/app/app_registry.cpp
     src/data/app_configuration.cpp src/data/job_description.cpp src/data/job_result.cpp src/interface/json_interface.cpp
     src/interface/api/api_connector.cpp src/interface/api/api_registry.cpp src/scheduling/core_allocator.cpp
     src/util/logger.cpp src/util/option.cpp src/util/params.cpp src/util/permutation.cpp 

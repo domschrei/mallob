@@ -14,18 +14,6 @@ namespace app_registry {
 
     // Anonymous / private namespace for implementation stuff
     namespace {
-        struct AppEntry {
-            std::string key;
-            JobReader reader;
-            bool isClientSide {false};
-            JobCreator creator;
-            ClientSideProgramCreator clientSideProgramCreator;
-            JobSolutionFormatter solutionFormatter;
-            ResourceCleaner cleaner;
-            std::optional<JobEpilog> epilog;
-            std::optional<JobResultTransformer> jobResultTransformer;
-        };
-
         std::vector<AppEntry> _app_entries;
         tsl::robin_map<std::string, int> _app_key_to_app_id;
     }
@@ -35,46 +23,12 @@ namespace app_registry {
     // reader: a lambda which reads a number of description files into a JobDescription object.
     // creator: a lambda which returns a new instance of a particular subclass of Job.
     // solutionFormatter: a lambda which transforms a found job result into 
-    void registerApplication(const std::string& key,
-        JobReader reader, 
-        JobCreator creator,
-        JobSolutionFormatter solutionFormatter,
-        ResourceCleaner cleaner,
-        std::optional<JobEpilog> epilog,
-        std::optional<JobResultTransformer> jobResultTransformer
-    ) {
+    void registerApplication(const AppEntry& entry) {
+
         int appId = _app_entries.size();
-        _app_key_to_app_id[key] = appId;
+        _app_key_to_app_id[entry.key] = appId;
         //std::cout << "Registered application id=" << appId << " key=" << key << std::endl;
 
-        AppEntry entry;
-        entry.key = key;
-        entry.reader = reader;
-        entry.creator = creator;
-        entry.solutionFormatter = solutionFormatter;
-        entry.epilog = epilog;
-        entry.jobResultTransformer = jobResultTransformer;
-        entry.cleaner = cleaner;
-        _app_entries.push_back(std::move(entry));
-    }
-
-    void registerClientSideApplication(const std::string& key,
-        JobReader reader,
-        ClientSideProgramCreator programCreator,
-        JobSolutionFormatter solutionFormatter,
-        ResourceCleaner cleaner
-    ) {
-        int appId = _app_entries.size();
-        _app_key_to_app_id[key] = appId;
-        //std::cout << "Registered application id=" << appId << " key=" << key << std::endl;
-
-        AppEntry entry;
-        entry.key = key;
-        entry.reader = reader;
-        entry.isClientSide = true;
-        entry.clientSideProgramCreator = programCreator;
-        entry.solutionFormatter = solutionFormatter;
-        entry.cleaner = cleaner;
         _app_entries.push_back(std::move(entry));
     }
 
@@ -103,7 +57,7 @@ namespace app_registry {
 
     bool isClientSide(int appId) {
         getAppKey(appId); // check existence
-        return _app_entries.at(appId).isClientSide;
+        return _app_entries.at(appId).type == AppEntry::CLIENT_SIDE;
     }
     JobCreator getJobCreator(int appId) {
         getAppKey(appId); // check existence
@@ -126,6 +80,15 @@ namespace app_registry {
         std::vector<ResourceCleaner> cleaners;
         for (auto& entry : _app_entries) cleaners.push_back(entry.cleaner);
         return cleaners;
+    }
+
+    std::string getCombinedCopyrightInformation() {
+        std::string out;
+        for (auto& entry : _app_entries) if (!entry.copyrightInformation.empty()) {
+            out += "c \nc Application module " + entry.key + ": " + entry.copyrightInformation;
+        }
+        out += "c \n";
+        return out;
     }
 
     void overrideProgramOptions(Parameters& params, JobDescription& desc) {

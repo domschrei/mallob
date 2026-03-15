@@ -11,12 +11,13 @@
 #include <vector>
 
 #include "params.hpp"
+#include "app/app_registry.hpp"
 #include "logger.hpp"
 #include "comm/sysstate.hpp"
 #include "util/option.hpp"
 #include "util/robin_hood.hpp"
 
-const char* BANNER = "\nMallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving\nCopyright (C) 2019-2025 Dominik Schreiber, Karlsruhe Institute of Technology, Germany\n";
+const char* BANNER = "\nMallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving\nCopyright (C) 2019-2026 Dominik Schreiber, Karlsruhe Institute of Technology, Germany\n";
 const char* BANNER_C_PREFIXED = "c \nc Mallob -- a parallel and distributed platform for job scheduling, load balancing, and SAT solving\nc Copyright (C) 2019-2025 Dominik Schreiber, Karlsruhe Institute of Technology, Germany\nc ";
 const char* USAGE = "Usage: [mpiexec -np <num-mpi-processes> [mpi-options]] mallob [options]\n";
 
@@ -93,11 +94,6 @@ void Parameters::expand() {
         //numClients.set(1); // 1 client
         useFilesystemInterface.set(false); // no fs interface
     }
-}
-
-void Parameters::printBanner() const {
-    // Output program banner (only the PE of rank zero)
-    LOG_OMIT_PREFIX(V2_INFO, "%s\n", monoFilename.isSet() ? BANNER_C_PREFIXED : BANNER);
 }
 
 void Parameters::printUsage() const {
