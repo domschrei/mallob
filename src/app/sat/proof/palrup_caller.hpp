@@ -48,7 +48,7 @@ public:
             return ERROR;
         }
 
-        std::string palRupCall = "cd palrup;"
+        std::string palRupCall = "cd lib/palrup;"
             " NUM_SOLVERS=" + std::to_string(nbSolvers)
             + " NUM_NODES=" + std::to_string(nbHosts)
             + " NUM_PROCS_PER_NODE=" + std::to_string(nbProcsPerHost)
