@@ -122,6 +122,33 @@ function(new_test testname includes linklibs)
 endfunction()
 
 
+
+# Function to add a solver backend to Mallob's core (and hence also the SAT subprocess)
+function(add_lib_dep depname basedir libdir libname sources)
+    message("Registering dependency ${depname}")
+
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${basedir}/${libdir}/lib${libname}.a
+        COMMAND bash fetch-and-build.sh
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${basedir}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${basedir}
+        COMMENT "Building dependency ${depname}"
+    )
+    add_custom_target(dep_${depname} DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${basedir}/${libdir}/lib${libname}.a)
+    set(MALLOB_CORE_DEPS ${MALLOB_CORE_DEPS} dep_${depname} CACHE INTERNAL "")
+
+    set(BASE_LINK_DIRS ${BASE_LINK_DIRS} ${basedir}/${libdir} CACHE INTERNAL "")
+    set(MALLOB_CORE_SOURCES ${MALLOB_CORE_SOURCES} ${sources} CACHE INTERNAL "")
+    #set(SAT_SUBPROC_SOURCES ${SAT_SUBPROC_SOURCES} ${sources} CACHE INTERNAL "")
+    set(BASE_LIBS ${BASE_LIBS} ${libname} CACHE INTERNAL "")
+    set(BASE_INCLUDES ${BASE_INCLUDES} ${basedir} CACHE INTERNAL "")
+
+    string(TOUPPER ${depname} depallcaps)
+    add_definitions(-DMALLOB_USE_${depallcaps})
+endfunction()
+
+
+
 # Add application-specific build configuration
 
 # Setup (do not change)
@@ -192,7 +219,9 @@ target_include_directories(mallob_core PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob_core PRIVATE ${BASE_COMPILEFLAGS})
 target_link_libraries(mallob_core ${BASE_LIBS})
 target_link_directories(mallob_core PUBLIC ${BASE_LINK_DIRS})
-
+if (DEFINED MALLOB_CORE_DEPS)
+    add_dependencies(mallob_core ${MALLOB_CORE_DEPS})
+endif()
 
 # Library of Mallob's CORE+COMM sources
 

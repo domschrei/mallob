@@ -338,18 +338,23 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSetup& setup) {
 	std::shared_ptr<PortfolioSolverInterface> solver;
 	switch (setup.solverType) {
+#if MALLOB_USE_LINGELING
 	case 'l':
 	case 'L':
 		// Lingeling
 		LOGGER(_logger, V4_VVER, "S%i : Lingeling-%i\n", setup.globalId, setup.diversificationIndex);
 		solver.reset(new Lingeling(setup));
 		break;
+#endif
+#if MALLOB_USE_CADICAL
 	case 'c':
 	case 'C':
 		// Cadical
 		LOGGER(_logger, V4_VVER, "S%i : Cadical-%i\n", setup.globalId, setup.diversificationIndex);
 		solver.reset(new Cadical(setup));
 		break;
+#endif
+#if MALLOB_USE_KISSAT
 	case 'k':
 	case 'v': // variable addition via Kissat
 	case 'p': // preprocessing via Kissat
@@ -360,6 +365,7 @@ std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSe
 			setup.diversificationIndex);
 		solver.reset(new Kissat(setup));
 		break;
+#endif
 #ifdef MALLOB_USE_MERGESAT
 	case 'm':
 	//case 'M': // no support for incremental mode as of now

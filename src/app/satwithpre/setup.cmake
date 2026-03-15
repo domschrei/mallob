@@ -1,4 +1,7 @@
 
+add_custom_target(app_satwithpre ALL)
+add_dependencies(app_satwithpre app_sat)
+
 # Add MaxSAT-specific sources to main Mallob executable
 set(SATWITHPRE_MALLOB_SOURCES src/app/sat/solvers/kissat.cpp src/app/sat/solvers/lingeling.cpp src/app/sat/solvers/portfolio_solver_interface.cpp)
 set(MALLOB_COREPLUSCOMM_SOURCES ${MALLOB_COREPLUSCOMM_SOURCES} ${SATWITHPRE_MALLOB_SOURCES} CACHE INTERNAL "")
