@@ -9,7 +9,29 @@ find_package(Threads REQUIRED)
 set(CMAKE_CXX_STANDARD 17)
 
 
+# Function to add a library dependency to Mallob's core
+function(add_lib_dep depname basedir libdir libname sources)
+    message("* Registering dependency ${depname}")
 
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${basedir}/${libdir}/lib${libname}.a
+        COMMAND bash fetch-and-build.sh
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${basedir}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${basedir}
+        COMMENT "Building dependency ${depname}"
+    )
+    add_custom_target(dep_${depname} DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${basedir}/${libdir}/lib${libname}.a)
+    set(MALLOB_CORE_DEPS ${MALLOB_CORE_DEPS} dep_${depname} CACHE INTERNAL "")
+
+    set(BASE_LINK_DIRS ${BASE_LINK_DIRS} ${basedir}/${libdir} CACHE INTERNAL "")
+    set(MALLOB_CORE_SOURCES ${MALLOB_CORE_SOURCES} ${sources} CACHE INTERNAL "")
+    #set(SAT_SUBPROC_SOURCES ${SAT_SUBPROC_SOURCES} ${sources} CACHE INTERNAL "")
+    set(BASE_LIBS ${BASE_LIBS} ${libname} CACHE INTERNAL "")
+    set(BASE_INCLUDES ${BASE_INCLUDES} ${basedir} CACHE INTERNAL "")
+
+    string(TOUPPER ${depname} depallcaps)
+    add_definitions(-DMALLOB_USE_${depallcaps}=1)
+endfunction()
 
 
 #Testing if march=native helps, but at least in quick laptop test, no, no change
@@ -17,7 +39,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 # Build-specific compile options
 
-set(BASE_LIBS Threads::Threads)
+set(BASE_LIBS Threads::Threads CACHE INTERNAL "")
 set(MY_DEBUG_OPTIONS "-rdynamic -g -ggdb -Wall -Wno-sign-compare -Wno-unused-variable")
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
@@ -48,25 +70,9 @@ if(MALLOB_SUBPROC_DISPATCH_PATH)
     add_definitions(-DMALLOB_SUBPROC_DISPATCH_PATH=${MALLOB_SUBPROC_DISPATCH_PATH})
 endif()
 
-if(DEFINED MALLOB_TRUSTED_SUBPROCESSING)
-    add_definitions(-DMALLOB_TRUSTED_SUBPROCESSING=${MALLOB_TRUSTED_SUBPROCESSING})
-endif()
-
 if(MALLOB_USE_ASAN)
     set(MY_DEBUG_OPTIONS "${MY_DEBUG_OPTIONS} -fno-omit-frame-pointer -fsanitize=address,leak,undefined -static-libasan") 
 endif()
-
-if(MALLOB_USE_TBBMALLOC)
-    set(BASE_LIBS tbbmalloc_proxy ${BASE_LIBS})
-endif()
-
-if(MALLOB_USE_JEMALLOC)
-    if(MALLOB_JEMALLOC_DIR)
-        link_directories(${MALLOB_JEMALLOC_DIR})
-    endif()
-    set(BASE_LIBS jemalloc ${BASE_LIBS})
-endif()
-
 
 
 # Libraries and includes
@@ -79,6 +85,19 @@ set(BASE_INCLUDES src src/util/tsl lib
     CACHE INTERNAL "")
 set(BASE_COMPILEFLAGS CACHE INTERNAL "")
 set(MALLOB_CORE_DEPS CACHE INTERNAL "")
+
+
+# Include jemalloc (enabled by default)
+if(NOT MALLOB_USE_JEMALLOC EQUAL 0)
+    if(MALLOB_JEMALLOC_DIR)
+        # Explicit directory provided - just link to it assuming it exists
+        link_directories(${MALLOB_JEMALLOC_DIR} CACHE INTERNAL "")
+        set(BASE_LIBS jemalloc ${BASE_LIBS} CACHE INTERNAL "")
+    else()
+        # No directory provided - fetch and build in lib/ directory
+        add_lib_dep("jemalloc" lib/jemalloc lib/ jemalloc "")
+    endif()
+endif()
 
 
 # Base source files
@@ -116,30 +135,6 @@ function(new_test testname includes linklibs)
         target_link_libraries(test_${testname} ${linklib})
     endforeach()
     add_test(NAME test_${testname} COMMAND test_${testname})
-endfunction()
-
-# Function to add a library dependency to Mallob's core
-function(add_lib_dep depname basedir libdir libname sources)
-    message("* Registering dependency ${depname}")
-
-    add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${basedir}/${libdir}/lib${libname}.a
-        COMMAND bash fetch-and-build.sh
-        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${basedir}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${basedir}
-        COMMENT "Building dependency ${depname}"
-    )
-    add_custom_target(dep_${depname} DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${basedir}/${libdir}/lib${libname}.a)
-    set(MALLOB_CORE_DEPS ${MALLOB_CORE_DEPS} dep_${depname} CACHE INTERNAL "")
-
-    set(BASE_LINK_DIRS ${BASE_LINK_DIRS} ${basedir}/${libdir} CACHE INTERNAL "")
-    set(MALLOB_CORE_SOURCES ${MALLOB_CORE_SOURCES} ${sources} CACHE INTERNAL "")
-    #set(SAT_SUBPROC_SOURCES ${SAT_SUBPROC_SOURCES} ${sources} CACHE INTERNAL "")
-    set(BASE_LIBS ${BASE_LIBS} ${libname} CACHE INTERNAL "")
-    set(BASE_INCLUDES ${BASE_INCLUDES} ${basedir} CACHE INTERNAL "")
-
-    string(TOUPPER ${depname} depallcaps)
-    add_definitions(-DMALLOB_USE_${depallcaps}=1)
 endfunction()
 
 
@@ -198,7 +193,7 @@ endif()
 if(MALLOB_APP_KMEANS EQUAL 1)
     register_mallob_app("kmeans")
 endif()
-# Include further applications here!
+# Include further applications here, above publish_app_registry_changes()
 publish_app_registry_changes()
 
 
