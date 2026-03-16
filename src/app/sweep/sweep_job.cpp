@@ -1209,7 +1209,7 @@ void SweepJob::cbContributeToAllReduce() {
 
 
 	if (_red && _red->hasResult()) {
-		// LOG(V1_WARN, ">>>> WARN SWEEP [%i] RED SHARE RESET: We are about to reset _red while it still has a valid result! <<<<< \n", _my_rank);
+		LOG(V1_WARN, ">>>> Warn SWEEP [%i] RED SHARE RESET: Noticing results from current _reduction just now in callback from new broadcast\n", _my_rank);
 		extractAllReductionResult();
 	}
 
@@ -1639,7 +1639,7 @@ SweepJob::~SweepJob() {
 		LOG(V1_WARN, "SWEEP [%i] Warn : rank was terminated while synchronizing \n", _my_rank);
 	}
 	if (!_terminated_while_synchronizing && (_lastClearedRound + 2 < _lastImportedRound)) {
-		LOG(V1_WARN, "SWEEP [%i] WARN : didn't clear all imported rounds! lastCleared %i, lastImported %i \n", _my_rank, _lastClearedRound, _lastImportedRound.load());
+		LOG(V1_WARN, "SWEEP [%i] WARN : didn't clear all imported rounds. lastCleared %i, lastImported %i \n", _my_rank, _lastClearedRound, _lastImportedRound.load());
 	}
 	if (_lastImportedRound==0) {
 		LOG(V1_WARN, "SWEEP [%i] WARN : rank didn't receive a single sharing round! \n", _my_rank);
