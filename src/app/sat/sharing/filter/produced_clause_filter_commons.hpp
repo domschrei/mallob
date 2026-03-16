@@ -17,6 +17,11 @@ typedef uint32_t cls_producers_bitset;
 #elif MALLOB_MAX_N_APPTHREADS_PER_PROCESS <= 64
 typedef uint64_t cls_producers_bitset;
 #elif MALLOB_MAX_N_APPTHREADS_PER_PROCESS <= 128
+#ifdef __GNUC__
+#ifndef __clang__
+typedef unsigned __int128 uint128_t;
+#endif
+#endif
 typedef uint128_t cls_producers_bitset;
 #endif
 
