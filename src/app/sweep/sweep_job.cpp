@@ -715,16 +715,16 @@ void SweepJob::checkSharingDelay() {
 }
 
 bool SweepJob::okToTrackSharingDelay() {
-	return true; //with always advance it should no longer be an issue to also immediately track any sharings...
+	return true; //with always advance it should now no longer be an issue to immediately track any sharings...
 
 	//we would get false positives if we already start timing when the solvers haven't even started yet
-	if (!_started_synchronized_solving)
-		return false;
+	// if (!_started_synchronized_solving)
+		// return false;
 	//we also would get false positive if the solvers have technically started, but haven't received any initial work yet
 	//this second consideration only works at the root node, the other nodes don't have such a live update whether the work for this iteration has been provided yet
-	if (_is_root && !_root_provided_initial_work)
-		return false;
-	return true;
+	// if (_is_root && !_root_provided_initial_work)
+		// return false;
+	// return true;
 }
 
 void SweepJob::printResweeps() {
@@ -1029,6 +1029,7 @@ void SweepJob::provideInitialWork(KissatPtr sweeper) {
 	const unsigned VARS = shweep_get_num_vars(sweeper->solver); //this value can be different from numVars here in C++ !! Because kissat might havel aready propagated some units, etc.
 	LOG(V2_INFO, "SWEEP WORK PROVIDING --------------%u---------------- \n", VARS);
 	sweeper->work_received_from_steal = std::vector<int>(VARS);
+	_root_started_providing_initial_work = true;
 	//the initial work is all variables
 	for (int idx = 0; idx < VARS; idx++) {
 		sweeper->work_received_from_steal[idx] = idx;
@@ -1140,6 +1141,14 @@ void SweepJob::rootStartNewSharingRound() {
 		return;
 	}
 
+	if (!_root_started_providing_initial_work) {
+		LOG(V3_VERB, "SWEEP root: Wait with next round, didn't start to provide new initial work yet\n");
+		return;
+		//Why this specific flag:
+		//1. If we dont have it, then it can happen that we aggregate an ALL_IDLE state because aggregation happens JUST before we start to provide work to the root solver for the next iteration
+		//	This continued all_idle state would then be wrongly interpreted by the root node as if all work was done, and it terminates the job
+		//2. If we wait until work is fully provided, then for very large instances we can have delays of up to multiple seconds. This will prevent a new round from existing for multiple seconds, which will trigger Delay warnings in all ranks.
+	}
 	// if (! _root_provided_initial_work.load(std::memory_order_relaxed)) {
 		// LOG(V3_VERB, "SWEEP root: Wait next round, initial work not provided yet\n");
 		// return;
@@ -1487,7 +1496,8 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	appendMetadataToReductionElement(aggregated, all_idle, aggr_unit_size, aggr_eq_size);
 
 	// if (contribs.size()>1)
-		// LOG(V3_VERB, "SWEEP RED aggr %i contribs: %i EQ, %i UNITS, %i ALL_IDLE\n", contribs.size(), aggr_eq_size/2, aggr_unit_size, all_idle);
+	LOG(V4_VVER, "SWEEP RED aggregated %i contributions: E %i, U %i, (%i)allidle\n", contribs.size(), aggr_eq_size/2, aggr_unit_size, all_idle);
+
 	int individual_sum =  aggr_eq_size + aggr_unit_size + NUM_METADATA_FIELDS;
 	assert(total_aggregated_size == individual_sum ||
 		log_return_false("SWEEP ERROR: aggregated element assert failed: total_size %i != %i individual_sum (total_eq_size %i + total_unit_size %i + metadata %i) ",
