@@ -265,7 +265,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.numVars = numVars;
 	setup.numOriginalClauses = numClauses;
 	int sqrt = std::ceil(std::sqrt((double) setup.maxNumSolvers));
-	setup.proofDir = proofDirectory + "/" + (_params.palRup() ? std::to_string(sqrt) + "/" : "");
+	setup.proofDir = proofDirectory;
 
 	LratConnector* modelCheckingLratConnector {nullptr};
 	setup.nbSkippedIdEpochs = std::max(0, epochOffset + epochModulus * config.nbPreviousBalancingEpochs);
@@ -282,7 +282,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	// Pre-create PalRUP proof directories for *all* solver IDs, including cancelled ones.
 	if (params.palRup()) for (setup.localId = 0; setup.localId < numOrigSolvers; setup.localId++) {
 		setup.globalId = appRank * numOrigSolvers + setup.localId;
-		auto dir = setup.proofDir + "/" + std::to_string(setup.globalId);
+		int sqrt = std::ceil(std::sqrt((double) setup.maxNumSolvers));
+		auto dir = proofDirectory + "/" + std::to_string((int)(setup.globalId / sqrt)) + "/" + std::to_string(setup.globalId);
 		LOG(V2_INFO, "MKDIR %s\n", dir.c_str());
 		FileUtils::mkdir(dir);
 	}
@@ -732,10 +733,13 @@ void SatEngine::cleanUp(bool hardTermination) {
 	if (hardTermination) {
 		if (_params.proofOutputFile.isSet()) writeClauseEpochs();
 		// Create (empty) proof files where none were created
-		if (_params.palRup()) for (int localId = 0; localId < _params.numThreadsPerProcess(); localId++) {
-			int globalId = _config.apprank * _params.numThreadsPerProcess() + localId;
-			auto dir = setup.proofDir + "/../" + std::to_string(globalId);
-			FileUtils::create(dir + "/out.palrup");
+		if (_params.palRup()) {
+			int sqrt = std::ceil(std::sqrt((double) setup.maxNumSolvers));
+			for (int localId = 0; localId < _params.numThreadsPerProcess(); localId++) {
+				int globalId = _config.apprank * _params.numThreadsPerProcess() + localId;
+				auto dir = setup.proofDir + "/" + std::to_string((int)(globalId / sqrt)) + "/" + std::to_string(globalId);
+				FileUtils::create(dir + "/out.palrup");
+			}
 		}
 		LOGGER(_logger, V4_VVER, "[engine-cleanup] done - hard exit pending\n");
 		return;

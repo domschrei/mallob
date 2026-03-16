@@ -103,11 +103,11 @@ Cadical::Cadical(const SolverSetup& setup)
 		} else if (_setup.usePalRupFormat) {
 			// Production of parallel (PalRUP) files: Initialize tracer that outputs to a file.
 			// Clause export for sharing is separate, set up in setLearnedClauseCallback.
-			_setup.proofDir += "/" + std::to_string(_setup.globalId);
 			okay = solver->set("lratpalrup", 1); // enable PalRUP proof output
 			okay = solver->set("binary", _setup.outputBinaryPalRup ? 1 : 0); assert(okay); // set proof logging mode to binary format
 			okay = solver->set("lratdeletelines", 1); assert(okay); // do enable printing deletion lines
-			proofFileString = _setup.proofDir + "/out.palrup~";
+			int sqrt = std::ceil(std::sqrt((double) maxNumSolvers));
+			proofFileString = _setup.proofDir + "/" + std::to_string((int)(solverRank / sqrt)) + "/" + std::to_string(_setup.globalId) + "/out.palrup~";
 			LOG(V2_INFO, "CADICAL PROOF DIR %s\n", proofFileString.c_str());
 			okay = solver->trace_proof(proofFileString.c_str()); assert(okay);
 		} else {
@@ -334,8 +334,9 @@ void Cadical::cleanUp() {
 		solver->close_proof_asynchronously ();
 		if (_setup.usePalRupFormat) {
 			// Finalize the proof fragment by moving temporary to final file
-			std::string proofFileStringOld = _setup.proofDir + "/out.palrup~";
-			std::string proofFileStringNew = _setup.proofDir + "/out.palrup";
+			int sqrt = std::ceil(std::sqrt((double) _setup.maxNumSolvers));
+			std::string proofFileStringOld = _setup.proofDir + "/" + std::to_string((int)(_setup.globalId / sqrt)) + "/" + std::to_string(_setup.globalId) + "/out.palrup~";
+			std::string proofFileStringNew = _setup.proofDir + "/" + std::to_string((int)(_setup.globalId / sqrt)) + "/" + std::to_string(_setup.globalId) + "/out.palrup";
 			::rename(proofFileStringOld.c_str(), proofFileStringNew.c_str());
 		}
 	}
