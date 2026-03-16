@@ -69,6 +69,8 @@ private:
     bool _valid = true;
     bool _broadcast_enabled = true;
 
+    std::function<void()> _cb;
+
     bool _parent_is_ready = true;
     bool _care_about_parent_status = false;
 
@@ -173,6 +175,10 @@ public:
         return _tree;
     }
 
+    void setResultCallback(std::function<void()> callback = []() {}) {
+        _cb = callback;
+    }
+
 private:
     // Process an incoming message and advance the all-reduction accordingly.
     bool receive(int source, int tag, JobMessage& msg) {
@@ -189,7 +195,7 @@ private:
 
         if (msg.returnedToSender) {
             _returnToSender_counter++;
-            LOG(V1_WARN, " Warn RED REDUCE : got %i-th returnedToSender (source %i, tag %i, msg.tag %i, msg.size %i)\n", _returnToSender_counter, source, tag, msg.tag, msg.payload.size());
+            LOG(V1_WARN, " Warn RED REDUCE : got %i. returnedToSender (source %i, tag %i, msg.tag %i, msg.size %i)\n", _returnToSender_counter, source, tag, msg.tag, msg.payload.size());
             _returnToSender_payload = std::move(msg.payload);
             _have_unanswered_returnToSender = true;
             return true;
@@ -256,7 +262,7 @@ public:
 
         //We resolve this problem by remembering a returnToSender error at the child, and retrying to sending it again
         if (_have_unanswered_returnToSender) {
-            LOG(V1_WARN, "WARN RED : sending %i-th fixing message to parent after returnedToSender \n", _returnToSender_counter);
+            LOG(V1_WARN, "Warn RED : sending %i. fixing message to parent after returnedToSender \n", _returnToSender_counter);
             _base_msg.payload = std::move(_returnToSender_payload);
             _base_msg.treeIndexOfDestination = _parent_index;
             _base_msg.contextIdOfDestination = _parent_ctx_id;
@@ -312,7 +318,7 @@ public:
                 }
 
                 if (_broadcast_enabled) {// receive final elem and begin broadcast
-                    LOG(VERB_ALLRED, "SWEEP RED SHARE broadcasting result \n");
+                    LOG(VERB_ALLRED, "SWEEP RED SHARE start sharing result \n");
                     receiveAndForwardFinalElem(std::move(_aggregated_elem.value()));
                 } else { // only receive final elem
                     receiveFinalElem(std::move(_aggregated_elem.value()));
@@ -410,22 +416,26 @@ private:
     }
 
     void receiveAndForwardFinalElem(AllReduceElement&& elem) {
-        LOG(VERB_ALLRED, "SWEEP SHARE got final element (size %i) \n", elem.size());
+        LOG(VERB_ALLRED, "SWEEP [%i] SHARE <---%i--- recvd result \n", _tree.nodeRank, elem.size());
         receiveFinalElem(std::move(elem));
         if (_expected_child_ranks.first >= 0) {
             _base_msg.treeIndexOfDestination = _expected_child_indices.first;
             _base_msg.contextIdOfDestination = _expected_child_ctx_ids.first;
             assert(_base_msg.contextIdOfDestination != 0);
-            LOG(VERB_ALLRED, "SWEEP RED SHARE forward ---%i---> left [%i] \n", _base_msg.payload.size(), _expected_child_ranks.first);
+            LOG(VERB_ALLRED, "SWEEP [%i] RED SHARE forward ---%i---> [%i] left \n", _tree.nodeRank, _base_msg.payload.size(), _expected_child_ranks.first);
             MyMpi::isend(_expected_child_ranks.first, MSG_JOB_TREE_MODULAR_BROADCAST, _base_msg);
         }
         if (_expected_child_ranks.second >= 0) {
             _base_msg.treeIndexOfDestination = _expected_child_indices.second;
             _base_msg.contextIdOfDestination = _expected_child_ctx_ids.second;
             assert(_base_msg.contextIdOfDestination != 0);
-            LOG(VERB_ALLRED, "SWEEP RED SHARE forward ---%i---> right [%i] \n", _base_msg.payload.size(), _expected_child_ranks.second);
+            LOG(VERB_ALLRED, "SWEEP [%i] RED SHARE forward ---%i---> [%i] right  \n", _tree.nodeRank, _base_msg.payload.size(), _expected_child_ranks.second);
             MyMpi::isend(_expected_child_ranks.second, MSG_JOB_TREE_MODULAR_BROADCAST, _base_msg);
         }
+        // if (_cb) {
+            // LOG(VERB_ALLRED, "SWEEP RED SHARE callback n", _base_msg.payload.size(), _expected_child_ranks.second);
+            // _cb();
+        // }
     }
 
 };

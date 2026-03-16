@@ -52,7 +52,7 @@ struct JobTreeSnapshot {
         msg.contextIdOfSender = contextId;
         msg.treeIndexOfSender = index;
         assert(msg.contextIdOfDestination != 0
-            || log_return_false("Error in Brodcast! Want to send within tree but destination contextId is 0! "
+            || log_return_false("ERROR in Brodcast! Want to send within tree but destination contextId is 0! "
                                 "mpiTag %i, msgTag %i, senderIdx %i, destinationIdx %i , senderContextId %i, destRank %i, "
                                 "leftChildRank %i rightChildRank %i parentRank %i \n",
                 mpiTag, msg.tag, msg.treeIndexOfSender, msg.treeIndexOfDestination, contextId, dest, leftChildNodeRank, rightChildNodeRank, parentNodeRank));

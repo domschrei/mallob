@@ -127,9 +127,14 @@ void SweepJob::appl_communicate() {
 	if (_bcast && _is_root && !_terminate_all.load(std::memory_order_relaxed))
 		_bcast->updateJobTree(getJobTree());
 
-	advanceAllReduction(); //always advance
-	sendWorkstealsViaMPI();
+	//By having rootStartNewSharingRound() before advanceAllReduction(),
+	//we dont immediately start a new broadcast after a successful Allreduction extraction which resets the broadcast object
+	//this heavily reduces the occurrences of broadcasts in the lower ranks forcing an early extraction of their result because they need to create a new blank _red object
+	//at the cost of slightly less frequent sharing rounds. If we wanted maximum sharing frequency, a callback in the allreduction would probably be needed,
+	//which would force the extraction immediately after the results arrives in _red...
 	rootStartNewSharingRound();
+	advanceAllReduction();
+	sendWorkstealsViaMPI();
 
 	checkSharingDelay();
 	printIdleFraction();
@@ -1194,7 +1199,7 @@ void SweepJob::cbContributeToAllReduce() {
 	// LOG(V4_VVER, "SWEEP BCAST Callback to AllReduce\n");
 	auto snapshot = _bcast->getJobTreeSnapshot();
 
-	LOG(V4_VVER, "SWEEP [%i] BCAST complete, now spawning RED. (%i)children: (%i)[%i] , (%i)[%i]  \n",
+	LOG(V4_VVER, "SWEEP [%i] BCAST complete, callback creating RED & contributing (%i)children: (%i)[%i] , (%i)[%i]  \n",
 		_my_rank, snapshot.nbChildren, snapshot.leftChildIndex, snapshot.leftChildNodeRank, snapshot.rightChildIndex, snapshot.rightChildNodeRank);
 
 	if (! _is_root) {
@@ -1208,6 +1213,7 @@ void SweepJob::cbContributeToAllReduce() {
 		//	Only via getJobTree().. we get the most up-to-date tree, as updated in appl_communicate
 		//  Instead with our own snapshot object, we would just re-use the one from last round, i.e. re-use the one from the very first round and never get any updates in, and remain stuck tree-wise
 		_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
+		// if (getJobTree().getCommSize())
 		// _bcast.reset(new JobTreeBroadcast(getId(), snapshot, [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT)); <<-- remains stuck at the very initial tree snapshot !
 	}
 
@@ -1226,6 +1232,10 @@ void SweepJob::cbContributeToAllReduce() {
 	baseMsg.tag = TAG_ALLRED;
 	LOG(V4_VVER, "SWEEP [%i] RED SHARE RESET\n", _my_rank);
 	_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateEqUnitContributions));
+	// _red->setResultCallback([this]() {
+	  // extractAllReductionResult();
+	// });
+	// _red->setResultCallback(extractAllReductionResult());
 	if (_is_root)
 		_red->setInplaceTransformationOfElementAtRoot(_inplace_rootTransform);
 
@@ -1368,7 +1378,7 @@ void SweepJob::extractAllReductionResult() {
 	//Sweepers can increase the size of their sweeping environments in later sweep iterations (analog to kissats own increasing environments)
 	//We tell them the current iteration, so that they can adjust accordingly
 	//We might want to limit the environment increase, since this SweepApp arrives typically at higher iteration numbers than a sequential kissat run, and thus just ever increasing the environments might be too costly or inefficient
-	if (!_terminate_all.load(std::memory_order_relaxed) && sweep_iteration <= _params.sweepMaxGrowthIteration.val) {
+	if (_started_synchronized_solving.load(std::memory_order_relaxed) && !_terminate_all.load(std::memory_order_relaxed) && sweep_iteration <= _params.sweepMaxGrowthIteration.val) {
 		for (auto &sweeper : _sweepers) {
 			if (sweeper) {
 				shweep_set_sweep_iteration(sweeper->solver, sweep_iteration);

@@ -100,7 +100,7 @@ private:
         //received on MSG_JOB_TREE_MODULAR_BROADCAST mpiTag (via _sub_broadcast(...))
         JobMessage msg = Serializable::get<JobMessage>(h.getRecvData());
 
-        LOG(VERB_BCAST, "BCAST [%i] <-- [%i] \n", _tree.nodeRank, h.source);
+        LOG(VERB_BCAST, "BCAST [%i] <-- [%i] rcvd \n", _tree.nodeRank, h.source);
         // Right recipient?
         if (msg.jobId != _job_id) return false;
         if (_internal_msg_tag >= 0 && msg.tag != _internal_msg_tag) return false;
