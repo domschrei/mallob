@@ -5,6 +5,7 @@
 #include <set>
 #include <vector>
 
+#include "app/sat/proof/lrat_op.hpp"
 #include "portfolio_solver_interface.hpp"
 #include "app/sat/data/clause.hpp"
 #include "app/sat/data/definitions.hpp"
@@ -141,7 +142,11 @@ public:
 	void reconstructSolutionFromPreprocessing(std::vector<int>& model);
 
     friend void produce_clause(void* state, int size, int glue);
-    friend void consume_clause(void* state, int** clause, int* size, int* lbd);
+    // friend void consume_clause(void* state, int** clause, int* size, int* lbd);
+    friend void consume_clause(void* state, int** clause, int* size, int* lbd, unsigned long* id, unsigned char* sig);
+	friend void on_drup_derivation(void* state, const int* lits, int nbLits, int glue);
+    friend void on_lrup_import(void* state, unsigned long id, const int* lits, int nbLits, const uint8_t* sigData);
+    friend void on_drup_deletion(void* state, const int* lits, int nbLits);
 
 	friend void report_database_lit(void *state, int lit);
 
@@ -168,8 +173,9 @@ public:
 
 private:
     void produceClause(int size, int lbd);
-    void consumeClause(int** clause, int* size, int* lbd);
-
+    // void consumeClause(int** clause, int* size, int* lbd);
+	void consumeClause(int** clause, int* size, int* lbd, unsigned long* id, unsigned char* sig);
+	void processProofLine(LratOp&& op);
 
 	void sweepSetReportCallback();
     bool isPreprocessingAcceptable(int vars, int cls);
