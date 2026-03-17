@@ -144,7 +144,7 @@ void Client::readIncomingJobs() {
                 LOGGER(log, V3_VERB, "[T] Reading job #%i rev. %i %s ...\n", id, foundJob.description->getRevision(), filesList.c_str());
 
                 Parameters params(_params);
-                app_registry::overrideProgramOptions(params, *foundJob.description);
+                app_registry::checkAndOverrideProgramOptions(params, *foundJob.description);
                 bool success = app_registry::getJobReader(foundJob.description->getApplicationId())(
                     params, foundJob.files, *foundJob.description
                 );
@@ -171,7 +171,7 @@ void Client::readIncomingJobs() {
                         JobResult* res = &clientSideJob.result;
                         auto* desc = clientSideJob.desc.get();
                         Parameters params(_params);
-                        app_registry::overrideProgramOptions(params, *desc);
+                        app_registry::checkAndOverrideProgramOptions(params, *desc);
                         // store "original" arrival time value as the job's submission time
                         desc->getStatistics().timeOfSubmission = desc->getArrival();
                         desc->getStatistics().timeOfScheduling = Timer::elapsedSeconds();
@@ -664,7 +664,7 @@ void Client::handleSendJobResultInternal(JobResult&& jobResult) {
         _sys_state.addLocal(SYSSTATE_SUCCESSFUL_JOBS, 1);
     }
     Parameters params(_params);
-    app_registry::overrideProgramOptions(params, desc);
+    app_registry::checkAndOverrideProgramOptions(params, desc);
 
     std::string resultString = "s " + resultCodeString + "\n";
     std::vector<std::string> modelStrings;

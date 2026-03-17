@@ -12,6 +12,8 @@
 #include "parse/sat_reader.hpp"
 #include "robin_map.h"
 #include "util/logger.hpp"
+#include "util/option.hpp"
+#include "util/params.hpp"
 #include "util/static_store.hpp"
 #include "util/sys/thread_pool.hpp"
 #include <ios>
@@ -34,6 +36,41 @@ void register_mallob_app_sat() {
 #if MALLOB_USE_MINISAT
     entry.copyrightInformation += "c Featuring Minisat by Niklas Een and Niklas Sörensson\n";
 #endif
+
+    entry.optionChecker = [](const Parameters& params, auto& vec) {
+        if (params.numThreadsPerProcess() == 0) {
+            vec.push_back({&params.numThreadsPerProcess,
+                "Set the number of threads per process according to your hardware & MPI setup."
+            });
+        }
+
+        // Checks surrounding proof logging and checking
+        if (params.proofOutputFile.isSet() && params.palRup()) {
+            vec.push_back({&params.proofOutputFile,
+                "Monolithic proof production is mutually exclusive with PalRUP proof logging (-palrup)."
+            });
+        }
+        if ((params.proofOutputFile.isSet() || params.palRup()) && !params.monoFilename.isSet()) {
+            vec.push_back({params.proofOutputFile.isSet() ? (Option*) &params.proofOutputFile : (Option*) &params.palRup,
+                "Mallob was launched with certified UNSAT support, which only supports the -mono mode of operation."
+            });
+        }
+        if ((params.proofOutputFile.isSet() || params.palRup()) && !params.proofDirectory.isSet()) {
+            vec.push_back({
+                params.proofOutputFile.isSet() ? (Option*) &params.proofOutputFile : (Option*) &params.palRup,
+                "Provide a proof directory (-proof-dir).\n"
+            });
+        }
+        if ((params.proofOutputFile.isSet() || params.palRup()) && params.onTheFlyChecking()) {
+            vec.push_back({
+                &params.onTheFlyChecking,
+                "[ERROR] Mallob does not support proof writing (-proof / -palrup) "
+                "and on-the-fly checking at the same time.\n"
+            });
+        }
+
+        return vec.empty(); // all good?
+    };
 
     entry.reader = [](const Parameters& params, const std::vector<std::string>& files, JobDescription& desc) {
         auto reader = SatReader(params, files, params.forceIncrementalTrustedParser());

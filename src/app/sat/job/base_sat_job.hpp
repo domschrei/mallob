@@ -25,24 +25,6 @@ public:
     void initializeWithDescriptionPresent() {
         // Launched in certified UNSAT mode?
         if (_params.proofOutputFile.isSet() || _params.onTheFlyChecking() || _params.palRup()) {
-            
-            // Check that the restrictions of this mode are met
-            if ((_params.proofOutputFile.isSet() || _params.palRup()) && !_params.monoFilename.isSet()) {
-                LOG(V0_CRIT, "[ERROR] Mallob was launched with certified UNSAT support "
-                    "which only supports -mono mode of operation.\n");
-                abort();
-            }
-            if ((_params.proofOutputFile.isSet() || _params.palRup()) && !_params.proofDirectory.isSet()) {
-                LOG(V0_CRIT, "[ERROR] Mallob was launched with proof writing "
-                    "which requires providing a proof directory (-proof-dir).\n");
-                abort();
-            }
-            if ((_params.proofOutputFile.isSet() || _params.palRup()) && _params.onTheFlyChecking()) {
-                LOG(V0_CRIT, "[ERROR] Mallob does not yet support proof writing "
-                    "and on-the-fly checking at the same time.\n");
-                abort();
-            }
-            
             ClauseMetadata::enableClauseIds();
             if (_params.onTheFlyChecking()) {
                 ClauseMetadata::enableClauseSignatures();

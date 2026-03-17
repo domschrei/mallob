@@ -69,7 +69,7 @@ void Job::pushRevision(const std::shared_ptr<std::vector<uint8_t>>& data) {
     }
     if (!_has_description) {
         // First time receiving a description: Apply any option overrides from the app configuration
-        app_registry::overrideProgramOptions(_params, _description);
+        app_registry::checkAndOverrideProgramOptions(_params, _description);
     }
 
     _sum_of_description_sizes += data->size() / sizeof(int);

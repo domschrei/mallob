@@ -8,6 +8,7 @@
 
 #include "robin_hash.h"
 #include "robin_map.h"
+#include "util/logger.hpp"
 #include "util/string_utils.hpp"
 
 namespace app_registry {
@@ -46,6 +47,10 @@ namespace app_registry {
         return _app_entries.at(appId).key;
     }
 
+    OptionChecker getOptionChecker(int appId) {
+        getAppKey(appId); // check existence
+        return _app_entries.at(appId).optionChecker;
+    }
     JobReader getJobReader(int appId) {
         getAppKey(appId); // check existence
         return _app_entries.at(appId).reader;
@@ -91,7 +96,23 @@ namespace app_registry {
         return out;
     }
 
-    void overrideProgramOptions(Parameters& params, JobDescription& desc) {
+    void checkAndOverrideProgramOptions(Parameters& params, JobDescription& desc) {
+
+        int appId = desc.getApplicationId();
+        OptionChecker chk = getOptionChecker(appId);
+        std::vector<std::pair<const Option*, std::string>> problems;
+        if (!chk(params, problems)) {
+            LOG(V0_CRIT, "[ERROR] Invalid configuration for #%i (application %s):\n",
+                desc.getId(), getAppKey(appId).c_str());
+            for (auto& [opt, msg] : problems) {
+                LOG(V0_CRIT, "[ERROR]  * Option -%s%s : %s\n",
+                    opt->id.c_str(), opt->hasLongOption() ? (", -" + opt->longid).c_str() : "",
+                    msg.c_str());
+            }
+            LOG(V0_CRIT, "[ERROR] Mallob will now abort.\n");
+            abort();
+        }
+
         const auto appConf = desc.getAppConfiguration();
         if (!appConf.map.count("options")) return;
 
