@@ -506,7 +506,7 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	sweeper->set_option("mallob_is_root", _is_root);
 	sweeper->set_option("mallob_resweep_chance", _params.sweepResweepChance.val);
 	sweeper->set_option("mallob_staggered_logs", 1); //set to 1 to have spatially separated logs, useful for verbose runs with 2-16 threads
-	// sweeper->set_option("mallob_growing_environments", _params.sweepMaxGrowthIteration.val > 1);
+	sweeper->set_option("mallob_individual_sweepiters", _params.sweepIndividualSweepIters.val);
 
 	if (_params.sweepCongruence() && _is_root && localId == _congruence_localId) {
 		//Do congruence closure instead of sweeping. I.e., syntactical instead of semantical search for equivalences.
@@ -523,33 +523,23 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	//Own options of Kissat
 	//identical to standard options right now
 	sweeper->set_option("sweepcomplete", 1);      //deactivates checking for time limits during sweeping, so we dont get kicked out due to some limits
-
-	//this grows exponentially for 6 rounds!
   	sweeper->set_option("sweepclauses", 1024);		//	1024, 0, INT_MAX,	"environment clauses")
   	sweeper->set_option("sweepmaxclauses", 32768);	//	32768,2, INT_MAX,	"maximum environment clauses")
-
   	sweeper->set_option("sweepdepth", 2);			//, 2,    0, INT_MAX,	"environment depth")
+	//depth 4 is expensive, but at least preliminary to measure the effects
   	sweeper->set_option("sweepmaxdepth", 4); //!!	//	3,    1, INT_MAX,	"maximum environment depth")
-
-	//this grows exponentially for 5 rounds!
   	sweeper->set_option("sweepvars", 256);			//  256,  0, INT_MAX,	"environment variables")
   	sweeper->set_option("sweepmaxvars", 8192);		//	8192, 2, INT_MAX,	"maximum environment variables")
-
   	sweeper->set_option("sweepfliprounds", 1);		//	1,    0, INT_MAX,	"flipping rounds")
   	sweeper->set_option("sweeprand", 0);			//  0,    0,    1,		"randomize sweeping environment")
 
-	//Specific for clean sweep run
-	sweeper->set_option("preprocess", 0); //skip other preprocessing stuff after shweep finished
-	// shweeper->set_option("probe", 1);   //there is some cleanup-probing at the end of the sweeping. keep it? (apparently the probe option is used nowhere anyways)
-	sweeper->set_option("substitute", 1); //apply equivalence substitutions after sweeping (kissat default 1, but keep here explicitly to remember it)
-	sweeper->set_option("substituterounds", 2); //default is 2, and changing that has currently no effect, virtually all substitutions happen in round 1, and already in round 2 zero or single substitutions are found, and it exits there.
+	sweeper->set_option("substitute", 1);			// (default 1) apply equivalence substitutions after sweeping, keep here explicitly to remember it
+	sweeper->set_option("substituterounds", 2);		// (default 2) there does not seem to be any need to go higher, as almost always all equivalences are already found in the very first round
 
 
-
-	// shweeper->set_option("substituteeffort", 1000); //changes here dont seem to have much effect, basically all substituting already happens in the first round...
-	// shweeper->set_option("substituterounds", 10);
-	sweeper->set_option("luckyearly", 0); //skip
-	sweeper->set_option("luckylate", 0);  //skip
+	sweeper->set_option("preprocess", 0); //to skip this part (other preprocessing stuff after shweep finished)
+	sweeper->set_option("luckyearly", 0); //to skip this part
+	sweeper->set_option("luckylate", 0);  //to skip this part
 	sweeper->interruptionInitialized = true;
 	return sweeper;
 }
@@ -1043,14 +1033,22 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	int localId = sweeper->getLocalId();
 	sweeper->work_received_from_steal = {};
 
+	// LOG(V3_VERB, "Sweeper [%i](%i) stealing \n", _my_rank, localId);
+
 	if (_terminate_all.load(std::memory_order_relaxed)) {
 		sweeper->sweeper_is_idle = true;
-		LOG(V4_VVER, "Sweeper [%i](%i) exit steal loop\n", _my_rank, localId);
-		sweeper->triggerSweepTerminate(); //just to be safe, send another termination to itself
+		LOG(V3_VERB, "Sweeper [%i](%i) exit mallob steal due to terminate_all\n", _my_rank, localId);
+		//just to be safe, send another termination to self
+		sweeper->triggerSweepTerminate(_params.sweepIndividualSweepIters.val);
 		sweeper->count_repeated_missed_termination++;
 		if (sweeper->count_repeated_missed_termination % sweeper->WARN_ON_REPEATED_MISSED_TERMINATION==0) {
 			LOG(V1_WARN, "SWEEP WARN : Sweeper [%i](%i) in %i-th worksteal loop after termination\n", _my_rank, localId, sweeper->count_repeated_missed_termination);
 		}
+		return;
+	}
+
+	if (shweep_get_end_iteration(sweeper->solver)) {
+		LOG(V3_VERB, "Sweeper [%i](%i) exit mallob steal due to end_iteration flag \n", _my_rank, localId);
 		return;
 	}
 
@@ -1268,6 +1266,9 @@ void SweepJob::cbContributeToAllReduce() {
 		std::vector<int> contrib = std::move(eqs);
 		contrib.insert(contrib.end(), units.begin(), units.end());
 
+		 /*
+		  * Todo: update idle_status now that sweepers disappear between iterations!
+		  */
 		appendMetadataToReductionElement(contrib, sweeper->sweeper_is_idle, unit_size, eq_size);
 
 		contribs.push_back(contrib);
@@ -1395,6 +1396,16 @@ void SweepJob::extractAllReductionResult() {
 	//The new reduction object will be created by the next bcast round when needed
 	_red.reset();
 
+
+
+	if (_params.sweepIndividualSweepIters.val && all_idle && _started_synchronized_solving  && !_terminate_all) {
+		LOG(V4_VVER, "SWEEP sending end_iteration signal\n");
+		for (auto &sweeper : _sweepers) {
+			if (sweeper) {
+				shweep_set_end_iteration(sweeper->solver);
+			}
+		}
+	}
 	//Check whether the whole sweep job sould be terminated.
 	//We do this check chronologically last in this function, because there might still be useful shared data that we want to import before terminating, and having an earlier termination signal only increases risks for concurrency problems
 	if (terminate) {
@@ -1635,7 +1646,7 @@ void SweepJob::triggerTerminations() {
 	int i=0;
 	for (auto &sweeper : _sweepers) {
 		if (sweeper) {
-			sweeper->triggerSweepTerminate();
+			sweeper->triggerSweepTerminate(_params.sweepIndividualSweepIters.val);
 			LOG(V3_VERB, "SWEEP TERM #%i [%i] trigger termination of solver (%i) \n", getId(), _my_rank, i);
 		} else {
 			LOG(V3_VERB, "SWEEP TERM #%i [%i] skip    termination of solver (%i), already null \n", getId(), _my_rank, i);

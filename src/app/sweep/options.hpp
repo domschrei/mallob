@@ -15,4 +15,5 @@ OPT_BOOL(sweepCongruence,  		"swpcg", 	"sweep-congruence", 		false, "One solver 
 OPT_BOOL(sweepDeduplicate,		"swpdd", 	"sweep-deduplicate",		true,  "Deduplicate units and equivalences during sharing aggregation")
 OPT_INT(sweepMaxGrowthIteration, "swmgi", 	"sweep-max-growth-iteration", 	2, 0, LARGE_INT, "the last iteration where the kissat sweeping environment size is increased (#clauses, #vars, depth) ")
 OPT_INT(sweepMaxEmptyRounds,    "swpmer",   "sweep-max-empty-rounds",    3, 1, LARGE_INT, "the maximum number of tolerated empty rounds (not a single unit or eqs found) before sweeping is terminated early")
+OPT_BOOL(sweepIndividualSweepIters,		"swpisi", 	"sweep-individual-sweep-iters",		true,  "Kissat start a new sweeper for each sweeping iteration. Closer to sequential model, and allows easier substitute integration between iterations")
 

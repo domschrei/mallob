@@ -216,15 +216,15 @@ private:
 		// }
 
 
-		bool notice_terminate_due_to_noprogress = _root_emptyrounds_before_progress > MAX_TOLERATED_EMPTYROUNDS;
-		if (notice_terminate_due_to_noprogress) {
+		bool terminate_noprogress = _root_emptyrounds_before_progress > MAX_TOLERATED_EMPTYROUNDS;
+		if (terminate_noprogress) {
 			LOG(V2_INFO, "SWEEP [%i](root) EARLYSTOP in iteration %i, round %i: now %i empty rounds in a row \n", _my_rank, _root_sweep_iteration, _root_sharing_round, _root_emptyrounds_before_progress);
 		}
 
-		LOG(V2_INFO, "SWEEP [%i](root) all_idle %i, terminate_due_to_emptyrounds %i \n", _my_rank, received_all_idle, notice_terminate_due_to_noprogress);
+		LOG(V2_INFO, "SWEEP [%i](root) (%i)all_idle  (%i)terminate_due_to_emptyrounds \n", _my_rank, received_all_idle, terminate_noprogress);
 
 		//A round is finished if all sweepers are idle, i.e. all finished their work.
-		if (received_all_idle || notice_terminate_due_to_noprogress) {
+		if (received_all_idle || terminate_noprogress) {
 			LOG(V2_INFO, "SWEEP [%i](root) ITERATION %i/%i FINISHED (seen at root transform) with sharing round %i \n", _my_rank, _root_sweep_iteration, _params.sweepIterations(), _root_sharing_round);
 			LOG(V2_INFO, "SWEEP [%i](root) ITERATION %i/%i had: %i EQS, %i UNITS  \n", _my_rank, _root_sweep_iteration, _params.sweepIterations(), _root_shared_eqs_this_iteration, _root_shared_units_this_iteration);
 			printSweepStats(_sweepers[_representative_localId], false); //report some intermediate statistics about this iteration
@@ -237,8 +237,8 @@ private:
 			LOGGER(_reslogger, V2_INFO, "SWEEP_PROGRESS %i   \n", progress);
 			bool lastsweepround = (_root_sweep_iteration == _params.sweepIterations());
 			if (lastsweepround || !progress) {
-				if (lastsweepround)LOG(V2_INFO, "SWEEP [%i]: Job finished! All iterations done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_iteration, _params.sweepIterations());
-				if (!progress)LOG(V2_INFO, "SWEEP [%i]: Job finished! No more progress in iteration %i/%i. Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_iteration, _params.sweepIterations());
+				if (lastsweepround) LOG(V2_INFO, "SWEEP [%i]: Job finished! All iterations done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_iteration, _params.sweepIterations());
+				if (!progress)		LOG(V2_INFO, "SWEEP [%i]: Job finished! No more progress in iteration %i/%i. Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_iteration, _params.sweepIterations());
 				//we DON'T yet set _terminate_all=1 here, because we want also the root solver to first import this last sharing information, which contains valuable equalities and units, before terminating the solvers
 				send_terminate = true;
 			}
@@ -260,9 +260,10 @@ private:
 		payload[payload.size() - METADATA_SWEEP_ITERATION] = _root_sweep_iteration;
 		payload[payload.size() - METADATA_SHARING_ROUND] = _root_sharing_round;
 		payload[payload.size() - METADATA_TERMINATE] = send_terminate;
+		//the all_idle payload is already set
 
-		assert(!notice_terminate_due_to_noprogress || send_terminate || log_return_false("SWEEP ERROR unexpected: Sweep root didnt send out terminate signal eventhough it should due to too many emptyrounds "));
-		LOG(V3_VERB, "SWEEP [%i](root): I(%i) r(%i): E %i, U %i, terminate(%i)   \n", _my_rank, _root_sweep_iteration, _root_sharing_round, n_eqs, n_units, send_terminate);
+		assert(!terminate_noprogress || send_terminate || log_return_false("SWEEP ERROR unexpected: Sweep root didnt send out terminate signal eventhough it should due to too many emptyrounds "));
+		LOG(V3_VERB, "SWEEP [%i](root) send: I(%i) r(%i): E %i, U %i, (%i)allidle (%i)terminate  \n", _my_rank, _root_sweep_iteration, _root_sharing_round, n_eqs, n_units, received_all_idle, send_terminate);
 		//no return, payload was just transformed in-place
     };
 

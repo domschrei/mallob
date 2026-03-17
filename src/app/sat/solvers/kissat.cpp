@@ -401,8 +401,11 @@ void Kissat::setSolverInterrupt() {
     if (interruptionInitialized) kissat_terminate (solver);
 }
 
-void Kissat::triggerSweepTerminate() {
-    shweep_terminate(solver);
+void Kissat::triggerSweepTerminate(bool solver_does_single_iterations) {
+    if (solver_does_single_iterations)
+        shweep_set_end_sweepjob(solver);
+    else
+        shweep_terminate(solver);
 }
 
 void Kissat::unsetSolverInterrupt() {
