@@ -305,7 +305,7 @@ private:
 	void checkForUnsatResults();
 	void tryReportUnsat();
 	void reportSolverResult(KissatPtr sweeper, int res);
-	void printSweepStats(KissatPtr sweeper, bool full);
+	void printSweepStats(KissatPtr sweeper, bool end);
 	void printCongruenceStats(KissatPtr sweeper);
 	// void readResult(KissatPtr shweeper, bool withStats);
 	// void serializeResultFormula(KissatPtr sweeper);

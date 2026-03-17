@@ -1,8 +1,8 @@
 #!/bin/bash
 
 
-NPROCS=4
-threads=3
+NPROCS=2
+threads=2
 echo "NPROCS $NPROCS"
 echo "threads per process $threads"
 
@@ -31,18 +31,18 @@ MALLOB_OPTIONS="-t=$threads \
   -rspaa=1 \
 	-rpa=1 \
 	-seed=1 \
-	-v=4 \
+	-v=2 \
   -spl=4 \
 	-jcup=0.05 \
 	-preprocess-sweep=1 \
 	-sweep-sharing-period=0.020 \
   -sweep-resweep-chance=1000 \
-  -sweep-iterations=5 \
-	-sweep-solver-verbosity=0 \
+  -sweep-iterations=2 \
+	-sweep-solver-verbosity=2 \
 	-sweep-solver-quiet=1 \
   -sweep-congruence=0 \
-  -sweep-max-growth-iteration=2 \
-  -sweep-max-empty-rounds=3 \
+  -sweep-max-growth-iteration=3 \
+  -sweep-max-empty-rounds=5 \
   -preprocess-sweep-priority=1.0 \
 "
 

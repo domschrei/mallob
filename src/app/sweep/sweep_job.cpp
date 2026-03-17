@@ -114,6 +114,12 @@ void SweepJob::appl_start() {
 	_internal_result.id = getId();
 	_internal_result.revision = getRevision();
 
+	LOGGER(_reslogger,V2_INFO, "SWEEP_PRIORITY       %.3f\n", _params.preprocessSweepPriority.val);
+	LOGGER(_reslogger,V2_INFO, "SWEEP_PROCESSES      %i\n", getVolume());
+	LOGGER(_reslogger,V2_INFO, "SWEEP_THREADS_PER_P  %i\n", _nThreads);
+	LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_PERIOD %.3f sec \n", _params.sweepSharingPeriod.val);
+
+
 	LOG(V3_VERB, "SWEEP appl_start() FINISHED\n");
 }
 
@@ -500,7 +506,7 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	sweeper->set_option("mallob_is_root", _is_root);
 	sweeper->set_option("mallob_resweep_chance", _params.sweepResweepChance.val);
 	sweeper->set_option("mallob_staggered_logs", 1); //set to 1 to have spatially separated logs, useful for verbose runs with 2-16 threads
-	sweeper->set_option("mallob_growing_environments", _params.sweepMaxGrowthIteration.val > 1);
+	// sweeper->set_option("mallob_growing_environments", _params.sweepMaxGrowthIteration.val > 1);
 
 	if (_params.sweepCongruence() && _is_root && localId == _congruence_localId) {
 		//Do congruence closure instead of sweeping. I.e., syntactical instead of semantical search for equivalences.
@@ -523,7 +529,7 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
   	sweeper->set_option("sweepmaxclauses", 32768);	//	32768,2, INT_MAX,	"maximum environment clauses")
 
   	sweeper->set_option("sweepdepth", 2);			//, 2,    0, INT_MAX,	"environment depth")
-  	sweeper->set_option("sweepmaxdepth", 3);		//	3,    1, INT_MAX,	"maximum environment depth")
+  	sweeper->set_option("sweepmaxdepth", 4); //!!	//	3,    1, INT_MAX,	"maximum environment depth")
 
 	//this grows exponentially for 5 rounds!
   	sweeper->set_option("sweepvars", 256);			//  256,  0, INT_MAX,	"environment variables")
@@ -548,14 +554,14 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	return sweeper;
 }
 
-void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
+void SweepJob::printSweepStats(KissatPtr sweeper, bool end) {
 	assert(_is_root);
 	assert(sweeper->getLocalId() == _representative_localId);
 
 	auto stats = sweeper->fetchSweepStats();
 	//As "vars" we are only interested in variables that are active (not fixed) at the start of Sweep. The "VAR" counter is much larger, but most of these variables are often already fixed.
-	int vars_fixed_end  = stats.sweep_eqs + stats.units_new;
-	int vars_remain_end = stats.vars_active_orig - vars_fixed_end;
+	int eq_unit_sum  = stats.sweep_eqs + stats.sweep_units;
+	int vars_remain_end = stats.vars_active_orig - eq_unit_sum;
 	int clauses_removed = sweeper->_setup.numOriginalClauses - stats.clauses_end;
 
 	int ranks = getVolume();
@@ -563,65 +569,62 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 	int eqs_per_sweeper = stats.sweep_eqs / n_sweepers;
 	int units_per_sweeper = stats.sweep_units / n_sweepers;
 
-	double vars_fixed_percent = 100*vars_fixed_end/(double)stats.vars_active_orig;
+	double vars_fixed_percent = 100*eq_unit_sum/(double)stats.vars_active_orig;
 	double vars_remain_percent = 100*vars_remain_end/(double)stats.vars_active_orig;
 	double clauses_removed_percent = 100*clauses_removed/(double)sweeper->_setup.numOriginalClauses;
 
 	LOG(			  V2_INFO, "SWEEP solver [%i](%i) reports statistics in dedicated .sweep file \n", _my_rank, sweeper->getLocalId());
 	LOGGER(_reslogger,V2_INFO, "\n");
 	LOGGER(_reslogger,V2_INFO, "Reported by [%i](%i) \n", _my_rank, sweeper->getLocalId());
-	if (!full) {
+	if (!end) {
 		LOGGER(_reslogger,V2_INFO, "SWEEP_ITERATION				%i / %i \n", _root_sweep_iteration, _params.sweepIterations());
-		LOGGER(_reslogger,V2_INFO, "SWEEP_TIME					%f seconds \n", Timer::elapsedSeconds() - _start_sweep_timestamp);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_NEW				%i \n", stats.units_new);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_TIME					%.3f seconds \n", Timer::elapsedSeconds() - _start_sweep_timestamp);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_ACTIVE_ORIG			%i \n", stats.vars_active_orig);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_ACTIVE_CURR			%i \n", stats.curr_active);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_ACTIVE_PRCNT			%.2f % \n", 100*(double)stats.curr_active/(double)stats.vars_active_orig);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_NEW				%i \n", stats.sweep_units);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_EQUIVALENCES			%i \n", stats.sweep_eqs);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_FIXED_N			%i / %i (%.3f %)\n", vars_fixed_end, stats.vars_active_orig, vars_fixed_percent);
+		LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_FIXED_N			%i / %i (%.3f %)\n", eq_unit_sum, stats.vars_active_orig, vars_fixed_percent);
 		// LOGGER(_reslogger,V2_INFO, "SWEEP_IMPORTED_UNITS		%i / %i \n", stats.units_useful, stats.units_seen);
 		// LOGGER(_reslogger,V2_INFO, "SWEEP_IMPORTED_EQS			%i / %i \n", stats.eqs_useful, stats.eqs_seen); //representative for the reporting solver
 		LOGGER(_reslogger,V2_INFO, "SWEEP_TOTAL_SHARED_UNITS %i \n", _root_total_shared_units);
 		LOGGER(_reslogger,V2_INFO, "SWEEP_TOTAL_SHARED_EQS   %i \n", _root_total_shared_eqs);
 	}
 
-	if (full) {
-		LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_PER_SWEEPER %i \n", units_per_sweeper);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_EQS_PER_SWEEPER   %i\n", eqs_per_sweeper);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_PRIORITY       %.3f\n", _params.preprocessSweepPriority.val);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_PROCESSES      %i\n", getVolume());
-		LOGGER(_reslogger,V2_INFO, "SWEEP_THREADS_PER_P  %i\n", _nThreads);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_PERIOD %.3f sec \n", _params.sweepSharingPeriod.val);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_ORIG		 %i\n", sweeper->_setup.numVars);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_END		 %i\n", stats.vars_end);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_ACTIVE_ORIG    %i\n", stats.vars_active_orig);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_ACTIVE_END     %i\n", vars_remain_end);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_CLAUSES_ORIG   %i\n", sweeper->_setup.numOriginalClauses);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_CLAUSES_END    %i\n", stats.clauses_end);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_ORIG     %i\n", stats.units_orig);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_END      %i\n", stats.units_end);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_ELIMINATED     %i\n", stats.eliminated);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_SWEEP    %i\n", stats.sweep_units);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_CLAUSES_REMOVED_N		%i \n", clauses_removed);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_CLAUSES_REMOVED_PRCNT	%.6f \n", clauses_removed_percent);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_REMAIN_N			%i / %i (%.6f %)\n", vars_remain_end, stats.vars_active_orig, vars_remain_percent);
-		LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_FIXED_PRCNT		%.6f \n", vars_fixed_percent);
+	if (end) {
+		// LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_PER_SWEEPER %i \n", units_per_sweeper);
+		// LOGGER(_reslogger,V2_INFO, "SWEEP_EQS_PER_SWEEPER   %i\n", eqs_per_sweeper);
+		// LOGGER(_reslogger,V2_INFO, "SWEEP_PRIORITY       %.3f\n", _params.preprocessSweepPriority.val);
+		// LOGGER(_reslogger,V2_INFO, "SWEEP_PROCESSES      %i\n", getVolume());
+		// LOGGER(_reslogger,V2_INFO, "SWEEP_THREADS_PER_P  %i\n", _nThreads);
+		// LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_PERIOD %.3f sec \n", _params.sweepSharingPeriod.val);
+		// LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_ORIG		 %i\n", sweeper->_setup.numVars);
+		// LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_END		 %i\n", stats.vars_end);
+		// LOGGER(_reslogger,V2_INFO, "SWEEP_ACTIVE_END     %i\n", vars_remain_end);
+		// LOGGER(_reslogger,V2_INFO, "SWEEP_CLAUSES_ORIG   %i\n", sweeper->_setup.numOriginalClauses);
+		// LOGGER(_reslogger,V2_INFO, "SWEEP_CLAUSES_END    %i\n", stats.clauses_end);
+		// LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_ORIG     %i\n", stats.units_orig);
+		// LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_END      %i\n", stats.units_end);
+		// LOGGER(_reslogger,V2_INFO, "SWEEP_ELIMINATED     %i\n", stats.eliminated);
+		// LOGGER(_reslogger,V2_INFO, "SWEEP_UNITS_SWEEP    %i\n", stats.sweep_units);
+		// LOGGER(_reslogger,V2_INFO, "SWEEP_CLAUSES_REMOVED_N		%i \n", clauses_removed);
+		// LOGGER(_reslogger,V2_INFO, "SWEEP_CLAUSES_REMOVED_PRCNT	%.6f \n", clauses_removed_percent);
+		// LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_REMAIN_N			%i / %i (%.6f %)\n", vars_remain_end, stats.vars_active_orig, vars_remain_percent);
+		// LOGGER(_reslogger,V2_INFO, "SWEEP_VARS_FIXED_PRCNT		%.6f \n", vars_fixed_percent);
 	}
 
-	if (full) {
+	if (end) {
 		static const int DURATION_WARN_FACTOR=2;
 		float latency_sum=0, latency_avg=0, period_sum=0, period_avg=0;
-		// std::vector<float> latencies;
-		// for (int i=0; i < _timestamp_root_started_bcast.size() && i < _timestamp_receive_sharing_result.size(); i++) {
-			// latencies.push_back(_timestamp_receive_sharing_result[i]-_timestamp_root_started_bcast[i]);
-			// latency_sum += latencies.back();
-		// }
-		// if (!latencies.empty()) {
-			// latency_avg = latency_sum/latencies.size();
-		// }
 		if (_timestamp_root_started_bcast.size()>1) {
 			period_sum = _timestamp_root_started_bcast.back() - _timestamp_root_started_bcast.front();
 			period_avg = period_sum / (_timestamp_root_started_bcast.size()-1);
 		}
 		// LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_LATENCY     %.4f sec (average) \n",latency_avg);
 		// LOGGER(_reslogger,V2_INFO, "SWEEP_SHARING_PERIOD_REAL %.4f sec (average) \n",period_avg);
+		float max_appl_comm_duration = *std::max_element(_duration_appl_communicate.begin(), _duration_appl_communicate.end());
+
+		LOGGER(_reslogger,V2_INFO, "SWEEP_APPL_COMMUNICATE_MAX		%.6f s \n", max_appl_comm_duration);
 
 
 		if (_timestamp_root_started_bcast.size()>1) {
@@ -632,13 +635,6 @@ void SweepJob::printSweepStats(KissatPtr sweeper, bool full) {
 				}
 			}
 		}
-
-		// for (int i=0; i< latencies.size(); i++) {
-			// if (latencies[i] > DURATION_WARN_FACTOR*latency_avg) {
-				// LOGGER(_reslogger,V2_INFO, "[WARN] SWEEP_SHARING_LATENCY %.4f sec     (between rounds %i,%i) is much larger than average \n", latencies[i], i, i+1);
-			// }
-		// }
-
 		for (int i=0; i<15 && i<_internal_result.getSolutionSize(); i++) {
 			LOGGER(_reslogger,V3_VERB, "RESULT Sweep Formula[%i] = %i \n", i, _internal_result.getSolution(i));
 		}
