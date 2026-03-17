@@ -8,18 +8,18 @@ In the following we explain which steps need to be performed and how exactly the
 
 Mallob supports two kinds of application engines:
 
-* **Regular application engines** are fully decentralized. Only the parsing of the job description (if at all needed) is performed by a single client process. All other application-specific logic applies uniformly to all processes where a job is scheduled. Examples are `dummy`, `kmeans`, and `sat`.
+* **Regular / distributed application engines** are fully decentralized. Only the parsing of the job description (if at all needed) is performed by a single client process. All other application-specific logic applies uniformly to all processes where a job is scheduled. Examples are `dummy`, `kmeans`, and `sat`.
 * **Client-side application engines** only consist of a single head program, which is executed directly at the client process receiving a job submission. Such a job is thus not distributed in and of itself. However, the head program can submit regular application tasks to Mallob (e.g., SAT solving sub-tasks) to exploit distributed computing. Examples are `maxsat` and `satwithpre`.
 
 ## Overview
 
-To integrate your application into Mallob, create a subdirectory `app/yourappkey` where `yourappkey` is an all lower case identifier for your application within Mallob (e.g., `kmeans` or `smt`). In that directory, the following files are strictly required - each is explained in more detail further below.
+To integrate your application into Mallob, create a subdirectory `app/yourappkey`, where `yourappkey` is an all lower case identifier for your application within Mallob (e.g., `kmeans` or `smt`). In that directory, the following files are strictly required - each is explained in more detail further below.
 
 * `setup.cmake`: Define the build process for your application.
 * `options.hpp`: Define custom, application-specific program options.
-* `register.hpp`: Define a global method `void register_mallob_app_yourappkey()` (replace "yourappkey" accordingly) where you define a bit of glue code for your app within the `app_registry`. This programmatically connects your application code with Mallob's program flow.
+* `register.hpp`: Define a global method `void register_mallob_app_yourappkey()` (replace "yourappkey" accordingly) where you define the meta data and internal logic of your app.
 
-After all of this is set up, register your application within Mallob's build process by adding the following code to `CMakeLists.txt` below the line `# Include further applications here:`.
+After all of this is set up, register your application within Mallob's build process by adding the following code to `CMakeLists.txt` below the line `# Include further applications here`.
 ```cmake
 if(MALLOB_APP_YOURAPPKEY) 
     register_mallob_app("yourappkey")
@@ -29,7 +29,7 @@ You can then build Mallob with CMake option `-DMALLOB_APP_YOURAPPKEY=1` to inclu
 
 ## `setup.cmake`
 
-The CMake file `app/yourappkey/setup.cmake` must contain all directives necessary to build and include your application in Mallob. In principle, if your code only consists of header files transitively included by a single entry point `register.hpp` and if no additional libraries are required, this file may be completely empty. Otherwise, you should define the compilation units (.cpp files) of your application, add additional include directories and libraries as necessary, and define any external executables your application calls. Please take a look at `app/dummy/setup.cmake` for a simple example which only adds additional compilation units, `app/sat/` for a reasonably complex example featuring external libraries and a separate subprocess executable, and `app/maxsat/` for a client-side application example.
+The CMake file `app/yourappkey/setup.cmake` must contain all directives necessary to build and include your application in Mallob. In principle, if your code only consists of header files transitively included by a single entry point `register.hpp` and if no additional dependencies are required, this file may be completely empty. Otherwise, you should define the compilation units (.cpp files) of your application, add additional include directories and libraries as necessary, and define any external executables your application calls. Please take a look at `app/dummy/setup.cmake` for a simple example which only adds additional compilation units, `app/sat/` for a relatively complex example featuring external libraries and separate executables, and `app/maxsat/` for a client-side application example.
 
 ## `options.hpp`
 
@@ -41,49 +41,69 @@ All options defined after this definition and before the next group definition a
 
 ## `register.hpp`
 
-A typical `register.hpp` for a **regular** application engine looks as follows. See also [dummy/register.hpp](/src/app/dummy/register.hpp) for potential recent updates.
+Here's an example for a typical `register.hpp` (for a **regular**, distributed application engine).
 
 ```C++
 #pragma once
 #include "app/app_registry.hpp"
-// further #includes as needed
+#include "app/palrupcheck/palrupcheck_job.hpp" // your subclass of Job
+// further #includes as needed ...
 
-void register_mallob_app_yourappkey() {
-    // You need to call either app_registry::registerApplication or app_registry::registerClientSideApplication,
-    // depending on whether you want to register a regular or a client-side application.
-    // The latter expects a ClientSideProgramCreator instead of a JobCreator.
-    // See `src/app/app_registry.hpp` for details.
-    app_registry::registerApplication(
-        // your key in all caps (!) goes here
-        "YOURAPPKEY", 
+void register_mallob_app_palrupcheck() {
 
-        // Job reader: Given a number of input files and a JobDescription instance,
-        // read the files into the JobDescription and return true iff everything went well.
-        [](const std::vector<std::string>& files, JobDescription& desc) -> bool {
-            // TODO If needed, perform parsing, write via desc.addData()
-            return true;
-        },
+    // Create an AppEntry for your app
+    app_registry::AppEntry entry;
+    entry.key = "PALRUPCHECK"; // all-caps unique key
+    entry.type = app_registry::AppEntry::DISTRIBUTED; // DISTRIBUTED or CLIENT_SIDE ?
+    entry.copyrightInformation = "by Dominik Schreiber and Ruben Götz\n"; // optional, printed at program start
 
-        // Job creator: Return an instance of your custom subclass of Job.
-        [](const Parameters& params, const Job::JobSetup& setup) -> Job* {
-            return new YourSubclassOfJob(params, setup);
-        },
-
-        // Job solution formatter: Given a JobResult instance, return a nlohmann::json
-        // object which represents the found solution in some way.
-        [](const JobResult& result) -> nlohmann::json {
-            // Just create an array of strings, one for each integer in the solution.
-            auto json = nlohmann::json::array();
-            for (size_t i = 0; i < result.getSolutionSize(); ++i) {
-                json.push_back(std::to_string(result.getSolution(i)));
-            }
-            return json;
+    // Optional: Check if your app can work with the provided program options.
+    // Otherwise, tell the user what they need to change.
+    entry.optionChecker = [](const Parameters& params, auto& vec) {
+        // Check for -rpa=1 -pph=<k>
+        if (!params.regularProcessDistribution() || params.processesPerHost() == 0) {
+            vec.push_back({
+                &params.regularProcessDistribution,
+                "PalRUP-check requires to specify a valid number of processes per host (-rpa=1 -pph=<k>)."
+            });
         }
+        // Further checks ...
+        return vec.empty(); // no issues found?
+    };
 
-        // Optional: Specify a resource cleaner which cleans up any system-level resources
-        // (files, shared-memory, ...) in between Mallob executions.
-        //, [](const Parameters& params) {}
-    );
+    // Mandatory: Take a (potentially empty) list of input file paths and initialize the specified job description.
+    entry.reader = [](const Parameters& params, const std::vector<std::string>& files, JobDescription& desc) {
+        // In this specific case, we don't actually parse the files (yet) but just store their paths
+        // in the job description via AppConfiguration entries (BEFORE beginInitialization!).
+        desc.setAppConfigurationEntry("__chkcnf", files[0]);
+        desc.setAppConfigurationEntry("__chkproofdir", files[1]);
+        // Important: Begin and end initialization of the description!
+        desc.beginInitialization(0);
+        desc.endInitialization();
+        return true; // "parsing" / initialization succeeded?
+    };
+
+    // Mandatory (for DISTRIBUTED apps): Function that creates your own subclass of Job
+    // to execute your distributed program.
+    // For a CLIENT_SIDE app, you must set the field clientSideProgramCreator instead.
+    entry.creator = [](const Parameters& params, const Job::JobSetup& setup, AppMessageTable& table) -> Job* {
+        return new PalrupCheckJob(params, setup, table);
+    };
+
+    // Mandatory: Format the provided job result as some JSON object.
+    entry.solutionFormatter = [](const Parameters& params, const JobResult& result, const JobProcessingStatistics& stat) {
+        // Just return the integer solution vector as a JSON array
+        auto json = nlohmann::json::array();
+        auto model = result.copySolution();
+        json = std::move(model);
+        return json;
+    };
+
+    // Optional: Define further bits of logic - see src/app/app_registry.hpp:AppEntry for full documentation
+    // ...
+
+    // Important: "Publish" your app!
+    app_registry::registerApplication(entry);
 }
 ```
 
@@ -93,7 +113,7 @@ In the following sections we shed more light on how to properly realize the job 
 
 Given a number of input files and a mutable JobDescription instance, parse the files and serialize the job described by the files. A serialization of a job in Mallob is a flat sequence of 32-bit integer or float numbers which describe the job's entire payload. Push individual numbers to this serialization using `desc.addData()`.
 
-Some global parameters can be stored seperately in the AppConfiguration via `desc.getAppConfiguration().updateFixedSizeEntry()`. Such stores need to be done **before** calling `desc.beginInitialization(0)`, otherwise the Job might not be scheduled correctly (as then the AppConfiguration and serialized data are no longer clearly separated).
+Global parameters can be stored seperately in the AppConfiguration via `desc.getAppConfiguration().updateFixedSizeEntry()`. Such parameters need to be initialized, with their maximum potential string length, **before** calling `desc.beginInitialization(0)`.
 
 Your job reading should return with a `bool` which expresses whether the parsing was successful. In case of returning false, please log some warning or error message describing what happened.
 
@@ -149,7 +169,9 @@ The `dummy` application serves as an educative starting point - please take a lo
 * [pointtopoint_example_job.hpp](/src/app/dummy/pointtopoint_example_job.hpp): A simple example for point-to-point messaging, setting a job's desired resources, and waiting for sufficient resources to become active.
 * [collectives_example_job.hpp](/src/app/dummy/collectives_example_job.hpp): An example for collective operations (broadcast, all-reduction), background computations, and how to properly clean everything up.
 
-The `SAT` application is a more involved example for a full-featured application; its job logic is relatively complex due to sub-processing.
+The `PALRUPCHECK` application (which is usually invoked following a result from a SAT job to check the emitted parallel proof) constitutes an example for a distributed (albeit not malleable) application that invokes an external program at each process and has these programs communicate over a parallel file system.
+
+The `SAT` application is a more involved example for a full-featured, malleable C++ application; its job logic is relatively complex due to sub-processing.
 
 ### Core principles
 

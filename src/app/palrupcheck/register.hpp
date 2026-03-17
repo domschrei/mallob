@@ -42,9 +42,6 @@ void register_mallob_app_palrupcheck() {
     };
 
     entry.reader = [](const Parameters& params, const std::vector<std::string>& files, JobDescription& desc) {
-        const std::string NC_DEFAULT_VAL = "BMMMKKK111";
-        desc.setAppConfigurationEntry("__NV", NC_DEFAULT_VAL);
-        desc.setAppConfigurationEntry("__NC", NC_DEFAULT_VAL);
         desc.setAppConfigurationEntry("__chkcnf", files[0]);
         desc.setAppConfigurationEntry("__chkproofdir", files[1]);
         desc.beginInitialization(0);
