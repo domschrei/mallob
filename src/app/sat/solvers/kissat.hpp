@@ -178,7 +178,7 @@ private:
 	void consumeClause(int** clause, int* size, int* lbd, unsigned long* id, unsigned char* sig);
 	void processProofLine(LratOp&& op);
 
-	void sweepSetReportCallback();
+	void sweepSetFormulaReportCallback();
     bool isPreprocessingAcceptable(int vars, int cls);
     void addLiteralFromPreprocessing(int lit);
 	shweep_statistics fetchSweepStats();

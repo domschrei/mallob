@@ -58,8 +58,9 @@ private:
 
 	//Workstealing
 	SplitMix64Rng _rng;
-    std::atomic_bool _root_started_providing_initial_work=false;
-    std::atomic_bool _root_provided_initial_work=false;
+	// std::atomic_bool _root_initwork_providable=false;
+    std::atomic_bool _root_initwork_startedproviding=false;
+    std::atomic_bool _root_initwork_provided=false;
 	struct WorkstealRequest {
 		int senderLocalId{-1};
 		int targetIndex{-1};
@@ -139,9 +140,6 @@ private:
 	int _lastClearedRound = 0;
 
 
-
-
-
 	//Termination. Determined during workstealing, broadcasted via sharing
 	std::atomic_bool _terminate_all=false; //termination (on this node) due to sharing consensus that there is no more work
 	// std::atomic_bool _external_termination=false; //termination because somebody else told us to (for example Job interrupted because Base Job already found a solution, ...)
@@ -167,7 +165,7 @@ private:
 	int _root_rounds_this_iteration = 0;
 	int _root_sweep_iteration = 0;
 	int _root_sharing_round = 0;
-	bool _root_did_just_finish_iteration = true; //remember for the next sharing round that we entered a new sweep iteration
+	bool _root_did_just_finish_iteration = true; //remember for the next sharing round that we entered a new sweep iteration. Start with true to immediately start into iteration 1
 
 	const int MAX_TOLERATED_EMPTYROUNDS = _params.sweepMaxEmptyRounds.val;
 
@@ -177,14 +175,22 @@ private:
 	//On a technical level, This information is injected here via an inplace root transform at the end of the sharing aggregation, before broadcasting it
 	std::function<void(std::vector<int>&)> _inplace_rootTransform = [&](std::vector<int>& payload) {
 		assert(_is_root);
+		_root_sharing_round++;
+		LOG(V2_INFO, "SWEEP [%i](root-trf) rnd(%i) entered \n", _my_rank, _root_sharing_round);
 
 		//Remember from last sharing round whether now begins a new iteration iteration
 		if (_root_did_just_finish_iteration) {
 			_root_sweep_iteration++;
 			_root_did_just_finish_iteration = false;
-			LOG(V2_INFO, "SWEEP [%i](root) ITERATION %i/%i STARTED \n", _my_rank, _root_sweep_iteration, _params.sweepIterations());
-		}
 
+			//Only now the new iteration truly begins, so only now we reset these iteration-specific counters
+			_root_shared_units_this_iteration = 0;
+			_root_shared_eqs_this_iteration = 0;
+			_root_emptyrounds_before_progress = 0;
+			_root_rounds_this_iteration=0;
+
+			LOG(V2_INFO, "SWEEP [%i](root-trf) ITERATION %i/%i STARTED \n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations());
+		}
 
 		int n_units = payload[payload.size() - METADATA_UNIT_SIZE];
 		int n_eqs   = payload[payload.size() - METADATA_EQ_SIZE] / 2;
@@ -194,66 +200,55 @@ private:
 		_root_total_shared_units += n_units;
 		_root_total_shared_eqs   += n_eqs;
 
-		_root_sharing_round++;
 		_root_rounds_this_iteration++;
+
 
 		//Check whether this is a round with yet again zero progress. It makes only sense to check for progress once the solvers actually got their work provided.
 		if (_root_shared_units_this_iteration==0 && _root_shared_eqs_this_iteration==0) {
-			if (_root_provided_initial_work) {
+			//we don't count empty sharing rounds if we know that there hasn't even been work provided, i.e. solvers couldn't even do anything till now
+			if (_root_initwork_provided) {
 				_root_emptyrounds_before_progress++;
-				LOG(V2_INFO, "SWEEP [%i](root) EMPTYROUND nr %i (iteration %i, sharing round %i)  \n", _my_rank, _root_emptyrounds_before_progress, _root_sweep_iteration, _root_sharing_round);
+				LOG(V2_INFO, "SWEEP [%i](root-trf) EMPTYROUND nr %i (iteration %i, sharing round %i)  \n", _my_rank, _root_emptyrounds_before_progress, _root_sweep_iteration, _root_sharing_round);
 			} else {
-				LOG(V2_INFO, "SWEEP [%i](root) fake EMPTYROUND, because solvers didnt receive work yet (iteration %i, sharing round %i)  \n", _my_rank, _root_sweep_iteration, _root_sharing_round);
+				LOG(V2_INFO, "SWEEP [%i](root-trf) fake EMPTYROUND, because solvers didnt receive work yet (iteration %i, sharing round %i)  \n", _my_rank, _root_sweep_iteration, _root_sharing_round);
 			}
 		}
 
 		bool send_terminate = false;
-
 		bool received_all_idle = payload[payload.size() - METADATA_IDLE];
-		// if (received_all_idle && !_root_provided_initial_work) {
-			// received_all_idle = false;
-			// LOG(V2_INFO, "Warn SWEEP [%i](root) : solvers all idle, but does not indicate finished work because the new work hasn't even been provided yet \n", _my_rank, _root_sweep_iteration, _root_sharing_round);
-		// }
+		bool terminate_emptyrounds = _root_emptyrounds_before_progress > MAX_TOLERATED_EMPTYROUNDS;
 
-
-		bool terminate_noprogress = _root_emptyrounds_before_progress > MAX_TOLERATED_EMPTYROUNDS;
-		if (terminate_noprogress) {
-			LOG(V2_INFO, "SWEEP [%i](root) EARLYSTOP in iteration %i, round %i: now %i empty rounds in a row \n", _my_rank, _root_sweep_iteration, _root_sharing_round, _root_emptyrounds_before_progress);
+		if (terminate_emptyrounds) {
+			LOG(V2_INFO, "SWEEP [%i](root-trf) EARLYSTOP in iteration %i, round %i: now %i empty rounds in a row \n", _my_rank, _root_sweep_iteration, _root_sharing_round, _root_emptyrounds_before_progress);
 		}
 
-		LOG(V2_INFO, "SWEEP [%i](root) (%i)all_idle  (%i)terminate_due_to_emptyrounds \n", _my_rank, received_all_idle, terminate_noprogress);
-
-		//A round is finished if all sweepers are idle, i.e. all finished their work.
-		if (received_all_idle || terminate_noprogress) {
-			LOG(V2_INFO, "SWEEP [%i](root) ITERATION %i/%i FINISHED (seen at root transform) with sharing round %i \n", _my_rank, _root_sweep_iteration, _params.sweepIterations(), _root_sharing_round);
-			LOG(V2_INFO, "SWEEP [%i](root) ITERATION %i/%i had: %i EQS, %i UNITS  \n", _my_rank, _root_sweep_iteration, _params.sweepIterations(), _root_shared_eqs_this_iteration, _root_shared_units_this_iteration);
-			printSweepStats(_sweepers[_representative_localId], false); //report some intermediate statistics about this iteration
+		//A round is finished if all sweepers are idle, or if we had for too long exclusively empty rounds since the start of this iteration
+		if (received_all_idle || terminate_emptyrounds) {
+			LOG(V2_INFO, "SWEEP [%i](root-trf) (%i)all_idle  (%i)terminate_emptyrounds \n", _my_rank, received_all_idle, terminate_emptyrounds);
+			LOG(V2_INFO, "SWEEP [%i](root-trf) ITERATION %i/%i FINISHED (seen at root transform) in sharing round %i \n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations(), _root_sharing_round);
+			LOG(V2_INFO, "SWEEP [%i](root-trf) ITERATION %i/%i shared: %i EQS, %i UNITS  \n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations(), _root_shared_eqs_this_iteration, _root_shared_units_this_iteration);
+			//The kissat solver will report the sweep stats itself via a callback once it has cleaned up its internal database and metrics via substitute()
+			// printSweepStats(_sweepers[_representative_localId], false); //report some intermediate statistics about this iteration
 			bool progress = (_root_shared_eqs_this_iteration + _root_shared_units_this_iteration) > 0;
 			if (!progress) {
 				_root_emptyrounds_before_progress=0; //there never has been progress, so there was never any last round before we found progress
 			}
-			LOGGER(_reslogger, V2_INFO, "SWEEP_ROUNDS_THIS_ITERATION     %i   \n", _root_rounds_this_iteration);
-			LOGGER(_reslogger, V2_INFO, "SWEEP_EMPTYROUNDS_BEFORE_PROGRESS %i   \n", _root_emptyrounds_before_progress);
-			LOGGER(_reslogger, V2_INFO, "SWEEP_PROGRESS %i   \n", progress);
-			bool lastsweepround = (_root_sweep_iteration == _params.sweepIterations());
+			bool lastsweepround = (_root_sweep_iteration == _params.sweepMaxIterations());
 			if (lastsweepround || !progress) {
-				if (lastsweepround) LOG(V2_INFO, "SWEEP [%i]: Job finished! All iterations done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_iteration, _params.sweepIterations());
-				if (!progress)		LOG(V2_INFO, "SWEEP [%i]: Job finished! No more progress in iteration %i/%i. Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_iteration, _params.sweepIterations());
+				if (lastsweepround) LOG(V2_INFO, "SWEEP [%i](root-trf): Job finished! All iterations done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations());
+				if (!progress)		LOG(V2_INFO, "SWEEP [%i](root-trf): Job finished! No more progress in iteration %i/%i. Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations());
 				//we DON'T yet set _terminate_all=1 here, because we want also the root solver to first import this last sharing information, which contains valuable equalities and units, before terminating the solvers
 				send_terminate = true;
 			}
 			else {
 				_root_did_just_finish_iteration = true;
-				_root_shared_units_this_iteration = 0;
-				_root_shared_eqs_this_iteration = 0;
-				_root_emptyrounds_before_progress = 0;
-				_root_rounds_this_iteration=0;
 				//The new iteration is started by providing  all variables as new work to one solver
-				_root_provided_initial_work = false;
-				_root_started_providing_initial_work = false;
+				// _root_initwork_providable	= false;
+				_root_initwork_startedproviding = false;
+				_root_initwork_provided		= false;
 				//Prevent that workers see a round change of 2 when going from one sweepround to the next
 				// _root_sharing_round--;
-				LOG(V2_INFO, "SWEEP [%i](root) initiate new sharing round. _root_provided_initial_work=%i \n", _my_rank, _root_provided_initial_work.load() );
+				LOG(V2_INFO, "SWEEP [%i](root-trf) Preparing for new iteration. Have set (%i)started_providing_work, (%i)provided_work  \n", _my_rank, _root_initwork_startedproviding.load(), _root_initwork_provided.load() );
 			}
 		}
 		//The root node (and only the root node) tracks the number of completed sweep rounds, and broadcasts this information. This way, also nodes that join later know which round we are in.
@@ -262,8 +257,8 @@ private:
 		payload[payload.size() - METADATA_TERMINATE] = send_terminate;
 		//the all_idle payload is already set
 
-		assert(!terminate_noprogress || send_terminate || log_return_false("SWEEP ERROR unexpected: Sweep root didnt send out terminate signal eventhough it should due to too many emptyrounds "));
-		LOG(V3_VERB, "SWEEP [%i](root) send: I(%i) r(%i): E %i, U %i, (%i)allidle (%i)terminate  \n", _my_rank, _root_sweep_iteration, _root_sharing_round, n_eqs, n_units, received_all_idle, send_terminate);
+		assert(!terminate_emptyrounds || send_terminate || log_return_false("SWEEP ERROR unexpected: Sweep root didnt send out terminate signal eventhough it should due to too many emptyrounds "));
+		LOG(V3_VERB, "SWEEP [%i](root-trf) send: Iter(%i) rnd(%i): E %i, U %i, (%i)allidle (%i)terminate  \n", _my_rank, _root_sweep_iteration, _root_sharing_round, n_eqs, n_units, received_all_idle, send_terminate);
 		//no return, payload was just transformed in-place
     };
 
@@ -291,7 +286,8 @@ public:
     friend void cb_search_work_in_tree(void* SweepJob_state, unsigned **work, int *work_size, int local_id);
 	friend void cb_import_eq(void *SweepJobState, int *lit1, int *lit2, int localId);
 	friend void cb_import_unit(void *SweepJobState, int *lit, int localId);
-	friend int cb_custom_query(void *SweeJobState, int query);
+	friend int  cb_custom_query(void *SweeJobState, int query);
+	friend void cb_report_iteration(void *SweepJobState, int localId);
 
 
 private:
@@ -306,7 +302,7 @@ private:
 	void checkForUnsatResults();
 	void tryReportUnsat();
 	void reportSolverResult(KissatPtr sweeper, int res);
-	void printSweepStats(KissatPtr sweeper, bool end);
+	void reportEndStats(KissatPtr sweeper);
 	void printCongruenceStats(KissatPtr sweeper);
 	// void readResult(KissatPtr shweeper, bool withStats);
 	// void serializeResultFormula(KissatPtr sweeper);
@@ -319,7 +315,7 @@ private:
 
 	void solverGoStealing(KissatPtr sweeper);
 	void sendWorkstealsViaMPI();
-	void printIdleFraction();
+	void printIdleWorkStatus();
 	void printResweeps();
 
     void rootStartNewSharingRound();
@@ -331,7 +327,7 @@ private:
 
 	std::vector<int> getRandomIdPermutation();
 
-	void provideInitialWork(KissatPtr sweeper);
+	bool tryProvideInitialWork(KissatPtr sweeper);
 	std::vector<int> stealWorkFromAnyLocalSolver(int asking_rank, int asking_sourceLocalId); //parameters only for verbose logging
     std::vector<int> stealWorkFromSpecificLocalSolver(int localId);
     // void cbStealWork(unsigned **work, int *work_size, int localId);
@@ -339,7 +335,8 @@ private:
 	void checkForNewImportRound(KissatPtr sweeper);
 	void cbImportEq(int *ilit1, int *ilit2, int localId);
 	void cbImportUnit(int *lit, int localId);
-	int cbCustomQuery(int query);
+	int  cbCustomQuery(int query);
+	void cbReportIteration(int localId);
 	void clearImportedRound();
 
 	virtual ~SweepJob();

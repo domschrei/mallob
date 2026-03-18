@@ -37,11 +37,11 @@ MALLOB_OPTIONS="-t=$threads \
 	-preprocess-sweep=1 \
 	-sweep-sharing-period=0.020 \
   -sweep-resweep-chance=1000 \
-  -sweep-iterations=2 \
 	-sweep-solver-verbosity=2 \
 	-sweep-solver-quiet=1 \
   -sweep-congruence=0 \
-  -sweep-max-growth-iteration=3 \
+  -sweep-max-iterations=3 \
+  -sweep-max-depth=3 \
   -sweep-max-empty-rounds=5 \
   -preprocess-sweep-priority=1.0 \
 "

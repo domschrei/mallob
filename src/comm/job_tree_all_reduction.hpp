@@ -213,7 +213,7 @@ private:
             accept &= fromLeftChild || fromRightChild;
             if (!accept) return false;
 
-            LOG(VERB_ALLRED, "SWEEP RED <--%i--- [%i] child \n", msg.payload.size(), source);
+            LOG(V3_VERB, "SWEEP [%i] RED <<~~%i~~~ [%i] from child \n", _tree.nodeRank, msg.payload.size(), source);
             // message accepted: store and check off
             _child_elems.insert({source, std::move(msg.payload)});
             if (fromLeftChild) _received_child_elems.first = true;
@@ -240,18 +240,10 @@ public:
 
         if (_finished) return *this;
 
-        // LOG(V3_VERB, "SWEEP [%i] RED exp(%i) got(%i) loc(%i) childr[%i][%i]\n",
-            // _tree.nodeRank, _num_expected_child_elems, _child_elems.size(), _local_elem.has_value(), _expected_child_ranks.first, _expected_child_ranks.second);
-
-        // LOG(V3_VERB, "SWEEP [%i] RED recvd(%i,%i), ag'ing(%i) ag'ed(%i) fuvalid(%i) \n",
-            // _tree.nodeRank, _received_child_elems.first, _received_child_elems.second, _aggregating, _aggregated_logging, _future_aggregate.valid());
-
-        LOG(V3_VERB, "SWEEP [%i] RED g(%i) ex(%i) lc(%i) ch[%i][%i] rcvd(%i,%i)\n",
+        LOG(VERB_ALLRED, "SWEEP [%i] RED g(%i/%i) lc(%i) ch[%i][%i] rcvd(%i,%i)\n",
             _tree.nodeRank,  _child_elems.size(), _num_expected_child_elems, _local_elem.has_value(), _expected_child_ranks.first, _expected_child_ranks.second,
             _received_child_elems.first, _received_child_elems.second);
 
-        // LOG(V3_VERB, "SWEEP [%i] RED recvd(%i,%i), ag'ing(%i) ag'ed(%i) fuvalid(%i) \n",
-            // _tree.nodeRank, _received_child_elems.first, _received_child_elems.second, _aggregating, _aggregated_logging, _future_aggregate.valid());
 
         //It can happen that a reduction sent to the parent gets returned via the returnToSender error.
         //Afaik, this can happen (in rare cases) with combined modular BCAST+ALLRED, the following way
@@ -267,7 +259,7 @@ public:
             _base_msg.treeIndexOfDestination = _parent_index;
             _base_msg.contextIdOfDestination = _parent_ctx_id;
             assert(_base_msg.contextIdOfDestination != 0);
-            LOG(V3_VERB, "SWEEP [%i] RED ~~~%i~~~> [%i] to parent \n",_tree.nodeRank, _base_msg.payload.size(), _parent_rank);
+            LOG(V3_VERB, "SWEEP [%i] RED ~~~~%i~~>> [%i] to parent (is returnedToSender attempt) \n",_tree.nodeRank, _base_msg.payload.size(), _parent_rank);
             MyMpi::isend(_parent_rank, MSG_JOB_TREE_MODULAR_REDUCE, _base_msg);
             //Now that we re-send, the problem is no longer pending -- unless we get the error again, which would repeat this cycle
             _have_unanswered_returnToSender = false;
@@ -309,6 +301,7 @@ public:
 
             if (_is_root) {
                 // Transform reduced element at root
+                LOG(V3_VERB, "SWEEP [%i] RED ~~~~%i~~>> [%i] to root-trf \n",_tree.nodeRank, _aggregated_elem.value().size(), _parent_rank);
                 if (_has_transformation_at_root) {
                     _aggregated_elem.emplace(_transformation_at_root(_aggregated_elem.value()));
                 }

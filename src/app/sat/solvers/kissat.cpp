@@ -403,7 +403,7 @@ void Kissat::setSolverInterrupt() {
 
 void Kissat::triggerSweepTerminate(bool solver_does_single_iterations) {
     if (solver_does_single_iterations)
-        shweep_set_end_sweepjob(solver);
+        shweep_set_end_job_signal(solver);
     else
         shweep_terminate(solver);
 }
@@ -567,7 +567,7 @@ void Kissat::sweepImportUnits(int **units, int *unit_count) {
 }
 */
 
-void Kissat::sweepSetReportCallback() {
+void Kissat::sweepSetFormulaReportCallback() {
     kissat_set_preprocessing_report_callback(solver, this, begin_formula_report, report_preprocessed_lit);
 }
 
