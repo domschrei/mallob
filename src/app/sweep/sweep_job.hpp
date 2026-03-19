@@ -101,17 +101,20 @@ private:
     const int TAG_ALLRED		= 1004;
 	const int TAG_FOUND_UNSAT	= 1005;
 
-	const int NUM_SEARCHING_WORK_FIELDS = 3; //must match with the number of fields we actually provide at that point (follow symbol)
+	const int NUM_SEARCHING_WORK_FIELDS = 3; //how many fields are attached to an MPI message searching work
 
 	//each aggregation element has some metadata integers at the end
-	static const int NUM_METADATA_FIELDS = 6;
+	static const int NUM_METADATA_FIELDS = 9;
 		//field indices must be unique numbers exactly filling 1..NUM_METADATA_FIELDS !
-		static const int METADATA_TERMINATE			= 6;
-		static const int METADATA_SWEEP_ITERATION = 5;
+		static const int METADATA_WORK_SWEEPS		 = 9;
+		static const int METADATA_WORK_STEPOVERS	= 8;
+		static const int METADATA_UNSCHED_RESWEEPS = 7;
+		static const int METADATA_TERMINATE		  = 6;
+		static const int METADATA_SWEEP_ITERATION= 5;
 		static const int METADATA_SHARING_ROUND = 4;
-		static const int METADATA_IDLE		  = 3;
-		static const int METADATA_UNIT_SIZE	 = 2;
-		static const int METADATA_EQ_SIZE   = 1;
+		static const int METADATA_IDLE		   = 3;
+		static const int METADATA_UNIT_SIZE	  = 2;
+		static const int METADATA_EQ_SIZE    = 1;
 
 
 	//Distribute Eqs and Units that we received from sharing broadcast to local solvers
@@ -148,13 +151,13 @@ private:
 	// int _NO_UNSAT_REPORT_YET = -1;
 	// std::atomic_int  _first_UNSAT_reporting_localId = _NO_UNSAT_REPORT_YET;
 
-	std::vector<int> _worksweeps{}; //to collect statistics
-	std::vector<int> _resweeps_in{};
-	std::vector<int> _resweeps_out{};
-	// shweep_statistics _congruence_stats{};
+	// std::vector<int> _worksweeps{}; //to collect statistics
+	// std::vector<int> _resweeps_in{};
+	// std::vector<int> _resweeps_out{};
 
-	Logger _reslogger; //Logging most important results in dedicated file, to not have them mangled by other verbose logs
+	Logger _reslogger;  //Logging most important results in dedicated file, to not have them mangled by other verbose logs
 	Logger _warnlogger; //Logging some warnings in a dedicated file, to avoid needing to grep later the whole large main log files for these warnings
+	// Logger _rootlogger; //Logging information from the root transformation
 
 	//the root node tracks the number of sweep iterations and sharing rounds, distributes this information in the sharing operation
 	int _root_shared_units_this_iteration = 0;
@@ -192,8 +195,12 @@ private:
 			LOG(V2_INFO, "SWEEP [%i](root-trf) ITERATION %i/%i STARTED \n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations());
 		}
 
-		int n_units = payload[payload.size() - METADATA_UNIT_SIZE];
-		int n_eqs   = payload[payload.size() - METADATA_EQ_SIZE] / 2;
+		int n_units	 = payload[payload.size() - METADATA_UNIT_SIZE];
+		int n_eqs	 = payload[payload.size() - METADATA_EQ_SIZE] / 2;  //each equivalence takes up two integers
+		bool all_idle= payload[payload.size() - METADATA_IDLE];
+		int work_sweeps			 = payload[payload.size() - METADATA_WORK_SWEEPS];
+		int work_stepovers		 = payload[payload.size() - METADATA_WORK_STEPOVERS];
+		int work_unsched_resweeps= payload[payload.size() - METADATA_UNSCHED_RESWEEPS];
 
 		_root_shared_units_this_iteration += n_units;
 		_root_shared_eqs_this_iteration   += n_eqs;
@@ -215,7 +222,6 @@ private:
 		}
 
 		bool send_terminate = false;
-		bool received_all_idle = payload[payload.size() - METADATA_IDLE];
 		bool terminate_emptyrounds = _root_emptyrounds_before_progress > MAX_TOLERATED_EMPTYROUNDS;
 
 		if (terminate_emptyrounds) {
@@ -223,8 +229,8 @@ private:
 		}
 
 		//A round is finished if all sweepers are idle, or if we had for too long exclusively empty rounds since the start of this iteration
-		if (received_all_idle || terminate_emptyrounds) {
-			LOG(V2_INFO, "SWEEP [%i](root-trf) (%i)all_idle  (%i)terminate_emptyrounds \n", _my_rank, received_all_idle, terminate_emptyrounds);
+		if (all_idle || terminate_emptyrounds) {
+			LOG(V2_INFO, "SWEEP [%i](root-trf) (%i)all_idle  (%i)terminate_emptyrounds \n", _my_rank, all_idle, terminate_emptyrounds);
 			LOG(V2_INFO, "SWEEP [%i](root-trf) ITERATION %i/%i FINISHED (seen at root transform) in sharing round %i \n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations(), _root_sharing_round);
 			LOG(V2_INFO, "SWEEP [%i](root-trf) ITERATION %i/%i shared: %i EQS, %i UNITS  \n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations(), _root_shared_eqs_this_iteration, _root_shared_units_this_iteration);
 			//The kissat solver will report the sweep stats itself via a callback once it has cleaned up its internal database and metrics via substitute()
@@ -258,7 +264,20 @@ private:
 		//the all_idle payload is already set
 
 		assert(!terminate_emptyrounds || send_terminate || log_return_false("SWEEP ERROR unexpected: Sweep root didnt send out terminate signal eventhough it should due to too many emptyrounds "));
-		LOG(V3_VERB, "SWEEP [%i](root-trf) send: Iter(%i) rnd(%i): E %i, U %i, (%i)allidle (%i)terminate  \n", _my_rank, _root_sweep_iteration, _root_sharing_round, n_eqs, n_units, received_all_idle, send_terminate);
+
+		char logmsg[512];
+		snprintf(logmsg, sizeof(logmsg),
+			"SWEEP [%i](root-trf) send: iter %i rnd %i :  %i ai  %i trm  E %i  U %i    SW %i  ST %i  RE %i      WW  %i \n",
+			_my_rank, _root_sweep_iteration, _root_sharing_round, all_idle, send_terminate, n_eqs, n_units,
+			work_sweeps, work_stepovers, work_unsched_resweeps, work_sweeps + work_stepovers
+		);
+
+		//Log two times, once for completeness chronologically in the general logs, and once in a special root file for easier postprocessing later
+		LOG(			   V2_INFO, "%s", logmsg);
+		LOGGER(_reslogger, V2_INFO, "%s", logmsg);
+
+		// LOG(V2_INFO,				 "SWEEP [%i](root-trf) send: Iter(%i) rnd(%i): (%i)ai (%i)trm  E %i  U %i    SW %i  ST %i  RE %i  WW (%i)   \n", _my_rank, _root_sweep_iteration, _root_sharing_round, all_idle, send_terminate, n_eqs, n_units, work_sweeps, work_stepovers,  work_unsched_resweeps, work_sweeps + work_stepovers);
+		// LOGGER(_rootlogger, V2_INFO, "SWEEP [%i](root-trf) send: Iter(%i) rnd(%i): (%i)ai (%i)trm  E %i  U %i    SW %i  ST %i  RE %i  WW (%i)   \n", _my_rank, _root_sweep_iteration, _root_sharing_round, all_idle, send_terminate, n_eqs, n_units, work_sweeps, work_stepovers,  work_unsched_resweeps, work_sweeps + work_stepovers);
 		//no return, payload was just transformed in-place
     };
 
@@ -304,8 +323,6 @@ private:
 	void reportSolverResult(KissatPtr sweeper, int res);
 	void reportEndStats(KissatPtr sweeper);
 	void printCongruenceStats(KissatPtr sweeper);
-	// void readResult(KissatPtr shweeper, bool withStats);
-	// void serializeResultFormula(KissatPtr sweeper);
 
 	void triggerTerminations();
 
@@ -316,12 +333,12 @@ private:
 	void solverGoStealing(KissatPtr sweeper);
 	void sendWorkstealsViaMPI();
 	void printIdleWorkStatus();
-	void printResweeps();
+	// void printResweeps();
 
     void rootStartNewSharingRound();
     void cbContributeToAllReduce();
     static std::vector<int> aggregateEqUnitContributions(std::list<std::vector<int>> &contribs);
-	static void appendMetadataToReductionElement(std::vector<int> &contrib, int is_idle, int unit_size, int eq_size);
+	static void appendMetadataToReductionElement(std::vector<int> &contrib, int is_idle, int unit_size, int eq_size, int work_sweeps, int work_stepovers, int unsched_resweeps);
 	void advanceAllReduction();
 	void extractAllReductionResult();
 

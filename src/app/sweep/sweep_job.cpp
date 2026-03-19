@@ -15,6 +15,7 @@ SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTa
     : Job(params, setup, table),
 	_reslogger(Logger::getMainInstance().copy("<RESULT>", ".sweep")),
 	_warnlogger(Logger::getMainInstance().copy("<WARN>", ".warn"))
+	// _rootlogger(Logger::getMainInstance().copy("<ROOT>", ".sweeproot"))
 {
 	assert(_params.jobCommUpdatePeriod() > 0 || log_return_false("[ERROR] For this application to work,"
             " you must explicitly enable job communicators with the -jcup option, e.g., -jcup=0.1\n"));
@@ -70,8 +71,9 @@ void SweepJob::appl_start() {
 
 	_start_sweep_timestamp = Timer::elapsedSeconds();
 
-    _reslogger = Logger::getMainInstance().copy("<RESULT>", ".sweep");
-    _warnlogger = Logger::getMainInstance().copy("<WARN>", ".warn");
+    // _reslogger = Logger::getMainInstance().copy("<RESULT>", ".sweep");
+    // _warnlogger = Logger::getMainInstance().copy("<WARN>", ".warn");
+    // _rootlogger = Logger::getMainInstance().copy("<ROOT>", ".root");
 
 	_worksteal_requests.resize(_nThreads);
 
@@ -84,9 +86,9 @@ void SweepJob::appl_start() {
 	_EQS_to_import.resize(MAX_IMPORT_SIZE);
 	_UNITS_to_import.resize(MAX_IMPORT_SIZE);
 
-	_worksweeps = std::vector<int>(_nThreads, -1);
-	_resweeps_in = std::vector<int>(_nThreads, -1);
-	_resweeps_out = std::vector<int>(_nThreads, -1);
+	// _worksweeps = std::vector<int>(_nThreads, -1);
+	// _resweeps_in = std::vector<int>(_nThreads, -1);
+	// _resweeps_out = std::vector<int>(_nThreads, -1);
 
 	//To randomize workstealing on a given rank, we create a list of all ids that will be then shuffled each time
 	std::ostringstream oss;
@@ -341,7 +343,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		auto sweeper = createNewSweeper(localId);
 
 		loadFormula(sweeper);
-		_started_sweepers_count++; //only additive, monotonically increasing, going from 0...nThreads-1 and never decreased
+		_started_sweepers_count++; //only additive, monotonically increasing, going from 0...nThreads-1 and never decreases
 		_running_sweepers_count++; //tracks actual number of running solvers at any given moment in time
 		/*
 		 *  Syncronization Layer!
@@ -360,7 +362,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		if (_terminate_all) {
 			LOG(V3_VERB, "SWEEP [%i](%i): terminated while waiting in synchronization \n", _my_rank, localId);
 			_running_sweepers_count--;
-			_finished_sweepers_count++;
+			_finished_sweepers_count++; //only monotonically increasing
 			_terminated_while_synchronizing = true;
 			// maybe this release helps with memory?
 			// kissat_release(sweeper->solver);
@@ -368,21 +370,21 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		}
 
 		_sweepers[localId] = sweeper; //only now expose the solver to the rest of the system, now that we know we start solving
-		_started_synchronized_solving = true; //multiple threads will write non-thread-safe to this bool, but all only monotonically to "true"
+		_started_synchronized_solving = true; //multiple threads will write non-thread-safe to this bool, but all will write monotonically "true"
 
 		LOG(V3_VERB, "SWEEP [%i](%i) START solve() \n", _my_rank, localId);
 		int res = sweeper->solve(0, nullptr);
 		LOG(V3_VERB, "SWEEP [%i](%i) FINISH solve(). Result %i \n", _my_rank, localId, res);
 
 		//transfer some solver-specific statistics
-		auto stats = sweeper->fetchSweepStats();
-		_worksweeps[localId] = stats.worksweeps;
-		_resweeps_in[localId] = stats.resweeps_in;
-		_resweeps_out[localId] = stats.resweeps_out;
+		// auto stats = sweeper->fetchSweepStats();
+		// _worksweeps[localId] = stats.worksweeps;
+		// _resweeps_in[localId] = stats.resweeps_into_work;
+		// _resweeps_out[localId] = stats.resweeps_outof_work;
 
-		if (sweeper->is_congruencer) {
-			printCongruenceStats(sweeper);
-		}
+		// if (sweeper->is_congruencer) {
+			// printCongruenceStats(sweeper);
+		// }
 
 		if (res==UNSAT) {
 			//Found UNSAT
@@ -422,9 +424,9 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 
 		//If no solver sets UNSAT or IMPROVED, the job will be returned by default as UNKNOWN
 
-		if (_running_sweepers_count==1) { //the last solver should report resweeps, as only then they are gathered from all exited solvers
-			printResweeps();
-		}
+		// if (_running_sweepers_count==1) { //the last solver should report resweeps, as only then they are gathered from all exited solvers
+			// printResweeps();
+		// }
 
 		_sweepers[localId]->cleanUp(); //write kissat timing profile
 		_sweepers[localId].reset();  //this should delete the only persistent shared pointer on the solver, and thus trigger its destructor soon
@@ -485,11 +487,12 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 		//we want to read out the final formula at the root node for convenience, so we provide this callback only to root-node solvers in the first place
 		sweeper->sweepSetFormulaReportCallback();
 		sweeper->setRepresentativeLocalId(_representative_localId);
-
+		//One representive solver at the root node reports about its new kissat-internal state after each iteration (e.g., number of active variables, clauses, etc)
 		if (localId==_representative_localId) {
 			shweep_set_report_finished_iteration_callback(sweeper->solver, this, cb_report_iteration);
 		}
 	}
+
 
     //Basic configuration
 	// int quiet = _params.sweepSolverVerbosity()==0 ? 1 : 0;
@@ -548,40 +551,40 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 }
 
 void SweepJob::cbReportIteration(int localId) {
-	assert(_is_root);
+	assert(_is_root || log_return_false("SWEEP ERROR : iteration report in a non-root rank. Technically possible, but currently not allowed \n"));
 	assert(localId == _representative_localId);
 	KissatPtr sweeper = _sweepers[localId];
 	assert(sweeper);
-	int iteration = shweep_get_curr_iteration(sweeper->solver);
+	// int iteration = shweep_get_curr_iteration(sweeper->solver);
 	auto stats = sweeper->fetchSweepStats();
 
 	LOG(			  V2_INFO, "SWEEP solver [%i](%i) reports statistics in dedicated .sweep file \n", _my_rank, localId);
 	LOGGER(_reslogger, V2_INFO, "\n");
 	LOGGER(_reslogger,V2_INFO, "Reported by [%i](%i)		\n", _my_rank, localId);
-	LOGGER(_reslogger,V2_INFO, "ITERATION_CURR    %i \n", iteration);
-	LOGGER(_reslogger,V2_INFO, "ITERATIONS_MAX     %i \n", _params.sweepMaxIterations());
-	LOGGER(_reslogger,V2_INFO, "TIME                    %.3f s \n", Timer::elapsedSeconds() - _start_sweep_timestamp);
-	LOGGER(_reslogger,V2_INFO, "ACTIVE_PRCNT            %.2f % \n", 100*(double)stats.curr_active/(double)stats.vars_active_orig);
-	LOGGER(_reslogger,V2_INFO, "ENV_LIMIT_VARS    %i \n", stats.env_limit_vars);
-	LOGGER(_reslogger,V2_INFO, "ENV_LIMIT_DEPTH   %i \n", stats.env_limit_depth);
-	LOGGER(_reslogger,V2_INFO, "ENV_LIMIT_CLAUSES %i \n", stats.env_limit_clauses);
-	LOGGER(_reslogger,V2_INFO, "ROUNDS_THISITER     %i   \n", _root_rounds_this_iteration);
-	LOGGER(_reslogger,V2_INFO, "EMPTYROUNDS_BP      %i   \n", _root_emptyrounds_before_progress);
+	LOGGER(_reslogger,V2_INFO, "ITERATION_CURR    %i		\n", stats.curr_iteration);
+	LOGGER(_reslogger,V2_INFO, "ITERATIONS_MAX     %i		\n", _params.sweepMaxIterations());
+	LOGGER(_reslogger,V2_INFO, "TIME                    %.3f s\n", Timer::elapsedSeconds() - _start_sweep_timestamp);
+	LOGGER(_reslogger,V2_INFO, "ACTIVE_PRCNT            %.2f %\n", 100*(double)stats.curr_active/(double)stats.vars_active_orig);
+	LOGGER(_reslogger,V2_INFO, "ENV_LIMIT_VARS    %i 		\n", stats.env_limit_vars);
+	LOGGER(_reslogger,V2_INFO, "ENV_LIMIT_DEPTH   %i 		\n", stats.env_limit_depth);
+	LOGGER(_reslogger,V2_INFO, "ENV_LIMIT_CLAUSES %i 		\n", stats.env_limit_clauses);
+	LOGGER(_reslogger,V2_INFO, "ROUNDS_THISITER     %i   	\n",_root_rounds_this_iteration);
+	LOGGER(_reslogger,V2_INFO, "EMPTYROUNDS_BP      %i   	\n",_root_emptyrounds_before_progress);
 
-	LOGGER(_reslogger,V2_INFO, "CLAUSES_CURR		%i \n", stats.clauses);
-	LOGGER(_reslogger,V2_INFO, "CLAUSES_ORIG		%i \n", stats.clauses_orig);
-	LOGGER(_reslogger,V2_INFO, "BINIRR_CURR				%i \n", stats.binirr);
-	LOGGER(_reslogger,V2_INFO, "BINIRR_ORIG				%i \n", stats.binirr_orig);
-	LOGGER(_reslogger,V2_INFO, "ACTIVE_CURR      %i \n", stats.curr_active);
-	LOGGER(_reslogger,V2_INFO, "ACTIVE_ORIG      %i \n", stats.vars_active_orig);
-	LOGGER(_reslogger,V2_INFO, "NONACTIVE_CURR          %i \n", stats.vars_active_orig - stats.curr_active);
-	LOGGER(_reslogger,V2_INFO, "ELIMINATED       %i \n", stats.curr_eliminated);
-	LOGGER(_reslogger,V2_INFO, "NEWUNITS         %i \n", stats.curr_units - stats.units_orig);
-	LOGGER(_reslogger,V2_INFO, "ALLUNITS         %i \n", stats.curr_units);
-	LOGGER(_reslogger,V2_INFO, "SUM_ELIM_NEWU           %i \n", stats.curr_eliminated + stats.curr_units - stats.units_orig );
-	LOGGER(_reslogger,V2_INFO, "SWEEPUNITS       %i \n", stats.sweep_units);
-	LOGGER(_reslogger,V2_INFO, "EQUIVALENCES     %i \n", stats.sweep_eqs);
-	LOGGER(_reslogger,V2_INFO, "SUM_SWEEP_EU            %i \n", stats.sweep_eqs + stats.sweep_units);
+	LOGGER(_reslogger,V2_INFO, "CLAUSES_CURR		%i 		\n", stats.clauses);
+	LOGGER(_reslogger,V2_INFO, "CLAUSES_ORIG		%i 		\n", stats.clauses_orig);
+	LOGGER(_reslogger,V2_INFO, "BINIRR_CURR				%i	\n", stats.binirr);
+	LOGGER(_reslogger,V2_INFO, "BINIRR_ORIG				%i	\n", stats.binirr_orig);
+	LOGGER(_reslogger,V2_INFO, "ACTIVE_CURR      %i			\n", stats.curr_active);
+	LOGGER(_reslogger,V2_INFO, "ACTIVE_ORIG      %i			\n", stats.vars_active_orig);
+	LOGGER(_reslogger,V2_INFO, "NONACTIVE_CURR          %i	\n", stats.vars_active_orig - stats.curr_active);
+	LOGGER(_reslogger,V2_INFO, "ELIMINATED       %i 		\n", stats.curr_eliminated);
+	LOGGER(_reslogger,V2_INFO, "NEWUNITS         %i 		\n", stats.curr_units - stats.units_orig);
+	LOGGER(_reslogger,V2_INFO, "ALLUNITS         %i 		\n", stats.curr_units);
+	LOGGER(_reslogger,V2_INFO, "SUM_ELIM_NEWU           %i	\n", stats.curr_eliminated + stats.curr_units - stats.units_orig );
+	LOGGER(_reslogger,V2_INFO, "SWEEPUNITS       %i 		\n", stats.sweep_units);
+	LOGGER(_reslogger,V2_INFO, "EQUIVALENCES     %i 		\n", stats.sweep_eqs);
+	LOGGER(_reslogger,V2_INFO, "SUM_SWEEP_EU            %i  \n", stats.sweep_eqs + stats.sweep_units);
 	LOGGER(_reslogger,V2_INFO, "\n");
 }
 
@@ -618,12 +621,12 @@ void SweepJob::reportEndStats(KissatPtr sweeper) {
 	}
 }
 
-void SweepJob::printCongruenceStats(KissatPtr sweeper) {
-	auto stats = sweeper->fetchSweepStats();
-	LOGGER(_reslogger, V2_INFO, "CONGRUENCE_EQUIVALENCES   %i \n", stats.congr_eqs);
-	LOGGER(_reslogger, V2_INFO, "CONGRUENCE_UNITS          %i \n", stats.congr_units);
-	LOGGER(_reslogger, V2_INFO, "CONGRUENCE_EQS_SKIPPED    %i / %i \n", stats.congr_eqs_skipped, stats.eqs_seen);
-}
+// void SweepJob::printCongruenceStats(KissatPtr sweeper) {
+	// auto stats = sweeper->fetchSweepStats();
+	// LOGGER(_reslogger, V2_INFO, "CONGRUENCE_EQUIVALENCES   %i \n", stats.congr_eqs);
+	// LOGGER(_reslogger, V2_INFO, "CONGRUENCE_UNITS          %i \n", stats.congr_units);
+	// LOGGER(_reslogger, V2_INFO, "CONGRUENCE_EQS_SKIPPED    %i / %i \n", stats.congr_eqs_skipped, stats.eqs_seen);
+// }
 
 
 void SweepJob::printIdleWorkStatus() {
@@ -705,27 +708,27 @@ bool SweepJob::okToTrackSharingDelay() {
 	// return true;
 }
 
-void SweepJob::printResweeps() {
-	std::ostringstream oss;
-	int worksweeps = 0;
-	int resweeps_in = 0;
-	int resweeps_out = 0;
-	for (int i=0; i<_nThreads; i++) {
-		oss << " (id=" << i
-		<<" ws=" << _worksweeps[i]
-		<<" rsi=" << _resweeps_in[i]
-		<<" rso=" << _resweeps_out[i]
-		<<") ";
-		worksweeps += _worksweeps[i];
-		resweeps_in += _resweeps_in[i];
-		resweeps_out += _resweeps_out[i];
-	}
+// void SweepJob::printResweeps() {
+	// std::ostringstream oss;
+	// int worksweeps = 0;
+	// int resweeps_in = 0;
+	// int resweeps_out = 0;
+	// for (int i=0; i<_nThreads; i++) {
+		// oss << " (id=" << i
+		// <<" ws=" << _worksweeps[i]
+		// <<" rsi=" << _resweeps_in[i]
+		// <<" rso=" << _resweeps_out[i]
+		// <<") ";
+		// worksweeps += _worksweeps[i];
+		// resweeps_in += _resweeps_in[i];
+		// resweeps_out += _resweeps_out[i];
+	// }
 	// LOG(V3_VERB, "SWEEP WORKSWEEPS,RESWEEPS: %s \n", _my_rank, oss.str().c_str()); //information for each individual thread
-	LOGGER(_reslogger, V2_INFO, "[%i] SWEEP_WORKSWEEPS   %i \n", _my_rank, worksweeps);
-	LOGGER(_reslogger, V2_INFO, "[%i] SWEEP_RESWEEPS_ALL %i \n", _my_rank, resweeps_in + resweeps_out);
-	LOGGER(_reslogger, V3_VERB, "[%i] SWEEP_RESWEEPS_IN  %i \n", _my_rank, resweeps_in);
-	LOGGER(_reslogger, V3_VERB, "[%i] SWEEP_RESWEEPS_OUT %i \n", _my_rank, resweeps_out);
-}
+	// LOGGER(_reslogger, V2_INFO, "[%i] SWEEP_WORKSWEEPS   %i \n", _my_rank, worksweeps);
+	// LOGGER(_reslogger, V2_INFO, "[%i] SWEEP_RESWEEPS_ALL %i \n", _my_rank, resweeps_in + resweeps_out);
+	// LOGGER(_reslogger, V3_VERB, "[%i] SWEEP_RESWEEPS_IN  %i \n", _my_rank, resweeps_in);
+	// LOGGER(_reslogger, V3_VERB, "[%i] SWEEP_RESWEEPS_OUT %i \n", _my_rank, resweeps_out);
+// }
 
 
 bool SweepJob::skip_MPI_forNow() {
@@ -1156,16 +1159,19 @@ void SweepJob::rootStartNewSharingRound() {
 	_bcast->broadcast(std::move(msg));
 }
 
-void SweepJob::appendMetadataToReductionElement(std::vector<int> &contrib, int is_idle, int unit_size, int eq_size) {
+void SweepJob::appendMetadataToReductionElement(std::vector<int> &contrib, int is_idle, int unit_size, int eq_size, int work_sweeps, int work_stepovers, int unsched_resweeps) {
 	contrib.insert(contrib.end(), NUM_METADATA_FIELDS, 0); //Make space for the upcoming metadata, initialized with zero
 	int size = contrib.size();
 	int n=0;
-	n++; contrib[size - METADATA_TERMINATE]      = 0;  //dummy, will be set by root transformation, here just for completeness
+	n++; contrib[size - METADATA_TERMINATE]      = 0;  //dummy, for completeness and robustness, to have the n++ count match
 	n++; contrib[size - METADATA_SWEEP_ITERATION]= 0;  //dummy, ""
 	n++; contrib[size - METADATA_SHARING_ROUND]  = 0;  //dummy, ""
 	n++; contrib[size - METADATA_IDLE]       = is_idle;
 	n++; contrib[size - METADATA_UNIT_SIZE]  = unit_size;
 	n++; contrib[size - METADATA_EQ_SIZE]    = eq_size;
+	n++; contrib[size - METADATA_WORK_SWEEPS]     = work_sweeps;
+	n++; contrib[size - METADATA_WORK_STEPOVERS]  = work_stepovers;
+	n++; contrib[size - METADATA_UNSCHED_RESWEEPS]= unsched_resweeps;
 	assert(n==NUM_METADATA_FIELDS || log_return_false("SWEEP ERROR: Added metadata count (%i) doesnt match expected number (%i) \n", n, NUM_METADATA_FIELDS));
 }
 
@@ -1191,8 +1197,10 @@ void SweepJob::cbContributeToAllReduce() {
 		//	Only via getJobTree().. we get the most up-to-date tree, as updated in appl_communicate
 		//  Instead with our own snapshot object, we would just re-use the one from last round, i.e. re-use the one from the very first round and never get any updates in, and remain stuck tree-wise
 		_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
-		// if (getJobTree().getCommSize())
 		// _bcast.reset(new JobTreeBroadcast(getId(), snapshot, [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT)); <<-- remains stuck at the very initial tree snapshot !
+		if (getJobTree().getCommSize() < getVolume()) {
+			LOG(V1_WARN, ">>>> WARN SWEEP [%i] BCAST Tree size %i smaller than volume %i \n", _my_rank, getJobTree().getCommSize(), getVolume());
+		}
 	}
 
 	if (_terminate_all.load(std::memory_order_relaxed)) {
@@ -1202,7 +1210,7 @@ void SweepJob::cbContributeToAllReduce() {
 
 
 	if (_red && _red->hasResult()) {
-		LOG(V1_WARN, ">>>> Warn SWEEP [%i] RED SHARE RESET: Noticing results from current _reduction just now in callback from new broadcast\n", _my_rank);
+		LOG(V1_WARN, ">>>> Warn SWEEP [%i] Noticing unextracted _red results late during broadcast callback\n", _my_rank);
 		extractAllReductionResult();
 	}
 
@@ -1210,13 +1218,8 @@ void SweepJob::cbContributeToAllReduce() {
 	baseMsg.tag = TAG_ALLRED;
 	LOG(V4_VVER, "SWEEP [%i] RED SHARE RESET\n", _my_rank);
 	_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateEqUnitContributions));
-	// _red->setResultCallback([this]() {
-	  // extractAllReductionResult();
-	// });
-	// _red->setResultCallback(extractAllReductionResult());
 	if (_is_root)
 		_red->setInplaceTransformationOfElementAtRoot(_inplace_rootTransform);
-
 
 	//Bring individual data per thread in the sharing element format: [Equivalences, Units, eq_size, unit_size, all_idle]
 	std::list<std::vector<int>> contribs;
@@ -1243,17 +1246,15 @@ void SweepJob::cbContributeToAllReduce() {
 
 		int eq_size = eqs.size();
 		int unit_size = units.size();
-		assert(eq_size%2==0 || log_return_false("ERROR in AGGR: Non-even number %i of equivalence literals, should always come in pairs", eq_size)); //equivalences come always in pairs
-		//we need to glue together equivalences and units. can use move on the equivalences to save a copying of them, and only need to copy the units
-		//moved logging before the actions, because this code triggered std::bad_alloc once, might give some more info next time
+		assert(eq_size%2==0 || log_return_false("ERROR in AGGR: Non-even number %i of equivalence literals, should always come in pairs", eq_size));
 		LOG(V5_DEBG, "SWEEP SHARE REDUCE (%i): %i eq_size, %i units, %i idle \n", sweeper->getLocalId(), eq_size, unit_size, sweeper->sweeper_is_idle);
+
+
 		std::vector<int> contrib = std::move(eqs);
 		contrib.insert(contrib.end(), units.begin(), units.end());
 
-		 /*
-		  * Todo: update idle_status now that sweepers disappear between iterations!
-		  */
-		appendMetadataToReductionElement(contrib, sweeper->sweeper_is_idle, unit_size, eq_size);
+		auto stats = sweeper->fetchSweepStats();
+		appendMetadataToReductionElement(contrib, sweeper->sweeper_is_idle, unit_size, eq_size, stats.progress_work_sweeps, stats.progress_work_stepovers, stats.progress_unsched_resweeps);
 
 		contribs.push_back(contrib);
 	}
@@ -1304,8 +1305,10 @@ void SweepJob::extractAllReductionResult() {
 		_timestamp_receive_sharing_result.push_back(Timer::elapsedSeconds());
 
 
-	LOG(V2_INFO,				"SWEEP GOTT: iter %i round %i : %i all_idle, %i terminate. E U  %i  %i  \n", sweep_iteration, sharing_round, all_idle, terminate, eq_size/2, unit_size);
-	LOGGER(_reslogger, V2_INFO, "SWEEP GOTT: iter %i round %i : %i all_idle, %i terminate. E U  %i  %i  \n", sweep_iteration, sharing_round, all_idle, terminate, eq_size/2, unit_size);
+	LOG(V2_INFO, "SWEEP GOTT: iter %i round %i : %i ai , %i trm . E %i  U %i  \n", sweep_iteration, sharing_round, all_idle, terminate, eq_size/2, unit_size);
+	// if (_is_root) {
+		// LOGGER(_reslogger, V2_INFO, "SWEEP GOTT: iter %i round %i : %i ai , %i trm . E %i  U %i  \n", sweep_iteration, sharing_round, all_idle, terminate, eq_size/2, unit_size);
+	// }
 	// LOG(V2_INFO, "SWEEP RED SHARE SKIP bc not all init'd yet: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)terminate. #longidle: %i / %i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastLongtermIdleCount, _nThreads);
 
 #if SWEEP_NEW_IMPORT_VERSION == 0
@@ -1465,7 +1468,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	//Extract deduplicated units and equivalences
 	std::vector<int> aggregated;
 	int total_aggregated_size = 0;
-	int aggr_eq_size   = 2*dedup_eqs.size(); //each key is 64 bit, i.e. 2 literals
+	int aggr_eq_size   = 2*dedup_eqs.size(); //each key is 64 bit, i.e. 2 32-bit literals
 	int aggr_unit_size = dedup_units.size();
 	int aggr_data_size = aggr_eq_size + aggr_unit_size;
 	aggregated.resize(aggr_data_size);
@@ -1490,11 +1493,21 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
     	all_idle &= idle;
     }
 
+	//Aggregate the individual work/resweep counts
+	int sum_work_sweeps = 0;
+	int sum_work_stepovers = 0;
+	int sum_unsched_resweeps = 0;
+	for (const auto &contrib : contribs) {
+		sum_work_sweeps     += contrib[contrib.size()-METADATA_WORK_SWEEPS];
+		sum_work_stepovers  += contrib[contrib.size()-METADATA_WORK_STEPOVERS];
+		sum_unsched_resweeps+= contrib[contrib.size()-METADATA_UNSCHED_RESWEEPS];
+	}
+
 	if (contribs.empty()) {
 		all_idle = false; //edge-case: if not a single solver is initialized yet, we are waiting for them to come online, so they are not really idle
 	}
 
-	appendMetadataToReductionElement(aggregated, all_idle, aggr_unit_size, aggr_eq_size);
+	appendMetadataToReductionElement(aggregated, all_idle, aggr_unit_size, aggr_eq_size, sum_work_sweeps, sum_work_stepovers, sum_unsched_resweeps);
 
 	// if (contribs.size()>1)
 	LOG(V4_VVER, "SWEEP RED aggregated %i contributions: E %i, U %i, (%i)allidle\n", contribs.size(), aggr_eq_size/2, aggr_unit_size, all_idle);
