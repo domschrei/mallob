@@ -563,7 +563,7 @@ void SweepJob::cbReportIteration(int localId) {
 	LOGGER(_reslogger,V2_INFO, "Reported by [%i](%i)		\n", _my_rank, localId);
 	LOGGER(_reslogger,V2_INFO, "ITERATION_CURR    %i		\n", stats.curr_iteration);
 	LOGGER(_reslogger,V2_INFO, "ITERATIONS_MAX     %i		\n", _params.sweepMaxIterations());
-	LOGGER(_reslogger,V2_INFO, "TIME                    %.3f s\n", Timer::elapsedSeconds() - _start_sweep_timestamp);
+	LOGGER(_reslogger,V2_INFO, "TIME_SEC                %.3f s\n", Timer::elapsedSeconds() - _start_sweep_timestamp);
 	LOGGER(_reslogger,V2_INFO, "ACTIVE_PRCNT            %.2f %\n", 100*(double)stats.curr_active/(double)stats.vars_active_orig);
 	LOGGER(_reslogger,V2_INFO, "ENV_LIMIT_VARS    %i 		\n", stats.env_limit_vars);
 	LOGGER(_reslogger,V2_INFO, "ENV_LIMIT_DEPTH   %i 		\n", stats.env_limit_depth);
@@ -577,7 +577,7 @@ void SweepJob::cbReportIteration(int localId) {
 	LOGGER(_reslogger,V2_INFO, "BINIRR_ORIG				%i	\n", stats.binirr_orig);
 	LOGGER(_reslogger,V2_INFO, "ACTIVE_CURR      %i			\n", stats.curr_active);
 	LOGGER(_reslogger,V2_INFO, "ACTIVE_ORIG      %i			\n", stats.vars_active_orig);
-	LOGGER(_reslogger,V2_INFO, "NONACTIVE_CURR          %i	\n", stats.vars_active_orig - stats.curr_active);
+	LOGGER(_reslogger,V2_INFO, "FIXED_CURR              %i	\n", stats.vars_active_orig - stats.curr_active);
 	LOGGER(_reslogger,V2_INFO, "ELIMINATED       %i 		\n", stats.curr_eliminated);
 	LOGGER(_reslogger,V2_INFO, "NEWUNITS         %i 		\n", stats.curr_units - stats.units_orig);
 	LOGGER(_reslogger,V2_INFO, "ALLUNITS         %i 		\n", stats.curr_units);
