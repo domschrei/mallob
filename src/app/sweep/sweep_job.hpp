@@ -44,13 +44,14 @@ private:
     std::atomic_int _running_sweepers_count {0};
 	std::atomic_int _finished_sweepers_count {0};
 	std::vector<int> _list_of_ids;
-	std::atomic_bool _started_synchronized_solving{false};
-	std::atomic_bool _terminated_while_synchronizing{false};
-	bool _started_sharedelay_tracking{false};
+	std::atomic_bool _flag_started_synchronized_solving{false};
+	std::atomic<float> _timestamp_started_synchronized_solving{0};
+	std::atomic_bool _flag_terminated_while_synchronizing{false};
+	// bool _started_sharedelay_tracking{false};
 	int _lastLongtermIdleCount{0};
 
 	//Timing
-	float _start_sweep_timestamp;
+	float			   _timestamp_start_sweepapp;
 	std::vector<float> _timestamp_root_started_bcast;
 	std::vector<float> _timestamp_receive_sharing_result;
 	std::vector<float> _timestamp_contributed_to_sharing;
@@ -168,7 +169,7 @@ private:
 	int _root_rounds_this_iteration = 0;
 	int _root_sweep_iteration = 0;
 	int _root_sharing_round = 0;
-	bool _root_did_just_finish_iteration = true; //remember for the next sharing round that we entered a new sweep iteration. Start with true to immediately start into iteration 1
+	bool _root_did_just_finish_iteration = true; //Starts with true to immediately start into iteration 1.
 
 	const int MAX_TOLERATED_EMPTYROUNDS = _params.sweepMaxEmptyRounds.val;
 
@@ -181,7 +182,7 @@ private:
 		_root_sharing_round++;
 		LOG(V2_INFO, "SWEEP [%i](root-trf) rnd(%i) entered \n", _my_rank, _root_sharing_round);
 
-		//Remember from last sharing round whether now begins a new iteration iteration
+		//Remember from last sharing round whether now begins a new iteration
 		if (_root_did_just_finish_iteration) {
 			_root_sweep_iteration++;
 			_root_did_just_finish_iteration = false;
@@ -267,13 +268,14 @@ private:
 
 		char logmsg[512];
 		snprintf(logmsg, sizeof(logmsg),
-			"SWEEP [%i](root-trf) send: iter %i rnd %i :  %i ai  %i trm  E %i  U %i    SW %i  ST %i  RE %i      WW  %i \n",
+			"SWEEP [%i](root-trf) send: iter %i rnd %i :  %i ai  %i trm  E %i  U %i    SW %i  ST %i  RE %i    Sched, Sweeps  %i  %i    ( %.2f ,  %.2f )%   \n",
 			_my_rank, _root_sweep_iteration, _root_sharing_round, all_idle, send_terminate, n_eqs, n_units,
-			work_sweeps, work_stepovers, work_unsched_resweeps, work_sweeps + work_stepovers
+			work_sweeps, work_stepovers, work_unsched_resweeps, work_sweeps + work_stepovers, work_sweeps + work_unsched_resweeps,
+			100*(work_sweeps + work_stepovers)/(double)_numVars , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars
 		);
 
 		//Log two times, once for completeness chronologically in the general logs, and once in a special root file for easier postprocessing later
-		LOG(			   V2_INFO, "%s", logmsg);
+		LOG(			   V2_INFO, "         %s", logmsg);
 		LOGGER(_reslogger, V2_INFO, "%s", logmsg);
 
 		// LOG(V2_INFO,				 "SWEEP [%i](root-trf) send: Iter(%i) rnd(%i): (%i)ai (%i)trm  E %i  U %i    SW %i  ST %i  RE %i  WW (%i)   \n", _my_rank, _root_sweep_iteration, _root_sharing_round, all_idle, send_terminate, n_eqs, n_units, work_sweeps, work_stepovers,  work_unsched_resweeps, work_sweeps + work_stepovers);

@@ -17,6 +17,9 @@ INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf
 # INST_PATH="$HOME/PhD/instances/some2024/39fba35826ce8c87cd8e8de1969b2dd2-SGI_30_80_26_70_4-log.shuffled-as.sat03-208.cnf.xz" # 30sec, 17% after 2 rounds
 # INST_PATH="$HOME/PhD/instances/some2024/39277cab188349aee0f229cb7341b5c5-crafted_n12_d6_c4_num23.cnf.xz"
 
+# INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s101.cnf.xz" 
+# INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s103.cnf.xz"   #huge, & congruence extremely effective
+INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s107.cnf.xz"     #significant nr. of fixed before start/CEC (10%), &congr strong
 
 MALLOB_OPTIONS="-t=$threads \
   -mono-app=SWEEP \
@@ -39,7 +42,7 @@ MALLOB_OPTIONS="-t=$threads \
   -sweep-resweep-chance=1000 \
 	-sweep-solver-verbosity=2 \
 	-sweep-solver-quiet=1 \
-  -sweep-congruence=0 \
+  -sweep-initial-congruence=1 \
   -sweep-max-iterations=3 \
   -sweep-max-depth=3 \
   -sweep-max-empty-rounds=5 \

@@ -11,7 +11,7 @@ OPT_INT(sweepSolverVerbosity,  	"swpvrb", 	"sweep-solver-verbosity", 	0, 0, 5, "
 OPT_INT(sweepSolverQuiet,		"swpqt", 	"sweep-solver-quiet", 		1, 0, 1, "whether the solver-native messages should be completely disabled (kissat quiet option)")
 OPT_INT(sweepResweepChance, 	"swprc", 	"sweep-resweep-chance", 	1e4, 0, 1e4, "chance that a solver resweeps a variable from a found equivalence (in per mille)")
 OPT_INT(sweepMaxIterations, 	"swpmi", 	"sweep-max-iterations", 	3, 0, LARGE_INT, "max number of completed sweeps over all variables")
-OPT_BOOL(sweepCongruence,  		"swpcg", 	"sweep-congruence", 		false, "One solver at the root node does clausal congruence closure instead of sweeping")
+OPT_BOOL(sweepInitialCongruence,"swpic", 	"sweep-initial-congruence", true, "Let all solvers do one iteration of congruence before sweeping")
 OPT_BOOL(sweepDeduplicate,		"swpdd", 	"sweep-deduplicate",		true,  "Deduplicate units and equivalences during sharing aggregation")
 OPT_INT(sweepMaxDepth, 			"swpmd", 	"sweep-max-depth", 			3, 1, LARGE_INT, "the maximum environment depth for sweeping")
 OPT_INT(sweepMaxEmptyRounds,    "swpmer",   "sweep-max-empty-rounds",    5, 1, LARGE_INT, "the maximum number of tolerated empty rounds (not a single unit or eqs found) before sweeping is terminated early")

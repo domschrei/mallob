@@ -1,5 +1,7 @@
 #include "sweep_job.hpp"
 
+#include <memory>
+
 #include "app/job.hpp"
 #include "app/job_tree.hpp"
 #include "util/ctre.hpp"
@@ -69,7 +71,7 @@ void SweepJob::appl_start() {
 		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _nThreads, numVars, numClauses);
     _metadata = getSerializedDescription(0)->data();
 
-	_start_sweep_timestamp = Timer::elapsedSeconds();
+	_timestamp_start_sweepapp = Timer::elapsedSeconds();
 
     // _reslogger = Logger::getMainInstance().copy("<RESULT>", ".sweep");
     // _warnlogger = Logger::getMainInstance().copy("<WARN>", ".warn");
@@ -353,7 +355,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		 */
 		while (_started_sweepers_count < _nThreads) {
 			LOG(V5_DEBG, "SWEEP [%i](%i) waits for other solvers (started %i/%i)\n", _my_rank, localId, _started_sweepers_count.load(), _nThreads);
-			usleep(2000); //2ms
+			usleep(500); //2ms
 			if (_terminate_all) {
 				break;
 			}
@@ -363,14 +365,15 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			LOG(V3_VERB, "SWEEP [%i](%i): terminated while waiting in synchronization \n", _my_rank, localId);
 			_running_sweepers_count--;
 			_finished_sweepers_count++; //only monotonically increasing
-			_terminated_while_synchronizing = true;
+			_flag_terminated_while_synchronizing = true;
 			// maybe this release helps with memory?
 			// kissat_release(sweeper->solver);
 			return;
 		}
 
-		_sweepers[localId] = sweeper; //only now expose the solver to the rest of the system, now that we know we start solving
-		_started_synchronized_solving = true; //multiple threads will write non-thread-safe to this bool, but all will write monotonically "true"
+		_sweepers[localId] = sweeper; //only now expose the solver to the rest of the system, now that solving starts
+		_flag_started_synchronized_solving = true;
+		_timestamp_started_synchronized_solving = Timer::elapsedSeconds();
 
 		LOG(V3_VERB, "SWEEP [%i](%i) START solve() \n", _my_rank, localId);
 		int res = sweeper->solve(0, nullptr);
@@ -464,10 +467,10 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 
 	// LOG(V2_INFO, "SWEEP JOB [%i](%i) create kissat shweeper \n", _my_rank, localId);
 	float t0 = Timer::elapsedSeconds();
-	std::shared_ptr<Kissat> sweeper(new Kissat(setup));
+	auto sweeper = std::make_shared<Kissat>(setup);
 	float t1 = Timer::elapsedSeconds();
 	float init_dur =  (t1 - t0);
-	const float WARN_init_dur = 0.050; //Usual initializations take 0.2ms in the Sat Solver Subprocess and 4-25ms  in the sweep job (for some weird reasons), but should never be above ~30ms, we warn at >50ms
+	const float WARN_init_dur = 0.050; //Usual kissat initializations take 0.2ms in the Sat Solver Subprocess and 4-25ms  in the sweep job (for some weird reasons), but should never be above ~30ms, we warn at >50ms
 	LOG(V3_VERB, "SWEEP [%i](%i) kissat init %.6f sec (%i/%i started)\n", _my_rank, localId, init_dur, _started_sweepers_count.load(), _nThreads);
 	if (init_dur > WARN_init_dur) {
 		LOG(V1_WARN, "SWEEP WARN STARTUP [%i](%i): kissat init took unusually long, %.6f sec !\n", _my_rank, localId, init_dur);
@@ -514,18 +517,19 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	sweeper->set_option("mallob_resweep_chance", _params.sweepResweepChance.val);
 	sweeper->set_option("mallob_staggered_logs", 1); //set to 1 to have spatially separated logs, useful for verbose runs with 2-16 threads
 	sweeper->set_option("mallob_individual_sweepiters", _params.sweepIndividualSweepIters.val);
+	sweeper->set_option("mallob_initial_congruence", _params.sweepInitialCongruence.val);
 
-	if (_params.sweepCongruence() && _is_root && localId == _congruence_localId) {
+	// if (_params.sweepCongruence() && _is_root && localId == _congruence_localId) {
 		//Do congruence closure instead of sweeping. I.e., syntactical instead of semantical search for equivalences.
 		//the congruencer does not participate in workstealing and might be out-of-sync with the sweepers in terms of rounds, so there is no sensible "idle" state
 		//we give authority to the sweepers and when they finish the congruencer must finish as well, implemented here by always marking it as idle
-		sweeper->set_option("mallob_is_congruencer", 1);
-		sweeper->set_option("mallob_is_shweeper",1);
-		sweeper->set_option("quiet", 1);
-		sweeper->set_option("log", 0);   //0..5
-		sweeper->sweeper_is_idle = true;
-		sweeper->is_congruencer = true;
-	}
+		// sweeper->set_option("mallob_is_congruencer", 1);
+		// sweeper->set_option("mallob_is_shweeper",1);
+		// sweeper->set_option("quiet", 1);
+		// sweeper->set_option("log", 0);   //0..5
+		// sweeper->sweeper_is_idle = true;
+		// sweeper->is_congruencer = true;
+	// }
 
 	//Own options of Kissat
 	//identical to standard options right now
@@ -555,36 +559,38 @@ void SweepJob::cbReportIteration(int localId) {
 	assert(localId == _representative_localId);
 	KissatPtr sweeper = _sweepers[localId];
 	assert(sweeper);
-	// int iteration = shweep_get_curr_iteration(sweeper->solver);
 	auto stats = sweeper->fetchSweepStats();
 
 	LOG(			  V2_INFO, "SWEEP solver [%i](%i) reports statistics in dedicated .sweep file \n", _my_rank, localId);
 	LOGGER(_reslogger, V2_INFO, "\n");
 	LOGGER(_reslogger,V2_INFO, "Reported by [%i](%i)		\n", _my_rank, localId);
-	LOGGER(_reslogger,V2_INFO, "ITERATION_CURR    %i		\n", stats.curr_iteration);
+	LOGGER(_reslogger,V2_INFO, "ITERATION_CURR   %i		    \n", stats.curr_iteration);
 	LOGGER(_reslogger,V2_INFO, "ITERATIONS_MAX     %i		\n", _params.sweepMaxIterations());
-	LOGGER(_reslogger,V2_INFO, "TIME_SEC                %.3f s\n", Timer::elapsedSeconds() - _start_sweep_timestamp);
-	LOGGER(_reslogger,V2_INFO, "ACTIVE_PRCNT            %.2f %\n", 100*(double)stats.curr_active/(double)stats.vars_active_orig);
+	LOGGER(_reslogger,V2_INFO, "TIME_APP_TOTAL          %.3f s\n",  Timer::elapsedSeconds() - _timestamp_start_sweepapp);
+	LOGGER(_reslogger,V2_INFO, "TIME_BEFORE_SOLVING     %.3f s\n",  _timestamp_started_synchronized_solving - _timestamp_start_sweepapp);
+	LOGGER(_reslogger,V2_INFO, "ACTIVE_PRCNT            %.2f %\n", 100*(double)stats.curr_active/(double)stats.orig_vars);
 	LOGGER(_reslogger,V2_INFO, "ENV_LIMIT_VARS    %i 		\n", stats.env_limit_vars);
 	LOGGER(_reslogger,V2_INFO, "ENV_LIMIT_DEPTH   %i 		\n", stats.env_limit_depth);
 	LOGGER(_reslogger,V2_INFO, "ENV_LIMIT_CLAUSES %i 		\n", stats.env_limit_clauses);
 	LOGGER(_reslogger,V2_INFO, "ROUNDS_THISITER     %i   	\n",_root_rounds_this_iteration);
 	LOGGER(_reslogger,V2_INFO, "EMPTYROUNDS_BP      %i   	\n",_root_emptyrounds_before_progress);
 
-	LOGGER(_reslogger,V2_INFO, "CLAUSES_CURR		%i 		\n", stats.clauses);
-	LOGGER(_reslogger,V2_INFO, "CLAUSES_ORIG		%i 		\n", stats.clauses_orig);
-	LOGGER(_reslogger,V2_INFO, "BINIRR_CURR				%i	\n", stats.binirr);
-	LOGGER(_reslogger,V2_INFO, "BINIRR_ORIG				%i	\n", stats.binirr_orig);
+	LOGGER(_reslogger,V2_INFO, "CLAUSES_CURR        %i 		\n", stats.clauses);
+	LOGGER(_reslogger,V2_INFO, "CLAUSES_START       %i 		\n", stats.start_clauses);
+	LOGGER(_reslogger,V2_INFO, "BINIRR_CURR             %i	\n", stats.binirr);
+	LOGGER(_reslogger,V2_INFO, "BINIRR_START            %i	\n", stats.start_binirr);
 	LOGGER(_reslogger,V2_INFO, "ACTIVE_CURR      %i			\n", stats.curr_active);
-	LOGGER(_reslogger,V2_INFO, "ACTIVE_ORIG      %i			\n", stats.vars_active_orig);
-	LOGGER(_reslogger,V2_INFO, "FIXED_CURR              %i	\n", stats.vars_active_orig - stats.curr_active);
+	LOGGER(_reslogger,V2_INFO, "ACTIVE_START     %i			\n", stats.start_active);
+	LOGGER(_reslogger,V2_INFO, "FIXED_CURR           %i	\n", stats.orig_vars - stats.curr_active);
+	LOGGER(_reslogger,V2_INFO, "FIXED_START          %i	\n", stats.orig_vars - stats.start_active);
+	LOGGER(_reslogger,V2_INFO, "FIXED_IN_CEC             %i	\n", stats.start_active - stats.curr_active);
 	LOGGER(_reslogger,V2_INFO, "ELIMINATED       %i 		\n", stats.curr_eliminated);
-	LOGGER(_reslogger,V2_INFO, "NEWUNITS         %i 		\n", stats.curr_units - stats.units_orig);
+	LOGGER(_reslogger,V2_INFO, "NEWUNITS         %i 		\n", stats.curr_units - stats.start_units);
 	LOGGER(_reslogger,V2_INFO, "ALLUNITS         %i 		\n", stats.curr_units);
-	LOGGER(_reslogger,V2_INFO, "SUM_ELIM_NEWU           %i	\n", stats.curr_eliminated + stats.curr_units - stats.units_orig );
+	LOGGER(_reslogger,V2_INFO, "SUM_ELIM_NEWU            %i	\n", stats.curr_eliminated + stats.curr_units - stats.start_units );
 	LOGGER(_reslogger,V2_INFO, "SWEEPUNITS       %i 		\n", stats.sweep_units);
 	LOGGER(_reslogger,V2_INFO, "EQUIVALENCES     %i 		\n", stats.sweep_eqs);
-	LOGGER(_reslogger,V2_INFO, "SUM_SWEEP_EU            %i  \n", stats.sweep_eqs + stats.sweep_units);
+	LOGGER(_reslogger,V2_INFO, "SUM_SWEEP_EU             %i  \n", stats.sweep_eqs + stats.sweep_units);
 	LOGGER(_reslogger,V2_INFO, "\n");
 }
 
@@ -1128,7 +1134,7 @@ void SweepJob::rootStartNewSharingRound() {
 		return;
 	}
 
-	if (!_started_synchronized_solving.load(std::memory_order_relaxed)) {
+	if (!_flag_started_synchronized_solving.load(std::memory_order_relaxed)) {
 		LOG(V3_VERB, "SWEEP root: Delay first round, not all solvers online yet (%i/%i) \n", _started_sweepers_count.load(), _nThreads);
 		return;
 	}
@@ -1313,7 +1319,7 @@ void SweepJob::extractAllReductionResult() {
 
 #if SWEEP_NEW_IMPORT_VERSION == 0
 	//if our local solvers are not fully initialised yet we ignore the global sharing data, is cleaner than going hot solver-by-solver
-	if (_started_synchronized_solving) {
+	if (_flag_started_synchronized_solving) {
 		//All solvers are initialised, we can make use of the shared data
 
 		if (eq_size > MAX_IMPORT_SIZE) {
@@ -1385,7 +1391,7 @@ void SweepJob::extractAllReductionResult() {
 	_red.reset();
 
 
-	if (_params.sweepIndividualSweepIters.val && all_idle && _started_synchronized_solving  && !_terminate_all) {
+	if (_params.sweepIndividualSweepIters.val && all_idle && _flag_started_synchronized_solving  && !_terminate_all) {
 		LOG(V4_VVER, "SWEEP sending end_iteration signal\n");
 		for (auto &sweeper : _sweepers) {
 			if (sweeper) {
@@ -1659,10 +1665,10 @@ SweepJob::~SweepJob() {
 	for (int i=0; i<5; i++) {
 		clearImportedRound();
 	}
-	if (_terminated_while_synchronizing) {
+	if (_flag_terminated_while_synchronizing) {
 		LOG(V1_WARN, "SWEEP [%i] Warn : rank was terminated while synchronizing \n", _my_rank);
 	}
-	if (!_terminated_while_synchronizing && (_lastClearedRound + 2 < _lastImportedRound)) {
+	if (!_flag_terminated_while_synchronizing && (_lastClearedRound + 2 < _lastImportedRound)) {
 		LOG(V1_WARN, "SWEEP [%i] WARN : didn't clear all imported rounds. lastCleared %i, lastImported %i \n", _my_rank, _lastClearedRound, _lastImportedRound.load());
 	}
 	if (_lastImportedRound==0) {
