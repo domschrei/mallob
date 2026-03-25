@@ -6,7 +6,7 @@ if [ ! -f CMakeLists.txt ]; then
     if [ ! -f palrup.zip ]; then
         echo "[palrup] Fetching sources ..."
         # for fixing a branch instead of a commit, prepend "refs/heads/"
-        branchorcommit="bfde5f1c74279a892a85335c1929efde702f211f" # updated 2026-01-29
+        branchorcommit="31f52fd70d39c1a6f7eeb3ce1bb7d97dbee6142d" # updated 2026-01-29
         curl -L -o palrup.zip https://github.com/rubenGoetz/PalRUP-Check/archive/${branchorcommit}.zip
     fi
     echo "[palrup] Extracting sources ..."

@@ -101,11 +101,11 @@ build/iimpcheck_confirm -key-seed=13805254743912277295 -formula=instances/r3unsa
 
 To enable proof production in the PalRUP framework run Mallob with options `-palrup=1 -proof-dir=path/to/palrup/proof`. The given path can be on local disks, if Mallob is run on a distributed system. To output the proof in a readable text format (instead of variable byte length coded binary format) set the option `-palrup-binary=0`.
 
-Mallob supports checking a produced PalRUP proof immediatly after solving utilizing [PalRUP-Check](https://github.com/rubenGoetz/PalRUP-Check). To enable proof checking, build Mallob with the `-DMALLOB_APP_PALRUPCHECK=1` option. To check a PalRUP proof, run Mallob with the options `-palrup-check=1 -palrup-check-dir=path/to/communication/`. The given path must be accessable by all processes, i.e. located in a parallel file system if run on distributed systems. If the PalRUP proof is stored on distributed disks, set the `use_local_disks="true"` flag in `palrup/scripts/pal/pal_launcher.sh` and rerun the `build-and-fetch.sh` script in the `lib/palrup` directory. After a proof was validated successfully (unsuccessfully), a `success.palrup` (`failure.palrup`) file will be created in Mallob's log directory.
+Mallob supports checking a produced PalRUP proof immediatly after solving utilizing [PalRUP-Check](https://github.com/rubenGoetz/PalRUP-Check). To enable proof checking, build Mallob with the `-DMALLOB_APP_PALRUPCHECK=1` option. To check a PalRUP proof, run Mallob with the options `-palrup-check=1 -palrup-check-dir=path/to/communication/`. The given path must be accessable by all processes, i.e. located in a parallel file system if run on distributed systems. After a proof was validated successfully (unsuccessfully), a `success.palrup` (`failure.palrup`) file will be created in Mallob's log directory.
 
-Non-default options can be passed to the PalRUP-Checker by setting the corresponding Mallob options. See [options.hpp](../src/app/sat/options.hpp) for details.
+As described above, a PalRUP proof can be stored on local disks when it was created on a distributed system. If this is the case, make sure to run Mallob with the `-palrup-use-local-disks=1` option.
 
-**Note:** If you decide to change PalRUP-Check's default secret keys, you will have to generate a new `scripts/pal/out.palrup_import.dummy`.
+Non-default options can be passed to the PalRUP-Checker by setting the corresponding Mallob options. See [options.hpp](../src/app/palrupcheck/options.hpp) for details.
 
 
 ### Streamlined SAT Setup
