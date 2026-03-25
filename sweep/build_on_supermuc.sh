@@ -1,5 +1,8 @@
 #!/bin/bash
 
+#Temporary 
+module switch stack/22.2.1
+
 module load slurm_setup
 module unload devEnv/Intel/2019 intel-mpi cmake
 module load gcc/11 intel-mpi/2019-gcc cmake/3.21.4 gdb valgrind
