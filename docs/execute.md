@@ -97,6 +97,17 @@ build/iimpcheck_confirm -key-seed=13805254743912277295 -formula=instances/r3unsa
 
 **Note:** On-the-fly checking can also be used in Mallob's scheduled mode of operation. Globally unique clause IDs are ensured by adding a large offset times $x$ to a new solver thread's clause ID counter if the job has already experienced $x$ _balancing epochs_, i.e., received $x$ volume updates, since its initialization. The offset is chosen in such a way that 10,000 solvers each producing 10,000 clauses per second can run for 10,000 seconds before they may begin overlapping with clause IDs from the next balancing epoch. `ImpCheck` notices and reports any errors that would result from such a corner case.
 
+### Producing Distributed Proofs of Unsatisfiability
+
+To enable proof production in the PalRUP framework run Mallob with options `-palrup=1 -proof-dir=path/to/palrup/proof`. The given path can be on local disks, if Mallob is run on a distributed system. To output the proof in a readable text format (instead of variable byte length coded binary format) set the option `-palrup-binary=0`.
+
+Mallob supports checking a produced PalRUP proof immediatly after solving utilizing [PalRUP-Check](https://github.com/rubenGoetz/PalRUP-Check). To enable proof checking, build Mallob with the `-DMALLOB_APP_PALRUPCHECK=1` option. To check a PalRUP proof, run Mallob with the options `-palrup-check=1 -palrup-check-dir=path/to/communication/`. The given path must be accessable by all processes, i.e. located in a parallel file system if run on distributed systems. If the PalRUP proof is stored on distributed disks, set the `use_local_disks="true"` flag in `palrup/scripts/pal/pal_launcher.sh` and rerun the `build-and-fetch.sh` script in the `lib/palrup` directory. After a proof was validated successfully (unsuccessfully), a `success.palrup` (`failure.palrup`) file will be created in Mallob's log directory.
+
+Non-default options can be passed to the PalRUP-Checker by setting the corresponding Mallob options. See [options.hpp](../src/app/sat/options.hpp) for details.
+
+**Note:** If you decide to change PalRUP-Check's default secret keys, you will have to generate a new `scripts/pal/out.palrup_import.dummy`.
+
+
 ### Streamlined SAT Setup
 
 In the context of our [SAT'25 publication](https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.SAT.2025.27), we developed an alternative setup for distributed SAT solving where a single process performs preprocessing while all other processes run plain search-only threads (i.e., without pre-/inprocessing). When the result from preprocessing is available, another task on the preprocessed formula is launched.
