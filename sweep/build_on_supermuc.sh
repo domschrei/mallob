@@ -1,7 +1,10 @@
 #!/bin/bash
 
 #Temporary 
+echo "Reverting back to old 22.2.1 slurm stack for compatibility"
 module switch stack/22.2.1
+module unload gcc/11.5.0
+module unload gdb/15.2
 
 module load slurm_setup
 module unload devEnv/Intel/2019 intel-mpi cmake

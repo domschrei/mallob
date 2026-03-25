@@ -1,7 +1,0 @@
-source -s abc.rc
-&splitprove -h
-&cec -h
-&fraig -h
-fraig -h
-cec -h
-splitprove -h

@@ -18,8 +18,10 @@
 # SuperMUC has TWO processors with 24 physical cores each, totalling 48 physical cores (96 hwthreads)
 # See: https://doku.lrz.de/download/attachments/43321076/SuperMUC-NG_computenode.png
 
-#Temporary fix to remain on old version 22
+echo "Reverting back to old 22.2.1 slurm stack for compatibility"
 module switch stack/22.2.1
+module unload gcc/11.5.0
+module unload gdb/15.2
 
 
 
@@ -125,36 +127,36 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
   # -s2f=${globallogdir}/model \ dont write solution to file
   #
     timeout=$DS_SECONDSPERJOB
-    cmd="$build/mallob \
+  cmd="$build/mallob \
 	-mono-app=SWEEP \
 	-satsolver=[k_]w \
 	-pb=1 -pjp=999999 -pef=1 -mono=$f \
-	-jwl=$timeout -T=$(($timeout+30)) -wam=10``000 -pre-cleanup=1 \
+	-jwl=$timeout -T=$(($timeout+30)) -wam=10000 -pre-cleanup=1 \
 	-q=1 -log=$globallogdir -tmp=$localtmpdir -comment-outputlogdir=$outputlogdir \
 	-sro=${globallogdir}/processed-jobs.out -trace-dir=${globallogdir}/ \
   -os=1 \
   -iff=0 \
   -cm=0 \
   -rspaa=1 \
-	-rpa=1 -pph=${SLURM_NTASKS_PER_NODE} -mlpt=50``000``000 -t=$((${SLURM_CPUS_PER_TASK} / 2)) \
+	-rpa=1 -pph=${SLURM_NTASKS_PER_NODE} -mlpt=50000000 -t=$((${SLURM_CPUS_PER_TASK} / 2)) \
 	-isp=0 -div-phases=1 -div-noise=0 -div-seeds=1 -div-elim=0 -div-native=0 -scsd=0 \
 	-scll=60 -slbdl=60 -qcll=60 -qlbdl=60 -csm=3 -cfm=3 -cfci=30 -mscf=5 -bem=1 -aim=1 \
 	-rlbd=0 -ilbd=1 -randlbd=0 -scramble-lbds=0 \
 	-seed=1 \
-	-v=4 \
 	-spd=${globallogdir}/ \
   -spl=4 \
 	-jcup=0.05 \
+	-v=2 \
 	-preprocess-sweep=1 \
+  -preprocess-sweep-priority=1.0 \
 	-sweep-sharing-period=0.020 \
   -sweep-resweep-chance=1000 \
-  -sweep-iterations=5 \
 	-sweep-solver-verbosity=0 \
 	-sweep-solver-quiet=1 \
-  -sweep-congruence=0 \
-  -sweep-max-growth-iteration=2 \
-  -sweep-max-empty-rounds=3 \
-  -preprocess-sweep-priority=1.0 \
+  -sweep-initial-congruence=1 \
+  -sweep-max-iterations=3 \
+  -sweep-max-depth=3 \
+  -sweep-max-empty-rounds=5 \
 "
 
   # -sweep-growing-environments=1 \
