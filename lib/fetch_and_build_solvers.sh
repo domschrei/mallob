@@ -103,7 +103,8 @@ if echo $solvers|grep -q "k" && [ ! -f kissat/libkissat.a ]; then
     cd kissat
     ##Might need manual -O3 on the server!
     ##Because ./configure fails to detect gcc compiler via regex-matching, and falls back to slow -O
-    ./configure --no-proofs -O3
+    ##Also manual CC=gcc, for same reason!
+    ./configure --no-proofs -O3 CC=gcc
     make -j
     cp build/libkissat.a .
     cd ..
