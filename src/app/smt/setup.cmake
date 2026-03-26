@@ -8,6 +8,11 @@ set(MALLOB_COREPLUSCOMM_SOURCES ${MALLOB_COREPLUSCOMM_SOURCES} ${SMT_MALLOB_SOUR
 
 # Library dependency Bitwuzla (and a bunch of additional transitive dependencies)
 add_lib_dep("bitwuzla" lib/bitwuzla build/src/lib/ bitwuzla "")
-set(BASE_LINK_DIRS ${BASE_LINK_DIRS} lib/bitwuzla/build/src/ CACHE INTERNAL "")
+
+# Find location of libmpfr
+find_library(MPFR_LIB mpfr)
+get_filename_component(MPFR_LIB_DIR "${MPFR_LIB}" DIRECTORY)
+
+set(BASE_LINK_DIRS ${BASE_LINK_DIRS} ${MPFR_LIB_DIR} lib/bitwuzla/build/src/ CACHE INTERNAL "")
 set(BASE_LIBS ${BASE_LIBS} bzlarng bitwuzlabv bitwuzlabb bitwuzlals bzlautil gmp mpfr CACHE INTERNAL "")
 set(BASE_INCLUDES ${BASE_INCLUDES} lib/bitwuzla/include/ CACHE INTERNAL "") # need to include some solver code

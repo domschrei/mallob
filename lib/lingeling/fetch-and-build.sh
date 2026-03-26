@@ -1,27 +1,18 @@
 #!/bin/bash
 
-set -e
+source ../base-build-functions.sh
+dirname="lingeling"
 
-if [ ! -f configure.sh ]; then
-    if [ ! -f lingeling.zip ]; then
-        echo "[lingeling] Fetching sources ..."
-        branchorcommit="89a167d0d2efe98d983c87b5b84175b40ea55842" # version 1.0.0, March 2024
-        curl -L -o lingeling.zip https://github.com/arminbiere/lingeling/archive/${branchorcommit}.zip
-    fi
-    echo "[lingeling] Extracting sources ..."
-    unzip lingeling.zip
-    mv lingeling-*/* lingeling-*/.* ./
-    rmdir lingeling-*/
+branchorcommit="89a167d0d2efe98d983c87b5b84175b40ea55842" # version 1.0.0, March 2024
+fetch_and_extract $dirname configure.sh https://github.com/arminbiere/lingeling/archive/${branchorcommit}.zip
 
+if grep -qE "exit \([01]\)" *.c *.h ; then
+    ./configure.sh
     for f in *.c *.h ; do
         sed -i 's/exit ([01])/abort()/g' $f
     done
-
-    ./configure.sh
-else
-    echo "[lingeling] Assuming sources are present"
 fi
 
-echo "[lingeling] Building ..."
+echo "[$dirname] Building ..."
 make
-echo "[lingeling] Build complete"
+echo "[$dirname] Build complete"

@@ -1,29 +1,20 @@
 #!/bin/bash
 
-set -e
+source ../base-build-functions.sh
+dirname="PalRUP-Check"
 
-if [ ! -f CMakeLists.txt ]; then
-    if [ ! -f palrup.zip ]; then
-        echo "[palrup] Fetching sources ..."
-        # for fixing a branch instead of a commit, prepend "refs/heads/"
-        branchorcommit="5fc5c7577e723848934fbb03b59836f76be956f5" # updated 2026-01-29
-        curl -L -o palrup.zip https://github.com/rubenGoetz/PalRUP-Check/archive/${branchorcommit}.zip
-    fi
-    echo "[palrup] Extracting sources ..."
-    unzip palrup.zip
-    mv PalRUP-Check-*/* PalRUP-Check-*/.* ./ || :
-    rmdir PalRUP-Check-*/
-    sed -i 's/-Werror//g' CMakeLists.txt
-else
-    echo "[palrup] Assuming sources are present"
-fi
+branchorcommit="31f52fd70d39c1a6f7eeb3ce1bb7d97dbee6142d" # updated 2026-01-29
+fetch_and_extract $dirname CMakeLists.txt https://github.com/rubenGoetz/PalRUP-Check/archive/${branchorcommit}.zip
 
-echo "[palrup] Building ..."
+sed -i 's/-Werror//g' CMakeLists.txt
+
+echo "[$dirname] Building ..."
 mkdir -p build
 cd build
 cmake ..
 make
 cd ..
+<<<<<<< HEAD
 echo "[palrup] Build complete"
 
 if ! [ -z "$1" ]; then
@@ -39,3 +30,6 @@ if ! [ -z "$1" ]; then
 
     cp build/out.palrup_import.dummy "$1/out.palrup_import.dummy"
 fi
+=======
+echo "[$dirname] Build complete"
+>>>>>>> upstream/fullcmake

@@ -1,19 +1,9 @@
 #!/bin/bash
 
-set -e
+source ../base-build-functions.sh
+dirname="jemalloc"
 
-if [ ! -f autogen.sh ]; then
-    if [ ! -f jemalloc.zip ]; then
-        echo "[jemalloc] Fetching sources ..."
-        curl -L -o jemalloc.zip https://github.com/jemalloc/jemalloc/archive/refs/tags/5.2.1.zip
-    fi
-    echo "[jemalloc] Extracting sources ..."
-    unzip jemalloc.zip
-    mv jemalloc-*/* jemalloc-*/.* ./
-    rmdir jemalloc-*/
-else
-    echo "[jemalloc] Assuming sources are present"
-fi
+fetch_and_extract $dirname autogen.sh https://github.com/jemalloc/jemalloc/archive/refs/tags/5.2.1.zip
 
 echo "[jemalloc] Building ..."
 ./autogen.sh

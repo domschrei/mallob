@@ -43,9 +43,10 @@ public:
         setup.logger = &Logger::getMainInstance();
         setup.localId = 0;
         setup.globalId = 0;
-        setup.maxNumSolvers = 1;
+        setup.maxNumSolvers = 64; // just for proper diversification
         setup.solverType = 'C';
         setup.exportClauses = false;
+        setup.diversifyNative = true;
         if (setup.onTheFlyChecking) setup.certifiedUnsat = true;
 #if MALLOB_USE_MINISAT
         if (_solvertype == MINISAT) {
@@ -64,6 +65,7 @@ public:
 #endif
         assert(_solver);
 
+        _solver->diversify(0);
         _solver->setLearnedClauseCallback([&](const Mallob::Clause&, int) {});
         if (_lrat) _lrat->init(".seq");
     }
