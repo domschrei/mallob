@@ -18,18 +18,13 @@ function fetch_and_extract() {
     fi
 
     echo "[$dirname] Fetching sources ..."
-    curl -L -o "${dirname}*.zip" "$url"
+    curl -L -o "${dirname}.zip" "$url"
 
     echo "[$dirname] Extracting sources ..."
     unzip ${dirname}*.zip
     for d in $dirname-*/ ; do
         cd "$d"
-        if compgen -G "./*" > /dev/null; then
-            mv ./* ../
-        fi
-        if compgen -G "./.*" > /dev/null; then
-            mv ./.* ../
-        fi
+        mv $(find . -maxdepth 1 -mindepth 1) ../
         cd ..
     done
     rmdir $dirname-*/
