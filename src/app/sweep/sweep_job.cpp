@@ -73,10 +73,6 @@ void SweepJob::appl_start() {
 
 	_timestamp_start_sweepapp = Timer::elapsedSeconds();
 
-    // _reslogger = Logger::getMainInstance().copy("<RESULT>", ".sweep");
-    // _warnlogger = Logger::getMainInstance().copy("<WARN>", ".warn");
-    // _rootlogger = Logger::getMainInstance().copy("<ROOT>", ".root");
-
 	_worksteal_requests.resize(_nThreads);
 
 	//Need to mark them as empty initially, such that the solvers can turn them into actual requests when required.
@@ -379,15 +375,6 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		int res = sweeper->solve(0, nullptr);
 		LOG(V3_VERB, "SWEEP [%i](%i) FINISH solve(). Result %i \n", _my_rank, localId, res);
 
-		//transfer some solver-specific statistics
-		// auto stats = sweeper->fetchSweepStats();
-		// _worksweeps[localId] = stats.worksweeps;
-		// _resweeps_in[localId] = stats.resweeps_into_work;
-		// _resweeps_out[localId] = stats.resweeps_outof_work;
-
-		// if (sweeper->is_congruencer) {
-			// printCongruenceStats(sweeper);
-		// }
 
 		if (res==UNSAT) {
 			//Found UNSAT
@@ -426,10 +413,6 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		}
 
 		//If no solver sets UNSAT or IMPROVED, the job will be returned by default as UNKNOWN
-
-		// if (_running_sweepers_count==1) { //the last solver should report resweeps, as only then they are gathered from all exited solvers
-			// printResweeps();
-		// }
 
 		_sweepers[localId]->cleanUp(); //write kissat timing profile
 		_sweepers[localId].reset();  //this should delete the only persistent shared pointer on the solver, and thus trigger its destructor soon
@@ -518,18 +501,6 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	sweeper->set_option("mallob_staggered_logs", 1); //set to 1 to have spatially separated logs, useful for verbose runs with 2-16 threads
 	sweeper->set_option("mallob_individual_sweepiters", _params.sweepIndividualSweepIters.val);
 	sweeper->set_option("mallob_initial_congruence", _params.sweepInitialCongruence.val);
-
-	// if (_params.sweepCongruence() && _is_root && localId == _congruence_localId) {
-		//Do congruence closure instead of sweeping. I.e., syntactical instead of semantical search for equivalences.
-		//the congruencer does not participate in workstealing and might be out-of-sync with the sweepers in terms of rounds, so there is no sensible "idle" state
-		//we give authority to the sweepers and when they finish the congruencer must finish as well, implemented here by always marking it as idle
-		// sweeper->set_option("mallob_is_congruencer", 1);
-		// sweeper->set_option("mallob_is_shweeper",1);
-		// sweeper->set_option("quiet", 1);
-		// sweeper->set_option("log", 0);   //0..5
-		// sweeper->sweeper_is_idle = true;
-		// sweeper->is_congruencer = true;
-	// }
 
 	//Own options of Kissat
 	//identical to standard options right now
@@ -628,12 +599,6 @@ void SweepJob::reportEndStats(KissatPtr sweeper) {
 	}
 }
 
-// void SweepJob::printCongruenceStats(KissatPtr sweeper) {
-	// auto stats = sweeper->fetchSweepStats();
-	// LOGGER(_reslogger, V2_INFO, "CONGRUENCE_EQUIVALENCES   %i \n", stats.congr_eqs);
-	// LOGGER(_reslogger, V2_INFO, "CONGRUENCE_UNITS          %i \n", stats.congr_units);
-	// LOGGER(_reslogger, V2_INFO, "CONGRUENCE_EQS_SKIPPED    %i / %i \n", stats.congr_eqs_skipped, stats.eqs_seen);
-// }
 
 
 void SweepJob::printIdleWorkStatus() {
@@ -701,41 +666,6 @@ void SweepJob::checkSharingDelay() {
 		}
 	}
 }
-
-bool SweepJob::okToTrackSharingDelay() {
-	return true; //with always advance it should now no longer be an issue to immediately track any sharings...
-
-	//we would get false positives if we already start timing when the solvers haven't even started yet
-	// if (!_started_synchronized_solving)
-		// return false;
-	//we also would get false positive if the solvers have technically started, but haven't received any initial work yet
-	//this second consideration only works at the root node, the other nodes don't have such a live update whether the work for this iteration has been provided yet
-	// if (_is_root && !_root_provided_initial_work)
-		// return false;
-	// return true;
-}
-
-// void SweepJob::printResweeps() {
-	// std::ostringstream oss;
-	// int worksweeps = 0;
-	// int resweeps_in = 0;
-	// int resweeps_out = 0;
-	// for (int i=0; i<_nThreads; i++) {
-		// oss << " (id=" << i
-		// <<" ws=" << _worksweeps[i]
-		// <<" rsi=" << _resweeps_in[i]
-		// <<" rso=" << _resweeps_out[i]
-		// <<") ";
-		// worksweeps += _worksweeps[i];
-		// resweeps_in += _resweeps_in[i];
-		// resweeps_out += _resweeps_out[i];
-	// }
-	// LOG(V3_VERB, "SWEEP WORKSWEEPS,RESWEEPS: %s \n", _my_rank, oss.str().c_str()); //information for each individual thread
-	// LOGGER(_reslogger, V2_INFO, "[%i] SWEEP_WORKSWEEPS   %i \n", _my_rank, worksweeps);
-	// LOGGER(_reslogger, V2_INFO, "[%i] SWEEP_RESWEEPS_ALL %i \n", _my_rank, resweeps_in + resweeps_out);
-	// LOGGER(_reslogger, V3_VERB, "[%i] SWEEP_RESWEEPS_IN  %i \n", _my_rank, resweeps_in);
-	// LOGGER(_reslogger, V3_VERB, "[%i] SWEEP_RESWEEPS_OUT %i \n", _my_rank, resweeps_out);
-// }
 
 
 bool SweepJob::skip_MPI_forNow() {
@@ -896,34 +826,8 @@ void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
 #define SWEEP_NEW_IMPORT_VERSION 1
 
 void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
-	// if (_terminate_all) { //can happen that we arrive here before the solver learned that we already terminated
-		//leave *ilit's untouched
-		// return;
-	// }
 
 	KissatPtr sweeper = _sweepers[localId];
-
-#if SWEEP_NEW_IMPORT_VERSION == 0
-
-	checkForNewImportRound(sweeper);
-
-	// LOG(V2_INFO, "solver [%i](%i) eq callback sees index %i and size %i \n",_my_rank, localId, sweeper->sweep_curr_EQS_index.load(), sweeper->sweep_curr_EQS_size.load());
-	if (sweeper->sweep_EQS_index == sweeper->sweep_EQS_size) {
-		//leave *ilit's untouched
-		return;
-	}
-
-	assert(sweeper->sweep_EQS_index < sweeper->sweep_EQS_size	|| log_return_false("SWEEP ERROR: in Equivalence Import: curr index %i is larger than expected size %i\n", sweeper->sweep_EQS_index.load(), sweeper->sweep_EQS_size.load()));
-	int idx = sweeper->sweep_EQS_index.load();
-	*ilit1 = _EQS_to_import[idx];
-	*ilit2 = _EQS_to_import[idx+1];
-	sweeper->sweep_EQS_index +=2;
-
-	assert(sweeper->sweep_EQS_index <= sweeper->sweep_EQS_size	|| log_return_false("SWEEP ERROR: in Equivalence Import: index %i is now beyond size %i \n", sweeper->sweep_EQS_index.load(), sweeper->sweep_EQS_size.load()));
-	assert(*ilit1 !=0 || *ilit2 !=0								|| log_return_false("SWEEP ERROR: in cbImportEq: sending invalid empty *ilit1=%i, *ilit2=0 to the solvers\n", *ilit1, *ilit2));
-	assert(*ilit1 < *ilit2										|| log_return_false("SWEEP ERROR: in cbImportEq: *ilit1 %i is larger than %i *ilit2, but they should be sorted (index %i, %i,)\n", *ilit1, *ilit2, idx, idx+1));
-
-#else
 
 	const int idx   = sweeper->curr_eq_index;
 	const int round = sweeper->curr_eq_round;
@@ -951,32 +855,12 @@ void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
 		sweeper->curr_eq_index=0;
 	}
 
-#endif
 	//now returning to the kissat solver
 }
 
 
 void SweepJob::cbImportUnit(int *ilit, int localId) {
-	// if (_terminate_all) {
-		// return;
-	// }
 	KissatPtr sweeper = _sweepers[localId];
-
-
-#if SWEEP_NEW_IMPORT_VERSION == 0
-
-	checkForNewImportRound(sweeper);
-	if (sweeper->sweep_UNITS_index == sweeper->sweep_UNITS_size) {
-		// leave *ilit untouched
-		return;
-	}
-	assert(sweeper->sweep_UNITS_index < sweeper->sweep_UNITS_size || log_return_false("SWEEP ERROR: in Unit Import: curr index %i is larger than expected size %i\n", sweeper->sweep_UNITS_index.load(), sweeper->sweep_UNITS_size.load()));
-	int idx = sweeper->sweep_UNITS_index.load();
-	*ilit = _UNITS_to_import[idx];
-	sweeper->sweep_UNITS_index++;
-	assert(sweeper->sweep_UNITS_index <= sweeper->sweep_UNITS_size || log_return_false("SWEEP ERROR: in Unit Import: index %i is now beyond size %i \n", sweeper->sweep_UNITS_index.load(), sweeper->sweep_UNITS_size.load()));
-
-#else
 	//For comments see cbImportEq (the analog method for importing equalities)
 	const int idx   = sweeper->curr_unit_index;
 	const int round = sweeper->curr_unit_round;
@@ -996,7 +880,6 @@ void SweepJob::cbImportUnit(int *ilit, int localId) {
 		sweeper->curr_unit_round++;
 		sweeper->curr_unit_index=0;
 	}
-#endif
 
 	//now returning to kissat solver
 }
@@ -1283,9 +1166,7 @@ void SweepJob::cbContributeToAllReduce() {
 		return;
 	}
 
-	if (okToTrackSharingDelay()) {
-		_timestamp_contributed_to_sharing.push_back(Timer::elapsedSeconds());
-	}
+	_timestamp_contributed_to_sharing.push_back(Timer::elapsedSeconds());
 
 	_red->contribute(std::move(aggregation_element));
 
@@ -1316,55 +1197,10 @@ void SweepJob::extractAllReductionResult() {
 	const int eq_size     = data[data.size()-METADATA_EQ_SIZE];
 	assert(eq_size%2==0 || log_return_false("SWEEP ERROR: Import Equality size %i not even\n", eq_size));
 
-	if (okToTrackSharingDelay())
-		_timestamp_receive_sharing_result.push_back(Timer::elapsedSeconds());
+	_timestamp_receive_sharing_result.push_back(Timer::elapsedSeconds());
 
 
 	LOG(V2_INFO, "SWEEP GOTT: iter %i round %i : %i ai , %i trm . E %i  U %i  \n", sweep_iteration, sharing_round, all_idle, terminate, eq_size/2, unit_size);
-	// if (_is_root) {
-		// LOGGER(_reslogger, V2_INFO, "SWEEP GOTT: iter %i round %i : %i ai , %i trm . E %i  U %i  \n", sweep_iteration, sharing_round, all_idle, terminate, eq_size/2, unit_size);
-	// }
-	// LOG(V2_INFO, "SWEEP RED SHARE SKIP bc not all init'd yet: iter(%i),round(%i) got: %i EQS, %i UNITS, (%i)all_idle, (%i)terminate. #longidle: %i / %i \n", sweep_iteration, sharing_round, eq_size/2, unit_size, all_idle, terminate, _lastLongtermIdleCount, _nThreads);
-
-#if SWEEP_NEW_IMPORT_VERSION == 0
-	//if our local solvers are not fully initialised yet we ignore the global sharing data, is cleaner than going hot solver-by-solver
-	if (_flag_started_synchronized_solving) {
-		//All solvers are initialised, we can make use of the shared data
-
-		if (eq_size > MAX_IMPORT_SIZE) {
-			LOG(V1_WARN, "WARN SWEEP too many equalities to import! %i, max %i\n", eq_size, MAX_IMPORT_SIZE);
-		}
-		if (unit_size > MAX_IMPORT_SIZE) {
-			LOG(V1_WARN, "WARN SWEEP too many units to import! %i, max %i\n", unit_size, MAX_IMPORT_SIZE);
-		}
-
-		for (int i=0; i<eq_size && i < MAX_IMPORT_SIZE; i++) {
-			_EQS_to_import[i] = data[i];
-		}
-
-		// for (int i=eq_size; i<data.size()-NUM_METADATA_FIELDS; i++) {
-		for (int i=0; i<unit_size && i < MAX_IMPORT_SIZE; i++) {
-			_UNITS_to_import[i] = data[eq_size + i];
-		}
-
-		_EQS_import_size.store(eq_size, std::memory_order_relaxed);
-		_UNITS_import_size.store(unit_size, std::memory_order_relaxed);
-		_available_import_round.store(sharing_round, std::memory_order_release);
-
-		//the sweepers need to know the current sweep iteration to set the size of their sweep environments accordingly
-		//which grow with each round (if activated)
-		if (!_terminate_all && sweep_iteration <= _params.sweepMaxGrowthIteration.val) { //when sweepers are already being deleted we don't want to risk a segfault looping over them...
-			for (auto &sweeper : _sweepers) {
-				if (sweeper) {
-					shweep_set_sweep_iteration(sweeper->solver, sweep_iteration);
-				}
-			}
-		}
-	} else {
-		LOG(V2_INFO, "SWEEP RED SHARE GOTT SKIP: iter(%i),round(%i): not all solvers init'd yet (%i / %i)\n", sweep_iteration, sharing_round, _started_sweepers_count.load(),  _nThreads);
-	}
-
-#else
 
 	assert(sharing_round > _lastImportedRound.load() || log_return_false("SWEEP ERROR : unexpected round number when importing shared data. got round %i, while lastImportedRound %i \n", sharing_round, _lastImportedRound.load()));
 
@@ -1374,19 +1210,6 @@ void SweepJob::extractAllReductionResult() {
 	_imported_EQS_UNITS[sharing_round].eqs   = std::vector<int>(data.begin()		  , data.begin() + eq_size);
 	_imported_EQS_UNITS[sharing_round].units = std::vector<int>(data.begin() + eq_size, data.begin() + eq_size + unit_size);
 	_lastImportedRound = sharing_round;
-
-	//Sweepers can increase the size of their sweeping environments in later sweep iterations (analog to kissats own increasing environments)
-	//We tell them the current iteration, so that they can adjust accordingly
-	//We might want to limit the environment increase, since this SweepApp arrives typically at higher iteration numbers than a sequential kissat run, and thus just ever increasing the environments might be too costly or inefficient
-	// if (_started_synchronized_solving.load(std::memory_order_relaxed) && !_terminate_all.load(std::memory_order_relaxed) && sweep_iteration <= _params.sweepMaxGrowthIteration.val) {
-		// for (auto &sweeper : _sweepers) {
-			// if (sweeper) {
-				// shweep_set_sweep_iteration(sweeper->solver, sweep_iteration);
-			// }
-		// }
-	// }
-
-#endif
 
 	//the root node is special in that it is the only node that initiates sharing rounds. Prepare for a new one, since we just extracted all the shared data from the current round.
 	if (_is_root) {
@@ -1631,15 +1454,10 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 	LOG(V3_VERB, "SWEEP [%i](%i) loading formula (%.3f MB) \n", _my_rank, sweeper->getLocalId(), formula_in_MB);
 	float t0 = Timer::elapsedSeconds();
 
-	// for (int i = 0; i < payload_size ; i++) {
-		// sweeper->addLiteral(lits[i]);
-	// }
-
 	constexpr int CHECK_INTERVAL = 50000;
 	int counter = CHECK_INTERVAL;
 	for (int i = 0; i < payload_size; i++) {
 		sweeper->addLiteral(lits[i]);
-
 		if (--counter == 0) {
 			counter = CHECK_INTERVAL;
 			if (_terminate_all.load(std::memory_order_relaxed)) {

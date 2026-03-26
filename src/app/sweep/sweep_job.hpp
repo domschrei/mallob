@@ -318,7 +318,6 @@ private:
 	void createAndStartNewSweeper(int localId);
     void loadFormula(KissatPtr sweeper);
 
-	bool okToTrackSharingDelay();
 	void checkSharingDelay();
 	void checkForUnsatResults();
 	void tryReportUnsat();
