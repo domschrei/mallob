@@ -62,6 +62,7 @@ private:
 	// std::atomic_bool _root_initwork_providable=false;
     std::atomic_bool _root_initwork_startedproviding=false;
     std::atomic_bool _root_initwork_provided=false;
+	bool _rank_is_inbetween_iterations=true;
 	struct WorkstealRequest {
 		int senderLocalId{-1};
 		int targetIndex{-1};
@@ -143,18 +144,8 @@ private:
 	std::atomic_int _lastImportedRound = 0;
 	int _lastClearedRound = 0;
 
-
 	//Termination. Determined during workstealing, broadcasted via sharing
 	std::atomic_bool _terminate_all=false; //termination (on this node) due to sharing consensus that there is no more work
-	// std::atomic_bool _external_termination=false; //termination because somebody else told us to (for example Job interrupted because Base Job already found a solution, ...)
-
-	//An UNSAT result can occur suddenly from any solver. We make sure that only the very first reports the results to Mallob
-	// int _NO_UNSAT_REPORT_YET = -1;
-	// std::atomic_int  _first_UNSAT_reporting_localId = _NO_UNSAT_REPORT_YET;
-
-	// std::vector<int> _worksweeps{}; //to collect statistics
-	// std::vector<int> _resweeps_in{};
-	// std::vector<int> _resweeps_out{};
 
 	Logger _reslogger;  //Logging most important results in dedicated file, to not have them mangled by other verbose logs
 	Logger _warnlogger; //Logging some warnings in a dedicated file, to avoid needing to grep later the whole large main log files for these warnings

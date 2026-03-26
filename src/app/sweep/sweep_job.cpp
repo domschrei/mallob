@@ -634,24 +634,25 @@ void SweepJob::checkSharingDelay() {
 	if (_terminate_all.load(std::memory_order_relaxed))
 		return;
 
-
-	//We insert manually a first timestamp to detect cases where NO communication happened at all for a specific rank (due to a programming bug in the job tree handling)
-	//With the manual insertions we have a reference against which delays can be detected, and can be sure that we are warned if this rank does not participate in the overall communication. i
-	//Otherwise the timing-vectors could have remained completely empty and no delay-difference would be detected
-	// if (!_started_sharedelay_tracking && _started_synchronized_solving) {
-		// float t = Timer::elapsedSeconds();
-		// _timestamp_contributed_to_sharing.push_back(t);
-		// _timestamp_receive_sharing_result.push_back(t);
-		// _started_sharedelay_tracking = true;
-	// }
-
-	constexpr float MAX_DELAY_FACTOR = 6;
 	float time = Timer::elapsedSeconds();
 
-	float expected_period = _params.sweepSharingPeriod.val; //in seconds
+	constexpr float MAX_DELAY_FACTOR = 6; //factor
+	constexpr float MAX_DELAY_BETWEEN_ITERATIONS = 3; //seconds
+
+	float expected_period = _params.sweepSharingPeriod.val;
+	float warn_threshhold = expected_period * MAX_DELAY_FACTOR;
+
+	//Be more lenient
+	//If we are inbetween iterations we can (and should) be more lenient with the warnings. Because for very large instances it can take even a few seconds
+	//on the root node to finish up on iteration (mainly the substitute() call.
+	//This end-of-iteration delay is expected and unavoidable, and should not count as a problem in the sharing procedure
+	if (_rank_is_inbetween_iterations) {
+		warn_threshhold = MAX_DELAY_BETWEEN_ITERATIONS;
+	}
+
 	if (!_timestamp_contributed_to_sharing.empty()) {
 		float delay = time - _timestamp_contributed_to_sharing.back();
-		if (delay > expected_period*MAX_DELAY_FACTOR) {
+		if (delay > warn_threshhold) {
 			//We log two times. Once in the main log file to see the information chronologically correct interleaved with the other logs
 			//and onces separately in a .warn file for faster grepping during post-processing, where we would like to avoid to grep through the main logs
 			LOG(				V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since contrib, factor %.1f \n", _my_rank, delay, delay/expected_period);
@@ -660,7 +661,7 @@ void SweepJob::checkSharingDelay() {
 	}
 	if (!_timestamp_receive_sharing_result.empty()) {
 		float delay = time - _timestamp_receive_sharing_result.back();
-		if (delay > expected_period*MAX_DELAY_FACTOR) {
+		if (delay > warn_threshhold) {
 			LOG(			    V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since recv, factor %.1f \n", _my_rank, delay, delay/expected_period);
 			LOGGER(_warnlogger, V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since recv, factor %.1f \n", _my_rank, delay, delay/expected_period);
 		}
@@ -1199,6 +1200,7 @@ void SweepJob::extractAllReductionResult() {
 
 	_timestamp_receive_sharing_result.push_back(Timer::elapsedSeconds());
 
+	_rank_is_inbetween_iterations = all_idle;
 
 	LOG(V2_INFO, "SWEEP GOTT: iter %i round %i : %i ai , %i trm . E %i  U %i  \n", sweep_iteration, sharing_round, all_idle, terminate, eq_size/2, unit_size);
 
