@@ -560,8 +560,9 @@ void SweepJob::cbReportIteration(int localId) {
 	KissatPtr sweeper = _sweepers[localId];
 	assert(sweeper);
 	auto stats = sweeper->fetchSweepStats();
+	LOG(			  V2_INFO, "SWEEP solver [%i](%i) reports about iteration %i in dedicated .sweep file \n", _my_rank, localId, stats.curr_iteration);
+	assert(stats.curr_iteration <= _params.sweepMaxIterations.val || log_return_false("SWEEP ERROR: solver has internally higher iteration (%i) than expected max iterations (%i)", stats.curr_iteration, _params.sweepMaxIterations.val));
 
-	LOG(			  V2_INFO, "SWEEP solver [%i](%i) reports statistics in dedicated .sweep file \n", _my_rank, localId);
 	LOGGER(_reslogger, V2_INFO, "\n");
 	LOGGER(_reslogger,V2_INFO, "Reported by [%i](%i)		\n", _my_rank, localId);
 	LOGGER(_reslogger,V2_INFO, "ITERATION_CURR   %i		    \n", stats.curr_iteration);
@@ -738,8 +739,11 @@ bool SweepJob::okToTrackSharingDelay() {
 
 
 bool SweepJob::skip_MPI_forNow() {
+	if (getVolume()==0) {
+		LOG(V3_VERB, "SWEEP [%i] WARN : getVolume()==0\n", _my_rank);
+		return true;
+	}
 	return (getJobComm().size() < getVolume());
-	// LOG(V4_VVER, "SWEEP [%i] Skip MPI workstealing, jobcomm size %i < volume %i\n", _my_rank, getJobComm().size(), getVolume());
 }
 
 void SweepJob::sendWorkstealsViaMPI() {
@@ -999,22 +1003,27 @@ void SweepJob::cbImportUnit(int *ilit, int localId) {
 
 bool SweepJob::tryProvideInitialWork(KissatPtr sweeper) {
 		//we only provide work at the root node, this simplifies its tracking, and especially allows the root-transform to know and influence the work-sharing state via shared-memory
+	int solver_iteration = shweep_get_curr_iteration(sweeper->solver);
 	if (_is_root
-		//to avoid any concurrency problems, only a single hardcoded representative solver (localId 0 per default) receives the work
+		//only a single hardcoded representative solver (localId 0 per default) receives the work, to avoid any concurrency problems
 		&& sweeper->getLocalId()==_representative_localId
-		//to prevent that we provide work multiple times in the same iteration, check explicitly that the solver expects it for a new iteration
-		&& shweep_get_curr_iteration(sweeper->solver) > _root_sweep_iteration)
+		//we check explicitly that the solver expects this work it for a new iteration, to prevent that we provide work multiple times in the same iteration,
+		&& solver_iteration > _root_sweep_iteration)
 	{
 
 		sweeper->sweeper_is_idle = false; //already set non-idle here to prevent case where solver is already initialized, non-idle, but still has no work cause its just being copied, and then a sharing operation starts right now, terminating everything wrongly early
 		sweeper->sweeper_longterm_idle = false;
 
+		assert(solver_iteration <= _params.sweepMaxIterations.val || log_return_false("SWEEP ERROR : solver iteration %i is too high, should be max %i ", solver_iteration, _params.sweepMaxIterations.val));
+		if (solver_iteration != _root_sweep_iteration +1 ) {
+			LOG(V1_WARN, "SWEEP WARN : new solver iteration %i more than 1 larger than counter at root (iteration %i) \n", solver_iteration, _root_sweep_iteration);
+		}
 		//We need to know how much space to allocate to store each variable "idx" at the array position work[idx], i.e. we need to know max(idx).
 		//We assume that the maximum variable index corresponds to the total number of variables
 		//i.e. we assume that there are no holes in kissats internal numbering. This is an assumption that standard Kissat makes all the time, so we also do it here
 
 		const unsigned VARS = shweep_get_num_vars(sweeper->solver); //this value can be different from numVars here in C++ !! Because kissat might have aready propagated some units, etc.
-		LOG(V2_INFO, "SWEEP WORK PROVIDING --------------%u---------------- \n", VARS);
+		LOG(V2_INFO, "SWEEP WORK PROVIDING --------------%u---------------- for new solver iteration %i (root at %i)\n", VARS, solver_iteration, _root_sweep_iteration);
 		sweeper->work_received_from_steal = std::vector<int>(VARS);
 		_root_initwork_startedproviding = true;
 
@@ -1392,7 +1401,7 @@ void SweepJob::extractAllReductionResult() {
 
 
 	if (_params.sweepIndividualSweepIters.val && all_idle && _flag_started_synchronized_solving  && !_terminate_all) {
-		LOG(V4_VVER, "SWEEP sending end_iteration signal\n");
+		LOG(V4_VVER, "SWEEP sending end_iteration signal to solvers\n");
 		for (auto &sweeper : _sweepers) {
 			if (sweeper) {
 				shweep_set_end_iteration_signal(sweeper->solver);
