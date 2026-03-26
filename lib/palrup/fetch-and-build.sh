@@ -14,7 +14,6 @@ cd build
 cmake ..
 make
 cd ..
-<<<<<<< HEAD
 echo "[palrup] Build complete"
 
 if ! [ -z "$1" ]; then
@@ -30,6 +29,3 @@ if ! [ -z "$1" ]; then
 
     cp build/out.palrup_import.dummy "$1/out.palrup_import.dummy"
 fi
-=======
-echo "[$dirname] Build complete"
->>>>>>> upstream/fullcmake
