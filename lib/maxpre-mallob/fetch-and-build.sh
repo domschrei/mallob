@@ -1,22 +1,11 @@
 #!/bin/bash
 
-set -e
+source ../base-build-functions.sh
+dirname="maxpre-mallob"
 
-if [ ! -f Makefile ]; then
-    echo "[maxpre] Fetching sources ..."
-    if [ ! -f maxpre-mallob.zip ]; then
-        # for fixing a branch instead of a commit, prepend "refs/heads/"
-        branchorcommit="ccd759aab16dae3d8e74f021d0955d17c424ed38"
-        curl -L -o maxpre-mallob.zip https://github.com/jezberg/maxpre-mallob/archive/${branchorcommit}.zip
-    fi
-    echo "[maxpre] Extracting sources ..."
-    unzip maxpre-mallob.zip
-    mv maxpre-mallob-*/* maxpre-mallob-*/.* ./
-    rmdir maxpre-mallob-*/
-else
-    echo "[maxpre] Assuming sources are present"
-fi
+branchorcommit="ccd759aab16dae3d8e74f021d0955d17c424ed38"
+fetch_and_extract $dirname Makefile https://github.com/jezberg/maxpre-mallob/archive/${branchorcommit}.zip
 
-echo "[maxpre] Building ..."
+echo "[$dirname] Building ..."
 make lib with_zlib=false
-echo "[maxpre] Build complete"
+echo "[$dirname] Build complete"

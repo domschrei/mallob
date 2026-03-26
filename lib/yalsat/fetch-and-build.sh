@@ -1,30 +1,20 @@
 #!/bin/bash
 
-set -e
+source ../base-build-functions.sh
+dirname="yalsat"
+
+fetch_and_extract $dirname configure.sh http://fmv.jku.at/yalsat/yalsat-03v.zip
+
 disable_fpu=false
 
-if [ ! -f configure.sh ]; then
-    if [ ! -f yalsat-*.zip ]; then
-        echo "[lingeling:yalsat] Fetching sources ..."
-        curl -L -o yalsat-03v.zip -C - http://fmv.jku.at/yalsat/yalsat-03v.zip
-    fi
-    echo "[lingeling:yalsat] Extracting sources ..."
-    unzip yalsat-03v.zip
-    mv yalsat-*/* ./
-    rmdir yalsat-*/
-
-    for f in *.c *.h ; do
-        sed -i 's/exit ([01])/abort()/g' $f
-    done
-    if $disable_fpu; then
-        sed -i 's/#ifdef __linux__/#if 0/g' yals.c
-    fi
-    
-    ./configure.sh
-else
-    echo "[lingeling:yalsat] Assuming sources are present"
+for f in *.c *.h ; do
+    sed -i 's/exit ([01])/abort()/g' $f
+done
+if $disable_fpu; then
+    sed -i 's/#ifdef __linux__/#if 0/g' yals.c
 fi
 
-echo "[lingeling:yalsat] Building ..."
+echo "[$dirname] Building ..."
+./configure.sh
 make
-echo "[lingeling:yalsat] Build complete"
+echo "[$dirname] Build complete"

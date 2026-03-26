@@ -12,16 +12,25 @@ function fetch_and_extract() {
         return
     fi
 
-    if [ -f "$dirname.zip" ]; then
+    if [ -f ${dirname}*.zip ]; then
         echo "[$dirname] ZIP already present"
         return
     fi
 
     echo "[$dirname] Fetching sources ..."
-    curl -L -o "$dirname.zip" "$url"
+    curl -L -o "${dirname}*.zip" "$url"
 
     echo "[$dirname] Extracting sources ..."
-    unzip $dirname.zip
-    for d in $dirname-*/ ; do cd "$d"; mv . ../; cd ..; done
+    unzip ${dirname}*.zip
+    for d in $dirname-*/ ; do
+        cd "$d"
+        if compgen -G "./*" > /dev/null; then
+            mv ./* ../
+        fi
+        if compgen -G "./.*" > /dev/null; then
+            mv ./.* ../
+        fi
+        cd ..
+    done
     rmdir $dirname-*/
 }

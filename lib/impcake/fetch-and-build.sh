@@ -1,21 +1,10 @@
 #!/bin/bash
 
-set -e
+source ../base-build-functions.sh
+dirname="impcheck"
 
-if [ ! -f CMakeLists.txt ]; then
-    if [ ! -f impcheck.zip ]; then
-        echo "[impcake] Fetching sources ..."
-        # for fixing a branch instead of a commit, prepend "refs/heads/"
-        branchorcommit="a96fb5f268e7c384dafbf2861deeeb4ac8330146" # updated 2026-01-29
-        curl -L -o impcheck.zip https://github.com/tanyongkiam/impcheck/archive/${branchorcommit}.zip
-    fi
-    echo "[impcake] Extracting sources ..."
-    unzip impcheck.zip
-    mv impcheck-*/* impcheck-*/.* ./ || :
-    rmdir impcheck-*/
-else
-    echo "[impcake] Assuming sources are present"
-fi
+branchorcommit="a96fb5f268e7c384dafbf2861deeeb4ac8330146" # updated 2026-01-29
+fetch_and_extract $dirname CMakeLists.txt https://github.com/tanyongkiam/impcheck/archive/${branchorcommit}.zip
 
 echo "[impcake] Building ..."
 mkdir -p build
