@@ -379,7 +379,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		if (res==UNSAT) {
 			//Found UNSAT
 			assert(kissat_is_inconsistent(sweeper->solver) || log_return_false("SWEEP ERROR: Solver returned UNSAT 20 but is not in inconsistent (==UNSAT) state!\n"));
-			LOG(V2_INFO, "SWEEP [%i](%i) found UNSAT! \n", _my_rank, localId);
+			LOG(V4_VVER, "SWEEP [%i](%i) found UNSAT! \n", _my_rank, localId);
 			if (_is_root) {
 				//there had been rare cases where sending a self-message on the root-node crashed the program, so in this case we skip the mpi message
 				tryReportUnsat();
@@ -637,7 +637,7 @@ void SweepJob::checkSharingDelay() {
 	float time = Timer::elapsedSeconds();
 
 	constexpr float MAX_DELAY_FACTOR = 6; //factor
-	constexpr float MAX_DELAY_BETWEEN_ITERATIONS = 3; //seconds
+	constexpr float MAX_DELAY_BETWEEN_ITERATIONS = 4; //seconds
 
 	float expected_period = _params.sweepSharingPeriod.val;
 	float warn_threshhold = expected_period * MAX_DELAY_FACTOR;
@@ -886,12 +886,12 @@ void SweepJob::cbImportUnit(int *ilit, int localId) {
 }
 
 bool SweepJob::tryProvideInitialWork(KissatPtr sweeper) {
-		//we only provide work at the root node, this simplifies its tracking, and especially allows the root-transform to know and influence the work-sharing state via shared-memory
 	int solver_iteration = shweep_get_curr_iteration(sweeper->solver);
+		//we only provide work at the root node. this simplifies its tracking, and especially allows the root-transform to know and influence the work-sharing state via shared-memory
+		//also, only a single hardcoded representative solver (localId 0 per default) receives the work, to avoid any concurrency problems
+		//also, we check explicitly that the solver expects this work it for a new iteration, to prevent that we provide work multiple times in the same iteration,
 	if (_is_root
-		//only a single hardcoded representative solver (localId 0 per default) receives the work, to avoid any concurrency problems
 		&& sweeper->getLocalId()==_representative_localId
-		//we check explicitly that the solver expects this work it for a new iteration, to prevent that we provide work multiple times in the same iteration,
 		&& solver_iteration > _root_sweep_iteration)
 	{
 
