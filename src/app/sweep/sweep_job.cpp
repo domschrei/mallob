@@ -306,9 +306,9 @@ void SweepJob::tryReportUnsat() {
 }
 
 void SweepJob::reportSolverResult(KissatPtr sweeper, int res) {
-	LOG(V2_INFO, "SWEEP JOB [%i] reports sweep result %i to Mallob\n", _my_rank, res);
+	LOG(V2_INFO, "SWEEP JOB [%i](%i) reports sweep result %i to Mallob\n", _my_rank, sweeper->getLocalId(), res);
 	assert(_is_root || log_return_false("SWEEP ERROR: non-root tries to report result to mallob\n"));
-	assert(_solved_status == -1 || log_return_false("SWEEP ERROR: duplicate attempt to report result to mallob")); //something would be off if we called this function more than once
+	assert(_solved_status == -1 || log_return_false("SWEEP ERROR: duplicate attempt to report result to mallob\n")); //something would be off if we called this function more than once
 	std::vector<int> formula;
 	if (res==UNSAT) {
 		//an UNSAT result doesnt come with a proof and can arrive via MPI from another process, so we don't have access to that particular reporting sweeper, nor do we need it
@@ -381,9 +381,10 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			assert(kissat_is_inconsistent(sweeper->solver) || log_return_false("SWEEP ERROR: Solver returned UNSAT 20 but is not in inconsistent (==UNSAT) state!\n"));
 			LOG(V4_VVER, "SWEEP [%i](%i) found UNSAT! \n", _my_rank, localId);
 			if (_is_root) {
-				//there had been rare cases where sending a self-message on the root-node crashed the program, so in this case we skip the mpi message
+				//for consistency, only the root node is allowed to report to Mallob
 				tryReportUnsat();
 			} else {
+				//if we are not on root, this flag lets the main Process soon send an MPI message to root, indicating UNSAT
 				_do_report_UNSAT_to_root = true;
 			}
 		} else if (res==UNKNOWN && _is_root && sweeper->getLocalId()==_representative_localId) {
@@ -393,14 +394,18 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			if (sweeper->hasPreprocessedFormula() ) { //by design only the representative sweeper might have a preprocessed (Improved) formula
 				if (_root_reported_unsat) {
 					//in rare cases, it can happen that an UNSAT result is found in some other solver, but almost at the same time the root solver also ends and doesnt know this information yet, catch this case here
-					LOG(V1_WARN, "SWEEP [%i](%i): wanted to report improvement result, but stopped because other solvers already deduced UNSAT\n", _my_rank, localId);
+					LOG(V1_WARN, "SWEEP WARN [%i](%i): wanted to report improvement result, but was stopped because other solvers already deduced UNSAT\n", _my_rank, localId);
 				}  else {
 					//we found an Improved formula via Sweeping
 					reportSolverResult(sweeper, IMPROVED);
 				}
 			} else {
 				//The whole sweeping didn't yield any improvements
-				reportSolverResult(sweeper, UNKNOWN);
+				if (!_root_reported_unsat) {
+					reportSolverResult(sweeper, UNKNOWN);
+				} else {
+					LOG(V1_WARN, "SWEEP WARN [%i](%i): wanted to report no-progress-result, but was stopped because other solvers already deduced UNSAT\n", _my_rank, localId);
+				}
 			}
 		}
 
