@@ -19,7 +19,7 @@ private:
     JobResult _internal_result;
     int _solved_status{-1};
 	bool _do_report_UNSAT_to_root{false};
-	std::atomic_bool _root_reported_unsat{false};
+	std::atomic<int> _root_reported_result{-1};
 	bool _finished_job_setup{false};
 	bool _started_communication{false};
 
@@ -311,10 +311,10 @@ private:
 
 	void checkSharingDelay();
 	void checkForUnsatResults();
-	void tryReportUnsat();
-	void reportSolverResult(KissatPtr sweeper, int res);
+	// void tryReportUnsat();
+	void rootReportSolverResult(KissatPtr sweeper, int res);
 	void reportEndStats(KissatPtr sweeper);
-	void printCongruenceStats(KissatPtr sweeper);
+	// void printCongruenceStats(KissatPtr sweeper);
 
 	void triggerTerminations();
 

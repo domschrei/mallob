@@ -69,6 +69,7 @@ void SweepJob::appl_start() {
 
 	LOG(V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d, NumVars %i, NumClauses %i\n",
 		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _nThreads, numVars, numClauses);
+	LOG(V2_INFO,"SWEEP_PAYLOAD_SIZE %i\n", getDescription().getFormulaPayloadSize(0));
     _metadata = getSerializedDescription(0)->data();
 
 	_timestamp_start_sweepapp = Timer::elapsedSeconds();
@@ -239,7 +240,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 	else if (msg.tag == TAG_FOUND_UNSAT) {
 		LOG(V2_INFO, "SWEEP MSG [%i] <~~~ Found UNSAT! [%i]\n", _my_rank, sourceRank );
 		assert(_is_root);
-		tryReportUnsat();
+		rootReportSolverResult(nullptr, UNSAT);
 	}
 	else if (mpiTag == MSG_NOTIFY_JOB_ABORTING)    {LOG(V1_WARN, "SWEEP MSG WARN [%i]: received NOTIFY_JOB_ABORTING \n", _my_rank);}
 	else if (mpiTag == MSG_NOTIFY_JOB_TERMINATING) {LOG(V1_WARN, "SWEEP MSG WARN [%i]: received NOTIFY_JOB_TERMINATING \n", _my_rank);}
@@ -296,32 +297,45 @@ void SweepJob::checkForUnsatResults() {
 
 }
 
-void SweepJob::tryReportUnsat() {
-	assert(_is_root);
-	bool expected = false;
+// void SweepJob::tryReportUnsat() {
+	// assert(_is_root);
+	// bool expected = false;
 	//report exactly once to Mallob, ignore all additional internal UNSAT messages
-	if (_root_reported_unsat.compare_exchange_strong(expected, true)) {
-		reportSolverResult(nullptr, UNSAT);
-	}
-}
+	// if (_root_reported_result.compare_exchange_strong(expected, true)) {
+		// rootReportSolverResult(nullptr, UNSAT);
+	// }
+// }
 
-void SweepJob::reportSolverResult(KissatPtr sweeper, int res) {
-	LOG(V2_INFO, "SWEEP JOB [%i](%i) reports sweep result %i to Mallob\n", _my_rank, sweeper->getLocalId(), res);
+void SweepJob::rootReportSolverResult(KissatPtr sweeper, int res) {
 	assert(_is_root || log_return_false("SWEEP ERROR: non-root tries to report result to mallob\n"));
-	assert(_solved_status == -1 || log_return_false("SWEEP ERROR: duplicate attempt to report result to mallob\n")); //something would be off if we called this function more than once
-	std::vector<int> formula;
 	if (res==UNSAT) {
 		//an UNSAT result doesnt come with a proof and can arrive via MPI from another process, so we don't have access to that particular reporting sweeper, nor do we need it
-		assert(sweeper == nullptr);
+		assert(sweeper==nullptr);
+	}
+	//CAREFUL: don't access sweeper in case of UNSAT, because it doesn't exist!...
+
+	//report exactly once to Mallob, ignore all additional internal reports (can happen if multiple UNSAT messages arrive from other ranks/solvers)
+	int expected = -1;
+	if (_root_reported_result.compare_exchange_strong(expected, res)) {
+		//we are first, continue reporting
+	} else {
+		LOG(V1_WARN, "SWEEP WARN [%i]: wanted to report result %i, but was stopped because there is already reported result %i \n", _my_rank, res, _root_reported_result.load());
+		return;
+	}
+
+
+	LOG(V2_INFO, "SWEEP JOB [%i] reports sweep result %i to Mallob\n", _my_rank, res);
+	assert(_solved_status == -1 || log_return_false("SWEEP ERROR: duplicate attempt to report result to mallob, was already reported as %i \n", _internal_result.result)); //something would be off if we called this function more than once
+	std::vector<int> formula;
+	if (res==UNSAT) {
 		formula = {};
 	} else if (res==IMPROVED){
 		assert(sweeper);
 		formula = sweeper->extractPreprocessedFormula();
 		LOG(V2_INFO, "SWEEP JOB [%i]: Solution Size %zu\n", _my_rank, formula.size());
 	} else if (res==UNKNOWN) {
-		//Design choice: we don't even send a formula back. if we couldn't improve anything in it
-		//since, in the SWEEP app, we stop anyways after sweeping ends
-		//and in the SATWITHPRE app, we don't use any reported formula in this case of no progress
+		//No progress has been made.
+		//Design choice: we don't send any formula back, since there would be no new information in it
 		assert(sweeper);
 		formula = {};
 	} else {
@@ -382,30 +396,20 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			LOG(V4_VVER, "SWEEP [%i](%i) found UNSAT! \n", _my_rank, localId);
 			if (_is_root) {
 				//for consistency, only the root node is allowed to report to Mallob
-				tryReportUnsat();
+				rootReportSolverResult(nullptr, UNSAT);
 			} else {
 				//if we are not on root, this flag lets the main Process soon send an MPI message to root, indicating UNSAT
 				_do_report_UNSAT_to_root = true;
 			}
+			//To reduce concurrency problems, only a single representative solver on the root node is allowed to report to Mallob
 		} else if (res==UNKNOWN && _is_root && sweeper->getLocalId()==_representative_localId) {
 			//Found either IMPROVED or UNKNOWN
-			//To reduce concurrency problems, only a single representative solver on the root node is allowed to report this
-			assert(_is_root);
-			if (sweeper->hasPreprocessedFormula() ) { //by design only the representative sweeper might have a preprocessed (Improved) formula
-				if (_root_reported_unsat) {
-					//in rare cases, it can happen that an UNSAT result is found in some other solver, but almost at the same time the root solver also ends and doesnt know this information yet, catch this case here
-					LOG(V1_WARN, "SWEEP WARN [%i](%i): wanted to report improvement result, but was stopped because other solvers already deduced UNSAT\n", _my_rank, localId);
-				}  else {
-					//we found an Improved formula via Sweeping
-					reportSolverResult(sweeper, IMPROVED);
-				}
+			if (sweeper->hasPreprocessedFormula() ) {
+				//Found some improvements
+				rootReportSolverResult(sweeper, IMPROVED);
 			} else {
 				//The whole sweeping didn't yield any improvements
-				if (!_root_reported_unsat) {
-					reportSolverResult(sweeper, UNKNOWN);
-				} else {
-					LOG(V1_WARN, "SWEEP WARN [%i](%i): wanted to report no-progress-result, but was stopped because other solvers already deduced UNSAT\n", _my_rank, localId);
-				}
+				rootReportSolverResult(sweeper, UNKNOWN);
 			}
 		}
 
@@ -425,7 +429,6 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		_finished_sweepers_count++;
 		LOG(V3_VERB, "SWEEP [%i](%i) WORKER EXIT, %i left \n", _my_rank, localId, _running_sweepers_count.load());
 
-		// if (_localId==_representative_localId) {
 	});
 }
 
