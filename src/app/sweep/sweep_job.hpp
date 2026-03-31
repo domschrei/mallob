@@ -163,6 +163,8 @@ private:
 	bool _root_did_just_finish_iteration = true; //Starts with true to immediately start into iteration 1.
 
 	const int MAX_TOLERATED_EMPTYROUNDS = _params.sweepMaxEmptyRounds.val;
+	const int MIN_EARLYEXIT_SWEEPS = 40000;
+	const double EARLYEXIT_RATIO = 0.001;
 
 	//The root node (and only the root node) tracks progress over the sharing rounds and sweeping iterations
 	//It decides whether sharing should continue or whether it should end (either because the last iteration is reached, or because no progress has been made)
@@ -202,6 +204,7 @@ private:
 		_root_rounds_this_iteration++;
 
 
+
 		//Check whether this is a round with yet again zero progress. It makes only sense to check for progress once the solvers actually got their work provided.
 		if (_root_shared_units_this_iteration==0 && _root_shared_eqs_this_iteration==0) {
 			//we don't count empty sharing rounds if we know that there hasn't even been work provided, i.e. solvers couldn't even do anything till now
@@ -213,13 +216,29 @@ private:
 			}
 		}
 
-		bool send_terminate = false;
 		bool terminate_emptyrounds = _root_emptyrounds_before_progress > MAX_TOLERATED_EMPTYROUNDS;
 
 		if (terminate_emptyrounds) {
 			LOG(V2_INFO, "SWEEP [%i](root-trf) EARLYSTOP in iteration %i, round %i: now %i empty rounds in a row \n", _my_rank, _root_sweep_iteration, _root_sharing_round, _root_emptyrounds_before_progress);
 		}
 
+
+		double progress_ratio=0;
+		int eliminated = _root_shared_units_this_iteration + _root_shared_eqs_this_iteration; //slight overestimation, because the same eq can be shared in different rounds. But in the relevant regime (almost no sharing) this is not a problem.
+		int swept = work_sweeps + work_unsched_resweeps;
+		if (swept >= MIN_EARLYEXIT_SWEEPS) {
+			//mirror the decision process in original sequential kissat sweeping
+			progress_ratio = eliminated/(double)swept;
+			if (progress_ratio <= EARLYEXIT_RATIO) {
+				terminate_emptyrounds = true;
+			}
+		}
+
+		if (terminate_emptyrounds) {
+			LOG(V2_INFO, "SWEEP [%i](root-trf) EARLYEXIT in iteration %i, round %i: only %zu / %zu progress \n", _my_rank, _root_sweep_iteration, _root_sharing_round, eliminated, swept);
+		}
+
+		bool send_terminate = false;
 		//A round is finished if all sweepers are idle, or if we had for too long exclusively empty rounds since the start of this iteration
 		if (all_idle || terminate_emptyrounds) {
 			LOG(V2_INFO, "SWEEP [%i](root-trf) (%i)all_idle  (%i)terminate_emptyrounds \n", _my_rank, all_idle, terminate_emptyrounds);
@@ -259,7 +278,7 @@ private:
 
 		char logmsg[512];
 		snprintf(logmsg, sizeof(logmsg),
-			"SWEEP [%i](root-trf) send: iter %i rnd %i :  %i ai  %i trm  E %i  U %i    SW %i  ST %i  RE %i    Sched, Sweeps  %i  %i    ( %.2f ,  %.2f )%   \n",
+			"SWEEP [%i](root-trf) send: iter %i rnd %i :  %i ai  %i trm  E %i  U %i    SW %i  ST %i  RE %i    Sched, Swept  %i  %i    ( %.2f ,  %.2f )%   \n",
 			_my_rank, _root_sweep_iteration, _root_sharing_round, all_idle, send_terminate, n_eqs, n_units,
 			work_sweeps, work_stepovers, work_unsched_resweeps, work_sweeps + work_stepovers, work_sweeps + work_unsched_resweeps,
 			100*(work_sweeps + work_stepovers)/(double)_numVars , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars
@@ -341,7 +360,7 @@ private:
     std::vector<int> stealWorkFromSpecificLocalSolver(int localId);
     // void cbStealWork(unsigned **work, int *work_size, int localId);
 	void cbStealWorkNew(unsigned **work, int *work_size, int localId);
-	void checkForNewImportRound(KissatPtr sweeper);
+	// void checkForNewImportRound(KissatPtr sweeper);
 	void cbImportEq(int *ilit1, int *ilit2, int localId);
 	void cbImportUnit(int *lit, int localId);
 	int  cbCustomQuery(int query);

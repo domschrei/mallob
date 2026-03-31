@@ -806,33 +806,33 @@ int SweepJob::cbCustomQuery(int query) {
 
 
 
-void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
-	int available_import_round = _available_import_round.load(std::memory_order_acquire);
-	int my_last_import_round = sweeper->sweep_import_round;
-	if (available_import_round != my_last_import_round) [[unlikely]] {
+// void SweepJob::checkForNewImportRound(KissatPtr sweeper) {
+	// int available_import_round = _available_import_round.load(std::memory_order_acquire);
+	// int my_last_import_round = sweeper->sweep_import_round;
+	// if (available_import_round != my_last_import_round) [[unlikely]] {
 		//there is new data from a new sharing round
 		// publish_round = _sharing_import_round.load(std::memory_order_acquire);
-		LOG(V4_VVER, "SWEEP [%i](%i) see round %i --> %i \n", _my_rank, sweeper->getLocalId(), my_last_import_round, available_import_round);
+		// LOG(V4_VVER, "SWEEP [%i](%i) see round %i --> %i \n", _my_rank, sweeper->getLocalId(), my_last_import_round, available_import_round);
 
-		assert(my_last_import_round <= available_import_round);
-		if (my_last_import_round!=0 && my_last_import_round != available_import_round - 1) {
-			LOG(V1_WARN, "SWEEP WARN SKIP: Solver [%i](%i) skipped import rounds, went %i -> %i \n", _my_rank, sweeper->getLocalId(), my_last_import_round, available_import_round);
-		}
-		sweeper->sweep_import_round  = available_import_round;
-		if (sweeper->sweep_EQS_index != sweeper->sweep_EQS_size)
-			LOG(V1_WARN, "SWEEP WARN SKIP: Solver [%i](%i) couldn't finish reading previous eqs  imports (of round %i)! now skipping remaining  %i/%i \n", _my_rank, sweeper->getLocalId(), my_last_import_round, sweeper->sweep_EQS_index.load(), sweeper->sweep_EQS_size.load());
-		if (sweeper->sweep_UNITS_index != sweeper->sweep_UNITS_size)
-			LOG(V1_WARN, "SWEEP WARN SKIP: Solver [%i](%i) couldn't finish reading previous unit imports (of round %i)! now skipping remaining  %i/%i \n", _my_rank, sweeper->getLocalId(), my_last_import_round, sweeper->sweep_UNITS_index.load(), sweeper->sweep_UNITS_size.load());
+		// assert(my_last_import_round <= available_import_round);
+		// if (my_last_import_round!=0 && my_last_import_round != available_import_round - 1) {
+			// LOG(V1_WARN, "SWEEP WARN SKIP: Solver [%i](%i) skipped import rounds, went %i -> %i \n", _my_rank, sweeper->getLocalId(), my_last_import_round, available_import_round);
+		// }
+		// sweeper->sweep_import_round  = available_import_round;
+		// if (sweeper->sweep_EQS_index != sweeper->sweep_EQS_size)
+			// LOG(V1_WARN, "SWEEP WARN SKIP: Solver [%i](%i) couldn't finish reading previous eqs  imports (of round %i)! now skipping remaining  %i/%i \n", _my_rank, sweeper->getLocalId(), my_last_import_round, sweeper->sweep_EQS_index.load(), sweeper->sweep_EQS_size.load());
+		// if (sweeper->sweep_UNITS_index != sweeper->sweep_UNITS_size)
+			// LOG(V1_WARN, "SWEEP WARN SKIP: Solver [%i](%i) couldn't finish reading previous unit imports (of round %i)! now skipping remaining  %i/%i \n", _my_rank, sweeper->getLocalId(), my_last_import_round, sweeper->sweep_UNITS_index.load(), sweeper->sweep_UNITS_size.load());
 		//tell the solver where in the fixed array the data starts and where it ends
-		sweeper->sweep_EQS_index   = 0;
-		sweeper->sweep_UNITS_index = 0;
-		sweeper->sweep_EQS_size    = _EQS_import_size.load(std::memory_order_relaxed);
-		sweeper->sweep_UNITS_size  = _UNITS_import_size.load(std::memory_order_relaxed);
+		// sweeper->sweep_EQS_index   = 0;
+		// sweeper->sweep_UNITS_index = 0;
+		// sweeper->sweep_EQS_size    = _EQS_import_size.load(std::memory_order_relaxed);
+		// sweeper->sweep_UNITS_size  = _UNITS_import_size.load(std::memory_order_relaxed);
 		// LOG(V2_INFO, "Solver [%i](%i) updates to new round %i with eq_size %i, unit_size %i \n", _my_rank, sweeper->getLocalId(), publish_round, sweeper->sweep_EQS_size.load(), sweeper->sweep_UNITS_size.load());
-	}
-}
+	// }
+// }
 
-#define SWEEP_NEW_IMPORT_VERSION 1
+// #define SWEEP_NEW_IMPORT_VERSION 1
 
 void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
 
@@ -1096,7 +1096,7 @@ void SweepJob::cbContributeToAllReduce() {
 	if (! _is_root) {
 		LOG(V4_VVER, "SWEEP [%i] BCAST RESET non-root \n", _my_rank);
 		//Prepare all non-root processes to be ready to receive the next broadcast
-		//CRUCIAL:
+		//CRUCIAL: use
 		//	getJobTree().getSnapshot()
 		//		instead of
 		//	snapshot !!

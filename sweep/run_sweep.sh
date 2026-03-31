@@ -20,7 +20,9 @@ INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s101.cnf.xz" 
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s103.cnf.xz"   #huge, & congruence extremely effective
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s107.cnf.xz"     #significant nr. of fixed before start/CEC (10%), &congr strong
-INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/nusmvdme1d16multi.cnf.xz" #had weird multiple works provided in quick succession
+# INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/nusmvdme1d16multi.cnf.xz" #had weird multiple works provided in quick succession
+INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/nusmvdme2d3multi.cnf.xz" #done almost immediately
+
 
 MALLOB_OPTIONS="-t=$threads \
   -mono-app=SWEEP \
