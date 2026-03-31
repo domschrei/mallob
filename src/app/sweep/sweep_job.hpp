@@ -163,7 +163,7 @@ private:
 	bool _root_did_just_finish_iteration = true; //Starts with true to immediately start into iteration 1.
 
 	const int MAX_TOLERATED_EMPTYROUNDS = _params.sweepMaxEmptyRounds.val;
-	const int MIN_EARLYEXIT_SWEEPS = 40000;
+	// const int MIN_EARLYEXIT_SWEEPS = 40000;
 	const double EARLYEXIT_RATIO = 0.001;
 
 	//The root node (and only the root node) tracks progress over the sharing rounds and sweeping iterations
@@ -226,7 +226,7 @@ private:
 		double progress_ratio=0;
 		int eliminated = _root_shared_units_this_iteration + _root_shared_eqs_this_iteration; //slight overestimation, because the same eq can be shared in different rounds. But in the relevant regime (almost no sharing) this is not a problem.
 		int swept = work_sweeps + work_unsched_resweeps;
-		if (swept >= MIN_EARLYEXIT_SWEEPS) {
+		if (swept >= _params.sweepMinExitSweeps.val) {
 			//mirror the decision process in original sequential kissat sweeping
 			progress_ratio = eliminated/(double)swept;
 			if (progress_ratio <= EARLYEXIT_RATIO) {
