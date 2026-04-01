@@ -156,7 +156,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 	-sweep-solver-quiet=1 \
   -sweep-initial-congruence=1 \
   -sweep-max-iterations=3 \
-  -sweep-max-depth=3 \
+  -sweep-max-depth=4 \
   -sweep-min-exit-swept=40000 \
   -sweep-max-empty-rounds=5 \
 "
