@@ -1,16 +1,17 @@
 #!/bin/bash
 
 #Temporary 
-echo "Reverting back to old 22.2.1 slurm stack for compatibility"
-module switch stack/22.2.1
-module unload gcc/11.5.0
-module unload gdb/15.2
+# echo "Reverting back to old 22.2.1 slurm stack for compatibility"
+# module switch stack/22.2.1
+# module unload gcc/11.5.0
+# module unload gdb/15.2
 
-module load slurm_setup
-module unload devEnv/Intel/2019 intel-mpi cmake
-module load gcc/11 intel-mpi/2019-gcc cmake/3.21.4 gdb valgrind
-echo "Modules loaded"
+# module load slurm_setup
+# module unload devEnv/Intel/2019 intel-mpi cmake
+# module load gcc/11 intel-mpi/2019-gcc cmake/3.21.4 gdb valgrind
+# echo "Modules loaded"
 
+source load_standard_modules.sh
 
 echo "---"
 echo "REMOVING OLD KISSAT, forcing fetching of newest"
