@@ -227,18 +227,16 @@ private:
 
 		bool terminate_emptyrounds = false;
 		int swept = work_sweeps + work_unsched_resweeps;
+		int eliminated = _root_shared_units_this_iteration + _root_shared_eqs_this_iteration; //slight overestimation, because the same eq can be shared in different rounds. But in the relevant regime (almost no sharing) this is not a problem.
+		double progress_ratio = eliminated/(double)swept;
+		//mirror the "delay" decision process in original sequential kissat sweeping
 		if (_params.sweepMinExitSwept()!=0 && swept >= _params.sweepMinExitSwept.val) {
-			//mirror the decision process in original sequential kissat sweeping
-			int eliminated = _root_shared_units_this_iteration + _root_shared_eqs_this_iteration; //slight overestimation, because the same eq can be shared in different rounds. But in the relevant regime (almost no sharing) this is not a problem.
-			double progress_ratio = eliminated/(double)swept;
 			if (progress_ratio <= EARLYEXIT_RATIO) {
 				LOG(V2_INFO, "SWEEP [%i](root-trf) EARLYEXIT in iteration %i, round %i: only %zu / %zu progress \n", _my_rank, _root_sweep_iteration, _root_sharing_round, eliminated, swept);
 				terminate_emptyrounds = true;
 			}
 		}
 
-		// if (terminate_emptyrounds) {
-		// }
 
 		bool send_terminate = false;
 		//A round is finished if all sweepers are idle, or if we had for too long exclusively empty rounds since the start of this iteration
@@ -280,10 +278,11 @@ private:
 
 		char logmsg[512];
 		snprintf(logmsg, sizeof(logmsg),
-			"SWEEP [%i](root-trf) send: iter %i rnd %i :  %i ai  %i trm  E %i  U %i    SW %i  ST %i  RE %i    Sched, Swept  %i  %i    ( %.2f ,  %.2f )%   \n",
+			"SWEEP [%i](root-trf) send: iter %i rnd %i :  %i ai  %i trm  E %i  U %i    SW %i  ST %i  RE %i    Sched, Swept  %i  %i    ( %.2f ,  %.2f )°/.   succs-r. %.3f   \n",
 			_my_rank, _root_sweep_iteration, _root_sharing_round, all_idle, send_terminate, n_eqs, n_units,
 			work_sweeps, work_stepovers, work_unsched_resweeps, work_sweeps + work_stepovers, work_sweeps + work_unsched_resweeps,
-			100*(work_sweeps + work_stepovers)/(double)_numVars , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars
+			100*(work_sweeps + work_stepovers)/(double)_numVars , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars,
+			progress_ratio
 		);
 
 		//Log two times, once for completeness chronologically in the general logs, and once in a special root file for easier postprocessing later

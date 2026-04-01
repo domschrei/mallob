@@ -192,7 +192,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
     # Commit that we're done with this job
     mkdir -p sbatch/generated/$DS_JOBNAME/.done.$i
 
-    sleep 3 # maybe a means to avoid "nodes are still busy" srun error?
+    sleep 3 # maybe a means to avoid "nodes are still busy" srun er-ror?
 
 done # END OF MAIN LOOP
 
