@@ -1069,9 +1069,10 @@ void SweepJob::appendMetadataToReductionElement(std::vector<int> &contrib, int i
 	contrib.insert(contrib.end(), NUM_METADATA_FIELDS, 0); //Make space for the upcoming metadata, initialized with zero
 	int size = contrib.size();
 	int n=0;
-	n++; contrib[size - METADATA_TERMINATE]      = 0;  //dummy, for completeness and robustness, to have the n++ count match
-	n++; contrib[size - METADATA_SWEEP_ITERATION]= 0;  //dummy, ""
-	n++; contrib[size - METADATA_SHARING_ROUND]  = 0;  //dummy, ""
+	n++; contrib[size - METADATA_TERMINATE]      = 0;  //dummy. Keep here for completeness (and robustness) to have the n++ count match and force ourselves to keep this method updated
+	n++; contrib[size - METADATA_SWEEP_ITERATION]= 0;  //dummy ""
+	n++; contrib[size - METADATA_SHARING_ROUND]  = 0;  //dummy ""
+	n++; contrib[size - METADATA_END_ITERATION]  = 0;  //dummy ""
 	n++; contrib[size - METADATA_IDLE]       = is_idle;
 	n++; contrib[size - METADATA_UNIT_SIZE]  = unit_size;
 	n++; contrib[size - METADATA_EQ_SIZE]    = eq_size;
@@ -1210,7 +1211,7 @@ void SweepJob::extractAllReductionResult() {
 
 	_rank_is_inbetween_iterations = end_iteration;
 
-	LOG(V2_INFO, "SWEEP GOTT: iter %i round %i : %i ai , %endi , %i trm . E %i  U %i  \n", sweep_iteration, sharing_round, all_idle, end_iteration, terminate, eq_size/2, unit_size);
+	LOG(V2_INFO, "SWEEP GOTT: iter %i round %i : %i ai , %i endi , %i trm . E %i  U %i  \n", sweep_iteration, sharing_round, all_idle, end_iteration, terminate, eq_size/2, unit_size);
 
 	assert(sharing_round > _lastImportedRound.load() || log_return_false("SWEEP ERROR : unexpected round number when importing shared data. got round %i, while lastImportedRound %i \n", sharing_round, _lastImportedRound.load()));
 
