@@ -553,7 +553,6 @@ void SweepJob::cbReportIteration(int localId) {
 	LOGGER(_reslogger,V2_INFO, "ENV_LIMIT_DEPTH   %i 		\n", stats.env_limit_depth);
 	LOGGER(_reslogger,V2_INFO, "ENV_LIMIT_CLAUSES %i 		\n", stats.env_limit_clauses);
 	LOGGER(_reslogger,V2_INFO, "ROUNDS_THISITER     %i   	\n",_root_rounds_this_iteration);
-	LOGGER(_reslogger,V2_INFO, "EMPTYROUNDS_BP      %i   	\n",_root_emptyrounds_before_progress);
 
 	LOGGER(_reslogger,V2_INFO, "CLAUSES_CURR        %i 		\n", stats.clauses);
 	LOGGER(_reslogger,V2_INFO, "CLAUSES_START       %i 		\n", stats.start_clauses);

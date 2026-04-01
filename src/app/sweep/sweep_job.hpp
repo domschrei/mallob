@@ -157,14 +157,11 @@ private:
 	int _root_shared_eqs_this_iteration = 0;
 	int _root_total_shared_eqs = 0;
 	int _root_total_shared_units = 0;
-	int _root_emptyrounds_before_progress=0;
 	int _root_rounds_this_iteration = 0;
 	int _root_sweep_iteration = 0;
 	int _root_sharing_round = 0;
 	bool _root_did_just_finish_iteration = true; //Starts with true to immediately start into iteration 1.
 
-	const int MAX_TOLERATED_EMPTYROUNDS = _params.sweepMaxEmptyRounds.val;
-	// const int MIN_EARLYEXIT_SWEEPS = 40000;
 	const double EARLYEXIT_RATIO = 0.001;
 
 	//The root node (and only the root node) tracks progress over the sharing rounds and sweeping iterations
@@ -184,7 +181,6 @@ private:
 			//Only now the new iteration truly begins, so only now we reset these iteration-specific counters
 			_root_shared_units_this_iteration = 0;
 			_root_shared_eqs_this_iteration = 0;
-			_root_emptyrounds_before_progress = 0;
 			_root_rounds_this_iteration=0;
 
 			LOG(V2_INFO, "SWEEP [%i](root-trf) ITERATION %i/%i STARTED \n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations());
@@ -201,31 +197,9 @@ private:
 		_root_shared_eqs_this_iteration   += n_eqs;
 		_root_total_shared_units += n_units;
 		_root_total_shared_eqs   += n_eqs;
-
 		_root_rounds_this_iteration++;
 
-
-
-		//Check whether this is a round with yet again zero progress. It makes only sense to check for progress once the solvers actually got their work provided.
-		//we don't count empty sharing rounds if we know that there hasn't even been work provided, i.e. solvers couldn't even do anything till now
-
-		// if (_root_shared_units_this_iteration==0 && _root_shared_eqs_this_iteration==0) {
-			// if (_root_initwork_provided) {
-				// _root_emptyrounds_before_progress++;
-				// LOG(V2_INFO, "SWEEP [%i](root-trf) EMPTYROUND nr %i (iteration %i, sharing round %i)  \n", _my_rank, _root_emptyrounds_before_progress, _root_sweep_iteration, _root_sharing_round);
-			// } else {
-				// LOG(V2_INFO, "SWEEP [%i](root-trf) fake EMPTYROUND, because solvers didnt receive work yet (iteration %i, sharing round %i)  \n", _my_rank, _root_sweep_iteration, _root_sharing_round);
-			// }
-		// }
-
-		// bool terminate_emptyrounds = _root_emptyrounds_before_progress > MAX_TOLERATED_EMPTYROUNDS;
-
-		// if (terminate_emptyrounds) {
-			// LOG(V2_INFO, "SWEEP [%i](root-trf) EARLYSTOP in iteration %i, round %i: now %i empty rounds in a row \n", _my_rank, _root_sweep_iteration, _root_sharing_round, _root_emptyrounds_before_progress);
-		// }
-
-
-		bool terminate_emptyrounds = false;
+		bool earlyexit = false;
 		int swept = work_sweeps + work_unsched_resweeps;
 		int eliminated = _root_shared_units_this_iteration + _root_shared_eqs_this_iteration; //slight overestimation, because the same eq can be shared in different rounds. But in the relevant regime (almost no sharing) this is not a problem.
 		double progress_ratio = eliminated/(double)swept;
@@ -233,23 +207,20 @@ private:
 		if (_params.sweepMinExitSwept()!=0 && swept >= _params.sweepMinExitSwept.val) {
 			if (progress_ratio <= EARLYEXIT_RATIO) {
 				LOG(V2_INFO, "SWEEP [%i](root-trf) EARLYEXIT in iteration %i, round %i: only %zu / %zu progress \n", _my_rank, _root_sweep_iteration, _root_sharing_round, eliminated, swept);
-				terminate_emptyrounds = true;
+				earlyexit = true;
 			}
 		}
 
 
 		bool send_terminate = false;
-		//A round is finished if all sweepers are idle, or if we had for too long exclusively empty rounds since the start of this iteration
-		if (all_idle || terminate_emptyrounds) {
-			LOG(V2_INFO, "SWEEP [%i](root-trf) (%i)all_idle  (%i)terminate_emptyrounds \n", _my_rank, all_idle, terminate_emptyrounds);
+		//A round is finished if all sweepers are idle or if we didnt have enough progress
+		if (all_idle || earlyexit) {
+			LOG(V2_INFO, "SWEEP [%i](root-trf) (%i)all_idle  (%i)earlyexit \n", _my_rank, all_idle, earlyexit);
 			LOG(V2_INFO, "SWEEP [%i](root-trf) ITERATION %i/%i FINISHED (seen at root transform) in sharing round %i \n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations(), _root_sharing_round);
 			LOG(V2_INFO, "SWEEP [%i](root-trf) ITERATION %i/%i shared: %i EQS, %i UNITS  \n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations(), _root_shared_eqs_this_iteration, _root_shared_units_this_iteration);
 			//The kissat solver will report the sweep stats itself via a callback once it has cleaned up its internal database and metrics via substitute()
 			// printSweepStats(_sweepers[_representative_localId], false); //report some intermediate statistics about this iteration
 			bool progress = (_root_shared_eqs_this_iteration + _root_shared_units_this_iteration) > 0;
-			if (!progress) {
-				_root_emptyrounds_before_progress=0; //there never has been progress, so there was never any last round before we found progress
-			}
 			bool lastsweepround = (_root_sweep_iteration == _params.sweepMaxIterations());
 			if (lastsweepround || !progress) {
 				if (lastsweepround) LOG(V2_INFO, "SWEEP [%i](root-trf): Job finished! All iterations done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations());
@@ -274,8 +245,8 @@ private:
 		payload[payload.size() - METADATA_TERMINATE] = send_terminate;
 		//the all_idle payload is already set
 
-		assert(!terminate_emptyrounds || send_terminate || log_return_false("SWEEP ERROR unexpected: Sweep root didnt send out terminate signal eventhough it should due to too many emptyrounds\n"));
-
+		//create char to print the same msg in two logs
+		//once for completeness chronologically in the general logs, and once in a special smaller file on the root node for easier postprocessing
 		char logmsg[512];
 		snprintf(logmsg, sizeof(logmsg),
 			"SWEEP [%i](root-trf) send: iter %i rnd %i :  %i ai  %i trm  E %i  U %i    SW %i  ST %i  RE %i    Sched, Swept  %i  %i    ( %.2f ,  %.2f )°/.   succs-r. %.3f   \n",
@@ -284,8 +255,6 @@ private:
 			100*(work_sweeps + work_stepovers)/(double)_numVars , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars,
 			progress_ratio
 		);
-
-		//Log two times, once for completeness chronologically in the general logs, and once in a special root file for easier postprocessing later
 		LOG(			   V2_INFO, "         %s", logmsg);
 		LOGGER(_reslogger, V2_INFO, "%s", logmsg);
 
