@@ -120,13 +120,14 @@ private:
 
 
 	//Distribute Eqs and Units that we received from sharing broadcast to local solvers
-	static const unsigned INVALID_LIT = UINT_MAX; //Internal literals count unsigned 0,1,2,..., the largest number marks an invalid literal. see further: https://github.com/arminbiere/satch/blob/master/satch.c#L1017
-	static const int MAX_IMPORT_SIZE = 400'000; //Limiting the import to a known preallocated area, to simplify concurrent reads and writes (still neglectable with ~ 1.6 MB)
-	std::atomic_int _available_import_round{0}; //identifier for the newest import round that we received from the sharing operation
-	std::atomic_int _EQS_import_size{0};
-	std::atomic_int _UNITS_import_size{0};
-	std::vector<int> _EQS_to_import {};
-	std::vector<int> _UNITS_to_import {};
+	//update: now handled via individual vectors per sharing round
+	// static const unsigned INVALID_LIT = UINT_MAX; //Internal literals count unsigned 0,1,2,..., the largest number marks an invalid literal. see further: https://github.com/arminbiere/satch/blob/master/satch.c#L1017
+	// static const int MAX_IMPORT_SIZE = 400'000; //Limiting the import to a known preallocated area, to simplify concurrent reads and writes (still neglectable with ~ 1.6 MB)
+	// std::atomic_int _available_import_round{0}; //identifier for the newest import round that we received from the sharing operation
+	// std::atomic_int _EQS_import_size{0};
+	// std::atomic_int _UNITS_import_size{0};
+	// std::vector<int> _EQS_to_import {};
+	// std::vector<int> _UNITS_to_import {};
 
 	//New Version of Importing, via separated vectors per round
 	struct importedRound {
@@ -138,7 +139,7 @@ private:
 		std::atomic_int threads_finished_units=0;
 	};
 
-	static constexpr int MAX_IMPORT_ROUNDS = 50 * 1000; //Max 50 per seconds (~20ms period), max 1000 seconds
+	static constexpr int MAX_IMPORT_ROUNDS = 50 * 2000; //Enough for ca. 2000 seconds (~each round takes >=20ms, i.e. max 50 rounds per second)
 	std::vector<importedRound> _imported_EQS_UNITS{MAX_IMPORT_ROUNDS};
 	std::vector<finishedCounter> _finishedRoundCounters{MAX_IMPORT_ROUNDS}; //technically atomics in std::vector, but we only construct once with a fixed size and never push_back or resize, so it compiles and should be fine
 	std::atomic_int _lastImportedRound = 0;
@@ -206,37 +207,38 @@ private:
 
 
 		//Check whether this is a round with yet again zero progress. It makes only sense to check for progress once the solvers actually got their work provided.
-		if (_root_shared_units_this_iteration==0 && _root_shared_eqs_this_iteration==0) {
-			//we don't count empty sharing rounds if we know that there hasn't even been work provided, i.e. solvers couldn't even do anything till now
-			if (_root_initwork_provided) {
-				_root_emptyrounds_before_progress++;
-				LOG(V2_INFO, "SWEEP [%i](root-trf) EMPTYROUND nr %i (iteration %i, sharing round %i)  \n", _my_rank, _root_emptyrounds_before_progress, _root_sweep_iteration, _root_sharing_round);
-			} else {
-				LOG(V2_INFO, "SWEEP [%i](root-trf) fake EMPTYROUND, because solvers didnt receive work yet (iteration %i, sharing round %i)  \n", _my_rank, _root_sweep_iteration, _root_sharing_round);
-			}
-		}
+		//we don't count empty sharing rounds if we know that there hasn't even been work provided, i.e. solvers couldn't even do anything till now
 
-		bool terminate_emptyrounds = _root_emptyrounds_before_progress > MAX_TOLERATED_EMPTYROUNDS;
+		// if (_root_shared_units_this_iteration==0 && _root_shared_eqs_this_iteration==0) {
+			// if (_root_initwork_provided) {
+				// _root_emptyrounds_before_progress++;
+				// LOG(V2_INFO, "SWEEP [%i](root-trf) EMPTYROUND nr %i (iteration %i, sharing round %i)  \n", _my_rank, _root_emptyrounds_before_progress, _root_sweep_iteration, _root_sharing_round);
+			// } else {
+				// LOG(V2_INFO, "SWEEP [%i](root-trf) fake EMPTYROUND, because solvers didnt receive work yet (iteration %i, sharing round %i)  \n", _my_rank, _root_sweep_iteration, _root_sharing_round);
+			// }
+		// }
 
-		if (terminate_emptyrounds) {
-			LOG(V2_INFO, "SWEEP [%i](root-trf) EARLYSTOP in iteration %i, round %i: now %i empty rounds in a row \n", _my_rank, _root_sweep_iteration, _root_sharing_round, _root_emptyrounds_before_progress);
-		}
+		// bool terminate_emptyrounds = _root_emptyrounds_before_progress > MAX_TOLERATED_EMPTYROUNDS;
+
+		// if (terminate_emptyrounds) {
+			// LOG(V2_INFO, "SWEEP [%i](root-trf) EARLYSTOP in iteration %i, round %i: now %i empty rounds in a row \n", _my_rank, _root_sweep_iteration, _root_sharing_round, _root_emptyrounds_before_progress);
+		// }
 
 
-		double progress_ratio=0;
-		int eliminated = _root_shared_units_this_iteration + _root_shared_eqs_this_iteration; //slight overestimation, because the same eq can be shared in different rounds. But in the relevant regime (almost no sharing) this is not a problem.
+		bool terminate_emptyrounds = false;
 		int swept = work_sweeps + work_unsched_resweeps;
-		if (swept >= _params.sweepMinExitSweeps.val) {
+		if (_params.sweepMinExitSwept()!=0 && swept >= _params.sweepMinExitSwept.val) {
 			//mirror the decision process in original sequential kissat sweeping
-			progress_ratio = eliminated/(double)swept;
+			int eliminated = _root_shared_units_this_iteration + _root_shared_eqs_this_iteration; //slight overestimation, because the same eq can be shared in different rounds. But in the relevant regime (almost no sharing) this is not a problem.
+			double progress_ratio = eliminated/(double)swept;
 			if (progress_ratio <= EARLYEXIT_RATIO) {
+				LOG(V2_INFO, "SWEEP [%i](root-trf) EARLYEXIT in iteration %i, round %i: only %zu / %zu progress \n", _my_rank, _root_sweep_iteration, _root_sharing_round, eliminated, swept);
 				terminate_emptyrounds = true;
 			}
 		}
 
-		if (terminate_emptyrounds) {
-			LOG(V2_INFO, "SWEEP [%i](root-trf) EARLYEXIT in iteration %i, round %i: only %zu / %zu progress \n", _my_rank, _root_sweep_iteration, _root_sharing_round, eliminated, swept);
-		}
+		// if (terminate_emptyrounds) {
+		// }
 
 		bool send_terminate = false;
 		//A round is finished if all sweepers are idle, or if we had for too long exclusively empty rounds since the start of this iteration
@@ -274,7 +276,7 @@ private:
 		payload[payload.size() - METADATA_TERMINATE] = send_terminate;
 		//the all_idle payload is already set
 
-		assert(!terminate_emptyrounds || send_terminate || log_return_false("SWEEP ERROR unexpected: Sweep root didnt send out terminate signal eventhough it should due to too many emptyrounds "));
+		assert(!terminate_emptyrounds || send_terminate || log_return_false("SWEEP ERROR unexpected: Sweep root didnt send out terminate signal eventhough it should due to too many emptyrounds\n"));
 
 		char logmsg[512];
 		snprintf(logmsg, sizeof(logmsg),

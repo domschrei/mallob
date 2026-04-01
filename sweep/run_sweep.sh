@@ -50,7 +50,7 @@ MALLOB_OPTIONS="-t=$threads \
   -sweep-max-iterations=3 \
   -sweep-max-depth=3 \
   -sweep-max-empty-rounds=5 \
-  -sweep-min-exit-sweeps=40000 \
+  -sweep-min-exit-swept=40000 \
   -preprocess-sweep-priority=1.0 \
 "
 

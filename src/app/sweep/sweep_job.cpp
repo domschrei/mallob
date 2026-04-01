@@ -82,8 +82,8 @@ void SweepJob::appl_start() {
 		request.is_inactive = true;
 	}
 	//pre-allocate a fixed array from where solver can concurrently import the received equalities and units
-	_EQS_to_import.resize(MAX_IMPORT_SIZE);
-	_UNITS_to_import.resize(MAX_IMPORT_SIZE);
+	// _EQS_to_import.resize(MAX_IMPORT_SIZE);
+	// _UNITS_to_import.resize(MAX_IMPORT_SIZE);
 
 	// _worksweeps = std::vector<int>(_nThreads, -1);
 	// _resweeps_in = std::vector<int>(_nThreads, -1);
@@ -1217,6 +1217,9 @@ void SweepJob::extractAllReductionResult() {
 	assert(_imported_EQS_UNITS[sharing_round].eqs.empty()   || log_return_false("SWEEP ERROR : want to store %i shared eq   integers, but already importedRounds[%i].eqs.size()==%zu nonempty ", eq_size,  sharing_round, _imported_EQS_UNITS[sharing_round].eqs.size()));
 	assert(_imported_EQS_UNITS[sharing_round].units.empty() || log_return_false("SWEEP ERROR : want to store %i shared unit integers, but already importedRounds[%i].units.size()==%zu nonempty", unit_size,  sharing_round, _imported_EQS_UNITS[sharing_round].units.size()));
 
+	if (sharing_round >= MAX_IMPORT_ROUNDS) {
+		LOG(V0_CRIT, "SWEEP ERROR : reached hardcoded limit of %i Sharing rounds. Increase that limit if needed for your case.\n", MAX_IMPORT_ROUNDS);
+	}
 	_imported_EQS_UNITS[sharing_round].eqs   = std::vector<int>(data.begin()		  , data.begin() + eq_size);
 	_imported_EQS_UNITS[sharing_round].units = std::vector<int>(data.begin() + eq_size, data.begin() + eq_size + unit_size);
 	_lastImportedRound = sharing_round;
