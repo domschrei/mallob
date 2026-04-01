@@ -106,8 +106,9 @@ private:
 	const int NUM_SEARCHING_WORK_FIELDS = 3; //how many fields are attached to an MPI message searching work
 
 	//each aggregation element has some metadata integers at the end
-	static const int NUM_METADATA_FIELDS = 9;
+	static const int NUM_METADATA_FIELDS = 10;
 		//field indices must be unique numbers exactly filling 1..NUM_METADATA_FIELDS !
+		static const int METADATA_END_ITERATION		  = 10;
 		static const int METADATA_WORK_SWEEPS		 = 9;
 		static const int METADATA_WORK_STEPOVERS	= 8;
 		static const int METADATA_UNSCHED_RESWEEPS = 7;
@@ -213,6 +214,7 @@ private:
 
 
 		bool send_terminate = false;
+		bool send_end_iteration = false;
 		//A round is finished if all sweepers are idle or if we didnt have enough progress
 		if (all_idle || earlyexit) {
 			LOG(V2_INFO, "SWEEP [%i](root-trf) (%i)all_idle  (%i)earlyexit \n", _my_rank, all_idle, earlyexit);
@@ -226,22 +228,21 @@ private:
 				if (lastsweepround) LOG(V2_INFO, "SWEEP [%i](root-trf): Job finished! All iterations done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations());
 				if (!progress)		LOG(V2_INFO, "SWEEP [%i](root-trf): Job finished! No more progress in iteration %i/%i. Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations());
 				//we DON'T yet set _terminate_all=1 here, because we want also the root solver to first import this last sharing information, which contains valuable equalities and units, before terminating the solvers
+				send_end_iteration = true;
 				send_terminate = true;
 			}
 			else {
 				_root_did_just_finish_iteration = true;
-				//The new iteration is started by providing  all variables as new work to one solver
-				// _root_initwork_providable	= false;
 				_root_initwork_startedproviding = false;
 				_root_initwork_provided		= false;
-				//Prevent that workers see a round change of 2 when going from one sweepround to the next
-				// _root_sharing_round--;
+				send_end_iteration = true;
 				LOG(V2_INFO, "SWEEP [%i](root-trf) Preparing for new iteration. Have set (%i)started_providing_work, (%i)provided_work  \n", _my_rank, _root_initwork_startedproviding.load(), _root_initwork_provided.load() );
 			}
 		}
 		//The root node (and only the root node) tracks the number of completed sweep rounds, and broadcasts this information. This way, also nodes that join later know which round we are in.
 		payload[payload.size() - METADATA_SWEEP_ITERATION] = _root_sweep_iteration;
 		payload[payload.size() - METADATA_SHARING_ROUND] = _root_sharing_round;
+		payload[payload.size() - METADATA_END_ITERATION] = send_end_iteration;
 		payload[payload.size() - METADATA_TERMINATE] = send_terminate;
 		//the all_idle payload is already set
 
@@ -249,8 +250,8 @@ private:
 		//once for completeness chronologically in the general logs, and once in a special smaller file on the root node for easier postprocessing
 		char logmsg[512];
 		snprintf(logmsg, sizeof(logmsg),
-			"SWEEP [%i](root-trf) send: iter %i rnd %i :  %i ai  %i trm  E %i  U %i    SW %i  ST %i  RE %i    Sched, Swept  %i  %i    ( %.2f ,  %.2f )°/.   succs-r. %.3f   \n",
-			_my_rank, _root_sweep_iteration, _root_sharing_round, all_idle, send_terminate, n_eqs, n_units,
+			"SWEEP [%i](root-trf) send: iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i    SW %i  ST %i  RE %i    Sched, Swept  %i  %i    ( %.2f ,  %.2f )°/.   succ-rate %.6f   \n",
+			_my_rank, _root_sweep_iteration, _root_sharing_round, all_idle,  send_end_iteration, send_terminate, n_eqs, n_units,
 			work_sweeps, work_stepovers, work_unsched_resweeps, work_sweeps + work_stepovers, work_sweeps + work_unsched_resweeps,
 			100*(work_sweeps + work_stepovers)/(double)_numVars , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars,
 			progress_ratio
@@ -258,8 +259,6 @@ private:
 		LOG(			   V2_INFO, "         %s", logmsg);
 		LOGGER(_reslogger, V2_INFO, "%s", logmsg);
 
-		// LOG(V2_INFO,				 "SWEEP [%i](root-trf) send: Iter(%i) rnd(%i): (%i)ai (%i)trm  E %i  U %i    SW %i  ST %i  RE %i  WW (%i)   \n", _my_rank, _root_sweep_iteration, _root_sharing_round, all_idle, send_terminate, n_eqs, n_units, work_sweeps, work_stepovers,  work_unsched_resweeps, work_sweeps + work_stepovers);
-		// LOGGER(_rootlogger, V2_INFO, "SWEEP [%i](root-trf) send: Iter(%i) rnd(%i): (%i)ai (%i)trm  E %i  U %i    SW %i  ST %i  RE %i  WW (%i)   \n", _my_rank, _root_sweep_iteration, _root_sharing_round, all_idle, send_terminate, n_eqs, n_units, work_sweeps, work_stepovers,  work_unsched_resweeps, work_sweeps + work_stepovers);
 		//no return, payload was just transformed in-place
     };
 

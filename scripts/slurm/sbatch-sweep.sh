@@ -173,7 +173,8 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
     export MALLOB_NUMNODES=$DS_NODES
 
     # Assemble MPI command options
-    mpicall="mpiexec -n $SLURM_NTASKS --bind-to core --map-by numa -genvall"
+    # mpicall="mpiexec -n $SLURM_NTASKS --bind-to core --map-by numa -genvall"
+    mpicall="mpiexec -n $SLURM_NTASKS -genvall -genv I_MPI_PIN=1 -genv I_MPI_PIN_DOMAIN=core -genv I_MPI_PIN_ORDER=bunch --report-bindings"
 
     # Drop hint which file we're solving
     echo "$f -> $globallogdir"

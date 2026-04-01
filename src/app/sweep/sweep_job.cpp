@@ -1197,19 +1197,20 @@ void SweepJob::extractAllReductionResult() {
 	assert(_red->hasResult());
 
 	auto data = _red->extractResult();
-	const int terminate   = data[data.size()-METADATA_TERMINATE];
-	const int sweep_iteration = data[data.size()-METADATA_SWEEP_ITERATION];
-	const int sharing_round= data[data.size()-METADATA_SHARING_ROUND];
-	const int all_idle    = data[data.size()-METADATA_IDLE];
-	const int unit_size   = data[data.size()-METADATA_UNIT_SIZE];
-	const int eq_size     = data[data.size()-METADATA_EQ_SIZE];
+	const int terminate		 = data[data.size()-METADATA_TERMINATE];
+	const int sweep_iteration= data[data.size()-METADATA_SWEEP_ITERATION];
+	const int sharing_round  = data[data.size()-METADATA_SHARING_ROUND];
+	const int all_idle       = data[data.size()-METADATA_IDLE];
+	const int end_iteration  = data[data.size()-METADATA_END_ITERATION];
+	const int unit_size      = data[data.size()-METADATA_UNIT_SIZE];
+	const int eq_size        = data[data.size()-METADATA_EQ_SIZE];
 	assert(eq_size%2==0 || log_return_false("SWEEP ERROR: Import Equality size %i not even\n", eq_size));
 
 	_timestamp_receive_sharing_result.push_back(Timer::elapsedSeconds());
 
-	_rank_is_inbetween_iterations = all_idle;
+	_rank_is_inbetween_iterations = end_iteration;
 
-	LOG(V2_INFO, "SWEEP GOTT: iter %i round %i : %i ai , %i trm . E %i  U %i  \n", sweep_iteration, sharing_round, all_idle, terminate, eq_size/2, unit_size);
+	LOG(V2_INFO, "SWEEP GOTT: iter %i round %i : %i ai , %endi , %i trm . E %i  U %i  \n", sweep_iteration, sharing_round, all_idle, end_iteration, terminate, eq_size/2, unit_size);
 
 	assert(sharing_round > _lastImportedRound.load() || log_return_false("SWEEP ERROR : unexpected round number when importing shared data. got round %i, while lastImportedRound %i \n", sharing_round, _lastImportedRound.load()));
 
@@ -1235,7 +1236,7 @@ void SweepJob::extractAllReductionResult() {
 	_red.reset();
 
 
-	if (_params.sweepIndividualSweepIters.val && all_idle && _flag_started_synchronized_solving  && !_terminate_all) {
+	if (_params.sweepIndividualSweepIters.val && end_iteration && _flag_started_synchronized_solving  && !_terminate_all) {
 		LOG(V4_VVER, "SWEEP sending end_iteration signal to solvers\n");
 		for (auto &sweeper : _sweepers) {
 			if (sweeper) {
