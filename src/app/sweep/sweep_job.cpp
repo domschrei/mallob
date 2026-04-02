@@ -507,7 +507,7 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	sweeper->set_option("mallob_is_root", _is_root);
 	sweeper->set_option("mallob_resweep_chance", _params.sweepResweepChance.val);
 	sweeper->set_option("mallob_staggered_logs", 1); //set to 1 to have spatially separated logs, useful for verbose runs with 2-16 threads
-	sweeper->set_option("mallob_individual_sweepiters", _params.sweepIndividualSweepIters.val);
+	// sweeper->set_option("mallob_individual_sweepiters", _params.sweepIndividualSweepIters.val);
 	sweeper->set_option("mallob_initial_congruence", _params.sweepInitialCongruence.val);
 
 	//Own options of Kissat
@@ -942,7 +942,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 		sweeper->sweeper_is_idle = true;
 		LOG(V3_VERB, "Sweeper [%i](%i) exit mallob steal due to terminate_all\n", _my_rank, localId);
 		//just to be safe, send another termination to self
-		sweeper->triggerSweepTerminate(_params.sweepIndividualSweepIters.val);
+		sweeper->triggerSweepTerminate();
 		sweeper->count_repeated_missed_termination++;
 		if (sweeper->count_repeated_missed_termination % sweeper->WARN_ON_REPEATED_MISSED_TERMINATION==0) {
 			LOG(V1_WARN, "SWEEP WARN : Sweeper [%i](%i) in %i-th worksteal loop after termination\n", _my_rank, localId, sweeper->count_repeated_missed_termination);
@@ -1237,7 +1237,7 @@ void SweepJob::extractAllReductionResult() {
 	_red.reset();
 
 
-	if (_params.sweepIndividualSweepIters.val && end_iteration && _flag_started_synchronized_solving  && !_terminate_all) {
+	if (end_iteration && _flag_started_synchronized_solving  && !_terminate_all) {
 		LOG(V4_VVER, "SWEEP sending end_iteration signal to solvers\n");
 		for (auto &sweeper : _sweepers) {
 			if (sweeper) {
@@ -1490,7 +1490,7 @@ void SweepJob::triggerTerminations() {
 	int i=0;
 	for (auto &sweeper : _sweepers) {
 		if (sweeper) {
-			sweeper->triggerSweepTerminate(_params.sweepIndividualSweepIters.val);
+			sweeper->triggerSweepTerminate();
 			LOG(V3_VERB, "SWEEP TERM #%i [%i] trigger termination of solver (%i) \n", getId(), _my_rank, i);
 		} else {
 			LOG(V3_VERB, "SWEEP TERM #%i [%i] skip    termination of solver (%i), already null \n", getId(), _my_rank, i);

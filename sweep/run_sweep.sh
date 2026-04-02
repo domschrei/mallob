@@ -51,8 +51,7 @@ MALLOB_OPTIONS="-t=$threads \
   -sweep-initial-congruence=1 \
   -sweep-max-iterations=3 \
   -sweep-max-depth=3 \
-  -sweep-max-empty-rounds=5 \
-  -sweep-min-exit-swept=100 \
+  -sweep-min-exit-swept=0 \
   -sweep-term-no-progress=0 \
   -preprocess-sweep-priority=1.0 \
 "

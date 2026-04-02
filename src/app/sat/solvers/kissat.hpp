@@ -163,7 +163,7 @@ public:
 	// void sweepSetReportingPtr(std::shared_ptr<std::atomic<int>> field);
 	void setToSweeper();
 	// void triggerSweepTerminate();
-	void triggerSweepTerminate(bool solver_does_single_iterations);
+	void triggerSweepTerminate();
 	void setRepresentativeLocalId(int localId);
 	// bool hasReportedSweepDimacs() const;
 	// shweep_statistics getSweepStats();

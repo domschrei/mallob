@@ -16,5 +16,4 @@ OPT_INT(sweepMaxDepth, 			"swpmd", 	"sweep-max-depth", 			3, 1, LARGE_INT, "the 
 OPT_INT(sweepMaxEmptyRounds,    "swpmer",   "sweep-max-empty-rounds",   5, 1, LARGE_INT, "the maximum number of tolerated empty rounds (not a single unit or eqs found) before sweeping is terminated early")
 OPT_INT(sweepMinExitSwept,      "swpmes",   "sweep-min-exit-swept",     40000, 1, LARGE_INT, "minimum number of sweeps after which we start checking for early exit")
 OPT_INT(sweepTermNoProgress,    "swptnp",   "sweep-term-no-progress",   1, 0, 1, "terminate sweeping after an iteration made no progress at all (for both when it finished normally or exited early)")
-OPT_BOOL(sweepIndividualSweepIters,"swpisi","sweep-individual-sweep-iters",		true,  "Kissat start a new sweeper for each sweeping iteration. Closer to sequential model, and allows easier substitute integration between iterations")
 
