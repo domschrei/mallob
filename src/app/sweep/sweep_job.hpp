@@ -224,9 +224,9 @@ private:
 			// printSweepStats(_sweepers[_representative_localId], false); //report some intermediate statistics about this iteration
 			bool progress = (_root_shared_eqs_this_iteration + _root_shared_units_this_iteration) > 0;
 			bool lastsweepround = (_root_sweep_iteration == _params.sweepMaxIterations());
-			if (lastsweepround || (!progress && _params.sweepNoProgressTerm())) {
+			if (lastsweepround || (!progress && _params.sweepTermNoProgress())) {
 				if (lastsweepround) LOG(V2_INFO, "SWEEP [%i](root-trf): Job finished! All iterations done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations());
-				if (!progress && _params.sweepNoProgressTerm())	LOG(V2_INFO, "SWEEP [%i](root-trf): Job finished! No more progress in iteration %i/%i. Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations());
+				if (!progress && _params.sweepTermNoProgress())	LOG(V2_INFO, "SWEEP [%i](root-trf): Job finished! No more progress in iteration %i/%i. Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations());
 				//we DON'T yet set _terminate_all=1 here, because we want also the root solver to first import this last sharing information, which contains valuable equalities and units, before terminating the solvers
 				send_end_iteration = true;
 				send_terminate = true;
