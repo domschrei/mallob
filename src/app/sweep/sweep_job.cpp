@@ -319,7 +319,9 @@ void SweepJob::rootReportSolverResult(KissatPtr sweeper, int res) {
 	if (_root_reported_result.compare_exchange_strong(expected, res)) {
 		//we are first, continue reporting
 	} else {
-		LOG(V1_WARN, "SWEEP WARN [%i]: wanted to report result %i, but was stopped because there is already reported result %i \n", _my_rank, res, _root_reported_result.load());
+		if (res != _root_reported_result.load()) {
+			LOG(V1_WARN, "SWEEP WARN [%i]: wanted to report result %i, but was stopped because there is already a different reported result %i \n", _my_rank, res, _root_reported_result.load());
+		}
 		return;
 	}
 
