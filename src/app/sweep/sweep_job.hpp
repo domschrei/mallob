@@ -62,7 +62,7 @@ private:
 	// std::atomic_bool _root_initwork_providable=false;
     std::atomic_bool _root_initwork_startedproviding=false;
     std::atomic_bool _root_initwork_provided=false;
-	bool _rank_is_inbetween_iterations=true;
+	std::atomic_bool _rank_is_inbetween_iterations=true;
 	struct WorkstealRequest {
 		int senderLocalId{-1};
 		int targetIndex{-1};
@@ -204,7 +204,7 @@ private:
 		int swept = work_sweeps + work_unsched_resweeps;
 		int eliminated = _root_shared_units_this_iteration + _root_shared_eqs_this_iteration; //slight overestimation, because the same eq can be shared in different rounds. But in the relevant regime (almost no sharing) this is not a problem.
 		double progress_ratio = eliminated/(double)swept;
-		//mirror the "delay" decision process in original sequential kissat sweeping
+		//mirror the "delay" decision in original kissat sweeping. There, if  not enough progress is made, the next sweeping is delayed - here we exit the iteration early
 		if (_params.sweepMinExitSwept()!=0 && swept >= _params.sweepMinExitSwept.val) {
 			if (progress_ratio <= EARLYEXIT_RATIO) {
 				LOG(V2_INFO, "SWEEP [%i](root-trf) EARLYEXIT in iteration %i, round %i: only %zu / %zu progress \n", _my_rank, _root_sweep_iteration, _root_sharing_round, eliminated, swept);
@@ -224,9 +224,9 @@ private:
 			// printSweepStats(_sweepers[_representative_localId], false); //report some intermediate statistics about this iteration
 			bool progress = (_root_shared_eqs_this_iteration + _root_shared_units_this_iteration) > 0;
 			bool lastsweepround = (_root_sweep_iteration == _params.sweepMaxIterations());
-			if (lastsweepround || !progress) {
+			if (lastsweepround || (!progress && _params.sweepNoProgressTerm())) {
 				if (lastsweepround) LOG(V2_INFO, "SWEEP [%i](root-trf): Job finished! All iterations done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations());
-				if (!progress)		LOG(V2_INFO, "SWEEP [%i](root-trf): Job finished! No more progress in iteration %i/%i. Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations());
+				if (!progress && _params.sweepNoProgressTerm())	LOG(V2_INFO, "SWEEP [%i](root-trf): Job finished! No more progress in iteration %i/%i. Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations());
 				//we DON'T yet set _terminate_all=1 here, because we want also the root solver to first import this last sharing information, which contains valuable equalities and units, before terminating the solvers
 				send_end_iteration = true;
 				send_terminate = true;

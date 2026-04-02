@@ -12,9 +12,9 @@ OPT_INT(sweepSolverQuiet,		"swpqt", 	"sweep-solver-quiet", 		1, 0, 1, "whether t
 OPT_INT(sweepResweepChance, 	"swprc", 	"sweep-resweep-chance", 	1e4, 0, 1e4, "chance that a solver resweeps a variable from a found equivalence (in per mille)")
 OPT_INT(sweepMaxIterations, 	"swpmi", 	"sweep-max-iterations", 	3, 0, LARGE_INT, "max number of completed sweeps over all variables")
 OPT_BOOL(sweepInitialCongruence,"swpic", 	"sweep-initial-congruence", true, "Let all solvers do one iteration of congruence before sweeping")
-OPT_BOOL(sweepDeduplicate,		"swpdd", 	"sweep-deduplicate",		true,  "Deduplicate units and equivalences during sharing aggregation")
 OPT_INT(sweepMaxDepth, 			"swpmd", 	"sweep-max-depth", 			3, 1, LARGE_INT, "the maximum environment depth for sweeping")
 OPT_INT(sweepMaxEmptyRounds,    "swpmer",   "sweep-max-empty-rounds",   5, 1, LARGE_INT, "the maximum number of tolerated empty rounds (not a single unit or eqs found) before sweeping is terminated early")
 OPT_INT(sweepMinExitSwept,      "swpmes",   "sweep-min-exit-swept",     40000, 1, LARGE_INT, "minimum number of sweeps after which we start checking for early exit")
+OPT_INT(sweepNoProgressTerm,    "swpnpt",   "sweep-no-progress-term",   1, 0, 1, "terminate sweeping after one finished (or earlyexited) iteration made no progress at all")
 OPT_BOOL(sweepIndividualSweepIters,"swpisi","sweep-individual-sweep-iters",		true,  "Kissat start a new sweeper for each sweeping iteration. Closer to sequential model, and allows easier substitute integration between iterations")
 
