@@ -19,6 +19,11 @@
 #include "util/sys/terminator.hpp"
 #include "util/sys/thread_pool.hpp"
 
+#include <memory>
+#include <string>
+#include <charconv>
+
+
 class SatPreprocessSolver {
 
 private:
@@ -159,6 +164,8 @@ private:
         _base_job_submitted = true;
     }
 
+
+
     void submitPreprocessedJob(std::vector<int>&& fPre) {
 
         assert(fPre.size() > 2);
@@ -166,6 +173,7 @@ private:
         int nbVars = fPre.back(); fPre.pop_back();
         size_t preprocessedSize = fPre.size();
 
+        LOG(V2_INFO, "size of formula %i\n", preprocessedSize);
         if (_params.compressFormula()) {
             auto out = FormulaCompressor::compress(fPre.data(), fPre.size(), 0, 0);
             fPre = std::move(*out.vec);
