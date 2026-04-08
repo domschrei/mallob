@@ -113,7 +113,7 @@ public:
         }
         _prepro.interrupt();
 
-        LOG(V2_INFO, "#%i SATWP RES ~%i~\n", _desc.getId(), res.result);
+        LOG(V3_VERB, "#%i SATWP RES ~%i~\n", _desc.getId(), res.result);
         return res;
     }
 
