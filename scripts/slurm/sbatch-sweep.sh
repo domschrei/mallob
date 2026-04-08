@@ -145,7 +145,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 	-rlbd=0 -ilbd=1 -randlbd=0 -scramble-lbds=0 \
 	-seed=1 \
 	-spd=${globallogdir}/ \
-  -spl=4 \
+  -spl=-1 \
 	-jcup=0.05 \
 	-v=2 \
 	-preprocess-sweep=1 \

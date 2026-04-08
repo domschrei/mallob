@@ -14,6 +14,7 @@ fi
 
 jobname="$1"
 
+echo "$jobname"
 # WORK
 outdir="/hppfs/work/$projectname/$username/logs/${jobname}"
 # HOME
