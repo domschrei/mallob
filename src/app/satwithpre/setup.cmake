@@ -18,7 +18,7 @@ set(MALLOB_COREPLUSCOMM_SOURCES
 # Include external libraries as necessary
 
 
-if(MALLOB_USE_SATSUMA)
+
     message("* Registering dependency Satsuma")
     add_custom_command(
         OUTPUT ${CMAKE_SOURCE_DIR}/lib/satsuma/libsatsuma.a
@@ -31,12 +31,12 @@ if(MALLOB_USE_SATSUMA)
     # Füge Satsuma zu den Abhängigkeiten des Kerns hinzu, 
     # damit es vor allem anderen gebaut wird
     set(MALLOB_CORE_DEPS ${MALLOB_CORE_DEPS} dep_satsuma CACHE INTERNAL "")
-endif()
+
 # Satsuma utility library (prebuilt static)
 
 
 
-if(MALLOB_USE_SATSUMA)
+
     add_definitions(-DMALLOB_USE_SATSUMA=1)
     
     set(BASE_LINK_DIRS
@@ -56,9 +56,7 @@ if(MALLOB_USE_SATSUMA)
         ${CMAKE_SOURCE_DIR}/lib/satsuma/include
         CACHE INTERNAL ""
     )
-else()
-    add_definitions(-DMALLOB_USE_SATSUMA=0)
-endif()
+
 
 # Add unit tests: for each $arg there must be a standalone cpp file under "test/test_${arg}.cpp".
 # ...

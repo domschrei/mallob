@@ -15,7 +15,7 @@
 #include <atomic>
 #include <future>
 #include <fstream>
-#include "ISatsumaPreprocessor.h""
+#include "ISatsumaPreprocessor.h"
 #include "ICnf2wl.h"
 
 class SatPreprocessor {
