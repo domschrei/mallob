@@ -42,7 +42,7 @@ private:
     long long _iteration = 0;
     PeriodicEvent<1000> _periodic_stats_check;
     PeriodicEvent<2990> _periodic_big_stats_check; // ready at every 3rd "ready" of _periodic_stats_check
-    PeriodicEvent<1, 1> _periodic_job_check;
+    PeriodicEvent<2,1> _periodic_job_check;
     PeriodicEvent<1> _periodic_balance_check;
     PeriodicEvent<1000> _periodic_maintenance;
     bool _job_active {false};
