@@ -16,7 +16,8 @@ extern "C" {
 SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table)
     : Job(params, setup, table),
 	_reslogger(Logger::getMainInstance().copy("<RESULT>", ".sweep")),
-	_warnlogger(Logger::getMainInstance().copy("<WARN>", ".warn"))
+	_warnlogger(Logger::getMainInstance().copy("<WARN>", ".warn")),
+	_contriblogger(Logger::getMainInstance().copy("<CONTRIB>", ".contrib"))
 	// _rootlogger(Logger::getMainInstance().copy("<ROOT>", ".sweeproot"))
 {
 	assert(_params.jobCommUpdatePeriod() > 0 || log_return_false("[ERROR] For this application to work,"
@@ -76,11 +77,13 @@ void SweepJob::appl_start() {
 
 	_worksteal_requests.resize(_nThreads);
 
-	//Need to mark them as empty initially, such that the solvers can turn them into actual requests when required.
-	//Once the chain started, the solvers will mark their processed request as empty again on their own
-	for (auto &request : _worksteal_requests) {
-		request.is_inactive = true;
-	}
+	//Need to mark them as inactive initially, such that the solvers can turn them into actual requests when required.
+	//Once the chain is started, the new requests will be marked their processed request as empty again on their own
+
+	// for (auto &request : _worksteal_requests) {
+		// request.is_active = false;
+	// }
+
 	//pre-allocate a fixed array from where solver can concurrently import the received equalities and units
 	// _EQS_to_import.resize(MAX_IMPORT_SIZE);
 	// _UNITS_to_import.resize(MAX_IMPORT_SIZE);
@@ -934,7 +937,7 @@ bool SweepJob::tryProvideInitialWork(KissatPtr sweeper) {
 }
 
 void SweepJob::solverGoStealing(KissatPtr sweeper) {
-	usleep(1000);
+	// usleep(1000);
 	int localId = sweeper->getLocalId();
 	sweeper->work_received_from_steal = {};
 
@@ -972,12 +975,19 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 			LOG(V4_VVER, "SWEEP recv [%i](%i) <==%zu==== [%i] \n",  _my_rank, localId, (int)sweeper->work_received_from_steal.size(), _worksteal_requests[localId].targetRank);
 			return;
 		}
-		_worksteal_requests[localId].got_steal_response = false; //to no read it a second time
-		_worksteal_requests[localId].is_inactive = true; //request was fully processed, the slot is now effectively empty
+		_worksteal_requests[localId].got_steal_response = false; //to not read it a second time
+		_worksteal_requests[localId].is_active = false; //request was fully processed, the slot is now inactive
 	}
 
-	//No success via MPI (either there was no answer, or the answer hat no work).
+	if (_worksteal_requests[localId].is_active) {
+		//an MPI request is queued, we wait for it's response and will not try to steal locally meanwhile
+		return;
+	}
+
+	//No success via MPI (either there was no answer, or the answer had no work).
 	//Next try: steal locally
+	//this local steal can "skip-ahead" an already queued global steal, i.e. the solver can receive work eventhough its global request is still ongoing
+	//if the global request comes back positive, it sits there until the solver eventually comes back here for worksteal, and finds the positive MPI response
 	auto stolen_work = stealWorkFromAnyLocalSolver(_my_rank, localId);
 	if ( ! stolen_work.empty()) {
 		//Successful local steal
@@ -989,7 +999,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	//Did not find work locally. Deposit an MPI request in case there isn't one yet.
 	//We deposit a request for an MPI message via shared memory and the main MPI thread of this process will pick up the request and actually send it via MPI
 	//This extra step is necessary, because the thread is just "some" solver-thread and it can cause problems it it start sending MPI messages on it's own
-	if (_worksteal_requests[localId].is_inactive) {
+	if (_worksteal_requests[localId].is_active == false) {
 		//careful, this is close to creating a race-condition with the main-thread, if it just so happens to also read this request right now
 		//to prevent the race-condition, the main-thread sets .wait_for_send only to false after it already send out the msg. i.e. this code here can no longer corrupt the outwards send
 		_worksteal_requests[localId].newQueuedRequest(localId);
@@ -1130,7 +1140,7 @@ void SweepJob::cbContributeToAllReduce() {
 	if (_is_root)
 		_red->setInplaceTransformationOfElementAtRoot(_inplace_rootTransform);
 
-	//Bring individual data per thread in the sharing element format: [Equivalences, Units, eq_size, unit_size, all_idle]
+	//Bring individual data per thread in the sharing element format
 	std::list<std::vector<int>> contribs;
 	int id=-1; //for debugging
 	for (auto &sweeper : _sweepers) {
@@ -1171,6 +1181,7 @@ void SweepJob::cbContributeToAllReduce() {
 	auto aggregation_element = aggregateEqUnitContributions(contribs);
 
 	LOG(V4_VVER, "SWEEP [%i] contributing ~~~%zu~~~(+%i)~~> to _red \n", _my_rank, aggregation_element.size()-NUM_METADATA_FIELDS, NUM_METADATA_FIELDS);
+	LOGGER(_contriblogger, V2_INFO, "last rnd was %i , now contributing EU %zu\n", _lastImportedRound.load(), aggregation_element.size()-NUM_METADATA_FIELDS);
 
 	if (_terminate_all.load(std::memory_order_relaxed)) {
 		LOG(V4_VVER, "SWEEP SHARE BCAST skip contribution, seen already _terminate_all\n");

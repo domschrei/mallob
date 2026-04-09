@@ -69,7 +69,7 @@ private:
 		int targetRank{-1};
 		std::atomic_bool to_send{false};
 		std::atomic_bool got_steal_response{false};
-		std::atomic_bool is_inactive{false};
+		std::atomic_bool is_active{false};
 		std::vector<int> stolen_work{};
 
 		void newQueuedRequest(int _senderLocalId) noexcept {
@@ -77,8 +77,8 @@ private:
 			targetIndex = -1;
 			targetRank = -1;
 			stolen_work.clear();
-			//atomic flags only after modifying the non-atomics
-			is_inactive = false;
+			//atomic flags are changed only now, after modifying the non-atomics
+			is_active = true;
 			got_steal_response = false;
 			to_send = true;
 		}
@@ -149,8 +149,10 @@ private:
 	//Termination. Determined during workstealing, broadcasted via sharing
 	std::atomic_bool _terminate_all=false; //termination (on this node) due to sharing consensus that there is no more work
 
-	Logger _reslogger;  //Logging most important results in dedicated file, to not have them mangled by other verbose logs
-	Logger _warnlogger; //Logging some warnings in a dedicated file, to avoid needing to grep later the whole large main log files for these warnings
+	Logger _reslogger;  //most important results go in a dedicated file, to not have them mangled by concurrent verbose logs in the main log
+	Logger _warnlogger; //some warnings into a dedicated file for easier postprocessing
+	Logger _contriblogger; //contribution counts also go in a dedicated file, again to prevent mangling and faster postprocessing
+
 	// Logger _rootlogger; //Logging information from the root transformation
 
 	//the root node tracks the number of sweep iterations and sharing rounds, distributes this information in the sharing operation
