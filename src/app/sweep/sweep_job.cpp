@@ -253,9 +253,13 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 
 void SweepJob::appl_terminate() {
 	LOG(V2_INFO, "SWEEP [%i] (job #%i) got TERMINATE signal (appl_terminate()) \n", _my_rank,getId());
-	_terminate_all = true;
-	// _external_termination = true;
-	triggerTerminations();
+	if (!_terminate_all) {
+		_terminate_all = true;
+		// _external_termination = true;
+		triggerTerminations();
+	} else {
+		LOG(V2_INFO, "SWEEP [%i] (job #%i) already triggered terminations on its own, skipping this second external trigger, to avoid concurrent accesses\n", _my_rank,getId());
+	}
 }
 
 
@@ -981,6 +985,8 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 
 	if (_worksteal_requests[localId].is_active) {
 		//an MPI request is queued, we wait for it's response and will not try to steal locally meanwhile
+		//since the request is queued, there is nothing else to do for now, can way ~1ms
+		usleep(1000);
 		return;
 	}
 
@@ -1006,8 +1012,8 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	}
 
 	//If we make it until here we are waiting for work and have have nothing else to do for now. Can wait for  ~1 millisecond until we check the system again.
-	usleep(1000);
-
+	// usleep(1000);
+	//update: waiting is now moved upwards, to prevent localsteal while we wait for an MPI response
 }
 
 void SweepJob::cbStealWorkNew(unsigned **work, int *work_size, int localId) {
