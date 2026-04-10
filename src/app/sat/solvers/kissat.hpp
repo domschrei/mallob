@@ -19,6 +19,12 @@ struct kissat;
 struct SolverSetup;
 struct SolverStatistics;
 
+enum class SweepStealType {
+	MPI   = 1,
+	Local = 2,
+};
+
+
 class Kissat : public PortfolioSolverInterface {
 
 private:
@@ -33,7 +39,7 @@ private:
 
 
 
-	//#################################################
+	//#################################################################################################
 	//Sweeping
 	bool is_sweeper = false;
 	bool is_congruencer = false; //subtype of sweeper, that does congruence closure instead of sweeping
@@ -41,11 +47,11 @@ private:
 	friend class SweepJob; //fwd
 	std::vector<int> eq_up_buffer;    //transfer a single equivalence from C to C++
 
-	std::vector<int> eqs_from_broadcast_queued; //equivalences that came from the broadcast, but are not yet shown to the solver
-	std::vector<int> units_from_broadcast_queued;
+	// std::vector<int> eqs_from_broadcast_queued; //equivalences that came from the broadcast, but are not yet shown to the solver
+	// std::vector<int> units_from_broadcast_queued;
 
-    std::vector<int> eqs_from_broadcast;  //equivalences that are currently shown to the solver, originating from broadcast
-	std::vector<int> units_from_broadcast;
+    // std::vector<int> eqs_from_broadcast;  //equivalences that are currently shown to the solver, originating from broadcast
+	// std::vector<int> units_from_broadcast;
 
     std::vector<int> eqs_to_share;    //accumulate exported equivalences for sharing
 	std::vector<int> units_to_share;
@@ -59,11 +65,11 @@ private:
 
 	// bool has_reported_sweep_dimacs = false;
 
-	std::atomic_int sweep_import_round{0};
-	std::atomic_int sweep_EQS_index{0};
-	std::atomic_int sweep_EQS_size{0};
-	std::atomic_int sweep_UNITS_index{0};
-	std::atomic_int sweep_UNITS_size{0};
+	// std::atomic_int sweep_import_round{0};
+	// std::atomic_int sweep_EQS_index{0};
+	// std::atomic_int sweep_EQS_size{0};
+	// std::atomic_int sweep_UNITS_index{0};
+	// std::atomic_int sweep_UNITS_size{0};
 	// int sweep_unread_EQS_count{0};
 
 	//New Import Version with dedicated vectors per round
@@ -73,13 +79,26 @@ private:
 	int curr_unit_index{0};
 
 
+	struct steal_info {
+		int		nr;
+		SweepStealType stealtype;
+		int		size;
+		float	t_submit;
+		float	t_receive;
+		int		round;
+	};
+
+	// int attempted_mpi_steals = 0;
+	int attempted_steals = 0;
+	std::vector<steal_info> steal_records{};
+
 	struct shweep_statistics sweep_stats;
 
 	static constexpr int WARN_ON_REPEATED_MISSED_TERMINATION=32;
 	int count_repeated_missed_termination=0;
 	// std::vector<char> stolen_done;
 	// std::vector<int> formulaForShweeping;
-	//##################################################
+	//##################################################################################################
 
 
 

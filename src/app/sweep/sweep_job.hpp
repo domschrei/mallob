@@ -67,16 +67,20 @@ private:
 		int senderLocalId{-1};
 		int targetIndex{-1};
 		int targetRank{-1};
+		float t_queued{0};
+		int nr{-1};
 		std::atomic_bool to_send{false};
 		std::atomic_bool got_steal_response{false};
 		std::atomic_bool is_active{false};
 		std::vector<int> stolen_work{};
 
-		void newQueuedRequest(int _senderLocalId) noexcept {
+		void newQueuedRequest(int _senderLocalId, int _nr) noexcept {
 			senderLocalId = _senderLocalId;
 			targetIndex = -1;
 			targetRank = -1;
 			stolen_work.clear();
+			t_queued = Timer::elapsedSeconds();
+			nr = _nr;
 			//atomic flags are changed only now, after modifying the non-atomics
 			is_active = true;
 			got_steal_response = false;
@@ -149,9 +153,11 @@ private:
 	//Termination. Determined during workstealing, broadcasted via sharing
 	std::atomic_bool _terminate_all=false; //termination (on this node) due to sharing consensus that there is no more work
 
-	Logger _reslogger;  //most important results go in a dedicated file, to not have them mangled by concurrent verbose logs in the main log
-	Logger _warnlogger; //some warnings into a dedicated file for easier postprocessing
-	Logger _contriblogger; //contribution counts also go in a dedicated file, again to prevent mangling and faster postprocessing
+	//Have dedicated files for some important logging types. Mostly to protect them from becoming mangled due to concurrent logging, and for nicer post processing (especially not needing to scan through the main large log file)
+	Logger _reslogger;  //most important information about results
+	Logger _warnlogger; //some relevant warnings
+	Logger _contriblogger; //each rank logs how many Eq+Units it contributed each round
+	// Logger _steallogger; //each solver logs each of its steal attempts
 
 	// Logger _rootlogger; //Logging information from the root transformation
 
@@ -301,21 +307,16 @@ private:
 
 	void checkSharingDelay();
 	void checkForUnsatResults();
-	// void tryReportUnsat();
 	void rootReportSolverResult(KissatPtr sweeper, int res);
 	void reportEndStats(KissatPtr sweeper);
-	// void printCongruenceStats(KissatPtr sweeper);
-
+	static void reportStealLatencies(KissatPtr sweeper);
 	void triggerTerminations();
 
-
 	bool skip_MPI_forNow();
-
 
 	void solverGoStealing(KissatPtr sweeper);
 	void sendWorkstealsViaMPI();
 	void printIdleWorkStatus();
-	// void printResweeps();
 
     void rootStartNewSharingRound();
     void cbContributeToAllReduce();

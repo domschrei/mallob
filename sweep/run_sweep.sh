@@ -40,20 +40,21 @@ MALLOB_OPTIONS="-t=$threads \
   -rspaa=1 \
 	-rpa=1 \
 	-seed=1 \
-	-v=3 \
-  -spl=4 \
-	-jcup=0.05 \
+	-jcup=0.2 \
+  -sleep=10 \
+	-v=4 \
+  -spl=-1 \
 	-preprocess-sweep=1 \
+  -preprocess-sweep-priority=1.0 \
 	-sweep-sharing-period=0.020 \
   -sweep-resweep-chance=1000 \
 	-sweep-solver-verbosity=2 \
 	-sweep-solver-quiet=1 \
   -sweep-initial-congruence=1 \
   -sweep-max-iterations=3 \
-  -sweep-max-depth=3 \
+  -sweep-max-depth=4 \
   -sweep-min-exit-swept=0 \
   -sweep-term-no-progress=0 \
-  -preprocess-sweep-priority=1.0 \
 "
 
 
