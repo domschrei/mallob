@@ -146,7 +146,8 @@ private:
 
 	static constexpr int MAX_IMPORT_ROUNDS = 50 * 2000; //Enough for ca. 2000 seconds (~each round takes >=20ms, i.e. max 50 rounds per second)
 	std::vector<importedRound> _imported_EQS_UNITS{MAX_IMPORT_ROUNDS};
-	std::vector<finishedCounter> _finishedRoundCounters{MAX_IMPORT_ROUNDS}; //technically atomics in std::vector, but we only construct once with a fixed size and never push_back or resize, so it compiles and should be fine
+	std::vector<finishedCounter> _finishedRoundCounters{MAX_IMPORT_ROUNDS}; //technically we store atomics in std::vector, but we only construct once with a fixed size and never push_back or resize, so it compiles and should be fine
+	std::vector<int> _iteration_of_round = std::vector<int>(MAX_IMPORT_ROUNDS, -1);
 	std::atomic_int _lastImportedRound = 0;
 	int _lastClearedRound = 0;
 
@@ -157,6 +158,9 @@ private:
 	Logger _reslogger;  //most important information about results
 	Logger _warnlogger; //some relevant warnings
 	Logger _contriblogger; //each rank logs how many Eq+Units it contributed each round
+
+	std::mutex _stealinfo_mutex; //when exporting data from the solver to Mallob, need to lock them when extracting them for global sharing, otherwise the solver threads might continue concurrently pushing new data onto them
+	std::vector<std::vector<SweepStealInfo>> _stealinfos_per_solver;
 	// Logger _steallogger; //each solver logs each of its steal attempts
 
 	// Logger _rootlogger; //Logging information from the root transformation
@@ -309,7 +313,7 @@ private:
 	void checkForUnsatResults();
 	void rootReportSolverResult(KissatPtr sweeper, int res);
 	void reportEndStats(KissatPtr sweeper);
-	static void reportStealLatencies(KissatPtr sweeper);
+	void saveStealLatencies(KissatPtr sweeper);
 	void triggerTerminations();
 
 	bool skip_MPI_forNow();

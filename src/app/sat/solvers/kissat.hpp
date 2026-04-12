@@ -25,6 +25,15 @@ enum class SweepStealType {
 };
 
 
+struct SweepStealInfo {
+	int		nr;
+	SweepStealType stealtype;
+	int		size;
+	float	t_submit;
+	float	t_receive;
+	int		round;
+};
+
 class Kissat : public PortfolioSolverInterface {
 
 private:
@@ -79,18 +88,10 @@ private:
 	int curr_unit_index{0};
 
 
-	struct steal_info {
-		int		nr;
-		SweepStealType stealtype;
-		int		size;
-		float	t_submit;
-		float	t_receive;
-		int		round;
-	};
 
 	// int attempted_mpi_steals = 0;
 	int attempted_steals = 0;
-	std::vector<steal_info> steal_records{};
+	std::vector<SweepStealInfo> steal_records{};
 
 	struct shweep_statistics sweep_stats;
 

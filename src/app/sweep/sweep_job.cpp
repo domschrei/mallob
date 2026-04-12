@@ -1,6 +1,7 @@
 #include "sweep_job.hpp"
 
 #include <memory>
+#include <algorithm>
 
 #include "app/job.hpp"
 #include "app/job_tree.hpp"
@@ -428,7 +429,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		if (_is_root && localId == _representative_localId) {
 			reportEndStats(sweeper);
 		}
-		reportStealLatencies(sweeper);
+		saveStealLatencies(sweeper);
 
 		//If no solver sets UNSAT or IMPROVED, the job will be returned by default as UNKNOWN
 
@@ -583,12 +584,68 @@ void SweepJob::cbReportIteration(int localId) {
 }
 
 
-void SweepJob::reportStealLatencies(KissatPtr sweeper) {
+void SweepJob::saveStealLatencies(KissatPtr sweeper) {
+
+	//Write out every single steal when at very high verbosity
 	Logger _steallogger(Logger::getMainInstance().copy("<STEAL>", ".steal."+to_string(sweeper->getLocalId())));
 	for (auto steal : sweeper->steal_records) {
 		string stealtype = steal.stealtype == SweepStealType::MPI ? "mpi" : "local";
-		LOGGER(_steallogger, V2_INFO, "id %i   r %i   nr %i   tr %.5f   ts %.5f   d %.6f   s %i  %s\n",sweeper->getLocalId(), steal.round, steal.nr, steal.t_receive, steal.t_submit, steal.t_receive - steal.t_submit, steal.size,  stealtype.c_str() );
+		LOGGER(_steallogger, V4_VVER, "id %i   r %i   nr %i   tr %.5f   ts %.5f   d %.6f   s %i  %s\n",sweeper->getLocalId(), steal.round, steal.nr, steal.t_receive, steal.t_submit, steal.t_receive - steal.t_submit, steal.size,  stealtype.c_str() );
 	}
+
+	//Create much more aggregated information for lower verbosities
+	//All solvers deposit their steal logs in a common data structure of this rank
+	{
+		std::lock_guard<std::mutex> lock(_stealinfo_mutex);
+		_stealinfos_per_solver.emplace_back(sweeper->steal_records);
+
+		//The last sweeper to contribute also reports the aggregated statistics
+		if (_stealinfos_per_solver.size() == _nThreads) {
+			LOG(V2_INFO, "SWEEP reporting steal information in dedicated file .stealsum\n");
+			//Organize steal info for each round
+			auto _stealinfos_per_round = std::vector<std::vector<SweepStealInfo>>(_lastImportedRound);
+			for (auto &records_of_solver : _stealinfos_per_solver) {
+				for (auto &info : records_of_solver) {
+					_stealinfos_per_round[info.round].push_back(info);
+				}
+			}
+			//Report statistics for each round
+			Logger _stealsumlogger(Logger::getMainInstance().copy("<STEALSUM>", ".stealsum"));
+			int round = 0;
+			for (auto &roundlist : _stealinfos_per_round) {
+				round++;
+				int iteration = _iteration_of_round[round];
+				int loc_stolensum = 0;
+				int mpi_stolensum = 0;
+				std::vector<float> local{};
+				std::vector<float> mpi{};
+				for (auto &info : roundlist) {
+					float latency = info.t_receive - info.t_submit;
+					if (info.stealtype==SweepStealType::Local) {
+						loc_stolensum += info.size;
+						local.push_back(latency);
+					} else {
+						mpi_stolensum += info.size;
+						mpi.push_back(latency);
+					}
+				}
+				// LOGGER(_stealsumlogger, V2_INFO, "it %i rnd %i   attmpts %i   stolen %i \n", iter, round, roundlist.size(), stolen_sum);
+				LOGGER(_stealsumlogger, V2_INFO, "iter %i rnd %i   loc_attempts %i   mpi_attempts %i   loc_stolen %i   mpi_stolen %i   Latencies in ms: local_max %.3f   mpi_min %.3f   mpi_mean %.3f   mpi_max %.3f\n",
+					iteration, round, local.size(), mpi.size(), loc_stolensum, mpi_stolensum,
+					// local.empty() ? 0.0f : std::accumulate(local.begin(), local.end(), 0.0f) / local.size(),
+					local.empty() ? 0.0f : *std::max_element(local.begin(), local.end()) * 1000,
+					mpi.empty()   ? 0.0f : *std::min_element(mpi.begin(), mpi.end()) * 1000,
+					mpi.empty()   ? 0.0f : 1000 * std::accumulate(mpi.begin(), mpi.end(), 0.0f) / mpi.size(),
+					mpi.empty()   ? 0.0f : *std::max_element(mpi.begin(), mpi.end()) * 1000);
+			}
+		}
+	}
+
+	// Logger _steallogger(Logger::getMainInstance().copy("<STEAL>", ".steal."+to_string(sweeper->getLocalId())));
+	// for (auto steal : sweeper->steal_records) {
+		// string stealtype = steal.stealtype == SweepStealType::MPI ? "mpi" : "local";
+		// LOGGER(_steallogger, V2_INFO, "id %i   r %i   nr %i   tr %.5f   ts %.5f   d %.6f   s %i  %s\n",sweeper->getLocalId(), steal.round, steal.nr, steal.t_receive, steal.t_submit, steal.t_receive - steal.t_submit, steal.size,  stealtype.c_str() );
+	// }
 
 }
 
@@ -1214,6 +1271,8 @@ void SweepJob::extractAllReductionResult() {
 	_timestamp_receive_sharing_result.push_back(Timer::elapsedSeconds());
 
 	_rank_is_inbetween_iterations = end_iteration;
+
+	_iteration_of_round[sharing_round] = sweep_iteration;
 
 	LOG(V2_INFO, "SWEEP GOTT: iter %i round %i : %i ai , %i endi , %i trm . E %i  U %i  \n", sweep_iteration, sharing_round, all_idle, end_iteration, terminate, eq_size/2, unit_size);
 
