@@ -115,7 +115,7 @@ If you make use of Mallob in an academic / scientific setting or in a competitiv
 	doi={10.1007/s10817-025-09725-w},
 }
 ```
-#### Real-time proof checking (SAT'24)
+#### Non-incremental real-time proof checking (SAT'24)
 ```bibtex
 @inproceedings{schreiber2024trusted,
 	title={Trusted Scalable {SAT} Solving with on-the-fly {LRAT} Checking},
@@ -125,6 +125,17 @@ If you make use of Mallob in an academic / scientific setting or in a competitiv
 	pages={25:1--25:19},
 	organization={Schloss Dagstuhl -- Leibniz-Zentrum für Informatik},
 	doi={10.4230/LIPIcs.SAT.2024.25},
+}
+```
+#### Incremental, flexible real-time proof checking (TACAS'26)
+```bibtex
+@inproceedings{schreiber2026realtime,
+	author={Dominik Schreiber and Katalin Fazekas and Mathias Fleury and Armin Biere},
+	title={{Real-time proof checking for distributed incremental {SAT} solving}},
+	booktitle={Tools and Algorithms for the Construction and Analysis of Systems (TACAS)},
+	note={To appear},
+	year={2026},
+	url={https://satres.kikit.kit.edu/papers/2026-tacas-distrincproof.pdf},
 }
 ```
 #### MaxSAT Solving (SoCS'25)
@@ -138,6 +149,17 @@ If you make use of Mallob in an academic / scientific setting or in a competitiv
 	volume={18},
 	number={1},
 	pages={127--135},
+}
+```
+#### Bit-precise SMT Solving (TACAS'26)
+```bibtex
+@inproceedings{schreiber2026massively,
+	author={Dominik Schreiber and Aina Niemetz and Mathias Preiner},
+	title={Massively Parallel Bit-precise Verification with {Bitwuzla} and {Mallob}},
+	booktitle={Tools and Algorithms for the Construction and Analysis of Systems (TACAS)},
+	note={To appear},
+	year={2026},
+	url={https://satres.kikit.kit.edu/papers/2026-tacas-smt.pdf},
 }
 ```
 #### Most recent SAT Competition solver description (TR)
