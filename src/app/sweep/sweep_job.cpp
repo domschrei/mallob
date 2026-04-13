@@ -598,6 +598,7 @@ void SweepJob::saveStealLatencies(KissatPtr sweeper) {
 	//Create much more aggregated information for lower verbosities
 	//All solvers deposit their steal logs in a common data structure of this rank
 	{
+		LOG(V2_INFO, "SWEEP solver lock enter %i\n", sweeper->getLocalId());
 		std::lock_guard<std::mutex> lock(_stealinfo_mutex);
 		_stealinfos_per_solver.emplace_back(sweeper->steal_records);
 
@@ -605,9 +606,10 @@ void SweepJob::saveStealLatencies(KissatPtr sweeper) {
 		if (_stealinfos_per_solver.size() == _nThreads) {
 			LOG(V2_INFO, "SWEEP reporting steal information in dedicated file .stealsum\n");
 			//Organize steal info for each round
-			auto _stealinfos_per_round = std::vector<std::vector<SweepStealInfo>>(_lastImportedRound);
+			auto _stealinfos_per_round = std::vector<std::vector<SweepStealInfo>>(_lastImportedRound + 10);
 			for (auto &records_of_solver : _stealinfos_per_solver) {
 				for (auto &info : records_of_solver) {
+					assert(info.round < _stealinfos_per_round.size() || log_return_false("SWEEP ERROR : trying to sort stealinfo of round %i into too small provisioned vector of size %i \n", info.round, _stealinfos_per_round.size()));
 					_stealinfos_per_round[info.round].push_back(info);
 				}
 			}
@@ -617,10 +619,6 @@ void SweepJob::saveStealLatencies(KissatPtr sweeper) {
 			int round = 0;
 			for (auto &roundlist : _stealinfos_per_round) {
 				round++;
-				if (round >= _iteration_of_round.size()) {
-					LOG(V1_WARN, "WARN SWEEP reporting steal information, but stealinfos know more rounds than this rank\n");
-					continue;
-				}
 				int iteration = _iteration_of_round[round];
 				int loc_stolensum = 0;
 				int mpi_stolensum = 0;
@@ -637,7 +635,7 @@ void SweepJob::saveStealLatencies(KissatPtr sweeper) {
 					}
 				}
 				// LOGGER(_stealsumlogger, V2_INFO, "it %i rnd %i   attmpts %i   stolen %i \n", iter, round, roundlist.size(), stolen_sum);
-				LOG(V2_INFO, "SWEEP reporting steal information, logging round %i / %i\n", round, _iteration_of_round.size()-1);
+				LOG(V2_INFO, "SWEEP reporting steal information, logging round %i / %i\n", round, _lastImportedRound.load());
 				LOGGER(_stealsumlogger, V2_INFO, "iter %i rnd %i   loc_attempts %i   mpi_attempts %i   loc_stolen %i   mpi_stolen %i   Latencies in ms: local_max %.3f   mpi_min %.3f   mpi_mean %.3f   mpi_max %.3f\n",
 					iteration, round, local.size(), mpi.size(), loc_stolensum, mpi_stolensum,
 					// local.empty() ? 0.0f : std::accumulate(local.begin(), local.end(), 0.0f) / local.size(),
@@ -646,14 +644,10 @@ void SweepJob::saveStealLatencies(KissatPtr sweeper) {
 					mpi.empty()   ? 0.0f : 1000 * std::accumulate(mpi.begin(), mpi.end(), 0.0f) / mpi.size(),
 					mpi.empty()   ? 0.0f : *std::max_element(mpi.begin(), mpi.end()) * 1000);
 			}
+			LOG(V2_INFO, "SWEEP finished reporting steal information\n");
 		}
+		LOG(V2_INFO, "SWEEP solver lock exit  %i\n", sweeper->getLocalId());
 	}
-
-	// Logger _steallogger(Logger::getMainInstance().copy("<STEAL>", ".steal."+to_string(sweeper->getLocalId())));
-	// for (auto steal : sweeper->steal_records) {
-		// string stealtype = steal.stealtype == SweepStealType::MPI ? "mpi" : "local";
-		// LOGGER(_steallogger, V2_INFO, "id %i   r %i   nr %i   tr %.5f   ts %.5f   d %.6f   s %i  %s\n",sweeper->getLocalId(), steal.round, steal.nr, steal.t_receive, steal.t_submit, steal.t_receive - steal.t_submit, steal.size,  stealtype.c_str() );
-	// }
 
 }
 
