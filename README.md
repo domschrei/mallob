@@ -10,9 +10,9 @@
 
 **Mallob** (**Mal**leable **Lo**ad **B**alancer, or **Ma**ssively P**a**ra**ll**el **Lo**gic **B**ackend) is a distributed platform for automated reasoning in modern large-scale HPC and cloud environments. Mallob primarily solves instances of _propositional satisfiability_ (SAT) – an essential building block at the core of Symbolic AI. Mallob's flexible and decentralized approach to job scheduling allows to concurrently process many tasks of varying priority by different users. As such, Mallob can be used to scale up academic or industrial workflows tied to automated reasoning.
 
-Mallob and its tightly integrated distributed general-purpose SAT solving engine, **MallobSat**, received a large amount of attention, including five gold medals in the [International SAT Competition](https://satcompetition.github.io/)'s Cloud Track in a row, [high-profile scientific awards](https://www.informatik.kit.edu/english/11147_14198.php), and a [highlight on Amazon Science](https://www.amazon.science/blog/automated-reasonings-scientific-frontiers).
-Mallob is the first distributed system that supports _incremental SAT solving_, i.e., interactive solving procedures over evolving formulas, and is also the first system transferring _proof technology_ to parallel and distributed SAT solving in a scalable manner.
-
+Mallob and its tightly integrated distributed general-purpose SAT solving engine, **MallobSat**, ranked first in all (five) Cloud Tracks of the [International SAT Competition](https://satcompetition.github.io/) so far.
+Mallob is the first distributed system that supports _incremental SAT solving_, i.e., interactive solving procedures over evolving formulas, and is also the first system that supports logging and/or checking propositional proofs at parallel and distributed scales - also for incremental solving queries.
+Last but not least, Mallob features engines for state-of-the-art distributed MaxSAT solving (**MallobMax**) and bit-precise SMT solving (**Bitwuzllob** - parallelizing [Bitwuzla](https://github.com/bitwuzla/bitwuzla)).
 
 ## Setup
 
@@ -61,13 +61,12 @@ RDMAV_FORK_SAFE=1; mpirun -np 8 --bind-to core --map-by ppr:1:node:pe=4 build/ma
 
 First of all, **please let us know if you make use of Mallob!** We like to hear about it and depend on it for continued support and further development.
 
-Mallob and its source code can be used, changed and redistributed under the terms of the [**MIT License**](/LICENSE_MIT) _or_ the [**Lesser General Public License (LGPLv3)**](/LICENSE_LGPL). One exception is the Glucose interface which is excluded from compilation by default (see below).
+Mallob and its source code can be used, changed and redistributed under the terms of the [**MIT License**](/LICENSE_MIT) _or_ the [**Lesser General Public License (LGPLv3)**](/LICENSE_LGPL). (One exception is the Glucose interface, excluded from compilation by default - see below).
 
-The used versions of Lingeling, YalSAT, CaDiCaL, and Kissat are MIT-licensed, as is HordeSat (the massively parallel solver system our SAT engine was based on) and other statically linked libraries (RustSAT, Bitwuzla, and MaxPRE).
+Depending on the application engines included in the particular build, the Mallob executable includes a number of liberally licensed solvers and/or (pre-)processors, which are listed at the top of every Mallob execution output together with their main authors.  
+There is also a Glucose interface for Mallob, which is subject to the [non-free license of (parallel-ready) Glucose](https://github.com/mi-ki/glucose-syrup/blob/master/LICENCE). Notably, its usage in competitive events is restricted. This interface is however **disabled** by default.
 
-The Glucose interface of Mallob (only included when explicitly compiled with `-DMALLOB_USE_GLUCOSE=1`) is subject to the [non-free license of (parallel-ready) Glucose](https://github.com/mi-ki/glucose-syrup/blob/master/LICENCE). Notably, its usage in competitive events is restricted.
-
-Within our codebase we make thankful use of the following liberally licensed projects:
+Within our codebase we further make thankful use of the following liberally licensed projects:
 
 * [Compile Time Regular Expressions](https://github.com/hanickadot/compile-time-regular-expressions) by Hana Dusíková, for matching particular user inputs
 * [JSON for Modern C++](https://github.com/nlohmann/json) by Niels Lohmann, for reading and writing JSON files
