@@ -587,10 +587,12 @@ void SweepJob::cbReportIteration(int localId) {
 void SweepJob::saveStealLatencies(KissatPtr sweeper) {
 
 	//Write out every single steal when at very high verbosity
-	Logger _steallogger(Logger::getMainInstance().copy("<STEAL>", ".steal."+to_string(sweeper->getLocalId())));
-	for (auto steal : sweeper->steal_records) {
-		string stealtype = steal.stealtype == SweepStealType::MPI ? "mpi" : "local";
-		LOGGER(_steallogger, V4_VVER, "id %i   r %i   nr %i   tr %.5f   ts %.5f   d %.6f   s %i  %s\n",sweeper->getLocalId(), steal.round, steal.nr, steal.t_receive, steal.t_submit, steal.t_receive - steal.t_submit, steal.size,  stealtype.c_str() );
+	if (LOGGER_STATIC_VERBOSITY >= 4) {
+		Logger _steallogger(Logger::getMainInstance().copy("<STEAL>", ".steal."+to_string(sweeper->getLocalId())));
+		for (auto steal : sweeper->steal_records) {
+			string stealtype = steal.stealtype == SweepStealType::MPI ? "mpi" : "local";
+			LOGGER(_steallogger, V4_VVER, "id %i   r %i   nr %i   tr %.5f   ts %.5f   d %.6f   s %i  %s\n",sweeper->getLocalId(), steal.round, steal.nr, steal.t_receive, steal.t_submit, steal.t_receive - steal.t_submit, steal.size,  stealtype.c_str() );
+		}
 	}
 
 	//Create much more aggregated information for lower verbosities
@@ -610,10 +612,15 @@ void SweepJob::saveStealLatencies(KissatPtr sweeper) {
 				}
 			}
 			//Report statistics for each round
+			LOG(V2_INFO, "SWEEP reporting steal information, sorted all infos\n");
 			Logger _stealsumlogger(Logger::getMainInstance().copy("<STEALSUM>", ".stealsum"));
 			int round = 0;
 			for (auto &roundlist : _stealinfos_per_round) {
 				round++;
+				if (round >= _iteration_of_round.size()) {
+					LOG(V1_WARN, "WARN SWEEP reporting steal information, but stealinfos know more rounds than this rank\n");
+					continue;
+				}
 				int iteration = _iteration_of_round[round];
 				int loc_stolensum = 0;
 				int mpi_stolensum = 0;
@@ -630,6 +637,7 @@ void SweepJob::saveStealLatencies(KissatPtr sweeper) {
 					}
 				}
 				// LOGGER(_stealsumlogger, V2_INFO, "it %i rnd %i   attmpts %i   stolen %i \n", iter, round, roundlist.size(), stolen_sum);
+				LOG(V2_INFO, "SWEEP reporting steal information, logging round %i / %i\n", round, _iteration_of_round.size()-1);
 				LOGGER(_stealsumlogger, V2_INFO, "iter %i rnd %i   loc_attempts %i   mpi_attempts %i   loc_stolen %i   mpi_stolen %i   Latencies in ms: local_max %.3f   mpi_min %.3f   mpi_mean %.3f   mpi_max %.3f\n",
 					iteration, round, local.size(), mpi.size(), loc_stolensum, mpi_stolensum,
 					// local.empty() ? 0.0f : std::accumulate(local.begin(), local.end(), 0.0f) / local.size(),
@@ -938,12 +946,13 @@ void SweepJob::cbImportUnit(int *ilit, int localId) {
 
 bool SweepJob::tryProvideInitialWork(KissatPtr sweeper) {
 	int solver_iteration = shweep_get_curr_iteration(sweeper->solver);
-		//we only provide work at the root node. this simplifies its tracking, and especially allows the root-transform to know and influence the work-sharing state via shared-memory
-		//also, only a single hardcoded representative solver (localId 0 per default) receives the work, to avoid any concurrency problems
-		//also, we check explicitly that the solver expects this work it for a new iteration, to prevent that we provide work multiple times in the same iteration,
+		//we avoid any concurrent business by only providing the initial work to one dedicated solver at the root node
+		//by limiting this work provision to the root node, we also have direct access to the flags set by the root transformation of each sharing round
+		//we also check explicitly that the solver expects this work for a new iteration, and that we have not already provided it
 	if (_is_root
 		&& sweeper->getLocalId()==_representative_localId
-		&& solver_iteration > _root_sweep_iteration)
+		&& solver_iteration > _root_sweep_iteration
+		&& !_root_initwork_startedproviding)
 	{
 
 		sweeper->sweeper_is_idle = false; //already set non-idle here to prevent case where solver is already initialized, non-idle, but still has no work cause its just being copied, and then a sharing operation starts right now, terminating everything wrongly early
