@@ -419,7 +419,9 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			//To reduce concurrency problems, only a single representative solver on the root node is allowed to report to Mallob
 		} else if (res==UNKNOWN && _is_root && sweeper->getLocalId()==_representative_localId) {
 			//Found either IMPROVED or UNKNOWN
-			if (sweeper->hasPreprocessedFormula() ) {
+			auto stats = sweeper->fetchSweepStats();
+			// if (sweeper->hasPreprocessedFormula() ) {
+			if (stats.clauses < stats.start_clauses) {
 				//Found some improvements
 				rootReportSolverResult(sweeper, IMPROVED);
 			} else {
@@ -610,7 +612,7 @@ void SweepJob::saveStealLatencies(KissatPtr sweeper) {
 
 		//The last sweeper to contribute also reports the aggregated statistics
 		if (_stealinfos_per_solver.size() == _nThreads) {
-			LOG(V2_INFO, "SWEEP sorting steal information for reporting\n");
+			// LOG(V2_INFO, "SWEEP sorting steal information for reporting\n");
 			//Organize steal info for each round
 			auto _stealinfos_per_round = std::vector<std::vector<SweepStealInfo>>(_lastImportedRound + 10);
 			for (auto &records_of_solver : _stealinfos_per_solver) {
@@ -621,7 +623,7 @@ void SweepJob::saveStealLatencies(KissatPtr sweeper) {
 			}
 			//Report statistics for each round
 			// LOG(V2_INFO, "SWEEP reporting steal information, sorted all infos\n");
-			LOG(V2_INFO, "SWEEP reporting steal information in dedicated file .stealsum\n");
+			// LOG(V2_INFO, "SWEEP reporting steal information in dedicated file .stealsum\n");
 			Logger _stealsumlogger(Logger::getMainInstance().copy("<STEALSUM>", ".stealsum"));
 			int round = 0;
 			for (auto &roundlist : _stealinfos_per_round) {
@@ -651,7 +653,7 @@ void SweepJob::saveStealLatencies(KissatPtr sweeper) {
 					mpi.empty()   ? 0.0f : 1000 * std::accumulate(mpi.begin(), mpi.end(), 0.0f) / mpi.size(),
 					mpi.empty()   ? 0.0f : *std::max_element(mpi.begin(), mpi.end()) * 1000);
 			}
-			LOG(V2_INFO, "SWEEP finished reporting steal information in file .stealsum\n");
+			// LOG(V2_INFO, "SWEEP finished reporting steal information in file .stealsum\n");
 		}
 		// LOG(V2_INFO, "SWEEP solver lock exit  %i\n", sweeper->getLocalId());
 	}
