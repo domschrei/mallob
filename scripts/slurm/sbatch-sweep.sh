@@ -146,12 +146,12 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 	-seed=1 \
 	-spd=${globallogdir}/ \
   -spl=-1 \
-	-jcup=0.2 \
-  -sleep=10 \
+	-jcup=0.05 \
+  -sleep=100 \
 	-v=2 \
 	-preprocess-sweep=1 \
   -preprocess-sweep-priority=1.0 \
-	-sweep-sharing-period=0.020 \
+	-sweep-sharing-period=0.010 \
   -sweep-resweep-chance=1000 \
 	-sweep-solver-verbosity=0 \
 	-sweep-solver-quiet=1 \
@@ -160,6 +160,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
   -sweep-max-depth=4 \
   -sweep-min-exit-swept=0 \
   -sweep-term-no-progress=0 \
+  -sweep-shuffle-work=1 \
 "
 
   # -sweep-growing-environments=1 \

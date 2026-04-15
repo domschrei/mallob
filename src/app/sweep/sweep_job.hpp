@@ -56,6 +56,7 @@ private:
 	std::vector<float> _timestamp_receive_sharing_result;
 	std::vector<float> _timestamp_contributed_to_sharing;
 	std::vector<float> _duration_appl_communicate;
+	bool 			   _logged_full_jobcomm{false};
 
 	//Workstealing
 	SplitMix64Rng _rng;
@@ -124,16 +125,6 @@ private:
 		static const int METADATA_EQ_SIZE    = 1;
 
 
-	//Distribute Eqs and Units that we received from sharing broadcast to local solvers
-	//update: now handled via individual vectors per sharing round
-	// static const unsigned INVALID_LIT = UINT_MAX; //Internal literals count unsigned 0,1,2,..., the largest number marks an invalid literal. see further: https://github.com/arminbiere/satch/blob/master/satch.c#L1017
-	// static const int MAX_IMPORT_SIZE = 400'000; //Limiting the import to a known preallocated area, to simplify concurrent reads and writes (still neglectable with ~ 1.6 MB)
-	// std::atomic_int _available_import_round{0}; //identifier for the newest import round that we received from the sharing operation
-	// std::atomic_int _EQS_import_size{0};
-	// std::atomic_int _UNITS_import_size{0};
-	// std::vector<int> _EQS_to_import {};
-	// std::vector<int> _UNITS_to_import {};
-
 	//New Version of Importing, via separated vectors per round
 	struct importedRound {
 		std::vector<int> eqs{};
@@ -147,7 +138,7 @@ private:
 	static constexpr int MAX_IMPORT_ROUNDS = 50 * 2000; //Enough for ca. 2000 seconds (~each round takes >=20ms, i.e. max 50 rounds per second)
 	std::vector<importedRound> _imported_EQS_UNITS{MAX_IMPORT_ROUNDS};
 	std::vector<finishedCounter> _finishedRoundCounters{MAX_IMPORT_ROUNDS}; //technically we store atomics in std::vector, but we only construct once with a fixed size and never push_back or resize, so it compiles and should be fine
-	std::vector<int> _iteration_of_round = std::vector<int>(MAX_IMPORT_ROUNDS, -1);
+	std::vector<int> _iteration_of_round = std::vector<int>(MAX_IMPORT_ROUNDS, -9); //dummy value to distinguish from iteration values >=-1
 	std::atomic_int _lastImportedRound = 0;
 	int _lastClearedRound = 0;
 
@@ -215,7 +206,7 @@ private:
 		bool earlyexit = false;
 		int swept = work_sweeps + work_unsched_resweeps;
 		int eliminated = _root_shared_units_this_iteration + _root_shared_eqs_this_iteration; //slight overestimation, because the same eq can be shared in different rounds. But in the relevant regime (almost no sharing) this is not a problem.
-		double progress_ratio = eliminated/(double)swept;
+		double progress_ratio = (swept==0 ? 0 : eliminated/(double)swept);
 		//mirror the "delay" decision in original kissat sweeping. There, if  not enough progress is made, the next sweeping is delayed - here we exit the iteration early
 		if (_params.sweepMinExitSwept()!=0 && swept >= _params.sweepMinExitSwept.val) {
 			if (progress_ratio <= EARLYEXIT_RATIO) {

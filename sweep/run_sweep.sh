@@ -40,9 +40,9 @@ MALLOB_OPTIONS="-t=$threads \
   -rspaa=1 \
 	-rpa=1 \
 	-seed=1 \
-	-jcup=0.2 \
+	-jcup=0.05 \
   -sleep=10 \
-	-v=4 \
+	-v=2 \
   -spl=-1 \
 	-preprocess-sweep=1 \
   -preprocess-sweep-priority=1.0 \
@@ -55,6 +55,7 @@ MALLOB_OPTIONS="-t=$threads \
   -sweep-max-depth=4 \
   -sweep-min-exit-swept=0 \
   -sweep-term-no-progress=0 \
+  -sweep-shuffle-work=0 \
 "
 
 

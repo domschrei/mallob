@@ -137,6 +137,12 @@ void SweepJob::appl_communicate() {
 	if (_bcast && _is_root && !_terminate_all.load(std::memory_order_relaxed))
 		_bcast->updateJobTree(getJobTree());
 
+	if (!_logged_full_jobcomm && getJobComm().size() == getVolume()) {
+		_logged_full_jobcomm = true;
+		LOG(V2_INFO, "SWEEP FULL-JOBCOMM , all ranks are online now \n");
+	}
+
+
 	//By having rootStartNewSharingRound() before advanceAllReduction(),
 	//we dont immediately start a new broadcast after a successful Allreduction extraction which resets the broadcast object
 	//this heavily reduces the occurrences of broadcasts in the lower ranks forcing an early extraction of their result because they need to create a new blank _red object
@@ -773,7 +779,6 @@ void SweepJob::sendWorkstealsViaMPI() {
 
 			//if we are still in the phase where MPI sends are not done, we short-fuse the requests to a zero dummy and return them to the solver threads
 			//same if the whole job is terminated
-			// if (skip_MPI_forNow() || _terminate_all || getVolume()==0) {
 			if (skip_MPI_forNow()) {
 				// request.stolen_work = {}; //remains empty from request initialization
 				request.to_send = false;
@@ -970,7 +975,15 @@ bool SweepJob::tryProvideInitialWork(KissatPtr sweeper) {
 		for (int idx = 0; idx < VARS; idx++) {
 			sweeper->work_received_from_steal[idx] = idx;
 		}
-		LOG(V2_INFO, "SWEEP WORK PROVIDED  --------------%u----------------> to sweeper [%i](%i)\n", VARS, _my_rank, sweeper->getLocalId());
+
+		if (_params.sweepShuffleWork()) {
+			static thread_local std::mt19937 rng19937(std::random_device{}()); //created/seeded only once per thread, then just advancing rng calls
+			std::shuffle(sweeper->work_received_from_steal.begin(), sweeper->work_received_from_steal.end(), rng19937);
+			for (int i=0; i <8 && i<sweeper->work_received_from_steal.size(); i++) {
+				LOG(V2_INFO, "SWEEP WORK Shuffle view: %i\n", sweeper->work_received_from_steal[i]);
+			}
+		}
+		LOG(V2_INFO, "SWEEP WORK PROVIDED  -------------%u----------------> to sweeper [%i](%i)\n", VARS, _my_rank, sweeper->getLocalId());
 		_root_initwork_provided = true;
 		return true;
 	}
