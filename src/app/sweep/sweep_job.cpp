@@ -581,6 +581,8 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
   	sweeper->set_option("sweepfliprounds", 1);		//	1,    0, INT_MAX,	"flipping rounds")
   	sweeper->set_option("sweeprand", 0);			//  0,    0,    1,		"randomize sweeping environment")
 
+  	sweeper->set_option("puresweep_tocompletion", _params.sweepToCompletion());
+
 	sweeper->set_option("substitute", 1);			// (default 1) apply equivalence substitutions after sweeping, keep here explicitly to remember it
 	sweeper->set_option("substituterounds", 2);		// (default 2) there does not seem to be any need to go higher, as almost always all equivalences are already found in the very first round
 
@@ -599,10 +601,13 @@ void SweepJob::cbReportIteration(int localId) {
 	assert(sweeper);
 	auto stats = sweeper->fetchSweepStats();
 	LOG(			  V2_INFO, "SWEEP solver [%i](%i) reports about iteration %i in dedicated .sweep file \n", _my_rank, localId, stats.curr_iteration);
-	assert(stats.curr_iteration <= _params.sweepMaxIterations.val || log_return_false("SWEEP ERROR: solver has internally higher iteration (%i) than expected max iterations (%i)", stats.curr_iteration, _params.sweepMaxIterations.val));
+	if (!_params.sweepToCompletion()) {
+		assert(stats.curr_iteration <= _params.sweepMaxIterations.val || log_return_false("SWEEP ERROR: solver has internally higher iteration (%i) than expected max iterations (%i)", stats.curr_iteration, _params.sweepMaxIterations.val));
+	}
 
 	LOGGER(_reslogger, V2_INFO, "\n");
 	LOGGER(_reslogger,V2_INFO, "Reported by [%i](%i)		\n", _my_rank, localId);
+	LOGGER(_reslogger,V2_INFO, "TO_COMPLETION    %i		    \n", _params.sweepToCompletion());
 	LOGGER(_reslogger,V2_INFO, "ITERATION_CURR   %i		    \n", stats.curr_iteration);
 	LOGGER(_reslogger,V2_INFO, "ITERATIONS_MAX     %i		\n", _params.sweepMaxIterations());
 	LOGGER(_reslogger,V2_INFO, "TIME_APP_TOTAL          %.3f s\n",  Timer::elapsedSeconds() - _timestamp_start_sweepapp);
@@ -1001,7 +1006,9 @@ bool SweepJob::tryProvideInitialWork(KissatPtr sweeper) {
 		sweeper->sweeper_is_idle = false; //already set non-idle here to prevent case where solver is already initialized, non-idle, but still has no work cause its just being copied, and then a sharing operation starts right now, terminating everything wrongly early
 		sweeper->sweeper_longterm_idle = false;
 
-		assert(solver_iteration <= _params.sweepMaxIterations.val || log_return_false("SWEEP ERROR : solver iteration %i is too high, should be max %i ", solver_iteration, _params.sweepMaxIterations.val));
+		if (!_params.sweepToCompletion()) {
+			assert( solver_iteration <= _params.sweepMaxIterations.val || log_return_false("SWEEP ERROR : solver iteration %i is too high, should be max %i ", solver_iteration, _params.sweepMaxIterations.val));
+		}
 		if (solver_iteration != _root_sweep_iteration +1 ) {
 			LOG(V1_WARN, "SWEEP WARN : new solver iteration %i more than 1 larger than counter at root (iteration %i) \n", solver_iteration, _root_sweep_iteration);
 		}
@@ -1189,7 +1196,8 @@ void SweepJob::appendMetadataToReductionElement(std::vector<int> &contrib, int i
 	contrib.insert(contrib.end(), NUM_METADATA_FIELDS, 0); //Make space for the upcoming metadata, initialized with zero
 	int size = contrib.size();
 	int n=0;
-	n++; contrib[size - METADATA_TERMINATE]      = 0;  //dummy. Keep here for completeness (and robustness) to have the n++ count match and force ourselves to keep this method updated
+	n++; contrib[size - METADATA_ENVCOMPLETIONS]= 0;  //dummy. Keep here for completeness (and robustness) to have the n++ count match and force ourselves to keep this method updated
+	n++; contrib[size - METADATA_TERMINATE]      = 0;  //dummy ""
 	n++; contrib[size - METADATA_SWEEP_ITERATION]= 0;  //dummy ""
 	n++; contrib[size - METADATA_SHARING_ROUND]  = 0;  //dummy ""
 	n++; contrib[size - METADATA_END_ITERATION]  = 0;  //dummy ""
@@ -1322,6 +1330,7 @@ void SweepJob::extractAllReductionResult() {
 	const int terminate		 = data[data.size()-METADATA_TERMINATE];
 	const int sweep_iteration= data[data.size()-METADATA_SWEEP_ITERATION];
 	const int sharing_round  = data[data.size()-METADATA_SHARING_ROUND];
+	const int env_completions= data[data.size()-METADATA_ENVCOMPLETIONS];
 	const int all_idle       = data[data.size()-METADATA_IDLE];
 	const int end_iteration  = data[data.size()-METADATA_END_ITERATION];
 	const int unit_size      = data[data.size()-METADATA_UNIT_SIZE];
@@ -1331,10 +1340,11 @@ void SweepJob::extractAllReductionResult() {
 	_timestamp_receive_sharing_result.push_back(Timer::elapsedSeconds());
 
 	_rank_is_inbetween_iterations = end_iteration;
+	// _completed_envsizes = completed_envsizes;
 
 	_iteration_of_round[sharing_round] = sweep_iteration;
 
-	LOG(V2_INFO, "SWEEP GOTT: iter %i round %i : %i ai , %i endi , %i trm . E %i  U %i  \n", sweep_iteration, sharing_round, all_idle, end_iteration, terminate, eq_size/2, unit_size);
+	LOG(V2_INFO, "SWEEP GOTT: envsize %i iter %i round %i : %i ai , %i endi , %i trm . E %i  U %i  \n", env_completions, sweep_iteration, sharing_round, all_idle, end_iteration, terminate, eq_size/2, unit_size);
 
 	assert(sharing_round > _lastImportedRound.load() || log_return_false("SWEEP ERROR : unexpected round number when importing shared data. got round %i, while lastImportedRound %i \n", sharing_round, _lastImportedRound.load()));
 
@@ -1368,6 +1378,15 @@ void SweepJob::extractAllReductionResult() {
 			}
 		}
 	}
+
+	if ( _flag_started_synchronized_solving && !_terminate_all) {
+		for (auto &sweeper : _sweepers) {
+			if (sweeper) {
+				shweep_set_env_completions(sweeper->solver, env_completions);
+			}
+		}
+	}
+
 	//Check whether the whole sweep job sould be terminated.
 	//We do this check chronologically last in this function, because there might still be useful shared data that we want to import before terminating, and having an earlier termination signal only increases risks for concurrency problems
 	if (terminate) {

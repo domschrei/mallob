@@ -112,8 +112,9 @@ private:
 	const int NUM_SEARCHING_WORK_FIELDS = 3; //how many fields are attached to an MPI message searching work
 
 	//each aggregation element has some metadata integers at the end
-	static const int NUM_METADATA_FIELDS = 10;
+	static const int NUM_METADATA_FIELDS = 11;
 		//field indices must be unique numbers exactly filling 1..NUM_METADATA_FIELDS !
+		static const int METADATA_ENVCOMPLETIONS   = 11;
 		static const int METADATA_END_ITERATION		  = 10;
 		static const int METADATA_WORK_SWEEPS		 = 9;
 		static const int METADATA_WORK_STEPOVERS	= 8;
@@ -136,7 +137,7 @@ private:
 		std::atomic_int threads_finished_units=0;
 	};
 
-	static constexpr int MAX_IMPORT_ROUNDS = 50 * 2000; //Enough for ca. 2000 seconds (~each round takes >=20ms, i.e. max 50 rounds per second)
+	static constexpr int MAX_IMPORT_ROUNDS = 100 * 2000; //Enough for ca. 2000 seconds (~each round takes >=10ms, i.e. max 100 rounds per second)
 	std::vector<importedRound> _imported_EQS_UNITS{MAX_IMPORT_ROUNDS};
 	std::vector<finishedCounter> _finishedRoundCounters{MAX_IMPORT_ROUNDS}; //technically we store atomics in std::vector, but we only construct once with a fixed size and never push_back or resize, so it compiles and should be fine
 	std::vector<int> _iteration_of_round = std::vector<int>(MAX_IMPORT_ROUNDS, -9); //dummy value to distinguish from iteration values >=-1
@@ -154,8 +155,9 @@ private:
 	std::mutex _stealinfo_mutex; //when exporting data from the solver to Mallob, need to lock them when extracting them for global sharing, otherwise the solver threads might continue concurrently pushing new data onto them
 	std::vector<std::vector<SweepStealInfo>> _stealinfos_per_solver;
 	// Logger _steallogger; //each solver logs each of its steal attempts
-
 	// Logger _rootlogger; //Logging information from the root transformation
+
+	// int _completed_envsizes = 0; //received information from sharing
 
 	//the root node tracks the number of sweep iterations and sharing rounds, distributes this information in the sharing operation
 	int _root_shared_units_this_iteration = 0;
@@ -165,6 +167,7 @@ private:
 	int _root_rounds_this_iteration = 0;
 	int _root_sweep_iteration = 0;
 	int _root_sharing_round = 0;
+	int _root_env_completions = 0;
 	bool _root_did_just_finish_iteration = true; //Starts with true to immediately start into iteration 1.
 	std::unique_ptr<AnytimeSatClauseCommunicator> _clause_comm;
 
@@ -229,6 +232,9 @@ private:
 			// printSweepStats(_sweepers[_representative_localId], false); //report some intermediate statistics about this iteration
 			bool progress = (_root_shared_eqs_this_iteration + _root_shared_units_this_iteration) > 0;
 			bool lastsweepround = (_root_sweep_iteration == _params.sweepMaxIterations());
+			if (_params.sweepToCompletion()) {
+				lastsweepround = false;
+			}
 			if (lastsweepround || (!progress && _params.sweepTermNoProgress())) {
 				if (lastsweepround) LOG(V2_INFO, "SWEEP [%i](root-trf): Job finished! All iterations done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations());
 				if (!progress && _params.sweepTermNoProgress())	LOG(V2_INFO, "SWEEP [%i](root-trf): Job finished! No more progress in iteration %i/%i. Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations());
@@ -243,20 +249,27 @@ private:
 				send_end_iteration = true;
 				LOG(V2_INFO, "SWEEP [%i](root-trf) Preparing for new iteration. Have set (%i)started_providing_work, (%i)provided_work  \n", _my_rank, _root_initwork_startedproviding.load(), _root_initwork_provided.load() );
 			}
+			if (_params.sweepToCompletion() && !progress) {
+				_root_env_completions++;
+			}
 		}
+
+		_root_env_completions = _root_sweep_iteration/2;
+
 		//The root node (and only the root node) tracks the number of completed sweep rounds, and broadcasts this information. This way, also nodes that join later know which round we are in.
 		payload[payload.size() - METADATA_SWEEP_ITERATION] = _root_sweep_iteration;
 		payload[payload.size() - METADATA_SHARING_ROUND] = _root_sharing_round;
 		payload[payload.size() - METADATA_END_ITERATION] = send_end_iteration;
 		payload[payload.size() - METADATA_TERMINATE] = send_terminate;
+		payload[payload.size() - METADATA_ENVCOMPLETIONS] = _root_env_completions;
 		//the all_idle payload is already set
 
 		//create char to print the same msg in two logs
 		//once for completeness chronologically in the general logs, and once in a special smaller file on the root node for easier postprocessing
 		char logmsg[512];
 		snprintf(logmsg, sizeof(logmsg),
-			"SWEEP [%i](root-trf) send: iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i    SW %i  ST %i  RE %i    Sched, Swept  %i  %i    ( %.2f ,  %.2f )°/.   succ-rate %.6f   \n",
-			_my_rank, _root_sweep_iteration, _root_sharing_round, all_idle,  send_end_iteration, send_terminate, n_eqs, n_units,
+			"SWEEP [%i](root-trf) send: envsize %i iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i    SW %i  ST %i  RE %i    Sched, Swept  %i  %i    ( %.2f ,  %.2f )°/.   succ-rate %.6f   \n",
+			_my_rank, _root_env_completions, _root_sweep_iteration, _root_sharing_round, all_idle,  send_end_iteration, send_terminate, n_eqs, n_units,
 			work_sweeps, work_stepovers, work_unsched_resweeps, work_sweeps + work_stepovers, work_sweeps + work_unsched_resweeps,
 			100*(work_sweeps + work_stepovers)/(double)_numVars , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars,
 			progress_ratio
