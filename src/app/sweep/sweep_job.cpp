@@ -314,7 +314,7 @@ void SweepJob::appl_memoryPanic() {
 
 bool SweepJob::appl_isDestructible() {
 
-	//TODO: check whether this added condition is in the right order w.r.t to the sweeper termination
+	//TODO: check whether this added cjc condition is in the right order w.r.t to the sweeper termination
 	//maybe clauseComm checks should come after the sweeper terminations?
 	if (_clause_comm && !_clause_comm->isDestructible()) {
 		for (int i = 0; i < 10; i++) _clause_comm->communicate(); // may advance destructibility
