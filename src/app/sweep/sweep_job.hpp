@@ -280,6 +280,16 @@ public:
     void appl_terminate() override;
     bool appl_isDestructible() override;
 
+    // bool appl_isDestructible() override {
+		// SAT comm. present which is not destructible (yet)?
+		// if (_clause_comm && !_clause_comm->isDestructible()) {
+			// for (int i = 0; i < 10; i++) _clause_comm->communicate(); // may advance destructibility
+			// return false;
+		// }
+		// TODO(Nicco) Did you not at some point implement isDestructible for this job?
+		// return true;
+	// }
+
     int appl_solved() override {
 		// TODO(Nicco) Before reporting a result via the below line, check via
 		//_clause_comm->hasLocalClausesLeftToShare();
@@ -294,17 +304,7 @@ public:
     void appl_suspend() override {}
     void appl_resume() override {}
     void appl_dumpStats() override {}
-	bool appl_isDestructible() override;
 
-    // bool appl_isDestructible() override {
-		// SAT comm. present which is not destructible (yet)?
-		// if (_clause_comm && !_clause_comm->isDestructible()) {
-			// for (int i = 0; i < 10; i++) _clause_comm->communicate(); // may advance destructibility
-			// return false;
-		// }
-		// TODO(Nicco) Did you not at some point implement isDestructible for this job?
-		// return true;
-	// }
 
     void appl_memoryPanic() override;
 
@@ -357,6 +357,76 @@ private:
 	void clearImportedRound();
 
 	virtual ~SweepJob();
+
+
+	//stubs
+	bool isInitialized() override {
+		LOG(V1_WARN, "[SweepJob] Called stub: isInitialized\n");
+		return true;
+	}
+
+	void prepareSharing() override {
+		LOG(V1_WARN, "[SweepJob] Called stub: prepareSharing\n");
+	}
+
+	bool hasPreparedSharing() override {
+		LOG(V1_WARN, "[SweepJob] Called stub: hasPreparedSharing\n");
+		return false;
+	}
+
+	std::vector<int> getPreparedClauses(Checksum&, int&, int&) override {
+		LOG(V1_WARN, "[SweepJob] Called stub: getPreparedClauses\n");
+		return {};
+	}
+
+	void filterSharing(int, std::vector<int>&&) override {
+		LOG(V1_WARN, "[SweepJob] Called stub: filterSharing\n");
+	}
+
+	bool hasFilteredSharing(int) override {
+		LOG(V1_WARN, "[SweepJob] Called stub: hasFilteredSharing\n");
+		return true;
+	}
+
+	std::vector<int> getLocalFilter(int) override {
+		LOG(V1_WARN, "[SweepJob] Called stub: getLocalFilter\n");
+		return {};
+	}
+
+	void applyFilter(int, std::vector<int>&&) override {
+		LOG(V1_WARN, "[SweepJob] Called stub: applyFilter\n");
+	}
+
+	void digestSharingWithoutFilter(int, std::vector<int>&&, bool) override {
+		LOG(V1_WARN, "[SweepJob] Called stub: digestSharingWithoutFilter\n");
+	}
+
+	void returnClauses(std::vector<int>&&) override {
+		LOG(V1_WARN, "[SweepJob] Called stub: returnClauses\n");
+	}
+
+	void digestHistoricClauses(int, int, std::vector<int>&&) override {
+		LOG(V1_WARN, "[SweepJob] Called stub: digestHistoricClauses\n");
+	}
+
+	int getLastAdmittedNumLits() override {
+		LOG(V1_WARN, "[SweepJob] Called stub: getLastAdmittedNumLits\n");
+		return 0;
+	}
+
+	long long getBestFoundObjectiveCost() override {
+		LOG(V1_WARN, "[SweepJob] Called stub: getBestFoundObjectiveCost\n");
+		return 0;
+	}
+
+	void setClauseBufferRevision(int) override {
+		LOG(V1_WARN, "[SweepJob] Called stub: setClauseBufferRevision\n");
+	}
+
+	void updateBestFoundSolutionCost(long long) override {
+		LOG(V1_WARN, "[SweepJob] Called stub: updateBestFoundSolutionCost\n");
+	}
+
 
 };
 

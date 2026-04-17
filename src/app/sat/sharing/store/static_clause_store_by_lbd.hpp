@@ -162,6 +162,11 @@ public:
         return BufferReader(data, buflen, _max_eff_clause_length, false, useChecksums);
     }
 
+    //TODO: Nicco, check why compilation failed without this addition, after merging sweep-cjc...
+    BufferBuilder getBufferBuilder(int limit) const override {
+        return BufferBuilder(limit, _max_eff_clause_length, false);
+    }
+
     ~StaticClauseStoreByLbd() {
         for (unsigned int i = 0; i < buckets.size(); i++) {
             delete buckets[i];

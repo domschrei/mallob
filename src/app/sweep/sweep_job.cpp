@@ -89,20 +89,6 @@ void SweepJob::appl_start() {
 
 	_worksteal_requests.resize(_nThreads);
 
-	//Need to mark them as inactive initially, such that the solvers can turn them into actual requests when required.
-	//Once the chain is started, the new requests will be marked their processed request as empty again on their own
-
-	// for (auto &request : _worksteal_requests) {
-		// request.is_active = false;
-	// }
-
-	//pre-allocate a fixed array from where solver can concurrently import the received equalities and units
-	// _EQS_to_import.resize(MAX_IMPORT_SIZE);
-	// _UNITS_to_import.resize(MAX_IMPORT_SIZE);
-
-	// _worksweeps = std::vector<int>(_nThreads, -1);
-	// _resweeps_in = std::vector<int>(_nThreads, -1);
-	// _resweeps_out = std::vector<int>(_nThreads, -1);
 
 	//To randomize workstealing on a given rank, we create a list of all ids that will be then shuffled each time
 	std::ostringstream oss;
