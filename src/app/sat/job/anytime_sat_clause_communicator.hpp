@@ -54,17 +54,22 @@ private:
 
     int _last_skipped_epochs_warning {0};
 
+    bool _internal_sharing = true;
+
 public:
-    AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job);
+    AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job, bool internalSharing = true);
     void initCrossSharer();
 
     void communicate();
-    void handle(int source, int mpiTag, JobMessage& msg);
+    bool handle(int source, int mpiTag, JobMessage& msg);
 
     bool isDestructible();
     int getCurrentEpoch() const {return _current_epoch;}
 
     bool isDoneAssemblingProof() const {return _proof_producer && _proof_producer->isDoneAssemblingProof();}
+
+    void feedLocalClausesIntoCrossSharing(std::vector<int>& clauses, ClauseSharingSession* session);
+    bool hasLocalClausesLeftToShare() const {return _cross_job_clause_sharer->hasClausesToBroadcastInternally();}
 
 private:
     bool handleClauseHistoryMessage(int source, int mpiTag, JobMessage& msg);
@@ -75,7 +80,6 @@ private:
 
     void initiateClauseSharing(JobMessage& msg, int source, bool fromDeferredQueue);
     void initiateCrossSharing(JobMessage& msg, int source, bool fromDeferredQueue);
-    void feedLocalClausesIntoCrossSharing(std::vector<int>& clauses, ClauseSharingSession* session);
     void tryActivateDeferredSharingInitiation();
     
     void checkCertifiedUnsatReadyMsg();

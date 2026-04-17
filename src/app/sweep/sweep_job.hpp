@@ -7,13 +7,14 @@
 
 #include "app/job.hpp"
 #include "../sat/solvers/kissat.hpp"
+#include "app/sat/job/anytime_sat_clause_communicator.hpp"
 #include "comm/job_tree_all_reduction.hpp"
 #include "comm/job_tree_broadcast.hpp"
 
 
 // #define IMPORT_TECHNIQUE 3
 
-class SweepJob : public Job {
+class SweepJob : public BaseSatJob {
 private:
 
     JobResult _internal_result;
@@ -165,6 +166,7 @@ private:
 	int _root_sweep_iteration = 0;
 	int _root_sharing_round = 0;
 	bool _root_did_just_finish_iteration = true; //Starts with true to immediately start into iteration 1.
+	std::unique_ptr<AnytimeSatClauseCommunicator> _clause_comm;
 
 	const double EARLYEXIT_RATIO = 0.001;
 
@@ -278,12 +280,32 @@ public:
     void appl_terminate() override;
     bool appl_isDestructible() override;
 
-    int appl_solved() override            {return _solved_status;}
+    int appl_solved() override {
+		// TODO(Nicco) Before reporting a result via the below line, check via
+		//_clause_comm->hasLocalClausesLeftToShare();
+		// (should be from the main thread) if there's still some clauses that need to be shared.
+		// In that case, appl_communicate() needs to call this from time to time:
+		// _clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
+		// (with an empty buffer from a BufferBuilder) since this will initiate XTCS operations.
+		return _solved_status;
+	}
     JobResult&& appl_getResult() override {return std::move(_internal_result);}
 
     void appl_suspend() override {}
     void appl_resume() override {}
     void appl_dumpStats() override {}
+	bool appl_isDestructible() override;
+
+    // bool appl_isDestructible() override {
+		// SAT comm. present which is not destructible (yet)?
+		// if (_clause_comm && !_clause_comm->isDestructible()) {
+			// for (int i = 0; i < 10; i++) _clause_comm->communicate(); // may advance destructibility
+			// return false;
+		// }
+		// TODO(Nicco) Did you not at some point implement isDestructible for this job?
+		// return true;
+	// }
+
     void appl_memoryPanic() override;
 
     friend void cb_search_work_in_tree(void* SweepJob_state, unsigned **work, int *work_size, int local_id);

@@ -5,6 +5,10 @@
 
 #include "app/job.hpp"
 #include "app/job_tree.hpp"
+#include "app/sat/job/anytime_sat_clause_communicator.hpp"
+#include "app/sat/job/base_sat_job.hpp"
+#include "app/sat/job/clause_sharing_session.hpp"
+#include "app/sat/sharing/buffer/buffer_builder.hpp"
 #include "util/ctre.hpp"
 #include "util/logger.hpp"
 #include "util/sys/tmpdir.hpp"
@@ -15,7 +19,7 @@ extern "C" {
 
 
 SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table)
-    : Job(params, setup, table),
+    : BaseSatJob(params, setup, table),
 	_reslogger(Logger::getMainInstance().copy("<RESULT>", ".sweep")),
 	_warnlogger(Logger::getMainInstance().copy("<WARN>", ".warn")),
 	_contriblogger(Logger::getMainInstance().copy("<CONTRIB>", ".contrib"))
@@ -71,6 +75,14 @@ void SweepJob::appl_start() {
 	LOG(V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d, NumVars %i, NumClauses %i\n",
 		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _nThreads, numVars, numClauses);
 	LOG(V2_INFO,"SWEEP_PAYLOAD_SIZE %i\n", getDescription().getFormulaPayloadSize(0));
+	_nThreads = _params.numThreadsPerProcess.val;
+
+	_clause_comm.reset(new AnytimeSatClauseCommunicator(_params, this, false));
+
+	LOG(V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d\n",
+		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _nThreads);
+	// LOG(V2_INFO,"SWEEP JOB sweep-sharing-period: %i ms\n", _params.sweepSharingPeriod_ms.val);
+	// LOG(V2_INFO, "New SweepJob rank %i working on %i vars in %i clauses \n", getJobTree().getRank(), );
     _metadata = getSerializedDescription(0)->data();
 
 	_timestamp_start_sweepapp = Timer::elapsedSeconds();
@@ -135,6 +147,26 @@ void SweepJob::appl_communicate() {
 	float t0 = Timer::elapsedSeconds();
 
 	if (_bcast && _is_root && !_terminate_all.load(std::memory_order_relaxed))
+	// TODO(Nicco) This is how you feed gathered results to XTCS:
+	//std::vector<int> units; // coming from sweepers
+	// build buffer
+	//BufferBuilder bb(-1, 10, false);
+	//for (int unit : units) bb.append({&unit, 1, 1});
+	//std::vector<int> buffer = bb.extractBuffer();
+	// feed buffer to XTCS
+	//_clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
+
+	if (_clause_comm) _clause_comm->communicate();
+
+	while (hasDeferredMessage()) {
+        auto deferredMsg = getDeferredMessage();
+        _clause_comm->handle(
+            deferredMsg.source, deferredMsg.mpiTag, deferredMsg.msg);
+    }
+
+	// printIdleFraction();
+	// checkSharingDelayHealth();
+	if (_bcast && _is_root)// Root: Update job tree snapshot in case your children changed
 		_bcast->updateJobTree(getJobTree());
 
 	if (!_logged_full_jobcomm && getJobComm().size() == getVolume()) {
@@ -167,6 +199,13 @@ void SweepJob::appl_communicate() {
 
 // React to an incoming message. (This becomes relevant only if you send custom messages)
 void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
+
+	if (!_clause_comm) {
+		LOG(V1_WARN, " [WARN] Return to sender: ForkedSatJob::appl_communicate(): not initialized! \n");
+        msg.returnToSender(sourceRank, mpiTag);
+		return;
+	} else if (_clause_comm->handle(sourceRank, mpiTag, msg)) return;
+
 	// LOG(V2_INFO, "Shweep rank %i: received custom message from source %i, mpiTag %i, msg.tag %i \n", _my_rank, source, mpiTag, msg.tag);
 	if (mpiTag != MSG_SEND_APPLICATION_MESSAGE) {
 		LOG(V1_WARN, "SWEEP MSG WARN [%i] got unexpected message with mpiTag=%i, msg.tag=%i  (instead of MSG_SEND_APPLICATION_MESSAGE mpiTag == 30)\n", _my_rank, mpiTag, msg.tag);
@@ -275,6 +314,15 @@ void SweepJob::appl_memoryPanic() {
 
 bool SweepJob::appl_isDestructible() {
 
+	//TODO: check whether this added condition is in the right order w.r.t to the sweeper termination
+	//maybe clauseComm checks should come after the sweeper terminations?
+	if (_clause_comm && !_clause_comm->isDestructible()) {
+		for (int i = 0; i < 10; i++) _clause_comm->communicate(); // may advance destructibility
+		return false;
+	}
+	// TODO(Nicco) Did you not at some point implement isDestructible for this job?
+	// return true;
+
 	int _running_sweepers = _started_sweepers_count - _finished_sweepers_count;
 	if (_finished_sweepers_count < _nThreads) {
 		LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? no. only %i/%i finished, %i running \n",  getId(),_my_rank, _finished_sweepers_count.load(), _nThreads, _running_sweepers);
@@ -359,6 +407,7 @@ void SweepJob::rootReportSolverResult(KissatPtr sweeper, int res) {
 	LOGGER(_reslogger,V2_INFO, "SWEEP_RESULT_CODE %i == %s \n", res, res==40 ? "IMPROVED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
 	_internal_result.setSolutionToSerialize(formula.data(), formula.size());
 	_internal_result.result = res;
+
 	_solved_status = res; //this change will be noticed by the main thread and triggers the termination of this job
 }
 
@@ -395,6 +444,12 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			// kissat_release(sweeper->solver);
 			return;
 		}
+
+		LOG(V3_VERB, "SWEEP JOB [%i](%i) solve() START \n", _my_rank, localId);
+
+		// TODO(Nicco) Get a callback into the sweepers so that learned equivalences and units
+		// arrive in this class "in realtime" (or per round/iteration) and can be added to XTCS.
+		// See appl_communicate() for handling the arriving clauses (which must happen in the main thread).
 
 		_sweepers[localId] = sweeper; //only now expose the solver to the rest of the system, now that solving starts
 		_flag_started_synchronized_solving = true;
