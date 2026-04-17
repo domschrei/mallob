@@ -9,14 +9,16 @@ set -e
 # echo "$flags"
 # echo ""
 
-build_flags=$(grep -A 25 -- "if \[" "sweep/build_on_supermuc.sh")
-echo "$build_flags"
+# build_flags=$(grep -A 25 -- "if \[" "sweep/build_on_supermuc.sh")
+# echo "$build_flags"
+grep -A 25 -- "if \[" "sweep/build_on_supermuc.sh")
 echo "----------------------------------------------------------------------------"
 echo ""
 echo "----------------------------------------------------------------------------"
 provided_sbatch_file=$1
-flags=$(grep -A 28 -- "build/mallob" "$provided_sbatch_file")
-echo "$flags"
+# flags=$(grep -A 28 -- "build/mallob" "$provided_sbatch_file")
+# echo "$flags"
+grep -A 30 -- "build/mallob" "$provided_sbatch_file")
 echo "----------------------------------------------------------------------------"
 echo ""
 
