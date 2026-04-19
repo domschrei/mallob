@@ -17,6 +17,6 @@ if [ ! -d vendor ]; then
     echo '[source.vendored-sources]'            >> .cargo/config.toml
     echo 'directory = "vendor"'                 >> .cargo/config.toml
 fi
-cargo build --release
+cargo build --release --offline
 cd ..
 echo "[$dirname] Build complete"
