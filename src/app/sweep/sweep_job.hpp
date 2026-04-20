@@ -138,7 +138,7 @@ private:
 	};
 
 	static constexpr int MAX_IMPORT_ROUNDS = 100 * 2000; //Enough for ca. 2000 seconds (~each round takes >=10ms, i.e. max 100 rounds per second)
-	std::vector<importedRound> _imported_EQS_UNITS{MAX_IMPORT_ROUNDS};
+	std::vector<importedRound> _imported_data{MAX_IMPORT_ROUNDS};
 	std::vector<finishedCounter> _finishedRoundCounters{MAX_IMPORT_ROUNDS}; //technically we store atomics in std::vector, but we only construct once with a fixed size and never push_back or resize, so it compiles and should be fine
 	std::vector<int> _iteration_of_round = std::vector<int>(MAX_IMPORT_ROUNDS, -9); //dummy value to distinguish from iteration values >=-1
 	std::atomic_int _lastImportedRound = 0;
@@ -277,6 +277,37 @@ private:
 		LOG(			   V2_INFO, "         %s", logmsg);
 		LOGGER(_reslogger, V2_INFO, "%s", logmsg);
 
+
+
+		if (_params.crossJobCommunication()) {
+			assert(_clause_comm || log_return_false("Sweep ERROR: _clause_comm object missing\n"));
+			// TODO(Nicco) This is how you feed gathered results to XTCS:
+			// build buffer
+			const int eq_size = n_eqs*2;
+			BufferBuilder bb(-1, 10, false);
+
+			//Payload Format: [eqs, units, metadata]
+			//Read equivalences
+			for (int i=0; i < eq_size; i+=2) {
+				int elit1 = payload[i];
+				int elit2 = payload[i+1];
+				//Convert elit1==elit2 in CNF form
+				int clauseA[2] = {-elit1, elit2};
+				int clauseB[2] = {-elit2, elit1};
+				bb.append({&clauseA[0],2,1});
+				bb.append({&clauseB[0],2,1});
+			}
+			//Read units, which are stored directly after the equivalences
+			for (int i=eq_size; i<eq_size+n_units; i++) {
+				int unit = payload[i];
+				bb.append({&unit, 1, 1});
+			}
+			auto buffer = bb.extractBuffer();
+			_clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
+
+
+		}
+
 		//no return, payload was just transformed in-place
     };
 
@@ -410,8 +441,9 @@ private:
 		LOG(V1_WARN, "[SweepJob] Called stub: applyFilter\n");
 	}
 
-	void digestSharingWithoutFilter(int, std::vector<int>&&, bool) override {
-		LOG(V1_WARN, "[SweepJob] Called stub: digestSharingWithoutFilter\n");
+	void digestSharingWithoutFilter(int epoch, std::vector<int>  &&clauses, bool stateless) override {
+		LOG(V1_WARN, "SWEEP CJC: received digestSharingWithoutFilter with clauses.size()==%i\n",clauses.size());
+
 	}
 
 	void returnClauses(std::vector<int>&&) override {

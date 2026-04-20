@@ -116,6 +116,10 @@ void SweepJob::appl_start() {
 		createAndStartNewSweeper(localId);
 	}
 
+	if (_params.crossJobCommunication()) {
+        _clause_comm = std::make_unique<AnytimeSatClauseCommunicator>(_params, this);
+	}
+
 	//set some general metadata information
 	_internal_result.id = getId();
 	_internal_result.revision = getRevision();
@@ -132,23 +136,10 @@ void SweepJob::appl_communicate() {
 	LOG(V5_DEBG, "SWEEP appl_communicate() \n");
 	float t0 = Timer::elapsedSeconds();
 
-	if (_bcast && _is_root && !_terminate_all.load(std::memory_order_relaxed))
-	// TODO(Nicco) This is how you feed gathered results to XTCS:
-	//std::vector<int> units; // coming from sweepers
-	// build buffer
-	//BufferBuilder bb(-1, 10, false);
-	//for (int unit : units) bb.append({&unit, 1, 1});
-	//std::vector<int> buffer = bb.extractBuffer();
-	// feed buffer to XTCS
-	//_clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
+	if (_bcast && _is_root && !_terminate_all.load(std::memory_order_relaxed)) {
+		_bcast->updateJobTree(getJobTree());
+	}
 
-	if (_clause_comm) _clause_comm->communicate();
-
-	while (hasDeferredMessage()) {
-        auto deferredMsg = getDeferredMessage();
-        _clause_comm->handle(
-            deferredMsg.source, deferredMsg.mpiTag, deferredMsg.msg);
-    }
 
 	// printIdleFraction();
 	// checkSharingDelayHealth();
@@ -167,8 +158,16 @@ void SweepJob::appl_communicate() {
 	//at the cost of slightly less frequent sharing rounds. If we wanted maximum sharing frequency, a callback in the allreduction would probably be needed,
 	//which would force the extraction immediately after the results arrives in _red...
 	rootStartNewSharingRound();
-	advanceAllReduction();
+	advanceAllReduction(); //contains pushing data to Cross-Job-Sharing (in root transformation)
 	sendWorkstealsViaMPI();
+
+	if (_clause_comm) _clause_comm->communicate(); //triggers digestSharingWithoutFilter(...) on this rank, where we receive the shared data from the other jobs
+	while (hasDeferredMessage()) {
+		LOG(V2_INFO, "SWEEP CJC has deferred message\n");
+		auto deferredMsg = getDeferredMessage();
+		_clause_comm->handle(
+			deferredMsg.source, deferredMsg.mpiTag, deferredMsg.msg);
+	}
 
 	checkSharingDelay();
 	printIdleWorkStatus();
@@ -939,7 +938,7 @@ void SweepJob::cbImportEq(int *elit1, int *elit2, int localId) {
 
 	const int idx   = sweeper->curr_eq_index;
 	const int round = sweeper->curr_eq_round;
-	std::vector<int> &eqs = _imported_EQS_UNITS[round].eqs;
+	std::vector<int> &eqs = _imported_data[round].eqs;
 	//Try to (continue) importing from the round we are currently reading from
 	if (idx < eqs.size()) {
 		*elit1 = eqs[idx];
@@ -974,7 +973,7 @@ void SweepJob::cbImportUnit(int *elit, int localId) {
 	//For comments see cbImportEq (the analog method for importing equalities)
 	const int idx   = sweeper->curr_unit_index;
 	const int round = sweeper->curr_unit_round;
-	std::vector<int> &units = _imported_EQS_UNITS[round].units;
+	std::vector<int> &units = _imported_data[round].units;
 	if (idx < units.size()) {
 		*elit = units[idx];
 		sweeper->curr_unit_index++;
@@ -1287,6 +1286,7 @@ void SweepJob::cbContributeToAllReduce() {
 		LOG(V5_DEBG, "SWEEP SHARE REDUCE (%i): %i eq_size, %i units, %i idle \n", sweeper->getLocalId(), eq_size, unit_size, sweeper->sweeper_is_idle);
 
 
+		//Format: [eqs, units, metadata]
 		std::vector<int> contrib = std::move(eqs);
 		contrib.insert(contrib.end(), units.begin(), units.end());
 
@@ -1350,14 +1350,15 @@ void SweepJob::extractAllReductionResult() {
 
 	assert(sharing_round > _lastImportedRound.load() || log_return_false("SWEEP ERROR : unexpected round number when importing shared data. got round %i, while lastImportedRound %i \n", sharing_round, _lastImportedRound.load()));
 
-	assert(_imported_EQS_UNITS[sharing_round].eqs.empty()   || log_return_false("SWEEP ERROR : want to store %i shared eq   integers, but already importedRounds[%i].eqs.size()==%zu nonempty ", eq_size,  sharing_round, _imported_EQS_UNITS[sharing_round].eqs.size()));
-	assert(_imported_EQS_UNITS[sharing_round].units.empty() || log_return_false("SWEEP ERROR : want to store %i shared unit integers, but already importedRounds[%i].units.size()==%zu nonempty", unit_size,  sharing_round, _imported_EQS_UNITS[sharing_round].units.size()));
+	assert(_imported_data[sharing_round].eqs.empty()   || log_return_false("SWEEP ERROR : want to store %i shared eq   integers, but already importedRounds[%i].eqs.size()==%zu nonempty ", eq_size,  sharing_round, _imported_data[sharing_round].eqs.size()));
+	assert(_imported_data[sharing_round].units.empty() || log_return_false("SWEEP ERROR : want to store %i shared unit integers, but already importedRounds[%i].units.size()==%zu nonempty", unit_size,  sharing_round, _imported_data[sharing_round].units.size()));
 
 	if (sharing_round >= MAX_IMPORT_ROUNDS) {
 		LOG(V0_CRIT, "SWEEP ERROR : reached hardcoded limit of %i Sharing rounds. Increase that limit if needed for your case.\n", MAX_IMPORT_ROUNDS);
 	}
-	_imported_EQS_UNITS[sharing_round].eqs   = std::vector<int>(data.begin()		  , data.begin() + eq_size);
-	_imported_EQS_UNITS[sharing_round].units = std::vector<int>(data.begin() + eq_size, data.begin() + eq_size + unit_size);
+
+	_imported_data[sharing_round].eqs   = std::vector<int>(data.begin()		  , data.begin() + eq_size);
+	_imported_data[sharing_round].units = std::vector<int>(data.begin() + eq_size, data.begin() + eq_size + unit_size);
 	_lastImportedRound = sharing_round;
 
 	//the root node is special in that it is the only node that initiates sharing rounds. Prepare for a new one, since we just extracted all the shared data from the current round.
@@ -1408,8 +1409,8 @@ void SweepJob::clearImportedRound() {
 	assert(_finishedRoundCounters[r].threads_finished_eqs   <= _nThreads);
 	assert(_finishedRoundCounters[r].threads_finished_units <= _nThreads);
 	if (_finishedRoundCounters[r].threads_finished_eqs == _nThreads && _finishedRoundCounters[r].threads_finished_units == _nThreads) {
-		_imported_EQS_UNITS[r].eqs.clear();
-		_imported_EQS_UNITS[r].units.clear();
+		_imported_data[r].eqs.clear();
+		_imported_data[r].units.clear();
 		LOG(V4_VVER, "SWEEP [%i] CLEARED round %i data \n", _my_rank, r);
 		_lastClearedRound = r;
 	}
