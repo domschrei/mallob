@@ -38,12 +38,12 @@ void cb_search_work_in_tree(void *SweepJob_state, unsigned **work, int *work_siz
     ((SweepJob*) SweepJob_state)->cbStealWorkNew(work, work_size, local_id);
 }
 
-void cb_import_eq(void *SweepJobState, int *lit1, int *lit2, int localId) {
-	((SweepJob*) SweepJobState)->cbImportEq(lit1, lit2, localId);
+void cb_import_eq(void *SweepJobState, int *elit1, int *elit2, int localId) {
+	((SweepJob*) SweepJobState)->cbImportEq(elit1, elit2, localId);
 }
 
-void cb_import_unit(void *SweepJobState, int *lit, int localId) {
-	((SweepJob*) SweepJobState)->cbImportUnit(lit, localId);
+void cb_import_unit(void *SweepJobState, int *elit, int localId) {
+	((SweepJob*) SweepJobState)->cbImportUnit(elit, localId);
 }
 
 int cb_custom_query(void *SweepJobState, int query) {
@@ -660,7 +660,7 @@ void SweepJob::saveStealLatencies(KissatPtr sweeper) {
 		if (_stealinfos_per_solver.size() == _nThreads) {
 			// LOG(V2_INFO, "SWEEP sorting steal information for reporting\n");
 			//Organize steal info for each round
-			auto _stealinfos_per_round = std::vector<std::vector<SweepStealInfo>>(_lastImportedRound + 10);
+			auto _stealinfos_per_round = std::vector<std::vector<SweepStealInfo>>(_lastImportedRound+1);
 			for (auto &records_of_solver : _stealinfos_per_solver) {
 				for (auto &info : records_of_solver) {
 					assert(info.round < _stealinfos_per_round.size() || log_return_false("SWEEP ERROR : trying to sort stealinfo of round %i into too small provisioned vector of size %i \n", info.round, _stealinfos_per_round.size()));
@@ -933,7 +933,7 @@ int SweepJob::cbCustomQuery(int query) {
 
 
 
-void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
+void SweepJob::cbImportEq(int *elit1, int *elit2, int localId) {
 
 	KissatPtr sweeper = _sweepers[localId];
 
@@ -942,11 +942,12 @@ void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
 	std::vector<int> &eqs = _imported_EQS_UNITS[round].eqs;
 	//Try to (continue) importing from the round we are currently reading from
 	if (idx < eqs.size()) {
-		*ilit1 = eqs[idx];
-		*ilit2 = eqs[idx+1];
+		*elit1 = eqs[idx];
+		*elit2 = eqs[idx+1];
+		// LOG(V1_WARN, "SWEEP import e[%i,%i] \n", *elit1, *elit2);
 		sweeper->curr_eq_index+=2;
-		assert(*ilit1 !=0 || *ilit2 !=0		|| log_return_false("SWEEP ERROR: in cbImportEq: sending invalid empty *ilit1=%i, *ilit2=0 to the solvers\n", *ilit1, *ilit2));
-		assert(*ilit1 < *ilit2				|| log_return_false("SWEEP ERROR: in cbImportEq: *ilit1 %i is larger than %i *ilit2, but they should be sorted (index %i, %i,)\n", *ilit1, *ilit2, idx, idx+1));
+		assert(*elit1 !=0 || *elit2 !=0		|| log_return_false("SWEEP ERROR: in cbImportEq: sending invalid empty *elit1=%i, *elit2=0 to the solvers\n", *elit1, *elit2));
+		assert(std::abs(*elit1) < std::abs(*elit2)				|| log_return_false("SWEEP ERROR: in cbImportEq: abs(*elit1) is larger than abs(*elit2), but they should be sorted elit1=%i, elit2=%i (index %i, %i,)\n", *elit1, *elit2, idx, idx+1));
 		if (sweeper->curr_eq_index == eqs.size()) {
 			LOG(V5_DEBG, "SWEEP [%i](%i) ((( < %i > E %i \n", _my_rank, sweeper->getLocalId(),  round, eqs.size()/2);
 		}
@@ -964,17 +965,18 @@ void SweepJob::cbImportEq(int *ilit1, int *ilit2, int localId) {
 	}
 
 	//now returning to the kissat solver
+	//if we didn't have any new equivalcen to provide to the solver, then we didn't touch elit1 & elit2, and the kissat solver notices that we didnt touch them
 }
 
 
-void SweepJob::cbImportUnit(int *ilit, int localId) {
+void SweepJob::cbImportUnit(int *elit, int localId) {
 	KissatPtr sweeper = _sweepers[localId];
 	//For comments see cbImportEq (the analog method for importing equalities)
 	const int idx   = sweeper->curr_unit_index;
 	const int round = sweeper->curr_unit_round;
 	std::vector<int> &units = _imported_EQS_UNITS[round].units;
 	if (idx < units.size()) {
-		*ilit = units[idx];
+		*elit = units[idx];
 		sweeper->curr_unit_index++;
 		if (sweeper->curr_unit_index == units.size()) {
 			LOG(V5_DEBG, "SWEEP [%i](%i) ((( < %i > U %i \n", _my_rank, sweeper->getLocalId(), round, units.size() );
@@ -1432,49 +1434,52 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 
 	//Deduplication
 
-	robin_hood::unordered_flat_set<int> dedup_units;
-	robin_hood::unordered_flat_set<uint64_t> dedup_eqs;
+	robin_hood::unordered_flat_set<int> set_of_units;
+	robin_hood::unordered_flat_set<uint64_t> set_of_eqs;
 
-	int orig_unit_size = 0;
-	int orig_eqs_size = 0;
-
-	//Deduplicate eq & units via hashing
-	//each eq-pair represented as one 64-bit key to have an easy datatype
 	for (const auto &contrib : contribs) {
 		const int eq_size = contrib[contrib.size()-METADATA_EQ_SIZE];
 		const int unit_size = contrib[contrib.size()-METADATA_UNIT_SIZE];
-		orig_unit_size += unit_size;
-		orig_eqs_size  +=eq_size;
+		//Deduplicate Equivalences
+		//each eq-pair is represented as one 64-bit key to have an easy datatype
 		for (int j=0; j < eq_size; j+=2) {
-			int lit1 = contrib[j];
-			int lit2 = contrib[j+1];
-			assert(lit1<lit2);
-			uint64_t litpair = (((uint64_t)lit1) << 32) | (uint64_t) lit2;
-			dedup_eqs.insert(litpair);
+			int elit1 = contrib[j];
+			int elit2 = contrib[j+1];
+			// LOG(V1_WARN, "SWEEP aggr  eq: e[%i,%i] \n", elit1, elit2);
+			assert(std::abs(elit1) < std::abs(elit2) || log_return_false("SWEEP ERROR: in aggregate: abs(elit1) is larger than abs(elit2), but it should be smaller. elit1=%i, elit2=%i, at index j=%i\n", elit1, elit2, j));
+			// The uint32_t cast is critically necessary to truncate to 32 bits first, killing the sign extension. Only this way we can pack it without mangling the values
+			uint64_t litpair = (((uint64_t)(uint32_t)elit1) << 32) |  ((uint64_t)(uint32_t)elit2);
+			set_of_eqs.insert(litpair);
 		}
+		//Deduplicate Units
 		const int units_start = eq_size;
 		const int units_end   = units_start + unit_size;
 		for (int j=units_start; j< units_end; j++) {
-			dedup_units.insert(contrib[j]);
+			int32_t eunit = contrib[j];
+			set_of_units.insert(eunit);
 		}
 	}
 
-	//Extract deduplicated units and equivalences
+	//Extract the deduplicated equivalences and units
 	std::vector<int> aggregated;
 	int total_aggregated_size = 0;
-	int aggr_eq_size   = 2*dedup_eqs.size(); //each key is 64 bit, i.e. 2 32-bit literals
-	int aggr_unit_size = dedup_units.size();
+	int aggr_eq_size   = 2*set_of_eqs.size(); //each key is 64 bit, i.e. contains two 32-bit literals
+	int aggr_unit_size = set_of_units.size();
 	int aggr_data_size = aggr_eq_size + aggr_unit_size;
 	aggregated.resize(aggr_data_size);
 	int j=0;
-	for (uint64_t litpair : dedup_eqs) {
-		uint32_t lit1 = litpair >> 32;
-		uint32_t lit2 = litpair & 0xffffffff;
-		assert(lit1 < lit2);
-		aggregated[j++] = lit1;
-		aggregated[j++] = lit2;
+	for (uint64_t litpair : set_of_eqs) {
+		// int elit1 = litpair >> 32;
+		// int elit2 = litpair & 0xffffffff;
+		// Extraction — explicit narrowing cast to recover sign
+		int elit1 = (int32_t)(litpair >> 32);
+		int elit2 = (int32_t)(litpair & 0xffffffff);
+		assert(std::abs(elit1) < std::abs(elit2) || log_return_false("SWEEP ERROR: in extraction on aggregate: abs(elit1) is larger than abs(elit2), but it should be smaller. elit1=%i, elit2=%i, at index j=%i\n", elit1, elit2, j));
+		// LOG(V1_WARN, "SWEEP dedup eq: e[%i,%i], litpair %zu %ll \n", elit1, elit2, litpair);
+		aggregated[j++] = elit1;
+		aggregated[j++] = elit2;
 	}
-	for (int unit : dedup_units) {
+	for (int unit : set_of_units) {
 		aggregated[j++] = unit;
 	}
 	assert(j==aggr_data_size);

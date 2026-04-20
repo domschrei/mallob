@@ -1,16 +1,12 @@
 #!/bin/bash
 
 
-NPROCS=3
-threads=4
-echo "NPROCS $NPROCS"
-echo "threads per process $threads"
 
 OUT_DIR=$HOME/PhD/logsntraces/
 
 # INST_PATH=$HOME/PhD/instances/miter/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/nusmvdme1d3multi.cnf.xz" #0.1sec
-# INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf.xz" # 6sec
+INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf.xz" # 6sec
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/iso/6s151.cnf.xz"  # 0.1sec
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/bob12s01.cnf.xz" # 30sec, 17% after 2 rounds
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/cmudme1.cnf.xz" # 30sec, 17% after 2 rounds
@@ -25,7 +21,12 @@ OUT_DIR=$HOME/PhD/logsntraces/
 
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s158.cnf.xz" #done almost immediately
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/bob12s04.cnf.xz" 
-INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s176.cnf.xz" # 6sec
+# INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s176.cnf.xz" # 6sec
+
+NPROCS=1
+threads=1
+echo "NPROCS $NPROCS"
+echo "threads per process $threads"
 
 MALLOB_OPTIONS="-t=$threads \
   -mono-app=SWEEP \
@@ -56,6 +57,7 @@ MALLOB_OPTIONS="-t=$threads \
   -sweep-min-exit-swept=0 \
   -sweep-term-no-progress=0 \
   -sweep-shuffle-work=0 \
+  -sweep-to-completion=0 \
 "
 
 

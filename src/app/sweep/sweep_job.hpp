@@ -254,7 +254,7 @@ private:
 			}
 		}
 
-		_root_env_completions = _root_sweep_iteration/2;
+		// _root_env_completions = _root_sweep_iteration/2;
 
 		//The root node (and only the root node) tracks the number of completed sweep rounds, and broadcasts this information. This way, also nodes that join later know which round we are in.
 		payload[payload.size() - METADATA_SWEEP_ITERATION] = _root_sweep_iteration;
@@ -322,8 +322,8 @@ public:
     void appl_memoryPanic() override;
 
     friend void cb_search_work_in_tree(void* SweepJob_state, unsigned **work, int *work_size, int local_id);
-	friend void cb_import_eq(void *SweepJobState, int *lit1, int *lit2, int localId);
-	friend void cb_import_unit(void *SweepJobState, int *lit, int localId);
+	friend void cb_import_eq(void *SweepJobState, int *elit1, int *elit2, int localId);
+	friend void cb_import_unit(void *SweepJobState, int *elit, int localId);
 	friend int  cb_custom_query(void *SweeJobState, int query);
 	friend void cb_report_iteration(void *SweepJobState, int localId);
 
@@ -363,7 +363,7 @@ private:
     // void cbStealWork(unsigned **work, int *work_size, int localId);
 	void cbStealWorkNew(unsigned **work, int *work_size, int localId);
 	// void checkForNewImportRound(KissatPtr sweeper);
-	void cbImportEq(int *ilit1, int *ilit2, int localId);
+	void cbImportEq(int *elit1, int *elit2, int localId);
 	void cbImportUnit(int *lit, int localId);
 	int  cbCustomQuery(int query);
 	void cbReportIteration(int localId);

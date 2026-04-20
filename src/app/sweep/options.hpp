@@ -17,5 +17,5 @@ OPT_INT(sweepMaxEmptyRounds,    "swpmer",   "sweep-max-empty-rounds",   5, 1, LA
 OPT_INT(sweepMinExitSwept,      "swpmes",   "sweep-min-exit-swept",     40000, 0, LARGE_INT, "minimum number of sweeps after which earlyexit gets checked. 0 = never exit early")
 OPT_INT(sweepTermNoProgress,    "swptnp",   "sweep-term-no-progress",   1, 0, 1, "terminate sweeping after an iteration made no progress at all")
 OPT_BOOL(sweepShuffleWork,		"swpsw", 	"sweep-shuffle-work",		true, "Shuffle the work that is provided at the start of each iteration")
-OPT_BOOL(sweepToCompletion,		"swptoc", 	"sweep-to-completion",		true, "Sweep indefinitely to completion, increase env size only when no more progress")
+OPT_BOOL(sweepToCompletion,		"swptoc", 	"sweep-to-completion",		false, "Sweep indefinitely to completion (or timeout). Increase env size only when no more progress")
 

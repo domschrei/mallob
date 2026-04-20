@@ -208,7 +208,7 @@ private:
 
 	//Shared Sweeping
 	void sweepExportEq();
-	void sweepExportUnit(int unit);
+	void sweepExportUnit(int eunit);
 	void sweepImportEqs(int** equivalences, int *eqs_size);
 	void sweepImportUnits(int **units, int *unit_count);
     // void addLiteralToShweepJob(int lit);
