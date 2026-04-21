@@ -5,6 +5,7 @@
 #include "util/option.hpp"
 
 #define SATWITHPRE_OPT_OVERRIDES "-satsolver=k_k_l+[k_]{13} -ilbd=0 -rlbd=3"
+#define SATWITHPRE_OPT_SNS_OVERRIDES "-satsolver=k_"
 // Application-specific program options for SAT solving.
 // memberName                               short option name, long option name          default   min  max
 
@@ -20,3 +21,6 @@ OPT_BOOL(preprocessSweep, "preprocess-sweep", "", false, "run the SWEEP app afte
 OPT_BOOL(preprocessSequentialSweepComplete, "pssc", "preprocess-single-sweep-complete", false, "run the single sequential kissat preprocessor with the -sweepcomplete flag, i.e. it sweeps all variables")
 OPT_BOOL(overrideSatOptions, "oso", "override-sat-options", true,
     "In the SAT sub-tasks, override SAT solving options with \"" + std::string(SATWITHPRE_OPT_OVERRIDES) + "\"")
+OPT_BOOL(snsOverrideSatOptions, "snsoso", "sns-override-sat-options", true,
+    "In the snsSAT sub-tasks, override snsSAT solving options with \"" + std::string(SATWITHPRE_OPT_SNS_OVERRIDES) + "\"")
+OPT_BOOL(preprocessSweepnSat, "preprocess-sweep-n-sat", "", false, "run the Sweep App next to a (CDCL) SAT App, exchange units and equivalence continously via cross job communication")

@@ -72,6 +72,7 @@ public:
         LOG(V2_INFO, "Subprocess command: \n");
         printf(command.c_str());
 
+        LOG(V2_INFO, "\n \n");
 
 
         // Write command to tmp file (to be read by child process)

@@ -137,12 +137,17 @@ private:
 		std::atomic_int threads_finished_units=0;
 	};
 
+	//Equalities and units from sharing are stored once on this rank, and sit there for the local solvers to get picked up
 	static constexpr int MAX_IMPORT_ROUNDS = 100 * 2000; //Enough for ca. 2000 seconds (~each round takes >=10ms, i.e. max 100 rounds per second)
 	std::vector<importedRound> _imported_data{MAX_IMPORT_ROUNDS};
 	std::vector<finishedCounter> _finishedRoundCounters{MAX_IMPORT_ROUNDS}; //technically we store atomics in std::vector, but we only construct once with a fixed size and never push_back or resize, so it compiles and should be fine
 	std::vector<int> _iteration_of_round = std::vector<int>(MAX_IMPORT_ROUNDS, -9); //dummy value to distinguish from iteration values >=-1
+	//Track which data is already present from sharing
 	std::atomic_int _lastImportedRound = 0;
+	//After all solvers have picked up the shared data, it can be deleted from this rank
 	int _lastClearedRound = 0;
+	std::vector<importedRound> _cjc_root_imported_data{};
+
 
 	//Termination. Determined during workstealing, broadcasted via sharing
 	std::atomic_bool _terminate_all=false; //termination (on this node) due to sharing consensus that there is no more work
@@ -172,6 +177,11 @@ private:
 	std::unique_ptr<AnytimeSatClauseCommunicator> _clause_comm;
 
 	const double EARLYEXIT_RATIO = 0.001;
+
+
+
+
+
 
 	//The root node (and only the root node) tracks progress over the sharing rounds and sweeping iterations
 	//It decides whether sharing should continue or whether it should end (either because the last iteration is reached, or because no progress has been made)
@@ -277,30 +287,26 @@ private:
 		LOG(			   V2_INFO, "         %s", logmsg);
 		LOGGER(_reslogger, V2_INFO, "%s", logmsg);
 
-
-
 		if (_params.crossJobCommunication()) {
 			assert(_clause_comm || log_return_false("Sweep ERROR: _clause_comm object missing\n"));
-			// TODO(Nicco) This is how you feed gathered results to XTCS:
-			// build buffer
 			const int eq_size = n_eqs*2;
 			BufferBuilder bb(-1, 10, false);
 
 			//Payload Format: [eqs, units, metadata]
-			//Read equivalences
-			for (int i=0; i < eq_size; i+=2) {
-				int elit1 = payload[i];
-				int elit2 = payload[i+1];
-				//Convert elit1==elit2 in CNF form
-				int clauseA[2] = {-elit1, elit2};
-				int clauseB[2] = {-elit2, elit1};
-				bb.append({&clauseA[0],2,1});
-				bb.append({&clauseB[0],2,1});
-			}
 			//Read units, which are stored directly after the equivalences
 			for (int i=eq_size; i<eq_size+n_units; i++) {
 				int unit = payload[i];
 				bb.append({&unit, 1, 1});
+			}
+			//Read equivalences (need to append after units, because have larger clause length)
+			for (int i=0; i < eq_size; i+=2) {
+				int elit1 = payload[i];
+				int elit2 = payload[i+1];
+				//Convert elit1==elit2 in CNF form
+				int cnfA[2] = {-elit1, elit2};
+				int cnfB[2] = {-elit2, elit1};
+				bb.append({&cnfA[0],2,2});
+				bb.append({&cnfB[0],2,2});
 			}
 			auto buffer = bb.extractBuffer();
 			_clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
@@ -386,6 +392,8 @@ private:
 	void advanceAllReduction();
 	void extractAllReductionResult();
 
+	void rootReceiveCJCclauses(std::vector<int>  &&clauses);
+
 	std::vector<int> getRandomIdPermutation();
 
 	bool tryProvideInitialWork(KissatPtr sweeper);
@@ -443,7 +451,9 @@ private:
 
 	void digestSharingWithoutFilter(int epoch, std::vector<int>  &&clauses, bool stateless) override {
 		LOG(V1_WARN, "SWEEP CJC: received digestSharingWithoutFilter with clauses.size()==%i\n",clauses.size());
-
+		if (_is_root) {
+			rootReceiveCJCclauses(std::move(clauses));
+		}
 	}
 
 	void returnClauses(std::vector<int>&&) override {

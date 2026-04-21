@@ -23,13 +23,16 @@ INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/bob12s04.cnf.xz" 
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s176.cnf.xz" # 6sec
 
-NPROCS=1
-threads=1
+NPROCS=4
+threads=2
 echo "NPROCS $NPROCS"
 echo "threads per process $threads"
 
+# APP="SWEEP"
+APP="SATWITHPRE"
+
 MALLOB_OPTIONS="-t=$threads \
-  -mono-app=SWEEP \
+  -mono-app=$APP \
   -satsolver=k \
   -colors \
   -trace-dir=$OUT_DIR/traces/ \
@@ -43,9 +46,10 @@ MALLOB_OPTIONS="-t=$threads \
 	-seed=1 \
 	-jcup=0.05 \
   -sleep=10 \
-	-v=2 \
+	-v=4 \
   -spl=-1 \
-	-preprocess-sweep=1 \
+  -cjc=1 \
+	-preprocess-sweep-n-sat=1 \
   -preprocess-sweep-priority=1.0 \
 	-sweep-sharing-period=0.020 \
   -sweep-resweep-chance=1000 \

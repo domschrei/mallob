@@ -7,6 +7,8 @@
 #include "buffer_iterator.hpp"
 #include "../../data/clause.hpp"
 
+#include "util/logger.hpp"
+
 class BufferBuilder {
 
 public:
@@ -76,6 +78,7 @@ public:
 
         int numSwitches = 0;
         while (c.size != _it.clauseLength || c.lbd != _it.lbd) {
+		    // LOG(1, "buffer numswitches %i,c.size %i, _it.clauseLength %i, c.lbd %i _it.lbd %i \n", numSwitches, c.size, _it.clauseLength, c.lbd, _it.lbd);
             numSwitches++;
             _counter_position = _out->size();
             _out->push_back(0); // counter

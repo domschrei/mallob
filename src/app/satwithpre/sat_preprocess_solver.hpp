@@ -68,6 +68,73 @@ public:
     }
 
     JobResult solve() {
+        if (_params.preprocessSweepnSat()) {
+            return solveViaSweepnSat();
+        } else {
+            return solveViaStreamlining();
+        }
+    }
+
+    JobResult solveViaSweepnSat() {
+        LOG(V2_INFO, "SATWP Starting SNS \n");
+        _time_of_activation = Timer::elapsedSeconds();
+        JobResult res;
+        res.id = _desc.getId();
+        res.revision = 0;
+        res.result = RESULT_UNKNOWN;
+
+        submitSnsSatJob();
+        submitSnsSweepJob();
+
+        while (!isTimeoutHit()) {
+            if (_base_job_done && !_base_job_digested) {
+                LOG(V2_INFO, "SATWP snsSat done\n");
+                res = jsonToJobResult(_base_job_response, false);
+                _base_job_digested = true;
+                if (res.result != 0) {
+                    LOG(V2_INFO, "SATWP RESULT snsBASE SOLVER done, result code %i\n", res.result);//capslock grepped in postprocessing
+                    break;
+                }
+            }
+            if (_sweep_job_done && !_sweep_job_digested) {
+                LOG(V2_INFO, "SATWP snsSweep done\n");
+                res = jsonToJobResult(_sweep_job_response, false); //eventually probably convert = true to reconstruct solution if necessary
+                _sweep_job_digested = true;
+                if (res.result==UNSAT) {
+                    LOG(V2_INFO, "SATWP RESULT snsSWEEP SOLVER , result code %i\n", res.result);//capslock grepped in postprocessing
+                    break;
+                }
+                else if (res.result==IMPROVED) {
+                    assert(res.getSolutionSize() > 0);
+                    LOG(V2_INFO, "SATWP snsSWEEP has improved formula\n");
+                    LOG(V2_INFO, "SATWP snsSWEEP reading json SolutionSize=%i\n", res.getSolutionSize());
+                    _sweep_job_has_improved_formula = true;
+                } else {
+                    assert(res.result==UNKNOWN);
+                    LOG(V1_WARN, "WARN: SATWP snsSWEEP did not improve formula! Leaving all resources to the running base snsSAT job\n");
+                }
+            }
+            usleep(3*1000);
+        }
+
+        // Terminate sub-jobs
+        if (_base_job_submitted && !_base_job_done) {
+            interrupt(_base_job_submission, _base_job_done);
+            while (!_base_job_done) usleep(5*1000);
+        }
+        if (_sweep_job_submitted && !_sweep_job_done) {
+            interrupt(_sweep_job_submission, _sweep_job_done);
+            while (!_sweep_job_done) usleep(5*1000);
+        }
+
+        if (res.result==IMPROVED) //if the only thing we got back is an improvement by the sweeping, the final result is still unknown
+            res.result = UNKNOWN;
+
+        LOG(V2_INFO, "#%i SATWP SNS RES ~%i~\n", _desc.getId(), res.result);
+        return res;
+    }
+
+    JobResult solveViaStreamlining() {
         LOG(V2_INFO, "SATWP Starting SATWITHPRE app\n");
         _time_of_activation = Timer::elapsedSeconds();
 
@@ -204,6 +271,7 @@ public:
         return res;
     }
 
+
 private:
 
     bool isTimeoutHit() const {
@@ -217,6 +285,87 @@ private:
     }
 
 
+    void submitSnsSatJob() {
+        auto& json = _base_job_submission;
+        json = {
+            {"user", "sat-" + std::string(toStr())},
+            {"name", std::string(toStr())+":sns"},
+            {"priority", 1.000},
+            {"application", "SAT"}
+        };
+        if (_params.crossJobCommunication()) json["group-id"] =  std::to_string(_desc.getGroupId());
+        StaticStore<std::vector<int>>::insert(json["name"].get<std::string>(),
+            std::vector<int>(_desc.getFormulaPayload(0), _desc.getFormulaPayload(0)+_desc.getFormulaPayloadSize(0)));
+        json["internalliterals"] = json["name"].get<std::string>();
+        json["configuration"]["__NV"] = std::to_string(_desc.getAppConfiguration().fixedSizeEntryToInt("__NV"));
+        json["configuration"]["__NC"] = std::to_string(_desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
+        if (_desc.getWallclockLimit() > 0)
+            json["wallclock-limit"] = std::to_string(_desc.getWallclockLimit() - getAgeSinceActivation()) + "s";
+        if (_desc.getCpuLimit() > 0)
+            json["cpu-limit"] = std::to_string(_desc.getCpuLimit() - getAgeSinceActivation()) + "s";
+        if (_params.snsOverrideSatOptions())
+            json["configuration"]["options"] = SATWITHPRE_OPT_SNS_OVERRIDES; //using solver type "s", to create Kissat Solvers specifically to expect Cross-Job-Communication from the concurrent Sweep App
+
+        LOG(V2_INFO, "SATWP Starting snsSat Job: %d Vars\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NV"));
+        LOG(V2_INFO, "SATWP Starting snsSat Job: %d Clauses\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
+
+        auto copiedJson = json;
+        auto result = _api.submit(copiedJson, [&](nlohmann::json& response) {
+            // Job done
+            _base_job_response = std::move(response);
+            _base_job_done = true;
+        });
+        if (result != JsonInterface::Result::ACCEPT) {
+            LOG(V0_CRIT, "[ERROR] Cannot introduce snsSat job!\n");
+            abort();
+        }
+
+        LOG(V2_INFO, "SATWP submitted snsSat Job\n");
+        _base_job_submitted = true;
+    }
+
+
+    void submitSnsSweepJob() {
+        // Prepare job submission data
+        auto& json = _sweep_job_submission;
+        json = {
+            {"user", "sweep-" + std::string(toStr())},
+            {"name", std::string(toStr())+":snsSweep"},
+            {"priority", _params.preprocessSweepPriority()},
+            {"application", "SWEEP"},
+        };
+
+        if (_params.crossJobCommunication()) json["group-id"] =std::to_string(_desc.getGroupId());
+        StaticStore<std::vector<int>>::insert(json["name"].get<std::string>(),
+            std::vector<int>(_desc.getFormulaPayload(0), _desc.getFormulaPayload(0)+_desc.getFormulaPayloadSize(0)));
+        json["internalliterals"] = json["name"].get<std::string>();
+        json["configuration"]["__NV"] = std::to_string(_desc.getAppConfiguration().fixedSizeEntryToInt("__NV"));
+        json["configuration"]["__NC"] = std::to_string(_desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
+        if (_desc.getWallclockLimit() > 0)
+            json["wallclock-limit"] = std::to_string(_desc.getWallclockLimit() - getAgeSinceActivation()) + "s";
+        if (_desc.getCpuLimit() > 0)
+            json["cpu-limit"] = std::to_string(_desc.getCpuLimit() - getAgeSinceActivation()) + "s";
+        if (_params.snsOverrideSatOptions())
+            json["configuration"]["options"] = SATWITHPRE_OPT_SNS_OVERRIDES; //using solver type "s", to create Kissat Solvers specifically to expect Cross-Job-Communication from the concurrent Sweep App
+
+        LOG(V2_INFO, "SATWP Starting snsSweep Job: %d Vars\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NV"));
+        LOG(V2_INFO, "SATWP Starting snsSweep Job: %d Clauses\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
+
+        // Obtain API and submit the job
+        auto copiedJson = json;
+        auto retcode = _api.submit(copiedJson, [&](nlohmann::json& response) {
+            // Job done
+            _sweep_job_response = std::move(response);
+            _sweep_job_done = true;
+        });
+        if (retcode != JsonInterface::ACCEPT) return;
+
+        _sweep_job_submitted = true;
+
+    }
+
+
+
     void submitBaseJob() {
         auto& json = _base_job_submission;
         json = {
@@ -225,7 +374,7 @@ private:
             {"priority", 1.000},
             {"application", "SAT"}
         };
-        if (_params.crossJobCommunication()) json["group-id"] = _desc.getGroupId();
+        if (_params.crossJobCommunication()) json["group-id"] = std::to_string(_desc.getGroupId());
         StaticStore<std::vector<int>>::insert(json["name"].get<std::string>(),
             std::vector<int>(_desc.getFormulaPayload(0), _desc.getFormulaPayload(0)+_desc.getFormulaPayloadSize(0)));
         json["internalliterals"] = json["name"].get<std::string>();
@@ -288,7 +437,7 @@ private:
             {"priority", _params.preprocessSweepPriority()},
             {"application", "SWEEP"},
         };
-        if (_params.crossJobCommunication()) json["group-id"] = _desc.getGroupId();
+        if (_params.crossJobCommunication()) json["group-id"] = std::to_string(_desc.getGroupId());
         StaticStore<std::vector<int>>::insert(json["name"].get<std::string>(), std::move(fPre));
         json["internalliterals"] = json["name"].get<std::string>();
         json["configuration"]["__NV"] = std::to_string(nbVars);
@@ -395,6 +544,9 @@ private:
 
         _preprod_job_submitted = true;
     }
+
+
+
 
     void interrupt(nlohmann::json& json, volatile bool& doneFlag) {
         LOG(V2_INFO, "SATWP Interrupt %s\n", json["name"].get<std::string>().c_str());

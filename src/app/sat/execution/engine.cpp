@@ -337,10 +337,12 @@ std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSe
 	case 'k':
 	case 'v': // variable addition via Kissat
 	case 'p': // preprocessing via Kissat
+	case 's': // Sweep'n'Sat CDCL SAT solver in Kissat
 		// Kissat
 		LOGGER(_logger, V4_VVER, "S%i : Kissat%s%s-%i\n", setup.globalId,
 			setup.solverType == 'v' ? "-BVA": "",
 			setup.solverType == 'p' ? "-pre": "",
+			setup.solverType == 's' ? "-sns": "",
 			setup.diversificationIndex);
 		solver.reset(new Kissat(setup));
 		break;

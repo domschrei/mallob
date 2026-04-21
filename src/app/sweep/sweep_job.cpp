@@ -343,14 +343,6 @@ void SweepJob::checkForUnsatResults() {
 
 }
 
-// void SweepJob::tryReportUnsat() {
-	// assert(_is_root);
-	// bool expected = false;
-	//report exactly once to Mallob, ignore all additional internal UNSAT messages
-	// if (_root_reported_result.compare_exchange_strong(expected, true)) {
-		// rootReportSolverResult(nullptr, UNSAT);
-	// }
-// }
 
 void SweepJob::rootReportSolverResult(KissatPtr sweeper, int res) {
 	assert(_is_root || log_return_false("SWEEP ERROR: non-root tries to report result to mallob\n"));
@@ -1357,7 +1349,7 @@ void SweepJob::extractAllReductionResult() {
 		LOG(V0_CRIT, "SWEEP ERROR : reached hardcoded limit of %i Sharing rounds. Increase that limit if needed for your case.\n", MAX_IMPORT_ROUNDS);
 	}
 
-	_imported_data[sharing_round].eqs   = std::vector<int>(data.begin()		  , data.begin() + eq_size);
+	_imported_data[sharing_round].eqs   = std::vector<int>(data.begin()          , data.begin() + eq_size);
 	_imported_data[sharing_round].units = std::vector<int>(data.begin() + eq_size, data.begin() + eq_size + unit_size);
 	_lastImportedRound = sharing_round;
 
@@ -1604,6 +1596,11 @@ std::vector<int> SweepJob::getRandomIdPermutation() {
 	return permutation;
 }
 
+void SweepJob::rootReceiveCJCclauses(std::vector<int>  &&clauses) {
+	for (auto el : clauses) {
+		LOG(V1_WARN, "cjc data: %i\n", el);
+	}
+}
 
 
 void SweepJob::loadFormula(KissatPtr sweeper) {
