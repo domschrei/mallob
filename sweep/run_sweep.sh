@@ -23,7 +23,7 @@ INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/bob12s04.cnf.xz" 
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s176.cnf.xz" # 6sec
 
-NPROCS=4
+NPROCS=2
 threads=2
 echo "NPROCS $NPROCS"
 echo "threads per process $threads"
@@ -49,6 +49,7 @@ MALLOB_OPTIONS="-t=$threads \
 	-v=4 \
   -spl=-1 \
   -cjc=1 \
+  -app-comm-period=0.22 \
 	-preprocess-sweep-n-sat=1 \
   -preprocess-sweep-priority=1.0 \
 	-sweep-sharing-period=0.020 \

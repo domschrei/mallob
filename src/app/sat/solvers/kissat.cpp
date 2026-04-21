@@ -490,6 +490,11 @@ void Kissat::produceClause(int size, int lbd) {
     if (learntClause.lbd == 1 && learntClause.size > 1) learntClause.lbd++;
     if (learntClause.lbd > _setup.strictLbdLimit) return;
     learntClause.begin = learntClauseBuffer.data();
+
+    if (size<=2) {
+        LOG(V2_INFO, "kproduce (only <=2): %s\n", learntClause.toStr().c_str());
+    }
+
     callback(learntClause, _setup.localId);
 }
 
@@ -511,6 +516,11 @@ void Kissat::consumeClause(int** clause, int* size, int* lbd, unsigned long* id,
         memcpy(producedClause.data(), c.begin+ClauseMetadata::numInts(), *size*sizeof(int));
         *clause = producedClause.data();
         *lbd = c.lbd;
+
+        if (*size<=2) {
+            LOG(V2_INFO, "      kconsume (only <=2): %s\n", c.toStr().c_str());
+        }
+
     } else {
         *clause = 0;
         *size = 0;

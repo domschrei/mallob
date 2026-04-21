@@ -112,6 +112,7 @@ void AnytimeSatClauseCommunicator::communicate() {
                 agg.maxRevision() = _job->getRevisionToReachForGroupId();
                 msg.treeIndexOfDestination = msg.treeIndexOfSender = 0;
                 msg.contextIdOfDestination = msg.contextIdOfSender = _job->getActorContextId();
+                LOG(V1_WARN, "%s : MSG_BROADCAST_CLAUSE_STATELESS, payload size %i\n", _job->toStr(), msg.payload.size());
                 advanceCollective(_job, msg, MSG_BROADCAST_CLAUSES_STATELESS);
             }
             _cancelled_sessions.emplace_back(_cross_sharing_session.release());
@@ -390,6 +391,7 @@ void AnytimeSatClauseCommunicator::feedLocalClausesIntoCrossSharing(std::vector<
         LOG(V4_VVER, "XTCS #%i comm-size 1 (group ID %i)\n", _job->getId(), _job->getDescription().getGroupId());
     } else if (comm.getCommSize() == 0) {
         LOG(V4_VVER, "XTCS communicator not ready yet\n");
+        LOG(V4_VVER, "XTCS communicator not ready yet, commsize %i, mylocalrank %i, jobstate %i\n", comm.getCommSize(), comm.getMyLocalRank(), _job->getState());
     }
 }
 

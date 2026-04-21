@@ -1597,8 +1597,20 @@ std::vector<int> SweepJob::getRandomIdPermutation() {
 }
 
 void SweepJob::rootReceiveCJCclauses(std::vector<int>  &&clauses) {
+	// auto reader = _clause_store->getBufferReader(clauses.data(), clauses.size());
+	// auto clause = reader.getNextIncomingClause();
+	// while (clause.begin != nullptr) {
+		// LOG(V2_INFO, "  sconsume %s\n", clause.toStr().c_str());
+		// clause = reader.getNextIncomingClause();
+	// }
+
 	for (auto el : clauses) {
-		LOG(V1_WARN, "cjc data: %i\n", el);
+		if (el==0) {
+			LOG(V1_WARN, "cjc data: %i ----------- is zero ---------------\n", el);
+		}
+		else {
+			LOG(V1_WARN, "cjc data: %i\n", el);
+		}
 	}
 }
 

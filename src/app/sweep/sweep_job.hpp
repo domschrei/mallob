@@ -179,6 +179,8 @@ private:
 	const double EARLYEXIT_RATIO = 0.001;
 
 
+	//Cross-Job-sharing
+	std::unique_ptr<GenericClauseStore> _clause_store;
 
 
 
@@ -297,6 +299,7 @@ private:
 			for (int i=eq_size; i<eq_size+n_units; i++) {
 				int unit = payload[i];
 				bb.append({&unit, 1, 1});
+				LOG(V2_INFO, "   sproduce: %i\n", unit);
 			}
 			//Read equivalences (need to append after units, because have larger clause length)
 			for (int i=0; i < eq_size; i+=2) {
@@ -307,8 +310,10 @@ private:
 				int cnfB[2] = {-elit2, elit1};
 				bb.append({&cnfA[0],2,2});
 				bb.append({&cnfB[0],2,2});
+				LOG(V2_INFO, "   sproduce: %i %i   &   %i %i\n", -elit1, elit2, -elit2, elit1);
 			}
 			auto buffer = bb.extractBuffer();
+			LOG(V2_INFO, "snsSweep feed to Crossharing: eq-clauses %i, unit-clauses %i --> buffersize %i\n", n_eqs*2, n_units, buffer.size());
 			_clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
 
 
