@@ -174,12 +174,12 @@ private:
 	int _root_sharing_round = 0;
 	int _root_env_completions = 0;
 	bool _root_did_just_finish_iteration = true; //Starts with true to immediately start into iteration 1.
-	std::unique_ptr<AnytimeSatClauseCommunicator> _clause_comm;
 
 	const double EARLYEXIT_RATIO = 0.001;
 
 
 	//Cross-Job-sharing
+	std::unique_ptr<AnytimeSatClauseCommunicator> _clause_comm;
 	std::unique_ptr<GenericClauseStore> _clause_store;
 
 
@@ -397,7 +397,7 @@ private:
 	void advanceAllReduction();
 	void extractAllReductionResult();
 
-	void rootReceiveCJCclauses(std::vector<int>  &&clauses);
+	void rootReceiveXJclauses(std::vector<int>  &&clauses);
 
 	std::vector<int> getRandomIdPermutation();
 
@@ -457,7 +457,7 @@ private:
 	void digestSharingWithoutFilter(int epoch, std::vector<int>  &&clauses, bool stateless) override {
 		LOG(V1_WARN, "SWEEP CJC: received digestSharingWithoutFilter with clauses.size()==%i\n",clauses.size());
 		if (_is_root) {
-			rootReceiveCJCclauses(std::move(clauses));
+			rootReceiveXJclauses(std::move(clauses));
 		}
 	}
 

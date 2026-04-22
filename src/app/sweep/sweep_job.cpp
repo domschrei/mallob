@@ -8,10 +8,14 @@
 #include "app/sat/job/anytime_sat_clause_communicator.hpp"
 #include "app/sat/job/base_sat_job.hpp"
 #include "app/sat/job/clause_sharing_session.hpp"
+#include "app/sat/sharing/sharing_manager.hpp"
 #include "app/sat/sharing/buffer/buffer_builder.hpp"
+#include "app/sat/sharing/store/static_clause_store_by_lbd.hpp"
+#include "app/sat/sharing/store/static_clause_store_mixed_lbd.hpp"
 #include "util/ctre.hpp"
 #include "util/logger.hpp"
 #include "util/sys/tmpdir.hpp"
+
 
 extern "C" {
 #include "kissat/src/kissat.h"
@@ -20,9 +24,40 @@ extern "C" {
 
 SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table)
     : BaseSatJob(params, setup, table),
+	_nThreads(min( getNumThreads(), _params.numThreadsPerProcess.val)),
 	_reslogger(Logger::getMainInstance().copy("<RESULT>", ".sweep")),
 	_warnlogger(Logger::getMainInstance().copy("<WARN>", ".warn")),
-	_contriblogger(Logger::getMainInstance().copy("<CONTRIB>", ".contrib"))
+	_contriblogger(Logger::getMainInstance().copy("<CONTRIB>", ".contrib")),
+
+	//taken from sharing_manager.cpp, replaced _solvers.size() with _nThreads
+	_clause_store([&]() -> GenericClauseStore* {
+		bool resetLbdAtExport = _params.resetLbd() == MALLOB_RESET_LBD_AT_EXPORT;
+		int staticBucketSize = (2*_params.exportVolumePerThread()*_nThreads)/3;
+		switch(_params.clauseStoreMode()) {
+		case MALLOB_CLAUSE_STORE_STATIC_BY_LENGTH_MIXED_LBD:
+				return new StaticClauseStoreMixedLbd(_params.strictClauseLengthLimit()+ClauseMetadata::numInts(),
+					resetLbdAtExport, staticBucketSize);
+			case MALLOB_CLAUSE_STORE_STATIC_BY_LENGTH:
+				return new StaticClauseStore<true>(_params,
+					resetLbdAtExport, staticBucketSize, false, 0);
+			case MALLOB_CLAUSE_STORE_STATIC_BY_LBD:
+				return new StaticClauseStoreByLbd(_params.strictClauseLengthLimit()+ClauseMetadata::numInts(),
+					resetLbdAtExport, staticBucketSize);
+			case MALLOB_CLAUSE_STORE_ADAPTIVE_SIMPLE:
+				return new StaticClauseStore<true>(_params,
+					resetLbdAtExport, 256, true,
+					_params.exportVolumePerThread()*_nThreads*_params.numExportChunks());
+			case MALLOB_CLAUSE_STORE_ADAPTIVE:
+			default:
+				AdaptiveClauseStore::Setup setup;
+				setup.maxEffectiveClauseLength = _params.strictClauseLengthLimit()+ClauseMetadata::numInts();
+				setup.maxLbdPartitionedSize = _params.maxLbdPartitioningSize();
+				setup.numLiterals = _params.exportVolumePerThread()*_nThreads*_params.numExportChunks();
+				setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
+				setup.resetLbdAtExport = resetLbdAtExport;
+				return new AdaptiveClauseStore(setup);
+			}
+	}())
 {
 	assert(_params.jobCommUpdatePeriod() > 0 || log_return_false("[ERROR] For this application to work,"
             " you must explicitly enable job communicators with the -jcup option, e.g., -jcup=0.1\n"));
@@ -64,7 +99,7 @@ void SweepJob::appl_start() {
 	_my_index = getJobTree().getIndex();
 	_my_ctx_id = getJobTree().getContextId();
 	_is_root = getJobTree().isRoot();
-	_nThreads = min( getNumThreads(), _params.numThreadsPerProcess.val);
+	// _nThreads = min( getNumThreads(), _params.numThreadsPerProcess.val); //done in constructor
 	if (_nThreads < _params.numThreadsPerProcess.val) {
 		LOG(V1_WARN,"SWEEP WARN : cut down threads to %i \n", _nThreads);
 	}
@@ -1596,21 +1631,21 @@ std::vector<int> SweepJob::getRandomIdPermutation() {
 	return permutation;
 }
 
-void SweepJob::rootReceiveCJCclauses(std::vector<int>  &&clauses) {
-	// auto reader = _clause_store->getBufferReader(clauses.data(), clauses.size());
-	// auto clause = reader.getNextIncomingClause();
-	// while (clause.begin != nullptr) {
-		// LOG(V2_INFO, "  sconsume %s\n", clause.toStr().c_str());
-		// clause = reader.getNextIncomingClause();
-	// }
+void SweepJob::rootReceiveXJclauses(std::vector<int>  &&clauses) {
+	auto reader = _clause_store->getBufferReader(clauses.data(), clauses.size());
+	auto clause = reader.getNextIncomingClause();
 
-	for (auto el : clauses) {
-		if (el==0) {
-			LOG(V1_WARN, "cjc data: %i ----------- is zero ---------------\n", el);
+	while (clause.begin != nullptr) {
+
+		if (ClauseMetadata::enabled()) {
+			assert(clause.size >= ClauseMetadata::numInts()+1 || log_return_false("[ERROR] Clause of invalid size %i!\n", clause.size));
+			uint64_t id;
+			memcpy(&id, clause.begin, sizeof(uint64_t));
 		}
-		else {
-			LOG(V1_WARN, "cjc data: %i\n", el);
-		}
+
+		LOG(V2_INFO, "  sconsume %s\n", clause.toStr().c_str());
+
+		clause = reader.getNextIncomingClause();
 	}
 }
 
