@@ -285,41 +285,48 @@ private:
 
 		//Cross-Job Interaction.
 		//Send my units and equivalences to the cross-job sharing
-		if (_params.crossJobCommunication() && _params.sweepXJsendTo()) {
+		if (_params.crossJobCommunication()) {
 			assert(_clause_comm || log_return_false("Sweep ERROR: _clause_comm object missing\n"));
 			BufferBuilder bb(-1, 10, false);
-			//Payload Format: [eqs, units, metadata]
-			//Read units, which are stored directly after the equivalences
-			for (int i=eq_size; i<eq_size+n_sweep_units; i++) {
-				int unit = payload[i];
-				bb.append({&unit, 1, 1});
-				LOG(V2_INFO, "   sproduce: %i\n", unit);
-			}
-			//Read equivalences (need to append to the buffer after units, because they have a larger clause length)
-			for (int i=0; i < eq_size; i+=2) {
-				int elit1 = payload[i];
-				int elit2 = payload[i+1];
-				//Convert elit1==elit2 in CNF form
-				int cnfA[2] = {-elit1, elit2};
-				int cnfB[2] = {-elit2, elit1};
-				bb.append({&cnfA[0],2,2});
-				bb.append({&cnfB[0],2,2});
-				// LOG(V2_INFO, "   sproduce: %i %i   &   %i %i\n", -elit1, elit2, -elit2, elit1);
+			//For debugging purposes another flag for actually sending our stuff to cjc
+			if (_params.sweepXJsendTo()) {
+				//Payload Format: [eqs, units, metadata]
+				//Read units, which are stored directly after the equivalences
+				for (int i=eq_size; i<eq_size+n_sweep_units; i++) {
+					int unit = payload[i];
+					bb.append({&unit, 1, 1});
+					LOG(V2_INFO, "   sproduce: %i\n", unit);
+				}
+				//Read equivalences (need to append to the buffer after units, because they have a larger clause length)
+				for (int i=0; i < eq_size; i+=2) {
+					int elit1 = payload[i];
+					int elit2 = payload[i+1];
+					//Convert elit1==elit2 in CNF form
+					int cnfA[2] = {-elit1, elit2};
+					int cnfB[2] = {-elit2, elit1};
+					bb.append({&cnfA[0],2,2});
+					bb.append({&cnfB[0],2,2});
+					// LOG(V2_INFO, "   sproduce: %i %i   &   %i %i\n", -elit1, elit2, -elit2, elit1);
+				}
 			}
 			auto buffer = bb.extractBuffer();
-			LOG(V2_INFO, "snsSweep feed to Crossharing: eq-clauses %i, unit-clauses %i --> buffersize %i\n", n_eqs*2, n_sweep_units, buffer.size());
+			if (_params.sweepXJsendTo()) {
+				LOG(V1_WARN, "snsSweep feed to Crosssharing: eq-clauses %i, unit-clauses %i --> buffersize %i\n", n_eqs*2, n_sweep_units, buffer.size());
+			} else {
+				LOG(V1_WARN, "snsSweep feed dummy buffer to Crosssharing: buffersize %i\n", buffer.size());
+			}
 			_clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
-			_crossjob_has_prepared_sharing = true;
 
 			//communicate() happens in appl_communicate()
 			// if (_clause_comm) {
-				// _clause_comm->communicate();
+			_clause_comm->communicate();
 			// }
-			// while (hasDeferredMessage()) {
-				// auto deferredMsg = getDeferredMessage();
-				// _clause_comm->handle(
-					// deferredMsg.source, deferredMsg.mpiTag, deferredMsg.msg);
-			// }
+			while (hasDeferredMessage()) {
+				auto deferredMsg = getDeferredMessage();
+				_clause_comm->handle(
+					deferredMsg.source, deferredMsg.mpiTag, deferredMsg.msg);
+			}
+			_crossjob_has_prepared_sharing = true;
 		}
 
 
@@ -473,13 +480,25 @@ private:
 	}
 
 	bool hasPreparedSharing() override {
-		//seems that at some point we need to return true, otherwise this gets called indefinitely at the end of this job...
-		bool answer = _crossjob_has_prepared_sharing;
-		if (_terminate_all || _staged_solved_status!=-1) {
-			answer = true;
-		}
-		LOG(V1_WARN, "[SweepJob] Called stub: hasPreparedSharing. return %i\n", answer);
-		return answer;
+
+		//for now only consider case with one rank, where it is automatically root
+		//with 2 ranks new problems arrived..., since we only really feed at the root node?
+
+		// if (_is_root) {
+			//seems that at some point we need to return true, otherwise this gets called indefinitely at the end of this job...
+			bool answer = _crossjob_has_prepared_sharing;
+			// if (_terminate_all || _staged_solved_status!=-1) {
+			// answer = true;
+			// }
+			LOG(V1_WARN, "[SweepJob] Called stub: hasPreparedSharing. return %i  (root)\n",  answer);
+			return answer;
+		// } else {
+			// BufferBuilder bb(_clause_store->getBufferBuilder(-1));
+			// auto buffer = bb.extractBuffer();
+			// _clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
+			// LOG(V1_WARN, "[SweepJob] Called stub: hasPreparedSharing. return 1  (dummy buffer, non-root)\n");
+			// return true;
+		// }
 	}
 
 	std::vector<int> getPreparedClauses(Checksum&, int&, int&) override {

@@ -128,7 +128,14 @@ public:
 
             // Fetch initial clause buffer (result of all-reduction of clauses)
             _broadcast_clause_buffer = _allreduce_clauses.extractResult();
+            LOG(V1_WARN, "CSSession: _broadcast_clause_buffer.size() %i\n", _broadcast_clause_buffer.size());
             auto aggregation = InplaceClauseAggregation(_broadcast_clause_buffer);
+            LOG(V1_WARN, "CSSession: aggr metadataints %i  maxrev %i  inputlits %i  nodes %i   succsolver %i \n", aggregation.numMetadataInts(), aggregation.maxRevision(), aggregation.numInputLiterals(), aggregation.numAggregatedNodes(),  aggregation.successfulSolver());
+            if (aggregation.buffer.size() <=10) {
+                for (int i=0; i<aggregation.buffer.size(); i++) {
+                    LOG(V1_WARN, "CSSession: aggregation[%i]=%i \n", i, aggregation.buffer[i]);
+                }
+            }
             _best_found_solution_cost = aggregation.bestFoundSolutionCost();
             // If desired, scramble the LBD scores of featured clauses
             if (_params.scrambleLbdScores()) {

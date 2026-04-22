@@ -50,8 +50,8 @@ MALLOB_OPTIONS="-t=$threads \
   -spl=-1 \
   -cjc=1 \
   -fcll=2 \
-  -swpxs=0 \
-  -swpxr=0 \
+  -swpxs=1 \
+  -swpxr=1 \
   -app-comm-period=0.22 \
 	-preprocess-sweep-n-sat=1 \
   -preprocess-sweep-priority=1.0 \

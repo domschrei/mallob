@@ -27,37 +27,38 @@ SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTa
 	_nThreads(min( getNumThreads(), _params.numThreadsPerProcess.val)),
 	_reslogger(Logger::getMainInstance().copy("<RESULT>", ".sweep")),
 	_warnlogger(Logger::getMainInstance().copy("<WARN>", ".warn")),
-	_contriblogger(Logger::getMainInstance().copy("<CONTRIB>", ".contrib")),
+	_contriblogger(Logger::getMainInstance().copy("<CONTRIB>", ".contrib"))
 
-	//taken from sharing_manager.cpp, replaced _solvers.size() with _nThreads
-	_clause_store([&]() -> GenericClauseStore* {
-		bool resetLbdAtExport = _params.resetLbd() == MALLOB_RESET_LBD_AT_EXPORT;
-		int staticBucketSize = (2*_params.exportVolumePerThread()*_nThreads)/3;
-		switch(_params.clauseStoreMode()) {
-		case MALLOB_CLAUSE_STORE_STATIC_BY_LENGTH_MIXED_LBD:
-				return new StaticClauseStoreMixedLbd(_params.strictClauseLengthLimit()+ClauseMetadata::numInts(),
-					resetLbdAtExport, staticBucketSize);
-			case MALLOB_CLAUSE_STORE_STATIC_BY_LENGTH:
-				return new StaticClauseStore<true>(_params,
-					resetLbdAtExport, staticBucketSize, false, 0);
-			case MALLOB_CLAUSE_STORE_STATIC_BY_LBD:
-				return new StaticClauseStoreByLbd(_params.strictClauseLengthLimit()+ClauseMetadata::numInts(),
-					resetLbdAtExport, staticBucketSize);
-			case MALLOB_CLAUSE_STORE_ADAPTIVE_SIMPLE:
-				return new StaticClauseStore<true>(_params,
-					resetLbdAtExport, 256, true,
-					_params.exportVolumePerThread()*_nThreads*_params.numExportChunks());
-			case MALLOB_CLAUSE_STORE_ADAPTIVE:
-			default:
-				AdaptiveClauseStore::Setup setup;
-				setup.maxEffectiveClauseLength = _params.strictClauseLengthLimit()+ClauseMetadata::numInts();
-				setup.maxLbdPartitionedSize = _params.maxLbdPartitioningSize();
-				setup.numLiterals = _params.exportVolumePerThread()*_nThreads*_params.numExportChunks();
-				setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
-				setup.resetLbdAtExport = resetLbdAtExport;
-				return new AdaptiveClauseStore(setup);
-			}
-	}())
+	// /**
+	// _clause_store([&]() -> GenericClauseStore* {
+	// 	bool resetLbdAtExport = _params.resetLbd() == MALLOB_RESET_LBD_AT_EXPORT;
+	// 	int staticBucketSize = (2*_params.exportVolumePerThread()*_nThreads)/3;
+	// 	switch(_params.clauseStoreMode()) {
+	// 	case MALLOB_CLAUSE_STORE_STATIC_BY_LENGTH_MIXED_LBD:
+	// 			return new StaticClauseStoreMixedLbd(_params.strictClauseLengthLimit()+ClauseMetadata::numInts(),
+	// 				resetLbdAtExport, staticBucketSize);
+	// 		case MALLOB_CLAUSE_STORE_STATIC_BY_LENGTH:
+	// 			return new StaticClauseStore<true>(_params,
+	// 				resetLbdAtExport, staticBucketSize, false, 0);
+	// 		case MALLOB_CLAUSE_STORE_STATIC_BY_LBD:
+	// 			return new StaticClauseStoreByLbd(_params.strictClauseLengthLimit()+ClauseMetadata::numInts(),
+	// 				resetLbdAtExport, staticBucketSize);
+	// 		case MALLOB_CLAUSE_STORE_ADAPTIVE_SIMPLE:
+	// 			return new StaticClauseStore<true>(_params,
+	// 				resetLbdAtExport, 256, true,
+	// 				_params.exportVolumePerThread()*_nThreads*_params.numExportChunks());
+	// 		case MALLOB_CLAUSE_STORE_ADAPTIVE:
+	// 		default:
+	// 			AdaptiveClauseStore::Setup setup;
+	// 			setup.maxEffectiveClauseLength = _params.strictClauseLengthLimit()+ClauseMetadata::numInts();
+	// 			setup.maxLbdPartitionedSize = _params.maxLbdPartitioningSize();
+	// 			setup.numLiterals = _params.exportVolumePerThread()*_nThreads*_params.numExportChunks();
+	// 			setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
+	// 			setup.resetLbdAtExport = resetLbdAtExport;
+	// 			return new AdaptiveClauseStore(setup);
+	// 		}
+	// }())
+	// */
 {
 	assert(_params.jobCommUpdatePeriod() > 0 || log_return_false("[ERROR] For this application to work,"
             " you must explicitly enable job communicators with the -jcup option, e.g., -jcup=0.1\n"));
@@ -260,7 +261,7 @@ bool SweepJob::checkCrossCommNeedsAdvancing(const std::string &from) {
 			LOG(V2_INFO, "SWEEP _clause_comm->hasLocalClausesLeftToShare() == true . Advancing now. Called from:  %s \n", from.c_str());
 			//try to get the cross-job sharer to finish
 			for (int i=0; i<5; i++) {
-				BufferBuilder bb(_clause_store->getBufferBuilder(-1));
+				BufferBuilder bb(-1,10,false);
 				auto buffer = bb.extractBuffer();
 				_clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
 			}
@@ -402,10 +403,10 @@ bool SweepJob::appl_isDestructible() {
 	}
 
 
-	if (checkCrossCommNeedsAdvancing("appl_isDestructible")) {
-		LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? no. _clause_comm still has clauses left to share\n",  getId(),_my_rank);
-		return false;
-	}
+	// if (checkCrossCommNeedsAdvancing("appl_isDestructible")) {
+		// LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? no. _clause_comm still has clauses left to share\n",  getId(),_my_rank);
+		// return false;
+	// }
 
 	int _running_sweepers = _started_sweepers_count - _finished_sweepers_count;
 	if (_finished_sweepers_count < _nThreads) {
@@ -1717,7 +1718,8 @@ void SweepJob::crossjob_rootReceiveClauses(std::vector<int>  &&clauses) {
 		return;
 	}
 
-	auto reader = _clause_store->getBufferReader(clauses.data(), clauses.size());
+	// auto reader = _clause_store->getBufferReader(clauses.data(), clauses.size());
+	auto reader = BufferReader(clauses.data(), clauses.size(), 10, false);
 	auto clause = reader.getNextIncomingClause();
 	{
 		int before = _crossjob_root_received_units.size();
@@ -1769,7 +1771,7 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 }
 
 void SweepJob::triggerTerminations() {
-	checkCrossCommNeedsAdvancing("triggerTerminations");
+	// checkCrossCommNeedsAdvancing("triggerTerminations");
 	LOG(V2_INFO, "SWEEP TERM #%i [%i] trigger solver terminations (ctx %i). Of: Running %i, Finished %i \n", getId(), _my_rank, _my_ctx_id, _running_sweepers_count.load(), _finished_sweepers_count.load());
 	int i=0;
 	for (auto &sweeper : _sweepers) {
