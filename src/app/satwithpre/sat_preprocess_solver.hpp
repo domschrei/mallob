@@ -76,7 +76,7 @@ public:
     }
 
     JobResult solveViaSweepnSat() {
-        LOG(V2_INFO, "SATWP Starting SNS \n");
+        LOG(V2_INFO, "SATWP Starting Sat'n'Sweep App\n");
         _time_of_activation = Timer::elapsedSeconds();
         JobResult res;
         res.id = _desc.getId();
@@ -88,16 +88,16 @@ public:
 
         while (!isTimeoutHit()) {
             if (_base_job_done && !_base_job_digested) {
-                LOG(V2_INFO, "SATWP snsSat done\n");
+                LOG(V2_INFO, "SATWP snsSAT done\n");
                 res = jsonToJobResult(_base_job_response, false);
                 _base_job_digested = true;
                 if (res.result != 0) {
-                    LOG(V2_INFO, "SATWP RESULT snsBASE SOLVER done, result code %i\n", res.result);//capslock grepped in postprocessing
+                    LOG(V2_INFO, "SATWP RESULT snsSAT SOLVER done, result code %i\n", res.result);//capslock grepped in postprocessing
                     break;
                 }
             }
             if (_sweep_job_done && !_sweep_job_digested) {
-                LOG(V2_INFO, "SATWP snsSweep done\n");
+                LOG(V2_INFO, "SATWP snsSWEEP done\n");
                 res = jsonToJobResult(_sweep_job_response, false); //eventually probably convert = true to reconstruct solution if necessary
                 _sweep_job_digested = true;
                 if (res.result==UNSAT) {
@@ -304,7 +304,7 @@ private:
         if (_desc.getCpuLimit() > 0)
             json["cpu-limit"] = std::to_string(_desc.getCpuLimit() - getAgeSinceActivation()) + "s";
         if (_params.snsOverrideSatOptions())
-            json["configuration"]["options"] = SATWITHPRE_OPT_SNS_OVERRIDES; //using solver type "s", to create Kissat Solvers specifically to expect Cross-Job-Communication from the concurrent Sweep App
+            json["configuration"]["options"] = SATWITHPRE_OPT_SNS_OVERRIDES; //using plain solver type "k_", most important is that it does not delete/rename variables
 
         LOG(V2_INFO, "SATWP Starting snsSat Job: %d Vars\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NV"));
         LOG(V2_INFO, "SATWP Starting snsSat Job: %d Clauses\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
@@ -320,7 +320,7 @@ private:
             abort();
         }
 
-        LOG(V2_INFO, "SATWP submitted snsSat Job\n");
+        LOG(V2_INFO, "SATWP submitted snsSAT Job\n");
         _base_job_submitted = true;
     }
 
@@ -360,6 +360,7 @@ private:
         });
         if (retcode != JsonInterface::ACCEPT) return;
 
+        LOG(V2_INFO, "SATWP submitted snsSWEEP Job\n");
         _sweep_job_submitted = true;
 
     }

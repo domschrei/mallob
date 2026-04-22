@@ -206,7 +206,7 @@ void Kissat::diversify(int seed) {
             case 3: kissat_set_option(solver, "eliminate", 0); break;
         }
     } else if (_setup.flavour == PortfolioSequence::PLAIN) {
-        LOGGER(_logger, V4_VVER, "plain\n");
+        LOGGER(_logger, V4_VVER, "creating plain kissat (k_)\n");
         bool partitionedVivification = false;
         ok = kissat_set_option(solver, "lucky", 0); assert(ok);
         ok = kissat_set_option(solver, "preprocess", 0); assert(ok);
@@ -491,8 +491,8 @@ void Kissat::produceClause(int size, int lbd) {
     if (learntClause.lbd > _setup.strictLbdLimit) return;
     learntClause.begin = learntClauseBuffer.data();
 
-    if (size<=2) {
-        LOG(V2_INFO, "kproduce (only <=2): %s\n", learntClause.toStr().c_str());
+    if (size<=1) {
+        LOG(V2_INFO, "kproduce (only <=1): %s\n", learntClause.toStr().c_str());
     }
 
     callback(learntClause, _setup.localId);
@@ -517,8 +517,8 @@ void Kissat::consumeClause(int** clause, int* size, int* lbd, unsigned long* id,
         *clause = producedClause.data();
         *lbd = c.lbd;
 
-        if (*size<=2) {
-            LOG(V2_INFO, "      kconsume (only <=2): %s\n", c.toStr().c_str());
+        if (*size<=1) {
+            LOG(V2_INFO, "      kconsume (only <=1): %s\n", c.toStr().c_str());
         }
 
     } else {

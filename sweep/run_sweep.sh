@@ -33,7 +33,7 @@ APP="SATWITHPRE"
 
 MALLOB_OPTIONS="-t=$threads \
   -mono-app=$APP \
-  -satsolver=k \
+  -satsolver=k_ \
   -colors \
   -trace-dir=$OUT_DIR/traces/ \
   -log=$OUT_DIR/logs/ \
@@ -46,9 +46,12 @@ MALLOB_OPTIONS="-t=$threads \
 	-seed=1 \
 	-jcup=0.05 \
   -sleep=10 \
-	-v=4 \
+	-v=3 \
   -spl=-1 \
   -cjc=1 \
+  -fcll=2 \
+  -swpxs=0 \
+  -swpxi=0 \
   -app-comm-period=0.22 \
 	-preprocess-sweep-n-sat=1 \
   -preprocess-sweep-priority=1.0 \

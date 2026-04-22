@@ -18,7 +18,8 @@ class SweepJob : public BaseSatJob {
 private:
 
     JobResult _internal_result;
-    int _solved_status{-1};
+    int _solved_status{-1}; //final status that gets communicated to Mallob, only touched by the main thread
+	int _staged_solved_status{-1}; //can be touched by any thread
 	bool _do_report_UNSAT_to_root{false};
 	std::atomic<int> _root_reported_result{-1};
 	bool _finished_job_setup{false};
@@ -146,7 +147,6 @@ private:
 	std::atomic_int _lastImportedRound = 0;
 	//After all solvers have picked up the shared data, it can be deleted from this rank
 	int _lastClearedRound = 0;
-	std::vector<importedRound> _cjc_root_imported_data{};
 
 
 	//Termination. Determined during workstealing, broadcasted via sharing
@@ -181,7 +181,9 @@ private:
 	//Cross-Job-sharing
 	std::unique_ptr<AnytimeSatClauseCommunicator> _clause_comm;
 	std::unique_ptr<GenericClauseStore> _clause_store;
-
+	std::vector<int>  _crossjob_root_received_units{};
+	std::mutex _crossjob_import_mutex;
+	bool _crossjob_has_prepared_sending{false};
 
 
 
@@ -207,16 +209,17 @@ private:
 			LOG(V2_INFO, "SWEEP [%i](root-trf) ITERATION %i/%i STARTED \n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations());
 		}
 
-		int n_units	 = payload[payload.size() - METADATA_UNIT_SIZE];
-		int n_eqs	 = payload[payload.size() - METADATA_EQ_SIZE] / 2;  //each equivalence takes up two integers
+		int n_sweep_units = payload[payload.size() - METADATA_UNIT_SIZE];
+		int eq_size  = payload[payload.size() - METADATA_EQ_SIZE];
+		int n_eqs	 = eq_size / 2;  //each equivalence takes up two integers
 		bool all_idle= payload[payload.size() - METADATA_IDLE];
 		int work_sweeps			 = payload[payload.size() - METADATA_WORK_SWEEPS];
 		int work_stepovers		 = payload[payload.size() - METADATA_WORK_STEPOVERS];
 		int work_unsched_resweeps= payload[payload.size() - METADATA_UNSCHED_RESWEEPS];
 
-		_root_shared_units_this_iteration += n_units;
+		_root_shared_units_this_iteration += n_sweep_units;
 		_root_shared_eqs_this_iteration   += n_eqs;
-		_root_total_shared_units += n_units;
+		_root_total_shared_units += n_sweep_units;
 		_root_total_shared_eqs   += n_eqs;
 		_root_rounds_this_iteration++;
 
@@ -278,30 +281,20 @@ private:
 
 		//create char to print the same msg in two logs
 		//once for completeness chronologically in the general logs, and once in a special smaller file on the root node for easier postprocessing
-		char logmsg[512];
-		snprintf(logmsg, sizeof(logmsg),
-			"SWEEP [%i](root-trf) send: envsize %i iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i    SW %i  ST %i  RE %i    Sched, Swept  %i  %i    ( %.2f ,  %.2f )°/.   succ-rate %.6f   \n",
-			_my_rank, _root_env_completions, _root_sweep_iteration, _root_sharing_round, all_idle,  send_end_iteration, send_terminate, n_eqs, n_units,
-			work_sweeps, work_stepovers, work_unsched_resweeps, work_sweeps + work_stepovers, work_sweeps + work_unsched_resweeps,
-			100*(work_sweeps + work_stepovers)/(double)_numVars , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars,
-			progress_ratio
-		);
-		LOG(			   V2_INFO, "         %s", logmsg);
-		LOGGER(_reslogger, V2_INFO, "%s", logmsg);
 
-		if (_params.crossJobCommunication()) {
+		//Cross-Job Interaction.
+		//Send my units and equivalences to the cross-job sharing
+		if (_params.crossJobCommunication() && _params.sweepSendToCrossjob()) {
 			assert(_clause_comm || log_return_false("Sweep ERROR: _clause_comm object missing\n"));
-			const int eq_size = n_eqs*2;
 			BufferBuilder bb(-1, 10, false);
-
 			//Payload Format: [eqs, units, metadata]
 			//Read units, which are stored directly after the equivalences
-			for (int i=eq_size; i<eq_size+n_units; i++) {
+			for (int i=eq_size; i<eq_size+n_sweep_units; i++) {
 				int unit = payload[i];
 				bb.append({&unit, 1, 1});
 				LOG(V2_INFO, "   sproduce: %i\n", unit);
 			}
-			//Read equivalences (need to append after units, because have larger clause length)
+			//Read equivalences (need to append to the buffer after units, because they have a larger clause length)
 			for (int i=0; i < eq_size; i+=2) {
 				int elit1 = payload[i];
 				int elit2 = payload[i+1];
@@ -310,15 +303,62 @@ private:
 				int cnfB[2] = {-elit2, elit1};
 				bb.append({&cnfA[0],2,2});
 				bb.append({&cnfB[0],2,2});
-				LOG(V2_INFO, "   sproduce: %i %i   &   %i %i\n", -elit1, elit2, -elit2, elit1);
+				// LOG(V2_INFO, "   sproduce: %i %i   &   %i %i\n", -elit1, elit2, -elit2, elit1);
 			}
 			auto buffer = bb.extractBuffer();
-			LOG(V2_INFO, "snsSweep feed to Crossharing: eq-clauses %i, unit-clauses %i --> buffersize %i\n", n_eqs*2, n_units, buffer.size());
+			LOG(V2_INFO, "snsSweep feed to Crossharing: eq-clauses %i, unit-clauses %i --> buffersize %i\n", n_eqs*2, n_sweep_units, buffer.size());
 			_clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
-
-
+			_crossjob_has_prepared_sending = true;
 		}
 
+
+		if (_clause_comm) _clause_comm->communicate();
+		while (hasDeferredMessage()) {
+			auto deferredMsg = getDeferredMessage();
+			_clause_comm->handle(
+				deferredMsg.source, deferredMsg.mpiTag, deferredMsg.msg);
+		}
+
+		//Integrate units which were received via Cross-Job Sharing into the sweep-internal sharing vector
+		//This way, only the root rank "knows" which units came from sweeping and which from the cross-job sharing
+		//All other ranks will just receive a larger sharing vector, without the details which units came from where
+		int crossjob_units_added = 0;
+		if (_params.crossJobCommunication() && _params.sweepImportFromCrossjob()) {
+			std::lock_guard<std::mutex> lock(_crossjob_import_mutex);
+			if (!_crossjob_root_received_units.empty()) {
+				const int insert_pos = eq_size + n_sweep_units;
+				// Splice the cross-job units in right after the sweep units, before metadata
+				payload.insert(
+					payload.begin() + insert_pos,
+					_crossjob_root_received_units.begin(),
+					_crossjob_root_received_units.end()
+				);
+				for (int elit : _crossjob_root_received_units) {
+					LOG(V2_INFO, "SWEEP [%i](root-trf) insert unit from crossjob: %i \n", _my_rank, elit);
+				}
+				crossjob_units_added = static_cast<int>(_crossjob_root_received_units.size());
+				assert(payload.size() == eq_size + n_sweep_units + crossjob_units_added + NUM_METADATA_FIELDS);
+				const int total_units = n_sweep_units + crossjob_units_added;
+				//updated stored unit count to reflect the additions.
+				payload[payload.size() - METADATA_UNIT_SIZE] = total_units;
+				LOG(V2_INFO, "SWEEP [%i](root-trf) spliced cross-job units into payload: %i \n", _my_rank, crossjob_units_added, n_sweep_units);
+
+				//discard the temporary buffer, to not import the same units a second time
+				_crossjob_root_received_units.clear();
+			}
+		}
+
+
+		char logmsg[512];
+		snprintf(logmsg, sizeof(logmsg),
+			"SWEEP [%i](root-trf) send: envsize %i iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i   SW %i  ST %i  RE %i    Sched, Swept  %i  %i    ( %.2f ,  %.2f )°/.   succ-rate %.6f   \n",
+			_my_rank, _root_env_completions, _root_sweep_iteration, _root_sharing_round, all_idle,  send_end_iteration, send_terminate, n_eqs, n_sweep_units, crossjob_units_added,
+			work_sweeps, work_stepovers, work_unsched_resweeps, work_sweeps + work_stepovers, work_sweeps + work_unsched_resweeps,
+			100*(work_sweeps + work_stepovers)/(double)_numVars , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars,
+			progress_ratio
+		);
+		LOG(			   V2_INFO, "         %s", logmsg);
+		LOGGER(_reslogger, V2_INFO, "%s", logmsg);
 		//no return, payload was just transformed in-place
     };
 
@@ -381,6 +421,7 @@ private:
 	void checkForUnsatResults();
 	void rootReportSolverResult(KissatPtr sweeper, int res);
 	void reportEndStats(KissatPtr sweeper);
+	void tryReportToMallob();
 	void saveStealLatencies(KissatPtr sweeper);
 	void triggerTerminations();
 
@@ -397,7 +438,7 @@ private:
 	void advanceAllReduction();
 	void extractAllReductionResult();
 
-	void rootReceiveXJclauses(std::vector<int>  &&clauses);
+	void crossjob_rootReceiveClauses(std::vector<int>  &&clauses);
 
 	std::vector<int> getRandomIdPermutation();
 
@@ -424,15 +465,17 @@ private:
 
 	void prepareSharing() override {
 		LOG(V1_WARN, "[SweepJob] Called stub: prepareSharing\n");
+		//we prepare sharing anyway in every sharing round, don't need this reminder/callback(?)
 	}
 
 	bool hasPreparedSharing() override {
-		LOG(V1_WARN, "[SweepJob] Called stub: hasPreparedSharing\n");
-		return false;
+		LOG(V1_WARN, "[SweepJob] Called stub: hasPreparedSharing. return true\n");
+		return true;
+		//just clamped to "true" for the moment, hoping this will advance any sharing.
 	}
 
 	std::vector<int> getPreparedClauses(Checksum&, int&, int&) override {
-		LOG(V1_WARN, "[SweepJob] Called stub: getPreparedClauses\n");
+		LOG(V1_WARN, "[SweepJob] Called stub: getPreparedClauses. return {}\n");
 		return {};
 	}
 
@@ -441,12 +484,12 @@ private:
 	}
 
 	bool hasFilteredSharing(int) override {
-		LOG(V1_WARN, "[SweepJob] Called stub: hasFilteredSharing\n");
+		LOG(V1_WARN, "[SweepJob] Called stub: hasFilteredSharing. return true\n");
 		return true;
 	}
 
 	std::vector<int> getLocalFilter(int) override {
-		LOG(V1_WARN, "[SweepJob] Called stub: getLocalFilter\n");
+		LOG(V1_WARN, "[SweepJob] Called stub: getLocalFilter. return {}\n");
 		return {};
 	}
 
@@ -457,7 +500,7 @@ private:
 	void digestSharingWithoutFilter(int epoch, std::vector<int>  &&clauses, bool stateless) override {
 		LOG(V1_WARN, "SWEEP CJC: received digestSharingWithoutFilter with clauses.size()==%i\n",clauses.size());
 		if (_is_root) {
-			rootReceiveXJclauses(std::move(clauses));
+			crossjob_rootReceiveClauses(std::move(clauses));
 		}
 	}
 
@@ -470,12 +513,12 @@ private:
 	}
 
 	int getLastAdmittedNumLits() override {
-		LOG(V1_WARN, "[SweepJob] Called stub: getLastAdmittedNumLits\n");
+		LOG(V1_WARN, "[SweepJob] Called stub: getLastAdmittedNumLits. return 0\n");
 		return 0;
 	}
 
 	long long getBestFoundObjectiveCost() override {
-		LOG(V1_WARN, "[SweepJob] Called stub: getBestFoundObjectiveCost\n");
+		LOG(V1_WARN, "[SweepJob] Called stub: getBestFoundObjectiveCost. return 0\n");
 		return 0;
 	}
 

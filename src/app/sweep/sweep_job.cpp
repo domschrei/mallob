@@ -208,7 +208,7 @@ void SweepJob::appl_communicate() {
 	printIdleWorkStatus();
 	checkForUnsatResults();
 	clearImportedRound();
-
+	tryReportToMallob();
 
 	float t1 = Timer::elapsedSeconds();
 	_duration_appl_communicate.push_back(t1-t0);
@@ -216,6 +216,44 @@ void SweepJob::appl_communicate() {
 	LOG(V5_DEBG, "SWEEP appl_communicate() done \n");
 }
 
+void SweepJob::tryReportToMallob() { //needs to be called from the main thread
+	if (_staged_solved_status==-1) {
+		return;
+		//there is no result yet
+	}
+
+	// doneTODO(Nicco) Before reporting a result via the below line, check via
+	//_clause_comm->hasLocalClausesLeftToShare();
+	// (should be from the main thread) if there's still some clauses that need to be shared.
+	// In that case, appl_communicate() needs to call this from time to time:
+	// _clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
+	// (with an empty buffer from a BufferBuilder) since this will initiate XTCS operations.
+
+	//There is a result (SAT,UNSAT,IMPROVED,UNKNOWN,...), but first check whether the cross-job sharer is still up
+	if (_clause_comm->hasLocalClausesLeftToShare()) {
+		//Dont report to Mallob yet, first try to get the cross-job sharer to finish
+		for (int i=0; i<5; i++) {
+			BufferBuilder bb(_clause_store->getBufferBuilder(-1));
+			auto buffer = bb.extractBuffer();
+			_clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
+		}
+		LOG(V2_INFO, " SWEEP : mainthread cannot report yet, needs to first end crossjob communication\n");
+		return;
+	}
+
+	int res = _staged_solved_status;
+	assert(res!=-1);
+	_internal_result.result = res;
+	_solved_status = res; //this will now be noticed by Mallob, and will end this App
+	LOG(V2_INFO, " SWEEP : mainthread reports result %i to Mallob \n", _solved_status);
+
+	// TODO(Nicco) Before reporting a result via the below line, check via
+	//_clause_comm->hasLocalClausesLeftToShare();
+	// (should be from the main thread) if there's still some clauses that need to be shared.
+	// In that case, appl_communicate() needs to call this from time to time:
+	// _clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
+	// (with an empty buffer from a BufferBuilder) since this will initiate XTCS operations.
+}
 
 // React to an incoming message. (This becomes relevant only if you send custom messages)
 void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
@@ -224,7 +262,10 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		LOG(V1_WARN, " [WARN] Return to sender: ForkedSatJob::appl_communicate(): not initialized! \n");
         msg.returnToSender(sourceRank, mpiTag);
 		return;
-	} else if (_clause_comm->handle(sourceRank, mpiTag, msg)) return;
+	} else if (_clause_comm->handle(sourceRank, mpiTag, msg)) {
+		LOG(V1_WARN, " CJC _clause_comm->handle() got message \n");
+		return;
+	}
 
 	// LOG(V2_INFO, "Shweep rank %i: received custom message from source %i, mpiTag %i, msg.tag %i \n", _my_rank, source, mpiTag, msg.tag);
 	if (mpiTag != MSG_SEND_APPLICATION_MESSAGE) {
@@ -400,7 +441,7 @@ void SweepJob::rootReportSolverResult(KissatPtr sweeper, int res) {
 
 
 	LOG(V2_INFO, "SWEEP JOB [%i] reports sweep result %i to Mallob\n", _my_rank, res);
-	assert(_solved_status == -1 || log_return_false("SWEEP ERROR: duplicate attempt to report result to mallob, was already reported as %i \n", _internal_result.result)); //something would be off if we called this function more than once
+	assert(_staged_solved_status == -1 || log_return_false("SWEEP ERROR: duplicate attempt to report result to mallob, was already reported as %i \n", _internal_result.result)); //something would be off if we called this function more than once
 	std::vector<int> formula;
 	if (res==UNSAT) {
 		formula = {};
@@ -418,9 +459,8 @@ void SweepJob::rootReportSolverResult(KissatPtr sweeper, int res) {
 	}
 	LOGGER(_reslogger,V2_INFO, "SWEEP_RESULT_CODE %i == %s \n", res, res==40 ? "IMPROVED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
 	_internal_result.setSolutionToSerialize(formula.data(), formula.size());
-	_internal_result.result = res;
 
-	_solved_status = res; //this change will be noticed by the main thread and triggers the termination of this job
+	_staged_solved_status = res;
 }
 
 void SweepJob::createAndStartNewSweeper(int localId) {
@@ -838,6 +878,10 @@ bool SweepJob::skip_MPI_forNow() {
 		LOG(V3_VERB, "SWEEP [%i] WARN : getVolume()==0\n", _my_rank);
 		return true;
 	}
+	if (getVolume()==1) {
+		LOG(V3_VERB, "SWEEP [%i] SKIP MPI steal, we are the only MPI rank\n", _my_rank);
+		return true;
+	}
 	return (getJobComm().size() < getVolume());
 }
 
@@ -869,10 +913,11 @@ void SweepJob::sendWorkstealsViaMPI() {
 			}
 
 			assert(getVolume()>=1 || log_return_false("SWEEP ERROR [%i](%i) in workstealing: getVolume()==%i, i.e. no volume available to steal from\n", _my_rank, senderLocalId, getVolume()));
-			if (getVolume()==1) {
-				LOG(V4_VVER, "SWEEP SKIP [%i](%i) steal loop --> we are the only MPI rank, no global steal \n", _my_rank, senderLocalId);
-				continue;
-			}
+			//Volume==1 is now part of skip_MPI_forNow
+			// if (getVolume()==1) {
+				// LOG(V4_VVER, "SWEEP SKIP [%i](%i) steal loop --> we are the only MPI rank, no global steal \n", _my_rank, senderLocalId);
+				// continue;
+			// }
 
 			assert(request.targetIndex==-1);
 			assert(request.targetRank==-1);
@@ -1004,6 +1049,7 @@ void SweepJob::cbImportUnit(int *elit, int localId) {
 	if (idx < units.size()) {
 		*elit = units[idx];
 		sweeper->curr_unit_index++;
+		assert(*elit!=0);
 		if (sweeper->curr_unit_index == units.size()) {
 			LOG(V5_DEBG, "SWEEP [%i](%i) ((( < %i > U %i \n", _my_rank, sweeper->getLocalId(), round, units.size() );
 		}
@@ -1551,6 +1597,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 std::vector<int> SweepJob::stealWorkFromAnyLocalSolver(int asking_rank, int asking_sourceLocalId) { //Parameters are only used for verbose logging, don't influence function behaviour
 	auto rand_permutation = getRandomIdPermutation();
 
+	LOG(V1_WARN, "SWEEP [%i] ask from [%i](%i) to steal from any local solver \n",_my_rank, asking_rank, asking_sourceLocalId);
 	for (int localId : rand_permutation) {
 		auto stolen_work = stealWorkFromSpecificLocalSolver(localId);
 		if ( ! stolen_work.empty()) {
@@ -1578,6 +1625,8 @@ struct scoped_guard {
 
 
 std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
+
+	LOG(V1_WARN, "SWEEP [%i] stealattempt into (%i) \n",_my_rank, localId);
 	if (_terminate_all.load(std::memory_order_relaxed)) //sweeping finished globally, nothing to steal anymore
 		return {};
 	if ( ! _sweepers[localId]) {
@@ -1595,6 +1644,9 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	//For that in the C code there are further guards against unfinished initialization, all returning 0 in that case
 	//The congruence closure solver will always return 0, as it doesnt operate on work and doesnt have any
 	int max_steal_amount = shweep_get_max_steal_amount(sweeper->solver);
+
+	LOG(V1_WARN, "SWEEP [%i] stealattempt into (%i) max : %i \n",_my_rank, localId, max_steal_amount);
+
 	if (max_steal_amount < MIN_STEAL_AMOUNT)
 		return {};
 
@@ -1631,21 +1683,31 @@ std::vector<int> SweepJob::getRandomIdPermutation() {
 	return permutation;
 }
 
-void SweepJob::rootReceiveXJclauses(std::vector<int>  &&clauses) {
+void SweepJob::crossjob_rootReceiveClauses(std::vector<int>  &&clauses) {
+	if (!_params.sweepImportFromCrossjob()) {
+		return;
+	}
+
 	auto reader = _clause_store->getBufferReader(clauses.data(), clauses.size());
 	auto clause = reader.getNextIncomingClause();
-
-	while (clause.begin != nullptr) {
-
-		if (ClauseMetadata::enabled()) {
-			assert(clause.size >= ClauseMetadata::numInts()+1 || log_return_false("[ERROR] Clause of invalid size %i!\n", clause.size));
-			uint64_t id;
-			memcpy(&id, clause.begin, sizeof(uint64_t));
+	{
+		int before = _crossjob_root_received_units.size();
+		std::lock_guard<std::mutex> lock(_crossjob_import_mutex);
+		while (clause.begin != nullptr) {
+			if (ClauseMetadata::enabled()) {
+				assert(clause.size >= ClauseMetadata::numInts()+1 || log_return_false("[ERROR] Clause of invalid size %i!\n", clause.size));
+				uint64_t id;
+				memcpy(&id, clause.begin, sizeof(uint64_t));
+			}
+			if (clause.size==1) {
+				LOG(V2_INFO, "  sconsume (only <=1): %s\n", clause.toStr().c_str());
+				assert(clause.begin[0]!=0 || log_return_false("snsSweep ERROR : got crossjob unit literal 0\n"));
+				_crossjob_root_received_units.push_back(clause.begin[0]);
+			}
+			clause = reader.getNextIncomingClause();
 		}
-
-		LOG(V2_INFO, "  sconsume %s\n", clause.toStr().c_str());
-
-		clause = reader.getNextIncomingClause();
+		int after = _crossjob_root_received_units.size();
+		LOG(V2_INFO, "  sconsume consumed i% units \n", after - before);
 	}
 }
 
