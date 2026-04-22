@@ -59,6 +59,7 @@ private:
 	std::vector<float> _timestamp_contributed_to_sharing;
 	std::vector<float> _duration_appl_communicate;
 	bool 			   _logged_full_jobcomm{false};
+	float			   _timestamp_last_idleinfo;
 
 	//Workstealing
 	SplitMix64Rng _rng;
@@ -183,7 +184,7 @@ private:
 	std::unique_ptr<GenericClauseStore> _clause_store;
 	std::vector<int>  _crossjob_root_received_units{};
 	std::mutex _crossjob_import_mutex;
-	bool _crossjob_has_prepared_sending{false};
+	bool _crossjob_has_prepared_sharing{false};
 
 
 
@@ -284,7 +285,7 @@ private:
 
 		//Cross-Job Interaction.
 		//Send my units and equivalences to the cross-job sharing
-		if (_params.crossJobCommunication() && _params.sweepSendToCrossjob()) {
+		if (_params.crossJobCommunication() && _params.sweepXJsendTo()) {
 			assert(_clause_comm || log_return_false("Sweep ERROR: _clause_comm object missing\n"));
 			BufferBuilder bb(-1, 10, false);
 			//Payload Format: [eqs, units, metadata]
@@ -308,22 +309,26 @@ private:
 			auto buffer = bb.extractBuffer();
 			LOG(V2_INFO, "snsSweep feed to Crossharing: eq-clauses %i, unit-clauses %i --> buffersize %i\n", n_eqs*2, n_sweep_units, buffer.size());
 			_clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
-			_crossjob_has_prepared_sending = true;
+			_crossjob_has_prepared_sharing = true;
+
+			//communicate() happens in appl_communicate()
+			// if (_clause_comm) {
+				// _clause_comm->communicate();
+			// }
+			// while (hasDeferredMessage()) {
+				// auto deferredMsg = getDeferredMessage();
+				// _clause_comm->handle(
+					// deferredMsg.source, deferredMsg.mpiTag, deferredMsg.msg);
+			// }
 		}
 
 
-		if (_clause_comm) _clause_comm->communicate();
-		while (hasDeferredMessage()) {
-			auto deferredMsg = getDeferredMessage();
-			_clause_comm->handle(
-				deferredMsg.source, deferredMsg.mpiTag, deferredMsg.msg);
-		}
 
 		//Integrate units which were received via Cross-Job Sharing into the sweep-internal sharing vector
 		//This way, only the root rank "knows" which units came from sweeping and which from the cross-job sharing
 		//All other ranks will just receive a larger sharing vector, without the details which units came from where
 		int crossjob_units_added = 0;
-		if (_params.crossJobCommunication() && _params.sweepImportFromCrossjob()) {
+		if (_params.crossJobCommunication() && _params.sweepXJrecvFrom()) {
 			std::lock_guard<std::mutex> lock(_crossjob_import_mutex);
 			if (!_crossjob_root_received_units.empty()) {
 				const int insert_pos = eq_size + n_sweep_units;
@@ -422,6 +427,7 @@ private:
 	void rootReportSolverResult(KissatPtr sweeper, int res);
 	void reportEndStats(KissatPtr sweeper);
 	void tryReportToMallob();
+	bool checkCrossCommNeedsAdvancing(const std::string &from);
 	void saveStealLatencies(KissatPtr sweeper);
 	void triggerTerminations();
 
@@ -445,9 +451,7 @@ private:
 	bool tryProvideInitialWork(KissatPtr sweeper);
 	std::vector<int> stealWorkFromAnyLocalSolver(int asking_rank, int asking_sourceLocalId); //parameters only for verbose logging
     std::vector<int> stealWorkFromSpecificLocalSolver(int localId);
-    // void cbStealWork(unsigned **work, int *work_size, int localId);
 	void cbStealWorkNew(unsigned **work, int *work_size, int localId);
-	// void checkForNewImportRound(KissatPtr sweeper);
 	void cbImportEq(int *elit1, int *elit2, int localId);
 	void cbImportUnit(int *lit, int localId);
 	int  cbCustomQuery(int query);
@@ -469,13 +473,18 @@ private:
 	}
 
 	bool hasPreparedSharing() override {
-		LOG(V1_WARN, "[SweepJob] Called stub: hasPreparedSharing. return true\n");
-		return true;
-		//just clamped to "true" for the moment, hoping this will advance any sharing.
+		//seems that at some point we need to return true, otherwise this gets called indefinitely at the end of this job...
+		bool answer = _crossjob_has_prepared_sharing;
+		if (_terminate_all || _staged_solved_status!=-1) {
+			answer = true;
+		}
+		LOG(V1_WARN, "[SweepJob] Called stub: hasPreparedSharing. return %i\n", answer);
+		return answer;
 	}
 
 	std::vector<int> getPreparedClauses(Checksum&, int&, int&) override {
 		LOG(V1_WARN, "[SweepJob] Called stub: getPreparedClauses. return {}\n");
+		_crossjob_has_prepared_sharing = false; //mirroring the behaviour in inter_job_clause_sharer.hpp
 		return {};
 	}
 

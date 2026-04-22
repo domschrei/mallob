@@ -110,12 +110,16 @@ void SweepJob::appl_start() {
 	LOG(V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d, NumVars %i, NumClauses %i\n",
 		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _nThreads, numVars, numClauses);
 	LOG(V2_INFO,"SWEEP_PAYLOAD_SIZE %i\n", getDescription().getFormulaPayloadSize(0));
+
+	LOG(V2_INFO,"SWEEP XJCS option: send to   SAT: %i \n", _params.sweepXJsendTo());
+	LOG(V2_INFO,"SWEEP XJCS option: recv from SAT: %i \n", _params.sweepXJrecvFrom());
+
 	_nThreads = _params.numThreadsPerProcess.val;
 
 	_clause_comm.reset(new AnytimeSatClauseCommunicator(_params, this, false));
 
-	LOG(V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d\n",
-		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _nThreads);
+	// LOG(V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d\n",
+		// _my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _nThreads);
 	// LOG(V2_INFO,"SWEEP JOB sweep-sharing-period: %i ms\n", _params.sweepSharingPeriod_ms.val);
 	// LOG(V2_INFO, "New SweepJob rank %i working on %i vars in %i clauses \n", getJobTree().getRank(), );
     _metadata = getSerializedDescription(0)->data();
@@ -196,7 +200,9 @@ void SweepJob::appl_communicate() {
 	advanceAllReduction(); //contains pushing data to Cross-Job-Sharing (in root transformation)
 	sendWorkstealsViaMPI();
 
-	if (_clause_comm) _clause_comm->communicate(); //triggers digestSharingWithoutFilter(...) on this rank, where we receive the shared data from the other jobs
+	if (_clause_comm) {
+		_clause_comm->communicate(); //triggers digestSharingWithoutFilter(...) on this rank, where we receive the shared data from the other jobs
+	}
 	while (hasDeferredMessage()) {
 		LOG(V2_INFO, "SWEEP CJC has deferred message\n");
 		auto deferredMsg = getDeferredMessage();
@@ -208,6 +214,7 @@ void SweepJob::appl_communicate() {
 	printIdleWorkStatus();
 	checkForUnsatResults();
 	clearImportedRound();
+	checkCrossCommNeedsAdvancing("appl_communicate");
 	tryReportToMallob();
 
 	float t1 = Timer::elapsedSeconds();
@@ -228,18 +235,10 @@ void SweepJob::tryReportToMallob() { //needs to be called from the main thread
 	// In that case, appl_communicate() needs to call this from time to time:
 	// _clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
 	// (with an empty buffer from a BufferBuilder) since this will initiate XTCS operations.
+	// update: is now
+	checkCrossCommNeedsAdvancing("tryReportToMallob");
 
 	//There is a result (SAT,UNSAT,IMPROVED,UNKNOWN,...), but first check whether the cross-job sharer is still up
-	if (_clause_comm->hasLocalClausesLeftToShare()) {
-		//Dont report to Mallob yet, first try to get the cross-job sharer to finish
-		for (int i=0; i<5; i++) {
-			BufferBuilder bb(_clause_store->getBufferBuilder(-1));
-			auto buffer = bb.extractBuffer();
-			_clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
-		}
-		LOG(V2_INFO, " SWEEP : mainthread cannot report yet, needs to first end crossjob communication\n");
-		return;
-	}
 
 	int res = _staged_solved_status;
 	assert(res!=-1);
@@ -253,6 +252,25 @@ void SweepJob::tryReportToMallob() { //needs to be called from the main thread
 	// In that case, appl_communicate() needs to call this from time to time:
 	// _clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
 	// (with an empty buffer from a BufferBuilder) since this will initiate XTCS operations.
+}
+
+bool SweepJob::checkCrossCommNeedsAdvancing(const std::string &from) {
+	if (_staged_solved_status!=-1 || _terminate_all) {
+		if (_clause_comm->hasLocalClausesLeftToShare()) {
+			LOG(V2_INFO, "SWEEP _clause_comm->hasLocalClausesLeftToShare() == true . Advancing now. Called from:  %s \n", from.c_str());
+			//try to get the cross-job sharer to finish
+			for (int i=0; i<5; i++) {
+				BufferBuilder bb(_clause_store->getBufferBuilder(-1));
+				auto buffer = bb.extractBuffer();
+				_clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
+			}
+			_clause_comm->communicate();
+			return true;
+		} else {
+			LOG(V2_INFO, "SWEEP _clause_comm->hasLocalClausesLeftToShare() == false \n");
+		}
+	}
+	return false;
 }
 
 // React to an incoming message. (This becomes relevant only if you send custom messages)
@@ -379,10 +397,15 @@ bool SweepJob::appl_isDestructible() {
 	//maybe clauseComm checks should come after the sweeper terminations?
 	if (_clause_comm && !_clause_comm->isDestructible()) {
 		for (int i = 0; i < 10; i++) _clause_comm->communicate(); // may advance destructibility
+		LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? no. _clause_comm not destructible yet\n",  getId(),_my_rank);
 		return false;
 	}
-	// TODO(Nicco) Did you not at some point implement isDestructible for this job?
-	// return true;
+
+
+	if (checkCrossCommNeedsAdvancing("appl_isDestructible")) {
+		LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? no. _clause_comm still has clauses left to share\n",  getId(),_my_rank);
+		return false;
+	}
 
 	int _running_sweepers = _started_sweepers_count - _finished_sweepers_count;
 	if (_finished_sweepers_count < _nThreads) {
@@ -552,8 +575,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		_sweepers[localId].reset();  //this should delete the only persistent shared pointer on the solver, and thus trigger its destructor soon
 		_running_sweepers_count--;
 		_finished_sweepers_count++;
-		LOG(V3_VERB, "SWEEP [%i](%i) WORKER EXIT, %i left \n", _my_rank, localId, _running_sweepers_count.load());
-
+		LOG(V3_VERB, "SWEEP [%i](%i) WORKER EXIT, %i left running\n", _my_rank, localId, _running_sweepers_count.load());
 	});
 }
 
@@ -808,6 +830,13 @@ void SweepJob::reportEndStats(KissatPtr sweeper) {
 void SweepJob::printIdleWorkStatus() {
 	if (_terminate_all.load(std::memory_order_relaxed))
 		return; //prevent segfault! when termination is triggered, the sweeper references might suddenly become invalid. no touching them
+
+	const float STATUS_PERIOD = 0.030; //status every 30ms
+
+	if (Timer::elapsedSeconds() - _timestamp_last_idleinfo < STATUS_PERIOD) {
+		return;
+	}
+	_timestamp_last_idleinfo = Timer::elapsedSeconds();
 
 	int idles = 0;
 	int longterm_idles = 0;
@@ -1597,7 +1626,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 std::vector<int> SweepJob::stealWorkFromAnyLocalSolver(int asking_rank, int asking_sourceLocalId) { //Parameters are only used for verbose logging, don't influence function behaviour
 	auto rand_permutation = getRandomIdPermutation();
 
-	LOG(V1_WARN, "SWEEP [%i] ask from [%i](%i) to steal from any local solver \n",_my_rank, asking_rank, asking_sourceLocalId);
+	// LOG(V1_WARN, "SWEEP [%i] ask from [%i](%i) to steal from any local solver \n",_my_rank, asking_rank, asking_sourceLocalId);
 	for (int localId : rand_permutation) {
 		auto stolen_work = stealWorkFromSpecificLocalSolver(localId);
 		if ( ! stolen_work.empty()) {
@@ -1626,7 +1655,7 @@ struct scoped_guard {
 
 std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 
-	LOG(V1_WARN, "SWEEP [%i] stealattempt into (%i) \n",_my_rank, localId);
+	// LOG(V1_WARN, "SWEEP [%i] stealattempt into (%i) \n",_my_rank, localId);
 	if (_terminate_all.load(std::memory_order_relaxed)) //sweeping finished globally, nothing to steal anymore
 		return {};
 	if ( ! _sweepers[localId]) {
@@ -1645,7 +1674,7 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	//The congruence closure solver will always return 0, as it doesnt operate on work and doesnt have any
 	int max_steal_amount = shweep_get_max_steal_amount(sweeper->solver);
 
-	LOG(V1_WARN, "SWEEP [%i] stealattempt into (%i) max : %i \n",_my_rank, localId, max_steal_amount);
+	// LOG(V1_WARN, "SWEEP [%i] stealattempt into (%i) max : %i \n",_my_rank, localId, max_steal_amount);
 
 	if (max_steal_amount < MIN_STEAL_AMOUNT)
 		return {};
@@ -1684,7 +1713,7 @@ std::vector<int> SweepJob::getRandomIdPermutation() {
 }
 
 void SweepJob::crossjob_rootReceiveClauses(std::vector<int>  &&clauses) {
-	if (!_params.sweepImportFromCrossjob()) {
+	if (!_params.sweepXJrecvFrom()) {
 		return;
 	}
 
@@ -1740,7 +1769,8 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 }
 
 void SweepJob::triggerTerminations() {
-	LOG(V2_INFO, "SWEEP TERM #%i [%i] trigger solver terminations (ctx %i). State before: Running %i, Finished %i \n", getId(), _my_rank, _my_ctx_id, _running_sweepers_count.load(), _finished_sweepers_count.load());
+	checkCrossCommNeedsAdvancing("triggerTerminations");
+	LOG(V2_INFO, "SWEEP TERM #%i [%i] trigger solver terminations (ctx %i). Of: Running %i, Finished %i \n", getId(), _my_rank, _my_ctx_id, _running_sweepers_count.load(), _finished_sweepers_count.load());
 	int i=0;
 	for (auto &sweeper : _sweepers) {
 		if (sweeper) {
@@ -1751,8 +1781,6 @@ void SweepJob::triggerTerminations() {
 		}
 		i++;
 	}
-
-
 }
 
 SweepJob::~SweepJob() {

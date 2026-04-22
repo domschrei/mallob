@@ -51,11 +51,11 @@ MALLOB_OPTIONS="-t=$threads \
   -cjc=1 \
   -fcll=2 \
   -swpxs=0 \
-  -swpxi=0 \
+  -swpxr=0 \
   -app-comm-period=0.22 \
 	-preprocess-sweep-n-sat=1 \
   -preprocess-sweep-priority=1.0 \
-	-sweep-sharing-period=0.020 \
+	-sweep-sharing-period=0.100 \
   -sweep-resweep-chance=1000 \
 	-sweep-solver-verbosity=1 \
 	-sweep-solver-quiet=1 \

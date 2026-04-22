@@ -18,6 +18,6 @@ OPT_INT(sweepMinExitSwept,      "swpmes",   "sweep-min-exit-swept",     40000, 0
 OPT_INT(sweepTermNoProgress,    "swptnp",   "sweep-term-no-progress",   1, 0, 1, "terminate sweeping after an iteration made no progress at all")
 OPT_BOOL(sweepShuffleWork,		"swpsw", 	"sweep-shuffle-work",		true, "Shuffle the work that is provided at the start of each iteration")
 OPT_BOOL(sweepToCompletion,		"swptoc", 	"sweep-to-completion",		false, "Sweep indefinitely to completion (or timeout). Increase env size only when no more progress")
-OPT_BOOL(sweepSendToCrossjob,		"swpxs", 	"sweep-send-to-cjc",		true, "Sweep sends its units and equivalences via cjc to the concurrent SAT job ")
-OPT_BOOL(sweepImportFromCrossjob,	"swpxi", 	"sweep-import-from-cjc",	true, "Sweep imports units via cjc from the concurrent SAT job")
+OPT_BOOL(sweepXJsendTo,			"swpxs", 	"sweep-xj-send",			true, "Sweep sends its units and equivalences via cjc to the concurrent SAT job ")
+OPT_BOOL(sweepXJrecvFrom,		"swpxr", 	"sweep-xj-recv",			true, "Sweep imports units via cjc from the concurrent SAT job")
 
