@@ -501,8 +501,11 @@ private:
 		// }
 	}
 
-	std::vector<int> getPreparedClauses(Checksum&, int&, int&) override {
-		LOG(V1_WARN, "[SweepJob] Called stub: getPreparedClauses. return {}\n");
+
+	std::vector<int> getPreparedClauses(Checksum& checksum, int& successfulSolverId, int& numLits) override {
+		successfulSolverId = -1;
+		numLits = 0;
+		LOG(V1_WARN, "[SweepJob] Called stub: getPreparedClauses. return succSolver -1 , numLits 0, vector {}\n");
 		_crossjob_has_prepared_sharing = false; //mirroring the behaviour in inter_job_clause_sharer.hpp
 		return {};
 	}

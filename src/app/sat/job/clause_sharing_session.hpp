@@ -104,13 +104,15 @@ public:
             // Produce contribution to all-reduction of clauses
             _allreduce_clauses.produce([&]() {
                 Checksum checksum;
-                int successfulSolverId;
-                int numLits;
+                int successfulSolverId=-1; //initialize here, such that in case an new implementation of getPreparedClauses forgets to overwrite them, we don't crash with uninitialized values.
+                int numLits=0;
                 auto clauses = _job->getPreparedClauses(checksum, successfulSolverId, numLits);
                 LOG(V4_VVER, "%s CS produced cls size=%lu lits=%i/%i\n", _job->getLabel(), clauses.size(), numLits, _local_export_limit);
+                LOG(V4_VVER, "%s CS produced metadata: successfulSolverId %i, numLits %i \n", _job->getLabel(), successfulSolverId, numLits);
                 auto agg = InplaceClauseAggregation::prepareRawBuffer(clauses,
                     _job->getClausesRevision(), numLits, 1, successfulSolverId,
                     _job->getBestFoundObjectiveCost());
+                LOG(V4_VVER, "%s CS return cls size=%lu  (after prepareRawBuffer(...) inplace aggr\n", _job->getLabel(), clauses.size());
                 return clauses;
             });
 
