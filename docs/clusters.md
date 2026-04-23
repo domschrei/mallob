@@ -101,12 +101,7 @@ Login to the cluster. First load the modules necessary for building, like this:
 
 In the `mallob` directory with all dependencies fetched, you can build Mallob like this:
 
-    ( cd lib && bash fetch_and_build_solvers.sh kcly )
-    mkdir -p build
-    cd build
-    CC=$(which mpicc) CXX=$(which mpicxx) cmake -DMALLOB_USE_JEMALLOC=0 ${OPTIONS} ..
-    VERBOSE=1 make -j 8
-    cd ..
+    CC=$(which mpicc) CXX=$(which mpicxx) bash scripts/setup/cmake-make.sh build ${OPTIONS}
 
 Set `${OPTIONS}` to the build options you desire.
 
