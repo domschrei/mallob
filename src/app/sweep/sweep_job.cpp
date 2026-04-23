@@ -24,41 +24,9 @@ extern "C" {
 
 SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table)
     : BaseSatJob(params, setup, table),
-	_nThreads(min( getNumThreads(), _params.numThreadsPerProcess.val)),
 	_reslogger(Logger::getMainInstance().copy("<RESULT>", ".sweep")),
 	_warnlogger(Logger::getMainInstance().copy("<WARN>", ".warn")),
 	_contriblogger(Logger::getMainInstance().copy("<CONTRIB>", ".contrib"))
-
-	// /**
-	// _clause_store([&]() -> GenericClauseStore* {
-	// 	bool resetLbdAtExport = _params.resetLbd() == MALLOB_RESET_LBD_AT_EXPORT;
-	// 	int staticBucketSize = (2*_params.exportVolumePerThread()*_nThreads)/3;
-	// 	switch(_params.clauseStoreMode()) {
-	// 	case MALLOB_CLAUSE_STORE_STATIC_BY_LENGTH_MIXED_LBD:
-	// 			return new StaticClauseStoreMixedLbd(_params.strictClauseLengthLimit()+ClauseMetadata::numInts(),
-	// 				resetLbdAtExport, staticBucketSize);
-	// 		case MALLOB_CLAUSE_STORE_STATIC_BY_LENGTH:
-	// 			return new StaticClauseStore<true>(_params,
-	// 				resetLbdAtExport, staticBucketSize, false, 0);
-	// 		case MALLOB_CLAUSE_STORE_STATIC_BY_LBD:
-	// 			return new StaticClauseStoreByLbd(_params.strictClauseLengthLimit()+ClauseMetadata::numInts(),
-	// 				resetLbdAtExport, staticBucketSize);
-	// 		case MALLOB_CLAUSE_STORE_ADAPTIVE_SIMPLE:
-	// 			return new StaticClauseStore<true>(_params,
-	// 				resetLbdAtExport, 256, true,
-	// 				_params.exportVolumePerThread()*_nThreads*_params.numExportChunks());
-	// 		case MALLOB_CLAUSE_STORE_ADAPTIVE:
-	// 		default:
-	// 			AdaptiveClauseStore::Setup setup;
-	// 			setup.maxEffectiveClauseLength = _params.strictClauseLengthLimit()+ClauseMetadata::numInts();
-	// 			setup.maxLbdPartitionedSize = _params.maxLbdPartitioningSize();
-	// 			setup.numLiterals = _params.exportVolumePerThread()*_nThreads*_params.numExportChunks();
-	// 			setup.slotsForSumOfLengthAndLbd = _params.groupClausesByLengthLbdSum();
-	// 			setup.resetLbdAtExport = resetLbdAtExport;
-	// 			return new AdaptiveClauseStore(setup);
-	// 		}
-	// }())
-	// */
 {
 	assert(_params.jobCommUpdatePeriod() > 0 || log_return_false("[ERROR] For this application to work,"
             " you must explicitly enable job communicators with the -jcup option, e.g., -jcup=0.1\n"));
@@ -100,7 +68,7 @@ void SweepJob::appl_start() {
 	_my_index = getJobTree().getIndex();
 	_my_ctx_id = getJobTree().getContextId();
 	_is_root = getJobTree().isRoot();
-	// _nThreads = min( getNumThreads(), _params.numThreadsPerProcess.val); //done in constructor
+	_nThreads = min( getNumThreads(), _params.numThreadsPerProcess.val); //done in constructor
 	if (_nThreads < _params.numThreadsPerProcess.val) {
 		LOG(V1_WARN,"SWEEP WARN : cut down threads to %i \n", _nThreads);
 	}
@@ -117,7 +85,6 @@ void SweepJob::appl_start() {
 
 	_nThreads = _params.numThreadsPerProcess.val;
 
-	_clause_comm.reset(new AnytimeSatClauseCommunicator(_params, this, false));
 
 	// LOG(V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d\n",
 		// _my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _nThreads);
@@ -157,7 +124,8 @@ void SweepJob::appl_start() {
 	}
 
 	if (_params.crossJobCommunication()) {
-        _clause_comm = std::make_unique<AnytimeSatClauseCommunicator>(_params, this);
+        _clause_comm = std::make_unique<AnytimeSatClauseCommunicator>(_params, this, false);
+		// _clause_comm.reset(new AnytimeSatClauseCommunicator(_params, this, false));
 	}
 
 	//set some general metadata information
@@ -205,7 +173,7 @@ void SweepJob::appl_communicate() {
 		_clause_comm->communicate(); //triggers digestSharingWithoutFilter(...) on this rank, where we receive the shared data from the other jobs
 	}
 	while (hasDeferredMessage()) {
-		LOG(V2_INFO, "SWEEP CJC has deferred message\n");
+		LOG(V2_INFO, "SWEEP has deferred message\n");
 		auto deferredMsg = getDeferredMessage();
 		_clause_comm->handle(
 			deferredMsg.source, deferredMsg.mpiTag, deferredMsg.msg);
@@ -256,6 +224,9 @@ void SweepJob::tryReportToMallob() { //needs to be called from the main thread
 }
 
 bool SweepJob::checkCrossCommNeedsAdvancing(const std::string &from) {
+	if (!_clause_comm) {
+		return false;
+	}
 	if (_staged_solved_status!=-1 || _terminate_all) {
 		if (_clause_comm->hasLocalClausesLeftToShare()) {
 			LOG(V2_INFO, "SWEEP _clause_comm->hasLocalClausesLeftToShare() == true . Advancing now. Called from:  %s \n", from.c_str());
@@ -1271,7 +1242,7 @@ void SweepJob::rootStartNewSharingRound() {
 	}
 
 	if (!_root_initwork_startedproviding) {
-		LOG(V3_VERB, "SWEEP root: Wait with next round, haven't started yet to provide new initial work\n");
+		LOG(V3_VERB, "SWEEP root: Wait with next round, not yet started providing (new) initial work\n");
 		return;
 		//Waiting until _starting_ to provide initial work seems the sweet-spot in terms of waiting
 		//If we didn't check for initial work at all, then it can happen that we have multiple sharing rounds after an iteration ends, which can share all_idle multiple times and could lead to skipped iterations
@@ -1738,7 +1709,7 @@ void SweepJob::crossjob_rootReceiveClauses(std::vector<int>  &&clauses) {
 			clause = reader.getNextIncomingClause();
 		}
 		int after = _crossjob_root_received_units.size();
-		LOG(V2_INFO, "  sconsume consumed i% units \n", after - before);
+		LOG(V2_INFO, "  sconsume consumed %i units \n", after - before);
 	}
 }
 

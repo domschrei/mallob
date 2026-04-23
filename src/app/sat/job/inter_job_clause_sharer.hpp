@@ -202,7 +202,7 @@ public:
         int nbExportedClauses;
         _internal_shared_clauses = _clause_store->exportBuffer(size, nbExportedClauses, _nb_internal_shared_lits,
             GenericClauseStore::ANY, /*sortClauses=*/true);
-        LOG(V4_VVER, "%s XTCS prepareSharing from clause_store: size %i, clauses %i\n", _label.c_str(), _internal_shared_clauses.size(), nbExportedClauses);
+        LOG(V4_VVER, "%s XTCS prepareSharing got: size %i  clauses %i\n", _label.c_str(), _internal_shared_clauses.size(), nbExportedClauses);
         _has_prepared_internal_shared_clauses = true;
         _epoch++;
         _clause_filter->updateEpoch(_epoch);

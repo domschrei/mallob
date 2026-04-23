@@ -311,7 +311,7 @@ private:
 			}
 			auto buffer = bb.extractBuffer();
 			if (_params.sweepXJsendTo()) {
-				LOG(V1_WARN, "snsSweep feed to XTCS size %i (eq-cls %i, unit-cls %i)\n",  buffer.size(), n_eqs*2, n_sweep_units);
+				LOG(V1_WARN, "snsSweep feed to XTCS size %i  clauses %i \n", buffer.size(), n_eqs*2 + n_sweep_units);
 			} else {
 				LOG(V1_WARN, "snsSweep feed dummy buffer to Crosssharing: buffersize %i\n", buffer.size());
 			}
@@ -529,7 +529,7 @@ private:
 	}
 
 	void digestSharingWithoutFilter(int epoch, std::vector<int>  &&clauses, bool stateless) override {
-		LOG(V1_WARN, "SWEEP CJC: received digestSharingWithoutFilter with clauses.size()==%i\n",clauses.size());
+		LOG(V1_WARN, "SWEEP receive XTCS size %i\n",clauses.size());
 		if (_is_root) {
 			crossjob_rootReceiveClauses(std::move(clauses));
 		}
