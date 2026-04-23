@@ -311,7 +311,7 @@ private:
 			}
 			auto buffer = bb.extractBuffer();
 			if (_params.sweepXJsendTo()) {
-				LOG(V1_WARN, "snsSweep feed to Crosssharing: eq-clauses %i, unit-clauses %i --> buffersize %i\n", n_eqs*2, n_sweep_units, buffer.size());
+				LOG(V1_WARN, "snsSweep feed to XTCS size %i (eq-cls %i, unit-cls %i)\n",  buffer.size(), n_eqs*2, n_sweep_units);
 			} else {
 				LOG(V1_WARN, "snsSweep feed dummy buffer to Crosssharing: buffersize %i\n", buffer.size());
 			}
