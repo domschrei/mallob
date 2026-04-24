@@ -11,7 +11,7 @@ mkdir -p "$builddir"
 priordir=$(pwd)
 cd "$builddir"
 
-cmake -DMALLOB_SUBPROC_DISPATCH_PATH=\""$builddir"/\" $@ ..
+cmake -DMALLOB_SUBPROC_DISPATCH_PATH=\""$builddir"/\" -DCMAKE_BUILD_TYPE=RELEASE $@ ..
 
 #VERBOSE=1 \
 make -j
