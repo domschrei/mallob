@@ -43,6 +43,7 @@ ForkedSatJob::ForkedSatJob(const Parameters& params, const JobSetup& setup, AppM
 }
 
 void ForkedSatJob::appl_start() {
+    LOG(V4_VVER, "§ ForkedSatJob appl_start()\n");
     assert(!_initialized);
     _core_alloc.requestCores(getNumThreads());
     setNumThreads(_core_alloc.getNbAllocated());

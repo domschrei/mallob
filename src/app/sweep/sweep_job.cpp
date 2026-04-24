@@ -80,6 +80,7 @@ void SweepJob::appl_start() {
 		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _nThreads, numVars, numClauses);
 	LOG(V2_INFO,"SWEEP_PAYLOAD_SIZE %i\n", getDescription().getFormulaPayloadSize(0));
 
+	LOG(V2_INFO,"SWEEP XJCS active: %i \n", _params.crossJobCommunication());
 	LOG(V2_INFO,"SWEEP XJCS option: send to   SAT: %i \n", _params.sweepXJsendTo());
 	LOG(V2_INFO,"SWEEP XJCS option: recv from SAT: %i \n", _params.sweepXJrecvFrom());
 
@@ -171,12 +172,11 @@ void SweepJob::appl_communicate() {
 
 	if (_clause_comm) {
 		_clause_comm->communicate(); //triggers digestSharingWithoutFilter(...) on this rank, where we receive the shared data from the other jobs
-	}
-	while (hasDeferredMessage()) {
-		LOG(V2_INFO, "SWEEP has deferred message\n");
-		auto deferredMsg = getDeferredMessage();
-		_clause_comm->handle(
-			deferredMsg.source, deferredMsg.mpiTag, deferredMsg.msg);
+		while (hasDeferredMessage()) {
+			LOG(V2_INFO, "SWEEP has deferred message\n");
+			auto deferredMsg = getDeferredMessage();
+			_clause_comm->handle(deferredMsg.source, deferredMsg.mpiTag, deferredMsg.msg);
+		}
 	}
 
 	checkSharingDelay();
@@ -248,13 +248,21 @@ bool SweepJob::checkCrossCommNeedsAdvancing(const std::string &from) {
 // React to an incoming message. (This becomes relevant only if you send custom messages)
 void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 
-	if (!_clause_comm) {
-		LOG(V1_WARN, " [WARN] Return to sender: ForkedSatJob::appl_communicate(): not initialized! \n");
-        msg.returnToSender(sourceRank, mpiTag);
-		return;
-	} else if (_clause_comm->handle(sourceRank, mpiTag, msg)) {
-		LOG(V1_WARN, " CJC _clause_comm->handle() got message \n");
-		return;
+	// if (_params.crossJobCommunication()) {
+		// if (!_clause_comm) {
+			// LOG(V1_WARN, " [WARN] Return to sender: ForkedSatJob::appl_communicate(): not initialized! \n");
+			// msg.returnToSender(sourceRank, mpiTag);
+			// return;
+		// } else if (_clause_comm->handle(sourceRank, mpiTag, msg)) {
+			// LOG(V1_WARN, " CJC _clause_comm->handle() got message \n");
+			// return;
+		// }
+	// }
+	if (_params.crossJobCommunication() && _clause_comm) {
+		if (_clause_comm->handle(sourceRank, mpiTag, msg)) {
+			LOG(V2_INFO, " _clause_comm->handle() got message in SweepJob::communicate \n");
+			return;
+		}
 	}
 
 	// LOG(V2_INFO, "Shweep rank %i: received custom message from source %i, mpiTag %i, msg.tag %i \n", _my_rank, source, mpiTag, msg.tag);
@@ -1121,7 +1129,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	int localId = sweeper->getLocalId();
 	sweeper->work_received_from_steal = {};
 
-	// LOG(V3_VERB, "Sweeper [%i](%i) stealing \n", _my_rank, localId);
+	LOG(V3_VERB, "Sweeper [%i](%i) stealing \n", _my_rank, localId);
 
 	if (_terminate_all.load(std::memory_order_relaxed)) {
 		sweeper->sweeper_is_idle = true;
@@ -1153,6 +1161,8 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 
 	//Check whether a previously queued MPI request has been answered
 	if (request.got_steal_response) {
+
+		LOG(V3_VERB, "Sweeper [%i](%i) got steal response \n", _my_rank, localId);
 		float t1 = Timer::elapsedSeconds();
 		int size = request.stolen_work.size();
 		assert(request.to_send  == false			|| log_return_false("SWEEP ERROR : got request response, but still   request.to_send==true.             stealingLocalId %i, payload.size %zu ", localId, size));
@@ -1170,6 +1180,13 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	if (request.is_active) {
 		//an MPI request is queued, we wait for it's response and will not try to steal locally meanwhile
 		//since the request is queued, there is nothing else to do for now, can way ~2ms
+		const float STEALDELAY_WARN_TRIGGER=0.1; //Warn if MPI stealing request is not answered after 100ms
+		float delay = Timer::elapsedSeconds() - request.t_queued;
+		if (delay > STEALDELAY_WARN_TRIGGER) {
+			LOG(V1_WARN, "WARN STEALDELAY at [%i](%i)! waiting %f s  \n", _my_rank, localId, delay);
+		}
+
+		LOG(V3_VERB, "Sweeper [%i](%i) waits for active request to return \n", _my_rank, localId);
 		usleep(2000);
 		return;
 	}
@@ -1194,6 +1211,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	//This indirection is necessary because sending MPI messages from any other thread (like this solver thread) can cause MPI problems
 	if (request.is_active == false && !skip_MPI_forNow()) {
 		request.newQueuedRequest(localId, sweeper->attempted_steals++);
+		LOG(V3_VERB, "Sweeper [%i](%i) queued new request \n", _my_rank, localId);
 	}
 
 	// If we make it until here we are waiting for work and have have nothing else to do for now. Can wait for  ~2 millisecond until we check the system again.
@@ -1598,7 +1616,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 std::vector<int> SweepJob::stealWorkFromAnyLocalSolver(int asking_rank, int asking_sourceLocalId) { //Parameters are only used for verbose logging, don't influence function behaviour
 	auto rand_permutation = getRandomIdPermutation();
 
-	// LOG(V1_WARN, "SWEEP [%i] ask from [%i](%i) to steal from any local solver \n",_my_rank, asking_rank, asking_sourceLocalId);
+	LOG(V1_WARN, "SWEEP [%i] ask from [%i](%i) to steal from any local solver \n",_my_rank, asking_rank, asking_sourceLocalId);
 	for (int localId : rand_permutation) {
 		auto stolen_work = stealWorkFromSpecificLocalSolver(localId);
 		if ( ! stolen_work.empty()) {

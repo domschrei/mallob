@@ -285,7 +285,7 @@ private:
 
 		//Cross-Job Interaction.
 		//Send my units and equivalences to the cross-job sharing
-		if (_params.crossJobCommunication()) {
+		if (_clause_comm && _params.crossJobCommunication()) {
 			assert(_clause_comm || log_return_false("Sweep ERROR: _clause_comm object missing\n"));
 			BufferBuilder bb(-1, 10, false);
 			//For debugging purposes another flag for actually sending our stuff to cjc
@@ -328,7 +328,6 @@ private:
 			}
 			_crossjob_has_prepared_sharing = true;
 		}
-
 
 
 		//Integrate units which were received via Cross-Job Sharing into the sweep-internal sharing vector
