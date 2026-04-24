@@ -133,8 +133,6 @@ void SweepJob::appl_start() {
 	_internal_result.id = getId();
 	_internal_result.revision = getRevision();
 
-
-
 	LOG(V3_VERB, "SWEEP appl_start() FINISHED\n");
 }
 
@@ -1733,14 +1731,14 @@ void SweepJob::crossjob_rootReceiveClauses(std::vector<int>  &&clauses) {
 				memcpy(&id, clause.begin, sizeof(uint64_t));
 			}
 			if (clause.size==1) {
-				LOG(V2_INFO, "  sconsume (only <=1): %s\n", clause.toStr().c_str());
+				// LOG(V2_INFO, "  sconsume (only <=1): %s\n", clause.toStr().c_str());
 				assert(clause.begin[0]!=0 || log_return_false("snsSweep ERROR : got crossjob unit literal 0\n"));
 				_crossjob_root_received_units.push_back(clause.begin[0]);
 			}
 			clause = reader.getNextIncomingClause();
 		}
 		int after = _crossjob_root_received_units.size();
-		LOG(V2_INFO, "  sconsume consumed %i units \n", after - before);
+		LOG(V4_VVER, "  sconsume consumed %i units \n", after - before);
 	}
 }
 
@@ -1799,7 +1797,7 @@ SweepJob::~SweepJob() {
 		LOG(V1_WARN, "SWEEP [%i] WARN : didn't clear all imported rounds. lastCleared %i, lastImported %i \n", _my_rank, _lastClearedRound, _lastImportedRound.load());
 	}
 	if (_lastImportedRound==0) {
-		LOG(V1_WARN, "SWEEP [%i] WARN : rank didn't receive a single sharing round! \n", _my_rank);
+		LOG(V1_WARN, "SWEEP [%i] WARN : rank didn't receive a single sharing round! (irrelevant if only 1 rank present) \n", _my_rank);
 	}
 	// triggerTerminations();
 	LOG(V3_VERB, "SWEEP JOB DESTRUCTOR DONE\n");

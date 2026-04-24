@@ -28,6 +28,7 @@ threads=4
 echo "NPROCS $NPROCS"
 echo "threads per process $threads"
 
+# APP="SAT"
 # APP="SWEEP"
 APP="SATWITHPRE"
 
@@ -46,16 +47,15 @@ MALLOB_OPTIONS="-t=$threads \
 	-seed=1 \
   -spl=-1 \
 	-jcup=0.05 \
-  -sleep=10 \
+  -sleep=100 \
 	-v=4 \
   -cjc=1 \
   -swpxs=1 \
   -swpxr=1 \
   -fcll=2 \
-  -app-comm-period=0.22 \
-	-preprocess-sweep-n-sat=1 \
+	-preprocess-sweepnsat=1 \
   -preprocess-sweep-priority=1.0 \
-	-sweep-sharing-period=0.050 \
+	-sweep-sharing-period=0.020 \
   -sweep-resweep-chance=1000 \
 	-sweep-solver-verbosity=0 \
 	-sweep-solver-quiet=1 \

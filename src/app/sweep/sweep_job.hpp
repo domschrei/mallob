@@ -283,13 +283,10 @@ private:
 		payload[payload.size() - METADATA_END_ITERATION] = send_end_iteration;
 		payload[payload.size() - METADATA_TERMINATE] = send_terminate;
 		payload[payload.size() - METADATA_ENVCOMPLETIONS] = _root_env_completions;
-		//the all_idle payload is already set
 
-		//create char to print the same msg in two logs
-		//once for completeness chronologically in the general logs, and once in a special smaller file on the root node for easier postprocessing
 
-		//Cross-Job Interaction.
-		//Send my units and equivalences to the cross-job sharing
+
+		//Send my units and equivalences via cross-job communication to the SAT job
 		if (_clause_comm && _params.crossJobCommunication()) {
 			assert(_clause_comm || log_return_false("Sweep ERROR: _clause_comm object missing\n"));
 			BufferBuilder bb(-1, 10, false);
@@ -300,13 +297,13 @@ private:
 				for (int i=eq_size; i<eq_size+n_sweep_units; i++) {
 					int unit = payload[i];
 					bb.append({&unit, 1, 1});
-					LOG(V2_INFO, "   sproduce: %i\n", unit);
+					// LOG(V4_VVER, "   sproduce: %i\n", unit);
 				}
 				//Read equivalences (need to append to the buffer after units, because they have a larger clause length)
 				for (int i=0; i < eq_size; i+=2) {
 					int elit1 = payload[i];
 					int elit2 = payload[i+1];
-					//Convert elit1==elit2 in CNF form
+					//Represent elit1==elit2 in CNF form
 					int cnfA[2] = {-elit1, elit2};
 					int cnfB[2] = {-elit2, elit1};
 					bb.append({&cnfA[0],2,2});
@@ -316,7 +313,7 @@ private:
 			}
 			auto buffer = bb.extractBuffer();
 			if (_params.sweepXJsendTo()) {
-				LOG(V1_WARN, "snsSweep feed to XTCS size %i  clauses %i \n", buffer.size(), n_eqs*2 + n_sweep_units);
+				LOG(V1_WARN, "snsSweep feed to XTCS:  size %i  clauses %i \n", buffer.size(), n_eqs*2 + n_sweep_units);
 			} else {
 				LOG(V1_WARN, "snsSweep feed dummy buffer to Crosssharing: buffersize %i\n", buffer.size());
 			}
@@ -334,11 +331,8 @@ private:
 			_crossjob_has_prepared_sharing = true;
 		}
 
-
-		//Integrate units which were received via Cross-Job Sharing into the sweep-internal sharing vector
-		//This way, only the root rank "knows" which units came from sweeping and which from the cross-job sharing
-		//All other ranks will just receive a larger sharing vector, without the details which units came from where
-		int crossjob_units_added = 0;
+		//Pass down units from the SAT job to all sweepers.
+		int crossjob_units_received = 0;
 		if (_params.crossJobCommunication() && _params.sweepXJrecvFrom()) {
 			std::lock_guard<std::mutex> lock(_crossjob_import_mutex);
 			if (!_crossjob_root_received_units.empty()) {
@@ -349,26 +343,28 @@ private:
 					_crossjob_root_received_units.begin(),
 					_crossjob_root_received_units.end()
 				);
-				for (int elit : _crossjob_root_received_units) {
-					LOG(V2_INFO, "SWEEP [%i](root-trf) splice-in %i \n", _my_rank, elit);
-				}
-				crossjob_units_added = static_cast<int>(_crossjob_root_received_units.size());
-				assert(payload.size() == eq_size + n_sweep_units + crossjob_units_added + NUM_METADATA_FIELDS);
-				const int total_units = n_sweep_units + crossjob_units_added;
-				//updated stored unit count to reflect the additions.
-				payload[payload.size() - METADATA_UNIT_SIZE] = total_units;
-				LOG(V2_INFO, "SWEEP [%i](root-trf) spliced cross-job units into payload: %i \n", _my_rank, crossjob_units_added, n_sweep_units);
+				// for (int elit : _crossjob_root_received_units) {
+					// LOG(V2_INFO, "SWEEP [%i](root-trf) splice-in %i \n", _my_rank, elit);
+				// }
+				crossjob_units_received = static_cast<int>(_crossjob_root_received_units.size());
+				assert(payload.size() == eq_size + n_sweep_units + crossjob_units_received + NUM_METADATA_FIELDS);
+				const int total_units = n_sweep_units + crossjob_units_received;
 
+				//updated stored unit count to reflect the additions. Otherwise the sweepers would not know that we added new units
+				payload[payload.size() - METADATA_UNIT_SIZE] = total_units;
+
+				// LOG(V2_INFO, "SWEEP [%i](root-trf) units received spliced : %i \n", _my_rank, crossjob_units_added, n_sweep_units);
 				//discard the temporary buffer, to not import the same units a second time
 				_crossjob_root_received_units.clear();
 			}
 		}
 
 
+		//Copy message, once for chronological view in the general logs, once in a special smaller file (on the root node) for easier postprocessing
 		char logmsg[512];
 		snprintf(logmsg, sizeof(logmsg),
 			"SWEEP [%i](root-trf) send: act,idle %i,%i  envsize %i iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i   SW %i  ST %i  RE %i    Sched, Swept  %i  %i    ( %.2f ,  %.2f )°/.   succ-rate %.6f   \n",
-			_my_rank, active_count, idle_count, _root_env_completions, _root_sweep_iteration, _root_sharing_round, all_idle,  send_end_iteration, send_terminate, n_eqs, n_sweep_units, crossjob_units_added,
+			_my_rank, active_count, idle_count, _root_env_completions, _root_sweep_iteration, _root_sharing_round, all_idle,  send_end_iteration, send_terminate, n_eqs, n_sweep_units, crossjob_units_received,
 			work_sweeps, work_stepovers, work_unsched_resweeps, work_sweeps + work_stepovers, work_sweeps + work_unsched_resweeps,
 			100*(work_sweeps + work_stepovers)/(double)_numVars , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars,
 			progress_ratio

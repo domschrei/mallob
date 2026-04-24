@@ -121,16 +121,18 @@ public:
         if (_base_job_submitted && !_base_job_done) {
             interrupt(_base_job_submission, _base_job_done);
             while (!_base_job_done) usleep(5*1000);
+            LOG(V2_INFO, "SATWP SATsns interrupt done.\n");
         }
         if (_sweep_job_submitted && !_sweep_job_done) {
             interrupt(_sweep_job_submission, _sweep_job_done);
             while (!_sweep_job_done) usleep(5*1000);
+            LOG(V2_INFO, "SATWP SWEEPsns interrupt done.\n");
         }
 
         if (res.result==IMPROVED) //if the only thing we got back is an improvement by the sweeping, the final result is still unknown
             res.result = UNKNOWN;
 
-        LOG(V2_INFO, "#%i SATWP SNS RES ~%i~\n", _desc.getId(), res.result);
+        LOG(V2_INFO, "#%i SATWP SweepNSat RES ~%i~\n", _desc.getId(), res.result);
         return res;
     }
 
@@ -289,7 +291,7 @@ private:
         auto& json = _base_job_submission;
         json = {
             {"user", "sat-" + std::string(toStr())},
-            {"name", std::string(toStr())+":sns"},
+            {"name", std::string(toStr())+":SATsns"},
             {"priority", 1.000},
             {"application", "SAT"}
         };
@@ -303,8 +305,8 @@ private:
             json["wallclock-limit"] = std::to_string(_desc.getWallclockLimit() - getAgeSinceActivation()) + "s";
         if (_desc.getCpuLimit() > 0)
             json["cpu-limit"] = std::to_string(_desc.getCpuLimit() - getAgeSinceActivation()) + "s";
-        if (_params.snsOverrideSatOptions())
-            json["configuration"]["options"] = SATWITHPRE_OPT_SNS_OVERRIDES; //using plain solver type "k_", most important is that it does not delete/rename variables
+        // if (_params.snsOverrideSatOptions())
+            // json["configuration"]["options"] = SATWITHPRE_OPT_SNS_OVERRIDES; //using plain solver type "k_", most important is that it does not delete/rename variables
 
         LOG(V2_INFO, "SATWP Starting SATsns Job: %d Vars\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NV"));
         LOG(V2_INFO, "SATWP Starting SATsns  Job: %d Clauses\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));

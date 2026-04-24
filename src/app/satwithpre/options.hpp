@@ -23,4 +23,4 @@ OPT_BOOL(overrideSatOptions, "oso", "override-sat-options", true,
     "In the SAT sub-tasks, override SAT solving options with \"" + std::string(SATWITHPRE_OPT_OVERRIDES) + "\"")
 OPT_BOOL(snsOverrideSatOptions, "snsoso", "sns-override-sat-options", true,
     "In the snsSAT sub-tasks, override snsSAT solving options with \"" + std::string(SATWITHPRE_OPT_SNS_OVERRIDES) + "\"")
-OPT_BOOL(preprocessSweepnSat, "preprocess-sweep-n-sat", "", false, "run the Sweep App next to a (CDCL) SAT App, exchange units and equivalence continously via cross job communication")
+OPT_BOOL(preprocessSweepnSat, "preprocess-sweepnsat", "", false, "run concurrently two Apps (Sweep and Sat) with cross job units and equivalence sharing")
