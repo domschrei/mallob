@@ -44,14 +44,14 @@ MALLOB_OPTIONS="-t=$threads \
   -rspaa=1 \
 	-rpa=1 \
 	-seed=1 \
+  -spl=-1 \
 	-jcup=0.05 \
   -sleep=10 \
 	-v=2 \
-  -spl=-1 \
-  -cjc=0 \
-  -fcll=2 \
+  -cjc=1 \
   -swpxs=1 \
   -swpxr=1 \
+  -fcll=2 \
   -app-comm-period=0.22 \
 	-preprocess-sweep-n-sat=1 \
   -preprocess-sweep-priority=1.0 \

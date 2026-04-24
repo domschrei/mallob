@@ -69,7 +69,8 @@ public:
     bool isDoneAssemblingProof() const {return _proof_producer && _proof_producer->isDoneAssemblingProof();}
 
     void feedLocalClausesIntoCrossSharing(std::vector<int>& clauses, ClauseSharingSession* session);
-    bool hasLocalClausesLeftToShare() const {return _cross_job_clause_sharer->hasClausesToBroadcastInternally();}
+    // For a mono job with no group (getGroupId() <= 0),  _cross_job_clause_sharer is initialized to nullptr, need to guard against that
+    bool hasLocalClausesLeftToShare() const {return _cross_job_clause_sharer && _cross_job_clause_sharer->hasClausesToBroadcastInternally();}
 
 private:
     bool handleClauseHistoryMessage(int source, int mpiTag, JobMessage& msg);
