@@ -114,9 +114,10 @@ private:
 	const int NUM_SEARCHING_WORK_FIELDS = 3; //how many fields are attached to an MPI message searching work
 
 	//each aggregation element has some metadata integers at the end
-	static const int NUM_METADATA_FIELDS = 11;
+	static const int NUM_METADATA_FIELDS = 12;
 		//field indices must be unique numbers exactly filling 1..NUM_METADATA_FIELDS !
-		static const int METADATA_ENVCOMPLETIONS   = 11;
+		static const int METADATA_ACTIVE_COUNT	     = 12;
+		static const int METADATA_ENVCOMPLETIONS     = 11;
 		static const int METADATA_END_ITERATION		  = 10;
 		static const int METADATA_WORK_SWEEPS		 = 9;
 		static const int METADATA_WORK_STEPOVERS	= 8;
@@ -124,7 +125,7 @@ private:
 		static const int METADATA_TERMINATE		  = 6;
 		static const int METADATA_SWEEP_ITERATION= 5;
 		static const int METADATA_SHARING_ROUND = 4;
-		static const int METADATA_IDLE		   = 3;
+		static const int METADATA_IDLE_COUNT   = 3;
 		static const int METADATA_UNIT_SIZE	  = 2;
 		static const int METADATA_EQ_SIZE    = 1;
 
@@ -213,10 +214,14 @@ private:
 		int n_sweep_units = payload[payload.size() - METADATA_UNIT_SIZE];
 		int eq_size  = payload[payload.size() - METADATA_EQ_SIZE];
 		int n_eqs	 = eq_size / 2;  //each equivalence takes up two integers
-		bool all_idle= payload[payload.size() - METADATA_IDLE];
+		// bool all_idle= payload[payload.size() - METADATA_IDLE];
+		int idle_count = payload[payload.size() - METADATA_IDLE_COUNT];
+		int active_count = payload[payload.size() - METADATA_ACTIVE_COUNT];
 		int work_sweeps			 = payload[payload.size() - METADATA_WORK_SWEEPS];
 		int work_stepovers		 = payload[payload.size() - METADATA_WORK_STEPOVERS];
 		int work_unsched_resweeps= payload[payload.size() - METADATA_UNSCHED_RESWEEPS];
+
+		bool all_idle = (active_count == 0);
 
 		_root_shared_units_this_iteration += n_sweep_units;
 		_root_shared_eqs_this_iteration   += n_eqs;
@@ -362,8 +367,8 @@ private:
 
 		char logmsg[512];
 		snprintf(logmsg, sizeof(logmsg),
-			"SWEEP [%i](root-trf) send: envsize %i iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i   SW %i  ST %i  RE %i    Sched, Swept  %i  %i    ( %.2f ,  %.2f )°/.   succ-rate %.6f   \n",
-			_my_rank, _root_env_completions, _root_sweep_iteration, _root_sharing_round, all_idle,  send_end_iteration, send_terminate, n_eqs, n_sweep_units, crossjob_units_added,
+			"SWEEP [%i](root-trf) send: act,idle %i,%i  envsize %i iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i   SW %i  ST %i  RE %i    Sched, Swept  %i  %i    ( %.2f ,  %.2f )°/.   succ-rate %.6f   \n",
+			_my_rank, active_count, idle_count, _root_env_completions, _root_sweep_iteration, _root_sharing_round, all_idle,  send_end_iteration, send_terminate, n_eqs, n_sweep_units, crossjob_units_added,
 			work_sweeps, work_stepovers, work_unsched_resweeps, work_sweeps + work_stepovers, work_sweeps + work_unsched_resweeps,
 			100*(work_sweeps + work_stepovers)/(double)_numVars , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars,
 			progress_ratio
@@ -446,7 +451,7 @@ private:
     void rootStartNewSharingRound();
     void cbContributeToAllReduce();
     static std::vector<int> aggregateEqUnitContributions(std::list<std::vector<int>> &contribs);
-	static void appendMetadataToReductionElement(std::vector<int> &contrib, int is_idle, int unit_size, int eq_size, int work_sweeps, int work_stepovers, int unsched_resweeps);
+	static void appendMetadataToReductionElement(std::vector<int> &contrib, int idle_count, int active_count, int unit_size, int eq_size, int work_sweeps, int work_stepovers, int unsched_resweeps);
 	void advanceAllReduction();
 	void extractAllReductionResult();
 

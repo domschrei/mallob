@@ -1285,7 +1285,7 @@ void SweepJob::rootStartNewSharingRound() {
 	_bcast->broadcast(std::move(msg));
 }
 
-void SweepJob::appendMetadataToReductionElement(std::vector<int> &contrib, int is_idle, int unit_size, int eq_size, int work_sweeps, int work_stepovers, int unsched_resweeps) {
+void SweepJob::appendMetadataToReductionElement(std::vector<int> &contrib, int idle_count, int active_count, int unit_size, int eq_size, int work_sweeps, int work_stepovers, int unsched_resweeps) {
 	contrib.insert(contrib.end(), NUM_METADATA_FIELDS, 0); //Make space for the upcoming metadata, initialized with zero
 	int size = contrib.size();
 	int n=0;
@@ -1294,7 +1294,8 @@ void SweepJob::appendMetadataToReductionElement(std::vector<int> &contrib, int i
 	n++; contrib[size - METADATA_SWEEP_ITERATION]= 0;  //dummy ""
 	n++; contrib[size - METADATA_SHARING_ROUND]  = 0;  //dummy ""
 	n++; contrib[size - METADATA_END_ITERATION]  = 0;  //dummy ""
-	n++; contrib[size - METADATA_IDLE]       = is_idle;
+	n++; contrib[size - METADATA_IDLE_COUNT]     = idle_count;
+	n++; contrib[size - METADATA_ACTIVE_COUNT]   = active_count;
 	n++; contrib[size - METADATA_UNIT_SIZE]  = unit_size;
 	n++; contrib[size - METADATA_EQ_SIZE]    = eq_size;
 	n++; contrib[size - METADATA_WORK_SWEEPS]     = work_sweeps;
@@ -1383,7 +1384,9 @@ void SweepJob::cbContributeToAllReduce() {
 		contrib.insert(contrib.end(), units.begin(), units.end());
 
 		auto stats = sweeper->fetchSweepStats();
-		appendMetadataToReductionElement(contrib, sweeper->sweeper_is_idle, unit_size, eq_size, stats.progress_work_sweeps, stats.progress_work_stepovers, stats.progress_unsched_resweeps);
+		bool is_idle = sweeper->sweeper_is_idle;
+		bool is_active = !is_idle;
+		appendMetadataToReductionElement(contrib, is_idle, is_active, unit_size, eq_size, stats.progress_work_sweeps, stats.progress_work_stepovers, stats.progress_unsched_resweeps);
 
 		contribs.push_back(contrib);
 	}
@@ -1425,7 +1428,8 @@ void SweepJob::extractAllReductionResult() {
 	const int sweep_iteration= data[data.size()-METADATA_SWEEP_ITERATION];
 	const int sharing_round  = data[data.size()-METADATA_SHARING_ROUND];
 	const int env_completions= data[data.size()-METADATA_ENVCOMPLETIONS];
-	const int all_idle       = data[data.size()-METADATA_IDLE];
+	const int idle_count     = data[data.size()-METADATA_IDLE_COUNT];
+	const int active_count   = data[data.size()-METADATA_ACTIVE_COUNT];
 	const int end_iteration  = data[data.size()-METADATA_END_ITERATION];
 	const int unit_size      = data[data.size()-METADATA_UNIT_SIZE];
 	const int eq_size        = data[data.size()-METADATA_EQ_SIZE];
@@ -1437,8 +1441,9 @@ void SweepJob::extractAllReductionResult() {
 	// _completed_envsizes = completed_envsizes;
 
 	_iteration_of_round[sharing_round] = sweep_iteration;
+	bool all_idle = (active_count==0);
 
-	LOG(V2_INFO, "SWEEP GOTT: envsize %i iter %i round %i : %i ai , %i endi , %i trm . E %i  U %i  \n", env_completions, sweep_iteration, sharing_round, all_idle, end_iteration, terminate, eq_size/2, unit_size);
+	LOG(V2_INFO, "SWEEP GOTT: envsize %i iter %i round %i : %i ai , %i endi , %i trm . act,idle %i,%i   E %i  U %i  \n", env_completions, sweep_iteration, sharing_round, all_idle, end_iteration, terminate, active_count, idle_count, eq_size/2, unit_size);
 
 	assert(sharing_round > _lastImportedRound.load() || log_return_false("SWEEP ERROR : unexpected round number when importing shared data. got round %i, while lastImportedRound %i \n", sharing_round, _lastImportedRound.load()));
 
@@ -1579,11 +1584,22 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	total_aggregated_size = aggr_data_size + NUM_METADATA_FIELDS;
 
 	//See whether all solvers are idle
-	bool all_idle = true;
+	// bool all_idle = true;
+	int idle_count = 0;
+	int active_count = 0;
     for (const auto &contrib : contribs) {
-		bool idle = contrib[contrib.size()-METADATA_IDLE];
-    	all_idle &= idle;
+    	idle_count += contrib[contrib.size()-METADATA_IDLE_COUNT];
+    	active_count+=contrib[contrib.size()-METADATA_ACTIVE_COUNT];
+		// bool idle = contrib[contrib.size()-METADATA_IDLE];
+    	// all_idle &= idle;
     }
+	if (contribs.empty()) {
+		//edge-case: if not a single solver is initialized yet, we are waiting for them to come online, so they are not really idle
+		// all_idle = false;
+		if (active_count==0) {
+			active_count=1;
+		}
+	}
 
 	//Aggregate the individual work/resweep counts
 	int sum_work_sweeps = 0;
@@ -1595,14 +1611,11 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 		sum_unsched_resweeps+= contrib[contrib.size()-METADATA_UNSCHED_RESWEEPS];
 	}
 
-	if (contribs.empty()) {
-		all_idle = false; //edge-case: if not a single solver is initialized yet, we are waiting for them to come online, so they are not really idle
-	}
 
-	appendMetadataToReductionElement(aggregated, all_idle, aggr_unit_size, aggr_eq_size, sum_work_sweeps, sum_work_stepovers, sum_unsched_resweeps);
+	appendMetadataToReductionElement(aggregated, idle_count, active_count, aggr_unit_size, aggr_eq_size, sum_work_sweeps, sum_work_stepovers, sum_unsched_resweeps);
 
 	// if (contribs.size()>1)
-	LOG(V4_VVER, "SWEEP RED aggregated %i contributions: E %i, U %i, (%i)allidle\n", contribs.size(), aggr_eq_size/2, aggr_unit_size, all_idle);
+	LOG(V4_VVER, "SWEEP RED aggregated %i contributions: E %i, U %i, act,idle %i,%i\n", contribs.size(), aggr_eq_size/2, aggr_unit_size, active_count, idle_count);
 
 	int individual_sum =  aggr_eq_size + aggr_unit_size + NUM_METADATA_FIELDS;
 	assert(total_aggregated_size == individual_sum ||
@@ -1616,7 +1629,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 std::vector<int> SweepJob::stealWorkFromAnyLocalSolver(int asking_rank, int asking_sourceLocalId) { //Parameters are only used for verbose logging, don't influence function behaviour
 	auto rand_permutation = getRandomIdPermutation();
 
-	LOG(V1_WARN, "SWEEP [%i] ask from [%i](%i) to steal from any local solver \n",_my_rank, asking_rank, asking_sourceLocalId);
+	// LOG(V1_WARN, "SWEEP [%i] ask from [%i](%i) to steal from any local solver \n",_my_rank, asking_rank, asking_sourceLocalId);
 	for (int localId : rand_permutation) {
 		auto stolen_work = stealWorkFromSpecificLocalSolver(localId);
 		if ( ! stolen_work.empty()) {

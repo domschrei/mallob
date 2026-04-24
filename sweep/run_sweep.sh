@@ -46,7 +46,7 @@ MALLOB_OPTIONS="-t=$threads \
 	-seed=1 \
 	-jcup=0.05 \
   -sleep=10 \
-	-v=4 \
+	-v=2 \
   -spl=-1 \
   -cjc=0 \
   -fcll=2 \
