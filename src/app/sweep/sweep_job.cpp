@@ -239,7 +239,7 @@ bool SweepJob::checkCrossCommNeedsAdvancing(const std::string &from) {
 			_clause_comm->communicate();
 			return true;
 		} else {
-			LOG(V2_INFO, "SWEEP _clause_comm->hasLocalClausesLeftToShare() == false \n");
+			// LOG(V2_INFO, "SWEEP wrapup: _clause_comm->hasLocalClausesLeftToShare() == false \n");
 		}
 	}
 	return false;
@@ -888,7 +888,7 @@ bool SweepJob::skip_MPI_forNow() {
 		return true;
 	}
 	if (getVolume()==1) {
-		LOG(V3_VERB, "SWEEP [%i] SKIP MPI steal, we are the only MPI rank\n", _my_rank);
+		// LOG(V3_VERB, "SWEEP [%i] SKIP MPI steal, we are the only MPI rank\n", _my_rank);
 		return true;
 	}
 	return (getJobComm().size() < getVolume());
@@ -1129,7 +1129,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	int localId = sweeper->getLocalId();
 	sweeper->work_received_from_steal = {};
 
-	LOG(V3_VERB, "Sweeper [%i](%i) stealing \n", _my_rank, localId);
+	// LOG(V3_VERB, "Sweeper [%i](%i) stealing \n", _my_rank, localId);
 
 	if (_terminate_all.load(std::memory_order_relaxed)) {
 		sweeper->sweeper_is_idle = true;

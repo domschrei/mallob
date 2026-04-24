@@ -83,35 +83,35 @@ public:
         res.revision = 0;
         res.result = RESULT_UNKNOWN;
 
-        submitSnsSatJob();
-        submitSnsSweepJob();
+        submitSATsnsJob();
+        submitSWEEPsnsJob();
 
         while (!isTimeoutHit()) {
             if (_base_job_done && !_base_job_digested) {
-                LOG(V2_INFO, "SATWP snsSAT done\n");
+                LOG(V2_INFO, "SATWP SATsns done\n");
                 res = jsonToJobResult(_base_job_response, false);
                 _base_job_digested = true;
                 if (res.result != 0) {
-                    LOG(V2_INFO, "SATWP RESULT snsSAT SOLVER done, result code %i\n", res.result);//capslock grepped in postprocessing
+                    LOG(V2_INFO, "SATWP RESULT SATsns SOLVER done, result code %i\n", res.result);//capslock grepped in postprocessing
                     break;
                 }
             }
             if (_sweep_job_done && !_sweep_job_digested) {
-                LOG(V2_INFO, "SATWP snsSWEEP done\n");
+                LOG(V2_INFO, "SATWP SWEEPsns done\n");
                 res = jsonToJobResult(_sweep_job_response, false); //eventually probably convert = true to reconstruct solution if necessary
                 _sweep_job_digested = true;
                 if (res.result==UNSAT) {
-                    LOG(V2_INFO, "SATWP RESULT snsSWEEP SOLVER , result code %i\n", res.result);//capslock grepped in postprocessing
+                    LOG(V2_INFO, "SATWP RESULT SWEEPsns SOLVER , result code %i\n", res.result);//capslock grepped in postprocessing
                     break;
                 }
                 else if (res.result==IMPROVED) {
                     assert(res.getSolutionSize() > 0);
-                    LOG(V2_INFO, "SATWP snsSWEEP has improved formula\n");
-                    LOG(V2_INFO, "SATWP snsSWEEP reading json SolutionSize=%i\n", res.getSolutionSize());
+                    LOG(V2_INFO, "SATWP SWEEPsns has improved formula\n");
+                    LOG(V2_INFO, "SATWP SWEEPsns reading json SolutionSize=%i\n", res.getSolutionSize());
                     _sweep_job_has_improved_formula = true;
                 } else {
                     assert(res.result==UNKNOWN);
-                    LOG(V1_WARN, "WARN: SATWP snsSWEEP did not improve formula! Leaving all resources to the running base snsSAT job\n");
+                    LOG(V1_WARN, "WARN: SATWP SWEEPsns did not improve formula! Leaving all resources to the running base SATsns job\n");
                 }
             }
             usleep(3*1000);
@@ -285,7 +285,7 @@ private:
     }
 
 
-    void submitSnsSatJob() {
+    void submitSATsnsJob() {
         auto& json = _base_job_submission;
         json = {
             {"user", "sat-" + std::string(toStr())},
@@ -306,8 +306,8 @@ private:
         if (_params.snsOverrideSatOptions())
             json["configuration"]["options"] = SATWITHPRE_OPT_SNS_OVERRIDES; //using plain solver type "k_", most important is that it does not delete/rename variables
 
-        LOG(V2_INFO, "SATWP Starting snsSat Job: %d Vars\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NV"));
-        LOG(V2_INFO, "SATWP Starting snsSat Job: %d Clauses\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
+        LOG(V2_INFO, "SATWP Starting SATsns Job: %d Vars\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NV"));
+        LOG(V2_INFO, "SATWP Starting SATsns  Job: %d Clauses\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
 
         auto copiedJson = json;
         auto result = _api.submit(copiedJson, [&](nlohmann::json& response) {
@@ -316,21 +316,21 @@ private:
             _base_job_done = true;
         });
         if (result != JsonInterface::Result::ACCEPT) {
-            LOG(V0_CRIT, "[ERROR] Cannot introduce snsSat job!\n");
+            LOG(V0_CRIT, "[ERROR] Cannot introduce SATsns  job!\n");
             abort();
         }
 
-        LOG(V2_INFO, "SATWP submitted snsSAT Job\n");
+        LOG(V2_INFO, "SATWP submitted SATsns Job\n");
         _base_job_submitted = true;
     }
 
 
-    void submitSnsSweepJob() {
+    void submitSWEEPsnsJob() {
         // Prepare job submission data
         auto& json = _sweep_job_submission;
         json = {
             {"user", "sweep-" + std::string(toStr())},
-            {"name", std::string(toStr())+":snsSweep"},
+            {"name", std::string(toStr())+":SWEEPsns"},
             {"priority", _params.preprocessSweepPriority()},
             {"application", "SWEEP"},
         };
@@ -348,8 +348,8 @@ private:
         if (_params.snsOverrideSatOptions())
             json["configuration"]["options"] = SATWITHPRE_OPT_SNS_OVERRIDES; //using solver type "s", to create Kissat Solvers specifically to expect Cross-Job-Communication from the concurrent Sweep App
 
-        LOG(V2_INFO, "SATWP Starting snsSweep Job: %d Vars\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NV"));
-        LOG(V2_INFO, "SATWP Starting snsSweep Job: %d Clauses\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
+        LOG(V2_INFO, "SATWP Starting SWEEPsns Job: %d Vars\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NV"));
+        LOG(V2_INFO, "SATWP Starting SWEEPsns Job: %d Clauses\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
 
         // Obtain API and submit the job
         auto copiedJson = json;
@@ -360,7 +360,7 @@ private:
         });
         if (retcode != JsonInterface::ACCEPT) return;
 
-        LOG(V2_INFO, "SATWP submitted snsSWEEP Job\n");
+        LOG(V2_INFO, "SATWP submitted SWEEPsns Job\n");
         _sweep_job_submitted = true;
 
     }

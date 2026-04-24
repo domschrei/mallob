@@ -350,7 +350,7 @@ private:
 					_crossjob_root_received_units.end()
 				);
 				for (int elit : _crossjob_root_received_units) {
-					LOG(V2_INFO, "SWEEP [%i](root-trf) insert unit from crossjob: %i \n", _my_rank, elit);
+					LOG(V2_INFO, "SWEEP [%i](root-trf) splice-in %i \n", _my_rank, elit);
 				}
 				crossjob_units_added = static_cast<int>(_crossjob_root_received_units.size());
 				assert(payload.size() == eq_size + n_sweep_units + crossjob_units_added + NUM_METADATA_FIELDS);
@@ -533,6 +533,7 @@ private:
 	}
 
 	void digestSharingWithoutFilter(int epoch, std::vector<int>  &&clauses, bool stateless) override {
+		InplaceClauseAggregation(clauses).stripToRawBuffer(); //found by Claude
 		LOG(V1_WARN, "SWEEP receive XTCS size %i\n",clauses.size());
 		if (_is_root) {
 			crossjob_rootReceiveClauses(std::move(clauses));
