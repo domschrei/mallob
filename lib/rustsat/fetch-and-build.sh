@@ -8,6 +8,15 @@ fetch_and_extract $dirname Cargo.toml https://github.com/domschrei/rustsat/archi
 
 echo "[$dirname] Building ..."
 cd capi
-cargo build --release
+if [ ! -d vendor ]; then
+    cargo vendor
+    mkdir -p .cargo
+    echo '[source.crates-io]'                   >> .cargo/config.toml
+    echo 'replace-with = "vendored-sources"'    >> .cargo/config.toml
+    echo ''                                     >> .cargo/config.toml
+    echo '[source.vendored-sources]'            >> .cargo/config.toml
+    echo 'directory = "vendor"'                 >> .cargo/config.toml
+fi
+cargo build --release --offline
 cd ..
 echo "[$dirname] Build complete"

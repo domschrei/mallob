@@ -7,7 +7,7 @@ fetch_and_extract $dirname configure.sh http://fmv.jku.at/yalsat/yalsat-03v.zip
 
 disable_fpu=false
 
-if grep -qE "exit \([01]\)" *.c *.h ; then
+if ! [ -f makefile ] || grep -qE "exit \([01]\)" *.c *.h ; then
     ./configure.sh
     for f in *.c *.h ; do
         sed -i 's/exit ([01])/abort()/g' $f
