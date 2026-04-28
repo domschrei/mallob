@@ -20,6 +20,8 @@ rm -r lib/kissat
 rm lib/kissat.zip
 ( cd lib && bash fetch_and_build_solvers.sh klyc sweep)
 
+./sweep/show-kissat-build.sh
+
 mkdir -p build
 rm build/*mallob*
 
