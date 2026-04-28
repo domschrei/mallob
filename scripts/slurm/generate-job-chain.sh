@@ -15,6 +15,7 @@ jobname="$5"
 #cd $HOME/mallob
 echo ""
 echo "$jobname: $sbatch_base"
+echo "$jobname: $DS_APP"
 echo "$jobname: min         $minjobidx"
 echo "$jobname: max         $maxjobidx"
 echo "$jobname: chains      $numchains"
@@ -23,8 +24,8 @@ echo "$jobname: $DS_BENCHMARKFILE"
 echo " "
 
 #As security check show the current mallob flags
-scripts/slurm/showflags.sh "$sbatch_base"
-echo " "
+# scripts/slurm/showflags.sh "$sbatch_base"
+# echo " "
 
 dir="sbatch/generated/$jobname"
 mkdir -p "$dir"
@@ -49,6 +50,12 @@ sed -i 's/$DS_LASTJOBIDX/'$maxjobidx'/g' "$out_templated"
 # escaped_benchmarkfile=$(echo "$benchmarkfile" | sed 's/\//\\\//g')
 # sed -i 's/$DS_BENCHMARKFILE/'$DS_BENCHMARKFILE'/g' "$out_templated"
 sed -i "s|\$DS_BENCHMARKFILE|$DS_BENCHMARKFILE|g" "$out_templated"   #file paths have / that sed should not escape
+sed -i 's/$DS_APP/'$DS_APP'/g' "$out_templated"
+
+#As security check show the current mallob flags
+scripts/slurm/showflags.sh "$out_templated"
+echo ""
+
 
 cmd="for i in {1..$numchains}; do sbatch $out_templated; done"
 

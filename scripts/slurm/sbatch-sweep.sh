@@ -115,7 +115,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
     #echo "logdir: $globallogdir , localtmp: $localtmpdir , output: $outputlogdir"
     ./sweep/show-kissat-build.sh
 	
-	echo " "
+	  echo " "
     echo " "
     echo "jobname:  $DS_JOBNAME"
     echo "index:    $i"
@@ -130,8 +130,8 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
   #
     timeout=$DS_SECONDSPERJOB
   cmd="$build/mallob \
-	-mono-app=SWEEP \
-	-satsolver=[k_]w \
+	-mono-app=$DS_APP \
+	-satsolver=k_ \
 	-pb=1 -pjp=999999 -pef=1 -mono=$f \
 	-jwl=$timeout -T=$(($timeout+30)) -wam=10000 -pre-cleanup=1 \
 	-q=1 -log=$globallogdir -tmp=$localtmpdir -comment-outputlogdir=$outputlogdir \
@@ -149,19 +149,24 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
   -spl=-1 \
 	-jcup=0.05 \
   -sleep=100 \
-	-v=2 \
-	-preprocess-sweep=1 \
+  -v=2 \
+  -cjc=1 \
+  -swpxs=1 \
+  -swpxr=1 \
+  -fcll=2 \
+  -preprocess-sweepnsat=1 \
   -preprocess-sweep-priority=1.0 \
-	-sweep-sharing-period=0.010 \
+  -sweep-sharing-period=0.020 \
   -sweep-resweep-chance=1000 \
-	-sweep-solver-verbosity=0 \
-	-sweep-solver-quiet=1 \
+  -sweep-solver-verbosity=1 \
+  -sweep-solver-quiet=1 \
   -sweep-initial-congruence=1 \
   -sweep-max-iterations=3 \
   -sweep-max-depth=4 \
   -sweep-min-exit-swept=0 \
   -sweep-term-no-progress=0 \
-  -sweep-shuffle-work=1 \
+  -sweep-shuffle-work=0 \
+  -sweep-to-completion=0 \
 "
 
   # -sweep-growing-environments=1 \
