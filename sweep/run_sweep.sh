@@ -23,6 +23,9 @@ INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/bob12s04.cnf.xz" 
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s176.cnf.xz" # 6sec
 
+
+./sweep/show-kissat-build.sh
+
 NPROCS=2
 threads=4
 echo "NPROCS $NPROCS"
@@ -57,7 +60,7 @@ MALLOB_OPTIONS="-t=$threads \
   -preprocess-sweep-priority=1.0 \
 	-sweep-sharing-period=0.020 \
   -sweep-resweep-chance=1000 \
-	-sweep-solver-verbosity=0 \
+	-sweep-solver-verbosity=1 \
 	-sweep-solver-quiet=1 \
   -sweep-initial-congruence=1 \
   -sweep-max-iterations=3 \

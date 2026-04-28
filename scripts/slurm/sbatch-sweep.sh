@@ -113,6 +113,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
     outputlogdir="${globallogdir_base}"
 
     #echo "logdir: $globallogdir , localtmp: $localtmpdir , output: $outputlogdir"
+    ./sweep/show-kissat-build.sh
 	
 	echo " "
     echo " "

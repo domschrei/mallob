@@ -3,6 +3,8 @@
 #get the latest swissat source & binary
 ./sweep/fetch-local-sweep-kissat.sh
 
+./sweep/show-kissat-build.sh
+
 mkdir -p build
 #remove old binaries and linkers to make sure they are updated
 rm build/*mallob*

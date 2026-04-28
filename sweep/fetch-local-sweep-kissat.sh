@@ -8,5 +8,6 @@ if cmp --silent -- "$KISSAT_SWEEP/build/libkissat.a" "$MALLOB_LIB/kissat/libkiss
 else
   echo "libkissat.a changed. Updated libkissat.a from ksst-sweep/kissat/"
   cp -r $KISSAT_SWEEP/src $MALLOB_LIB/kissat
+  cp -r $KISSAT_SWEEP/build/ $MALLOB_LIB/kissat/build
   cp $KISSAT_SWEEP/build/libkissat.a $MALLOB_LIB/kissat/libkissat.a
 fi
