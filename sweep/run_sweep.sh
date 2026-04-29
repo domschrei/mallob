@@ -22,18 +22,19 @@ INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s158.cnf.xz" #done almost immediately
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/bob12s04.cnf.xz" 
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s176.cnf.xz" # 6sec
+INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s48.cnf.xz" # 6sec
 
 
 ./sweep/show-kissat-build.sh
 
 NPROCS=4
-threads=2
+threads=3
 echo "NPROCS $NPROCS"
 echo "threads per process $threads"
 
 # APP="SAT"
-# APP="SWEEP"
-APP="SATWITHPRE"
+APP="SWEEP"
+# APP="SATWITHPRE"
 
 MALLOB_OPTIONS="-t=$threads \
   -mono-app=$APP \
@@ -53,14 +54,14 @@ MALLOB_OPTIONS="-t=$threads \
   -sleep=100 \
 	-v=4 \
   -cjc=1 \
-  -swpxs=1 \
-  -swpxr=1 \
+  -swpxs=0 \
+  -swpxr=0 \
   -fcll=2 \
 	-preprocess-sweepnsat=1 \
   -preprocess-sweep-priority=1.0 \
 	-sweep-sharing-period=0.020 \
   -sweep-resweep-chance=1000 \
-	-sweep-solver-verbosity=1 \
+	-sweep-solver-verbosity=2 \
 	-sweep-solver-quiet=1 \
   -sweep-initial-congruence=1 \
   -sweep-max-iterations=3 \

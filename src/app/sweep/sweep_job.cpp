@@ -1283,15 +1283,16 @@ void SweepJob::rootStartNewSharingRound() {
 	_bcast->broadcast(std::move(msg));
 }
 
-void SweepJob::appendMetadataToReductionElement(std::vector<int> &contrib, int idle_count, int active_count, int unit_size, int eq_size, int work_sweeps, int work_stepovers, int unsched_resweeps) {
+void SweepJob::appendMetadataToReductionElement(int foundUnsat, std::vector<int> &contrib, int idle_count, int active_count, int unit_size, int eq_size, int work_sweeps, int work_stepovers, int unsched_resweeps) {
 	contrib.insert(contrib.end(), NUM_METADATA_FIELDS, 0); //Make space for the upcoming metadata, initialized with zero
 	int size = contrib.size();
 	int n=0;
-	n++; contrib[size - METADATA_ENVCOMPLETIONS]= 0;  //dummy. Keep here for completeness (and robustness) to have the n++ count match and force ourselves to keep this method updated
+	n++; contrib[size - METADATA_ENVCOMPLETIONS]= 0;   //dummy, will be set by the root transform. Keep the line(s) here to have the n++ count match the expected number of Metadata, which forces ourselves to keep this method updated
 	n++; contrib[size - METADATA_TERMINATE]      = 0;  //dummy ""
 	n++; contrib[size - METADATA_SWEEP_ITERATION]= 0;  //dummy ""
 	n++; contrib[size - METADATA_SHARING_ROUND]  = 0;  //dummy ""
 	n++; contrib[size - METADATA_END_ITERATION]  = 0;  //dummy ""
+	n++; contrib[size - METADATA_FOUND_UNSAT]     = foundUnsat;
 	n++; contrib[size - METADATA_IDLE_COUNT]     = idle_count;
 	n++; contrib[size - METADATA_ACTIVE_COUNT]   = active_count;
 	n++; contrib[size - METADATA_UNIT_SIZE]  = unit_size;
@@ -1384,7 +1385,8 @@ void SweepJob::cbContributeToAllReduce() {
 		auto stats = sweeper->fetchSweepStats();
 		bool is_idle = sweeper->sweeper_is_idle;
 		bool is_active = !is_idle;
-		appendMetadataToReductionElement(contrib, is_idle, is_active, unit_size, eq_size, stats.progress_work_sweeps, stats.progress_work_stepovers, stats.progress_unsched_resweeps);
+		int foundUnsat = kissat_is_inconsistent(sweeper->solver);
+		appendMetadataToReductionElement(foundUnsat, contrib, is_idle, is_active, unit_size, eq_size, stats.progress_work_sweeps, stats.progress_work_stepovers, stats.progress_unsched_resweeps);
 
 		contribs.push_back(contrib);
 	}
@@ -1422,6 +1424,7 @@ void SweepJob::extractAllReductionResult() {
 	assert(_red->hasResult());
 
 	auto data = _red->extractResult();
+	const int foundUnsat     = data[data.size()-METADATA_FOUND_UNSAT];
 	const int terminate		 = data[data.size()-METADATA_TERMINATE];
 	const int sweep_iteration= data[data.size()-METADATA_SWEEP_ITERATION];
 	const int sharing_round  = data[data.size()-METADATA_SHARING_ROUND];
@@ -1439,6 +1442,7 @@ void SweepJob::extractAllReductionResult() {
 	// _completed_envsizes = completed_envsizes;
 
 	_iteration_of_round[sharing_round] = sweep_iteration;
+
 	bool all_idle = (active_count==0);
 
 	LOG(V2_INFO, "SWEEP GOTT: envsize %i iter %i round %i : %i ai , %i endi , %i trm . act,idle %i,%i   E %i  U %i  \n", env_completions, sweep_iteration, sharing_round, all_idle, end_iteration, terminate, active_count, idle_count, eq_size/2, unit_size);
@@ -1455,6 +1459,12 @@ void SweepJob::extractAllReductionResult() {
 	_imported_data[sharing_round].eqs   = std::vector<int>(data.begin()          , data.begin() + eq_size);
 	_imported_data[sharing_round].units = std::vector<int>(data.begin() + eq_size, data.begin() + eq_size + unit_size);
 	_lastImportedRound = sharing_round;
+
+	if (foundUnsat) {
+		//Eqs&Units are no longer worth something since we already know Unsat. Even more important, they might be inconsistent and their import could cause problems at other solvers
+		_imported_data[sharing_round].eqs   = {};
+		_imported_data[sharing_round].units = {};
+	}
 
 	//the root node is special in that it is the only node that initiates sharing rounds. Prepare for a new one, since we just extracted all the shared data from the current round.
 	if (_is_root) {
@@ -1585,9 +1595,11 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	// bool all_idle = true;
 	int idle_count = 0;
 	int active_count = 0;
+	int foundUnsat=0;
     for (const auto &contrib : contribs) {
-    	idle_count += contrib[contrib.size()-METADATA_IDLE_COUNT];
-    	active_count+=contrib[contrib.size()-METADATA_ACTIVE_COUNT];
+    	idle_count  += contrib[contrib.size()-METADATA_IDLE_COUNT];
+    	active_count+= contrib[contrib.size()-METADATA_ACTIVE_COUNT];
+    	foundUnsat  += contrib[contrib.size()-METADATA_FOUND_UNSAT];
 		// bool idle = contrib[contrib.size()-METADATA_IDLE];
     	// all_idle &= idle;
     }
@@ -1610,7 +1622,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	}
 
 
-	appendMetadataToReductionElement(aggregated, idle_count, active_count, aggr_unit_size, aggr_eq_size, sum_work_sweeps, sum_work_stepovers, sum_unsched_resweeps);
+	appendMetadataToReductionElement(foundUnsat, aggregated, idle_count, active_count, aggr_unit_size, aggr_eq_size, sum_work_sweeps, sum_work_stepovers, sum_unsched_resweeps);
 
 	// if (contribs.size()>1)
 	LOG(V4_VVER, "SWEEP RED aggregated %i contributions: E %i, U %i, act,idle %i,%i\n", contribs.size(), aggr_eq_size/2, aggr_unit_size, active_count, idle_count);
@@ -1718,6 +1730,7 @@ void SweepJob::crossjob_rootReceiveClauses(std::vector<int>  &&clauses) {
 		return;
 	}
 
+	LOG(V1_WARN, "SWEEP storing part of received XTCS size %i\n",clauses.size());
 	// auto reader = _clause_store->getBufferReader(clauses.data(), clauses.size());
 	auto reader = BufferReader(clauses.data(), clauses.size(), 10, false);
 	auto clause = reader.getNextIncomingClause();
@@ -1738,7 +1751,8 @@ void SweepJob::crossjob_rootReceiveClauses(std::vector<int>  &&clauses) {
 			clause = reader.getNextIncomingClause();
 		}
 		int after = _crossjob_root_received_units.size();
-		LOG(V4_VVER, "  sconsume consumed %i units \n", after - before);
+		// LOG(V4_VVER, "  sconsume consumed %i units \n", after - before);
+		LOG(V1_WARN, "SWEEP stored %i received XTCS units \n", after -before);
 	}
 }
 

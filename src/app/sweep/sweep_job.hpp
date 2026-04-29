@@ -114,9 +114,10 @@ private:
 	const int NUM_SEARCHING_WORK_FIELDS = 3; //how many fields are attached to an MPI message searching work
 
 	//each aggregation element has some metadata integers at the end
-	static const int NUM_METADATA_FIELDS = 12;
+	static const int NUM_METADATA_FIELDS = 13;
 		//field indices must be unique numbers exactly filling 1..NUM_METADATA_FIELDS !
-		static const int METADATA_ACTIVE_COUNT	     = 12;
+		static const int METADATA_FOUND_UNSAT	   = 13;
+		static const int METADATA_ACTIVE_COUNT	    = 12;
 		static const int METADATA_ENVCOMPLETIONS     = 11;
 		static const int METADATA_END_ITERATION		  = 10;
 		static const int METADATA_WORK_SWEEPS		 = 9;
@@ -220,6 +221,7 @@ private:
 		int work_sweeps			 = payload[payload.size() - METADATA_WORK_SWEEPS];
 		int work_stepovers		 = payload[payload.size() - METADATA_WORK_STEPOVERS];
 		int work_unsched_resweeps= payload[payload.size() - METADATA_UNSCHED_RESWEEPS];
+		int foundUnsat			 = payload[payload.size() - METADATA_FOUND_UNSAT];
 
 		bool all_idle = (active_count == 0);
 
@@ -246,7 +248,7 @@ private:
 		bool send_end_iteration = false;
 		//A round is finished if all sweepers are idle or if we didnt have enough progress
 		if (all_idle || earlyexit) {
-			LOG(V2_INFO, "SWEEP [%i](root-trf) (%i)all_idle  (%i)earlyexit \n", _my_rank, all_idle, earlyexit);
+			LOG(V2_INFO, "SWEEP [%i](root-trf) (%i)all_idle  (%i)earlyexit (%i)foundUnsat \n", _my_rank, all_idle, earlyexit, foundUnsat);
 			LOG(V2_INFO, "SWEEP [%i](root-trf) ITERATION %i/%i FINISHED (seen at root transform) in sharing round %i \n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations(), _root_sharing_round);
 			LOG(V2_INFO, "SWEEP [%i](root-trf) ITERATION %i/%i shared: %i EQS, %i UNITS  \n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations(), _root_shared_eqs_this_iteration, _root_shared_units_this_iteration);
 			//The kissat solver will report the sweep stats itself via a callback once it has cleaned up its internal database and metrics via substitute()
@@ -285,9 +287,8 @@ private:
 		payload[payload.size() - METADATA_ENVCOMPLETIONS] = _root_env_completions;
 
 
-
 		//Send my units and equivalences via cross-job communication to the SAT job
-		if (_clause_comm && _params.crossJobCommunication()) {
+		if (!foundUnsat && _clause_comm && _params.crossJobCommunication()) {
 			assert(_clause_comm || log_return_false("Sweep ERROR: _clause_comm object missing\n"));
 			BufferBuilder bb(-1, 10, false);
 			//For debugging purposes another flag for actually sending our stuff to cjc
@@ -337,7 +338,7 @@ private:
 			std::lock_guard<std::mutex> lock(_crossjob_import_mutex);
 			if (!_crossjob_root_received_units.empty()) {
 				const int insert_pos = eq_size + n_sweep_units;
-				// Splice the cross-job units in right after the sweep units, before metadata
+				// Splice the cross-job units into the existing vector, appending them after the sweep units, but before before the metadata
 				payload.insert(
 					payload.begin() + insert_pos,
 					_crossjob_root_received_units.begin(),
@@ -363,8 +364,8 @@ private:
 		//Copy message, once for chronological view in the general logs, once in a special smaller file (on the root node) for easier postprocessing
 		char logmsg[512];
 		snprintf(logmsg, sizeof(logmsg),
-			"SWEEP [%i](root-trf) send: act,idle %i,%i  envsize %i iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i   SW %i  ST %i  RE %i    Sched, Swept  %i  %i    ( %.2f ,  %.2f )°/.   succ-rate %.6f   \n",
-			_my_rank, active_count, idle_count, _root_env_completions, _root_sweep_iteration, _root_sharing_round, all_idle,  send_end_iteration, send_terminate, n_eqs, n_sweep_units, crossjob_units_received,
+			"SWEEP [%i](root-trf) send: unsat %i  act,idle %i,%i  envsize %i iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i   SW %i  ST %i  RE %i    Sched, Swept  %i  %i    ( %.2f ,  %.2f )°/.   succ-rate %.6f   \n",
+			_my_rank, foundUnsat, active_count, idle_count, _root_env_completions, _root_sweep_iteration, _root_sharing_round, all_idle,  send_end_iteration, send_terminate, n_eqs, n_sweep_units, crossjob_units_received,
 			work_sweeps, work_stepovers, work_unsched_resweeps, work_sweeps + work_stepovers, work_sweeps + work_unsched_resweeps,
 			100*(work_sweeps + work_stepovers)/(double)_numVars , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars,
 			progress_ratio
@@ -447,7 +448,7 @@ private:
     void rootStartNewSharingRound();
     void cbContributeToAllReduce();
     static std::vector<int> aggregateEqUnitContributions(std::list<std::vector<int>> &contribs);
-	static void appendMetadataToReductionElement(std::vector<int> &contrib, int idle_count, int active_count, int unit_size, int eq_size, int work_sweeps, int work_stepovers, int unsched_resweeps);
+	static void appendMetadataToReductionElement(int foundUnsat, std::vector<int> &contrib, int idle_count, int active_count, int unit_size, int eq_size, int work_sweeps, int work_stepovers, int unsched_resweeps);
 	void advanceAllReduction();
 	void extractAllReductionResult();
 
