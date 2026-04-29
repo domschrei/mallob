@@ -248,7 +248,7 @@ private:
 		bool send_end_iteration = false;
 		//A round is finished if all sweepers are idle or if we didnt have enough progress
 		if (all_idle || earlyexit) {
-			LOG(V2_INFO, "SWEEP [%i](root-trf) (%i)all_idle  (%i)earlyexit (%i)foundUnsat \n", _my_rank, all_idle, earlyexit, foundUnsat);
+			LOG(V2_INFO, "SWEEP [%i](root-trf) (%i)all_idle  (%i)earlyexit (%i)foundUn-sat \n", _my_rank, all_idle, earlyexit, foundUnsat);
 			LOG(V2_INFO, "SWEEP [%i](root-trf) ITERATION %i/%i FINISHED (seen at root transform) in sharing round %i \n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations(), _root_sharing_round);
 			LOG(V2_INFO, "SWEEP [%i](root-trf) ITERATION %i/%i shared: %i EQS, %i UNITS  \n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations(), _root_shared_eqs_this_iteration, _root_shared_units_this_iteration);
 			//The kissat solver will report the sweep stats itself via a callback once it has cleaned up its internal database and metrics via substitute()
@@ -364,7 +364,7 @@ private:
 		//Copy message, once for chronological view in the general logs, once in a special smaller file (on the root node) for easier postprocessing
 		char logmsg[512];
 		snprintf(logmsg, sizeof(logmsg),
-			"SWEEP [%i](root-trf) send: unsat %i  act,idle %i,%i  envsize %i iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i   SW %i  ST %i  RE %i    Sched, Swept  %i  %i    ( %.2f ,  %.2f )°/.   succ-rate %.6f   \n",
+			"SWEEP [%i](root-trf) send: un-sat %i  act,idle %i,%i  envsize %i iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i   SW %i  ST %i  RE %i    Sched, Swept  %i  %i    ( %.2f ,  %.2f )°/.   succ-rate %.6f   \n",
 			_my_rank, foundUnsat, active_count, idle_count, _root_env_completions, _root_sweep_iteration, _root_sharing_round, all_idle,  send_end_iteration, send_terminate, n_eqs, n_sweep_units, crossjob_units_received,
 			work_sweeps, work_stepovers, work_unsched_resweeps, work_sweeps + work_stepovers, work_sweeps + work_unsched_resweeps,
 			100*(work_sweeps + work_stepovers)/(double)_numVars , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars,

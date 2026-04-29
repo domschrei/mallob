@@ -1461,7 +1461,7 @@ void SweepJob::extractAllReductionResult() {
 	_lastImportedRound = sharing_round;
 
 	if (foundUnsat) {
-		//Eqs&Units are no longer worth something since we already know Unsat. Even more important, they might be inconsistent and their import could cause problems at other solvers
+		//A bit paranoid, but Eqs&Units are no longer relevant after we found Unsat. So we don't even pass them to the sweepers anymore.
 		_imported_data[sharing_round].eqs   = {};
 		_imported_data[sharing_round].units = {};
 	}

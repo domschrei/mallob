@@ -24,6 +24,12 @@ INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s176.cnf.xz" # 6sec
 INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s48.cnf.xz" # 6sec
 
+#easy SATs
+# INST_PATH="$HOME/PhD/instances/sat-and-minisat1m/0225fa9581c622e5abbc8497a97edf4e-fla-qhid-360-4.cnf.xz" #<1s kissat
+# INST_PATH="$HOME/PhD/instances/sat-and-minisat1m/01653db16d6cedc27f5314d680efc055-fla-komb-220-5.cnf.xz" #<1s kissat
+# INST_PATH="$HOME/PhD/instances/sat-and-minisat1m/01d037bf22a943430790eedd667f415e-60-128351.cnf.xz" #30sec kissat
+# INST_PATH="$HOME/PhD/instances/sat-and-minisat1m/037c423f56548082b1935e88c48ffdda-3col120_5_2.shuffled.cnf.xz" #actually has some equivalences
+
 
 ./sweep/show-kissat-build.sh
 
@@ -61,7 +67,7 @@ MALLOB_OPTIONS="-t=$threads \
   -preprocess-sweep-priority=1.0 \
 	-sweep-sharing-period=0.020 \
   -sweep-resweep-chance=1000 \
-	-sweep-solver-verbosity=2 \
+	-sweep-solver-verbosity=1 \
 	-sweep-solver-quiet=1 \
   -sweep-initial-congruence=1 \
   -sweep-max-iterations=3 \
