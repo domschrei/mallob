@@ -18,7 +18,7 @@ echo "--------------------------------------------------------------------------
 provided_sbatch_file=$1
 # flags=$(grep -A 28 -- "build/mallob" "$provided_sbatch_file")
 # echo "$flags"
-grep -A 30 -- "build/mallob" "$provided_sbatch_file"
+grep -A 40 -- "build/mallob" "$provided_sbatch_file"
 echo "----------------------------------------------------------------------------"
 echo ""
 

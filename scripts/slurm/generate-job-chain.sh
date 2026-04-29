@@ -54,6 +54,7 @@ sed -i 's/$DS_APP/'$DS_APP'/g' "$out_templated"
 
 #As security check show the current mallob flags
 scripts/slurm/showflags.sh "$out_templated"
+sweep/show-kissat-build.sh 
 echo ""
 
 
