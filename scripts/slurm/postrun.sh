@@ -31,8 +31,8 @@ for f in $outdir-*/*/.alldone ; do
 done
 
 
-echo "cp sbatch/generated/${jobname}/sbatch.sh $outdir/"
-cp sbatch/generated/${jobname}/sbatch.sh "$outdir/"
+echo "mv sbatch/generated/${jobname}/sbatch.sh $outdir/"
+mv sbatch/generated/${jobname}/sbatch.sh "$outdir/"
 
 echo "$jobname: moving slurm-out files"
 echo $outdir-*/ | grep -oE "\-[0-9]{7}/" | grep -oE "[0-9]{7}" | while read slurmid; do
