@@ -230,6 +230,7 @@ private:
     }
 
     void interrupt(nlohmann::json& json, volatile bool& doneFlag) {
+        if (!json.count("name")) return;
         LOG(V3_VERB, "SATWP Interrupt %s\n", json["name"].get<std::string>().c_str());
         nlohmann::json jsonInterrupt {
             {"name", json["name"]},
