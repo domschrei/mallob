@@ -757,7 +757,7 @@ void SweepJob::saveStealLatencies(KissatPtr sweeper) {
 				}
 				// LOGGER(_stealsumlogger, V2_INFO, "it %i rnd %i   attmpts %i   stolen %i \n", iter, round, roundlist.size(), stolen_sum);
 				// LOG(V2_INFO, "SWEEP reporting steal information, logging round %i / %i\n", round, _lastImportedRound.load());
-				LOGGER(_stealsumlogger, V2_INFO, "iter %i rnd %i   loc_attempts %i   mpi_attempts %i   loc_stolen %i   mpi_stolen %i   Latencies in ms: local_max %.3f   mpi_min %.3f   mpi_mean %.3f   mpi_max %.3f\n",
+				LOGGER(_stealsumlogger, V3_VERB, "iter %i rnd %i   loc_attempts %i   mpi_attempts %i   loc_stolen %i   mpi_stolen %i   Latencies in ms: local_max %.3f   mpi_min %.3f   mpi_mean %.3f   mpi_max %.3f\n",
 					iteration, round, local.size(), mpi.size(), loc_stolensum, mpi_stolensum,
 					// local.empty() ? 0.0f : std::accumulate(local.begin(), local.end(), 0.0f) / local.size(),
 					local.empty() ? 0.0f : *std::max_element(local.begin(), local.end()) * 1000,
