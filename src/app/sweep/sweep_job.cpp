@@ -178,7 +178,7 @@ void SweepJob::appl_communicate() {
 	}
 
 	checkSharingDelay();
-	printIdleWorkStatus();
+	checkIdleWorkStatus();
 	checkForUnsatResults();
 	clearImportedRound();
 	checkCrossCommNeedsAdvancing("appl_communicate");
@@ -805,11 +805,11 @@ void SweepJob::reportEndStats(KissatPtr sweeper) {
 
 
 
-void SweepJob::printIdleWorkStatus() {
+void SweepJob::checkIdleWorkStatus() {
 	if (_terminate_all.load(std::memory_order_relaxed))
 		return; //prevent segfault! when termination is triggered, the sweeper references might suddenly become invalid. no touching them
 
-	const float STATUS_PERIOD = 0.030; //status every 30ms
+	const float STATUS_PERIOD = 0.030; //status every 30ms, also the long-term-idle window
 
 	if (Timer::elapsedSeconds() - _timestamp_last_idleinfo < STATUS_PERIOD) {
 		return;
@@ -1283,7 +1283,7 @@ void SweepJob::rootStartNewSharingRound() {
 	_bcast->broadcast(std::move(msg));
 }
 
-void SweepJob::appendMetadataToReductionElement(int foundUnsat, std::vector<int> &contrib, int idle_count, int active_count, int unit_size, int eq_size, int work_sweeps, int work_stepovers, int unsched_resweeps) {
+void SweepJob::appendMetadataToReductionElement(int foundUnsat, std::vector<int> &contrib, int idle_count, int longtermidle_count, int active_count, int unit_size, int eq_size, int work_sweeps, int work_stepovers, int unsched_resweeps) {
 	contrib.insert(contrib.end(), NUM_METADATA_FIELDS, 0); //Make space for the upcoming metadata, initialized with zero
 	int size = contrib.size();
 	int n=0;
@@ -1294,6 +1294,7 @@ void SweepJob::appendMetadataToReductionElement(int foundUnsat, std::vector<int>
 	n++; contrib[size - METADATA_END_ITERATION]  = 0;  //dummy ""
 	n++; contrib[size - METADATA_FOUND_UNSAT]     = foundUnsat;
 	n++; contrib[size - METADATA_IDLE_COUNT]     = idle_count;
+	n++; contrib[size - METADATA_LONGTERM_IDLE]  = longtermidle_count;
 	n++; contrib[size - METADATA_ACTIVE_COUNT]   = active_count;
 	n++; contrib[size - METADATA_UNIT_SIZE]  = unit_size;
 	n++; contrib[size - METADATA_EQ_SIZE]    = eq_size;
@@ -1384,9 +1385,10 @@ void SweepJob::cbContributeToAllReduce() {
 
 		auto stats = sweeper->fetchSweepStats();
 		bool is_idle = sweeper->sweeper_is_idle;
+		bool is_longterm_idle = sweeper->sweeper_longterm_idle;
 		bool is_active = !is_idle;
 		int foundUnsat = kissat_is_inconsistent(sweeper->solver);
-		appendMetadataToReductionElement(foundUnsat, contrib, is_idle, is_active, unit_size, eq_size, stats.progress_work_sweeps, stats.progress_work_stepovers, stats.progress_unsched_resweeps);
+		appendMetadataToReductionElement(foundUnsat, contrib, is_idle, is_longterm_idle, is_active, unit_size, eq_size, stats.progress_work_sweeps, stats.progress_work_stepovers, stats.progress_unsched_resweeps);
 
 		contribs.push_back(contrib);
 	}
@@ -1594,10 +1596,12 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	//See whether all solvers are idle
 	// bool all_idle = true;
 	int idle_count = 0;
+	int longtermidle_count = 0;
 	int active_count = 0;
 	int foundUnsat=0;
     for (const auto &contrib : contribs) {
     	idle_count  += contrib[contrib.size()-METADATA_IDLE_COUNT];
+    	longtermidle_count += contrib[contrib.size()-METADATA_LONGTERM_IDLE];
     	active_count+= contrib[contrib.size()-METADATA_ACTIVE_COUNT];
     	foundUnsat  += contrib[contrib.size()-METADATA_FOUND_UNSAT];
 		// bool idle = contrib[contrib.size()-METADATA_IDLE];
@@ -1622,7 +1626,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	}
 
 
-	appendMetadataToReductionElement(foundUnsat, aggregated, idle_count, active_count, aggr_unit_size, aggr_eq_size, sum_work_sweeps, sum_work_stepovers, sum_unsched_resweeps);
+	appendMetadataToReductionElement(foundUnsat, aggregated, idle_count, longtermidle_count, active_count, aggr_unit_size, aggr_eq_size, sum_work_sweeps, sum_work_stepovers, sum_unsched_resweeps);
 
 	// if (contribs.size()>1)
 	LOG(V4_VVER, "SWEEP RED aggregated %i contributions: E %i, U %i, act,idle %i,%i\n", contribs.size(), aggr_eq_size/2, aggr_unit_size, active_count, idle_count);

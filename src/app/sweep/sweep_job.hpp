@@ -114,8 +114,9 @@ private:
 	const int NUM_SEARCHING_WORK_FIELDS = 3; //how many fields are attached to an MPI message searching work
 
 	//each aggregation element has some metadata integers at the end
-	static const int NUM_METADATA_FIELDS = 13;
+	static const int NUM_METADATA_FIELDS = 14;
 		//field indices must be unique numbers exactly filling 1..NUM_METADATA_FIELDS !
+		static const int METADATA_LONGTERM_IDLE	  = 14;
 		static const int METADATA_FOUND_UNSAT	   = 13;
 		static const int METADATA_ACTIVE_COUNT	    = 12;
 		static const int METADATA_ENVCOMPLETIONS     = 11;
@@ -217,6 +218,7 @@ private:
 		int n_eqs	 = eq_size / 2;  //each equivalence takes up two integers
 		// bool all_idle= payload[payload.size() - METADATA_IDLE];
 		int idle_count = payload[payload.size() - METADATA_IDLE_COUNT];
+		int longtermidle_count = payload[payload.size() - METADATA_LONGTERM_IDLE];
 		int active_count = payload[payload.size() - METADATA_ACTIVE_COUNT];
 		int work_sweeps			 = payload[payload.size() - METADATA_WORK_SWEEPS];
 		int work_stepovers		 = payload[payload.size() - METADATA_WORK_STEPOVERS];
@@ -364,8 +366,8 @@ private:
 		//Copy message, once for chronological view in the general logs, once in a special smaller file (on the root node) for easier postprocessing
 		char logmsg[512];
 		snprintf(logmsg, sizeof(logmsg),
-			"SWEEP [%i](root-trf) send: un-sat %i  act,idle %i,%i  envsize %i iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i   SW %i  ST %i  RE %i    Sched, Swept  %i  %i    ( %.2f ,  %.2f )°/.   succ-rate %.6f   \n",
-			_my_rank, foundUnsat, active_count, idle_count, _root_env_completions, _root_sweep_iteration, _root_sharing_round, all_idle,  send_end_iteration, send_terminate, n_eqs, n_sweep_units, crossjob_units_received,
+			"SWEEP [%i](root-trf) send: un-sat %i  act,idl,lti %i,%i,%i  envc %i iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i   SW %i  ST %i  RE %i    Sched, Swept  %i  %i    ( %.2f ,  %.2f )°/.   succ-rate %.6f   \n",
+			_my_rank, foundUnsat, active_count, idle_count, longtermidle_count, _root_env_completions, _root_sweep_iteration, _root_sharing_round, all_idle,  send_end_iteration, send_terminate, n_eqs, n_sweep_units, crossjob_units_received,
 			work_sweeps, work_stepovers, work_unsched_resweeps, work_sweeps + work_stepovers, work_sweeps + work_unsched_resweeps,
 			100*(work_sweeps + work_stepovers)/(double)_numVars , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars,
 			progress_ratio
@@ -443,12 +445,12 @@ private:
 
 	void solverGoStealing(KissatPtr sweeper);
 	void sendWorkstealsViaMPI();
-	void printIdleWorkStatus();
+	void checkIdleWorkStatus();
 
     void rootStartNewSharingRound();
     void cbContributeToAllReduce();
     static std::vector<int> aggregateEqUnitContributions(std::list<std::vector<int>> &contribs);
-	static void appendMetadataToReductionElement(int foundUnsat, std::vector<int> &contrib, int idle_count, int active_count, int unit_size, int eq_size, int work_sweeps, int work_stepovers, int unsched_resweeps);
+	static void appendMetadataToReductionElement(int foundUnsat, std::vector<int> &contrib, int idle_count, int longtermidle_count, int active_count, int unit_size, int eq_size, int work_sweeps, int work_stepovers, int unsched_resweeps);
 	void advanceAllReduction();
 	void extractAllReductionResult();
 
