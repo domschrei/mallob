@@ -26,8 +26,8 @@ INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf
 
 ./sweep/show-kissat-build.sh
 
-NPROCS=2
-threads=4
+NPROCS=4
+threads=2
 echo "NPROCS $NPROCS"
 echo "threads per process $threads"
 

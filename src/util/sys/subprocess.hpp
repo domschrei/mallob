@@ -72,6 +72,8 @@ public:
         LOG(V2_INFO, "Subprocess command: \n");
         printf(command.c_str());
 
+        LOG(V2_INFO, "\n Logged Subprocess command: %s\n", command.c_str());
+
         // Write command to tmp file (to be read by child process)
         const std::string commandOutfile = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob.subproc_cmd_" + std::to_string(res);
         const std::string tmpFile = commandOutfile + "~";

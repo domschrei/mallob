@@ -92,7 +92,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
     if [ -d sbatch/generated/$DS_JOBNAME/.done.$i ] ; then continue; fi
     # exit if you may be unable to finish this job in time
     if [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -gt $DS_RUNTIME ]; then 
-		echo "Exit job because probably unable to finish in time"
+      echo "Exit sbatch-job early (and chain next) because not enough time remaining on this one"
 		break; 
 	fi
     # try to get a reservation for working on this job
