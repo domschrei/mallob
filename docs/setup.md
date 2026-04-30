@@ -25,7 +25,7 @@ By default, the above call creates a build that includes the most common SAT sol
     - This includes or excludes specific application engines in/from your Mallob build. Some applications depend on each another (e.g., most depend on SAT) and the building script will raise an error if a dependency is not present.
 * `-DMALLOB_BUILD_<mod>=<0|1>` for `<mod>` = IMPCHECK, CHECKER
     - Build certain standalone executables for use together with Mallob: IMPCHECK for the ImpCheck real-time proof checking suite (in two versions, incremental and verified) and CHECKER for a standalone efficient LRUP checker.
-* `-DMALLOB_USE_<dep>=<0|1>` for `<dep>` = ASAN, JEMALLOC, MINISAT, CADICAL, LINGELING, KISSAT, RUSTSAT, MAXPRE
+* `-DMALLOB_USE_<dep>=<0|1>` for `<dep>` = ASAN, JEMALLOC, MINISAT, CADICAL, LINGELING, KISSAT, RUSTSAT, MAXPRE, SATSUMA
     - Include or exclude certain internal dependencies from linkage into Mallob. This concerns AdressSanitizer (ASAN) for debugging, JEMALLOC for more scalable memory allocation (enabled by default), and various SAT and MaxSAT backends (which are enabled by default for their respective application).
 * `-DMALLOB_MAX_N_APPTHREADS_PER_PROCESS=<t>` for `<t>` = 32, 64, (128)
     - Setting this as low as possible allows the SAT solving process to save a little bit of memory for each clause.
