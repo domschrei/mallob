@@ -14,26 +14,35 @@
 #include "util/sys/thread_pool.hpp"
 #include <atomic>
 #include <future>
+#include <fstream>
+#include "ISatsumaPreprocessor.h"
+#include "ICnf2wl.h"
 
 class SatPreprocessor {
 
 private:
+    int numberOfVariables;
     const Parameters& _params;
-    const JobDescription& _desc;
+    JobDescription& _desc;
     bool _run_lingeling {false};
+    bool _run_satsuma {false};
+    bool _chain {false};
+    bool _running {false};
     CoreAllocator::Allocation _core_alloc;
 
     std::unique_ptr<Lingeling> _lingeling;
     std::unique_ptr<Kissat> _kissat;
+    std::unique_ptr<satsuma::ISatsumaPreprocessor> _satsuma_preprocessor;
     std::future<void> _fut_lingeling;
     std::future<void> _fut_kissat;
+    std::future<void> _fut_satsuma;
     std::atomic_int _solver_result {0};
     std::atomic_int _nb_running {0};
     std::vector<int> _solution;
 
 public:
     SatPreprocessor(const Parameters& params, JobDescription& desc, bool runLingeling) :
-        _params(params), _desc(desc), _run_lingeling(runLingeling), _core_alloc(1 + _run_lingeling) {}
+        _params(params), _desc(desc), _run_lingeling(runLingeling), _core_alloc(1 + _run_lingeling) {_run_satsuma = _params.preprocessSatsuma(); _chain = _params.chainKissatAfterSatsuma();}
     ~SatPreprocessor() {
         join(false);
         if (_kissat) _kissat->cleanUp();
@@ -45,22 +54,63 @@ public:
         setup.logger = &Logger::getMainInstance();
         setup.numVars = _desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
         setup.numOriginalClauses = _desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
-        setup.solverType = 'p';
-        _kissat.reset(new Kissat(setup));
-        _nb_running++;
-        _fut_kissat = ProcessWideThreadPool::get().addTask([&]() {
-            loadFormulaToSolver(_kissat.get());
-            LOG(V2_INFO, "PREPRO running Kissat\n");
-            int res = _kissat->solve(0, nullptr);
-            LOG(V2_INFO, "PREPRO Kissat done, result %i\n", res);
-            if (res != RESULT_UNKNOWN) {
-                int expected = 0;
-                if (_solver_result.compare_exchange_strong(expected, res)) {
-                    if (_solver_result == RESULT_SAT) _solution = _kissat->getSolution();
+        if (!_run_satsuma){
+            _running = true;
+            setup.solverType = 'p';
+            _kissat.reset(new Kissat(setup));
+            _nb_running++;
+            _fut_kissat = ProcessWideThreadPool::get().addTask([&]() {
+                loadFormulaToSolver(_kissat.get());
+                LOG(V2_INFO, "PREPRO running Kissat\n");
+                int res = _kissat->solve(0, nullptr);
+                LOG(V2_INFO, "PREPRO Kissat done, result %i\n", res);
+                if (res != RESULT_UNKNOWN) {
+                    int expected = 0;
+                    if (_solver_result.compare_exchange_strong(expected, res)) {
+                        if (_solver_result == RESULT_SAT) _solution = _kissat->getSolution();
+                    }
                 }
-            }
-            _nb_running--;
-        });
+                _nb_running--;
+            });
+        }
+        if (_run_satsuma){
+            _nb_running++;
+            _satsuma_preprocessor = satsuma::create_preprocessor();
+            _fut_satsuma = ProcessWideThreadPool::get().addTask([&]() {
+                std::unique_ptr<satsuma::ICnf2wl> formula = satsuma::create_cnf2wl();
+
+                loadFormulaToCnf2wl(*formula);
+            	LOG(V2_INFO, "PREPRO running Satsuma\n");
+                _satsuma_preprocessor->set_save_as_Formula(true);
+                // hier vielleicht echten logger mit bestimmter verbosity
+                std::ofstream dev_null("/dev/null");
+                _satsuma_preprocessor->set_log_output(&dev_null);
+    			_satsuma_preprocessor->preprocess(*formula);
+                LOG(V2_INFO, "PREPRO Satsuma done \n");
+                if (_chain){
+                    std::vector<int>&& satsumaResult = _satsuma_preprocessor->extractPreprocessedFormula() ;
+                    SolverSetup kissatSetup;
+                    kissatSetup.logger = &Logger::getMainInstance();
+                    kissatSetup.numOriginalClauses = satsumaResult.back(); satsumaResult.pop_back();
+                    kissatSetup.numVars = satsumaResult.back(); satsumaResult.pop_back();
+                    kissatSetup.solverType = 'p';
+                    _kissat.reset(new Kissat(kissatSetup));
+                    _running = true ;
+                    loadFormulaFromExtracted(_kissat.get(), satsumaResult);
+                    LOG(V2_INFO, "PREPRO running Kissat\n");
+                    int res = _kissat->solve(0, nullptr);
+                    LOG(V2_INFO, "PREPRO Kissat done, result %i\n", res);
+                    if (res != RESULT_UNKNOWN) {
+                        int expected = 0;
+                        if (_solver_result.compare_exchange_strong(expected, res)) {
+                            if (_solver_result == RESULT_SAT) _solution = _kissat->getSolution();
+                        }
+                    }
+                }
+                
+                _nb_running--;
+            });
+        }
         if (_run_lingeling) {
             setup.solverType = 'l';
             setup.flavour = PortfolioSequence::PREPROCESS;
@@ -92,32 +142,62 @@ public:
         if (nbRunning == 0) _nb_running.store(-1, std::memory_order_relaxed);
         return done;
     }
+
     int getResultCode() const {
         return _solver_result;
     }
+    
     std::vector<int>&& getSolution() {
         return std::move(_solution);
     }
 
+
     bool hasPreprocessedFormula() {
-        return _kissat->hasPreprocessedFormula();
+        if (!_run_satsuma || (_chain )){
+            if (_running){
+                return _kissat->hasPreprocessedFormula();
+            }
+            return false;
+        }
+        return _satsuma_preprocessor->hasPreprocessedFormula();
     }
+
     std::vector<int>&& extractPreprocessedFormula() {
-        return _kissat->extractPreprocessedFormula();
+        if (!_run_satsuma || (_chain && _running)){
+            return _kissat->extractPreprocessedFormula();
+        }
+        LOG(V2_INFO, "PREPRO extracting Satsuma\n");
+        return _satsuma_preprocessor->extractPreprocessedFormula();
     }
+
 
     // Interrupt any preprocessing, no more need for a result
     void interrupt() {
-        _kissat->interrupt();
+        if (!_run_satsuma || _chain) _kissat->interrupt();
         if (_lingeling) _lingeling->interrupt();
+        //if (_satsuma_preprocessor) _satsuma_preprocessor->interrupt();
+
+        //TODO satsuma hat noch kein interrupt
     }
     void join(bool onlyWaitForModel) {
         if (!onlyWaitForModel && _fut_lingeling.valid()) _fut_lingeling.get(); // wait for solver thread to return
         if (_fut_kissat.valid()) _fut_kissat.get(); // wait for solver thread to return
+        if (_fut_satsuma.valid()) _fut_satsuma.get(); 
+        
     }
 
     void reconstructSolution(std::vector<int>& solution) {
-        _kissat->reconstructSolutionFromPreprocessing(solution);
+        if (!_run_satsuma ){
+            _kissat->reconstructSolutionFromPreprocessing(solution);
+        } else{
+            if (_chain) {
+                _kissat->reconstructSolutionFromPreprocessing(solution);
+                solution.resize(numberOfVariables + 1);
+            } else {
+                solution.resize(numberOfVariables + 1);
+            }
+        }
+
     }
 
 private:
@@ -130,4 +210,33 @@ private:
         }
         slv->diversify(0);
     }
+
+    void loadFormulaFromExtracted(PortfolioSolverInterface* slv, const std::vector<int>& formula) {
+        for (int lit : formula) {
+            slv->addLiteral(lit);
+        }
+        slv->diversify(0);
+    }
+
+	void loadFormulaToCnf2wl(satsuma::ICnf2wl& result){
+		SerializedFormulaParser parser(Logger::getMainInstance(), _desc.getFormulaPayload(0), _desc.getFormulaPayloadSize(0));
+        if (_params.compressFormula()) parser.setCompressed();
+		numberOfVariables = _desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
+        int numberOfClauses = _desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
+
+        assert(numberOfVariables > 0 && numberOfVariables < 1000000000);
+		result.reserve(numberOfVariables, numberOfClauses);
+		int lit;
+		std::vector<int> construct_clause;
+		while (parser.getNextLiteral(lit)) {
+			if (lit != 0) {
+				construct_clause.push_back(lit);
+			} else {
+				result.add_clause(construct_clause); 
+
+				construct_clause.clear();
+			}
+		}
+
+	}
 };
