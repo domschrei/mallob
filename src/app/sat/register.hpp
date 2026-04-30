@@ -151,8 +151,10 @@ void register_mallob_app_sat() {
         auto sol = res.copySolution();
         Witness w = Witness::extractWitnessFromSolutionVector(sol);
         res.setSolutionToSerialize(sol.data(), sol.size());
-        if (w.valid() && params.logDirectory.isSet()) {
-            std::ofstream ofs(params.logDirectory() + "/witness.#" + std::to_string(res.id), ios_base::app);
+        if (w.valid() && (params.solutionToFile.isSet() || params.logDirectory.isSet())) {
+            auto dir = params.solutionToFile.isSet() ? FileUtils::getDirectory(params.solutionToFile())
+                : params.logDirectory();
+            std::ofstream ofs(dir + "/witness.#" + std::to_string(res.id), ios_base::app);
             ofs << w.cidx << " " << w.result << " "
                 << Logger::dataToHexStr((const u8*) w.data, SIG_SIZE_BYTES);
             if (!w.asmpt.empty()) {
