@@ -23,6 +23,7 @@ INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/bob12s04.cnf.xz" 
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s176.cnf.xz" # 6sec
 INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s48.cnf.xz" # 6sec
+INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s12.cnf.xz" # 6sec
 
 #easy SATs
 # INST_PATH="$HOME/PhD/instances/sat-and-minisat1m/0225fa9581c622e5abbc8497a97edf4e-fla-qhid-360-4.cnf.xz" #<1s kissat
@@ -39,8 +40,8 @@ echo "NPROCS $NPROCS"
 echo "threads per process $threads"
 
 # APP="SAT"
-APP="SWEEP"
-# APP="SATWITHPRE"
+# APP="SWEEP"
+APP="SATWITHPRE"
 
 MALLOB_OPTIONS="-t=$threads \
   -mono-app=$APP \
@@ -58,10 +59,10 @@ MALLOB_OPTIONS="-t=$threads \
   -spl=-1 \
 	-jcup=0.05 \
   -sleep=100 \
-	-v=4 \
+	-v=3 \
   -cjc=1 \
-  -swpxs=0 \
-  -swpxr=0 \
+  -swpxs=1 \
+  -swpxr=1 \
   -fcll=2 \
 	-preprocess-sweepnsat=1 \
   -preprocess-sweep-priority=1.0 \
@@ -70,8 +71,8 @@ MALLOB_OPTIONS="-t=$threads \
 	-sweep-solver-verbosity=1 \
 	-sweep-solver-quiet=1 \
   -sweep-initial-congruence=1 \
-  -sweep-max-iterations=3 \
-  -sweep-max-depth=4 \
+  -sweep-max-iterations=4 \
+  -sweep-max-depth=5 \
   -sweep-min-exit-swept=0 \
   -sweep-term-no-progress=0 \
   -sweep-shuffle-work=0 \

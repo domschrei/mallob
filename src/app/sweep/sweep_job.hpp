@@ -92,7 +92,7 @@ private:
 		}
 	};
 	std::deque<WorkstealRequest> _worksteal_requests; //deque, because each object has an atomic member and thus isnt copyable (which vector would require)
-	const int MIN_STEAL_AMOUNT = 10; //avoid to much overhead at the very end when there is almost no work left, avoid sending around ridiculously small work packages
+	const int MIN_STEAL_AMOUNT = 4; //avoid to much overhead at the very end when there is almost no work left
 
 
 	//Sharing Equivalences and Units
@@ -160,6 +160,7 @@ private:
 	Logger _reslogger;  //most important information about results
 	Logger _warnlogger; //some relevant warnings
 	Logger _contriblogger; //each rank logs how many Eq+Units it contributed each round
+	Logger _termlogger; //terminations
 
 	std::mutex _stealinfo_mutex; //when exporting data from the solver to Mallob, need to lock them when extracting them for global sharing, otherwise the solver threads might continue concurrently pushing new data onto them
 	std::vector<std::vector<SweepStealInfo>> _stealinfos_per_solver;

@@ -162,10 +162,10 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
   -sweep-solver-quiet=1 \
   -sweep-initial-congruence=1 \
   -sweep-max-iterations=3 \
-  -sweep-max-depth=4 \
+  -sweep-max-depth=6 \
   -sweep-min-exit-swept=0 \
   -sweep-term-no-progress=0 \
-  -sweep-shuffle-work=0 \
+  -sweep-shuffle-work=1 \
   -sweep-to-completion=0 \
 "
 

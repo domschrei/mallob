@@ -26,7 +26,8 @@ SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTa
     : BaseSatJob(params, setup, table),
 	_reslogger(Logger::getMainInstance().copy("<RESULT>", ".sweep")),
 	_warnlogger(Logger::getMainInstance().copy("<WARN>", ".warn")),
-	_contriblogger(Logger::getMainInstance().copy("<CONTRIB>", ".contrib"))
+	_contriblogger(Logger::getMainInstance().copy("<CONTRIB>", ".contrib")),
+	_termlogger(Logger::getMainInstance().copy("<TERM>", ".termination"))
 {
 	assert(_params.jobCommUpdatePeriod() > 0 || log_return_false("[ERROR] For this application to work,"
             " you must explicitly enable job communicators with the -jcup option, e.g., -jcup=0.1\n"));
@@ -203,8 +204,10 @@ void SweepJob::tryReportToMallob() { //needs to be called from the main thread
 	// _clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
 	// (with an empty buffer from a BufferBuilder) since this will initiate XTCS operations.
 	// update: is now
-	checkCrossCommNeedsAdvancing("tryReportToMallob");
 
+	if (checkCrossCommNeedsAdvancing("tryReportToMallob")) {
+		return;
+	}
 	//There is a result (SAT,UNSAT,IMPROVED,UNKNOWN,...), but first check whether the cross-job sharer is still up
 
 	int res = _staged_solved_status;
@@ -458,6 +461,7 @@ void SweepJob::rootReportSolverResult(KissatPtr sweeper, int res) {
 	} else {
 		LOG(V1_WARN, "WARN SWEEP [%i]: unexpected result code %i when reporting to mallob \n", _my_rank, res);
 	}
+	LOG(			  V2_INFO, "SWEEP_RESULT_CODE %i == %s \n", res, res==40 ? "IMPROVED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
 	LOGGER(_reslogger,V2_INFO, "SWEEP_RESULT_CODE %i == %s \n", res, res==40 ? "IMPROVED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
 	_internal_result.setSolutionToSerialize(formula.data(), formula.size());
 
@@ -508,9 +512,11 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		_flag_started_synchronized_solving = true;
 		_timestamp_started_synchronized_solving = Timer::elapsedSeconds();
 
-		LOG(V3_VERB, "SWEEP [%i](%i) START solve() \n", _my_rank, localId);
+		LOG(				V3_VERB, "SWEEP [%i](%i) START solve() \n", _my_rank, localId);
+		LOGGER(_termlogger, V2_INFO, "SWEEP [%i](%i) START solve() \n", _my_rank, localId);
 		int res = sweeper->solve(0, nullptr);
-		LOG(V3_VERB, "SWEEP [%i](%i) FINISH solve(). Result %i \n", _my_rank, localId, res);
+		LOG(				V3_VERB, "SWEEP [%i](%i) FINISH solve(). Result %i \n", _my_rank, localId, res);
+		LOGGER(_termlogger, V2_INFO, "SWEEP [%i](%i) FINISH solve(). Result %i \n", _my_rank, localId, res);
 
 
 		if (res==UNSAT) {
@@ -553,7 +559,8 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		_sweepers[localId].reset();  //this should delete the only persistent shared pointer on the solver, and thus trigger its destructor soon
 		_running_sweepers_count--;
 		_finished_sweepers_count++;
-		LOG(V3_VERB, "SWEEP [%i](%i) WORKER EXIT, %i left running\n", _my_rank, localId, _running_sweepers_count.load());
+		LOG(				V3_VERB, "SWEEP [%i](%i) WORKER EXIT, %i left running\n", _my_rank, localId, _running_sweepers_count.load());
+		LOGGER(_termlogger, V2_INFO, "SWEEP [%i](%i) WORKER EXIT, %i left running\n", _my_rank, localId, _running_sweepers_count.load());
 	});
 }
 
@@ -707,11 +714,11 @@ void SweepJob::cbReportIteration(int localId) {
 void SweepJob::saveStealLatencies(KissatPtr sweeper) {
 
 	//Write out every single steal when at very high verbosity
-	if (LOGGER_STATIC_VERBOSITY >= 4) {
+	if (LOGGER_STATIC_VERBOSITY >= 5) {
 		Logger _steallogger(Logger::getMainInstance().copy("<STEAL>", ".steal."+to_string(sweeper->getLocalId())));
 		for (auto steal : sweeper->steal_records) {
 			string stealtype = steal.stealtype == SweepStealType::MPI ? "mpi" : "local";
-			LOGGER(_steallogger, V4_VVER, "id %i   r %i   nr %i   tr %.5f   ts %.5f   d %.6f   s %i  %s\n",sweeper->getLocalId(), steal.round, steal.nr, steal.t_receive, steal.t_submit, steal.t_receive - steal.t_submit, steal.size,  stealtype.c_str() );
+			LOGGER(_steallogger, V5_DEBG, "id %i   r %i   nr %i   tr %.5f   ts %.5f   d %.6f   s %i  %s\n",sweeper->getLocalId(), steal.round, steal.nr, steal.t_receive, steal.t_submit, steal.t_receive - steal.t_submit, steal.size,  stealtype.c_str() );
 		}
 	}
 
@@ -757,7 +764,7 @@ void SweepJob::saveStealLatencies(KissatPtr sweeper) {
 				}
 				// LOGGER(_stealsumlogger, V2_INFO, "it %i rnd %i   attmpts %i   stolen %i \n", iter, round, roundlist.size(), stolen_sum);
 				// LOG(V2_INFO, "SWEEP reporting steal information, logging round %i / %i\n", round, _lastImportedRound.load());
-				LOGGER(_stealsumlogger, V3_VERB, "iter %i rnd %i   loc_attempts %i   mpi_attempts %i   loc_stolen %i   mpi_stolen %i   Latencies in ms: local_max %.3f   mpi_min %.3f   mpi_mean %.3f   mpi_max %.3f\n",
+				LOGGER(_stealsumlogger, V4_VVER, "iter %i rnd %i   loc_attempts %i   mpi_attempts %i   loc_stolen %i   mpi_stolen %i   Latencies in ms: local_max %.3f   mpi_min %.3f   mpi_mean %.3f   mpi_max %.3f\n",
 					iteration, round, local.size(), mpi.size(), loc_stolensum, mpi_stolensum,
 					// local.empty() ? 0.0f : std::accumulate(local.begin(), local.end(), 0.0f) / local.size(),
 					local.empty() ? 0.0f : *std::max_element(local.begin(), local.end()) * 1000,
@@ -1734,7 +1741,7 @@ void SweepJob::crossjob_rootReceiveClauses(std::vector<int>  &&clauses) {
 		return;
 	}
 
-	LOG(V1_WARN, "SWEEP storing part of received XTCS size %i\n",clauses.size());
+	LOG(V2_INFO, "SWEEP storing part of received XTCS size %i\n",clauses.size());
 	// auto reader = _clause_store->getBufferReader(clauses.data(), clauses.size());
 	auto reader = BufferReader(clauses.data(), clauses.size(), 10, false);
 	auto clause = reader.getNextIncomingClause();
@@ -1756,7 +1763,7 @@ void SweepJob::crossjob_rootReceiveClauses(std::vector<int>  &&clauses) {
 		}
 		int after = _crossjob_root_received_units.size();
 		// LOG(V4_VVER, "  sconsume consumed %i units \n", after - before);
-		LOG(V1_WARN, "SWEEP stored %i received XTCS units \n", after -before);
+		LOG(V2_INFO, "SWEEP stored %i received XTCS units \n", after -before);
 	}
 }
 
@@ -1790,21 +1797,24 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 
 void SweepJob::triggerTerminations() {
 	// checkCrossCommNeedsAdvancing("triggerTerminations");
-	LOG(V2_INFO, "SWEEP TERM #%i [%i] trigger solver terminations (ctx %i). Of: Running %i, Finished %i \n", getId(), _my_rank, _my_ctx_id, _running_sweepers_count.load(), _finished_sweepers_count.load());
+	LOG(                V2_INFO, "SWEEP TERM #%i [%i] trigger solver terminations (ctx %i). Of: Running %i, Finished %i \n", getId(), _my_rank, _my_ctx_id, _running_sweepers_count.load(), _finished_sweepers_count.load());
+	LOGGER(_termlogger, V2_INFO, "SWEEP TERM #%i [%i] trigger solver terminations (ctx %i). Of: Running %i, Finished %i \n", getId(), _my_rank, _my_ctx_id, _running_sweepers_count.load(), _finished_sweepers_count.load());
 	int i=0;
 	for (auto &sweeper : _sweepers) {
 		if (sweeper) {
 			sweeper->triggerSweepTerminate();
-			LOG(V3_VERB, "SWEEP TERM #%i [%i] trigger termination of solver (%i) \n", getId(), _my_rank, i);
+			LOG(                V3_VERB, "SWEEP TERM #%i [%i] trigger termination of solver (%i) \n", getId(), _my_rank, i);
+			LOGGER(_termlogger, V2_INFO, "SWEEP TERM #%i [%i] trigger termination of solver (%i) \n", getId(), _my_rank, i);
 		} else {
-			LOG(V3_VERB, "SWEEP TERM #%i [%i] skip    termination of solver (%i), already null \n", getId(), _my_rank, i);
+			LOG(				V3_VERB, "SWEEP TERM #%i [%i] skip    termination of solver (%i), already null \n", getId(), _my_rank, i);
+			LOGGER(_termlogger, V2_INFO, "SWEEP TERM #%i [%i] skip    termination of solver (%i), already null \n", getId(), _my_rank, i);
 		}
 		i++;
 	}
 }
 
 SweepJob::~SweepJob() {
-	LOG(V3_VERB, "SWEEP JOB DESTRUCTOR ENTERED (ctx %i) \n", _my_ctx_id);
+	LOG(V2_INFO, "SWEEP JOB DESTRUCTOR ENTERED (ctx %i) \n", _my_ctx_id);
 	for (int i=0; i<5; i++) {
 		clearImportedRound();
 	}
@@ -1818,7 +1828,7 @@ SweepJob::~SweepJob() {
 		LOG(V1_WARN, "SWEEP [%i] WARN : rank didn't receive a single sharing round! (irrelevant if only 1 rank present) \n", _my_rank);
 	}
 	// triggerTerminations();
-	LOG(V3_VERB, "SWEEP JOB DESTRUCTOR DONE\n");
+	LOG(V2_INFO, "SWEEP JOB DESTRUCTOR DONE\n");
 }
 
 
