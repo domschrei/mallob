@@ -34,14 +34,15 @@ INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s12.cnf.xz" # 
 
 ./sweep/show-kissat-build.sh
 
+timeout=20
 NPROCS=4
 threads=3
 echo "NPROCS $NPROCS"
 echo "threads per process $threads"
 
 # APP="SAT"
-# APP="SWEEP"
-APP="SATWITHPRE"
+APP="SWEEP"
+# APP="SATWITHPRE"
 
 MALLOB_OPTIONS="-t=$threads \
   -mono-app=$APP \
@@ -50,6 +51,8 @@ MALLOB_OPTIONS="-t=$threads \
   -trace-dir=$OUT_DIR/traces/ \
   -log=$OUT_DIR/logs/ \
   -mono=$INST_PATH \
+  -jwl=$timeout \
+  -T=$(($timeout+30)) \
   -os=1 \
   -iff=0 \
   -cm=0 \
@@ -66,16 +69,16 @@ MALLOB_OPTIONS="-t=$threads \
   -fcll=2 \
 	-preprocess-sweepnsat=1 \
   -preprocess-sweep-priority=1.0 \
-	-sweep-sharing-period=0.020 \
-  -sweep-resweep-chance=1000 \
+  -sweep-min-exit-swept=0 \
+  -sweep-term-no-progress=0 \
 	-sweep-solver-verbosity=1 \
 	-sweep-solver-quiet=1 \
   -sweep-initial-congruence=1 \
-  -sweep-max-iterations=4 \
-  -sweep-max-depth=5 \
-  -sweep-min-exit-swept=0 \
-  -sweep-term-no-progress=0 \
-  -sweep-shuffle-work=0 \
+  -sweep-shuffle-work=1 \
+	-sweep-sharing-period=0.020 \
+  -sweep-resweep-chance=0 \
+  -sweep-max-iterations=99 \
+  -sweep-max-depth=99 \
   -sweep-to-completion=0 \
 "
 

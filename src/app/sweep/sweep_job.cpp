@@ -540,8 +540,9 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		_sweepers[localId].reset();  //this should delete the only persistent shared pointer on the solver, and thus trigger its destructor soon
 		_running_sweepers_count--;
 		_finished_sweepers_count++;
-		LOG(				V3_VERB, "SWEEP [%i](%i) WORKER EXIT, %i left running\n", _my_rank, localId, _running_sweepers_count.load());
-		LOGGER(_termlogger, V2_INFO, "SWEEP [%i](%i) WORKER EXIT, %i left running\n", _my_rank, localId, _running_sweepers_count.load());
+		LOG(				V3_VERB, "SWEEP [%i](%i) WORKER EXITED. still running: %i\n", _my_rank, localId, _running_sweepers_count.load());
+		LOGGER(_termlogger, V2_INFO, "SWEEP [%i](%i) WORKER EXITED. still running: %i\n", _my_rank, localId, _running_sweepers_count.load());
+		printActiveMPIRequestsCount();
 	});
 }
 
@@ -1116,13 +1117,13 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	int localId = sweeper->getLocalId();
 	sweeper->work_received_from_steal = {};
 
-	// LOG(V3_VERB, "Sweeper [%i](%i) stealing \n", _my_rank, localId);
+	LOG(V3_VERB, "Sweeper [%i](%i) stealing \n", _my_rank, localId);
 
 	if (_terminate_all.load(std::memory_order_relaxed)) {
 		sweeper->sweeper_is_idle = true;
 		LOG(V3_VERB, "Sweeper [%i](%i) exit mallob steal due to terminate_all\n", _my_rank, localId);
 		//just to be safe, send another termination to self
-		sweeper->triggerSweepTerminate();
+		// sweeper->triggerSweepTerminate();
 		sweeper->count_repeated_missed_termination++;
 		if (sweeper->count_repeated_missed_termination % sweeper->WARN_ON_REPEATED_MISSED_TERMINATION==0) {
 			LOG(V1_WARN, "SWEEP WARN : Sweeper [%i](%i) in %i-th worksteal loop after termination\n", _my_rank, localId, sweeper->count_repeated_missed_termination);
@@ -1148,7 +1149,6 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 
 	//Check whether a previously queued MPI request has been answered
 	if (request.got_steal_response) {
-
 		LOG(V4_VVER, "Sweeper [%i](%i) got steal response \n", _my_rank, localId);
 		float t1 = Timer::elapsedSeconds();
 		int size = request.stolen_work.size();
@@ -1173,7 +1173,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 			LOG(V1_WARN, "WARN STEALDELAY at [%i](%i)! waiting %f s  \n", _my_rank, localId, delay);
 		}
 
-		LOG(V3_VERB, "Sweeper [%i](%i) waits for active request to return \n", _my_rank, localId);
+		LOG(V3_VERB, "Sweeper [%i](%i) waits for answer to sent request nr. %i \n", _my_rank, localId, request.nr);
 		usleep(2000);
 		return;
 	}
@@ -1711,6 +1711,14 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	//lock is freed up now automatically by going out of scope
 }
 
+void SweepJob::printActiveMPIRequestsCount() {
+	int active=0;
+	for (auto &request : _worksteal_requests) {
+		active+=request.is_active;
+	}
+	LOG(V3_VERB, "still active MPI requests: %i\n",active);
+}
+
 std::vector<int> SweepJob::getRandomIdPermutation() {
 	auto permutation = _list_of_ids; //copy
 	static thread_local std::mt19937 rng(std::random_device{}()); //created/seeded only once per thread, then just advancing rng calls
@@ -1781,6 +1789,7 @@ void SweepJob::triggerTerminations() {
 	// checkCrossCommNeedsAdvancing("triggerTerminations");
 	LOG(                V2_INFO, "SWEEP TERM #%i [%i] trigger solver terminations (ctx %i). Of: Running %i, Finished %i \n", getId(), _my_rank, _my_ctx_id, _running_sweepers_count.load(), _finished_sweepers_count.load());
 	LOGGER(_termlogger, V2_INFO, "SWEEP TERM #%i [%i] trigger solver terminations (ctx %i). Of: Running %i, Finished %i \n", getId(), _my_rank, _my_ctx_id, _running_sweepers_count.load(), _finished_sweepers_count.load());
+	printActiveMPIRequestsCount();
 	int i=0;
 	for (auto &sweeper : _sweepers) {
 		if (sweeper) {

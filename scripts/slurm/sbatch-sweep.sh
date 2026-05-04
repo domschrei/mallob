@@ -117,6 +117,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 	
 	  echo " "
     echo " "
+    echo "$(date)"
     echo "jobname:  $DS_JOBNAME"
     echo "index:    $i"
     echo "logdir:   $globallogdir"
@@ -173,7 +174,6 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 
     # Pre-create network-disk output directories to avoid many concurrent filesystem manips
     #
-    echo "$(date) mkdir of output logdirs"
     mkdir -p $(for rank in $(seq 0 $(($SLURM_NTASKS-1))); do echo $outputlogdir/$i/$rank; done)
 
     export MALLOB_GLOBALLOGDIR=$globallogdir

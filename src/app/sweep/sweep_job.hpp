@@ -471,6 +471,7 @@ private:
 	void crossjob_rootReceiveClauses(std::vector<int>  &&clauses);
 
 	std::vector<int> getRandomIdPermutation();
+	void printActiveMPIRequestsCount();
 
 	bool tryProvideInitialWork(KissatPtr sweeper);
 	std::vector<int> stealWorkFromAnyLocalSolver(int asking_rank, int asking_sourceLocalId); //parameters only for verbose logging
