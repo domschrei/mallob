@@ -163,9 +163,9 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
   -sweep-initial-congruence=1 \
   -sweep-shuffle-work=1 \
   -sweep-sharing-period=0.020 \
-  -sweep-resweep-chance=1000 \
-  -sweep-max-iterations=3 \
-  -sweep-max-depth=6 \
+  -sweep-resweep-chance=0 \
+  -sweep-max-iterations=99 \
+  -sweep-max-depth=99 \
   -sweep-to-completion=0 \
 "
 
