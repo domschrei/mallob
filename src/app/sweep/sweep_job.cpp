@@ -1167,7 +1167,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	//Check whether a previously queued MPI request has been answered
 	if (request.got_steal_response) {
 
-		LOG(V3_VERB, "Sweeper [%i](%i) got steal response \n", _my_rank, localId);
+		LOG(V4_VVER, "Sweeper [%i](%i) got steal response \n", _my_rank, localId);
 		float t1 = Timer::elapsedSeconds();
 		int size = request.stolen_work.size();
 		assert(request.to_send  == false			|| log_return_false("SWEEP ERROR : got request response, but still   request.to_send==true.             stealingLocalId %i, payload.size %zu ", localId, size));
@@ -1216,7 +1216,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	//This indirection is necessary because sending MPI messages from any other thread (like this solver thread) can cause MPI problems
 	if (request.is_active == false && !skip_MPI_forNow()) {
 		request.newQueuedRequest(localId, sweeper->attempted_steals++);
-		LOG(V3_VERB, "Sweeper [%i](%i) queued new request \n", _my_rank, localId);
+		LOG(V4_VVER, "Sweeper [%i](%i) queued new request \n", _my_rank, localId);
 	}
 
 	// If we make it until here we are waiting for work and have have nothing else to do for now. Can wait for  ~2 millisecond until we check the system again.
