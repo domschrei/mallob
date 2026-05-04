@@ -1120,28 +1120,60 @@ bool SweepJob::tryProvideInitialWork(KissatPtr sweeper) {
 
 }
 
+bool SweepJob::canSolverExitStealing(KissatPtr sweeper) {
+	int localId = sweeper->getLocalId();
+	auto &request = _worksteal_requests[localId];
+	//Most importantly: we cannot exit when there is still a pending MPI message we are awaiting an answer from
+	if (request.is_active) {
+		if (shweep_get_end_iteration_signal(sweeper->solver)) {
+			LOG(V3_VERB, "Sweeper [%i](%i) would like to exit stealing (iteration ended), but must wait for pending MPI msg\n", _my_rank, localId);
+		}
+		if (_terminate_all.load(std::memory_order_relaxed)) {
+			LOG(V3_VERB, "Sweeper [%i](%i) would like to exit stealing (job terminated), but must wait for pending MPI msg\n", _my_rank, localId);
+		}
+		return false;
+	}
+	if (shweep_get_end_iteration_signal(sweeper->solver)) {
+		LOG(V3_VERB, "Sweeper [%i](%i) exit mallob steal due to end_iteration flag \n", _my_rank, localId);
+		return true;
+	}
+	// if (shweep_get_end_job_signal(sweeper->solver)) {
+		// LOG(V3_VERB, "Sweeper [%i](%i) exit mallob steal due to end_job flag \n", _my_rank, localId);
+		// return true;
+	// }
+
+	if (_terminate_all.load(std::memory_order_relaxed)) {
+		sweeper->sweeper_is_idle = true;
+		LOG(V3_VERB, "Sweeper [%i](%i) exit mallob steal due to terminate_all\n", _my_rank, localId);
+		sweeper->count_repeated_missed_termination++;
+		if (sweeper->count_repeated_missed_termination % sweeper->WARN_ON_REPEATED_MISSED_TERMINATION==0) {
+			LOG(V1_WARN, "SWEEP WARN : Sweeper [%i](%i) in %i-th worksteal loop after termination\n", _my_rank, localId, sweeper->count_repeated_missed_termination);
+		}
+		return true;
+	}
+	return false;
+}
+
 void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	int localId = sweeper->getLocalId();
 	sweeper->work_received_from_steal = {};
 
 	LOG(V3_VERB, "Sweeper [%i](%i) stealing \n", _my_rank, localId);
 
-	if (_terminate_all.load(std::memory_order_relaxed)) {
-		sweeper->sweeper_is_idle = true;
-		LOG(V3_VERB, "Sweeper [%i](%i) exit mallob steal due to terminate_all\n", _my_rank, localId);
-		//just to be safe, send another termination to self
-		// sweeper->triggerSweepTerminate();
-		sweeper->count_repeated_missed_termination++;
-		if (sweeper->count_repeated_missed_termination % sweeper->WARN_ON_REPEATED_MISSED_TERMINATION==0) {
-			LOG(V1_WARN, "SWEEP WARN : Sweeper [%i](%i) in %i-th worksteal loop after termination\n", _my_rank, localId, sweeper->count_repeated_missed_termination);
-		}
-		return;
-	}
+	// if (_terminate_all.load(std::memory_order_relaxed)) {
+		// sweeper->sweeper_is_idle = true;
+		// LOG(V3_VERB, "Sweeper [%i](%i) exit mallob steal due to terminate_all\n", _my_rank, localId);
+		// sweeper->count_repeated_missed_termination++;
+		// if (sweeper->count_repeated_missed_termination % sweeper->WARN_ON_REPEATED_MISSED_TERMINATION==0) {
+			// LOG(V1_WARN, "SWEEP WARN : Sweeper [%i](%i) in %i-th worksteal loop after termination\n", _my_rank, localId, sweeper->count_repeated_missed_termination);
+		// }
+		// return;
+	// }
 
-	if (shweep_get_end_iteration_signal(sweeper->solver)) {
-		LOG(V3_VERB, "Sweeper [%i](%i) exit mallob steal due to end_iteration flag \n", _my_rank, localId);
-		return;
-	}
+	// if (shweep_get_end_iteration_signal(sweeper->solver)) {
+		// LOG(V3_VERB, "Sweeper [%i](%i) exit mallob steal due to end_iteration flag \n", _my_rank, localId);
+		// return;
+	// }
 
 	if (tryProvideInitialWork(sweeper)) {
 		//we successfully provided the initial work to this solver
@@ -1161,14 +1193,18 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 		int size = request.stolen_work.size();
 		assert(request.to_send  == false			|| log_return_false("SWEEP ERROR : got request response, but still   request.to_send==true.             stealingLocalId %i, payload.size %zu ", localId, size));
 		assert(request.is_active		    		|| log_return_false("SWEEP ERROR : got request response, but was no longer flagged active.               stealingLocalId %i, payload.size %zu ", localId, size));
-		sweeper->steal_records.push_back({request.nr, SweepStealType::MPI, size , request.t_queued , t1, _lastImportedRound });
+		if (_params.verbosity()>=V4_VVER) {
+			sweeper->steal_records.push_back({request.nr, SweepStealType::MPI, size , request.t_queued , t1, _lastImportedRound });
+		}
 		request.got_steal_response = false; //to not read it a second time
 		request.is_active = false; //request was fully processed, the slot is now inactive
 		if (size>0) {
 			sweeper->work_received_from_steal = std::move(request.stolen_work);
 			LOG(V4_VVER, "SWEEP recv [%i](%i) <==%zu==== [%i] \n",  _my_rank, localId, size, request.targetRank);
-			return;
+			// return;
 		}
+		//update: with the steal-loop now happening in Mallob-Level, we need to return here to allow the steal-loop to break if the iteration ended, and not immediately schedule another request
+		return;
 	}
 
 	if (request.is_active) {
@@ -1192,7 +1228,9 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	float t1 = Timer::elapsedSeconds();
 	int size = stolen_work.size();
 	int nr = sweeper->attempted_steals++;
-	sweeper->steal_records.push_back({nr, SweepStealType::Local, size, t0, t1, _lastImportedRound });
+	if (_params.verbosity()>=V4_VVER) {
+		sweeper->steal_records.push_back({nr, SweepStealType::Local, size, t0, t1, _lastImportedRound });
+	}
 	if (size>0) {
 		//Successful local steal
 		sweeper->work_received_from_steal = std::move(stolen_work);
@@ -1214,7 +1252,18 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 
 void SweepJob::cbStealWorkNew(unsigned **work, int *work_size, int localId) {
 	KissatPtr sweeper = _sweepers[localId]; //this array access is safe because the callback is called by this sweeper itself
-	solverGoStealing(sweeper);
+	//This is the main loop in which a solver sits while it tries to steal work from others
+	while (true) {
+		shweep_check_EU_imports(sweeper->solver);
+		solverGoStealing(sweeper);
+		if (canSolverExitStealing(sweeper)) {
+			sweeper->work_received_from_steal = {};
+			break;
+		}
+		if (sweeper->work_received_from_steal.size()>0) {
+			break;
+		}
+	}
 	//We store the steal data persistently in the C++ vector sweeper->work_received_from_steal, allocated and managed in C++
 	//The kissat solver (and other solver threads) will then be allowed to read and write(!) within this fixed allocated memory.
 	*work = reinterpret_cast<unsigned int*>(sweeper->work_received_from_steal.data());

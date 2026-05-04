@@ -473,6 +473,7 @@ private:
 	std::vector<int> getRandomIdPermutation();
 	void printActiveMPIRequestsCount();
 
+	bool canSolverExitStealing(KissatPtr sweeper);
 	bool tryProvideInitialWork(KissatPtr sweeper);
 	std::vector<int> stealWorkFromAnyLocalSolver(int asking_rank, int asking_sourceLocalId); //parameters only for verbose logging
     std::vector<int> stealWorkFromSpecificLocalSolver(int localId);
