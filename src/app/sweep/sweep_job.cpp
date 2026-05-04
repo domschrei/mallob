@@ -503,6 +503,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		_sweepers[localId] = sweeper; //only now expose the solver to the rest of the system, now that solving starts
 		_flag_started_synchronized_solving = true;
 		_timestamp_started_synchronized_solving = Timer::elapsedSeconds();
+		shweep_set_wallclock_offset(sweeper->solver, Timer::elapsedSeconds());
 
 		LOG(				V3_VERB, "SWEEP [%i](%i) START solve() \n", _my_rank, localId);
 		LOGGER(_termlogger, V2_INFO, "SWEEP [%i](%i) START solve() \n", _my_rank, localId);
@@ -1222,7 +1223,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 			LOG(V1_WARN, "WARN STEALDELAY at [%i](%i)! waiting %f s  \n", _my_rank, localId, delay);
 		}
 
-		LOG(V3_VERB, "Sweeper [%i](%i) waits for answer to sent request nr. %i \n", _my_rank, localId, request.nr);
+		LOG(V3_VERB, "Sweeper [%i](%i) waiting for MPI nr. %i \n", _my_rank, localId, request.nr);
 		usleep(2000);
 		return;
 	}
@@ -1260,7 +1261,9 @@ void SweepJob::cbStealWorkNew(unsigned **work, int *work_size, int localId) {
 	KissatPtr sweeper = _sweepers[localId]; //this array access is safe because the callback is called by this sweeper itself
 	//This is the main loop in which a solver sits while it tries to steal work from others
 	while (true) {
+		if (_terminate_all) LOG(V3_VERB, "Sweeper [%i](%i) last seen: checking EU imports\n", _my_rank, localId);
 		shweep_check_EU_imports(sweeper->solver);
+		if (_terminate_all) LOG(V3_VERB, "Sweeper [%i](%i) last seen: go stealing\n", _my_rank, localId);
 		solverGoStealing(sweeper);
 		if (canSolverExitStealing(sweeper)) {
 			sweeper->work_received_from_steal = {};
