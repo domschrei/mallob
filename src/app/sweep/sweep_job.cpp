@@ -191,6 +191,9 @@ void SweepJob::appl_communicate() {
 }
 
 void SweepJob::tryReportToMallob() { //needs to be called from the main thread
+	if (!_is_root) {
+		return;
+	}
 	if (_staged_solved_status==-1) {
 		return;
 		//there is no result yet
@@ -208,12 +211,16 @@ void SweepJob::tryReportToMallob() { //needs to be called from the main thread
 		return;
 	}
 
+	if (_running_sweepers_count.load()>0) {
+		LOG(V2_INFO, " SWEEP : mainthread waiting with staged report %i to Mallob because still solvers running: %i \n", _staged_solved_status, _running_sweepers_count.load());
+		return;
+	}
+
 	int res = _staged_solved_status;
 	assert(res!=-1);
 	_internal_result.result = res;
 	_solved_status = res; //this will now be noticed by Mallob, and will end this App
-	LOG(V2_INFO, " SWEEP : mainthread reports result %i to Mallob \n", _solved_status);
-
+	LOG(V2_INFO, " SWEEP : mainthread now reporting to Mallob: result %i \n", _solved_status);
 }
 
 
@@ -360,13 +367,13 @@ bool SweepJob::appl_isDestructible() {
 	//maybe clauseComm checks should come after the sweeper terminations?
 	if (_clause_comm && !_clause_comm->isDestructible()) {
 		for (int i = 0; i < 10; i++) _clause_comm->communicate(); // may advance destructibility
-		LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? no. _clause_comm not destructible yet\n",  getId(),_my_rank);
+		LOG(V3_VERB, "SWEEP TERM #%i [%i] isDestructible? no. _clause_comm not destructible yet\n",  getId(),_my_rank);
 		return false;
 	}
 
 	int _running_sweepers = _started_sweepers_count - _finished_sweepers_count;
 	if (_finished_sweepers_count < _nThreads) {
-		LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? no. only %i/%i finished, %i running \n",  getId(),_my_rank, _finished_sweepers_count.load(), _nThreads, _running_sweepers);
+		LOG(V3_VERB, "SWEEP TERM #%i [%i] isDestructible? no. only %i/%i finished, %i running \n",  getId(),_my_rank, _finished_sweepers_count.load(), _nThreads, _running_sweepers);
 		return false;
 	}
 
@@ -375,13 +382,13 @@ bool SweepJob::appl_isDestructible() {
 	int i=0;
 	for (auto &bg_worker : _bg_workers) {
 		if (bg_worker->isRunning()) {
-			LOG(V4_VVER, "SWEEP TERM #%i [%i] joining bg_worker    (%i) \n",  getId(),_my_rank, i);
+			LOG(V3_VERB, "SWEEP TERM #%i [%i] joining bg_worker    (%i) \n",  getId(),_my_rank, i);
 			bg_worker->stop();
-			LOG(V4_VVER, "SWEEP TERM #%i [%i] joined  bg_worker (%i) \n",  getId(),_my_rank, i);
+			LOG(V3_VERB, "SWEEP TERM #%i [%i] joined  bg_worker (%i) \n",  getId(),_my_rank, i);
 		}
 		i++;
 	}
-	LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? yes. all joined \n",  getId(),_my_rank);
+	LOG(V3_VERB, "SWEEP TERM #%i [%i] isDestructible? yes. all joined \n",  getId(),_my_rank);
 	return true;
 }
 
@@ -419,10 +426,10 @@ void SweepJob::rootReportSolverResult(KissatPtr sweeper, int res) {
 		return;
 	}
 
-
-	LOG(V2_INFO, "SWEEP JOB [%i] reports sweep result %i to Mallob\n", _my_rank, res);
+	//CAREFUL: don't access sweeper in case of UNSAT, because it doesn't exist!...
+	LOG(V2_INFO, "SWEEP JOB [%i] stages sweep result %i to Mallob\n", _my_rank, res);
 	assert(_staged_solved_status == -1 || log_return_false("SWEEP ERROR: duplicate attempt to report result to mallob, was already reported as %i \n", _internal_result.result)); //something would be off if we called this function more than once
-	//update: we dont pipe the formula back, since we don't use it anyways currently, and all progress is communicated already via Cross-Job-Communication
+	//update: dont pipe the formula back to Mallob, because we don't use it currently, all progress is communicated anyways via Cross-Job-Communication, and it only takes time at the end
 	std::vector<int> formula = {};
 	if (res!=UNSAT && res!=IMPROVED && res!= UNKNOWN) {
 		LOG(V1_WARN, "WARN SWEEP [%i]: unexpected result code %i when reporting to mallob \n", _my_rank, res);
