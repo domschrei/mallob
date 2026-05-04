@@ -156,16 +156,16 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
   -fcll=2 \
   -preprocess-sweepnsat=1 \
   -preprocess-sweep-priority=1.0 \
-  -sweep-sharing-period=0.020 \
-  -sweep-resweep-chance=1000 \
+  -sweep-min-exit-swept=0 \
+  -sweep-term-no-progress=0 \
   -sweep-solver-verbosity=0 \
   -sweep-solver-quiet=1 \
   -sweep-initial-congruence=1 \
+  -sweep-shuffle-work=1 \
+  -sweep-sharing-period=0.020 \
+  -sweep-resweep-chance=1000 \
   -sweep-max-iterations=3 \
   -sweep-max-depth=6 \
-  -sweep-min-exit-swept=0 \
-  -sweep-term-no-progress=0 \
-  -sweep-shuffle-work=1 \
   -sweep-to-completion=0 \
 "
 

@@ -157,7 +157,7 @@ private:
 	std::atomic_bool _terminate_all=false; //termination (on this node) due to sharing consensus that there is no more work
 
 	//Have dedicated files for some important logging types. Mostly to protect them from becoming mangled due to concurrent logging, and for nicer post processing (especially not needing to scan through the main large log file)
-	Logger _reslogger;  //most important information about results
+	Logger _reslogger;  //most important information about sweep results
 	Logger _warnlogger; //some relevant warnings
 	Logger _contriblogger; //each rank logs how many Eq+Units it contributed each round
 	Logger _termlogger; //terminations
