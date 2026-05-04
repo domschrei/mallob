@@ -148,7 +148,6 @@ void SweepJob::appl_communicate() {
 		_bcast->updateJobTree(getJobTree());
 	}
 
-
 	// printIdleFraction();
 	// checkSharingDelayHealth();
 	if (_bcast && _is_root)// Root: Update job tree snapshot in case your children changed
@@ -158,7 +157,6 @@ void SweepJob::appl_communicate() {
 		_logged_full_jobcomm = true;
 		LOG(V2_INFO, "SWEEP FULL-JOBCOMM , all ranks are online now \n");
 	}
-
 
 	//By having rootStartNewSharingRound() before advanceAllReduction(),
 	//we dont immediately start a new broadcast after a successful Allreduction extraction which resets the broadcast object
@@ -181,6 +179,7 @@ void SweepJob::appl_communicate() {
 	checkSharingDelay();
 	checkIdleWorkStatus();
 	checkForUnsatResults();
+
 	clearImportedRound();
 	checkCrossCommNeedsAdvancing("appl_communicate");
 	tryReportToMallob();
@@ -197,7 +196,7 @@ void SweepJob::tryReportToMallob() { //needs to be called from the main thread
 		//there is no result yet
 	}
 
-	// doneTODO(Nicco) Before reporting a result via the below line, check via
+	// Before reporting a result via the below line, check via
 	//_clause_comm->hasLocalClausesLeftToShare();
 	// (should be from the main thread) if there's still some clauses that need to be shared.
 	// In that case, appl_communicate() needs to call this from time to time:
@@ -208,7 +207,6 @@ void SweepJob::tryReportToMallob() { //needs to be called from the main thread
 	if (checkCrossCommNeedsAdvancing("tryReportToMallob")) {
 		return;
 	}
-	//There is a result (SAT,UNSAT,IMPROVED,UNKNOWN,...), but first check whether the cross-job sharer is still up
 
 	int res = _staged_solved_status;
 	assert(res!=-1);
@@ -216,13 +214,8 @@ void SweepJob::tryReportToMallob() { //needs to be called from the main thread
 	_solved_status = res; //this will now be noticed by Mallob, and will end this App
 	LOG(V2_INFO, " SWEEP : mainthread reports result %i to Mallob \n", _solved_status);
 
-	// TODO(Nicco) Before reporting a result via the below line, check via
-	//_clause_comm->hasLocalClausesLeftToShare();
-	// (should be from the main thread) if there's still some clauses that need to be shared.
-	// In that case, appl_communicate() needs to call this from time to time:
-	// _clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
-	// (with an empty buffer from a BufferBuilder) since this will initiate XTCS operations.
 }
+
 
 bool SweepJob::checkCrossCommNeedsAdvancing(const std::string &from) {
 	if (!_clause_comm) {
@@ -249,16 +242,6 @@ bool SweepJob::checkCrossCommNeedsAdvancing(const std::string &from) {
 // React to an incoming message. (This becomes relevant only if you send custom messages)
 void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 
-	// if (_params.crossJobCommunication()) {
-		// if (!_clause_comm) {
-			// LOG(V1_WARN, " [WARN] Return to sender: ForkedSatJob::appl_communicate(): not initialized! \n");
-			// msg.returnToSender(sourceRank, mpiTag);
-			// return;
-		// } else if (_clause_comm->handle(sourceRank, mpiTag, msg)) {
-			// LOG(V1_WARN, " CJC _clause_comm->handle() got message \n");
-			// return;
-		// }
-	// }
 	if (_params.crossJobCommunication() && _clause_comm) {
 		if (_clause_comm->handle(sourceRank, mpiTag, msg)) {
 			LOG(V2_INFO, " _clause_comm->handle() got message in SweepJob::communicate \n");
@@ -373,7 +356,6 @@ void SweepJob::appl_memoryPanic() {
 }
 
 bool SweepJob::appl_isDestructible() {
-
 	//TODO: check whether this added cjc condition is in the right order w.r.t to the sweeper termination
 	//maybe clauseComm checks should come after the sweeper terminations?
 	if (_clause_comm && !_clause_comm->isDestructible()) {
@@ -381,12 +363,6 @@ bool SweepJob::appl_isDestructible() {
 		LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? no. _clause_comm not destructible yet\n",  getId(),_my_rank);
 		return false;
 	}
-
-
-	// if (checkCrossCommNeedsAdvancing("appl_isDestructible")) {
-		// LOG(V4_VVER, "SWEEP TERM #%i [%i] isDestructible? no. _clause_comm still has clauses left to share\n",  getId(),_my_rank);
-		// return false;
-	// }
 
 	int _running_sweepers = _started_sweepers_count - _finished_sweepers_count;
 	if (_finished_sweepers_count < _nThreads) {
@@ -446,21 +422,26 @@ void SweepJob::rootReportSolverResult(KissatPtr sweeper, int res) {
 
 	LOG(V2_INFO, "SWEEP JOB [%i] reports sweep result %i to Mallob\n", _my_rank, res);
 	assert(_staged_solved_status == -1 || log_return_false("SWEEP ERROR: duplicate attempt to report result to mallob, was already reported as %i \n", _internal_result.result)); //something would be off if we called this function more than once
-	std::vector<int> formula;
-	if (res==UNSAT) {
-		formula = {};
-	} else if (res==IMPROVED){
-		assert(sweeper);
-		formula = sweeper->extractPreprocessedFormula();
-		LOG(V2_INFO, "SWEEP JOB [%i]: Solution Size %zu\n", _my_rank, formula.size());
-	} else if (res==UNKNOWN) {
-		//No progress has been made.
-		//Design choice: we don't send any formula back, since there would be no new information in it
-		assert(sweeper);
-		formula = {};
-	} else {
+	//update: we dont pipe the formula back, since we don't use it anyways currently, and all progress is communicated already via Cross-Job-Communication
+	std::vector<int> formula = {};
+	if (res!=UNSAT && res!=IMPROVED && res!= UNKNOWN) {
 		LOG(V1_WARN, "WARN SWEEP [%i]: unexpected result code %i when reporting to mallob \n", _my_rank, res);
 	}
+	// if (res==UNSAT) {
+		// formula = {};
+	// } else if (res==IMPROVED){
+		// assert(sweeper);
+		// formula = sweeper->extractPreprocessedFormula();
+		// formula
+		// LOG(V2_INFO, "SWEEP JOB [%i]: Solution Size %zu\n", _my_rank, formula.size());
+	// } else if (res==UNKNOWN) {
+		//No progress has been made.
+		//Design choice: we don't send any formula back, since there would be no new information in it
+		// assert(sweeper);
+		// formula = {};
+	// } else {
+		// LOG(V1_WARN, "WARN SWEEP [%i]: unexpected result code %i when reporting to mallob \n", _my_rank, res);
+	// }
 	LOG(			  V2_INFO, "SWEEP_RESULT_CODE %i == %s \n", res, res==40 ? "IMPROVED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
 	LOGGER(_reslogger,V2_INFO, "SWEEP_RESULT_CODE %i == %s \n", res, res==40 ? "IMPROVED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
 	_internal_result.setSolutionToSerialize(formula.data(), formula.size());
@@ -611,7 +592,8 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 
 	if (_is_root) {
 		//we want to read out the final formula at the root node for convenience, so we provide this callback only to root-node solvers in the first place
-		sweeper->sweepSetFormulaReportCallback();
+		//update: we don't provide prove the FormulaReport Callback because we don't need the final formula reported (currently). Prevents getting stuck for multiple seconds at the end during termination.
+		// sweeper->sweepSetFormulaReportCallback();
 		sweeper->setRepresentativeLocalId(_representative_localId);
 		//One representive solver at the root node reports about its new kissat-internal state after each iteration (e.g., number of active variables, clauses, etc)
 		if (localId==_representative_localId) {
@@ -1403,7 +1385,7 @@ void SweepJob::cbContributeToAllReduce() {
 	auto aggregation_element = aggregateEqUnitContributions(contribs);
 
 	LOG(V4_VVER, "SWEEP [%i] contributing ~~~%zu~~~(+%i)~~> to _red \n", _my_rank, aggregation_element.size()-NUM_METADATA_FIELDS, NUM_METADATA_FIELDS);
-	LOGGER(_contriblogger, V2_INFO, "last rnd %i , now contr. EU %zu\n", _lastImportedRound.load(), aggregation_element.size()-NUM_METADATA_FIELDS);
+	LOGGER(_contriblogger, V2_INFO, "lr %i EU %zu\n", _lastImportedRound.load(), aggregation_element.size()-NUM_METADATA_FIELDS);
 
 	if (_terminate_all.load(std::memory_order_relaxed)) {
 		LOG(V4_VVER, "SWEEP SHARE BCAST skip contribution, seen already _terminate_all\n");

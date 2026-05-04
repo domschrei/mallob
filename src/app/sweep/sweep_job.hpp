@@ -92,7 +92,7 @@ private:
 		}
 	};
 	std::deque<WorkstealRequest> _worksteal_requests; //deque, because each object has an atomic member and thus isnt copyable (which vector would require)
-	const int MIN_STEAL_AMOUNT = 4; //avoid to much overhead at the very end when there is almost no work left
+	const int MIN_STEAL_AMOUNT = 1; //update: avoid stealing even up to a single variable. The MPI call happend anyways already at this point
 
 
 	//Sharing Equivalences and Units
@@ -190,7 +190,8 @@ private:
 	std::mutex _crossjob_import_mutex;
 	bool _crossjob_has_prepared_sharing{false};
 
-
+	const double TIMEBUFFER_FOR_FINAL_SUBSTITUTE = 10; //[seconds] End sweeping 10 seconds earlier than the wallclock time, to allow for substitute to finish, to get a proper final clause database state before reporting
+	const int SKIP_LAST_SCHEDULED_PER_ITERATION = 10; //If there are less than 10 variables remaining scheduled in an iteration then end it early, because at this point only very few solver still work and all others are just watching
 
 	//The root node (and only the root node) tracks progress over the sharing rounds and sweeping iterations
 	//It decides whether sharing should continue or whether it should end (either because the last iteration is reached, or because no progress has been made)
@@ -199,7 +200,7 @@ private:
 	std::function<void(std::vector<int>&)> _inplace_rootTransform = [&](std::vector<int>& payload) {
 		assert(_is_root);
 		_root_sharing_round++;
-		LOG(V2_INFO, "SWEEP [%i](root-trf) rnd(%i) entered \n", _my_rank, _root_sharing_round);
+		// LOG(V2_INFO, "SWEEP [%i](root-trf) rnd(%i) entered \n", _my_rank, _root_sharing_round);
 
 		//Remember from last sharing round whether now begins a new iteration
 		if (_root_did_just_finish_iteration) {
@@ -234,7 +235,8 @@ private:
 		_root_total_shared_eqs   += n_eqs;
 		_root_rounds_this_iteration++;
 
-		bool earlyexit = false;
+
+		bool earlyexit_this_iteration = false;
 		int swept = work_sweeps + work_unsched_resweeps;
 		int eliminated = _root_shared_units_this_iteration + _root_shared_eqs_this_iteration; //slight overestimation, because the same eq can be shared in different rounds. But in the relevant regime (almost no sharing) this is not a problem.
 		double progress_ratio = (swept==0 ? 0 : eliminated/(double)swept);
@@ -242,16 +244,28 @@ private:
 		if (_params.sweepMinExitSwept()!=0 && swept >= _params.sweepMinExitSwept.val) {
 			if (progress_ratio <= EARLYEXIT_RATIO) {
 				LOG(V2_INFO, "SWEEP [%i](root-trf) EARLYEXIT in iteration %i, round %i: only %zu / %zu progress \n", _my_rank, _root_sweep_iteration, _root_sharing_round, eliminated, swept);
-				earlyexit = true;
+				earlyexit_this_iteration = true;
 			}
+		}
+
+		// bool scheduled_vars_done = work_sweeps + work_stepovers;
+		// if (scheduled_vars_done > _numVars - SKIP_LAST_SCHEDULED_PER_ITERATION) {
+			// LOG(V2_INFO, "SWEEP [%i](root-trf) EARLYEXIT iter %i round %i: Skipping very last scheduled work (done %i, numvars %i, skipParam %i) \n", scheduled_vars_done, _numVars, SKIP_LAST_SCHEDULED_PER_ITERATION);
+			// earlyexit_this_iteration = true;
+		// }
+
+		bool terminate_due_to_timeout=false;
+		if (Timer::elapsedSeconds() > _params.jobWallclockLimit() - TIMEBUFFER_FOR_FINAL_SUBSTITUTE) {
+			LOG(V2_INFO, "SWEEP [%i](root-trf) TERMINATE due to timeout (%f), with buffer time %f for final substitute \n", _params.jobWallclockLimit(), TIMEBUFFER_FOR_FINAL_SUBSTITUTE);
+			terminate_due_to_timeout=true;
 		}
 
 
 		bool send_terminate = false;
 		bool send_end_iteration = false;
 		//A round is finished if all sweepers are idle or if we didnt have enough progress
-		if (all_idle || earlyexit) {
-			LOG(V2_INFO, "SWEEP [%i](root-trf) (%i)all_idle  (%i)earlyexit (%i)foundUn-sat \n", _my_rank, all_idle, earlyexit, foundUnsat);
+		if (all_idle || earlyexit_this_iteration || terminate_due_to_timeout) {
+			LOG(V2_INFO, "SWEEP [%i](root-trf) (%i)all_idle  (%i)earlyexit (%i)foundUn-sat (%i)timeout-termination \n", _my_rank, all_idle, earlyexit_this_iteration, foundUnsat, terminate_due_to_timeout);
 			LOG(V2_INFO, "SWEEP [%i](root-trf) ITERATION %i/%i FINISHED (seen at root transform) in sharing round %i \n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations(), _root_sharing_round);
 			LOG(V2_INFO, "SWEEP [%i](root-trf) ITERATION %i/%i shared: %i EQS, %i UNITS  \n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations(), _root_shared_eqs_this_iteration, _root_shared_units_this_iteration);
 			//The kissat solver will report the sweep stats itself via a callback once it has cleaned up its internal database and metrics via substitute()
@@ -261,10 +275,9 @@ private:
 			if (_params.sweepToCompletion()) {
 				lastsweepround = false;
 			}
-			if (lastsweepround || (!progress && _params.sweepTermNoProgress())) {
+			if (terminate_due_to_timeout || lastsweepround || (!progress && _params.sweepTermNoProgress())) {
 				if (lastsweepround) LOG(V2_INFO, "SWEEP [%i](root-trf): Job finished! All iterations done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations());
 				if (!progress && _params.sweepTermNoProgress())	LOG(V2_INFO, "SWEEP [%i](root-trf): Job finished! No more progress in iteration %i/%i. Broadcasting termination signal with sharing data.\n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations());
-				//we DON'T yet set _terminate_all=1 here, because we want also the root solver to first import this last sharing information, which contains valuable equalities and units, before terminating the solvers
 				send_end_iteration = true;
 				send_terminate = true;
 			}
