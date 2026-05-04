@@ -653,8 +653,11 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     if (resultCode != 0) {
         _sys_state.addLocal(SYSSTATE_SUCCESSFUL_JOBS, 1);
     }
+
+    LOG(V3_VERB, "(Nicco) proceed 1\n");
     Parameters params(_params);
     app_registry::overrideProgramOptions(params, desc);
+
 
     std::string resultString = "s " + resultCodeString + "\n";
     std::vector<std::string> modelStrings;
@@ -730,6 +733,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
         });
     }
 
+    LOG(V3_VERB, "(Nicco) proceed 2\n");
     Logger::getMainInstance().flush();
     finishJob(permanentId, /*hasIncrementalSuccessors=*/desc.isIncremental());
 }
@@ -765,7 +769,7 @@ void Client::handleAbort(MessageHandle& handle) {
 }
 
 void Client::finishJob(int jobId, bool hasIncrementalSuccessors) {
-
+    LOG(V3_VERB, "(Nicco) proceed 3\n");
     if (!_active_jobs.count(jobId)) {
         // try to fetch client-side job
         for (auto it = _done_client_side_jobs.begin(); it != _done_client_side_jobs.end(); ++it) {
@@ -790,7 +794,7 @@ void Client::finishJob(int jobId, bool hasIncrementalSuccessors) {
         auto lock = _done_job_lock.getLock();
         _done_jobs[jobId] = DoneInfo{_active_jobs[jobId]->getRevision(), _active_jobs[jobId]->getChecksum()};
     }
-
+    LOG(V3_VERB, "(Nicco) proceed 4\n");
     // Clean up job, remember as done
     if (!hasIncrementalSuccessors) {
         _root_nodes.erase(jobId);

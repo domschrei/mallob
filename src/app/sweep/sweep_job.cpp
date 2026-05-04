@@ -198,6 +198,10 @@ void SweepJob::tryReportToMallob() { //needs to be called from the main thread
 		return;
 		//there is no result yet
 	}
+	if (_solved_status!=-1) {
+		return;
+		//we already reported to Mallob
+	}
 
 	// Before reporting a result via the below line, check via
 	//_clause_comm->hasLocalClausesLeftToShare();
@@ -1127,9 +1131,11 @@ bool SweepJob::canSolverExitStealing(KissatPtr sweeper) {
 	if (request.is_active) {
 		if (shweep_get_end_iteration_signal(sweeper->solver)) {
 			LOG(V3_VERB, "Sweeper [%i](%i) would like to exit stealing (iteration ended), but must wait for pending MPI msg\n", _my_rank, localId);
+			usleep(2000);
 		}
 		if (_terminate_all.load(std::memory_order_relaxed)) {
 			LOG(V3_VERB, "Sweeper [%i](%i) would like to exit stealing (job terminated), but must wait for pending MPI msg\n", _my_rank, localId);
+			usleep(2000);
 		}
 		return false;
 	}
@@ -1158,7 +1164,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	int localId = sweeper->getLocalId();
 	sweeper->work_received_from_steal = {};
 
-	LOG(V3_VERB, "Sweeper [%i](%i) stealing \n", _my_rank, localId);
+	// LOG(V3_VERB, "Sweeper [%i](%i) stealing \n", _my_rank, localId);
 
 	// if (_terminate_all.load(std::memory_order_relaxed)) {
 		// sweeper->sweeper_is_idle = true;
