@@ -216,10 +216,10 @@ void SweepJob::tryReportToMallob() { //needs to be called from the main thread
 		return;
 	}
 
-	if (_running_sweepers_count.load()>0) {
-		LOG(V2_INFO, " SWEEP : mainthread waiting with staged report %i to Mallob because still solvers running: %i \n", _staged_solved_status, _running_sweepers_count.load());
-		return;
-	}
+	// if (_running_sweepers_count.load()>0) {
+		// LOG(V2_INFO, " SWEEP : mainthread waiting with staged report %i to Mallob because still solvers running: %i \n", _staged_solved_status, _running_sweepers_count.load());
+		// return;
+	// }
 
 	int res = _staged_solved_status;
 	assert(res!=-1);
@@ -1593,7 +1593,8 @@ void SweepJob::checkForStuckSolvers() {
 	for (auto &sweeper : _sweepers) {
 		if (sweeper) {
 			if (sweeper->curr_eq_round < _lastImportedRound.load() - WARN_DIFFERENCE) {
-				LOG(V1_WARN, "WARN SWEEP [%i](%i) lags eq-import %i vs %i  (%i)\n", _my_rank, sweeper->getLocalId(), sweeper->curr_eq_round, _lastImportedRound.load(), sweeper->curr_eq_round - _lastImportedRound.load());
+				int loc = shweep_get_code_location(sweeper->solver);
+				LOG(V1_WARN, "WARN SWEEP [%i](%i) lags eq-import %i vs %i  (%i). CodeLoc %i\n", _my_rank, sweeper->getLocalId(), sweeper->curr_eq_round, _lastImportedRound.load(), sweeper->curr_eq_round - _lastImportedRound.load(), loc);
 			}
 		}
 	}
