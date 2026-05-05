@@ -1594,11 +1594,11 @@ void SweepJob::checkForStuckSolvers() {
 		if (sweeper) {
 			if (sweeper->curr_eq_round < _lastImportedRound.load() - WARN_DIFFERENCE) {
 				int loc = shweep_get_code_location(sweeper->solver);
-				const char *profilename = shweep_get_profilename(sweeper->solver);
+				// const char *profilename = shweep_get_profilename(sweeper->solver);
 				int reps = shweep_get_reps_debug(sweeper->solver);
 				int kitten_propagations = shweep_kitten_propagations(sweeper->solver);
-				LOG(V1_WARN, "WARN SWEEP [%i](%i) lags eq-import %i vs %i  (%i). CodeLoc %i prof %s  reps %i  kitten-prop %i\n", _my_rank, sweeper->getLocalId(), sweeper->curr_eq_round, _lastImportedRound.load(), sweeper->curr_eq_round - _lastImportedRound.load(),
-					loc, profilename, reps, kitten_propagations);
+				LOG(V1_WARN, "WARN SWEEP [%i](%i) lags eq-import %i vs %i  (%i). CodeLoc %i reps %i  kitten-prop %i\n", _my_rank, sweeper->getLocalId(), sweeper->curr_eq_round, _lastImportedRound.load(), sweeper->curr_eq_round - _lastImportedRound.load(),
+					loc, reps, kitten_propagations);
 			}
 		}
 	}
