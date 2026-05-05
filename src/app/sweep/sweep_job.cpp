@@ -1141,7 +1141,7 @@ bool SweepJob::canSolverExitStealing(KissatPtr sweeper) {
 		return false;
 	}
 	if (shweep_get_end_iteration_signal(sweeper->solver)) {
-		LOG(V3_VERB, "Sweeper [%i](%i) exit mallob steal due to end_iteration flag \n", _my_rank, localId);
+		LOG(V3_VERB, "Sweeper [%i](%i) exit mallob steal (end_iter)\n", _my_rank, localId);
 		return true;
 	}
 	// if (shweep_get_end_job_signal(sweeper->solver)) {
@@ -1151,7 +1151,7 @@ bool SweepJob::canSolverExitStealing(KissatPtr sweeper) {
 
 	if (_terminate_all.load(std::memory_order_relaxed)) {
 		sweeper->sweeper_is_idle = true;
-		LOG(V3_VERB, "Sweeper [%i](%i) exit mallob steal due to terminate_all\n", _my_rank, localId);
+		LOG(V3_VERB, "Sweeper [%i](%i) exit mallob steal (terminate_all)\n", _my_rank, localId);
 		sweeper->count_repeated_missed_termination++;
 		if (sweeper->count_repeated_missed_termination % sweeper->WARN_ON_REPEATED_MISSED_TERMINATION==0) {
 			LOG(V1_WARN, "SWEEP WARN : Sweeper [%i](%i) in %i-th worksteal loop after termination\n", _my_rank, localId, sweeper->count_repeated_missed_termination);
@@ -1196,6 +1196,9 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	//Check whether a previously queued MPI request has been answered
 	if (request.got_steal_response) {
 		LOG(V4_VVER, "Sweeper [%i](%i) got steal response \n", _my_rank, localId);
+		if (_terminate_all) {
+			LOG(V3_VERB, "Sweeper [%i](%i) got steal response nr. %i\n", _my_rank, localId, request.nr);
+		}
 		float t1 = Timer::elapsedSeconds();
 		int size = request.stolen_work.size();
 		assert(request.to_send  == false			|| log_return_false("SWEEP ERROR : got request response, but still   request.to_send==true.             stealingLocalId %i, payload.size %zu ", localId, size));
@@ -1285,6 +1288,7 @@ void SweepJob::cbStealWorkNew(unsigned **work, int *work_size, int localId) {
 		sweeper->sweeper_is_idle = false;
 		sweeper->sweeper_longterm_idle = false;
 	}
+	if (_terminate_all)	LOG(V3_VERB, "Sweeper [%i](%i) returning from stealing to solver\n", _my_rank, localId);
 	//callback ends, kissat thread returns back to its C solver code
 }
 
