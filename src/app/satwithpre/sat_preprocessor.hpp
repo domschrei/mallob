@@ -29,7 +29,8 @@ private:
     bool _run_lingeling {false};
     bool _run_satsuma {false};
     bool _chain_kissat_after_satsuma {false};
-    bool _kissat_initialized {false};
+    volatile bool _kissat_initialized {false};
+    volatile bool _kissat_interrupted {false};
     CoreAllocator::Allocation _core_alloc;
 
     std::unique_ptr<Lingeling> _lingeling;
@@ -70,9 +71,9 @@ public:
             _kissat.reset(new Kissat(setup));
             _nb_running++;
             _fut_kissat = ProcessWideThreadPool::get().addTask([&]() {
-                loadFormulaToSolver(_kissat.get());
+                if (!_kissat_interrupted) loadFormulaToSolver(_kissat.get());
                 LOG(V2_INFO, "PREPRO running Kissat\n");
-                int res = _kissat->solve(0, nullptr);
+                int res = _kissat_interrupted ? 0 : _kissat->solve(0, nullptr);
                 LOG(V2_INFO, "PREPRO Kissat done, result %i\n", res);
                 if (res != RESULT_UNKNOWN) {
                     int expected = 0;
@@ -98,7 +99,7 @@ public:
                 _satsuma_preprocessor->set_log_output(&dev_null);
     			_satsuma_preprocessor->preprocess(*formula);
                 LOG(V2_INFO, "PREPRO Satsuma done \n");
-                if (_chain_kissat_after_satsuma) {
+                if (_chain_kissat_after_satsuma && !_kissat_interrupted) {
                     std::vector<int>&& satsumaResult = _satsuma_preprocessor->extractPreprocessedFormula();
                     SolverSetup kissatSetup;
                     kissatSetup.logger = &Logger::getMainInstance();
@@ -107,9 +108,9 @@ public:
                     kissatSetup.solverType = 'p';
                     _kissat.reset(new Kissat(kissatSetup));
                     _kissat_initialized = true;
-                    loadFormulaFromExtracted(_kissat.get(), satsumaResult);
+                    if (!_kissat_interrupted) loadFormulaFromExtracted(_kissat.get(), satsumaResult);
                     LOG(V2_INFO, "PREPRO running Kissat\n");
-                    int res = _kissat->solve(0, nullptr);
+                    int res = _kissat_interrupted ? 0 : _kissat->solve(0, nullptr);
                     LOG(V2_INFO, "PREPRO Kissat done, result %i\n", res);
                     if (res != RESULT_UNKNOWN) {
                         int expected = 0;
@@ -193,7 +194,10 @@ public:
 
     // Interrupt any preprocessing, no more need for a result
     void interrupt() {
-        if (!_run_satsuma || _chain_kissat_after_satsuma) _kissat->interrupt();
+        if (!_run_satsuma || _chain_kissat_after_satsuma) {
+            _kissat_interrupted = true;
+            if (_kissat_initialized) _kissat->interrupt();
+        }
         if (_lingeling) _lingeling->interrupt();
         // TODO satsuma has no interrupt as of yet
         //if (_satsuma_preprocessor) _satsuma_preprocessor->interrupt();
