@@ -1031,7 +1031,11 @@ void SweepJob::cbImportEq(int *elit1, int *elit2, int localId) {
 		assert(*elit1 !=0 || *elit2 !=0		|| log_return_false("SWEEP ERROR: in cbImportEq: sending invalid empty *elit1=%i, *elit2=0 to the solvers\n", *elit1, *elit2));
 		assert(std::abs(*elit1) < std::abs(*elit2)				|| log_return_false("SWEEP ERROR: in cbImportEq: abs(*elit1) is larger than abs(*elit2), but they should be sorted elit1=%i, elit2=%i (index %i, %i,)\n", *elit1, *elit2, idx, idx+1));
 		if (sweeper->curr_eq_index == eqs.size()) {
-			LOG(V3_VERB, "SWEEP [%i](%i) ((( < %i > E %i \n", _my_rank, sweeper->getLocalId(),  round, eqs.size()/2);
+			if (_terminate_all) {
+				LOG(V3_VERB, "SWEEP [%i](%i) ((( < %i > E %i \n", _my_rank, sweeper->getLocalId(),  round, eqs.size()/2);
+			} else {
+				LOG(V4_VVER, "SWEEP [%i](%i) ((( < %i > E %i \n", _my_rank, sweeper->getLocalId(),  round, eqs.size()/2);
+			}
 		}
 	}
 	//Check if there is a next round to import
