@@ -503,7 +503,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		_sweepers[localId] = sweeper; //only now expose the solver to the rest of the system, now that solving starts
 		_flag_started_synchronized_solving = true;
 		_timestamp_started_synchronized_solving = Timer::elapsedSeconds();
-		shweep_set_wallclock_offset(sweeper->solver, Timer::elapsedSeconds());
+		shweep_set_wallclock_offset(sweeper->solver, -1.0 * Timer::elapsedSeconds());
 
 		LOG(				V3_VERB, "SWEEP [%i](%i) START solve() \n", _my_rank, localId);
 		LOGGER(_termlogger, V2_INFO, "SWEEP [%i](%i) START solve() \n", _my_rank, localId);

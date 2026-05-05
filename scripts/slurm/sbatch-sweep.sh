@@ -37,6 +37,7 @@ hostname
 module list
 which mpirun
 echo "#ranks: $SLURM_NTASKS"
+echo "$(date)"
 
 build="build" # TODO your build directory for Mallob
 
