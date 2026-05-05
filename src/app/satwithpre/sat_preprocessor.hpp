@@ -66,10 +66,10 @@ public:
         setup.numVars = _desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
         setup.numOriginalClauses = _desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
         if (!_run_satsuma){
-            _kissat_initialized = true;
             setup.solverType = 'p';
             _kissat.reset(new Kissat(setup));
             _nb_running++;
+            _kissat_initialized = true;
             _fut_kissat = ProcessWideThreadPool::get().addTask([&]() {
                 if (!_kissat_interrupted) loadFormulaToSolver(_kissat.get());
                 LOG(V2_INFO, "PREPRO running Kissat\n");
