@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <algorithm>
+#include <sys/wait.h>
 
 #include "app/job.hpp"
 #include "app/job_tree.hpp"
@@ -811,7 +812,7 @@ void SweepJob::checkIdleWorkStatus() {
 	if (_terminate_all.load(std::memory_order_relaxed))
 		return; //prevent segfault! when termination is triggered, the sweeper references might suddenly become invalid. no touching them
 
-	const float STATUS_PERIOD = 0.030; //status every 30ms, also the long-term-idle window
+	const float STATUS_PERIOD = 0.050; //status every 50ms, this defines also the long-term-idle window
 
 	if (Timer::elapsedSeconds() - _timestamp_last_idleinfo < STATUS_PERIOD) {
 		return;
@@ -841,6 +842,7 @@ void SweepJob::checkIdleWorkStatus() {
 	}
 	_lastLongtermIdleCount = longterm_idles;
 	LOG(V3_VERB, "SWEEP [%i]                          rng %i   idle(long) %i(%i) %s   Work[%i]: %s\n", _my_rank, _running_sweepers_count.load(), idles, longterm_idles, oss_idles.str().c_str(), _my_rank, oss_work.str().c_str());
+	checkForStuckSolvers();
 }
 
 void SweepJob::checkSharingDelay() {
@@ -1581,6 +1583,28 @@ void SweepJob::clearImportedRound() {
 	}
 }
 
+void SweepJob::checkForStuckSolvers() {
+	if (_terminate_all) {
+		return;
+	}
+	int WARN_DIFFERENCE = 5;
+	int maxRound = 0;
+	int minRound = 999999;
+	for (auto &sweeper : _sweepers) {
+		if (sweeper) {
+			maxRound = std::max(maxRound, sweeper->curr_eq_round);
+			minRound = std::min(minRound, sweeper->curr_eq_round);
+		}
+	}
+	for (auto &sweeper : _sweepers) {
+		if (sweeper) {
+			if (sweeper->curr_eq_round < maxRound - WARN_DIFFERENCE) {
+				LOG(V1_WARN, "WARN SWEEP [%i](%i) lagging in Eq imports! Only at rnd %i , while maxrnd at %i (lastImportedRound %i)\n", _my_rank, sweeper->getLocalId(), sweeper->curr_eq_round,  maxRound, _lastImportedRound.load());
+			}
+		}
+	}
+
+}
 
 std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<int>> &contribs) {
 	//Each contribution has the format [Equivalences,Units, eq_size,unit_size,all_idle].

@@ -460,6 +460,7 @@ private:
 	void solverGoStealing(KissatPtr sweeper);
 	void sendWorkstealsViaMPI();
 	void checkIdleWorkStatus();
+	void checkForStuckSolvers();
 
     void rootStartNewSharingRound();
     void cbContributeToAllReduce();
