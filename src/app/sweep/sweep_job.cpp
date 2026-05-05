@@ -1016,9 +1016,7 @@ int SweepJob::cbCustomQuery(int query) {
 
 
 void SweepJob::cbImportEq(int *elit1, int *elit2, int localId) {
-
 	KissatPtr sweeper = _sweepers[localId];
-
 	const int idx   = sweeper->curr_eq_index;
 	const int round = sweeper->curr_eq_round;
 	std::vector<int> &eqs = _imported_data[round].eqs;
@@ -1591,19 +1589,11 @@ void SweepJob::checkForStuckSolvers() {
 	if (_terminate_all) {
 		return;
 	}
-	int WARN_DIFFERENCE = 5;
-	int maxRound = 0;
-	int minRound = 999999;
+	int WARN_DIFFERENCE = 25; //#rounds.  I.e. if at 25, with ca. 20ms rounds, we warn if there is a lagging of >=500ms
 	for (auto &sweeper : _sweepers) {
 		if (sweeper) {
-			maxRound = std::max(maxRound, sweeper->curr_eq_round);
-			minRound = std::min(minRound, sweeper->curr_eq_round);
-		}
-	}
-	for (auto &sweeper : _sweepers) {
-		if (sweeper) {
-			if (sweeper->curr_eq_round < maxRound - WARN_DIFFERENCE) {
-				LOG(V1_WARN, "WARN SWEEP [%i](%i) lagging in Eq imports! Only at rnd %i , while maxrnd at %i (lastImportedRound %i)\n", _my_rank, sweeper->getLocalId(), sweeper->curr_eq_round,  maxRound, _lastImportedRound.load());
+			if (sweeper->curr_eq_round < _lastImportedRound.load() - WARN_DIFFERENCE) {
+				LOG(V1_WARN, "WARN SWEEP [%i](%i) lags eq-import %i vs %i  (%i)\n", _my_rank, sweeper->getLocalId(), sweeper->curr_eq_round, _lastImportedRound.load(), sweeper->curr_eq_round - _lastImportedRound.load());
 			}
 		}
 	}
