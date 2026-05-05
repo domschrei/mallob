@@ -114,8 +114,9 @@ private:
 	const int NUM_SEARCHING_WORK_FIELDS = 3; //how many fields are attached to an MPI message searching work
 
 	//each aggregation element has some metadata integers at the end
-	static const int NUM_METADATA_FIELDS = 14;
+	static const int NUM_METADATA_FIELDS = 15;
 		//field indices must be unique numbers exactly filling 1..NUM_METADATA_FIELDS !
+		static const int METADATA_MAXXED_KITTENS = 15;
 		static const int METADATA_LONGTERM_IDLE	  = 14;
 		static const int METADATA_FOUND_UNSAT	   = 13;
 		static const int METADATA_ACTIVE_COUNT	    = 12;
@@ -226,6 +227,7 @@ private:
 		int work_stepovers		 = payload[payload.size() - METADATA_WORK_STEPOVERS];
 		int work_unsched_resweeps= payload[payload.size() - METADATA_UNSCHED_RESWEEPS];
 		int foundUnsat			 = payload[payload.size() - METADATA_FOUND_UNSAT];
+		int maxxed_kittens		= payload[payload.size() - METADATA_MAXXED_KITTENS];
 
 		bool all_idle = (active_count == 0);
 
@@ -380,11 +382,10 @@ private:
 		//Copy message, once for chronological view in the general logs, once in a special smaller file (on the root node) for easier postprocessing
 		char logmsg[512];
 		snprintf(logmsg, sizeof(logmsg),
-			"SWEEP [%i](root-trf) send: un-sat %i  act,idl,lti %i,%i,%i  envc %i iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i   SW %i  ST %i  RE %i    Sched, Swept  %i  %i    ( %.2f ,  %.2f )°/.   succ-rate %.6f   \n",
-			_my_rank, foundUnsat, active_count, idle_count, longtermidle_count, _root_env_completions, _root_sweep_iteration, _root_sharing_round, all_idle,  send_end_iteration, send_terminate, n_eqs, n_sweep_units, crossjob_units_received,
-			work_sweeps, work_stepovers, work_unsched_resweeps, work_sweeps + work_stepovers, work_sweeps + work_unsched_resweeps,
-			100*(work_sweeps + work_stepovers)/(double)_numVars , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars,
-			progress_ratio
+			"SWEEP [%i](root-trf) send: un-sat %i  act,idl,lti %i,%i,%i  mxdk %i  envc %i iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i   SW %i  ST %i  RE %i    Sched, Swept  %.2f ,  %.2f °/.   succ-rate %.6f   \n",
+			_my_rank, foundUnsat, active_count, idle_count, longtermidle_count, maxxed_kittens,  _root_env_completions, _root_sweep_iteration, _root_sharing_round, all_idle,  send_end_iteration, send_terminate, n_eqs, n_sweep_units, crossjob_units_received,
+			work_sweeps, work_stepovers, work_unsched_resweeps,
+			100*(work_sweeps + work_stepovers)/(double)_numVars , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars, progress_ratio
 		);
 		LOG(			   V2_INFO, "         %s", logmsg);
 		LOGGER(_reslogger, V2_INFO, "%s", logmsg);
@@ -465,7 +466,7 @@ private:
     void rootStartNewSharingRound();
     void cbContributeToAllReduce();
     static std::vector<int> aggregateEqUnitContributions(std::list<std::vector<int>> &contribs);
-	static void appendMetadataToReductionElement(int foundUnsat, std::vector<int> &contrib, int idle_count, int longtermidle_count, int active_count, int unit_size, int eq_size, int work_sweeps, int work_stepovers, int unsched_resweeps);
+	static void appendMetadataToReductionElement(int foundUnsat, std::vector<int> &contrib, int idle_count, int longtermidle_count, int active_count, int unit_size, int eq_size, int work_sweeps, int work_stepovers, int unsched_resweeps, int maxxed_kittens);
 	void advanceAllReduction();
 	void extractAllReductionResult();
 

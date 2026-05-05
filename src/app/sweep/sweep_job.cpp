@@ -1345,7 +1345,7 @@ void SweepJob::rootStartNewSharingRound() {
 	_bcast->broadcast(std::move(msg));
 }
 
-void SweepJob::appendMetadataToReductionElement(int foundUnsat, std::vector<int> &contrib, int idle_count, int longtermidle_count, int active_count, int unit_size, int eq_size, int work_sweeps, int work_stepovers, int unsched_resweeps) {
+void SweepJob::appendMetadataToReductionElement(int foundUnsat, std::vector<int> &contrib, int idle_count, int longtermidle_count, int active_count, int unit_size, int eq_size, int work_sweeps, int work_stepovers, int unsched_resweeps, int maxxed_kittens) {
 	contrib.insert(contrib.end(), NUM_METADATA_FIELDS, 0); //Make space for the upcoming metadata, initialized with zero
 	int size = contrib.size();
 	int n=0;
@@ -1363,6 +1363,7 @@ void SweepJob::appendMetadataToReductionElement(int foundUnsat, std::vector<int>
 	n++; contrib[size - METADATA_WORK_SWEEPS]     = work_sweeps;
 	n++; contrib[size - METADATA_WORK_STEPOVERS]  = work_stepovers;
 	n++; contrib[size - METADATA_UNSCHED_RESWEEPS]= unsched_resweeps;
+	n++; contrib[size - METADATA_MAXXED_KITTENS] = maxxed_kittens;
 	assert(n==NUM_METADATA_FIELDS || log_return_false("SWEEP ERROR: Added metadata count (%i) doesnt match expected number (%i) \n", n, NUM_METADATA_FIELDS));
 }
 
@@ -1450,7 +1451,7 @@ void SweepJob::cbContributeToAllReduce() {
 		bool is_longterm_idle = sweeper->sweeper_longterm_idle;
 		bool is_active = !is_idle;
 		int foundUnsat = kissat_is_inconsistent(sweeper->solver);
-		appendMetadataToReductionElement(foundUnsat, contrib, is_idle, is_longterm_idle, is_active, unit_size, eq_size, stats.progress_work_sweeps, stats.progress_work_stepovers, stats.progress_unsched_resweeps);
+		appendMetadataToReductionElement(foundUnsat, contrib, is_idle, is_longterm_idle, is_active, unit_size, eq_size, stats.progress_work_sweeps, stats.progress_work_stepovers, stats.progress_unsched_resweeps, stats.maxxed_kittens);
 
 		contribs.push_back(contrib);
 	}
@@ -1680,11 +1681,13 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	int longtermidle_count = 0;
 	int active_count = 0;
 	int foundUnsat=0;
+	int maxxed_kittens=0;
     for (const auto &contrib : contribs) {
     	idle_count  += contrib[contrib.size()-METADATA_IDLE_COUNT];
     	longtermidle_count += contrib[contrib.size()-METADATA_LONGTERM_IDLE];
     	active_count+= contrib[contrib.size()-METADATA_ACTIVE_COUNT];
     	foundUnsat  += contrib[contrib.size()-METADATA_FOUND_UNSAT];
+    	maxxed_kittens+=contrib[contrib.size()-METADATA_MAXXED_KITTENS];
 		// bool idle = contrib[contrib.size()-METADATA_IDLE];
     	// all_idle &= idle;
     }
@@ -1706,8 +1709,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 		sum_unsched_resweeps+= contrib[contrib.size()-METADATA_UNSCHED_RESWEEPS];
 	}
 
-
-	appendMetadataToReductionElement(foundUnsat, aggregated, idle_count, longtermidle_count, active_count, aggr_unit_size, aggr_eq_size, sum_work_sweeps, sum_work_stepovers, sum_unsched_resweeps);
+	appendMetadataToReductionElement(foundUnsat, aggregated, idle_count, longtermidle_count, active_count, aggr_unit_size, aggr_eq_size, sum_work_sweeps, sum_work_stepovers, sum_unsched_resweeps, maxxed_kittens);
 
 	// if (contribs.size()>1)
 	LOG(V4_VVER, "SWEEP RED aggregated %i contributions: E %i, U %i, act,idle %i,%i\n", contribs.size(), aggr_eq_size/2, aggr_unit_size, active_count, idle_count);
