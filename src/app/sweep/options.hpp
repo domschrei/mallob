@@ -21,3 +21,4 @@ OPT_BOOL(sweepShuffleWork,		"swpsw", 	"sweep-shuffle-work",		true, "Shuffle the 
 OPT_BOOL(sweepToCompletion,		"swptoc", 	"sweep-to-completion",		false, "Sweep indefinitely to completion (or timeout). Increase env size only when no more progress")
 OPT_BOOL(sweepXJsendTo,			"swpxs", 	"sweep-xj-send",			true, "Sweep sends its units and equivalences via cjc to the concurrent SAT job ")
 OPT_BOOL(sweepXJrecvFrom,		"swpxr", 	"sweep-xj-recv",			true, "Sweep imports units via cjc from the concurrent SAT job")
+OPT_INT(sweepMaxKittenProp,		"swpmkp", 	"sweep-max-kitten-prop",	500000,1000,LARGE_INT, "Maximum number of kitten propagations per Kitten SAT Call")

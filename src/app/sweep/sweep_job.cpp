@@ -651,6 +651,7 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
   	sweeper->set_option("sweeprand", 0);			//  0,    0,    1,		"randomize sweeping environment")
 
   	sweeper->set_option("puresweep_tocompletion", _params.sweepToCompletion());
+  	sweeper->set_option("puresweep_maxKittenProp", _params.sweepMaxKittenProp());
 
 	sweeper->set_option("substitute", 1);			// (default 1) apply equivalence substitutions after sweeping, keep here explicitly to remember it
 	sweeper->set_option("substituterounds", 2);		// (default 2) there does not seem to be any need to go higher, as almost always all equivalences are already found in the very first round
