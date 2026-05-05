@@ -1037,7 +1037,7 @@ void SweepJob::cbImportEq(int *elit1, int *elit2, int localId) {
 		}
 	}
 	//Check if there is a next round to import
-	else if (round < _lastImportedRound) {
+	else if (round < _lastImportedRound.load(memory_order_relaxed)) {
 		if (eqs.size()==0) { //for completeness we also log the edge-case where there was nothing to import
 			LOG(V5_DEBG, "SWEEP [%i](%i) ((( < %i > E %i \n", _my_rank, sweeper->getLocalId(), round,  eqs.size()/2);
 		}
@@ -1133,17 +1133,17 @@ bool SweepJob::canSolverExitStealing(KissatPtr sweeper) {
 	int localId = sweeper->getLocalId();
 	auto &request = _worksteal_requests[localId];
 	//Most importantly: we cannot exit when there is still a pending MPI message we are awaiting an answer from
-	if (request.is_active) {
-		if (shweep_get_end_iteration_signal(sweeper->solver)) {
-			LOG(V3_VERB, "Sweeper [%i](%i) would like to exit stealing (iteration ended), but must wait for pending MPI msg\n", _my_rank, localId);
-			usleep(2000);
-		}
-		if (_terminate_all.load(std::memory_order_relaxed)) {
-			LOG(V3_VERB, "Sweeper [%i](%i) would like to exit stealing (job terminated), but must wait for pending MPI msg\n", _my_rank, localId);
-			usleep(2000);
-		}
-		return false;
-	}
+	// if (request.is_active) {
+		// if (shweep_get_end_iteration_signal(sweeper->solver)) {
+			// LOG(V3_VERB, "Sweeper [%i](%i) would like to exit stealing (iteration ended), but must wait for pending MPI msg\n", _my_rank, localId);
+			// usleep(2000);
+		// }
+		// if (_terminate_all.load(std::memory_order_relaxed)) {
+			// LOG(V3_VERB, "Sweeper [%i](%i) would like to exit stealing (job terminated), but must wait for pending MPI msg\n", _my_rank, localId);
+			// usleep(2000);
+		// }
+		// return false;
+	// }
 	if (shweep_get_end_iteration_signal(sweeper->solver)) {
 		LOG(V3_VERB, "Sweeper [%i](%i) exit mallob steal (end_iter)\n", _my_rank, localId);
 		return true;
@@ -1154,7 +1154,6 @@ bool SweepJob::canSolverExitStealing(KissatPtr sweeper) {
 	// }
 
 	if (_terminate_all.load(std::memory_order_relaxed)) {
-		sweeper->sweeper_is_idle = true;
 		LOG(V3_VERB, "Sweeper [%i](%i) exit mallob steal (terminate_all)\n", _my_rank, localId);
 		sweeper->count_repeated_missed_termination++;
 		if (sweeper->count_repeated_missed_termination % sweeper->WARN_ON_REPEATED_MISSED_TERMINATION==0) {
@@ -1269,10 +1268,11 @@ void SweepJob::cbStealWorkNew(unsigned **work, int *work_size, int localId) {
 	//This is the main loop in which a solver sits while it tries to steal work from others
 	while (true) {
 		if (_terminate_all) LOG(V3_VERB, "Sweeper [%i](%i) last seen: checking EU imports\n", _my_rank, localId);
-		shweep_check_EU_imports(sweeper->solver);
+		shweep_do_EU_imports(sweeper->solver);
 		if (_terminate_all) LOG(V3_VERB, "Sweeper [%i](%i) last seen: go stealing\n", _my_rank, localId);
 		solverGoStealing(sweeper);
 		if (canSolverExitStealing(sweeper)) {
+			sweeper->sweeper_is_idle = true;
 			sweeper->work_received_from_steal = {};
 			break;
 		}
