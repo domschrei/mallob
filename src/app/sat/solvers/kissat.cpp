@@ -258,15 +258,14 @@ void Kissat::diversify(int seed) {
         LOGGER(_logger, V3_VERB, "Sampled restartint=%i decay=%i\n", restartFrequency, decay);
     }
 
-
     //Randomize reduce bounds
-    if (getDiversificationIndex() >= getNumOriginalDiversifications() && (_setup.diversifyReduce > 0)) {
+    if (getDiversificationIndex() >= 4 && _setup.diversifyReduce > 0) {
         std::mt19937 rng(seed);
         Distribution distribution(rng);
 
         //Give each Kissat solver a randomized reduce-range, such that some solvers keep most clauses and other solvers other kick most clauses
-        int reduce_low;
-        int reduce_high;
+        int reduce_low = 500;
+        int reduce_high = 900;
         LOGGER(_logger, V3_VERB, "--\n");
 
         //Reduce==1: Uniform distribution of range values
@@ -300,6 +299,23 @@ void Kissat::diversify(int seed) {
             reduce_high = reduce_fixed;
             LOGGER(_logger, V3_VERB, "Given diversifyReduce=%i, reduceMin=%i, reduceMax=%i, reduceMean=%i, reduceStddev=%i \n",
                 _setup.diversifyReduce, _setup.reduceMin, _setup.reduceMax, _setup.reduceMean, _setup.reduceStddev);
+        }
+        //Reduce==4: 10% of solvers are either almost full-keep or almost full-kick, 
+        //the remaining solvers are slightly perturbed
+        else if(_setup.diversifyReduce==4) {
+            distribution.configure(Distribution::UNIFORM, std::vector<double>{0,1});
+            if (distribution.sample() < 0.1) {
+                // 20% chance: keep or remove almost all clauses (coin flip)
+                reduce_low = (distribution.sample() < 0.5) ? 50 : 950;
+                reduce_high = reduce_low;
+            } else {
+                // 80% chance: just add some minor perturbation to the reduce params
+                distribution.configure(Distribution::NORMAL, {
+                    /*mean=*/0, /*stddev=*/5, /*min=*/-50, /*max=*/50
+                });
+                reduce_low += distribution.sample();
+                reduce_high += distribution.sample();
+            }
         }
         else {
             cout << "Error: div-reduce="<<_setup.diversifyReduce<<" is not a valid flag" << endl;

@@ -18,3 +18,8 @@ OPT_BOOL(preprocessLingeling, "pl", "preprocess-lingeling", true, "Additionally 
 OPT_BOOL(terminateAbruptly, "terminate-abruptly", "", false, "Upon termination, avoid waiting for preprocessors to finish")
 OPT_BOOL(overrideSatOptions, "oso", "override-sat-options", true,
     "In the SAT sub-tasks, override SAT solving options with \"" + std::string(SATWITHPRE_OPT_OVERRIDES) + "\"")
+
+#if MALLOB_USE_SATSUMA
+OPT_BOOL(preprocessSatsuma, "presa", "preprocess-satsuma", false, "Run Satsuma instead of kissat")
+OPT_BOOL(chainKissatAfterSatsuma, "ckas", "chain-kissat-after", false, "Additionally run Kissat on the result of Satsuma")
+#endif

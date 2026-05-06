@@ -3,7 +3,7 @@
 source ../base-build-functions.sh
 dirname="impcheck"
 
-branchorcommit="bf740494de4408817f225b90c6ec1d457e8db9b5" # updated 2026-01-29
+branchorcommit="b5f37b21385ee802ce015103b23aff62f92b1734" # updated 2026-04-29
 fetch_and_extract $dirname CMakeLists.txt https://github.com/domschrei/impcheck/archive/${branchorcommit}.zip
 
 echo "[iimpcheck] Building ..."

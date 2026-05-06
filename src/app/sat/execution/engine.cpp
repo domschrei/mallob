@@ -335,6 +335,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		auto mclc = _solver_interfaces.back()->getSolverSetup().modelCheckingLratConnector;
 		if (mclc) modelCheckingLratConnector = mclc;
 	}
+	_base_solver_setup = setup;
 
 	_sharing_manager.reset(new SharingManager(_solver_interfaces, _params, _logger, 
 		/*max. deferred literals per solver=*/5*config.maxBroadcastedLitsPerCycle, config.apprank));
@@ -728,7 +729,7 @@ void SatEngine::cleanUp(bool hardTermination) {
 	LOGGER(_logger, V4_VVER, "[engine-cleanup] enter\n");
 
 	// Terminate any remaining running threads
-	auto setup = _solver_interfaces.front()->getSolverSetup();
+	auto& setup = _base_solver_setup;
 	terminateSolvers(hardTermination);
 	if (hardTermination) {
 		if (_params.proofOutputFile.isSet()) writeClauseEpochs();
