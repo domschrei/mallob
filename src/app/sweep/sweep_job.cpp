@@ -645,8 +645,8 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
   	sweeper->set_option("sweepvars", 256);			//  256,  0, INT_MAX,	"environment variables")
   	sweeper->set_option("sweepclauses", 1024);		//	1024, 0, INT_MAX,	"environment clauses")
   	sweeper->set_option("sweepmaxdepth", _params.sweepMaxDepth.val); //	//	3,    1, INT_MAX,	"maximum environment depth")
-  	sweeper->set_option("sweepmaxvars", 32 * 8192);		//	8192, 2, INT_MAX,	"maximum environment variables")
-  	sweeper->set_option("sweepmaxclauses", 32 * 32768);	//	32768,2, INT_MAX,	"maximum environment clauses")
+  	sweeper->set_option("sweepmaxvars", 64 * 8192);		//	8192, 2, INT_MAX,	"maximum environment variables")
+  	sweeper->set_option("sweepmaxclauses", 64 * 32768);	//	32768,2, INT_MAX,	"maximum environment clauses")
   	sweeper->set_option("sweepfliprounds", 1);		//	1,    0, INT_MAX,	"flipping rounds")
   	sweeper->set_option("sweeprand", 0);			//  0,    0,    1,		"randomize sweeping environment")
 
