@@ -641,12 +641,12 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	//Own options of Kissat
 	//identical to standard options right now
 	sweeper->set_option("sweepcomplete", 1);      //deactivates checking for time limits during sweeping, so we dont get kicked out due to some limits
-  	sweeper->set_option("sweepvars", 256);			//  256,  0, INT_MAX,	"environment variables")
-  	sweeper->set_option("sweepmaxvars", 8192);		//	8192, 2, INT_MAX,	"maximum environment variables")
   	sweeper->set_option("sweepdepth", 2);			//, 2,    0, INT_MAX,	"environment depth")
-  	sweeper->set_option("sweepmaxdepth", _params.sweepMaxDepth.val); //	//	3,    1, INT_MAX,	"maximum environment depth")
+  	sweeper->set_option("sweepvars", 256);			//  256,  0, INT_MAX,	"environment variables")
   	sweeper->set_option("sweepclauses", 1024);		//	1024, 0, INT_MAX,	"environment clauses")
-  	sweeper->set_option("sweepmaxclauses", 32768);	//	32768,2, INT_MAX,	"maximum environment clauses")
+  	sweeper->set_option("sweepmaxdepth", _params.sweepMaxDepth.val); //	//	3,    1, INT_MAX,	"maximum environment depth")
+  	sweeper->set_option("sweepmaxvars", 32 * 8192);		//	8192, 2, INT_MAX,	"maximum environment variables")
+  	sweeper->set_option("sweepmaxclauses", 32 * 32768);	//	32768,2, INT_MAX,	"maximum environment clauses")
   	sweeper->set_option("sweepfliprounds", 1);		//	1,    0, INT_MAX,	"flipping rounds")
   	sweeper->set_option("sweeprand", 0);			//  0,    0,    1,		"randomize sweeping environment")
 
@@ -1511,7 +1511,9 @@ void SweepJob::extractAllReductionResult() {
 
 	bool all_idle = (active_count==0);
 
-	LOG(V2_INFO, "SWEEP GOTT: envsize %i iter %i round %i : %i ai , %i endi , %i trm . act,idle %i,%i   E %i  U %i  \n", env_completions, sweep_iteration, sharing_round, all_idle, end_iteration, terminate, active_count, idle_count, eq_size/2, unit_size);
+	if (_is_root) {
+		LOG(V3_VERB, "SWEEP GOTT: envsize %i iter %i round %i : %i ai , %i endi , %i trm . act,idle %i,%i   E %i  U %i  \n", env_completions, sweep_iteration, sharing_round, all_idle, end_iteration, terminate, active_count, idle_count, eq_size/2, unit_size);
+	}
 
 	assert(sharing_round > _lastImportedRound.load() || log_return_false("SWEEP ERROR : unexpected round number when importing shared data. got round %i, while lastImportedRound %i \n", sharing_round, _lastImportedRound.load()));
 
@@ -1591,16 +1593,17 @@ void SweepJob::checkForStuckSolvers() {
 	if (_terminate_all) {
 		return;
 	}
-	int WARN_DIFFERENCE = 25; //#rounds.  I.e. if at 25, with ca. 20ms rounds, we warn if there is a lagging of >=500ms
+	int WARN_DIFFERENCE = 50; //#rounds.  I.e. if at 25, with ca. 20ms rounds, we warn if there is a lagging of >=500ms
 	for (auto &sweeper : _sweepers) {
 		if (sweeper) {
 			if (sweeper->curr_eq_round < _lastImportedRound.load() - WARN_DIFFERENCE) {
 				int loc = shweep_get_code_location(sweeper->solver);
 				// const char *profilename = shweep_get_profilename(sweeper->solver);
 				int reps = shweep_get_reps_debug(sweeper->solver);
-				int kitten_propagations = shweep_kitten_propagations(sweeper->solver);
-				LOG(V1_WARN, "WARN SWEEP [%i](%i) lags eq-import %i vs %i  (%i). CodeLoc %i reps %i  kitten-prop %i\n", _my_rank, sweeper->getLocalId(), sweeper->curr_eq_round, _lastImportedRound.load(), sweeper->curr_eq_round - _lastImportedRound.load(),
-					loc, reps, kitten_propagations);
+				uint64_t kitten_propagations = shweep_kitten_propagations(sweeper->solver);
+				if (_is_root) {
+					LOG(V2_INFO, "WARN SWEEP [%i](%i) lags eq-import %i vs %i  (%i). CodeLoc %i reps %i  kitten-prop %zu\n", _my_rank, sweeper->getLocalId(), sweeper->curr_eq_round, _lastImportedRound.load(), sweeper->curr_eq_round - _lastImportedRound.load(), loc, reps, kitten_propagations);
+				}
 			}
 		}
 	}
