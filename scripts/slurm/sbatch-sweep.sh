@@ -164,7 +164,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
   -sweep-solver-quiet=1 \
   -sweep-initial-congruence=1 \
   -sweep-shuffle-work=1 \
-  -sweep-max-kitten-prop=500000 \
+  -sweep-max-kitten-prop=1000000 \
   -sweep-sharing-period=0.020 \
   -sweep-resweep-chance=0 \
   -sweep-max-iterations=99 \
