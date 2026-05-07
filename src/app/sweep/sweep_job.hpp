@@ -232,14 +232,21 @@ private:
 
 		bool all_idle = (active_count == 0);
 
+		double done_scheduled_prcnt = 100*(work_sweeps + work_stepovers)/(double)_numVars;
+
 		_root_shared_units_this_iteration += n_sweep_units;
 		_root_shared_eqs_this_iteration   += n_eqs;
 		_root_total_shared_units += n_sweep_units;
 		_root_total_shared_eqs   += n_eqs;
 		_root_rounds_this_iteration++;
 
-
 		bool earlyexit_this_iteration = false;
+
+		if (_params.sweepEarlyExitPercent()!=0 && done_scheduled_prcnt > _params.sweepEarlyExitPercent()) {
+			LOG(V2_INFO, "SWEEP [%i](root-trf) EARLYEXIT in iteration %i, round %i, bc reached EarlyExitPercent %i  (%i/%i done) \n", _my_rank, _root_sweep_iteration, _root_sharing_round, _params.sweepEarlyExitPercent(), work_sweeps + work_stepovers, _numVars);
+			earlyexit_this_iteration=true;
+		}
+
 		int swept = work_sweeps + work_unsched_resweeps;
 		int eliminated = _root_shared_units_this_iteration + _root_shared_eqs_this_iteration; //slight overestimation, because the same eq can be shared in different rounds. But in the relevant regime (almost no sharing) this is not a problem.
 		double progress_ratio = (swept==0 ? 0 : eliminated/(double)swept);
@@ -386,7 +393,7 @@ private:
 			"SWEEP [%i](root-trf) send: un-sat %i  act,idl,lti %i,%i,%i  mxdk %i  envc %i iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i   SW %i  ST %i  RE %i    Sched, Swept  %.2f ,  %.2f °/.   succ-rate %.6f   \n",
 			_my_rank, foundUnsat, active_count, idle_count, longtermidle_count, maxxed_kittens,  _root_env_completions, _root_sweep_iteration, _root_sharing_round, all_idle,  send_end_iteration, send_terminate, n_eqs, n_sweep_units, crossjob_units_received,
 			work_sweeps, work_stepovers, work_unsched_resweeps,
-			100*(work_sweeps + work_stepovers)/(double)_numVars , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars, progress_ratio
+			done_scheduled_prcnt , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars, progress_ratio
 		);
 		LOG(			   V2_INFO, "         %s", logmsg);
 		LOGGER(_reslogger, V2_INFO, "%s", logmsg);

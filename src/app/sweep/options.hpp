@@ -22,3 +22,4 @@ OPT_BOOL(sweepToCompletion,		"swptoc", 	"sweep-to-completion",		false, "Sweep in
 OPT_BOOL(sweepXJsendTo,			"swpxs", 	"sweep-xj-send",			true, "Sweep sends its units and equivalences via cjc to the concurrent SAT job ")
 OPT_BOOL(sweepXJrecvFrom,		"swpxr", 	"sweep-xj-recv",			true, "Sweep imports units via cjc from the concurrent SAT job")
 OPT_INT(sweepMaxKittenProp,		"swpmkp", 	"sweep-max-kitten-prop",	1000000,1000,LARGE_INT, "Maximum number of kitten propagations per Kitten SAT Call")
+OPT_INT(sweepEarlyExitPercent,  "swpeep",   "sweep-early-exit-percent", 0, 0, 100, "percentage of processed scheduled variables after which an iteration is exited early")

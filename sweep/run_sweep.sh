@@ -23,7 +23,7 @@ INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/bob12s04.cnf.xz" 
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s176.cnf.xz" # 6sec
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s48.cnf.xz" # 6sec
-# INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s12.cnf.xz" # 6sec
+INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s12.cnf.xz" # 6sec
 
 #easy SATs
 # INST_PATH="$HOME/PhD/instances/sat-and-minisat1m/0225fa9581c622e5abbc8497a97edf4e-fla-qhid-360-4.cnf.xz" #<1s kissat
@@ -73,6 +73,7 @@ MALLOB_OPTIONS="-t=$threads \
   -sweep-term-no-progress=0 \
 	-sweep-solver-verbosity=2 \
 	-sweep-solver-quiet=1 \
+  -sweep-to-completion=0 \
   -sweep-initial-congruence=1 \
   -sweep-shuffle-work=1 \
   -sweep-max-kitten-prop=500000 \
@@ -80,7 +81,7 @@ MALLOB_OPTIONS="-t=$threads \
   -sweep-resweep-chance=0 \
   -sweep-max-iterations=99 \
   -sweep-max-depth=99 \
-  -sweep-to-completion=0 \
+  -sweep-early-exit-percent=0 \
 "
 
 
