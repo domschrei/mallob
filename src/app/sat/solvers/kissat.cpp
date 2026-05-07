@@ -206,7 +206,7 @@ void Kissat::diversify(int seed) {
             case 3: kissat_set_option(solver, "eliminate", 0); break;
         }
     } else if (_setup.flavour == PortfolioSequence::PLAIN) {
-        LOGGER(_logger, V4_VVER, "creating plain kissat (k_)\n");
+        LOGGER(_logger, V2_INFO, "creating plain kissat (k_)\n");
         bool partitionedVivification = false;
         ok = kissat_set_option(solver, "lucky", 0); assert(ok);
         ok = kissat_set_option(solver, "preprocess", 0); assert(ok);
