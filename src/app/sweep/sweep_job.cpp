@@ -23,6 +23,7 @@ extern "C" {
 }
 
 
+
 SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table)
     : BaseSatJob(params, setup, table),
 	_reslogger(Logger::getMainInstance().copy("<RESULT>", ".sweep")),
@@ -1017,6 +1018,8 @@ int SweepJob::cbCustomQuery(int query) {
 
 
 void SweepJob::cbImportEq(int *elit1, int *elit2, int localId) {
+	assert(*elit1==0);
+	assert(*elit2==0);
 	KissatPtr sweeper = _sweepers[localId];
 	const int idx   = sweeper->curr_eq_index;
 	const int round = sweeper->curr_eq_round;
@@ -1047,14 +1050,21 @@ void SweepJob::cbImportEq(int *elit1, int *elit2, int localId) {
 		_finishedRoundCounters[round].threads_finished_eqs++;
 		sweeper->curr_eq_round++;
 		sweeper->curr_eq_index=0;
+		assert(*elit1==0);
+		assert(*elit2==0);
+		//signal to kissat that there is more to import, it should call again
+	} else {
+		*elit1 = INVALID_ELIT;
+		*elit2 = INVALID_ELIT;
+		//signal to kissat that there is nothing more to import
 	}
-
 	//now returning to the kissat solver
 	//if we didn't have any new equivalcen to provide to the solver, then we didn't touch elit1 & elit2, and the kissat solver notices that we didnt touch them
 }
 
 
 void SweepJob::cbImportUnit(int *elit, int localId) {
+	assert(*elit==0);
 	KissatPtr sweeper = _sweepers[localId];
 	//For comments see cbImportEq (the analog method for importing equalities)
 	const int idx   = sweeper->curr_unit_index;
@@ -1068,15 +1078,17 @@ void SweepJob::cbImportUnit(int *elit, int localId) {
 			LOG(V5_DEBG, "SWEEP [%i](%i) ((( < %i > U %i \n", _my_rank, sweeper->getLocalId(), round, units.size() );
 		}
 	}
-	else if (round < _lastImportedRound) {
-		if (units.size()==0) {
-			LOG(V5_DEBG, "SWEEP [%i](%i) ((( < %i > U %i \n", _my_rank, sweeper->getLocalId(), round, units.size());
-		}
+	else if (round < _lastImportedRound.load(memory_order_relaxed)) {
+		if (units.size()==0) {LOG(V5_DEBG, "SWEEP [%i](%i) ((( < %i > U %i \n", _my_rank, sweeper->getLocalId(), round, units.size());}
 		_finishedRoundCounters[round].threads_finished_units++;
 		sweeper->curr_unit_round++;
 		sweeper->curr_unit_index=0;
+		//leaving elit untouched at zero, signalling to kissat that there is still more to import
 	}
-
+	else {
+		*elit = INVALID_ELIT;
+		//signalling kissat that there is nothing more to import
+	}
 	//now returning to kissat solver
 }
 

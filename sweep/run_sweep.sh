@@ -22,8 +22,8 @@ INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s158.cnf.xz" #done almost immediately
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/bob12s04.cnf.xz" 
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s176.cnf.xz" # 6sec
-INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s48.cnf.xz" # 6sec
-INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s12.cnf.xz" # 6sec
+# INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s48.cnf.xz" # 6sec
+# INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s12.cnf.xz" # 6sec
 
 #easy SATs
 # INST_PATH="$HOME/PhD/instances/sat-and-minisat1m/0225fa9581c622e5abbc8497a97edf4e-fla-qhid-360-4.cnf.xz" #<1s kissat
@@ -71,7 +71,7 @@ MALLOB_OPTIONS="-t=$threads \
   -preprocess-sweep-priority=1.0 \
   -sweep-min-exit-swept=0 \
   -sweep-term-no-progress=0 \
-	-sweep-solver-verbosity=1 \
+	-sweep-solver-verbosity=2 \
 	-sweep-solver-quiet=1 \
   -sweep-initial-congruence=1 \
   -sweep-shuffle-work=1 \

@@ -33,6 +33,7 @@ private:
     uint8_t* _metadata; //serialized description
 	int _numVars{0};
 
+	const int INVALID_ELIT = __INT32_MAX__;
 
 	const int _representative_localId{0}; //a dedicated solver that reports its statistics to us
 	const int _congruence_localId{1};
