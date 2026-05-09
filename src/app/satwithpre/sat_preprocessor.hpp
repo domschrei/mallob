@@ -11,11 +11,15 @@
 #include "scheduling/core_allocator.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
+#include "util/sys/process.hpp"
 #include "util/sys/thread_pool.hpp"
 #include <atomic>
+#include <fstream>
 #include <future>
 
-#if MALLOB_USE_SATSUMA
+#if MALLOB_USE_SATSUMA == 2
+#include "app/satwithpre/ext_satsuma_caller.hpp"
+#elif MALLOB_USE_SATSUMA == 1
 #include "ISatsumaPreprocessor.h"
 #include "ICnf2wl.h"
 #endif
@@ -29,6 +33,13 @@ private:
     bool _run_lingeling {false};
     bool _run_satsuma {false};
     bool _chain_kissat_after_satsuma {false};
+
+#if MALLOB_USE_SATSUMA == 2
+    bool _satsuma_external = true;
+#else
+    bool _satsuma_external = false;
+#endif
+
     volatile bool _kissat_initialized {false};
     volatile bool _kissat_interrupted {false};
     CoreAllocator::Allocation _core_alloc;
@@ -42,8 +53,11 @@ private:
     std::atomic_int _nb_running {0};
     std::vector<int> _solution;
 
-#if MALLOB_USE_SATSUMA
+#if MALLOB_USE_SATSUMA == 1
     std::unique_ptr<satsuma::ISatsumaPreprocessor> _satsuma_preprocessor;
+#endif
+#if MALLOB_USE_SATSUMA == 2
+    std::unique_ptr<ExtSatsumaCaller> _ext_satsuma_caller;
 #endif
 
 public:
@@ -84,23 +98,40 @@ public:
                 _nb_running--;
             });
         }
-#if MALLOB_USE_SATSUMA
+
         if (_run_satsuma) {
             _nb_running++;
-            _satsuma_preprocessor = satsuma::create_preprocessor();
             _fut_satsuma = ProcessWideThreadPool::get().addTask([&]() {
-                std::unique_ptr<satsuma::ICnf2wl> formula = satsuma::create_cnf2wl();
-
-                loadFormulaToCnf2wl(*formula);
             	LOG(V2_INFO, "PREPRO running Satsuma\n");
+
+#if MALLOB_USE_SATSUMA == 2
+                _ext_satsuma_caller.reset(new ExtSatsumaCaller(_params, _desc));
+                auto satsumaRes = _ext_satsuma_caller->callBlocking();
+                if (satsumaRes == ExtSatsumaCaller::UNSAT) {
+                    int expected = 0;
+                    _solver_result.compare_exchange_strong(expected, 20);
+                    _nb_running--;
+                    return;
+                }
+                if (satsumaRes != ExtSatsumaCaller::SUCCESS) abort();
+#else
+                _satsuma_preprocessor = satsuma::create_preprocessor();
+                std::unique_ptr<satsuma::ICnf2wl> formula = satsuma::create_cnf2wl();
+                loadFormulaToCnf2wl(*formula);
                 _satsuma_preprocessor->set_save_as_Formula(true);
                 // hier vielleicht echten logger mit bestimmter verbosity
                 std::ofstream dev_null("/dev/null");
                 _satsuma_preprocessor->set_log_output(&dev_null);
-    			_satsuma_preprocessor->preprocess(*formula);
-                LOG(V2_INFO, "PREPRO Satsuma done \n");
+                _satsuma_preprocessor->preprocess(*formula);
+#endif
+                LOG(V2_INFO, "PREPRO Satsuma done\n");
+
                 if (_chain_kissat_after_satsuma && !_kissat_interrupted) {
-                    std::vector<int>&& satsumaResult = _satsuma_preprocessor->extractPreprocessedFormula();
+#if MALLOB_USE_SATSUMA == 2
+                    std::vector<int> satsumaResult = std::move(_ext_satsuma_caller->getPreprocessedFormula());
+#else
+                    std::vector<int> satsumaResult = std::move(_satsuma_preprocessor->extractPreprocessedFormula());
+#endif
                     SolverSetup kissatSetup;
                     kissatSetup.logger = &Logger::getMainInstance();
                     kissatSetup.numOriginalClauses = satsumaResult.back(); satsumaResult.pop_back();
@@ -123,7 +154,7 @@ public:
                 _nb_running--;
             });
         }
-#endif
+
         if (_run_lingeling) {
             setup.solverType = 'l';
             setup.flavour = PortfolioSequence::PREPROCESS;
@@ -172,22 +203,26 @@ public:
             }
             return false;
         }
-#if MALLOB_USE_SATSUMA
+#if MALLOB_USE_SATSUMA == 2
+        return _ext_satsuma_caller && _ext_satsuma_caller->hasPreprocessedFormula();
+#elif MALLOB_USE_SATSUMA == 1
         return _satsuma_preprocessor->hasPreprocessedFormula();
 #else
         return false;
 #endif
     }
 
-    std::vector<int>&& extractPreprocessedFormula() {
-#if MALLOB_USE_SATSUMA
+    std::vector<int> extractPreprocessedFormula() {
         if (!_run_satsuma || (_chain_kissat_after_satsuma && _kissat_initialized)) {
-            return _kissat->extractPreprocessedFormula();
+            return std::move(_kissat->extractPreprocessedFormula());
         }
         LOG(V2_INFO, "PREPRO extracting Satsuma\n");
-        return _satsuma_preprocessor->extractPreprocessedFormula();
+#if MALLOB_USE_SATSUMA == 2
+        return std::move(_ext_satsuma_caller->getPreprocessedFormula());
+#elif MALLOB_USE_SATSUMA == 1
+        return std::move(_satsuma_preprocessor->extractPreprocessedFormula());
 #else
-        return _kissat->extractPreprocessedFormula();
+        return std::move(_kissat->extractPreprocessedFormula());
 #endif
     }
 
@@ -240,7 +275,7 @@ private:
         slv->diversify(0);
     }
 
-#if MALLOB_USE_SATSUMA
+#if MALLOB_USE_SATSUMA == 1
 	void loadFormulaToCnf2wl(satsuma::ICnf2wl& result){
 		SerializedFormulaParser parser(Logger::getMainInstance(), _desc.getFormulaPayload(0), _desc.getFormulaPayloadSize(0));
         if (_params.compressFormula()) parser.setCompressed();
