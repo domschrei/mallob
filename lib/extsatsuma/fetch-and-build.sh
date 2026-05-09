@@ -12,6 +12,9 @@ for d in $dirname-*/ ; do
 done
 rmdir $dirname-*/
 
+# Disable unlocked file I/O since this may cause trouble with pipes
+sed -i 's/#if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))/#if false/g' src/utility.h
+
 # Once Satsuma version is public, do something like this:
 #branchorcommit="b5f37b21385ee802ce015103b23aff62f92b1734" # updated 2026-04-29
 #fetch_and_extract $dirname CMakeLists.txt https://github.com/domschrei/impcheck/archive/${branchorcommit}.zip
