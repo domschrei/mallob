@@ -27,7 +27,7 @@
 class SatPreprocessor {
 
 private:
-    int numberOfVariables;
+    int _nb_vars;
     const Parameters& _params;
     JobDescription& _desc;
     bool _run_lingeling {false};
@@ -79,6 +79,7 @@ public:
         setup.logger = &Logger::getMainInstance();
         setup.numVars = _desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
         setup.numOriginalClauses = _desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
+        _nb_vars = setup.numVars;
         if (!_run_satsuma){
             setup.solverType = 'p';
             _kissat.reset(new Kissat(setup));
@@ -249,9 +250,9 @@ public:
         } else {
             if (_chain_kissat_after_satsuma) {
                 _kissat->reconstructSolutionFromPreprocessing(solution);
-                solution.resize(numberOfVariables + 1);
+                solution.resize(_nb_vars + 1);
             } else {
-                solution.resize(numberOfVariables + 1);
+                solution.resize(_nb_vars + 1);
             }
         }
 
