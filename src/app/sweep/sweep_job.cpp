@@ -1472,7 +1472,7 @@ void SweepJob::cbContributeToAllReduce() {
 	auto aggregation_element = aggregateEqUnitContributions(contribs);
 
 	LOG(V4_VVER, "SWEEP [%i] contributing ~~~%zu~~~(+%i)~~> to _red \n", _my_rank, aggregation_element.size()-NUM_METADATA_FIELDS, NUM_METADATA_FIELDS);
-	LOGGER(_contriblogger, V2_INFO, "lr %i EU %zu\n", _lastImportedRound.load(), aggregation_element.size()-NUM_METADATA_FIELDS);
+	LOGGER(_contriblogger, V3_VERB, "lr %i EU %zu\n", _lastImportedRound.load(), aggregation_element.size()-NUM_METADATA_FIELDS);
 
 	if (_terminate_all.load(std::memory_order_relaxed)) {
 		LOG(V4_VVER, "SWEEP SHARE BCAST skip contribution, seen already _terminate_all\n");
@@ -1614,7 +1614,7 @@ void SweepJob::checkForStuckSolvers() {
 				int reps = shweep_get_reps_debug(sweeper->solver);
 				uint64_t kitten_propagations = shweep_kitten_propagations(sweeper->solver);
 				if (_is_root) {
-					LOG(V2_INFO, "WARN SWEEP [%i](%i) lags eq-import %i vs %i  (%i). CodeLoc %i reps %i  kitten-prop %zu\n", _my_rank, sweeper->getLocalId(), sweeper->curr_eq_round, _lastImportedRound.load(), sweeper->curr_eq_round - _lastImportedRound.load(), loc, reps, kitten_propagations);
+					LOG(V3_VERB, "WARN SWEEP [%i](%i) lags eq-import %i vs %i  (%i). CodeLoc %i reps %i  kitten-prop %zu\n", _my_rank, sweeper->getLocalId(), sweeper->curr_eq_round, _lastImportedRound.load(), sweeper->curr_eq_round - _lastImportedRound.load(), loc, reps, kitten_propagations);
 				}
 			}
 		}

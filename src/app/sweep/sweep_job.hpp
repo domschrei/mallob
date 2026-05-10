@@ -395,7 +395,7 @@ private:
 			work_sweeps, work_stepovers, work_unsched_resweeps,
 			done_scheduled_prcnt , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars, progress_ratio
 		);
-		LOG(			   V2_INFO, "         %s", logmsg);
+		LOG(			   V3_VERB, "         %s", logmsg);
 		LOGGER(_reslogger, V2_INFO, "%s", logmsg);
 		//no return, payload was just transformed in-place
     };
