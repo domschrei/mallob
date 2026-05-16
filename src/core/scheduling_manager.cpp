@@ -1107,6 +1107,7 @@ JobRequest SchedulingManager::uncommit(Job& job, bool leaving) {
         LOG(V4_VVER, "destruct request(s) to multiply\n");
         job.getRequestToMultiply(/*left=*/true).reset();
         job.getRequestToMultiply(/*left=*/false).reset();
+        if (!job.hasDescription()) eraseJobAndQueueForDeletion(job);
     }
     return optReq.value();
 }

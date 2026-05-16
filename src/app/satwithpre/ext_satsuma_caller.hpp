@@ -1,19 +1,21 @@
 
 #pragma once
 
+#include <cstdio>
+#include <fcntl.h>
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <string>
 #include <sstream>
+#include <asm/termbits.h>  /* Definition of constants */
+#include <sys/ioctl.h>
 
-#include "app/sat/parse/serialized_formula_parser.hpp"
+#include "app/satwithpre/sat_preprocess_actor.hpp"
 #include "data/job_description.hpp"
+#include "scheduling/core_allocator.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
-#include "util/assert.hpp"
-#include "util/sys/fileutils.hpp"
-#include "util/sys/process.hpp"
 #include "util/sys/thread_pool.hpp"
 #include <fstream>
 #include <future>
@@ -21,29 +23,28 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-class ExtSatsumaCaller {
+class ExtSatsumaCaller : public SatPreprocessActor {
 
 private:
-    const Parameters& _params;
     std::string _in_path;
     std::string _out_path;
-
-    volatile bool _result_available {false};
-
-    std::vector<int> _result_cnf;
-    int _result_vars {0};
-    int _result_cls {0};
-    int _result_code = 0;
 
     std::future<void> _fut_in;
     std::future<void> _fut_out;
 
+    volatile bool _received_empty_clause {false};
+
 public:
-    ExtSatsumaCaller(const Parameters& params, const JobDescription& desc) : _params(params) {
+    ExtSatsumaCaller(const Parameters& params, const JobDescription& desc, const std::string& name, std::vector<int>&& formula) :
+        SatPreprocessActor(params, name, std::move(formula)) {
 
         std::string basePath = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob."
             + std::to_string(Proc::getPid()) + "."
-            + std::to_string(desc.getId()) + ".satsuma.";
+            + std::to_string(desc.getId()) + "." + name + ".";
+        std::ostringstream oss;
+        oss << static_cast<const void*>(this);
+        basePath += oss.str() + ".";
+
         _in_path = basePath + "in.pipe.cnf";
         _out_path = basePath + "out.pipe.cnf";
 
@@ -52,97 +53,111 @@ public:
         if (res == -1) abort();
         res = mkfifo(_out_path.c_str(), 0666);
         if (res == -1) abort();
-        LOG(V4_VVER, "Satsuma pipes created\n");
+        LOG(V4_VVER, "%s pipes created\n", getName());
+    }
+    ~ExtSatsumaCaller() {}
+
+    void preprocessAsync() override {
 
         _fut_in = ProcessWideThreadPool::get().addTask([&]() {
-            loadFormulaToPipe(desc);
+            loadFormulaToPipe();
         });
         _fut_out = ProcessWideThreadPool::get().addTask([&]() {
             readPreprocessedFormula();
         });
-    }
-    ~ExtSatsumaCaller() {}
 
-    enum ExtSatsumaResult {SUCCESS, UNSAT, ERROR};
-    ExtSatsumaResult callBlocking() {
+        _fut_prepro = ProcessWideThreadPool::get().addTask([&]() {
+            CoreAllocator::Allocation ca(1);
+            std::string cmd = //"cat " + _in_path + " | " + 
+                std::string(MALLOB_SUBPROC_DISPATCH_PATH"/satsuma")
+                + " fix --add-reduced-as-unit --file " + _in_path
+                + " --out-file " + _out_path
+                + " > " + (_params.logDirectory.isSet() ? (_params.logDirectory() + "/satsuma.txt") : "/dev/null")
+                + " 2>&1";
 
-        std::string cmd = std::string(MALLOB_SUBPROC_DISPATCH_PATH"/satsuma")
-            + " fix --add-reduced-as-unit --file " + _in_path
-            + " --out-file " + _out_path
-            + " > " + (_params.logDirectory.isSet() ? (_params.logDirectory() + "/satsuma.txt") : "/dev/null")
-            + " 2>&1";
+            LOG(V4_VVER, "%s Calling Satsuma: %s\n", getName(), cmd.c_str());
+            const int retval = system(cmd.c_str());
+            LOG(V4_VVER, "%s returned, retval %i\n", getName(), retval);
+            _fut_in.get();
+            _fut_out.get();
 
-        LOG(V4_VVER, "Calling External Satsuma: %s\n", cmd.c_str());
-        const int retval = system(cmd.c_str());
-        _fut_in.get();
-        _fut_out.get();
-
-        LOG(V4_VVER, "External Satsuma returned, retval=%i\n", retval);
-        if (retval != 0) return ERROR;
-
-        _result_available = true;
-        if (_result_code == 20) return UNSAT;
-        return SUCCESS;
+            if (retval != 0) _result = ERROR;
+            if (_received_empty_clause) _result = UNSAT;
+            else _result = SIMPLIFIED;
+            LOG(V4_VVER, "%s result %i\n", getName(), _result);
+        });
     }
 
-    bool hasPreprocessedFormula() const {
-        return _result_available;
+    std::vector<int>&& getPreprocessedFormula() override {
+        assert(!_output_cnf.empty());
+        assert(_output_cnf[0] != 0);
+        LOG(V4_VVER, "%s Returning preprocessed formula of size %lu : %s\n", getName(),
+            _output_cnf.size(), StringUtils::getSummary(_output_cnf).c_str());
+        return std::move(_output_cnf);
     }
 
-    std::vector<int>&& getPreprocessedFormula() {
-        _result_cnf.push_back(_result_vars);
-        _result_cnf.push_back(_result_cls);
-        return std::move(_result_cnf);
+    void reconstructSolution(std::vector<int>& sol) override {
+        sol.resize(nbInputVars() + 1);
     }
 
 private:
-    void loadFormulaToPipe(const JobDescription& _desc) {
+    void loadFormulaToPipe() {
 
-        LOG(V4_VVER, "Loading formula to Satsuma pipe ...\n");
-        SerializedFormulaParser parser(Logger::getMainInstance(), _desc.getFormulaPayload(0),
-            _desc.getFormulaPayloadSize(0));
-        if (_params.compressFormula()) parser.setCompressed();
-        int numberOfVariables = _desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
-        int numberOfClauses = _desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
+        LOG(V4_VVER, "%s Loading formula to Satsuma pipe ...\n", getName());
 
-        assert(numberOfVariables > 0 && numberOfVariables < 1000000000);
-        int lit;
-        std::ofstream ofs(_in_path);
-        ofs << "p cnf " << numberOfVariables << " " << numberOfClauses << "\n";
-        int inputLits = 0;
-        while (parser.getNextLiteral(lit) && ofs.is_open()) {
-            ofs << lit << (lit == 0 ? "\n" : " ");
-            inputLits++;
+        assert(nbVars() > 0 && nbVars() < 1'000'000'000);
+
+        std::ofstream ofs(_in_path.c_str());
+
+        LOG(V4_VVER, "%s Writing p cnf %i %i\n", getName(), nbInputVars(), nbInputClauses());
+
+        ofs << "p cnf " << nbInputVars() << " " << nbInputClauses() << "\n";
+        for (int i = 0; i+2 < _input_cnf.size(); i++) {
+            int lit = _input_cnf[i];
+            ofs << lit << (lit==0 ? "\n" : " ");
         }
-        LOG(V4_VVER, "Forwarded %i lits to Satsuma\n", inputLits);
+        ofs << "X";
+        ofs.flush();
         ofs.close();
+
+        LOG(V4_VVER, "%s Forwarded %lu lits to Satsuma\n", getName(), _input_cnf.size()-2);
     }
 
     void readPreprocessedFormula() {
+
+        LOG(V4_VVER, "%s opening ifs ...\n", getName());
         std::ifstream ifs(_out_path);
+        LOG(V4_VVER, "%s ifs open\n", getName());
+        
         std::string line;
-        bool unsat = false;
         bool lastLitZero = true;
         int outputLits = 0;
+        int nbVars, nbClauses;
         while (std::getline(ifs, line)) {
             if (line.empty() || line[0] == 'c') continue;
 
             if (line[0] == 'p') {
                 std::istringstream iss(line);
                 std::string p, cnf;
-                iss >> p >> cnf >> _result_vars >> _result_cls;
+                iss >> p >> cnf >> nbVars >> nbClauses;
                 continue;
             }
 
             std::istringstream iss(line);
             int lit;
             while (iss >> lit) {
-                _result_cnf.push_back(lit);
-                if (lit == 0 && lastLitZero) _result_code = 20;
+                _output_cnf.push_back(lit);
+                if (lit == 0 && lastLitZero) {
+                    LOG(V4_VVER, "%s reported empty clause\n", getName());
+                    _received_empty_clause = true;
+                }
                 lastLitZero = lit == 0;
                 outputLits++;
             }
         }
-        LOG(V4_VVER, "Received %i lits from Satsuma\n", outputLits);
+        _output_cnf.push_back(nbVars);
+        _output_cnf.push_back(nbClauses);
+        ifs.close();
+        LOG(V4_VVER, "%s Received %i lits from Satsuma\n", getName(), outputLits);
     }
 };

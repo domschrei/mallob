@@ -27,7 +27,7 @@
 class SatPreprocessor {
 
 private:
-    int _nb_vars;
+    int numberOfVariables;
     const Parameters& _params;
     JobDescription& _desc;
     bool _run_lingeling {false};
@@ -79,7 +79,6 @@ public:
         setup.logger = &Logger::getMainInstance();
         setup.numVars = _desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
         setup.numOriginalClauses = _desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
-        _nb_vars = setup.numVars;
         if (!_run_satsuma){
             setup.solverType = 'p';
             _kissat.reset(new Kissat(setup));
@@ -106,7 +105,7 @@ public:
             	LOG(V2_INFO, "PREPRO running Satsuma\n");
 
 #if MALLOB_USE_SATSUMA == 2
-                _ext_satsuma_caller.reset(new ExtSatsumaCaller(_params, _desc));
+                _ext_satsuma_caller.reset(new ExtSatsumaCaller(_params, _desc, "ExtSatsuma"));
                 auto satsumaRes = _ext_satsuma_caller->callBlocking();
                 if (satsumaRes == ExtSatsumaCaller::UNSAT) {
                     int expected = 0;
@@ -135,6 +134,7 @@ public:
 #endif
                     SolverSetup kissatSetup;
                     kissatSetup.logger = &Logger::getMainInstance();
+                    assert(satsumaResult.size() > 2);
                     kissatSetup.numOriginalClauses = satsumaResult.back(); satsumaResult.pop_back();
                     kissatSetup.numVars = satsumaResult.back(); satsumaResult.pop_back();
                     kissatSetup.solverType = 'p';
@@ -250,9 +250,9 @@ public:
         } else {
             if (_chain_kissat_after_satsuma) {
                 _kissat->reconstructSolutionFromPreprocessing(solution);
-                solution.resize(_nb_vars + 1);
+                solution.resize(numberOfVariables + 1);
             } else {
-                solution.resize(_nb_vars + 1);
+                solution.resize(numberOfVariables + 1);
             }
         }
 
