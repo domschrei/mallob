@@ -12,6 +12,7 @@
 #include "util/logger.hpp"
 #include "util/params.hpp"
 #include "util/static_store.hpp"
+#include "util/sys/timer.hpp"
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -20,15 +21,16 @@ class MallobSatPreprocessActor : public SatPreprocessActor {
 private:
     const JobDescription& _desc; // contains our instance to solve and all metadata
     APIConnector& _api; // for submitting jobs to Mallob
-    int _job_id;
+    const int _job_id;
+    const float _time_of_activation;
 
     nlohmann::json _base_json;
-    float _time_of_activation;
 
 public:
     MallobSatPreprocessActor(const Parameters& params, const JobDescription& desc, const std::string& name,
-            APIConnector& api, std::vector<int>&& formula) :
-        SatPreprocessActor(params, name, std::move(formula)), _desc(desc), _api(api), _job_id(desc.getId()) {
+            APIConnector& api, std::vector<int>&& formula, float timeOfActivation) :
+        SatPreprocessActor(params, name, std::move(formula)), _desc(desc), _api(api),
+            _job_id(desc.getId()), _time_of_activation(timeOfActivation) {
 
         static int _actor_counter = 1;
 
@@ -64,9 +66,11 @@ private:
         json["configuration"]["__NV"] = std::to_string(nbInputVars());
         json["configuration"]["__NC"] = std::to_string(nbInputClauses());
         if (_desc.getWallclockLimit() > 0)
-            json["wallclock-limit"] = std::to_string(_desc.getWallclockLimit() - getAgeSinceActivation()) + "s";
+            json["wallclock-limit"] = std::to_string(
+                std::max(0.001f, _desc.getWallclockLimit() - getAgeSinceActivation())) + "s";
         if (_desc.getCpuLimit() > 0)
-            json["cpu-limit"] = std::to_string(_desc.getCpuLimit() - getAgeSinceActivation()) + "s";
+            json["cpu-limit"] = std::to_string(
+            std::max(0.001f, _desc.getCpuLimit() - getAgeSinceActivation())) + "s";
         if (_params.overrideSatOptions())
             json["configuration"]["options"] = SATWITHPRE_OPT_OVERRIDES;
         applySuccessiveGrowth(json);

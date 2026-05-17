@@ -42,6 +42,8 @@ public:
     PreprocessorOrchestrator(const Parameters& params, const JobDescription& desc, APIConnector& api) : _params(params), _desc(desc), _api(api),
             _base_cnf(getCnfFromJobDescription()) {
 
+        _time_of_start = Timer::elapsedSeconds();
+
         // Mallob on original instance
         _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSAT, nullptr});
         ActorContext* ctxMalOrig = &_actors.back();
@@ -66,8 +68,6 @@ public:
         // Mallob on Satsuma+Kissat-preprocessed formula - displaces all prior Mallob tasks
         _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSAT, ctxKisAfterSats, {ctxMalOrig, ctxMalPre1}});
         ActorContext* ctxMalPreFull = &_actors.back();
-
-        _time_of_start = Timer::elapsedSeconds();
     }
 
     int loop() {
@@ -99,7 +99,7 @@ public:
                     actor.actor.reset(new LingelingPreprocessor(_params, _desc, std::to_string(actorIdx) + ":Lingeling", std::move(formula)));
                     break;
                 case ActorContext::MALLOBSAT:
-                    actor.actor.reset(new MallobSatPreprocessActor(_params, _desc, std::to_string(actorIdx) + ":MallobSat", _api, std::move(formula)));
+                    actor.actor.reset(new MallobSatPreprocessActor(_params, _desc, std::to_string(actorIdx) + ":MallobSat", _api, std::move(formula), _time_of_start));
                     break;
                 }
                 LOG(V2_INFO, "SATWP launch %s\n", actor.actor->getName());

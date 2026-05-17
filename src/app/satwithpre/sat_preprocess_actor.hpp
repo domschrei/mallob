@@ -18,6 +18,7 @@ public:
     virtual PreprocessActorResult getPreprocessingResult() const {return _result;}
     std::string getPreprocessingResultAsString() const {
         switch (_result) {
+        case NONE: return "NONE";
         case PENDING: return "PENDING";
         case SAT: return "SAT";
         case UNSAT: return "UNSAT";
