@@ -121,7 +121,8 @@ public:
             if (actor.state == ActorContext::RUNNING && actor.actor->isDonePreprocessing()) {
                 // this actor is done
                 auto res = actor.actor->getPreprocessingResult();
-                LOG(V2_INFO, "SATWP %s done, result %i\n", actor.actor->getName(), res);
+                LOG(V2_INFO, "SATWP %s done, result %s\n", actor.actor->getName(),
+                    actor.actor->getPreprocessingResultAsString().c_str());
                 if (res == SatPreprocessActor::SAT) {
                     actor.model = std::move(actor.actor->getModel());
                 }

@@ -16,6 +16,15 @@ public:
     enum PreprocessActorResult {PENDING, SAT, UNSAT, SIMPLIFIED, ERROR, NONE};
     virtual bool isDonePreprocessing() const {return _result != PENDING;}
     virtual PreprocessActorResult getPreprocessingResult() const {return _result;}
+    std::string getPreprocessingResultAsString() const {
+        switch (_result) {
+        case PENDING: return "PENDING";
+        case SAT: return "SAT";
+        case UNSAT: return "UNSAT";
+        case SIMPLIFIED: return "SIMPLIFIED";
+        default: return "ERROR";
+        }
+    }
     virtual std::vector<int>&& getPreprocessedFormula() {
         return std::move(_output_cnf);
     }

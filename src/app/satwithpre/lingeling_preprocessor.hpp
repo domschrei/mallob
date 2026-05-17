@@ -43,8 +43,8 @@ public:
             int res = _lingeling->solve(0, nullptr);
             LOG(V2_INFO, "PREPRO Lingeling done, result %i\n", res);
             if (res == 10) _result = SAT;
-            if (res == 20) _result = UNSAT;
-            _result = NONE;
+            else if (res == 20) _result = UNSAT;
+            else _result = NONE;
         });
     }
 
