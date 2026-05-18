@@ -8,7 +8,7 @@
 #include "comm/msgtags.h"
 #include "data/job_transfer.hpp"
 
-#define VERB_BCAST V4_VVER
+#define VERB_BCAST V5_DEBG
 
 class JobTreeBroadcast {
 

@@ -6,7 +6,7 @@ OUT_DIR=$HOME/PhD/logsntraces/
 
 # INST_PATH=$HOME/PhD/instances/miter/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/nusmvdme1d3multi.cnf.xz" #0.1sec
-INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf.xz" # 6sec
+INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf.xz" # 6sec @ 3 iterations
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/iso/6s151.cnf.xz"  # 0.1sec
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/bob12s01.cnf.xz" # 30sec, 17% after 2 rounds
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/cmudme1.cnf.xz" # 30sec, 17% after 2 rounds
@@ -23,7 +23,7 @@ INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/bob12s04.cnf.xz" 
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s176.cnf.xz" # 6sec
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s48.cnf.xz" # 6sec
-INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s12.cnf.xz" # 6sec
+# INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s12.cnf.xz" # 6sec
 
 #easy SATs
 # INST_PATH="$HOME/PhD/instances/sat-and-minisat1m/0225fa9581c622e5abbc8497a97edf4e-fla-qhid-360-4.cnf.xz" #<1s kissat
@@ -34,7 +34,7 @@ INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s12.cnf.xz" # 
 
 ./sweep/show-kissat-build.sh
 
-timeout=30
+timeout=60
 NPROCS=4
 threads=3
 echo "NPROCS $NPROCS"
@@ -62,7 +62,7 @@ MALLOB_OPTIONS="-t=$threads \
   -spl=-1 \
 	-jcup=0.05 \
   -sleep=100 \
-	-v=2 \
+	-v=3 \
   -cjc=1 \
   -swpxs=1 \
   -swpxr=1 \
@@ -77,9 +77,9 @@ MALLOB_OPTIONS="-t=$threads \
   -sweep-initial-congruence=1 \
   -sweep-shuffle-work=1 \
   -sweep-max-kitten-prop=1000000 \
-	-sweep-sharing-period=0.020 \
+	-sweep-sharing-period=0.050 \
   -sweep-resweep-chance=0 \
-  -sweep-max-iterations=99 \
+  -sweep-max-iterations=3 \
   -sweep-max-depth=99 \
   -sweep-early-exit-percent=0 \
 "

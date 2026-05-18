@@ -12,7 +12,7 @@
 #include "util/sys/thread_pool.hpp"
 #include "data/job_transfer.hpp"
 
-#define VERB_ALLRED V4_VVER
+#define VERB_ALLRED V5_DEBG
 
 class JobTreeAllReduction {
 
@@ -88,7 +88,7 @@ public:
             return receive(h.source, h.tag, msg);
         }),
         _sub_broadcast(MSG_JOB_TREE_MODULAR_BROADCAST, [this](MessageHandle& h) {
-            LOG(V3_VERB, "BROADCAST\n");
+            LOG(V4_VVER, "BROADCAST\n");
             JobMessage msg = Serializable::get<JobMessage>(h.getRecvData());
             return receive(h.source, h.tag, msg);
         }),
@@ -213,7 +213,7 @@ private:
             accept &= fromLeftChild || fromRightChild;
             if (!accept) return false;
 
-            LOG(V3_VERB, "SWEEP [%i] RED <<~~%i~~~ [%i] from child \n", _tree.nodeRank, msg.payload.size(), source);
+            LOG(VERB_ALLRED, "SWEEP [%i] RED <<~~%i~~~ [%i] from child \n", _tree.nodeRank, msg.payload.size(), source);
             // message accepted: store and check off
             _child_elems.insert({source, std::move(msg.payload)});
             if (fromLeftChild) _received_child_elems.first = true;
@@ -301,7 +301,7 @@ public:
 
             if (_is_root) {
                 // Transform reduced element at root
-                LOG(V3_VERB, "SWEEP [%i] RED ~~~~%i~~>> [%i] to root-trf \n",_tree.nodeRank, _aggregated_elem.value().size(), _parent_rank);
+                LOG(VERB_ALLRED, "SWEEP [%i] RED ~~~~%i~~>> [%i] to root-trf \n",_tree.nodeRank, _aggregated_elem.value().size(), _parent_rank);
                 if (_has_transformation_at_root) {
                     _aggregated_elem.emplace(_transformation_at_root(_aggregated_elem.value()));
                 }
@@ -321,7 +321,7 @@ public:
                 _base_msg.payload = std::move(_aggregated_elem.value());
                 _base_msg.treeIndexOfDestination = _parent_index;
                 _base_msg.contextIdOfDestination = _parent_ctx_id;
-                LOG(V3_VERB, "SWEEP [%i] RED ~~~%i~~~> [%i] to parent \n",_tree.nodeRank, _base_msg.payload.size(), _parent_rank);
+                LOG(VERB_ALLRED, "SWEEP [%i] RED ~~~%i~~~> [%i] to parent \n",_tree.nodeRank, _base_msg.payload.size(), _parent_rank);
                 assert(_base_msg.contextIdOfDestination != 0);
                 MyMpi::isend(_parent_rank, MSG_JOB_TREE_MODULAR_REDUCE, _base_msg);
                 if (_care_about_parent_status) {

@@ -614,12 +614,12 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
         if (is_representative_solver) {
             LOG(V2_INFO, "SWEEP [root](%i) first to report dimacs result\n", getLocalId());
             if (accept) {
-                LOG(V2_INFO, "SATWP ACCEPTS SWEEP dimacs formula\n");
+                LOG(V2_INFO, "SWEEP dimacs formula is acceptable, is different from original\n");
             }
             else {
-                LOG(V2_INFO, "SATWP DECLINES SWEEP dimacs formula\n");
+                LOG(V2_INFO, "SWEEP dimacs fomula is not acceptable, no difference to original\n");
             }
-            LOG(V2_INFO, "SATWP sees from SWEEP: (%i --> %i vars) (%i --> %i clauses) \n", _setup.numVars, nbVars, _setup.numOriginalClauses, nbClauses);
+            LOG(V2_INFO, "SWEEP dimacs: (%i --> %i vars) (%i --> %i clauses) \n", _setup.numVars, nbVars, _setup.numOriginalClauses, nbClauses);
         } else {
             // LOG(V3_VERB, "SWEEP [root](%i) formula report request denied, already taken by (%i) \n", getLocalId(), sweepReportingLocalId->load());
             accept = false;

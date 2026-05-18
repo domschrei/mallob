@@ -254,7 +254,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 
 	if (_params.crossJobCommunication() && _clause_comm) {
 		if (_clause_comm->handle(sourceRank, mpiTag, msg)) {
-			LOGGER(_sweeplogger,V3_VERB, " _clause_comm->handle() got message in SweepJob::communicate \n");
+			LOGGER(_sweeplogger,V5_DEBG, " _clause_comm->handle() got message in SweepJob::communicate \n");
 			return;
 		}
 	}
@@ -332,6 +332,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		assert(request.got_steal_response == false || log_return_false("SWEEP ERROR : got MPI steal answer, but already request.got_steal_response==true.  sourceRank %i, stealingLocalId %i, payload.size %zu ", sourceRank, stealingLocalId, msg.payload.size()));
 		assert(request.to_send == false			|| log_return_false("SWEEP ERROR : got MPI steal answer, but still   request.to_send==true.             sourceRank %i, stealingLocalId %i, payload.size %zu ", sourceRank, stealingLocalId, msg.payload.size()));
 
+		request.t_received = Timer::elapsedSeconds();
 		request.stolen_work = std::move(msg.payload);
 		request.got_steal_response = true;
 		if (request.stolen_work.size() > 0)
@@ -351,7 +352,8 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 }
 
 void SweepJob::appl_terminate() {
-	LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i] (job #%i) got TERMINATE signal (appl_terminate()) \n", _my_rank,getId());
+	LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i] (job #%i) got TERMINATE signal via appl_terminate() \n", _my_rank,getId());
+	LOG(                V2_INFO, "SWEEP [%i] (job #%i) got TERMINATE signal via appl_terminate() \n", _my_rank,getId());
 	if (!_terminate_all) {
 		_terminate_all = true;
 		triggerTerminations();
@@ -546,6 +548,10 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		}
 		saveStealLatencies(sweeper);
 
+		if (_running_sweepers_count==1) {
+			LOGGER(_sweeplogger, V2_INFO, "RANK_CONTRIBUTED_UNITS %i\n", _rank_contributed_units);
+			LOGGER(_sweeplogger, V2_INFO, "RANK_CONTRIBUTED_EQS %i\n", _rank_contributed_equalities);
+		}
 		//If no solver sets UNSAT or IMPROVED, the job will be returned by default as UNKNOWN
 
 		_sweepers[localId]->cleanUp(); //write kissat timing profile
@@ -715,7 +721,7 @@ void SweepJob::saveStealLatencies(KissatPtr sweeper) {
 		Logger _steallogger(Logger::getMainInstance().copy("<STEAL>", ".steal."+to_string(sweeper->getLocalId())));
 		for (auto steal : sweeper->steal_records) {
 			string stealtype = steal.stealtype == SweepStealType::MPI ? "mpi" : "local";
-			LOGGER(_steallogger, V5_DEBG, "id %i   r %i   nr %i   tr %.5f   ts %.5f   d %.6f   s %i  %s\n",sweeper->getLocalId(), steal.round, steal.nr, steal.t_receive, steal.t_submit, steal.t_receive - steal.t_submit, steal.size,  stealtype.c_str() );
+			LOGGER(_steallogger, V5_DEBG, "id %i   r %i   nr %i   ts %.5f  trc %.5f  trd %.5f   d %.6f   s %i  %s\n",sweeper->getLocalId(), steal.round, steal.nr,  steal.t_submit, steal.t_receive, steal.t_read, steal.t_receive - steal.t_submit, steal.size,  stealtype.c_str() );
 		}
 	}
 
@@ -761,13 +767,16 @@ void SweepJob::saveStealLatencies(KissatPtr sweeper) {
 				}
 				// LOGGER(_stealsumlogger, V2_INFO, "it %i rnd %i   attmpts %i   stolen %i \n", iter, round, roundlist.size(), stolen_sum);
 				// LOGGER(_sweeplogger,V2_INFO, "SWEEP reporting steal information, logging round %i / %i\n", round, _lastImportedRound.load());
-				LOGGER(_stealsumlogger, V4_VVER, "iter %i rnd %i   loc_attempts %i   mpi_attempts %i   loc_stolen %i   mpi_stolen %i   Latencies in ms: local_max %.3f   mpi_min %.3f   mpi_mean %.3f   mpi_max %.3f\n",
-					iteration, round, local.size(), mpi.size(), loc_stolensum, mpi_stolensum,
-					// local.empty() ? 0.0f : std::accumulate(local.begin(), local.end(), 0.0f) / local.size(),
-					local.empty() ? 0.0f : *std::max_element(local.begin(), local.end()) * 1000,
-					mpi.empty()   ? 0.0f : *std::min_element(mpi.begin(), mpi.end()) * 1000,
-					mpi.empty()   ? 0.0f : 1000 * std::accumulate(mpi.begin(), mpi.end(), 0.0f) / mpi.size(),
-					mpi.empty()   ? 0.0f : *std::max_element(mpi.begin(), mpi.end()) * 1000);
+				if (!local.empty() || !mpi.empty() || loc_stolensum || mpi_stolensum) {
+					LOGGER(_stealsumlogger, V4_VVER, "iter %i rnd %i   locA %i   mpiA %i   locS %i   mpiS %i   max_mpi_ms %.3f\n",
+						iteration, round, local.size(), mpi.size(), loc_stolensum, mpi_stolensum,
+						// local.empty() ? 0.0f : std::accumulate(local.begin(), local.end(), 0.0f) / local.size(),
+						// local.empty() ? 0.0f : *std::max_element(local.begin(), local.end()) * 1000,
+						// mpi.empty()   ? 0.0f : *std::min_element(mpi.begin(), mpi.end()) * 1000,
+						// mpi.empty()   ? 0.0f : 1000 * std::accumulate(mpi.begin(), mpi.end(), 0.0f) / mpi.size(),
+						mpi.empty()   ? 0.0f : *std::max_element(mpi.begin(), mpi.end()) * 1000);
+
+				}
 			}
 			// LOGGER(_sweeplogger,V2_INFO, "SWEEP finished reporting steal information in file .stealsum\n");
 		}
@@ -813,7 +822,7 @@ void SweepJob::checkIdleWorkStatus() {
 	if (_terminate_all.load(std::memory_order_relaxed))
 		return; //prevent segfault! when termination is triggered, the sweeper references might suddenly become invalid. no touching them
 
-	const float STATUS_PERIOD = 0.050; //status every 50ms, this defines also the long-term-idle window
+	const float STATUS_PERIOD = 0.100; //in seconds. Defines the long-term-idle window
 
 	if (Timer::elapsedSeconds() - _timestamp_last_idleinfo < STATUS_PERIOD) {
 		return;
@@ -842,7 +851,7 @@ void SweepJob::checkIdleWorkStatus() {
 		}
 	}
 	_lastLongtermIdleCount = longterm_idles;
-	LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i]                          rng %i   idle(long) %i(%i) %s   Work[%i]: %s\n", _my_rank, _running_sweepers_count.load(), idles, longterm_idles, oss_idles.str().c_str(), _my_rank, oss_work.str().c_str());
+	LOGGER(_sweeplogger,V4_VVER, "SWEEP [%i] idle(long) %i(%i) %s  Work[%i]: %s\n", _my_rank, idles, longterm_idles, oss_idles.str().c_str(), _my_rank, oss_work.str().c_str());
 	checkForStuckSolvers();
 }
 
@@ -852,16 +861,14 @@ void SweepJob::checkSharingDelay() {
 
 	float time = Timer::elapsedSeconds();
 
-	constexpr float MAX_DELAY_FACTOR = 6; //factor
-	constexpr float MAX_DELAY_BETWEEN_ITERATIONS = 4; //seconds
-
+	constexpr float MAX_DELAY_FACTOR = 6; //factor over normal sharing round period
 	float expected_period = _params.sweepSharingPeriod.val;
 	float warn_threshhold = expected_period * MAX_DELAY_FACTOR;
 
-	//Be more lenient
-	//If we are inbetween iterations we can (and should) be more lenient with the warnings. Because for very large instances it can take even a few seconds
-	//on the root node to finish up on iteration (mainly the substitute() call.
+	//Be more lenient if we are inbetween iterations
+	//Because for very large instances it can take even a few seconds on the root node to finish up on iteration (mainly the substitute() call.
 	//This end-of-iteration delay is expected and unavoidable, and should not count as a problem in the sharing procedure
+	constexpr float MAX_DELAY_BETWEEN_ITERATIONS = 4; //seconds
 	if (_rank_is_inbetween_iterations) {
 		warn_threshhold = MAX_DELAY_BETWEEN_ITERATIONS;
 	}
@@ -1155,7 +1162,7 @@ bool SweepJob::canSolverExitStealing(KissatPtr sweeper) {
 		// return false;
 	// }
 	if (shweep_get_end_iteration_signal(sweeper->solver)) {
-		LOGGER(_sweeplogger,V3_VERB, "Sweeper [%i](%i) exit mallob steal (end_iter)\n", _my_rank, localId);
+		LOGGER(_sweeplogger,V4_VVER, "Sweeper [%i](%i) exit mallob steal (end_iter)\n", _my_rank, localId);
 		return true;
 	}
 	// if (shweep_get_end_job_signal(sweeper->solver)) {
@@ -1164,7 +1171,7 @@ bool SweepJob::canSolverExitStealing(KissatPtr sweeper) {
 	// }
 
 	if (_terminate_all.load(std::memory_order_relaxed)) {
-		LOGGER(_sweeplogger,V3_VERB, "Sweeper [%i](%i) exit mallob steal (terminate_all)\n", _my_rank, localId);
+		LOGGER(_sweeplogger,V4_VVER, "Sweeper [%i](%i) exit mallob steal (terminate_all)\n", _my_rank, localId);
 		sweeper->count_repeated_missed_termination++;
 		if (sweeper->count_repeated_missed_termination % sweeper->WARN_ON_REPEATED_MISSED_TERMINATION==0) {
 			LOGGER(_sweeplogger,V1_WARN, "SWEEP WARN : Sweeper [%i](%i) in %i-th worksteal loop after termination\n", _my_rank, localId, sweeper->count_repeated_missed_termination);
@@ -1183,25 +1190,31 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 		return;
 	}
 
-
 	sweeper->sweeper_is_idle = true;
 
 	//This is the fixed request "slot" we are using to communicate concurently via shared memory with the main worker thread
 	auto &request = _worksteal_requests[localId];
 
+	// LOGGER(_sweeplogger,V4_VVER, "Sweeper [%i](%i) goes stealing\n", _my_rank, localId);
+
+
 	//Check whether a previously queued MPI request has been answered
 	if (request.got_steal_response) {
-		LOGGER(_sweeplogger,V4_VVER, "Sweeper [%i](%i) got steal response \n", _my_rank, localId);
+		LOGGER(_sweeplogger,V4_VVER, "Sweeper [%i](%i) got response nr %i \n", _my_rank, localId, request.nr);
 		if (_terminate_all) {
 			LOGGER(_sweeplogger,V3_VERB, "Sweeper [%i](%i) got steal response nr. %i\n", _my_rank, localId, request.nr);
 		}
 		float t1 = Timer::elapsedSeconds();
+		request.t_read = t1;
 		int size = request.stolen_work.size();
 		assert(request.to_send  == false			|| log_return_false("SWEEP ERROR : got request response, but still   request.to_send==true.             stealingLocalId %i, payload.size %zu ", localId, size));
 		assert(request.is_active		    		|| log_return_false("SWEEP ERROR : got request response, but was no longer flagged active.               stealingLocalId %i, payload.size %zu ", localId, size));
 		if (_params.verbosity()>=V4_VVER) {
-			sweeper->steal_records.push_back({request.nr, SweepStealType::MPI, size , request.t_queued , t1, _lastImportedRound });
+			sweeper->steal_records.push_back({request.nr, SweepStealType::MPI, size , request.t_queued, request.t_received ,  t1, _lastImportedRound });
 		}
+		// if (t1 - request.t_queued > 1.000) {
+			// LOGGER(_sweeplogger, V3_VERB, "STEALDELAY (%i)(at stealnr %i) recvd mpi.nr %i queued at %f received at %f  read at %f\n",  localId, sweeper->attempted_steals, request.nr, request.t_queued, request.t_received, request.t_read);
+		// }
 		request.got_steal_response = false; //to not read it a second time
 		request.is_active = false; //request was fully processed, the slot is now inactive
 		if (size>0) {
@@ -1223,8 +1236,9 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 		}
 
 		LOGGER(_sweeplogger,V4_VVER, "Sweeper [%i](%i) waiting for MPI nr. %i \n", _my_rank, localId, request.nr);
-		usleep(2000);
-		return;
+		//can wait for some milliseconds, nothing to do
+		usleep(5000);
+		// return;
 	}
 
 	//No success via MPI (either there was no answer, or the answer had no work).
@@ -1235,7 +1249,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	int size = stolen_work.size();
 	int nr = sweeper->attempted_steals++;
 	if (_params.verbosity()>=V4_VVER) {
-		sweeper->steal_records.push_back({nr, SweepStealType::Local, size, t0, t1, _lastImportedRound });
+		sweeper->steal_records.push_back({nr, SweepStealType::Local, size, t0, t1, t1, _lastImportedRound });
 	}
 	if (size>0) {
 		//Successful local steal
@@ -1249,20 +1263,21 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	//This indirection is necessary because sending MPI messages from any other thread (like this solver thread) can cause MPI problems
 	if (request.is_active == false && !skip_MPI_forNow()) {
 		request.newQueuedRequest(localId, sweeper->attempted_steals++);
-		LOGGER(_sweeplogger,V4_VVER, "Sweeper [%i](%i) queued new request \n", _my_rank, localId);
+		LOGGER(_sweeplogger,V4_VVER, "Sweeper [%i](%i) queued nr. %i \n", _my_rank, localId, request.nr);
 	}
 
-	// If we make it until here we are waiting for work and have have nothing else to do for now. Can wait for  ~2 millisecond until we check the system again.
-	usleep(2000);
+	// If we make it until here we are waiting for work and have have nothing else to do for now. Can wait for some millisecond until we check the system again.
+	usleep(5000);
 }
 
 void SweepJob::cbStealWorkNew(unsigned **work, int *work_size, int localId) {
 	KissatPtr sweeper = _sweepers[localId]; //this array access is safe because the callback is called by this sweeper itself
-	//This is the main loop in which a solver sits while it tries to steal work from others
+
+	//main loop in which a solver sits while it tries to steal work from others
 	while (true) {
-		if (_terminate_all) LOGGER(_sweeplogger,V3_VERB, "Sweeper [%i](%i) last seen: checking EU imports\n", _my_rank, localId);
+		// if (_terminate_all) LOGGER(_sweeplogger,V3_VERB, "Sweeper [%i](%i) last seen: checking EU imports\n", _my_rank, localId);
 		shweep_do_EU_imports(sweeper->solver);
-		if (_terminate_all) LOGGER(_sweeplogger,V3_VERB, "Sweeper [%i](%i) last seen: go stealing\n", _my_rank, localId);
+		// if (_terminate_all) LOGGER(_sweeplogger,V3_VERB, "Sweeper [%i](%i) last seen: go stealing\n", _my_rank, localId);
 		solverGoStealing(sweeper);
 		if (canSolverExitStealing(sweeper)) {
 			sweeper->sweeper_is_idle = true;
@@ -1285,7 +1300,7 @@ void SweepJob::cbStealWorkNew(unsigned **work, int *work_size, int localId) {
 		sweeper->sweeper_is_idle = false;
 		sweeper->sweeper_longterm_idle = false;
 	}
-	if (_terminate_all)	LOGGER(_sweeplogger,V3_VERB, "Sweeper [%i](%i) returning from stealing to solver\n", _my_rank, localId);
+	if (_terminate_all)	LOGGER(_sweeplogger,V4_VVER, "Sweeper [%i](%i) returning from stealing to solver\n", _my_rank, localId);
 	//callback ends, kissat thread returns back to its C solver code
 }
 
@@ -1313,7 +1328,11 @@ void SweepJob::rootStartNewSharingRound() {
 	}
 
 	if (!_root_initwork_startedproviding) {
-		LOGGER(_sweeplogger,V3_VERB, "SWEEP root: Wait with next round, not yet started providing (new) initial work\n");
+		if (_root_sweep_iteration==0) {
+			LOGGER(_sweeplogger,V3_VERB, "SWEEP root: Wait with next round, CCC still running\n");
+		} else {
+			LOGGER(_sweeplogger,V3_VERB, "SWEEP root: Wait with next round, not yet started providing (new) initial work\n");
+		}
 		return;
 		//Waiting until _starting_ to provide initial work seems the sweet-spot in terms of waiting
 		//If we didn't check for initial work at all, then it can happen that we have multiple sharing rounds after an iteration ends, which can share all_idle multiple times and could lead to skipped iterations
@@ -1506,7 +1525,7 @@ void SweepJob::extractAllReductionResult() {
 	bool all_idle = (active_count==0);
 
 	if (_is_root) {
-		LOGGER(_sweeplogger,V3_VERB, "SWEEP GOTT: envsize %i iter %i round %i : %i ai , %i endi , %i trm . act,idle %i,%i   E %i  U %i  \n", env_completions, sweep_iteration, sharing_round, all_idle, end_iteration, terminate, active_count, idle_count, eq_size/2, unit_size);
+		LOGGER(_sweeplogger,V4_VVER, "SWEEP GOTT: envsize %i iter %i round %i : %i ai , %i endi , %i trm . act,idle %i,%i   E %i  U %i  \n", env_completions, sweep_iteration, sharing_round, all_idle, end_iteration, terminate, active_count, idle_count, eq_size/2, unit_size);
 	}
 
 	assert(sharing_round > _lastImportedRound.load() || log_return_false("SWEEP ERROR : unexpected round number when importing shared data. got round %i, while lastImportedRound %i \n", sharing_round, _lastImportedRound.load()));
@@ -1564,6 +1583,7 @@ void SweepJob::extractAllReductionResult() {
 		//update: we now trigger terminations here directly, no longer indirectly via the worksteal callback
 		triggerTerminations();
 		LOGGER(_sweeplogger,V1_WARN, "# \n # \n # --- [%i] got terminate flag, TERMINATING SWEEP JOB ---\n # \n", _my_rank);
+		LOG(V1_WARN, "SweepJob got [%i] got terminate flag\n", _my_rank);
 	}
 }
 
@@ -1587,10 +1607,10 @@ void SweepJob::checkForStuckSolvers() {
 	if (_terminate_all) {
 		return;
 	}
-	int WARN_DIFFERENCE = 50; //#rounds.  I.e. if at 25, with ca. 20ms rounds, we warn if there is a lagging of >=500ms
+	int WARN_ROUND_DIFF = 50; //#rounds.  I.e. if at 50, we warn if import is lagging by 50 rounds (~1000ms)
 	for (auto &sweeper : _sweepers) {
 		if (sweeper) {
-			if (sweeper->curr_eq_round < _lastImportedRound.load() - WARN_DIFFERENCE) {
+			if (sweeper->curr_eq_round < _lastImportedRound.load() - WARN_ROUND_DIFF) {
 				int loc = shweep_get_code_location(sweeper->solver);
 				// const char *profilename = shweep_get_profilename(sweeper->solver);
 				int reps = shweep_get_reps_debug(sweeper->solver);
@@ -1823,7 +1843,7 @@ void SweepJob::crossjob_rootReceiveClauses(std::vector<int>  &&clauses) {
 		return;
 	}
 
-	LOGGER(_sweeplogger,V2_INFO, "SWEEP storing part of received XTCS size %i\n",clauses.size());
+	LOGGER(_sweeplogger,V4_VVER, "SWEEP storing part of received XTCS size %i\n",clauses.size());
 	// auto reader = _clause_store->getBufferReader(clauses.data(), clauses.size());
 	auto reader = BufferReader(clauses.data(), clauses.size(), 10, false);
 	auto clause = reader.getNextIncomingClause();
@@ -1845,7 +1865,7 @@ void SweepJob::crossjob_rootReceiveClauses(std::vector<int>  &&clauses) {
 		}
 		int after = _crossjob_root_received_units.size();
 		// LOGGER(_sweeplogger,V4_VVER, "  sconsume consumed %i units \n", after - before);
-		LOGGER(_sweeplogger,V2_INFO, "SWEEP stored %i received XTCS units \n", after -before);
+		LOGGER(_sweeplogger,V4_VVER, "SWEEP stored %i received XTCS units \n", after -before);
 	}
 }
 
@@ -1879,7 +1899,8 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 
 void SweepJob::triggerTerminations() {
 	// checkCrossCommNeedsAdvancing("triggerTerminations");
-	LOGGER(_sweeplogger,                V2_INFO, "SWEEP TERM #%i [%i] trigger solver terminations (ctx %i). Of: Running %i, Finished %i \n", getId(), _my_rank, _my_ctx_id, _running_sweepers_count.load(), _finished_sweepers_count.load());
+	LOGGER(_sweeplogger,  V2_INFO, "SWEEP TERM #%i [%i] trigger solver terminations (ctx %i). Of: Running %i, Finished %i \n", getId(), _my_rank, _my_ctx_id, _running_sweepers_count.load(), _finished_sweepers_count.load());
+	LOG   (               V2_INFO, "SWEEP TERM #%i [%i] trigger solver terminations (ctx %i). Of: Running %i, Finished %i \n", getId(), _my_rank, _my_ctx_id, _running_sweepers_count.load(), _finished_sweepers_count.load());
 	// LOGGER(_termlogger, V2_INFO, "SWEEP TERM #%i [%i] trigger solver terminations (ctx %i). Of: Running %i, Finished %i \n", getId(), _my_rank, _my_ctx_id, _running_sweepers_count.load(), _finished_sweepers_count.load());
 	printActiveMPIRequestsCount();
 	int i=0;
@@ -1897,9 +1918,8 @@ void SweepJob::triggerTerminations() {
 }
 
 SweepJob::~SweepJob() {
-	LOGGER(_sweeplogger, V2_INFO, "RANK_CONTRIBUTED_UNITS %i\n", _rank_contributed_units);
-	LOGGER(_sweeplogger, V2_INFO, "RANK_CONTRIBUTED_EQS %i\n", _rank_contributed_equalities);
 	LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB DESTRUCTOR ENTERED (ctx %i) \n", _my_ctx_id);
+	LOG(                V2_INFO, "SWEEP JOB DESTRUCTOR ENTERED (ctx %i) \n", _my_ctx_id);
 	for (int i=0; i<5; i++) {
 		clearImportedRound();
 	}
@@ -1914,6 +1934,7 @@ SweepJob::~SweepJob() {
 	}
 	// triggerTerminations();
 	LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB DESTRUCTOR DONE\n");
+	LOG(                V2_INFO, "SWEEP JOB DESTRUCTOR DONE\n");
 }
 
 

@@ -49,6 +49,7 @@ private:
 	std::atomic_bool _flag_started_synchronized_solving{false};
 	std::atomic<float> _timestamp_started_synchronized_solving{0};
 	std::atomic_bool _flag_terminated_while_synchronizing{false};
+	std::atomic_bool _root_finished_CCC{false};
 	// bool _started_sharedelay_tracking{false};
 	int _lastLongtermIdleCount{0};
 
@@ -72,6 +73,8 @@ private:
 		int targetIndex{-1};
 		int targetRank{-1};
 		float t_queued{0};
+		float t_received{0};
+		float t_read{0};
 		int nr{-1};
 		std::atomic_bool to_send{false};
 		std::atomic_bool got_steal_response{false};
@@ -84,6 +87,8 @@ private:
 			targetRank = -1;
 			stolen_work.clear();
 			t_queued = Timer::elapsedSeconds();
+			t_received = -1;
+			t_read = -1;
 			nr = _nr;
 			//atomic flags are changed only now, after modifying the non-atomics
 			is_active = true;
@@ -92,7 +97,7 @@ private:
 		}
 	};
 	std::deque<WorkstealRequest> _worksteal_requests; //deque, because each object has an atomic member and thus isnt copyable (which vector would require)
-	const int MIN_STEAL_AMOUNT = 1; //update: avoid stealing even up to a single variable. The MPI call happend anyways already at this point
+	const int MIN_STEAL_AMOUNT = 4; //update: avoid stealing even up to a single variable. The MPI call happend anyways already at this point
 
 
 	//Sharing Equivalences and Units
@@ -341,7 +346,7 @@ private:
 			}
 			auto buffer = bb.extractBuffer();
 			if (_params.sweepXJsendTo()) {
-				LOGGER(_sweeplogger,V3_VERB, "SWEEPsns feed to XTCS:  size %i (clauses %i) \n", buffer.size(), n_eqs*2 + n_sweep_units);
+				LOGGER(_sweeplogger,V3_VERB, "SWEEPsns to XTCS: s %i cl %i \n", buffer.size(), n_eqs*2 + n_sweep_units);
 			}
 			// else {
 				// LOGGER(_sweeplogger,V3_VERB, "snsSweep feed dummy buffer to Crosssharing: buffersize %i\n", buffer.size());
@@ -537,8 +542,8 @@ private:
 
 	void digestSharingWithoutFilter(int epoch, std::vector<int>  &&clauses, bool stateless) override {
 		InplaceClauseAggregation(clauses).stripToRawBuffer(); //found by Claude
-		LOGGER(_sweeplogger,V3_VERB, "SWEEP receive XTCS size %i\n",clauses.size());
 		if (_is_root) {
+			LOGGER(_sweeplogger,V3_VERB, "SWEEP receive XTCS s %i\n",clauses.size());
 			crossjob_rootReceiveClauses(std::move(clauses));
 		}
 	}

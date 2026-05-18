@@ -31,6 +31,7 @@ struct SweepStealInfo {
 	int		size;
 	float	t_submit;
 	float	t_receive;
+	float   t_read;
 	int		round;
 };
 
