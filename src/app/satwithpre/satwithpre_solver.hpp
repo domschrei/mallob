@@ -39,7 +39,8 @@ public:
                 res.setSolution(_po.getModel());
                 res.result = RESULT_SAT;
             }
-            if (code == 20) res.result = RESULT_UNSAT;
+            else if (code == 20) res.result = RESULT_UNSAT;
+            else usleep(1000); // 1ms
         }
 
         LOG(V2_INFO, "SATWP RES ~%i~\n", res.result);

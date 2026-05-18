@@ -32,7 +32,10 @@ private:
     std::future<void> _fut_in;
     std::future<void> _fut_out;
 
+    int _orig_nb_vars;
+    int _orig_nb_cls;
     volatile bool _received_empty_clause {false};
+    volatile bool _simplification_achieved {false};
 
 public:
     ExtSatsumaCaller(const Parameters& params, const JobDescription& desc, const std::string& name, std::vector<int>&& formula) :
@@ -82,8 +85,9 @@ public:
             _fut_out.get();
 
             if (retval != 0) _result = ERROR;
-            if (_received_empty_clause) _result = UNSAT;
-            else _result = SIMPLIFIED;
+            else if (_received_empty_clause) _result = UNSAT;
+            else if (_simplification_achieved) _result = SIMPLIFIED;
+            else _result = NONE;
             LOG(V4_VVER, "%s result %i\n", getName(), _result);
         });
     }
@@ -109,9 +113,11 @@ private:
 
         std::ofstream ofs(_in_path.c_str());
 
-        LOG(V4_VVER, "%s Writing p cnf %i %i\n", getName(), nbInputVars(), nbInputClauses());
+        _orig_nb_vars = nbInputVars();
+        _orig_nb_cls = nbInputClauses();
+        LOG(V4_VVER, "%s Writing p cnf %i %i\n", getName(), _orig_nb_vars, _orig_nb_cls);
 
-        ofs << "p cnf " << nbInputVars() << " " << nbInputClauses() << "\n";
+        ofs << "p cnf " << _orig_nb_vars << " " << _orig_nb_cls << "\n";
         for (int i = 0; i+2 < _input_cnf.size(); i++) {
             int lit = _input_cnf[i];
             ofs << lit << (lit==0 ? "\n" : " ");
@@ -158,6 +164,8 @@ private:
         _output_cnf.push_back(nbVars);
         _output_cnf.push_back(nbClauses);
         ifs.close();
-        LOG(V4_VVER, "%s Received %i lits from Satsuma\n", getName(), outputLits);
+        _simplification_achieved = (nbVars != _orig_nb_vars || nbClauses != _orig_nb_cls);
+        LOG(V4_VVER, "%s Received %i lits from Satsuma; simplification: %s\n", getName(), outputLits,
+            _simplification_achieved ? "yes" : "no");
     }
 };

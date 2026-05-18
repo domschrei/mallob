@@ -24,6 +24,7 @@ private:
         enum ActorType {SATSUMA_INT, SATSUMA_EXT, KISSAT, LINGELING, MALLOBSAT} type;
         ActorContext* prerequisite {nullptr};
         std::vector<ActorContext*> actorsBeingDisplaced;
+        bool onlyStartIfPrerequisiteSimplified {false};
 
         std::unique_ptr<SatPreprocessActor> actor;
         enum ActiveActorState {UNINITIALIZED, RUNNING, FINISHED} state {UNINITIALIZED};
@@ -61,13 +62,17 @@ public:
         // Kissat on Satsuma-preprocessed formula (preprocesses the formula)
         _actors.push_back({PreprocessorOrchestrator::ActorContext::KISSAT, ctxSats, {}});
         ActorContext* ctxKisAfterSats = &_actors.back();
+        ctxKisAfterSats->onlyStartIfPrerequisiteSimplified = true; // do not launch Kissat (again!) if Satsuma didn't simplify anything
 
         // Mallob on Kissat-preprocessed formula - displaces original Mallob task
         _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSAT, ctxKis, {ctxMalOrig}});
         ActorContext* ctxMalPre1 = &_actors.back();
+        ctxMalPre1->onlyStartIfPrerequisiteSimplified = true; // do not launch this MallobSat task if Kissat didn't simplify anything
+
         // Mallob on Satsuma+Kissat-preprocessed formula - displaces all prior Mallob tasks
         _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSAT, ctxKisAfterSats, {ctxMalOrig, ctxMalPre1}});
         ActorContext* ctxMalPreFull = &_actors.back();
+        // (we always spawn this one since Satsuma *did* simplify something if the prerequisite is ready)
     }
 
     int loop() {
@@ -81,6 +86,8 @@ public:
                 // check prerequisite
                 if (actor.prerequisite && actor.prerequisite->state != ActorContext::FINISHED)
                     continue; // prerequisite not done yet - skip for now
+                if (actor.prerequisite && actor.onlyStartIfPrerequisiteSimplified && actor.prerequisite->result != SatPreprocessActor::SIMPLIFIED)
+                    continue; // never initialize this actor since its prerequisite didn't lead to a simplification
 
                 // prerequisite done: initialize actor
                 auto formula = (actor.prerequisite && actor.prerequisite->result == SatPreprocessActor::SIMPLIFIED) ?
