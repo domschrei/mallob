@@ -112,7 +112,7 @@ void AnytimeSatClauseCommunicator::communicate() {
                 agg.maxRevision() = _job->getRevisionToReachForGroupId();
                 msg.treeIndexOfDestination = msg.treeIndexOfSender = 0;
                 msg.contextIdOfDestination = msg.contextIdOfSender = _job->getActorContextId();
-                LOG(V1_WARN, "%s : MSG_BROADCAST_CLAUSE_STATELESS, payload size %i\n", _job->toStr(), msg.payload.size());
+                // LOG(V1_WARN, "%s : MSG_BROADCAST_CLAUSE_STATELESS, payload size %i\n", _job->toStr(), msg.payload.size());
                 advanceCollective(_job, msg, MSG_BROADCAST_CLAUSES_STATELESS);
             }
             _cancelled_sessions.emplace_back(_cross_sharing_session.release());
