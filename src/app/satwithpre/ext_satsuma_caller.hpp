@@ -164,7 +164,8 @@ private:
         _output_cnf.push_back(nbVars);
         _output_cnf.push_back(nbClauses);
         ifs.close();
-        _simplification_achieved = (nbVars != _orig_nb_vars || nbClauses != _orig_nb_cls);
+        _simplification_achieved = (nbVars != _orig_nb_vars || nbClauses != _orig_nb_cls
+            || _output_cnf.size() != _input_cnf.size());
         LOG(V4_VVER, "%s Received %i lits from Satsuma; simplification: %s\n", getName(), outputLits,
             _simplification_achieved ? "yes" : "no");
     }
