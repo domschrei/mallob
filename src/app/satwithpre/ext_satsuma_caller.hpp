@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <csignal>
 #include <cstdio>
 #include <fcntl.h>
 #include <iostream>
@@ -29,6 +30,8 @@ private:
     std::string _in_path;
     std::string _out_path;
 
+    std::string _pid_path;
+
     std::future<void> _fut_in;
     std::future<void> _fut_out;
 
@@ -41,7 +44,7 @@ public:
     ExtSatsumaCaller(const Parameters& params, const JobDescription& desc, const std::string& name, std::vector<int>&& formula) :
         SatPreprocessActor(params, name, std::move(formula)) {
 
-        std::string basePath = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob."
+        std::string basePath = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallobtermrelev."
             + std::to_string(Proc::getPid()) + "."
             + std::to_string(desc.getId()) + "." + name + ".";
         std::ostringstream oss;
@@ -50,6 +53,7 @@ public:
 
         _in_path = basePath + "in.pipe.cnf";
         _out_path = basePath + "out.pipe.cnf";
+        _pid_path = basePath + "pid";
 
         int res;
         res = mkfifo(_in_path.c_str(), 0666);
@@ -58,7 +62,9 @@ public:
         if (res == -1) abort();
         LOG(V4_VVER, "%s pipes created\n", getName());
     }
-    ~ExtSatsumaCaller() {}
+    ~ExtSatsumaCaller() {
+        if (_fut_prepro.valid()) _fut_prepro.get();
+    }
 
     void preprocessAsync() override {
 
@@ -76,7 +82,7 @@ public:
                 + " fix --add-reduced-as-unit --file " + _in_path
                 + " --out-file " + _out_path
                 + " > " + (_params.logDirectory.isSet() ? (_params.logDirectory() + "/satsuma.txt") : "/dev/null")
-                + " 2>&1";
+                + " 2>&1 & echo \"$! x\" > " + _pid_path;
 
             LOG(V4_VVER, "%s Calling Satsuma: %s\n", getName(), cmd.c_str());
             const int retval = system(cmd.c_str());
@@ -102,6 +108,28 @@ public:
 
     void reconstructSolution(std::vector<int>& sol) override {
         sol.resize(nbInputVars() + 1);
+    }
+
+    void interrupt() override {
+        if (!_fut_prepro.valid() || _result != PENDING) return;
+
+        LOG(V4_VVER, "%s INTERRUPT\n", getName());
+
+        for (int i = 0; i < 10; i++) {
+            pid_t pid;
+            {
+                LOG(V4_VVER, "%s try to read pid from %s\n", getName(), _pid_path.c_str());
+                std::ifstream ifs(_pid_path);
+                std::string x;
+                ifs >> pid >> x;
+                if (ifs.fail() || x != "x") pid = -1;
+            }
+            if (pid > 0) {
+                LOG(V4_VVER, "%s TERMINATE\n", getName());
+                Process::sendSignal(pid, SIGTERM);
+                return;
+            } else usleep(1000 * 30); // 30ms
+        }
     }
 
 private:

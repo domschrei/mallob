@@ -146,13 +146,11 @@ public:
                 if (res == SatPreprocessActor::SAT) {
                     LOG(V2_INFO, "SATWP %s found SAT\n", actor.actor->getName());
                     _winning_actor = &actor;
-                    stopAll();
                     return 10;
                 }
                 if (res == SatPreprocessActor::UNSAT) {
                     LOG(V2_INFO, "SATWP %s found UNSAT\n", actor.actor->getName());
                     _winning_actor = &actor;
-                    stopAll();
                     return 20;
                 }
                 assert(actor.formula[0] != 0); // no empty clause without reporting UNSAT!
@@ -189,7 +187,6 @@ public:
         return model;
     }
 
-private:
     void stopAll() {
         for (auto& actor : _actors) if (actor.state == ActorContext::RUNNING) {
             LOG(V2_INFO, "SATWP %s interrupt\n", actor.actor->getName());
@@ -197,6 +194,7 @@ private:
         }
     }
 
+private:
     std::vector<int> getCnfFromJobDescription() {
 
         SerializedFormulaParser parser(Logger::getMainInstance(), _desc.getFormulaPayload(0),
