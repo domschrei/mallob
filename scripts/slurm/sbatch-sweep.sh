@@ -18,12 +18,6 @@
 # SuperMUC has TWO processors with 24 physical cores each, totalling 48 physical cores (96 hwthreads)
 # See: https://doku.lrz.de/download/attachments/43321076/SuperMUC-NG_computenode.png
 
-# echo "Reverting back to old 22.2.1 slurm stack for compatibility"
-# module switch stack/22.2.1
-# module unload gcc/11.5.0
-# module unload gdb/15.2
-#
-# module load slurm_setup; module unload devEnv/Intel/2019 intel-mpi; module load gcc/11 intel-mpi/2019-gcc cmake/3.14.5 gdb
 
 source load_standard_modules.sh
 
@@ -62,8 +56,6 @@ mkdir -p $localtmpdir_base $globallogdir_base
 echo "globallogdir: $globallogdir_base"
 
 # Benchmark instances, one per line
-#benchmarkfile="/hppfs/work/$projname/$username/instances/hwmcc20miters/cnf/opt/pathlist.txt" # TODO 
-# benchmarkfile="/hppfs/work/$projname/$username/instances/rotmul_testcase/rotmul-4-copies.txt"
 benchmarkfile="$DS_BENCHMARKFILE"
 
 if [ ! -f $benchmarkfile ]; then
@@ -151,7 +143,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
   -spl=-1 \
 	-jcup=0.05 \
   -sleep=100 \
-  -v=2 \
+  -v=3 \
   -cjc=1 \
   -swpxs=1 \
   -swpxr=1 \
@@ -171,8 +163,6 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
   -sweep-max-depth=99 \
   -sweep-to-completion=0 \
 "
-
-  # -sweep-growing-environments=1 \
 
     # Pre-create network-disk output directories to avoid many concurrent filesystem manips
     #
