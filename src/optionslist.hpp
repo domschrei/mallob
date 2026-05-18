@@ -139,6 +139,7 @@ OPTION_GROUP(grpDebug, "debug", "Debugging")
  OPT_BOOL(useChecksums,                   "checksums", "",                             false,                   "Compute and verify checksum for every job description transfer")
  OPT_BOOL(watchdog,                       "watchdog", "",                              true,                    "Employ watchdog threads to detect unresponsive program flow")
  OPT_INT(watchdogAbortMillis,             "wam", "watchdog-abort-millis",              10000, 1, MAX_INT,       "Interval (in milliseconds) after which an un-reset watchdog in a worker's main thread will invoke a crash")
+ OPT_BOOL(forceTerminate, "ft", "force-terminate", false, "Make sure to terminate certain sub-processes after everything is cleaned up")
 
 ///////////////////////////////////////////////////////////////////////
 

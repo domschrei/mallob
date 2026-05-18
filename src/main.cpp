@@ -1,4 +1,5 @@
 
+#include <cstdlib>
 #include <stdlib.h>
 #include <unistd.h>
 #include <assert.h>
@@ -358,4 +359,8 @@ int main(int argc, char *argv[]) {
     TmpDir::wipe();
     Process::removeDelayedExitWatchers();
     LOG(V2_INFO, "Exiting happily\n");
+
+    if (params.forceTerminate()) {
+        system("killall " MALLOB_SUBPROC_DISPATCH_PATH "/satsuma 2>/dev/null");
+    }
 }
