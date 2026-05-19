@@ -82,7 +82,11 @@ void SweepJob::appl_start() {
 
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d, NumVars %i, NumClauses %i\n",
 		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _nThreads, numVars, numClauses);
+	LOG(                V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d, NumVars %i, NumClauses %i\n",
+		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _nThreads, numVars, numClauses);
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP_PAYLOAD_SIZE %i\n", getDescription().getFormulaPayloadSize(0));
+	LOGGER(_sweeplogger,V2_INFO,"SWEEP_NUM_VARS %i", numVars);
+	LOGGER(_sweeplogger,V2_INFO,"SWEEP_NUM_CLAUSES %i", numClauses);
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP XJCS active: %i \n", _params.crossJobCommunication());
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP XJCS option: send to   SAT: %i \n", _params.sweepXJsendTo());
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP XJCS option: recv from SAT: %i \n", _params.sweepXJrecvFrom());
