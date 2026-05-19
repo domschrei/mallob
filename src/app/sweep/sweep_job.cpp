@@ -85,8 +85,8 @@ void SweepJob::appl_start() {
 	LOG(                V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d, NumVars %i, NumClauses %i\n",
 		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _nThreads, numVars, numClauses);
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP_PAYLOAD_SIZE %i\n", getDescription().getFormulaPayloadSize(0));
-	LOGGER(_sweeplogger,V2_INFO,"SWEEP_NUM_VARS %i", numVars);
-	LOGGER(_sweeplogger,V2_INFO,"SWEEP_NUM_CLAUSES %i", numClauses);
+	LOGGER(_sweeplogger,V2_INFO,"SWEEP_NUM_VARS %i\n", numVars);
+	LOGGER(_sweeplogger,V2_INFO,"SWEEP_NUM_CLAUSES %i\n", numClauses);
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP XJCS active: %i \n", _params.crossJobCommunication());
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP XJCS option: send to   SAT: %i \n", _params.sweepXJsendTo());
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP XJCS option: recv from SAT: %i \n", _params.sweepXJrecvFrom());
@@ -377,18 +377,18 @@ bool SweepJob::appl_isDestructible() {
 	//maybe clauseComm checks should come after the sweeper terminations?
 	if (_clause_comm && !_clause_comm->isDestructible()) {
 		for (int i = 0; i < 10; i++) _clause_comm->communicate(); // may advance destructibility
-		LOGGER(_sweeplogger,V3_VERB, "SWEEP TERM #%i [%i] isDestructible? no. _clause_comm not destructible yet\n",  getId(),_my_rank);
+		LOGGER(_sweeplogger,V3_VERB, "SWEEP TERM #%i ctx %i [%i] isDestructible? no. _clause_comm not destructible yet\n",  getId(),_my_ctx_id,  _my_rank);
 		return false;
 	}
 
 	int _running_sweepers = _started_sweepers_count - _finished_sweepers_count;
 	if (_finished_sweepers_count < _nThreads) {
-		LOGGER(_sweeplogger,V3_VERB, "SWEEP TERM #%i [%i] isDestructible? no. only %i/%i finished, %i running \n",  getId(),_my_rank, _finished_sweepers_count.load(), _nThreads, _running_sweepers);
+		LOGGER(_sweeplogger,V3_VERB, "SWEEP TERM #%i ctx %i [%i] isDestructible? no. only %i/%i finished, %i running \n",  getId(),_my_ctx_id, _my_rank, _finished_sweepers_count.load(), _nThreads, _running_sweepers);
 		return false;
 	}
 
 	//all background workers are completely done, so joining them now should happen immediately (even doing it sequentially)
-	LOGGER(_sweeplogger,V2_INFO, "SWEEP TERM #%i [%i] isDestructible? yes. now joining... \n",  getId(),_my_rank);
+	LOGGER(_sweeplogger,V2_INFO, "SWEEP TERM #%i ctx %i [%i] isDestructible? yes. now joining... \n",  getId(), _my_ctx_id,  _my_rank);
 	int i=0;
 	for (auto &bg_worker : _bg_workers) {
 		if (bg_worker->isRunning()) {
@@ -398,7 +398,7 @@ bool SweepJob::appl_isDestructible() {
 		}
 		i++;
 	}
-	LOGGER(_sweeplogger,V2_INFO, "SWEEP TERM #%i [%i] isDestructible? yes. all joined \n",  getId(),_my_rank);
+	LOGGER(_sweeplogger,V2_INFO, "SWEEP TERM #%i ctx %i [%i] isDestructible? yes. all joined \n",  getId(),_my_ctx_id, _my_rank);
 	return true;
 }
 
@@ -1937,8 +1937,8 @@ SweepJob::~SweepJob() {
 		LOGGER(_sweeplogger,V1_WARN, "SWEEP [%i] WARN : rank didn't receive a single sharing round! (irrelevant if only 1 rank present) \n", _my_rank);
 	}
 	// triggerTerminations();
-	LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB DESTRUCTOR DONE\n");
-	LOG(                V2_INFO, "SWEEP JOB DESTRUCTOR DONE\n");
+	LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB DESTRUCTOR DONE ctx %i\n", _my_ctx_id);
+	LOG(                V2_INFO, "SWEEP JOB DESTRUCTOR DONE ctx %i\n", _my_ctx_id);
 }
 
 

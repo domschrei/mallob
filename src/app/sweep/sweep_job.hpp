@@ -397,11 +397,11 @@ private:
 		//Copy message, once for chronological view in the general logs, once in a special smaller file (on the root node) for easier postprocessing
 		char logmsg[512];
 		snprintf(logmsg, sizeof(logmsg),
-			"SWEEP [%i](root-trf) send: un-sat %i  act,idl,lti %i,%i,%i  mxdk %i  envc %i iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i   SW %i  ST %i  RE %i    Sched, Swept  %.2f ,  %.2f °/.   succ-rate %.6f   \n",
+			"SWEEP [%i](root-trf) send: un-sat %i  act,idl,lti %i,%i,%i  mxdk %i  envc %i iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i   SW %i  ST %i  RE %i    Sched, Swept  %.2f ,  %.2f °/.   succ-rate %.6f  _termall %i  \n",
 			_my_rank, foundUnsat, active_count, idle_count, longtermidle_count, maxxed_kittens,  _root_env_completions, _root_sweep_iteration, _root_sharing_round,
 			all_idle,  send_end_iteration, send_terminate, n_eqs, n_sweep_units, crossjob_units_received,
 			work_sweeps, work_stepovers, work_unsched_resweeps,
-			done_scheduled_prcnt , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars, progress_ratio
+			done_scheduled_prcnt , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars, progress_ratio, _terminate_all.load()
 		);
 		// LOGGER(_sweeplogger,			     V3_VERB, "         %s", logmsg);
 		LOGGER(_sweeplogger, V3_VERB, "%s", logmsg);
