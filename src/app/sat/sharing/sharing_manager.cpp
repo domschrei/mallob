@@ -136,7 +136,8 @@ SharingManager::SharingManager(
 	}
 
 	if (_job_index == 0 && _params.clauseLog.isSet()) {
-		_clause_logger.reset(new ClauseLogger(_params.clauseLog()));
+		_clause_logger.reset(new ClauseLogger(_params.clauseLog()
+			+ ".#" + std::to_string(_solvers[0]->getSolverSetup().jobId)));
 	}
 
 	if (_params.groundTruthModel.isSet()) {
