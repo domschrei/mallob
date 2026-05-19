@@ -74,7 +74,11 @@ public:
 
 int cbTerminate(void * state) {
     MiniSat* ms = (MiniSat*) state;
-    return ms->interrupt;
+    if (ms->interrupt || (ms->_ext_terminator && ms->_ext_terminator())) {
+      ms->_solver->interrupt();
+      return true;
+    }
+    return false;
 }
 
 MiniSat::MiniSat(const SolverSetup& setup) : PortfolioSolverInterface(setup) {
@@ -166,7 +170,13 @@ bool MiniSat::exportsConditionalClauses() {
 void MiniSat::cleanUp() {}
 
 // Interrupt the SAT solving, solving cannot continue until interrupt is unset.
-void MiniSat::setSolverInterrupt() {interrupt = true;}
+void MiniSat::setSolverInterrupt() {
+  interrupt = true;
+  _solver->interrupt();
+}
 
 // Resume SAT solving after it was interrupted.
-void MiniSat::unsetSolverInterrupt() {interrupt = false;}
+void MiniSat::unsetSolverInterrupt() {
+  interrupt = false;
+  _solver->clearInterrupt();
+}

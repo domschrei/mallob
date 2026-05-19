@@ -54,6 +54,8 @@ private:
 
     std::unique_ptr<DTaskTracker::DTaskSlot> _slot;
 
+    int _last_won_rev {-2};
+
 public:
     MallobSatJobStreamProcessor(const Parameters& params, APIConnector& api, JobDescription& desc,
             const std::string& baseUserName, int streamId, bool incremental, Synchronizer& sync) :
@@ -126,15 +128,19 @@ public:
             return;
         }
 
-        if (!_finalized && !_began_nontrivial_solving) {
-
-            // If no distributed job was submitted yet, we try to avoid this overhead;
-            // we wait for a short while if a more lightweight solver finds a solution immediately.
+        if (_last_won_rev < t.rev-1 && _nontrivial_wait_millis > 0) {
+            // This processor *did not* solve the last revision:
+            // we wait for a short while if another, more lightweight solver finds a solution immediately.
+            LOG(V4_VVER, "%s sleep first (last won: %i, now: %i)\n", _name.c_str(), _last_won_rev, t.rev);
             time = Timer::elapsedSeconds() - time;
             usleep(1'000'000 * std::max(0.0, 0.001 * _nontrivial_wait_millis - time)); // X ms minus the time taken to copy the literals
             if (_terminator(t.rev)) {
                 return; // Task has become obsolete in the meantime, so skip solving
             }
+        }
+
+        if (!_finalized && !_began_nontrivial_solving) {
+
             // Task is not (yet) obsolete after the wait, so we now begin proper distributed solving
             LOG(V2_INFO, "%s awakes for rev. %i\n", _name.c_str(), t.rev);
             _began_nontrivial_solving = true;
@@ -229,8 +235,11 @@ public:
                 }
                 const int solSize = solution.size();
                 bool winner = concludeRevision(rev, resultCode, std::move(solution));
-                if (winner) LOG(V2_INFO, "%s rev. %i (internally %i) won with res=%i solsize=%i\n",
-                    _name.c_str(), rev, subjob, resultCode, solSize);
+                if (winner) {
+                    _last_won_rev = rev;
+                    LOG(V3_VERB, "%s rev. %i (internally %i) won with res=%i solsize=%i\n",
+                        _name.c_str(), rev, subjob, resultCode, solSize);
+                }
                 _task_pending = false;
             });
             if (response == JsonInterface::Result::DISCARD) {

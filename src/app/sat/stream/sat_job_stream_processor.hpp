@@ -10,6 +10,7 @@
 
 #include "app/sat/proof/trusted/trusted_utils.hpp"
 #include "data/checksum.hpp"
+#include "util/logger.hpp"
 #include "util/spsc_blocking_ringbuffer.hpp"
 #include "util/string_utils.hpp"
 
@@ -51,7 +52,7 @@ public:
                     //for (int l : lits) assert(l != INT32_MAX && l != INT32_MIN);
                 }
                 // Append new clauses, fingerprint, and assumptions
-                for (int lit : other.lits) lits.push_back(lit);
+                lits.insert(lits.end(), other.lits.begin(), other.lits.end());
             }
         }
     };
@@ -104,7 +105,7 @@ public:
     virtual void process(SatTask& task) = 0;
 
     virtual void finalize() {
-        LOG(V2_INFO, "%s finalize\n", _name.c_str());
+        LOG(V4_VVER, "%s finalize\n", _name.c_str());
         _queue.markExhausted();
         _queue.markTerminated();
     }

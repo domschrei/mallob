@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.11.4)
 project (mallob)
 
+set(CMAKE_FIND_LIBRARY_SUFFIXES ".a" ".lib" ".so" ".dylib")
+
 find_package(MPI REQUIRED)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)

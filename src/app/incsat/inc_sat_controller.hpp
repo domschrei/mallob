@@ -21,7 +21,7 @@
 class IncSatController {
 
 private:
-    const Parameters _params;
+    const Parameters& _params;
     APIConnector& _api;
     JobDescription& _desc;
     std::string _problem_file;
@@ -49,10 +49,10 @@ public:
             _name("#" + std::to_string(desc.getId()) + "(ISAT):" + std::to_string(_stream_id)),
             _dtask_tracker(dTaskTracker) {
 
-        LOG(V3_VERB, "+IncSat %s\n", _name.c_str());
+        LOG(V4_VVER, "+IncSat %s\n", _name.c_str());
     }
     ~IncSatController() {
-        LOG(V3_VERB, "-IncSat %s\n", _name.c_str());
+        LOG(V4_VVER, "-IncSat %s\n", _name.c_str());
         finalize();
     }
 

@@ -11,7 +11,7 @@
 
 class BitwuzllobSatSolverFactory : public bitwuzla::SatSolverFactory {
 private:
-    const Parameters& _params;
+    const Parameters _params;
     APIConnector& _api;
     JobDescription& _desc;
     DTaskTracker& _tracker;
