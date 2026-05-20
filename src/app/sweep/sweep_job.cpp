@@ -87,9 +87,9 @@ void SweepJob::appl_start() {
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP_PAYLOAD_SIZE %i\n", getDescription().getFormulaPayloadSize(0));
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP_NUM_VARS %i\n", numVars);
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP_NUM_CLAUSES %i\n", numClauses);
-	LOGGER(_sweeplogger,V2_INFO,"SWEEP XJCS active: %i \n", _params.crossJobCommunication());
-	LOGGER(_sweeplogger,V2_INFO,"SWEEP XJCS option: send to   SAT: %i \n", _params.sweepXJsendTo());
-	LOGGER(_sweeplogger,V2_INFO,"SWEEP XJCS option: recv from SAT: %i \n", _params.sweepXJrecvFrom());
+	LOGGER(_sweeplogger,V2_INFO,"SWEEP -cjc = %i \n", _params.crossJobCommunication());
+	LOGGER(_sweeplogger,V2_INFO,"SWEEP XTCS send: %i \n", _params.sweepXTCSsend());
+	LOGGER(_sweeplogger,V2_INFO,"SWEEP XTCS recv: %i \n", _params.sweepXTCSrecv());
 
 	_nThreads = _params.numThreadsPerProcess.val;
 
@@ -160,11 +160,6 @@ void SweepJob::appl_communicate() {
 		LOGGER(_sweeplogger, V3_VERB, "SWEEP FULL-JOBCOMM , all ranks are online now \n");
 	}
 
-	//By having rootStartNewSharingRound() before advanceAllReduction(),
-	//we dont immediately start a new broadcast after a successful Allreduction extraction which resets the broadcast object
-	//this heavily reduces the occurrences of broadcasts in the lower ranks forcing an early extraction of their result because they need to create a new blank _red object
-	//at the cost of slightly less frequent sharing rounds. If we wanted maximum sharing frequency, a callback in the allreduction would probably be needed,
-	//which would force the extraction immediately after the results arrives in _red...
 	rootStartNewSharingRound();
 	advanceAllReduction(); //contains pushing data to Cross-Job-Sharing (in root transformation)
 	sendWorkstealsViaMPI();
@@ -191,6 +186,215 @@ void SweepJob::appl_communicate() {
 	LOGGER(_sweeplogger, V5_DEBG, "SWEEP appl_communicate(): %.6f sec \n", (t1-t0));
 	LOGGER(_sweeplogger, V5_DEBG, "SWEEP appl_communicate() done \n");
 }
+
+
+void SweepJob::createAndStartNewSweeper(int localId) {
+	LOGGER(_sweeplogger,V4_VVER, "SWEEP JOB [%i](%i) queuing background worker thread\n", _my_rank, localId);
+	_bg_workers[localId]->run([this, localId]() {
+		LOGGER(_sweeplogger,V3_VERB, "SWEEP JOB [%i](%i) WORKER START \n", _my_rank, localId);
+
+		auto sweeper = createNewSweeper(localId);
+
+		loadFormula(sweeper);
+		_started_sweepers_count++; //only additive, monotonically increasing, going from 0...nThreads-1 and never decreases
+		_running_sweepers_count++; //tracks actual number of running solvers at any given moment in time
+		/*
+		 *  Syncronization Layer!
+		 *  We wait here until all other solvers are also initialized, and only then start solving
+		 *  This is relevant for sweeping quality, as otherwise the solvers joining late might miss some of the equalities shared in the first rounds
+		 *  Alternatively, store all the shared information as a warmup-greeting-package for newly joining solvers, to maximize quality. But only relevant if the SweepJob grows with time, which is not currently the case.
+		 */
+		while (_started_sweepers_count < _nThreads) {
+			LOGGER(_sweeplogger,V5_DEBG, "SWEEP [%i](%i) waits for other solvers (started %i/%i)\n", _my_rank, localId, _started_sweepers_count.load(), _nThreads);
+			usleep(500); //2ms
+			if (_terminate_all) {
+				break;
+			}
+		}
+
+		if (_terminate_all) {
+			LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](%i): terminated while waiting in synchronization \n", _my_rank, localId);
+			_running_sweepers_count--;
+			_finished_sweepers_count++; //only monotonically increasing
+			_flag_terminated_while_synchronizing = true;
+			// maybe this release helps with memory?
+			// kissat_release(sweeper->solver);
+			return;
+		}
+
+		LOGGER(_sweeplogger,V3_VERB, "SWEEP JOB [%i](%i) solve() START \n", _my_rank, localId);
+
+		// TODO(Nicco) Get a callback into the sweepers so that learned equivalences and units
+		// arrive in this class "in realtime" (or per round/iteration) and can be added to XTCS.
+		// See appl_communicate() for handling the arriving clauses (which must happen in the main thread).
+
+		_sweepers[localId] = sweeper; //only now expose the solver to the rest of the system, now that solving starts
+		_flag_started_synchronized_solving = true;
+		_timestamp_started_synchronized_solving = Timer::elapsedSeconds();
+		shweep_set_wallclock_offset(sweeper->solver, -1.0 * Timer::elapsedSeconds());
+
+		LOGGER(_sweeplogger, V3_VERB, "SWEEP [%i](%i) START solve() \n", _my_rank, localId);
+		int res = sweeper->solve(0, nullptr);
+		LOGGER(_sweeplogger, V3_VERB, "SWEEP [%i](%i) FINISH solve(). Result %i \n", _my_rank, localId, res);
+
+
+		if (res==UNSAT) {
+			//Found UNSAT
+			assert(kissat_is_inconsistent(sweeper->solver) || log_return_false("SWEEP ERROR: Solver returned UNSAT 20 but is not in inconsistent (==UNSAT) state!\n"));
+			LOGGER(_sweeplogger,V4_VVER, "SWEEP [%i](%i) found UNSAT! \n", _my_rank, localId);
+			if (_is_root) {
+				//for consistency, only the root node is allowed to report to Mallob
+				rootReportSolverResult(nullptr, UNSAT);
+			} else {
+				//if we are not on root, this flag lets the main Process soon send an MPI message to root, indicating UNSAT
+				_do_report_UNSAT_to_root = true;
+			}
+			//To reduce concurrency problems, only a single representative solver on the root node is allowed to report to Mallob
+		} else if (res==UNKNOWN && _is_root && sweeper->getLocalId()==_representative_localId) {
+			//Found either IMPROVED or UNKNOWN
+			auto stats = sweeper->fetchSweepStats();
+			// if (sweeper->hasPreprocessedFormula() ) {
+			if (stats.clauses < stats.start_clauses) {
+				//Found some improvements
+				rootReportSolverResult(sweeper, IMPROVED);
+			} else {
+				//The whole sweeping didn't yield any improvements
+				rootReportSolverResult(sweeper, UNKNOWN);
+			}
+		}
+
+		assert(res==UNKNOWN || res==UNSAT || log_return_false("SWEEP ERROR: solver has returned with unexpected signal %i \n", res));
+
+		//A dedicated solver on the root node print his stats as a representative of all other solvers.
+		//Their stats differ slightly between solvers, but especially these global stats are very similar between all of them, so we don't bother aggregating/averaging them
+		if (_is_root && localId == _representative_localId) {
+			reportEndStats(sweeper);
+		}
+		reportStealLatencies(sweeper);
+
+		if (_running_sweepers_count==1) {
+			LOGGER(_sweeplogger, V2_INFO, "RANK_CONTRIBUTED_UNITS %i\n", _rank_contributed_units);
+			LOGGER(_sweeplogger, V2_INFO, "RANK_CONTRIBUTED_EQS %i\n", _rank_contributed_equalities);
+		}
+		//If no solver sets UNSAT or IMPROVED, the job will be returned by default as UNKNOWN
+
+		_sweepers[localId]->cleanUp(); //write kissat timing profile
+		_sweepers[localId].reset();  //this should delete the only persistent shared pointer on the solver, and thus trigger its destructor soon
+		_running_sweepers_count--;
+		_finished_sweepers_count++;
+		LOGGER(_sweeplogger,	V3_VERB, "SWEEP [%i](%i) WORKER EXITED. still running: %i\n", _my_rank, localId, _running_sweepers_count.load());
+		printActiveMPIRequestsCount();
+	});
+}
+
+
+std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
+	const JobDescription& desc = getDescription();
+	SolverSetup setup;
+	setup.logger = &Logger::getMainInstance();
+	setup.jobname = "sweep-"+to_string(_my_index);
+	setup.numVars = desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
+	setup.numOriginalClauses = desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
+	setup.localId = localId;
+	setup.globalId = _my_rank * _nThreads + localId;
+
+	if (_params.satProfilingLevel() >= 0) {
+		setup.profilingBaseDir = _params.satProfilingDir();
+		if (setup.profilingBaseDir.empty()) setup.profilingBaseDir = TmpDir::getGeneralTmpDir();
+		setup.profilingBaseDir += "/" + std::to_string(_my_rank) + "/"; // rank == appRank ?
+		// LOGGER(_sweeplogger,V4_VVER, "SWEEP [%i](%i) Profiling Dir = %s \n", _my_rank, localId, setup.profilingBaseDir.c_str());
+		FileUtils::mkdir(setup.profilingBaseDir);
+		setup.profilingLevel = _params.satProfilingLevel();
+	}
+
+
+	if (_numVars==0)
+		_numVars = setup.numVars;
+
+	// LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB [%i](%i) create kissat shweeper \n", _my_rank, localId);
+	float t0 = Timer::elapsedSeconds();
+	auto sweeper = std::make_shared<Kissat>(setup);
+	float t1 = Timer::elapsedSeconds();
+	float init_dur =  (t1 - t0);
+	const float WARN_init_dur = 0.050; //Usual kissat initializations take 0.2ms in the Sat Solver Subprocess and 4-25ms  in the sweep job (for some weird reasons), but should never be above ~30ms, we warn at >50ms
+	LOGGER(_sweeplogger, V3_VERB, "SWEEP [%i](%i) kissat init %.6f sec (%i/%i started)\n", _my_rank, localId, init_dur, _started_sweepers_count.load(), _nThreads);
+	if (init_dur > WARN_init_dur) {
+		LOGGER(_sweeplogger,V1_WARN, "SWEEP WARN STARTUP [%i](%i): kissat init took unusually long, %.6f sec !\n", _my_rank, localId, init_dur);
+	}
+
+	sweeper->setToSweeper();
+
+	//Connecting kissat to Kissat
+	sweeper->sweepSetExportCallbacks();
+
+	//Connecting kissat directly to SweepJob
+    shweep_set_search_work_callback(sweeper->solver, this, cb_search_work_in_tree);
+	shweep_set_SweepJob_eq_import_callback(sweeper->solver, this, cb_import_eq);
+	shweep_set_SweepJob_unit_import_callback(sweeper->solver, this, cb_import_unit);
+
+	if (_is_root) {
+		//we want to read out the final formula at the root node for convenience, so we provide this callback only to root-node solvers in the first place
+		//update: we don't provide prove the FormulaReport Callback because we don't need the final formula reported (currently). Prevents getting stuck for multiple seconds at the end during termination.
+		//update2: for integration in fullcmake we do want the cnf to be reported back.
+		sweeper->sweepSetFormulaReportCallback();
+		sweeper->setRepresentativeLocalId(_representative_localId);
+		//One representive solver at the root node reports about its new kissat-internal state after each iteration (e.g., number of active variables, clauses, etc)
+		if (localId==_representative_localId) {
+			shweep_set_report_finished_iteration_callback(sweeper->solver, this, cb_report_iteration);
+		}
+	}
+
+
+    //Basic configuration
+	// int quiet = _params.sweepSolverVerbosity()==0 ? 1 : 0;
+    sweeper->set_option("quiet", _params.sweepSolverQuiet());  //suppress any standard kissat messages
+    sweeper->set_option("verbose", 0);//the native kissat verbosity
+    sweeper->set_option("log", 0);    //potentially extensive logging
+    sweeper->set_option("check", 0);  // do not check model or derived clauses, because we import anyways units and equivalences without proof tracking
+    sweeper->set_option("statistics", 1);  //print full statistics
+    sweeper->set_option("profile", max(_params.satProfilingLevel.val, 0)); // do detailed profiling how much time we spent where. kissat allows down to 0, mallob down to -1
+	sweeper->set_option("seed", 0);   //Sweeping should not contain any RNG part
+
+	//Specific due to Mallob
+	// printf("Mallob sweep Solver verbosity %i \n", _params.sweepSolverVerbosity.val);
+	sweeper->set_option("mallob_custom_sweep_verbosity", _params.sweepSolverVerbosity.val); //Shweeper verbosity 0..4
+	sweeper->set_option("mallob_is_shweeper", 1); //Make this Kissat solver a pure Distributed Sweeping Solver. Jumps directly to distributed sweeping and bypasses everything else
+	sweeper->set_option("mallob_local_id", localId);
+	sweeper->set_option("mallob_rank", _my_rank);
+	sweeper->set_option("mallob_is_root", _is_root);
+	sweeper->set_option("mallob_resweep_chance", _params.sweepResweepChance.val);
+	sweeper->set_option("mallob_staggered_logs", 1); //set to 1 to have spatially separated logs, useful for verbose runs with 2-16 threads
+	// sweeper->set_option("mallob_individual_sweepiters", _params.sweepIndividualSweepIters.val);
+	sweeper->set_option("mallob_initial_congruence", _params.sweepInitialCongruence.val);
+
+	//Own options of Kissat
+	//identical to standard options right now
+	sweeper->set_option("sweepcomplete", 1);      //deactivates checking for time limits during sweeping, so we dont get kicked out due to some limits
+	//Start already with depth 3, and accordingly doubled sweepvars and clauses
+  	sweeper->set_option("sweepdepth", 3);			//, 2,    0, INT_MAX,	"environment depth")
+  	sweeper->set_option("sweepvars", 256*2);			//  256,  0, INT_MAX,	"environment variables")
+  	sweeper->set_option("sweepclauses", 1024*2);		//	1024, 0, INT_MAX,	"environment clauses")
+  	sweeper->set_option("sweepmaxdepth", _params.sweepMaxDepth.val); //	//	3,    1, INT_MAX,	"maximum environment depth")
+  	sweeper->set_option("sweepmaxvars", 64 * 8192);		//	8192, 2, INT_MAX,	"maximum environment variables")
+  	sweeper->set_option("sweepmaxclauses", 64 * 32768);	//	32768,2, INT_MAX,	"maximum environment clauses")
+  	sweeper->set_option("sweepfliprounds", 1);		//	1,    0, INT_MAX,	"flipping rounds")
+  	sweeper->set_option("sweeprand", 0);			//  0,    0,    1,		"randomize sweeping environment")
+
+  	// sweeper->set_option("puresweep_tocompletion", _params.sweepToCompletion());
+  	sweeper->set_option("puresweep_maxKittenProp", _params.sweepMaxKittenProp());
+
+	sweeper->set_option("substitute", 1);			// (default 1) apply equivalence substitutions after sweeping, keep here explicitly to remember it
+	sweeper->set_option("substituterounds", 2);		// (default 2) there does not seem to be any need to go higher, as almost always all equivalences are already found in the very first round
+
+
+	sweeper->set_option("preprocess", 0); //to skip this part (other preprocessing stuff after shweep finished)
+	sweeper->set_option("luckyearly", 0); //to skip this part
+	sweeper->set_option("luckylate", 0);  //to skip this part
+	sweeper->interruptionInitialized = true;
+	return sweeper;
+}
+
+
 
 void SweepJob::tryReportToMallob() { //needs to be called from the main thread
 	if (!_is_root) {
@@ -468,210 +672,6 @@ void SweepJob::rootReportSolverResult(KissatPtr sweeper, int res) {
 	_staged_solved_status = res;
 }
 
-void SweepJob::createAndStartNewSweeper(int localId) {
-	LOGGER(_sweeplogger,V4_VVER, "SWEEP JOB [%i](%i) queuing background worker thread\n", _my_rank, localId);
-	_bg_workers[localId]->run([this, localId]() {
-		LOGGER(_sweeplogger,V3_VERB, "SWEEP JOB [%i](%i) WORKER START \n", _my_rank, localId);
-
-		auto sweeper = createNewSweeper(localId);
-
-		loadFormula(sweeper);
-		_started_sweepers_count++; //only additive, monotonically increasing, going from 0...nThreads-1 and never decreases
-		_running_sweepers_count++; //tracks actual number of running solvers at any given moment in time
-		/*
-		 *  Syncronization Layer!
-		 *  We wait here until all other solvers are also initialized, and only then start solving
-		 *  This is relevant for sweeping quality, as otherwise the solvers joining late might miss some of the equalities shared in the first rounds
-		 *  Alternatively, store all the shared information as a warmup-greeting-package for newly joining solvers, to maximize quality. But only relevant if the SweepJob grows with time, which is not currently the case.
-		 */
-		while (_started_sweepers_count < _nThreads) {
-			LOGGER(_sweeplogger,V5_DEBG, "SWEEP [%i](%i) waits for other solvers (started %i/%i)\n", _my_rank, localId, _started_sweepers_count.load(), _nThreads);
-			usleep(500); //2ms
-			if (_terminate_all) {
-				break;
-			}
-		}
-
-		if (_terminate_all) {
-			LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](%i): terminated while waiting in synchronization \n", _my_rank, localId);
-			_running_sweepers_count--;
-			_finished_sweepers_count++; //only monotonically increasing
-			_flag_terminated_while_synchronizing = true;
-			// maybe this release helps with memory?
-			// kissat_release(sweeper->solver);
-			return;
-		}
-
-		LOGGER(_sweeplogger,V3_VERB, "SWEEP JOB [%i](%i) solve() START \n", _my_rank, localId);
-
-		// TODO(Nicco) Get a callback into the sweepers so that learned equivalences and units
-		// arrive in this class "in realtime" (or per round/iteration) and can be added to XTCS.
-		// See appl_communicate() for handling the arriving clauses (which must happen in the main thread).
-
-		_sweepers[localId] = sweeper; //only now expose the solver to the rest of the system, now that solving starts
-		_flag_started_synchronized_solving = true;
-		_timestamp_started_synchronized_solving = Timer::elapsedSeconds();
-		shweep_set_wallclock_offset(sweeper->solver, -1.0 * Timer::elapsedSeconds());
-
-		LOGGER(_sweeplogger, V3_VERB, "SWEEP [%i](%i) START solve() \n", _my_rank, localId);
-		int res = sweeper->solve(0, nullptr);
-		LOGGER(_sweeplogger, V3_VERB, "SWEEP [%i](%i) FINISH solve(). Result %i \n", _my_rank, localId, res);
-
-
-		if (res==UNSAT) {
-			//Found UNSAT
-			assert(kissat_is_inconsistent(sweeper->solver) || log_return_false("SWEEP ERROR: Solver returned UNSAT 20 but is not in inconsistent (==UNSAT) state!\n"));
-			LOGGER(_sweeplogger,V4_VVER, "SWEEP [%i](%i) found UNSAT! \n", _my_rank, localId);
-			if (_is_root) {
-				//for consistency, only the root node is allowed to report to Mallob
-				rootReportSolverResult(nullptr, UNSAT);
-			} else {
-				//if we are not on root, this flag lets the main Process soon send an MPI message to root, indicating UNSAT
-				_do_report_UNSAT_to_root = true;
-			}
-			//To reduce concurrency problems, only a single representative solver on the root node is allowed to report to Mallob
-		} else if (res==UNKNOWN && _is_root && sweeper->getLocalId()==_representative_localId) {
-			//Found either IMPROVED or UNKNOWN
-			auto stats = sweeper->fetchSweepStats();
-			// if (sweeper->hasPreprocessedFormula() ) {
-			if (stats.clauses < stats.start_clauses) {
-				//Found some improvements
-				rootReportSolverResult(sweeper, IMPROVED);
-			} else {
-				//The whole sweeping didn't yield any improvements
-				rootReportSolverResult(sweeper, UNKNOWN);
-			}
-		}
-
-		assert(res==UNKNOWN || res==UNSAT || log_return_false("SWEEP ERROR: solver has returned with unexpected signal %i \n", res));
-
-		//A dedicated solver on the root node print his stats as a representative of all other solvers.
-		//Their stats differ slightly between solvers, but especially these global stats are very similar between all of them, so we don't bother aggregating/averaging them
-		if (_is_root && localId == _representative_localId) {
-			reportEndStats(sweeper);
-		}
-		saveStealLatencies(sweeper);
-
-		if (_running_sweepers_count==1) {
-			LOGGER(_sweeplogger, V2_INFO, "RANK_CONTRIBUTED_UNITS %i\n", _rank_contributed_units);
-			LOGGER(_sweeplogger, V2_INFO, "RANK_CONTRIBUTED_EQS %i\n", _rank_contributed_equalities);
-		}
-		//If no solver sets UNSAT or IMPROVED, the job will be returned by default as UNKNOWN
-
-		_sweepers[localId]->cleanUp(); //write kissat timing profile
-		_sweepers[localId].reset();  //this should delete the only persistent shared pointer on the solver, and thus trigger its destructor soon
-		_running_sweepers_count--;
-		_finished_sweepers_count++;
-		LOGGER(_sweeplogger,	V3_VERB, "SWEEP [%i](%i) WORKER EXITED. still running: %i\n", _my_rank, localId, _running_sweepers_count.load());
-		printActiveMPIRequestsCount();
-	});
-}
-
-
-std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
-	const JobDescription& desc = getDescription();
-	SolverSetup setup;
-	setup.logger = &Logger::getMainInstance();
-	setup.jobname = "sweep-"+to_string(_my_index);
-	setup.numVars = desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
-	setup.numOriginalClauses = desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
-	setup.localId = localId;
-	setup.globalId = _my_rank * _nThreads + localId;
-
-	if (_params.satProfilingLevel() >= 0) {
-		setup.profilingBaseDir = _params.satProfilingDir();
-		if (setup.profilingBaseDir.empty()) setup.profilingBaseDir = TmpDir::getGeneralTmpDir();
-		setup.profilingBaseDir += "/" + std::to_string(_my_rank) + "/"; // rank == appRank ?
-		// LOGGER(_sweeplogger,V4_VVER, "SWEEP [%i](%i) Profiling Dir = %s \n", _my_rank, localId, setup.profilingBaseDir.c_str());
-		FileUtils::mkdir(setup.profilingBaseDir);
-		setup.profilingLevel = _params.satProfilingLevel();
-	}
-
-
-	if (_numVars==0)
-		_numVars = setup.numVars;
-
-	// LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB [%i](%i) create kissat shweeper \n", _my_rank, localId);
-	float t0 = Timer::elapsedSeconds();
-	auto sweeper = std::make_shared<Kissat>(setup);
-	float t1 = Timer::elapsedSeconds();
-	float init_dur =  (t1 - t0);
-	const float WARN_init_dur = 0.050; //Usual kissat initializations take 0.2ms in the Sat Solver Subprocess and 4-25ms  in the sweep job (for some weird reasons), but should never be above ~30ms, we warn at >50ms
-	LOGGER(_sweeplogger, V3_VERB, "SWEEP [%i](%i) kissat init %.6f sec (%i/%i started)\n", _my_rank, localId, init_dur, _started_sweepers_count.load(), _nThreads);
-	if (init_dur > WARN_init_dur) {
-		LOGGER(_sweeplogger,V1_WARN, "SWEEP WARN STARTUP [%i](%i): kissat init took unusually long, %.6f sec !\n", _my_rank, localId, init_dur);
-	}
-
-	sweeper->setToSweeper();
-
-	//Connecting kissat to Kissat
-	sweeper->sweepSetExportCallbacks();
-
-	//Connecting kissat directly to SweepJob
-    shweep_set_search_work_callback(sweeper->solver, this, cb_search_work_in_tree);
-	shweep_set_SweepJob_eq_import_callback(sweeper->solver, this, cb_import_eq);
-	shweep_set_SweepJob_unit_import_callback(sweeper->solver, this, cb_import_unit);
-
-	if (_is_root) {
-		//we want to read out the final formula at the root node for convenience, so we provide this callback only to root-node solvers in the first place
-		//update: we don't provide prove the FormulaReport Callback because we don't need the final formula reported (currently). Prevents getting stuck for multiple seconds at the end during termination.
-		//update2: for integration in fullcmake we do want the cnf to be reported back.
-		sweeper->sweepSetFormulaReportCallback();
-		sweeper->setRepresentativeLocalId(_representative_localId);
-		//One representive solver at the root node reports about its new kissat-internal state after each iteration (e.g., number of active variables, clauses, etc)
-		if (localId==_representative_localId) {
-			shweep_set_report_finished_iteration_callback(sweeper->solver, this, cb_report_iteration);
-		}
-	}
-
-
-    //Basic configuration
-	// int quiet = _params.sweepSolverVerbosity()==0 ? 1 : 0;
-    sweeper->set_option("quiet", _params.sweepSolverQuiet());  //suppress any standard kissat messages
-    sweeper->set_option("verbose", 0);//the native kissat verbosity
-    sweeper->set_option("log", 0);    //potentially extensive logging
-    sweeper->set_option("check", 0);  // do not check model or derived clauses, because we import anyways units and equivalences without proof tracking
-    sweeper->set_option("statistics", 1);  //print full statistics
-    sweeper->set_option("profile", max(_params.satProfilingLevel.val, 0)); // do detailed profiling how much time we spent where. kissat allows down to 0, mallob down to -1
-	sweeper->set_option("seed", 0);   //Sweeping should not contain any RNG part
-
-	//Specific due to Mallob
-	// printf("Mallob sweep Solver verbosity %i \n", _params.sweepSolverVerbosity.val);
-	sweeper->set_option("mallob_custom_sweep_verbosity", _params.sweepSolverVerbosity.val); //Shweeper verbosity 0..4
-	sweeper->set_option("mallob_is_shweeper", 1); //Make this Kissat solver a pure Distributed Sweeping Solver. Jumps directly to distributed sweeping and bypasses everything else
-	sweeper->set_option("mallob_local_id", localId);
-	sweeper->set_option("mallob_rank", _my_rank);
-	sweeper->set_option("mallob_is_root", _is_root);
-	sweeper->set_option("mallob_resweep_chance", _params.sweepResweepChance.val);
-	sweeper->set_option("mallob_staggered_logs", 1); //set to 1 to have spatially separated logs, useful for verbose runs with 2-16 threads
-	// sweeper->set_option("mallob_individual_sweepiters", _params.sweepIndividualSweepIters.val);
-	sweeper->set_option("mallob_initial_congruence", _params.sweepInitialCongruence.val);
-
-	//Own options of Kissat
-	//identical to standard options right now
-	sweeper->set_option("sweepcomplete", 1);      //deactivates checking for time limits during sweeping, so we dont get kicked out due to some limits
-  	sweeper->set_option("sweepdepth", 2);			//, 2,    0, INT_MAX,	"environment depth")
-  	sweeper->set_option("sweepvars", 256);			//  256,  0, INT_MAX,	"environment variables")
-  	sweeper->set_option("sweepclauses", 1024);		//	1024, 0, INT_MAX,	"environment clauses")
-  	sweeper->set_option("sweepmaxdepth", _params.sweepMaxDepth.val); //	//	3,    1, INT_MAX,	"maximum environment depth")
-  	sweeper->set_option("sweepmaxvars", 64 * 8192);		//	8192, 2, INT_MAX,	"maximum environment variables")
-  	sweeper->set_option("sweepmaxclauses", 64 * 32768);	//	32768,2, INT_MAX,	"maximum environment clauses")
-  	sweeper->set_option("sweepfliprounds", 1);		//	1,    0, INT_MAX,	"flipping rounds")
-  	sweeper->set_option("sweeprand", 0);			//  0,    0,    1,		"randomize sweeping environment")
-
-  	sweeper->set_option("puresweep_tocompletion", _params.sweepToCompletion());
-  	sweeper->set_option("puresweep_maxKittenProp", _params.sweepMaxKittenProp());
-
-	sweeper->set_option("substitute", 1);			// (default 1) apply equivalence substitutions after sweeping, keep here explicitly to remember it
-	sweeper->set_option("substituterounds", 2);		// (default 2) there does not seem to be any need to go higher, as almost always all equivalences are already found in the very first round
-
-
-	sweeper->set_option("preprocess", 0); //to skip this part (other preprocessing stuff after shweep finished)
-	sweeper->set_option("luckyearly", 0); //to skip this part
-	sweeper->set_option("luckylate", 0);  //to skip this part
-	sweeper->interruptionInitialized = true;
-	return sweeper;
-}
 
 void SweepJob::cbReportIteration(int localId) {
 	assert(_is_root || log_return_false("SWEEP ERROR : iteration report in a non-root rank. Technically possible, but currently not allowed \n"));
@@ -681,13 +681,13 @@ void SweepJob::cbReportIteration(int localId) {
 	auto stats = sweeper->fetchSweepStats();
 	//writing this often mangled the response time log line, too close together
 	// LOGGER(_sweeplogger,			  V2_INFO, "SWEEP solver [%i](%i) reports about iteration %i in dedicated .sweep file \n", _my_rank, localId, stats.curr_iteration);
-	if (!_params.sweepToCompletion()) {
-		assert(stats.curr_iteration <= _params.sweepMaxIterations.val || log_return_false("SWEEP ERROR: solver has internally higher iteration (%i) than expected max iterations (%i)", stats.curr_iteration, _params.sweepMaxIterations.val));
-	}
+	// if (!_params.sweepToCompletion()) {
+	// }
+	// assert(stats.curr_iteration <= _params.sweepMaxIterations.val || log_return_false("SWEEP ERROR: solver has internally higher iteration (%i) than expected max iterations (%i)", stats.curr_iteration, _params.sweepMaxIterations.val));
 
 	LOGGER(_sweeplogger, V2_INFO, "\n");
 	LOGGER(_sweeplogger,V2_INFO, "Reported by [%i](%i)		\n", _my_rank, localId);
-	LOGGER(_sweeplogger,V2_INFO, "TO_COMPLETION    %i		    \n", _params.sweepToCompletion());
+	// LOGGER(_sweeplogger,V2_INFO, "TO_COMPLETION    %i		    \n", _params.sweepToCompletion());
 	LOGGER(_sweeplogger,V2_INFO, "ITERATION_CURR   %i		    \n", stats.curr_iteration);
 	LOGGER(_sweeplogger,V2_INFO, "ITERATIONS_MAX     %i		\n", _params.sweepMaxIterations());
 	LOGGER(_sweeplogger,V2_INFO, "TIME_APP_TOTAL          %.3f s\n",  Timer::elapsedSeconds() - _timestamp_start_sweepapp);
@@ -718,7 +718,7 @@ void SweepJob::cbReportIteration(int localId) {
 }
 
 
-void SweepJob::saveStealLatencies(KissatPtr sweeper) {
+void SweepJob::reportStealLatencies(KissatPtr sweeper) {
 
 	//Write out every single steal when at very high verbosity
 	if (LOGGER_STATIC_VERBOSITY >= 5) {
@@ -1114,9 +1114,9 @@ bool SweepJob::tryProvideInitialWork(KissatPtr sweeper) {
 		sweeper->sweeper_is_idle = false; //already set non-idle here to prevent case where solver is already initialized, non-idle, but still has no work cause its just being copied, and then a sharing operation starts right now, terminating everything wrongly early
 		sweeper->sweeper_longterm_idle = false;
 
-		if (!_params.sweepToCompletion()) {
-			assert( solver_iteration <= _params.sweepMaxIterations.val || log_return_false("SWEEP ERROR : solver iteration %i is too high, should be max %i ", solver_iteration, _params.sweepMaxIterations.val));
-		}
+		// if (!_params.sweepToCompletion()) {
+			// assert( solver_iteration <= _params.sweepMaxIterations.val || log_return_false("SWEEP ERROR : solver iteration %i is too high, should be max %i ", solver_iteration, _params.sweepMaxIterations.val));
+		// }
 		if (solver_iteration != _root_sweep_iteration +1 ) {
 			LOGGER(_sweeplogger,V1_WARN, "SWEEP WARN : new solver iteration %i more than 1 larger than counter at root (iteration %i) \n", solver_iteration, _root_sweep_iteration);
 		}
@@ -1418,7 +1418,7 @@ void SweepJob::cbContributeToAllReduce() {
 
 
 	if (_red && _red->hasResult()) {
-		LOGGER(_sweeplogger,V1_WARN, ">>>> Warn SWEEP [%i] Noticing unextracted _red results late during broadcast callback\n", _my_rank);
+		LOGGER(_sweeplogger,V1_WARN, ">>>> WARN SWEEP [%i] Noticing unextracted _red results late during broadcast callback\n", _my_rank);
 		extractAllReductionResult();
 	}
 
@@ -1469,7 +1469,18 @@ void SweepJob::cbContributeToAllReduce() {
 		bool is_longterm_idle = sweeper->sweeper_longterm_idle;
 		bool is_active = !is_idle;
 		int foundUnsat = kissat_is_inconsistent(sweeper->solver);
-		appendMetadataToReductionElement(foundUnsat, contrib, is_idle, is_longterm_idle, is_active, unit_size, eq_size, stats.progress_work_sweeps, stats.progress_work_stepovers, stats.progress_unsched_resweeps, stats.maxxed_kittens);
+		int work_sweeps = (int)stats.progress_work_sweeps;
+		int work_stepovers = (int)stats.progress_work_stepovers;
+		int work_resweeps = (int)stats.progress_unsched_resweeps;
+		if (stats.curr_iteration < expected_iteration_of_next_round) {
+			//edgecase: This sweeper is still stuck in a previous iteration, maybe because its last Kitten Call takes extremely long, and it didn't yet reach the point where it resets it's work statistics
+			//Thus we catch that case here and filter out "left-over" statistics form the previous iteration
+			LOGGER(_sweeplogger,V2_INFO, "caught left-over work statistics: work %i steppedover %i \n", work_sweeps, work_stepovers);
+			work_sweeps = 0;
+			work_stepovers = 0;
+			work_resweeps = 0;
+		}
+		appendMetadataToReductionElement(foundUnsat, contrib, is_idle, is_longterm_idle, is_active, unit_size, eq_size, work_sweeps, work_stepovers, work_resweeps, stats.maxxed_kittens);
 
 		contribs.push_back(contrib);
 	}
@@ -1525,8 +1536,13 @@ void SweepJob::extractAllReductionResult() {
 	// _completed_envsizes = completed_envsizes;
 
 	_iteration_of_round[sharing_round] = sweep_iteration;
+	expected_iteration_of_next_round = sweep_iteration;
+	if (end_iteration) {
+		expected_iteration_of_next_round += 1;
+	}
 
 	bool all_idle = (active_count==0);
+
 
 	if (_is_root) {
 		LOGGER(_sweeplogger,V4_VVER, "SWEEP GOTT: envsize %i iter %i round %i : %i ai , %i endi , %i trm . act,idle %i,%i   E %i  U %i  \n", env_completions, sweep_iteration, sharing_round, all_idle, end_iteration, terminate, active_count, idle_count, eq_size/2, unit_size);
@@ -1843,7 +1859,7 @@ std::vector<int> SweepJob::getRandomIdPermutation() {
 }
 
 void SweepJob::crossjob_rootReceiveClauses(std::vector<int>  &&clauses) {
-	if (!_params.sweepXJrecvFrom()) {
+	if (!_params.sweepXTCSrecv()) {
 		return;
 	}
 

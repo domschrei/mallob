@@ -41,8 +41,8 @@ echo "NPROCS $NPROCS"
 echo "threads per process $threads"
 
 # APP="SAT"
-# APP="SWEEP"
-APP="SATWITHPRE"
+APP="SWEEP"
+# APP="SATWITHPRE"
 
 MALLOB_OPTIONS="-t=$threads \
   -mono-app=$APP \
@@ -63,25 +63,21 @@ MALLOB_OPTIONS="-t=$threads \
 	-jcup=0.05 \
   -sleep=100 \
 	-v=3 \
-  -cjc=1 \
-  -swpxs=1 \
-  -swpxr=1 \
   -fcll=2 \
 	-preprocess-sweepnsat=1 \
   -preprocess-sweep-priority=1.0 \
-  -sweep-min-exit-swept=0 \
-  -sweep-term-no-progress=0 \
-	-sweep-solver-verbosity=0 \
-	-sweep-solver-quiet=1 \
-  -sweep-to-completion=0 \
-  -sweep-initial-congruence=1 \
-  -sweep-shuffle-work=1 \
-  -sweep-max-kitten-prop=1000000 \
-	-sweep-sharing-period=0.050 \
-  -sweep-resweep-chance=0 \
-  -sweep-max-iterations=3 \
+  -sweep-solver-verbosity=0 \
+  -sweep-solver-quiet=1 \
+  -sweep-max-iterations=99 \
   -sweep-max-depth=99 \
-  -sweep-early-exit-percent=0 \
+  -sweep-xj-send=1 \
+  -sweep-xj-recv=1 \
+  -cjc=1 \
+  -sweep-max-kitten-prop=100000 \
+	-sweep-sharing-period=0.050 \
+  -sweep-progress-ratio=0.01 \
+  -sweep-progress-window=100 \
+  -sweep-progress-skips=3 \
 "
 
 
