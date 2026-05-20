@@ -17,9 +17,9 @@ OPT_BOOL(sweepXTCSsend,			"swpxs", 	"sweep-xj-send",			true, "send units and equ
 OPT_BOOL(sweepXTCSrecv,			"swpxr", 	"sweep-xj-recv",			true, "receive units via cross-job-communication -cjc")
 OPT_FLOAT(sweepSharingPeriod,	"swpsp", 	"sweep-sharing-period", 	0.050, 0.001, LARGE_INT, "The sharing period (of equivalences and units), in seconds")
 OPT_INT(sweepMaxKittenProp,		"swpmkp", 	"sweep-max-kitten-prop",	1000000,1000,LARGE_INT, "Maximum number of kitten propagations per kitten SAT Call")
-OPT_FLOAT(sweepProgressRatio,	"swppr",    "sweep-progress-ratio",		0.01, 0, 1, "minimum ratio of found Eqs+Units (versus swept variables) to continue an iteration")
-OPT_INT(sweepProgressWindow,	"swppw",	"sweep-progress-window",	200, 1, LARGE_INT, "number of last sharing rounds for which the progress ratio is checked")
-OPT_INT(sweepProgressSkips,		"swpps",	"sweep-progress-skips",		3, 1, LARGE_INT, "number of allowed progress skips, after which the job is terminated")
+OPT_FLOAT(sweepSuccessRatio,	"swpsur",   "sweep-success-ratio",		0.01, 0, 1, "minimum ratio of Eqs+Units versus swept variables to not skip an iteration")
+OPT_INT(sweepSuccessWindow,		"swpsuw",	"sweep-success-window",		200, 1, LARGE_INT, "number of last sharing rounds for which the success ratio is checked")
+OPT_INT(sweepSuccessSkips,		"swpsus",	"sweep-success-skips",		3, 1, LARGE_INT, "number of allowed skips after which the job is terminated")
 
 //OPT_INT(sweepMinDepth,			"swpmind",  "sweep-min-depth",			2, 2, LARGE_INT, "minimum environment depth for sweeping")
 //OPT_INT(sweepMaxEmptyRounds,    "swpmer",   "sweep-max-empty-rounds",   5, 1, LARGE_INT, "the maximum number of tolerated empty rounds (not a single unit or eqs found) before sweeping is terminated early")

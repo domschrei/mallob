@@ -243,7 +243,7 @@ private:
 		_shared_EU_this_iteration_per_round.push_back(n_sweep_units + n_eqs); //relative per round
 		_swept_this_iteration_at_round.push_back(work_sweeps + work_unsched_resweeps); //cumulative
 
-		double iteration_progress_ratio = (_root_shared_eqs_this_iteration + _root_shared_units_this_iteration) / (double)(work_sweeps + work_unsched_resweeps);
+		// double iteration_progress_ratio = (_root_shared_eqs_this_iteration + _root_shared_units_this_iteration) / (double)(work_sweeps + work_unsched_resweeps);
 
 		bool decide_end_iteration = false;
 		bool decide_terminate_job = false;
@@ -255,23 +255,29 @@ private:
 
 		auto &shared = _shared_EU_this_iteration_per_round;
 		auto &swept = _swept_this_iteration_at_round;
-		int window = _params.sweepProgressWindow();
-		if (shared.size() > window) {
-			int shared_in_window = std::accumulate(shared.end() - window, shared.end(), 0);  //sum of relative values
-			int swept_in_window  = swept[swept.size()-1] - swept[swept.size()-1-window]; //difference between two cumulative values
-			double progress_in_window = swept_in_window==0 ? 0: shared_in_window / (double) swept_in_window;
-			if (progress_in_window < _params.sweepProgressRatio()) {
+		int window = _params.sweepSuccessWindow();
+		if (window > shared.size()) {
+			window = shared.size();
+		}
+		//Always calculate the success within the window of the last rounds
+		int shared_in_window = std::accumulate(shared.end() - window, shared.end(), 0);  //sum of relative values
+		int swept_in_window  = swept.back() - swept[swept.size()-window]; //difference between two cumulative values
+		double success_in_window = swept_in_window==0 ? 0: shared_in_window / (double) swept_in_window;
+		//Only check the success when the window reached the minimum required size
+		if (shared.size()>=_params.sweepSuccessWindow()) {
+			if (success_in_window < _params.sweepSuccessRatio()) {
 				decide_end_iteration = true;
 				_root_skipped_iterations++;
-				LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf) SKIP iteration %i , due to progress %f  (%i / %i) in window rounds [%i, %i]  \n",
-					_my_rank, _root_sweep_iteration, progress_in_window, shared_in_window, swept_in_window, _root_rounds_this_iteration - window, _root_rounds_this_iteration);
+				LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf) SKIP iteration %i , due to success %f  (%i / %i) in window rounds [%i, %i]  \n",
+					_my_rank, _root_sweep_iteration, success_in_window, shared_in_window, swept_in_window, _root_rounds_this_iteration - window, _root_rounds_this_iteration);
 				for (auto s : swept) {
 					LOGGER(_sweeplogger, V2_INFO, "%i \n", s);
 				}
 			}
 		}
+		// }
 
-		if (_root_skipped_iterations > _params.sweepProgressSkips()) {
+		if (_root_skipped_iterations > _params.sweepSuccessSkips()) {
 			decide_terminate_job = true;
 			LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf) TERMINATE job , due to %i th skipped iteration \n", _my_rank, _root_skipped_iterations);
 		}
@@ -332,7 +338,7 @@ private:
 			}
 			auto buffer = bb.extractBuffer();
 			if (_params.sweepXTCSsend()) {
-				LOGGER(_sweeplogger,V3_VERB, "SWEEPsns to XTCS: s %i cl %i \n", buffer.size(), n_eqs*2 + n_sweep_units);
+				LOGGER(_sweeplogger,V4_VVER, "SWEEPsns to XTCS: s %i cl %i \n", buffer.size(), n_eqs*2 + n_sweep_units);
 			}
 			_clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
 
@@ -374,11 +380,11 @@ private:
 		//Copy message, once for chronological view in the general logs, once in a special smaller file (on the root node) for easier postprocessing
 		char logmsg[512];
 		snprintf(logmsg, sizeof(logmsg),
-			"SWEEP [%i](root-trf) send: un-sat %i  act,idl,lti %i,%i,%i  mxkit %i  envc %i iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i   SW %i  ST %i  RE %i    Sched, Swept  %.2f ,  %.2f °/.  iter-progress %.6f  _termall %i  \n",
-			_my_rank, foundUnsat, active_count, idle_count, longtermidle_count, maxxed_kittens,  _root_env_completions, _root_sweep_iteration, _root_sharing_round,
+			"SWEEP [%i](root-trf) send: un-sat %i  act,idl,lti %i,%i,%i  mxkit %i  iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i  SW %i  ST %i  Sched, Swept  %.2f ,  %.2f °/.  wsucc %.6f  ETI %i  UTI %i   \n",
+			_my_rank, foundUnsat, active_count, idle_count, longtermidle_count, maxxed_kittens,  _root_sweep_iteration, _root_sharing_round,
 			all_idle,  decide_end_iteration, decide_terminate_job, n_eqs, n_sweep_units, crossjob_units_received,
-			work_sweeps, work_stepovers, work_unsched_resweeps,
-			done_scheduled_prcnt , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars, iteration_progress_ratio, _terminate_all.load()
+			work_sweeps, work_stepovers,
+			done_scheduled_prcnt , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars, success_in_window, _root_shared_eqs_this_iteration, _root_shared_units_this_iteration
 		);
 		// LOGGER(_sweeplogger,			     V3_VERB, "         %s", logmsg);
 		LOGGER(_sweeplogger, V3_VERB, "%s", logmsg);

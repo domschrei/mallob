@@ -75,9 +75,9 @@ MALLOB_OPTIONS="-t=$threads \
   -cjc=1 \
   -sweep-max-kitten-prop=100000 \
 	-sweep-sharing-period=0.050 \
-  -sweep-progress-ratio=0.01 \
-  -sweep-progress-window=100 \
-  -sweep-progress-skips=3 \
+  -sweep-success-ratio=0.01 \
+  -sweep-success-window=50 \
+  -sweep-success-skips=3 \
 "
 
 

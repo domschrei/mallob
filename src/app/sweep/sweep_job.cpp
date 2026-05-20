@@ -87,9 +87,21 @@ void SweepJob::appl_start() {
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP_PAYLOAD_SIZE %i\n", getDescription().getFormulaPayloadSize(0));
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP_NUM_VARS %i\n", numVars);
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP_NUM_CLAUSES %i\n", numClauses);
-	LOGGER(_sweeplogger,V2_INFO,"SWEEP -cjc = %i \n", _params.crossJobCommunication());
-	LOGGER(_sweeplogger,V2_INFO,"SWEEP XTCS send: %i \n", _params.sweepXTCSsend());
-	LOGGER(_sweeplogger,V2_INFO,"SWEEP XTCS recv: %i \n", _params.sweepXTCSrecv());
+	LOGGER(_sweeplogger,V2_INFO, "cjc = %i \n", _params.crossJobCommunication());
+	LOGGER(_sweeplogger,V2_INFO, "sweepInitialCongruence=%i\n", _params.sweepInitialCongruence());
+	LOGGER(_sweeplogger,V2_INFO, "sweepShuffleWork    =%i\n", _params.sweepShuffleWork());
+	LOGGER(_sweeplogger,V2_INFO, "sweepResweepChance  =%i\n", _params.sweepResweepChance());
+	LOGGER(_sweeplogger,V2_INFO, "sweepSolverVerbosity=%i\n", _params.sweepSolverVerbosity());
+	LOGGER(_sweeplogger,V2_INFO, "sweepSolverQuiet    =%i\n", _params.sweepSolverQuiet());
+	LOGGER(_sweeplogger,V2_INFO, "sweepMaxIterations  =%i\n", _params.sweepMaxIterations());
+	LOGGER(_sweeplogger,V2_INFO, "sweepMaxDepth       =%i\n", _params.sweepMaxDepth());
+	LOGGER(_sweeplogger,V2_INFO, "sweepXTCSsend       =%i\n", _params.sweepXTCSsend());
+	LOGGER(_sweeplogger,V2_INFO, "sweepXTCSrecv       =%i\n", _params.sweepXTCSrecv());
+	LOGGER(_sweeplogger,V2_INFO, "sweepSharingPeriod  =%i\n", _params.sweepSharingPeriod());
+	LOGGER(_sweeplogger,V2_INFO, "sweepMaxKittenProp  =%i\n", _params.sweepMaxKittenProp());
+	LOGGER(_sweeplogger,V2_INFO, "sweepSuccessRatio   =%i\n", _params.sweepSuccessRatio());
+	LOGGER(_sweeplogger,V2_INFO, "sweepSuccessWindow  =%i\n", _params.sweepSuccessWindow());
+	LOGGER(_sweeplogger,V2_INFO, "sweepSuccessSkips   =%i\n", _params.sweepSuccessSkips());
 
 	_nThreads = _params.numThreadsPerProcess.val;
 
