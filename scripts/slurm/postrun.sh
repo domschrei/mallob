@@ -26,7 +26,7 @@ mkdir -p "$outdir/"
 # for f in /hppfs/work/$projectname/$username/logs/${jobname}-*/*/.alldone ; do
 for f in $outdir-*/*/.alldone ; do
     if [ -d "$outdir/$(basename $(dirname $f))" ]; then continue; fi
-    echo "mv $(dirname $f) $outdir/ "
+    # echo "mv $(dirname $f) $outdir/ "
     mv $(dirname $f) "$outdir/"
 done
 
@@ -36,13 +36,13 @@ mv sbatch/generated/${jobname}/sbatch.sh "$outdir/"
 
 echo "$jobname: moving slurm-out files"
 echo $outdir-*/ | grep -oE "\-[0-9]{7}/" | grep -oE "[0-9]{7}" | while read slurmid; do
-    echo "mv slurm-${slurmid}.out $outdir/"
+    # echo "mv slurm-${slurmid}.out $outdir/"
     mv slurm-${slurmid}.out "$outdir/"
 done
 
 for globallogdir in $outdir/*/ ; do
     grep -m 1 "Program options" "$globallogdir/0/log.0" | grep -oP "mono=.*? " | sed 's/mono=//g' | awk '{print $1}' > "$globallogdir/instance.txt"
-    echo "written $globallogdir/instance.txt  with $(cat $globallogdir/instance.txt)"
+    # echo "written $globallogdir/instance.txt  with $(cat $globallogdir/instance.txt)"
 done
 
 echo "All logs and sbatch / SLURM files moved to: $outdir"

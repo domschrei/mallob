@@ -17,8 +17,10 @@ class SweepJob : public BaseSatJob {
 private:
 
     JobResult _internal_result;
-    int _solved_status{-1}; //final status that gets communicated to Mallob, only touched by the main thread
-	int _staged_solved_status{-1}; //can be touched by any thread
+	//final status that gets communicated to Mallob, only touched by the main thread
+    int _solved_status{-1};
+	//can be touched by any thread
+	int _staged_solved_status{-1};
 	bool _do_report_UNSAT_to_root{false};
 	std::atomic<int> _root_reported_result{-1};
 	bool _finished_job_setup{false};
@@ -34,7 +36,8 @@ private:
 
 	const int INVALID_ELIT = __INT32_MAX__;
 
-	const int _representative_localId{0}; //a dedicated solver that reports its statistics to us
+	//a dedicated solver that reports its statistics to us
+	const int _representative_localId{0};
 	const int _congruence_localId{1};
 
 	//Local Solvers
@@ -42,7 +45,7 @@ private:
 	typedef std::shared_ptr<Kissat> KissatPtr;
 	std::vector<KissatPtr> _sweepers;
 	std::vector<std::unique_ptr<BackgroundWorker>> _bg_workers;
-    std::atomic_int _started_sweepers_count {0}; //no. of initialized Kissat solvers with loaded formula. Monotonically 0..24
+    std::atomic_int _started_sweepers_count {0};
     std::atomic_int _running_sweepers_count {0};
 	std::atomic_int _finished_sweepers_count {0};
 	std::vector<int> _list_of_ids;
@@ -50,7 +53,6 @@ private:
 	std::atomic<float> _timestamp_started_synchronized_solving{0};
 	std::atomic_bool _flag_terminated_while_synchronizing{false};
 	std::atomic_bool _root_finished_CCC{false};
-	// bool _started_sharedelay_tracking{false};
 	int _lastLongtermIdleCount{0};
 
 	//Timing
@@ -96,16 +98,16 @@ private:
 			to_send = true;
 		}
 	};
-	std::deque<WorkstealRequest> _worksteal_requests; //deque, because each object has an atomic member and thus isnt copyable (which vector would require)
-	const int MIN_STEAL_AMOUNT = 4; //update: avoid stealing even up to a single variable. The MPI call happend anyways already at this point
-
+	//deque, because each object has an atomic member and thus isnt copyable (which vector would require)
+	std::deque<WorkstealRequest> _worksteal_requests;
+	//prevent excessivley small steals at the end
+	const int MIN_STEAL_AMOUNT = 2;
 
 	//Sharing Equivalences and Units
-	// float _root_last_sharing_start_timestamp;
     std::unique_ptr<JobTreeBroadcast> _bcast;
     std::unique_ptr<JobTreeAllReduction> _red;
 
-	//Sanity checks, Warn if periods get too large
+	//Sanity checks, Warn if periods between sharing rounds get too large
 	float _last_received_sharing_time{0};
 	float _last_contribution_time{0};
 	float _last_sharedelay_warning{0};
@@ -116,11 +118,13 @@ private:
     const int TAG_ALLRED		= 1004;
 	const int TAG_FOUND_UNSAT	= 1005;
 
-	const int NUM_SEARCHING_WORK_FIELDS = 3; //how many fields are attached to an MPI message searching work
+	//how many fields are attached to an MPI message searching work
+	const int NUM_SEARCHING_WORK_FIELDS = 3;
 
-	//each aggregation element has some metadata integers at the end
+	//each aggregation element has some metadata at the end
+	//field indices must be unique numbers exactly filling 1..NUM_METADATA_FIELDS !
+	//Enums would be more elegant, but keeping this for now
 	static const int NUM_METADATA_FIELDS = 15;
-		//field indices must be unique numbers exactly filling 1..NUM_METADATA_FIELDS !
 		static const int METADATA_MAXXED_KITTENS = 15;
 		static const int METADATA_LONGTERM_IDLE	  = 14;
 		static const int METADATA_FOUND_UNSAT	   = 13;
@@ -137,44 +141,58 @@ private:
 		static const int METADATA_UNIT_SIZE	  = 2;
 		static const int METADATA_EQ_SIZE    = 1;
 
-
-	//New Version of Importing, via separated vectors per round
+	//Buffer received Eq+Units from sharing rounds, for Sweepers to soon import them
+	//To allow easier concurrent accessed, we choose a large preallocated vector
+	//Should be enough for 5000 second runs with very aggressive 20ms sharing rounds (50 per second)
+	//This is still cheap memory-wise, since each entry only stores the references to the actual Eq+Unit vectors
 	struct importedRound {
 		std::vector<int> eqs{};
 		std::vector<int> units{};
 	};
+	static constexpr int MAX_IMPORT_ROUNDS = 5000 * 50;
+	std::vector<importedRound> _imported_data{MAX_IMPORT_ROUNDS};
+
+
+	//After all sweepers have imported a specific round, we no longer need to buffer it
+	//Here we technically we store atomics in std::vector,
+	//but we only construct once with a fixed size and never push_back or resize, so it compiles and should be fine
+	//After all solvers have picked up the shared data, it can be deleted from this rank
+	int _lastClearedRound = 0;
 	struct finishedCounter {
 		std::atomic_int threads_finished_eqs=0;
 		std::atomic_int threads_finished_units=0;
 	};
+	std::vector<finishedCounter> _finishedRoundCounters{MAX_IMPORT_ROUNDS};
+	std::atomic_int _lastImportedRound = 0;
 
+	//Map a specific round to an iteration. The value -9 is just a sentinel/dummy
+	std::vector<int> _iteration_of_round = std::vector<int>(MAX_IMPORT_ROUNDS, -9);
+
+	//For a very niche situation we need to know the expected _next_ iteration number
+	int expected_iteration_of_next_round = -1;
+
+	//Keep track of Eq+Unit success as well as the number of swept variables,
+	//their ratio determins whether we skip iterations and potentially terminate the entire job
 	std::vector<int> _shared_EU_this_iteration_cumul{};
 	std::vector<int> _swept_this_iteration_cumul{};
 
+	//See how much each rank contributed in postprocessing
+	//Main use is to detect whether some ranks didn't contribute at all, which would hint at a bug
 	int _rank_contributed_equalities = 0;
 	int _rank_contributed_units = 0;
 
-	//Equalities and units from sharing are stored once on this rank, and sit there for the local solvers to get picked up
-	static constexpr int MAX_IMPORT_ROUNDS = 100 * 2000; //Enough for ca. 2000 seconds (~each round takes >=10ms, i.e. max 100 rounds per second)
-	std::vector<importedRound> _imported_data{MAX_IMPORT_ROUNDS};
-	std::vector<finishedCounter> _finishedRoundCounters{MAX_IMPORT_ROUNDS}; //technically we store atomics in std::vector, but we only construct once with a fixed size and never push_back or resize, so it compiles and should be fine
-	std::vector<int> _iteration_of_round = std::vector<int>(MAX_IMPORT_ROUNDS, -9); //-9 is dummy value to distinguish from iteration values with >=-1
-	int expected_iteration_of_next_round = -1;
-	//Track which data is already present from sharing
-	std::atomic_int _lastImportedRound = 0;
-	//After all solvers have picked up the shared data, it can be deleted from this rank
-	int _lastClearedRound = 0;
+	//Terminate the sweep job/app. Either self-determined, or received by an external termination
+	std::atomic_bool _terminate_all=false;
 
-	//Termination. Determined during workstealing, broadcasted via sharing
-	std::atomic_bool _terminate_all=false; //termination (on this node) due to sharing consensus that there is no more work
+	Logger _sweeplogger;
 
-	//Have dedicated files for some important logging types. Mostly to protect them from becoming mangled due to concurrent logging, and for nicer post processing (especially not needing to scan through the main large log file)
-	Logger _sweeplogger;  //most important information about sweep results
-
-	std::mutex _stealinfo_mutex; //when exporting data from the solver to Mallob, need to lock them when extracting them for global sharing, otherwise the solver threads might continue concurrently pushing new data onto them
+	//when we exporting Eqs+Units from a solver thread to Mallob, use mutex to prevent
+	//the solver thread to concurrently push new data onto the vector we are just reading/moving
+	std::mutex _stealinfo_mutex;
 	std::vector<std::vector<SweepStealInfo>> _stealinfos_per_solver;
 
-	//the root node tracks the number of sweep iterations and sharing rounds, distributes this information in the sharing operation
+	//the root node tracks the number of sweep iterations and sharing rounds,
+	//distributes this information in the sharing operation
 	int _root_shared_units_this_iteration = 0;
 	int _root_shared_eqs_this_iteration = 0;
 	int _root_total_shared_eqs = 0;
@@ -182,11 +200,9 @@ private:
 	int _root_rounds_this_iteration = 0;
 	int _root_sweep_iteration = 0;
 	int _root_sharing_round = 0;
-	int _root_env_completions = 0;
-	bool _root_did_just_finish_iteration = true; //Starts with true to immediately start into iteration 1.
+	//Starts with true to immediately start into iteration 1.
+	bool _root_did_just_finish_iteration = true;
 	int _root_skipped_iterations = 0;
-
-	const double EARLYEXIT_RATIO = 0.001;
 
 	//Cross-Job-sharing
 	std::unique_ptr<AnytimeSatClauseCommunicator> _clause_comm;
@@ -195,16 +211,18 @@ private:
 	std::mutex _crossjob_import_mutex;
 	bool _crossjob_has_prepared_sharing{false};
 
-	const double TIMEBUFFER_FOR_FINAL_SUBSTITUTE = 10; //[seconds] End sweeping 10 seconds earlier than the wallclock time, to allow for substitute to finish, to get a proper final clause database state before reporting
+	//[seconds] End sweeping 10 seconds earlier than the wallclock time, to allow for substitute to finish,
+	//to get a proper final clause database state before reporting
+	const double TIMEBUFFER_FOR_FINAL_SUBSTITUTE = 10;
 
 	//The root node (and only the root node) tracks global sweeping progress
 	//It decides whether a given sharing iteration should continue or end
 	//It broadcasts this decision to all other ranks, along with general information about the current sweeping state
-	//On a technical level, this information is injected here via an inplace root transform at the end of the sharing aggregation, before broadcasting it
+	//On a technical level, this information is injected here via an inplace root transform at
+	//the end of the sharing aggregation, before broadcasting it
 	std::function<void(std::vector<int>&)> _inplace_rootTransform = [&](std::vector<int>& payload) {
 		assert(_is_root);
 		_root_sharing_round++;
-
 		//Remember from last sharing round whether now begins a new iteration
 		if (_root_did_just_finish_iteration) {
 			_root_sweep_iteration++;
@@ -219,7 +237,6 @@ private:
 
 			LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf) ITERATION %i/%i STARTED \n", _my_rank, _root_sweep_iteration, _params.sweepMaxIterations());
 		}
-
 		int n_sweep_units = payload[payload.size() - METADATA_UNIT_SIZE];
 		int eq_size  = payload[payload.size() - METADATA_EQ_SIZE];
 		int n_eqs	 = eq_size / 2;  //each equivalence takes up two integers
@@ -234,26 +251,19 @@ private:
 
 		bool all_idle = (active_count == 0);
 		double done_scheduled_prcnt = 100*(work_sweeps + work_stepovers)/(double)_numVars;
-
 		_root_shared_units_this_iteration += n_sweep_units;
 		_root_shared_eqs_this_iteration   += n_eqs;
 		_root_total_shared_units += n_sweep_units;
 		_root_total_shared_eqs   += n_eqs;
 		_root_rounds_this_iteration++;
-
 		_shared_EU_this_iteration_cumul.push_back(_root_shared_units_this_iteration + _root_shared_eqs_this_iteration);
 		_swept_this_iteration_cumul.push_back(work_sweeps + work_unsched_resweeps);
-
-		// double iteration_progress_ratio = (_root_shared_eqs_this_iteration + _root_shared_units_this_iteration) / (double)(work_sweeps + work_unsched_resweeps);
-
 		bool decide_end_iteration = false;
 		bool decide_terminate_job = false;
-
 		if (all_idle) {
 			LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf): All idle - ending this iteration %i \n", _my_rank, _root_sweep_iteration);
 			decide_end_iteration = true;
 		}
-
 		auto &shared = _shared_EU_this_iteration_cumul;
 		auto &swept = _swept_this_iteration_cumul;
 		int window = _params.sweepSuccessWindow();
@@ -273,18 +283,14 @@ private:
 					_my_rank, _root_sweep_iteration, _root_sharing_round,  success_in_window, shared_in_window, swept_in_window, _params.sweepSuccessRatio(), _root_sharing_round - window, _root_sharing_round, _root_skipped_iterations);
 			}
 		}
-		// }
-
 		if (_root_skipped_iterations > _params.sweepSuccessSkips()) {
 			decide_terminate_job = true;
 			LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf) TERMINATE job , due to %i th skipped iteration \n", _my_rank, _root_skipped_iterations);
 		}
-
 		if (Timer::elapsedSeconds() > _params.jobWallclockLimit() - TIMEBUFFER_FOR_FINAL_SUBSTITUTE) {
 			decide_terminate_job=true;
 			LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf) TERMINATE due to timeout (%f), with buffer time %f for final substitute \n", _my_rank, _params.jobWallclockLimit(), TIMEBUFFER_FOR_FINAL_SUBSTITUTE);
 		}
-
 		//A round is finished if all sweepers are idle or if we didnt have enough progress
 		if (decide_end_iteration || decide_terminate_job) {
 			LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf) (%i)all_idle  (%i)end_iteration (%i)foundUn-sat (%i)terminate_job \n", _my_rank, all_idle, decide_end_iteration, foundUnsat, decide_terminate_job);
@@ -301,20 +307,17 @@ private:
 				LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf) Preparing for new iteration \n", _my_rank);
 			}
 		}
-
-		//The root node (and only the root node) tracks the number of completed sweep rounds, and broadcasts this information. This way, also nodes that join later know which round we are in.
+		//The root node (and only the root node) tracks the number of completed sweep rounds,
+		//and broadcasts this information. This way, also nodes that join later know which round we are in.
 		payload[payload.size() - METADATA_SWEEP_ITERATION] = _root_sweep_iteration;
 		payload[payload.size() - METADATA_SHARING_ROUND] = _root_sharing_round;
 		payload[payload.size() - METADATA_END_ITERATION] = decide_end_iteration;
 		payload[payload.size() - METADATA_TERMINATE] = decide_terminate_job;
-		payload[payload.size() - METADATA_ENVCOMPLETIONS] = _root_env_completions;
-
 
 		//Send my units and equivalences via cross-job communication to the SAT job
 		if (!foundUnsat && _clause_comm && _params.crossJobCommunication()) {
 			assert(_clause_comm || log_return_false("Sweep ERROR: _clause_comm object missing\n"));
 			BufferBuilder bb(-1, 10, false);
-			//For debugging purposes another flag for actually sending our stuff to cjc
 			if (_params.sweepXTCSsend()) {
 				//Payload Format: [eqs, units, metadata]
 				//Read units, which are stored directly after the equivalences
@@ -326,12 +329,11 @@ private:
 				for (int i=0; i < eq_size; i+=2) {
 					int elit1 = payload[i];
 					int elit2 = payload[i+1];
-					//Represent elit1==elit2 in CNF form
+					//Represent the equality elit1==elit2 in CNF format via two binary clauses
 					int cnfA[2] = {-elit1, elit2};
 					int cnfB[2] = {-elit2, elit1};
 					bb.append({&cnfA[0],2,2});
 					bb.append({&cnfB[0],2,2});
-					// LOGGER(_sweeplogger,V2_INFO, "   sproduce: %i %i   &   %i %i\n", -elit1, elit2, -elit2, elit1);
 				}
 			}
 			auto buffer = bb.extractBuffer();
@@ -351,12 +353,14 @@ private:
 		}
 
 		//Within SweepJob, pass down the units received via Cross-Job-Communication to all sweepers.
+		//(we use SweepJobs own broadcasting, instead of relying on the CJC broadcasting)
 		int crossjob_units_received = 0;
 		if (_params.crossJobCommunication() && _params.sweepXTCSrecv()) {
 			std::lock_guard<std::mutex> lock(_crossjob_import_mutex);
 			if (!_crossjob_root_received_units.empty()) {
 				const int insert_pos = eq_size + n_sweep_units;
-				// Splice the cross-job units into the existing vector, appending them after the sweep units, but before before the metadata
+				// Splice the cross-job units into the existing vector,
+				// appending them after the sweep units, but before before the metadata
 				payload.insert(
 					payload.begin() + insert_pos,
 					_crossjob_root_received_units.begin(),
@@ -366,7 +370,8 @@ private:
 				assert(payload.size() == eq_size + n_sweep_units + crossjob_units_received + NUM_METADATA_FIELDS);
 				const int total_units = n_sweep_units + crossjob_units_received;
 
-				//updated stored unit count to reflect the additions. Otherwise the sweepers would not know that we added new units
+				//updated stored unit count to reflect the additions.
+				//Otherwise, the sweepers would not know that we added new units
 				payload[payload.size() - METADATA_UNIT_SIZE] = total_units;
 
 				//discard the temporary buffer, to not import the same units a second time
@@ -374,8 +379,6 @@ private:
 			}
 		}
 
-
-		//Copy message, once for chronological view in the general logs, once in a special smaller file (on the root node) for easier postprocessing
 		char logmsg[512];
 		snprintf(logmsg, sizeof(logmsg),
 			"SWEEP [%i](root-trf) send: act,idl,lti %i,%i,%i  mxkit %i  iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i  SW %i  ST %i  Sched, Swept  %.2f , %.2f °/.  wsucc  %.6f  ETI %i  UTI %i\n",
@@ -384,9 +387,8 @@ private:
 			work_sweeps, work_stepovers,
 			done_scheduled_prcnt , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars, success_in_window, _root_shared_eqs_this_iteration, _root_shared_units_this_iteration
 		);
-		// LOGGER(_sweeplogger,			     V3_VERB, "         %s", logmsg);
 		LOGGER(_sweeplogger, V3_VERB, "%s", logmsg);
-		//no return, payload was just transformed in-place
+		//no return statement, because the payload was just transformed in-place
     };
 
 	enum CustomQuery {
@@ -403,12 +405,6 @@ public:
     bool appl_isDestructible() override;
 
     int appl_solved() override {
-		// TODO(Nicco) Before reporting a result via the below line, check via
-		//_clause_comm->hasLocalClausesLeftToShare();
-		// (should be from the main thread) if there's still some clauses that need to be shared.
-		// In that case, appl_communicate() needs to call this from time to time:
-		// _clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
-		// (with an empty buffer from a BufferBuilder) since this will initiate XTCS operations.
 		return _solved_status;
 	}
     JobResult&& appl_getResult() override {return std::move(_internal_result);}
@@ -416,7 +412,6 @@ public:
     void appl_suspend() override {}
     void appl_resume() override {}
     void appl_dumpStats() override {}
-
 
     void appl_memoryPanic() override;
 
@@ -428,7 +423,6 @@ public:
 
 
 private:
-    // void advanceSweepMessage(JobMessage& msg);
 	KissatPtr createNewSweeper(int localId);
 
 	void createAndStartNewSweeper(int localId);
@@ -474,7 +468,6 @@ private:
 	void clearImportedRound();
 
 	virtual ~SweepJob();
-
 
 	//stubs
 	bool isInitialized() override {
@@ -523,6 +516,7 @@ private:
 
 	void digestSharingWithoutFilter(int epoch, std::vector<int>  &&clauses, bool stateless) override {
 		InplaceClauseAggregation(clauses).stripToRawBuffer(); //found by Claude
+		//We only receive at the root node, all further distribution is handled by our own SweepApp logic
 		if (_is_root) {
 			LOGGER(_sweeplogger,V3_VERB, "SWEEP receive XTCS s %i\n",clauses.size());
 			crossjob_rootReceiveClauses(std::move(clauses));
@@ -554,7 +548,6 @@ private:
 	void updateBestFoundSolutionCost(long long) override {
 		LOGGER(_sweeplogger,V1_WARN, "[SweepJob] Called stub: updateBestFoundSolutionCost\n");
 	}
-
 
 };
 

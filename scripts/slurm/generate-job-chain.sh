@@ -12,6 +12,12 @@ maxjobidx="$3"
 numchains="$4"
 jobname="$5"
 
+ninstances=$(cat $DS_BENCHMARKFILE | wc -l)
+if [ "$maxjobidx" = "all" ]; then
+       maxjobidx=$ninstances
+fi
+
+
 #cd $HOME/mallob
 echo ""
 echo "$jobname: $sbatch_base"
@@ -21,6 +27,7 @@ echo "$jobname: max         $maxjobidx"
 echo "$jobname: chains      $numchains"
 echo "$jobname: nodes       $DS_NODES"
 echo "$jobname: $DS_BENCHMARKFILE"
+echo "$jobname: $ninstances instances in this file"
 echo " "
 
 #As security check show the current mallob flags
