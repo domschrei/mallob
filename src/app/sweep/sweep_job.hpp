@@ -148,8 +148,8 @@ private:
 		std::atomic_int threads_finished_units=0;
 	};
 
-	std::vector<int> _shared_EU_this_iteration_per_round{};
-	std::vector<int> _swept_this_iteration_at_round{};
+	std::vector<int> _shared_EU_this_iteration_cumul{};
+	std::vector<int> _swept_this_iteration_cumul{};
 
 	int _rank_contributed_equalities = 0;
 	int _rank_contributed_units = 0;
@@ -209,8 +209,8 @@ private:
 		if (_root_did_just_finish_iteration) {
 			_root_sweep_iteration++;
 			_root_did_just_finish_iteration = false;
-			_shared_EU_this_iteration_per_round.clear();
-			_swept_this_iteration_at_round.clear();
+			_shared_EU_this_iteration_cumul = {0};
+			_swept_this_iteration_cumul = {0};
 
 			//Only now the new iteration truly begins, so only now we reset these iteration-specific counters
 			_root_shared_units_this_iteration = 0;
@@ -240,8 +240,9 @@ private:
 		_root_total_shared_units += n_sweep_units;
 		_root_total_shared_eqs   += n_eqs;
 		_root_rounds_this_iteration++;
-		_shared_EU_this_iteration_per_round.push_back(n_sweep_units + n_eqs); //relative per round
-		_swept_this_iteration_at_round.push_back(work_sweeps + work_unsched_resweeps); //cumulative
+
+		_shared_EU_this_iteration_cumul.push_back(_root_shared_units_this_iteration + _root_shared_eqs_this_iteration);
+		_swept_this_iteration_cumul.push_back(work_sweeps + work_unsched_resweeps);
 
 		// double iteration_progress_ratio = (_root_shared_eqs_this_iteration + _root_shared_units_this_iteration) / (double)(work_sweeps + work_unsched_resweeps);
 
@@ -253,26 +254,23 @@ private:
 			decide_end_iteration = true;
 		}
 
-		auto &shared = _shared_EU_this_iteration_per_round;
-		auto &swept = _swept_this_iteration_at_round;
+		auto &shared = _shared_EU_this_iteration_cumul;
+		auto &swept = _swept_this_iteration_cumul;
 		int window = _params.sweepSuccessWindow();
 		if (window > shared.size()) {
 			window = shared.size();
 		}
-		//Always calculate the success within the window of the last rounds
-		int shared_in_window = std::accumulate(shared.end() - window, shared.end(), 0);  //sum of relative values
-		int swept_in_window  = swept.back() - swept[swept.size()-window]; //difference between two cumulative values
+		//Always calculate the success within the window of the last rounds, to print it
+		int shared_in_window = shared.back() - shared[shared.size()-window];
+		int swept_in_window  = swept.back()  - swept[swept.size()-window];
 		double success_in_window = swept_in_window==0 ? 0: shared_in_window / (double) swept_in_window;
-		//Only check the success when the window reached the minimum required size
+		//Decide whether to skip the iteration only if we have accumulated enough rounds
 		if (shared.size()>=_params.sweepSuccessWindow()) {
 			if (success_in_window < _params.sweepSuccessRatio()) {
 				decide_end_iteration = true;
 				_root_skipped_iterations++;
-				LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf) SKIP iteration %i , due to success %f  (%i / %i) in window rounds [%i, %i]  \n",
-					_my_rank, _root_sweep_iteration, success_in_window, shared_in_window, swept_in_window, _root_rounds_this_iteration - window, _root_rounds_this_iteration);
-				for (auto s : swept) {
-					LOGGER(_sweeplogger, V2_INFO, "%i \n", s);
-				}
+				LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf) SKIP iteration %i (rnd %i), success %f (%i / %i) < %.3f (threshhold) , in rounds [%i, %i]. Is skip nr. %i  \n",
+					_my_rank, _root_sweep_iteration, _root_sharing_round,  success_in_window, shared_in_window, swept_in_window, _params.sweepSuccessRatio(), _root_sharing_round - window, _root_sharing_round, _root_skipped_iterations);
 			}
 		}
 		// }
@@ -380,8 +378,8 @@ private:
 		//Copy message, once for chronological view in the general logs, once in a special smaller file (on the root node) for easier postprocessing
 		char logmsg[512];
 		snprintf(logmsg, sizeof(logmsg),
-			"SWEEP [%i](root-trf) send: un-sat %i  act,idl,lti %i,%i,%i  mxkit %i  iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i  SW %i  ST %i  Sched, Swept  %.2f ,  %.2f °/.  wsucc %.6f  ETI %i  UTI %i   \n",
-			_my_rank, foundUnsat, active_count, idle_count, longtermidle_count, maxxed_kittens,  _root_sweep_iteration, _root_sharing_round,
+			"SWEEP [%i](root-trf) send: act,idl,lti %i,%i,%i  mxkit %i  iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i  SW %i  ST %i  Sched, Swept  %.2f , %.2f °/.  wsucc  %.6f  ETI %i  UTI %i\n",
+			_my_rank, active_count, idle_count, longtermidle_count, maxxed_kittens,  _root_sweep_iteration, _root_sharing_round,
 			all_idle,  decide_end_iteration, decide_terminate_job, n_eqs, n_sweep_units, crossjob_units_received,
 			work_sweeps, work_stepovers,
 			done_scheduled_prcnt , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars, success_in_window, _root_shared_eqs_this_iteration, _root_shared_units_this_iteration
