@@ -60,7 +60,7 @@ public:
         if (_solvertype == CADICAL) {
             if (setup.onTheFlyChecking) setup.certifiedUnsat = true;
             // disable pre-/inprocessing
-            setup.flavour = PortfolioSequence::PLAIN;
+            // setup.flavour = PortfolioSequence::PLAIN;
             // native diversification 0 (phase=0) happens to improve performance
             setup.diversifyNative = true;
             auto cadical = new Cadical(setup);
