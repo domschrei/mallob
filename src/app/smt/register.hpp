@@ -11,14 +11,16 @@
 #include "util/static_store.hpp"
 
 struct ClientSideSMTProgram : public app_registry::ClientSideProgram {
-    const Parameters& _params;
+    const bool _terminate_abruptly;
     BitwuzlaSolver* _solver;
     ClientSideSMTProgram(const Parameters& params, APIConnector& api, JobDescription& desc, const std::string& problemFile) :
-        app_registry::ClientSideProgram(), _params(params), _solver(new BitwuzlaSolver(params, api, desc, problemFile)) {
+        app_registry::ClientSideProgram(), _terminate_abruptly(params.terminateAbruptly()),
+        _solver(new BitwuzlaSolver(params, api, desc, problemFile)) {
+
         function = [&]() {return _solver->solve();};
     }
     virtual ~ClientSideSMTProgram() {
-        if (!_params.terminateAbruptly()) delete _solver;
+        if (!_terminate_abruptly) delete _solver;
     }
 };
 

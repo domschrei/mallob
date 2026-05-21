@@ -73,11 +73,15 @@ public:
 
         _result.id = _desc.getId();
         _result.revision = 0;
-        if (_result.result == -1) {
+        if (_result.result <= 0 || isTimeoutHit(&_params, &_desc, endTime)) {
+            LOG(V2_INFO, "%s SMT TASK INTERRUPTED time: %.3f\n", _name.c_str(),
+                Timer::elapsedSeconds()-_start_time);
             JobResult res = _result;
             res.result = 0;
             return res;
         } else {
+            LOG(V2_INFO, "%s SMT TASK COMPLETE time: %.3f\n", _name.c_str(),
+                Timer::elapsedSeconds()-_start_time);
             return _result;
         }
     }
@@ -170,6 +174,7 @@ private:
 
         DTaskTracker dTaskTracker(_params);
         std::unique_ptr<BitwuzllobSatSolverFactory> factory;
+        bool success = false;
 
         try {
             *out << bitwuzla::set_bv_format(bv_format);
@@ -194,6 +199,7 @@ private:
                 if (!parse_only && !pp_only) bitwuzla->simplify();
                 bitwuzla->print_formula(*out, "smt2");
             }
+            success = true;
 
         } catch (const bitwuzla::parser::Exception& e) {
             LOG(V0_CRIT, "[ERROR] exception in Bitwuzla parser: %s\n", e.msg().c_str());
@@ -217,7 +223,6 @@ private:
 
         _result.id = _desc.getId();
         _result.revision = 0;
-        _result.result = 20;
-        LOG(V2_INFO, "SMT return result\n");
+        _result.result = success ? 20 : 0;
     }
 };
