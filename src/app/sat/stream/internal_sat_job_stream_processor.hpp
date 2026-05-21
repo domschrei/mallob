@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#include "app/sat/data/portfolio_sequence.hpp"
 #include "app/sat/execution/solver_setup.hpp"
 #include "app/sat/parse/serialized_formula_parser.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
@@ -46,8 +47,6 @@ public:
         setup.maxNumSolvers = 64; // just for proper diversification
         setup.solverType = 'C';
         setup.exportClauses = false;
-        setup.diversifyNative = true;
-        if (setup.onTheFlyChecking) setup.certifiedUnsat = true;
 #if MALLOB_USE_MINISAT
         if (_solvertype == MINISAT) {
             auto minisat = new MiniSat(setup);
@@ -59,6 +58,11 @@ public:
 #endif
 #if MALLOB_USE_CADICAL
         if (_solvertype == CADICAL) {
+            if (setup.onTheFlyChecking) setup.certifiedUnsat = true;
+            // disable pre-/inprocessing
+            setup.flavour = PortfolioSequence::PLAIN;
+            // native diversification 0 (phase=0) happens to improve performance
+            setup.diversifyNative = true;
             auto cadical = new Cadical(setup);
             cadical->getTerminator().setExternalTerminator([&]() {
                 return _terminator(_current_rev);
