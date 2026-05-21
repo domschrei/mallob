@@ -156,7 +156,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
   -fcll=2 \
   -sweep-max-kitten-prop=1000000 \
   -sweep-signal-kitten=1 \
-	-sweep-sharing-period=0.050 \
+  -sweep-sharing-period=0.050 \
   -sweep-success-ratio=0.01 \
   -sweep-success-window=100 \
   -sweep-success-skips=3

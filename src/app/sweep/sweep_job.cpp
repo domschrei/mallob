@@ -94,12 +94,12 @@ void SweepJob::appl_start() {
 	LOGGER(_sweeplogger,V2_INFO, "sweepMaxDepth       =%i\n", _params.sweepMaxDepth());
 	LOGGER(_sweeplogger,V2_INFO, "sweepXTCSsend       =%i\n", _params.sweepXTCSsend());
 	LOGGER(_sweeplogger,V2_INFO, "sweepXTCSrecv       =%i\n", _params.sweepXTCSrecv());
-	LOGGER(_sweeplogger,V2_INFO, "sweepSharingPeriod  =%i\n", _params.sweepSharingPeriod());
+	LOGGER(_sweeplogger,V2_INFO, "sweepSharingPeriod  =%f\n", _params.sweepSharingPeriod());
 	LOGGER(_sweeplogger,V2_INFO, "sweepMaxKittenProp  =%i\n", _params.sweepMaxKittenProp());
 	LOGGER(_sweeplogger,V2_INFO, "sweepSignalKitten   =%i\n", _params.sweepSignalKitten());
-	LOGGER(_sweeplogger,V2_INFO, "sweepSuccessRatio   =%i\n", _params.sweepSuccessRatio());
-	LOGGER(_sweeplogger,V2_INFO, "sweepSuccessWindow  =%i\n", _params.sweepSuccessWindow());
-	LOGGER(_sweeplogger,V2_INFO, "sweepSuccessSkips   =%i\n", _params.sweepSuccessSkips());
+	LOGGER(_sweeplogger,V2_INFO, "sweepSkipRatio   =%f\n", _params.sweepSkipRatio());
+	LOGGER(_sweeplogger,V2_INFO, "sweepSkipWindow  =%i\n", _params.sweepSkipWindow());
+	LOGGER(_sweeplogger,V2_INFO, "sweepSkipCount   =%i\n", _params.sweepSkipCount());
 
 	_nThreads = _params.numThreadsPerProcess.val;
     _metadata = getSerializedDescription(0)->data();

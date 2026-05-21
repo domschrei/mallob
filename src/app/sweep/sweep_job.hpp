@@ -266,7 +266,7 @@ private:
 		}
 		auto &shared = _shared_EU_this_iteration_cumul;
 		auto &swept = _swept_this_iteration_cumul;
-		int window = _params.sweepSuccessWindow();
+		int window = _params.sweepSkipWindow();
 		if (window > shared.size()) {
 			window = shared.size();
 		}
@@ -275,15 +275,15 @@ private:
 		int swept_in_window  = swept.back()  - swept[swept.size()-window];
 		double success_in_window = swept_in_window==0 ? 0: shared_in_window / (double) swept_in_window;
 		//Decide whether to skip the iteration only if we have accumulated enough rounds
-		if (shared.size()>=_params.sweepSuccessWindow()) {
-			if (success_in_window < _params.sweepSuccessRatio()) {
+		if (shared.size()>=_params.sweepSkipWindow()) {
+			if (success_in_window < _params.sweepSkipRatio()) {
 				decide_end_iteration = true;
 				_root_skipped_iterations++;
-				LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf) SKIP iteration %i (rnd %i), success %f (%i / %i) < %.3f (threshhold) , in rounds [%i, %i]. Is skip nr. %i  \n",
-					_my_rank, _root_sweep_iteration, _root_sharing_round,  success_in_window, shared_in_window, swept_in_window, _params.sweepSuccessRatio(), _root_sharing_round - window, _root_sharing_round, _root_skipped_iterations);
+				LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf) SKIP iteration %i (rnd %i), success %f (%i / %i) < %.3f (skip-threshhold) , in rounds [%i, %i]. Is skip nr. %i  \n",
+					_my_rank, _root_sweep_iteration, _root_sharing_round,  success_in_window, shared_in_window, swept_in_window, _params.sweepSkipRatio(), _root_sharing_round - window, _root_sharing_round, _root_skipped_iterations);
 			}
 		}
-		if (_root_skipped_iterations > _params.sweepSuccessSkips()) {
+		if (_root_skipped_iterations > _params.sweepSkipCount()) {
 			decide_terminate_job = true;
 			LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf) TERMINATE job , due to %i th skipped iteration \n", _my_rank, _root_skipped_iterations);
 		}
