@@ -37,6 +37,9 @@ private:
     int _nb_clauses {0};
     int _revision {-1};
 
+    bool _has_empty_clause {false};
+    bool _last_lit_zero {true};
+
     std::vector<int> _solution;
     tsl::robin_set<int> _failed_lits;
 
@@ -78,9 +81,13 @@ public:
 
     virtual void add(int32_t lit, int64_t cgroup_id = 0) override {
         _in_solved_state = false;
+        const bool isZero = lit == 0;
+        if (MALLOB_UNLIKELY(isZero && _last_lit_zero))
+            _has_empty_clause = true;
+        _last_lit_zero = isZero;
         _lits.push_back(lit);
         _nb_vars = std::max(_nb_vars, std::abs(lit));
-        _nb_clauses += lit == 0;
+        _nb_clauses += isZero;
     }
     virtual void assume(int32_t lit) override {
         _in_solved_state = false;
@@ -96,6 +103,18 @@ public:
 
     virtual bitwuzla::Result solve() override {
         if (_in_solved_state) return _result;
+
+        if (_has_empty_clause) {
+            // Empty clause is part of the permanent clauses:
+            // Enter a "solved" state with UNSAT and no failed assumptions
+            LOG(V2_INFO, "%s trivially UNSAT\n", _name.c_str());
+            _lits.clear();
+            _assumptions.clear();
+            _failed_lits.clear();
+            _result = bitwuzla::Result::UNSAT;
+            _in_solved_state = true;
+            return _result;
+        }
 
         _revision++;
         auto time = Timer::elapsedSeconds();
