@@ -11,6 +11,7 @@
 
 #include "bitwuzla/cpp/parser.h"
 #include "bitwuzla/cpp/bitwuzla.h"
+#include "util/sys/thread_pool.hpp"
 
 #include <cstdint>
 #include <cstdio>
@@ -25,6 +26,8 @@ private:
     float _start_time = (float) INT32_MAX;
 
     std::string _name;
+
+    JobResult _result;
 
     struct BzllobTerminator : public bitwuzla::Terminator {
         BitwuzlaSolver& inst;
@@ -58,7 +61,49 @@ public:
     JobResult solve() {
         _start_time = Timer::elapsedSeconds();
         _terminator.updateStartTime(_start_time);
+        float endTime = getEndTime(&_params, &_desc, _start_time);
+        _result.result = -1;
 
+        auto fut = ProcessWideThreadPool::get().addTask([&]() {
+            run();
+        });
+
+        while (_result.result == -1 && !isTimeoutHit(&_params, &_desc, endTime))
+            usleep(1000*25); // 25 ms
+
+        _result.id = _desc.getId();
+        _result.revision = 0;
+        if (_result.result == -1) {
+            JobResult res = _result;
+            res.result = 0;
+            return res;
+        } else {
+            return _result;
+        }
+    }
+
+    static std::string getSmtOutputFilePath(const Parameters& params, int jobId) {
+        return params.smtOutputFile() + (params.monoFilename.isSet() ? "" : "." + std::to_string(jobId));
+    }
+
+    static inline bool isTimeoutHit(const Parameters* params, JobDescription* desc, float endTime) {
+        if (Terminator::isTerminating())
+            return true;
+        if (Timer::elapsedSeconds() > endTime)
+            return true;
+        return false;
+    }
+    static float getEndTime(const Parameters* params, JobDescription* desc, float startTime) {
+        float endTime = INT32_MAX;
+        if (params->timeLimit() > 0)
+            endTime = std::min(endTime, startTime + params->timeLimit());
+        if (desc->getWallclockLimit() > 0)
+            endTime = std::min(endTime, startTime + desc->getWallclockLimit());
+        return endTime;
+    }
+
+private:
+    void run() {
         bitwuzla::Options options;
         bitwuzla::TermManager tm;
 
@@ -170,32 +215,9 @@ public:
 
         if (smtOutFileSet) delete out;
 
-        JobResult res;
-        res.id = _desc.getId();
-        res.revision = 0;
-        res.result = 20;
-        LOG(V2_INFO,"SMT return result\n");
-
-        return res;
-    }
-
-    static std::string getSmtOutputFilePath(const Parameters& params, int jobId) {
-        return params.smtOutputFile() + (params.monoFilename.isSet() ? "" : "." + std::to_string(jobId));
-    }
-
-    static inline bool isTimeoutHit(const Parameters* params, JobDescription* desc, float endTime) {
-        if (Terminator::isTerminating())
-            return true;
-        if (Timer::elapsedSeconds() > endTime)
-            return true;
-        return false;
-    }
-    static float getEndTime(const Parameters* params, JobDescription* desc, float startTime) {
-        float endTime = INT32_MAX;
-        if (params->timeLimit() > 0)
-            endTime = std::min(endTime, startTime + params->timeLimit());
-        if (desc->getWallclockLimit() > 0)
-            endTime = std::min(endTime, startTime + desc->getWallclockLimit());
-        return endTime;
+        _result.id = _desc.getId();
+        _result.revision = 0;
+        _result.result = 20;
+        LOG(V2_INFO, "SMT return result\n");
     }
 };
