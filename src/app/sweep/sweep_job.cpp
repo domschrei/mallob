@@ -96,6 +96,7 @@ void SweepJob::appl_start() {
 	LOGGER(_sweeplogger,V2_INFO, "sweepXTCSrecv       =%i\n", _params.sweepXTCSrecv());
 	LOGGER(_sweeplogger,V2_INFO, "sweepSharingPeriod  =%i\n", _params.sweepSharingPeriod());
 	LOGGER(_sweeplogger,V2_INFO, "sweepMaxKittenProp  =%i\n", _params.sweepMaxKittenProp());
+	LOGGER(_sweeplogger,V2_INFO, "sweepSignalKitten   =%i\n", _params.sweepSignalKitten());
 	LOGGER(_sweeplogger,V2_INFO, "sweepSuccessRatio   =%i\n", _params.sweepSuccessRatio());
 	LOGGER(_sweeplogger,V2_INFO, "sweepSuccessWindow  =%i\n", _params.sweepSuccessWindow());
 	LOGGER(_sweeplogger,V2_INFO, "sweepSuccessSkips   =%i\n", _params.sweepSuccessSkips());
@@ -359,6 +360,7 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	sweeper->set_option("mallob_resweep_chance", _params.sweepResweepChance.val);
 	sweeper->set_option("mallob_staggered_logs", 1); //set to 1 to have spatially separated logs, useful for verbose runs with 2-16 threads
 	sweeper->set_option("mallob_initial_congruence", _params.sweepInitialCongruence.val);
+	sweeper->set_option("mallob_signal_kitten", _params.sweepSignalKitten());
 
 	//Own options of Kissat
 	sweeper->set_option("sweepcomplete", 1); //deactivates checking for time limits during sweeping, so we dont get kicked out due to some limits

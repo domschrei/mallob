@@ -74,10 +74,11 @@ MALLOB_OPTIONS="-t=$threads \
   -sweep-xj-recv=1 \
   -cjc=1 \
   -sweep-max-kitten-prop=100000 \
+  -sweep-signal-kitten=0 \
 	-sweep-sharing-period=0.050 \
   -sweep-success-ratio=0.01 \
   -sweep-success-window=50 \
-  -sweep-success-skips=3 \
+  -sweep-success-skips=3
 "
 
 

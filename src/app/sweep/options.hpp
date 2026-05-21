@@ -17,6 +17,7 @@ OPT_BOOL(sweepXTCSsend,			"swpxs", 	"sweep-xj-send",			true, "send units and equ
 OPT_BOOL(sweepXTCSrecv,			"swpxr", 	"sweep-xj-recv",			true, "receive units via cross-job-communication -cjc")
 OPT_FLOAT(sweepSharingPeriod,	"swpsp", 	"sweep-sharing-period", 	0.050, 0.001, LARGE_INT, "The sharing period (of equivalences and units), in seconds")
 OPT_INT(sweepMaxKittenProp,		"swpmkp", 	"sweep-max-kitten-prop",	1000000,1000,LARGE_INT, "Maximum number of kitten propagations per kitten SAT Call")
+OPT_BOOL(sweepSignalKitten,		"swpsk", 	"sweep-signal-kitten",		true, "Signal to kitten solvers when an iteration has been skipped, such that they exit immediately")
 OPT_FLOAT(sweepSuccessRatio,	"swpsur",   "sweep-success-ratio",		0.01, 0, 1, "minimum ratio of Eqs+Units versus swept variables to not skip an iteration")
 OPT_INT(sweepSuccessWindow,		"swpsuw",	"sweep-success-window",		200, 1, LARGE_INT, "number of last sharing rounds for which the success ratio is checked")
 OPT_INT(sweepSuccessSkips,		"swpsus",	"sweep-success-skips",		3, 1, LARGE_INT, "number of allowed skips after which the job is terminated")
