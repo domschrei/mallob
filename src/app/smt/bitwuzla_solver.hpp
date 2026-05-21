@@ -68,19 +68,24 @@ public:
             run();
         });
 
-        while (_result.result == -1 && !isTimeoutHit(&_params, &_desc, endTime))
-            usleep(1000*25); // 25 ms
+        float sleepMicros = 1;
+        while (_result.result == -1 && !isTimeoutHit(&_params, &_desc, endTime)) {
+            // To allow for relatively small latencies for trivial problems:
+            // initially just sleep for 1us, then increase it exponentially up to 25ms
+            usleep((unsigned long) sleepMicros);
+            sleepMicros = std::min(25'000.f, 1 + sleepMicros * 1.5f);
+        }
 
         _result.id = _desc.getId();
         _result.revision = 0;
         if (_result.result <= 0 || isTimeoutHit(&_params, &_desc, endTime)) {
-            LOG(V2_INFO, "%s SMT TASK INTERRUPTED time: %.3f\n", _name.c_str(),
+            LOG(V2_INFO, "%s SMT TASK INTERRUPTED time=%.3fs\n", _name.c_str(),
                 Timer::elapsedSeconds()-_start_time);
             JobResult res = _result;
             res.result = 0;
             return res;
         } else {
-            LOG(V2_INFO, "%s SMT TASK COMPLETE time: %.3f\n", _name.c_str(),
+            LOG(V2_INFO, "%s SMT TASK COMPLETE time=%.3fs\n", _name.c_str(),
                 Timer::elapsedSeconds()-_start_time);
             return _result;
         }
