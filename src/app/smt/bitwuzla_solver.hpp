@@ -27,6 +27,7 @@ private:
 
     std::string _name;
 
+    std::future<void> _fut;
     JobResult _result;
 
     struct BzllobTerminator : public bitwuzla::Terminator {
@@ -55,6 +56,7 @@ public:
         LOG(V2_INFO,"SMT Bitwuzla+Mallob %s\n", _name.c_str());
     }
     ~BitwuzlaSolver() {
+        if (_fut.valid()) _fut.get();
         LOG(V2_INFO, "Deleting SMT Bitwuzla+Mallob #%i\n", _desc.getId());
     }
 
@@ -64,7 +66,10 @@ public:
         float endTime = getEndTime(&_params, &_desc, _start_time);
         _result.result = -1;
 
-        auto fut = ProcessWideThreadPool::get().addTask([&]() {
+        // We execute Bitwuzllob concurrently in another thread. If it gets stuck somewhere,
+        // we can still quit the entire program without destroying this BitwuzlaSolver instance
+        // and hence without waiting for Bitwuzllob to return (if -terminate-abruptly=1).
+        _fut = ProcessWideThreadPool::get().addTask([&]() {
             run();
         });
 
