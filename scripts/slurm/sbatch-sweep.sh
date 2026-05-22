@@ -144,22 +144,17 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 	-jcup=0.05 \
   -sleep=100 \
   -v=3 \
+  -cjc=1 \
+  -fcll=2 \
 	-preprocess-sweepnsat=1 \
   -preprocess-sweep-priority=1.0 \
   -sweep-solver-verbosity=0 \
-  -sweep-solver-quiet=1 \
-  -sweep-max-iterations=99 \
-  -sweep-max-depth=99 \
-  -sweep-xj-send=1 \
-  -sweep-xj-recv=1 \
-  -cjc=1 \
-  -fcll=2 \
   -sweep-max-kitten-prop=1000000 \
   -sweep-signal-kitten=1 \
   -sweep-sharing-period=0.050 \
   -sweep-skip-ratio=0.01 \
   -sweep-skip-window=100 \
-  -sweep-skip-count=3
+  -sweep-max-failed-iters=5
 "
 
     # Pre-create network-disk output directories to avoid many concurrent filesystem manips

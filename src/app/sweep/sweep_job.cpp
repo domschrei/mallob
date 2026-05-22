@@ -26,7 +26,7 @@ extern "C" {
 
 SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTable& table)
     : BaseSatJob(params, setup, table),
-	_sweeplogger(Logger::getMainInstance().copy("<RESULT>", ".sweep"))
+	_sweeplogger(Logger::getMainInstance().copy("<SWEEP>", ".sweep"))
 {
 	assert(_params.jobCommUpdatePeriod() > 0 || log_return_false("[ERROR] For this application to work,"
             " you must explicitly enable job communicators with the -jcup option, e.g., -jcup=0.1\n"));
@@ -84,22 +84,16 @@ void SweepJob::appl_start() {
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP_PAYLOAD_SIZE %i\n", getDescription().getFormulaPayloadSize(0));
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP_NUM_VARS %i\n", numVars);
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP_NUM_CLAUSES %i\n", numClauses);
-	LOGGER(_sweeplogger,V2_INFO, "cjc = %i \n", _params.crossJobCommunication());
-	LOGGER(_sweeplogger,V2_INFO, "sweepInitialCongruence=%i\n", _params.sweepInitialCongruence());
-	LOGGER(_sweeplogger,V2_INFO, "sweepShuffleWork    =%i\n", _params.sweepShuffleWork());
-	LOGGER(_sweeplogger,V2_INFO, "sweepResweepChance  =%i\n", _params.sweepResweepChance());
-	LOGGER(_sweeplogger,V2_INFO, "sweepSolverVerbosity=%i\n", _params.sweepSolverVerbosity());
-	LOGGER(_sweeplogger,V2_INFO, "sweepSolverQuiet    =%i\n", _params.sweepSolverQuiet());
-	LOGGER(_sweeplogger,V2_INFO, "sweepMaxIterations  =%i\n", _params.sweepMaxIterations());
-	LOGGER(_sweeplogger,V2_INFO, "sweepMaxDepth       =%i\n", _params.sweepMaxDepth());
-	LOGGER(_sweeplogger,V2_INFO, "sweepXTCSsend       =%i\n", _params.sweepXTCSsend());
-	LOGGER(_sweeplogger,V2_INFO, "sweepXTCSrecv       =%i\n", _params.sweepXTCSrecv());
-	LOGGER(_sweeplogger,V2_INFO, "sweepSharingPeriod  =%f\n", _params.sweepSharingPeriod());
-	LOGGER(_sweeplogger,V2_INFO, "sweepMaxKittenProp  =%i\n", _params.sweepMaxKittenProp());
-	LOGGER(_sweeplogger,V2_INFO, "sweepSignalKitten   =%i\n", _params.sweepSignalKitten());
-	LOGGER(_sweeplogger,V2_INFO, "sweepSkipRatio   =%f\n", _params.sweepSkipRatio());
-	LOGGER(_sweeplogger,V2_INFO, "sweepSkipWindow  =%i\n", _params.sweepSkipWindow());
-	LOGGER(_sweeplogger,V2_INFO, "sweepSkipCount   =%i\n", _params.sweepSkipCount());
+	for (auto& group : _params._grouped_list) {
+		  if (group->groupId != "app/sweep") continue;
+		  std::map<std::string, Option*> sorted;
+		  for (const auto& [id, opt] : group->map) sorted[id] = opt;
+		  for (const auto& [id, opt] : sorted) {
+			  LOGGER(_sweeplogger, V2_INFO, "SWEEPAPP_OPTION %s  %-22s = %s\n",
+					 opt->id.c_str(), opt->longid.c_str(), opt->getValAsString().c_str());
+		  }
+		  break;
+	}
 
 	_nThreads = _params.numThreadsPerProcess.val;
     _metadata = getSerializedDescription(0)->data();
@@ -112,7 +106,7 @@ void SweepJob::appl_start() {
 		_list_of_ids.push_back(localId);
 		oss << localId << ",";
 	}
-	LOGGER(_sweeplogger, V3_VERB,"SWEEP LIST_OF_LOCAL_IDS: %s \n", oss.str().c_str());
+	LOGGER(_sweeplogger, V3_VERB,"LIST_OF_LOCAL_IDS: %s \n", oss.str().c_str());
 
 	//Will hold pointers to the kissat solvers
 	_sweepers.resize(_nThreads);
@@ -127,7 +121,7 @@ void SweepJob::appl_start() {
 	_red.reset();
 
 	//Start individual Kissat threads (those then immediately jump into the sweep algorithm)
-	LOGGER(_sweeplogger, V3_VERB,"SWEEP Create solvers\n");
+	LOGGER(_sweeplogger, V3_VERB,"Create solvers\n");
 	for (int localId=0; localId < _nThreads; localId++) {
 		createAndStartNewSweeper(localId);
 	}
@@ -169,7 +163,7 @@ void SweepJob::appl_communicate() {
 		_clause_comm->communicate();
 		//triggers digestSharingWithoutFilter(...) on this rank, where we receive the shared data from the other jobs
 		while (hasDeferredMessage()) {
-			LOGGER(_sweeplogger, V3_VERB, "SWEEP has deferred message\n");
+			LOGGER(_sweeplogger, V3_VERB, "clause_comm has deferred message\n");
 			auto deferredMsg = getDeferredMessage();
 			_clause_comm->handle(deferredMsg.source, deferredMsg.mpiTag, deferredMsg.msg);
 		}
@@ -183,9 +177,11 @@ void SweepJob::appl_communicate() {
 	tryReportToMallob();
 
 	float t1 = Timer::elapsedSeconds();
-	_duration_appl_communicate.push_back(t1-t0);
-	LOGGER(_sweeplogger, V5_DEBG, "SWEEP appl_communicate(): %.6f sec \n", (t1-t0));
-	LOGGER(_sweeplogger, V5_DEBG, "SWEEP appl_communicate() done \n");
+	if (t1-t0 > _max_appl_comm_duration) {
+		_max_appl_comm_duration = t1-t0;
+	}
+	LOGGER(_sweeplogger, V5_DEBG, "appl_communicate(): %.6f sec \n", (t1-t0));
+	LOGGER(_sweeplogger, V5_DEBG, "appl_communicate() done \n");
 }
 
 
@@ -200,7 +196,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		_started_sweepers_count++; //only additive, monotonically increasing, going from 0...nThreads-1 and never decreases
 		_running_sweepers_count++; //tracks actual number of running solvers at any given moment in time
 		/*
-		 *  Syncronization Layer!
+		 *  Synchronization Layer!
 		 *  We wait here until all other solvers are also initialized, and only then start solving
 		 *  This is relevant for sweeping quality, as otherwise the solvers joining late might miss some of the equalities shared in the first rounds
 		 *  Alternatively, store all the shared information as a warmup-greeting-package for newly joining solvers, to maximize quality. But only relevant if the SweepJob grows with time, which is not currently the case.
@@ -603,7 +599,7 @@ void SweepJob::rootReportSolverResult(KissatPtr sweeper, int res) {
 		//we are first, continue reporting
 	} else {
 		if (res != _root_reported_result.load()) {
-			LOGGER(_sweeplogger,V1_WARN, "SWEEP WARN [%i]: wanted to report result %i, but was stopped because there is already a different reported result %i \n", _my_rank, res, _root_reported_result.load());
+			LOGGER(_sweeplogger,V3_VERB, "SWEEP WARN [%i]: wanted to report result %i, but was stopped because there is already a different reported result %i \n", _my_rank, res, _root_reported_result.load());
 		}
 		return;
 	}
@@ -751,8 +747,8 @@ void SweepJob::reportEndStats(KissatPtr sweeper) {
 			}
 		}
 	}
-	float max_appl_comm_duration = *std::max_element(_duration_appl_communicate.begin(), _duration_appl_communicate.end());
-	LOGGER(_sweeplogger,V2_INFO, "SWEEP_APPL_COMMUNICATE_MAX   %.6f s \n", max_appl_comm_duration);
+	// float max_appl_comm_duration = *std::max_element(_duration_appl_communicate.begin(), _duration_appl_communicate.end());
+	LOGGER(_sweeplogger,V2_INFO, "SWEEP_APPL_COMMUNICATE_MAX   %.6f s \n", _max_appl_comm_duration);
 	for (int i=0; i<15 && i<_internal_result.getSolutionSize(); i++) {
 		LOGGER(_sweeplogger,V3_VERB, "RESULT Sweep Formula[%i] = %i \n", i, _internal_result.getSolution(i));
 	}
@@ -761,7 +757,8 @@ void SweepJob::reportEndStats(KissatPtr sweeper) {
 void SweepJob::checkIdleWorkStatus() {
 	if (_terminate_all.load(std::memory_order_relaxed)) {
 		return;
-		//prevents segfault! when termination is triggered, the sweeper references might suddenly become invalid. no touching them
+		//prevents segfault! when termination is triggered, the sweeper references might suddenly become invalid.
+		//no touching them anymore
 	}
 
 	const float STATUS_PERIOD = 0.100; //in seconds. Defines the long-term-idle window
@@ -814,13 +811,13 @@ void SweepJob::checkSharingDelay() {
 	if (!_timestamp_contributed_to_sharing.empty()) {
 		float delay = time - _timestamp_contributed_to_sharing.back();
 		if (delay > warn_threshhold) {
-			LOGGER(_sweeplogger, V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since contrib, factor %.1f \n", _my_rank, delay, delay/expected_period);
+			LOGGER(_sweeplogger, V3_VERB, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since contrib, factor %.1f \n", _my_rank, delay, delay/expected_period);
 		}
 	}
 	if (!_timestamp_receive_sharing_result.empty()) {
 		float delay = time - _timestamp_receive_sharing_result.back();
 		if (delay > warn_threshhold) {
-			LOGGER(_sweeplogger, V1_WARN, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since recv, factor %.1f \n", _my_rank, delay, delay/expected_period);
+			LOGGER(_sweeplogger, V3_VERB, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since recv, factor %.1f \n", _my_rank, delay, delay/expected_period);
 		}
 	}
 }
@@ -1035,7 +1032,7 @@ bool SweepJob::tryProvideInitialWork(KissatPtr sweeper) {
 		sweeper->sweeper_longterm_idle = false;
 
 		if (solver_iteration != _root_sweep_iteration +1 ) {
-			LOGGER(_sweeplogger,V1_WARN, "SWEEP WARN : new solver iteration %i more than 1 larger than counter at root (iteration %i) \n", solver_iteration, _root_sweep_iteration);
+			LOGGER(_sweeplogger,V1_WARN, "SWEEP WARN : When providing new work, the solver iteration %i is more than one larger than root_iteration %i \n", solver_iteration, _root_sweep_iteration);
 		}
 		//We need to know how much space to allocate to store each variable "idx" at the array position work[idx],
 		//i.e. we need to know max(idx).
@@ -1083,7 +1080,7 @@ bool SweepJob::canSolverExitStealing(KissatPtr sweeper) {
 		LOGGER(_sweeplogger,V4_VVER, "Sweeper [%i](%i) exit mallob steal (terminate_all)\n", _my_rank, localId);
 		sweeper->count_repeated_missed_termination++;
 		if (sweeper->count_repeated_missed_termination % sweeper->WARN_ON_REPEATED_MISSED_TERMINATION==0) {
-			LOGGER(_sweeplogger,V1_WARN, "SWEEP WARN : Sweeper [%i](%i) in %i-th worksteal loop after termination\n", _my_rank, localId, sweeper->count_repeated_missed_termination);
+			LOGGER(_sweeplogger,V3_VERB, "SWEEP WARN : Sweeper [%i](%i) in %i-th worksteal loop after termination\n", _my_rank, localId, sweeper->count_repeated_missed_termination);
 		}
 		return true;
 	}
@@ -1136,7 +1133,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 		const float STEALDELAY_WARN_TRIGGER=0.1; //Warn if MPI stealing request is not answered after 100ms
 		float delay = Timer::elapsedSeconds() - request.t_queued;
 		if (delay > STEALDELAY_WARN_TRIGGER) {
-			LOGGER(_sweeplogger,V1_WARN, "WARN STEALDELAY at [%i](%i)! waiting %f s  \n", _my_rank, localId, delay);
+			LOGGER(_sweeplogger,V3_VERB, "WARN STEALDELAY at [%i](%i)! waiting %f s  \n", _my_rank, localId, delay);
 		}
 
 		LOGGER(_sweeplogger,V4_VVER, "Sweeper [%i](%i) waiting for MPI nr. %i \n", _my_rank, localId, request.nr);
@@ -1236,13 +1233,19 @@ void SweepJob::rootStartNewSharingRound() {
 	}
 
 	if (!_root_initwork_startedproviding) {
-		if (_root_sweep_iteration==0) {
-			LOGGER(_sweeplogger,V3_VERB, "SWEEP root: Wait with next round, CCC still running\n");
-		} else {
-			LOGGER(_sweeplogger,V3_VERB, "SWEEP root: Wait with next round, not yet started providing (new) initial work\n");
+		//Print these infos only once ever 100ms
+		const float LOG_PERIOD = 0.100;
+		float t = Timer::elapsedSeconds();
+		if (t > _timestamp_delayedround + LOG_PERIOD) {
+			_timestamp_delayedround = t;
+			if (_root_sweep_iteration==0) {
+				LOGGER(_sweeplogger,V3_VERB, "root: Delay first sharing round, CCC still running\n");
+			} else {
+				LOGGER(_sweeplogger,V3_VERB, "root: Delay next sharing round, haven't started to provide initial work\n");
+			}
 		}
 		return;
-		//Waiting until _starting_ to provide initial work seems the sweet-spot in terms of waiting
+		//It seems to be the sweet-spot to wait with initiating a new sharing round until we *started* to provide initial work to the representative solver
 		//If we didn't check for initial work at all, then it can happen that we have multiple sharing rounds after an iteration ends,
 		//which can share all_idle multiple times and could lead to skipped iterations
 		//If we waited longer, for example until the work was actually provided,
@@ -1313,7 +1316,7 @@ void SweepJob::cbContributeToAllReduce() {
 		return;
 	}
 	if (_red && _red->hasResult()) {
-		LOGGER(_sweeplogger,V1_WARN, ">>>> WARN SWEEP [%i] Noticing unextracted _red results late during broadcast callback\n", _my_rank);
+		LOGGER(_sweeplogger,V3_VERB, ">>>> WARN SWEEP [%i] Noticing unextracted _red results late during broadcast callback\n", _my_rank);
 		extractAllReductionResult();
 	}
 	JobMessage baseMsg = getMessageTemplate();
@@ -1458,8 +1461,8 @@ void SweepJob::extractAllReductionResult() {
 	if (terminate) {
 		_terminate_all = true;
 		triggerTerminations();
-		LOGGER(_sweeplogger,V1_WARN, "# \n # \n # --- [%i] got terminate flag, TERMINATING SWEEP JOB ---\n # \n", _my_rank);
-		LOG(V1_WARN, "SweepJob got [%i] got terminate flag\n", _my_rank);
+		LOGGER(_sweeplogger,V2_INFO, "# \n # \n # --- [%i] got terminate flag, TERMINATING SWEEP JOB ---\n # \n", _my_rank);
+		LOG(V2_INFO, "SweepJob got [%i] got terminate flag\n", _my_rank);
 	}
 }
 
@@ -1730,7 +1733,7 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 		if (--counter == 0) {
 			counter = CHECK_INTERVAL;
 			if (_terminate_all.load(std::memory_order_relaxed)) {
-				LOGGER(_sweeplogger,V1_WARN, "SWEEP Warn [%i](%i) stopped loading formula due to termination  (at payload lit %i / %i) \n", _my_rank, sweeper->getLocalId(), i, payload_size);
+				LOGGER(_sweeplogger,V1_WARN, "SWEEP WARN [%i](%i) stopped loading formula due to termination  (at payload lit %i / %i) \n", _my_rank, sweeper->getLocalId(), i, payload_size);
 				break;
 			}
 		}
@@ -1762,7 +1765,7 @@ SweepJob::~SweepJob() {
 		clearImportedRound();
 	}
 	if (_flag_terminated_while_synchronizing) {
-		LOGGER(_sweeplogger,V1_WARN, "SWEEP [%i] Warn : rank was terminated while synchronizing \n", _my_rank);
+		LOGGER(_sweeplogger,V1_WARN, "SWEEP [%i] WARN : rank was terminated while synchronizing \n", _my_rank);
 	}
 	if (!_flag_terminated_while_synchronizing && (_lastClearedRound + 2 < _lastImportedRound)) {
 		LOGGER(_sweeplogger,V1_WARN, "SWEEP [%i] WARN : didn't clear all imported rounds. lastCleared %i, lastImported %i \n", _my_rank, _lastClearedRound, _lastImportedRound.load());
