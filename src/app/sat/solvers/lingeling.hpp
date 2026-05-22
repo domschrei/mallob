@@ -22,7 +22,7 @@ private:
 	std::string name;
 	int stopSolver;
 	LearnedClauseCallback callback;
-	int maxvar;
+	int maxvar {0};
 	double lastTermCallbackTime;
 	const bool incremental;
     
