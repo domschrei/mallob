@@ -21,6 +21,8 @@ public:
         enum Type {RAW, SPLIT} type {SPLIT};
         std::vector<int> lits;
         std::vector<int> assumptions;
+        int nbVars {-1};
+        int nbClauses {-1};
         std::string descLabel;
         float priority;
         Checksum chksum;
@@ -31,6 +33,8 @@ public:
         void integrate(SatTask&& other) {
             assert(other.rev != rev);
             assert(type == other.type);
+            nbVars = std::max(nbVars, other.nbVars);
+            nbClauses = std::min(nbClauses, other.nbClauses) >= 0 ? nbClauses + other.nbClauses : -1;
             if (other.rev > rev) {
                 rev = other.rev;
                 descLabel = std::move(other.descLabel);

@@ -657,11 +657,12 @@ void SatEngine::dumpStats(bool final) {
 	for (size_t i = 0; i < _num_solvers; i++) {
 		SolverStatistics st = _solver_interfaces[i]->getSolverStats();
 		int globalId = _solver_interfaces[i]->getGlobalId();
-		_logger.log(verb, "%sS%d %s\n",
+		int sVerb = final ? V3_VERB : verb;
+		_logger.log(sVerb, "%sS%d %s\n",
 				final ? "END " : "", globalId, st.getReport().c_str());
-		_logger.log(verb, "%sS%d clenhist prod %s\n",
+		_logger.log(sVerb, "%sS%d clenhist prod %s\n",
 				final ? "END " : "", globalId, st.histProduced->getReport().c_str());
-		_logger.log(verb, "%sS%d clenhist digd %s\n",
+		_logger.log(sVerb, "%sS%d clenhist digd %s\n",
 				final ? "END " : "", globalId, st.histDigested->getReport().c_str());
 		solveStats.aggregate(st);
 	}
@@ -670,16 +671,24 @@ void SatEngine::dumpStats(bool final) {
 	// Sharing statistics
 	SharingStatistics shareStats;
 	if (_sharing_manager != NULL) shareStats = _sharing_manager->getStatistics();
-	_logger.log(verb, "%s%s\n", final ? "END " : "", shareStats.getReport().c_str());
+	_logger.log(shareStats.empty() ? V4_VVER : verb, "%s%s\n",
+		final ? "END " : "", shareStats.getReport().c_str());
 
 	if (final) {
+		std::initializer_list<std::pair<std::string, ClauseHistogram*>> histList = {
+			{"prod", shareStats.histProduced},
+			{"flfl", shareStats.histFailedFilter},
+			{"admt", shareStats.histAdmittedToDb},
+			{"drpd", shareStats.histDroppedBeforeDb},
+			{"dltd", shareStats.histDeletedInSlots},
+			{"retd", shareStats.histReturnedToDb}
+		};
 		// Histogram over clause lengths (do not print trailing zeroes)
-		_logger.log(verb, "clenhist prod %s\n", shareStats.histProduced->getReport().c_str());
-		_logger.log(verb, "clenhist flfl %s\n", shareStats.histFailedFilter->getReport().c_str());
-		_logger.log(verb, "clenhist admt %s\n", shareStats.histAdmittedToDb->getReport().c_str());
-		_logger.log(verb, "clenhist drpd %s\n", shareStats.histDroppedBeforeDb->getReport().c_str());
-		_logger.log(verb, "clenhist dltd %s\n", shareStats.histDeletedInSlots->getReport().c_str());
-		_logger.log(verb, "clenhist retd %s\n", shareStats.histReturnedToDb->getReport().c_str());
+		for (auto& [name, hist] : histList) {
+			// Increased verbosity for empty histograms
+			_logger.log(hist->getTotal()==0 ? V4_VVER : verb,
+				"clenhist %s %s\n", name.c_str(), hist->getReport().c_str());
+		}
 
 		// Flush logs
 		for (auto& solver : _solver_interfaces) solver->getLogger().flush();

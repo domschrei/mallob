@@ -121,7 +121,8 @@ public:
         LOG(V2_INFO, "%s submit rev. %i (%i lits, %i asmpt)\n", _name.c_str(), _revision, _lits.size(), _assumptions.size());
 
         bool noAssumptions = _assumptions.empty();
-        auto [resultCode, solution] = _incsat->solveNextRevision(std::move(_lits), std::move(_assumptions));
+        auto [resultCode, solution] = _incsat->solveNextRevision(std::move(_lits), std::move(_assumptions),
+            _nb_vars, _nb_clauses);
         _in_solved_state = noAssumptions;
         _lits.clear();
         _assumptions.clear();

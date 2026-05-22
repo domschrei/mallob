@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <vector>
 #include <string>
 
@@ -29,6 +30,10 @@ public:
     void increase(size_t size, int by) {
         _hist[std::min(size, _hist.size())-1]->fetch_add(by, std::memory_order_relaxed);
         _total.fetch_add(by, std::memory_order_relaxed);
+    }
+
+    unsigned long long getTotal() const {
+        return _total.load(std::memory_order_relaxed);
     }
 
     std::string getReport() {

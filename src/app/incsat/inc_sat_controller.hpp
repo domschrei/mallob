@@ -90,12 +90,13 @@ public:
         initStream(true);
     }
 
-    bool solveNextRevisionNonblocking(std::vector<int>&& clauses, std::vector<int>&& assumptions, const std::string& descLabel = "") {
+    bool solveNextRevisionNonblocking(std::vector<int>&& clauses, std::vector<int>&& assumptions, const std::string& descLabel = "",
+            int nbVars = -1, int nbClauses = -1) {
         initInteractiveSolving();
 
         if (!_params.onTheFlyChecking()) {
             _stream->stream.solveNonblocking({SatJobStreamProcessor::SatTask::Type::SPLIT,
-                std::move(clauses), std::move(assumptions)});
+                std::move(clauses), std::move(assumptions), nbVars, nbClauses});
             return true;
         }
         auto futWrite = ProcessWideThreadPool::get().addTask([&]() {
@@ -119,12 +120,15 @@ public:
         }
         std::vector<int> payload(_desc.getFormulaPayload(_rev),
             _desc.getFormulaPayload(_rev)+_desc.getFormulaPayloadSize(_rev));
-        _stream->stream.solveNonblocking({SatJobStreamProcessor::SatTask::Type::RAW, std::move(payload)});
+        _stream->stream.solveNonblocking({SatJobStreamProcessor::SatTask::Type::RAW, std::move(payload),
+            {}, nbVars, nbClauses});
         return true;
     }
 
-    std::pair<int, std::vector<int>> solveNextRevision(std::vector<int>&& clauses, std::vector<int>&& assumptions) {
-        bool ok = solveNextRevisionNonblocking(std::move(clauses), std::move(assumptions));
+    std::pair<int, std::vector<int>> solveNextRevision(std::vector<int>&& clauses, std::vector<int>&& assumptions,
+            int nbVars = -1, int nbClauses = -1) {
+        bool ok = solveNextRevisionNonblocking(std::move(clauses), std::move(assumptions),
+            "", nbVars, nbClauses);
         assert(ok);
         return _stream->stream.getNonblockingSolveResult();
     }

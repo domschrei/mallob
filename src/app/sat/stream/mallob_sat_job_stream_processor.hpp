@@ -48,7 +48,7 @@ private:
 
     bool _began_nontrivial_solving {false};
     bool _retrieve_complete_task {false};
-    SatTask _backlog_task {SatTask::RAW};
+    SatTask _backlog_task {SatTask::RAW, {}, {}, 0, 0};
     bool _initialized_backlog_task {false};
     bool _finalized {false};
 
@@ -109,6 +109,9 @@ public:
             _backlog_task.integrate(task);
         }
         auto& t = _backlog_task;
+        if (t.nbVars >= 0) _nb_vars = t.nbVars;
+        if (t.nbClauses >= 0) _nb_clauses = t.nbClauses;
+
         LOG(V5_DEBG, "%s attempting to solve task ...\n", _name.c_str());
 
         if (_task_pending) {
@@ -142,7 +145,8 @@ public:
         if (!_finalized && !_began_nontrivial_solving) {
 
             // Task is not (yet) obsolete after the wait, so we now begin proper distributed solving
-            LOG(V2_INFO, "%s awakes for rev. %i\n", _name.c_str(), t.rev);
+            LOG(V2_INFO, "%s awakes for rev. %i (V=%i C=%i L=%i)\n", _name.c_str(), t.rev,
+                _nb_vars, _nb_clauses, t.lits.size());
             _began_nontrivial_solving = true;
             _slot->deploy();
 
