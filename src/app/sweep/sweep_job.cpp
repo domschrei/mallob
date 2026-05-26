@@ -790,7 +790,7 @@ void SweepJob::checkIdleWorkStatus() {
 	}
 	_lastLongtermIdleCount = longterm_idles;
 	LOGGER(_sweeplogger,V4_VVER, "SWEEP [%i] idle(long) %i(%i) %s  Work[%i]: %s\n", _my_rank, idles, longterm_idles, oss_idles.str().c_str(), _my_rank, oss_work.str().c_str());
-	checkForStuckSolvers();
+	checkForLaggingSolvers();
 }
 
 void SweepJob::checkSharingDelay() {
@@ -1277,7 +1277,7 @@ void SweepJob::rootStartNewSharingRound() {
 	_bcast->broadcast(std::move(msg));
 }
 
-void SweepJob::appendMetadataToReductionElement(int foundUnsat, std::vector<int> &contrib, int idle_count, int longtermidle_count, int active_count, int working_internally_count, int unit_size, int eq_size, int work_sweeps, int work_stepovers, int unsched_resweeps, int maxxed_kittens) {
+void SweepJob::appendMetadataToReductionElement(std::vector<int> &contrib, const Metadata &md) {
 	//Make space for the upcoming metadata, initialized with zero
 	contrib.insert(contrib.end(), NUM_METADATA_FIELDS, 0);
 	int size = contrib.size();
@@ -1288,17 +1288,17 @@ void SweepJob::appendMetadataToReductionElement(int foundUnsat, std::vector<int>
 	n++; contrib[size - METADATA_SWEEP_ITERATION]= 0;  //dummy
 	n++; contrib[size - METADATA_SHARING_ROUND]  = 0;  //dummy
 	n++; contrib[size - METADATA_END_ITERATION]  = 0;  //dummy
-	n++; contrib[size - METADATA_FOUND_UNSAT]     = foundUnsat;
-	n++; contrib[size - METADATA_IDLE_COUNT]     = idle_count;
-	n++; contrib[size - METADATA_LONGTERM_IDLE]  = longtermidle_count;
-	n++; contrib[size - METADATA_ACTIVE_COUNT]   = active_count;
-	n++; contrib[size - METADATA_WORKING_INTERNALLY] = working_internally_count;
-	n++; contrib[size - METADATA_UNIT_SIZE]  = unit_size;
-	n++; contrib[size - METADATA_EQ_SIZE]    = eq_size;
-	n++; contrib[size - METADATA_WORK_SWEEPS]     = work_sweeps;
-	n++; contrib[size - METADATA_WORK_STEPOVERS]  = work_stepovers;
-	n++; contrib[size - METADATA_UNSCHED_RESWEEPS]= unsched_resweeps;
-	n++; contrib[size - METADATA_MAXXED_KITTENS] = maxxed_kittens;
+	n++; contrib[size - METADATA_FOUND_UNSAT]     = md.foundUnsat;
+	n++; contrib[size - METADATA_IDLE_COUNT]     = md.idle_count;
+	n++; contrib[size - METADATA_LONGTERM_IDLE]  = md.longtermidle_count;
+	n++; contrib[size - METADATA_ACTIVE_COUNT]   = md.active_count;
+	n++; contrib[size - METADATA_WORKING_INTERNALLY] = md.working_internally_count;
+	n++; contrib[size - METADATA_UNIT_SIZE]  = md.unit_size;
+	n++; contrib[size - METADATA_EQ_SIZE]    = md.eq_size;
+	n++; contrib[size - METADATA_WORK_SWEEPS]     = md.work_sweeps;
+	n++; contrib[size - METADATA_WORK_STEPOVERS]  = md.work_stepovers;
+	n++; contrib[size - METADATA_UNSCHED_RESWEEPS]= md.unsched_resweeps;
+	n++; contrib[size - METADATA_MAXXED_KITTENS] = md.maxxed_kittens;
 	assert(n==NUM_METADATA_FIELDS || log_return_false("SWEEP ERROR: Added metadata count (%i) doesnt match expected number (%i) \n", n, NUM_METADATA_FIELDS));
 }
 
@@ -1354,33 +1354,35 @@ void SweepJob::cbContributeToAllReduce() {
 			}
 			//by moving we also clear their current position, i.e. prevents from sharing the data twice
 		}
-		int eq_size = eqs.size();
-		int unit_size = units.size();
-		assert(eq_size%2==0 || log_return_false("ERROR in AGGR: Non-even number %i of equivalence literals, should always come in pairs", eq_size));
-		LOGGER(_sweeplogger,V5_DEBG, "SWEEP SHARE REDUCE (%i): %i eq_size, %i units, %i idle \n", sweeper->getLocalId(), eq_size, unit_size, sweeper->sweeper_is_idle);
-		_rank_contributed_equalities += eq_size/2;
-		_rank_contributed_units += unit_size;
+		Metadata md;
+		md.eq_size = eqs.size();
+		md.unit_size = units.size();
+		assert(md.eq_size%2==0 || log_return_false("ERROR in AGGR: Non-even number %i of equivalence literals, should always come in pairs", md.eq_size));
+		LOGGER(_sweeplogger,V5_DEBG, "SWEEP SHARE REDUCE (%i): %i eq_size, %i units, %i idle \n", sweeper->getLocalId(), md.eq_size, md.unit_size, sweeper->sweeper_is_idle);
+		_rank_contributed_equalities += md.eq_size/2;
+		_rank_contributed_units += md.unit_size;
 		//Format: [eqs, units, metadata]
 		std::vector<int> contrib = std::move(eqs);
 		contrib.insert(contrib.end(), units.begin(), units.end());
 		auto stats = sweeper->fetchSweepStats();
-		bool is_idle = sweeper->sweeper_is_idle;
-		bool is_longterm_idle = sweeper->sweeper_longterm_idle;
-		bool is_active = !is_idle;
-		bool is_working_internally = shweep_working_internally(sweeper->solver);
-		int foundUnsat = kissat_is_inconsistent(sweeper->solver);
-		int work_sweeps = (int)stats.progress_work_sweeps;
-		int work_stepovers = (int)stats.progress_work_stepovers;
-		int work_resweeps = (int)stats.progress_unsched_resweeps;
+		md.idle_count = sweeper->sweeper_is_idle;
+		md.longtermidle_count = sweeper->sweeper_longterm_idle;
+		md.active_count = !md.idle_count;
+		md.working_internally_count = shweep_working_internally(sweeper->solver);
+		md.foundUnsat = kissat_is_inconsistent(sweeper->solver);
+		md.work_sweeps = (int)stats.progress_work_sweeps;
+		md.work_stepovers = (int)stats.progress_work_stepovers;
+		md.unsched_resweeps = (int)stats.progress_unsched_resweeps;
 		if (stats.curr_iteration < expected_iteration_of_next_round) {
 			//edgecase: This sweeper is still stuck in a previous iteration, maybe because its last Kitten Call
 			//takes extremely long, and it didn't yet reach the point where it resets it's work statistics
 			//we catch that case here and filter out "left-over" statistics form the previous iteration
-			work_sweeps = 0;
-			work_stepovers = 0;
-			work_resweeps = 0;
+			md.work_sweeps = 0;
+			md.work_stepovers = 0;
+			md.unsched_resweeps = 0;
 		}
-		appendMetadataToReductionElement(foundUnsat, contrib, is_idle, is_longterm_idle, is_active, is_working_internally, unit_size, eq_size, work_sweeps, work_stepovers, work_resweeps, stats.maxxed_kittens);
+		md.maxxed_kittens = stats.maxxed_kittens;
+		appendMetadataToReductionElement(contrib, md);
 		contribs.push_back(contrib);
 	}
 	auto aggregation_element = aggregateEqUnitContributions(contribs);
@@ -1491,7 +1493,7 @@ void SweepJob::clearImportedRound() {
 	}
 }
 
-void SweepJob::checkForStuckSolvers() {
+void SweepJob::checkForLaggingSolvers() {
 	if (_terminate_all) {
 		return;
 	}
@@ -1500,9 +1502,11 @@ void SweepJob::checkForStuckSolvers() {
 		if (sweeper) {
 			if (sweeper->curr_eq_round < _lastImportedRound.load() - WARN_ROUND_DIFF) {
 				uint64_t kitten_propagations = shweep_kitten_propagations(sweeper->solver);
+				const char *profile = shweep_get_profilename(sweeper->solver);
+				auto stats = sweeper->fetchSweepStats();
 				if (_is_root) {
-					LOGGER(_sweeplogger,V3_VERB, "WARN SWEEP [%i](%i) lags eq-import %i vs %i  (%i). kitten-prop %zu\n",
-						_my_rank, sweeper->getLocalId(), sweeper->curr_eq_round, _lastImportedRound.load(), sweeper->curr_eq_round - _lastImportedRound.load(), kitten_propagations);
+					LOGGER(_sweeplogger,V3_VERB, "WARN SWEEP [%i](%i) lags eq-import %i vs %i  (%i). kcalls %i  kprops %zu kprof %s\n",
+						_my_rank, sweeper->getLocalId(), sweeper->curr_eq_round, _lastImportedRound.load(), sweeper->curr_eq_round - _lastImportedRound.load(), stats.kitten_calls, kitten_propagations, profile);
 				}
 			}
 		}
@@ -1574,37 +1578,29 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	total_aggregated_size = aggr_data_size + NUM_METADATA_FIELDS;
 
 	//Aggregate additional metadata fields
-	int idle_count = 0;
-	int longtermidle_count = 0;
-	int working_internally_count = 0;
-	int active_count = 0;
-	int foundUnsat=0;
-	int maxxed_kittens=0;
+	Metadata md;
+	md.eq_size = aggr_eq_size;
+	md.unit_size = aggr_unit_size;
     for (const auto &contrib : contribs) {
-    	idle_count			+= contrib[contrib.size()-METADATA_IDLE_COUNT];
-    	longtermidle_count	+= contrib[contrib.size()-METADATA_LONGTERM_IDLE];
-    	active_count		+= contrib[contrib.size()-METADATA_ACTIVE_COUNT];
-    	foundUnsat			+= contrib[contrib.size()-METADATA_FOUND_UNSAT];
-    	maxxed_kittens		+= contrib[contrib.size()-METADATA_MAXXED_KITTENS];
-    	working_internally_count+=contrib[contrib.size()-METADATA_WORKING_INTERNALLY];
+    	md.idle_count			+= contrib[contrib.size()-METADATA_IDLE_COUNT];
+    	md.longtermidle_count	+= contrib[contrib.size()-METADATA_LONGTERM_IDLE];
+    	md.active_count			+= contrib[contrib.size()-METADATA_ACTIVE_COUNT];
+    	md.foundUnsat			+= contrib[contrib.size()-METADATA_FOUND_UNSAT];
+    	md.maxxed_kittens		+= contrib[contrib.size()-METADATA_MAXXED_KITTENS];
+    	md.working_internally_count += contrib[contrib.size()-METADATA_WORKING_INTERNALLY];
+    	md.work_sweeps			+= contrib[contrib.size()-METADATA_WORK_SWEEPS];
+    	md.work_stepovers		+= contrib[contrib.size()-METADATA_WORK_STEPOVERS];
+    	md.unsched_resweeps		+= contrib[contrib.size()-METADATA_UNSCHED_RESWEEPS];
     }
 	if (contribs.empty()) {
 		//edge-case: if not a single solver is initialized yet,
 		//we are waiting for them to come online, so they are not really idle
-		if (active_count==0) {
-			active_count=1;
+		if (md.active_count==0) {
+			md.active_count=1;
 		}
 	}
-	int sum_work_sweeps = 0;
-	int sum_work_stepovers = 0;
-	int sum_unsched_resweeps = 0;
-	for (const auto &contrib : contribs) {
-		sum_work_sweeps     += contrib[contrib.size()-METADATA_WORK_SWEEPS];
-		sum_work_stepovers  += contrib[contrib.size()-METADATA_WORK_STEPOVERS];
-		sum_unsched_resweeps+= contrib[contrib.size()-METADATA_UNSCHED_RESWEEPS];
-	}
-	appendMetadataToReductionElement(foundUnsat, aggregated, idle_count, longtermidle_count, active_count, working_internally_count, aggr_unit_size, aggr_eq_size, sum_work_sweeps, sum_work_stepovers, sum_unsched_resweeps, maxxed_kittens);
-	LOG(V5_DEBG, "SWEEP RED aggregated %i contributions: E %i, U %i, act,idle %i,%i\n", contribs.size(), aggr_eq_size/2, aggr_unit_size, active_count, idle_count);
+	appendMetadataToReductionElement(aggregated, md);
+	LOG(V5_DEBG, "SWEEP RED aggregated %i contributions: E %i, U %i, act,idle %i,%i\n", contribs.size(), aggr_eq_size/2, aggr_unit_size, md.active_count, md.idle_count);
 	int individual_sum =  aggr_eq_size + aggr_unit_size + NUM_METADATA_FIELDS;
 	assert(total_aggregated_size == individual_sum ||
 		log_return_false("SWEEP ERROR: aggregated element assert failed: total_size %i != %i individual_sum (total_eq_size %i + total_unit_size %i + metadata %i) ",

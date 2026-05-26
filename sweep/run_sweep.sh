@@ -31,6 +31,8 @@ INST_PATH="$HOME/PhD/instances/some2024/39277cab188349aee0f229cb7341b5c5-crafted
 # INST_PATH="$HOME/PhD/instances/sat-and-minisat1m/01d037bf22a943430790eedd667f415e-60-128351.cnf.xz" #30sec kissat
 # INST_PATH="$HOME/PhD/instances/sat-and-minisat1m/037c423f56548082b1935e88c48ffdda-3col120_5_2.shuffled.cnf.xz" #actually has some equivalences
 
+#difficult SATs
+INST_PATH="$HOME/PhD/instances/some2024/fb51311320bb42bdb893249998a77f40-constraints_16_0.3_1.sanitized.cnf.xz"
 
 ./sweep/show-kissat-build.sh
 
@@ -59,7 +61,7 @@ MALLOB_OPTIONS="-t=$threads \
   -rspaa=1 \
 	-rpa=1 \
 	-seed=1 \
-  -spl=-1 \
+  -spl=4 \
 	-jcup=0.05 \
   -sleep=100 \
 	-v=3 \
@@ -71,7 +73,7 @@ MALLOB_OPTIONS="-t=$threads \
   -sweep-max-kitten-prop=1000000 \
   -sweep-signal-kitten=1 \
 	-sweep-sharing-period=0.050 \
-  -sweep-skip-ratio=0.001 \
+  -sweep-skip-ratio=0.005 \
   -sweep-skip-window=50 \
   -sweep-max-failed-iters=3
 "

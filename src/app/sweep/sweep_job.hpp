@@ -145,6 +145,22 @@ private:
 		static const int METADATA_UNIT_SIZE	  = 2;
 		static const int METADATA_EQ_SIZE    = 1;
 
+	//Bundled metadata payload appended to each reduction element.
+	//Adding a new field here does not change the signature of appendMetadataToReductionElement.
+	struct Metadata {
+		int foundUnsat{0};
+		int idle_count{0};
+		int longtermidle_count{0};
+		int active_count{0};
+		int working_internally_count{0};
+		int unit_size{0};
+		int eq_size{0};
+		int work_sweeps{0};
+		int work_stepovers{0};
+		int unsched_resweeps{0};
+		int maxxed_kittens{0};
+	};
+
 	//Buffer received Eq+Units from sharing rounds, for Sweepers to soon import them
 	//To allow easier concurrent accessed, we choose a large preallocated vector
 	//Should be enough for 5000 second runs with very aggressive 20ms sharing rounds (50 per second)
@@ -286,7 +302,7 @@ private:
 			if (success_in_window < _params.sweepSkipRatio()) {
 				decide_end_iteration = true;
 				_root_skipped_iterations++;
-				LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) SKIP iteration %i (rnd %i) , bc. success %f (%i / %i) < %.3f (skip-threshhold) , in rounds [%i, %i]. Skipped-Count %i  Failed-Count %i (this: +%i)\n",
+				LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) SKIP iteration %i (rnd %i) , bc. success %f (%i / %i) < %.3f thresh, in rounds [%i, %i]. Skipped-Count %i  Failed-Count %i (this: +%i)\n",
 					_my_rank, _root_iteration, _root_sharing_round,  success_in_window, shared_in_window, swept_in_window,
 					_params.sweepSkipRatio(), _root_sharing_round - window, _root_sharing_round,
 					_root_skipped_iterations, _root_failed_iterations, !_root_had_success_this_iteration);
@@ -304,7 +320,7 @@ private:
 			//which is we evaluate the success of all the (few) rounds of this iteration.
 			if (shared.size() < _params.sweepSkipWindow() && success_in_window >= _params.sweepSkipRatio()) {
 				_root_had_success_this_iteration = true;
-				LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf): Iteration was short but still deemed successfull \n", _my_rank, _root_iteration);
+				LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf): SHORT_SUCCESSFULL_ITERATION  \n", _my_rank, _root_iteration);
 			}
 		}
 
@@ -415,8 +431,8 @@ private:
 
 		char logmsg[512];
 		snprintf(logmsg, sizeof(logmsg),
-			"[%i](root-trf) send: act,wi,idl,lti %i,%i,%i,%i  mxkit %i  iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i  SW %i  ST %i  Sched, Swept  %.2f , %.2f °/.  wsucc  %.6f  ETI %i  UTI %i\n",
-			_my_rank, active_count, working_internally_count, idle_count, longtermidle_count, maxxed_kittens,  _root_iteration, _root_sharing_round,
+			"[%i](root-trf) send: act,idl,lti %i,%i,%i  mxkit %i  iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i  SW %i  ST %i  Sched, Swept  %.2f , %.2f °/.  wsucc  %.6f  ETI %i  UTI %i\n",
+			_my_rank, active_count, idle_count, longtermidle_count, maxxed_kittens,  _root_iteration, _root_sharing_round,
 			all_idle,  decide_end_iteration, decide_terminate_job, n_eqs, n_sweep_units, crossjob_units_received,
 			work_sweeps, work_stepovers,
 			done_scheduled_prcnt , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars, success_in_window, _root_shared_eqs_this_iteration, _root_shared_units_this_iteration
@@ -476,12 +492,12 @@ private:
 	void solverGoStealing(KissatPtr sweeper);
 	void sendWorkstealsViaMPI();
 	void checkIdleWorkStatus();
-	void checkForStuckSolvers();
+	void checkForLaggingSolvers();
 
     void rootStartNewSharingRound();
     void cbContributeToAllReduce();
     static std::vector<int> aggregateEqUnitContributions(std::list<std::vector<int>> &contribs);
-	static void appendMetadataToReductionElement(int foundUnsat, std::vector<int> &contrib, int idle_count, int longtermidle_count, int active_count, int working_internally_count, int unit_size, int eq_size, int work_sweeps, int work_stepovers, int unsched_resweeps, int maxxed_kittens);
+	static void appendMetadataToReductionElement(std::vector<int> &contrib, const Metadata &md);
 	void advanceAllReduction();
 	void extractAllReductionResult();
 
