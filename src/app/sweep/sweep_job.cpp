@@ -1278,28 +1278,21 @@ void SweepJob::rootStartNewSharingRound() {
 }
 
 void SweepJob::appendMetadataToReductionElement(std::vector<int> &contrib, const Metadata &md) {
-	//Make space for the upcoming metadata, initialized with zero
-	contrib.insert(contrib.end(), NUM_METADATA_FIELDS, 0);
-	int size = contrib.size();
-	int n=0;
-	//set all fields, mostly to keep the n++ count consistent and force ourselves to keep this list here complete
-	n++; contrib[size - METADATA_ENVCOMPLETIONS]= 0;   //dummy
-	n++; contrib[size - METADATA_TERMINATE]      = 0;  //dummy
-	n++; contrib[size - METADATA_SWEEP_ITERATION]= 0;  //dummy
-	n++; contrib[size - METADATA_SHARING_ROUND]  = 0;  //dummy
-	n++; contrib[size - METADATA_END_ITERATION]  = 0;  //dummy
-	n++; contrib[size - METADATA_FOUND_UNSAT]     = md.foundUnsat;
-	n++; contrib[size - METADATA_IDLE_COUNT]     = md.idle_count;
-	n++; contrib[size - METADATA_LONGTERM_IDLE]  = md.longtermidle_count;
-	n++; contrib[size - METADATA_ACTIVE_COUNT]   = md.active_count;
-	n++; contrib[size - METADATA_WORKING_INTERNALLY] = md.working_internally_count;
-	n++; contrib[size - METADATA_UNIT_SIZE]  = md.unit_size;
-	n++; contrib[size - METADATA_EQ_SIZE]    = md.eq_size;
-	n++; contrib[size - METADATA_WORK_SWEEPS]     = md.work_sweeps;
-	n++; contrib[size - METADATA_WORK_STEPOVERS]  = md.work_stepovers;
-	n++; contrib[size - METADATA_UNSCHED_RESWEEPS]= md.unsched_resweeps;
-	n++; contrib[size - METADATA_MAXXED_KITTENS] = md.maxxed_kittens;
-	assert(n==NUM_METADATA_FIELDS || log_return_false("SWEEP ERROR: Added metadata count (%i) doesnt match expected number (%i) \n", n, NUM_METADATA_FIELDS));
+	const size_t offset = contrib.size();
+	contrib.resize(offset + NUM_METADATA_FIELDS);
+	std::memcpy(contrib.data() + offset, &md, sizeof(md));
+}
+
+SweepJob::Metadata SweepJob::readMetadataFromReductionElement(const std::vector<int> &contrib) {
+	assert(contrib.size() >= (size_t)NUM_METADATA_FIELDS);
+	Metadata md;
+	std::memcpy(&md, contrib.data() + contrib.size() - NUM_METADATA_FIELDS, sizeof(md));
+	return md;
+}
+
+void SweepJob::writeMetadataToReductionElement(std::vector<int> &contrib, const Metadata &md) {
+	assert(contrib.size() >= (size_t)NUM_METADATA_FIELDS);
+	std::memcpy(contrib.data() + contrib.size() - NUM_METADATA_FIELDS, &md, sizeof(md));
 }
 
 void SweepJob::cbContributeToAllReduce() {
@@ -1410,40 +1403,32 @@ void SweepJob::extractAllReductionResult() {
 	assert(_red);
 	assert(_red->hasResult());
 	auto data = _red->extractResult();
-	const int foundUnsat     = data[data.size()-METADATA_FOUND_UNSAT];
-	const int terminate		 = data[data.size()-METADATA_TERMINATE];
-	const int sweep_iteration= data[data.size()-METADATA_SWEEP_ITERATION];
-	const int sharing_round  = data[data.size()-METADATA_SHARING_ROUND];
-	const int idle_count     = data[data.size()-METADATA_IDLE_COUNT];
-	const int active_count   = data[data.size()-METADATA_ACTIVE_COUNT];
-	const int end_iteration  = data[data.size()-METADATA_END_ITERATION];
-	const int unit_size      = data[data.size()-METADATA_UNIT_SIZE];
-	const int eq_size        = data[data.size()-METADATA_EQ_SIZE];
-	assert(eq_size%2==0 || log_return_false("SWEEP ERROR: Import Equality size %i not even\n", eq_size));
+	const Metadata md = readMetadataFromReductionElement(data);
+	assert(md.eq_size%2==0 || log_return_false("SWEEP ERROR: Import Equality size %i not even\n", md.eq_size));
 	_timestamp_receive_sharing_result.push_back(Timer::elapsedSeconds());
-	_rank_is_inbetween_iterations = end_iteration;
-	_iteration_of_round[sharing_round] = sweep_iteration;
-	expected_iteration_of_next_round = sweep_iteration;
-	if (end_iteration) {
+	_rank_is_inbetween_iterations = md.end_iteration;
+	_iteration_of_round[md.sharing_round] = md.sweep_iteration;
+	expected_iteration_of_next_round = md.sweep_iteration;
+	if (md.end_iteration) {
 		expected_iteration_of_next_round += 1;
 	}
-	bool all_idle = (active_count==0);
+	bool all_idle = (md.active_count==0);
 	if (_is_root) {
-		LOGGER(_sweeplogger,V4_VVER, "SWEEP GOTT: iter %i round %i : %i ai , %i endi , %i trm . act,idle %i,%i   E %i  U %i  \n", sweep_iteration, sharing_round, all_idle, end_iteration, terminate, active_count, idle_count, eq_size/2, unit_size);
+		LOGGER(_sweeplogger,V4_VVER, "SWEEP GOTT: iter %i round %i : %i ai , %i endi , %i trm . act,idle %i,%i   E %i  U %i  \n", md.sweep_iteration, md.sharing_round, all_idle, md.end_iteration, md.terminate, md.active_count, md.idle_count, md.eq_size/2, md.unit_size);
 	}
-	assert(sharing_round > _lastImportedRound.load() || log_return_false("SWEEP ERROR : unexpected round number when importing shared data. got round %i, while lastImportedRound %i \n", sharing_round, _lastImportedRound.load()));
-	assert(_imported_data[sharing_round].eqs.empty()   || log_return_false("SWEEP ERROR : want to store %i shared eq   integers, but already importedRounds[%i].eqs.size()==%zu nonempty ", eq_size,  sharing_round, _imported_data[sharing_round].eqs.size()));
-	assert(_imported_data[sharing_round].units.empty() || log_return_false("SWEEP ERROR : want to store %i shared unit integers, but already importedRounds[%i].units.size()==%zu nonempty", unit_size,  sharing_round, _imported_data[sharing_round].units.size()));
-	if (sharing_round >= MAX_IMPORT_ROUNDS) {
+	assert(md.sharing_round > _lastImportedRound.load() || log_return_false("SWEEP ERROR : unexpected round number when importing shared data. got round %i, while lastImportedRound %i \n", md.sharing_round, _lastImportedRound.load()));
+	assert(_imported_data[md.sharing_round].eqs.empty()   || log_return_false("SWEEP ERROR : want to store %i shared eq   integers, but already importedRounds[%i].eqs.size()==%zu nonempty ", md.eq_size,  md.sharing_round, _imported_data[md.sharing_round].eqs.size()));
+	assert(_imported_data[md.sharing_round].units.empty() || log_return_false("SWEEP ERROR : want to store %i shared unit integers, but already importedRounds[%i].units.size()==%zu nonempty", md.unit_size,  md.sharing_round, _imported_data[md.sharing_round].units.size()));
+	if (md.sharing_round >= MAX_IMPORT_ROUNDS) {
 		LOGGER(_sweeplogger,V0_CRIT, "SWEEP ERROR : reached hardcoded limit of %i Sharing rounds. Increase that limit if needed for your case.\n", MAX_IMPORT_ROUNDS);
 	}
-	_imported_data[sharing_round].eqs   = std::vector<int>(data.begin()          , data.begin() + eq_size);
-	_imported_data[sharing_round].units = std::vector<int>(data.begin() + eq_size, data.begin() + eq_size + unit_size);
-	_lastImportedRound = sharing_round;
-	if (foundUnsat) {
+	_imported_data[md.sharing_round].eqs   = std::vector<int>(data.begin()             , data.begin() + md.eq_size);
+	_imported_data[md.sharing_round].units = std::vector<int>(data.begin() + md.eq_size, data.begin() + md.eq_size + md.unit_size);
+	_lastImportedRound = md.sharing_round;
+	if (md.foundUnsat) {
 		//A bit paranoid, but Eqs&Units are no longer relevant after we found Unsat. So we don't even pass them to the sweepers anymore.
-		_imported_data[sharing_round].eqs   = {};
-		_imported_data[sharing_round].units = {};
+		_imported_data[md.sharing_round].eqs   = {};
+		_imported_data[md.sharing_round].units = {};
 	}
 	//the root node is special in that it is the only node that initiates sharing rounds.
 	//Prepare for a new one, since we just extracted all the shared data from the current round.
@@ -1457,7 +1442,7 @@ void SweepJob::extractAllReductionResult() {
 	//but can leave it at null (Contrary to the bcast)
 	//The new reduction object will be created by the next bcast round when needed
 	_red.reset();
-	if (end_iteration && _flag_started_synchronized_solving  && !_terminate_all) {
+	if (md.end_iteration && _flag_started_synchronized_solving  && !_terminate_all) {
 		LOGGER(_sweeplogger,V4_VVER, "SWEEP sending end_iteration signal to solvers\n");
 		for (auto &sweeper : _sweepers) {
 			if (sweeper) {
@@ -1469,7 +1454,7 @@ void SweepJob::extractAllReductionResult() {
 	//Check whether the whole sweep job sould be terminated.
 	//We do this check chronologically last in this function, because there might still be useful shared data
 	//that we want to import before terminating, and having an earlier termination signal only increases risks for concurrency problems
-	if (terminate) {
+	if (md.terminate) {
 		_terminate_all = true;
 		triggerTerminations();
 		LOGGER(_sweeplogger,V2_INFO, "# \n # \n # --- [%i] got terminate flag, TERMINATING SWEEP JOB ---\n # \n", _my_rank);
@@ -1517,12 +1502,11 @@ void SweepJob::checkForLaggingSolvers() {
 std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<int>> &contribs) {
 	//sanity check whether each contribution contains coherent size information about itself
 	for (const auto& contrib : contribs) {
-		int claimed_eq_size = contrib[contrib.size()- METADATA_EQ_SIZE];
-		int claimed_unit_size = contrib[contrib.size()- METADATA_UNIT_SIZE];
-		int claimed_total_size = claimed_eq_size + claimed_unit_size + NUM_METADATA_FIELDS;
+		const Metadata md = readMetadataFromReductionElement(contrib);
+		int claimed_total_size = md.eq_size + md.unit_size + NUM_METADATA_FIELDS;
 		assert(contrib.size() == claimed_total_size ||
 			log_return_false("ERROR in AllReduce, Bad Element Format: Claims total size %i != %zu actual contrib.size() (claims: eq_size %i,  units size %i, metadata %i)",
-				claimed_total_size, contrib.size(), claimed_eq_size, claimed_unit_size, NUM_METADATA_FIELDS)
+				claimed_total_size, contrib.size(), md.eq_size, md.unit_size, NUM_METADATA_FIELDS)
 			);
 	}
 
@@ -1532,8 +1516,9 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	robin_hood::unordered_flat_set<int> set_of_units;
 	robin_hood::unordered_flat_set<uint64_t> set_of_eqs;
 	for (const auto &contrib : contribs) {
-		const int eq_size = contrib[contrib.size()-METADATA_EQ_SIZE];
-		const int unit_size = contrib[contrib.size()-METADATA_UNIT_SIZE];
+		const Metadata md = readMetadataFromReductionElement(contrib);
+		const int eq_size = md.eq_size;
+		const int unit_size = md.unit_size;
 		//Deduplicate Equivalences
 		//each eq-pair is represented as one 64-bit key, to have an easy datatype
 		for (int j=0; j < eq_size; j+=2) {
@@ -1577,21 +1562,22 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	assert(j==aggr_data_size);
 	total_aggregated_size = aggr_data_size + NUM_METADATA_FIELDS;
 
-	//Aggregate additional metadata fields
+	//Aggregate additional metadata fields by summing each contribution's tail
 	Metadata md;
 	md.eq_size = aggr_eq_size;
 	md.unit_size = aggr_unit_size;
-    for (const auto &contrib : contribs) {
-    	md.idle_count			+= contrib[contrib.size()-METADATA_IDLE_COUNT];
-    	md.longtermidle_count	+= contrib[contrib.size()-METADATA_LONGTERM_IDLE];
-    	md.active_count			+= contrib[contrib.size()-METADATA_ACTIVE_COUNT];
-    	md.foundUnsat			+= contrib[contrib.size()-METADATA_FOUND_UNSAT];
-    	md.maxxed_kittens		+= contrib[contrib.size()-METADATA_MAXXED_KITTENS];
-    	md.working_internally_count += contrib[contrib.size()-METADATA_WORKING_INTERNALLY];
-    	md.work_sweeps			+= contrib[contrib.size()-METADATA_WORK_SWEEPS];
-    	md.work_stepovers		+= contrib[contrib.size()-METADATA_WORK_STEPOVERS];
-    	md.unsched_resweeps		+= contrib[contrib.size()-METADATA_UNSCHED_RESWEEPS];
-    }
+	for (const auto &contrib : contribs) {
+		const Metadata c = readMetadataFromReductionElement(contrib);
+		md.idle_count				+= c.idle_count;
+		md.longtermidle_count		+= c.longtermidle_count;
+		md.active_count				+= c.active_count;
+		md.foundUnsat				+= c.foundUnsat;
+		md.maxxed_kittens			+= c.maxxed_kittens;
+		md.working_internally_count += c.working_internally_count;
+		md.work_sweeps				+= c.work_sweeps;
+		md.work_stepovers			+= c.work_stepovers;
+		md.unsched_resweeps			+= c.unsched_resweeps;
+	}
 	if (contribs.empty()) {
 		//edge-case: if not a single solver is initialized yet,
 		//we are waiting for them to come online, so they are not really idle

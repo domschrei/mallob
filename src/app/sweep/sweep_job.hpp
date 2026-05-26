@@ -3,6 +3,7 @@
 
 #include <shared_mutex>
 #include <deque>
+#include <cstring>
 
 #include "app/job.hpp"
 #include "../sat/solvers/kissat.hpp"
@@ -124,30 +125,11 @@ private:
 	//how many fields are attached to an MPI message searching work
 	const int NUM_SEARCHING_WORK_FIELDS = 3;
 
-	//each aggregation element has some metadata at the end
-	//field indices must be unique numbers exactly filling 1..NUM_METADATA_FIELDS !
-	//Enums would be more elegant, but keeping this for now
-	static const int NUM_METADATA_FIELDS = 16;
-		static const int METADATA_WORKING_INTERNALLY = 16;
-		static const int METADATA_MAXXED_KITTENS = 15;
-		static const int METADATA_LONGTERM_IDLE	  = 14;
-		static const int METADATA_FOUND_UNSAT	   = 13;
-		static const int METADATA_ACTIVE_COUNT	    = 12;
-		static const int METADATA_ENVCOMPLETIONS     = 11;
-		static const int METADATA_END_ITERATION		  = 10;
-		static const int METADATA_WORK_SWEEPS		 = 9;
-		static const int METADATA_WORK_STEPOVERS	= 8;
-		static const int METADATA_UNSCHED_RESWEEPS = 7;
-		static const int METADATA_TERMINATE		  = 6;
-		static const int METADATA_SWEEP_ITERATION= 5;
-		static const int METADATA_SHARING_ROUND = 4;
-		static const int METADATA_IDLE_COUNT   = 3;
-		static const int METADATA_UNIT_SIZE	  = 2;
-		static const int METADATA_EQ_SIZE    = 1;
-
-	//Bundled metadata payload appended to each reduction element.
-	//Adding a new field here does not change the signature of appendMetadataToReductionElement.
+	//Bundled metadata payload that lives at the tail of every reduction element.
+	//Stored via memcpy onto a std::vector<int>, so the layout must be plain ints with no padding.
+	//Adding a new field here is the only change required: NUM_METADATA_FIELDS is derived from sizeof.
 	struct Metadata {
+		//Per-solver fields, written before contributing
 		int foundUnsat{0};
 		int idle_count{0};
 		int longtermidle_count{0};
@@ -159,7 +141,16 @@ private:
 		int work_stepovers{0};
 		int unsched_resweeps{0};
 		int maxxed_kittens{0};
+		//Root-transform fields, written at the root after the reduction finishes
+		int sweep_iteration{0};
+		int sharing_round{0};
+		int end_iteration{0};
+		int terminate{0};
+		int env_completions{0};
 	};
+	static_assert(sizeof(Metadata) % sizeof(int) == 0,
+		"Metadata must be a packed run of ints for tail-of-vector memcpy");
+	static constexpr int NUM_METADATA_FIELDS = sizeof(Metadata) / sizeof(int);
 
 	//Buffer received Eq+Units from sharing rounds, for Sweepers to soon import them
 	//To allow easier concurrent accessed, we choose a large preallocated vector
@@ -259,29 +250,19 @@ private:
 			LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) ITERATION %i/%i STARTED \n", _my_rank, _root_iteration, _params.sweepMaxIterations());
 		}
 
-		int n_sweep_units		= payload[payload.size() - METADATA_UNIT_SIZE];
-		int eq_size				= payload[payload.size() - METADATA_EQ_SIZE];
-		int n_eqs				= eq_size / 2;  //each equivalence takes up two integers
-		int idle_count			= payload[payload.size() - METADATA_IDLE_COUNT];
-		int longtermidle_count	= payload[payload.size() - METADATA_LONGTERM_IDLE];
-		int working_internally_count = payload[payload.size() - METADATA_WORKING_INTERNALLY];
-		int active_count		= payload[payload.size() - METADATA_ACTIVE_COUNT];
-		int work_sweeps			= payload[payload.size() - METADATA_WORK_SWEEPS];
-		int work_stepovers		= payload[payload.size() - METADATA_WORK_STEPOVERS];
-		int work_unsched_resweeps= payload[payload.size() - METADATA_UNSCHED_RESWEEPS];
-		int foundUnsat			= payload[payload.size() - METADATA_FOUND_UNSAT];
-		int maxxed_kittens		= payload[payload.size() - METADATA_MAXXED_KITTENS];
+		Metadata md = readMetadataFromReductionElement(payload);
+		const int n_eqs = md.eq_size / 2;  //each equivalence takes up two integers
 
 		//Track metadata of this round
-		bool all_idle = (active_count == 0);
-		double done_scheduled_prcnt = 100*(work_sweeps + work_stepovers)/(double)_numVars;
-		_root_shared_units_this_iteration += n_sweep_units;
+		bool all_idle = (md.active_count == 0);
+		double done_scheduled_prcnt = 100*(md.work_sweeps + md.work_stepovers)/(double)_numVars;
+		_root_shared_units_this_iteration += md.unit_size;
 		_root_shared_eqs_this_iteration   += n_eqs;
-		_root_total_shared_units += n_sweep_units;
+		_root_total_shared_units += md.unit_size;
 		_root_total_shared_eqs   += n_eqs;
 		_root_rounds_this_iteration++;
 		_shared_EU_this_iteration_cumul.push_back(_root_shared_units_this_iteration + _root_shared_eqs_this_iteration);
-		_swept_this_iteration_cumul.push_back(work_sweeps + work_unsched_resweeps);
+		_swept_this_iteration_cumul.push_back(md.work_sweeps + md.unsched_resweeps);
 
 		bool decide_end_iteration = false;
 		bool decide_terminate_job = false;
@@ -343,7 +324,7 @@ private:
 		}
 		//A round is finished if all sweepers are idle or if we didnt have enough progress
 		if (decide_end_iteration || decide_terminate_job) {
-			LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) (%i)all_idle  (%i)end_iteration (%i)foundUn-sat (%i)terminate_job \n", _my_rank, all_idle, decide_end_iteration, foundUnsat, decide_terminate_job);
+			LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) (%i)all_idle  (%i)end_iteration (%i)foundUn-sat (%i)terminate_job \n", _my_rank, all_idle, decide_end_iteration, md.foundUnsat, decide_terminate_job);
 			LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) ITERATION %i/%i FINISHED in sharing round %i \n", _my_rank, _root_iteration, _params.sweepMaxIterations(), _root_sharing_round);
 			LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) ITERATION %i/%i shared: %i EQS, %i UNITS  \n", _my_rank, _root_iteration, _params.sweepMaxIterations(), _root_shared_eqs_this_iteration, _root_shared_units_this_iteration);
 			if (_root_iteration == _params.sweepMaxIterations()) {
@@ -359,13 +340,15 @@ private:
 		}
 		//The root node (and only the root node) tracks the number of completed sweep rounds,
 		//and broadcasts this information. This way, also nodes that join later know which round we are in.
-		payload[payload.size() - METADATA_SWEEP_ITERATION] = _root_iteration;
-		payload[payload.size() - METADATA_SHARING_ROUND] = _root_sharing_round;
-		payload[payload.size() - METADATA_END_ITERATION] = decide_end_iteration;
-		payload[payload.size() - METADATA_TERMINATE] = decide_terminate_job;
+		md.sweep_iteration = _root_iteration;
+		md.sharing_round = _root_sharing_round;
+		md.end_iteration = decide_end_iteration;
+		md.terminate = decide_terminate_job;
 
 		//Send my units and equivalences via cross-job communication to the SAT job
-		if (!foundUnsat && _clause_comm && _params.crossJobCommunication()) {
+		const int n_sweep_units = md.unit_size;
+		const int eq_size = md.eq_size;
+		if (!md.foundUnsat && _clause_comm && _params.crossJobCommunication()) {
 			assert(_clause_comm || log_return_false("Sweep ERROR: _clause_comm object missing\n"));
 			BufferBuilder bb(-1, 10, false);
 			if (_params.sweepXTCSsend()) {
@@ -418,24 +401,26 @@ private:
 				);
 				crossjob_units_received = static_cast<int>(_crossjob_root_received_units.size());
 				assert(payload.size() == eq_size + n_sweep_units + crossjob_units_received + NUM_METADATA_FIELDS);
-				const int total_units = n_sweep_units + crossjob_units_received;
 
 				//updated stored unit count to reflect the additions.
 				//Otherwise, the sweepers would not know that we added new units
-				payload[payload.size() - METADATA_UNIT_SIZE] = total_units;
+				md.unit_size = n_sweep_units + crossjob_units_received;
 
 				//discard the temporary buffer, to not import the same units a second time
 				_crossjob_root_received_units.clear();
 			}
 		}
 
+		//Persist the (possibly mutated) metadata back into the tail of the payload
+		writeMetadataToReductionElement(payload, md);
+
 		char logmsg[512];
 		snprintf(logmsg, sizeof(logmsg),
 			"[%i](root-trf) send: act,idl,lti %i,%i,%i  mxkit %i  iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i  SW %i  ST %i  Sched, Swept  %.2f , %.2f °/.  wsucc  %.6f  ETI %i  UTI %i\n",
-			_my_rank, active_count, idle_count, longtermidle_count, maxxed_kittens,  _root_iteration, _root_sharing_round,
+			_my_rank, md.active_count, md.idle_count, md.longtermidle_count, md.maxxed_kittens,  _root_iteration, _root_sharing_round,
 			all_idle,  decide_end_iteration, decide_terminate_job, n_eqs, n_sweep_units, crossjob_units_received,
-			work_sweeps, work_stepovers,
-			done_scheduled_prcnt , 100*(work_sweeps + work_unsched_resweeps)/(double)_numVars, success_in_window, _root_shared_eqs_this_iteration, _root_shared_units_this_iteration
+			md.work_sweeps, md.work_stepovers,
+			done_scheduled_prcnt , 100*(md.work_sweeps + md.unsched_resweeps)/(double)_numVars, success_in_window, _root_shared_eqs_this_iteration, _root_shared_units_this_iteration
 		);
 		LOGGER(_sweeplogger, V3_VERB, "%s", logmsg);
 		//no return statement, because the payload was just transformed in-place
@@ -498,6 +483,8 @@ private:
     void cbContributeToAllReduce();
     static std::vector<int> aggregateEqUnitContributions(std::list<std::vector<int>> &contribs);
 	static void appendMetadataToReductionElement(std::vector<int> &contrib, const Metadata &md);
+	static Metadata readMetadataFromReductionElement(const std::vector<int> &contrib);
+	static void writeMetadataToReductionElement(std::vector<int> &contrib, const Metadata &md);
 	void advanceAllReduction();
 	void extractAllReductionResult();
 

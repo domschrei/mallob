@@ -11,7 +11,7 @@ INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/bob12s01.cnf.xz" # 30sec, 17% after 2 rounds
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/cmudme1.cnf.xz" # 30sec, 17% after 2 rounds
 # INST_PATH="$HOME/PhD/instances/some2024/39fba35826ce8c87cd8e8de1969b2dd2-SGI_30_80_26_70_4-log.shuffled-as.sat03-208.cnf.xz" # 30sec, 17% after 2 rounds
-INST_PATH="$HOME/PhD/instances/some2024/39277cab188349aee0f229cb7341b5c5-crafted_n12_d6_c4_num23.cnf.xz"
+# INST_PATH="$HOME/PhD/instances/some2024/39277cab188349aee0f229cb7341b5c5-crafted_n12_d6_c4_num23.cnf.xz"
 
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s101.cnf.xz" 
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s103.cnf.xz"   #huge, & congruence extremely effective
@@ -32,7 +32,7 @@ INST_PATH="$HOME/PhD/instances/some2024/39277cab188349aee0f229cb7341b5c5-crafted
 # INST_PATH="$HOME/PhD/instances/sat-and-minisat1m/037c423f56548082b1935e88c48ffdda-3col120_5_2.shuffled.cnf.xz" #actually has some equivalences
 
 #difficult SATs
-INST_PATH="$HOME/PhD/instances/some2024/fb51311320bb42bdb893249998a77f40-constraints_16_0.3_1.sanitized.cnf.xz"
+# INST_PATH="$HOME/PhD/instances/some2024/fb51311320bb42bdb893249998a77f40-constraints_16_0.3_1.sanitized.cnf.xz"
 
 ./sweep/show-kissat-build.sh
 
