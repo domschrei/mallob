@@ -195,7 +195,7 @@ private:
 
         if (msg.returnedToSender) {
             _returnToSender_counter++;
-            LOG(V1_WARN, " Warn RED REDUCE : got %i. returnedToSender (source %i, tag %i, msg.tag %i, msg.size %i)\n", _returnToSender_counter, source, tag, msg.tag, msg.payload.size());
+            LOG(V1_WARN, "WARN RED REDUCE : got %i. returnedToSender (source %i, tag %i, msg.tag %i, msg.size %i)\n", _returnToSender_counter, source, tag, msg.tag, msg.payload.size());
             _returnToSender_payload = std::move(msg.payload);
             _have_unanswered_returnToSender = true;
             return true;
@@ -254,7 +254,7 @@ public:
 
         //We resolve this problem by remembering a returnToSender error at the child, and retrying to sending it again
         if (_have_unanswered_returnToSender) {
-            LOG(V1_WARN, "Warn RED : sending %i. fixing message to parent after returnedToSender \n", _returnToSender_counter);
+            LOG(V1_WARN, "WARN RED : sending %i. fixing message to parent after returnedToSender \n", _returnToSender_counter);
             _base_msg.payload = std::move(_returnToSender_payload);
             _base_msg.treeIndexOfDestination = _parent_index;
             _base_msg.contextIdOfDestination = _parent_ctx_id;

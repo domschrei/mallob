@@ -761,11 +761,11 @@ void SweepJob::checkIdleWorkStatus() {
 		//no touching them anymore
 	}
 
-	const float STATUS_PERIOD = 0.100; //in seconds. Defines the long-term-idle window
-	if (Timer::elapsedSeconds() - _timestamp_last_idleinfo < STATUS_PERIOD) {
+	const float STATUS_PERIOD = 0.0100; //in seconds. Defines the long-term-idle window
+	if (Timer::elapsedSeconds() - _timestamp_log_last_idleinfo < STATUS_PERIOD) {
 		return;
 	}
-	_timestamp_last_idleinfo = Timer::elapsedSeconds();
+	_timestamp_log_last_idleinfo = Timer::elapsedSeconds();
 	int idles = 0;
 	int longterm_idles = 0;
 	int open = 0;
@@ -934,7 +934,7 @@ void SweepJob::sendWorkstealsViaMPI() {
 //without the need to declare dedicated new functions each time
 int SweepJob::cbCustomQuery(int query) {
 	if (query==QUERY_SWEEP_ITERATION) {
-		return _root_sweep_iteration;
+		return _root_iteration;
 	}
 	return 0;
 }
@@ -1022,7 +1022,7 @@ bool SweepJob::tryProvideInitialWork(KissatPtr sweeper) {
 		//we also check explicitly that the solver expects this work for a new iteration, and that we have not already provided it
 	if (_is_root
 		&& sweeper->getLocalId()==_representative_localId
-		&& solver_iteration > _root_sweep_iteration
+		&& solver_iteration > _root_iteration
 		&& !_root_initwork_startedproviding)
 	{
 		//already set non-idle here to prevent case where solver is already initialized, non-idle,
@@ -1031,8 +1031,8 @@ bool SweepJob::tryProvideInitialWork(KissatPtr sweeper) {
 		sweeper->sweeper_is_idle = false;
 		sweeper->sweeper_longterm_idle = false;
 
-		if (solver_iteration != _root_sweep_iteration +1 ) {
-			LOGGER(_sweeplogger,V1_WARN, "SWEEP WARN : When providing new work, the solver iteration %i is more than one larger than root_iteration %i \n", solver_iteration, _root_sweep_iteration);
+		if (solver_iteration != _root_iteration +1 ) {
+			LOGGER(_sweeplogger,V1_WARN, "SWEEP WARN : When providing new work, the solver iteration %i is more than one larger than root_iteration %i \n", solver_iteration, _root_iteration);
 		}
 		//We need to know how much space to allocate to store each variable "idx" at the array position work[idx],
 		//i.e. we need to know max(idx).
@@ -1042,7 +1042,7 @@ bool SweepJob::tryProvideInitialWork(KissatPtr sweeper) {
 
 		//this value can be different from numVars here in C++ !! Because kissat might have aready propagated some units, etc.
 		const unsigned VARS = shweep_get_num_vars(sweeper->solver);
-		LOGGER(_sweeplogger,V2_INFO, "SWEEP WORK PROVIDING --------------%u---------------- for new solver iteration %i (root at %i)\n", VARS, solver_iteration, _root_sweep_iteration);
+		LOGGER(_sweeplogger,V2_INFO, "SWEEP WORK PROVIDING --------------%u---------------- for new solver iteration %i (root at %i)\n", VARS, solver_iteration, _root_iteration);
 		sweeper->work_received_from_steal = std::vector<int>(VARS);
 		_root_initwork_startedproviding = true;
 
@@ -1101,6 +1101,8 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	//This is the fixed request "slot" we are using to communicate concurently via shared memory with the main worker thread
 	auto &request = _worksteal_requests[localId];
 
+	constexpr int MPI_WAIT_TIME_MILLISECS = 10;
+
 	//Check whether a previously queued MPI request has been answered
 	if (request.got_steal_response) {
 		LOGGER(_sweeplogger,V4_VVER, "Sweeper [%i](%i) got response nr %i \n", _my_rank, localId, request.nr);
@@ -1138,7 +1140,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 
 		LOGGER(_sweeplogger,V4_VVER, "Sweeper [%i](%i) waiting for MPI nr. %i \n", _my_rank, localId, request.nr);
 		//can wait for some milliseconds, nothing to do
-		usleep(5000);
+		usleep(1000 * MPI_WAIT_TIME_MILLISECS);
 		// return;
 		//update: by bypassing this return, the solver can steal locally, even if there is also an MPI request pending
 	}
@@ -1172,7 +1174,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 
 	// If we make it until here we are waiting for work and have have nothing else to do for now.
 	// Can wait for some millisecond until we check the system again.
-	usleep(5000);
+	usleep(1000 * MPI_WAIT_TIME_MILLISECS);
 }
 
 void SweepJob::cbStealWorkNew(unsigned **work, int *work_size, int localId) {
@@ -1228,7 +1230,12 @@ void SweepJob::rootStartNewSharingRound() {
 	}
 
 	if (!_flag_started_synchronized_solving.load(std::memory_order_relaxed)) {
-		LOGGER(_sweeplogger,V3_VERB, "SWEEP root: Delay first round, not all solvers online yet (%i/%i) \n", _started_sweepers_count.load(), _nThreads);
+		const float LOG_PERIOD = 0.100;
+		float t = Timer::elapsedSeconds();
+		if (t > _timestamp_log_notonline + LOG_PERIOD) {
+			_timestamp_log_notonline = t;
+			LOGGER(_sweeplogger,V3_VERB, "SWEEP root: Delay first round, not all solvers online yet (%i/%i) \n", _started_sweepers_count.load(), _nThreads);
+		}
 		return;
 	}
 
@@ -1236,9 +1243,9 @@ void SweepJob::rootStartNewSharingRound() {
 		//Print these infos only once ever 100ms
 		const float LOG_PERIOD = 0.100;
 		float t = Timer::elapsedSeconds();
-		if (t > _timestamp_delayedround + LOG_PERIOD) {
-			_timestamp_delayedround = t;
-			if (_root_sweep_iteration==0) {
+		if (t > _timestamp_log_delayedround + LOG_PERIOD) {
+			_timestamp_log_delayedround = t;
+			if (_root_iteration==0) {
 				LOGGER(_sweeplogger,V3_VERB, "root: Delay first sharing round, CCC still running\n");
 			} else {
 				LOGGER(_sweeplogger,V3_VERB, "root: Delay next sharing round, haven't started to provide initial work\n");
@@ -1270,7 +1277,7 @@ void SweepJob::rootStartNewSharingRound() {
 	_bcast->broadcast(std::move(msg));
 }
 
-void SweepJob::appendMetadataToReductionElement(int foundUnsat, std::vector<int> &contrib, int idle_count, int longtermidle_count, int active_count, int unit_size, int eq_size, int work_sweeps, int work_stepovers, int unsched_resweeps, int maxxed_kittens) {
+void SweepJob::appendMetadataToReductionElement(int foundUnsat, std::vector<int> &contrib, int idle_count, int longtermidle_count, int active_count, int working_internally_count, int unit_size, int eq_size, int work_sweeps, int work_stepovers, int unsched_resweeps, int maxxed_kittens) {
 	//Make space for the upcoming metadata, initialized with zero
 	contrib.insert(contrib.end(), NUM_METADATA_FIELDS, 0);
 	int size = contrib.size();
@@ -1285,6 +1292,7 @@ void SweepJob::appendMetadataToReductionElement(int foundUnsat, std::vector<int>
 	n++; contrib[size - METADATA_IDLE_COUNT]     = idle_count;
 	n++; contrib[size - METADATA_LONGTERM_IDLE]  = longtermidle_count;
 	n++; contrib[size - METADATA_ACTIVE_COUNT]   = active_count;
+	n++; contrib[size - METADATA_WORKING_INTERNALLY] = working_internally_count;
 	n++; contrib[size - METADATA_UNIT_SIZE]  = unit_size;
 	n++; contrib[size - METADATA_EQ_SIZE]    = eq_size;
 	n++; contrib[size - METADATA_WORK_SWEEPS]     = work_sweeps;
@@ -1359,6 +1367,7 @@ void SweepJob::cbContributeToAllReduce() {
 		bool is_idle = sweeper->sweeper_is_idle;
 		bool is_longterm_idle = sweeper->sweeper_longterm_idle;
 		bool is_active = !is_idle;
+		bool is_working_internally = shweep_working_internally(sweeper->solver);
 		int foundUnsat = kissat_is_inconsistent(sweeper->solver);
 		int work_sweeps = (int)stats.progress_work_sweeps;
 		int work_stepovers = (int)stats.progress_work_stepovers;
@@ -1371,7 +1380,7 @@ void SweepJob::cbContributeToAllReduce() {
 			work_stepovers = 0;
 			work_resweeps = 0;
 		}
-		appendMetadataToReductionElement(foundUnsat, contrib, is_idle, is_longterm_idle, is_active, unit_size, eq_size, work_sweeps, work_stepovers, work_resweeps, stats.maxxed_kittens);
+		appendMetadataToReductionElement(foundUnsat, contrib, is_idle, is_longterm_idle, is_active, is_working_internally, unit_size, eq_size, work_sweeps, work_stepovers, work_resweeps, stats.maxxed_kittens);
 		contribs.push_back(contrib);
 	}
 	auto aggregation_element = aggregateEqUnitContributions(contribs);
@@ -1567,15 +1576,17 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	//Aggregate additional metadata fields
 	int idle_count = 0;
 	int longtermidle_count = 0;
+	int working_internally_count = 0;
 	int active_count = 0;
 	int foundUnsat=0;
 	int maxxed_kittens=0;
     for (const auto &contrib : contribs) {
-    	idle_count  += contrib[contrib.size()-METADATA_IDLE_COUNT];
-    	longtermidle_count += contrib[contrib.size()-METADATA_LONGTERM_IDLE];
-    	active_count+= contrib[contrib.size()-METADATA_ACTIVE_COUNT];
-    	foundUnsat  += contrib[contrib.size()-METADATA_FOUND_UNSAT];
-    	maxxed_kittens+=contrib[contrib.size()-METADATA_MAXXED_KITTENS];
+    	idle_count			+= contrib[contrib.size()-METADATA_IDLE_COUNT];
+    	longtermidle_count	+= contrib[contrib.size()-METADATA_LONGTERM_IDLE];
+    	active_count		+= contrib[contrib.size()-METADATA_ACTIVE_COUNT];
+    	foundUnsat			+= contrib[contrib.size()-METADATA_FOUND_UNSAT];
+    	maxxed_kittens		+= contrib[contrib.size()-METADATA_MAXXED_KITTENS];
+    	working_internally_count+=contrib[contrib.size()-METADATA_WORKING_INTERNALLY];
     }
 	if (contribs.empty()) {
 		//edge-case: if not a single solver is initialized yet,
@@ -1592,7 +1603,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 		sum_work_stepovers  += contrib[contrib.size()-METADATA_WORK_STEPOVERS];
 		sum_unsched_resweeps+= contrib[contrib.size()-METADATA_UNSCHED_RESWEEPS];
 	}
-	appendMetadataToReductionElement(foundUnsat, aggregated, idle_count, longtermidle_count, active_count, aggr_unit_size, aggr_eq_size, sum_work_sweeps, sum_work_stepovers, sum_unsched_resweeps, maxxed_kittens);
+	appendMetadataToReductionElement(foundUnsat, aggregated, idle_count, longtermidle_count, active_count, working_internally_count, aggr_unit_size, aggr_eq_size, sum_work_sweeps, sum_work_stepovers, sum_unsched_resweeps, maxxed_kittens);
 	LOG(V5_DEBG, "SWEEP RED aggregated %i contributions: E %i, U %i, act,idle %i,%i\n", contribs.size(), aggr_eq_size/2, aggr_unit_size, active_count, idle_count);
 	int individual_sum =  aggr_eq_size + aggr_unit_size + NUM_METADATA_FIELDS;
 	assert(total_aggregated_size == individual_sum ||
@@ -1739,7 +1750,7 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 		}
 	}
 	float t1 = Timer::elapsedSeconds();
-	LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](%i) loaded  formula (%.3f MB) in %.6f sec \n", _my_rank, sweeper->getLocalId(), formula_in_MB , (t1-t0));
+	LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](%i) loaded formula (%.3f MB) in %.6f sec \n", _my_rank, sweeper->getLocalId(), formula_in_MB , (t1-t0));
 }
 
 void SweepJob::triggerTerminations() {

@@ -71,7 +71,7 @@ MALLOB_OPTIONS="-t=$threads \
   -sweep-max-kitten-prop=1000000 \
   -sweep-signal-kitten=1 \
 	-sweep-sharing-period=0.050 \
-  -sweep-skip-ratio=0.05 \
+  -sweep-skip-ratio=0.001 \
   -sweep-skip-window=50 \
   -sweep-max-failed-iters=3
 "

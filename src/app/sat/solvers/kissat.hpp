@@ -50,56 +50,46 @@ private:
 
 
 	//#################################################################################################
-	//Sweeping
+	//For MallobSweep
 	bool is_sweeper = false;
-	bool is_congruencer = false; //subtype of sweeper, that does congruence closure instead of sweeping
 	int representative_localId = 0;
-	friend class SweepJob; //fwd
-	std::vector<int> eq_up_buffer;    //transfer a single equivalence from C to C++
+	friend class SweepJob; //fwd decl
 
-	// std::vector<int> eqs_from_broadcast_queued; //equivalences that came from the broadcast, but are not yet shown to the solver
-	// std::vector<int> units_from_broadcast_queued;
+	//transfer a single equivalence from C to C++
+	std::vector<int> eq_up_buffer;
 
-    // std::vector<int> eqs_from_broadcast;  //equivalences that are currently shown to the solver, originating from broadcast
-	// std::vector<int> units_from_broadcast;
-
-    std::vector<int> eqs_to_share;    //accumulate exported equivalences for sharing
+	//accumulate unit and equivalences for sharing
+	//when exporting data from the solver to Mallob, need to lock the vector when extracting for global sharing,
+	//otherwise the solver threads might concurrently push new data into the std::vector while we are reading it
 	std::vector<int> units_to_share;
-	std::mutex sweep_export_mutex; //when exporting data from the solver to Mallob, need to lock them when extracting them for global sharing, otherwise the solver threads might continue concurrently pushing new data onto them
+    std::vector<int> eqs_to_share;
+	std::mutex sweep_export_mutex;
+
+	//Work received by stealing from others
+	//This vector is allocated and controlled on the C++ level, but accessible and operated on also within the kissat solver
+	//on the C level. The kissat solver thus trusts that this array is always available and never suddenly reallocated.
 	std::vector<int> work_received_from_steal;
 
+	//We make sure that only one other solver can steal from this one at a time
 	std::atomic_flag steal_victim_lock = ATOMIC_FLAG_INIT;
 
-	std::atomic_bool sweeper_is_idle = false; //current idle-status
-	std::atomic_bool sweeper_longterm_idle = false; //whether the sweeper remained idle through a whole period of checking
+	//Tracking the status of the solver
+	std::atomic_bool sweeper_is_idle = false;
+	std::atomic_bool sweeper_longterm_idle = false;
 
-	// bool has_reported_sweep_dimacs = false;
-
-	// std::atomic_int sweep_import_round{0};
-	// std::atomic_int sweep_EQS_index{0};
-	// std::atomic_int sweep_EQS_size{0};
-	// std::atomic_int sweep_UNITS_index{0};
-	// std::atomic_int sweep_UNITS_size{0};
-	// int sweep_unread_EQS_count{0};
-
-	//New Import Version with dedicated vectors per round
+	//The solver tracks which data it already imported that arrived via a global sharing round
 	int curr_eq_round{0};
 	int curr_eq_index{0};
 	int curr_unit_round{0};
 	int curr_unit_index{0};
 
-
-
-	// int attempted_mpi_steals = 0;
+	//Some more detailed information collection on stealing, for debugging
 	int attempted_steals = 0;
 	std::vector<SweepStealInfo> steal_records{};
-
 	struct shweep_statistics sweep_stats;
 
 	static constexpr int WARN_ON_REPEATED_MISSED_TERMINATION=32;
 	int count_repeated_missed_termination=0;
-	// std::vector<char> stolen_done;
-	// std::vector<int> formulaForShweeping;
 	//##################################################################################################
 
 
