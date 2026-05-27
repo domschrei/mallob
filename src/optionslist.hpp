@@ -39,6 +39,7 @@ OPTION_GROUP(grpGeneral, "general", "General")
  OPT_BOOL(preCleanup,                     "pre-cleanup", "",                           false,                   "Clean up shmem/proof/trace/extmem files before starting off")
  OPT_STRING(clientApplication,            "client-app", "",                            "", "Have clients run specified external program path + \".\" + i for increasing i (or, if nonexistent, just the path as is)")
  OPT_INT(clientAppThreads,                "client-app-threads", "",                    1,    1, LARGE_INT,      "Max. number of applications to run per client")
+ OPT_BOOL(terminateAbruptly,              "terminate-abruptly", "",                    false, "Upon termination, avoid waiting for sub-processors to finish")
 
 ///////////////////////////////////////////////////////////////////////
 
