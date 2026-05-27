@@ -33,6 +33,8 @@ By default, the above call creates a build that includes the most common SAT sol
 * `-DMALLOB_LOG_VERBOSITY=<v>` for `<v>` = 0, ..., 6
     - 0 means absolutely no logging except for critical output; 6 compiles _all_ logging calls into Mallob. Note that you still need to set the Mallob program option -v to an according value to actually see the respective log messages. The default level is 4.
 
+You can also prepend `MALLOB_MINIMAL=1` to `bash scripts/setup/cmake-make.sh ...` in order to attain a **minimal Mallob build** that disables all dependencies and non-essential application engines. You can then append arguments to the script as listed above to re-enable individual features, dependencies and engines that you do want to include.
+
 ## Testing
 
 **Note:** By default, the test suite expects that Mallob is built and run with OpenMPI, i.e., that `mpirun` links to an OpenMPI executable on your system. For deviating MPI implementations, e.g., MPICH, try to prepend `mpiimpl=mpich` to the call `bash scripts/run/systest_commons.sh`.

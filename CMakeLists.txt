@@ -208,7 +208,7 @@ target_include_directories(mallob_core PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob_core PRIVATE ${BASE_COMPILEFLAGS})
 target_link_libraries(mallob_core ${BASE_LIBS})
 target_link_directories(mallob_core PUBLIC ${BASE_LINK_DIRS})
-if (DEFINED MALLOB_CORE_DEPS)
+if (DEFINED MALLOB_CORE_DEPS AND NOT MALLOB_CORE_DEPS STREQUAL "")
     add_dependencies(mallob_core ${MALLOB_CORE_DEPS})
 endif()
 
