@@ -2,11 +2,14 @@
 add_custom_target(app_incsat ALL)
 add_dependencies(app_incsat app_sat)
 
-# Add MaxSAT-specific sources to main Mallob executable
-set(INCSAT_MALLOB_SOURCES src/app/sat/stream/sat_job_stream_garbage_collector.cpp)
-#if(MALLOB_USE_MINISAT)
-#    set(INCSAT_MALLOB_SOURCES ${INCSAT_MALLOB_SOURCES} src/app/sat/solvers/minisat.cpp)
-#endif()
+# Add IncSAT-specific sources to main Mallob executable
+set(INCSAT_MALLOB_SOURCES src/app/sat/stream/sat_job_stream_garbage_collector.cpp src/app/sat/solvers/portfolio_solver_interface.cpp)
+if(NOT MALLOB_USE_CADICAL EQUAL 0)
+    set(INCSAT_MALLOB_SOURCES ${INCSAT_MALLOB_SOURCES} src/app/sat/solvers/cadical.cpp)
+endif()
+if(NOT MALLOB_USE_MINISAT EQUAL 0)
+    set(INCSAT_MALLOB_SOURCES ${INCSAT_MALLOB_SOURCES} src/app/sat/solvers/minisat.cpp)
+endif()
 
 set(MALLOB_COREPLUSCOMM_SOURCES ${MALLOB_COREPLUSCOMM_SOURCES} ${INCSAT_MALLOB_SOURCES} CACHE INTERNAL "")
 
