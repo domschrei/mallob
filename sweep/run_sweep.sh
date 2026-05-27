@@ -11,7 +11,7 @@ INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/bob12s01.cnf.xz" # 30sec, 17% after 2 rounds
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/cmudme1.cnf.xz" # 30sec, 17% after 2 rounds
 # INST_PATH="$HOME/PhD/instances/some2024/39fba35826ce8c87cd8e8de1969b2dd2-SGI_30_80_26_70_4-log.shuffled-as.sat03-208.cnf.xz" # 30sec, 17% after 2 rounds
-# INST_PATH="$HOME/PhD/instances/some2024/39277cab188349aee0f229cb7341b5c5-crafted_n12_d6_c4_num23.cnf.xz"
+INST_PATH="$HOME/PhD/instances/some2024/39277cab188349aee0f229cb7341b5c5-crafted_n12_d6_c4_num23.cnf.xz"
 
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s101.cnf.xz" 
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s103.cnf.xz"   #huge, & congruence extremely effective
@@ -36,7 +36,7 @@ INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf
 
 ./sweep/show-kissat-build.sh
 
-timeout=60
+timeout=120
 NPROCS=4
 threads=3
 echo "NPROCS $NPROCS"
@@ -68,14 +68,14 @@ MALLOB_OPTIONS="-t=$threads \
   -fcll=2 \
 	-preprocess-sweepnsat=1 \
   -preprocess-sweep-priority=1.0 \
-  -sweep-solver-verbosity=0 \
+  -sweep-solver-verbosity=2 \
   -cjc=1 \
   -sweep-max-kitten-prop=1000000 \
   -sweep-signal-kitten=1 \
 	-sweep-sharing-period=0.050 \
-  -sweep-skip-ratio=0.005 \
-  -sweep-skip-window=50 \
-  -sweep-max-failed-iters=3
+  -sweep-skip-ratio=0.001 \
+  -sweep-skip-window=40 \
+  -sweep-max-failed-iters=7
 "
 
 

@@ -51,8 +51,8 @@ void cb_import_unit(void *SweepJobState, int *elit, int localId) {
 	((SweepJob*) SweepJobState)->cbImportUnit(elit, localId);
 }
 
-int cb_custom_query(void *SweepJobState, int query) {
-	return ((SweepJob*)SweepJobState)->cbCustomQuery(query);
+int cb_custom_query(void *SweepJobState, int localId, int query) {
+	return ((SweepJob*)SweepJobState)->cbCustomQuery(localId, query);
 }
 
 void cb_report_iteration(void *SweepJobState, int localId) {
@@ -640,7 +640,7 @@ void SweepJob::cbReportIteration(int localId) {
 	auto stats = sweeper->fetchSweepStats();
 	LOGGER(_sweeplogger, V2_INFO, "\n");
 	LOGGER(_sweeplogger,V2_INFO, "Reported by [%i](%i)		\n", _my_rank, localId);
-	LOGGER(_sweeplogger,V2_INFO, "ITERATION_CURR   %i		    \n", stats.curr_iteration);
+	LOGGER(_sweeplogger,V2_INFO, "ITERATION_CURR   %i		    \n", stats.local_iteration);
 	LOGGER(_sweeplogger,V2_INFO, "ITERATIONS_MAX     %i		\n", _params.sweepMaxIterations());
 	LOGGER(_sweeplogger,V2_INFO, "TIME_APP_TOTAL          %.3f s\n",  Timer::elapsedSeconds() - _timestamp_start_sweepapp);
 	LOGGER(_sweeplogger,V2_INFO, "TIME_BEFORE_SOLVING     %.3f s\n",  _timestamp_started_synchronized_solving - _timestamp_start_sweepapp);
@@ -790,7 +790,7 @@ void SweepJob::checkIdleWorkStatus() {
 	}
 	_lastLongtermIdleCount = longterm_idles;
 	LOGGER(_sweeplogger,V4_VVER, "SWEEP [%i] idle(long) %i(%i) %s  Work[%i]: %s\n", _my_rank, idles, longterm_idles, oss_idles.str().c_str(), _my_rank, oss_work.str().c_str());
-	checkForLaggingSolvers();
+	countLaggingSolvers();
 }
 
 void SweepJob::checkSharingDelay() {
@@ -932,7 +932,7 @@ void SweepJob::sendWorkstealsViaMPI() {
 
 //For development purposes: A simple interface to communicate some integers between solver and Mallob
 //without the need to declare dedicated new functions each time
-int SweepJob::cbCustomQuery(int query) {
+int SweepJob::cbCustomQuery(int localId, int query) {
 	if (query==QUERY_SWEEP_ITERATION) {
 		return _root_iteration;
 	}
@@ -1361,12 +1361,18 @@ void SweepJob::cbContributeToAllReduce() {
 		md.idle_count = sweeper->sweeper_is_idle;
 		md.longtermidle_count = sweeper->sweeper_longterm_idle;
 		md.active_count = !md.idle_count;
-		md.working_internally_count = shweep_working_internally(sweeper->solver);
+		// md.working_internally_count = shweep_working_internally(sweeper->solver);
 		md.foundUnsat = kissat_is_inconsistent(sweeper->solver);
 		md.work_sweeps = (int)stats.progress_work_sweeps;
 		md.work_stepovers = (int)stats.progress_work_stepovers;
 		md.unsched_resweeps = (int)stats.progress_unsched_resweeps;
-		if (stats.curr_iteration < expected_iteration_of_next_round) {
+		md.maxxed_kittens = stats.maxxed_kittens;
+		md.lagging = isSolverLagging(sweeper);
+		md.sweeper_objs = shweep_has_sweeper_obj(sweeper->solver);
+		//Steal amount can overestimate the actual remaining work, but is quick and cheap to calculate
+		//*2, because stealing considers half of the available work
+		md.remaining_work_estimate = 2*shweep_get_max_steal_amount(sweeper->solver);
+		if (stats.local_iteration < expected_iteration_of_next_round) {
 			//edgecase: This sweeper is still stuck in a previous iteration, maybe because its last Kitten Call
 			//takes extremely long, and it didn't yet reach the point where it resets it's work statistics
 			//we catch that case here and filter out "left-over" statistics form the previous iteration
@@ -1374,7 +1380,6 @@ void SweepJob::cbContributeToAllReduce() {
 			md.work_stepovers = 0;
 			md.unsched_resweeps = 0;
 		}
-		md.maxxed_kittens = stats.maxxed_kittens;
 		appendMetadataToReductionElement(contrib, md);
 		contribs.push_back(contrib);
 	}
@@ -1442,8 +1447,22 @@ void SweepJob::extractAllReductionResult() {
 	//but can leave it at null (Contrary to the bcast)
 	//The new reduction object will be created by the next bcast round when needed
 	_red.reset();
+
+	//Some solvers can "lag behind" in iterations, if their initial formula loading takes so long that they
+	//arrive at sweeping when the global sweeping already finished the first iteration
+	//Thus, tell them which iteration we are in
+	if (_flag_started_synchronized_solving  && !_terminate_all) {
+		for (auto &sweeper : _sweepers) {
+			if (sweeper) {
+				shweep_set_global_iteration(sweeper->solver, md.sweep_iteration);
+			}
+		}
+	}
+
+
+	//Tell the solvers that the iteration ended
 	if (md.end_iteration && _flag_started_synchronized_solving  && !_terminate_all) {
-		LOGGER(_sweeplogger,V4_VVER, "SWEEP sending end_iteration signal to solvers\n");
+		LOGGER(_sweeplogger,V4_VVER, "sending end_iteration signal to solvers\n");
 		for (auto &sweeper : _sweepers) {
 			if (sweeper) {
 				shweep_set_end_iteration_signal(sweeper->solver);
@@ -1478,24 +1497,31 @@ void SweepJob::clearImportedRound() {
 	}
 }
 
-void SweepJob::checkForLaggingSolvers() {
+bool SweepJob::isSolverLagging(KissatPtr sweeper) {
+	//A solver is considered lagging if it is more than MIN_LAGGING_ROUNDS rounds behind in importing equalities and units
+	//This happens when a solver is stuck for multiple seconds within a single -particularly hard- sweep call
+	constexpr int MIN_LAGGING_ROUNDS = 50;
+	return sweeper->curr_eq_round < (_lastImportedRound.load() - MIN_LAGGING_ROUNDS);
+}
+
+int SweepJob::countLaggingSolvers() {
 	if (_terminate_all) {
-		return;
+		return 0;
 	}
-	int WARN_ROUND_DIFF = 50; //Warn after this amount of rounds. I.e. if at 50, we warn if import is lagging by 50 rounds (~1000ms)
+	int lagging = 0;
 	for (auto &sweeper : _sweepers) {
-		if (sweeper) {
-			if (sweeper->curr_eq_round < _lastImportedRound.load() - WARN_ROUND_DIFF) {
-				uint64_t kitten_propagations = shweep_kitten_propagations(sweeper->solver);
-				const char *profile = shweep_get_profilename(sweeper->solver);
-				auto stats = sweeper->fetchSweepStats();
-				if (_is_root) {
-					LOGGER(_sweeplogger,V3_VERB, "WARN SWEEP [%i](%i) lags eq-import %i vs %i  (%i). kcalls %i  kprops %zu kprof %s\n",
-						_my_rank, sweeper->getLocalId(), sweeper->curr_eq_round, _lastImportedRound.load(), sweeper->curr_eq_round - _lastImportedRound.load(), stats.kitten_calls, kitten_propagations, profile);
-				}
+		if (sweeper && isSolverLagging(sweeper)) {
+			lagging++;
+			uint64_t kitten_propagations = shweep_kitten_propagations(sweeper->solver);
+			const char *profile = shweep_get_profilename(sweeper->solver);
+			auto stats = sweeper->fetchSweepStats();
+			if (_is_root) {
+				LOGGER(_sweeplogger,V3_VERB, "WARN [%i](%i) lags %i vs %i (%i). kcalls %i  kprops %zu  kprof %s iter %i\n",
+					_my_rank, sweeper->getLocalId(), sweeper->curr_eq_round, _lastImportedRound.load(), sweeper->curr_eq_round - _lastImportedRound.load(), stats.kitten_calls, kitten_propagations, profile, stats.local_iteration);
 			}
 		}
 	}
+	return lagging;
 
 }
 
@@ -1577,6 +1603,9 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 		md.work_sweeps				+= c.work_sweeps;
 		md.work_stepovers			+= c.work_stepovers;
 		md.unsched_resweeps			+= c.unsched_resweeps;
+		md.lagging                  += c.lagging;
+		md.remaining_work_estimate  += c.remaining_work_estimate;
+		md.sweeper_objs				+= c.sweeper_objs;
 	}
 	if (contribs.empty()) {
 		//edge-case: if not a single solver is initialized yet,

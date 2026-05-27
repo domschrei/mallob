@@ -135,6 +135,9 @@ private:
 		int longtermidle_count{0};
 		int active_count{0};
 		int working_internally_count{0};
+		int lagging{0};
+		int sweeper_objs{0};
+		int remaining_work_estimate{0};
 		int unit_size{0};
 		int eq_size{0};
 		int work_sweeps{0};
@@ -416,10 +419,10 @@ private:
 
 		char logmsg[512];
 		snprintf(logmsg, sizeof(logmsg),
-			"[%i](root-trf) send: act,idl,lti %i,%i,%i  mxkit %i  iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i  SW %i  ST %i  Sched, Swept  %.2f , %.2f °/.  wsucc  %.6f  ETI %i  UTI %i\n",
-			_my_rank, md.active_count, md.idle_count, md.longtermidle_count, md.maxxed_kittens,  _root_iteration, _root_sharing_round,
+			"[%i](root-trf) send: act,idl,lti %i,%i,%i  swp %i lag %i mxkit %i  iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i  SW %i  ST %i  RmW %i  Sched, Swept  %.2f , %.2f °/.  wsucc  %.6f  ETI %i  UTI %i\n",
+			_my_rank, md.active_count, md.idle_count, md.longtermidle_count, md.sweeper_objs, md.lagging, md.maxxed_kittens,  _root_iteration, _root_sharing_round,
 			all_idle,  decide_end_iteration, decide_terminate_job, n_eqs, n_sweep_units, crossjob_units_received,
-			md.work_sweeps, md.work_stepovers,
+			md.work_sweeps, md.work_stepovers, md.remaining_work_estimate,
 			done_scheduled_prcnt , 100*(md.work_sweeps + md.unsched_resweeps)/(double)_numVars, success_in_window, _root_shared_eqs_this_iteration, _root_shared_units_this_iteration
 		);
 		LOGGER(_sweeplogger, V3_VERB, "%s", logmsg);
@@ -453,7 +456,7 @@ public:
     friend void cb_search_work_in_tree(void* SweepJob_state, unsigned **work, int *work_size, int local_id);
 	friend void cb_import_eq(void *SweepJobState, int *elit1, int *elit2, int localId);
 	friend void cb_import_unit(void *SweepJobState, int *elit, int localId);
-	friend int  cb_custom_query(void *SweeJobState, int query);
+	friend int  cb_custom_query(void *SweeJobState, int localId, int query);
 	friend void cb_report_iteration(void *SweepJobState, int localId);
 
 
@@ -477,7 +480,8 @@ private:
 	void solverGoStealing(KissatPtr sweeper);
 	void sendWorkstealsViaMPI();
 	void checkIdleWorkStatus();
-	void checkForLaggingSolvers();
+	int countLaggingSolvers();
+	bool isSolverLagging(KissatPtr sweeper);
 
     void rootStartNewSharingRound();
     void cbContributeToAllReduce();
@@ -500,7 +504,7 @@ private:
 	void cbStealWorkNew(unsigned **work, int *work_size, int localId);
 	void cbImportEq(int *elit1, int *elit2, int localId);
 	void cbImportUnit(int *lit, int localId);
-	int  cbCustomQuery(int query);
+	int  cbCustomQuery(int localId, int query);
 	void cbReportIteration(int localId);
 	void clearImportedRound();
 
