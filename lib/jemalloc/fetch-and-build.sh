@@ -8,5 +8,5 @@ fetch_and_extract $dirname autogen.sh https://github.com/jemalloc/jemalloc/archi
 echo "[jemalloc] Building ..."
 ./autogen.sh
 make
-rm lib/jemalloc*.so
+rm lib/*.so*
 echo "[jemalloc] Build complete"
