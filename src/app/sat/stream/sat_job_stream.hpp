@@ -65,6 +65,7 @@ public:
 
                 if (!taskInitialized) {
                     accumulatedTask.type = task.type;
+                    accumulatedTask.nbVars = accumulatedTask.nbClauses = 0;
                     taskInitialized = true;
                 }
                 accumulatedTask.integrate(std::move(task));
@@ -75,6 +76,7 @@ public:
                 processor->process(accumulatedTask); // blocking
 
                 accumulatedTask = SatJobStreamProcessor::SatTask{accumulatedTask.type};
+                accumulatedTask.nbVars = accumulatedTask.nbClauses = 0;
             }
             LOG(V4_VVER, "Processor %s stopping\n", processor->getName().c_str());
             processor->finalize();
@@ -90,6 +92,7 @@ public:
     void solveNonblocking(SatJobStreamProcessor::SatTask&& task) {
 
         assert(task.lits.empty() || task.lits.front() != 0);
+        assert(task.lits.empty() || task.lits.back() == 0);
 
         _active_rev++;
         assert(_sync.resultQueue.empty());

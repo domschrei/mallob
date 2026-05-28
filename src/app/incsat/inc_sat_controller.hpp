@@ -43,6 +43,9 @@ private:
     std::function<bool()> _cb_terminate;
     bool _replace_default_terminator {false};
 
+    Mutex _mtx_terminate;
+    volatile bool _terminators_invalidated {false};
+
 public:
     IncSatController(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& dTaskTracker) :
             _params(params), _api(api), _desc(desc), _stream_id(getNextStreamId()),
@@ -137,6 +140,10 @@ public:
         _cb_terminate = cb;
         _replace_default_terminator = replaceDefaultTerminator;
     }
+    void invalidateTerminators() {
+        auto lock = _mtx_terminate.getLock();
+        _terminators_invalidated = true;
+    }
 
     void finalize() {
         if (!hasStream()) return;
@@ -182,7 +189,11 @@ private:
 
         _stream->stream.setTerminator([&, str=&_stream->stream, params=&_params, desc=&_desc, startTime=_start_time]() {
             if (str->finalizing()) return true;
-            if (_cb_terminate && _cb_terminate()) return true;
+            {
+                auto lock = _mtx_terminate.getLock();
+                if (_terminators_invalidated) return true;
+                if (_cb_terminate && _cb_terminate()) return true;
+            }
             if (_replace_default_terminator) return false; // skip default terminator
             return isTimeoutHit(params, desc, startTime);
         });

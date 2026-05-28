@@ -29,7 +29,8 @@ private:
     const Parameters& _params;
     APIConnector& _api;
     int _stream_id;
-    long _nontrivial_wait_millis;
+    long _nontrivial_wait_millis_initial;
+    long _nontrivial_wait_millis_subsequent;
 
     int _nb_vars {0};
     int _nb_clauses {0};
@@ -60,7 +61,8 @@ public:
     MallobSatJobStreamProcessor(const Parameters& params, APIConnector& api, JobDescription& desc,
             const std::string& baseUserName, int streamId, bool incremental, Synchronizer& sync) :
         SatJobStreamProcessor(sync), _params(params), _api(api), _stream_id(streamId),
-        _nontrivial_wait_millis(params.internalStreamProcessor() ? params.nontrivialSolvingDelay() : 0),
+        _nontrivial_wait_millis_initial(params.internalStreamProcessor() ? params.nontrivialSolvingDelayInitial() : 0),
+        _nontrivial_wait_millis_subsequent(params.internalStreamProcessor() ? params.nontrivialSolvingDelaySubsequent() : 0),
         _incremental(incremental), _username(baseUserName)
         //,_job_slot(new JobSlotRegistry::JobSlot(_username, [&]() {signalReinitialization();})) 
         {}
@@ -111,6 +113,7 @@ public:
         auto& t = _backlog_task;
         if (t.nbVars >= 0) _nb_vars = t.nbVars;
         if (t.nbClauses >= 0) _nb_clauses = t.nbClauses;
+        if (t.lits.size() > 0) assert(_nb_clauses > 0);
 
         LOG(V5_DEBG, "%s attempting to solve task ...\n", _name.c_str());
 
@@ -131,15 +134,19 @@ public:
             return;
         }
 
-        if (_last_won_rev < t.rev-1 && _nontrivial_wait_millis > 0) {
-            // This processor *did not* solve the last revision:
-            // we wait for a short while if another, more lightweight solver finds a solution immediately.
-            LOG(V4_VVER, "%s sleep first (last won: %i, now: %i)\n", _name.c_str(), _last_won_rev, t.rev);
+        if (!_began_nontrivial_solving && _nontrivial_wait_millis_initial > 0) {
+            LOG(V4_VVER, "%s sleep initially\n", _name.c_str());
             time = Timer::elapsedSeconds() - time;
-            usleep(1'000'000 * std::max(0.0, 0.001 * _nontrivial_wait_millis - time)); // X ms minus the time taken to copy the literals
-            if (_terminator(t.rev)) {
-                return; // Task has become obsolete in the meantime, so skip solving
-            }
+            // X ms minus the time taken to copy the literals
+            usleep(1'000'000 * std::max(0.0, 0.001 * _nontrivial_wait_millis_initial - time));
+            if (_terminator(t.rev)) return; // Task has become obsolete in the meantime, so skip solving
+
+        } else if (_last_won_rev < t.rev-1 && _nontrivial_wait_millis_subsequent > 0) {
+            LOG(V4_VVER, "%s sleep (last won: %i, now: %i)\n", _name.c_str(), _last_won_rev, t.rev);
+            time = Timer::elapsedSeconds() - time;
+            // X ms minus the time taken to copy the literals
+            usleep(1'000'000 * std::max(0.0, 0.001 * _nontrivial_wait_millis_subsequent - time));
+            if (_terminator(t.rev)) return; // Task has become obsolete in the meantime, so skip solving
         }
 
         if (!_finalized && !_began_nontrivial_solving) {

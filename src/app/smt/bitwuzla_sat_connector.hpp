@@ -54,6 +54,8 @@ private:
     bitwuzla::Terminator* _bzla_term {nullptr};
     bitwuzla::Terminator* _ext_term {nullptr};
 
+    std::function<void(std::unique_ptr<IncSatController>&&)> _incsat_cleaner;
+
 public:
     BitwuzlaSatConnector(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& tracker, const std::string& name) :
         bitwuzla::SatSolver(), _params(params), _desc(desc),
@@ -69,11 +71,21 @@ public:
     virtual ~BitwuzlaSatConnector() {
         LOG(V2_INFO, "Done: %s\n", _name.c_str());
         if (_cb_cleanup) _cb_cleanup();
+        if (_incsat_cleaner) {
+            // Important: We need to stop internal access to the terminators
+            // in a thread-safe way before cleaning up the terminators!
+            _incsat->invalidateTerminators();
+            _incsat_cleaner(std::move(_incsat));
+        }
     }
 
     void setCleanupCallback(std::function<void()> cb) {_cb_cleanup = cb;}
     void outputModels(std::ostream* os) {
         _out_stream = os;
+    }
+
+    void setIncSatCleaner(std::function<void(std::unique_ptr<IncSatController>&&)> cleaner) {
+        _incsat_cleaner = cleaner;
     }
 
     virtual const char* get_name() const override {return "MallobSat-internal";}
