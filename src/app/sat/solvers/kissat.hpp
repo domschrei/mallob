@@ -70,10 +70,10 @@ private:
 	//on the C level. The kissat solver thus trusts that this array is always available and never suddenly reallocated.
 	std::vector<int> work_received_from_steal;
 
-	//We make sure that only one other solver can steal from this one at a time
+	//Lock that makes sure that only one other solver can steal from this solver at a time
 	std::atomic_flag steal_victim_lock = ATOMIC_FLAG_INIT;
 
-	//Tracking the status of the solver
+	//Tracking whether this solver is idle (searching for work)
 	std::atomic_bool sweeper_is_idle = false;
 	std::atomic_bool sweeper_longterm_idle = false;
 
@@ -87,9 +87,6 @@ private:
 	int attempted_steals = 0;
 	std::vector<SweepStealInfo> steal_records{};
 	struct shweep_statistics sweep_stats;
-
-	static constexpr int WARN_ON_REPEATED_MISSED_TERMINATION=32;
-	int count_repeated_missed_termination=0;
 	//##################################################################################################
 
 

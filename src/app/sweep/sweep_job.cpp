@@ -360,7 +360,8 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 
 	//Own options of Kissat
 	sweeper->set_option("sweepcomplete", 1); //deactivates checking for time limits during sweeping, so we dont get kicked out due to some limits
-	//Start already with depth 3, and accordingly doubled sweepvars and clauses than the default
+	//Start already with depth 3,
+	//and accordingly start with doubled sweepvars and clauses than the default (depth 2)
   	sweeper->set_option("sweepdepth", 3);				//, 2,    0, INT_MAX,	"environment depth")
   	sweeper->set_option("sweepvars", 256*2);			//  256,  0, INT_MAX,	"environment variables")
   	sweeper->set_option("sweepclauses", 1024*2);		//	1024, 0, INT_MAX,	"environment clauses")
@@ -1078,10 +1079,6 @@ bool SweepJob::canSolverExitStealing(KissatPtr sweeper) {
 
 	if (_terminate_all.load(std::memory_order_relaxed)) {
 		LOGGER(_sweeplogger,V4_VVER, "Sweeper [%i](%i) exit mallob steal (terminate_all)\n", _my_rank, localId);
-		sweeper->count_repeated_missed_termination++;
-		if (sweeper->count_repeated_missed_termination % sweeper->WARN_ON_REPEATED_MISSED_TERMINATION==0) {
-			LOGGER(_sweeplogger,V3_VERB, "SWEEP WARN : Sweeper [%i](%i) in %i-th worksteal loop after termination\n", _my_rank, localId, sweeper->count_repeated_missed_termination);
-		}
 		return true;
 	}
 	return false;

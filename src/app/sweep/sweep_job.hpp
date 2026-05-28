@@ -280,6 +280,8 @@ private:
 		int shared_in_window = shared.back() - shared[shared.size()-window];
 		int swept_in_window  = swept.back()  - swept[swept.size()-window];
 		double success_in_window = swept_in_window==0 ? 0: shared_in_window / (double) swept_in_window;
+		//This has the side effect of assigning success==0 also in case not a single new sweep() call
+		//has been started, even when there have been ongoing new Eqs+Units found within these same ongoing sweep() calls
 
 		//Skip this iteration if there has not been enough success in the considered window
 		if (shared.size()>=_params.sweepSkipWindow()) {
