@@ -79,6 +79,10 @@ public:
         }
     }
 
+    void preInitialize() {
+        _incsat->initInteractiveSolving();
+    }
+
     void setCleanupCallback(std::function<void()> cb) {_cb_cleanup = cb;}
     void outputModels(std::ostream* os) {
         _out_stream = os;

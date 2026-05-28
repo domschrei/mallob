@@ -95,6 +95,7 @@ private:
             // will be cleaned up by Bitwuzla or in the destructor above
             auto solver = new BitwuzlaSatConnector(_params, _api, _desc, _tracker,
                     _name + ":sat" + std::to_string(solverCounter++));
+            solver->preInitialize();
             _provision_buffer.pushBlocking(solver);
         }
         while (!_provision_buffer.empty()) usleep(1000 * 10);
