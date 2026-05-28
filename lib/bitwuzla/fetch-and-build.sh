@@ -3,7 +3,7 @@
 source ../base-build-functions.sh
 dirname="bitwuzla"
 
-branchorcommit="1177124ddc7e6ea9ce7eaf464da199d141146f04" # main branch, updated 2026-03-15
+branchorcommit="af2f6029d4cf978decb7652b4902210998001e1a" # main branch, updated 2026-05-28
 fetch_and_extract $dirname configure.py https://github.com/bitwuzla/bitwuzla/archive/${branchorcommit}.zip
 
 echo "[$dirname] Building ..."
