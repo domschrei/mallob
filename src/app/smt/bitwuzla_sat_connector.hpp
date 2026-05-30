@@ -120,6 +120,14 @@ public:
     virtual bitwuzla::Result solve() override {
         if (_in_solved_state) return _result;
 
+        if (_nb_clauses == 0 && _lits.empty() && _assumptions.empty()) {
+            _failed_lits.clear();
+            _result = bitwuzla::Result::SAT;
+            _solution = {0};
+            _in_solved_state = true;
+            return _result;
+        }
+
         if (_has_empty_clause) {
             // Empty clause is part of the permanent clauses:
             // Enter a "solved" state with UNSAT and no failed assumptions

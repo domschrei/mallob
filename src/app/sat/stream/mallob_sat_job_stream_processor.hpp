@@ -65,7 +65,24 @@ public:
         _nontrivial_wait_millis_subsequent(params.internalStreamProcessor() ? params.nontrivialSolvingDelaySubsequent() : 0),
         _incremental(incremental), _username(baseUserName)
         //,_job_slot(new JobSlotRegistry::JobSlot(_username, [&]() {signalReinitialization();})) 
-        {}
+            {
+
+        int jobSlots = _params.jobSlots() > 0 ? _params.jobSlots() : MyMpi::size(MPI_COMM_WORLD);
+        int numConcStreams = std::min(jobSlots, MyMpi::size(MPI_COMM_WORLD));
+
+        _base_job_name = "satjob-" + std::to_string(_stream_id) + "-rev-";
+        _json_base["user"] = _username;
+        _json_base["incremental"] = _incremental;
+        _json_base["priority"] = 1;
+        _json_base["application"] = "SAT";
+        _json_base["files"] = std::vector<std::string>();
+        if (!_json_base["configuration"].count("__XL"))
+            _json_base["configuration"]["__XL"] = "-1";
+        if (!_json_base["configuration"].count("__XU"))
+            _json_base["configuration"]["__XU"] = "-1";
+        _json_base["configuration"]["__EO"] = std::to_string(_stream_id);
+        _json_base["configuration"]["__EM"] = std::to_string(numConcStreams);
+    }
 
     ~MallobSatJobStreamProcessor() override {}
 
@@ -157,23 +174,8 @@ public:
             _began_nontrivial_solving = true;
             _slot->deploy();
 
-            int jobSlots = _params.jobSlots() > 0 ? _params.jobSlots() : MyMpi::size(MPI_COMM_WORLD);
-            int numConcStreams = std::min(jobSlots, MyMpi::size(MPI_COMM_WORLD));
-
-            _base_job_name = "satjob-" + std::to_string(_stream_id) + "-rev-";
-            _json_base["user"] = _username;
-            _json_base["incremental"] = _incremental;
-            _json_base["priority"] = 1;
-            _json_base["application"] = "SAT";
-            _json_base["files"] = std::vector<std::string>();
-            if (!_json_base["configuration"].count("__XL"))
-                _json_base["configuration"]["__XL"] = "-1";
-            if (!_json_base["configuration"].count("__XU"))
-                _json_base["configuration"]["__XU"] = "-1";
             _json_base["configuration"]["__NV"] = std::to_string(_nb_vars);
             _json_base["configuration"]["__NC"] = std::to_string(_nb_clauses);
-            _json_base["configuration"]["__EO"] = std::to_string(_stream_id);
-            _json_base["configuration"]["__EM"] = std::to_string(numConcStreams);
         }
 
         auto& newLiterals = t.lits;
@@ -215,12 +217,13 @@ public:
             newLiterals.push_back(INT32_MIN);
         }
 
-        StaticStore<std::vector<int>>::insert(copy["name"].get<std::string>(), std::move(newLiterals));
-        copy["internalliterals"] = copy["name"].get<std::string>();
+        auto nameOfCall = copy["name"].get<std::string>();
+        StaticStore<std::vector<int>>::insert(nameOfCall, std::move(newLiterals));
+        copy["internalliterals"] = nameOfCall;
         if (!descriptionLabel.empty()) {
             copy["description-id"] = descriptionLabel;
         }
-        _expected_result_job_name = copy["name"].get<std::string>();
+        _expected_result_job_name = nameOfCall;
 
         LOG(V5_DEBG, "MSJS %s begin call\n", _name.c_str());
         _slot->resume();
@@ -228,7 +231,7 @@ public:
         _pending_rev = t.rev;
         _pending_task_interrupted = false;
         try {
-            LOG(V4_VVER, "%s SUBMIT %s\n", _name.c_str(), copy["name"].get<std::string>().c_str());
+            LOG(V4_VVER, "%s SUBMIT %s\n", _name.c_str(), nameOfCall.c_str());
             auto response = _api.submit(copy, [&, rev = _pending_rev, subjob](nlohmann::json& result) {
 
                 if (result["name"].get<std::string>() != _expected_result_job_name) {
