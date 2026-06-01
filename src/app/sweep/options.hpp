@@ -21,3 +21,4 @@ OPT_BOOL(sweepSignalKitten,		"swsk", 	"sweep-signal-kitten",		true, "Signal to k
 OPT_FLOAT(sweepSkipRatio,		"swskr",    "sweep-skip-ratio",			0.01, 0, 1, "minimum ratio of found Eqs+Units versus number of swept variables to not skip an iteration")
 OPT_INT(sweepSkipWindow,		"swskw",	"sweep-skip-window",		100, 1, LARGE_INT, "number of last sharing rounds for which the skip-ratio is checked")
 OPT_INT(sweepMaxFailedIterations,"swmfi",	"sweep-max-failed-iters",	4, 0, LARGE_INT, "max allowed iterations which never reach the skip-ratio before Job is terminated")
+OPT_BOOL(sweepShowLagWarn,		"swslw", 	"sweep-show-lag-warn",		false, "show 'lagging' solvers that are in the same sweep(...) call since a long time")

@@ -6,12 +6,13 @@ OUT_DIR=$HOME/PhD/logsntraces/
 
 # INST_PATH=$HOME/PhD/instances/miter/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/nusmvdme1d3multi.cnf.xz" #0.1sec
-INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf.xz" # 6sec @ 3 iterations
+# INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf.xz" # 6sec @ 3 iterations
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/iso/6s151.cnf.xz"  # 0.1sec
+# surprisingly regular ~2000 literals received by XTCS in SATWITHPRE
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/bob12s01.cnf.xz" # 30sec, 17% after 2 rounds
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/cmudme1.cnf.xz" # 30sec, 17% after 2 rounds
 # INST_PATH="$HOME/PhD/instances/some2024/39fba35826ce8c87cd8e8de1969b2dd2-SGI_30_80_26_70_4-log.shuffled-as.sat03-208.cnf.xz" # 30sec, 17% after 2 rounds
-INST_PATH="$HOME/PhD/instances/some2024/39277cab188349aee0f229cb7341b5c5-crafted_n12_d6_c4_num23.cnf.xz"
+# INST_PATH="$HOME/PhD/instances/some2024/39277cab188349aee0f229cb7341b5c5-crafted_n12_d6_c4_num23.cnf.xz"
 
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s101.cnf.xz" 
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s103.cnf.xz"   #huge, & congruence extremely effective
@@ -28,7 +29,7 @@ INST_PATH="$HOME/PhD/instances/some2024/39277cab188349aee0f229cb7341b5c5-crafted
 #easy SATs
 # INST_PATH="$HOME/PhD/instances/sat-and-minisat1m/0225fa9581c622e5abbc8497a97edf4e-fla-qhid-360-4.cnf.xz" #<1s kissat
 # INST_PATH="$HOME/PhD/instances/sat-and-minisat1m/01653db16d6cedc27f5314d680efc055-fla-komb-220-5.cnf.xz" #<1s kissat
-# INST_PATH="$HOME/PhD/instances/sat-and-minisat1m/01d037bf22a943430790eedd667f415e-60-128351.cnf.xz" #30sec kissat
+INST_PATH="$HOME/PhD/instances/sat-and-minisat1m/01d037bf22a943430790eedd667f415e-60-128351.cnf.xz" #30sec kissat
 # INST_PATH="$HOME/PhD/instances/sat-and-minisat1m/037c423f56548082b1935e88c48ffdda-3col120_5_2.shuffled.cnf.xz" #actually has some equivalences
 
 #difficult SATs
@@ -43,8 +44,8 @@ echo "NPROCS $NPROCS"
 echo "threads per process $threads"
 
 # APP="SAT"
-APP="SWEEP"
-# APP="SATWITHPRE"
+# APP="SWEEP"
+APP="SATWITHPRE"
 
 MALLOB_OPTIONS="-t=$threads \
   -mono-app=$APP \
@@ -68,7 +69,7 @@ MALLOB_OPTIONS="-t=$threads \
   -fcll=2 \
 	-preprocess-sweepnsat=1 \
   -preprocess-sweep-priority=1.0 \
-  -sweep-solver-verbosity=0 \
+  -sweep-solver-verbosity=2 \
   -cjc=1 \
   -sweep-max-kitten-prop=1000000 \
   -sweep-signal-kitten=1 \

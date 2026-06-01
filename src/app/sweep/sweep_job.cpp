@@ -762,7 +762,7 @@ void SweepJob::checkIdleWorkStatus() {
 		//no touching them anymore
 	}
 
-	const float STATUS_PERIOD = 0.0100; //in seconds. Defines the long-term-idle window
+	const float STATUS_PERIOD = 0.1000; //in seconds. Defines the long-term-idle window
 	if (Timer::elapsedSeconds() - _timestamp_log_last_idleinfo < STATUS_PERIOD) {
 		return;
 	}
@@ -1512,7 +1512,7 @@ int SweepJob::countLaggingSolvers() {
 			uint64_t kitten_propagations = shweep_kitten_propagations(sweeper->solver);
 			const char *profile = shweep_get_profilename(sweeper->solver);
 			auto stats = sweeper->fetchSweepStats();
-			if (_is_root) {
+			if (_is_root && _params.sweepShowLagWarn() ) {
 				LOGGER(_sweeplogger,V3_VERB, "WARN [%i](%i) lags %i vs %i (%i). kcalls %i  kprops %zu  kprof %s iter %i\n",
 					_my_rank, sweeper->getLocalId(), sweeper->curr_eq_round, _lastImportedRound.load(), sweeper->curr_eq_round - _lastImportedRound.load(), stats.kitten_calls, kitten_propagations, profile, stats.local_iteration);
 			}
