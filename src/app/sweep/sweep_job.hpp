@@ -190,6 +190,14 @@ private:
 	std::vector<int> _shared_EU_this_iteration_cumul{};
 	std::vector<int> _swept_this_iteration_cumul{};
 
+
+	//The user defines the skip window in terms of seconds
+	//For us internally, it is however more elegant to express it in the corresponding number of sharing rounds
+	//that happen within that time window
+	//since this naturally ignores time spent inbetween iterations (where sequential bookkeping is done)
+	//and where skipping would not defined or wanted
+	int _skip_window_rounds = _params.sweepSkipWindowSecs() / (double) _params.sweepSharingPeriod();
+
 	//See how much each rank contributed in postprocessing
 	//Main use is to detect whether some ranks didn't contribute at all, which would hint at a bug
 	int _rank_contributed_equalities = 0;
@@ -270,10 +278,16 @@ private:
 		bool decide_end_iteration = false;
 		bool decide_terminate_job = false;
 
+		//There exist three ways in which an iteration can end.
+		// 1. Naturally, because all work has been done and the iteration is done
+		// 2. Early, because there has not been enough success in recent rounds (found Eqs+Units)
+		// 3. Early, because there have been too many lagging solvers in recent rounds (solvers stuck in long sweep calls)
+
+
 		//Calculate the success within the last rounds window (Number of equivalences + units versus the number of swept variables)
 		auto &shared = _shared_EU_this_iteration_cumul;
 		auto &swept = _swept_this_iteration_cumul;
-		int window = _params.sweepSkipWindow();
+		int window = _skip_window_rounds;
 		if (window > shared.size()) {
 			window = shared.size();
 		}
@@ -284,11 +298,11 @@ private:
 		//has been started, even when there have been ongoing new Eqs+Units found within these same ongoing sweep() calls
 
 		//Skip this iteration if there has not been enough success in the considered window
-		if (shared.size()>=_params.sweepSkipWindow()) {
+		if (shared.size()>=_skip_window_rounds) {
 			if (success_in_window < _params.sweepSkipRatio()) {
 				decide_end_iteration = true;
 				_root_skipped_iterations++;
-				LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) SKIP iteration %i (rnd %i) , bc. success %f (%i / %i) < %.3f thresh, in rounds [%i, %i]. Skipped-Count %i  Failed-Count %i (this: +%i)\n",
+				LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) SUCCESS_SKIP iteration %i (rnd %i) , bc. success %f (%i / %i) < %.3f thresh, in rounds [%i, %i]. Skipped-Count %i  Failed-Count %i (this: +%i)\n",
 					_my_rank, _root_iteration, _root_sharing_round,  success_in_window, shared_in_window, swept_in_window,
 					_params.sweepSkipRatio(), _root_sharing_round - window, _root_sharing_round,
 					_root_skipped_iterations, _root_failed_iterations, !_root_had_success_this_iteration);
@@ -297,25 +311,34 @@ private:
 				_root_had_success_this_iteration = true;
 			}
 		}
-		//End this iteration if all work has been done
+		//Skip the iteration because too many solvers are lagging (chose a third as a threshold)
+		//A solver is deemed lagging if it is stuck in the same sweep call for the whole window of recent rounds
+		if (shared.size()>=_skip_window_rounds && md.lagging > 0.33 * _nThreads) {
+			decide_end_iteration = true;
+			LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf) LAGGING_SKIP iteration %i (rnd %i) , bc. more than a third of solvers are lagging ( %i / %i ) in window %.3f sec , %i rounds \n",
+				_my_rank, _root_iteration, _root_sharing_round, md.lagging, _nThreads, _params.sweepSkipWindowSecs(), _skip_window_rounds);
+		}
+
+		//If all work has been done, the iteration ends naturally
 		if (all_idle) {
 			LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf): All idle - ending this iteration %i \n", _my_rank, _root_iteration);
 			decide_end_iteration = true;
-			//Usually we wait for sufficiently many rounds until we determine whether this iteration had success.
-			//But if we reach all_idle before the first such check, we do the next best thing,
-			//which is we evaluate the success of all the (few) rounds of this iteration.
-			if (shared.size() < _params.sweepSkipWindow() && success_in_window >= _params.sweepSkipRatio()) {
-				_root_had_success_this_iteration = true;
-				LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf): SHORT_SUCCESSFULL_ITERATION  \n", _my_rank, _root_iteration);
-			}
 		}
 
 		//On iteration end, note whether we ever had success in this iteration
 		//Can end either because all work is done, or because we decided to skip the rest
 		if (decide_end_iteration) {
+			//Usually we wait for sufficiently many rounds until we determine whether this iteration had success.
+			//But if we reach the end of an iteration earlier (through all_idle), before the first such check,
+			//we do the next best thing, which is we evaluate the success of all the (few) rounds of this iteration.
+			if (shared.size() < _skip_window_rounds && success_in_window >= _params.sweepSkipRatio()) {
+				_root_had_success_this_iteration = true;
+				LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf): SHORT_SUCCESSFULL_ITERATION  \n", _my_rank, _root_iteration);
+			}
+
 			if (_root_had_success_this_iteration == false) {
 				_root_failed_iterations++;
-				LOGGER(_sweeplogger,V2_INFO, "Iteration %i FAILED . Now total FAILED_ITERATIONS %i \n", _root_iteration, _root_failed_iterations);
+				LOGGER(_sweeplogger,V2_INFO, "Iteration %i failed. Now FAILED_ITERATIONS %i \n", _root_iteration, _root_failed_iterations);
 			}
 		}
 		//Terminate the whole SweepJob if enough failed iterations happened

@@ -71,12 +71,13 @@ MALLOB_OPTIONS="-t=$threads \
   -preprocess-sweep-priority=1.0 \
   -sweep-solver-verbosity=2 \
   -cjc=1 \
+  -sweep-show-lag-warn=1 \
   -sweep-max-kitten-prop=1000000 \
   -sweep-signal-kitten=1 \
 	-sweep-sharing-period=0.050 \
   -sweep-skip-ratio=0.001 \
-  -sweep-skip-window=30 \
-  -sweep-max-failed-iters=6
+  -sweep-skip-window=2.0 \
+  -sweep-max-failed-iters=3
 "
 
 

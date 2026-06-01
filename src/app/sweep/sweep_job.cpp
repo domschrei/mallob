@@ -94,6 +94,7 @@ void SweepJob::appl_start() {
 		  }
 		  break;
 	}
+	LOGGER(_sweeplogger, V2_INFO, "Calculated SkipWindowRounds %i\n", _skip_window_rounds);
 
 	_nThreads = _params.numThreadsPerProcess.val;
     _metadata = getSerializedDescription(0)->data();
@@ -762,8 +763,8 @@ void SweepJob::checkIdleWorkStatus() {
 		//no touching them anymore
 	}
 
-	const float STATUS_PERIOD = 0.1000; //in seconds. Defines the long-term-idle window
-	if (Timer::elapsedSeconds() - _timestamp_log_last_idleinfo < STATUS_PERIOD) {
+	const float CHECK_PERIOD = 2 * _params.sweepSharingPeriod(); // Defines the long-term-idle threshhold
+	if (Timer::elapsedSeconds() - _timestamp_log_last_idleinfo < CHECK_PERIOD) {
 		return;
 	}
 	_timestamp_log_last_idleinfo = Timer::elapsedSeconds();
@@ -1098,6 +1099,8 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	//This is the fixed request "slot" we are using to communicate concurently via shared memory with the main worker thread
 	auto &request = _worksteal_requests[localId];
 
+	//There can be times where there is nothing to do, since the solver waits for a steal response
+	//Define here how long we wait in that situation until we check again for incoming answers
 	constexpr int MPI_WAIT_TIME_MILLISECS = 10;
 
 	//Check whether a previously queued MPI request has been answered
@@ -1495,10 +1498,12 @@ void SweepJob::clearImportedRound() {
 }
 
 bool SweepJob::isSolverLagging(KissatPtr sweeper) {
-	//A solver is considered lagging if it is more than MIN_LAGGING_ROUNDS rounds behind in importing equalities and units
-	//This happens when a solver is stuck for multiple seconds within a single -particularly hard- sweep call
-	constexpr int MIN_LAGGING_ROUNDS = 50;
-	return sweeper->curr_eq_round < (_lastImportedRound.load() - MIN_LAGGING_ROUNDS);
+	//A solver is considered lagging if it is stuck in the same sweep call for the whole period of the user-defined skip window
+	//Lagging is already mitigated a bit by limiting each individual Kitten Call to some maximum number of propagations.
+	//However, within one sweep_variable(v) call there are multiple stages (backbones, partitioning, sweeping, ...)
+	//each of which can trigger many individual Kitten calls. So to manually "un-stuck" such a solver,
+	//one would also need to exit all those stages on demand
+	return sweeper->curr_eq_round < (_lastImportedRound.load() - _skip_window_rounds);
 }
 
 int SweepJob::countLaggingSolvers() {
