@@ -4,6 +4,8 @@
 #include "app/sat/execution/solver_setup.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
 
+#include <functional>
+
 class IPAsirMiniSAT;
 
 class MiniSat : public PortfolioSolverInterface {
@@ -46,6 +48,8 @@ public:
 	virtual bool exportsConditionalClauses() override;
 	virtual void cleanUp() override;
 
+	void setExternalTerminator(std::function<bool()> extTerminator) {_ext_terminator = extTerminator;}
+
 protected:
 	// Interrupt the SAT solving, solving cannot continue until interrupt is unset.
 	virtual void setSolverInterrupt() override;
@@ -55,7 +59,8 @@ protected:
 private:
 	std::vector<int> _assumptions;
 	IPAsirMiniSAT* _solver {0};
-	volatile bool interrupt {false};
 
+	volatile bool interrupt {false};
 	friend int cbTerminate(void * state);
+	std::function<bool()> _ext_terminator;
 };

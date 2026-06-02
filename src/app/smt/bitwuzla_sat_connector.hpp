@@ -37,6 +37,9 @@ private:
     int _nb_clauses {0};
     int _revision {-1};
 
+    bool _has_empty_clause {false};
+    bool _last_lit_zero {true};
+
     std::vector<int> _solution;
     tsl::robin_set<int> _failed_lits;
 
@@ -50,6 +53,8 @@ private:
     std::function<void()> _cb_cleanup;
     bitwuzla::Terminator* _bzla_term {nullptr};
     bitwuzla::Terminator* _ext_term {nullptr};
+
+    std::function<void(std::unique_ptr<IncSatController>&&)> _incsat_cleaner;
 
 public:
     BitwuzlaSatConnector(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& tracker, const std::string& name) :
@@ -66,6 +71,16 @@ public:
     virtual ~BitwuzlaSatConnector() {
         LOG(V2_INFO, "Done: %s\n", _name.c_str());
         if (_cb_cleanup) _cb_cleanup();
+        if (_incsat_cleaner) {
+            // Important: We need to stop internal access to the terminators
+            // in a thread-safe way before cleaning up the terminators!
+            _incsat->invalidateTerminators();
+            _incsat_cleaner(std::move(_incsat));
+        }
+    }
+
+    void preInitialize() {
+        _incsat->initInteractiveSolving();
     }
 
     void setCleanupCallback(std::function<void()> cb) {_cb_cleanup = cb;}
@@ -73,14 +88,22 @@ public:
         _out_stream = os;
     }
 
+    void setIncSatCleaner(std::function<void(std::unique_ptr<IncSatController>&&)> cleaner) {
+        _incsat_cleaner = cleaner;
+    }
+
     virtual const char* get_name() const override {return "MallobSat-internal";}
     virtual const char* get_version() const override {return "N/A";}
 
     virtual void add(int32_t lit, int64_t cgroup_id = 0) override {
         _in_solved_state = false;
+        const bool isZero = lit == 0;
+        if (MALLOB_UNLIKELY(isZero && _last_lit_zero))
+            _has_empty_clause = true;
+        _last_lit_zero = isZero;
         _lits.push_back(lit);
         _nb_vars = std::max(_nb_vars, std::abs(lit));
-        _nb_clauses += lit == 0;
+        _nb_clauses += isZero;
     }
     virtual void assume(int32_t lit) override {
         _in_solved_state = false;
@@ -97,12 +120,33 @@ public:
     virtual bitwuzla::Result solve() override {
         if (_in_solved_state) return _result;
 
+        if (_nb_clauses == 0 && _lits.empty() && _assumptions.empty()) {
+            _failed_lits.clear();
+            _result = bitwuzla::Result::SAT;
+            _solution = {0};
+            _in_solved_state = true;
+            return _result;
+        }
+
+        if (_has_empty_clause) {
+            // Empty clause is part of the permanent clauses:
+            // Enter a "solved" state with UNSAT and no failed assumptions
+            LOG(V2_INFO, "%s trivially UNSAT\n", _name.c_str());
+            _lits.clear();
+            _assumptions.clear();
+            _failed_lits.clear();
+            _result = bitwuzla::Result::UNSAT;
+            _in_solved_state = true;
+            return _result;
+        }
+
         _revision++;
         auto time = Timer::elapsedSeconds();
         LOG(V2_INFO, "%s submit rev. %i (%i lits, %i asmpt)\n", _name.c_str(), _revision, _lits.size(), _assumptions.size());
 
         bool noAssumptions = _assumptions.empty();
-        auto [resultCode, solution] = _incsat->solveNextRevision(std::move(_lits), std::move(_assumptions));
+        auto [resultCode, solution] = _incsat->solveNextRevision(std::move(_lits), std::move(_assumptions),
+            _nb_vars, _nb_clauses);
         _in_solved_state = noAssumptions;
         _lits.clear();
         _assumptions.clear();

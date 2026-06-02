@@ -23,6 +23,7 @@ public:
     enum PalRupResult {DONE, VALIDATED, ERROR};
     PalRupResult callBlocking() {
 
+#if MALLOB_APP_PALRUPCHECK
         assert(_params.regularProcessDistribution());
         assert(_params.logDirectory.isSet());
         assert(_params.proofDirectory.isSet());
@@ -88,5 +89,8 @@ public:
             return VALIDATED;
         }
         return DONE;
+#else
+        return ERROR;
+#endif
     }
 };

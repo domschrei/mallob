@@ -11,6 +11,7 @@
 
 #include "bitwuzla/cpp/parser.h"
 #include "bitwuzla/cpp/bitwuzla.h"
+#include "util/sys/thread_pool.hpp"
 
 #include <cstdint>
 #include <cstdio>
@@ -25,6 +26,9 @@ private:
     float _start_time = (float) INT32_MAX;
 
     std::string _name;
+
+    std::future<void> _fut;
+    JobResult _result;
 
     struct BzllobTerminator : public bitwuzla::Terminator {
         BitwuzlaSolver& inst;
@@ -52,13 +56,68 @@ public:
         LOG(V2_INFO,"SMT Bitwuzla+Mallob %s\n", _name.c_str());
     }
     ~BitwuzlaSolver() {
+        if (_fut.valid()) _fut.get();
         LOG(V2_INFO, "Deleting SMT Bitwuzla+Mallob #%i\n", _desc.getId());
     }
 
     JobResult solve() {
         _start_time = Timer::elapsedSeconds();
         _terminator.updateStartTime(_start_time);
+        float endTime = getEndTime(&_params, &_desc, _start_time);
+        _result.result = -1;
 
+        // We execute Bitwuzllob concurrently in another thread. If it gets stuck somewhere,
+        // we can still quit the entire program without destroying this BitwuzlaSolver instance
+        // and hence without waiting for Bitwuzllob to return (if -terminate-abruptly=1).
+        _fut = ProcessWideThreadPool::get().addTask([&]() {
+            run();
+        });
+
+        float sleepMicros = 1;
+        while (_result.result == -1 && !isTimeoutHit(&_params, &_desc, endTime)) {
+            // To allow for relatively small latencies for trivial problems:
+            // initially just sleep for 1us, then increase it exponentially up to 25ms
+            usleep((unsigned long) sleepMicros);
+            sleepMicros = std::min(25'000.f, 1 + sleepMicros * 1.5f);
+        }
+
+        _result.id = _desc.getId();
+        _result.revision = 0;
+        if (_result.result <= 0 || isTimeoutHit(&_params, &_desc, endTime)) {
+            LOG(V2_INFO, "%s SMT TASK INTERRUPTED time=%.3fs\n", _name.c_str(),
+                Timer::elapsedSeconds()-_start_time);
+            JobResult res = _result;
+            res.result = 0;
+            return res;
+        } else {
+            LOG(V2_INFO, "%s SMT TASK COMPLETE time=%.3fs\n", _name.c_str(),
+                Timer::elapsedSeconds()-_start_time);
+            return _result;
+        }
+    }
+
+    static std::string getSmtOutputFilePath(const Parameters& params, int jobId) {
+        return params.smtOutputFile() + (params.monoFilename.isSet() ? "" : "." + std::to_string(jobId));
+    }
+
+    static inline bool isTimeoutHit(const Parameters* params, JobDescription* desc, float endTime) {
+        if (Terminator::isTerminating())
+            return true;
+        if (Timer::elapsedSeconds() > endTime)
+            return true;
+        return false;
+    }
+    static float getEndTime(const Parameters* params, JobDescription* desc, float startTime) {
+        float endTime = INT32_MAX;
+        if (params->timeLimit() > 0)
+            endTime = std::min(endTime, startTime + params->timeLimit());
+        if (desc->getWallclockLimit() > 0)
+            endTime = std::min(endTime, startTime + desc->getWallclockLimit());
+        return endTime;
+    }
+
+private:
+    void run() {
         bitwuzla::Options options;
         bitwuzla::TermManager tm;
 
@@ -125,6 +184,7 @@ public:
 
         DTaskTracker dTaskTracker(_params);
         std::unique_ptr<BitwuzllobSatSolverFactory> factory;
+        bool success = false;
 
         try {
             *out << bitwuzla::set_bv_format(bv_format);
@@ -149,6 +209,7 @@ public:
                 if (!parse_only && !pp_only) bitwuzla->simplify();
                 bitwuzla->print_formula(*out, "smt2");
             }
+            success = true;
 
         } catch (const bitwuzla::parser::Exception& e) {
             LOG(V0_CRIT, "[ERROR] exception in Bitwuzla parser: %s\n", e.msg().c_str());
@@ -170,32 +231,8 @@ public:
 
         if (smtOutFileSet) delete out;
 
-        JobResult res;
-        res.id = _desc.getId();
-        res.revision = 0;
-        res.result = 20;
-        LOG(V2_INFO,"SMT return result\n");
-
-        return res;
-    }
-
-    static std::string getSmtOutputFilePath(const Parameters& params, int jobId) {
-        return params.smtOutputFile() + (params.monoFilename.isSet() ? "" : "." + std::to_string(jobId));
-    }
-
-    static inline bool isTimeoutHit(const Parameters* params, JobDescription* desc, float endTime) {
-        if (Terminator::isTerminating())
-            return true;
-        if (Timer::elapsedSeconds() > endTime)
-            return true;
-        return false;
-    }
-    static float getEndTime(const Parameters* params, JobDescription* desc, float startTime) {
-        float endTime = INT32_MAX;
-        if (params->timeLimit() > 0)
-            endTime = std::min(endTime, startTime + params->timeLimit());
-        if (desc->getWallclockLimit() > 0)
-            endTime = std::min(endTime, startTime + desc->getWallclockLimit());
-        return endTime;
+        _result.id = _desc.getId();
+        _result.revision = 0;
+        _result.result = success ? 20 : 0;
     }
 };

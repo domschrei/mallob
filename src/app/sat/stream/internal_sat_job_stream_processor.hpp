@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#include "app/sat/data/portfolio_sequence.hpp"
 #include "app/sat/execution/solver_setup.hpp"
 #include "app/sat/parse/serialized_formula_parser.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
@@ -46,15 +47,22 @@ public:
         setup.maxNumSolvers = 64; // just for proper diversification
         setup.solverType = 'C';
         setup.exportClauses = false;
-        setup.diversifyNative = true;
-        if (setup.onTheFlyChecking) setup.certifiedUnsat = true;
 #if MALLOB_USE_MINISAT
         if (_solvertype == MINISAT) {
-            _solver.reset(new MiniSat(setup));
+            auto minisat = new MiniSat(setup);
+            minisat->setExternalTerminator([&]() {
+                return _terminator(_current_rev);
+            });
+            _solver.reset(minisat);
         }
 #endif
 #if MALLOB_USE_CADICAL
         if (_solvertype == CADICAL) {
+            if (setup.onTheFlyChecking) setup.certifiedUnsat = true;
+            // disable pre-/inprocessing
+            // setup.flavour = PortfolioSequence::PLAIN;
+            // native diversification 0 (phase=0) happens to improve performance
+            setup.diversifyNative = true;
             auto cadical = new Cadical(setup);
             cadical->getTerminator().setExternalTerminator([&]() {
                 return _terminator(_current_rev);
@@ -85,7 +93,7 @@ public:
         _current_rev = task.rev;
         _internal_rev++;
         _pending = true;
-        LOG(V2_INFO, "%s rev. %i process payload of size %lu, %lu assumptions\n", _name.c_str(), task.rev, task.lits.size(), task.assumptions.size());
+        LOG(V3_VERB, "%s rev. %i process payload of size %lu, %lu assumptions\n", _name.c_str(), task.rev, task.lits.size(), task.assumptions.size());
         if (task.type == SatJobStreamProcessor::SatTask::RAW) {
             SerializedFormulaParser parser(Logger::getMainInstance(), task.lits.data(), task.lits.size(), true);
             assert(task.assumptions.empty());
@@ -125,7 +133,7 @@ public:
             solution = std::move(failedVec);
         }
         bool winner = concludeRevision(task.rev, res, std::move(solution));
-        if (winner) LOG(V2_INFO, "%s rev. %i won with res=%i\n", _name.c_str(), task.rev, res);
+        if (winner) LOG(V3_VERB, "%s rev. %i won with res=%i\n", _name.c_str(), task.rev, res);
         _pending = false;
     }
 

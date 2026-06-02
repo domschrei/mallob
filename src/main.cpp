@@ -1,4 +1,5 @@
 
+#include <cstdlib>
 #include <stdlib.h>
 #include <unistd.h>
 #include <assert.h>
@@ -283,7 +284,7 @@ int main(int argc, char *argv[]) {
         }
         std::string cmd = "find /dev/shm/ -name 'edu.kit.iti.mallob.*' -print0 | xargs -0 rm 2>/dev/null";
         (void) system(cmd.c_str());
-        TmpDir::wipe();
+        TmpDir::wipe(true);
 
         // Wait for all processes to have cleaned up before proceeding
         // (creating new files which shouldn't be cleaned up!)
@@ -355,7 +356,7 @@ int main(int argc, char *argv[]) {
     if (clientComm != MPI_COMM_NULL) MPI_Comm_free(&clientComm);
     if (workerComm != MPI_COMM_NULL) MPI_Comm_free(&workerComm);
     MPI_Finalize();
-    TmpDir::wipe();
+    TmpDir::wipe(false);
     Process::removeDelayedExitWatchers();
     LOG(V2_INFO, "Exiting happily\n");
 }

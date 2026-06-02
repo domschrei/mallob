@@ -10,6 +10,7 @@
 
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
+#include "app/sat/solvers/reduce_diversifier.hpp"
 #include "util/logger.hpp"
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "app/sat/data/solver_statistics.hpp"
@@ -260,70 +261,16 @@ void Kissat::diversify(int seed) {
 
     //Randomize reduce bounds
     if (getDiversificationIndex() >= 4 && _setup.diversifyReduce > 0) {
-        std::mt19937 rng(seed);
-        Distribution distribution(rng);
-
-        //Give each Kissat solver a randomized reduce-range, such that some solvers keep most clauses and other solvers other kick most clauses
-        int reduce_low = 500;
-        int reduce_high = 900;
-        LOGGER(_logger, V3_VERB, "--\n");
-
-        //Reduce==1: Uniform distribution of range values
-        if(_setup.diversifyReduce==1) {
-            distribution.configure(Distribution::UNIFORM, std::vector<double>{
-                    /*min=*/(double)(_setup.reduceMin - _setup.reduceDelta), /*max=*/(double) (_setup.reduceMax + _setup.reduceMax)
-            });
-            int reduce_center = (int) std::round(distribution.sample());
-            reduce_low  = std::max(0, reduce_center - _setup.reduceDelta);
-            reduce_high = std::min(1000, reduce_center + _setup.reduceDelta);
-            LOGGER(_logger, V3_VERB, "Given diversifyReduce=%i, reduceMin=%i, reduceMax=%i, reduceDelta=%i\n", _setup.diversifyReduce, _setup.reduceMin, _setup.reduceMax, _setup.reduceDelta);
-            LOGGER(_logger, V3_VERB, "Sampled reduce_center=%i\n", reduce_center);
-        }
-
-        //Reduce==2: More extreme range values, 80% of solvers are either full-keep or full-kick, only 20% of solvers are moderate with keep half
-        else if(_setup.diversifyReduce==2) {
-            distribution.configure(Distribution::UNIFORM, std::vector<double>{0,1});
-            double random_selector = distribution.sample();
-            if      (random_selector<0.4) reduce_low = reduce_high = 0;
-            else if (random_selector<0.6) reduce_low = reduce_high = 500;
-            else                          reduce_low = reduce_high = 1000;
-            LOGGER(_logger, V3_VERB, "Given diversifyReduce=%i, reduceDelta=%i\n", _setup.diversifyReduce, _setup.reduceDelta);
-        }
-        //Reduce==3: Gaussian Distribution
-        else if(_setup.diversifyReduce==3) {
-            distribution.configure(Distribution::NORMAL, std::vector<double>{
-                /*mean=*/(double)_setup.reduceMean, /*stddev=*/(double)_setup.reduceStddev, /*min=*/(double)_setup.reduceMin, /*max=*/(double)_setup.reduceMax
-            });
-            int reduce_fixed = (int) std::round(distribution.sample());
-            reduce_low  = reduce_fixed;
-            reduce_high = reduce_fixed;
-            LOGGER(_logger, V3_VERB, "Given diversifyReduce=%i, reduceMin=%i, reduceMax=%i, reduceMean=%i, reduceStddev=%i \n",
-                _setup.diversifyReduce, _setup.reduceMin, _setup.reduceMax, _setup.reduceMean, _setup.reduceStddev);
-        }
-        //Reduce==4: 10% of solvers are either almost full-keep or almost full-kick, 
-        //the remaining solvers are slightly perturbed
-        else if(_setup.diversifyReduce==4) {
-            distribution.configure(Distribution::UNIFORM, std::vector<double>{0,1});
-            if (distribution.sample() < 0.1) {
-                // 20% chance: keep or remove almost all clauses (coin flip)
-                reduce_low = (distribution.sample() < 0.5) ? 50 : 950;
-                reduce_high = reduce_low;
-            } else {
-                // 80% chance: just add some minor perturbation to the reduce params
-                distribution.configure(Distribution::NORMAL, {
-                    /*mean=*/0, /*stddev=*/5, /*min=*/-50, /*max=*/50
-                });
-                reduce_low += distribution.sample();
-                reduce_high += distribution.sample();
-            }
-        }
-        else {
-            cout << "Error: div-reduce="<<_setup.diversifyReduce<<" is not a valid flag" << endl;
-        }
-        kissat_set_option(solver, "reducelow", reduce_low);
-        kissat_set_option(solver, "reducehigh", reduce_high);
-        LOGGER(_logger, V3_VERB, "Sampled reducelow    =%i\n", reduce_low);
-        LOGGER(_logger, V3_VERB, "Sampled reducehigh   =%i\n", reduce_high);
+        ReduceDiversifier rd(_setup, _logger,
+        [&](int lower) {
+            kissat_set_option(solver, "reducelow", lower);
+            return true;
+        },
+        [&](int upper) {
+            kissat_set_option(solver, "reducehigh", upper);
+            return true;
+        });
+        rd.apply(seed);
     }
 
     seedSet = true;

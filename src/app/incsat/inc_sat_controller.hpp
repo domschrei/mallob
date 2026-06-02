@@ -21,7 +21,7 @@
 class IncSatController {
 
 private:
-    const Parameters _params;
+    const Parameters& _params;
     APIConnector& _api;
     JobDescription& _desc;
     std::string _problem_file;
@@ -43,16 +43,19 @@ private:
     std::function<bool()> _cb_terminate;
     bool _replace_default_terminator {false};
 
+    Mutex _mtx_terminate;
+    volatile bool _terminators_invalidated {false};
+
 public:
     IncSatController(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& dTaskTracker) :
             _params(params), _api(api), _desc(desc), _stream_id(getNextStreamId()),
             _name("#" + std::to_string(desc.getId()) + "(ISAT):" + std::to_string(_stream_id)),
             _dtask_tracker(dTaskTracker) {
 
-        LOG(V3_VERB, "+IncSat %s\n", _name.c_str());
+        LOG(V4_VVER, "+IncSat %s\n", _name.c_str());
     }
     ~IncSatController() {
-        LOG(V3_VERB, "-IncSat %s\n", _name.c_str());
+        LOG(V4_VVER, "-IncSat %s\n", _name.c_str());
         finalize();
     }
 
@@ -90,12 +93,13 @@ public:
         initStream(true);
     }
 
-    bool solveNextRevisionNonblocking(std::vector<int>&& clauses, std::vector<int>&& assumptions, const std::string& descLabel = "") {
+    bool solveNextRevisionNonblocking(std::vector<int>&& clauses, std::vector<int>&& assumptions, const std::string& descLabel = "",
+            int nbVars = -1, int nbClauses = -1) {
         initInteractiveSolving();
 
         if (!_params.onTheFlyChecking()) {
             _stream->stream.solveNonblocking({SatJobStreamProcessor::SatTask::Type::SPLIT,
-                std::move(clauses), std::move(assumptions)});
+                std::move(clauses), std::move(assumptions), nbVars, nbClauses});
             return true;
         }
         auto futWrite = ProcessWideThreadPool::get().addTask([&]() {
@@ -119,12 +123,15 @@ public:
         }
         std::vector<int> payload(_desc.getFormulaPayload(_rev),
             _desc.getFormulaPayload(_rev)+_desc.getFormulaPayloadSize(_rev));
-        _stream->stream.solveNonblocking({SatJobStreamProcessor::SatTask::Type::RAW, std::move(payload)});
+        _stream->stream.solveNonblocking({SatJobStreamProcessor::SatTask::Type::RAW, std::move(payload),
+            {}, nbVars, nbClauses});
         return true;
     }
 
-    std::pair<int, std::vector<int>> solveNextRevision(std::vector<int>&& clauses, std::vector<int>&& assumptions) {
-        bool ok = solveNextRevisionNonblocking(std::move(clauses), std::move(assumptions));
+    std::pair<int, std::vector<int>> solveNextRevision(std::vector<int>&& clauses, std::vector<int>&& assumptions,
+            int nbVars = -1, int nbClauses = -1) {
+        bool ok = solveNextRevisionNonblocking(std::move(clauses), std::move(assumptions),
+            "", nbVars, nbClauses);
         assert(ok);
         return _stream->stream.getNonblockingSolveResult();
     }
@@ -132,6 +139,10 @@ public:
     void setInnerTerminator(std::function<bool()> cb, bool replaceDefaultTerminator) {
         _cb_terminate = cb;
         _replace_default_terminator = replaceDefaultTerminator;
+    }
+    void invalidateTerminators() {
+        auto lock = _mtx_terminate.getLock();
+        _terminators_invalidated = true;
     }
 
     void finalize() {
@@ -178,7 +189,11 @@ private:
 
         _stream->stream.setTerminator([&, str=&_stream->stream, params=&_params, desc=&_desc, startTime=_start_time]() {
             if (str->finalizing()) return true;
-            if (_cb_terminate && _cb_terminate()) return true;
+            {
+                auto lock = _mtx_terminate.getLock();
+                if (_terminators_invalidated) return true;
+                if (_cb_terminate && _cb_terminate()) return true;
+            }
             if (_replace_default_terminator) return false; // skip default terminator
             return isTimeoutHit(params, desc, startTime);
         });

@@ -29,7 +29,8 @@ private:
     const Parameters& _params;
     APIConnector& _api;
     int _stream_id;
-    long _nontrivial_wait_millis;
+    long _nontrivial_wait_millis_initial;
+    long _nontrivial_wait_millis_subsequent;
 
     int _nb_vars {0};
     int _nb_clauses {0};
@@ -48,20 +49,40 @@ private:
 
     bool _began_nontrivial_solving {false};
     bool _retrieve_complete_task {false};
-    SatTask _backlog_task {SatTask::RAW};
+    SatTask _backlog_task {SatTask::RAW, {}, {}, 0, 0};
     bool _initialized_backlog_task {false};
     bool _finalized {false};
 
     std::unique_ptr<DTaskTracker::DTaskSlot> _slot;
 
+    int _last_won_rev {-2};
+
 public:
     MallobSatJobStreamProcessor(const Parameters& params, APIConnector& api, JobDescription& desc,
             const std::string& baseUserName, int streamId, bool incremental, Synchronizer& sync) :
         SatJobStreamProcessor(sync), _params(params), _api(api), _stream_id(streamId),
-        _nontrivial_wait_millis(params.internalStreamProcessor() ? params.nontrivialSolvingDelay() : 0),
+        _nontrivial_wait_millis_initial(params.internalStreamProcessor() ? params.nontrivialSolvingDelayInitial() : 0),
+        _nontrivial_wait_millis_subsequent(params.internalStreamProcessor() ? params.nontrivialSolvingDelaySubsequent() : 0),
         _incremental(incremental), _username(baseUserName)
         //,_job_slot(new JobSlotRegistry::JobSlot(_username, [&]() {signalReinitialization();})) 
-        {}
+            {
+
+        int jobSlots = _params.jobSlots() > 0 ? _params.jobSlots() : MyMpi::size(MPI_COMM_WORLD);
+        int numConcStreams = std::min(jobSlots, MyMpi::size(MPI_COMM_WORLD));
+
+        _base_job_name = "satjob-" + std::to_string(_stream_id) + "-rev-";
+        _json_base["user"] = _username;
+        _json_base["incremental"] = _incremental;
+        _json_base["priority"] = 1;
+        _json_base["application"] = "SAT";
+        _json_base["files"] = std::vector<std::string>();
+        if (!_json_base["configuration"].count("__XL"))
+            _json_base["configuration"]["__XL"] = "-1";
+        if (!_json_base["configuration"].count("__XU"))
+            _json_base["configuration"]["__XU"] = "-1";
+        _json_base["configuration"]["__EO"] = std::to_string(_stream_id);
+        _json_base["configuration"]["__EM"] = std::to_string(numConcStreams);
+    }
 
     ~MallobSatJobStreamProcessor() override {}
 
@@ -107,6 +128,10 @@ public:
             _backlog_task.integrate(task);
         }
         auto& t = _backlog_task;
+        if (t.nbVars >= 0) _nb_vars = t.nbVars;
+        if (t.nbClauses >= 0) _nb_clauses = t.nbClauses;
+        if (t.lits.size() > 0) assert(_nb_clauses > 0);
+
         LOG(V5_DEBG, "%s attempting to solve task ...\n", _name.c_str());
 
         if (_task_pending) {
@@ -126,37 +151,31 @@ public:
             return;
         }
 
+        if (!_began_nontrivial_solving && _nontrivial_wait_millis_initial > 0) {
+            LOG(V4_VVER, "%s sleep initially\n", _name.c_str());
+            time = Timer::elapsedSeconds() - time;
+            // X ms minus the time taken to copy the literals
+            usleep(1'000'000 * std::max(0.0, 0.001 * _nontrivial_wait_millis_initial - time));
+            if (_terminator(t.rev)) return; // Task has become obsolete in the meantime, so skip solving
+
+        } else if (_last_won_rev < t.rev-1 && _nontrivial_wait_millis_subsequent > 0) {
+            LOG(V4_VVER, "%s sleep (last won: %i, now: %i)\n", _name.c_str(), _last_won_rev, t.rev);
+            time = Timer::elapsedSeconds() - time;
+            // X ms minus the time taken to copy the literals
+            usleep(1'000'000 * std::max(0.0, 0.001 * _nontrivial_wait_millis_subsequent - time));
+            if (_terminator(t.rev)) return; // Task has become obsolete in the meantime, so skip solving
+        }
+
         if (!_finalized && !_began_nontrivial_solving) {
 
-            // If no distributed job was submitted yet, we try to avoid this overhead;
-            // we wait for a short while if a more lightweight solver finds a solution immediately.
-            time = Timer::elapsedSeconds() - time;
-            usleep(1'000'000 * std::max(0.0, 0.001 * _nontrivial_wait_millis - time)); // X ms minus the time taken to copy the literals
-            if (_terminator(t.rev)) {
-                return; // Task has become obsolete in the meantime, so skip solving
-            }
             // Task is not (yet) obsolete after the wait, so we now begin proper distributed solving
-            LOG(V2_INFO, "%s awakes for rev. %i\n", _name.c_str(), t.rev);
+            LOG(V2_INFO, "%s awakes for rev. %i (V=%i C=%i L=%i)\n", _name.c_str(), t.rev,
+                _nb_vars, _nb_clauses, t.lits.size());
             _began_nontrivial_solving = true;
             _slot->deploy();
 
-            int jobSlots = _params.jobSlots() > 0 ? _params.jobSlots() : MyMpi::size(MPI_COMM_WORLD);
-            int numConcStreams = std::min(jobSlots, MyMpi::size(MPI_COMM_WORLD));
-
-            _base_job_name = "satjob-" + std::to_string(_stream_id) + "-rev-";
-            _json_base["user"] = _username;
-            _json_base["incremental"] = _incremental;
-            _json_base["priority"] = 1;
-            _json_base["application"] = "SAT";
-            _json_base["files"] = std::vector<std::string>();
-            if (!_json_base["configuration"].count("__XL"))
-                _json_base["configuration"]["__XL"] = "-1";
-            if (!_json_base["configuration"].count("__XU"))
-                _json_base["configuration"]["__XU"] = "-1";
             _json_base["configuration"]["__NV"] = std::to_string(_nb_vars);
             _json_base["configuration"]["__NC"] = std::to_string(_nb_clauses);
-            _json_base["configuration"]["__EO"] = std::to_string(_stream_id);
-            _json_base["configuration"]["__EM"] = std::to_string(numConcStreams);
         }
 
         auto& newLiterals = t.lits;
@@ -198,12 +217,13 @@ public:
             newLiterals.push_back(INT32_MIN);
         }
 
-        StaticStore<std::vector<int>>::insert(copy["name"].get<std::string>(), std::move(newLiterals));
-        copy["internalliterals"] = copy["name"].get<std::string>();
+        auto nameOfCall = copy["name"].get<std::string>();
+        StaticStore<std::vector<int>>::insert(nameOfCall, std::move(newLiterals));
+        copy["internalliterals"] = nameOfCall;
         if (!descriptionLabel.empty()) {
             copy["description-id"] = descriptionLabel;
         }
-        _expected_result_job_name = copy["name"].get<std::string>();
+        _expected_result_job_name = nameOfCall;
 
         LOG(V5_DEBG, "MSJS %s begin call\n", _name.c_str());
         _slot->resume();
@@ -211,7 +231,7 @@ public:
         _pending_rev = t.rev;
         _pending_task_interrupted = false;
         try {
-            LOG(V4_VVER, "%s SUBMIT %s\n", _name.c_str(), copy["name"].get<std::string>().c_str());
+            LOG(V4_VVER, "%s SUBMIT %s\n", _name.c_str(), nameOfCall.c_str());
             auto response = _api.submit(copy, [&, rev = _pending_rev, subjob](nlohmann::json& result) {
 
                 if (result["name"].get<std::string>() != _expected_result_job_name) {
@@ -229,8 +249,11 @@ public:
                 }
                 const int solSize = solution.size();
                 bool winner = concludeRevision(rev, resultCode, std::move(solution));
-                if (winner) LOG(V2_INFO, "%s rev. %i (internally %i) won with res=%i solsize=%i\n",
-                    _name.c_str(), rev, subjob, resultCode, solSize);
+                if (winner) {
+                    _last_won_rev = rev;
+                    LOG(V3_VERB, "%s rev. %i (internally %i) won with res=%i solsize=%i\n",
+                        _name.c_str(), rev, subjob, resultCode, solSize);
+                }
                 _task_pending = false;
             });
             if (response == JsonInterface::Result::DISCARD) {

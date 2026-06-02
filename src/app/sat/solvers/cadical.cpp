@@ -18,6 +18,7 @@
 #include "app/sat/proof/lrat_connector.hpp"
 #include "cadical.hpp"
 #include "app/sat/proof/trusted/trusted_utils.hpp"
+#include "app/sat/solvers/reduce_diversifier.hpp"
 #include "app/sat/solvers/solving_replay.hpp"
 #include "cadical/src/onthefly_checking.hpp"
 #include "util/logger.hpp"
@@ -201,6 +202,27 @@ void Cadical::diversify(int seed) {
 			}
 		}
 	}
+
+	// Randomize reduce bounds
+	if (_setup.diversifyReduce > 0) {
+		// Radically reduce glue values of tier1 / tier2 so that fewer clauses are kept forever
+		bool ok;
+		ok = solver->set("reducetier1glue", 1);
+		if (!ok) abort();
+		ok = solver->set("reducetier2glue", 2);
+		if (!ok) abort();
+		if (getDiversificationIndex() >= 4) {
+			ReduceDiversifier rd(_setup, _logger,
+			// same callback for lower/upper because there is only one such option in CaDiCaL
+			[&](int lower) {
+				return solver->set("reducetarget", lower);
+			},
+			[&](int upper) {
+				return solver->set("reducetarget", upper);
+			});
+			rd.apply(seed);
+		}
+    }
 
 	// Disable clause import for the 0th solver thread in incremental solving
 	// for the lowest possible best-case response latencies.
