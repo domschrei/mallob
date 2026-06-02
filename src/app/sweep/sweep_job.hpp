@@ -313,29 +313,29 @@ private:
 		}
 		//Skip the iteration because too many solvers are lagging (chose a third as a threshold)
 		//A solver is deemed lagging if it is stuck in the same sweep call for the whole window of recent rounds
-		if (shared.size()>=_skip_window_rounds && md.lagging > 0.33 * _nThreads) {
+		int nSolvers = md.active_count + md.idle_count;
+		if (shared.size()>=_skip_window_rounds && md.lagging > 0.33 * nSolvers) {
 			decide_end_iteration = true;
 			LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf) LAGGING_SKIP iteration %i (rnd %i) , bc. more than a third of solvers are lagging ( %i / %i ) in window %.3f sec , %i rounds \n",
-				_my_rank, _root_iteration, _root_sharing_round, md.lagging, _nThreads, _params.sweepSkipWindowSecs(), _skip_window_rounds);
+				_my_rank, _root_iteration, _root_sharing_round, md.lagging, nSolvers, _params.sweepSkipWindowSecs(), _skip_window_rounds);
 		}
 
 		//If all work has been done, the iteration ends naturally
 		if (all_idle) {
 			LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf): All idle - ending this iteration %i \n", _my_rank, _root_iteration);
 			decide_end_iteration = true;
-		}
-
-		//On iteration end, note whether we ever had success in this iteration
-		//Can end either because all work is done, or because we decided to skip the rest
-		if (decide_end_iteration) {
 			//Usually we wait for sufficiently many rounds until we determine whether this iteration had success.
-			//But if we reach the end of an iteration earlier (through all_idle), before the first such check,
+			//But if we reach the end of an iteration earlier through all_idle, before the first such check,
 			//we do the next best thing, which is we evaluate the success of all the (few) rounds of this iteration.
 			if (shared.size() < _skip_window_rounds && success_in_window >= _params.sweepSkipRatio()) {
 				_root_had_success_this_iteration = true;
 				LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf): SHORT_SUCCESSFULL_ITERATION  \n", _my_rank, _root_iteration);
 			}
+		}
 
+		//On iteration end, note whether we ever had success in this iteration, because we only allow a fixed
+		//number of unsuccessfull (failed) iterations
+		if (decide_end_iteration) {
 			if (_root_had_success_this_iteration == false) {
 				_root_failed_iterations++;
 				LOGGER(_sweeplogger,V2_INFO, "Iteration %i failed. Now FAILED_ITERATIONS %i \n", _root_iteration, _root_failed_iterations);
