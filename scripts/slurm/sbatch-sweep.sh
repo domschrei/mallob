@@ -154,7 +154,7 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
   -sweep-sharing-period=0.050 \
   -sweep-skip-ratio=0.001 \
   -sweep-skip-window=2.0 \
-  -sweep-max-failed-iters=3
+  -sweep-max-bad-iters=3
 "
 
     # Pre-create network-disk output directories to avoid many concurrent filesystem manips

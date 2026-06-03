@@ -225,7 +225,7 @@ private:
 	//This starts with true to immediately start into iteration nr. 1
 	bool _root_did_just_finish_iteration = true;
 	int _root_skipped_iterations = 0;
-	int _root_failed_iterations = 0;
+	int _root_bad_iterations = 0;
 	bool _root_had_success_this_iteration = false;
 
 	//Cross-Job-sharing
@@ -305,7 +305,7 @@ private:
 				LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) SUCCESS_SKIP iteration %i (rnd %i) , bc. success %f (%i / %i) < %.3f thresh, in rounds [%i, %i]. Skipped-Count %i  Failed-Count %i (this: +%i)\n",
 					_my_rank, _root_iteration, _root_sharing_round,  success_in_window, shared_in_window, swept_in_window,
 					_params.sweepSkipRatio(), _root_sharing_round - window, _root_sharing_round,
-					_root_skipped_iterations, _root_failed_iterations, !_root_had_success_this_iteration);
+					_root_skipped_iterations, _root_bad_iterations, !_root_had_success_this_iteration);
 			} else {
 				//Had some success in this iteration, average over a sufficiently large window
 				_root_had_success_this_iteration = true;
@@ -340,14 +340,14 @@ private:
 		//number of unsuccessfull (failed) iterations
 		if (decide_end_iteration) {
 			if (_root_had_success_this_iteration == false) {
-				_root_failed_iterations++;
-				LOGGER(_sweeplogger,V2_INFO, "Iteration %i failed. Now FAILED_ITERATIONS %i \n", _root_iteration, _root_failed_iterations);
+				_root_bad_iterations++;
+				LOGGER(_sweeplogger,V2_INFO, "Iteration %i bad . Now BAD_ITERATIONS %i \n", _root_iteration, _root_bad_iterations);
 			}
 		}
 		//Terminate the whole SweepJob if enough failed iterations happened
-		if (_root_failed_iterations > _params.sweepMaxFailedIterations()) {
+		if (_root_bad_iterations > _params.sweepMaxBadIterations()) {
 			decide_terminate_job = true;
-			LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) TERMINATE (due to ITERATIONS_FAILED_TOO_OFTEN) due to %i th failed iteration (limit: %i) \n", _my_rank, _root_failed_iterations, _params.sweepMaxFailedIterations());
+			LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) TERMINATE (due to TOO_MANY_BAD_ITERATIONS) due to %i th bad iteration (limit: %i) \n", _my_rank, _root_bad_iterations, _params.sweepMaxBadIterations());
 		}
 		if (Timer::elapsedSeconds() > _params.jobWallclockLimit() - TIMEBUFFER_FOR_FINAL_SUBSTITUTE) {
 			decide_terminate_job=true;
