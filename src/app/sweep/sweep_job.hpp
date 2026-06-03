@@ -316,6 +316,9 @@ private:
 		int nSolvers = md.active_count + md.idle_count;
 		if (shared.size()>=_skip_window_rounds && md.lagging > 0.33 * nSolvers) {
 			decide_end_iteration = true;
+			//We declare this iteration failed, otherwise it can happen that hundreds of iterations
+			//occur, each skipped after 3-4 seconds due to lagging, but each being juuust long enough to count as successfull
+			_root_had_success_this_iteration = false;
 			LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf) LAGGING_SKIP iteration %i (rnd %i) , bc. more than a third of solvers are lagging ( %i / %i ) in window %.3f sec , %i rounds \n",
 				_my_rank, _root_iteration, _root_sharing_round, md.lagging, nSolvers, _params.sweepSkipWindowSecs(), _skip_window_rounds);
 		}

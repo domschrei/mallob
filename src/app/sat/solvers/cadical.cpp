@@ -199,6 +199,7 @@ void Cadical::diversify(int seed) {
 		}
 	}
 
+
 	// Disable clause import for the 0th solver thread in incremental solving
 	// for the lowest possible best-case response latencies.
 	//if (_setup.isJobIncremental && _setup.doIncrementalSolving && _setup.globalId == 0
