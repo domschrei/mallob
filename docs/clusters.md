@@ -117,16 +117,16 @@ Under `scripts/slurm/`, you find some scripts allowing to chain jobs together. E
 
 The workflow is as follows:
 
-* Adjust the files `scripts/slurm/run-sat-chained.sh` and `scripts/slurm/postrun.sh` to your liking, especially at the places marked with `TODO`.
+* Adjust the file `scripts/slurm/sbatch.sh` (and potentially `scripts/slurm/postrun.sh`) to your liking, especially at the places marked with `TODO`.
 
 * Generate the sbatch files as in the following example command (the last argument is the number of concurrent chains and must be smaller than the maximum number of allowed concurrent jobs per user at your cluster):
 
-    `DS_NODES=4 DS_RUNTIME=360 DS_PARTITION=micro DS_SECONDSPERJOB=300 scripts/slurm/generate-job-chain.sh \
-    sat-profiling-newplain-4nodes scripts/slurm/run-sat-chained.sh 1 500 45` 
+    `DS_NODES=4 DS_RUNTIME=720 DS_PARTITION=micro DS_SECONDSPERJOB=300 scripts/slurm/generate-job-chain.sh \
+    sat-profiling-newplain-4nodes scripts/slurm/sbatch.sh 1 500 45`
 
 * Execute the command output by the previous command, then wait until all jobs have been executed.
 
-* Execute `scripts/slurm/postrun.sh` to merge together all log directories into a single lob directory.
+* Execute `scripts/slurm/postrun.sh sat-profiling-newplain-4nodes` to merge together all log directories into a single lob directory.
 
 * Postprocess the logs in the output destination directory to your liking.
 
