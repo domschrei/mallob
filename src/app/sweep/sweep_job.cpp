@@ -70,13 +70,42 @@ void SweepJob::appl_start() {
 	_my_ctx_id = getJobTree().getContextId();
 	_is_root = getJobTree().isRoot();
 	_nThreads = min( getNumThreads(), _params.numThreadsPerProcess.val); //done in constructor
-	if (_nThreads < _params.numThreadsPerProcess.val) {
-		LOGGER(_sweeplogger,V1_WARN,"SWEEP WARN : cut down threads to %i \n", _nThreads);
-	}
 	const JobDescription& desc = getDescription();
 	int numVars = desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
 	int numClauses = desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
+    _metadata = getSerializedDescription(0)->data();
+	_timestamp_start_sweepapp = Timer::elapsedSeconds();
+	_worksteal_requests.resize(_nThreads);
+	//To randomize workstealing on a given rank
+	//we create a list of all ids that will be then shuffled each time
+	std::ostringstream oss;
+	for (int localId=0; localId < _nThreads; localId++) {
+		_list_of_ids.push_back(localId);
+		oss << localId << ",";
+	}
+	//hold pointers to the kissat solvers
+	_sweepers.resize(_nThreads);
+	//Initialize the background workers, each will run one kissat thread
+	_bg_workers.reserve(_nThreads);
+	for (int i = 0; i < _nThreads; ++i) {
+		_bg_workers.emplace_back(std::make_unique<BackgroundWorker>());
+	}
+	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
+	_red.reset();
+	//Start individual Kissat threads (those then immediately jump into the sweep algorithm)
+	LOGGER(_sweeplogger, V3_VERB,"Create solvers\n");
+	for (int localId=0; localId < _nThreads; localId++) {
+		createAndStartNewSweeper(localId);
+	}
+	if (_params.crossJobCommunication()) {
+        _clause_comm = std::make_unique<AnytimeSatClauseCommunicator>(_params, this, false);
+	}
+	//set some general metadata information
+	_internal_result.id = getId();
+	_internal_result.revision = getRevision();
+	//fmcad commit
 
+	//Moved all logging down here to keep it separate from the actual logic
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d, NumVars %i, NumClauses %i\n",
 		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _nThreads, numVars, numClauses);
 	LOG(                V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d, NumVars %i, NumClauses %i\n",
@@ -84,6 +113,7 @@ void SweepJob::appl_start() {
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP_PAYLOAD_SIZE %i\n", getDescription().getFormulaPayloadSize(0));
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP_NUM_VARS %i\n", numVars);
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP_NUM_CLAUSES %i\n", numClauses);
+	LOGGER(_sweeplogger,V2_INFO,"SWEEP_THREADS %i\n", _nThreads);
 	for (auto& group : _params._grouped_list) {
 		  if (group->groupId != "app/sweep") continue;
 		  std::map<std::string, Option*> sorted;
@@ -96,47 +126,12 @@ void SweepJob::appl_start() {
 	}
 	LOGGER(_sweeplogger, V2_INFO, "Calculated SkipWindowRounds %i\n", _skip_window_rounds);
 
-	_nThreads = _params.numThreadsPerProcess.val;
-    _metadata = getSerializedDescription(0)->data();
-	_timestamp_start_sweepapp = Timer::elapsedSeconds();
-	_worksteal_requests.resize(_nThreads);
-
-	//To randomize workstealing on a given rank, we create a list of all ids that will be then shuffled each time
-	std::ostringstream oss;
-	for (int localId=0; localId < _nThreads; localId++) {
-		_list_of_ids.push_back(localId);
-		oss << localId << ",";
+	if (_nThreads < _params.numThreadsPerProcess.val) {
+		LOGGER(_sweeplogger,V1_WARN,"WARN : cut down threads to %i \n", _nThreads);
+		LOGGER(_sweeplogger,V1_WARN,"CUT_DOWN_THREADS %i \n", _nThreads);
 	}
 	LOGGER(_sweeplogger, V3_VERB,"LIST_OF_LOCAL_IDS: %s \n", oss.str().c_str());
-
-	//Will hold pointers to the kissat solvers
-	_sweepers.resize(_nThreads);
-
-	//Initialize the background workers, each will run one kissat thread
-	_bg_workers.reserve(_nThreads);
-	for (int i = 0; i < _nThreads; ++i) {
-		_bg_workers.emplace_back(std::make_unique<BackgroundWorker>());
-	}
-
-	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
-	_red.reset();
-
-	//Start individual Kissat threads (those then immediately jump into the sweep algorithm)
-	LOGGER(_sweeplogger, V3_VERB,"Create solvers\n");
-	for (int localId=0; localId < _nThreads; localId++) {
-		createAndStartNewSweeper(localId);
-	}
-
-	if (_params.crossJobCommunication()) {
-        _clause_comm = std::make_unique<AnytimeSatClauseCommunicator>(_params, this, false);
-	}
-
-	//set some general metadata information
-	_internal_result.id = getId();
-	_internal_result.revision = getRevision();
-
 	LOGGER(_sweeplogger, V3_VERB, "SWEEP appl_start() FINISHED\n");
-	//fmcad commit
 }
 
 
