@@ -1,5 +1,10 @@
 #!/bin/bash
 
+echo ""
+echo ""
+echo "BUILDING MALLOB via $0"
+echo ""
+echo ""
 #get the latest swissat source & binary
 ./sweep/fetch-local-sweep-kissat.sh
 

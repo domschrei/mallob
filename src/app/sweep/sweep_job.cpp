@@ -113,7 +113,7 @@ void SweepJob::appl_start() {
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP_PAYLOAD_SIZE %i\n", getDescription().getFormulaPayloadSize(0));
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP_NUM_VARS %i\n", numVars);
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP_NUM_CLAUSES %i\n", numClauses);
-	LOGGER(_sweeplogger,V2_INFO,"SWEEP_THREADS %i\n", _nThreads);
+	LOGGER(_sweeplogger,V2_INFO,"SWEEP_THREADS_USED %i\n", _nThreads);
 	for (auto& group : _params._grouped_list) {
 		  if (group->groupId != "app/sweep") continue;
 		  std::map<std::string, Option*> sorted;

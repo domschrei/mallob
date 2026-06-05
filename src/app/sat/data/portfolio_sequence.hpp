@@ -17,7 +17,7 @@ struct PortfolioSequence {
         VARIABLE_ADDITION = 'v'
     };
     enum Flavour {
-        DEFAULT, SAT, UNSAT, PLAIN, PREPROCESS
+        DEFAULT, SAT, UNSAT, PLAIN, PREPROCESS, PLAINWSWEEP
     };
     struct Item {
         BaseSolver baseSolver;
@@ -151,6 +151,10 @@ private:
             case '_':
                 // "Plain" flavour
                 next.flavour = PLAIN;
+                break;
+            case '~':
+                //"Plain" flavour, but allowing sweep & congruence closure
+                next.flavour = PLAINWSWEEP;
                 break;
             case '0':
                 // "Preprocess" flavour

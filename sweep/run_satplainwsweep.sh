@@ -6,7 +6,7 @@ OUT_DIR=$HOME/PhD/logsntraces/
 
 # INST_PATH=$HOME/PhD/instances/miter/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/nusmvdme1d3multi.cnf.xz" #0.1sec
-INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf.xz" # 6sec @ 3 iterations
+# INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf.xz" # 6sec @ 3 iterations
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/iso/6s151.cnf.xz"  # 0.1sec
 # surprisingly regular ~2000 literals received by XTCS in SATWITHPRE
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/bob12s01.cnf.xz" # 30sec, 17% after 2 rounds
@@ -29,7 +29,7 @@ INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf
 #easy SATs
 # INST_PATH="$HOME/PhD/instances/sat-and-minisat1m/0225fa9581c622e5abbc8497a97edf4e-fla-qhid-360-4.cnf.xz" #<1s kissat
 # INST_PATH="$HOME/PhD/instances/sat-and-minisat1m/01653db16d6cedc27f5314d680efc055-fla-komb-220-5.cnf.xz" #<1s kissat
-# INST_PATH="$HOME/PhD/instances/sat-and-minisat1m/01d037bf22a943430790eedd667f415e-60-128351.cnf.xz" #30sec kissat
+INST_PATH="$HOME/PhD/instances/sat-and-minisat1m/01d037bf22a943430790eedd667f415e-60-128351.cnf.xz" #30sec kissat
 # INST_PATH="$HOME/PhD/instances/sat-and-minisat1m/037c423f56548082b1935e88c48ffdda-3col120_5_2.shuffled.cnf.xz" #actually has some equivalences
 
 #difficult SATs
@@ -53,7 +53,6 @@ MALLOB_OPTIONS="-t=$threads \
   -colors \
   -trace-dir=$OUT_DIR/traces/ \
   -log=$OUT_DIR/logs/ \
-  -spd=$OUT_DIR/logs/ \
   -mono=$INST_PATH \
   -jwl=$timeout \
   -T=$(($timeout+30)) \
@@ -63,10 +62,10 @@ MALLOB_OPTIONS="-t=$threads \
   -rspaa=1 \
 	-rpa=1 \
 	-seed=1 \
+  -spl=4 \
 	-jcup=0.05 \
   -sleep=100 \
-	-v=2 \
-  -spl=2 \
+	-v=3 \
   -fcll=2 \
 	-preprocess-sweepnsat=1 \
   -preprocess-sweep-priority=1.0 \

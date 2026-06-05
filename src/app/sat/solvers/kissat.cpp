@@ -239,6 +239,17 @@ void Kissat::diversify(int seed) {
             }
         }
 
+    } else if (_setup.flavour == PortfolioSequence::PLAINWSWEEP) {
+        LOGGER(_logger, V2_INFO, "creating plainwsweep kissat (k~)\n");
+        //Remove everything but sweep, congruence and substitute (for version 4.0.4)
+        set_option("lucky", 0);
+        set_option("fastel", 0);
+        set_option("backbone", 0);
+        set_option("vivify", 0);
+        set_option("transitive", 0);
+        set_option("factor", 0);
+        set_option("eliminate", 0);
+
     } else {
         if (_setup.flavour != PortfolioSequence::DEFAULT) {
             LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");
