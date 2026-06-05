@@ -140,10 +140,11 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
 	-rlbd=0 -ilbd=1 -randlbd=0 -scramble-lbds=0 \
 	-seed=1 \
 	-spd=${globallogdir}/ \
-  -spl=-1 \
+  -spl=2 \
 	-jcup=0.05 \
   -sleep=100 \
   -v=3 \
+  -sweepeffort=100 \
 	-preprocess-sweepnsat=1 \
   -preprocess-sweep-priority=1.0 \
   -sweep-solver-verbosity=0 \

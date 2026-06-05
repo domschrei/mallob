@@ -230,6 +230,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.reduceStddev = params.reduceStddev();
 	setup.reduceDelta = params.reduceDelta();
 
+	setup.sweepeffort = params.sweepeffort();
+
 	setup.plainAddSpecific = params.plainAddSpecific();
 	setup.diversifyNative = params.diversifyNative();
 	setup.diversifyFanOut = params.diversifyFanOut();

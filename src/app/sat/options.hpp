@@ -109,6 +109,7 @@ OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversificati
  OPT_BOOL(diversifySeeds,                   "div-seeds", "",                             true,              "Diversify solvers with different random seeds")
  OPT_STRING(satSolverSequence,              "satsolver",  "",                            "C",
  "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")
+ OPT_INT(sweepeffort,                      "sweepeffort",  "",                            100,    0,   1000,     "For Kissats Plain-with-sweep flavour (k~), pass the sweepeffort through to the solver")
 
 OPTION_GROUP(grpAppSatProof, "app/sat/proof", "Production of UNSAT proofs")
  OPT_STRING(proofDirectory,               "proof-dir", "",                             "",                      "Directory to write partial proofs into (default: -log option")

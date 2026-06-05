@@ -66,6 +66,8 @@ struct SolverSetup {
 	} eliminationSetting {ALLOW_ALL};
 	PortfolioSequence::Flavour flavour {PortfolioSequence::DEFAULT};
 
+	int sweepeffort{100};
+
 	// Clause export
 
 	bool exportClauses {true}; // exporting clauses to other solvers?

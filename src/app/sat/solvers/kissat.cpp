@@ -249,6 +249,7 @@ void Kissat::diversify(int seed) {
         set_option("transitive", 0);
         set_option("factor", 0);
         set_option("eliminate", 0);
+        set_option("sweepeffort", _setup.sweepeffort);
 
     } else {
         if (_setup.flavour != PortfolioSequence::DEFAULT) {

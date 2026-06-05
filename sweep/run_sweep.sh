@@ -43,13 +43,13 @@ threads=3
 echo "NPROCS $NPROCS"
 echo "threads per process $threads"
 
-# APP="SAT"
+APP="SAT"
 # APP="SWEEP"
-APP="SATWITHPRE"
+# APP="SATWITHPRE"
 
 MALLOB_OPTIONS="-t=$threads \
   -mono-app=$APP \
-  -satsolver=k_ \
+  -satsolver=k~ \
   -colors \
   -trace-dir=$OUT_DIR/traces/ \
   -log=$OUT_DIR/logs/ \
@@ -68,6 +68,7 @@ MALLOB_OPTIONS="-t=$threads \
 	-v=2 \
   -spl=2 \
   -fcll=2 \
+  -sweepeffort=1000 \
 	-preprocess-sweepnsat=1 \
   -preprocess-sweep-priority=1.0 \
   -sweep-solver-verbosity=2 \
