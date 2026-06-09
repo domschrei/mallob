@@ -67,6 +67,7 @@ private:
 	float			   _timestamp_log_last_idleinfo = 0;
 	float			   _timestamp_log_delayedround = 0;
 	float			   _timestamp_log_notonline = 0;
+	float			   _timestamp_log_sharingdelay = 0;
 
 	//Workstealing
 	SplitMix64Rng _rng;

@@ -49,7 +49,7 @@ APP="SAT"
 
 MALLOB_OPTIONS="-t=$threads \
   -mono-app=$APP \
-  -satsolver=k~ \
+  -satsolver=k_ \
   -colors \
   -trace-dir=$OUT_DIR/traces/ \
   -log=$OUT_DIR/logs/ \

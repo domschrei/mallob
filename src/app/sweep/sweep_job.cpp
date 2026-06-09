@@ -64,6 +64,10 @@ void SweepJob::appl_start() {
 		LOGGER(_sweeplogger,V2_INFO,"Skip SWEEP JOB, as sweepMaxIterations==0");
 		return;
 	}
+	if (_params.sweepMaxPayload()!=0 && getDescription().getFormulaPayloadSize(0) > _params.sweepMaxPayload()) {
+		LOGGER(_sweeplogger,V2_INFO,"WARN Skip whole job because instance too large (payload %i, limit %i)\n", getDescription().getFormulaPayloadSize(0), _params.sweepMaxPayload());
+		LOG   (             V2_INFO,"WARN Skip whole job because instance too large (payload %i, limit %i)\n", getDescription().getFormulaPayloadSize(0), _params.sweepMaxPayload());
+	}
 	_started_appl_start = true;
 	_my_rank = getJobTree().getRank();
 	_my_index = getJobTree().getIndex();
@@ -392,6 +396,7 @@ void SweepJob::tryReportToMallob() {
 		return;
 		//we already reported to Mallob
 	}
+	LOGGER(_sweeplogger,V3_VERB, "seeing staged solved status %i, try to convert to visible _solved_status (still at %i) \n", _staged_solved_status, _solved_status);
 	if (checkCrossCommNeedsAdvancing("tryReportToMallob")) {
 		return;
 	}
@@ -793,28 +798,32 @@ void SweepJob::checkIdleWorkStatus() {
 void SweepJob::checkSharingDelay() {
 	if (_terminate_all.load(std::memory_order_relaxed))
 		return;
-
+	//Inform about potential sharing delays only once every 100ms
+	float LOG_PERIOD = 0.100;
 	float time = Timer::elapsedSeconds();
-	constexpr float MAX_DELAY_FACTOR = 6; //factor over normal sharing round period
-	float expected_period = _params.sweepSharingPeriod.val;
-	float warn_threshhold = expected_period * MAX_DELAY_FACTOR;
-	//Be more lenient if we are inbetween iterations
-	//Because for very large instances it can take even a few seconds on the root node to finish up on one iteration (mainly the substitute() call.
-	//This end-of-iteration delay is expected and should not count as a problem in the sharing procedure
-	constexpr float MAX_DELAY_BETWEEN_ITERATIONS = 4; //seconds
-	if (_rank_is_inbetween_iterations) {
-		warn_threshhold = MAX_DELAY_BETWEEN_ITERATIONS;
-	}
-	if (!_timestamp_contributed_to_sharing.empty()) {
-		float delay = time - _timestamp_contributed_to_sharing.back();
-		if (delay > warn_threshhold) {
-			LOGGER(_sweeplogger, V3_VERB, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since contrib, factor %.1f \n", _my_rank, delay, delay/expected_period);
+	if (time > _timestamp_log_sharingdelay + LOG_PERIOD) {
+		_timestamp_log_sharingdelay = time;
+		constexpr float MAX_DELAY_FACTOR = 6; //factor over normal sharing round period
+		float expected_period = _params.sweepSharingPeriod.val;
+		float warn_threshhold = expected_period * MAX_DELAY_FACTOR;
+		//Be more lenient if we are inbetween iterations
+		//Because for very large instances it can take even a few seconds on the root node to finish up on one iteration (mainly the substitute() call.
+		//This end-of-iteration delay is expected and should not count as a problem in the sharing procedure
+		constexpr float MAX_DELAY_BETWEEN_ITERATIONS = 4; //seconds
+		if (_rank_is_inbetween_iterations) {
+			warn_threshhold = MAX_DELAY_BETWEEN_ITERATIONS;
 		}
-	}
-	if (!_timestamp_receive_sharing_result.empty()) {
-		float delay = time - _timestamp_receive_sharing_result.back();
-		if (delay > warn_threshhold) {
-			LOGGER(_sweeplogger, V3_VERB, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since recv, factor %.1f \n", _my_rank, delay, delay/expected_period);
+		if (!_timestamp_contributed_to_sharing.empty()) {
+			float delay = time - _timestamp_contributed_to_sharing.back();
+			if (delay > warn_threshhold) {
+				LOGGER(_sweeplogger, V3_VERB, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since contrib, factor %.1f \n", _my_rank, delay, delay/expected_period);
+			}
+		}
+		if (!_timestamp_receive_sharing_result.empty()) {
+			float delay = time - _timestamp_receive_sharing_result.back();
+			if (delay > warn_threshhold) {
+				LOGGER(_sweeplogger, V3_VERB, "WARN SWEEP SHARINGDELAY [%i]: %.2f sec since recv, factor %.1f \n", _my_rank, delay, delay/expected_period);
+			}
 		}
 	}
 }
