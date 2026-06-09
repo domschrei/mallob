@@ -6,7 +6,8 @@ OUT_DIR=$HOME/PhD/logsntraces/
 
 # INST_PATH=$HOME/PhD/instances/miter/18faad09a2e931cdfb4c8d7b1f2ef35f-rotmul.miter.used-as.sat04-336.cnf
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/nusmvdme1d3multi.cnf.xz" #0.1sec
-INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf.xz" # 6sec @ 3 iterations
+INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf.xz" # UNSAT in ~30sec
+INST_PATH="$HOME/PhD/instances/some23/02c6fe8483e4f4474b7ac9731772535d-ncc_none_7047_6_3_3_0_0_420.cnf.xz" #12sec on 88 cores
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/iso/6s151.cnf.xz"  # 0.1sec
 # surprisingly regular ~2000 literals received by XTCS in SATWITHPRE
 # INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/bob12s01.cnf.xz" # 30sec, 17% after 2 rounds
@@ -39,7 +40,7 @@ INST_PATH="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/beemndhm2b2.cnf
 
 timeout=120
 NPROCS=4
-threads=3
+threads=2
 echo "NPROCS $NPROCS"
 echo "threads per process $threads"
 
@@ -65,7 +66,7 @@ MALLOB_OPTIONS="-t=$threads \
 	-seed=1 \
 	-jcup=0.05 \
   -sleep=100 \
-	-v=2 \
+	-v=4 \
   -spl=2 \
   -fcll=2 \
   -sweepeffort=1000 \

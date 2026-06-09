@@ -1305,10 +1305,10 @@ void SweepJob::cbContributeToAllReduce() {
 	//bcast hasResult present means that this Process got responses from all its children,
 	//so the tree structure is correctly known, and we can continue with a contribution and reduction
 	auto snapshot = _bcast->getJobTreeSnapshot();
-	LOGGER(_sweeplogger,V4_VVER, "SWEEP [%i] BCAST complete, callback creating RED & contributing (%i)children: (%i)[%i] , (%i)[%i]  \n",
+	LOGGER(_sweeplogger, V5_DEBG, "SWEEP [%i] BCAST complete, callback creating RED & contributing (%i)children: (%i)[%i] , (%i)[%i]  \n",
 		_my_rank, snapshot.nbChildren, snapshot.leftChildIndex, snapshot.leftChildNodeRank, snapshot.rightChildIndex, snapshot.rightChildNodeRank);
 	if (! _is_root) {
-		LOGGER(_sweeplogger,V4_VVER, "SWEEP [%i] BCAST RESET non-root \n", _my_rank);
+		LOGGER(_sweeplogger,V5_DEBG, "SWEEP [%i] BCAST RESET non-root \n", _my_rank);
 		//Prepare all non-root processes to be ready to receive the next broadcast
 		//CRUCIAL: use getJobTree().getSnapshot() instead of snapshot !! Otherwise we would re-use the same old outdated snapshot for eternity
 		_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
@@ -1326,7 +1326,7 @@ void SweepJob::cbContributeToAllReduce() {
 	}
 	JobMessage baseMsg = getMessageTemplate();
 	baseMsg.tag = TAG_ALLRED;
-	LOGGER(_sweeplogger,V4_VVER, "SWEEP [%i] RED SHARE RESET\n", _my_rank);
+	LOGGER(_sweeplogger,V5_DEBG, "SWEEP [%i] RED SHARE RESET\n", _my_rank);
 	_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateEqUnitContributions));
 	if (_is_root)
 		_red->setInplaceTransformationOfElementAtRoot(_inplace_rootTransform);
@@ -1374,7 +1374,7 @@ void SweepJob::cbContributeToAllReduce() {
 		md.lagging = isSolverLagging(sweeper);
 		md.sweeper_objs = shweep_has_sweeper_obj(sweeper->solver);
 		//Steal amount can overestimate the actual remaining work, but is quick and cheap to calculate
-		//*2, because stealing considers half of the available work
+		//*2, because stealing considers half of the available work to be stealable
 		md.remaining_work_estimate = 2*shweep_get_max_steal_amount(sweeper->solver);
 		if (stats.local_iteration < expected_iteration_of_next_round) {
 			//edgecase: This sweeper is still stuck in a previous iteration, maybe because its last Kitten Call
@@ -1383,6 +1383,7 @@ void SweepJob::cbContributeToAllReduce() {
 			md.work_sweeps = 0;
 			md.work_stepovers = 0;
 			md.unsched_resweeps = 0;
+			md.remaining_work_estimate=0;
 		}
 		appendMetadataToReductionElement(contrib, md);
 		contribs.push_back(contrib);

@@ -223,11 +223,14 @@ private:
 	int _root_shared_eqs_this_iteration = 0;
 	int _root_total_shared_eqs = 0;
 	int _root_total_shared_units = 0;
-	//This starts with true to immediately start into iteration nr. 1
+
+	//This next value starts with true to immediately start into iteration nr. 1
 	bool _root_did_just_finish_iteration = true;
+
 	int _root_skipped_iterations = 0;
 	int _root_bad_iterations = 0;
 	bool _root_had_success_this_iteration = false;
+	bool _root_had_work_this_iteration = false;
 
 	//Cross-Job-sharing
 	std::unique_ptr<AnytimeSatClauseCommunicator> _clause_comm;
@@ -259,14 +262,19 @@ private:
 			_root_shared_eqs_this_iteration = 0;
 			_root_rounds_this_iteration=0;
 			_root_had_success_this_iteration = false;
+			_root_had_work_this_iteration = false;
 			LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) ITERATION %i/%i STARTED \n", _my_rank, _root_iteration, _params.sweepMaxIterations());
 		}
 
 		Metadata md = readMetadataFromReductionElement(payload);
 		const int n_eqs = md.eq_size / 2;  //each equivalence takes up two integers
 
+		if (md.remaining_work_estimate>0) {
+			_root_had_work_this_iteration = true;
+		}
 		//Track metadata of this round
 		bool all_idle = (md.active_count == 0);
+		bool all_work_done = _root_had_work_this_iteration && (md.remaining_work_estimate==0);
 		double done_scheduled_prcnt = 100*(md.work_sweeps + md.work_stepovers)/(double)_numVars;
 		_root_shared_units_this_iteration += md.unit_size;
 		_root_shared_eqs_this_iteration   += n_eqs;
@@ -280,7 +288,7 @@ private:
 		bool decide_terminate_job = false;
 
 		//There exist three ways in which an iteration can end.
-		// 1. Naturally, because all work has been done and the iteration is done
+		// 1. Naturally, because all work has been done (notice through either all idle, or work estimate is zero)
 		// 2. Early, because there has not been enough success in recent rounds (found Eqs+Units)
 		// 3. Early, because there have been too many lagging solvers in recent rounds (solvers stuck in long sweep calls)
 
@@ -325,8 +333,11 @@ private:
 		}
 
 		//If all work has been done, the iteration ends naturally
-		if (all_idle) {
-			LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf): All idle - ending this iteration %i \n", _my_rank, _root_iteration);
+		if (all_idle || all_work_done) {
+			if (all_idle)
+				LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf): All idle      - ending this iteration %i \n", _my_rank, _root_iteration);
+			else if (all_work_done)
+				LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf): All work done - ending this iteration %i \n", _my_rank, _root_iteration);
 			decide_end_iteration = true;
 			//Usually we wait for sufficiently many rounds until we determine whether this iteration had success.
 			//But if we reach the end of an iteration earlier through all_idle, before the first such check,
