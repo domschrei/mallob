@@ -43,8 +43,8 @@ threads=3
 echo "NPROCS $NPROCS"
 echo "threads per process $threads"
 
-APP="SAT"
-# APP="SWEEP"
+# APP="SAT"
+APP="SWEEP"
 # APP="SATWITHPRE"
 
 MALLOB_OPTIONS="-t=$threads \

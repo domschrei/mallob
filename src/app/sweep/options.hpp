@@ -22,5 +22,5 @@ OPT_FLOAT(sweepSkipRatio,		"swskr",    "sweep-skip-ratio",			0.01, 0, 1, "minimu
 OPT_FLOAT(sweepSkipWindowSecs,	"swskw",	"sweep-skip-window",		2.0, 0, LARGE_INT, "size of moving window for which the skip-ratio is checked (in seconds)")
 OPT_INT(sweepMaxBadIterations,	"swmbi",	"sweep-max-bad-iters",		3, 0, LARGE_INT, "max iterations allowed to end without being successful before the Job is terminated")
 OPT_BOOL(sweepShowLagWarn,		"swslw", 	"sweep-show-lag-warn",		false, "show 'lagging' solvers that are in the same sweep(...) call since a long time")
-OPT_INT(sweepMaxPayload,		"swmpay",	"sweep-max-payload",		100000000, 0, LARGE_INT, "max payload for which the SweepApp starts, otherwise it directly exits")
+OPT_INT(sweepMaxPayload,		"swmpay",	"sweep-max-payload",		100'000'000, 0, 2'000'000'000, "max payload for which the SweepApp starts, otherwise it directly exits")
 
