@@ -27,7 +27,7 @@ module list
 which mpirun
 echo "#ranks: $SLURM_NTASKS"
 
-build="build-maxsat" # TODO your build directory for Mallob
+build="build" # TODO your build directory for Mallob
 
 # Environment variables
 export PATH="$build/:$PATH"
@@ -42,7 +42,7 @@ if [ -d "$WORK_$DS_PROJECTNAME" ]; then globallogdir_base="$WORK_$DS_PROJECTNAME
 #if [ -d "$SCRATCH" ]; then globallogdir_base="$SCRATCH/$globallogdir_base"; fi
 
 # Directories for writing and for storing logs
-localtmpdir_base=/tmp/$DS_JOBNAME-$SLURM_JOB_ID # fast local disk
+localtmpdir_base=${SCRATCH}/tmp/$DS_JOBNAME-$SLURM_JOB_ID # fast (?) disk
 mkdir -p $localtmpdir_base $globallogdir_base
 
 # Benchmark instances, one per line
@@ -52,33 +52,41 @@ if [ ! -f $benchmarkfile ]; then
     exit 1
 fi
 
-# Diagnose number of done / active / total jobs
-ndone=$(echo sbatch/generated/$DS_JOBNAME/.done.* | wc -w)
-ntotal=$(($DS_LASTJOBIDX - $DS_FIRSTJOBIDX + 1))
-nactive=$(squeue -u $username|grep $username|wc -l)
-# All jobs already done? -> exit
-if [ $ndone -ge $ntotal ]; then exit; fi
-
 # Failsafe: Exit if an unreasonable number of jobs of this kind have launched
 echo "I" >> sbatch/generated/$DS_JOBNAME/.ticks
-if [ $(cat sbatch/generated/$DS_JOBNAME/.ticks|wc -l) -gt $ntotal ]; then exit; fi
+if [ $(cat sbatch/generated/$DS_JOBNAME/.ticks|wc -l) -gt $(($DS_LASTJOBIDX - $DS_FIRSTJOBIDX + 1)) ]; then exit; fi
 
 change=false # track if this task makes any progress and should hence start another task
+lockfile=sbatch/generated/$DS_JOBNAME/.lock
+idfile=sbatch/generated/$DS_JOBNAME/.remaining_ids
 
-# MAIN LOOP over benchmark instances (shuffled differently for each execution)
-for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
+while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME ]; do
 
-    # already done? -> skip
-    if [ -d sbatch/generated/$DS_JOBNAME/.done.$i ] ; then continue; fi
-    # exit if you may be unable to finish this job in time
-    if [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -gt $DS_RUNTIME ]; then break; fi
-    # try to get a reservation for working on this job
-    if [ -d sbatch/generated/$DS_JOBNAME/.reserved.$i ] && ! [[ $(find sbatch/generated/$DS_JOBNAME/.reserved.$i -newermt "8 minutes ago") ]]; then
-        # reservation is old (>8 minutes) - reset it
-        rmdir sbatch/generated/$DS_JOBNAME/.reserved.$i
+    # obtain lock
+    while ! mkdir $lockfile 2> /dev/null ; do
+        if [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -gt $DS_RUNTIME ]; then
+            break # timeout
+        fi
+        sleep 0.1
+    done
+    # lock held
+
+    # exit if you may be unable to finish another job in time
+    if [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -gt $DS_RUNTIME ]; then
+        rmdir $lockfile # release lock
+        break
     fi
-    # unable to get a reservation? -> skip
-    if ! mkdir sbatch/generated/$DS_JOBNAME/.reserved.$i 2> /dev/null ; then continue; fi
+
+    # extract next job from file of remaining instance IDs (should be constant-time)
+    i=$(tail -n 1 $idfile)
+    truncate -s -$((${#i} + 1)) $idfile # +1 for the newline
+
+    rmdir $lockfile # release lock
+
+    if [ -z "$i" ]; then
+        # ID file is empty - all jobs should be done
+        break
+    fi
 
     change=true
 
@@ -126,9 +134,6 @@ for i in $(seq $DS_FIRSTJOBIDX $DS_LASTJOBIDX | shuf) ; do
     $mpicall scripts/slurm/epilog.sh
 
     echo "$(date) JOB $i FINISHED"
-
-    # Commit that we're done with this job
-    mkdir -p sbatch/generated/$DS_JOBNAME/.done.$i
 
     sleep 3 # maybe a means to avoid "nodes are still busy" srun error?
 
