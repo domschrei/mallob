@@ -60,13 +60,21 @@ void cb_report_iteration(void *SweepJobState, int localId) {
 }
 
 void SweepJob::appl_start() {
+	//set some general metadata information
+	_internal_result.id = getId();
+	_internal_result.revision = getRevision();
+
 	if (_params.sweepMaxIterations.val==0) {
 		LOGGER(_sweeplogger,V2_INFO,"Skip SWEEP JOB, as sweepMaxIterations==0");
+		_internal_result.result = 0;
+		_solved_status = 0; //gets noticed by Mallob
 		return;
 	}
 	if (_params.sweepMaxPayload()!=0 && getDescription().getFormulaPayloadSize(0) > _params.sweepMaxPayload()) {
 		LOGGER(_sweeplogger,V2_INFO,"WARN SWEEP_MAX_PAYLOAD Skip whole job because instance too large (payload %i, limit %i)\n", getDescription().getFormulaPayloadSize(0), _params.sweepMaxPayload());
 		LOG   (             V2_INFO,"WARN SWEEP_MAX_PAYLOAD Skip whole job because instance too large (payload %i, limit %i)\n", getDescription().getFormulaPayloadSize(0), _params.sweepMaxPayload());
+		_internal_result.result = 0;
+		_solved_status = 0; //gets noticed by Mallob
 		return;
 	}
 	_started_appl_start = true;
@@ -105,9 +113,6 @@ void SweepJob::appl_start() {
 	if (_params.crossJobCommunication()) {
         _clause_comm = std::make_unique<AnytimeSatClauseCommunicator>(_params, this, false);
 	}
-	//set some general metadata information
-	_internal_result.id = getId();
-	_internal_result.revision = getRevision();
 	//fmcad commit
 
 	//Moved all logging down here to keep it separate from the actual logic
