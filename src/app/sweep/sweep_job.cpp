@@ -65,8 +65,9 @@ void SweepJob::appl_start() {
 		return;
 	}
 	if (_params.sweepMaxPayload()!=0 && getDescription().getFormulaPayloadSize(0) > _params.sweepMaxPayload()) {
-		LOGGER(_sweeplogger,V2_INFO,"WARN Skip whole job because instance too large (payload %i, limit %i)\n", getDescription().getFormulaPayloadSize(0), _params.sweepMaxPayload());
-		LOG   (             V2_INFO,"WARN Skip whole job because instance too large (payload %i, limit %i)\n", getDescription().getFormulaPayloadSize(0), _params.sweepMaxPayload());
+		LOGGER(_sweeplogger,V2_INFO,"WARN SWEEP_MAX_PAYLOAD Skip whole job because instance too large (payload %i, limit %i)\n", getDescription().getFormulaPayloadSize(0), _params.sweepMaxPayload());
+		LOG   (             V2_INFO,"WARN SWEEP_MAX_PAYLOAD Skip whole job because instance too large (payload %i, limit %i)\n", getDescription().getFormulaPayloadSize(0), _params.sweepMaxPayload());
+		return;
 	}
 	_started_appl_start = true;
 	_my_rank = getJobTree().getRank();
