@@ -32,8 +32,8 @@ SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTa
             " you must explicitly enable job communicators with the -jcup option, e.g., -jcup=0.1\n"));
 
 	LOG(V2_INFO, "## \n");
-	LOG(                 V2_INFO, "New SweepJob MPI Process on rank [%i] with %i threads, ctx %i \n", getJobTree().getRank(), params.numThreadsPerProcess.val, getJobTree().getContextId());
-	LOGGER(_sweeplogger, V2_INFO, "New SweepJob MPI Process on rank [%i] with %i threads, ctx %i \n", getJobTree().getRank(), params.numThreadsPerProcess.val, getJobTree().getContextId());
+	LOG(                 V2_INFO, "New SweepJob MPI Process on rank [%i] with planned %i threads, ctx %i \n", getJobTree().getRank(), params.numThreadsPerProcess.val, getJobTree().getContextId());
+	LOGGER(_sweeplogger, V2_INFO, "New SweepJob MPI Process on rank [%i] with planned %i threads, ctx %i \n", getJobTree().getRank(), params.numThreadsPerProcess.val, getJobTree().getContextId());
 	LOG(V2_INFO, "## \n");
 }
 
@@ -64,20 +64,7 @@ void SweepJob::appl_start() {
 	_internal_result.id = getId();
 	_internal_result.revision = getRevision();
 
-	if (_params.sweepMaxIterations.val==0) {
-		LOGGER(_sweeplogger,V2_INFO,"Skip SWEEP JOB, as sweepMaxIterations==0");
-		_internal_result.result = 0;
-		_solved_status = 0; //gets noticed by Mallob
-		return;
-	}
-	if (_params.sweepMaxPayload()!=0 && getDescription().getFormulaPayloadSize(0) > _params.sweepMaxPayload()) {
-		LOGGER(_sweeplogger,V2_INFO,"WARN SWEEP_MAX_PAYLOAD Skip whole job because instance too large (payload %i, limit %i)\n", getDescription().getFormulaPayloadSize(0), _params.sweepMaxPayload());
-		LOG   (             V2_INFO,"WARN SWEEP_MAX_PAYLOAD Skip whole job because instance too large (payload %i, limit %i)\n", getDescription().getFormulaPayloadSize(0), _params.sweepMaxPayload());
-		_internal_result.result = 0;
-		_solved_status = 0; //gets noticed by Mallob
-		return;
-	}
-	_started_appl_start = true;
+	// _started_appl_start = true;
 	_my_rank = getJobTree().getRank();
 	_my_index = getJobTree().getIndex();
 	_my_ctx_id = getJobTree().getContextId();
@@ -89,31 +76,6 @@ void SweepJob::appl_start() {
     _metadata = getSerializedDescription(0)->data();
 	_timestamp_start_sweepapp = Timer::elapsedSeconds();
 	_worksteal_requests.resize(_nThreads);
-	//To randomize workstealing on a given rank
-	//we create a list of all ids that will be then shuffled each time
-	std::ostringstream oss;
-	for (int localId=0; localId < _nThreads; localId++) {
-		_list_of_ids.push_back(localId);
-		oss << localId << ",";
-	}
-	//hold pointers to the kissat solvers
-	_sweepers.resize(_nThreads);
-	//Initialize the background workers, each will run one kissat thread
-	_bg_workers.reserve(_nThreads);
-	for (int i = 0; i < _nThreads; ++i) {
-		_bg_workers.emplace_back(std::make_unique<BackgroundWorker>());
-	}
-	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
-	_red.reset();
-	//Start individual Kissat threads (those then immediately jump into the sweep algorithm)
-	LOGGER(_sweeplogger, V3_VERB,"Create solvers\n");
-	for (int localId=0; localId < _nThreads; localId++) {
-		createAndStartNewSweeper(localId);
-	}
-	if (_params.crossJobCommunication()) {
-        _clause_comm = std::make_unique<AnytimeSatClauseCommunicator>(_params, this, false);
-	}
-	//fmcad commit
 
 	//Moved all logging down here to keep it separate from the actual logic
 	LOGGER(_sweeplogger,V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d, NumVars %i, NumClauses %i\n",
@@ -140,7 +102,57 @@ void SweepJob::appl_start() {
 		LOGGER(_sweeplogger,V1_WARN,"WARN : cut down threads to %i \n", _nThreads);
 		LOGGER(_sweeplogger,V1_WARN,"CUT_DOWN_THREADS %i \n", _nThreads);
 	}
+
+	//To randomize workstealing on a given rank
+	//we create a list of all ids that will be then shuffled each time
+	std::ostringstream oss;
+	for (int localId=0; localId < _nThreads; localId++) {
+		_list_of_ids.push_back(localId);
+		oss << localId << ",";
+	}
 	LOGGER(_sweeplogger, V3_VERB,"LIST_OF_LOCAL_IDS: %s \n", oss.str().c_str());
+
+	if (_params.sweepMaxIterations.val==0) {
+		LOGGER(_sweeplogger,V2_INFO,"WARN SWEEP_DEACTIVATED , because sweepMaxIterations==0");
+		if (_is_root) {
+			LOGGER(_sweeplogger,V2_INFO,"Report UNKOWN to Mallob immediately");
+			rootReportSolverResult(nullptr, UNKNOWN);
+		}
+		// _internal_result.result = 0;
+		// _solved_status = 0;
+		return;
+	}
+	if (_params.sweepMaxPayload()!=0 && getDescription().getFormulaPayloadSize(0) > _params.sweepMaxPayload()) {
+		LOGGER(_sweeplogger,V2_INFO,"WARN SWEEP_MAX_PAYLOAD_SKIP ,  because instance too large (payload %i, limit %i)\n", getDescription().getFormulaPayloadSize(0), _params.sweepMaxPayload());
+		LOG   (             V2_INFO,"WARN SWEEP_MAX_PAYLOAD_SKIP ,  because instance too large (payload %i, limit %i)\n", getDescription().getFormulaPayloadSize(0), _params.sweepMaxPayload());
+		if (_is_root) {
+			LOGGER(_sweeplogger,V2_INFO,"Report UNKOWN to Mallob immediately");
+			rootReportSolverResult(nullptr, UNKNOWN);
+		}
+		// _internal_result.result = 0;
+		// _solved_status = 0; //gets noticed by Mallob
+		return;
+	}
+
+	//hold pointers to the kissat solvers
+	_sweepers.resize(_nThreads);
+	//each background worker will run one kissat thread
+	_bg_workers.reserve(_nThreads);
+	for (int i = 0; i < _nThreads; ++i) {
+		_bg_workers.emplace_back(std::make_unique<BackgroundWorker>());
+	}
+	_bcast.reset(new JobTreeBroadcast(getId(), getJobTree().getSnapshot(), [this]() {cbContributeToAllReduce();}, TAG_BCAST_INIT));
+	_red.reset();
+	//Start individual Kissat threads (those then immediately jump into the sweep algorithm)
+	LOGGER(_sweeplogger, V3_VERB,"Create solvers\n");
+	for (int localId=0; localId < _nThreads; localId++) {
+		createAndStartNewSweeper(localId);
+	}
+	if (_params.crossJobCommunication()) {
+        _clause_comm = std::make_unique<AnytimeSatClauseCommunicator>(_params, this, false);
+	}
+	//fmcad commit
+
 	LOGGER(_sweeplogger, V3_VERB, "SWEEP appl_start() FINISHED\n");
 }
 
@@ -635,6 +647,7 @@ void SweepJob::rootReportSolverResult(KissatPtr sweeper, int res) {
 	}
 	LOG(                V2_INFO, "SWEEP_RESULT_CODE %i == %s \n", res, res==40 ? "IMPROVED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
 	LOGGER(_sweeplogger,V2_INFO, "SWEEP_RESULT_CODE %i == %s \n", res, res==40 ? "IMPROVED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
+	//Serialization! Even an empty solution needs to be serialized, otherwise the solution reader asserts.
 	_internal_result.setSolutionToSerialize(formula.data(), formula.size());
 	_staged_solved_status = res;
 }

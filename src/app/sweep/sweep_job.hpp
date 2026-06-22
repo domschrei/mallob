@@ -27,7 +27,7 @@ private:
 	bool _finished_job_setup{false};
 	bool _started_communication{false};
 
-	bool _started_appl_start{false};
+	// bool _started_appl_start{false};
     int _my_rank{0};
     int _my_index{0};
 	int _my_ctx_id{0};
