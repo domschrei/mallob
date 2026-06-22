@@ -92,16 +92,18 @@ public:
                 res = jsonToJobResult(_base_job_response, false);
                 _base_job_digested = true;
                 if (res.result != 0) {
-                    LOG(V2_INFO, "SATWP RESULT SATsns SOLVER done, result code %i\n", res.result);//capslock grepped in postprocessing
+                    //capslock [SATWP RESULT ... SOLVER] grepped in postprocessing
+                    LOG(V2_INFO, "SATWP RESULT SATsns SOLVER done, result code %i\n", res.result);
                     break;
                 }
             }
             if (_sweep_job_done && !_sweep_job_digested) {
                 LOG(V2_INFO, "SATWP SWEEPsns done\n");
-                res = jsonToJobResult(_sweep_job_response, false); //eventually probably convert = true to reconstruct solution if necessary
+                //to reconstruct a satisfying solution, would need to call this with 'true'
+                res = jsonToJobResult(_sweep_job_response, false);
                 _sweep_job_digested = true;
                 if (res.result==UNSAT) {
-                    LOG(V2_INFO, "SATWP RESULT SWEEPsns SOLVER , result code %i\n", res.result);//capslock grepped in postprocessing
+                    LOG(V2_INFO, "SATWP RESULT SWEEPsns SOLVER , result code %i\n", res.result);
                     break;
                 }
                 else if (res.result==IMPROVED) {

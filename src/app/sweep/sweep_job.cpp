@@ -260,7 +260,6 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			auto stats = sweeper->fetchSweepStats();
 			if (stats.clauses < stats.start_clauses) {
 				//Found some improvements
-
 				rootReportSolverResult(IMPROVED, sweeper->extractPreprocessedFormula());
 			} else {
 				//whole sweeping didn't yield any improvements
