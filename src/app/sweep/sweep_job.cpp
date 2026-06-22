@@ -112,25 +112,21 @@ void SweepJob::appl_start() {
 	}
 	LOGGER(_sweeplogger, V3_VERB,"LIST_OF_LOCAL_IDS: %s \n", oss.str().c_str());
 
+	bool exitDirectly = false;
 	if (_params.sweepMaxIterations.val==0) {
 		LOGGER(_sweeplogger,V2_INFO,"WARN SWEEP_DEACTIVATED , because sweepMaxIterations==0");
-		if (_is_root) {
-			LOGGER(_sweeplogger,V2_INFO,"Report UNKOWN to Mallob immediately");
-			rootReportSolverResult(nullptr, UNKNOWN);
-		}
-		// _internal_result.result = 0;
-		// _solved_status = 0;
-		return;
+		exitDirectly = true;
 	}
 	if (_params.sweepMaxPayload()!=0 && getDescription().getFormulaPayloadSize(0) > _params.sweepMaxPayload()) {
 		LOGGER(_sweeplogger,V2_INFO,"WARN SWEEP_MAX_PAYLOAD_SKIP ,  because instance too large (payload %i, limit %i)\n", getDescription().getFormulaPayloadSize(0), _params.sweepMaxPayload());
 		LOG   (             V2_INFO,"WARN SWEEP_MAX_PAYLOAD_SKIP ,  because instance too large (payload %i, limit %i)\n", getDescription().getFormulaPayloadSize(0), _params.sweepMaxPayload());
+		exitDirectly = true;
+	}
+	if (exitDirectly) {
 		if (_is_root) {
 			LOGGER(_sweeplogger,V2_INFO,"Report UNKOWN to Mallob immediately");
-			rootReportSolverResult(nullptr, UNKNOWN);
+			rootReportSolverResult(UNKNOWN, {});
 		}
-		// _internal_result.result = 0;
-		// _solved_status = 0; //gets noticed by Mallob
 		return;
 	}
 
@@ -254,7 +250,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			LOGGER(_sweeplogger,V4_VVER, "SWEEP [%i](%i) found UNSAT! \n", _my_rank, localId);
 			if (_is_root) {
 				//for consistency, only the root node is allowed to report to Mallob
-				rootReportSolverResult(nullptr, UNSAT);
+				rootReportSolverResult(UNSAT, {});
 			} else {
 				//if we are not on root, this flag lets the main Process soon send an MPI message to root, indicating UNSAT
 				_do_report_UNSAT_to_root = true;
@@ -265,10 +261,11 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			auto stats = sweeper->fetchSweepStats();
 			if (stats.clauses < stats.start_clauses) {
 				//Found some improvements
-				rootReportSolverResult(sweeper, IMPROVED);
+
+				rootReportSolverResult(IMPROVED, sweeper->extractPreprocessedFormula());
 			} else {
 				//whole sweeping didn't yield any improvements
-				rootReportSolverResult(sweeper, UNKNOWN);
+				rootReportSolverResult(UNKNOWN, {});
 			}
 		}
 
@@ -536,7 +533,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 	else if (msg.tag == TAG_FOUND_UNSAT) {
 		LOGGER(_sweeplogger,V2_INFO, "SWEEP MSG [%i] <~~~ Found UNSAT! [%i]\n", _my_rank, sourceRank );
 		assert(_is_root);
-		rootReportSolverResult(nullptr, UNSAT);
+		rootReportSolverResult(UNSAT, {});
 	}
 	else if (mpiTag == MSG_NOTIFY_JOB_ABORTING)    {LOGGER(_sweeplogger,V1_WARN, "SWEEP MSG WARN [%i]: received NOTIFY_JOB_ABORTING \n", _my_rank);}
 	else if (mpiTag == MSG_NOTIFY_JOB_TERMINATING) {LOGGER(_sweeplogger,V1_WARN, "SWEEP MSG WARN [%i]: received NOTIFY_JOB_TERMINATING \n", _my_rank);}
@@ -604,13 +601,17 @@ void SweepJob::checkForUnsatResults() {
 }
 
 
-void SweepJob::rootReportSolverResult(KissatPtr sweeper, int res) {
-	assert(_is_root || log_return_false("SWEEP ERROR: non-root tries to report result to mallob\n"));
-	if (res==UNSAT) {
+void SweepJob::rootReportSolverResult(int res, const std::vector<int> &formula = {}) {
+	if (!_is_root) {
+		LOGGER(_sweeplogger,V2_INFO, "Non-root rank tried to report result %i , not let through \n");
+		return;
+	}
+	// assert(_is_root || log_return_false("SWEEP ERROR: non-root tries to report result to mallob\n"));
+	// if (res==UNSAT) {
 		//an UNSAT result doesnt come with a proof and can arrive via MPI from another process,
 		//so we don't have access to that particular reporting sweeper, nor do we need it, -->nullptr
-		assert(sweeper==nullptr);
-	}
+		// assert(sweeper==nullptr);
+	// }
 	//CAREFUL: sweeper is now nullptr in case of UNSAT
 	//report exactly once to Mallob, ignore all additional internal reports
 	//(can happen if multiple UNSAT messages arrive from other ranks/solvers)
@@ -628,19 +629,19 @@ void SweepJob::rootReportSolverResult(KissatPtr sweeper, int res) {
 	LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB [%i] stages sweep result %i to Mallob\n", _my_rank, res);
 	//something would be off if we called this function more than once
 	assert(_staged_solved_status == -1 || log_return_false("SWEEP ERROR: duplicate attempt to report result to mallob, was already reported as %i \n", _internal_result.result));
-	std::vector<int> formula = {};
+	// std::vector<int> formula = {};
 	if (res==UNSAT) {
-		formula = {};
+		// formula = {};
 	} else if (res==IMPROVED){
-		assert(sweeper);
-		formula = sweeper->extractPreprocessedFormula();
+		// assert(sweeper);
+		// formula = sweeper->extractPreprocessedFormula();
 		LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB [%i]: Solution IMPROVED, payload size %zu\n", _my_rank, formula.size());
 	} else if (res==UNKNOWN) {
-		assert(sweeper);
+		// assert(sweeper);
 		// No progress has been made.
 		// Design choice: we don't send any formula back, since there would be no new information in it
 		// formula = sweeper->extractPreprocessedFormula();
-		formula = {};
+		// formula = {};
 		LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB [%i]: Solution UNKNOWN, payload size %zu\n", _my_rank, formula.size());
 	} else {
 		LOGGER(_sweeplogger,V1_WARN, "WARN SWEEP [%i]: unexpected result code %i when reporting to mallob \n", _my_rank, res);

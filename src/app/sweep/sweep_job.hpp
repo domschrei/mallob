@@ -508,7 +508,7 @@ private:
 
 	void checkSharingDelay();
 	void checkForUnsatResults();
-	void rootReportSolverResult(KissatPtr sweeper, int res);
+	void rootReportSolverResult(int res, const std::vector<int> &formula);
 	void reportEndStats(KissatPtr sweeper);
 	void tryReportToMallob();
 	bool checkCrossCommNeedsAdvancing(const std::string &from);
