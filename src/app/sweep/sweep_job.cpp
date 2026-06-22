@@ -112,17 +112,16 @@ void SweepJob::appl_start() {
 	}
 	LOGGER(_sweeplogger, V3_VERB,"LIST_OF_LOCAL_IDS: %s \n", oss.str().c_str());
 
-	bool exitDirectly = false;
 	if (_params.sweepMaxIterations.val==0) {
 		LOGGER(_sweeplogger,V2_INFO,"WARN SWEEP_DEACTIVATED , because sweepMaxIterations==0");
-		exitDirectly = true;
+		_exited_immediately = true;
 	}
 	if (_params.sweepMaxPayload()!=0 && getDescription().getFormulaPayloadSize(0) > _params.sweepMaxPayload()) {
 		LOGGER(_sweeplogger,V2_INFO,"WARN SWEEP_MAX_PAYLOAD_SKIP ,  because instance too large (payload %i, limit %i)\n", getDescription().getFormulaPayloadSize(0), _params.sweepMaxPayload());
 		LOG   (             V2_INFO,"WARN SWEEP_MAX_PAYLOAD_SKIP ,  because instance too large (payload %i, limit %i)\n", getDescription().getFormulaPayloadSize(0), _params.sweepMaxPayload());
-		exitDirectly = true;
+		_exited_immediately = true;
 	}
-	if (exitDirectly) {
+	if (_exited_immediately) {
 		if (_is_root) {
 			LOGGER(_sweeplogger,V2_INFO,"Report UNKOWN to Mallob immediately");
 			rootReportSolverResult(UNKNOWN, {});
@@ -565,7 +564,7 @@ bool SweepJob::appl_isDestructible() {
 		return false;
 	}
 	int _running_sweepers = _started_sweepers_count - _finished_sweepers_count;
-	if (_finished_sweepers_count < _nThreads) {
+	if (_finished_sweepers_count < _nThreads && !_exited_immediately) {
 		LOGGER(_sweeplogger,V3_VERB, "SWEEP TERM #%i ctx %i [%i] isDestructible? no. only %i/%i finished, %i running \n",  getId(),_my_ctx_id, _my_rank, _finished_sweepers_count.load(), _nThreads, _running_sweepers);
 		return false;
 	}

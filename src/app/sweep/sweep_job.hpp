@@ -26,6 +26,7 @@ private:
 	std::atomic<int> _root_reported_result{-1};
 	bool _finished_job_setup{false};
 	bool _started_communication{false};
+	bool _exited_immediately{false};
 
 	// bool _started_appl_start{false};
     int _my_rank{0};
