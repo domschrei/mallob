@@ -39,7 +39,7 @@ endif()
 
 
 # ImpCheck binaries for real-time proof checking.
-if(MALLOB_BUILD_IMPCHECK EQUAL 1)
+if(NOT MALLOB_BUILD_IMPCHECK EQUAL 0)
     add_definitions(-DMALLOB_USE_IMPCHECK=1)
 
     # Incremental ImpCheck (IImpCheck)

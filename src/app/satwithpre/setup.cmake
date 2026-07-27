@@ -41,7 +41,7 @@ elseif(MALLOB_USE_SATSUMA EQUAL 1)
     set(BASE_LIBS ${BASE_LIBS} satsuma CACHE INTERNAL "")    
     set(BASE_INCLUDES ${BASE_INCLUDES} ${CMAKE_SOURCE_DIR}/lib/satsuma/include CACHE INTERNAL "")
 
-elseif(MALLOB_USE_SATSUMA EQUAL 2)
+else()
 
     # Externally called Satsuma (new version)
     add_definitions(-DMALLOB_USE_SATSUMA=2)

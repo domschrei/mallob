@@ -18,8 +18,7 @@ Last but not least, Mallob features engines for state-of-the-art distributed Max
 
 Mallob uses MPI (Message Passing Interface) and is built using CMake.
 
-For a default build for full featured SAT solving, execute [`bash scripts/setup/cmake-make.sh build`](scripts/setup/build.sh).
-For a complete build with MaxSAT and SMT solving features, execute `bash scripts/setup/cmake-make.sh build -DMALLOB_APP_{MAXSAT,SMT}=1`.
+For a default, full featured build, execute [`bash scripts/setup/cmake-make.sh build`](scripts/setup/build.sh).
 
 [**Find detailed instructions at docs/setup.md.**](docs/setup.md)
 
@@ -27,29 +26,35 @@ For a complete build with MaxSAT and SMT solving features, execute `bash scripts
 
 We also provide a setup based on Docker containerization. Please consult the (for now separate) documentation in the `docker/` directory.
 
-### Bash Autocompletion
-
-To enable bash auto-completion by pressing TAB, execute `source scripts/run/autocomplete.sh` from Mallob's base directory.
-You should now be able to autocomplete program options by pressing TAB once or twice from this directory.
-
-
 ## Usage
 
 **Quick Start:**
 
-Run `build/mallob --help` for an overview of all Mallob options.
-E.g., to run MallobSat with a single (MPI) process with twelve Kissat threads, execute `build/mallob -mono=path/to/problem.cnf -t=12 -satsolver=k`. **Make sure to execute Mallob from its home directory**, otherwise some relative paths might not work per default.
+If you just want to use Mallob on a single, parallel machine, then the script `scripts/run/mallob_local.sh` automatically retrieves a suitable process+thread configuration of Mallob for your hardware that makes use of the entire machine. Examples:
 
+```bash
+# SAT solving
+scripts/run/mallob_local.sh -mono=instances/r3unsat_300.cnf
+# SMT solving
+scripts/run/mallob_local.sh -mono=path/to/problem.smt2 -mono-app=SMT
+# MaxSAT solving
+scripts/run/mallob_local.sh -mono=path/to/problem.wcnf -mono-app=MAXSAT
+```
+
+**Always make sure to execute Mallob and/or wrapper run scripts from Mallob's home directory**, otherwise Mallob will not find critical executables in `build/` and **will not work correctly**.
 For trouble-shooting, see also [FAQ:Execution](docs/faq.md#execution).
 
-For multi-process and distributed execution, prepend the command by `mpirun` or `mpiexec` followed by appropriate MPI options.
+For more general settings, run `build/mallob --help` for an overview of all Mallob options.
+E.g., to run MallobSat with one single (MPI) process with twelve Kissat threads, you can execute `build/mallob -mono=path/to/problem.cnf -t=12 -satsolver=k`.
+
+For multi-process and distributed execution, prepend the command by `mpirun` or `mpiexec` followed by appropriate MPI options, as returned by the script `scripts/run/mallob_local.sh` (see above).
 E.g., using Open MPI, the following command runs Mallob as a service (taking JSON job submissions on demand at `.api/jobs.0/`) with a total of eight processes à four threads.
 
 ```bash
-RDMAV_FORK_SAFE=1; mpirun -np 8 --bind-to core --map-by ppr:1:node:pe=4 build/mallob -t=4
+RDMAV_FORK_SAFE=1; mpirun --bind-to core --map-by ppr:8:node:pe=4 -np 8 build/mallob -t=4
 ```
 
-[**Find detailed instructions at docs/execute.md.**](docs/execute.md)
+[**Find more detailed instructions at docs/execute.md.**](docs/execute.md)
 
 
 ## Development and Debugging
