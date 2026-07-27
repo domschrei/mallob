@@ -31,7 +31,7 @@ elif echo $mpiinfo | grep -q "Intel(R) MPI"; then
     echo "c Detected Intel(R) MPI."
     mpioptions="$mpioptions -ppn $nb_procs -genv I_MPI_PIN_DOMAIN=${nb_threads}:core"
 else
-    echo "c WARNING: Unable to classify local MPI implementation - trying default options."
+    echo "c WARNING: Unable to classify local MPI implementation - trying default configuration."
     mpioptions="$mpioptions -np $nb_procs"
 fi
 
@@ -45,6 +45,6 @@ if [ "x$1" == "x" ]; then
 fi
 
 cmd="mpirun $mpioptions build/mallob -t=$nb_threads $@"
-echo "Running command:"
-echo "  $cmd"
+echo "c Running command:"
+echo "c   $cmd"
 $cmd
