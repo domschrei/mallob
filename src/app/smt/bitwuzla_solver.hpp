@@ -101,10 +101,12 @@ public:
     }
 
     static inline bool isTimeoutHit(const Parameters* params, JobDescription* desc, float endTime) {
-        if (Terminator::isTerminating())
+        if (Terminator::isTerminating()) {
             return true;
-        if (Timer::elapsedSeconds() > endTime)
+        }
+        if (Timer::elapsedSeconds() > endTime) {
             return true;
+        }
         return false;
     }
     static float getEndTime(const Parameters* params, JobDescription* desc, float startTime) {
@@ -179,8 +181,10 @@ private:
         }
         options.set(opts);
         float endTime = getEndTime(&_params, &_desc, _start_time);
-        if (endTime < INT32_MAX)
+        if (endTime < INT32_MAX) {
             options.set(bitwuzla::Option::TIME_LIMIT_PER, 1000.f * (endTime - Timer::elapsedSeconds()));
+        }
+        options.set_diagnostic_output_stream(*out);
 
         DTaskTracker dTaskTracker(_params);
         std::unique_ptr<BitwuzllobSatSolverFactory> factory;

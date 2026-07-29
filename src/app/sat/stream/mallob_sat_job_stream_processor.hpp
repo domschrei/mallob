@@ -53,7 +53,8 @@ private:
     bool _initialized_backlog_task {false};
     bool _finalized {false};
 
-    std::unique_ptr<DTaskTracker::DTaskSlot> _slot;
+    DTaskTracker* _dtask_tracker {nullptr};
+    std::shared_ptr<DTaskTracker::DTask> _dtask;
 
     int _last_won_rev {-2};
 
@@ -66,11 +67,15 @@ public:
         _incremental(incremental), _username(baseUserName)
         //,_job_slot(new JobSlotRegistry::JobSlot(_username, [&]() {signalReinitialization();})) 
             {
+        initJson();
+    }
 
+    void initJson() {
         int jobSlots = _params.jobSlots() > 0 ? _params.jobSlots() : MyMpi::size(MPI_COMM_WORLD);
         int numConcStreams = std::min(jobSlots, MyMpi::size(MPI_COMM_WORLD));
-
         _base_job_name = "satjob-" + std::to_string(_stream_id) + "-rev-";
+
+        _json_base = {};
         _json_base["user"] = _username;
         _json_base["incremental"] = _incremental;
         _json_base["priority"] = 1;
@@ -93,16 +98,16 @@ public:
         _nb_vars = nbVars;
         _nb_clauses = nbClauses;
     }
-    void setDTaskSlot(std::unique_ptr<DTaskTracker::DTaskSlot>&& slot) {
-        _slot = std::move(slot);
-        _slot->setCallbackOnEvict([&]() {getQueue().interrupt();});
+    void setDTaskTracker(DTaskTracker& tracker) {
+        _dtask_tracker = &tracker;
     }
 
     virtual void loop() override {
-        if (_slot->checkEvicted()) yield();
+        if (_dtask && _dtask->evicted) yield();
     }
 
     virtual void process(SatTask& task) override {
+
         auto time = Timer::elapsedSeconds();
         if (!_initialized_backlog_task) {
             _backlog_task.type = task.type;
@@ -146,7 +151,7 @@ public:
             LOG(V4_VVER, "%s ... ready\n", _name.c_str());
         }
 
-        if (_slot->checkEvicted()) {
+        if (_dtask && _dtask->evicted) {
             yield();
             return;
         }
@@ -172,7 +177,7 @@ public:
             LOG(V2_INFO, "%s awakes for rev. %i (V=%i C=%i L=%i)\n", _name.c_str(), t.rev,
                 _nb_vars, _nb_clauses, t.lits.size());
             _began_nontrivial_solving = true;
-            _slot->deploy();
+            _dtask = _dtask_tracker->acquireSlot();
 
             _json_base["configuration"]["__NV"] = std::to_string(_nb_vars);
             _json_base["configuration"]["__NC"] = std::to_string(_nb_clauses);
@@ -226,7 +231,7 @@ public:
         _expected_result_job_name = nameOfCall;
 
         LOG(V5_DEBG, "MSJS %s begin call\n", _name.c_str());
-        _slot->resume();
+        _dtask->startActiveTime();
         _task_pending = true;
         _pending_rev = t.rev;
         _pending_task_interrupted = false;
@@ -271,29 +276,10 @@ public:
             sleepInterval = std::min(2500UL, (unsigned long) std::ceil(1.2*sleepInterval));
         }
 
-        _slot->suspend();
+        _dtask->commitActiveTime();
         LOG(V5_DEBG, "MSJS %s call ended\n", _name.c_str());
 
         _backlog_task = SatTask{_backlog_task.type};
-    }
-
-    virtual void finalize() override {
-        LOG(V4_VVER, "%s do finalize\n", _name.c_str());
-        _finalized = true;
-        SatJobStreamProcessor::finalize();
-        if (!_began_nontrivial_solving) return;
-        _slot->tryYield(false, false);
-        while (_task_pending) usleep(3000);
-        if (!_incremental) return;
-        if (!_json_base.contains("name")) return;
-        _json_base["precursor"] = _username + std::string(".") + _json_base["name"].get<std::string>();
-        _json_base["name"] = _base_job_name + std::to_string(_subjob_counter++);
-        nlohmann::json copy(_json_base);
-        copy["done"] = true;
-        // The callback is never called.
-        LOG(V4_VVER, "%s closing API\n", _name.c_str());
-        _api.submit(copy, [&](nlohmann::json& result) {assert(false);});
-        LOG(V4_VVER, "%s closed API\n", _name.c_str());
     }
 
     void yield() {
@@ -301,7 +287,9 @@ public:
         // already (in the process of being) finalized?
         if (_finalized || !_began_nontrivial_solving) return;
 
-        LOG(V3_VERB, "%s evicted: yielding\n", _name.c_str());
+        LOG(V3_VERB, "%s yielding\n", _name.c_str());
+
+        if (_dtask) _dtask->evicted = true; // mark as evicted yourself
         while (_task_pending) usleep(1000);
         if (!_incremental) return;
         if (!_json_base.contains("name")) return;
@@ -316,7 +304,15 @@ public:
 
         _began_nontrivial_solving = false;
         _retrieve_complete_task = true;
-        _json_base = {};
+        _dtask = {};
+        initJson();
+    }
+
+    virtual void finalize() override {
+        yield();
+        LOG(V4_VVER, "%s do finalize\n", _name.c_str());
+        _finalized = true;
+        SatJobStreamProcessor::finalize();
     }
 
     void setGroupId(const std::string& groupId, int minVar = -1, int maxVar = -1) {
@@ -337,7 +333,8 @@ private:
     bool continueWaitingForTask(int rev) {
         if (!_task_pending) return false;
         if (_pending_task_interrupted) return false; // do NOT wait for interrupted call to return
-        if (!_terminator(rev) && !_slot->wasEvicted()) return true;
+        assert(_dtask);
+        if (!_terminator(rev) && !_dtask->evicted) return true;
 
         _pending_task_interrupted = true;
         nlohmann::json jsonInterrupt {

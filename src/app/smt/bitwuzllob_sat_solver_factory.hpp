@@ -46,9 +46,10 @@ public:
     }
 
     virtual std::unique_ptr<bitwuzla::SatSolver> new_sat_solver() override {
-        BitwuzlaSatConnector* sat;
+        BitwuzlaSatConnector* sat {nullptr};
         bool ok = _provision_buffer.pollBlocking(sat);
         assert(ok);
+        assert(sat);
         solverPointers.push_back(sat);
         solversCleanedUp.push_back(false);
         sat->setCleanupCallback([&, i = solverPointers.size()-1]() {

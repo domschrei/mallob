@@ -137,7 +137,7 @@ private:
 
         LOG(V4_VVER, "%s Loading formula to Satsuma pipe ...\n", getName());
 
-        assert(nbVars() > 0 && nbVars() < 1'000'000'000);
+        assert(nbInputVars() > 0 && nbInputVars() < 1'000'000'000);
 
         std::ofstream ofs(_in_path.c_str());
 
