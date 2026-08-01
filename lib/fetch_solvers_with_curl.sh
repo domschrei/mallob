@@ -65,10 +65,10 @@ if echo $solvers|grep -q "k"; then
             # for fixing a branch instead of a commit, prepend "refs/heads/"
             if [ $switch_to_sweep_kissat ]; then
                 echo "Fetching sweep kissat from Niccos repo!"
-                curl -L -o kissat.zip https://github.com/nrilu/kissat/archive/refs/heads/update24.zip
-#                 echo "Downloading Nicco's Kissat Fork for Equivalence Sweeping"
-#               # TODO: Ask dominik why he included this move command
-                # mv kissat-update24 kissat
+                # curl -L -o kissat.zip https://github.com/nrilu/kissat/archive/refs/heads/update24.zip
+                # Only for this specific Mallob FMCAD 26 Artifact Commit: Select fixed according Kissat commit
+                branchorcommit="d4e76a387c93b28bbe84a2db043008e5bc70b185" #FMCAD26 Artifact Commit
+                curl -L -o kissat.zip https://github.com/nrilu/kissat/archive/${branchorcommit}.zip
             else
                 echo "Fetching kissat from standard repo (no shared sweeping!)"
                 #branchorcommit="53b0ce61b0ce8b1d91e5c302d8060f8597364137" # updated 2024-04-02

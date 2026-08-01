@@ -123,7 +123,7 @@ void SweepJob::appl_start() {
 	}
 	if (_exited_immediately) {
 		if (_is_root) {
-			LOGGER(_sweeplogger,V2_INFO,"Report UNKOWN to Mallob immediately");
+			LOGGER(_sweeplogger,V2_INFO,"Report UNKOWN to Mallob immediately\n");
 			rootReportSolverResult(UNKNOWN, {});
 		}
 		return;
