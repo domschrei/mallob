@@ -180,6 +180,8 @@ public:
         return _cs_params.numThreadsPerProcess();
     }
 
+    int getLocalRank() const {return _comm_rank;}
+
     virtual Parameters getClauseStoreParams() const override {
         Parameters params = _cs_params;
         if (params.incrementalVariableDomainHeuristic() >= 1) {

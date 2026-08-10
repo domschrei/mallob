@@ -342,6 +342,11 @@ void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg, int so
             while (!_incoming_crossshared_clauses.empty()) {
                 auto clauseBuf = std::move(_incoming_crossshared_clauses.back());
                 _incoming_crossshared_clauses.pop_back();
+                if (_cross_job_clause_sharer->getLocalRank() != 0) {
+                    LOG(V2_INFO, "MAXSAT XXS #%i ignoring clauses: not the root of XTCS group %i\n",
+                        _job->getId(), _job->getDescription().getGroupId());
+                    continue;
+                }
                 LOG(V2_INFO, "MAXSAT XXS #%i feeding clauses into XTCS group %i\n",
                     _job->getId(), _job->getDescription().getGroupId());
                 _cross_job_clause_sharer->addInternalSharedClauses(clauseBuf);
