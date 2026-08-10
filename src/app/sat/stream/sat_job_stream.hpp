@@ -126,6 +126,12 @@ public:
     }
     int getRevision() const {return _active_rev;}
 
+    void forwardAsyncRedundantClauses(std::vector<int>& clauseBuf) {
+        for (auto& [proc, worker] : _processors) {
+            proc->forwardAsyncRedundantClauses(clauseBuf);
+        }
+    }
+
     void setTerminator(const std::function<bool()>& terminator) {
         for (auto& [proc, worker] : _processors)
             proc->setTerminator([&, terminator](int rev) {

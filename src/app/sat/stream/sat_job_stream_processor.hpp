@@ -107,6 +107,7 @@ public:
 
     virtual void loop() {}
     virtual void process(SatTask& task) = 0;
+    virtual void forwardAsyncRedundantClauses(std::vector<int>& clauseBuf) = 0;
 
     virtual void finalize() {
         LOG(V4_VVER, "%s finalize\n", _name.c_str());

@@ -45,7 +45,10 @@ public:
     Submits any kind of JSON request, immediately returns the status of processing the JSON,
     and _may_ later call `callback(nlohmann::json& response)` to return a response JSON.
     */
-    JsonInterface::Result submit(nlohmann::json& data, std::function<void(nlohmann::json&)> callback = CALLBACK_IGNORE);
+    JsonInterface::Result submit(nlohmann::json& data,
+        std::function<void(nlohmann::json&)> callback = CALLBACK_IGNORE,
+        int* outId = nullptr,
+        std::function<void(int)> callbackRootRank = {});
     
     /*
     Submits a kind of JSON request which requires a JSON response. Processes the request,
@@ -62,6 +65,8 @@ public:
     std::promise<nlohmann::json> processAsync(nlohmann::json& input);
 
     bool active() const {return _interface.isActive();}
+
+    JsonInterface& getJsonInterface() {return _interface;}
 
 private:
     void handleExternalJobSubmission(MessageHandle& h) {

@@ -137,6 +137,11 @@ public:
         _pending = false;
     }
 
+    void forwardAsyncRedundantClauses(std::vector<int>& clauseBuf) override {
+        BufferReader reader(clauseBuf.data(), clauseBuf.size(), 255, false);
+        _solver->addLearnedClauses(reader, 0);
+    }
+
     virtual void finalize() override {
         SatJobStreamProcessor::finalize();
         _solver->setSolverInterrupt();

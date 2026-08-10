@@ -7,9 +7,11 @@
 #include "app/sat/stream/mallob_sat_job_stream_processor.hpp"
 #include "app/sat/stream/sat_job_stream_processor.hpp"
 #include "app/sat/stream/wrapped_sat_job_stream.hpp"
+#include "comm/msgtags.h"
 #include "core/dtask_tracker.hpp"
 #include "data/job_description.hpp"
 #include "data/job_result.hpp"
+#include "data/job_transfer.hpp"
 #include "interface/api/api_connector.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
@@ -135,6 +137,10 @@ public:
         assert(ok);
         return _stream->stream.getNonblockingSolveResult();
     }
+
+    void forwardAsyncRedundantClauses(std::vector<int>& clauseBuf) {
+        _stream->stream.forwardAsyncRedundantClauses(clauseBuf);
+    } 
 
     void setInnerTerminator(std::function<bool()> cb, bool replaceDefaultTerminator) {
         _cb_terminate = cb;

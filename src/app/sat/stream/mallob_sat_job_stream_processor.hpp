@@ -2,6 +2,7 @@
 #pragma once
 
 #include <algorithm>
+#include <atomic>
 #include <cstdlib>
 #include <cstring>
 #include <stdlib.h>
@@ -12,8 +13,10 @@
 
 #include "app/sat/data/formula_compressor.hpp"
 #include "app/sat/data/model_string_compressor.hpp"
+#include "comm/msgtags.h"
 #include "core/dtask_tracker.hpp"
 #include "data/job_description.hpp"
+#include "data/job_transfer.hpp"
 #include "interface/api/api_connector.hpp"
 #include "interface/json_interface.hpp"
 #include "sat_job_stream_processor.hpp"
@@ -28,6 +31,8 @@ class MallobSatJobStreamProcessor : public SatJobStreamProcessor {
 private:
     const Parameters& _params;
     APIConnector& _api;
+    JobDescription& _desc;
+
     int _stream_id;
     long _nontrivial_wait_millis_initial;
     long _nontrivial_wait_millis_subsequent;
@@ -42,6 +47,9 @@ private:
     int _subjob_counter {0};
     nlohmann::json _json_result;
     std::string _expected_result_job_name;
+    int _mallob_job_id {-1};
+    std::atomic_int _mallob_root_rank {-1};
+    int _xtcs_epoch {0};
 
     volatile bool _task_pending {false};
     int _pending_rev {-1};
@@ -61,7 +69,7 @@ private:
 public:
     MallobSatJobStreamProcessor(const Parameters& params, APIConnector& api, JobDescription& desc,
             const std::string& baseUserName, int streamId, bool incremental, Synchronizer& sync) :
-        SatJobStreamProcessor(sync), _params(params), _api(api), _stream_id(streamId),
+        SatJobStreamProcessor(sync), _params(params), _api(api), _desc(desc), _stream_id(streamId),
         _nontrivial_wait_millis_initial(params.internalStreamProcessor() ? params.nontrivialSolvingDelayInitial() : 0),
         _nontrivial_wait_millis_subsequent(params.internalStreamProcessor() ? params.nontrivialSolvingDelaySubsequent() : 0),
         _incremental(incremental), _username(baseUserName)
@@ -260,7 +268,10 @@ public:
                         _name.c_str(), rev, subjob, resultCode, solSize);
                 }
                 _task_pending = false;
+            }, &_mallob_job_id, [&](int rootRank) {
+                _mallob_root_rank.store(rootRank, std::memory_order_relaxed);
             });
+
             if (response == JsonInterface::Result::DISCARD) {
                 concludeRevision(_pending_rev, 0, {});
                 _task_pending = false;
@@ -302,10 +313,29 @@ public:
         _api.submit(copy, [&](nlohmann::json& result) {assert(false);});
         LOG(V4_VVER, "%s closed API\n", _name.c_str());
 
+        _mallob_job_id = -1;
+        _mallob_root_rank.store(-1, std::memory_order_relaxed);
         _began_nontrivial_solving = false;
         _retrieve_complete_task = true;
         _dtask = {};
         initJson();
+    }
+
+    void forwardAsyncRedundantClauses(std::vector<int>& clauseBuf) override {
+
+        int jobId = _mallob_job_id;
+        int rank = _mallob_root_rank.load(std::memory_order_relaxed);
+
+        if (jobId == -1 || rank == -1) return;
+
+        JobMessage resultMsg(jobId, jobId, _pending_rev, _xtcs_epoch++, MSG_SEND_APP_DATA_TO_JOB_TREE_ROOT);
+        resultMsg.treeIndexOfSender = 0;
+        resultMsg.treeIndexOfDestination = 0;
+        resultMsg.contextIdOfSender = jobId;
+        resultMsg.contextIdOfDestination = _desc.getGroupId();
+        resultMsg.payload = clauseBuf;
+
+        MyMpi::isend(rank, MSG_SEND_APP_DATA_TO_JOB_TREE_ROOT, resultMsg);
     }
 
     virtual void finalize() override {
@@ -327,6 +357,13 @@ public:
 
     const std::string& getUserName() const {
         return _username;
+    }
+
+    int getMallobJobId() const {
+        return _mallob_job_id;
+    }
+    int getMallobRootRank() const {
+        return _mallob_root_rank.load(std::memory_order_relaxed);
     }
 
 private:

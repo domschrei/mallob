@@ -114,6 +114,7 @@ private:
     std::map<int, int> _root_nodes;
     std::set<int> _client_ranks;
     SysState<5> _sys_state;
+    std::map<int, std::function<void(int)>> _root_rank_callbacks;
 
     // Number of jobs with a loaded description (taking memory!)
     std::atomic_int _num_loaded_jobs = 0;

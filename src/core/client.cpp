@@ -182,7 +182,10 @@ void Client::readIncomingJobs() {
                             *res = prog->function();
                             *done = true;
                         });
+                        // Notify root rank of this job to user
+                        if (foundJob.cbRootRank) foundJob.cbRootRank(_world_rank);
                     } else {
+                        if (foundJob.cbRootRank) _root_rank_callbacks[id] = std::move(foundJob.cbRootRank);
                         // Enqueue in ready jobs to be scheduled properly
                         auto lock = _ready_job_lock.getLock();
                         _ready_job_queue.push_back(std::move(foundJob.description));
@@ -573,6 +576,12 @@ void Client::sendJobDescription(JobRequest& req, int destRank) {
 
     // Remember transaction
     _root_nodes[req.jobId] = destRank;
+    // Notify root rank of this job to user
+    auto it = _root_rank_callbacks.find(req.jobId);
+    if (it != _root_rank_callbacks.end()) {
+        it->second(destRank);
+        _root_rank_callbacks.erase(it);
+    }
 
     // waiting instance reader might be able to continue now
     {

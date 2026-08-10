@@ -30,7 +30,8 @@
 #include "util/sys/timer.hpp"
 
 JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson, 
-    std::function<void(nlohmann::json&)> feedback) {
+    std::function<void(nlohmann::json&)> feedback, int* outId,
+    std::function<void(int)> callbackRootRank) {
 
     if (!_active || Terminator::isTerminating()) return DISCARD;
 
@@ -168,6 +169,7 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
     // From here on, use the json inside the JobImage because the parameter JSON has been moved
     assert(img->baseJson != nullptr);
     auto& json = img->baseJson;
+    if (outId) *outId = id;
 
     // Initialize new job
     JobDescription* job = new JobDescription(id, priority, applicationId);
@@ -274,6 +276,7 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
     metadata.description = std::unique_ptr<JobDescription>(job);
     metadata.files = std::move(files);
     metadata.dependencies = std::move(idDependencies);
+    metadata.cbRootRank = callbackRootRank;
     _job_callback(std::move(metadata));
 
     return ACCEPT;
