@@ -7,7 +7,8 @@ This page explains how to execute Mallob in general, with different applications
 
 ### Starting Mallob
 
->**Always make sure to execute Mallob and its wrapper run scripts from the home directory of the Mallob repository**, otherwise Mallob will not find critical executables in `build/` and **will not work correctly**.
+> [!IMPORTANT]  
+> **Always make sure to execute Mallob and its wrapper run scripts from the home directory of the Mallob repository**, otherwise Mallob will not find critical executables in `build/` and **will not work correctly**.
 
 **Quick Start:**
 
