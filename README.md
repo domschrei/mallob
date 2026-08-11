@@ -36,11 +36,15 @@ We also provide a setup based on Docker containerization. Please consult the (fo
 
 **Quick Start:**
 
-If you just want to use Mallob on a single, parallel machine, then the script `scripts/run/mallob_local.sh` automatically retrieves a suitable process+thread configuration of Mallob for your hardware that makes use of the entire machine. Examples:
+If you just want to use Mallob on a single, parallel machine, then the script `scripts/run/mallob_local.sh` automatically retrieves a suitable process+thread configuration of Mallob for your hardware that makes use of the entire machine. Useful presets can be applied by calling the scripts at `scripts/presets/`. Examples:
 
 ```bash
-# SAT solving
+# SAT solving (default, simple setup)
 scripts/run/mallob_local.sh -mono=instances/r3unsat_300.cnf
+# SAT solving (SAT Competition 2026 winning configuration, with Satsuma)
+scripts/run/mallob_local.sh $(scripts/presets/satcomp2026-quick.sh) -mono=instances/r3unsat_300.cnf
+# SAT solving (with real-time proof checking and assignment checking)
+scripts/run/mallob_local.sh $(scripts/presets/satcomp2026-safe.sh) -mono=instances/r3unsat_300.cnf
 # SMT solving
 scripts/run/mallob_local.sh -mono=path/to/problem.smt2 -mono-app=SMT
 # MaxSAT solving
@@ -48,7 +52,6 @@ scripts/run/mallob_local.sh -mono=path/to/problem.wcnf -mono-app=MAXSAT
 ```
 
 **Always make sure to execute Mallob and its wrapper run scripts from Mallob's home directory**, otherwise Mallob will not find critical executables in `build/` and **will not work correctly**.
-For trouble-shooting, see also [FAQ:Execution](docs/faq.md#execution).
 
 **More general settings:**
 
@@ -63,8 +66,8 @@ E.g., using Open MPI, the following command runs Mallob as a service (taking JSO
 RDMAV_FORK_SAFE=1; mpirun --bind-to core --map-by ppr:8:node:pe=4 -np 8 build/mallob -t=4
 ```
 
-[**Find more detailed instructions at docs/execute.md.**](docs/execute.md)
-
+[**Find more detailed instructions at docs/execute.md.**](docs/execute.md)  
+For trouble-shooting, see also [FAQ:Execution](docs/faq.md#execution).
 
 ## Development and Debugging
 

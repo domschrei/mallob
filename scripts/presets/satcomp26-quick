@@ -1,0 +1,3 @@
+#!/bin/bash
+
+echo "-mono-app=SATWITHPRE -max-lits-per-thread=60000000 -presa=1 -ckas=1 -pl=1 -jc=1 -div-reduce=4 -pre-cleanup=1 -seed=110519 -zero-only-logging=1 -v=2 -s2f=solution.txt -terminate-abruptly=1"

@@ -37,7 +37,8 @@ fi
 
 if [ "x$1" == "x" ]; then
     echo "c No options provided. Usage examples:"
-    echo "c $0 -mono=path/to/problem.cnf                   # SAT solving"
+    echo "c $0 -mono=instances/r3unsat_300.cnf  # SAT solving (default, simple setup)"
+    echo "c $0 "'$(scripts/presets/satcomp2026-quick.sh)'" -mono=instances/r3unsat_300.cnf  # SAT solving (SAT Comp. '26 winning config, with Satsuma)"
     echo "c $0 -mono=path/to/problem.smt2 -mono-app=SMT    # SMT solving"
     echo "c $0 -mono=path/to/problem.wcnf -mono-app=MAXSAT # MaxSAT solving"
     echo "c $0 -apidir=.api/   # Scheduled mode, process tasks via JSON api"

@@ -7,6 +7,27 @@ This page explains how to execute Mallob in general, with different applications
 
 ### Starting Mallob
 
+>**Always make sure to execute Mallob and its wrapper run scripts from the home directory of the Mallob repository**, otherwise Mallob will not find critical executables in `build/` and **will not work correctly**.
+
+**Quick Start:**
+
+If you just want to use Mallob on a single, parallel machine, then the script `scripts/run/mallob_local.sh` automatically retrieves a suitable process+thread configuration of Mallob for your hardware that makes use of the entire machine. Useful presets can be applied by calling the scripts at `scripts/presets/`. Examples:
+
+```bash
+# SAT solving (default, simple setup)
+scripts/run/mallob_local.sh -mono=instances/r3unsat_300.cnf
+# SAT solving (SAT Competition 2026 winning configuration, with Satsuma)
+scripts/run/mallob_local.sh $(scripts/presets/satcomp2026-quick.sh) -mono=instances/r3unsat_300.cnf
+# SAT solving (with real-time proof checking and assignment checking)
+scripts/run/mallob_local.sh $(scripts/presets/satcomp2026-safe.sh) -mono=instances/r3unsat_300.cnf
+# SMT solving
+scripts/run/mallob_local.sh -mono=path/to/problem.smt2 -mono-app=SMT
+# MaxSAT solving
+scripts/run/mallob_local.sh -mono=path/to/problem.wcnf -mono-app=MAXSAT
+```
+
+**General settings:**
+
 Mallob is an MPI application and should therefore usually be executed via `mpirun`, `mpiexec` or something similar.
 
 For example, given a single machine with two hardware threads per core, the following command executed in Mallob's base directory assigns one MPI process to each set of four physical cores (eight hardware threads) and then runs four solver threads on each MPI process.
@@ -39,6 +60,15 @@ You can find **all program options of Mallob** by executing Mallob with the `-h`
 For exact and clean logging, specify a logging directory with `-log=<log-dir>` where separate sub-directories and files will be created for each worker / thread. 
 This can be combined with the `-q` option to suppress Mallob's output to STDOUT. 
 Verbosity of logging can be set with the `-v` option (as long as Mallob was compiled with the respective verbosity or higher, see the `-DMALLOB_LOG_VERBOSITY` build option).
+
+**Presets:** We provide a few useful Mallob configuration presets in the directory `scripts/presets/`. Example:
+```bash
+# SAT solving (SAT Competition 2026 winning configuration, with Satsuma)
+scripts/run/mallob_local.sh $(scripts/presets/satcomp2026-quick.sh) -mono=instances/r3unsat_300.cnf
+```
+You can easily add your own presets by dropping an executable (script / program) under `scripts/presets/` that simply outputs the desired series of program options.
+
+Command-line options in Mallob can be specified repeatedly, in which case the **final occurrence** of the option will override all previously specified values of the option. This can be useful, e.g., when combined with presets: You can set a certain preset and then append your own configuration, possibly overriding some of the preset's settings.
 
 ### Mono mode of operation
 
