@@ -32,7 +32,7 @@ fi
 spack env activate mallob_env
 
 # spack config add "packages:elfutils:variants: ~debuginfod"   maybe not needed anymore with combined concretization
-spack add cmake gcc jemalloc openmpi curl gdb
+spack add cmake gcc jemalloc openmpi curl gdb zlib-ng
 echo "Installing. Might take 1-2min."
 spack concretize
 spack install -j 32
@@ -54,5 +54,9 @@ echo ""
 echo GCC
 echo $(gcc --version)
 echo "" 
+
+# prevent linking error that -lz can't be found
+export LIBRARY_PATH=$(spack location -i zlib-ng)/lib:$LIBRARY_PATH
+export LD_LIBRARY_PATH=$(spack location -i zlib-ng)/lib:$LD_LIBRARY_PATH 
 
 spack env activate mallob_env
