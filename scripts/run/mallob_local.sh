@@ -44,6 +44,9 @@ if [ "x$1" == "x" ]; then
     exit 0
 fi
 
+# Environment variables for mpirun
+export RDMAV_FORK_SAFE=1
+
 cmd="mpirun $mpioptions build/mallob -t=$nb_threads $@"
 echo "c Running command:"
 echo "c   $cmd"
