@@ -70,7 +70,7 @@ public:
         // stop providing new solver instances and flush the remaining ones
         LOG(V2_INFO, "SMT stop factory: provisioner\n");
         _provision_buffer.markTerminated();
-        BitwuzlaSatConnector* solver;
+        BitwuzlaSatConnector* solver {nullptr};
         while (!_provision_buffer.exhausted() && _provision_buffer.pollBlocking(solver)) {
             delete solver; // calls incsat cleaner above -> pushes to _clear_buffer!
         }
