@@ -617,10 +617,6 @@ private:
         MaxSatSearchProcedure::SearchStrategy searchStrat;
         std::string label = std::to_string(index) + ":";
         switch (c) {
-        case 'd':
-            searchStrat = MaxSatSearchProcedure::DECREASING;
-            label += "DEC";
-            break;
         case 'i':
             searchStrat = MaxSatSearchProcedure::INCREASING;
             label += "INC";
@@ -632,6 +628,11 @@ private:
         case 'r':
             searchStrat = MaxSatSearchProcedure::NAIVE_REFINEMENT;
             label += "NRE";
+            break;
+        case 'd':
+        default:
+            searchStrat = MaxSatSearchProcedure::DECREASING;
+            label += "DEC";
             break;
         }
         // Initialize search procedure

@@ -50,7 +50,8 @@ void register_mallob_app_maxsat() {
         assert(modelSize > 0);
         assert(solSize == modelSize + 2);
         int costAsTwoInts[2] = {result.getSolution(modelSize), result.getSolution(modelSize+1)};
-        unsigned long cost = * (unsigned long*) costAsTwoInts;
+        unsigned long cost;
+        memcpy(&cost, costAsTwoInts, sizeof(unsigned long));
         modelString << "o " << cost << "\nv ";
         for (size_t x = 1; x < modelSize; x++) {
             int lit = result.getSolution(x);

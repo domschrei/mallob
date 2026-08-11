@@ -64,6 +64,8 @@ struct Distribution {
         case NORMAL:
             delete (std::normal_distribution<double>*) _distribution;
             break;
+        default:
+            break;
         }
         _distribution = nullptr;
     }
