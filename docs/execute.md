@@ -12,15 +12,15 @@ This page explains how to execute Mallob in general, with different applications
 
 **Quick Start:**
 
-If you just want to use Mallob on a single, parallel machine, then the script `scripts/run/mallob_local.sh` automatically retrieves a suitable process+thread configuration of Mallob for your hardware that makes use of the entire machine. Useful presets can be applied by calling the scripts at `scripts/presets/`. Examples:
+If you just want to use Mallob on a single, parallel machine, then the script `scripts/run/mallob_local.sh` automatically retrieves a suitable process+thread configuration of Mallob for your hardware that makes use of the entire machine. Useful presets can be applied by calling the scripts at `config/presets/`. Examples:
 
 ```bash
 # SAT solving (default, simple setup)
 scripts/run/mallob_local.sh -mono=instances/r3unsat_300.cnf
 # SAT solving (SAT Competition 2026 winning configuration, with Satsuma)
-scripts/run/mallob_local.sh $(scripts/presets/satcomp2026-quick.sh) -mono=instances/r3unsat_300.cnf
+scripts/run/mallob_local.sh $(config/presets/satcomp2026-quick) -mono=instances/r3unsat_300.cnf
 # SAT solving (with real-time proof checking and assignment checking)
-scripts/run/mallob_local.sh $(scripts/presets/satcomp2026-safe.sh) -mono=instances/r3unsat_300.cnf
+scripts/run/mallob_local.sh $(config/presets/satcomp2026-safe) -mono=instances/r3unsat_300.cnf
 # SMT solving
 scripts/run/mallob_local.sh -mono=path/to/problem.smt2 -mono-app=SMT
 # MaxSAT solving
@@ -137,7 +137,6 @@ Mallob supports checking a produced PalRUP proof immediatly after solving utiliz
 As described above, a PalRUP proof can be stored on local disks when it was created on a distributed system. If this is the case, make sure to run Mallob with the `-palrup-use-local-disks=1` option.
 
 Non-default options can be passed to the PalRUP-Checker by setting the corresponding Mallob options. See [options.hpp](../src/app/palrupcheck/options.hpp) for details.
-
 
 ### Streamlined SAT Setup
 

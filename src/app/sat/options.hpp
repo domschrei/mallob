@@ -87,7 +87,7 @@ OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversificati
     "Diversify solvers based on random sparse variable phases in addition to native diversification")
  OPT_STRING(satSolverSequence,              "satsolver",  "",                            "C",
  "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")
- OPT_STRING(satConfigDirs, "sat-config-dirs", "", "", "Directory path, or comma-separated list of directory paths, to JSON solver configuration files")
+ OPT_STRING(satConfigDirs, "sat-config-dirs", "", "config/sat/base", "Directory path, or comma-separated list of directory paths, to JSON solver configuration files")
  OPT_STRING(satConfigFiles, "sat-config-files", "", "", "File path, or comma-separated list of file paths, to JSON solver configuration rules")
 
 OPTION_GROUP(grpAppSatProof, "app/sat/proof", "Production of UNSAT proofs")

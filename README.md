@@ -36,17 +36,17 @@ We also provide a setup based on Docker containerization. Please consult the (fo
 
 **Quick Start:**
 
-If you just want to use Mallob on a single, parallel machine, then the script `scripts/run/mallob_local.sh` automatically retrieves a suitable process+thread configuration of Mallob for your hardware that makes use of the entire machine. Useful presets can be applied by calling the scripts at `scripts/presets/`. Examples:
+If you just want to use Mallob on a single, parallel machine, then the script `scripts/run/mallob_local.sh` automatically retrieves a suitable process+thread configuration of Mallob for your hardware that makes use of the entire machine. Useful presets can be applied by calling the scripts at `config/presets/`. Examples:
 
 ```bash
 # SAT solving (default, simple setup)
 scripts/run/mallob_local.sh -mono=instances/r3unsat_300.cnf
 # SAT solving (SAT Competition 2026 winning configuration, with Satsuma)
-scripts/run/mallob_local.sh $(scripts/presets/satcomp2026-quick.sh) -mono=instances/r3unsat_300.cnf
+scripts/run/mallob_local.sh $(config/presets/satcomp26-quick) -mono=instances/r3unsat_300.cnf
 # SAT solving (with real-time proof checking and assignment checking)
-scripts/run/mallob_local.sh $(scripts/presets/satcomp2026-safe.sh) -mono=instances/r3unsat_300.cnf
+scripts/run/mallob_local.sh $(config/presets/satcomp26-safe) -mono=instances/r3unsat_300.cnf
 # SMT solving
-scripts/run/mallob_local.sh -mono=path/to/problem.smt2 -mono-app=SMT
+scripts/run/mallob_local.sh $(config/presets/smtcomp26) -mono=path/to/problem.smt2
 # MaxSAT solving
 scripts/run/mallob_local.sh -mono=path/to/problem.wcnf -mono-app=MAXSAT
 ```
