@@ -40,13 +40,10 @@ struct SolverSetup {
 	char solverType;
 	bool doIncrementalSolving {false};
 	int diversificationIndex {0};
+	PortfolioSequence::Flavour flavour {PortfolioSequence::DEFAULT};
+	SolverOverrideConfig overrides;
 
 	SolvingReplay::Mode replayMode {SolvingReplay::NONE};
-
-	bool diversifyNative {false};
-	PortfolioSequence::Flavour flavour {PortfolioSequence::DEFAULT};
-
-	SolverOverrideConfig overrides;
 
 
 	// Clause export

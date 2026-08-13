@@ -136,59 +136,19 @@ void Cadical::addLiteral(int lit) {
 void Cadical::diversify(int seed) {
 
 	if (seedSet) return;
-
 	LOGGER(_logger, V3_VERB, "Diversifying %i seed=%i\n", getDiversificationIndex(), seed);
+
 	bool okay = solver->set("seed", seed);
 	assert(okay);
 
 	seedSet = true;
 	setClauseSharing(getNumOriginalDiversifications());
-
-	if (_setup.flavour == PortfolioSequence::SAT) {
-		switch (getDiversificationIndex() % 3) {
-		case 0: okay = solver->configure("sat"); break;
-		case 1: /*default configuration*/ break;
-		case 2: okay = solver->set("inprocessing", 0); break;
-		}
-	} else if (_setup.flavour == PortfolioSequence::PLAIN) {
-		LOGGER(_logger, V4_VVER, "plain\n");
-		okay = solver->configure("plain");
-	} else {
-		if (_setup.flavour != PortfolioSequence::DEFAULT) {
-			LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");
-			_setup.flavour = PortfolioSequence::DEFAULT;
-		}
-		if (_setup.diversifyNative) {
-			switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
-			// Greedy 10-portfolio according to tests on SAT2020 instances
-			case 0: okay = solver->set("phase", 0); break;
-			case 1: okay = solver->configure("sat"); break;
-			case 2: okay = solver->set("elim", 0); break;
-			case 3: okay = solver->configure("unsat"); break;
-			case 4: okay = solver->set("condition", 1); break;
-			case 5: okay = solver->set("walk", 0); break;
-			case 6: okay = solver->set("restartint", 100); break;
-			case 7: okay = solver->set("cover", 1); break;
-			case 8: okay = solver->set("shuffle", 1) && solver->set("shufflerandom", 1); break;
-			case 9: okay = solver->set("inprocessing", 0); break;
-			}
-		}
-	}
-
 	applyOverrides(_setup.baseSeed);
-
-	// Disable clause import for the 0th solver thread in incremental solving
-	// for the lowest possible best-case response latencies.
-	//if (_setup.isJobIncremental && _setup.doIncrementalSolving && _setup.globalId == 0
-	//	&& _setup.maxNumSolvers >= 8)
-	//	_clause_import_enabled = false;
-
-	assert(okay);
 }
 
 void Cadical::applyOverrides(int seed) {
 	for (auto& setting : _setup.overrides.getConfigurationOverrides(
-				PortfolioSequence::BaseSolver(_setup.solverType),
+				PortfolioSequence::BaseSolver(_setup.solverType), _setup.flavour,
 				_setup.diversificationIndex, seed)) {
 		bool ok = true;
         if (setting.type == Setting::CONFIGURE) {
@@ -197,7 +157,7 @@ void Cadical::applyOverrides(int seed) {
                 LOGGER(_logger, V0_CRIT, "[ERROR] CaDiCaL does not have configuration %s\n", conf);
                 abort();
             }
-			LOGGER(_logger, V4_VVER, "conf override \"%s\"\n", setting.key.c_str());
+			LOGGER(_logger, V4_VVER, "conf override \"%s\"\n", conf);
             ok = solver->configure(conf);
         } else {
 			const char* opt = setting.key.c_str();
@@ -225,6 +185,9 @@ int Cadical::getNumOriginalDiversifications() {
 
 void Cadical::setPhase(const int var, const bool phase) {
 	solver->phase(phase ? var : -var);
+}
+void Cadical::setDefaultPhase(const bool phase) {
+	solver->set("phase", phase);
 }
 
 // Solve the formula with a given set of assumptions

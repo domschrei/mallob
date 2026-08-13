@@ -86,22 +86,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	std::string proofDirectory;
 
 	SolverOverrideConfig soc;
-	if (params.satOverrides.isSet()) {
-		std::vector<std::string> jsonPaths;
-		stringstream ss(params.satOverrides());
-		string str;
-		while (getline(ss, str, ',')) {
-			jsonPaths.push_back(str);
-		}
-		try {
-			soc.parseFromJson(jsonPaths);
-		} catch (const std::exception& e) {
-			LOG(V0_CRIT, "[ERROR] Failed to parse solver override configuration: %s\n", e.what());
-			abort();
-		}
-		LOG(V3_VERB, "Parsed %i solver configuration rules from %s\n",
-			soc.ruleCount(), params.satOverrides().c_str());
-	}
+	soc.parseFromDirsAndFiles(params.satConfigDirs(), params.satConfigFiles());
+	LOG(V3_VERB, "Parsed %i solver configuration rules\n", soc.ruleCount());
 
 	// Launched in some certified UNSAT mode?
     if (_params.proofOutputFile.isSet() || _params.onTheFlyChecking() || _params.palRup()) {
@@ -244,7 +230,6 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.minImportChunksPerSolver = params.minNumChunksForImportPerSolver();
 	setup.numBufferedClsGenerations = params.bufferedImportedClsGenerations();
 	setup.skipClauseSharingDiagonally = params.skipClauseSharingDiagonally();
-	setup.diversifyNative = params.diversifyNative();
 	setup.adaptiveImportManager = params.adaptiveImportManager();
 	setup.maxNumSolvers = config.mpisize * params.numThreadsPerProcess();
 	setup.numVars = numVars;

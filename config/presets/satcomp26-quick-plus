@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# just an assumption - the command will also work with deviating scales
+# (original in the SAT Comp: 16)
+n_threads_per_process=16
+
+echo '-max-lits-per-thread=60000000 -pre-cleanup=1 -seed=110519 -zero-only-logging=1
+ -v=2 -s2f=solution.txt -terminate-abruptly=1
+ -mono-app=SATWITHPRE -sat-config-dirs=config/sat/base/ 
+ -sat-config-files=config/sat/noise.json,config/sat/reduce.json
+ -satsolver=k_k_l+[k_]{'$(($n_threads_per_process-3))'}
+ -pl=1 -presa=1 -ckas=1 -jc=1'

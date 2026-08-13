@@ -4,9 +4,10 @@
 // Initial version generated via Claude Sonnet 5 (Medium), 2026-08-12
 
 #include "override_config.hpp"
+#include "app/sat/data/portfolio_sequence.hpp"
 #include "util/distribution.hpp"
-#include "util/logger.hpp"
 #include "util/random.hpp"
+#include "util/sys/fileutils.hpp"
 
 #include <fstream>
 #include <sstream>
@@ -31,32 +32,39 @@ std::string toString(SolverBackendType backend) {
         case SolverBackendType::KISSAT: return "Kissat";
         case SolverBackendType::CADICAL: return "CaDiCaL";
         case SolverBackendType::LINGELING: return "Lingeling";
+        default:
+            throw std::runtime_error("Unsupported solver backend type for solver override config");
     }
-    throw std::runtime_error("Unhandled SolverBackendType");
 }
 
 // ---------------------------------------------------------------------
 // Selector implementations
 // ---------------------------------------------------------------------
 
-bool TrueSelector::matches(int /*index*/, int /*seed*/) const { return true; }
+bool TrueSelector::matches(int /*index*/, PortfolioSequence::Flavour, int /*seed*/) const { return true; }
 
 RandomSelector::RandomSelector(double prob) : _prob(prob) {}
 
-bool RandomSelector::matches(int index, int seed) const {
+bool RandomSelector::matches(int index, PortfolioSequence::Flavour flavour, int seed) const {
     SplitMix64Rng rng(index * seed);
     return rng.randomInRange(0, 1) <= _prob;
 }
 
+FlavourSelector::FlavourSelector(PortfolioSequence::Flavour flavour) : _flavour(flavour) {}
+
+bool FlavourSelector::matches(int index, PortfolioSequence::Flavour flavour, int seed) const {
+    return _flavour == flavour;
+}
+
 RangeSelector::RangeSelector(int from, int to) : _from(from), _to(to) {}
 
-bool RangeSelector::matches(int index, int seed) const {
+bool RangeSelector::matches(int index, PortfolioSequence::Flavour flavour, int seed) const {
     return index >= _from && index <= _to;
 }
 
 ScatterSelector::ScatterSelector(int start, int step) : _start(start), _step(step) {}
 
-bool ScatterSelector::matches(int index, int seed) const {
+bool ScatterSelector::matches(int index, PortfolioSequence::Flavour flavour, int seed) const {
     if (index < _start) return false;
     if (_step == 0) return index == _start;
     return (index - _start) % _step == 0;
@@ -64,14 +72,16 @@ bool ScatterSelector::matches(int index, int seed) const {
 
 NotSelector::NotSelector(std::unique_ptr<Selector> inner) : _inner(std::move(inner)) {}
 
-bool NotSelector::matches(int index, int seed) const { return !_inner->matches(index, seed); }
+bool NotSelector::matches(int index, PortfolioSequence::Flavour flavour, int seed) const {
+    return !_inner->matches(index, flavour, seed);
+}
 
 AndSelector::AndSelector(std::vector<std::unique_ptr<Selector>> children)
     : _children(std::move(children)) {}
 
-bool AndSelector::matches(int index, int seed) const {
+bool AndSelector::matches(int index, PortfolioSequence::Flavour flavour, int seed) const {
     for (const auto& child : _children) {
-        if (!child->matches(index, seed)) return false;
+        if (!child->matches(index, flavour, seed)) return false;
     }
     return true;
 }
@@ -79,9 +89,9 @@ bool AndSelector::matches(int index, int seed) const {
 OrSelector::OrSelector(std::vector<std::unique_ptr<Selector>> children)
     : _children(std::move(children)) {}
 
-bool OrSelector::matches(int index, int seed) const {
+bool OrSelector::matches(int index, PortfolioSequence::Flavour flavour, int seed) const {
     for (const auto& child : _children) {
-        if (child->matches(index, seed)) return true;
+        if (child->matches(index, flavour, seed)) return true;
     }
     return false;
 }
@@ -126,6 +136,26 @@ std::unique_ptr<Selector> parseSelector(const json& j) {
 
     if (type == "true") {
         return std::make_unique<TrueSelector>();
+    }
+
+    if (type == "flavour") {
+        if (!j.contains("value"))
+            throw std::runtime_error("Flavour selector is missing a string 'value' field");
+        if (!j.at("value").is_string())
+            throw std::runtime_error("Flavour selector 'value' field must be a string");
+        if (j.at("value") == "default")
+            return std::make_unique<FlavourSelector>(PortfolioSequence::Flavour::DEFAULT);
+        else if (j.at("value") == "sat")
+            return std::make_unique<FlavourSelector>(PortfolioSequence::Flavour::SAT);
+        else if (j.at("value") == "unsat")
+            return std::make_unique<FlavourSelector>(PortfolioSequence::Flavour::UNSAT);
+        else if (j.at("value") == "plain")
+            return std::make_unique<FlavourSelector>(PortfolioSequence::Flavour::PLAIN);
+        else if (j.at("value") == "preprocess")
+            return std::make_unique<FlavourSelector>(PortfolioSequence::Flavour::PREPROCESS);
+        else
+            throw std::runtime_error("Flavour selector has invalid 'value' field "
+                + j.at("value").get<std::string>());
     }
 
     if (type == "random") {
@@ -287,11 +317,36 @@ void SolverOverrideConfig::parseFromJson(const std::vector<std::string>& filePat
     }
 }
 
-SettingsList SolverOverrideConfig::getConfigurationOverrides(SolverBackendType backend, int index, int randomSeed) const {
+void SolverOverrideConfig::parseFromDirsAndFiles(const std::string& dirList, const std::string& fileList) {
+    std::vector<std::string> jsonPaths;
+	if (!dirList.empty()) {
+		std::vector<std::string> dirs;
+		std::stringstream ss(dirList);
+		std::string str;
+		while (getline(ss, str, ',')) {
+			dirs.push_back(str);
+		}
+		for (const auto& dir : dirs) {
+			auto globbedFiles = FileUtils::glob(dir + "/*.json");
+			for (const auto& f : globbedFiles) jsonPaths.push_back(f);
+		}
+	}
+	if (!fileList.empty()) {
+		std::stringstream ss(fileList);
+		std::string str;
+		while (getline(ss, str, ',')) {
+			jsonPaths.push_back(str);
+		}
+	}
+    parseFromJson(jsonPaths);
+}
+
+SettingsList SolverOverrideConfig::getConfigurationOverrides(SolverBackendType backend,
+        PortfolioSequence::Flavour flavour, int index, int randomSeed) const {
     SettingsList result;
     for (const auto& rule : _rules) {
         if (rule.backend != backend) continue;
-        if (!rule.selector->matches(index, index + randomSeed)) continue;
+        if (!rule.selector->matches(index, flavour, index + randomSeed)) continue;
         for (auto setting : rule.settings) {
             // sample from random distribution where necessary
             if (setting.val.index() == 0) { // string

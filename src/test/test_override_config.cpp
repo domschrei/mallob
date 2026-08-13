@@ -1,6 +1,7 @@
 // Small sanity-check / usage demo for SolverConfig.
 // Initial version generated via Claude Sonnet 5 (Medium), 2026-08-12
 
+#include "app/sat/data/portfolio_sequence.hpp"
 #include "app/sat/solvers/override_config.hpp"
 #include <iostream>
 #include <variant>
@@ -8,7 +9,8 @@
 static void printOverrides(const SolverOverrideConfig& config, SolverBackendType backend, int index) {
     std::cout << toString(backend) << "[" << index << "] -> {";
     bool first = true;
-    for (const auto& setting : config.getConfigurationOverrides(backend, index)) {
+    for (const auto& setting : config.getConfigurationOverrides(
+                backend, PortfolioSequence::DEFAULT, index)) {
         if (!first) std::cout << ", ";
         first = false;
         if (setting.type == Setting::SET) std::cout << "SET: ";

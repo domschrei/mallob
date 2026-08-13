@@ -2,7 +2,7 @@
   "rules": [
     {
       "backend": "Kissat",
-      "selector": { "type": "true" },
+      "selector": { "type": "flavour", "value": "plain" },
       "settings": [
         {"type": "set", "key": "lucky", "value": 0},
         {"type": "set", "key": "preprocess", "value": 0},
@@ -12,7 +12,7 @@
     },
     {
       "backend": "CaDiCaL",
-      "selector": { "type": "true" },
+      "selector": { "type": "flavour", "value": "plain" },
       "settings": [
         {"type": "set", "key": "cover", "value": 0},
         {"type": "set", "key": "decompose", "value": 0},
@@ -28,21 +28,11 @@
     },
     {
       "backend": "Lingeling",
-      "selector": { "type": "true" },
+      "selector": { "type": "flavour", "value": "plain" },
       "settings": [
         {"type": "set", "key": "plain", "value": 1},
         {"type": "set", "key": "inprocessing", "value": 0}
       ]
-    }
-  ],
-
-  "samplers": [
-    {
-      "name": "Norm-0-5-m50-50",
-      "distribution": {
-        "type": "normal",
-        "params": [0, 5, -50, 50]
-      }
     }
   ]
 }

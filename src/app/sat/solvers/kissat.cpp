@@ -93,84 +93,37 @@ void Kissat::addLiteral(int lit) {
 void Kissat::diversify(int seed) {
 
     if (seedSet) return;
-
-	// Options may only be set in the initialization phase, so the seed cannot be re-set
-    LOGGER(_logger, V3_VERB, "Diversifying %i\n", getDiversificationIndex());
+    LOGGER(_logger, V3_VERB, "Diversifying %i seed=%i\n", getDiversificationIndex(), seed);
 
     // Basic configuration options for all solvers
     kissat_set_option(solver, "quiet", 1); // do not log to stdout / stderr
     kissat_set_option(solver, "check", 0); // do not check model or derived clauses
     kissat_set_option(solver, "factor", 0); // do not perform bounded variable addition
-
+    kissat_set_option(solver, "seed", seed); // random seed
+    // profiling (if desired)
     kissat_set_option(solver, "profile", _setup.profilingLevel);
 
-    // Set random seed
-    kissat_set_option(solver, "seed", seed);
+    seedSet = true;
+    setClauseSharing(getNumOriginalDiversifications());
 
-    if (_setup.solverType == 'p') {
+    if (_setup.flavour == PortfolioSequence::PREPROCESS || _setup.solverType == 'p') {
         LOGGER(_logger, V3_VERB, "Formula before preprocessing: %i vars, %i clauses\n",
             _setup.numVars, _setup.numOriginalClauses);
             kissat_set_preprocessing_report_callback(solver, this,
             begin_formula_report, report_preprocessed_lit);
         kissat_set_option(solver, "factor", 1); // do perform bounded variable addition
         //kissat_set_option(solver, "luckyearly", 0); // lucky before preprocess can take very long
-        seedSet = true;
         interruptionInitialized = true;
-        return;
+        return; // do not apply overrides since a preprocessor is not part of the portfolio
     }
 
-    bool ok = true;
-    if (_setup.flavour == PortfolioSequence::SAT) {
-        switch (getDiversificationIndex() % 4) {
-            case 0: ok = kissat_set_configuration(solver, "sat"); break;
-            case 1: /*use default*/ break;
-            case 2:
-                ok = kissat_set_option(solver, "preprocess", 0); assert(ok);
-                ok = kissat_set_option(solver, "simplify", 0); assert(ok);
-                break;
-            case 3: kissat_set_option(solver, "eliminate", 0); break;
-        }
-    } else if (_setup.flavour == PortfolioSequence::PLAIN) {
-        LOGGER(_logger, V4_VVER, "plain\n");
-        ok = kissat_set_option(solver, "lucky", 0); assert(ok);
-        ok = kissat_set_option(solver, "preprocess", 0); assert(ok);
-        ok = kissat_set_option(solver, "simplify", 0); assert(ok);
-        ok = kissat_set_option(solver, "probe", 0);
-
-    } else {
-        if (_setup.flavour != PortfolioSequence::DEFAULT) {
-            LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");
-            _setup.flavour = PortfolioSequence::DEFAULT;
-        }
-        if (_setup.diversifyNative) {
-            // Base portfolio of different configurations
-            switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
-                case 0: kissat_set_option(solver, "eliminate", 0); break;
-                case 1: kissat_set_option(solver, "restartint", 10); break;
-                case 2: kissat_set_option(solver, "walkinitially", 1); break;
-                case 3: kissat_set_option(solver, "restartint", 100); break;
-                case 4: kissat_set_option(solver, "sweep", 0); break;
-                case 5: ok = kissat_set_configuration(solver, "unsat"); break;
-                case 6: ok = kissat_set_configuration(solver, "sat"); break;
-                case 7: kissat_set_option(solver, "probe", 0); break;
-                case 8: kissat_set_option(solver, "minimizedepth", 1e4); break;
-                case 9: kissat_set_option(solver, "reducefraction", 90); break;
-                case 10: kissat_set_option(solver, "vivifyeffort", 1000); break;
-            }
-        }
-    }
-    assert(ok);
-
-    seedSet = true;
-    setClauseSharing(getNumOriginalDiversifications());
     applyOverrides(_setup.baseSeed);
-
     interruptionInitialized = true;
 }
 
 void Kissat::applyOverrides(int seed) {
     for (auto& setting : _setup.overrides.getConfigurationOverrides(
-				PortfolioSequence::BaseSolver(_setup.solverType),
+				PortfolioSequence::BaseSolver(_setup.solverType), _setup.flavour,
 				_setup.diversificationIndex, seed)) {
         if (setting.key == "configure") {
             const char* conf = std::get<0>(setting.val).c_str();
@@ -178,7 +131,7 @@ void Kissat::applyOverrides(int seed) {
                 LOGGER(_logger, V0_CRIT, "[ERROR] Kissat does not have configuration %s\n", conf);
                 abort();
             }
-            LOGGER(_logger, V4_VVER, "conf override \"%s\"\n", setting.key.c_str());
+            LOGGER(_logger, V4_VVER, "conf override \"%s\"\n", conf);
             kissat_set_configuration(solver, conf);
         } else {
             long long value = setting.type == Setting::ADD ? kissat_get_option(solver, setting.key.c_str())

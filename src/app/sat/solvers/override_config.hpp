@@ -42,6 +42,7 @@
 //
 // A <selector> is one of:
 //   { "type": "true" }
+//   { "type": "flavour", "value": <"default" | "sat" | "unsat" | "plain" | "preprocess"> }
 //   { "type": "random",  "chance": <0..1> }
 //   { "type": "range",   "from": <int>, "to": <int> }                // inclusive [i,j]
 //   { "type": "scatter", "start": <int>, "step": <int> }             // {start + x*step : x >= 0}
@@ -108,19 +109,28 @@ using SettingsList = std::vector<Setting>;
 class Selector {
 public:
     virtual ~Selector() = default;
-    virtual bool matches(int index, int seed) const = 0;
+    virtual bool matches(int index, PortfolioSequence::Flavour flavour, int seed) const = 0;
 };
 
 // Matches every index.
 class TrueSelector final : public Selector {
 public:
-    bool matches(int index, int seed) const override;
+    bool matches(int index, PortfolioSequence::Flavour flavour, int seed) const override;
+};
+
+class FlavourSelector final : public Selector {
+public:
+    FlavourSelector(PortfolioSequence::Flavour flavour);
+    bool matches(int index, PortfolioSequence::Flavour flavour, int seed) const override;
+
+private:
+    PortfolioSequence::Flavour _flavour;
 };
 
 class RandomSelector final : public Selector {
 public:
     RandomSelector(double prob);
-    bool matches(int index, int seed) const override;
+    bool matches(int index, PortfolioSequence::Flavour flavour, int seed) const override;
 
 private:
     double _prob;
@@ -130,7 +140,7 @@ private:
 class RangeSelector final : public Selector {
 public:
     RangeSelector(int from, int to);
-    bool matches(int index, int seed) const override;
+    bool matches(int index, PortfolioSequence::Flavour flavour, int seed) const override;
 
 private:
     int _from;
@@ -143,7 +153,7 @@ private:
 class ScatterSelector final : public Selector {
 public:
     ScatterSelector(int start, int step);
-    bool matches(int index, int seed) const override;
+    bool matches(int index, PortfolioSequence::Flavour flavour, int seed) const override;
 
 private:
     int _start;
@@ -153,7 +163,7 @@ private:
 class NotSelector final : public Selector {
 public:
     explicit NotSelector(std::unique_ptr<Selector> inner);
-    bool matches(int index, int seed) const override;
+    bool matches(int index, PortfolioSequence::Flavour flavour, int seed) const override;
 
 private:
     std::unique_ptr<Selector> _inner;
@@ -162,7 +172,7 @@ private:
 class AndSelector final : public Selector {
 public:
     explicit AndSelector(std::vector<std::unique_ptr<Selector>> children);
-    bool matches(int index, int seed) const override;
+    bool matches(int index, PortfolioSequence::Flavour flavour, int seed) const override;
 
 private:
     std::vector<std::unique_ptr<Selector>> _children;
@@ -171,7 +181,7 @@ private:
 class OrSelector final : public Selector {
 public:
     explicit OrSelector(std::vector<std::unique_ptr<Selector>> children);
-    bool matches(int index, int seed) const override;
+    bool matches(int index, PortfolioSequence::Flavour flavour, int seed) const override;
 
 private:
     std::vector<std::unique_ptr<Selector>> _children;
@@ -197,6 +207,8 @@ struct Rule {
 
 class SolverOverrideConfig {
 public:
+    void parseFromDirsAndFiles(const std::string& dirList, const std::string& fileList);
+
     // Parses and appends the rules found in each file, in order. May be
     // called multiple times; rules accumulate (they are not cleared first).
     // Throws std::runtime_error if a file cannot be opened or its content
@@ -207,7 +219,8 @@ public:
     // thread of the given backend at the given (0-based) index. Rules are
     // evaluated in the order they were parsed; later matching rules
     // overwrite settings from earlier matching rules with the same key.
-    SettingsList getConfigurationOverrides(SolverBackendType backend, int index, int randomSeed = 0) const;
+    SettingsList getConfigurationOverrides(SolverBackendType backend,
+        PortfolioSequence::Flavour flavour, int index, int randomSeed = 0) const;
 
     // Removes all previously parsed rules.
     void clear();

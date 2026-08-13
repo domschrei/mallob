@@ -1,7 +1,0 @@
-#!/bin/bash
-
-# just an assumption - the command will also work with deviating scales
-# (original in the SAT Comp: 11 - probably resulted in very weak clause sharing)
-n_threads_per_process=32
-
-echo '-satsolver=c!k+(c!){'$(($n_threads_per_process-2))'}(c!l+(c!){'$(($n_threads_per_process-2))'}){7} -rspaa=0 -otfc=1 -otfci=1 -max-lits-per-thread=35000000 -pre-cleanup=1 -seed=110519 -zero-only-logging=1 -v=2 -s2f=solution.txt -terminate-abruptly=1'

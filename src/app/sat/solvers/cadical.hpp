@@ -52,6 +52,7 @@ public:
 
 	void diversify(int seed) override;
 	void setPhase(const int var, const bool phase) override;
+	void setDefaultPhase(const bool phase);
 
 	// Solve the formula with a given set of assumptions
 	SatResult solve(size_t numAssumptions, const int* assumptions) override;

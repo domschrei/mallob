@@ -113,69 +113,29 @@ void Lingeling::updateMaxVar(int lit) {
 }
 
 void Lingeling::diversify(int seed) {
-	
-	lglsetopt(solver, "seed", seed);
-	int rank = getDiversificationIndex();
 
-	// This portfolio is based on Plingeling (mix of ayv and bcj)
+	LOGGER(_logger, V3_VERB, "Diversifying %i seed=%i\n", getDiversificationIndex(), seed);
+
+	lglsetopt(solver, "seed", seed);
 	lglsetopt(solver, "classify", 0);
-	if (_setup.flavour == PortfolioSequence::SAT) {
-		// sat preset: just run YalSAT
-		lglsetopt (solver, "plain", 1);
-		lglsetopt (solver, "locs", -1);
-		lglsetopt (solver, "locsrtc", 1);
-		lglsetopt (solver, "locswait", 0);
-		lglsetopt (solver, "locsclim", (1<<24));
-	} else if (_setup.flavour == PortfolioSequence::PLAIN) {
-		LOGGER(_logger, V4_VVER, "plain\n");
-		lglsetopt (solver, "plain", 1);
-	} else if (_setup.flavour == PortfolioSequence::PREPROCESS) {
+
+	setClauseSharing(getNumOriginalDiversifications());
+
+	if (_setup.flavour == PortfolioSequence::PREPROCESS) {
 		LOGGER(_logger, V4_VVER, "preprocess\n");
 		lglsetopt (solver, "dlim", 0);
 		lglsetopt (solver, "clim", 0);
 		lglsetopt (solver, "sweep", 0);
 		lglsetopt (solver, "gausswait", 0);
-	} else {
-		if (_setup.flavour != PortfolioSequence::DEFAULT) {
-			LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");
-			_setup.flavour = PortfolioSequence::DEFAULT;
-		}
-		if (_setup.diversifyNative) {
-			switch (rank % numDiversifications) {
-			case 0: lglsetopt (solver, "gluescale", 5); break; // from 3 (value "ld" moved)
-			case 1: 
-				lglsetopt (solver, "plain", 1);
-				lglsetopt (solver, "decompose", 1);
-				break;
-			case 2:
-				lglsetopt (solver, "plain", rank % (2*numDiversifications) < numDiversifications);
-				lglsetopt (solver, "locs", -1);
-				lglsetopt (solver, "locsrtc", 1);
-				lglsetopt (solver, "locswait", 0);
-				lglsetopt (solver, "locsclim", (1<<24));
-				break;
-			case 3: lglsetopt (solver, "restartint", 100); break;
-			case 4: lglsetopt (solver, "sweeprtc", 1); break;
-			case 5: lglsetopt (solver, "restartint", 1000); break;
-			case 6: lglsetopt (solver, "scincinc", 50); break;
-			case 7: lglsetopt (solver, "restartint", 4); break;
-			case 8: lglsetopt (solver, "phase", 1); break;
-			case 9: lglsetopt (solver, "phase", -1); break;
-			case 10: 
-				lglsetopt (solver, "block", 0); 
-				lglsetopt (solver, "cce", 0); 
-				break;
-			}
-		}
+		return; // do not apply overrides since a preprocessor is not part of the portfolio
 	}
 
-	setClauseSharing(getNumOriginalDiversifications());
 	applyOverrides(_setup.baseSeed);
 }
 
 void Lingeling::applyOverrides(int seed) {
 	for (auto& setting : _setup.overrides.getConfigurationOverrides(
-				PortfolioSequence::BaseSolver(_setup.solverType),
+				PortfolioSequence::BaseSolver(_setup.solverType), _setup.flavour,
 				_setup.diversificationIndex, seed)) {
 		const char* opt = setting.key.c_str();
 		long long value = setting.type == Setting::ADD ? lglgetopt(solver, setting.key.c_str()) : 0;
