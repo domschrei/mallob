@@ -1,0 +1,59 @@
+{
+  "rules": [
+
+    {
+      "backend": "Kissat",
+      "selector": { "type": "true" },
+      "settings": [
+        {"type": "set", "key": "restartint", "value": 100},
+        {"type": "set", "key": "sweep", "value": 1}
+      ]
+    },
+
+    {
+      "backend": "Kissat",
+      "selector": { "type": "range", "from": 0, "to": 3 },
+      "settings": [
+        {"type": "set", "key": "restartint", "value": 50}
+      ]
+    },
+
+    {
+      "backend": "CaDiCaL",
+      "selector": { "type": "scatter", "start": 1, "step": 2 },
+      "settings": [
+        {"type": "set", "key": "walk", "value": 1},
+        {"type": "set", "key": "elim", "value": 0}
+      ]
+    },
+
+    {
+      "backend": "Lingeling",
+      "selector": {
+        "type": "and",
+        "selectors": [
+          { "type": "scatter", "start": 0, "step": 3 },
+          { "type": "not", "selector": { "type": "range", "from": 0, "to": 2 } }
+        ]
+      },
+      "settings": [
+        {"type": "set", "key": "plain", "value": 1}
+      ]
+    },
+
+    {
+      "backend": "Kissat",
+      "selector": {
+        "type": "or",
+        "selectors": [
+          { "type": "range", "from": 5, "to": 5 },
+          { "type": "scatter", "start": 10, "step": 4 }
+        ]
+      },
+      "settings": [
+        {"type": "configure", "key": "configure", "value": "plain" }
+      ]
+    }
+
+  ]
+}

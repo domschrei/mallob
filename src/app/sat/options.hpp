@@ -23,7 +23,6 @@ OPTION_GROUP(grpAppSat, "app/sat", "SAT solving options")
  OPT_BOOL(compressModels,                   "cm", "compress-models", true, "Compress found models into hexadecimal vector in output")
  OPT_STRING(groundTruthModel,               "gtm", "", "", "Ground truth model to test learned clauses against")
  OPT_INT(replay, "replay", "", 0, 0, 2, "0: nothing, 1: record solver threads' behavior, 2: replay solving")
- OPT_BOOL(internalStreamProcessor, "isp", "", true, "For incremental SAT job streams, run a local single-threaded SAT solver for latency hiding")
  OPT_INT(jobSlots, "js", "", 0, 0, LARGE_INT, "Max. concurrent SAT job streams per client process (0: use # MPI processes)")
 
 OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration")
@@ -83,31 +82,14 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
    ">=1 also overrides -lbdpi=1 -lbdpo=1 -pbbm=1 for cross-sharing ONLY.")
 
 OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversification options")
- OPT_INT(diversifyElimination,              "div-elim", "",                              0,        0,   3,
-    "0=normal diversification, 1/2/3=disable some/most/all variable elimination")
- OPT_BOOL(diversifyFanOut,                  "div-fanout", "",                            false,
-    "Diversify some solvers based on making X random variable decisions every Y conflicts")
- OPT_BOOL(diversifyInitShuffle,             "div-init-shuffle", "",                      false, "Shuffle order in which variables are activated (->scored) initially")
  OPT_BOOL(diversifyPhases,                  "div-phases", "",                            true,
     "Diversify solvers based on random sparse variable phases in addition to native diversification")
  OPT_BOOL(diversifyNative,                 "div-native",  "",                            true,
     "Diversify solvers by cycling through sequence of solver-specific configurations")
- OPT_INT(plainAddSpecific,                 "plain-add-specific", "",                       0,     0,      1,    "Add specific single options to plain. 0=Nothing. 1=Sweep")
- OPT_BOOL(diversifyNoise,                  "div-noise",  "",                            false,                  "Diversify solvers by adding Gaussian noise on top of numeric parameters")
- OPT_INT(decayDistribution,                "decay-distr",  "",                             1,     1,      2,    "The type of the decay sampling distribution. 1=Gaussian, 2=Uniform     (used for div-noise=1)")
- OPT_INT(decayMean,                        "decay-mean",  "",                             50,     1,    200,    "The mean for sampling the decay value                (used for div-noise=1)")
- OPT_INT(decayStddev,                      "decay-stddev",  "",                           3,      0,   1000,    "The standard deviation for sampling the decay value  (used for div-noise=1)")
- OPT_INT(decayMin,                         "decay-min",  "",                              1,      1,    200,    "The minimum cutoff for sampling a decay value        (used for div-noise=1)")
- OPT_INT(decayMax,                         "decay-max",  "",                              200,    1,    200,    "The maximum cutoff for sampling a decay value        (used for div-noise=1)")
- OPT_INT(diversifyReduce,                  "div-reduce",  "",                             0,      0,      4,    "Toggle to diversify the reduce parameters. 0=Dont, 1=Uniform(with delta optional), 2=Extremes, 3=Gaussian")
- OPT_INT(reduceMin,                        "reduce-min",  "",                             300,    0,    1000,    "The minimium reduce value, in per mille")
- OPT_INT(reduceMax,                        "reduce-max",  "",                             980,    0,    1000,    "The maximum reduce value, in per mille")
- OPT_INT(reduceDelta,                      "reduce-delta", "",                            100,    0,    1000,    "For div-reduce=1: Samples a center reduce value r and give Kissat reducelow=r-delta and reducehigh=r+delta")
- OPT_INT(reduceMean,                       "reduce-mean", "",                             700,    0,    1000,    "For div-reduce=3: The mean reduce value")
- OPT_INT(reduceStddev,                     "reduce-stddev", "",                           150,    0,    1000,    "For div-reduce=3: The stddev of the Gaussian sampled reduce value")
  OPT_BOOL(diversifySeeds,                   "div-seeds", "",                             true,              "Diversify solvers with different random seeds")
  OPT_STRING(satSolverSequence,              "satsolver",  "",                            "C",
  "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")
+ OPT_STRING(satOverrides, "sat-overrides", "", "", "File path, or comma-separated list of file paths, to JSON solver configuration rules")
 
 OPTION_GROUP(grpAppSatProof, "app/sat/proof", "Production of UNSAT proofs")
  OPT_STRING(proofDirectory,               "proof-dir", "",                             "",                      "Directory to write partial proofs into (default: -log option")

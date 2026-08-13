@@ -92,5 +92,6 @@ public:
 
 private:
 	void updateMaxVar(int lit);
-    
+	void applyOverrides(int seed);
+
 };

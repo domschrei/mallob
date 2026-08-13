@@ -1,0 +1,48 @@
+{
+  "rules": [
+    {
+      "backend": "Kissat",
+      "selector": { "type": "true" },
+      "settings": [
+        {"type": "set", "key": "lucky", "value": 0},
+        {"type": "set", "key": "preprocess", "value": 0},
+        {"type": "set", "key": "simplify", "value": 0},
+        {"type": "set", "key": "probe", "value": 0}
+      ]
+    },
+    {
+      "backend": "CaDiCaL",
+      "selector": { "type": "true" },
+      "settings": [
+        {"type": "set", "key": "cover", "value": 0},
+        {"type": "set", "key": "decompose", "value": 0},
+        {"type": "set", "key": "deduplicate", "value": 0},
+        {"type": "set", "key": "elim", "value": 0},
+        {"type": "set", "key": "inprocessing", "value": 0},
+        {"type": "set", "key": "probe", "value": 0},
+        {"type": "set", "key": "subsume", "value": 0},
+        {"type": "set", "key": "ternary", "value": 0},
+        {"type": "set", "key": "transred", "value": 0},
+        {"type": "set", "key": "vivify", "value": 0}
+      ]
+    },
+    {
+      "backend": "Lingeling",
+      "selector": { "type": "true" },
+      "settings": [
+        {"type": "set", "key": "plain", "value": 1},
+        {"type": "set", "key": "inprocessing", "value": 0}
+      ]
+    }
+  ],
+
+  "samplers": [
+    {
+      "name": "Norm-0-5-m50-50",
+      "distribution": {
+        "type": "normal",
+        "params": [0, 5, -50, 50]
+      }
+    }
+  ]
+}

@@ -15,7 +15,6 @@
 
 #include "app/sat/solvers/optimizing_propagator.hpp"
 #include "portfolio_solver_interface.hpp"
-#include "util/sys/threading.hpp"
 #include "cadical/src/cadical.hpp"
 #include "cadical_terminator.hpp"
 #include "cadical_clause_export.hpp"
@@ -86,4 +85,8 @@ public:
 	void cleanUp() override;
 
 	CadicalTerminator& getTerminator() {return terminator;}
+
+private:
+	void applyOverrides(int seed);
+
 };

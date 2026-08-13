@@ -8,21 +8,21 @@
 #include <assert.h>
 #include <cstdint>
 #include <cstdio>
+#include <memory>
 #include <stdint.h>
 #include <functional>
 #include <algorithm>
 #include <cmath>
-#include <random>
 
 #include "app/sat/data/definitions.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
 #include "cadical.hpp"
 #include "app/sat/proof/trusted/trusted_utils.hpp"
-#include "app/sat/solvers/reduce_diversifier.hpp"
+#include "app/sat/solvers/override_config.hpp"
 #include "app/sat/solvers/solving_replay.hpp"
+#include "cadical/src/cadical.hpp"
 #include "cadical/src/onthefly_checking.hpp"
 #include "util/logger.hpp"
-#include "util/distribution.hpp"
 #include "app/sat/data/clause.hpp"
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "app/sat/data/solver_statistics.hpp"
@@ -33,7 +33,6 @@
 #include "app/sat/solvers/cadical_clause_import.hpp"
 #include "app/sat/solvers/cadical_terminator.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
-#include "util/sys/fileutils.hpp"
 
 Cadical::Cadical(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup),
@@ -121,11 +120,13 @@ Cadical::Cadical(const SolverSetup& setup)
 		}
 	}
 
+#if MALLOB_USE_CADICAL // explicit compile-time check to suppress missing polymorphy warning
 	if (_optimizer) {
 		solver->connect_external_propagator(_optimizer.get());
 		for (auto [weight, lit] : _setup.objectiveFunction)
 			solver->add_observed_var(std::abs(lit));
 	}
+#endif
 }
 
 void Cadical::addLiteral(int lit) {
@@ -142,35 +143,6 @@ void Cadical::diversify(int seed) {
 
 	seedSet = true;
 	setClauseSharing(getNumOriginalDiversifications());
-
-	// Randomize ("jitter") certain options around their default value
-    if (getDiversificationIndex() >= getNumOriginalDiversifications() && _setup.diversifyNoise) {
-        std::mt19937 rng(seed);
-        Distribution distribution(rng);
-
-        // Randomize restart frequency
-        double meanRestarts = solver->get("restartint");
-        double maxRestarts = std::min(2e9, 20*meanRestarts);
-        distribution.configure(Distribution::NORMAL, std::vector<double>{
-            /*mean=*/meanRestarts, /*stddev=*/10, /*min=*/1, /*max=*/maxRestarts
-        });
-        int restartFrequency = (int) std::round(distribution.sample());
-        okay = solver->set("restartint", restartFrequency); assert(okay);
-
-        // Randomize score decay
-        double meanDecay = solver->get("scorefactor");
-        distribution.configure(Distribution::NORMAL, std::vector<double>{
-            /*mean=*/meanDecay, /*stddev=*/3, /*min=*/500, /*max=*/1000
-        });
-        int decay = (int) std::round(distribution.sample());
-        okay = solver->set("scorefactor", decay); assert(okay);
-        
-        LOGGER(_logger, V3_VERB, "Sampled restartint=%i decay=%i\n", restartFrequency, decay);
-    }
-
-	if (getDiversificationIndex() >= getNumOriginalDiversifications() && _setup.diversifyFanOut) {
-		okay = solver->set("fanout", 1); assert(okay);
-	}
 
 	if (_setup.flavour == PortfolioSequence::SAT) {
 		switch (getDiversificationIndex() % 3) {
@@ -203,26 +175,7 @@ void Cadical::diversify(int seed) {
 		}
 	}
 
-	// Randomize reduce bounds
-	if (_setup.diversifyReduce > 0) {
-		// Radically reduce glue values of tier1 / tier2 so that fewer clauses are kept forever
-		bool ok;
-		ok = solver->set("reducetier1glue", 1);
-		if (!ok) abort();
-		ok = solver->set("reducetier2glue", 2);
-		if (!ok) abort();
-		if (getDiversificationIndex() >= 4) {
-			ReduceDiversifier rd(_setup, _logger,
-			// same callback for lower/upper because there is only one such option in CaDiCaL
-			[&](int lower) {
-				return solver->set("reducetarget", lower);
-			},
-			[&](int upper) {
-				return solver->set("reducetarget", upper);
-			});
-			rd.apply(seed);
-		}
-    }
+	applyOverrides(_setup.baseSeed);
 
 	// Disable clause import for the 0th solver thread in incremental solving
 	// for the lowest possible best-case response latencies.
@@ -231,6 +184,39 @@ void Cadical::diversify(int seed) {
 	//	_clause_import_enabled = false;
 
 	assert(okay);
+}
+
+void Cadical::applyOverrides(int seed) {
+	for (auto& setting : _setup.overrides.getConfigurationOverrides(
+				PortfolioSequence::BaseSolver(_setup.solverType),
+				_setup.diversificationIndex, seed)) {
+		bool ok = true;
+        if (setting.type == Setting::CONFIGURE) {
+            const char* conf = std::get<0>(setting.val).c_str();
+            if (!solver->is_valid_configuration(conf)) {
+                LOGGER(_logger, V0_CRIT, "[ERROR] CaDiCaL does not have configuration %s\n", conf);
+                abort();
+            }
+			LOGGER(_logger, V4_VVER, "conf override \"%s\"\n", setting.key.c_str());
+            ok = solver->configure(conf);
+        } else {
+			const char* opt = setting.key.c_str();
+            if (!solver->is_valid_option(opt)) {
+                LOGGER(_logger, V0_CRIT, "[ERROR] CaDiCaL does not have option %s\n", opt);
+                abort();
+            }
+			long long value = setting.type == Setting::ADD ? solver->get(setting.key.c_str()) : 0;
+            value += std::get<1>(setting.val);
+            value = std::min(value, setting.max);
+            value = std::max(value, setting.min);
+			LOGGER(_logger, V4_VVER, "opt override \"%s=%lld\"\n", setting.key.c_str(), value);
+            ok = solver->set(opt, value);
+        }
+		if (!ok) {
+			LOGGER(_logger, V0_CRIT, "[ERROR] CaDiCaL override for key \"%s\" failed!\n", setting.key.c_str());
+			abort();
+		}
+    }
 }
 
 int Cadical::getNumOriginalDiversifications() {

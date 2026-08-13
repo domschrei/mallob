@@ -10,7 +10,6 @@
 #include "app/sat/data/clause.hpp"
 #include "app/sat/data/definitions.hpp"
 #include "kissat/src/kissat.h"
-#include "util/sys/threading.hpp"
 
 struct kissat;
 struct SolverSetup;
@@ -53,8 +52,6 @@ public:
 	// Solve the formula with a given set of assumptions
 	SatResult solve(size_t numAssumptions, const int* assumptions) override;
 
-	void configureBoundedVariableAddition();
-
 	void setSolverInterrupt() override;
 	void unsetSolverInterrupt() override;
 
@@ -92,6 +89,8 @@ public:
     friend int terminate_callback(void* state);
 
 private:
+	void applyOverrides(int seed);
+
     void produceClause(int size, int lbd);
     void consumeClause(int** clause, int* size, int* lbd, unsigned long* id, unsigned char* sig);
 	void processProofLine(LratOp&& op);

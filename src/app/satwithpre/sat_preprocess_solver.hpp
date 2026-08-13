@@ -4,7 +4,6 @@
 #include "app/sat/data/formula_compressor.hpp"
 #include "app/sat/data/model_string_compressor.hpp"
 #include "app/sat/job/sat_constants.h"
-#include "app/satwithpre/options.hpp"
 #include "app/satwithpre/sat_preprocessor.hpp"
 #include "comm/mympi.hpp"
 #include "data/job_description.hpp"
@@ -19,9 +18,7 @@
 #include "util/sys/terminator.hpp"
 #include "util/sys/thread_pool.hpp"
 
-#include <memory>
 #include <string>
-#include <charconv>
 
 
 class SatPreprocessSolver {
@@ -147,8 +144,8 @@ private:
             json["wallclock-limit"] = std::to_string(_desc.getWallclockLimit() - getAgeSinceActivation()) + "s";
         if (_desc.getCpuLimit() > 0)
             json["cpu-limit"] = std::to_string(_desc.getCpuLimit() - getAgeSinceActivation()) + "s";
-        if (_params.overrideSatOptions())
-            json["configuration"]["options"] = SATWITHPRE_OPT_OVERRIDES;
+        if (_params.overrideSatOptions.isSet())
+            json["configuration"]["options"] = _params.overrideSatOptions();
 
         auto copiedJson = json;
         auto result = _api.submit(copiedJson, [&](nlohmann::json& response) {
@@ -222,8 +219,8 @@ private:
             json["wallclock-limit"] = std::to_string(_desc.getWallclockLimit() - getAgeSinceActivation()) + "s";
         if (_desc.getCpuLimit() > 0)
             json["cpu-limit"] = std::to_string(_desc.getCpuLimit() - getAgeSinceActivation()) + "s";
-        if (_params.overrideSatOptions())
-            json["configuration"]["options"] = SATWITHPRE_OPT_OVERRIDES;
+        if (_params.overrideSatOptions.isSet())
+            json["configuration"]["options"] = _params.overrideSatOptions();
 
         // Obtain API and submit the job
         auto copiedJson = json;

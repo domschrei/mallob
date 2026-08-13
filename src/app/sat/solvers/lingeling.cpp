@@ -12,12 +12,11 @@
 #include <cmath>
 #include <algorithm>
 #include <functional>
-#include <random>
 
 #include "app/sat/data/clause_metadata.hpp"
 #include "lingeling.hpp"
+#include "app/sat/solvers/override_config.hpp"
 #include "util/sys/timer.hpp"
-#include "util/distribution.hpp"
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "app/sat/data/solver_statistics.hpp"
 #include "app/sat/execution/solver_setup.hpp"
@@ -122,7 +121,7 @@ void Lingeling::diversify(int seed) {
 	lglsetopt(solver, "classify", 0);
 	if (_setup.flavour == PortfolioSequence::SAT) {
 		// sat preset: just run YalSAT
-		lglsetopt (solver, "plain", true);
+		lglsetopt (solver, "plain", 1);
 		lglsetopt (solver, "locs", -1);
 		lglsetopt (solver, "locsrtc", 1);
 		lglsetopt (solver, "locswait", 0);
@@ -170,23 +169,22 @@ void Lingeling::diversify(int seed) {
 		}
 	}
 
-	if (rank >= getNumOriginalDiversifications() && _setup.diversifyNoise) {
-		std::mt19937 rng(seed);
-        Distribution distribution(rng);
-
-        // Randomize restart frequency
-        double meanRestarts = lglgetopt(solver, "restartint");
-        double maxRestarts = std::min(10e4, 20*meanRestarts);
-        distribution.configure(Distribution::NORMAL, std::vector<double>{
-            /*mean=*/meanRestarts, /*stddev=*/10, /*min=*/1, /*max=*/maxRestarts
-        });
-        int restartFrequency = (int) std::round(distribution.sample());
-        lglsetopt(solver, "restartint", restartFrequency);
-
-		LOGGER(_logger, V3_VERB, "Sampled restartint=%i\n", restartFrequency);
-	}
-
 	setClauseSharing(getNumOriginalDiversifications());
+	applyOverrides(_setup.baseSeed);
+}
+
+void Lingeling::applyOverrides(int seed) {
+	for (auto& setting : _setup.overrides.getConfigurationOverrides(
+				PortfolioSequence::BaseSolver(_setup.solverType),
+				_setup.diversificationIndex, seed)) {
+		const char* opt = setting.key.c_str();
+		long long value = setting.type == Setting::ADD ? lglgetopt(solver, setting.key.c_str()) : 0;
+		value += std::get<1>(setting.val);
+		value = std::min(value, setting.max);
+		value = std::max(value, setting.min);
+		LOGGER(_logger, V4_VVER, "opt override \"%s=%lld\"\n", setting.key.c_str(), value);
+		lglsetopt(solver, opt, value);
+    }
 }
 
 // Set initial phase for a given variable

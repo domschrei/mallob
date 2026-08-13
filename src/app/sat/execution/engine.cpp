@@ -6,6 +6,7 @@
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "app/sat/data/revision_data.hpp"
 #include "app/sat/data/theories/theory_specification.hpp"
+#include "app/sat/solvers/override_config.hpp"
 #include "app/sat/solvers/solving_replay.hpp"
 #include "util/logger.hpp"
 #include "util/sys/fileutils.hpp"
@@ -83,6 +84,24 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		abort();
 	}
 	std::string proofDirectory;
+
+	SolverOverrideConfig soc;
+	if (params.satOverrides.isSet()) {
+		std::vector<std::string> jsonPaths;
+		stringstream ss(params.satOverrides());
+		string str;
+		while (getline(ss, str, ',')) {
+			jsonPaths.push_back(str);
+		}
+		try {
+			soc.parseFromJson(jsonPaths);
+		} catch (const std::exception& e) {
+			LOG(V0_CRIT, "[ERROR] Failed to parse solver override configuration: %s\n", e.what());
+			abort();
+		}
+		LOG(V3_VERB, "Parsed %i solver configuration rules from %s\n",
+			soc.ruleCount(), params.satOverrides().c_str());
+	}
 
 	// Launched in some certified UNSAT mode?
     if (_params.proofOutputFile.isSet() || _params.onTheFlyChecking() || _params.palRup()) {
@@ -174,7 +193,6 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	int numMrg = 0;
 	int numMini = 0;
 	int numKis = 0;
-	int numBVA = 0;
 	int numPre = 0;
 
 	// Add solvers from full cycles on previous ranks
@@ -193,7 +211,6 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		case PortfolioSequence::MERGESAT: solverToAdd = &numMrg; break;
 		case PortfolioSequence::MINISAT: solverToAdd = &numMini; break;
 		case PortfolioSequence::KISSAT: solverToAdd = &numKis; break;
-		case PortfolioSequence::VARIABLE_ADDITION: solverToAdd = &numBVA; break;
 		case PortfolioSequence::PREPROCESSOR: solverToAdd = &numPre; break;
 		}
 		*solverToAdd += numFullCycles + (i < begunCyclePos);
@@ -227,39 +244,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.minImportChunksPerSolver = params.minNumChunksForImportPerSolver();
 	setup.numBufferedClsGenerations = params.bufferedImportedClsGenerations();
 	setup.skipClauseSharingDiagonally = params.skipClauseSharingDiagonally();
-	setup.diversifyNoise = params.diversifyNoise();
-
-	setup.decayDistribution = params.decayDistribution();
-	setup.decayMean = params.decayMean();
-	setup.decayStddev = params.decayStddev();
-	setup.decayMin = params.decayMin();
-	setup.decayMax = params.decayMax();
-
-	setup.diversifyReduce = params.diversifyReduce();
-	setup.reduceMin = params.reduceMin();
-	setup.reduceMax = params.reduceMax();
-	setup.reduceMean = params.reduceMean();
-	setup.reduceStddev = params.reduceStddev();
-	setup.reduceDelta = params.reduceDelta();
-
-	setup.plainAddSpecific = params.plainAddSpecific();
 	setup.diversifyNative = params.diversifyNative();
-	setup.diversifyFanOut = params.diversifyFanOut();
-	setup.diversifyInitShuffle = params.diversifyInitShuffle();
-	switch (_params.diversifyElimination()) {
-	case 0:
-		setup.eliminationSetting = SolverSetup::ALLOW_ALL;
-		break;
-	case 1:
-		setup.eliminationSetting = SolverSetup::DISABLE_SOME;
-		break;
-	case 2:
-		setup.eliminationSetting = SolverSetup::DISABLE_MOST;
-		break;
-	case 3:
-		setup.eliminationSetting = SolverSetup::DISABLE_ALL;
-		break;
-	}
 	setup.adaptiveImportManager = params.adaptiveImportManager();
 	setup.maxNumSolvers = config.mpisize * params.numThreadsPerProcess();
 	setup.numVars = numVars;
@@ -311,7 +296,6 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 			case PortfolioSequence::MINISAT: setup.diversificationIndex = numMini++; break;
 			case PortfolioSequence::GLUCOSE: setup.diversificationIndex = numGlu++; break;
 			case PortfolioSequence::KISSAT: setup.diversificationIndex = numKis++; break;
-			case PortfolioSequence::VARIABLE_ADDITION: setup.diversificationIndex = numBVA++; break;
 			case PortfolioSequence::PREPROCESSOR: setup.diversificationIndex = numPre++; break;
 			}
 			setup.diversificationIndex += divOffsetCycle;
@@ -329,6 +313,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		setup.modelCheckingLratConnector = modelCheckingLratConnector;
 		setup.avoidUnsatParticipation = (params.proofOutputFile.isSet() || params.onTheFlyChecking() || _params.palRup()) && !item.outputProof;
 		setup.exportClauses = !setup.avoidUnsatParticipation;
+		setup.overrides = soc;
 
 		_solver_interfaces.push_back(createSolver(setup));
 		cyclePos = (cyclePos+1) % portfolio.cycle.size();

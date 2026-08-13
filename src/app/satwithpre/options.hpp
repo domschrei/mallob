@@ -4,8 +4,6 @@
 #include "optionslist.hpp"
 #include "util/option.hpp"
 
-#define SATWITHPRE_OPT_OVERRIDES "-satsolver=k_k_l+[k_]{13} -ilbd=0 -rlbd=3"
-
 // Application-specific program options for SAT solving.
 // memberName                               short option name, long option name          default   min  max
 
@@ -15,8 +13,8 @@ OPT_INT(preprocessBalancing, "pb", "preprocess-balancing", 1, -1, 2, "How to bal
 OPT_FLOAT(preprocessJobPriority, "pjp", "preprocess-job-priority", LARGE_INT, 0.0001f, LARGE_INT, "Job priority to assign to preprocessed task")
 OPT_FLOAT(preprocessExpansionFactor, "pef", "preprocess-expansion-factor", 1.f, 0.0001f, LARGE_INT, "Expand preprocessed task over -pef times the task's running time up to that point")
 OPT_BOOL(preprocessLingeling, "pl", "preprocess-lingeling", true, "Additionally run Lingeling as a preprocessor")
-OPT_BOOL(overrideSatOptions, "oso", "override-sat-options", true,
-    "In the SAT sub-tasks, override SAT solving options with \"" + std::string(SATWITHPRE_OPT_OVERRIDES) + "\"")
+OPT_STRING(overrideSatOptions, "oso", "override-sat-options", "",
+    "In each distributed SAT sub-task, override the SAT solver process configuration with these Mallob options")
 
 #if MALLOB_USE_SATSUMA
 OPT_BOOL(preprocessSatsuma, "presa", "preprocess-satsuma", false, "Run Satsuma instead of kissat")
