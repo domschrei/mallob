@@ -1,20 +1,40 @@
-// Configuration-override interface for a portfolio SAT solver.
+// Configuration-override interface for SAT solver portfolios.
 //
 // Users supply one or more JSON files, each containing a list of "rules".
 // Each rule says: for solver threads of a given BACKEND whose (0-based)
-// index matches a given SELECTOR, apply a given set of key/value SETTINGS.
+// index matches a given SELECTOR, apply a given set SETTINGS.
 //
 // JSON schema (informal):
 //
 // {
 //   "rules": [
 //     {
-//       "backend": "Kissat" | "CaDiCaL" | "Lingeling",
+//       "backend": <"Kissat" | "CaDiCaL" | "Lingeling">,
 //       "selector": <selector>,
 //       "settings": [ 
 //         {"type": "set", "key": "some-option", "value": "value"}, 
-//         {"type": "add", "key": "another-option", "value": 42}
+//         {"type": "set", "key": "some-option", "value": "sample R1"}, 
+//             // - value "sample <dist>" draws a sample from distribution R1
+//             //   (see below at "samplers")
+//         {"type": "add", "key": "another-option", "value": 42,
+//           "min": 1, "max": 1000},
+//             // - optional min/max fields clamp *final* value to [min, max]
+//         {"type": "configure", "key": "configure", "value": "plain"}
 //       ]
+//     },
+//     ...
+//   ],
+//   "samplers": [
+//     {
+//       "name": "R1",
+//       "distribution": {
+//         "type": <"constant" | "uniform" | "normal" | "exponential">
+//         "params": [0, 10, -100000, 100000]
+//             // type == constant: [val]
+//             // type == uniform: [min, max]
+//             // type == normal: [mean, stddev, min, max]
+//             // type == exponential: [lambda]
+//       }
 //     },
 //     ...
 //   ]
@@ -22,6 +42,7 @@
 //
 // A <selector> is one of:
 //   { "type": "true" }
+//   { "type": "random",  "chance": <0..1> }
 //   { "type": "range",   "from": <int>, "to": <int> }                // inclusive [i,j]
 //   { "type": "scatter", "start": <int>, "step": <int> }             // {start + x*step : x >= 0}
 //   { "type": "not",     "selector": <selector> }
@@ -33,8 +54,7 @@
 //
 // Multiple files are parsed in the order given, and within a file rules are
 // evaluated in array order. All matching rules for a (backend, index) pair
-// contribute their settings; if two matching rules set the same key, the
-// later rule (later in the same file, or in a later file) wins. This lets
+// contribute their settings, in the specified order. This lets
 // users layer a "defaults" file and an "overrides" file, for example.
 //
 // Initial version generated via Claude Sonnet 5 (Medium), 2026-08-12
@@ -46,9 +66,7 @@
 #include "util/distribution.hpp"
 #include "util/json.hpp"
 #include <climits>
-#include <map>
 #include <memory>
-#include <random>
 #include <string>
 #include <variant>
 #include <vector>
