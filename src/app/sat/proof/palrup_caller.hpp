@@ -39,7 +39,7 @@ public:
         const int palRupMergeBufferSize = _params.palRupMergeBufferSize();
         const int palRupQSize = _params.palRupQSize();
         const bool palRupBinary = _params.palRupBinary();
-        const bool palRipUseLocalDisks =_params.palRipUseLocalDisks();
+        const bool palRupUseLocalDisks =_params.palRupUseLocalDisks();
         const float palRupQAlpha = _params.palRupQAlpha();
         const std::string proofInputDir = FileUtils::getAbsoluteFilePath(_proofdir);
         const std::string proofWorkingDir = FileUtils::getAbsoluteFilePath(_params.palRupCheckWorkdir());
@@ -57,8 +57,7 @@ public:
             return ERROR;
         }
 
-        std::string palRupCall = "cd lib/palrup;"
-            " NUM_SOLVERS=" + std::to_string(nbSolvers)
+        std::string palRupCall = " NUM_SOLVERS=" + std::to_string(nbSolvers)
             + " NUM_NODES=" + std::to_string(nbHosts)
             + " NUM_PROCS_PER_NODE=" + std::to_string(nbProcsPerHost)
             // FIXME replace monoFilename with path to *this specific job's* description
@@ -74,7 +73,7 @@ public:
             + " Q_SIZE=\"" + std::to_string(palRupQSize) + "\""
             + " Q_ALPHA=\"" + std::to_string(palRupQAlpha) + "\""
             + " PALRUP_BINARY=\"" + std::to_string(palRupBinary) + "\""
-            + " USE_LOCAL_DISKS=\"" + std::to_string(palRipUseLocalDisks) + "\""
+            + " USE_LOCAL_DISKS=\"" + std::to_string(palRupUseLocalDisks) + "\""
             + " bash build/pal_launcher.sh";
 
         LOG(V4_VVER, "Calling PalRUP checker: %s\n", palRupCall.c_str());
