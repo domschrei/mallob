@@ -47,6 +47,7 @@ public:
 	void addLiteral(int lit) override;
 
 	void diversify(int seed) override;
+	void addConfigurationSetting(Setting setting) override;
 	void setPhase(const int var, const bool phase) override;
 
 	// Solve the formula with a given set of assumptions
@@ -89,8 +90,6 @@ public:
     friend int terminate_callback(void* state);
 
 private:
-	void applyOverrides(int seed);
-
     void produceClause(int size, int lbd);
     void consumeClause(int** clause, int* size, int* lbd, unsigned long* id, unsigned char* sig);
 	void processProofLine(LratOp&& op);

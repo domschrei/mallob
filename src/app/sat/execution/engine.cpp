@@ -6,7 +6,7 @@
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "app/sat/data/revision_data.hpp"
 #include "app/sat/data/theories/theory_specification.hpp"
-#include "app/sat/solvers/override_config.hpp"
+#include "app/sat/solvers/solver_portfolio_config.hpp"
 #include "app/sat/solvers/solving_replay.hpp"
 #include "util/logger.hpp"
 #include "util/sys/fileutils.hpp"
@@ -85,7 +85,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	}
 	std::string proofDirectory;
 
-	SolverOverrideConfig soc;
+	SolverPortfolioConfig soc;
 	soc.parseFromDirsAndFiles(params.satConfigDirs(), params.satConfigFiles());
 	LOG(V3_VERB, "Parsed %i solver configuration rules\n", soc.ruleCount());
 
@@ -298,7 +298,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		setup.modelCheckingLratConnector = modelCheckingLratConnector;
 		setup.avoidUnsatParticipation = (params.proofOutputFile.isSet() || params.onTheFlyChecking() || _params.palRup()) && !item.outputProof;
 		setup.exportClauses = !setup.avoidUnsatParticipation;
-		setup.overrides = soc;
+		setup.solverConfig = soc;
 
 		_solver_interfaces.push_back(createSolver(setup));
 		cyclePos = (cyclePos+1) % portfolio.cycle.size();

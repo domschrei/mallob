@@ -93,8 +93,6 @@ struct Setting {
     long long max {LLONG_MAX};
 };
 
-// Ordered by key so that iterating the result of getConfigurationOverrides()
-// is deterministic (handy for logging/debugging).
 using SettingsList = std::vector<Setting>;
 
 // ---------------------------------------------------------------------
@@ -205,7 +203,7 @@ struct Rule {
 // SolverConfig
 // ---------------------------------------------------------------------
 
-class SolverOverrideConfig {
+class SolverPortfolioConfig {
 public:
     void parseFromDirsAndFiles(const std::string& dirList, const std::string& fileList);
 
@@ -219,7 +217,7 @@ public:
     // thread of the given backend at the given (0-based) index. Rules are
     // evaluated in the order they were parsed; later matching rules
     // overwrite settings from earlier matching rules with the same key.
-    SettingsList getConfigurationOverrides(SolverBackendType backend,
+    SettingsList getConfigurationSettings(SolverBackendType backend,
         PortfolioSequence::Flavour flavour, int index, int randomSeed = 0) const;
 
     // Removes all previously parsed rules.

@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "portfolio_solver_interface.hpp"
-#include "util/sys/threading.hpp"
 #include "app/sat/data/clause.hpp"
 #include "app/sat/data/definitions.hpp"
 
@@ -60,6 +59,7 @@ public:
 	void addLiteral(int lit) override;
 
 	void diversify(int seed) override;
+	void addConfigurationSetting(Setting setting) override;
 	void setPhase(const int var, const bool phase) override;
 
 	// Solve the formula with a given set of assumptions
@@ -92,6 +92,5 @@ public:
 
 private:
 	void updateMaxVar(int lit);
-	void applyOverrides(int seed);
 
 };

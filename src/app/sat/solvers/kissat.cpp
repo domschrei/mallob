@@ -9,7 +9,6 @@
 
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
-#include "app/sat/solvers/override_config.hpp"
 #include "util/logger.hpp"
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "app/sat/data/solver_statistics.hpp"
@@ -113,35 +112,29 @@ void Kissat::diversify(int seed) {
             begin_formula_report, report_preprocessed_lit);
         kissat_set_option(solver, "factor", 1); // do perform bounded variable addition
         //kissat_set_option(solver, "luckyearly", 0); // lucky before preprocess can take very long
-        interruptionInitialized = true;
-        return; // do not apply overrides since a preprocessor is not part of the portfolio
     }
 
-    applyOverrides(_setup.baseSeed);
     interruptionInitialized = true;
 }
 
-void Kissat::applyOverrides(int seed) {
-    for (auto& setting : _setup.overrides.getConfigurationOverrides(
-				PortfolioSequence::BaseSolver(_setup.solverType), _setup.flavour,
-				_setup.diversificationIndex, seed)) {
-        if (setting.key == "configure") {
-            const char* conf = std::get<0>(setting.val).c_str();
-            if (!kissat_has_configuration(conf)) {
-                LOGGER(_logger, V0_CRIT, "[ERROR] Kissat does not have configuration %s\n", conf);
-                abort();
-            }
-            LOGGER(_logger, V4_VVER, "conf override \"%s\"\n", conf);
-            kissat_set_configuration(solver, conf);
-        } else {
-            long long value = setting.type == Setting::ADD ? kissat_get_option(solver, setting.key.c_str())
-                : 0;
-            value += std::get<1>(setting.val);
-            value = std::min(value, setting.max);
-            value = std::max(value, setting.min);
-			LOGGER(_logger, V4_VVER, "opt override \"%s=%lld\"\n", setting.key.c_str(), value);
-            kissat_set_option(solver, setting.key.c_str(), value);
+void Kissat::addConfigurationSetting(Setting setting) {
+
+    if (setting.key == "configure") {
+        const char* conf = std::get<0>(setting.val).c_str();
+        if (!kissat_has_configuration(conf)) {
+            LOGGER(_logger, V0_CRIT, "[ERROR] Kissat does not have configuration %s\n", conf);
+            abort();
         }
+        LOGGER(_logger, V5_DEBG, "conf override \"%s\"\n", conf);
+        kissat_set_configuration(solver, conf);
+    } else {
+        long long value = setting.type == Setting::ADD ? kissat_get_option(solver, setting.key.c_str())
+            : 0;
+        value += std::get<1>(setting.val);
+        value = std::min(value, setting.max);
+        value = std::max(value, setting.min);
+        LOGGER(_logger, V5_DEBG, "opt override \"%s=%lld\"\n", setting.key.c_str(), value);
+        kissat_set_option(solver, setting.key.c_str(), value);
     }
 }
 

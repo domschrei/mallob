@@ -4,7 +4,7 @@
 #include <string>
 
 #include "app/sat/data/portfolio_sequence.hpp"
-#include "app/sat/solvers/override_config.hpp"
+#include "app/sat/solvers/solver_portfolio_config.hpp"
 #include "app/sat/solvers/solving_replay.hpp"
 #include "util/logger.hpp"
 
@@ -41,7 +41,7 @@ struct SolverSetup {
 	bool doIncrementalSolving {false};
 	int diversificationIndex {0};
 	PortfolioSequence::Flavour flavour {PortfolioSequence::DEFAULT};
-	SolverOverrideConfig overrides;
+	SolverPortfolioConfig solverConfig;
 
 	SolvingReplay::Mode replayMode {SolvingReplay::NONE};
 

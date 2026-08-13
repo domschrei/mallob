@@ -213,6 +213,8 @@ void SolverThread::diversifyInitially() {
     }
     // Diversify solver based on seed
     _solver.diversify(seed);
+    // Configure solver
+    _solver.applySolverConfiguration(_solver.getSolverSetup().baseSeed);
     // RNG
     _rng = SplitMix64Rng(seed+_solver.getGlobalId());
 }

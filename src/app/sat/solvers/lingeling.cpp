@@ -15,7 +15,6 @@
 
 #include "app/sat/data/clause_metadata.hpp"
 #include "lingeling.hpp"
-#include "app/sat/solvers/override_config.hpp"
 #include "util/sys/timer.hpp"
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "app/sat/data/solver_statistics.hpp"
@@ -127,24 +126,17 @@ void Lingeling::diversify(int seed) {
 		lglsetopt (solver, "clim", 0);
 		lglsetopt (solver, "sweep", 0);
 		lglsetopt (solver, "gausswait", 0);
-		return; // do not apply overrides since a preprocessor is not part of the portfolio
 	}
-
-	applyOverrides(_setup.baseSeed);
 }
 
-void Lingeling::applyOverrides(int seed) {
-	for (auto& setting : _setup.overrides.getConfigurationOverrides(
-				PortfolioSequence::BaseSolver(_setup.solverType), _setup.flavour,
-				_setup.diversificationIndex, seed)) {
-		const char* opt = setting.key.c_str();
-		long long value = setting.type == Setting::ADD ? lglgetopt(solver, setting.key.c_str()) : 0;
-		value += std::get<1>(setting.val);
-		value = std::min(value, setting.max);
-		value = std::max(value, setting.min);
-		LOGGER(_logger, V4_VVER, "opt override \"%s=%lld\"\n", setting.key.c_str(), value);
-		lglsetopt(solver, opt, value);
-    }
+void Lingeling::addConfigurationSetting(Setting setting) {
+	const char* opt = setting.key.c_str();
+	long long value = setting.type == Setting::ADD ? lglgetopt(solver, setting.key.c_str()) : 0;
+	value += std::get<1>(setting.val);
+	value = std::min(value, setting.max);
+	value = std::max(value, setting.min);
+	LOGGER(_logger, V5_DEBG, "opt override \"%s=%lld\"\n", setting.key.c_str(), value);
+	lglsetopt(solver, opt, value);
 }
 
 // Set initial phase for a given variable

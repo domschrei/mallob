@@ -41,6 +41,7 @@ public:
 	// Diversify your parameters (seeds, heuristics, etc.) according to the seed
 	// and the individual diversification index given by getDiversificationIndex().
 	virtual void diversify(int seed) override;
+	virtual void addConfigurationSetting(Setting setting) override {}
 	// How many "true" different diversifications do you have?
 	// May be used to decide when to apply additional diversifications.
 	virtual int getNumOriginalDiversifications() override;

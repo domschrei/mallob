@@ -51,6 +51,7 @@ public:
 	void addLiteral(int lit) override;
 
 	void diversify(int seed) override;
+	void addConfigurationSetting(Setting setting) override;
 	void setPhase(const int var, const bool phase) override;
 	void setDefaultPhase(const bool phase);
 
@@ -86,8 +87,4 @@ public:
 	void cleanUp() override;
 
 	CadicalTerminator& getTerminator() {return terminator;}
-
-private:
-	void applyOverrides(int seed);
-
 };

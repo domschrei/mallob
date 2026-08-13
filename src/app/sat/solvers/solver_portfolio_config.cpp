@@ -3,7 +3,7 @@
 //
 // Initial version generated via Claude Sonnet 5 (Medium), 2026-08-12
 
-#include "override_config.hpp"
+#include "solver_portfolio_config.hpp"
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "util/distribution.hpp"
 #include "util/random.hpp"
@@ -213,7 +213,7 @@ std::unique_ptr<Selector> parseSelector(const json& j) {
 // SolverConfig
 // ---------------------------------------------------------------------
 
-SettingsList SolverOverrideConfig::parseSettings(const json& settingsJson) {
+SettingsList SolverPortfolioConfig::parseSettings(const json& settingsJson) {
     if (!settingsJson.is_array()) {
         throw std::runtime_error("'settings' must be a JSON array");
     }
@@ -244,7 +244,7 @@ SettingsList SolverOverrideConfig::parseSettings(const json& settingsJson) {
     return settings;
 }
 
-Rule SolverOverrideConfig::parseRule(const json& ruleJson) {
+Rule SolverPortfolioConfig::parseRule(const json& ruleJson) {
     if (!ruleJson.is_object()) {
         throw std::runtime_error("Each rule must be a JSON object");
     }
@@ -265,7 +265,7 @@ Rule SolverOverrideConfig::parseRule(const json& ruleJson) {
     return rule;
 }
 
-void SolverOverrideConfig::parseSingleFile(const std::string& filePath) {
+void SolverPortfolioConfig::parseSingleFile(const std::string& filePath) {
     std::ifstream in(filePath);
     if (!in.is_open()) {
         throw std::runtime_error("Could not open configuration file: " + filePath);
@@ -311,13 +311,13 @@ void SolverOverrideConfig::parseSingleFile(const std::string& filePath) {
     }
 }
 
-void SolverOverrideConfig::parseFromJson(const std::vector<std::string>& filePaths) {
+void SolverPortfolioConfig::parseFromJson(const std::vector<std::string>& filePaths) {
     for (const auto& filePath : filePaths) {
         parseSingleFile(filePath);
     }
 }
 
-void SolverOverrideConfig::parseFromDirsAndFiles(const std::string& dirList, const std::string& fileList) {
+void SolverPortfolioConfig::parseFromDirsAndFiles(const std::string& dirList, const std::string& fileList) {
     std::vector<std::string> jsonPaths;
 	if (!dirList.empty()) {
 		std::vector<std::string> dirs;
@@ -341,7 +341,7 @@ void SolverOverrideConfig::parseFromDirsAndFiles(const std::string& dirList, con
     parseFromJson(jsonPaths);
 }
 
-SettingsList SolverOverrideConfig::getConfigurationOverrides(SolverBackendType backend,
+SettingsList SolverPortfolioConfig::getConfigurationSettings(SolverBackendType backend,
         PortfolioSequence::Flavour flavour, int index, int randomSeed) const {
     SettingsList result;
     for (const auto& rule : _rules) {
@@ -369,6 +369,6 @@ SettingsList SolverOverrideConfig::getConfigurationOverrides(SolverBackendType b
     return result;
 }
 
-void SolverOverrideConfig::clear() { _rules.clear(); }
+void SolverPortfolioConfig::clear() { _rules.clear(); }
 
-std::size_t SolverOverrideConfig::ruleCount() const { return _rules.size(); }
+std::size_t SolverPortfolioConfig::ruleCount() const { return _rules.size(); }

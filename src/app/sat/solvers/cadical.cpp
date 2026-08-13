@@ -18,7 +18,6 @@
 #include "app/sat/proof/lrat_connector.hpp"
 #include "cadical.hpp"
 #include "app/sat/proof/trusted/trusted_utils.hpp"
-#include "app/sat/solvers/override_config.hpp"
 #include "app/sat/solvers/solving_replay.hpp"
 #include "cadical/src/cadical.hpp"
 #include "cadical/src/onthefly_checking.hpp"
@@ -143,40 +142,36 @@ void Cadical::diversify(int seed) {
 
 	seedSet = true;
 	setClauseSharing(getNumOriginalDiversifications());
-	applyOverrides(_setup.baseSeed);
+	applySolverConfiguration(_setup.baseSeed);
 }
 
-void Cadical::applyOverrides(int seed) {
-	for (auto& setting : _setup.overrides.getConfigurationOverrides(
-				PortfolioSequence::BaseSolver(_setup.solverType), _setup.flavour,
-				_setup.diversificationIndex, seed)) {
-		bool ok = true;
-        if (setting.type == Setting::CONFIGURE) {
-            const char* conf = std::get<0>(setting.val).c_str();
-            if (!solver->is_valid_configuration(conf)) {
-                LOGGER(_logger, V0_CRIT, "[ERROR] CaDiCaL does not have configuration %s\n", conf);
-                abort();
-            }
-			LOGGER(_logger, V4_VVER, "conf override \"%s\"\n", conf);
-            ok = solver->configure(conf);
-        } else {
-			const char* opt = setting.key.c_str();
-            if (!solver->is_valid_option(opt)) {
-                LOGGER(_logger, V0_CRIT, "[ERROR] CaDiCaL does not have option %s\n", opt);
-                abort();
-            }
-			long long value = setting.type == Setting::ADD ? solver->get(setting.key.c_str()) : 0;
-            value += std::get<1>(setting.val);
-            value = std::min(value, setting.max);
-            value = std::max(value, setting.min);
-			LOGGER(_logger, V4_VVER, "opt override \"%s=%lld\"\n", setting.key.c_str(), value);
-            ok = solver->set(opt, value);
-        }
-		if (!ok) {
-			LOGGER(_logger, V0_CRIT, "[ERROR] CaDiCaL override for key \"%s\" failed!\n", setting.key.c_str());
+void Cadical::addConfigurationSetting(Setting setting) {
+	bool ok = true;
+	if (setting.type == Setting::CONFIGURE) {
+		const char* conf = std::get<0>(setting.val).c_str();
+		if (!solver->is_valid_configuration(conf)) {
+			LOGGER(_logger, V0_CRIT, "[ERROR] CaDiCaL does not have configuration %s\n", conf);
 			abort();
 		}
-    }
+		LOGGER(_logger, V5_DEBG, "conf override \"%s\"\n", conf);
+		ok = solver->configure(conf);
+	} else {
+		const char* opt = setting.key.c_str();
+		if (!solver->is_valid_option(opt)) {
+			LOGGER(_logger, V0_CRIT, "[ERROR] CaDiCaL does not have option %s\n", opt);
+			abort();
+		}
+		long long value = setting.type == Setting::ADD ? solver->get(setting.key.c_str()) : 0;
+		value += std::get<1>(setting.val);
+		value = std::min(value, setting.max);
+		value = std::max(value, setting.min);
+		LOGGER(_logger, V5_DEBG, "opt override \"%s=%lld\"\n", setting.key.c_str(), value);
+		ok = solver->set(opt, value);
+	}
+	if (!ok) {
+		LOGGER(_logger, V0_CRIT, "[ERROR] CaDiCaL override for key \"%s\" failed!\n", setting.key.c_str());
+		abort();
+	}
 }
 
 int Cadical::getNumOriginalDiversifications() {
