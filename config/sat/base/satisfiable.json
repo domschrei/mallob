@@ -1,0 +1,35 @@
+{
+  "rules": [
+
+    { "backend": "Kissat",
+      "selector": { "type": "and", "selectors": [{"type":"flavour","value":"sat"},{"type":"scatter","start":0,"step":4}] },
+      "settings": [ {"type": "configure", "key": "configure", "value": "sat"} ] },
+    { "backend": "Kissat",
+      "selector": { "type": "and", "selectors": [{"type":"flavour","value":"sat"},{"type":"scatter","start":1,"step":4}] },
+      "settings": [ ] },
+    { "backend": "Kissat",
+      "selector": { "type": "and", "selectors": [{"type":"flavour","value":"sat"},{"type":"scatter","start":2,"step":4}] },
+      "settings": [ {"type": "set", "key": "preprocess", "value": 0}, {"type": "set", "key": "simplify", "value": 0} ] },
+    { "backend": "Kissat",
+      "selector": { "type": "and", "selectors": [{"type":"flavour","value":"sat"},{"type":"scatter","start":3,"step":4}] },
+      "settings": [ {"type": "set", "key": "eliminate", "value": "0"} ] },
+
+    { "backend": "CaDiCaL",
+      "selector": { "type": "and", "selectors": [{"type":"flavour","value":"sat"},{"type":"scatter","start":0,"step":3}] },
+      "settings": [ {"type": "configure", "key": "configure", "value": "sat"} ] },
+    { "backend": "CaDiCaL",
+      "selector": { "type": "and", "selectors": [{"type":"flavour","value":"sat"},{"type":"scatter","start":1,"step":3}] },
+      "settings": [ ] },
+    { "backend": "CaDiCaL",
+      "selector": { "type": "and", "selectors": [{"type":"flavour","value":"sat"},{"type":"scatter","start":2,"step":3}] },
+      "settings": [ {"type": "set", "key": "inprocessing", "value": "0"} ] },
+
+    { "backend": "Lingeling",
+      "selector": { "type": "and", "selectors": [{"type":"flavour","value":"sat"},{"type":"scatter","start":0,"step":1}] },
+      "settings": [ {"type": "set", "key": "plain", "value": 1},
+                  {"type": "set", "key": "locs", "value": -1},
+                  {"type": "set", "key": "locsrtc", "value": 1},
+                  {"type": "set", "key": "locswait", "value": 0},
+                  {"type": "set", "key": "locsclim", "value": 16777216} ] }
+  ]
+}

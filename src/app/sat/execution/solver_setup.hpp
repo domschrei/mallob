@@ -4,9 +4,9 @@
 #include <string>
 
 #include "app/sat/data/portfolio_sequence.hpp"
+#include "app/sat/solvers/solver_portfolio_config.hpp"
 #include "app/sat/solvers/solving_replay.hpp"
 #include "util/logger.hpp"
-#include "util/random.hpp"
 
 class LratConnector; // fwd
 
@@ -40,31 +40,11 @@ struct SolverSetup {
 	char solverType;
 	bool doIncrementalSolving {false};
 	int diversificationIndex {0};
+	PortfolioSequence::Flavour flavour {PortfolioSequence::DEFAULT};
+	SolverPortfolioConfig solverConfig;
 
 	SolvingReplay::Mode replayMode {SolvingReplay::NONE};
 
-	bool diversifyNoise {false};
-	int decayDistribution {0};
-	int decayMean {50};
-	int decayStddev {3};
-	int decayMin {1};
-	int decayMax {200};
-
-	int diversifyReduce {0};
-	int reduceMin {300};
-	int reduceMax {980};
-	int reduceDelta {100};
-	int reduceMean {700};
-	int reduceStddev {150};
-
-	int plainAddSpecific{0};
-	bool diversifyNative {false};
-	bool diversifyFanOut {false};
-	bool diversifyInitShuffle {false};
-	enum EliminationSetting {
-		ALLOW_ALL, DISABLE_SOME, DISABLE_MOST, DISABLE_ALL
-	} eliminationSetting {ALLOW_ALL};
-	PortfolioSequence::Flavour flavour {PortfolioSequence::DEFAULT};
 
 	int sweepeffort{100};
 
@@ -106,6 +86,7 @@ struct SolverSetup {
 	bool outputBinaryPalRup {true};
 	// If on-the-fly checking is enabled: this solver also seeks to have a found satisfying assignment checked.
 	bool onTheFlyCheckModel {false};
+	bool incrementalImpCheck {false};
 	bool trustedParserForced {false};
 	// If non-null, use this LratConnector instance for checking a model;
 	// if null && onTheFlyCheckModel, then *create* a model-checking LRAT connector instance yourself (also to use for others).
@@ -122,6 +103,11 @@ struct SolverSetup {
 	// Sweep related
 	bool preprocessSequentialSweepComplete{false};
 	// bool shared_sweeping {false};
+
+	// E.g., if 16 SAT threads should be spawned but only 3 are spawned due to memory shortage,
+	// this factor is 16/3 = 5.333.
+	float memoryFactor;
+
 
 	// Optimization and theories
 

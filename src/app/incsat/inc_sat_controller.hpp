@@ -2,17 +2,20 @@
 #pragma once
 
 #include "app/sat/execution/solver_setup.hpp"
-#include "app/sat/proof/trusted_parser_process_adapter.hpp"
+#include "app/sat/proof/trusted_inc_parser_process_adapter.hpp"
 #include "app/sat/stream/internal_sat_job_stream_processor.hpp"
 #include "app/sat/stream/mallob_sat_job_stream_processor.hpp"
 #include "app/sat/stream/sat_job_stream_processor.hpp"
 #include "app/sat/stream/wrapped_sat_job_stream.hpp"
+#include "comm/msgtags.h"
 #include "core/dtask_tracker.hpp"
 #include "data/job_description.hpp"
 #include "data/job_result.hpp"
+#include "data/job_transfer.hpp"
 #include "interface/api/api_connector.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
+#include "util/sys/terminator.hpp"
 #include "util/sys/tmpdir.hpp"
 #include <string>
 #include <sys/stat.h>
@@ -20,13 +23,13 @@
 class IncSatController {
 
 private:
-    const Parameters _params;
+    const Parameters& _params;
     APIConnector& _api;
     JobDescription& _desc;
     std::string _problem_file;
 
     int _rev {-1};
-    std::unique_ptr<TrustedParserProcessAdapter> _tppa;
+    std::unique_ptr<TrustedIncParserProcessAdapter> _tppa;
 
     static int getNextStreamId() {
         static int _stream_id = 1;
@@ -42,16 +45,19 @@ private:
     std::function<bool()> _cb_terminate;
     bool _replace_default_terminator {false};
 
+    Mutex _mtx_terminate;
+    volatile bool _terminators_invalidated {false};
+
 public:
     IncSatController(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& dTaskTracker) :
             _params(params), _api(api), _desc(desc), _stream_id(getNextStreamId()),
             _name("#" + std::to_string(desc.getId()) + "(ISAT):" + std::to_string(_stream_id)),
             _dtask_tracker(dTaskTracker) {
 
-        LOG(V3_VERB, "+IncSat %s\n", _name.c_str());
+        LOG(V4_VVER, "+IncSat %s\n", _name.c_str());
     }
     ~IncSatController() {
-        LOG(V3_VERB, "-IncSat %s\n", _name.c_str());
+        LOG(V4_VVER, "-IncSat %s\n", _name.c_str());
         finalize();
     }
 
@@ -89,12 +95,13 @@ public:
         initStream(true);
     }
 
-    bool solveNextRevisionNonblocking(std::vector<int>&& clauses, std::vector<int>&& assumptions, const std::string& descLabel = "") {
+    bool solveNextRevisionNonblocking(std::vector<int>&& clauses, std::vector<int>&& assumptions, const std::string& descLabel = "",
+            int nbVars = -1, int nbClauses = -1) {
         initInteractiveSolving();
 
         if (!_params.onTheFlyChecking()) {
             _stream->stream.solveNonblocking({SatJobStreamProcessor::SatTask::Type::SPLIT,
-                std::move(clauses), std::move(assumptions)});
+                std::move(clauses), std::move(assumptions), nbVars, nbClauses});
             return true;
         }
         auto futWrite = ProcessWideThreadPool::get().addTask([&]() {
@@ -118,19 +125,30 @@ public:
         }
         std::vector<int> payload(_desc.getFormulaPayload(_rev),
             _desc.getFormulaPayload(_rev)+_desc.getFormulaPayloadSize(_rev));
-        _stream->stream.solveNonblocking({SatJobStreamProcessor::SatTask::Type::RAW, std::move(payload)});
+        _stream->stream.solveNonblocking({SatJobStreamProcessor::SatTask::Type::RAW, std::move(payload),
+            {}, nbVars, nbClauses});
         return true;
     }
 
-    std::pair<int, std::vector<int>> solveNextRevision(std::vector<int>&& clauses, std::vector<int>&& assumptions) {
-        bool ok = solveNextRevisionNonblocking(std::move(clauses), std::move(assumptions));
+    std::pair<int, std::vector<int>> solveNextRevision(std::vector<int>&& clauses, std::vector<int>&& assumptions,
+            int nbVars = -1, int nbClauses = -1) {
+        bool ok = solveNextRevisionNonblocking(std::move(clauses), std::move(assumptions),
+            "", nbVars, nbClauses);
         assert(ok);
         return _stream->stream.getNonblockingSolveResult();
     }
 
+    void forwardAsyncRedundantClauses(std::vector<int>& clauseBuf) {
+        _stream->stream.forwardAsyncRedundantClauses(clauseBuf);
+    } 
+
     void setInnerTerminator(std::function<bool()> cb, bool replaceDefaultTerminator) {
         _cb_terminate = cb;
         _replace_default_terminator = replaceDefaultTerminator;
+    }
+    void invalidateTerminators() {
+        auto lock = _mtx_terminate.getLock();
+        _terminators_invalidated = true;
     }
 
     void finalize() {
@@ -157,7 +175,7 @@ private:
         _stream.reset(new WrappedSatJobStream(_name));
         _stream->mallobProcessor = new MallobSatJobStreamProcessor(_params, _api, _desc,
             _name, _stream_id, true, _stream->stream.getSynchronizer());
-        _stream->mallobProcessor->setDTaskSlot(_dtask_tracker.createDTask());
+        _stream->mallobProcessor->setDTaskTracker(_dtask_tracker);
         _stream->stream.addProcessor(_stream->mallobProcessor);
 
         if (_params.internalStreamProcessor()) {
@@ -168,20 +186,35 @@ private:
             setup.isJobIncremental = true;
             setup.onTheFlyChecking = _params.onTheFlyChecking();
             setup.onTheFlyCheckModel = _params.onTheFlyChecking() && _params.onTheFlyCheckModel();
+            setup.incrementalImpCheck = _params.onTheFlyCheckIncremental();
             auto internalProcessor = new InternalSatJobStreamProcessor(
-                setup, _stream->stream.getSynchronizer());
+                setup, _stream->stream.getSynchronizer(), _params.trivialSolverType() == 0 ?
+                    InternalSatJobStreamProcessor::MINISAT : InternalSatJobStreamProcessor::CADICAL);
             _stream->stream.addProcessor(internalProcessor);
         }
 
         _stream->stream.setTerminator([&, str=&_stream->stream, params=&_params, desc=&_desc, startTime=_start_time]() {
-            if (str->finalizing()) return true;
-            if (_cb_terminate && _cb_terminate()) return true;
+            if (str->finalizing()) {
+                return true;
+            }
+            {
+                auto lock = _mtx_terminate.getLock();
+                if (_terminators_invalidated) {
+                    return true;
+                }
+                if (_cb_terminate && _cb_terminate()) {
+                    return true;
+                }
+            }
             if (_replace_default_terminator) return false; // skip default terminator
-            return isTimeoutHit(params, desc, startTime);
+            if (isTimeoutHit(params, desc, startTime)) {
+                return true;
+            }
+            return false;
         });
 
         if (!_problem_file.empty()) {
-            _tppa.reset(new TrustedParserProcessAdapter(_params.seed(), _name));
+            _tppa.reset(new TrustedIncParserProcessAdapter(_params.seed(), _name));
             _tppa->setup(_problem_file.c_str(), createProblemFileAsPipe);
         }
     }

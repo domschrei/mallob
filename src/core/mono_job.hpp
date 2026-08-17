@@ -17,14 +17,24 @@ private:
     bool _done = false;
     float _time_of_start;
 
+    std::vector<std::string> _files;
+
 public:
-    MonoJob(Parameters& params) : _params(params) {}
+    MonoJob(Parameters& params) : _params(params) {
+        // Parse mono filenames, separating by comma
+        std::stringstream ss(params.monoFilename());
+        while (ss.good()) {
+            std::string substr;
+            getline(ss, substr, ',');
+            _files.push_back(substr);
+        }
+    }
     void submitFirst() {
         // Write a job JSON for the singular job to solve
         nlohmann::json json = {
             {"user", "admin"},
             {"name", "mono-job-" + std::to_string(_revision)},
-            {"files", {_params.monoFilename()}},
+            {"files", _files},
             {"description-id", "mono-job-desc-0"},
             {"priority", 1.000},
             {"application", getMonoApplicationName()},
@@ -78,7 +88,7 @@ private:
         nlohmann::json nextJson = {
             {"user", response["user"]},
             {"name", "mono-job-" + std::to_string(_revision)},
-            {"files", {_params.monoFilename()}},
+            {"files", _files},
             {"description-id", "mono-job-desc-" + std::to_string(_revision)},
             {"priority", 1.000},
             {"application", getMonoApplicationName()},

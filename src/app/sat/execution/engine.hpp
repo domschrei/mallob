@@ -35,7 +35,8 @@ private:
 	SatProcessConfig _config;
 	Logger& _logger;
 	int _job_id;
-	
+
+	SolverSetup _base_solver_setup;	
 	size_t _num_solvers;
 	size_t _num_active_solvers;
 	

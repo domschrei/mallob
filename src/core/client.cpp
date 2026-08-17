@@ -4,7 +4,6 @@
 #include <fstream>
 #include <string>
 #include <list>
-#include <filesystem>
 #include <functional>
 #include <initializer_list>
 #include <utility>
@@ -16,6 +15,7 @@
 #include "data/job_interrupt_reason.hpp"
 #include "interface/api/api_registry.hpp"
 #include "util/string_utils.hpp"
+#include "util/sys/threading.hpp"
 #include "util/sys/timer.hpp"
 #include "util/logger.hpp"
 #include "util/permutation.hpp"
@@ -146,7 +146,7 @@ void Client::readIncomingJobs() {
                 LOGGER(log, V3_VERB, "[T] Reading job #%i rev. %i %s ...\n", id, foundJob.description->getRevision(), filesList.c_str());
 
                 Parameters params(_params);
-                app_registry::overrideProgramOptions(params, *foundJob.description);
+                app_registry::checkAndOverrideProgramOptions(params, *foundJob.description);
                 bool success = app_registry::getJobReader(foundJob.description->getApplicationId())(
                     params, foundJob.files, *foundJob.description
                 );
@@ -175,7 +175,7 @@ void Client::readIncomingJobs() {
                         JobResult* res = &clientSideJob.result;
                         auto* desc = clientSideJob.desc.get();
                         Parameters params(_params);
-                        app_registry::overrideProgramOptions(params, *desc);
+                        app_registry::checkAndOverrideProgramOptions(params, *desc);
                         // store "original" arrival time value as the job's submission time
                         desc->getStatistics().timeOfSubmission = desc->getArrival();
                         desc->getStatistics().timeOfScheduling = Timer::elapsedSeconds();
@@ -191,7 +191,10 @@ void Client::readIncomingJobs() {
                             *res = prog->function();
                             *done = true;
                         });
+                        // Notify root rank of this job to user
+                        if (foundJob.cbRootRank) foundJob.cbRootRank(_world_rank);
                     } else {
+                        if (foundJob.cbRootRank) _root_rank_callbacks[id] = std::move(foundJob.cbRootRank);
                         // Enqueue in ready jobs to be scheduled properly
 
                         LOGGER(log, V4_VVER, "NEWJOB %s #%i <#%i> is regular job, enqueue\n", foundJob.jobName.c_str(), foundJob.description->getId(), appId);
@@ -289,9 +292,7 @@ void Client::init() {
         {
             // Write the available job submission path to an availability tmp file
             std::ofstream ofs(TmpDir::getGeneralTmpDir() + "/edu.kit.iti.mallob.apipath." + std::to_string(Proc::getPid()));
-            // Differentiate absolute vs. relative path
-            if (path[0] == '/') ofs << path;
-            else ofs << std::filesystem::current_path().string() + "/" + path;
+            ofs << path;
         }
         LOG(V2_INFO, "Set up filesystem interface at %s\n", path.c_str());
         // Tell JSON interface to output non-JSON result files to the interface path, too
@@ -330,7 +331,7 @@ int Client::getInternalRank() {
 }
 
 std::string Client::getFilesystemInterfacePath() {
-    return _params.apiDirectory() + "/jobs." + std::to_string(getInternalRank()) + "/";
+    return FileUtils::getAbsoluteFilePath(_params.apiDirectory() + "/jobs." + std::to_string(getInternalRank()) + "/");
 }
 
 std::string Client::getSocketPath() {
@@ -474,6 +475,14 @@ void Client::advance() {
             _pending_subtasks.pop_front();
         }
     }
+
+    for (auto it = _epiloging_jobs.begin(); it != _epiloging_jobs.end(); ) {
+        auto& [fut, res] = *it;
+        if (Future::isValidAndReady(fut)) {
+            handleSendJobResultInternal(std::move(res));
+            it = _epiloging_jobs.erase(it);
+        } else ++it;
+    }
 }
 
 int Client::getMaxNumParallelJobs() {
@@ -591,6 +600,12 @@ void Client::sendJobDescription(JobRequest& req, int destRank) {
 
     // Remember transaction
     _root_nodes[req.jobId] = destRank;
+    // Notify root rank of this job to user
+    auto it = _root_rank_callbacks.find(req.jobId);
+    if (it != _root_rank_callbacks.end()) {
+        it->second(destRank);
+        _root_rank_callbacks.erase(it);
+    }
 
     // waiting instance reader might be able to continue now
     {
@@ -606,11 +621,13 @@ void Client::handleJobDone(MessageHandle& handle) {
     if (!_active_jobs.count(stats.jobId)) return; // user-side terminated in the meantime?
     JobDescription& desc = *_active_jobs[stats.jobId];
     if (desc.getRevision() > stats.revision) return; // revision obsolete!
-    LOG_ADD_SRC(V4_VVER, "Will receive job result for job #%i rev. %i", handle.source, stats.jobId, stats.revision);
-    MyMpi::isendCopy(stats.successfulRank, MSG_QUERY_JOB_RESULT, handle.getRecvData());
+
     desc.getStatistics().usedWallclockSeconds = stats.usedWallclockSeconds;
     desc.getStatistics().usedCpuSeconds = stats.usedCpuSeconds;
     desc.getStatistics().latencyOf1stVolumeUpdate = stats.latencyOf1stVolumeUpdate;
+
+    LOG_ADD_SRC(V4_VVER, "Will receive job result for job #%i rev. %i", handle.source, stats.jobId, stats.revision);
+    MyMpi::isendCopy(stats.successfulRank, MSG_QUERY_JOB_RESULT, handle.getRecvData());
 }
 
 void Client::handleSendJobResult(MessageHandle& handle) {
@@ -623,6 +640,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     JobDescription* descPtr = getActiveJob(jobId);
     if (!descPtr) return; // user-side terminated in the meantime?
     JobDescription& desc = *descPtr;
+
     if (desc.getRevision() > revision) return; // revision obsolete!
     int surrogateId = desc.getAppConfiguration().map.count("__surrogate") ?
         desc.getAppConfiguration().fixedSizeEntryToInt("__surrogate") : 0;
@@ -638,6 +656,32 @@ void Client::handleSendJobResult(MessageHandle& handle) {
     const float now = Timer::elapsedSeconds();
     desc.getStatistics().processingTime = now - desc.getStatistics().timeOfScheduling + timeOfParentTask;
     desc.getStatistics().totalResponseTime = now - desc.getStatistics().timeOfSubmission + timeOfParentTask;
+
+    auto optEpilog = app_registry::getJobEpilog(desc.getApplicationId());
+    if (optEpilog) {
+        auto futEpilog = ProcessWideThreadPool::get().addTask([&, epilog = optEpilog.value(), res = jobResult]() {
+            epilog(_params, res);
+        });
+        _epiloging_jobs.push_back({std::move(futEpilog), std::move(jobResult)});
+        return;
+    }
+
+    handleSendJobResultInternal(std::move(jobResult));
+}
+
+void Client::handleSendJobResultInternal(JobResult&& jobResult) {
+
+    int& jobId = jobResult.id;
+    int resultCode = jobResult.result;
+    int revision = jobResult.revision;
+
+
+    JobDescription* descPtr = getActiveJob(jobId);
+    if (!descPtr) return; // user-side terminated in the meantime?
+    JobDescription& desc = *descPtr;
+
+    auto optTransformer = app_registry::getJobResultTransformer(desc.getApplicationId());
+    if (optTransformer) optTransformer.value()(_params, jobResult);
 
     std::string resultCodeString = "UNKNOWN";
     if (resultCode == RESULT_SAT) resultCodeString = "SATISFIABLE";
@@ -656,7 +700,7 @@ void Client::handleSendJobResult(MessageHandle& handle) {
 
     // LOG(V3_VERB, "(Nicco) proceed 1\n");
     Parameters params(_params);
-    app_registry::overrideProgramOptions(params, desc);
+    app_registry::checkAndOverrideProgramOptions(params, desc);
 
 
     std::string resultString = "s " + resultCodeString + "\n";

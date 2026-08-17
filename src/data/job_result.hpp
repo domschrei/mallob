@@ -28,6 +28,9 @@ public:
     JobResult(std::vector<uint8_t>&& packedData);
     virtual ~JobResult() {}
 
+    JobResult(const JobResult& other) {
+        *this = other;
+    }
     JobResult(JobResult&& other) {
         *this = std::move(other);
     }
@@ -41,6 +44,17 @@ public:
         solution = std::move(other.solution);
         packedData = std::move(other.packedData);
         other.id = 0;
+        return *this;
+    }
+    JobResult& operator=(const JobResult& other) {
+        id = other.id;
+        revision = other.revision;
+        result = other.result;
+        encodedType = other.encodedType;
+        winningInstanceId = other.winningInstanceId;
+        globalStartOfSuccessEpoch = other.globalStartOfSuccessEpoch;
+        solution = other.solution;
+        packedData = other.packedData;
         return *this;
     }
 

@@ -10,7 +10,7 @@
 #include <string>
 #include <algorithm>
 
-#include "app/sat/proof/trusted_parser_process_adapter.hpp"
+#include "app/sat/proof/trusted_inc_parser_process_adapter.hpp"
 #include "data/job_description.hpp"
 
 class Parameters;
@@ -26,7 +26,7 @@ private:
 	int _namedpipe {-1};
     bool _force_incremental_parser;
 
-    std::shared_ptr<TrustedParserProcessAdapter> _tppa;
+    std::shared_ptr<TrustedIncParserProcessAdapter> _tppa;
 
     // Content mode: ASCII
     int _sign = 1;
@@ -52,11 +52,12 @@ public:
         _params(params), _files({file}), _force_incremental_parser(forceIncrementalParser) {}
     SatReader(const Parameters& params, const std::vector<std::string>& files, bool forceIncrementalParser = false) : 
         _params(params), _files(files), _force_incremental_parser(forceIncrementalParser) {}
-    void setTrustedParser(std::shared_ptr<TrustedParserProcessAdapter> tppa) {_tppa = tppa;}
-    std::shared_ptr<TrustedParserProcessAdapter> getTrustedParser() {return _tppa;}
+    void setTrustedParser(std::shared_ptr<TrustedIncParserProcessAdapter> tppa) {_tppa = tppa;}
+    std::shared_ptr<TrustedIncParserProcessAdapter> getTrustedParser() {return _tppa;}
     bool read(JobDescription& desc);
     bool parseInternally(JobDescription& desc);
-    bool parseWithTrustedParser(JobDescription& desc);
+    bool parseWithTrustedNonincrementalParser(JobDescription& desc);
+    bool parseWithTrustedIncrementalParser(JobDescription& desc);
     bool parseAndCompress(JobDescription& desc);
 
     inline void processInt(int x, JobDescription& desc) {

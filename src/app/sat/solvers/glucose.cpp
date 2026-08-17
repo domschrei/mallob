@@ -58,7 +58,7 @@ void MGlucose::diversify(int seed) {
 	random_seed = (std::abs(seed) % UINT16_MAX) + 1;
 	adaptStrategies = false;
 
-	if (_setup.diversifyNative) {
+	if (true) {
 
 		if (_setup.flavour != PortfolioSequence::DEFAULT) {
 			LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");

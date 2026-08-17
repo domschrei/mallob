@@ -7,6 +7,28 @@ This page explains how to execute Mallob in general, with different applications
 
 ### Starting Mallob
 
+> [!IMPORTANT]  
+> **Always make sure to execute Mallob and its wrapper run scripts from the home directory of the Mallob repository**, otherwise Mallob will not find critical executables in `build/` and **will not work correctly**.
+
+**Quick Start:**
+
+If you just want to use Mallob on a single, parallel machine, then the script `scripts/run/mallob_local.sh` automatically retrieves a suitable process+thread configuration of Mallob for your hardware that makes use of the entire machine. Useful presets can be applied by calling the scripts at `config/presets/`. Examples:
+
+```bash
+# SAT solving (default, simple setup)
+scripts/run/mallob_local.sh -mono=instances/r3unsat_300.cnf
+# SAT solving (SAT Competition 2026 winning configuration, with Satsuma)
+scripts/run/mallob_local.sh $(config/presets/satcomp2026-quick) -mono=instances/r3unsat_300.cnf
+# SAT solving (with real-time proof checking and assignment checking)
+scripts/run/mallob_local.sh $(config/presets/satcomp2026-safe) -mono=instances/r3unsat_300.cnf
+# SMT solving
+scripts/run/mallob_local.sh -mono=path/to/problem.smt2 -mono-app=SMT
+# MaxSAT solving
+scripts/run/mallob_local.sh -mono=path/to/problem.wcnf -mono-app=MAXSAT
+```
+
+**General settings:**
+
 Mallob is an MPI application and should therefore usually be executed via `mpirun`, `mpiexec` or something similar.
 
 For example, given a single machine with two hardware threads per core, the following command executed in Mallob's base directory assigns one MPI process to each set of four physical cores (eight hardware threads) and then runs four solver threads on each MPI process.
@@ -40,6 +62,15 @@ For exact and clean logging, specify a logging directory with `-log=<log-dir>` w
 This can be combined with the `-q` option to suppress Mallob's output to STDOUT. 
 Verbosity of logging can be set with the `-v` option (as long as Mallob was compiled with the respective verbosity or higher, see the `-DMALLOB_LOG_VERBOSITY` build option).
 
+**Presets:** We provide a few useful Mallob configuration presets in the directory `scripts/presets/`. Example:
+```bash
+# SAT solving (SAT Competition 2026 winning configuration, with Satsuma)
+scripts/run/mallob_local.sh $(scripts/presets/satcomp2026-quick.sh) -mono=instances/r3unsat_300.cnf
+```
+You can easily add your own presets by dropping an executable (script / program) under `scripts/presets/` that simply outputs the desired series of program options.
+
+Command-line options in Mallob can be specified repeatedly, in which case the **final occurrence** of the option will override all previously specified values of the option. This can be useful, e.g., when combined with presets: You can set a certain preset and then append your own configuration, possibly overriding some of the preset's settings.
+
 ### Mono mode of operation
 
 In order to let Mallob process only a single instance, use option `-mono=$PROBLEM_FILE` where `$PROBLEM_FILE` is the path and file name of the problem to solve. Specify the application of this instance with `-mono-app=APPKEY`, where APPKEY can be SAT, KMEANS, MAXSAT, etc.
@@ -56,7 +87,7 @@ Afterwards, we explain Mallob's other modes of operation (solving multiple insta
 ### Input Formats
 
 The input can be provided (a) as a plain DIMACS CNF text file, (b) as a compressed (.lzma / .xz) DIMACS CNF file, or (c) as a compact binary file.
-CNF files may contain a single line of the form `a <lit1> <lit2> ... 0` **after all regular clauses**, where `<lit1>`, `<lit2>` etc. are assumption literals for incremental solving.
+CNF files may contain lines of the form `a <lit1> <lit2> ... 0` to indicate an **incremental SAT call**, where `<lit1>`, `<lit2>` etc. are assumption literals for incremental solving.
 For binary files, Mallob reads clauses as integer sequences with separation zeroes in between; the special integer INT32_MAX (2147483647) separates the clause literals from the sequence of assumption integers, and then another zero signals that the description is complete. This integer sequence is also how the field "literals" in manual job submission JSONs should be used (see below at [Introducing a job](#introducing-a-job)).
 
 ### Producing Monolithic Proofs of Unsatisfiability
@@ -74,22 +105,44 @@ You can use the [`drat-trim`](https://github.com/marijnheule/drat-trim) tool sui
 
 ### Real-time Proof Checking
 
-Proof production can be costly and bottlenecked by the I/O bandwidth of the single process which needs to write the entire proof. A more scalable approach is to check all proof information on-the-fly, without writing it to disk, and to transfer clause soundness guarantees across machines via cryptographic signatures. This is explained in detail in our [2024 SAT publication](https://dominikschreiber.de/papers/2024-sat-trusted-pre.pdf).
+Proof production can be costly and bottlenecked by the I/O bandwidth of the single process which needs to write the entire proof. A more scalable approach is to check all proof information on-the-fly, without writing it to disk, and to transfer clause soundness guarantees across machines via hash-based fingerprints. This is explained in detail in our [2024 SAT publication](https://dominikschreiber.de/papers/2024-sat-trusted-pre.pdf) and our [2026 TACAS publication](https://satres.kikit.kit.edu/papers/2026-tacas-distrincproof.pdf), where we extend the framework to incremental SAT solving.
 
-Execute the command chain fetching and building [ImpCheck](https://github.com/domschrei/impcheck) in [`scripts/setup/build.sh`](../scripts/setup/build.sh). Then just use Mallob's option `-otfc=1` (without any `-proof*` options) to enable on-the-fly checking. Again, only CaDiCaL is supported for UNSAT whereas any solver can be employed for boosting satisfying assignments. By default, found satisfying assignments are also validated, which can be disabled via `-otfcm=0`.
+To enable the setup involving the latest, incremental ImpCheck (which is also more efficient than original ImpCheck), execute the command chain fetching and building ImpCheck in [`scripts/setup/sat-setup.sh`](../scripts/setup/sat-setup.sh). Then use Mallob's option `-otfc=1` (without any `-proof*` options) to enable on-the-fly checking and `-otfci=1` to ensure that Mallob expects the _incremental_ ImpCheck programs. Again, only CaDiCaL is supported for UNSAT whereas any solver can be employed for boosting satisfying assignments. By default, found satisfying assignments are also validated, which can be disabled via `-otfcm=0`.
 
-Log lines of the following shape are reporting a trusted result from a proof checking process:
+Let's assume you get the following output from a proof checking process:
 ```
-c 0.851 0 <#11606> S0.0 TRUSTED checker reported UNSAT - sig c6c0a823f35ce38cdb31c9483dc98143
-c 0.851 0 <#11606> S0.0 TRUSTED checker reported SAT - sig a43e47d81715035d79290d1a6acf05e8
+c 0.059 0 <Reader> [T] Initialized job #230 {instances/r3unsat_300.cnf} in 0.004s: size 5127
+...
+c 6.164 1 <#230> S6.0 IMPCHK_CONFIRM 1280 20 8791e38feb111d9094da61be8651478a
+c 6.164 1 <#230> S6.0 Use iimpcheck_confirm -key-seed=13805254743912277295 to confirm fingerprint
 ```
-To be extra safe (e.g., if you are suspecting garbled or tampered-with logging output), execute the following command to validate the output signature:
+The `IMPCHK_CONFIRM` line indicates that ImpCheck validated a result of code 20 (UNSAT, 10=SAT) on a formula with 1280 clauses; the appended fingerprint serves as a witness for this result.
+To be extra safe (e.g., if you are suspecting garbled or tampered-with logging output), accordingly execute a command like this to validate the output fingerprint:
 ```bash
-build/impcheck_confirm -formula-input=path/to/input.cnf -result=X -result-sig=SIG
+build/iimpcheck_confirm -key-seed=13805254743912277295 -formula=instances/r3unsat_300.cnf -result=20 -sig=8791e38feb111d9094da61be8651478a
 ```
-where `X` is either 10 (for SAT) or 20 (for UNSAT), and `SIG` is the reported signature.
+For incremental problems, Mallob will write a file `witness.#<jobid>` to the directory specified via the `-log` option (if existent) and a subsequent check of all results works as follows:
+```bash
+build/iimpcheck_confirm -key-seed=13805254743912277295 -formula=instances/r3unsat_300.cnf -witness=path/to/witness.#*
+```
 
 **Note:** On-the-fly checking can also be used in Mallob's scheduled mode of operation. Globally unique clause IDs are ensured by adding a large offset times $x$ to a new solver thread's clause ID counter if the job has already experienced $x$ _balancing epochs_, i.e., received $x$ volume updates, since its initialization. The offset is chosen in such a way that 10,000 solvers each producing 10,000 clauses per second can run for 10,000 seconds before they may begin overlapping with clause IDs from the next balancing epoch. `ImpCheck` notices and reports any errors that would result from such a corner case.
+
+### Producing Distributed Proofs of Unsatisfiability
+
+To enable proof production in the PalRUP framework run Mallob with options `-palrup=1 -proof-dir=path/to/palrup/proof`. The given path can be on local disks, if Mallob is run on a distributed system. To output the proof in a readable text format (instead of variable byte length coded binary format) set the option `-palrup-binary=0`.
+
+Mallob supports checking a produced PalRUP proof immediatly after solving utilizing [PalRUP-Check](https://github.com/rubenGoetz/PalRUP-Check). To enable proof checking, build Mallob with the `-DMALLOB_APP_PALRUPCHECK=1` option. To check a PalRUP proof, run Mallob with the options `-palrup-check=1 -palrup-check-dir=path/to/communication/`. The given path must be accessable by all processes, i.e. located in a parallel file system if run on distributed systems. After a proof was validated successfully (unsuccessfully), a `success.palrup` (`failure.palrup`) file will be created in Mallob's log directory.
+
+As described above, a PalRUP proof can be stored on local disks when it was created on a distributed system. If this is the case, make sure to run Mallob with the `-palrup-use-local-disks=1` option.
+
+Non-default options can be passed to the PalRUP-Checker by setting the corresponding Mallob options. See [options.hpp](../src/app/palrupcheck/options.hpp) for details.
+
+### Streamlined SAT Setup
+
+In the context of our [SAT'25 publication](https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.SAT.2025.27), we developed an alternative setup for distributed SAT solving where a single process performs preprocessing while all other processes run plain search-only threads (i.e., without pre-/inprocessing). When the result from preprocessing is available, another task on the preprocessed formula is launched.
+
+Compile Mallob with `-DMALLOB_APP_SATWITHPRE=1` and then set `-mono-app=SATWITHPRE` to use this setup, which will (by default) also override the SAT solver configuration accordingly.
 
 ### Portfolio Tweaking
 

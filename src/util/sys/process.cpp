@@ -68,7 +68,7 @@ void Process::reportTerminationSignal(const SignalInfo& info) {
         LOG(V0_CRIT, "[ERROR] pid=%ld tid=%ld signal=%d\n", 
                 Proc::getPid(), info.tid, info.signum);
     } else {
-        LOG(V3_VERB, "pid=%ld tid=%ld signal=%d\n",
+        LOG(V2_INFO, "pid=%ld tid=%ld signal=%d\n",
                 Proc::getPid(), info.tid, info.signum);
     }
     Logger::getMainInstance().flush();

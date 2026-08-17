@@ -8,18 +8,14 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <fstream>
-#include <cstdint>
 #include <map>
 #include <memory>
-#include <utility>
 #include <vector>
 
 #if MALLOB_USE_MAXPRE == 1
 #include "parserinterface.hpp"
 #include "static_maxsat_parser_store.hpp"
 #endif
-#include "app/sat/proof/trusted/trusted_utils.hpp"
-#include "app/sat/proof/trusted_parser_process_adapter.hpp"
 #include "maxsat_reader.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"

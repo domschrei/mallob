@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "portfolio_solver_interface.hpp"
-#include "util/sys/threading.hpp"
 #include "app/sat/data/clause.hpp"
 #include "app/sat/data/definitions.hpp"
 
@@ -22,7 +21,7 @@ private:
 	std::string name;
 	int stopSolver;
 	LearnedClauseCallback callback;
-	int maxvar;
+	int maxvar {0};
 	double lastTermCallbackTime;
 	const bool incremental;
     
@@ -60,6 +59,7 @@ public:
 	void addLiteral(int lit) override;
 
 	void diversify(int seed) override;
+	void addConfigurationSetting(Setting setting) override;
 	void setPhase(const int var, const bool phase) override;
 
 	// Solve the formula with a given set of assumptions
@@ -92,5 +92,5 @@ public:
 
 private:
 	void updateMaxVar(int lit);
-    
+
 };

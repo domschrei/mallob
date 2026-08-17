@@ -13,11 +13,11 @@ class ClientTemplate {
 
 private:
     std::mt19937 _rng;
-    Distribution _dist_priority;
-    Distribution _dist_maxdemand;
-    Distribution _dist_wallclock_limit;
-    Distribution _dist_arrival;
-    Distribution _dist_burst_size;
+    RandomDistribution _dist_priority;
+    RandomDistribution _dist_maxdemand;
+    RandomDistribution _dist_wallclock_limit;
+    RandomDistribution _dist_arrival;
+    RandomDistribution _dist_burst_size;
     bool _valid = false;
 
     double _last_arrival;
@@ -43,11 +43,11 @@ public:
             abort();
         }
 
-        parseDistribution(clientJson["priority"], &_dist_priority);
-        parseDistribution(clientJson["maxdemand"], &_dist_maxdemand);
-        parseDistribution(clientJson["wallclock-limit"], &_dist_wallclock_limit);
-        parseDistribution(clientJson["arrival"], &_dist_arrival);
-        parseDistribution(clientJson["burstsize"], &_dist_burst_size);
+        RandomDistribution::parse(clientJson["priority"], &_dist_priority);
+        RandomDistribution::parse(clientJson["maxdemand"], &_dist_maxdemand);
+        RandomDistribution::parse(clientJson["wallclock-limit"], &_dist_wallclock_limit);
+        RandomDistribution::parse(clientJson["arrival"], &_dist_arrival);
+        RandomDistribution::parse(clientJson["burstsize"], &_dist_burst_size);
         _valid = true;
     }
 
@@ -63,7 +63,7 @@ public:
         return (int)_dist_wallclock_limit.sample();
     }
     double getNextArrival() {
-        if (_dist_arrival.type == Distribution::CONSTANT && _dist_arrival.params[0] == 0) {
+        if (_dist_arrival.type == RandomDistribution::CONSTANT && _dist_arrival.params[0] == 0) {
             return 0;
         }
         while (_remaining_jobs_from_burst == 0) {
@@ -73,21 +73,4 @@ public:
         _remaining_jobs_from_burst--;
         return _last_arrival;
     }
-
-private:
-
-    void parseDistribution(nlohmann::json& json, Distribution* dist) {
-        std::vector<double> params = json["params"].get<std::vector<double>>();
-        Distribution::Type type;
-        if (json["type"] == "constant") type = Distribution::CONSTANT;
-        else if (json["type"] == "uniform") type = Distribution::UNIFORM;
-        else if (json["type"] == "exponential") type = Distribution::EXPONENTIAL;
-        else if (json["type"] == "normal") type = Distribution::NORMAL;
-        else {
-            std::cout << "[ERROR] \"" << json["type"] << "\" is not a valid distribution type!" << std::endl;
-            abort();
-        }
-        dist->configure(type, params);
-    }
-
 };

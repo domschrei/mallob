@@ -15,7 +15,6 @@
 
 #include "app/sat/solvers/optimizing_propagator.hpp"
 #include "portfolio_solver_interface.hpp"
-#include "util/sys/threading.hpp"
 #include "cadical/src/cadical.hpp"
 #include "cadical_terminator.hpp"
 #include "cadical_clause_export.hpp"
@@ -52,7 +51,9 @@ public:
 	void addLiteral(int lit) override;
 
 	void diversify(int seed) override;
+	void addConfigurationSetting(Setting setting) override;
 	void setPhase(const int var, const bool phase) override;
+	void setDefaultPhase(const bool phase);
 
 	// Solve the formula with a given set of assumptions
 	SatResult solve(size_t numAssumptions, const int* assumptions) override;

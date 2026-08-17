@@ -12,17 +12,19 @@
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/parse/serialized_formula_parser.hpp"
 #include "app/sat/proof/impcheck.hpp"
+#include "app/sat/proof/impcheck_program_lookup.hpp"
 #include "app/sat/proof/lrat_op_tamperer.hpp"
 #include "app/sat/proof/trusted/trusted_checker_defs.hpp"
 #include "app/sat/proof/trusted_checker_process_adapter.hpp"
+#include "app/sat/proof/witness.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
+#include "data/serializable.hpp"
 #include "robin_map.h"
 #include "trusted/trusted_utils.hpp"
 #include "util/assert.hpp"
 #include "util/logger.hpp"
 #include "util/spsc_blocking_ringbuffer.hpp"
 #include "util/sys/background_worker.hpp"
-#include "util/sys/terminator.hpp"
 
 class LratConnector {
 
@@ -32,7 +34,8 @@ private:
     const int _local_id;
     const int _global_id;
     const int _job_id;
-    std::string _out_path;
+    const int _orig_nb_vars;
+    bool _incremental;
 
     Mutex _mtx_submit;
     SPSCBlockingRingbuffer<LratOp> _ringbuf;
@@ -62,17 +65,18 @@ private:
 
     tsl::robin_map<int, std::shared_ptr<LratOp>> _deferred_conclusion_ops;
 
+    Mutex _mtx_witnesses;
+    tsl::robin_map<int, Witness> _witness_by_revision;
+
 public:
     LratConnector(TrustedCheckerProcessAdapter::TrustedCheckerProcessSetup& setup) :
         _logger(setup.logger), _base_seed(setup.baseSeed), _local_id(setup.localSolverId),
-        _global_id(setup.globalSolverId), _job_id(setup.jobId), _ringbuf(1<<14), _checker(setup) {}
+        _global_id(setup.globalSolverId), _job_id(setup.jobId), _orig_nb_vars(setup.origNumVars),
+        _incremental(setup.incremental), _ringbuf(1<<14), _checker(setup) {}
 
     void init(const std::string& witnessSuffix = "") {
         assert(!_launched);
         _checker.init();
-        std::string outPath = (_logger.getLogDir().empty() ? "." : _logger.getLogDir())
-            + "/witness-trace." + std::to_string(_job_id) + "." + std::to_string(_global_id) + witnessSuffix + ".txt";
-        setWitnessOutputPath(outPath);
         _bg_emitter.run([&]() {runEmitter();});
         _bg_acceptor.run([&]() {runAcceptor();});
         _launched = true;
@@ -87,7 +91,6 @@ public:
     void setTamperingChancePerMille(float chance) {
         _tampering_chance_per_mille = chance;
     }
-    void setWitnessOutputPath(const std::string& outputPath) {_out_path = outputPath;}
 
     void initiateRevision(int revision, SerializedFormulaParser& fParser) {
 
@@ -174,7 +177,9 @@ public:
         if (acquireLock) _mtx_submit.unlock();
         return true;
     }
-    void waitForConclusion(int revision) {
+    Witness waitForConclusion(int revision) {
+
+        // Wait for revision to conclude
         _mtx_submit.lock();
         u64 sleepMicrosecs = 100;
         while (_last_concluded_rev < revision) {
@@ -184,7 +189,16 @@ public:
             _mtx_submit.lock();
         }
         _mtx_submit.unlock();
-        return;
+
+        // Try to retrieve witness
+        Witness w;
+        auto lock = _mtx_witnesses.getLock();
+        auto it = _witness_by_revision.find(revision);
+        if (it != _witness_by_revision.end()) {
+            w = std::move(it->second);
+            _witness_by_revision.erase(it);
+        }
+        return w;
     }
     bool checkForConclusion(int revision) {
         auto lock = _mtx_submit.getLock();
@@ -265,7 +279,7 @@ private:
                     auto parser = std::move(_f_parsers.front()); _f_parsers.pop_front();
                     // use the *old* revision index since this op may be considered
                     // a "conclusion" operation for the previous revision
-                    _checker.submit(LratOp(parser->getSignature()));
+                    _checker.submit(LratOp(_orig_nb_vars, parser->getSignature()));
                     revision++; // and *then* update the revision.
                     assert(_next_rev_to_conclude <= revision);
                     _next_rev_to_conclude = revision;
@@ -332,33 +346,32 @@ private:
             } else if (op.isUnsatValidation() || op.isSatValidation()) {
                 // SAT / UNSAT result
                 _last_concluded_rev = _accepted_revision;
-                if (_last_concluded_rev == 0)
-                    LOGGER(_logger, V2_INFO, "Use impcheck_confirm -key-seed=%lu to confirm fingerprint\n",
-                        ImpCheck::getKeySeed(_base_seed));
                 u32 code = op.isSatValidation() ? 10 : 20;
                 if (op.isUnsatValidation())
                     assumptions = std::vector(op.data.concludeUnsat.failed, op.data.concludeUnsat.failed + op.data.concludeUnsat.nbFailed);
                 std::string litStr;
                 for (int lit : assumptions) litStr += " " + std::to_string(lit);
-                if (_out_path.empty()) {
+                if (_last_concluded_rev == 0) {
                     LOGGER(_logger, V0_CRIT, "IMPCHK_CONFIRM %u %u %s%s\n", cidx, code,
                         Logger::dataToHexStr(sig, SIG_SIZE_BYTES).c_str(), litStr.c_str());
-                } else {
-                    std::ofstream ofs(_out_path, std::ios_base::app);
-                    ofs << cidx << " " << code << " " << Logger::dataToHexStr(sig, SIG_SIZE_BYTES) << litStr << std::endl;
+                    if (_last_concluded_rev == 0)
+                        LOGGER(_logger, V2_INFO, "Use %s -key-seed=%lu to confirm fingerprint\n",
+                            ImpCheckProgramLookup::getConfirmerExecutablePath(_incremental).c_str(),
+                            ImpCheck::getKeySeed(_base_seed));
                 }
+                Witness w;
+                w.cidx = cidx;
+                w.result = code;
+                memcpy(w.data, sig, SIG_SIZE_BYTES);
+                w.asmpt = assumptions;
+                auto lock = _mtx_witnesses.getLock();
+                _witness_by_revision[(int) _last_concluded_rev] = std::move(w);
             } else if (op.isBeginLoad()) {
                 if (cidx == 0) continue;
                 // obsolete "unknown" result (not actually unknown)
                 if (_last_concluded_rev == _accepted_revision) continue;
                 // UNKNOWN result
                 _last_concluded_rev = _accepted_revision;
-                if (_out_path.empty()) {
-                    LOGGER(_logger, V0_CRIT, "IMPCHK_CONFIRM %u %u\n", cidx, 0);
-                } else {
-                    std::ofstream ofs(_out_path, std::ios_base::app);
-                    ofs << cidx << " 0" << std::endl;
-                }
             } else if (op.isEndLoad()) {
                 _accepted_revision++; // next revision reached
                 LOGGER(_logger, V4_VVER, "IMPCHK in rev. %i\n", _accepted_revision);
@@ -371,15 +384,18 @@ private:
     inline void prepareClause(LratOp& op, const u8* sig, u32 cidx) {
         assert(op.isDerivation());
         auto& data = op.data.produce;
-        assert(ClauseMetadata::numInts() == 2+4+1);
-        _clause.size = 2+4+1+data.nbLits;
-        assert(_clause.size <= MAX_CLAUSE_LENGTH);
+        assert(ClauseMetadata::numInts() == 2+4+(_incremental ? 1 : 0));
         auto id = data.id;
-        memcpy(_clause.begin, &id, sizeof(u64)); // ID
-        memcpy(_clause.begin+2, sig, SIG_SIZE_BYTES); // Signature
+        int offset = 0;
+        memcpy(_clause.begin+offset, &id, sizeof(u64)); offset += 2; // ID
+        memcpy(_clause.begin+offset, sig, SIG_SIZE_BYTES); offset += 4; // Signature
         assert(_accepted_revision >= 0);
-        memcpy(_clause.begin+2+4, &cidx, sizeof(u32)); // Revision
-        memcpy(_clause.begin+2+4+1, data.lits, data.nbLits*sizeof(int)); // Literals
+        if (_incremental) {
+            memcpy(_clause.begin+offset, &cidx, sizeof(u32)); offset += 1; // Revision
+        }
+        _clause.size = offset+data.nbLits;
+        assert(_clause.size <= MAX_CLAUSE_LENGTH);
+        memcpy(_clause.begin+offset, data.lits, data.nbLits*sizeof(int)); // Literals
         _clause.lbd = data.glue;
         if (data.nbLits == 1) _clause.lbd = 1;
         else _clause.lbd = std::min(_clause.lbd, _clause.size);

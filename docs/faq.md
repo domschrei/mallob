@@ -8,7 +8,7 @@ Here we gather some frequently asked questions on Mallob. We plan to extend this
 #### Is it Mallob or MallobSat?
 
 Mallob is the name of our overall distributed scheduling and solving framework, which can support different applications.  
-MallobSat is the name of the distributed and malleable SAT solving engine that is tightly integrated within Mallob. We introduced this distinction only in 2023. As a result, early mentions of our SAT solving engine still go by the name of its surrounding framework, Mallob.
+MallobSat is the name of the distributed and malleable SAT solving engine that is tightly integrated within Mallob. We introduced this distinction only in 2023. As a result, early mentions of our SAT solving engine still go by the name of its surrounding framework, Mallob, or by the keyword of its mode of operation that runs a single SAT solving task, Mallob-_mono_.
 
 #### Can I execute the MallobSat solver in an isolated fashion? 
 
@@ -18,19 +18,19 @@ The involved initial overhead of scheduling the instance onto all available proc
 
 #### Do I need to obey the LGPL license?
 
-In general, yes. Please approach us if you would prefer not to.
+There are also MIT-licensed versions of our system; see the LICENSE* file(s) in Mallob's base directory for the licenses you can choose from.
 
-### Setup and Hardware
+### Technical Setup and Hardware
 
 #### What kind of hardware does Mallob need?
 
 Mallob can be run on a single machine or on many machines at once.
-In particular, Mallob(Sat) is a sensible SAT solving tool for hardware ranging from shared-memory parallelism (say, 8-16 cores and above) to distributed scales that amount to a few thousand cores.
+In particular, Mallob(Sat) is a sensible SAT solving tool for hardware ranging from shared-memory parallelism (say, 8-16 cores and above) to distributed scales that amount to several thousand cores.
 
 In terms of node size, Mallob is rather well equipped to handle both a large number of thin nodes as well as a small number of fat nodes.
-Our recommendation is to spawn one MPI process for each socket of a physical machine. The (maximum) number of solver threads per process should then be set to the number of (physical) cores per socket. This number can reasonably range from 4 to 32 cores with no problem. If the sockets are even larger, we recommend to try to spawn two MPI processes per socket to avoid overburdening the concurrent data structures.
+Our recommendation is to spawn one MPI process for each socket of a physical machine. The (maximum) number of solver threads per process should then be set to the number of (physical) cores per socket. This number can reasonably range from 4 to 32 cores with no problem. If the sockets are even larger, we recommend to try to spawn two (or more) MPI processes per socket to avoid overburdening the concurrent data structures.
 
-Modern architectures that feature heterogeneous cores (e.g., x "economy cores" + y "performance cores) would need to be treated differently and likely require some additional care.
+Modern architectures that feature heterogeneous cores (e.g., x "economy cores" + y "performance cores") would need to be treated differently and likely require some additional care.
 
 A reasonable amount of RAM per core is important. E.g., if only 2GB per physical core are available, MallobSat is sometimes forced to reduce the number of solver threads per node. For the actual SAT solving in the background, large and fast caches per core are likely beneficial.
 
@@ -43,7 +43,23 @@ If the intended use case is to use Mallob as an on-demand scheduling and solving
 
 As of yet, no.
 
-### Execution
+### Software Setup and Configuration
+
+#### What configuration should I use for best performance?
+
+Please follow the above advices regarding the technical setup and make sure to set `-t` (the number of threads per process) accordingly. Apart from that, we generally try to set all option defaults to what we consider the generally best options for good overall performance. See some more specific considerations below in the next Q&A.
+
+#### What SAT solver backends should I use?
+
+Some common choices of SAT solving backend(s) (`-satsolver=`) include
+* `k` (only run Kissat - most memory-efficient), 
+* `c` (only run CaDiCaL, which supports incremental solving and proof logging),
+* `kcl` (equal mix of Kissat, CaDiCaL, and Lingeling - the latter for YalSAT local search and for some wacky non-standard simplifications), and 
+* `k_k_l+[k_]{13}` (a search-only (`_`), SAT-competition-parallel-track-compliant setup of Kissat CDCL solvers and some scattered YalSAT threads (`l+`); this is the default setup in `-mono-app=SATWITHPRE` even if you change `-satsolver`, due to the `-oso=1` option).
+
+That said, you can mix and match arbitrarily and try to find out if some configuration works especially well for your purposes.
+
+### Troubleshooting
 
 #### Mallob doesn't solve my problem, it runs indefinitely or crashes.
 
@@ -55,12 +71,13 @@ As of yet, no.
 #### Mallob uses too much RAM / I'm getting SIGBUS errors / The OOM Killer strikes.
 
 * Kissat is generally the most RAM efficient SAT solver backend.
-* You can gauge Mallob's RAM hungriness with the `-mlpt` ("max literals per thread") option – decrease it to have Mallob spawn fewer threads per process for accordingly large inputs.
+* You can tune Mallob's hunger for RAM with the `-mlpt` ("max literals per thread") option – decrease it to have Mallob spawn fewer threads per process for accordingly large inputs.
+* Using coordinated preprocessing (`-mono-app=SATWITHPRE`) and spawning solver threads only _after_ a preprocessed result is available (`-pb=-1`) may significantly reduce the memory requirements for certain large inputs.
 * If this does not help, consider launching fewer MPI processes per node and/or fewer threads per MPI process.
 
 #### I try running $t$ solver threads per Mallob process and get an error "Option t: $t$ > 32(max)!"
 
-You need to compile Mallob with support for a higher maximum number of solver threads per process. Set `-DMALLOB_MAX_N_APPTHREADS_PER_PROCESS` to a number that is at least as high as $t$.
+You need to compile Mallob with support for a higher maximum number of solver threads per process. Set `-DMALLOB_MAX_N_APPTHREADS_PER_PROCESS` to a number that is at least as high as $t$. Please also consider the [notes on sensible numbers of threads per process above](#what-kind-of-hardware-does-mallob-need).
 
 #### Mallob performs badly and does not scale at all.
 
@@ -68,6 +85,10 @@ You need to compile Mallob with support for a higher maximum number of solver th
 * While running Mallob, you can see via `htop` whether the SAT solving threads are in fact running at separate cores.
     * A high ratio of CPU time spent in kernel mode can also indicate issues with the setup, such as non scalable memory allocation or over-subscription of cores.
 * You can also look out for log messages featuring the field `cpu_ratio`. For each solver thread (`td.*`), the reported value should be close to 1.
+
+#### Mallob raises weird errors / crashes when trying to assemble a proof file.
+
+Please double-check that all directories relevant for proof logging + assembling are set correctly. This especially concerns `-extmem-disk-dir` (where external-memory proof information is written during proof assembly) and `-tmp`. If these directories point to a RAM filesystem, trying to assemble huge proofs can result in corruption of the proof data.
 
 ### Advanced Usage and Development
 

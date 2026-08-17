@@ -39,6 +39,7 @@ OPTION_GROUP(grpGeneral, "general", "General")
  OPT_BOOL(preCleanup,                     "pre-cleanup", "",                           false,                   "Clean up shmem/proof/trace/extmem files before starting off")
  OPT_STRING(clientApplication,            "client-app", "",                            "", "Have clients run specified external program path + \".\" + i for increasing i (or, if nonexistent, just the path as is)")
  OPT_INT(clientAppThreads,                "client-app-threads", "",                    1,    1, LARGE_INT,      "Max. number of applications to run per client")
+ OPT_BOOL(terminateAbruptly,              "terminate-abruptly", "",                    false, "Upon termination, avoid waiting for sub-processors to finish")
 
 ///////////////////////////////////////////////////////////////////////
 
@@ -101,7 +102,7 @@ OPTION_GROUP(grpJob, "job", "Global configuration of jobs")
  OPT_FLOAT(jobCpuLimit,                   "jcl", "job-cpu-limit",                      0,    0, LARGE_INT,      "Timeout an instance after x cpu seconds")
  OPT_FLOAT(jobWallclockLimit,             "jwl", "job-wallclock-limit",                0,    0, LARGE_INT,      "Timeout an instance after x seconds wall clock time")
  OPT_INT(maxDemand,                       "md", "max-demand",                          0,    0, LARGE_INT,      "Limit any job's demand to this value")
- OPT_INT(numThreadsPerProcess,            "t", "threads-per-process",                  1,    1, MALLOB_MAX_N_APPTHREADS_PER_PROCESS,
+ OPT_INT(numThreadsPerProcess,            "t", "threads-per-process",                  0,    0, MALLOB_MAX_N_APPTHREADS_PER_PROCESS,
     "Number of application worker threads per MPI process; maximum value configurable at compile time via -DMALLOB_MAX_N_APPTHREADS_PER_PROCESS")
  OPT_BOOL(aggressiveDescriptionCaching, "adc", "aggressive-desc-caching", false, "Try to reuse cached job descriptions by only transferring them when not repairable without them")
  OPT_BOOL(crossJobCommunication, "cjc", "cross-job-communication", false, "Enable communication across jobs, such as cross-problem clause sharing, within user-specified job groups")

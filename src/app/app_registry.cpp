@@ -8,22 +8,13 @@
 
 #include "robin_hash.h"
 #include "robin_map.h"
+#include "util/logger.hpp"
 #include "util/string_utils.hpp"
 
 namespace app_registry {
 
     // Anonymous / private namespace for implementation stuff
     namespace {
-        struct AppEntry {
-            std::string key;
-            JobReader reader;
-            bool isClientSide {false};
-            JobCreator creator;
-            ClientSideProgramCreator clientSideProgramCreator;
-            JobSolutionFormatter solutionFormatter;
-            ResourceCleaner cleaner;
-        };
-
         std::vector<AppEntry> _app_entries;
         tsl::robin_map<std::string, int> _app_key_to_app_id;
     }
@@ -33,42 +24,12 @@ namespace app_registry {
     // reader: a lambda which reads a number of description files into a JobDescription object.
     // creator: a lambda which returns a new instance of a particular subclass of Job.
     // solutionFormatter: a lambda which transforms a found job result into 
-    void registerApplication(const std::string& key,
-        JobReader reader, 
-        JobCreator creator,
-        JobSolutionFormatter solutionFormatter,
-        ResourceCleaner cleaner
-    ) {
+    void registerApplication(const AppEntry& entry) {
+
         int appId = _app_entries.size();
-        _app_key_to_app_id[key] = appId;
+        _app_key_to_app_id[entry.key] = appId;
         //std::cout << "Registered application id=" << appId << " key=" << key << std::endl;
 
-        AppEntry entry;
-        entry.key = key;
-        entry.reader = reader;
-        entry.creator = creator;
-        entry.solutionFormatter = solutionFormatter;
-        entry.cleaner = cleaner;
-        _app_entries.push_back(std::move(entry));
-    }
-
-    void registerClientSideApplication(const std::string& key,
-        JobReader reader,
-        ClientSideProgramCreator programCreator,
-        JobSolutionFormatter solutionFormatter,
-        ResourceCleaner cleaner
-    ) {
-        int appId = _app_entries.size();
-        _app_key_to_app_id[key] = appId;
-        // std::cout << "Registered application id=" << appId << " key=" << key << std::endl;
-
-        AppEntry entry;
-        entry.key = key;
-        entry.reader = reader;
-        entry.isClientSide = true;
-        entry.clientSideProgramCreator = programCreator;
-        entry.solutionFormatter = solutionFormatter;
-        entry.cleaner = cleaner;
         _app_entries.push_back(std::move(entry));
     }
 
@@ -86,6 +47,10 @@ namespace app_registry {
         return _app_entries.at(appId).key;
     }
 
+    OptionChecker getOptionChecker(int appId) {
+        getAppKey(appId); // check existence
+        return _app_entries.at(appId).optionChecker;
+    }
     JobReader getJobReader(int appId) {
         getAppKey(appId); // check existence
         return _app_entries.at(appId).reader;
@@ -97,7 +62,7 @@ namespace app_registry {
 
     bool isClientSide(int appId) {
         getAppKey(appId); // check existence
-        return _app_entries.at(appId).isClientSide;
+        return _app_entries.at(appId).type == AppEntry::CLIENT_SIDE;
     }
     JobCreator getJobCreator(int appId) {
         getAppKey(appId); // check existence
@@ -107,6 +72,14 @@ namespace app_registry {
         getAppKey(appId); // check existence
         return _app_entries.at(appId).clientSideProgramCreator;
     }
+    std::optional<JobResultTransformer> getJobResultTransformer(int appId) {
+        getAppKey(appId);
+        return _app_entries.at(appId).jobResultTransformer;
+    }
+    std::optional<JobEpilog> getJobEpilog(int appId) {
+        getAppKey(appId);
+        return _app_entries.at(appId).epilog;
+    }
 
     std::vector<ResourceCleaner> getCleaners() {
         std::vector<ResourceCleaner> cleaners;
@@ -114,7 +87,32 @@ namespace app_registry {
         return cleaners;
     }
 
-    void overrideProgramOptions(Parameters& params, JobDescription& desc) {
+    std::string getCombinedCopyrightInformation() {
+        std::string out;
+        for (auto& entry : _app_entries) if (!entry.copyrightInformation.empty()) {
+            out += "c \nc Application module " + entry.key + ": " + entry.copyrightInformation;
+        }
+        out += "c \n";
+        return out;
+    }
+
+    void checkAndOverrideProgramOptions(Parameters& params, JobDescription& desc) {
+
+        int appId = desc.getApplicationId();
+        OptionChecker chk = getOptionChecker(appId);
+        std::vector<std::pair<const Option*, std::string>> problems;
+        if (!chk(params, problems)) {
+            LOG(V0_CRIT, "[ERROR] Invalid configuration for #%i (application %s):\n",
+                desc.getId(), getAppKey(appId).c_str());
+            for (auto& [opt, msg] : problems) {
+                LOG(V0_CRIT, "[ERROR]  * Option -%s%s : %s\n",
+                    opt->id.c_str(), opt->hasLongOption() ? (", -" + opt->longid).c_str() : "",
+                    msg.c_str());
+            }
+            LOG(V0_CRIT, "[ERROR] Mallob will now abort.\n");
+            abort();
+        }
+
         const auto appConf = desc.getAppConfiguration();
         if (!appConf.map.count("options")) return;
 

@@ -79,11 +79,15 @@ public:
 
     // User-side events
     enum Result {ACCEPT, ACCEPT_CONCLUDE, DISCARD};
-    Result handle(nlohmann::json& json, std::function<void(nlohmann::json&)> feedback);
+    Result handle(nlohmann::json& json, std::function<void(nlohmann::json&)> feedback, int* outId = nullptr,
+        std::function<void(int)> callbackRootRank = {});
 
     // Mallob-side events
     void handleJobDone(JobResult&& result, const JobProcessingStatistics& stats, int applicationId);
 
     bool isActive() const {return _active;}
     void deactivate() {_active = false;}
+    JobDescriptionIdAllocator& getJobDescriptionIdAllocator() {
+        return _job_desc_id_allocator;
+    }
 };

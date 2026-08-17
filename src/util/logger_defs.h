@@ -1,6 +1,6 @@
 
 #ifndef LOGGER_STATIC_VERBOSITY
-#define LOGGER_STATIC_VERBOSITY 6
+#define LOGGER_STATIC_VERBOSITY 4
 #endif
 
 // Depending on how high the verbosity is, switch the corresponding logger call on or off

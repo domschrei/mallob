@@ -6,15 +6,22 @@
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "app/sat/data/revision_data.hpp"
 #include "app/sat/data/theories/theory_specification.hpp"
+#include "app/sat/solvers/solver_portfolio_config.hpp"
 #include "app/sat/solvers/solving_replay.hpp"
 #include "util/logger.hpp"
 #include "util/sys/fileutils.hpp"
 #include "util/sys/thread_pool.hpp"
 #include "util/sys/timer.hpp"
 #include "data/app_configuration.hpp"
+#if MALLOB_USE_CADICAL
 #include "../solvers/cadical.hpp"
+#endif
+#if MALLOB_USE_LINGELING
 #include "../solvers/lingeling.hpp"
+#endif
+#if MALLOB_USE_KISSAT
 #include "../solvers/kissat.hpp"
+#endif
 #include "app/sat/data/clause_histogram.hpp"
 #include "app/sat/data/definitions.hpp"
 #include "app/sat/data/sharing_statistics.hpp"
@@ -30,6 +37,9 @@
 #include <iterator>
 
 class LratConnector;
+#if MALLOB_USE_MINISAT
+#include "../solvers/minisat.hpp"
+#endif
 #if MALLOB_USE_MERGESAT
 #include "../solvers/mergesat.hpp"
 #endif
@@ -75,6 +85,10 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	}
 	std::string proofDirectory;
 
+	SolverPortfolioConfig soc;
+	soc.parseFromDirsAndFiles(params.satConfigDirs(), params.satConfigFiles());
+	LOG(V3_VERB, "Parsed %i solver configuration rules\n", soc.ruleCount());
+
 	// Launched in some certified UNSAT mode?
     if (_params.proofOutputFile.isSet() || _params.onTheFlyChecking() || _params.palRup()) {
 
@@ -93,7 +107,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		ClauseMetadata::enableClauseIds();
 		if (_params.onTheFlyChecking()) {
 			ClauseMetadata::enableClauseSignatures();
-			ClauseMetadata::enableIncrementalSignatures();
+			if (_params.onTheFlyCheckIncremental())
+				ClauseMetadata::enableIncrementalSignatures();
 		}
 
 		if (_params.proofOutputFile.isSet() || _params.palRup()) {
@@ -162,8 +177,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	int numGlu = 0;
 	int numCdc = 0;
 	int numMrg = 0;
+	int numMini = 0;
 	int numKis = 0;
-	int numBVA = 0;
 	int numPre = 0;
 
 	// Add solvers from full cycles on previous ranks
@@ -180,8 +195,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		case PortfolioSequence::GLUCOSE: solverToAdd = &numGlu; break;
 		case PortfolioSequence::CADICAL: solverToAdd = &numCdc; break;
 		case PortfolioSequence::MERGESAT: solverToAdd = &numMrg; break;
+		case PortfolioSequence::MINISAT: solverToAdd = &numMini; break;
 		case PortfolioSequence::KISSAT: solverToAdd = &numKis; break;
-		case PortfolioSequence::VARIABLE_ADDITION: solverToAdd = &numBVA; break;
 		case PortfolioSequence::PREPROCESSOR: solverToAdd = &numPre; break;
 		}
 		*solverToAdd += numFullCycles + (i < begunCyclePos);
@@ -215,46 +230,14 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.minImportChunksPerSolver = params.minNumChunksForImportPerSolver();
 	setup.numBufferedClsGenerations = params.bufferedImportedClsGenerations();
 	setup.skipClauseSharingDiagonally = params.skipClauseSharingDiagonally();
-	setup.diversifyNoise = params.diversifyNoise();
-
-	setup.decayDistribution = params.decayDistribution();
-	setup.decayMean = params.decayMean();
-	setup.decayStddev = params.decayStddev();
-	setup.decayMin = params.decayMin();
-	setup.decayMax = params.decayMax();
-
-	setup.diversifyReduce = params.diversifyReduce();
-	setup.reduceMin = params.reduceMin();
-	setup.reduceMax = params.reduceMax();
-	setup.reduceMean = params.reduceMean();
-	setup.reduceStddev = params.reduceStddev();
-	setup.reduceDelta = params.reduceDelta();
-
-	setup.sweepeffort = params.sweepeffort();
-
-	setup.plainAddSpecific = params.plainAddSpecific();
-	setup.diversifyNative = params.diversifyNative();
-	setup.diversifyFanOut = params.diversifyFanOut();
-	setup.diversifyInitShuffle = params.diversifyInitShuffle();
-	switch (_params.diversifyElimination()) {
-	case 0:
-		setup.eliminationSetting = SolverSetup::ALLOW_ALL;
-		break;
-	case 1:
-		setup.eliminationSetting = SolverSetup::DISABLE_SOME;
-		break;
-	case 2:
-		setup.eliminationSetting = SolverSetup::DISABLE_MOST;
-		break;
-	case 3:
-		setup.eliminationSetting = SolverSetup::DISABLE_ALL;
-		break;
-	}
 	setup.adaptiveImportManager = params.adaptiveImportManager();
 	setup.maxNumSolvers = config.mpisize * params.numThreadsPerProcess();
 	setup.numVars = numVars;
 	setup.numOriginalClauses = numClauses;
+	setup.sweepeffort = params.sweepeffort();
+	int sqrt = std::ceil(std::sqrt((double) setup.maxNumSolvers));
 	setup.proofDir = proofDirectory;
+
 	LratConnector* modelCheckingLratConnector {nullptr};
 	setup.nbSkippedIdEpochs = std::max(0, epochOffset + epochModulus * config.nbPreviousBalancingEpochs);
 	if (params.satProfilingLevel() >= 0) {
@@ -264,7 +247,17 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		FileUtils::mkdir(setup.profilingBaseDir);
 		setup.profilingLevel = params.satProfilingLevel();
 	}
+	setup.memoryFactor = numOrigSolvers / (float)_num_active_solvers;
 	setup.objectiveFunction = _objective;
+
+	// Pre-create PalRUP proof directories for *all* solver IDs, including cancelled ones.
+	if (params.palRup()) for (setup.localId = 0; setup.localId < numOrigSolvers; setup.localId++) {
+		setup.globalId = appRank * numOrigSolvers + setup.localId;
+		int sqrt = std::ceil(std::sqrt((double) setup.maxNumSolvers));
+		auto dir = proofDirectory + "/" + std::to_string((int)(setup.globalId / sqrt)) + "/" + std::to_string(setup.globalId);
+		LOG(V2_INFO, "MKDIR %s\n", dir.c_str());
+		FileUtils::mkdir(dir);
+	}
 
 	// Instantiate solvers according to the global solver IDs and diversification indices
 	int cyclePos = begunCyclePos;
@@ -286,9 +279,9 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 			case PortfolioSequence::LINGELING: setup.diversificationIndex = numLgl++; break;
 			case PortfolioSequence::CADICAL: setup.diversificationIndex = numCdc++; break;
 			case PortfolioSequence::MERGESAT: setup.diversificationIndex = numMrg++; break;
+			case PortfolioSequence::MINISAT: setup.diversificationIndex = numMini++; break;
 			case PortfolioSequence::GLUCOSE: setup.diversificationIndex = numGlu++; break;
 			case PortfolioSequence::KISSAT: setup.diversificationIndex = numKis++; break;
-			case PortfolioSequence::VARIABLE_ADDITION: setup.diversificationIndex = numBVA++; break;
 			case PortfolioSequence::PREPROCESSOR: setup.diversificationIndex = numPre++; break;
 			}
 			setup.diversificationIndex += divOffsetCycle;
@@ -299,18 +292,21 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		setup.certifiedUnsat = item.outputProof && (params.proofOutputFile.isSet() || params.onTheFlyChecking() || _params.palRup());
 		setup.onTheFlyChecking = setup.certifiedUnsat && params.onTheFlyChecking();
 		setup.onTheFlyCheckModel = params.onTheFlyChecking() && params.onTheFlyCheckModel();
+		setup.incrementalImpCheck = params.onTheFlyCheckIncremental();
 		setup.usePalRupFormat = params.palRup();
 		setup.outputBinaryPalRup = params.palRupBinary();
 		setup.trustedParserForced = params.forceIncrementalTrustedParser();
 		setup.modelCheckingLratConnector = modelCheckingLratConnector;
 		setup.avoidUnsatParticipation = (params.proofOutputFile.isSet() || params.onTheFlyChecking() || _params.palRup()) && !item.outputProof;
 		setup.exportClauses = !setup.avoidUnsatParticipation;
+		setup.solverConfig = soc;
 
 		_solver_interfaces.push_back(createSolver(setup));
 		cyclePos = (cyclePos+1) % portfolio.cycle.size();
 		auto mclc = _solver_interfaces.back()->getSolverSetup().modelCheckingLratConnector;
 		if (mclc) modelCheckingLratConnector = mclc;
 	}
+	_base_solver_setup = setup;
 
 	_sharing_manager.reset(new SharingManager(_solver_interfaces, _params, _logger, 
 		/*max. deferred literals per solver=*/5*config.maxBroadcastedLitsPerCycle, config.apprank));
@@ -319,23 +315,25 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 }
 
 std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSetup& setup) {
-	// printf("ß creating new solver\n");
-	float t0 = Timer::elapsedSeconds();
-
 	std::shared_ptr<PortfolioSolverInterface> solver;
 	switch (setup.solverType) {
+#if MALLOB_USE_LINGELING
 	case 'l':
 	case 'L':
 		// Lingeling
 		LOGGER(_logger, V4_VVER, "S%i : Lingeling-%i\n", setup.globalId, setup.diversificationIndex);
 		solver.reset(new Lingeling(setup));
 		break;
+#endif
+#if MALLOB_USE_CADICAL
 	case 'c':
 	case 'C':
 		// Cadical
 		LOGGER(_logger, V4_VVER, "S%i : Cadical-%i\n", setup.globalId, setup.diversificationIndex);
 		solver.reset(new Cadical(setup));
 		break;
+#endif
+#if MALLOB_USE_KISSAT
 	case 'k':
 	case 'v': // variable addition via Kissat
 	case 'p': // preprocessing via Kissat
@@ -348,6 +346,7 @@ std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSe
 			setup.diversificationIndex);
 		solver.reset(new Kissat(setup));
 		break;
+#endif
 #ifdef MALLOB_USE_MERGESAT
 	case 'm':
 	//case 'M': // no support for incremental mode as of now
@@ -364,6 +363,14 @@ std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSe
 		solver.reset(new MGlucose(setup));
 		break;
 #endif
+#ifdef MALLOB_USE_MINISAT
+	case 'n':
+	case 'N':
+		// Minisat
+		LOGGER(_logger, V4_VVER, "S%i: Minisat-%i\n", setup.globalId, setup.diversificationIndex);
+		solver.reset(new MiniSat(setup));
+		break;
+#endif
 	default:
 		// Invalid solver
 		LOGGER(_logger, V0_CRIT, "[ERROR] Invalid solver \"%c\" assigned\n", setup.solverType);
@@ -371,8 +378,6 @@ std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSe
 		abort();
 		break;
 	}
-	float t1 = Timer::elapsedSeconds();
-	LOG(V2_INFO, "STARTUP Solver-type %c init duration: %f ms \n", setup.solverType, (t1-t0)*1000);
 	return solver;
 }
 
@@ -625,11 +630,12 @@ void SatEngine::dumpStats(bool final) {
 	for (size_t i = 0; i < _num_solvers; i++) {
 		SolverStatistics st = _solver_interfaces[i]->getSolverStats();
 		int globalId = _solver_interfaces[i]->getGlobalId();
-		_logger.log(verb, "%sS%d %s\n",
+		int sVerb = final ? V3_VERB : verb;
+		_logger.log(sVerb, "%sS%d %s\n",
 				final ? "END " : "", globalId, st.getReport().c_str());
-		_logger.log(verb, "%sS%d clenhist prod %s\n",
+		_logger.log(sVerb, "%sS%d clenhist prod %s\n",
 				final ? "END " : "", globalId, st.histProduced->getReport().c_str());
-		_logger.log(verb, "%sS%d clenhist digd %s\n",
+		_logger.log(sVerb, "%sS%d clenhist digd %s\n",
 				final ? "END " : "", globalId, st.histDigested->getReport().c_str());
 		solveStats.aggregate(st);
 	}
@@ -638,16 +644,24 @@ void SatEngine::dumpStats(bool final) {
 	// Sharing statistics
 	SharingStatistics shareStats;
 	if (_sharing_manager != NULL) shareStats = _sharing_manager->getStatistics();
-	_logger.log(verb, "%s%s\n", final ? "END " : "", shareStats.getReport().c_str());
+	_logger.log(shareStats.empty() ? V4_VVER : verb, "%s%s\n",
+		final ? "END " : "", shareStats.getReport().c_str());
 
 	if (final) {
+		std::initializer_list<std::pair<std::string, ClauseHistogram*>> histList = {
+			{"prod", shareStats.histProduced},
+			{"flfl", shareStats.histFailedFilter},
+			{"admt", shareStats.histAdmittedToDb},
+			{"drpd", shareStats.histDroppedBeforeDb},
+			{"dltd", shareStats.histDeletedInSlots},
+			{"retd", shareStats.histReturnedToDb}
+		};
 		// Histogram over clause lengths (do not print trailing zeroes)
-		_logger.log(verb, "clenhist prod %s\n", shareStats.histProduced->getReport().c_str());
-		_logger.log(verb, "clenhist flfl %s\n", shareStats.histFailedFilter->getReport().c_str());
-		_logger.log(verb, "clenhist admt %s\n", shareStats.histAdmittedToDb->getReport().c_str());
-		_logger.log(verb, "clenhist drpd %s\n", shareStats.histDroppedBeforeDb->getReport().c_str());
-		_logger.log(verb, "clenhist dltd %s\n", shareStats.histDeletedInSlots->getReport().c_str());
-		_logger.log(verb, "clenhist retd %s\n", shareStats.histReturnedToDb->getReport().c_str());
+		for (auto& [name, hist] : histList) {
+			// Increased verbosity for empty histograms
+			_logger.log(hist->getTotal()==0 ? V4_VVER : verb,
+				"clenhist %s %s\n", name.c_str(), hist->getReport().c_str());
+		}
 
 		// Flush logs
 		for (auto& solver : _solver_interfaces) solver->getLogger().flush();
@@ -697,9 +711,19 @@ void SatEngine::cleanUp(bool hardTermination) {
 	LOGGER(_logger, V4_VVER, "[engine-cleanup] enter\n");
 
 	// Terminate any remaining running threads
+	auto& setup = _base_solver_setup;
 	terminateSolvers(hardTermination);
 	if (hardTermination) {
 		if (_params.proofOutputFile.isSet()) writeClauseEpochs();
+		// Create (empty) proof files where none were created
+		if (_params.palRup()) {
+			int sqrt = std::ceil(std::sqrt((double) setup.maxNumSolvers));
+			for (int localId = 0; localId < _params.numThreadsPerProcess(); localId++) {
+				int globalId = _config.apprank * _params.numThreadsPerProcess() + localId;
+				auto dir = setup.proofDir + "/" + std::to_string((int)(globalId / sqrt)) + "/" + std::to_string(globalId);
+				FileUtils::create(dir + "/out.palrup");
+			}
+		}
 		LOGGER(_logger, V4_VVER, "[engine-cleanup] done - hard exit pending\n");
 		return;
 	}

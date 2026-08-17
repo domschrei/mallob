@@ -18,7 +18,9 @@
 #include "app/sat/stream/sat_job_stream_processor.hpp"
 #include "app/sat/stream/wrapped_sat_job_stream.hpp"
 #include "core/dtask_tracker.hpp"
+#include "data/job_transfer.hpp"
 #include "interface/api/api_connector.hpp"
+#include "interface/api/api_registry.hpp"
 #include "rustsat.h"
 #include "scheduling/core_allocator.hpp"
 #include "util/logger.hpp"
@@ -66,6 +68,7 @@ private:
     JobDescription& _desc; // contains our instance to solve and all metadata
     MaxSatInstance& _instance;
     int _nb_orig_vars;
+    int _group_id {-1};
 
     std::unique_ptr<IncSatController> _stream_wrapper;
 
@@ -364,6 +367,17 @@ public:
         }
     }
 
+    bool addCrossSharedClauses(JobMessage& msg) {
+        int groupId = msg.contextIdOfDestination;
+        if (groupId == _group_id) {
+            LOG(V2_INFO, "MAXSAT XXS %s rejected cls from group %i\n", _label.c_str(), groupId);
+            return false;
+        }
+        LOG(V2_INFO, "MAXSAT XXS %s accepted cls from group %i\n", _label.c_str(), groupId);
+        _stream_wrapper->forwardAsyncRedundantClauses(msg.payload);
+        return true;
+    }
+
     void setDescriptionLabelForNextCall(const std::string& label) {
         _desc_label_next_call = label;
     }
@@ -371,6 +385,7 @@ public:
     void setGroupId(const std::string& groupId, int minVar = -1, int maxVar = -1) {
         _stream_wrapper->initInteractiveSolving();
         _stream_wrapper->getMallobProcessor()->setGroupId(groupId, minVar, maxVar);
+        _group_id = _api.getJsonInterface().getJobDescriptionIdAllocator().getId(groupId);
     }
 
     size_t getCurrentBound() const {

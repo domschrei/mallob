@@ -16,7 +16,8 @@ struct JobMetadata {
     std::vector<int> dependencies;
     bool done = false;
     bool interrupt = false;
-    
+    std::function<void(int)> cbRootRank;
+
     mutable float lastDescriptionAvailabilityCheck = 0;
 
     JobMetadata() {}
@@ -25,12 +26,8 @@ struct JobMetadata {
         description(std::move(other.description)), 
         files(std::move(other.files)), 
         dependencies(std::move(other.dependencies)),
-        done(other.done), interrupt(other.interrupt) {}
-    
-    JobMetadata& operator=(JobMetadata&& other) {
-        *this = JobMetadata(std::move(other));
-        return *this;
-    }
+        done(other.done), interrupt(other.interrupt),
+        cbRootRank(std::move(other.cbRootRank)) {}
 
     bool operator==(const JobMetadata& other) const {
         if (!description != !(other.description)) return false;

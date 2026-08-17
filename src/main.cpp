@@ -1,4 +1,5 @@
 
+#include <cstdlib>
 #include <stdlib.h>
 #include <unistd.h>
 #include <assert.h>
@@ -12,6 +13,7 @@
 #include <thread>
 #include <vector>
 
+#include "app/sat/proof/impcheck_program_lookup.hpp"
 #include "comm/distributed_termination.hpp"
 #include "comm/mympi.hpp"
 #include "core/mono_job.hpp"
@@ -173,6 +175,18 @@ void longStartupWarnMsg(int rank, const char* msg) {
         std::cout << Timer::elapsedSeconds() << " " << rank << " " << std::string(msg) << std::endl;
 }
 
+void printBanner() {
+    // Output program banner (only the PE of rank zero)
+    LOG_OMIT_PREFIX(V2_INFO, "c \nc Mallob - Malleable Load Balancer - Massively Parallel Logic Backend\n"
+        "c \nc Core system:\n"
+        "c (C) 2018-2026 Dominik Schreiber, Karlsruhe Institute of Technology\n"
+        "c (C) 2025-2026 Niccolò Rigi-Luperti, Karlsruhe Institute of Technology\n");
+    auto copyrightInfo = app_registry::getCombinedCopyrightInformation();
+    if (!copyrightInfo.empty()) {
+        LOG_OMIT_PREFIX(V2_INFO, "%s", copyrightInfo.c_str());
+    }
+}
+
 int main(int argc, char *argv[]) {
     
     MyMpi::init();
@@ -186,9 +200,12 @@ int main(int argc, char *argv[]) {
 
     longStartupWarnMsg(rank, "Init'd MPI");
 
+    // Register all applications which were compiled into Mallob
+    #include "app/.register_commands.h"
+
     Parameters params;
     params.init(argc, argv);
-    if (rank == 0 && !params.quiet()) params.printBanner();
+    if (rank == 0 && !params.quiet()) printBanner();
 
     longStartupWarnMsg(rank, "Init'd params");
 
@@ -218,9 +235,6 @@ int main(int argc, char *argv[]) {
 
     longStartupWarnMsg(rank, "Init'd message queue");
 
-    // Register all applications which were compiled into Mallob
-    #include "app/.register_commands.h"
-
     if (rank == 0)
         LOG(V2_INFO, "Program options: %s\n", params.getParamsAsString().c_str());
     if (params.help()) {
@@ -245,13 +259,16 @@ int main(int argc, char *argv[]) {
         LOG(V2_INFO, "Cleaning up pre-execution\n");
 
         for (std::string subprocName : {
-            MALLOB_SUBPROC_DISPATCH_PATH"mallob_sat_process",
-            MALLOB_SUBPROC_DISPATCH_PATH"impcheck_parse",
-            MALLOB_SUBPROC_DISPATCH_PATH"impcheck_check",
-            MALLOB_SUBPROC_DISPATCH_PATH"impcheck_confirm",
+            std::string(MALLOB_SUBPROC_DISPATCH_PATH"mallob_sat_process"),
+            MALLOB_SUBPROC_DISPATCH_PATH + ImpCheckProgramLookup::tryGetParserExecutablePath(true),
+            MALLOB_SUBPROC_DISPATCH_PATH + ImpCheckProgramLookup::tryGetParserExecutablePath(false),
+            MALLOB_SUBPROC_DISPATCH_PATH + ImpCheckProgramLookup::tryGetCheckerExecutablePath(true),
+            MALLOB_SUBPROC_DISPATCH_PATH + ImpCheckProgramLookup::tryGetCheckerExecutablePath(false),
+            MALLOB_SUBPROC_DISPATCH_PATH + ImpCheckProgramLookup::tryGetConfirmerExecutablePath(true),
+            MALLOB_SUBPROC_DISPATCH_PATH + ImpCheckProgramLookup::tryGetConfirmerExecutablePath(false)
         }) {
             std::string cmd = "killall -9 " + subprocName + " 2>/dev/null";
-            LOG(V2_INFO, "Killing old subprocesses: \"%s\"\n", cmd.c_str());
+            LOG(V5_DEBG, "Killing old subprocesses: \"%s\"\n", cmd.c_str());
             (void) system(cmd.c_str());
         }
 
@@ -267,7 +284,7 @@ int main(int argc, char *argv[]) {
         }
         std::string cmd = "find /dev/shm/ -name 'edu.kit.iti.mallob.*' -print0 | xargs -0 rm 2>/dev/null";
         (void) system(cmd.c_str());
-        TmpDir::wipe();
+        TmpDir::wipe(true);
 
         // Wait for all processes to have cleaned up before proceeding
         // (creating new files which shouldn't be cleaned up!)
@@ -339,7 +356,7 @@ int main(int argc, char *argv[]) {
     if (clientComm != MPI_COMM_NULL) MPI_Comm_free(&clientComm);
     if (workerComm != MPI_COMM_NULL) MPI_Comm_free(&workerComm);
     MPI_Finalize();
-    TmpDir::wipe();
+    TmpDir::wipe(false);
     Process::removeDelayedExitWatchers();
     LOG(V2_INFO, "Exiting happily\n");
 }

@@ -37,6 +37,9 @@ private:
     int _nb_clauses {0};
     int _revision {-1};
 
+    bool _has_empty_clause {false};
+    bool _last_lit_zero {true};
+
     std::vector<int> _solution;
     tsl::robin_set<int> _failed_lits;
 
@@ -50,6 +53,8 @@ private:
     std::function<void()> _cb_cleanup;
     bitwuzla::Terminator* _bzla_term {nullptr};
     bitwuzla::Terminator* _ext_term {nullptr};
+
+    std::function<void(std::unique_ptr<IncSatController>&&)> _incsat_cleaner;
 
 public:
     BitwuzlaSatConnector(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& tracker, const std::string& name) :
@@ -66,6 +71,16 @@ public:
     virtual ~BitwuzlaSatConnector() {
         LOG(V2_INFO, "Done: %s\n", _name.c_str());
         if (_cb_cleanup) _cb_cleanup();
+        if (_incsat_cleaner) {
+            // Important: We need to stop internal access to the terminators
+            // in a thread-safe way before cleaning up the terminators!
+            _incsat->invalidateTerminators();
+            _incsat_cleaner(std::move(_incsat));
+        }
+    }
+
+    void preInitialize() {
+        _incsat->initInteractiveSolving();
     }
 
     void setCleanupCallback(std::function<void()> cb) {_cb_cleanup = cb;}
@@ -73,14 +88,22 @@ public:
         _out_stream = os;
     }
 
+    void setIncSatCleaner(std::function<void(std::unique_ptr<IncSatController>&&)> cleaner) {
+        _incsat_cleaner = cleaner;
+    }
+
     virtual const char* get_name() const override {return "MallobSat-internal";}
     virtual const char* get_version() const override {return "N/A";}
 
-    virtual void add(int32_t lit) override {
+    virtual void add(int32_t lit, int64_t cgroup_id = 0) override {
         _in_solved_state = false;
+        const bool isZero = lit == 0;
+        if (MALLOB_UNLIKELY(isZero && _last_lit_zero))
+            _has_empty_clause = true;
+        _last_lit_zero = isZero;
         _lits.push_back(lit);
         _nb_vars = std::max(_nb_vars, std::abs(lit));
-        _nb_clauses += lit == 0;
+        _nb_clauses += isZero;
     }
     virtual void assume(int32_t lit) override {
         _in_solved_state = false;
@@ -94,22 +117,82 @@ public:
         _ext_term = terminator;
     }
 
+    inline bitwuzla::Result returnFromSolve() {
+        LOG(V6_DEBGV, "RETURN_SOLVE code=%i\n", _result);
+        return _result;
+    }
+
     virtual bitwuzla::Result solve() override {
-        if (_in_solved_state) return _result;
+
+        if (_in_solved_state) {
+            return returnFromSolve();
+        }
+
+        if (_nb_clauses == 0 && _lits.empty() && _assumptions.empty()) {
+            _failed_lits.clear();
+            _result = bitwuzla::Result::SAT;
+            _solution = {0};
+            _in_solved_state = true;
+            return returnFromSolve();
+        }
+
+        if (_has_empty_clause) {
+            // Empty clause is part of the permanent clauses:
+            // Enter a "solved" state with UNSAT and no failed assumptions
+            LOG(V2_INFO, "%s trivially UNSAT\n", _name.c_str());
+            _lits.clear();
+            _assumptions.clear();
+            _failed_lits.clear();
+            _result = bitwuzla::Result::UNSAT;
+            _in_solved_state = true;
+            return returnFromSolve();
+        }
 
         _revision++;
         auto time = Timer::elapsedSeconds();
         LOG(V2_INFO, "%s submit rev. %i (%i lits, %i asmpt)\n", _name.c_str(), _revision, _lits.size(), _assumptions.size());
 
+        std::vector<int> assumptionsToCheck = _params.bitwuzlaCheckSatModels() ? _assumptions : std::vector<int>();
+
         bool noAssumptions = _assumptions.empty();
-        auto [resultCode, solution] = _incsat->solveNextRevision(std::move(_lits), std::move(_assumptions));
+        auto [resultCode, solution] = _incsat->solveNextRevision(std::move(_lits), std::move(_assumptions),
+            _nb_vars, _nb_clauses);
         _in_solved_state = noAssumptions;
+
+        if (resultCode == 10 && _params.bitwuzlaCheckSatModels()) {
+            // check model
+            bool clauseSat = false;
+            for (int lit : _lits) {
+                if (lit == 0) {
+                    if (!clauseSat) {
+                        LOG(V0_CRIT, "[ERROR] Returned model does not satisfy formula!\n");
+                        abort();
+                    }
+                    clauseSat = false;
+                    continue;
+                }
+                auto value = solution[std::abs(lit)];
+                assert(value == lit || value == -lit);
+                clauseSat |= (value == lit);
+            }
+            // check assumptions
+            for (int lit : assumptionsToCheck) {
+                auto value = solution[std::abs(lit)];
+                assert(value == lit || value == -lit);
+                if (value != lit) {
+                    LOG(V0_CRIT, "[ERROR] Returned model does not satisfy assumption %i!\n", lit);
+                    abort();
+                }
+            }
+        }
+
         _lits.clear();
         _assumptions.clear();
 
         bitwuzla::Result bzlaResult = bitwuzla::Result::UNKNOWN;
         time = Timer::elapsedSeconds() - time;
-        LOG(V2_INFO, "%s rev. %i done - time=%.3fs res=%i\n", _name.c_str(), _revision, time, resultCode);
+        LOG(V2_INFO, "%s rev. %i done - time=%.3fs res=%i slen=%lu\n", _name.c_str(), _revision, time, resultCode,
+            solution.size());
         if (resultCode == 10) bzlaResult = bitwuzla::Result::SAT;
         if (resultCode == 20) bzlaResult = bitwuzla::Result::UNSAT;
 
@@ -130,13 +213,14 @@ public:
         }
 
         _result = bzlaResult;
-        return _result;
+        return returnFromSolve();
     }
 
     virtual int32_t value(int32_t lit) override {
         int var = std::abs(lit);
         if (var >= _solution.size()) {
             LOG(V1_WARN, "[WARN] Solution has size %lu - variable %i queried!\n", _solution.size(), var);
+            assert(false);
             return 0;
         }
         int val = _solution[var];

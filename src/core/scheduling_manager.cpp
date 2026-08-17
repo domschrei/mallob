@@ -49,6 +49,10 @@ SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm,
         _reactivation_scheduler(_params, _job_registry,
             // Callback for emitting a job request
             [&](JobRequest& req, int tag, bool left, int dest) {
+                if (!has(req.jobId)) {
+                    LOG(V1_WARN, "[WARN] Tasked to emit req. with unknown ID #%i\n", req.jobId);
+                    return;
+                }
                 _req_mgr.emitJobRequest(get(req.jobId), req, tag, left, dest);
             }
         ) {
@@ -1124,6 +1128,7 @@ JobRequest SchedulingManager::uncommit(Job& job, bool leaving) {
         LOG(V4_VVER, "destruct request(s) to multiply\n");
         job.getRequestToMultiply(/*left=*/true).reset();
         job.getRequestToMultiply(/*left=*/false).reset();
+        if (!job.hasDescription()) eraseJobAndQueueForDeletion(job);
     }
     return optReq.value();
 }

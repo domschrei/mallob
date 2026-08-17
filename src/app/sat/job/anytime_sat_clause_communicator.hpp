@@ -9,6 +9,7 @@
 
 #include "app/sat/data/clause.hpp"
 #include "app/sat/job/inter_job_clause_sharer.hpp"
+#include "comm/msg_queue/message_subscription.hpp"
 #include "util/params.hpp"
 #include "util/hashing.hpp"
 #include "data/job_transfer.hpp"
@@ -39,6 +40,7 @@ private:
     int _current_epoch = 0;
     float _time_of_last_epoch_initiation = 0;
     float _time_of_last_epoch_conclusion = 0;
+    int _xtcs_epoch = 0;
 
     float _solving_time = 0;
 
@@ -55,6 +57,9 @@ private:
     int _last_skipped_epochs_warning {0};
 
     bool _internal_sharing = true;
+
+    MessageSubscription _sub_incoming_crossshared_clauses;
+    std::list<std::vector<int>> _incoming_crossshared_clauses;
 
 public:
     AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job, bool internalSharing = true);

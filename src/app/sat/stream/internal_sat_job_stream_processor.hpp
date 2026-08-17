@@ -10,39 +10,70 @@
 #include "app/sat/execution/solver_setup.hpp"
 #include "app/sat/parse/serialized_formula_parser.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
+#if MALLOB_USE_CADICAL
 #include "app/sat/solvers/cadical.hpp"
+#endif
+#if MALLOB_USE_MINISAT
+#include "app/sat/solvers/minisat.hpp"
+#endif
+#include "app/sat/solvers/portfolio_solver_interface.hpp"
 #include "sat_job_stream_processor.hpp"
 #include "scheduling/core_allocator.hpp"
 #include "util/logger.hpp"
 
 class InternalSatJobStreamProcessor : public SatJobStreamProcessor {
 
+public:
+    enum SeqSolver {CADICAL, MINISAT};
+
 private:
-    std::unique_ptr<Cadical> _solver;
+    std::unique_ptr<PortfolioSolverInterface> _solver;
     int _current_rev {-1};
     int _internal_rev {-1};
     volatile bool _pending {false};
 
-    LratConnector* _lrat ;
+    LratConnector* _lrat {nullptr};
+
+    SeqSolver _solvertype;
 
 public:
-    InternalSatJobStreamProcessor(SolverSetup setup, Synchronizer& sync) :
-        SatJobStreamProcessor(sync) {
+    InternalSatJobStreamProcessor(SolverSetup setup, Synchronizer& sync, SeqSolver solverType) :
+        SatJobStreamProcessor(sync), _solvertype(solverType) {
 
         setup.logger = &Logger::getMainInstance();
         setup.localId = 0;
         setup.globalId = 0;
-        setup.maxNumSolvers = 1;
+        setup.maxNumSolvers = 64; // just for proper diversification
         setup.solverType = 'C';
         setup.exportClauses = false;
-        if (setup.onTheFlyChecking) setup.certifiedUnsat = true;
-        _solver.reset(new Cadical(setup));
-        _lrat = setup.onTheFlyChecking ? _solver->getLratConnector() : nullptr;
+#if MALLOB_USE_MINISAT
+        if (_solvertype == MINISAT) {
+            auto minisat = new MiniSat(setup);
+            minisat->setExternalTerminator([&]() {
+                return _terminator(_current_rev);
+            });
+            _solver.reset(minisat);
+        }
+#endif
+#if MALLOB_USE_CADICAL
+        if (_solvertype == CADICAL) {
+            if (setup.onTheFlyChecking) setup.certifiedUnsat = true;
+            // disable pre-/inprocessing
+            // setup.flavour = PortfolioSequence::PLAIN;
+            auto cadical = new Cadical(setup);
+            cadical->getTerminator().setExternalTerminator([&]() {
+                return _terminator(_current_rev);
+            });
+            // phase=0 happens to improve performance
+            cadical->setDefaultPhase(false);
+            _solver.reset(cadical);
+            _lrat = setup.onTheFlyChecking ? _solver->getLratConnector() : nullptr;
+        }
+#endif
+        assert(_solver);
 
+        _solver->diversify(0);
         _solver->setLearnedClauseCallback([&](const Mallob::Clause&, int) {});
-        _solver->getTerminator().setExternalTerminator([&]() {
-            return _terminator(_current_rev);
-        });
         if (_lrat) _lrat->init(".seq");
     }
 
@@ -61,7 +92,7 @@ public:
         _current_rev = task.rev;
         _internal_rev++;
         _pending = true;
-        LOG(V2_INFO, "%s rev. %i process payload of size %lu, %lu assumptions\n", _name.c_str(), task.rev, task.lits.size(), task.assumptions.size());
+        LOG(V3_VERB, "%s rev. %i process payload of size %lu, %lu assumptions\n", _name.c_str(), task.rev, task.lits.size(), task.assumptions.size());
         if (task.type == SatJobStreamProcessor::SatTask::RAW) {
             SerializedFormulaParser parser(Logger::getMainInstance(), task.lits.data(), task.lits.size(), true);
             assert(task.assumptions.empty());
@@ -101,8 +132,13 @@ public:
             solution = std::move(failedVec);
         }
         bool winner = concludeRevision(task.rev, res, std::move(solution));
-        if (winner) LOG(V2_INFO, "%s rev. %i won with res=%i\n", _name.c_str(), task.rev, res);
+        if (winner) LOG(V3_VERB, "%s rev. %i won with res=%i\n", _name.c_str(), task.rev, res);
         _pending = false;
+    }
+
+    void forwardAsyncRedundantClauses(std::vector<int>& clauseBuf) override {
+        BufferReader reader(clauseBuf.data(), clauseBuf.size(), 255, false);
+        _solver->addLearnedClauses(reader, 0);
     }
 
     virtual void finalize() override {

@@ -43,7 +43,7 @@ void advanceCollective(BaseSatJob* job, JobMessage& msg, int broadcastTag) {
     }
 }
 
-AnytimeSatClauseCommunicator::AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job, bool internalSharing) : 
+AnytimeSatClauseCommunicator::AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job, bool internalSharing) :
     _params(params), _job(job),
     _cls_history(!params.collectClauseHistory() ? nullptr :
         new HistoricClauseStorage([&]() {
@@ -58,7 +58,13 @@ AnytimeSatClauseCommunicator::AnytimeSatClauseCommunicator(const Parameters& par
     _cross_job_clause_sharer(_job->getDescription().getGroupId() > 0 && _job->getJobTree().isRoot() ?
         new InterJobClauseSharer(_params, job->getDescription().getGroupId(), job->getContextId(), job->toStr()) : nullptr),
     _sent_cert_unsat_ready_msg(!params.proofOutputFile.isSet() && !params.deterministicSolving()),
-    _internal_sharing(internalSharing) {
+    _sub_incoming_crossshared_clauses(MSG_SEND_APP_DATA_TO_JOB_TREE_ROOT, [&](MessageHandle& h) {
+        JobMessage msg = Serializable::get<JobMessage>(h.getRecvData());
+        if (msg.jobId != _job->getId()) return;
+        if (!_job->getJobTree().isRoot()) return;
+        LOG(V2_INFO, "MAXSAT XXS #%i root rank received clauses (buflen=%i)\n", msg.jobId, msg.payload.size());
+        _incoming_crossshared_clauses.push_back(std::move(msg.payload));
+    }) {
 
     _time_of_last_epoch_initiation = Timer::elapsedSecondsCached();
     if (_cross_job_clause_sharer) initCrossSharer();
@@ -112,7 +118,6 @@ void AnytimeSatClauseCommunicator::communicate() {
                 agg.maxRevision() = _job->getRevisionToReachForGroupId();
                 msg.treeIndexOfDestination = msg.treeIndexOfSender = 0;
                 msg.contextIdOfDestination = msg.contextIdOfSender = _job->getActorContextId();
-                // LOG(V1_WARN, "%s : MSG_BROADCAST_CLAUSE_STATELESS, payload size %i\n", _job->toStr(), msg.payload.size());
                 advanceCollective(_job, msg, MSG_BROADCAST_CLAUSES_STATELESS);
             }
             _cancelled_sessions.emplace_back(_cross_sharing_session.release());
@@ -197,9 +202,6 @@ bool AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
         return true;
     }
 
-    //LOG(V0_CRIT, "[WARN] UNEXPECTED JOB MESSAGE - NORMAL CODE WOULD HAVE ASSERTED HERE!\n");
-    //LOG(V0_CRIT, "[Warn] Unexpected job message mpitag=%i inttag=%i jobId=%i ctx_id_sender=%i <= [%i]\n", mpiTag, msg.tag, msg.jobId, msg.contextIdOfSender, source);
-    // assert(log_return_false("[ERROR] Unexpected job message mpitag=%i inttag=%i jobId=%i ctx_id_sender=%i <= [%i]\n", mpiTag, msg.tag, msg.jobId, msg.contextIdOfSender, source));
     return false;
 }
 
@@ -326,7 +328,6 @@ void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg, int so
 
     // reject the clause sharing initiation if you are not active right now
     if (_job->getState() != ACTIVE && !_job->getJobTree().isRoot()) {
-        LOG(V1_WARN, " [WARN] Return to sender: AnytimeSatClauseCommunicator::initiateClauseSharing: (State != active && not root) \n");
         msg.returnToSender(source, MSG_SEND_APPLICATION_MESSAGE);
         return;
     }
@@ -352,8 +353,21 @@ void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg, int so
     );
 
     // register listener to grab final, filtered shared clauses and share them with other jobs
-    if (_cross_job_clause_sharer) _current_session->setAdditionalClauseListener(
+    _current_session->setAdditionalClauseListener(
         [&, session = _current_session.get()](std::vector<int>& clauses) {
+            if (!_cross_job_clause_sharer) return;
+            while (!_incoming_crossshared_clauses.empty()) {
+                auto clauseBuf = std::move(_incoming_crossshared_clauses.back());
+                _incoming_crossshared_clauses.pop_back();
+                if (_cross_job_clause_sharer->getLocalRank() != 0) {
+                    LOG(V2_INFO, "MAXSAT XXS #%i ignoring clauses: not the root of XTCS group %i\n",
+                        _job->getId(), _job->getDescription().getGroupId());
+                    continue;
+                }
+                LOG(V2_INFO, "MAXSAT XXS #%i feeding clauses into XTCS group %i\n",
+                    _job->getId(), _job->getDescription().getGroupId());
+                _cross_job_clause_sharer->addInternalSharedClauses(clauseBuf);
+            }
             feedLocalClausesIntoCrossSharing(clauses, session);
         }
     );
@@ -406,7 +420,6 @@ void AnytimeSatClauseCommunicator::initiateCrossSharing(JobMessage& msg, int sou
 
     // reject the cross-sharing initiation if the job is already terminated
     if (_job->getState() == PAST) {
-        LOG(V1_WARN, " [WARN] Return to sender: AnytimeSatClauseCommunicator::initiateCrossSharing: (State == PAST) \n");
         msg.returnToSender(source, MSG_SEND_APPLICATION_MESSAGE);
         return;
     }
@@ -422,6 +435,17 @@ void AnytimeSatClauseCommunicator::initiateCrossSharing(JobMessage& msg, int sou
     _cross_sharing_session.reset(
         new ClauseSharingSession(_params, _cross_job_clause_sharer.get(), snapshot, nullptr, 0, 1)
     );
+    if (snapshot.index == 0) {
+        // root of XTCS: export cross-shared clauses to client parent
+        _cross_sharing_session->setAdditionalClauseListener([&](std::vector<int>& clauses) {
+            JobMessage resultMsg(_job->getId(), _job->getId(), _job->getRevision(), _xtcs_epoch++, MSG_SEND_APP_DATA_TO_CLIENT_JOB);
+            resultMsg.treeIndexOfDestination = 0;
+            resultMsg.contextIdOfDestination = _job->getDescription().getGroupId();
+            resultMsg.payload = clauses;
+            _job->getJobTree().send(_job->getJobTree().getParentNodeRank(), MSG_SEND_APP_DATA_TO_CLIENT_JOB, resultMsg);
+        });
+    }
+
     msg.contextIdOfSender = snapshot.contextId;
     msg.treeIndexOfSender = snapshot.index;
     if (snapshot.leftChildNodeRank >= 0) {

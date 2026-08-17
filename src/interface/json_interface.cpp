@@ -30,7 +30,8 @@
 #include "util/sys/timer.hpp"
 
 JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson, 
-    std::function<void(nlohmann::json&)> feedback) {
+    std::function<void(nlohmann::json&)> feedback, int* outId,
+    std::function<void(int)> callbackRootRank) {
 
     if (!_active || Terminator::isTerminating()) return DISCARD;
 
@@ -40,9 +41,6 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
     int applicationId;
     bool incremental;
     JobImage* img = nullptr;
-
-
-    // printf("ß JsonInterface::handle\n");
 
     auto baseErrorMsg = "[WARN] Rejecting submission %s - reason: %s\n";
 
@@ -94,8 +92,7 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
             data.description->setIncremental(incremental);
             data.description->setRevision(rev);
             data.interrupt = true;
-            LOGGER(_logger, V2_INFO,"Interrupt Signal on job %s #%i (via) JsonInterface (now calling _job_callback) \n", jobName.c_str(), id);
-            _job_callback(std::move(data)); //goes to handleNewJob in client.cpp
+            _job_callback(std::move(data));
             return ACCEPT;
         }
 
@@ -172,6 +169,7 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
     // From here on, use the json inside the JobImage because the parameter JSON has been moved
     assert(img->baseJson != nullptr);
     auto& json = img->baseJson;
+    if (outId) *outId = id;
 
     // Initialize new job
     JobDescription* job = new JobDescription(id, priority, applicationId);
@@ -278,11 +276,7 @@ JsonInterface::Result JsonInterface::handle(nlohmann::json& inputJson,
     metadata.description = std::unique_ptr<JobDescription>(job);
     metadata.files = std::move(files);
     metadata.dependencies = std::move(idDependencies);
-     /*
-      *This now calls
-      *   Client::handleNewJob(metadata) !
-      * Because _job_callback was set to be Client::handleNewJob(metadata) by Client::init()
-      */
+    metadata.cbRootRank = callbackRootRank;
     _job_callback(std::move(metadata));
 
     return ACCEPT;
@@ -308,7 +302,6 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobProcessingStatist
         + std::to_string(result.id) + "." 
         + std::to_string(result.revision) + ".pipe";
 
-    LOG(V4_VVER, "Json handleJobDone: SolutionSize=%i\n", result.getSolutionSize());
     // Pack job result into JSON
     j["internal_id"] = result.id;
     j["internal_revision"] = result.revision;
@@ -321,7 +314,6 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobProcessingStatist
         j["result"]["solution-size"] = result.getSolutionSize();
         mkfifo(solutionFile.c_str(), 0666);
     } else {
-        LOG(V4_VVER, "Json handleJobDone: Setting [result][solution] via app_registry::getJobSolutionFormatter\n");
         j["result"]["solution"] = app_registry::getJobSolutionFormatter(applicationId)(_params, result, stats);
     }
     j["stats"] = {

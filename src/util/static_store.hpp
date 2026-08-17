@@ -32,6 +32,14 @@ public:
         _map.erase(key);
         return val;
     }
+    static std::optional<T> extractMaybe(const std::string& key) {
+        auto lock = _mtx_map.getLock();
+        auto it = _map.find(key);
+        if (it == _map.end()) return {};
+        T val = std::move(it->second);
+        _map.erase(key);
+        return val;
+    }
 };
 
 template <typename T>

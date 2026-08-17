@@ -34,6 +34,13 @@ echo " "
 # scripts/slurm/showflags.sh "$sbatch_base"
 # echo " "
 
+matches=(/hppfs/work/$projectname/$username/logs/${jobname}-*)
+if [ -d "${matches[0]}" ]; then
+    echo "Matching target directory / directories already exist: $matches"
+    echo "Remove or rename, then retry."
+    exit 1
+fi
+
 dir="sbatch/generated/$jobname"
 mkdir -p "$dir"
 
@@ -64,6 +71,8 @@ scripts/slurm/showflags.sh "$out_templated"
 sweep/show-kissat-build.sh 
 echo ""
 
+
+for i in $(seq $minjobidx $maxjobidx); do echo $i ; done | tac > $dir/.remaining_ids
 
 cmd="for i in {1..$numchains}; do sbatch $out_templated; done"
 

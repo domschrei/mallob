@@ -1,20 +1,19 @@
 
 #pragma once
 
-#include <cstdint>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <string>
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <signal.h>
 
 #include "app/sat/proof/impcheck.hpp"
+#include "app/sat/proof/impcheck_program_lookup.hpp"
 #include "app/sat/proof/lrat_op.hpp"
 #include "trusted/trusted_utils.hpp"
 #include "trusted/trusted_checker_defs.hpp"
-#include "util/hashing.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
 #include "util/spsc_blocking_ringbuffer.hpp"
@@ -22,8 +21,6 @@
 #include "util/sys/proc.hpp"
 #include "util/sys/process.hpp"
 #include "util/sys/subprocess.hpp"
-#include "util/sys/terminator.hpp"
-#include "util/sys/threading.hpp"
 #include "util/sys/tmpdir.hpp"
 
 class TrustedCheckerProcessAdapter {
@@ -52,6 +49,9 @@ private:
     bool _error_reported {false};
     int _revision {-1};
 
+    bool _incremental;
+    float _memory_factor;
+
 public:
     struct TrustedCheckerProcessSetup {
         Logger& logger;
@@ -60,12 +60,16 @@ public:
         int jobId;
         int globalSolverId;
         int localSolverId;
+        int origNumVars;
         bool checkModel;
+        bool incremental;
+        float memoryFactor;
     };
     TrustedCheckerProcessAdapter(TrustedCheckerProcessSetup& setup) :
             _base_seed(setup.baseSeed), _logger(setup.logger), _job_id(setup.jobId),
             _solver_id(setup.globalSolverId), _check_model(setup.checkModel),
-            _id_suffix(setup.idSuffix), _op_queue(1<<14) {}
+            _id_suffix(setup.idSuffix), _op_queue(1<<14), _incremental(setup.incremental),
+            _memory_factor(setup.memoryFactor) {}
 
     ~TrustedCheckerProcessAdapter() {
         if (!_f_directives) return;
@@ -94,8 +98,14 @@ public:
             + " -directives=" + _path_directives
             + " -feedback=" + _path_feedback; // + " -lenient";
         if (_check_model) moreArgs += " -check-model";
+        if (!_incremental) {
+            int heapMbs = std::round(_memory_factor * 2048);
+            LOG(V4_VVER, "Set CakeML heap size to %iMB\n", heapMbs);
+            moreArgs += " -heap-mbs=" + std::to_string(heapMbs);
+        }
 
-        _subproc = new Subprocess(params, "impcheck_check", moreArgs, false);
+        std::string executable = ImpCheckProgramLookup::getCheckerExecutablePath(_incremental);
+        _subproc = new Subprocess(params, executable, moreArgs, false);
         _child_pid = _subproc->start();
         assert(_child_pid != getpid());
 
@@ -108,12 +118,19 @@ public:
     inline void submit(LratOp&& op) {
         submit(op);
     }
+
+    inline bool trySubmit(LratOp& op) {
+        if (_op_queue.full()) return false;
+        submit(op);
+        return true;
+    }
+
     inline void submit(LratOp& op) {
         if (!_f_directives) return;
         if (op.isDerivation()) submitProduceClause(op.data.produce);
         else if (op.isImport()) submitImportClause(op.data.import);
         else if (op.isDeletion()) submitDeleteClauses(op.data.remove.hints, op.data.remove.nbHints);
-        else if (op.isBeginLoad()) submitBeginLoad(op.data.beginLoad.sig);
+        else if (op.isBeginLoad()) submitBeginLoad(op.data.beginLoad.nbVars, op.data.beginLoad.sig);
         else if (op.isLoad()) submitLoad(op.data.load.lits, op.data.load.nbLits);
         else if (op.isEndLoad()) submitEndLoad(op.data.endLoad.assumptions, op.data.endLoad.nbAssumptions);
         else if (op.isUnsatValidation()) submitValidateUnsat(op.data.concludeUnsat);
@@ -162,8 +179,9 @@ private:
         _error_reported = true;
     }
 
-    inline void submitBeginLoad(const u8* formulaSignature) {
+    inline void submitBeginLoad(int nbVars, const u8* formulaSignature) {
         writeDirectiveType(TRUSTED_CHK_BEGIN_LOAD);
+        if (!_incremental) _io.writeInt(nbVars, _f_directives);
         _io.writeSignature(formulaSignature, _f_directives);
         UNLOCKED_IO(fflush)(_f_directives);
     }
@@ -172,7 +190,7 @@ private:
             handleError("Begin load not accepted");
             return false;
         }
-        cidx = _io.readUint(_f_feedback);
+        if (_incremental) cidx = _io.readUint(_f_feedback);
         return true;
     }
 
@@ -192,8 +210,10 @@ private:
     inline void submitEndLoad(const int* asmpt, int nbAsmpt) {
         if (_buflen_lits > 0) flushLiteralBuffer();
         writeDirectiveType(TRUSTED_CHK_END_LOAD);
-        _io.writeInt(nbAsmpt, _f_directives);
-        _io.writeInts(asmpt, nbAsmpt, _f_directives);
+        if (_incremental) {
+            _io.writeInt(nbAsmpt, _f_directives);
+            _io.writeInts(asmpt, nbAsmpt, _f_directives);
+        }
         UNLOCKED_IO(fflush)(_f_directives);
     }
 
@@ -214,7 +234,7 @@ private:
         }
         if (sig) {
             _io.readSignature(sig, _f_feedback);
-            cidx = _io.readUint(_f_feedback);
+            if (_incremental) cidx = _io.readUint(_f_feedback);
         }
         return true;
     }
@@ -226,7 +246,7 @@ private:
         _io.writeInt(data.nbLits, _f_directives);
         _io.writeInts(data.lits, data.nbLits, _f_directives);
         _io.writeSignature(data.sig, _f_directives);
-        _io.writeUint(data.cidx, _f_directives);
+        if (_incremental) _io.writeUint(data.cidx, _f_directives);
     }
     inline bool acceptImportClause() {
         if (!awaitResponse()) {
@@ -252,9 +272,11 @@ private:
 
     inline void submitValidateUnsat(const LratOp::LratOpData::LratOpDataConcludeUnsat& data) {
         writeDirectiveType(TRUSTED_CHK_VALIDATE_UNSAT);
-        _io.writeUnsignedLong(data.id, _f_directives);
-        _io.writeInt(data.nbFailed, _f_directives);
-        _io.writeInts(data.failed, data.nbFailed, _f_directives);
+        if (_incremental) {
+            _io.writeUnsignedLong(data.id, _f_directives);
+            _io.writeInt(data.nbFailed, _f_directives);
+            _io.writeInts(data.failed, data.nbFailed, _f_directives);
+        }
         UNLOCKED_IO(fflush)(_f_directives);
     }
     inline bool acceptValidateUnsat(u8* sig, u32& cidx) {
@@ -263,8 +285,8 @@ private:
             return false;
         }
         _io.readSignature(sig, _f_feedback);
-        cidx = _io.readUint(_f_feedback);
-        auto str = Logger::dataToHexStr(sig, SIG_SIZE_BYTES);
+        if (_incremental) cidx = _io.readUint(_f_feedback);
+        //auto str = Logger::dataToHexStr(sig, SIG_SIZE_BYTES);
         return true;
     }
 
@@ -281,8 +303,8 @@ private:
             return false;
         }
         _io.readSignature(sig, _f_feedback);
-        cidx = _io.readUint(_f_feedback);
-        auto str = Logger::dataToHexStr(sig, SIG_SIZE_BYTES);
+        if (_incremental) cidx = _io.readUint(_f_feedback);
+        //auto str = Logger::dataToHexStr(sig, SIG_SIZE_BYTES);
         return true;
     }
 

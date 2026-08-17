@@ -2,7 +2,10 @@
 #define _optimizer_hpp_INCLUDED
 
 #include "app/sat/proof/trusted/trusted_utils.hpp"
+#include <vector>
+#if MALLOB_USE_CADICAL
 #include "cadical/src/cadical.hpp"
+#endif
 #include "util/logger.hpp"
 
 #include <atomic>
@@ -14,7 +17,11 @@
 
 using namespace std;
 
-class OptimizingPropagator : public CaDiCaL::ExternalPropagator {
+class OptimizingPropagator 
+#if MALLOB_USE_CADICAL
+: public CaDiCaL::ExternalPropagator 
+#endif
+  {
 
   long long int           obj_cur; // Objective value of the current solution
   long long int           obj_bsf; // Objective value of the best solution found so far
@@ -96,6 +103,7 @@ public:
     delete[] ass_map;
   }
 
+
   int nb_solutions_found() const {return sol_cnt;}
 
   // negative if proven to be optimal
@@ -136,6 +144,7 @@ public:
     return result;
   }
 
+#if MALLOB_USE_CADICAL
   void notify_assignment (const vector<int>& lits) override {
 
     // cerr << "Calling notify_assignment" << endl;
@@ -360,6 +369,8 @@ public:
     }
     return false;
   }
+
+#endif // MALLOB_USE_CADICAL
 };
 
 #endif

@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.11.4)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 project (mallob)
+
+set(CMAKE_FIND_LIBRARY_SUFFIXES ".a" ".lib" ".so" ".dylib")
 
 find_package(MPI REQUIRED)
 
@@ -10,7 +11,29 @@ find_package(Threads REQUIRED)
 set(CMAKE_CXX_STANDARD 17)
 
 
+# Function to add a library dependency to Mallob's core
+function(add_lib_dep depname basedir libdir libname sources)
+    message("* Registering dependency ${depname}")
 
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${basedir}/${libdir}/lib${libname}.a
+        COMMAND bash fetch-and-build.sh
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${basedir}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${basedir}
+        COMMENT "Building dependency ${depname}"
+    )
+    add_custom_target(dep_${depname} DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${basedir}/${libdir}/lib${libname}.a)
+    set(MALLOB_CORE_DEPS ${MALLOB_CORE_DEPS} dep_${depname} CACHE INTERNAL "")
+
+    set(BASE_LINK_DIRS ${BASE_LINK_DIRS} ${basedir}/${libdir} CACHE INTERNAL "")
+    set(MALLOB_CORE_SOURCES ${MALLOB_CORE_SOURCES} ${sources} CACHE INTERNAL "")
+    #set(SAT_SUBPROC_SOURCES ${SAT_SUBPROC_SOURCES} ${sources} CACHE INTERNAL "")
+    set(BASE_LIBS ${BASE_LIBS} ${libname} CACHE INTERNAL "")
+    set(BASE_INCLUDES ${BASE_INCLUDES} ${basedir} CACHE INTERNAL "")
+
+    string(TOUPPER ${depname} depallcaps)
+    add_definitions(-DMALLOB_USE_${depallcaps}=1)
+endfunction()
 
 
 #Testing if march=native helps, but at least in quick laptop test, no, no change
@@ -18,7 +41,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 # Build-specific compile options
 
-set(BASE_LIBS Threads::Threads)
+set(BASE_LIBS Threads::Threads CACHE INTERNAL "")
 set(MY_DEBUG_OPTIONS "-rdynamic -g -ggdb -Wall -Wno-sign-compare -Wno-unused-variable")
 
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
@@ -49,28 +72,8 @@ if(MALLOB_SUBPROC_DISPATCH_PATH)
     add_definitions(-DMALLOB_SUBPROC_DISPATCH_PATH=${MALLOB_SUBPROC_DISPATCH_PATH})
 endif()
 
-if(DEFINED MALLOB_TRUSTED_SUBPROCESSING)
-    add_definitions(-DMALLOB_TRUSTED_SUBPROCESSING=${MALLOB_TRUSTED_SUBPROCESSING})
-endif()
-
 if(MALLOB_USE_ASAN)
     set(MY_DEBUG_OPTIONS "${MY_DEBUG_OPTIONS} -fno-omit-frame-pointer -fsanitize=address,leak,undefined -static-libasan") 
-endif()
-
-if(MALLOB_USE_TBBMALLOC)
-    set(BASE_LIBS tbbmalloc_proxy ${BASE_LIBS})
-endif()
-
-if(MALLOB_USE_JEMALLOC)
-    if(MALLOB_JEMALLOC_DIR)
-        link_directories(${MALLOB_JEMALLOC_DIR})
-    endif()
-    set(BASE_LIBS jemalloc ${BASE_LIBS})
-endif()
-
-# Default application
-if(NOT DEFINED MALLOB_APP_SAT)
-    set(MALLOB_APP_SAT 1)
 endif()
 
 
@@ -83,11 +86,26 @@ set(BASE_INCLUDES src src/util/tsl lib
     ${MPI_C_INCLUDE_PATH} ${MPI_C_INCLUDE_DIRS} ${MPI_CXX_INCLUDE_PATH} ${MPI_CXX_INCLUDE_DIRS}
     CACHE INTERNAL "")
 set(BASE_COMPILEFLAGS CACHE INTERNAL "")
+set(MALLOB_CORE_DEPS CACHE INTERNAL "")
+
+
+# Include jemalloc (enabled by default)
+if(NOT MALLOB_USE_JEMALLOC EQUAL 0)
+    if(MALLOB_JEMALLOC_DIR)
+        # Explicit directory provided - just link to it assuming it exists
+        link_directories(${MALLOB_JEMALLOC_DIR} CACHE INTERNAL "")
+        set(BASE_LIBS jemalloc ${BASE_LIBS} CACHE INTERNAL "")
+    else()
+        # No directory provided - fetch and build in lib/ directory
+        add_lib_dep("jemalloc" lib/jemalloc lib/ jemalloc "")
+    endif()
+endif()
 
 
 # Base source files
 
 set(MALLOB_CORE_SOURCES
+    src/app/app_registry.cpp
     src/data/app_configuration.cpp src/data/job_description.cpp src/data/job_result.cpp src/interface/json_interface.cpp
     src/interface/api/api_connector.cpp src/interface/api/api_registry.cpp src/scheduling/core_allocator.cpp
     src/util/logger.cpp src/util/option.cpp src/util/params.cpp src/util/permutation.cpp 
@@ -109,10 +127,10 @@ set(MALLOB_COREPLUSCOMM_SOURCES ${MALLOB_CORE_SOURCES}
 #message("mallob CORE+COMM sources pre application registration: ${MALLOB_COREPLUSCOMM_SOURCES}")
 
 
-# Define test function
 
+# Function to add a unit test
 function(new_test testname includes linklibs)
-    message("Adding test: ${testname}")
+    message("* Adding test: ${testname}")
     add_executable(test_${testname} src/test/test_${testname}.cpp)
     target_include_directories(test_${testname} PRIVATE ${includes})
     target_compile_options(test_${testname} PRIVATE ${BASE_COMPILEFLAGS})
@@ -121,6 +139,7 @@ function(new_test testname includes linklibs)
     endforeach()
     add_test(NAME test_${testname} COMMAND test_${testname})
 endfunction()
+
 
 
 # Add application-specific build configuration
@@ -153,39 +172,35 @@ endfunction()
 
 # Include applications
 register_mallob_app("dummy") # always register the "no-op" application
-if(MALLOB_APP_KMEANS)
-    register_mallob_app("kmeans")
+if(NOT MALLOB_APP_SAT EQUAL 0) # included by default
+register_mallob_app("sat")
 endif()
-if(MALLOB_APP_SAT) 
-    register_mallob_app("sat")
+if(NOT MALLOB_APP_INCSAT EQUAL 0) # included by default
+register_mallob_app("incsat")
 endif()
-if(MALLOB_APP_INCSAT)
-    register_mallob_app("incsat")
+if(NOT MALLOB_APP_SATWITHPRE EQUAL 0) # included by default
+register_mallob_app("satwithpre")
 endif()
-if(MALLOB_APP_MAXSAT)
+if(NOT MALLOB_APP_PALRUPCHECK EQUAL 0) # included by default
+register_mallob_app("palrupcheck")
+endif()
+if(NOT MALLOB_APP_MAXSAT EQUAL 0) # included by default
 register_mallob_app("maxsat")
 endif()
-if(MALLOB_APP_SMT)
-    register_mallob_app("smt")
+if(NOT MALLOB_APP_SMT EQUAL 0) # included by default
+register_mallob_app("smt")
 endif()
-if(MALLOB_APP_SATWITHPRE)
-    register_mallob_app("satwithpre")
+if(MALLOB_APP_SATCNC EQUAL 1)
+register_mallob_app("satcnc")
 endif()
-if(MALLOB_APP_SATCNC)
-    register_mallob_app("satcnc")
+if(MALLOB_APP_KMEANS EQUAL 1)
+    register_mallob_app("kmeans")
 endif()
-# Include further applications here:
-#if(MALLOB_APP_YOURAPP)
-#    register_mallob_app("yourapp")
-#endif()
-# ...
-
-if(MALLOB_APP_SWEEP)
+if(MALLOB_APP_SWEEP EQUAL 1)
     register_mallob_app("sweep")
 endif()
 
-
-
+# Include further applications here, above publish_app_registry_changes()
 publish_app_registry_changes()
 
 
@@ -197,7 +212,9 @@ target_include_directories(mallob_core PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob_core PRIVATE ${BASE_COMPILEFLAGS})
 target_link_libraries(mallob_core ${BASE_LIBS})
 target_link_directories(mallob_core PUBLIC ${BASE_LINK_DIRS})
-
+if (DEFINED MALLOB_CORE_DEPS AND NOT MALLOB_CORE_DEPS STREQUAL "")
+    add_dependencies(mallob_core ${MALLOB_CORE_DEPS})
+endif()
 
 # Library of Mallob's CORE+COMM sources
 
@@ -205,7 +222,7 @@ target_link_directories(mallob_core PUBLIC ${BASE_LINK_DIRS})
 add_library(mallob_corepluscomm STATIC ${MALLOB_COREPLUSCOMM_SOURCES})
 target_include_directories(mallob_corepluscomm PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob_corepluscomm PRIVATE ${BASE_COMPILEFLAGS})
-target_link_libraries(mallob_corepluscomm ${MPI_CXX_LIBRARIES} ${MPI_CXX_LINK_FLAGS} MPI::MPI_CXX mallob_core ${BASE_LIBS})
+target_link_libraries(mallob_corepluscomm ${MPI_CXX_LIBRARIES} ${MPI_CXX_LINK_FLAGS} mallob_core ${BASE_LIBS})
 target_link_directories(mallob_corepluscomm PUBLIC ${BASE_LINK_DIRS})
 
 
@@ -215,7 +232,7 @@ target_link_directories(mallob_corepluscomm PUBLIC ${BASE_LINK_DIRS})
 add_executable(mallob src/core/client.cpp src/core/worker.cpp src/main.cpp)
 target_include_directories(mallob PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob PRIVATE ${BASE_COMPILEFLAGS})
-target_link_libraries(mallob MPI::MPI_CXX mallob_corepluscomm)
+target_link_libraries(mallob mallob_corepluscomm)
 
 # Mallob process dispatcher
 add_executable(mallob_process_dispatcher src/app/sat/main_dispatch.cpp)

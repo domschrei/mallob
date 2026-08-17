@@ -114,12 +114,11 @@ public:
 	void addLiteral(int lit) override;
 
 	void diversify(int seed) override;
+	void addConfigurationSetting(Setting setting) override;
 	void setPhase(const int var, const bool phase) override;
 
 	// Solve the formula with a given set of assumptions
 	SatResult solve(size_t numAssumptions, const int* assumptions) override;
-
-	void configureBoundedVariableAddition();
 
 	void setSolverInterrupt() override;
 	void unsetSolverInterrupt() override;
@@ -129,8 +128,7 @@ public:
 
 	// Set a function that should be called for each learned clause
 	void setLearnedClauseCallback(const LearnedClauseCallback& callback) override;
-
-
+	
 	// Get the number of variables of the formula
 	int getVariablesCount() override;
 
@@ -150,7 +148,6 @@ public:
 	void reconstructSolutionFromPreprocessing(std::vector<int>& model);
 
     friend void produce_clause(void* state, int size, int glue);
-    // friend void consume_clause(void* state, int** clause, int* size, int* lbd);
     friend void consume_clause(void* state, int** clause, int* size, int* lbd, unsigned long* id, unsigned char* sig);
 	friend void on_drup_derivation(void* state, const int* lits, int nbLits, int glue);
     friend void on_lrup_import(void* state, unsigned long id, const int* lits, int nbLits, const uint8_t* sigData);
@@ -182,8 +179,7 @@ public:
 
 private:
     void produceClause(int size, int lbd);
-    // void consumeClause(int** clause, int* size, int* lbd);
-	void consumeClause(int** clause, int* size, int* lbd, unsigned long* id, unsigned char* sig);
+    void consumeClause(int** clause, int* size, int* lbd, unsigned long* id, unsigned char* sig);
 	void processProofLine(LratOp&& op);
 
 	void sweepSetFormulaReportCallback();

@@ -8,6 +8,7 @@
 
 #include "app/app_message_subscription.hpp"
 #include "app/sat/job/sat_process_config_builder.hpp"
+#include "app/sat/proof/palrup_caller.hpp"
 #include "data/job_interrupt_reason.hpp"
 #include "interface/api/api_registry.hpp"
 #include "scheduling/core_allocator.hpp"

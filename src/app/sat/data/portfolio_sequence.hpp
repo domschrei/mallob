@@ -13,8 +13,8 @@ struct PortfolioSequence {
         LINGELING = 'l',
         GLUCOSE = 'g',
         MERGESAT = 'm',
+        MINISAT = 'n',
         PREPROCESSOR = 'p',
-        VARIABLE_ADDITION = 'v'
     };
     enum Flavour {
         DEFAULT, SAT, UNSAT, PLAIN, PREPROCESS, PLAINWSWEEP
@@ -92,8 +92,8 @@ private:
             case 'm':
                 next.baseSolver = MERGESAT;
                 break;
-            case 'v':
-                next.baseSolver = VARIABLE_ADDITION;
+            case 'n':
+                next.baseSolver = MINISAT;
                 break;
             case 'p':
                 next.baseSolver = PREPROCESSOR;

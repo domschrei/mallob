@@ -70,7 +70,8 @@ PortfolioSolverInterface::PortfolioSolverInterface(const SolverSetup& setup)
 		bool createModelCheckingLratConn = _setup.onTheFlyCheckModel && !_setup.modelCheckingLratConnector;
 		TrustedCheckerProcessAdapter::TrustedCheckerProcessSetup chkSetup {
 			_logger, _setup.jobname, _setup.baseSeed, _setup.jobId,
-			_setup.globalId, _setup.localId, true
+			_setup.globalId, _setup.localId, _setup.numVars,
+			true, _setup.incrementalImpCheck, _setup.memoryFactor
 		};
 		// Does this thread in particular run in certified UNSAT mode?
 		if (_setup.onTheFlyChecking) {

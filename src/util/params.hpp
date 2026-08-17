@@ -20,7 +20,6 @@ public:
 	void init(const std::vector<std::string>& args);
 	void expand();
 
-	void printBanner() const;
 	void printUsage() const;
 	std::string getParamsAsString() const;
 	std::vector<std::string> getParamsAsStringList() const;

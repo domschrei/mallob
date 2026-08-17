@@ -3,6 +3,7 @@
 
 #include "app/incsat/inc_sat_controller.hpp"
 #include "app/sat/data/definitions.hpp"
+#include "app/sat/solvers/cadical.hpp"
 #include "core/dtask_tracker.hpp"
 #include "data/job_description.hpp"
 #include "data/job_result.hpp"

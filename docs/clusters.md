@@ -12,7 +12,7 @@ First you need to set up a SOCKS5 proxy at your local host. Here we show an exam
     
     apt install proxychains openssh-sever
 
-Next locate the proxychains.conf file and add ``socks5  127.0.0.1       1537`` as a new line. It is usually located at either ``/etc/proxychains.conf`` or ``/usr/local/proxychains.conf``.
+Next locate the proxychains.conf file and add ``socks5  127.0.0.1       1537`` as a new line. It is usually located at either ``/etc/proxychains.conf`` or ``/usr/local/etc/proxychains.conf``.
 
     [ProxyList]
     # add proxy here ...
@@ -62,10 +62,10 @@ Commands like `git`, `wget`, and `curl` should now be able to download content o
 
 In case the above http(s) entries dont work, an attempt can be to explicitly include the SOCKS5 standard. Most probably wget will no longer work with this more explicit naming, but curl should still work.
     
-    export HTTP_PROXY="socks5://localhost:1537"
-    export http_proxy="socks5://localhost:1537"
-    export HTTPS_PROXY="socks5://localhost:1537"
-    export https_proxy="socks5://localhost:1537"
+    export HTTP_PROXY="socks5h://localhost:1537"
+    export http_proxy="socks5h://localhost:1537"
+    export HTTPS_PROXY="socks5h://localhost:1537"
+    export https_proxy="socks5h://localhost:1537"
 and
 
     [https]
@@ -101,12 +101,7 @@ Login to the cluster. First load the modules necessary for building, like this:
 
 In the `mallob` directory with all dependencies fetched, you can build Mallob like this:
 
-    ( cd lib && bash fetch_and_build_solvers.sh kcly )
-    mkdir -p build
-    cd build
-    CC=$(which mpicc) CXX=$(which mpicxx) cmake -DMALLOB_USE_JEMALLOC=0 ${OPTIONS} ..
-    VERBOSE=1 make -j 8
-    cd ..
+    CC=$(which mpicc) CXX=$(which mpicxx) bash scripts/setup/cmake-make.sh build ${OPTIONS}
 
 Set `${OPTIONS}` to the build options you desire.
 
@@ -122,16 +117,16 @@ Under `scripts/slurm/`, you find some scripts allowing to chain jobs together. E
 
 The workflow is as follows:
 
-* Adjust the files `scripts/slurm/run-sat-chained.sh` and `scripts/slurm/postrun.sh` to your liking, especially at the places marked with `TODO`.
+* Adjust the file `scripts/slurm/sbatch.sh` (and potentially `scripts/slurm/postrun.sh`) to your liking, especially at the places marked with `TODO`.
 
 * Generate the sbatch files as in the following example command (the last argument is the number of concurrent chains and must be smaller than the maximum number of allowed concurrent jobs per user at your cluster):
 
-    `DS_NODES=4 DS_RUNTIME=360 DS_PARTITION=micro DS_SECONDSPERJOB=300 scripts/slurm/generate-job-chain.sh \
-    sat-profiling-newplain-4nodes scripts/slurm/run-sat-chained.sh 1 500 45` 
+    `DS_NODES=4 DS_RUNTIME=720 DS_PARTITION=micro DS_SECONDSPERJOB=300 scripts/slurm/generate-job-chain.sh \
+    sat-profiling-newplain-4nodes scripts/slurm/sbatch.sh 1 500 45`
 
 * Execute the command output by the previous command, then wait until all jobs have been executed.
 
-* Execute `scripts/slurm/postrun.sh` to merge together all log directories into a single lob directory.
+* Execute `scripts/slurm/postrun.sh sat-profiling-newplain-4nodes` to merge together all log directories into a single lob directory.
 
 * Postprocess the logs in the output destination directory to your liking.
 

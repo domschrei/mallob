@@ -284,7 +284,7 @@ private:
             // also erase each such clause from the filter table
             cdb.setClauseDeletionCallback([&](Mallob::Clause& cls) {
                 ProducedClauseCandidate pcc(cls.begin, cls.size, cls.lbd, 0, epoch);
-                _filter->erase(pcc);
+                _filter->erase(std::move(pcc));
             });
 
             // Iterate over all clauses to be added
@@ -311,7 +311,7 @@ private:
                     if (accepted) {
                         numAccepted++;
                     } else {
-                        _filter->erase(pcc);
+                        _filter->erase(std::move(pcc));
                     }
                 }
                 numTotal++;

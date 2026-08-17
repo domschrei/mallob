@@ -21,6 +21,10 @@ public:
     static bool isRegularFile(const std::string& file);
     static bool isDirectory(const std::string& dirpath);
 
+    static std::string getWorkingDirectory();
+    static std::string getAbsoluteFilePath(const std::string& path);
+    static std::string getDirectory(const std::string& filePath);
+
     static std::vector<std::string> glob(const std::string& pattern);
 };
 

@@ -294,14 +294,15 @@ private:
                 _instance_id, _num_total_skipped_lines, _max_epoch_with_skipped_lines,
                 frontierContent.size(), StringUtils::getSummary(frontierContent, 100).c_str(),
                 backlogContent.size(), StringUtils::getSummary(backlogContent, 100).c_str());
+            _log.flush();
 
             // -- the proof file must have been read completely
             assert(!_current_line.valid());
             assert(!_parser.getNextLine(_current_line));
 
             // -- there may not be any underived clauses left
-            assert(_frontier.empty());
-            assert(_backlog.empty());
+            assert(frontierContent.empty());
+            assert(backlogContent.empty());
 
             if (_interleave_merging) {
 

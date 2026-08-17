@@ -51,6 +51,7 @@ public:
 
     static float getUptime();
 
+    static void closeAllFileDescriptors();
 };
 
 #endif
