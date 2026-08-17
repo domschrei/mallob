@@ -231,12 +231,12 @@ private:
             abort();
         }
 
-        factory.reset(); // cleans up any dangling solvers
-
         if (smtOutFileSet) delete out;
 
         _result.id = _desc.getId();
         _result.revision = 0;
         _result.result = success ? 20 : 0;
+
+        factory.reset(); // cleans up any dangling solvers
     }
 };
