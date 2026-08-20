@@ -1,0 +1,6 @@
+#!/bin/bash
+
+proof_dir="proofs"
+
+echo "-pre-cleanup=1 -v=2 -satsolver=c
+ -palrup=1 -proof-dir=$proof_dir -palrup-binary=1"
