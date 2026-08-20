@@ -67,18 +67,35 @@ void register_mallob_app_palrupcheck() {
 
     entry.cleaner = [](const Parameters& params) {
         if (!params.palRupCheckWorkdir().empty()) {
-            for (auto file : FileUtils::glob(params.palRupCheckWorkdir())) {
-                FileUtils::rmrf(file);
-            }
+            // Remove all files created by previous checker and directories if empty
+            FileUtils::rmrf(params.palRupCheckWorkdir() + "/.cleanup");
+            FileUtils::rmrf(params.palRupCheckWorkdir() + "/.unsat_found");
+            for (auto file : FileUtils::glob(params.palRupCheckWorkdir() + "/*/*/.check_ok"))
+                FileUtils::rm(file);
+            for (auto file : FileUtils::glob(params.palRupCheckWorkdir() + "/*/*/.done"))
+                FileUtils::rm(file);
+            for (auto file : FileUtils::glob(params.palRupCheckWorkdir() + "/*/*/.valid"))
+                FileUtils::rm(file);
+            for (auto file : FileUtils::glob(params.palRupCheckWorkdir() + "/*/*/out.palrup_import"))
+                FileUtils::rm(file);
+            for (auto file : FileUtils::glob(params.palRupCheckWorkdir() + "/*/*/out.palrup_proxy"))
+                FileUtils::rm(file);
+            for (auto file : FileUtils::glob(params.palRupCheckWorkdir() + "/*/*"))
+                if (FileUtils::isDirectory(file))
+                    FileUtils::rm(file);
+            for (auto file : FileUtils::glob(params.palRupCheckWorkdir() + "/*"))
+                if (FileUtils::isDirectory(file))    
+                    FileUtils::rm(file);
+
+            FileUtils::rm(params.palRupCheckWorkdir());
         }
+
         if (!params.logDirectory().empty()) {
             FileUtils::rmrf(params.logDirectory() + "/pals");
-            for (auto file : FileUtils::glob(params.logDirectory() + "/*.palrup")) {
+            for (auto file : FileUtils::glob(params.logDirectory() + "/*.palrup"))
                 FileUtils::rmrf(file);
-            }
-            for (auto file : FileUtils::glob(params.logDirectory() + "/*/palrup.out")) {
+            for (auto file : FileUtils::glob(params.logDirectory() + "/*/palrup.out"))
                 FileUtils::rmrf(file);
-            }
         }
     };
 
