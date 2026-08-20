@@ -48,7 +48,7 @@ fi
 # Environment variables for mpirun
 export RDMAV_FORK_SAFE=1
 
-cmd="mpirun $mpioptions build/mallob -t=$nb_threads $@"
+cmd="mpirun $mpioptions build/mallob -t=$nb_threads -rpa=1 -pph=$nb_procs $@"
 echo "c Running command:"
 echo "c   $cmd"
 $cmd
