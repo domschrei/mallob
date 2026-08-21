@@ -12,7 +12,6 @@
 #include "util/params.hpp"
 #include "util/spsc_blocking_ringbuffer.hpp"
 #include "util/sys/thread_pool.hpp"
-#include "util/sys/threading.hpp"
 
 class BitwuzllobSatSolverFactory : public bitwuzla::SatSolverFactory {
 private:
