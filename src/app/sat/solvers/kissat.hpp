@@ -89,11 +89,6 @@ private:
 	struct shweep_statistics sweep_stats;
 	//##################################################################################################
 
-
-
-
-
-
 	bool interruptionInitialized = false;
     bool interrupted = false;
     unsigned int glueLimit;
@@ -163,17 +158,10 @@ public:
 	//Shared Sweeping / SWEEP App
 	friend void sweep_export_eq(void *state);
 	friend void sweep_export_unit(void *state, int unit);
-	// friend void sweep_import_eqs(void* state, int** equivalences, int *eqs_size);
-	// friend void sweep_import_units(void *state, int **units, int *unit_count);
-	// void sweepSetReportingPtr(std::shared_ptr<std::atomic<int>> field);
 	void setToSweeper();
-	// void triggerSweepTerminate();
 	void triggerSweepTerminate();
 	void setRepresentativeLocalId(int localId);
-	// bool hasReportedSweepDimacs() const;
-	// shweep_statistics getSweepStats();
 
-	//Pass-through
 	bool set_option(const std::string &option_name, int value);
 
 
@@ -195,11 +183,7 @@ private:
 	void sweepExportUnit(int eunit);
 	void sweepImportEqs(int** equivalences, int *eqs_size);
 	void sweepImportUnits(int **units, int *unit_count);
-    // void addLiteralToShweepJob(int lit);
 
 	void sweepSetExportCallbacks();
-	// void shweepSetWorkstealingCallback(void* SweepJob_state, void (*search_callback)(void *SweepJob_state, unsigned **work, int *work_size, int local_id));
-
-	// void startSweepAppCallback();
 
 };

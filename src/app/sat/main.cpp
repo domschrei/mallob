@@ -62,8 +62,6 @@ int main(int argc, char *argv[]) {
     pid_t pid = Proc::getPid();
     LOG(V3_VERB, "Mallob SAT engine %s pid=%lu\n", MALLOB_VERSION, pid);
 
-    LOG(V1_WARN, "Starting SAT app\n");
-
     try {
         // Launch program
         SatProcess p(params, config, Logger::getMainInstance());

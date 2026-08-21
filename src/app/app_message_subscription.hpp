@@ -40,7 +40,6 @@ public:
         // and also unique within this process
         _ctx_id = _running_ctx_id * MyMpi::size(MPI_COMM_WORLD) + MyMpi::rank(MPI_COMM_WORLD);
         _running_ctx_id++;
-        LOG(V3_VERB, "APP JOB New _ctx_id %i for job_id %i\n", _ctx_id, _id);
         registerListenerInTable(listener);
     }
 

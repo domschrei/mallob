@@ -145,7 +145,6 @@ SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm,
     // Initialize conditional callbacks
     MyMpi::getMessageQueue().initializeConditionalCallbacks(MSG_JOB_TREE_MODULAR_REDUCE);
     MyMpi::getMessageQueue().initializeConditionalCallbacks(MSG_JOB_TREE_MODULAR_BROADCAST);
-    MyMpi::getMessageQueue().initializeConditionalCallbacks(MSG_JOB_TREE_PARENT_IS_READY); //ßß
 }
 
 RequestMatcher* SchedulingManager::createRequestMatcher() {
@@ -183,16 +182,13 @@ void SchedulingManager::execute(Job& job, int source) {
         // Restart job
         job.resume();
     }
-    LOG(V5_DEBG, "STARTED %s (#%i) \n", job.toStr(), job.getId());
 
     int demand = job.getDemand();
     _balancer.onActivate(job, demand);
     job.setLastDemand(demand);
 
-    LOG(V5_DEBG, "Looping through post-execution hooks for job #%i \n", job.getId());
     // execute post-execution hooks once, then delete them
     if (_job_execution_hooks.count(jobId)) {
-        LOG(V5_DEBG, "Execute %i post-execution hooks for job #%i \n", _job_execution_hooks.count(jobId), job.getId());
         auto funs = std::move(_job_execution_hooks[jobId]);
         _job_execution_hooks.erase(jobId);
         for (auto& fun : funs) fun();
@@ -525,20 +521,13 @@ void SchedulingManager::handleAnswerToAdoptionOffer(MessageHandle& handle) {
     assert(has(jobId));
     Job& job = get(jobId);
 
-    LOG(V4_VVER, "Adoption offer on job id %i  \n", jobId);
-
     if (accepted) {
         // Adoption offer accepted
     
-        LOG(V4_VVER, "Adoption offer on job id %i accepted. Volume %i \n", jobId, job.getVolume());
         // Check and apply (if possible) the job's current volume
         initiateVolumeUpdate(job);
-
-        LOG(V4_VVER, "Updated volume: %i \n", job.getVolume());
-
         if (!job.hasCommitment()) {
             // Job shrunk: Commitment cancelled, abort job adoption
-            LOG(V4_VVER, "Commitment cancelled, job shrunk \n", jobId);
             return;
         }
 
@@ -548,7 +537,6 @@ void SchedulingManager::handleAnswerToAdoptionOffer(MessageHandle& handle) {
         int missingRev;
         if (job.hasDescription() && (job.hasAllDescriptionsForSolving(missingRev) || missingRev > 0)) {
             // At least the initial description is present: Begin to execute job
-            LOG(V4_VVER, "Job State: %s \n", job.jobStateToStr());
             if (job.getState() == SUSPENDED) {
                 resume(job, req, handle.source);
             } else {
@@ -561,7 +549,6 @@ void SchedulingManager::handleAnswerToAdoptionOffer(MessageHandle& handle) {
         LOG_ADD_SRC(V4_VVER, "Rejected to become %s : uncommitting", handle.source, job.toStr());
         uncommit(job, /*leaving=*/true);
     }
-    LOG(V4_VVER, "Job %i (%s) exit handle adoption offer\n", jobId, job.toStr());
 }
 
 void SchedulingManager::handleIncomingJobDescription(MessageHandle& handle, bool deployNewRevision) {
@@ -680,16 +667,8 @@ void SchedulingManager::handleJobInterruption(MessageHandle& handle) {
     int rev = vec[1];
     JobInterruptReason reason = static_cast<JobInterruptReason>(vec[2]);
 
-    LOG(V3_VERB, "Got Interruption msg for job #%i, rev %i \n", jobId, rev);
-
     if (!has(jobId) || get(jobId).getState() != ACTIVE || get(jobId).getRevision() < rev) {
         // defer message until the job is ACTIVE in revision "rev"
-        LOG(V3_VERB, "Defer interrupt message for job #%i \n", jobId);
-        //careful: when logging only do second test if first test succeeds, otherwise segfault!
-        // if (!has(jobId)) LOG(V3_VERB, " defer because: has(jobId) == %i \n", has(jobId));
-        // if (get(jobId).getState() != ACTIVE) LOG(V3_VERB, " defer because: get(jobId).getState() == %s \n", JOB_STATE_STRINGS[(int)get(jobId).getState()]);
-        // if (get(jobId).getRevision() < rev) LOG(V3_VERB, " defer because: get(jobId).getRevision() == %i < rev == %i \n", get(jobId).getRevision(), rev);
-
         _job_execution_hooks[jobId].push_back([&, h = std::move(handle)]() mutable {
             LOG(V4_VVER, "#%i post-exec hook : interrupt\n", Serializable::get<IntVec>(h.getRecvData())[0]);
             handleJobInterruption(h);
@@ -1225,7 +1204,6 @@ void SchedulingManager::resume(Job& job, const JobRequest& req, int source) {
     job.resume();
 
     int demand = job.getDemand();
-    LOG(V4_VVER, "demand after resume = %i \n", demand);
     _balancer.onActivate(job, demand);
     job.setLastDemand(demand);
 }
@@ -1258,7 +1236,6 @@ void SchedulingManager::terminate(Job& job) {
 
 void SchedulingManager::interruptJob(int jobId, bool doTerminate, bool reckless) {
 
-    LOG(V4_VVER, "Interrupt Job #%i \n", jobId);
     int msgTag;
     if (doTerminate && reckless) msgTag = MSG_NOTIFY_JOB_ABORTING;
     else if (doTerminate) msgTag = MSG_NOTIFY_JOB_TERMINATING;
@@ -1357,27 +1334,18 @@ void SchedulingManager::triggerMemoryPanic() {
 
 SchedulingManager::~SchedulingManager() {
 
-    LOG(V4_VVER, "SchedulingManager: enter destructor\n");
     // Suspend current job (if applicable) to compute last slice of busy time
     if (_job_registry.hasActiveJob()) 
         setLoad(0, _job_registry.getActive().getId());
 
     // Setup a watchdog to get feedback on hanging destructors
     Watchdog watchdog(/*enabled=*/_params.watchdog(), /*checkIntervMillis=*/300, false);
-    watchdog.setWarningPeriod(1000);
-    watchdog.setAbortPeriod(10*1000);
-    
+
     // Forget each job, move raw pointer to destruct queue
     for (int jobId : _job_registry.collectAllJobs()) {
         eraseJobAndQueueForDeletion(get(jobId));
-        LOG(V4_VVER, "SchedulingManager: jobid %i to destruct queue \n", jobId);
         watchdog.reset();
     }
-    // For the corner case where a new job gets created during the below loop,
-    // we allow the job registry to clean it up immediately regardless of the
-    // job cache size and the job's age.
-    _job_registry.setTerminating();
-
     // For the corner case where a new job gets created during the below loop,
     // we allow the job registry to clean it up immediately regardless of the
     // job cache size and the job's age.
@@ -1389,7 +1357,6 @@ SchedulingManager::~SchedulingManager() {
     // (otherwise we might prevent another node from terminating).
     auto& q = MyMpi::getMessageQueue();
     while (_job_registry.hasJobsLeftToDelete() || q.hasOpenSends() || q.hasOpenRecvFragments()) {
-        LOG(V4_VVER, "SchedulingManager: loop destruct queue \n");
         q.advance();
         checkOldJobs();
         forgetOldJobs();

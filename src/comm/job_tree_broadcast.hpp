@@ -36,7 +36,7 @@ public:
         _job_id(jobId), _tree(tree), _internal_msg_tag(internalMsgTag),
         _sub_broadcast(MSG_JOB_TREE_MODULAR_BROADCAST, [&](MessageHandle& h) {return receiveMessage(h);}) {
         _cb = callback;
-        //The default callback is digestBroadcast()
+        //for example, when coming from collectives_example_job.hpp, the callback is 'digestBroadcast()'
     }
 
     void broadcast(JobMessage&& msg, bool rootOfBcast = true) {
@@ -47,9 +47,7 @@ public:
         assert(_internal_msg_tag == -1 || _msg.tag == _internal_msg_tag);
         _internal_msg_tag = _msg.tag;
 
-        // LOG(V4_VVER, "BCAST in broadcast(). isRoot? %i _received_broadcast? %i \n", rootOfBcast, _received_broadcast);
-
-        // LOG(V4_VVER, "BCAST ping received \n");
+        LOG(V2_INFO, "received broadcast\n");
         _received_broadcast = true;
 
         assert(!_msg.returnedToSender);
@@ -66,8 +64,8 @@ public:
 
             _tree.sendToParent(_msg, MSG_JOB_TREE_MODULAR_BROADCAST);
         }
-
-        if (hasResult()) _cb(); // execute the provided callback. In case of SweepJob it is SweepJob::cbContributeToAllReduce()
+        // execute the provided callback. When used in SweepJob, it's SweepJob::cbContributeToAllReduce()
+        if (hasResult()) _cb();
     }
 
     void updateJobTree(const JobTree& tree) {
@@ -97,7 +95,6 @@ public:
 
 private:
     bool receiveMessage(MessageHandle& h) {
-        //received on MSG_JOB_TREE_MODULAR_BROADCAST mpiTag (via _sub_broadcast(...))
         JobMessage msg = Serializable::get<JobMessage>(h.getRecvData());
 
         LOG(VERB_BCAST, "BCAST [%i] <-- [%i] rcvd \n", _tree.nodeRank, h.source);
@@ -108,7 +105,6 @@ private:
         // Undeliverable message being returned?
         if (msg.returnedToSender) {
             // prune child
-            LOG(V3_VERB, "BCAST [%i] got returnedToSender <--- [%i]\n", _tree.nodeRank, h.source);
             if (h.source == _tree.leftChildNodeRank) {
                 assert(_tree.nbChildren>0 || log_return_false("ERROR JobTreeBroadcast: Left child [%i] should be pruned, but _tree.nbChildren already %i", _tree.leftChildNodeRank, _tree.nbChildren));
                 _tree.leftChildNodeRank = -1;
@@ -129,7 +125,6 @@ private:
             LOG(VERB_BCAST, "BCAST [%i] <-- [%i] child response (either [%i],[%i])\n",
                 _tree.nodeRank, h.source, _tree.leftChildNodeRank, _tree.rightChildNodeRank);
         }
-
         // Response from child?
         if (_received_broadcast && h.source == _tree.leftChildNodeRank) {
             _received_response_left = true;
@@ -143,7 +138,6 @@ private:
         }
 
         // Advance broadcast
-
         broadcast(std::move(msg), false);
         return true;
     }

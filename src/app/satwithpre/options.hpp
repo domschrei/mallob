@@ -15,7 +15,6 @@ OPT_INT(preprocessBalancing, "pb", "preprocess-balancing", 1, -1, 2, "How to bal
 OPT_FLOAT(preprocessJobPriority, "pjp", "preprocess-job-priority", LARGE_INT, 0.0001f, LARGE_INT, "Job priority to assign to preprocessed task")
 OPT_FLOAT(preprocessSweepPriority, "psp", "preprocess-sweep-priority", 1.001f, 0.0001f, LARGE_INT, "Job priority for the SWEEP job, running parallel to the Base SAT Job during preprocessing. Default 1.000f is a 50/50 ressource split")
 OPT_FLOAT(preprocessExpansionFactor, "pef", "preprocess-expansion-factor", 1.f, 0.0001f, LARGE_INT, "Expand preprocessed task over -pef times the task's running time up to that point")
-OPT_BOOL(preprocessLingeling, "pl", "preprocess-lingeling", true, "Additionally run Lingeling as a preprocessor")
 OPT_STRING(overrideSatOptions, "oso", "override-sat-options", "",
     "In each distributed SAT sub-task, override the SAT solver process configuration with these Mallob options")
 
@@ -25,11 +24,6 @@ OPT_BOOL(chainKissatAfterSatsuma, "ckas", "chain-kissat-after", false, "Addition
 #endif
 
 OPT_BOOL(preprocessLingeling, "pl", "preprocess-lingeling", false, "Additionally run Lingeling as a preprocessor")
-OPT_BOOL(terminateAbruptly, "terminate-abruptly", "", false, "Upon termination, avoid waiting for preprocessors to finish")
-OPT_BOOL(preprocessSweep, "preprocess-sweep", "", false, "run the SWEEP app after the initial sequential kissat preprocessing, but still before the full SAT call")
-OPT_BOOL(preprocessSequentialSweepComplete, "pssc", "preprocess-single-sweep-complete", false, "run the single sequential kissat preprocessor with the -sweepcomplete flag, i.e. it sweeps all variables")
-OPT_BOOL(overrideSatOptions, "oso", "override-sat-options", true,
-    "In the SAT sub-tasks, override SAT solving options with \"" + std::string(SATWITHPRE_OPT_OVERRIDES) + "\"")
 OPT_BOOL(snsOverrideSatOptions, "snsoso", "sns-override-sat-options", true,
     "In the snsSAT sub-tasks, override snsSAT solving options with \"" + std::string(SATWITHPRE_OPT_SNS_OVERRIDES) + "\"")
-OPT_BOOL(preprocessSweepnSat, "preprocess-sweepnsat", "", false, "run concurrently two Apps (Sweep and Sat) with cross job units and equivalence sharing")
+OPT_BOOL(preprocessSweepnSat, "preprocess-sweepnsat", "", false, "run concurrently two Apps (Sweep and Sat) with cross job unit- and equivalence-sharing")

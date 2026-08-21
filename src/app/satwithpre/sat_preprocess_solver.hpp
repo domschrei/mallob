@@ -140,7 +140,6 @@ public:
     }
 
     JobResult solveViaStreamlining() {
-        LOG(V2_INFO, "SATWP Starting SATWITHPRE app\n");
         _time_of_activation = Timer::elapsedSeconds();
 
         if (_params.preprocessBalancing() >= 0) submitBaseJob();
@@ -237,7 +236,7 @@ private:
             // json["configuration"]["options"] = SATWITHPRE_OPT_SNS_OVERRIDES; //using plain solver type "k_", most important is that it does not delete/rename variables
 
         LOG(V2_INFO, "SATWP Starting SATsns Job: %d Vars\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NV"));
-        LOG(V2_INFO, "SATWP Starting SATsns  Job: %d Clauses\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
+        LOG(V2_INFO, "SATWP Starting SATsns Job: %d Clauses\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
 
         auto copiedJson = json;
         auto result = _api.submit(copiedJson, [&](nlohmann::json& response) {

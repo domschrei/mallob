@@ -121,7 +121,6 @@ bool SatReader::parseAndCompress(JobDescription& desc) {
 
 bool SatReader::parseInternally(JobDescription& desc) {
 
-	LOG(V2_INFO, "SatReader parseInternally\n");
 	_raw_content_mode = desc.getAppConfiguration().map.count("content-mode")
 		&& desc.getAppConfiguration().map.at("content-mode") == "raw";
 
@@ -178,7 +177,6 @@ bool SatReader::parseInternally(JobDescription& desc) {
 		desc.reserveSize(size / sizeof(int));
 		void* mmapped = mmap(0, size, PROT_READ, MAP_PRIVATE, fd, 0);
 
-		LOG(V2_INFO, "SatReader process\n");
 		if (_raw_content_mode) {
 			int* f = (int*) mmapped;
 			for (long i = 0; i < size; i++) {
@@ -197,7 +195,6 @@ bool SatReader::parseInternally(JobDescription& desc) {
 	} else if (_namedpipe != -1) {
 		// Read formula over named pipe
 
-		LOG(V2_INFO, "SatReader read formula over named pipe \n");
 		int iteration = 0;
 		if (_raw_content_mode) {
 			int buffer[1024] = {0};
@@ -227,7 +224,6 @@ bool SatReader::parseInternally(JobDescription& desc) {
 
 	} else {
 		// Read file over pipe
-		LOG(V2_INFO, "SatReader read file over pipe \n");
 		if (_raw_content_mode) {
 			int iteration = 0;
 			int buffer[1024] = {0};
@@ -258,7 +254,6 @@ bool SatReader::parseInternally(JobDescription& desc) {
 
 bool SatReader::read(JobDescription& desc) {
 
-	LOG(V2_INFO, "SatReader start. fsize %i, payloadsize %i\n", desc.getFSize(), desc.getFormulaPayloadSize(0));
 	std::optional<std::future<void>> optFuture;
 	std::vector<int> litsToParse;
 	if (_files.empty()) {
@@ -297,8 +292,6 @@ bool SatReader::read(JobDescription& desc) {
 		_filename = _files.front();
 	}
 
-
-	LOG(V2_INFO, "SatReader setAppConfigEntry\n");
 	const std::string NC_DEFAULT_VAL = "BMMMKKK111";
 	desc.setAppConfigurationEntry("__NC", NC_DEFAULT_VAL);
 	desc.setAppConfigurationEntry("__NV", NC_DEFAULT_VAL);

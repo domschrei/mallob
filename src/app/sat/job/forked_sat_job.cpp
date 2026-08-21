@@ -44,7 +44,6 @@ ForkedSatJob::ForkedSatJob(const Parameters& params, const JobSetup& setup, AppM
 }
 
 void ForkedSatJob::appl_start() {
-    LOG(V4_VVER, "§ ForkedSatJob appl_start()\n");
     assert(!_initialized);
     _core_alloc.requestCores(getNumThreads());
     setNumThreads(_core_alloc.getNbAllocated());
@@ -96,8 +95,6 @@ void ForkedSatJob::loadIncrements() {
     int lastRev = desc.getRevision();
     std::vector<SatProcessAdapter::RevisionData> revisions;
     
-    // LOG(V4_VVER, "§ Job (%i) loadIncrements: _last_imported_revision = %i, lastRev = %i  \n", getId(), _last_imported_revision, lastRev);
-
     while (_last_imported_revision < lastRev) {
         if (desc.isRevisionIncomplete(_last_imported_revision+1) && !canHandleIncompleteRevision(_last_imported_revision+1))
             break;
@@ -137,20 +134,16 @@ void ForkedSatJob::appl_suspend() {
 }
 
 void ForkedSatJob::appl_resume() {
-    LOG(V4_VVER, "§ ForkedSatJob (%i) appl_resume()  \n", getId());
     if (!_initialized) return;
 
     if (_core_alloc.empty()) {
         _core_alloc.requestCores(getNumThreads());
         setNumThreads(_core_alloc.getNbAllocated());
     }
-    LOG(V4_VVER, "§ ForkedSatJob (%i) numThreads = %i \n", getId(), getNumThreads());
 
     _solver->setSolvingState(SolvingStates::ACTIVE);
     loadIncrements();
-    LOG(V4_VVER, "§ ForkedSatJob (%i) loaded increments \n", getId());
     _clause_comm->communicate();
-    LOG(V4_VVER, "§ ForkedSatJob (%i) _clause_comm->communicate() \n", getId());
 }
 
 void ForkedSatJob::appl_terminate() {
@@ -181,8 +174,6 @@ int ForkedSatJob::appl_solved() {
 
     // Did a solver find a result?
     _solver->setDesiredRevision(getDesiredRevision());
-
-    // LOG(V4_VVER, "§ ForkedSatJob (%i) check() \n", getId());
     auto status = _solver->check();
     if (status == SatProcessAdapter::FOUND_RESULT) {
         _internal_result = std::move(_solver->getSolution());

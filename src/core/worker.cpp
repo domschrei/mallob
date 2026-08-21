@@ -48,7 +48,6 @@ void Worker::init() {
 }
 
 void Worker::advance() {
-    // LOG(V2_INFO, "ßß Adv. worker\n");
     auto time = Timer::elapsedSecondsCached();
 
     // Reset watchdog
@@ -163,34 +162,25 @@ void Worker::checkStats() {
 
 void Worker::checkJobs() {
 
-    // printf("ß Worker Check Jobs\n");
-
-    LOG(V5_DEBG, "WRKR check jobs\n");
     // Load and try to adopt pending root reactivation request
     _sched_man.tryAdoptPendingRootActivationRequest();
 
     if (!_job_registry.hasActiveJob()) {
         if (_job_registry.isBusyOrCommitted()) {
             // PE is committed but not active
-            // printf("ß // PE is committed but not active\n");
             _sys_state.setLocal(SYSSTATE_BUSYRATIO, 1.0f); // busy nodes
             _sys_state.setLocal(SYSSTATE_COMMITTEDRATIO, 1.0f); // committed nodes
         } else {
             // PE is completely idle
-            // printf("ß // PE is completely idle (world rank %i).  ", _world_rank);
-            // printf("ß load %i, has comittment %i\n", _job_registry.getLoad(), _job_registry.committed());
             _sys_state.setLocal(SYSSTATE_BUSYRATIO, 0.0f); // busy nodes
             _sys_state.setLocal(SYSSTATE_COMMITTEDRATIO, 0.0f); // committed nodes
         }
         _sys_state.setLocal(SYSSTATE_NUMJOBS, 0.0f); // active jobs
     } else {
-        // printf("ß Worker Checking for active Jobb, world rank %i\n", _world_rank);
         checkActiveJob();
     }
     _sched_man.checkSuspendedJobs();
     _sched_man.checkOldJobs();
-
-    LOG(V5_DEBG, "WRKR check jobs done \n");
 }
 
 void Worker::checkActiveJob() {
@@ -200,14 +190,11 @@ void Worker::checkActiveJob() {
     int id = job.getId();
     bool isRoot = job.getJobTree().isRoot();
 
-    // LOG(V4_VVER, "WRKR check active job %s\n", job.toStr());
-
     _sys_state.setLocal(SYSSTATE_BUSYRATIO, 1.0f); // busy nodes
     _sys_state.setLocal(SYSSTATE_COMMITTEDRATIO, 0.0f); // committed nodes
     _sys_state.setLocal(SYSSTATE_NUMJOBS, isRoot ? 1.0f : 0.0f); // active jobs
 
     _sched_man.checkActiveJob();
-    // LOG(V4_VVER, "WRKR check active job %s done\n", job.toStr());
 }
 
 void Worker::publishAndResetSysState() {
@@ -242,5 +229,5 @@ void Worker::publishAndResetSysState() {
 }
 
 Worker::~Worker() {
-    LOG(V4_VVER, "WORKER destruct\n");
+    LOG(V4_VVER, "Destruct worker\n");
 }

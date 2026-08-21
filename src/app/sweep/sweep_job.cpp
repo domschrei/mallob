@@ -604,12 +604,6 @@ void SweepJob::rootReportSolverResult(int res, const std::vector<int> &formula =
 		LOGGER(_sweeplogger,V2_INFO, "Non-root rank tried to report result %i , not let through \n");
 		return;
 	}
-	// assert(_is_root || log_return_false("SWEEP ERROR: non-root tries to report result to mallob\n"));
-	// if (res==UNSAT) {
-		//an UNSAT result doesnt come with a proof and can arrive via MPI from another process,
-		//so we don't have access to that particular reporting sweeper, nor do we need it, -->nullptr
-		// assert(sweeper==nullptr);
-	// }
 	//CAREFUL: sweeper is now nullptr in case of UNSAT
 	//report exactly once to Mallob, ignore all additional internal reports
 	//(can happen if multiple UNSAT messages arrive from other ranks/solvers)
@@ -625,9 +619,9 @@ void SweepJob::rootReportSolverResult(int res, const std::vector<int> &formula =
 
 	//CAREFUL: sweeper is now nullptr in case of UNSAT
 	LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB [%i] stages sweep result %i to Mallob\n", _my_rank, res);
-	//something would be off if we called this function more than once
 	assert(_staged_solved_status == -1 || log_return_false("SWEEP ERROR: duplicate attempt to report result to mallob, was already reported as %i \n", _internal_result.result));
 	// std::vector<int> formula = {};
+	// New design choice: Sweep never reports back a formula, because currently we are only using it coupled with a SAT Job, which will do this for us
 	if (res==UNSAT) {
 		// formula = {};
 	} else if (res==IMPROVED){
@@ -646,7 +640,8 @@ void SweepJob::rootReportSolverResult(int res, const std::vector<int> &formula =
 	}
 	LOG(                V2_INFO, "SWEEP_RESULT_CODE %i == %s \n", res, res==40 ? "IMPROVED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
 	LOGGER(_sweeplogger,V2_INFO, "SWEEP_RESULT_CODE %i == %s \n", res, res==40 ? "IMPROVED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
-	//Serialization! Even an empty solution needs to be serialized, otherwise the solution reader asserts.
+	//Serialization required!
+	//Even an empty solution needs to be serialized, otherwise assertions are triggerd at reading.
 	_internal_result.setSolutionToSerialize(formula.data(), formula.size());
 	_staged_solved_status = res;
 }
@@ -1824,7 +1819,3 @@ SweepJob::~SweepJob() {
 	LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB DESTRUCTOR DONE ctx %i\n", _my_ctx_id);
 	LOG(                V2_INFO, "SWEEP JOB DESTRUCTOR DONE ctx %i\n", _my_ctx_id);
 }
-
-
-
-

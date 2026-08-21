@@ -12,8 +12,6 @@
 #include "comm/job_tree_broadcast.hpp"
 
 
-// #define IMPORT_TECHNIQUE 3
-
 class SweepJob : public BaseSatJob {
 private:
 

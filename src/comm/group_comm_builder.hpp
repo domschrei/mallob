@@ -62,8 +62,7 @@ private:
     JobRegistry& _job_registry;
 
     bool _group_comm_reduce_ongoing {false};
-    //Nicco: Reduced this interval from 1000ms to more frequent 250ms! For SATWP Sweep'n'Sat testing.
-    PeriodicEvent<250> _periodic_group_comm_check;
+    PeriodicEvent<1000> _periodic_group_comm_check;
 
     tsl::robin_map<ctx_id_t, int> _ctx_id_to_job_id;
     tsl::robin_set<int> _relevant_group_ids;

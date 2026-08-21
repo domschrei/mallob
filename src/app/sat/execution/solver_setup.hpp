@@ -47,7 +47,6 @@ struct SolverSetup {
 
 
 	int sweepeffort{100};
-
 	// Clause export
 
 	bool exportClauses {true}; // exporting clauses to other solvers?
@@ -99,10 +98,6 @@ struct SolverSetup {
 	std::string proofDir;
 	int nbSkippedIdEpochs {0};
 
-	// Do shared instead of sequential sweeping, whenever sweeping is scheduled
-	// Sweep related
-	bool preprocessSequentialSweepComplete{false};
-	// bool shared_sweeping {false};
 
 	// E.g., if 16 SAT threads should be spawned but only 3 are spawned due to memory shortage,
 	// this factor is 16/3 = 5.333.

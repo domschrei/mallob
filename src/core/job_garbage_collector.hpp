@@ -45,7 +45,6 @@ public:
         // Find "forgotten" jobs in destruction queue which can now be destructed
         for (auto it = _job_destruct_queue.begin(); it != _job_destruct_queue.end(); ) {
             Job* job = *it;
-            LOG(V4_VVER, "JGC: check %s destructible\n", job->toStr());
             if (job->isDestructible()) {
                 LOG(V4_VVER, "%s ready for destruction\n", job->toStr());
                 // Move pointer to "free" queue emptied by janitor thread
@@ -64,42 +63,29 @@ public:
     }
 
     ~JobGarbageCollector() {
-        LOG(V4_VVER, "DELETE JobGarbageCollector \n");
         {
             auto lock = _mtx.getLock();
             _worker.stopWithoutWaiting();
         }
         _cond_var.notify();
         _worker.join();
-
-        LOG(V4_VVER, "DELETED JobGarbageCollector \n");
     }
 
 private:
     void run() {
 
-        //Nicco reminder
-        Watchdog wdog(true, 1'000);
-        wdog.setAbortPeriod(5'000);
-
         auto lg = Logger::getMainInstance().copy("<Janitor>", ".janitor");
         LOGGER(lg, V3_VERB, "tid=%lu\n", Proc::getTid());
 
-        LOG(V4_VVER, "JGC: entered, tid=%lu\n", Proc::getTid());
-
         while (_worker.continueRunning() || _num_stored_jobs > 0) {
 
-            LOG(V4_VVER, "JGC: _worker.continueRunning() %i, _num_stored_jobs %i \n", _worker.continueRunning(), _num_stored_jobs.load());
             std::list<Job*> copy;
             {
                 // Try to fetch the current jobs to free
-                wdog.setActive(false);
                 auto lock = _mtx.getLock();
                 _cond_var.waitWithLockedMutex(lock, [&]() {
                     return !_worker.continueRunning() || !_jobs_to_free.empty();
                 });
-                wdog.reset();
-                wdog.setActive(true);
                 if (!_worker.continueRunning() && _jobs_to_free.empty() && _num_stored_jobs == 0)
                     break;
                 
@@ -109,25 +95,17 @@ private:
             }
 
             LOGGER(lg, V5_DEBG, "Found %i job(s) to delete\n", copy.size());
-            // LOG(V4_VVER, "JGC: Found %i job(s) to delete\n", copy.size());
 
             // Free each job
             for (Job* job : copy) {
                 int id = job->getId();
-                LOGGER(lg, V4_VVER, "DELETE #%i\n", id);
                 delete job;
                 LOGGER(lg, V4_VVER, "DELETED #%i\n", id);
                 Logger::getMainInstance().mergeJobLogs(id);
                 _num_stored_jobs--;
-                LOG(V4_VVER, "JGC: Now %i _num_stored_jobs \n", _num_stored_jobs.load());
             }
 
             if (!_worker.continueRunning()) usleep(1000); // wait for last jobs to finish
-
-            //Nicco reminder
-            wdog.reset();
         }
-        LOG(V4_VVER, "JGC: exiting. \n");
-
     }
 };

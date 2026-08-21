@@ -108,11 +108,9 @@ public:
                 int numLits;
                 auto clauses = _job->getPreparedClauses(checksum, successfulSolverId, numLits);
                 LOG(V4_VVER, "%s CS produced cls size=%lu lits=%i/%i\n", _job->getLabel(), clauses.size(), numLits, _local_export_limit);
-                // LOG(V4_VVER, "%s CS produced metadata: successfulSolverId %i, numLits %i \n", _job->getLabel(), successfulSolverId, numLits);
                 auto agg = InplaceClauseAggregation::prepareRawBuffer(clauses,
                     _job->getClausesRevision(), numLits, 1, successfulSolverId,
                     _job->getBestFoundObjectiveCost());
-                LOG(V4_VVER, "%s CS aggr cls size=%lu \n", _job->getLabel(), clauses.size());
                 return clauses;
             });
 
@@ -130,14 +128,7 @@ public:
 
             // Fetch initial clause buffer (result of all-reduction of clauses)
             _broadcast_clause_buffer = _allreduce_clauses.extractResult();
-            LOG(V5_DEBG, "CSSession: _broadcast_clause_buffer.size() %i\n", _broadcast_clause_buffer.size());
             auto aggregation = InplaceClauseAggregation(_broadcast_clause_buffer);
-            // LOG(V1_WARN, "CSSession: aggr metadataints %i  maxrev %i  inputlits %i  nodes %i   succsolver %i \n", aggregation.numMetadataInts(), aggregation.maxRevision(), aggregation.numInputLiterals(), aggregation.numAggregatedNodes(),  aggregation.successfulSolver());
-            // if (aggregation.buffer.size() <=10) {
-                // for (int i=0; i<aggregation.buffer.size(); i++) {
-                    // LOG(V1_WARN, "CSSession: aggregation[%i]=%i \n", i, aggregation.buffer[i]);
-                // }
-            // }
             _best_found_solution_cost = aggregation.bestFoundSolutionCost();
             // If desired, scramble the LBD scores of featured clauses
             if (_params.scrambleLbdScores()) {

@@ -75,7 +75,7 @@ void on_drup_deletion(void* state, const int* lits, int nbLits) {
 Kissat::Kissat(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup), solver(kissat_init()),
         learntClauseBuffer(_setup.strictMaxLitsPerClause+ClauseMetadata::numInts()),
-        eq_up_buffer(2)  //pass two literals
+        eq_up_buffer(2)  //pass two literals as one equality
 {
 
     kissat_set_terminate(solver, this, &terminate_callback);
@@ -103,7 +103,7 @@ void Kissat::addLiteral(int lit) {
     numVars = std::max(numVars, std::abs(lit));
 }
 
-//Pass-through
+//Tighter handling on option setting, triggers an assertion if an option can't be applied
 bool Kissat::set_option(const std::string &option_name, int value) {
     int prev_value = kissat_get_option(solver, option_name.c_str());
     kissat_set_option(solver, option_name.c_str(), value);
@@ -142,20 +142,7 @@ void Kissat::diversify(int seed) {
             _setup.numVars, _setup.numOriginalClauses);
             kissat_set_preprocessing_report_callback(solver, this,
             begin_formula_report, report_preprocessed_lit);
-        kissat_set_option(solver, "factor", 1); // do perform (binary) bounded variable addition
-        if (_setup.preprocessSequentialSweepComplete)
-            kissat_set_option(solver, "sweepcomplete", 1);
-        // if (_setup.shared_sweeping) {
-            // kissat_set_option(solver, "mallob_shared_sweeping", 1);
-
-        //For debugging: The prpeprocessing solver should also log some things (quiet=0)
-        kissat_set_option(solver, "quiet", 1);
-        kissat_set_option(solver, "verbose", 0);
-        kissat_set_option(solver, "log", 0);
-
-        //Briefly deactivated seq. sweeping to not be inundated with logs
-        // kissat_set_option(solver, "sweep", 0);
-        // }
+        kissat_set_option(solver, "factor", 1); // do perform bounded variable addition
         //kissat_set_option(solver, "luckyearly", 0); // lucky before preprocess can take very long
     }
 
@@ -259,7 +246,8 @@ std::vector<int> Kissat::getSolution() {
 }
 
 void Kissat::reconstructSolutionFromPreprocessing(std::vector<int>& model) {
-    LOGGER(_logger, V3_VERB, "Latest Model only contains variables up to var %i \n", model.size()-1); //first entry is dummy zero
+    // LOGGER(_logger, V3_VERB, "Latest Model contains variables up to var %i \n", model.size()-1);
+    //first entry is dummy zero, to match index [1] to variable 1
     kissat_import_model(solver, model.data(), model.size());
     model.resize(_setup.numVars+1);
     LOGGER(_logger, V3_VERB, "Original formula contained variables up to var %i \n", _setup.numVars);
@@ -382,6 +370,12 @@ void Kissat::writeStatistics(SolverStatistics& stats) {
         kstats.r_ee, kstats.r_ed, kstats.r_pb, kstats.r_ss, kstats.r_sw, kstats.r_tr, kstats.r_fx, kstats.r_ia, kstats.r_tl);
 }
 
+
+shweep_statistics Kissat::fetchSweepStats() {
+    sweep_stats = shweep_get_statistics(solver);
+    return sweep_stats;
+}
+
 bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
     bool accept = nbVars != _setup.numVars || nbClauses != _setup.numOriginalClauses;
 
@@ -407,11 +401,11 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
     if (accept) {
         nbPreprocessedVariables = nbVars;
         nbPreprocessedClausesAdvertised = nbClauses;
-        //todo: Attention: The choice here on what number of Variables we write can have some effects down the line on reconstruction.
-        //If some variables have been eliminated because they never occurred in the formula at some point, the value here is different from the original number of variables.
-        //Once this result is then propagated through further Jobs, they no longer know the original number of variables.
-        //If we then might want/need to do a full reconstruction, we are reliant on the previous Job knowing the original variable count. This is how it's currently done, sequential prepro Kissat know this value.
-        //Alternatively, one could write just the original number of variables, then we would not depend on any previous job objects
+        //Attention: The number of Vars/Clauses we write here can differ from the original file,
+        //when variables have been eliminated because or never occurred in the formula
+        //For a full reconstruction, we are reliant on the previous Job knowing the original variable count.
+        //This is how it's currently done, sequential prepro Kissat know this value.
+        //Alternatively, one could write immediately the original number of variables, then we would not depend on previous jobs
     } else setSolverInterrupt();
     return accept;
 }

@@ -161,8 +161,8 @@ public:
         return _has_clauses_to_broadcast_internally;
     }
     std::vector<int>&& getClausesToBroadcastInternally() {
-        //Nicco: Added this flag toggle, because otherwise it was always (?) stuck at true
-        //when using Cross-Job Sharing in Sweep'n'Sat
+        //Nicco: Added this flag toggle, because otherwise it was always (?)
+        //stuck at true when using Cross-Job Sharing in Sweep'n'Sat
         _has_clauses_to_broadcast_internally = false;
         return std::move(_clauses_to_broadcast_internally);
     }
@@ -207,7 +207,6 @@ public:
         int nbExportedClauses;
         _internal_shared_clauses = _clause_store->exportBuffer(size, nbExportedClauses, _nb_internal_shared_lits,
             GenericClauseStore::ANY, /*sortClauses=*/true);
-        LOG(V4_VVER, "%s XTCS prepareSharing got: size %i  clauses %i\n", _label.c_str(), _internal_shared_clauses.size(), nbExportedClauses);
         _has_prepared_internal_shared_clauses = true;
         _epoch++;
         _clause_filter->updateEpoch(_epoch);

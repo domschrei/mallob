@@ -1,38 +1,12 @@
 #!/bin/bash
 
-source $ACCOUNTINFO # $projectname , $username
+source scripts/slurm/account.sh # $projectname , $username
 
-echo ""
-echo "$username"
-echo "$projectname"
-
-sbatch_base="$1"   #"scripts/slurm/sbatch.sh"
-minjobidx="$2"
-maxjobidx="$3"
-numchains="$4"
-jobname="$5"
-
-ninstances=$(cat $DS_BENCHMARKFILE | wc -l)
-if [ "$maxjobidx" = "all" ]; then
-       maxjobidx=$ninstances
-fi
-
-
-#cd $HOME/mallob
-echo ""
-echo "$jobname: $sbatch_base"
-echo "$jobname: $DS_APP"
-echo "$jobname: min         $minjobidx"
-echo "$jobname: max         $maxjobidx"
-echo "$jobname: chains      $numchains"
-echo "$jobname: nodes       $DS_NODES"
-echo "$jobname: $DS_BENCHMARKFILE"
-echo "$jobname: $ninstances instances in this file"
-echo " "
-
-#As security check show the current mallob flags
-# scripts/slurm/showflags.sh "$sbatch_base"
-# echo " "
+jobname="$1"
+sbatch_base="$2"
+minjobidx="$3"
+maxjobidx="$4"
+numchains="$5"
 
 matches=(/hppfs/work/$projectname/$username/logs/${jobname}-*)
 if [ -d "${matches[0]}" ]; then
@@ -47,8 +21,6 @@ mkdir -p "$dir"
 out_templated="$dir/sbatch.sh"
 runtime_slurmstr=$(date -d@${DS_RUNTIME} -u +%H:%M:%S)
 
-echo "templated origin: $sbatch_base"
-echo "templated target: $out_templated"
 cp "$sbatch_base" "$out_templated"
 
 sed -i 's/$DS_PROJECTNAME/'$projectname'/g' "$out_templated"
@@ -61,22 +33,11 @@ sed -i 's/$DS_PARTITION/'$DS_PARTITION'/g' "$out_templated"
 sed -i 's/$DS_SECONDSPERJOB/'$DS_SECONDSPERJOB'/g' "$out_templated"
 sed -i 's/$DS_FIRSTJOBIDX/'$minjobidx'/g' "$out_templated"
 sed -i 's/$DS_LASTJOBIDX/'$maxjobidx'/g' "$out_templated"
-# escaped_benchmarkfile=$(echo "$benchmarkfile" | sed 's/\//\\\//g')
-# sed -i 's/$DS_BENCHMARKFILE/'$DS_BENCHMARKFILE'/g' "$out_templated"
-sed -i "s|\$DS_BENCHMARKFILE|$DS_BENCHMARKFILE|g" "$out_templated"   #file paths have / that sed should not escape
-sed -i 's/$DS_APP/'$DS_APP'/g' "$out_templated"
-
-#As security check show the current mallob flags
-scripts/slurm/showflags.sh "$out_templated"
-sweep/show-kissat-build.sh 
-echo ""
-
 
 for i in $(seq $minjobidx $maxjobidx); do echo $i ; done | tac > $dir/.remaining_ids
 
 cmd="for i in {1..$numchains}; do sbatch $out_templated; done"
 
 echo "Execute the following command:"
-echo ""
 echo "$cmd"
-echo ""
+
