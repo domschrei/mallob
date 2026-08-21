@@ -846,6 +846,10 @@ Client::~Client() {
     _client_side_jobs.clear();
     _done_client_side_jobs.clear();
 
-    APIRegistry::close();
     LOG(V4_VVER, "Leaving client destructor\n");
+}
+
+// RAII to ensure that the API closes only after everything else is cleaned up.
+Client::APIConnectorHandle::~APIConnectorHandle() {
+    APIRegistry::close();
 }

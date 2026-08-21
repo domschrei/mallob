@@ -120,6 +120,8 @@ public:
 
 private:
     void run() {
+        _result.id = _desc.getId();
+
         bitwuzla::Options options;
         bitwuzla::TermManager tm;
 
@@ -233,7 +235,6 @@ private:
 
         if (smtOutFileSet) delete out;
 
-        _result.id = _desc.getId();
         _result.revision = 0;
         _result.result = success ? 20 : 0;
 

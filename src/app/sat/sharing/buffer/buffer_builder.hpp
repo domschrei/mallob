@@ -26,7 +26,7 @@ private:
     int _num_added_clauses = 0;
     int _num_added_lits = 0;
 
-    int _max_nb_free_lits;
+    int _max_nb_free_lits {0};
 
     FailedInsertion _failed_insertion;
 

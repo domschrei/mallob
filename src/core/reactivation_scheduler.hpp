@@ -140,10 +140,11 @@ public:
     }
 
     void processBalancingUpdate(int jobId, int index, int balancingEpoch, int volume, 
-                bool hasLeft, bool hasRight) {
+                bool hasLeft, bool hasRight, int revision) {
 
         if (!hasScheduler(jobId, index)) return;
-        getScheduler(jobId, index).updateBalancing(balancingEpoch, volume, hasLeft, hasRight);
+        getScheduler(jobId, index).updateBalancing(balancingEpoch, volume, hasLeft,
+            hasRight, revision);
     }
 
     bool hasReactivatorBlockingChild(int jobId, int index, int requestedNodeIndex) {
@@ -177,9 +178,16 @@ public:
 private:
 
     LocalScheduler constructScheduler(Job& job) {
-        LocalScheduler scheduler(job.getId(), _params, job.getJobTree(), 
-        [&job, this](int epoch, bool left, int dest) {
-            JobRequest req = job.spawnJobRequest(left, epoch);
+        LocalScheduler scheduler(job.getId(), _params, job.getJobTree(), job.getDesiredRevision(),
+                [this, 
+                tree = job.getJobTree(),
+                id = job.getId(),
+                appId = job.getApplicationId(),
+                inc = job.isIncremental()](int epoch, bool left, int dest, int rev) {
+            int index = left ? tree.getLeftChildIndex() : tree.getRightChildIndex();
+            JobRequest req = tree.getJobRequestFor(id, left ? JobTree::LEFT_CHILD : JobTree::RIGHT_CHILD, 
+                epoch, appId, inc);
+            req.revision = std::max(0, rev);
             _cb_emit_job_request(req, dest==-1 ? MSG_REQUEST_NODE : MSG_REQUEST_NODE_ONESHOT, left, dest);
         });
         return scheduler;

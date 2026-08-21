@@ -61,6 +61,11 @@ private:
     int _world_rank;
     Parameters& _params;
 
+    // RAII handle to close the API only after everything else is cleaned up.
+    struct APIConnectorHandle {
+        ~APIConnectorHandle();
+    } _api_conn_handle;
+
     std::list<MessageSubscription> _subscriptions;
 
     // For incoming job meta data. Full instance is NOT read yet.

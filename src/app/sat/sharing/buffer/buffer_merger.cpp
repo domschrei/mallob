@@ -130,7 +130,7 @@ std::vector<int> BufferMerger::merge(std::vector<int>* excessClauses, SplitMix64
     mainBuilder.setFreeClauseLengthLimit(_max_free_eff_clause_length - ClauseMetadata::numInts());
     BufferBuilder* excessBuilder {nullptr};
     if (excessClauses != nullptr) {
-        excessBuilder = new BufferBuilder(_size_limit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
+        excessBuilder = new BufferBuilder(INT32_MAX, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
     }
     BufferBuilder* currentBuilder = &mainBuilder;
     int excessFirstCounterPosition = -1;

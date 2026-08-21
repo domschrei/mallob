@@ -16,9 +16,8 @@ class JobRegistry {
 private:
     Parameters& _params;
     MPI_Comm& _comm;
-    JobGarbageCollector _job_gc;
-
     AppMessageTable _app_msg_table;
+    JobGarbageCollector _job_gc;
 
     robin_hood::unordered_map<int, Job*> _jobs;
     bool _has_commitment {false};

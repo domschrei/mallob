@@ -20,8 +20,9 @@ private:
     int _parent_index;
     int _left_child_index;
     int _right_child_index;
+    int _revision;
 
-    std::function<void(int epoch, bool left, int dest)> _cb_emit_request;
+    std::function<void(int epoch, bool left, int dest, int rev)> _cb_emit_request;
 
     std::vector<std::unique_ptr<ChildInterface>> _sessions;
     std::unique_ptr<ChildInterface> _empty_session;
@@ -35,12 +36,12 @@ private:
     bool _resuming = false;
 
 public:
-    LocalScheduler(int jobId, const Parameters& params, JobTree& jobTree,
-            std::function<void(int epoch, bool left, int dest)> cbEmitRequest) 
+    LocalScheduler(int jobId, const Parameters& params, JobTree& jobTree, int revision,
+            std::function<void(int epoch, bool left, int dest, int rev)> cbEmitRequest) 
         : _job_id(jobId), _params(params), _index(jobTree.getIndex()), 
             _parent_rank(jobTree.getParentNodeRank()), _parent_index(jobTree.getParentIndex()), 
             _left_child_index(jobTree.getLeftChildIndex()), _right_child_index(jobTree.getRightChildIndex()),
-            _cb_emit_request(cbEmitRequest) {
+            _revision(revision), _cb_emit_request(cbEmitRequest) {
         _sessions.resize(2);
         LOG(V5_DEBG, "RBS OPEN #%i:%i\n", _job_id, _index);
     }
@@ -102,13 +103,14 @@ public:
     }
 
     // called from local balancer update
-    void updateBalancing(int epoch, int volume, bool hasLeftChild, bool hasRightChild) {
+    void updateBalancing(int epoch, int volume, bool hasLeftChild, bool hasRightChild, int revision) {
 
         LOG(V5_DEBG, "RBS #%i:%i BLC e=%i\n", _job_id, _index, epoch);
         if (_last_update_epoch >= epoch) return;
         _last_update_epoch = epoch;
         _last_update_volume = volume;
-        
+        _revision = revision;
+
         if (_suspending || _suspended) return;
 
         for (size_t i = 0; i < _sessions.size(); i++) {
@@ -304,7 +306,7 @@ private:
         if (directive == ChildInterface::DO_NOTHING) return;
         bool isDirected = directive == ChildInterface::EMIT_DIRECTED_REQUEST;
         _cb_emit_request(session->getEpoch(), session->getChildIndex() == _left_child_index, 
-                        isDirected ? session->getChildRank() : -1);
+                        isDirected ? session->getChildRank() : -1, _revision);
     }
 
     std::unique_ptr<ChildInterface>& getSessionByChildIndex(int childIndex) {
