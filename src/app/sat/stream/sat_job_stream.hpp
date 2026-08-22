@@ -45,7 +45,7 @@ public:
     // Transfers ownership of the pointer.
     void addProcessor(SatJobStreamProcessor* processor) {
         processor->setName(_name);
-        processor->setRetrieveFullTaskCallback([this]() -> const SatJobStreamProcessor::SatTask& {
+        processor->setRetrieveFullTaskCallback([this]() -> SatJobStreamProcessor::SatTask {
             assert(_initialized_complete_task);
             auto lock = _mtx_complete_task.getLock();
             return _complete_task;
