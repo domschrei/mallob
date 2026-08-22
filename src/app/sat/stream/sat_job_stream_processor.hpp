@@ -33,8 +33,6 @@ public:
         void integrate(SatTask&& other) {
             assert(other.rev != rev);
             assert(type == other.type);
-            assert(lits.size() == 0 || nbClauses > 0);
-            assert(other.lits.size() == 0 || other.nbClauses > 0);
             nbVars = std::max(nbVars, other.nbVars);
             nbClauses = std::min(nbClauses, other.nbClauses) >= 0 ? nbClauses + other.nbClauses : -1;
             if (other.rev > rev) {
@@ -60,7 +58,6 @@ public:
                 // Append new clauses, fingerprint, and assumptions
                 lits.insert(lits.end(), other.lits.begin(), other.lits.end());
             }
-            assert(lits.size() == 0 || nbClauses > 0);
             other = SatTask {type};
         }
     };
