@@ -8,6 +8,7 @@
 #include "interface/api/api_connector.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
+#include "util/line_tee_stream.hpp"
 
 #include "bitwuzla/cpp/parser.h"
 #include "bitwuzla/cpp/bitwuzla.h"
@@ -121,23 +122,37 @@ public:
 private:
     void run() {
         _result.id = _desc.getId();
+        int internalResult = 0;
 
         bitwuzla::Options options;
         bitwuzla::TermManager tm;
 
-        auto out = &std::cout;
-        bool smtOutFileSet = false;
+        std::string outPath = "/dev/stdout";
         if (_desc.getAppConfiguration().map.count("smt-out-file")) {
             LOG(V2_INFO, "SMT Using smt-out-file %s\n", _desc.getAppConfiguration().map["smt-out-file"].c_str());
-            out = new std::ofstream(_desc.getAppConfiguration().map["smt-out-file"]);
-            smtOutFileSet = true;
+            outPath = _desc.getAppConfiguration().map["smt-out-file"];
         } else if (_params.smtOutputFile.isSet()) {
             LOG(V2_INFO, "SMT Using smt-out-file %s\n", _params.smtOutputFile().c_str());
-            out = new std::ofstream(getSmtOutputFilePath(_params, _desc.getId()));
-            smtOutFileSet = true;
+            outPath = getSmtOutputFilePath(_params, _desc.getId());
         } else {
             LOG(V2_INFO, "SMT Using NO smt-out-file\n");
         }
+        // Before writing Bitwuzla's output to the desired file, we examine it
+        // line by line, retrieving and Mallob-logging every (check-sat) result
+        // and returning the last such result as the SMT task's result code.
+        LineTeeFileStream out(outPath, [&](const std::string& line) {
+            // Line received from Bitwuzla
+            if (line == "sat") {
+                internalResult = 10;
+                LOG(V2_INFO, "#%i SMT RES ~sat~\n", _result.id);
+            } else if (line == "unsat") {
+                internalResult = 20;
+                LOG(V2_INFO, "#%i SMT RES ~unsat~\n", _result.id);
+            } else if (line == "unknown") {
+                internalResult = 0;
+                LOG(V2_INFO, "#%i SMT RES ~unknown~\n", _result.id);
+            }
+        });
 
         // Default top-level Bitwuzla options
         bool print_no_letify = false, print_formula = false, pp_only = false, parse_only = false;
@@ -186,22 +201,22 @@ private:
         if (endTime < INT32_MAX) {
             options.set(bitwuzla::Option::TIME_LIMIT_PER, 1000.f * (endTime - Timer::elapsedSeconds()));
         }
-        options.set_diagnostic_output_stream(*out);
+        options.set_diagnostic_output_stream(out);
 
         DTaskTracker dTaskTracker(_params);
         std::unique_ptr<BitwuzllobSatSolverFactory> factory;
         bool success = false;
 
         try {
-            *out << bitwuzla::set_bv_format(bv_format);
-            *out << bitwuzla::set_letify(!print_no_letify);
+            out << bitwuzla::set_bv_format(bv_format);
+            out << bitwuzla::set_letify(!print_no_letify);
 
             factory = std::make_unique<BitwuzllobSatSolverFactory>(
                 _params, _api, _desc, dTaskTracker,
                 _terminator, _name);
 
             bitwuzla::parser::Parser parser(
-                tm, *factory.get(), options, language, out);
+                tm, *factory.get(), options, language, &out);
             parser.configure_auto_print_model(print_model);
             parser.configure_terminator(&_terminator);
             parser.parse(
@@ -213,7 +228,7 @@ private:
             if (pp_only) bitwuzla->simplify();
             if (print_formula) {
                 if (!parse_only && !pp_only) bitwuzla->simplify();
-                bitwuzla->print_formula(*out, "smt2");
+                bitwuzla->print_formula(out, "smt2");
             }
             success = true;
 
@@ -233,10 +248,10 @@ private:
             abort();
         }
 
-        if (smtOutFileSet) delete out;
+        out.flush();
 
         _result.revision = 0;
-        _result.result = success ? 20 : 0;
+        _result.result = success ? internalResult : 0;
 
         factory.reset(); // cleans up any dangling solvers
     }
