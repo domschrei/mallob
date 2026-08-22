@@ -55,6 +55,7 @@ SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm,
                 }
                 auto& job = get(req.jobId);
                 req.revision = std::max(req.revision, job.getDesiredRevision());
+                req.requestingNodeContextId = job.getContextId();
                 _req_mgr.emitJobRequest(get(req.jobId), req, tag, left, dest);
             }
         ) {
@@ -976,7 +977,7 @@ job.toStr(), volume, balancingEpoch, tree.getBalancingEpochOfLastRequests(), eve
         // Apply volume update to the job's local scheduler
         if (_params.reactivationScheduling()) {
             _reactivation_scheduler.processBalancingUpdate(jobId, job.getIndex(), balancingEpoch, 
-                volume, tree.hasLeftChild(), tree.hasRightChild(), job.getDesiredRevision());
+                volume, tree.hasLeftChild(), tree.hasRightChild());
         }
 
         // Handle child relationships with respect to the new volume
