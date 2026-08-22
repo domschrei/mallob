@@ -53,6 +53,8 @@ SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm,
                     LOG(V1_WARN, "[WARN] Tasked to emit req. with unknown ID #%i\n", req.jobId);
                     return;
                 }
+                auto& job = get(req.jobId);
+                req.revision = std::max(req.revision, job.getDesiredRevision());
                 _req_mgr.emitJobRequest(get(req.jobId), req, tag, left, dest);
             }
         ) {
