@@ -330,7 +330,7 @@ void Client::advance() {
         }
         for (int jobId : doneJobs) {
             LOG_ADD_DEST(V3_VERB, "Notify #%i:0 that job is done", _root_nodes[jobId], jobId);
-            IntVec payload({jobId});
+            IntVec payload({jobId, -1});
             MyMpi::isend(_root_nodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
             finishJob(jobId, /*hasIncrementalSuccessors=*/false);
         }
