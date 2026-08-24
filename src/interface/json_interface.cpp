@@ -328,8 +328,17 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobProcessingStatist
         { "used_cpu_seconds" , stats.usedCpuSeconds }
     };
 
+    auto cbFeedback = img->feedback;
+    if (!img->incremental) {
+        _job_name_to_id_rev.erase(img->userQualifiedName);
+        _job_id_to_image.erase(result.id);
+        delete img;
+    }
+    // "img" is no longer valid, return the mutex
+    _job_map_mutex.unlock();
+
     // Send back feedback over whichever connection the job arrived
-    img->feedback(j);
+    cbFeedback(j);
 
     if (useSolutionFile) {
         ProcessWideThreadPool::get().addTask([solutionFile, sol = result.extractSolution()]() {
@@ -348,11 +357,4 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobProcessingStatist
             close(fd);
         });
     }
-
-    if (!img->incremental) {
-        _job_name_to_id_rev.erase(img->userQualifiedName);
-        _job_id_to_image.erase(result.id);
-        delete img;
-    }
-    _job_map_mutex.unlock();
 }
