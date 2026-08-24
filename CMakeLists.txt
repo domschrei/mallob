@@ -190,14 +190,14 @@ endif()
 if(NOT MALLOB_APP_SMT EQUAL 0) # included by default
 register_mallob_app("smt")
 endif()
+if(NOT MALLOB_APP_SWEEP EQUAL 0) # included by default
+register_mallob_app("sweep")
+endif()
 if(MALLOB_APP_SATCNC EQUAL 1)
 register_mallob_app("satcnc")
 endif()
 if(MALLOB_APP_KMEANS EQUAL 1)
     register_mallob_app("kmeans")
-endif()
-if(MALLOB_APP_SWEEP EQUAL 1)
-    register_mallob_app("sweep")
 endif()
 
 # Include further applications here, above publish_app_registry_changes()

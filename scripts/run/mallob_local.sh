@@ -9,7 +9,14 @@ echo "c Detected $nb_sockets sockets, with $nb_pcores_per_socket cores ($nb_hwth
 # How many processes and threads are we launching?
 nb_procs=$nb_sockets
 nb_threads=$nb_pcores_per_socket
-while [ $nb_threads -gt 38 ]; do
+nb_procs_min=1
+# Allow the config script to request a minimum number of processes
+if [ "$1" = "-minprocs" ]; then
+  nb_procs_min="$2"
+  echo "Config file wants at least $nb_procs_min processes"
+  shift 2
+fi
+while [ $nb_threads -gt 38 ] || [ $nb_procs -lt $nb_procs_min ]; do
     nb_procs=$((nb_procs * 2))
     nb_threads=$((nb_threads / 2))
 done
