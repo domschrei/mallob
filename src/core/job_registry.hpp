@@ -60,14 +60,13 @@ public:
         // So we need to swap the sender and receiver data now, on the receiving side.
         if (msg.returnedToSender) msg.swapSenderReceiver();
 
-        auto it = _app_msg_table.find(msg.contextIdOfDestination);
-        if (it == _app_msg_table.end()) {
+        auto listenerHandle = _app_msg_table.accessListener(msg.contextIdOfDestination);
+        if (!listenerHandle.listener) {
             LOG(V1_WARN, "[WARN] Job message for unregistered job #%i\n", msg.jobId);
             msg.returnToSender(source, mpiTag);
             return;
         }
-        AppMessageListener& l = *it->second;
-        l.communicate(source, mpiTag, msg);
+        listenerHandle.listener->communicate(source, mpiTag, msg);
     }
 
     void setCommitted() {
