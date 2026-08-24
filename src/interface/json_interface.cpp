@@ -329,9 +329,7 @@ void JsonInterface::handleJobDone(JobResult&& result, const JobProcessingStatist
     };
 
     // Send back feedback over whichever connection the job arrived
-    _job_map_mutex.unlock();
     img->feedback(j);
-    _job_map_mutex.lock();
 
     if (useSolutionFile) {
         ProcessWideThreadPool::get().addTask([solutionFile, sol = result.extractSolution()]() {

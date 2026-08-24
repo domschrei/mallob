@@ -47,6 +47,8 @@ public:
         _out->push_back(0); // counter for the first group
         if (totalLiteralLimit > 0) _out->reserve(totalLiteralLimit);
     }
+    BufferBuilder(BufferBuilder&& other) = delete;
+    BufferBuilder(const BufferBuilder& other) = delete;
     ~BufferBuilder() {
         if (_owning_vector && _out != nullptr) delete _out;
     }
