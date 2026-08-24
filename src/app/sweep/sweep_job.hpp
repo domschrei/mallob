@@ -38,7 +38,6 @@ private:
 
 	//a dedicated solver that reports its statistics to us
 	const int _representative_localId{0};
-	const int _congruence_localId{1};
 
 	//Local Solvers
 	int _nThreads{0};

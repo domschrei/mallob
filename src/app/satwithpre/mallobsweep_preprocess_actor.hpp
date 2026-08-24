@@ -58,8 +58,8 @@ private:
             {"priority", _params.preprocessSweepPriority()},
             {"application", "SWEEP"},
         };
-        //Changed from constant group-id = 1
-        if (_params.crossJobCommunication()) json["group-id"] = std::to_string(_desc.getGroupId());
+        if (_params.crossJobCommunication()) json["group-id"] = "1";
+        // if (_params.crossJobCommunication()) json["group-id"] = std::to_string(_desc.getGroupId());
 
         auto f = std::vector<int>(_input_cnf.begin(), _input_cnf.end() - 2);
         StaticStore<std::vector<int>>::insert(json["name"].get<std::string>(), std::move(f));
@@ -151,6 +151,7 @@ private:
             _model = std::move(solution);
         } else if (res.result == RESULT_SIMPLIFIED) {
             _output_cnf = std::move(solution);
+            //already contains metadata #vals and #clauses in the last two entries
         }
         res.setSolution(std::move(solution));
         LOG(V3_VERB, "SATWP %s extracted\n", json["name"].get<std::string>().c_str());

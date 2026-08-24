@@ -254,24 +254,22 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 				//if we are not on root, this flag lets the main Process soon send an MPI message to root, indicating UNSAT
 				_do_report_UNSAT_to_root = true;
 			}
-			//To reduce concurrency problems, only a single representative solver on the root node is allowed to report to Mallob
+			//To reduce concurrency problems, only a single representative solver (located on the root node) is allowed to report to Mallob
 		} else if (res==UNKNOWN && _is_root && sweeper->getLocalId()==_representative_localId) {
 			//Found either IMPROVED or UNKNOWN
 			auto stats = sweeper->fetchSweepStats();
 			if (stats.clauses < stats.start_clauses) {
 				//Found some improvements
-				rootReportSolverResult(IMPROVED, sweeper->extractPreprocessedFormula());
+				rootReportSolverResult(SIMPLIFIED, sweeper->extractPreprocessedFormula());
 			} else {
-				//whole sweeping didn't yield any improvements
+				//the whole sweeping didn't yield any improvements at all
 				rootReportSolverResult(UNKNOWN, {});
 			}
 		}
 
 		assert(res==UNKNOWN || res==UNSAT || log_return_false("SWEEP ERROR: solver has returned with unexpected signal %i \n", res));
 
-		//A dedicated solver on the root node prints his stats as a representative of all other solvers.
-		//stats differ slightly between solvers, but especially these global stats are very similar
-		//between all of them, so we don't bother aggregating/averaging them
+		//Get a rough idea of typical solver stats by reporting those of the representative solver
 		if (_is_root && localId == _representative_localId) {
 			reportEndStats(sweeper);
 		}
@@ -333,23 +331,22 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	//Connecting kissat to Kissat
 	sweeper->sweepSetExportCallbacks();
 
-	//Connecting kissat directly to SweepJob
+	//Connecting the .c kissat solver directly to SweepJob, skipping the intermediate Mallob::Kissat interface
     shweep_set_search_work_callback(sweeper->solver, this, cb_search_work_in_tree);
 	shweep_set_SweepJob_eq_import_callback(sweeper->solver, this, cb_import_eq);
 	shweep_set_SweepJob_unit_import_callback(sweeper->solver, this, cb_import_unit);
 
 	if (_is_root) {
-		//we want to read out the final formula at the root node for convenience,
-		//so we provide this callback only to root-node solvers in the first place
-		sweeper->sweepSetFormulaReportCallback();
-		sweeper->setRepresentativeLocalId(_representative_localId);
-		//One representive solver at the root node reports about its new kissat-internal state
-		//after each iteration (e.g., number of active variables, clauses, etc)
+		//we decide upfront that we read out the final (simplified) formula only from one representative solver,
+		//solver nr. 0 at the root node
+		//it is also used to report some statistics after each iteration (number of active variables and clauses, etc.)
 		if (localId==_representative_localId) {
+			sweeper->sweepSetFormulaReportCallback();
 			shweep_set_report_finished_iteration_callback(sweeper->solver, this, cb_report_iteration);
 		}
+		//tell all solvers which one is the representative one
+		sweeper->setRepresentativeLocalId(_representative_localId);
 	}
-
 
     //Basic configuration
     sweeper->set_option("quiet", _params.sweepSolverQuiet());  //suppress any standard kissat messages
@@ -361,24 +358,25 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	sweeper->set_option("seed", 0);   //Sweeping should not contain any own RNG part
 
 	//Specific due to Mallob
-	sweeper->set_option("mallob_sweeping", 1); //Bypasses all other Kissat-stuff and goes directly to MallobSweep Logic
-	sweeper->set_option("mallob_custom_sweep_verbosity", _params.sweepSolverVerbosity.val); //Sweeper verbosity 0..4
+	sweeper->set_option("mallob_sweeping", 1); //Bypass all other Kissat-stuff and go directly to MallobSweep Logic
+	sweeper->set_option("mallob_custom_sweep_verbosity", _params.sweepSolverVerbosity.val); //0..4, get info from the solvers themselves
 	sweeper->set_option("mallob_local_id", localId);
 	sweeper->set_option("mallob_rank", _my_rank);
 	sweeper->set_option("mallob_is_root", _is_root);
 	sweeper->set_option("mallob_resweep_chance", _params.sweepResweepChance.val);
-	sweeper->set_option("mallob_staggered_logs", 1); //set to 1 to have spatially separated logs, useful for verbose runs with 2-16 threads
+	sweeper->set_option("mallob_staggered_logs", 1); //have indents in log lines, useful to distinguish (a few) different solvers
 	sweeper->set_option("mallob_initial_congruence", _params.sweepInitialCongruence.val);
 	sweeper->set_option("mallob_signal_kitten", _params.sweepSignalKitten());
 
 	//Own options of Kissat
 	sweeper->set_option("sweepcomplete", 1); //deactivates checking for time limits during sweeping, so we dont get kicked out due to some limits
-	//Start already with depth 3,
-	//and accordingly start with doubled sweepvars and clauses than the default (depth 2)
+	//We start already with depth 3, because depth 2 is so quickly done, and less powerfull
+	//accordingly, start with doubled sweepvars and clauses than the default (depth 2)
   	sweeper->set_option("sweepdepth", 3);				//, 2,    0, INT_MAX,	"environment depth")
   	sweeper->set_option("sweepvars", 256*2);			//  256,  0, INT_MAX,	"environment variables")
   	sweeper->set_option("sweepclauses", 1024*2);		//	1024, 0, INT_MAX,	"environment clauses")
   	sweeper->set_option("sweepmaxdepth", _params.sweepMaxDepth.val); //	//	3,    1, INT_MAX,	"maximum environment depth")
+	//Allow a lot more vars and clauses per environment (compared to sequential sweeping)
   	sweeper->set_option("sweepmaxvars", 64 * 8192);		//	8192, 2, INT_MAX,	"maximum environment variables")
   	sweeper->set_option("sweepmaxclauses", 64 * 32768);	//	32768,2, INT_MAX,	"maximum environment clauses")
   	sweeper->set_option("sweepfliprounds", 1);		//	1,    0, INT_MAX,	"flipping rounds")
@@ -388,9 +386,9 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	sweeper->set_option("substitute", 1);	   //apply equivalence substitutions after sweeping, keep here explicitly to remember it
 	sweeper->set_option("substituterounds", 2);//there does not seem to be any need to go higher, almost always all equivalences are already found in the very first round
 
-	sweeper->set_option("preprocess", 0); //skip this part in search.c
-	sweeper->set_option("luckyearly", 0); //skip this part in search.c
-	sweeper->set_option("luckylate", 0);  //skip this part in search.c
+	sweeper->set_option("preprocess", 0); //skip this part in search.c, go directly to sweeping
+	sweeper->set_option("luckyearly", 0); // dito
+	sweeper->set_option("luckylate", 0);  // dito
 	sweeper->interruptionInitialized = true;
 	return sweeper;
 }
@@ -604,9 +602,6 @@ void SweepJob::rootReportSolverResult(int res, const std::vector<int> &formula =
 		LOGGER(_sweeplogger,V2_INFO, "Non-root rank tried to report result %i , not let through \n");
 		return;
 	}
-	//CAREFUL: sweeper is now nullptr in case of UNSAT
-	//report exactly once to Mallob, ignore all additional internal reports
-	//(can happen if multiple UNSAT messages arrive from other ranks/solvers)
 	int expected = -1;
 	if (_root_reported_result.compare_exchange_strong(expected, res)) {
 		//we are first, continue reporting
@@ -617,31 +612,24 @@ void SweepJob::rootReportSolverResult(int res, const std::vector<int> &formula =
 		return;
 	}
 
-	//CAREFUL: sweeper is now nullptr in case of UNSAT
 	LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB [%i] stages sweep result %i to Mallob\n", _my_rank, res);
 	assert(_staged_solved_status == -1 || log_return_false("SWEEP ERROR: duplicate attempt to report result to mallob, was already reported as %i \n", _internal_result.result));
-	// std::vector<int> formula = {};
-	// New design choice: Sweep never reports back a formula, because currently we are only using it coupled with a SAT Job, which will do this for us
 	if (res==UNSAT) {
-		// formula = {};
-	} else if (res==IMPROVED){
-		// assert(sweeper);
-		// formula = sweeper->extractPreprocessedFormula();
-		LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB [%i]: Solution IMPROVED, payload size %zu\n", _my_rank, formula.size());
+		LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB [%i]: Solution UNSAT\n", _my_rank);
+	}
+	if (res==SIMPLIFIED){
+		LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB [%i]: Solution SIMPLIFIED, payload size %zu\n", _my_rank, formula.size());
 	} else if (res==UNKNOWN) {
-		// assert(sweeper);
 		// No progress has been made.
 		// Design choice: we don't send any formula back, since there would be no new information in it
-		// formula = sweeper->extractPreprocessedFormula();
-		// formula = {};
-		LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB [%i]: Solution UNKNOWN, payload size %zu\n", _my_rank, formula.size());
+		LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB [%i]: Solution UNKNOWN\n", _my_rank);
 	} else {
 		LOGGER(_sweeplogger,V1_WARN, "WARN SWEEP [%i]: unexpected result code %i when reporting to mallob \n", _my_rank, res);
 	}
-	LOG(                V2_INFO, "SWEEP_RESULT_CODE %i == %s \n", res, res==40 ? "IMPROVED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
-	LOGGER(_sweeplogger,V2_INFO, "SWEEP_RESULT_CODE %i == %s \n", res, res==40 ? "IMPROVED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
+	LOG(                V2_INFO, "SWEEP_RESULT_CODE %i == %s \n", res, res==40 ? "SIMPLIFIED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
+	LOGGER(_sweeplogger,V2_INFO, "SWEEP_RESULT_CODE %i == %s \n", res, res==40 ? "SIMPLIFIED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
 	//Serialization required!
-	//Even an empty solution needs to be serialized, otherwise assertions are triggerd at reading.
+	//Even an empty solution needs to be serialized, otherwise the format is wrong at deserialization
 	_internal_result.setSolutionToSerialize(formula.data(), formula.size());
 	_staged_solved_status = res;
 }

@@ -378,34 +378,26 @@ shweep_statistics Kissat::fetchSweepStats() {
 
 bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
     bool accept = nbVars != _setup.numVars || nbClauses != _setup.numOriginalClauses;
-
     if (is_sweeper) {
-        //by arriving here we already know that the sweeper is on the root node
-        //furthermore, we only accept formulas from the dedicated solver localId==0, to not have to deal with concurrent bussiness
-        bool is_representative_solver = (getLocalId()== representative_localId);
-        if (is_representative_solver) {
-            LOG(V2_INFO, "SWEEP [root](%i) first to report dimacs result\n", getLocalId());
-            if (accept) {
-                LOG(V2_INFO, "SWEEP dimacs formula is acceptable, is different from original\n");
-            }
-            else {
-                LOG(V2_INFO, "SWEEP dimacs fomula is not acceptable, no difference to original\n");
-            }
-            LOG(V2_INFO, "SWEEP dimacs: (%i --> %i vars) (%i --> %i clauses) \n", _setup.numVars, nbVars, _setup.numOriginalClauses, nbClauses);
-        } else {
-            // LOG(V3_VERB, "SWEEP [root](%i) formula report request denied, already taken by (%i) \n", getLocalId(), sweepReportingLocalId->load());
-            accept = false;
+        //Only the representative solver at the root node should have received this callback
+        assert(getLocalId() == representative_localId);
+        LOG(V2_INFO, "SWEEP [root](%i) first to report dimacs result\n", getLocalId());
+        if (accept) {
+            LOG(V2_INFO, "SWEEP dimacs formula is acceptable bc. different from original\n");
         }
+        else {
+            LOG(V2_INFO, "SWEEP dimacs formula is not acceptable bc. no difference to original\n");
+        }
+        LOG(V2_INFO, "SWEEP dimacs simplification: (%i --> %i vars) (%i --> %i clauses) \n", _setup.numVars, nbVars, _setup.numOriginalClauses, nbClauses);
     }
-
     if (accept) {
         nbPreprocessedVariables = nbVars;
         nbPreprocessedClausesAdvertised = nbClauses;
         //Attention: The number of Vars/Clauses we write here can differ from the original file,
         //when variables have been eliminated because or never occurred in the formula
-        //For a full reconstruction, we are reliant on the previous Job knowing the original variable count.
-        //This is how it's currently done, sequential prepro Kissat know this value.
-        //Alternatively, one could write immediately the original number of variables, then we would not depend on previous jobs
+        //If we wish a full reconstruction later, we are reliant on the previous Job knowing the original variable count.
+        //Currently this is the way its done, sequential prepro Kissat know the original values.
+        //Alternatively, one could write the original number of variables here, then we would not depend on knowledge of previous jobs
     } else setSolverInterrupt();
     return accept;
 }

@@ -107,7 +107,7 @@ public:
                     LOG(V2_INFO, "SATWP RESULT SWEEPsns SOLVER , result code %i\n", res.result);
                     break;
                 }
-                else if (res.result==IMPROVED) {
+                else if (res.result==SIMPLIFIED) {
                     assert(res.getSolutionSize() > 0);
                     LOG(V2_INFO, "SATWP SWEEPsns has improved formula\n");
                     LOG(V2_INFO, "SATWP SWEEPsns reading json SolutionSize=%i\n", res.getSolutionSize());
@@ -132,7 +132,7 @@ public:
             LOG(V2_INFO, "SATWP SWEEPsns interrupt done.\n");
         }
 
-        if (res.result==IMPROVED) //if the only thing we got back is an improvement by the sweeping, the final result is still unknown
+        if (res.result==SIMPLIFIED) //if the only thing we got back is an improvement by the sweeping, the final result is still unknown
             res.result = UNKNOWN;
 
         LOG(V2_INFO, "#%i SATWP SweepNSat RES ~%i~\n", _desc.getId(), res.result);

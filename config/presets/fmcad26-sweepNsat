@@ -10,7 +10,7 @@ echo '-minprocs 2
   -trace-dir=/home/nicco/PhD/logsntraces/traces/
   -log=/home/nicco/PhD/logsntraces/logs/
 	-pre-cleanup=1 
-	-q=1 
+	-q=0
   -os=1 
   -cm=0 
   -rspaa=1 
