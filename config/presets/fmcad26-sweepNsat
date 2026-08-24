@@ -3,11 +3,12 @@
 # -minprocs 2 is a quick-and-dirty way to tell mallob_local.sh that we want at least 2 processes, no matter the size of the machine
 # This is because Sweep'n'Sat requires (at least) 2 processes, to launch both the SWEEP-App and the SAT-App concurrently
 
-echo '
-  -minprocs 2
+echo '-minprocs 2
   -sat-config-dirs=config/sat/base/ -sat-config-files=
 	-mono-app=SATWITHPRE 
 	-satsolver=k_ 
+  -trace-dir=/home/nicco/PhD/logsntraces/traces/
+  -log=/home/nicco/PhD/logsntraces/logs/
 	-pre-cleanup=1 
 	-q=1 
   -os=1 
