@@ -1269,7 +1269,7 @@ void SchedulingManager::interruptJob(int jobId, int revision, bool doTerminate, 
 
     // Avoid ping-pong of an old interruption signal back to the root for the next revision
     if (!doTerminate && revision >= 0 && revision < job.getRevision()) {
-        LOG_ADD_SRC(V4_VVER, "Interruption of %s : old revision %i (now %i)\n", job.toStr(), revision, job.getRevision());
+        LOG(V4_VVER, "Interruption of %s : old revision %i (now %i)\n", job.toStr(), revision, job.getRevision());
         return;
     }
 
