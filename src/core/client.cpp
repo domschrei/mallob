@@ -185,7 +185,10 @@ void Client::readIncomingJobs() {
                         // Notify root rank of this job to user
                         if (foundJob.cbRootRank) foundJob.cbRootRank(_world_rank);
                     } else {
-                        if (foundJob.cbRootRank) _root_rank_callbacks[id] = std::move(foundJob.cbRootRank);
+                        if (foundJob.cbRootRank) {
+                            auto lock = _root_rank_callbacks_mutex.getLock();
+                            _root_rank_callbacks[id] = std::move(foundJob.cbRootRank);
+                        }
                         // Enqueue in ready jobs to be scheduled properly
                         auto lock = _ready_job_lock.getLock();
                         _ready_job_queue.push_back(std::move(foundJob.description));
@@ -576,12 +579,18 @@ void Client::sendJobDescription(JobRequest& req, int destRank) {
 
     // Remember transaction
     _root_nodes[req.jobId] = destRank;
-    // Notify root rank of this job to user
-    auto it = _root_rank_callbacks.find(req.jobId);
-    if (it != _root_rank_callbacks.end()) {
-        it->second(destRank);
-        _root_rank_callbacks.erase(it);
+
+    // Notify root rank of this job to the user
+    std::function<void(int)> rootRankCb;
+    {
+        auto lock = _root_rank_callbacks_mutex.getLock();
+        auto it = _root_rank_callbacks.find(req.jobId);
+        if (it != _root_rank_callbacks.end()) {
+            rootRankCb = it->second;
+            _root_rank_callbacks.erase(it);
+        }
     }
+    if (rootRankCb) rootRankCb(destRank);
 
     // waiting instance reader might be able to continue now
     {
