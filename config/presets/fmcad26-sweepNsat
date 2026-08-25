@@ -19,11 +19,11 @@ echo '-minprocs 2
 	-seed=1 
 	-jcup=0.05 
   -sleep=100 
-  -v=3
+  -v=4
 	-preprocess-sweepnsat=1 
   -preprocess-sweep-priority=1.0 
   -sweep-solver-verbosity=0 
-  -cjc=1 
+  -cjc=1
   -fcll=2 
   -sweep-max-kitten-prop=1000000 
   -sweep-signal-kitten=1 

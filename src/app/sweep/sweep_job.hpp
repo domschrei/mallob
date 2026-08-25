@@ -237,9 +237,9 @@ private:
 	std::mutex _crossjob_import_mutex;
 	bool _crossjob_has_prepared_sharing{false};
 
-	//[seconds] End sweeping 10 seconds earlier than the wallclock time, to allow for substitute to finish,
+	//[seconds] End sweeping 5 seconds earlier than the wallclock time, to allow for substitute to finish,
 	//to get a proper final clause database state before reporting
-	const double TIMEBUFFER_FOR_FINAL_SUBSTITUTE = 10;
+	const double TIMEBUFFER_FOR_FINAL_SUBSTITUTE = 5;
 
 	//The root node (and only the root node) tracks global sweeping progress
 	//It decides whether a given sharing iteration should continue or end
@@ -359,7 +359,7 @@ private:
 			decide_terminate_job = true;
 			LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) TERMINATE (due to TOO_MANY_BAD_ITERATIONS) due to %i th bad iteration (limit: %i) \n", _my_rank, _root_bad_iterations, _params.sweepMaxBadIterations());
 		}
-		if (Timer::elapsedSeconds() > _params.jobWallclockLimit() - TIMEBUFFER_FOR_FINAL_SUBSTITUTE) {
+		if (_params.jobWallclockLimit()>0 && Timer::elapsedSeconds() > _params.jobWallclockLimit() - TIMEBUFFER_FOR_FINAL_SUBSTITUTE) {
 			decide_terminate_job=true;
 			LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) TERMINATE (due to SWEEP_JOB_TIMEOUT %.3f), with buffer time %f for final substitute \n", _my_rank, _params.jobWallclockLimit(), TIMEBUFFER_FOR_FINAL_SUBSTITUTE);
 		}

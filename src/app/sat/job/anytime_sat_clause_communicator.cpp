@@ -395,6 +395,7 @@ void AnytimeSatClauseCommunicator::feedLocalClausesIntoCrossSharing(std::vector<
     auto& comm = _job->getGroupComm();
     if (comm.getCommSize() > 1 && comm.getMyLocalRank() == 0 && _job->getState() == ACTIVE) {
         // build a cross-job clause sharing initiation message
+        LOG(V4_VVER, "XTCS build cross-job initiation msg\n");
         JobMessage msg;
         msg.tag = MSG_INITIATE_CROSS_JOB_CLAUSE_SHARING;
         auto packedComm = comm.serialize();
@@ -434,13 +435,16 @@ void AnytimeSatClauseCommunicator::initiateCrossSharing(JobMessage& msg, int sou
     _cross_sharing_session.reset(
         new ClauseSharingSession(_params, _cross_job_clause_sharer.get(), snapshot, nullptr, 0, 1)
     );
+    LOG(V4_VVER, "XTCS snapshot index %i\n", snapshot.index);
     if (snapshot.index == 0) {
         // root of XTCS: export cross-shared clauses to client parent
+        LOG(V4_VVER, "XTCS export to client parent [%i]\n", _job->getJobTree().getParentNodeRank());
         _cross_sharing_session->setAdditionalClauseListener([&](std::vector<int>& clauses) {
             JobMessage resultMsg(_job->getId(), _job->getId(), _job->getRevision(), _xtcs_epoch++, MSG_SEND_APP_DATA_TO_CLIENT_JOB);
             resultMsg.treeIndexOfDestination = 0;
             resultMsg.contextIdOfDestination = _job->getDescription().getGroupId();
             resultMsg.payload = clauses;
+            LOG(V4_VVER, "XTCS send appdatatoclientjob [%i] (myrank %i jobactorctxid %i)\n", _job->getJobTree().getParentNodeRank(), _job->getJobTree().getRank(), _job->getActorContextId());
             _job->getJobTree().send(_job->getJobTree().getParentNodeRank(), MSG_SEND_APP_DATA_TO_CLIENT_JOB, resultMsg);
         });
     }

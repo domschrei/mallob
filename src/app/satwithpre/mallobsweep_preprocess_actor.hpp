@@ -58,8 +58,10 @@ private:
             {"priority", _params.preprocessSweepPriority()},
             {"application", "SWEEP"},
         };
-        if (_params.crossJobCommunication()) json["group-id"] = "1";
-        // if (_params.crossJobCommunication()) json["group-id"] = std::to_string(_desc.getGroupId());
+        // if (_params.crossJobCommunication()) json["group-id"] = "1";
+        if (_params.crossJobCommunication()) json["group-id"] = std::to_string(_desc.getGroupId());
+        LOG(V0_CRIT, "MallobSweep GroupId %i \n", _desc.getGroupId());
+
 
         auto f = std::vector<int>(_input_cnf.begin(), _input_cnf.end() - 2);
         StaticStore<std::vector<int>>::insert(json["name"].get<std::string>(), std::move(f));

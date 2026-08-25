@@ -215,12 +215,11 @@ public:
             _received_child_elems.first, _received_child_elems.second);
 
         // We catch here a race condition which (as far as I understand) can occur with the modular BCAST+ALLRED system.
-        // The problem occurs when one child reacts 'too quickly' compared to the other child,
-        // sending a reduction message to the parent when the parent still waits for the broadcast message of the slower child.
-        // In that case the parent hasn't yet created its reduction object and cant handle the incoming reduction message
+        // The problem occurs when one child reacts 'too quickly' compared to the other child, which messes up the order at the receiving parent.
+        // When the fast child sends a reduction message to the parent while the parent is still waiting for the broadcast response of the slower child,
+        // then the parent hasn't yet created its reduction object to handle the incoming reduction message, and crashes
         //
-        // Minimal example: imagine root node 0 with two children 1 and 2
-        // Where, for some reason, child 2 reacts in general much faster than child 1
+        // detailed example: root node 0 with children 1 and 2
         //
         //        0
         //       / \
