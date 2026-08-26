@@ -1740,7 +1740,7 @@ void SweepJob::crossjob_rootReceiveClauses(std::vector<int>  &&clauses) {
 				_crossjob_root_received_units.push_back(clause.begin[0]);
 			}
 			//Technically we could also scan for equivalences (in linear time),
-			//but for now not added this extraction algorithm
+			//but for now I have not added this extraction algorithm
 			clause = reader.getNextIncomingClause();
 		}
 		int after = _crossjob_root_received_units.size();

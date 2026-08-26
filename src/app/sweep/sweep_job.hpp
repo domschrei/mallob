@@ -232,7 +232,6 @@ private:
 
 	//Cross-Job-sharing
 	std::unique_ptr<AnytimeSatClauseCommunicator> _clause_comm;
-	std::unique_ptr<GenericClauseStore> _clause_store;
 	std::vector<int>  _crossjob_root_received_units{};
 	std::mutex _crossjob_import_mutex;
 	bool _crossjob_has_prepared_sharing{false};
@@ -594,10 +593,10 @@ private:
 	}
 
 	void digestSharingWithoutFilter(int epoch, std::vector<int>  &&clauses, bool stateless) override {
-		InplaceClauseAggregation(clauses).stripToRawBuffer(); //found by Claude
 		//We only receive at the root node, all further distribution is handled by our own SweepApp logic
 		if (_is_root) {
-			LOGGER(_sweeplogger,V3_VERB, "SWEEP receive XTCS s %i\n",clauses.size());
+			InplaceClauseAggregation(clauses).stripToRawBuffer(); //found by Claude, counterpart to InplaceClauseAggregation agg(msg.payload);
+			LOGGER(_sweeplogger,V3_VERB, "SWEEP receive XTCS (stripped) size %i\n",clauses.size());
 			crossjob_rootReceiveClauses(std::move(clauses));
 		}
 	}

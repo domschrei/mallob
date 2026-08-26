@@ -62,7 +62,8 @@ private:
     JobRegistry& _job_registry;
 
     bool _group_comm_reduce_ongoing {false};
-    PeriodicEvent<1000> _periodic_group_comm_check;
+    // PeriodicEvent<1000> _periodic_group_comm_check;
+    PeriodicEvent<100> _periodic_group_comm_check; //Nicco
 
     tsl::robin_map<ctx_id_t, int> _ctx_id_to_job_id;
     tsl::robin_set<int> _relevant_group_ids;
