@@ -145,8 +145,11 @@ void SweepJob::appl_start() {
 	}
 	if (_params.crossJobCommunication()) {
         _clause_comm = std::make_unique<AnytimeSatClauseCommunicator>(_params, this, false);
+		//This flag prevents that the AnytimeCommunicator send a message with the tag MSG_SEND_APP_DATA_TO_CLIENT_JOB
+		//to its client process, as in Sweep'n'Sat the client is not listening to that tag and would crash at an incoming
+		//message with that tag. This is in contrast to the MaxSAT solving, where this piping through the client is wanted.
+		_clause_comm->setExportToClientParent(false);
 	}
-	//fmcad commit
 
 	LOGGER(_sweeplogger, V3_VERB, "SWEEP appl_start() FINISHED\n");
 }
