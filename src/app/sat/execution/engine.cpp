@@ -120,6 +120,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 					"Irredundant clause IDs in the produced proof will be ordered differently (by clause length). "
 					"Running a vanilla LRUP checker on the input CNF and the produced proof will fail!\n");
 			}
+			if (_params.palRup())
+				LOG(V2_INFO, "Writing PalRUP proof to %s\n", proofDirectory.c_str());
 		}
     }
 
@@ -254,7 +256,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		setup.globalId = appRank * numOrigSolvers + setup.localId;
 		int sqrt = std::ceil(std::sqrt((double) setup.maxNumSolvers));
 		auto dir = proofDirectory + "/" + std::to_string((int)(setup.globalId / sqrt)) + "/" + std::to_string(setup.globalId);
-		LOG(V2_INFO, "MKDIR %s\n", dir.c_str());
+		LOG(V4_VVER, "MKDIR %s\n", dir.c_str());
 		FileUtils::mkdir(dir);
 	}
 

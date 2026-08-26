@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <utility>
 #include <vector>
 
 #include "app/sat/data/clause_metadata.hpp"
@@ -26,7 +27,7 @@ private:
     int _num_added_clauses = 0;
     int _num_added_lits = 0;
 
-    int _max_nb_free_lits;
+    int _max_nb_free_lits {0};
 
     FailedInsertion _failed_insertion;
 
@@ -47,6 +48,21 @@ public:
         _out->push_back(0); // counter for the first group
         if (totalLiteralLimit > 0) _out->reserve(totalLiteralLimit);
     }
+    BufferBuilder(BufferBuilder&& other) {
+        _out = other._out;
+        _owning_vector = other._owning_vector;
+        _total_literal_limit = other._total_literal_limit;
+        _counter_position = other._counter_position;
+        _it = std::move(other._it);
+        _num_added_clauses = other._num_added_clauses;
+        _num_added_lits = other._num_added_lits;
+        _max_nb_free_lits = other._max_nb_free_lits;
+        _failed_insertion = std::move(other._failed_insertion);
+
+        other._out = nullptr;
+        other._owning_vector = false;
+    }
+    BufferBuilder(const BufferBuilder& other) = delete;
     ~BufferBuilder() {
         if (_owning_vector && _out != nullptr) delete _out;
     }

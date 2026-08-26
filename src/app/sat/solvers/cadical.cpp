@@ -107,7 +107,7 @@ Cadical::Cadical(const SolverSetup& setup)
 			okay = solver->set("lratdeletelines", 1); assert(okay); // do enable printing deletion lines
 			int sqrt = std::ceil(std::sqrt((double) maxNumSolvers));
 			proofFileString = _setup.proofDir + "/" + std::to_string((int)(solverRank / sqrt)) + "/" + std::to_string(_setup.globalId) + "/out.palrup~";
-			LOG(V2_INFO, "CADICAL PROOF DIR %s\n", proofFileString.c_str());
+			LOG(V5_DEBG, "CADICAL PROOF DIR %s\n", proofFileString.c_str());
 			okay = solver->trace_proof(proofFileString.c_str()); assert(okay);
 		} else {
 			// Monolithic proof production: LRAT tracer that outputs to a file.

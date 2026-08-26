@@ -118,7 +118,7 @@ private:
     void setLoad(int load, int jobId);
         
     void handleDemandUpdate(Job& job, int demand);
-    void interruptJob(int jobId, bool terminate, bool reckless);
+    void interruptJob(int jobId, int revision, bool terminate, bool reckless);
 
     bool isRequestObsolete(const JobRequest& req);
     enum AdoptionResult {ADOPT, REJECT, DEFER, DISCARD};

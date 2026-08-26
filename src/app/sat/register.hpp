@@ -117,7 +117,7 @@ void register_mallob_app_sat() {
     };
 
     entry.cleaner = [](const Parameters& params) {
-        if (!params.proofDirectory().empty() && !params.injectProofData.isSet()) {
+        if (params.proofDirectory.isSet() && params.proofOutputFile.isSet() && !params.injectProofData.isSet()) {
             for (auto file : FileUtils::glob(params.proofDirectory() + "/proof#*/")) {
                 FileUtils::rmrf(file);
             }

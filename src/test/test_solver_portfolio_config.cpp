@@ -3,6 +3,7 @@
 
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "app/sat/solvers/solver_portfolio_config.hpp"
+#include "util/sys/timer.hpp"
 #include <iostream>
 #include <variant>
 
@@ -22,7 +23,22 @@ static void printSettings(const SolverPortfolioConfig& config, SolverBackendType
     std::cout << "}\n";
 }
 
+static void checkTiming() {
+    auto t = Timer::elapsedSeconds();
+    SolverPortfolioConfig config;
+    try {
+        config.parseFromDirsAndFiles("config/sat/base/,config/sat/", "");
+    } catch (const std::exception& e) {
+        std::cerr << "Failed to parse configuration: " << e.what() << "\n";
+        return;
+    }
+    t = Timer::elapsedSeconds() - t;
+    std::cout << "Loaded " << config.ruleCount() << " rules within " << t << "s\n\n";
+}
+
 int main() {
+    Timer::init();
+
     SolverPortfolioConfig config;
     try {
         config.parseFromJson({"config/sat/example.json"});
@@ -53,6 +69,8 @@ int main() {
     for (int i = 0; i <= 8; ++i) {
         printSettings(config, SolverBackendType::LINGELING, i);
     }
+
+    checkTiming();
 
     return 0;
 }

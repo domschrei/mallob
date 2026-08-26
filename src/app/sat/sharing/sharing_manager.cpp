@@ -175,9 +175,9 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 	// Add the supplied conditional variable in negated form to the clause.
 	// This effectively renders the found conflict relative to the assumptions
 	// which were added not as assumptions but as permanent unit clauses.
-	std::vector<int>* tldClauseVec = nullptr;
+	std::unique_ptr<std::vector<int>> tldClauseVec;
 	if (!condLits.empty()) {
-		tldClauseVec = new std::vector<int>(clause.size+condLits.size());
+		tldClauseVec.reset(new std::vector<int>(clause.size+condLits.size()));
 		for (int i = 0; i < clause.size; i++) tldClauseVec->at(i) = clause.begin[i];
 		for (int i = clause.size; i < tldClauseVec->size(); i++)
 			tldClauseVec->at(i) = condLits[i - clause.size];
@@ -207,10 +207,7 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 	const int effectiveClauseLength = clauseSize - ClauseMetadata::numInts();
 
     // Check maximum size of clause
-    if (effectiveClauseLength > _params.strictClauseLengthLimit()) {
-        if (tldClauseVec) delete tldClauseVec;
-        return;
-    }
+    if (effectiveClauseLength > _params.strictClauseLengthLimit()) return;
 
 	if (effectiveClauseLength == 1 && clause.lbd != 1) {
 		_logger.log(V1_WARN, "Observed unit LBD of %i\n", clause.lbd);
@@ -249,10 +246,8 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 	}
 
 	Mallob::Clause c {clauseBegin, clauseSize, clauseLbd};
-	if (_prefilter && !_prefilter->prefilterClause(c)) {
-		if (tldClauseVec) delete tldClauseVec;
-        return;
-	}
+	if (_prefilter && !_prefilter->prefilterClause(c)) return;
+
 	assert(effectiveClauseLength == 1 || (clauseLbd >= 2 && clauseLbd <= effectiveClauseLength));
 	clauseLbd = c.lbd; // update LBD from pre-filter
 
@@ -284,8 +279,6 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 
 	_export_buffer->produce(clauseBegin, clauseSize, clauseLbd, solverId, _internal_epoch);
 	//log(V6_DEBGV, "%i : PRODUCED %s\n", solverId, tldClause.toStr().c_str());
-
-	if (tldClauseVec) delete tldClauseVec;
 }
 
 std::vector<int> SharingManager::prepareSharing(int totalLiteralLimit, int& outSuccessfulSolverId, int& outNbLits) {

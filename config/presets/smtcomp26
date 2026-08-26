@@ -4,10 +4,6 @@
 # (original in SMT Comp: 16)
 n_threads_per_process=16
 
-echo '-max-lits-per-thread=35000000 -pre-cleanup=1 -seed=110519 -zero-only-logging=1
- -v=2 -s2f=solution.txt -smt-out-file=out.smt2 -terminate-abruptly=1
- -mono-app=SMT -sat-config-dirs=config/sat/base/
- -satsolver=CCL[C]{'$(($n_threads_per_process-3))'}
- -isp=1 -nsdi=3 -nsds=0 -tst=1 -js=2 -jc=2'
+echo '-max-lits-per-thread=35000000 -pre-cleanup=1 -seed=110519 -zero-only-logging=1 -v=2 -s2f=solution.txt -smt-out-file=out.smt2 -terminate-abruptly=1 -mono-app=SMT -sat-config-dirs=config/sat/base/ -satsolver=CCL[C]{'$(($n_threads_per_process-3))'} -isp=1 -nsdi=3 -nsds=0 -tst=1 -js=2 -jc=2'
 
 # -sat-config-files=config/sat/incremental.json

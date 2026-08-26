@@ -143,7 +143,6 @@ public:
         auto& t = _backlog_task;
         if (t.nbVars >= 0) _nb_vars = t.nbVars;
         if (t.nbClauses >= 0) _nb_clauses = t.nbClauses;
-        if (t.lits.size() > 0) assert(_nb_clauses > 0);
 
         LOG(V5_DEBG, "%s attempting to solve task ...\n", _name.c_str());
 

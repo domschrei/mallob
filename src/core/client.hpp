@@ -5,7 +5,6 @@
 #include <string>
 #include <set>
 #include <atomic>
-#include <algorithm>
 #include <future>
 #include <list>
 #include <map>
@@ -14,6 +13,7 @@
 
 #include "app/app_registry.hpp"
 #include "comm/mympi.hpp"
+#include "robin_map.h"
 #include "util/params.hpp"
 #include "data/job_description.hpp"
 #include "util/sys/threading.hpp"
@@ -24,8 +24,6 @@
 #include "util/periodic_event.hpp"
 #include "interface/api/api_connector.hpp"
 #include "comm/msg_queue/message_subscription.hpp"
-#include "comm/mpi_base.hpp"
-#include "comm/sysstate_impl.hpp"
 #include "data/checksum.hpp"
 #include "util/option.hpp"
 #include "util/robin_hood.hpp"
@@ -60,6 +58,11 @@ private:
     MPI_Comm _comm;
     int _world_rank;
     Parameters& _params;
+
+    // RAII handle to close the API only after everything else is cleaned up.
+    struct APIConnectorHandle {
+        ~APIConnectorHandle();
+    } _api_conn_handle;
 
     std::list<MessageSubscription> _subscriptions;
 
@@ -114,7 +117,9 @@ private:
     std::map<int, int> _root_nodes;
     std::set<int> _client_ranks;
     SysState<5> _sys_state;
-    std::map<int, std::function<void(int)>> _root_rank_callbacks;
+
+    Mutex _root_rank_callbacks_mutex;
+    tsl::robin_map<int, std::function<void(int)>> _root_rank_callbacks;
 
     // Number of jobs with a loaded description (taking memory!)
     std::atomic_int _num_loaded_jobs = 0;

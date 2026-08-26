@@ -102,6 +102,10 @@ public:
         _current_recv_tag = recvTag;
         _current_send_tag = sendTag;
     }
+    void resetTagPointers() {
+        _current_recv_tag = &_default_tag_var;
+        _current_send_tag = &_default_tag_var;
+    }
 
     int send(const DataPtr& data, int dest, int tag, bool fromMainThread = true);
     void cancelSend(int sendId);
