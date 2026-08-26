@@ -301,28 +301,39 @@ bool AnytimeSatClauseCommunicator::handleClauseSharingMessage(int source, int mp
 
 void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg, int source, bool fromDeferredQueue) {
 
+    const auto snapshot = _job->getJobTree().getSnapshot();
+
+    // Non-root: reject the clause sharing initiation if you are not active right now
+    // or if the initiation message expects a different tree shape than what you have
+    if (snapshot.index > 0 && (_job->getState() != ACTIVE
+            || snapshot.index != msg.treeIndexOfDestination
+            || snapshot.parentNodeRank != source)) {
+        msg.returnToSender(source, MSG_SEND_APPLICATION_MESSAGE);
+        return;
+    }
+
+    // This pre-check before the next block ensures that a worker never defers a sharing session
+    // where it is already involved with another role (which can happen as a race condition during a re-scheduling).
+    bool waitingForSelf = (_current_session && _current_session->getEpoch() == msg.epoch);
+    if (!waitingForSelf && !fromDeferredQueue && !_deferred_sharing_initiation_msgs.empty())
+        for (auto& def : _deferred_sharing_initiation_msgs)
+            if (def.second.epoch == msg.epoch)
+                waitingForSelf = true;
+    if (snapshot.index > 0 && waitingForSelf) {
+        msg.returnToSender(source, MSG_SEND_APPLICATION_MESSAGE);
+        return;
+    }
+
+    // defer message until all past sessions are done
+    // and all earlier deferred initiation messages have been processed
     if (_current_session || (!fromDeferredQueue && !_deferred_sharing_initiation_msgs.empty())) {
-        // defer message until all past sessions are done
-        // and all earlier deferred initiation messages have been processed
         LOG(V3_VERB, "%s : deferring CS initiation\n", _job->toStr());
         _deferred_sharing_initiation_msgs.push_back({source, std::move(msg)});
         return;
     }
 
-    // reject the clause sharing initiation if you are not active right now
-    if (_job->getState() != ACTIVE && !_job->getJobTree().isRoot()) {
-        msg.returnToSender(source, MSG_SEND_APPLICATION_MESSAGE);
-        return;
-    }
-
     // no current sessions active - can start new session
     _current_epoch = msg.epoch;
-    const auto snapshot = _job->getJobTree().getSnapshot();
-    if (!_job->getJobTree().isRoot() && snapshot.parentNodeRank != source) {
-        // wrong sender from the view of the current snapshot - context changed since this message was sent
-        msg.returnToSender(source, MSG_SEND_APPLICATION_MESSAGE);
-        return;
-    }
     LOG(V4_VVER, "%s : INIT COMM e=%i nc=%i\n", _job->toStr(), _current_epoch, snapshot.nbChildren);
 
     // extract compensation factor for this session from the message
