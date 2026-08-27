@@ -7,8 +7,6 @@ echo '-minprocs 2
   -sat-config-dirs=config/sat/base/ -sat-config-files=
 	-mono-app=SATWITHPRE 
 	-satsolver=k_ 
-  -trace-dir=/home/nicco/PhD/logsntraces/traces/
-  -log=/home/nicco/PhD/logsntraces/logs/
 	-pre-cleanup=1 
 	-q=0
   -os=1 
@@ -19,16 +17,29 @@ echo '-minprocs 2
 	-seed=1 
 	-jcup=0.05 
   -sleep=100 
-  -v=4
+  -v=2
 	-preprocess-sweepnsat=1 
   -preprocess-sweep-priority=1.0 
   -sweep-solver-verbosity=0 
   -cjc=1
+  -cjtcp=0
   -fcll=2 
   -sweep-max-kitten-prop=1000000 
   -sweep-signal-kitten=1 
-  -sweep-sharing-period=0.020 
+  -sweep-sharing-period=0.050 
+  -sweep-max-iterations=999999
   -sweep-skip-ratio=0.000 
   -sweep-skip-window=2.0 
-  -sweep-max-bad-iters=3
+  -sweep-max-weak-iters=3
 '
+
+#The most important parameter is -sweep-skip-ratio
+#
+# -sweep-skip-ratio=0.000   #force full sweeping of every iterations
+# -sweep-skip-ratio=0.005   #abort iterations below success rates of 0.5%
+# -sweep-skip-ratio=0.020   #abort iterations below success rates of 2.0%
+#
+#-sweep-skip-ratio is the minimum success ratio, defined as (found Equivalences+Units) / (swept variables) 
+#It is measured as a rolling average within the last 2 seconds (-sweep-skip-window) of a given iteration
+#After 3 such aborted iterations (-sweep-max-weak-iters), Sweeping is finished.
+                              

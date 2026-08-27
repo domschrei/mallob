@@ -226,7 +226,7 @@ private:
 	bool _root_did_just_finish_iteration = true;
 
 	int _root_skipped_iterations = 0;
-	int _root_bad_iterations = 0;
+	int _root_weak_iterations = 0;
 	bool _root_had_success_this_iteration = false;
 	bool _root_had_work_this_iteration = false;
 
@@ -300,18 +300,19 @@ private:
 		int shared_in_window = shared.back() - shared[shared.size()-window];
 		int swept_in_window  = swept.back()  - swept[swept.size()-window];
 		double success_in_window = swept_in_window==0 ? 0: shared_in_window / (double) swept_in_window;
-		//This has the side effect of assigning success==0 also in case not a single new sweep() call
-		//has been started, even when there have been ongoing new Eqs+Units found within these same ongoing sweep() calls
+		//This has the side effect of assigning success==0 also in case not a single new sweep() call has been started,
+		//and potentially terminating Sweeping because single calls take too long,
+		//even when there have been ongoing new Eqs+Units found within these (very few) same ongoing sweep() calls
 
 		//Skip this iteration if there has not been enough success in the considered window
 		if (shared.size()>=_skip_window_rounds) {
 			if (success_in_window < _params.sweepSkipRatio()) {
 				decide_end_iteration = true;
 				_root_skipped_iterations++;
-				LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) SUCCESS_SKIP iteration %i (rnd %i) , bc. success %f (%i / %i) < %.3f thresh, in rounds [%i, %i]. Skipped-Count %i  Failed-Count %i (this: +%i)\n",
+				LOGGER(_sweeplogger,V3_VERB, "[%i](root-trf) SUCCESS_SKIP iteration %i (rnd %i) , bc. success %f (%i / %i) < %.3f thresh, in rounds [%i, %i]. Skipped-Count %i  Failed-Count %i (this: +%i)\n",
 					_my_rank, _root_iteration, _root_sharing_round,  success_in_window, shared_in_window, swept_in_window,
 					_params.sweepSkipRatio(), _root_sharing_round - window, _root_sharing_round,
-					_root_skipped_iterations, _root_bad_iterations, !_root_had_success_this_iteration);
+					_root_skipped_iterations, _root_weak_iterations, !_root_had_success_this_iteration);
 			} else {
 				//Had some success in this iteration, average over a sufficiently large window
 				_root_had_success_this_iteration = true;
@@ -325,16 +326,16 @@ private:
 			//We declare this iteration failed, otherwise it can happen that hundreds of iterations
 			//occur, each skipped after 3-4 seconds due to lagging, but each being juuust long enough to count as successfull
 			_root_had_success_this_iteration = false;
-			LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf) LAGGING_SKIP iteration %i (rnd %i) , bc. more than a third of solvers are lagging ( %i / %i ) in window %.3f sec , %i rounds \n",
+			LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](root-trf) LAGGING_SKIP iteration %i (rnd %i) , bc. more than a third of solvers are lagging ( %i / %i ) in window %.3f sec , %i rounds \n",
 				_my_rank, _root_iteration, _root_sharing_round, md.lagging, nSolvers, _params.sweepSkipWindowSecs(), _skip_window_rounds);
 		}
 
 		//If all work has been done, the iteration ends naturally
 		if (all_idle || all_work_done) {
 			if (all_idle)
-				LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf): All idle      - ending this iteration %i \n", _my_rank, _root_iteration);
+				LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](root-trf): All idle      - ending this iteration %i \n", _my_rank, _root_iteration);
 			else if (all_work_done)
-				LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf): All work done - ending this iteration %i \n", _my_rank, _root_iteration);
+				LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](root-trf): All work done - ending this iteration %i \n", _my_rank, _root_iteration);
 			decide_end_iteration = true;
 			//Usually we wait for sufficiently many rounds until we determine whether this iteration had success.
 			//But if we reach the end of an iteration earlier through all_idle, before the first such check,
@@ -349,14 +350,14 @@ private:
 		//number of unsuccessfull (failed) iterations
 		if (decide_end_iteration) {
 			if (_root_had_success_this_iteration == false) {
-				_root_bad_iterations++;
-				LOGGER(_sweeplogger,V2_INFO, "Iteration %i bad . Now BAD_ITERATIONS %i \n", _root_iteration, _root_bad_iterations);
+				_root_weak_iterations++;
+				LOGGER(_sweeplogger,V2_INFO, "Iteration %i weak . Now WEAK_ITERATIONS %i \n", _root_iteration, _root_weak_iterations);
 			}
 		}
 		//Terminate the whole SweepJob if enough failed iterations happened
-		if (_root_bad_iterations > _params.sweepMaxBadIterations()) {
+		if (_root_weak_iterations > _params.sweepMaxWeakIterations()) {
 			decide_terminate_job = true;
-			LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) TERMINATE (due to TOO_MANY_BAD_ITERATIONS) due to %i th bad iteration (limit: %i) \n", _my_rank, _root_bad_iterations, _params.sweepMaxBadIterations());
+			LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) TERMINATE (due to TOO_MANY_WEAK_ITERATIONS) due to %i th weak iteration (limit: %i) \n", _my_rank, _root_weak_iterations, _params.sweepMaxWeakIterations());
 		}
 		if (_params.jobWallclockLimit()>0 && Timer::elapsedSeconds() > _params.jobWallclockLimit() - TIMEBUFFER_FOR_FINAL_SUBSTITUTE) {
 			decide_terminate_job=true;
@@ -364,8 +365,8 @@ private:
 		}
 		//A round is finished if all sweepers are idle or if we didnt have enough progress
 		if (decide_end_iteration || decide_terminate_job) {
-			LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) (%i)all_idle  (%i)end_iteration (%i)foundUn-sat (%i)terminate_job \n", _my_rank, all_idle, decide_end_iteration, md.foundUnsat, decide_terminate_job);
-			LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) ITERATION %i/%i FINISHED in sharing round %i \n", _my_rank, _root_iteration, _params.sweepMaxIterations(), _root_sharing_round);
+			LOGGER(_sweeplogger,V3_VERB, "[%i](root-trf) (%i)all_idle  (%i)end_iteration (%i)foundUn-sat (%i)terminate_job \n", _my_rank, all_idle, decide_end_iteration, md.foundUnsat, decide_terminate_job);
+			LOGGER(_sweeplogger,V3_VERB, "[%i](root-trf) ITERATION %i/%i FINISHED in sharing round %i \n", _my_rank, _root_iteration, _params.sweepMaxIterations(), _root_sharing_round);
 			LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) ITERATION %i/%i shared: %i EQS, %i UNITS  \n", _my_rank, _root_iteration, _params.sweepMaxIterations(), _root_shared_eqs_this_iteration, _root_shared_units_this_iteration);
 			if (_root_iteration == _params.sweepMaxIterations()) {
 				LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf): Job finished! All iterations done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_iteration, _params.sweepMaxIterations());
@@ -375,7 +376,7 @@ private:
 				_root_did_just_finish_iteration = true; //remember for the next round
 				_root_initwork_startedproviding = false; //providing work to the solvers can take some time, track that progress
 				_root_initwork_provided		= false;
-				LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) Preparing for new iteration \n", _my_rank);
+				LOGGER(_sweeplogger,V3_VERB, "[%i](root-trf) Preparing for new iteration \n", _my_rank);
 			}
 		}
 		//The root node (and only the root node) tracks the number of completed sweep rounds,
@@ -549,12 +550,12 @@ private:
 
 	//stubs
 	bool isInitialized() override {
-		LOGGER(_sweeplogger,V1_WARN, "[SweepJob] Called stub: isInitialized\n");
+		LOGGER(_sweeplogger,V4_VVER, "[SweepJob] Called stub: isInitialized\n");
 		return true;
 	}
 
 	void prepareSharing() override {
-		LOGGER(_sweeplogger,V1_WARN, "[SweepJob] Called stub: prepareSharing\n");
+		LOGGER(_sweeplogger,V4_VVER, "[SweepJob] Called stub: prepareSharing\n");
 		//we prepare sharing anyway in every sharing round, don't need this reminder/callback(?)
 	}
 
@@ -569,27 +570,27 @@ private:
 	std::vector<int> getPreparedClauses(Checksum& checksum, int& successfulSolverId, int& numLits) override {
 		successfulSolverId = -1;
 		numLits = 0;
-		LOGGER(_sweeplogger,V1_WARN, "[SweepJob] Called stub: getPreparedClauses. return succSolver -1 , numLits 0, vector {}\n");
+		LOGGER(_sweeplogger,V4_VVER, "[SweepJob] Called stub: getPreparedClauses. return succSolver -1 , numLits 0, vector {}\n");
 		_crossjob_has_prepared_sharing = false; //mirroring the behaviour in inter_job_clause_sharer.hpp
 		return {};
 	}
 
 	void filterSharing(int, std::vector<int>&&) override {
-		LOGGER(_sweeplogger,V1_WARN, "[SweepJob] Called stub: filterSharing\n");
+		LOGGER(_sweeplogger,V4_VVER, "[SweepJob] Called stub: filterSharing\n");
 	}
 
 	bool hasFilteredSharing(int) override {
-		LOGGER(_sweeplogger,V1_WARN, "[SweepJob] Called stub: hasFilteredSharing. return true\n");
+		LOGGER(_sweeplogger,V4_VVER, "[SweepJob] Called stub: hasFilteredSharing. return true\n");
 		return true;
 	}
 
 	std::vector<int> getLocalFilter(int) override {
-		LOGGER(_sweeplogger,V1_WARN, "[SweepJob] Called stub: getLocalFilter. return {}\n");
+		LOGGER(_sweeplogger,V4_VVER, "[SweepJob] Called stub: getLocalFilter. return {}\n");
 		return {};
 	}
 
 	void applyFilter(int, std::vector<int>&&) override {
-		LOGGER(_sweeplogger,V1_WARN, "[SweepJob] Called stub: applyFilter\n");
+		LOGGER(_sweeplogger,V4_VVER, "[SweepJob] Called stub: applyFilter\n");
 	}
 
 	void digestSharingWithoutFilter(int epoch, std::vector<int>  &&clauses, bool stateless) override {
@@ -602,29 +603,29 @@ private:
 	}
 
 	void returnClauses(std::vector<int>&&) override {
-		LOGGER(_sweeplogger,V1_WARN, "[SweepJob] Called stub: returnClauses\n");
+		LOGGER(_sweeplogger,V4_VVER, "[SweepJob] Called stub: returnClauses\n");
 	}
 
 	void digestHistoricClauses(int, int, std::vector<int>&&) override {
-		LOGGER(_sweeplogger,V1_WARN, "[SweepJob] Called stub: digestHistoricClauses\n");
+		LOGGER(_sweeplogger,V4_VVER, "[SweepJob] Called stub: digestHistoricClauses\n");
 	}
 
 	int getLastAdmittedNumLits() override {
-		LOGGER(_sweeplogger,V1_WARN, "[SweepJob] Called stub: getLastAdmittedNumLits. return 0\n");
+		LOGGER(_sweeplogger,V4_VVER, "[SweepJob] Called stub: getLastAdmittedNumLits. return 0\n");
 		return 0;
 	}
 
 	long long getBestFoundObjectiveCost() override {
-		LOGGER(_sweeplogger,V1_WARN, "[SweepJob] Called stub: getBestFoundObjectiveCost. return 0\n");
+		LOGGER(_sweeplogger,V4_VVER, "[SweepJob] Called stub: getBestFoundObjectiveCost. return 0\n");
 		return 0;
 	}
 
 	void setClauseBufferRevision(int) override {
-		LOGGER(_sweeplogger,V1_WARN, "[SweepJob] Called stub: setClauseBufferRevision\n");
+		LOGGER(_sweeplogger,V4_VVER, "[SweepJob] Called stub: setClauseBufferRevision\n");
 	}
 
 	void updateBestFoundSolutionCost(long long) override {
-		LOGGER(_sweeplogger,V1_WARN, "[SweepJob] Called stub: updateBestFoundSolutionCost\n");
+		LOGGER(_sweeplogger,V4_VVER, "[SweepJob] Called stub: updateBestFoundSolutionCost\n");
 	}
 
 };

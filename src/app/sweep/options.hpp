@@ -20,7 +20,7 @@ OPT_INT(sweepMaxKittenProp,		"swmp", 	"sweep-max-kitten-prop",	1000000,1000,LARG
 OPT_BOOL(sweepSignalKitten,		"swsk", 	"sweep-signal-kitten",		true, "Signal to kittens when an iteration has been skipped such that they can exit their propagation loop immediately")
 OPT_FLOAT(sweepSkipRatio,		"swskr",    "sweep-skip-ratio",			0.01, 0, 1, "minimum ratio of found Eqs+Units versus number of swept variables to not skip an iteration")
 OPT_FLOAT(sweepSkipWindowSecs,	"swskw",	"sweep-skip-window",		2.0, 0, LARGE_INT, "size of moving window for which the skip-ratio is checked (in seconds)")
-OPT_INT(sweepMaxBadIterations,	"swmbi",	"sweep-max-bad-iters",		3, 0, LARGE_INT, "max iterations allowed to end without being successful before the Job is terminated")
+OPT_INT(sweepMaxWeakIterations,	"swmwi",	"sweep-max-weak-iters",		3, 0, LARGE_INT, "max number of iterations that are allowed to end without being successful before the Job is terminated")
 OPT_BOOL(sweepShowLagWarn,		"swslw", 	"sweep-show-lag-warn",		false, "show 'lagging' solvers that are in the same sweep(...) call since a long time")
 OPT_INT(sweepMaxPayload,		"swmpay",	"sweep-max-payload",		100'000'000, 0, 2'000'000'000, "max payload for which the SweepApp starts, otherwise it directly exits")
 

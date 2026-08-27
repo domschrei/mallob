@@ -436,7 +436,7 @@ void AnytimeSatClauseCommunicator::initiateCrossSharing(JobMessage& msg, int sou
         new ClauseSharingSession(_params, _cross_job_clause_sharer.get(), snapshot, nullptr, 0, 1)
     );
     LOG(V4_VVER, "XTCS snapshot index %i\n", snapshot.index);
-    if (snapshot.index == 0 && _export_to_client_parent) {
+    if (snapshot.index == 0 && _params.crossJobToClientParent()) {
         // root of XTCS: export cross-shared clauses to client parent
         LOG(V4_VVER, "XTCS export to client parent [%i]\n", _job->getJobTree().getParentNodeRank());
         _cross_sharing_session->setAdditionalClauseListener([&](std::vector<int>& clauses) {

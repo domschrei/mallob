@@ -87,7 +87,6 @@ MessageQueue::CallbackRef MessageQueue::registerCallback(int tag, const MsgCallb
     if (_callbacks.count(tag)) {
         LOG(V1_WARN, "[WARN] More than one callback for tag %i!\n", tag);
     }
-    LOG(V3_VERB, "registering msg callback tag %i\n", tag);
     _callbacks[tag].push_back(cb);
     auto it = _callbacks[tag].end();
     --it;
@@ -503,7 +502,6 @@ void MessageQueue::processSent() {
 
 void MessageQueue::digestReceivedMessage(MessageHandle& h) {
 
-    LOG(V3_VERB, "h.tag = %i, h.source = %i, robincount = %i \n", h.tag, h.source, _callbacks.count(h.tag));
     auto& callbacks = _callbacks.at(h.tag);
 
     if (callbacks.size() == 1) {

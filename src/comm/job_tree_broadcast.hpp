@@ -47,7 +47,7 @@ public:
         assert(_internal_msg_tag == -1 || _msg.tag == _internal_msg_tag);
         _internal_msg_tag = _msg.tag;
 
-        LOG(V2_INFO, "received broadcast\n");
+        LOG(V3_VERB, "received broadcast\n");
         _received_broadcast = true;
 
         assert(!_msg.returnedToSender);
