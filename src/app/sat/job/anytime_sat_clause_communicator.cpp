@@ -435,7 +435,6 @@ void AnytimeSatClauseCommunicator::initiateCrossSharing(JobMessage& msg, int sou
     _cross_sharing_session.reset(
         new ClauseSharingSession(_params, _cross_job_clause_sharer.get(), snapshot, nullptr, 0, 1)
     );
-    LOG(V4_VVER, "XTCS snapshot index %i\n", snapshot.index);
     if (snapshot.index == 0 && _params.crossJobToClientParent()) {
         // root of XTCS: export cross-shared clauses to client parent
         LOG(V4_VVER, "XTCS export to client parent [%i]\n", _job->getJobTree().getParentNodeRank());
@@ -444,7 +443,6 @@ void AnytimeSatClauseCommunicator::initiateCrossSharing(JobMessage& msg, int sou
             resultMsg.treeIndexOfDestination = 0;
             resultMsg.contextIdOfDestination = _job->getDescription().getGroupId();
             resultMsg.payload = clauses;
-            LOG(V4_VVER, "XTCS send appdatatoclientjob [%i] (myrank %i jobactorctxid %i)\n", _job->getJobTree().getParentNodeRank(), _job->getJobTree().getRank(), _job->getActorContextId());
             _job->getJobTree().send(_job->getJobTree().getParentNodeRank(), MSG_SEND_APP_DATA_TO_CLIENT_JOB, resultMsg);
         });
     }

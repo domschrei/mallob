@@ -161,8 +161,8 @@ public:
         return _has_clauses_to_broadcast_internally;
     }
     std::vector<int>&& getClausesToBroadcastInternally() {
-        //Nicco: Added this flag toggle, because otherwise it was always (?)
-        //stuck at true when using Cross-Job Sharing in Sweep'n'Sat
+        //Nicco: Added this toggle to false, otherwise this flag was always (?)
+        //stuck at true when using Cross-Job Sharing (at least in Sweep'n'Sat)
         _has_clauses_to_broadcast_internally = false;
         return std::move(_clauses_to_broadcast_internally);
     }

@@ -58,8 +58,6 @@ private:
 
     bool _internal_sharing = true;
 
-    bool _export_to_client_parent = true;
-
     MessageSubscription _sub_incoming_crossshared_clauses;
     std::list<std::vector<int>> _incoming_crossshared_clauses;
 
@@ -78,7 +76,6 @@ public:
     void feedLocalClausesIntoCrossSharing(std::vector<int>& clauses, ClauseSharingSession* session);
     // Need to guard against a mono job with no group (getGroupId() <= 0), where  _cross_job_clause_sharer is initialized to nullptr
     bool hasLocalClausesLeftToShare() const {return _cross_job_clause_sharer && _cross_job_clause_sharer->hasClausesToBroadcastInternally();}
-    void setExportToClientParent(bool exportToClientParent) {_export_to_client_parent = exportToClientParent;};
 
 private:
     bool handleClauseHistoryMessage(int source, int mpiTag, JobMessage& msg);

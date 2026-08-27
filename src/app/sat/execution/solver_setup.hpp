@@ -45,7 +45,6 @@ struct SolverSetup {
 
 	SolvingReplay::Mode replayMode {SolvingReplay::NONE};
 
-
 	int sweepeffort{100};
 	// Clause export
 

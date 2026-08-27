@@ -274,8 +274,6 @@ private:
             json["wallclock-limit"] = std::to_string(_desc.getWallclockLimit() - getAgeSinceActivation()) + "s";
         if (_desc.getCpuLimit() > 0)
             json["cpu-limit"] = std::to_string(_desc.getCpuLimit() - getAgeSinceActivation()) + "s";
-        if (_params.snsOverrideSatOptions())
-            json["configuration"]["options"] = SATWITHPRE_OPT_SNS_OVERRIDES;
 
         LOG(V2_INFO, "SATWP Starting SWEEPsns Job: %d Vars\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NV"));
         LOG(V2_INFO, "SATWP Starting SWEEPsns Job: %d Clauses\n", _desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));

@@ -74,8 +74,7 @@ private:
         if (_desc.getCpuLimit() > 0)
             json["cpu-limit"] = std::to_string(
             std::max(0.001f, _desc.getCpuLimit() - getAgeSinceActivation())) + "s";
-        // if (_params.overrideSatOptions.isSet())
-            // json["configuration"]["options"] = _params.overrideSatOptions();
+
         applySuccessiveGrowth(json);
 
         auto copiedJson = json;

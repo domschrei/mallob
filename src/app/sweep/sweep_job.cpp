@@ -35,6 +35,8 @@ SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTa
 {
 	assert(_params.jobCommUpdatePeriod() > 0 || log_return_false("[ERROR] For this application to work,"
             " you must explicitly enable job communicators with the -jcup option, e.g., -jcup=0.1\n"));
+	assert(_params.crossJobToClientParent()==false || log_return_false("[ERROR] For this application to work,"
+		    " you must explicitly disable cross-job sharing to the client parent, i.e. -cjtcp=0"));
 	DOUBLELOG(_sweeplogger, V2_INFO, "New SweepJob MPI Process on rank [%i] with planned %i threads, ctx %i \n", getJobTree().getRank(), params.numThreadsPerProcess.val, getJobTree().getContextId());
 }
 
@@ -143,10 +145,6 @@ void SweepJob::appl_start() {
 	}
 	if (_params.crossJobCommunication()) {
         _clause_comm = std::make_unique<AnytimeSatClauseCommunicator>(_params, this, false);
-		//This flag prevents that the AnytimeCommunicator send a message with the tag MSG_SEND_APP_DATA_TO_CLIENT_JOB
-		//to its client process, as in Sweep'n'Sat the client is not listening to that tag and would crash at an incoming
-		//message with that tag. This is in contrast to the MaxSAT solving, where this piping through the client is wanted.
-		_clause_comm->setExportToClientParent(false);
 	}
 
 	LOGGER(_sweeplogger, V3_VERB, "SWEEP appl_start() FINISHED\n");
