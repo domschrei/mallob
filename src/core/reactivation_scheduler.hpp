@@ -3,7 +3,6 @@
 
 #include "app/job.hpp"
 #include "util/logger.hpp"
-#include "util/tsl/robin_map.h"
 #include "scheduling/local_scheduler.hpp"
 #include "comm/msg_queue/message_subscription.hpp"
 #include "job_registry.hpp"
@@ -177,9 +176,15 @@ public:
 private:
 
     LocalScheduler constructScheduler(Job& job) {
-        LocalScheduler scheduler(job.getId(), _params, job.getJobTree(), 
-        [&job, this](int epoch, bool left, int dest) {
-            JobRequest req = job.spawnJobRequest(left, epoch);
+        LocalScheduler scheduler(job.getId(), _params, job.getJobTree(),
+                [this,
+                tree = job.getJobTree(),
+                id = job.getId(),
+                appId = job.getApplicationId(),
+                inc = job.isIncremental()](int epoch, bool left, int dest) {
+            int index = left ? tree.getLeftChildIndex() : tree.getRightChildIndex();
+            JobRequest req = tree.getJobRequestFor(id, left ? JobTree::LEFT_CHILD : JobTree::RIGHT_CHILD,
+                epoch, appId, inc);
             _cb_emit_job_request(req, dest==-1 ? MSG_REQUEST_NODE : MSG_REQUEST_NODE_ONESHOT, left, dest);
         });
         return scheduler;

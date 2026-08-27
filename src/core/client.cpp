@@ -186,7 +186,10 @@ void Client::readIncomingJobs() {
                         // Notify root rank of this job to user
                         if (foundJob.cbRootRank) foundJob.cbRootRank(_world_rank);
                     } else {
-                        if (foundJob.cbRootRank) _root_rank_callbacks[id] = std::move(foundJob.cbRootRank);
+                        if (foundJob.cbRootRank) {
+                            auto lock = _root_rank_callbacks_mutex.getLock();
+                            _root_rank_callbacks[id] = std::move(foundJob.cbRootRank);
+                        }
                         // Enqueue in ready jobs to be scheduled properly
                         auto lock = _ready_job_lock.getLock();
                         _ready_job_queue.push_back(std::move(foundJob.description));
@@ -334,7 +337,7 @@ void Client::advance() {
         }
         for (int jobId : doneJobs) {
             LOG_ADD_DEST(V3_VERB, "Notify #%i:0 that job is done", _root_nodes[jobId], jobId);
-            IntVec payload({jobId});
+            IntVec payload({jobId, -1});
             MyMpi::isend(_root_nodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
             finishJob(jobId, /*hasIncrementalSuccessors=*/false);
         }
@@ -580,12 +583,18 @@ void Client::sendJobDescription(JobRequest& req, int destRank) {
 
     // Remember transaction
     _root_nodes[req.jobId] = destRank;
-    // Notify root rank of this job to user
-    auto it = _root_rank_callbacks.find(req.jobId);
-    if (it != _root_rank_callbacks.end()) {
-        it->second(destRank);
-        _root_rank_callbacks.erase(it);
+
+    // Notify root rank of this job to the user
+    std::function<void(int)> rootRankCb;
+    {
+        auto lock = _root_rank_callbacks_mutex.getLock();
+        auto it = _root_rank_callbacks.find(req.jobId);
+        if (it != _root_rank_callbacks.end()) {
+            rootRankCb = it->second;
+            _root_rank_callbacks.erase(it);
+        }
     }
+    if (rootRankCb) rootRankCb(destRank);
 
     // waiting instance reader might be able to continue now
     {
@@ -849,6 +858,10 @@ Client::~Client() {
     _client_side_jobs.clear();
     _done_client_side_jobs.clear();
 
-    APIRegistry::close();
     LOG(V4_VVER, "Leaving client destructor\n");
+}
+
+// RAII to ensure that the API closes only after everything else is cleaned up.
+Client::APIConnectorHandle::~APIConnectorHandle() {
+    APIRegistry::close();
 }

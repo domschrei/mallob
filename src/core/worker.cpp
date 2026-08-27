@@ -230,4 +230,5 @@ void Worker::publishAndResetSysState() {
 
 Worker::~Worker() {
     LOG(V4_VVER, "Destruct worker\n");
+    MyMpi::getMessageQueue().resetTagPointers(); // disconnect msg queue from owned watchdog
 }

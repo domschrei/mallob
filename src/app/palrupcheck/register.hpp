@@ -43,14 +43,16 @@ void register_mallob_app_palrupcheck() {
 
     entry.reader = [](const Parameters& params, const std::vector<std::string>& files, JobDescription& desc) {
         desc.setAppConfigurationEntry("__chkcnf", files[0]);
-        desc.setAppConfigurationEntry("__chkproofdir", files[1]);
+        desc.setAppConfigurationEntry("__chkproofdir", files.size() > 1 ? files[1] : params.proofDirectory());
         desc.beginInitialization(0);
         desc.endInitialization();
         return true;
     };
+
     entry.creator = [](const Parameters& params, const Job::JobSetup& setup, AppMessageTable& table) -> Job* {
         return new PalrupCheckJob(params, setup, table);
     };
+
     entry.solutionFormatter = [](const Parameters& params, const JobResult& result, const JobProcessingStatistics& stat) {
         auto json = nlohmann::json::array();
         auto model = result.copySolution();
@@ -61,6 +63,40 @@ void register_mallob_app_palrupcheck() {
         //modelString << "c total_response_time " << stat.totalResponseTime << "\n";
         //json.push_back(modelString.str());
         return json;
+    };
+
+    entry.cleaner = [](const Parameters& params) {
+        if (!params.palRupCheckWorkdir().empty()) {
+            // Remove all files created by previous checker and directories if empty
+            FileUtils::rmrf(params.palRupCheckWorkdir() + "/.cleanup");
+            FileUtils::rmrf(params.palRupCheckWorkdir() + "/.unsat_found");
+            for (auto file : FileUtils::glob(params.palRupCheckWorkdir() + "/*/*/.check_ok"))
+                FileUtils::rm(file);
+            for (auto file : FileUtils::glob(params.palRupCheckWorkdir() + "/*/*/.done"))
+                FileUtils::rm(file);
+            for (auto file : FileUtils::glob(params.palRupCheckWorkdir() + "/*/*/.valid"))
+                FileUtils::rm(file);
+            for (auto file : FileUtils::glob(params.palRupCheckWorkdir() + "/*/*/out.palrup_import"))
+                FileUtils::rm(file);
+            for (auto file : FileUtils::glob(params.palRupCheckWorkdir() + "/*/*/out.palrup_proxy"))
+                FileUtils::rm(file);
+            for (auto file : FileUtils::glob(params.palRupCheckWorkdir() + "/*/*"))
+                if (FileUtils::isDirectory(file))
+                    FileUtils::rm(file);
+            for (auto file : FileUtils::glob(params.palRupCheckWorkdir() + "/*"))
+                if (FileUtils::isDirectory(file))    
+                    FileUtils::rm(file);
+
+            FileUtils::rm(params.palRupCheckWorkdir());
+        }
+
+        if (!params.logDirectory().empty()) {
+            FileUtils::rmrf(params.logDirectory() + "/pals");
+            for (auto file : FileUtils::glob(params.logDirectory() + "/*.palrup"))
+                FileUtils::rmrf(file);
+            for (auto file : FileUtils::glob(params.logDirectory() + "/*/palrup.out"))
+                FileUtils::rmrf(file);
+        }
     };
 
     app_registry::registerApplication(entry);

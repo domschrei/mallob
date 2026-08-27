@@ -8,6 +8,7 @@
 #include "util/assert.hpp"
 #include "data/job_transfer.hpp"
 #include "util/logger.hpp"
+#include "util/sys/threading.hpp"
 #include "util/tsl/robin_map.h"
 #include "util/hashing.hpp"
 #include "comm/mpi_base.hpp"
@@ -21,7 +22,30 @@ public:
     virtual void communicate(int source, int mpiTag, JobMessage& msg) = 0;
 };
 
-typedef tsl::robin_map<ctx_id_t, AppMessageListener*> AppMessageTable;
+class AppMessageTable {
+    Mutex mtx;
+    tsl::robin_map<ctx_id_t, AppMessageListener*> map;
+public:
+    void registerListenerInTable(ctx_id_t ctxId, AppMessageListener* l) {
+        auto lock = mtx.getLock();
+        map[ctxId] = l;
+    }
+    void unregisterListenerFromTable(ctx_id_t ctxId) {
+        auto lock = mtx.getLock();
+        map.erase(ctxId);
+    }
+    // RAII-style-locked handle for a particular listener. Valid if listener != nullptr.
+    struct ListenerHandle {
+        std::unique_lock<std::mutex> lock;
+        AppMessageListener* listener {nullptr};
+    };
+    ListenerHandle accessListener(ctx_id_t ctxId) {
+        auto lock = mtx.getLock();
+        auto it = map.find(ctxId);
+        if (it == map.end()) return {};
+        return {std::move(lock), it.value()};
+    };
+};
 
 class AppMessageSubscription {
 
@@ -40,7 +64,8 @@ public:
         // and also unique within this process
         _ctx_id = _running_ctx_id * MyMpi::size(MPI_COMM_WORLD) + MyMpi::rank(MPI_COMM_WORLD);
         _running_ctx_id++;
-        registerListenerInTable(listener);
+
+        _table.registerListenerInTable(_ctx_id, listener);
     }
 
     ctx_id_t getContextId() const {
@@ -48,19 +73,10 @@ public:
     }
 
     void destroy() {
-        unregisterListenerFromTable();
+        _table.unregisterListenerFromTable(_ctx_id);
     }
 
     ~AppMessageSubscription() {
-        unregisterListenerFromTable();
-    }
-
-private:
-    void registerListenerInTable(AppMessageListener* l) {
-        _table[_ctx_id] = l;
-    }
-
-    void unregisterListenerFromTable() {
-        _table.erase(_ctx_id);
+        destroy();
     }
 };

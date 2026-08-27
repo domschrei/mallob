@@ -58,6 +58,7 @@ public:
                 // Append new clauses, fingerprint, and assumptions
                 lits.insert(lits.end(), other.lits.begin(), other.lits.end());
             }
+            other = SatTask {type};
         }
     };
     struct SatTaskResult {
@@ -81,7 +82,7 @@ public:
 protected:
     std::string _name;
     std::function<bool(int)> _terminator;
-    std::function<const SatTask&()> _cb_retrieve_full_task;
+    std::function<SatTask()> _cb_retrieve_full_task;
 
 private:
     Synchronizer& _sync;
@@ -94,7 +95,7 @@ public:
     virtual void setName(const std::string& baseName) {
         _name = baseName + ":base";
     }
-    virtual void setRetrieveFullTaskCallback(std::function<const SatTask&()> cb) {
+    virtual void setRetrieveFullTaskCallback(std::function<SatTask()> cb) {
         _cb_retrieve_full_task = cb;
     }
     virtual void setTerminator(const std::function<bool(int)>& terminator) {

@@ -36,6 +36,7 @@ private:
     int _nb_vars {0};
     int _nb_clauses {0};
     int _revision {-1};
+    int _max_alloc_var {0};
 
     bool _has_empty_clause {false};
     bool _last_lit_zero {true};
@@ -94,6 +95,11 @@ public:
 
     virtual const char* get_name() const override {return "MallobSat-internal";}
     virtual const char* get_version() const override {return "N/A";}
+
+    virtual int32_t new_var() override {
+        _max_alloc_var++;
+        return _max_alloc_var;
+    }
 
     virtual void add(int32_t lit, int64_t cgroup_id = 0) override {
         _in_solved_state = false;

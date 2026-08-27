@@ -233,6 +233,10 @@ public:
         return _best_found_solution_cost;
     }
 
+    int getEpoch() const {
+        return _epoch;
+    }
+
     ~ClauseSharingSession() {
         LOG(V5_DEBG, "%s CS CLOSE e=%i\n", _job->getLabel(), _epoch);
         // If not done producing, will send empty clause buffer upwards
