@@ -66,7 +66,6 @@ private:
     bool _finished = false;
     bool _valid = true;
     bool _broadcast_enabled = true;
-    std::function<void()> _cb;
 
     CondMessageSubscription _sub_aggregate;
     CondMessageSubscription _sub_broadcast;
@@ -79,13 +78,11 @@ public:
         _sub_aggregate(MSG_JOB_TREE_MODULAR_REDUCE, [this](MessageHandle& h) {
             JobMessage msg = Serializable::get<JobMessage>(h.getRecvData());
             return receive(h.source, h.tag, msg);
-        }),
-        _sub_broadcast(MSG_JOB_TREE_MODULAR_BROADCAST, [this](MessageHandle& h) {
+        }), _sub_broadcast(MSG_JOB_TREE_MODULAR_BROADCAST, [this](MessageHandle& h) {
             LOG(V4_VVER, "BROADCAST\n");
             JobMessage msg = Serializable::get<JobMessage>(h.getRecvData());
             return receive(h.source, h.tag, msg);
-        })
-    {
+        }) {
 
         int leftRank = _tree.leftChildNodeRank;
         int rightRank = _tree.rightChildNodeRank;
@@ -108,12 +105,12 @@ public:
         _base_msg.treeIndexOfSender = _tree.index;
         _base_msg.contextIdOfSender = _tree.contextId;
 
-        int act_num_children = 0;
-        if (leftRank>=0) act_num_children++;
-        if (rightRank>=0) act_num_children++;
+        int actual_num_children = 0;
+        if (leftRank>=0) actual_num_children++;
+        if (rightRank>=0) actual_num_children++;
         LOG(VERB_ALLRED, "SWEEP New RED. (%i)children [%i],[%i] \n", _tree.nbChildren, leftRank, rightRank);
-        if (act_num_children != _tree.nbChildren) {
-            LOG(V1_WARN, "WARN SWEEP: AllReduction got Snapshot with _tree.nbChildren %i, but actual child ranks [%i]&[%i] give %i actual children! \n", _tree.nbChildren, leftRank, rightRank, act_num_children);
+        if (actual_num_children != _tree.nbChildren) {
+            LOG(V1_WARN, "WARN SWEEP: AllReduction got Snapshot with _tree.nbChildren %i, but actual child ranks [%i]&[%i] give %i actual children! \n", _tree.nbChildren, leftRank, rightRank, actual_num_children);
         }
     }
 
@@ -128,7 +125,7 @@ public:
         _transformation_at_root = transformation;
         _has_transformation_at_root = true;
         if (_has_inplace_transformation_at_root) {
-            LOG(V1_WARN, "WARN: Setting copying rootTransformation when there already exists its inplace pendant!\n");
+            LOG(V1_WARN, "WARN: You are setting a copying rootTransformation callback, but there is already an inplace version provided!\n");
         }
     }
 
@@ -136,7 +133,7 @@ public:
         _inplace_transformation_at_root = inplace_transformation;
         _has_inplace_transformation_at_root = true;
         if (_has_transformation_at_root) {
-            LOG(V1_WARN, "WARN: Setting inplace rootTransformation when there already exists its coyping pendant!\n");
+            LOG(V1_WARN, "WARN: You are setting an inplace rootTransformation callback, but there is already a copying version provided!\n");
         }
     }
 
@@ -152,17 +149,13 @@ public:
         return _tree;
     }
 
-    void setResultCallback(std::function<void()> callback = []() {}) {
-        _cb = callback;
-    }
-
 private:
     // Process an incoming message and advance the all-reduction accordingly.
     bool receive(int source, int tag, JobMessage& msg) {
 
         assert(tag == MSG_JOB_TREE_MODULAR_REDUCE || tag == MSG_JOB_TREE_MODULAR_BROADCAST || log_return_false("SWEEP Warn: Unexpected tag %i (msg.tag %i) in JobTreeAllReduction receive(...) from source %i\n", tag, msg.tag, source));
 
-        LOG(V5_DEBG, "TRY REDUCE %i %i %i %i %i\n", tag, msg.epoch, _base_msg.epoch, msg.tag, _base_msg.tag);
+        LOG(V3_VERB, "TRY REDUCE %i %i %i %i %i\n", tag, msg.epoch, _base_msg.epoch, msg.tag, _base_msg.tag);
 
         bool accept = msg.epoch == _base_msg.epoch
                     //&& msg.revision == _base_msg.revision
@@ -171,7 +164,7 @@ private:
 
         if (msg.returnedToSender) {
             _returnToSender_counter++;
-            LOG(V1_WARN, "WARN RED REDUCE : got %i. returnedToSender (source %i, tag %i, msg.tag %i, msg.size %i)\n", _returnToSender_counter, source, tag, msg.tag, msg.payload.size());
+            LOG(V1_WARN, "WARN: AllReduce got %i. returnedToSender msg (source %i, tag %i, msg.tag %i, msg.size %i)\n", _returnToSender_counter, source, tag, msg.tag, msg.payload.size());
             _returnToSender_payload = std::move(msg.payload);
             _have_unanswered_returnToSender = true;
             return true;
@@ -214,42 +207,42 @@ public:
             _tree.nodeRank,  _child_elems.size(), _num_expected_child_elems, _local_elem.has_value(), _expected_child_ranks.first, _expected_child_ranks.second,
             _received_child_elems.first, _received_child_elems.second);
 
-        // We catch here a race condition which (as far as I understand) can occur with the modular BCAST+ALLRED system.
-        // The problem occurs when one child reacts 'too quickly' compared to the other child, which messes up the order at the receiving parent.
-        // When the fast child sends a reduction message to the parent while the parent is still waiting for the broadcast response of the slower child,
-        // then the parent hasn't yet created its reduction object to handle the incoming reduction message, and crashes
+        // In the Broadcast+Allreduction setup a race condition can occur, when one child reacts 'too quickly' w.r.t the other child.
+        // Specifically, the fast child returns messages for both the Broadcast and the AllReduce step, but the parent
+        // is not yet ready for the incoming AllReduce message, because it is still waiting for the Broadcast response from the other child.
+        // As a result, the AllReduce is either stuck eternally.
+        // This occurred especially when the Bcast+AllRed period was aggressively lowered,
+        // to ca. 2ms periods between advance() calls  (PeriodicEvent<2,1>) instead of the default 10ms timing
+        // and more frequent initialisations of new Broadcast rounds in general (every 20-30ms)
         //
-        // detailed example: root node 0 with children 1 and 2
+        // Following, a (too) detailed example of the race condition, with root node 0 and children 1 and 2
         //
         //        0
         //       / \
         //      1  2
         //
         // - root 0 wants to start a Broadcast+AllReduction
-        // - root 0 initializes its broadcast object _bcast, but not yet its reduction object _red (!)
-        //      _red stays uninitialized, because it needs the yet-to-be-created local tree snapshot from broadcast
+        // - root 0 initializes its broadcast object _bcast, but not yet its reduction object _red
+        //      _red stays uninitialized, in part because it needs the yet-to-be-created tree snapshot from broadcast
         // - root 0 sends a broadcast to 1 and 2
         // - child 2 receives the broadcast.
         //     it sends an acknowledgment back to root that it received the broadcast (MSG_JOB_TREE_MODULAR_BROADCAST)
-        //     it also immediately reads hasResult()==true, since it doesnt have any children on its own
-        //     it triggers its own broadcast callback (digestBroadcast(), in the case of collectives_example_job.hpp)
-        //     it initializes its reduction object (_red)
+        //     it also immediately evaluates hasResult()==true, since it doesnt have any children on its own
+        //     it triggers its own broadcast callback (digestBroadcast() in the case of collectives_example_job.hpp)
+        //     it initializes its reduction object _red
         //     it contributes to its reduction object
-        // - root 0 receives the broadcast acknowledgment from child 2
-        //     and accordingly toggles _received_response_right=true
-        //     however, it still waits for the broadcast response from child 1, which for some reason takes longer...,
-        //     so its hasResult() stays false, it does not trigger its callback, and its _red stays uninitialized
-        // - child 2 calls the periodic tryEndReduction()
-        //     it triggers _red->advance(),
-        //     which starts the local aggregation
-        // - child 2 calls the periodic tryEndReduction() again
-        //     its local aggregation is finished, so it sends the reduction upwards to the parent (MSG_JOB_TREE_MODULAR_REDUCE)
-        // - root 0 receives the reduction message, but doesnt have any listening objects to handle it
-        //     in particular not a _red object, since we are still waiting for from child 1's broadcast response
+        // - root 0 receives the broadcast acknowledgment from child 2 and accordingly toggles _received_response_right=true
+        //     however, it still waits for the broadcast response from child 1
+        //     so its own hasResult() stays false, meaning it doesn't trigger its callback and _red stays uninitialized
+        // - child 2 calls the periodic tryEndReduction(), triggering _red->advance(), starting the local aggregation
+        // - child 2 calls the periodic tryEndReduction() again, sending the reduction element upwards to the parent (MSG_JOB_TREE_MODULAR_REDUCE)
+        // - root 0 receives the reduction message, but doesnt have any listening objects yet to handle it
+        //     in particular, root 0 is missing the  _red object, since its still waiting for child 1's broadcast response
         // - child 2 receives the "returnedToSender" message
+        // - we are stuck, because root 0 now waits indefinitely for child 2's reduction element, but child 2 never sends it again
         //
-        // THE HOTFIX (we are here, codewise):
-        // - child 2 tries to send the same message again, in the hope that by now the parent is finally ready
+        // THE HOTFIX:
+        // - child 2 tries to send the same message again after it bounced, hoping that at some point the parent can handle it
 
         if (_have_unanswered_returnToSender) {
             LOG(V1_WARN, "WARN RED : sending %i. fixing message to parent after returnedToSender \n", _returnToSender_counter);
@@ -291,8 +284,7 @@ public:
                 if (_has_transformation_at_root) {
                     _aggregated_elem.emplace(_transformation_at_root(_aggregated_elem.value()));
                 }
-                //A non-const transformation to avoid copying of the whole vector
-                //when we know that the shape will remain the same and we only want to toggle a few single values
+                //A non-const transformation to avoid copying of the whole vector, when possible
                 if (_has_inplace_transformation_at_root) {
                    _inplace_transformation_at_root(_aggregated_elem.value());
                 }

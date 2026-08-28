@@ -13,7 +13,6 @@
 extern "C" {
 #include "kissat/src/kissat.h"
 }
-#include "util/sys/threading.hpp"
 
 struct kissat;
 struct SolverSetup;
@@ -24,7 +23,7 @@ enum class SweepStealType {
 	Local = 2,
 };
 
-
+//Tracking worksteal events in MallobSweep
 struct SweepStealInfo {
 	int		nr;
 	SweepStealType stealtype;
@@ -62,7 +61,7 @@ private:
 	//when exporting data from the solver to Mallob, need to lock the vector when extracting for global sharing,
 	//otherwise the solver threads might concurrently push new data into the std::vector while we are reading it
 	std::vector<int> units_to_share;
-    std::vector<int> eqs_to_share;
+	std::vector<int> eqs_to_share;
 	std::mutex sweep_export_mutex;
 
 	//Work received by stealing from others
@@ -149,7 +148,6 @@ public:
     friend void on_drup_deletion(void* state, const int* lits, int nbLits);
 
 	friend void report_database_lit(void *state, int lit);
-
 	//Preprocessing
     friend bool begin_formula_report(void* state, int vars, int cls);
     friend void report_preprocessed_lit(void* state, int lit);
@@ -161,9 +159,7 @@ public:
 	void setToSweeper();
 	void triggerSweepTerminate();
 	void setRepresentativeLocalId(int localId);
-
 	bool set_option(const std::string &option_name, int value);
-
 
 private:
     void produceClause(int size, int lbd);
@@ -175,15 +171,10 @@ private:
     void addLiteralFromPreprocessing(int lit);
 	shweep_statistics fetchSweepStats();
 
-
     bool shouldTerminate();
-
 	//Shared Sweeping
 	void sweepExportEq();
 	void sweepExportUnit(int eunit);
-	void sweepImportEqs(int** equivalences, int *eqs_size);
-	void sweepImportUnits(int **units, int *unit_count);
-
 	void sweepSetExportCallbacks();
 
 };

@@ -174,11 +174,9 @@ void Client::readIncomingJobs() {
                         // store "original" arrival time value as the job's submission time
                         desc->getStatistics().timeOfSubmission = desc->getArrival();
                         desc->getStatistics().timeOfScheduling = Timer::elapsedSeconds();
-                        //Set the program
                         clientSideJob.program.reset(
                             app_registry::getClientSideProgramCreator(appId)(params, APIRegistry::get(), *desc)
                         );
-                        //Run the program
                         clientSideJob.thread->run([&, prog = clientSideJob.program.get(), done, res]() {
                             *res = prog->function();
                             *done = true;
@@ -676,7 +674,7 @@ void Client::handleSendJobResultInternal(JobResult&& jobResult) {
     if (resultCode == RESULT_SAT) resultCodeString = "SATISFIABLE";
     if (resultCode == RESULT_UNSAT) resultCodeString = "UNSATISFIABLE";
     if (resultCode == RESULT_OPTIMUM_FOUND) resultCodeString = "OPTIMUM FOUND";
-    if (resultCode == RESULT_SIMPLIFIED) resultCodeString = "IMPROVED";
+    if (resultCode == RESULT_SIMPLIFIED) resultCodeString = "SIMPLIFIED";
 
     // Output response time and solution header
     LOG(V2_INFO, "RESPONSE_TIME #%i %.6f rev. %i\n", jobId, desc.getStatistics().totalResponseTime, revision);

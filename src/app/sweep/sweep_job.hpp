@@ -207,6 +207,8 @@ private:
 
 	Logger _sweeplogger;
 
+
+
 	//when we exporting Eqs+Units from a solver thread to Mallob, use mutex to prevent
 	//the solver thread to concurrently push new data onto the vector we are just reading/moving
 	std::mutex _stealinfo_mutex;

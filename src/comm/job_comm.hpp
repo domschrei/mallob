@@ -234,9 +234,8 @@ public:
 
     void updateMap() {
         _world_to_int_rank.clear();
-        for (size_t i = 0; i < _address_list.list.size(); i++) {
+        for (size_t i = 0; i < _address_list.list.size(); i++)
             _world_to_int_rank[_address_list.list[i].rank] = i;
-        }
     }
 };
 

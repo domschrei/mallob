@@ -48,40 +48,40 @@ public:
 
         LOG(V2_INFO, "SATWP start orchestrator\n");
 
+        if (_params.preprocessSweepnSat()) {
+            //Use this preprocessing setup to start the Sweep'n'Sat setup (and nothing else)
+            startSweepNSat();
+            return;
+        }
+
         // Mallob on original instance
         _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSAT, nullptr});
         ActorContext* ctxMalOrig = &_actors.back();
 
-        if (_params.preprocessSweepnSat()) {
-            _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSWEEP, nullptr, {}});
-            ActorContext* ctxSweep = &_actors.back();
-        }
-        else {
-            // Lingeling (SAT, UNSAT or nothing)
-            _actors.push_back({PreprocessorOrchestrator::ActorContext::LINGELING, nullptr, {}});
-            ActorContext* ctxLgl = &_actors.back();
-            // Kissat (preprocesses the formula)
-            _actors.push_back({PreprocessorOrchestrator::ActorContext::KISSAT, nullptr, {}});
-            ActorContext* ctxKis = &_actors.back();
-            // Satsuma (preprocesses the formula)
-            _actors.push_back({PreprocessorOrchestrator::ActorContext::SATSUMA_EXT, nullptr, {}});
-            ActorContext* ctxSats = &_actors.back();
+        // Lingeling (SAT, UNSAT or nothing)
+        _actors.push_back({PreprocessorOrchestrator::ActorContext::LINGELING, nullptr, {}});
+        ActorContext* ctxLgl = &_actors.back();
+        // Kissat (preprocesses the formula)
+        _actors.push_back({PreprocessorOrchestrator::ActorContext::KISSAT, nullptr, {}});
+        ActorContext* ctxKis = &_actors.back();
+        // Satsuma (preprocesses the formula)
+        _actors.push_back({PreprocessorOrchestrator::ActorContext::SATSUMA_EXT, nullptr, {}});
+        ActorContext* ctxSats = &_actors.back();
 
-            // Kissat on Satsuma-preprocessed formula (preprocesses the formula)
-            _actors.push_back({PreprocessorOrchestrator::ActorContext::KISSAT, ctxSats, {}});
-            ActorContext* ctxKisAfterSats = &_actors.back();
-            ctxKisAfterSats->onlyStartIfPrerequisiteSimplified = true; // do not launch Kissat (again!) if Satsuma didn't simplify anything
+        // Kissat on Satsuma-preprocessed formula (preprocesses the formula)
+        _actors.push_back({PreprocessorOrchestrator::ActorContext::KISSAT, ctxSats, {}});
+        ActorContext* ctxKisAfterSats = &_actors.back();
+        ctxKisAfterSats->onlyStartIfPrerequisiteSimplified = true; // do not launch Kissat (again!) if Satsuma didn't simplify anything
 
-            // Mallob on Kissat-preprocessed formula - displaces original Mallob task
-            _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSAT, ctxKis, {ctxMalOrig}});
-            ActorContext* ctxMalPre1 = &_actors.back();
-            ctxMalPre1->onlyStartIfPrerequisiteSimplified = true; // do not launch this MallobSat task if Kissat didn't simplify anything
+        // Mallob on Kissat-preprocessed formula - displaces original Mallob task
+        _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSAT, ctxKis, {ctxMalOrig}});
+        ActorContext* ctxMalPre1 = &_actors.back();
+        ctxMalPre1->onlyStartIfPrerequisiteSimplified = true; // do not launch this MallobSat task if Kissat didn't simplify anything
 
-            // Mallob on Satsuma+Kissat-preprocessed formula - displaces all prior Mallob tasks
-            _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSAT, ctxKisAfterSats, {ctxMalOrig, ctxMalPre1}});
-            ActorContext* ctxMalPreFull = &_actors.back();
-            // (we always spawn this one since Satsuma *did* simplify something if the prerequisite is ready)
-        }
+        // Mallob on Satsuma+Kissat-preprocessed formula - displaces all prior Mallob tasks
+        _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSAT, ctxKisAfterSats, {ctxMalOrig, ctxMalPre1}});
+        ActorContext* ctxMalPreFull = &_actors.back();
+        // (we always spawn this one since Satsuma *did* simplify something if the prerequisite is ready)
     }
 
     int loop() {
@@ -220,5 +220,11 @@ private:
         cnf.push_back(nbVars);
         cnf.push_back(nbCls);
         return cnf;
+    }
+
+    void startSweepNSat() {
+        //FMCAD26. Start both SWEEP and SAT Jobs concurrently.
+        _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSAT, nullptr});
+        _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSWEEP, nullptr, {}});
     }
 };

@@ -17,9 +17,9 @@
 #define V6_DEBGV 6
 
 #define LOG_ADD_DESTRANK 8
-#define LOG_ADD_SRCRANK  16
-#define LOG_NO_PREFIX    32
+#define LOG_ADD_SRCRANK 16
 
+#define LOG_NO_PREFIX 32
 
 class Logger {
 

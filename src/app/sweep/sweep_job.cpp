@@ -669,7 +669,11 @@ void SweepJob::cbReportIteration(int localId) {
 
 void SweepJob::reportStealLatencies(KissatPtr sweeper) {
 	//Write detailed information about local and MPI workstealing events
-	if (LOGGER_STATIC_VERBOSITY >= 5) {
+	if (!_params.sweepTrackWorksteals()) {
+		return;
+	}
+
+	if (LOGGER_STATIC_VERBOSITY >= 4) {
 		//super verbose, print every individual steal
 		Logger _steallogger(Logger::getMainInstance().copy("<STEAL>", ".steal."+to_string(sweeper->getLocalId())));
 		for (auto steal : sweeper->steal_records) {
@@ -677,9 +681,9 @@ void SweepJob::reportStealLatencies(KissatPtr sweeper) {
 			LOGGER(_steallogger, V5_DEBG, "id %i   r %i   nr %i   ts %.5f  trc %.5f  trd %.5f   d %.6f   s %i  %s\n",sweeper->getLocalId(), steal.round, steal.nr,  steal.t_submit, steal.t_receive, steal.t_read, steal.t_receive - steal.t_submit, steal.size,  stealtype.c_str() );
 		}
 	}
-	//Still very verbose: Print steal information aggregated for each sharing round
-	//The last sweeper to contribute also reports the aggregated statistics
-	{
+	if (LOGGER_STATIC_VERBOSITY >= 3) {
+		//Still very verbose: Print steal information aggregated for each sharing round
+		//The last sweeper to contribute also reports the aggregated statistics
 		std::lock_guard<std::mutex> lock(_stealinfo_mutex);
 		_stealinfos_per_solver.emplace_back(sweeper->steal_records);
 		if (_stealinfos_per_solver.size() == _nThreads) {
@@ -711,7 +715,7 @@ void SweepJob::reportStealLatencies(KissatPtr sweeper) {
 					}
 				}
 				if (!local.empty() || !mpi.empty() || loc_stolensum || mpi_stolensum) {
-					LOGGER(_stealsumlogger, V4_VVER, "iter %i rnd %i   locA %i   mpiA %i   locS %i   mpiS %i   max_mpi_ms %.3f\n",
+					LOGGER(_stealsumlogger, V3_VERB, "iter %i rnd %i   locA %i   mpiA %i   locS %i   mpiS %i   max_mpi_ms %.3f\n",
 						iteration, round, local.size(), mpi.size(), loc_stolensum, mpi_stolensum,
 						// local.empty() ? 0.0f : std::accumulate(local.begin(), local.end(), 0.0f) / local.size(),
 						// local.empty() ? 0.0f : *std::max_element(local.begin(), local.end()) * 1000,
@@ -1113,7 +1117,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 		int size = request.stolen_work.size();
 		assert(request.to_send  == false			|| log_return_false("SWEEP ERROR : got request response, but still   request.to_send==true.             stealingLocalId %i, payload.size %zu ", localId, size));
 		assert(request.is_active		    		|| log_return_false("SWEEP ERROR : got request response, but was no longer flagged active.               stealingLocalId %i, payload.size %zu ", localId, size));
-		if (_params.verbosity()>=V4_VVER) {
+		if (_params.sweepTrackWorksteals()) {
 			sweeper->steal_records.push_back({request.nr, SweepStealType::MPI, size , request.t_queued, request.t_received ,  t1, _lastImportedRound });
 		}
 		request.got_steal_response = false; //to not read it a second time
@@ -1151,7 +1155,7 @@ void SweepJob::solverGoStealing(KissatPtr sweeper) {
 	float t1 = Timer::elapsedSeconds();
 	int size = stolen_work.size();
 	int nr = sweeper->attempted_steals++;
-	if (_params.verbosity()>=V4_VVER) {
+	if (_params.sweepTrackWorksteals()) {
 		sweeper->steal_records.push_back({nr, SweepStealType::Local, size, t0, t1, t1, _lastImportedRound });
 	}
 	if (size>0) {
