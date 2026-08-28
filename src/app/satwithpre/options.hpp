@@ -5,7 +5,6 @@
 #include "util/option.hpp"
 
 #define SATWITHPRE_OPT_OVERRIDES "-satsolver=k_k_l+[k_]{13} -ilbd=0 -rlbd=3"
-#define SATWITHPRE_OPT_SNS_OVERRIDES "-satsolver=k_"
 // Application-specific program options for SAT solving.
 // memberName                               short option name, long option name          default   min  max
 
@@ -23,7 +22,4 @@ OPT_STRING(overrideSatOptions, "oso", "override-sat-options", "",
 OPT_BOOL(preprocessSatsuma, "presa", "preprocess-satsuma", false, "Run Satsuma instead of kissat")
 OPT_BOOL(chainKissatAfterSatsuma, "ckas", "chain-kissat-after", false, "Additionally run Kissat on the result of Satsuma")
 #endif
-
 OPT_BOOL(preprocessLingeling, "pl", "preprocess-lingeling", false, "Additionally run Lingeling as a preprocessor")
-OPT_BOOL(snsOverrideSatOptions, "snsoso", "sns-override-sat-options", true,
-    "In the snsSAT sub-tasks, override snsSAT solving options with \"" + std::string(SATWITHPRE_OPT_SNS_OVERRIDES) + "\"")

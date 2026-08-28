@@ -236,7 +236,6 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.maxNumSolvers = config.mpisize * params.numThreadsPerProcess();
 	setup.numVars = numVars;
 	setup.numOriginalClauses = numClauses;
-	setup.sweepeffort = params.sweepeffort();
 	int sqrt = std::ceil(std::sqrt((double) setup.maxNumSolvers));
 	setup.proofDir = proofDirectory;
 
