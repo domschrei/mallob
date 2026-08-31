@@ -42,7 +42,10 @@ struct SolverSetup {
 	int diversificationIndex {0};
 	PortfolioSequence::Flavour flavour {PortfolioSequence::DEFAULT};
 	SolverPortfolioConfig solverConfig;
+
 	SolvingReplay::Mode replayMode {SolvingReplay::NONE};
+
+
 	// Clause export
 
 	bool exportClauses {true}; // exporting clauses to other solvers?

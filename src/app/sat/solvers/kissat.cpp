@@ -75,7 +75,7 @@ void on_drup_deletion(void* state, const int* lits, int nbLits) {
 Kissat::Kissat(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup), solver(kissat_init()),
         learntClauseBuffer(_setup.strictMaxLitsPerClause+ClauseMetadata::numInts()),
-        eq_up_buffer(2)  //pass two literals as one equality
+        eq_up_buffer(2)  //buffer pass an equality as two literals
 {
 
     kissat_set_terminate(solver, this, &terminate_callback);
@@ -279,8 +279,6 @@ void Kissat::sweepSetExportCallbacks() {
     shweep_set_unit_export_callback(solver, this, &sweep_export_unit);
 }
 
-
-
 void Kissat::produceClause(int size, int lbd) {
     interruptionInitialized = true;
     if (size > _setup.strictMaxLitsPerClause) return;
@@ -393,11 +391,10 @@ bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
     if (accept) {
         nbPreprocessedVariables = nbVars;
         nbPreprocessedClausesAdvertised = nbClauses;
-        //Attention: The number of Vars/Clauses we write here can differ from the original file,
-        //when variables have been eliminated because or never occurred in the formula
-        //If we wish a full reconstruction later, we are reliant on the previous Job knowing the original variable count.
-        //Currently this is the way its done, sequential prepro Kissat know the original values.
-        //Alternatively, one could write the original number of variables here, then we would not depend on knowledge of previous jobs
+        //Attention: The number of Vars & Clauses we write here can differ from the original file, due to
+        //variables having been eliminated or never occurred in the formula in the first place (holes).
+        //If we wish a full reconstruction later, we are reliant on the previous job knowing the original variable count.
+        //In the old preprocessing logic this was how it was done, sequential prepro Kissat knew these original values.
     } else setSolverInterrupt();
     return accept;
 }

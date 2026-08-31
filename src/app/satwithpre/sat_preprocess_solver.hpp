@@ -51,11 +51,11 @@ private:
 
 
     //SAT call on preprocessed formula
-    bool _preprod_job_submitted {false};
-    volatile bool _preprod_job_done {false};
-    bool _preprod_job_digested {false};
-    nlohmann::json _preprod_job_submission;
-    nlohmann::json _preprod_job_response;
+    bool _prepro_job_submitted {false};
+    volatile bool _prepro_job_done {false};
+    bool _prepro_job_digested {false};
+    nlohmann::json _prepro_job_submission;
+    nlohmann::json _prepro_job_response;
 
     SatPreprocessor& _prepro;
 

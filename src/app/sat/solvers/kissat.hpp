@@ -146,33 +146,31 @@ public:
 	friend void on_drup_derivation(void* state, const int* lits, int nbLits, int glue);
     friend void on_lrup_import(void* state, unsigned long id, const int* lits, int nbLits, const uint8_t* sigData);
     friend void on_drup_deletion(void* state, const int* lits, int nbLits);
-
-	friend void report_database_lit(void *state, int lit);
-	//Preprocessing
+    //Preprocessing
     friend bool begin_formula_report(void* state, int vars, int cls);
     friend void report_preprocessed_lit(void* state, int lit);
     friend int terminate_callback(void* state);
 
-	//Shared Sweeping / SWEEP App
-	friend void sweep_export_eq(void *state);
-	friend void sweep_export_unit(void *state, int unit);
-	void setToSweeper();
-	void triggerSweepTerminate();
-	void setRepresentativeLocalId(int localId);
-	bool set_option(const std::string &option_name, int value);
+    //Shared Sweeping / SWEEP App
+    friend void sweep_export_eq(void *state);
+    friend void sweep_export_unit(void *state, int unit);
+    void setToSweeper();
+    void triggerSweepTerminate();
+    void setRepresentativeLocalId(int localId);
+    bool set_option(const std::string &option_name, int value);
 
 private:
     void produceClause(int size, int lbd);
     void consumeClause(int** clause, int* size, int* lbd, unsigned long* id, unsigned char* sig);
 	void processProofLine(LratOp&& op);
 
-	void sweepSetFormulaReportCallback();
     bool isPreprocessingAcceptable(int vars, int cls);
     void addLiteralFromPreprocessing(int lit);
-	shweep_statistics fetchSweepStats();
 
     bool shouldTerminate();
-	//Shared Sweeping
+
+	void sweepSetFormulaReportCallback();
+	shweep_statistics fetchSweepStats();
 	void sweepExportEq();
 	void sweepExportUnit(int eunit);
 	void sweepSetExportCallbacks();

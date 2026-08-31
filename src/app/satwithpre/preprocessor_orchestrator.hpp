@@ -49,7 +49,7 @@ public:
         LOG(V2_INFO, "SATWP start orchestrator\n");
 
         if (_params.preprocessSweepnSat()) {
-            //Use this preprocessing setup to start the Sweep'n'Sat setup (and nothing else)
+            //start Sweep'n'Sat (and nothing else)
             startSweepNSat();
             return;
         }
@@ -223,7 +223,7 @@ private:
     }
 
     void startSweepNSat() {
-        //FMCAD26. Start both SWEEP and SAT Jobs concurrently.
+        //Two apps (SWEEP and SAT) run concurrently. from the FMCAD'26 paper
         _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSAT, nullptr});
         _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSWEEP, nullptr, {}});
     }

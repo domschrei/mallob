@@ -200,7 +200,6 @@ endif()
 if(MALLOB_APP_KMEANS EQUAL 1)
     register_mallob_app("kmeans")
 endif()
-
 # Include further applications here, above publish_app_registry_changes()
 publish_app_registry_changes()
 
