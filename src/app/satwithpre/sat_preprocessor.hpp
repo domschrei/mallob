@@ -292,7 +292,7 @@ private:
 			if (lit != 0) {
 				construct_clause.push_back(lit);
 			} else {
-				result.add_clause(construct_clause);
+				result.add_clause(construct_clause); 
 
 				construct_clause.clear();
 			}

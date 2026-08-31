@@ -71,7 +71,7 @@ private:
     CondMessageSubscription _sub_broadcast;
 
 public:
-    JobTreeAllReduction(const JobTreeSnapshot& tree, JobMessage baseMsg, AllReduceElement&& neutralElem,
+    JobTreeAllReduction(const JobTreeSnapshot& tree, JobMessage baseMsg, AllReduceElement&& neutralElem, 
             std::function<AllReduceElement(std::list<AllReduceElement>&)> aggregator) :
         _tree(tree), _base_msg(baseMsg), _neutral_elem(std::move(neutralElem)),
         _num_expected_child_elems(_tree.nbChildren), _aggregator(aggregator),
@@ -92,7 +92,7 @@ public:
             rightRank<0?-1: _tree.rightChildIndex
         );
         _expected_child_ctx_ids = std::pair<ctx_id_t, ctx_id_t>(
-            leftRank<0?0:_tree.leftChildContextId,
+            leftRank<0?0:_tree.leftChildContextId, 
             rightRank<0?0:_tree.rightChildContextId
         );
         _received_child_elems = std::pair<bool, bool>(false, false);
@@ -144,21 +144,20 @@ public:
         _broadcast_enabled = false;
     }
 
-
     const JobTreeSnapshot& getJobTreeSnapshot() const {
         return _tree;
     }
 
 private:
-    // Process an incoming message and advance the all-reduction accordingly.
+    // Process an incoming message and advance the all-reduction accordingly. 
     bool receive(int source, int tag, JobMessage& msg) {
 
-        assert(tag == MSG_JOB_TREE_MODULAR_REDUCE || tag == MSG_JOB_TREE_MODULAR_BROADCAST || log_return_false("SWEEP Warn: Unexpected tag %i (msg.tag %i) in JobTreeAllReduction receive(...) from source %i\n", tag, msg.tag, source));
+        assert(tag == MSG_JOB_TREE_MODULAR_REDUCE || tag == MSG_JOB_TREE_MODULAR_BROADCAST || log_return_false("[WARN] Unexpected tag %i (msg.tag %i) in JobTreeAllReduction receive(...) from source %i\n", tag, msg.tag, source));
 
         LOG(V3_VERB, "TRY REDUCE %i %i %i %i %i\n", tag, msg.epoch, _base_msg.epoch, msg.tag, _base_msg.tag);
 
-        bool accept = msg.epoch == _base_msg.epoch
-                    //&& msg.revision == _base_msg.revision
+        bool accept = msg.epoch == _base_msg.epoch 
+                    //&& msg.revision == _base_msg.revision 
                     && msg.tag == _base_msg.tag;
         if (!accept) return false;
 
@@ -173,7 +172,7 @@ private:
         if (tag == MSG_JOB_TREE_MODULAR_REDUCE) {
             LOG(V2_INFO, "REDUCE\n");
 
-            if (_aggregating || _future_aggregate.valid() || _reduction_locally_done)
+            if (_aggregating || _future_aggregate.valid() || _reduction_locally_done) 
                 return false; // already internally aggregating elements (or already done)!
 
             // check if this message comes from a child which didn't already send something
@@ -275,6 +274,8 @@ public:
         }
 
         if (!_aggregating && _future_aggregate.valid()) {
+            // Aggregation done
+            LOG(V5_DEBG, "CS got aggregation\n");
 
             _future_aggregate.get();
             _reduction_locally_done = true;
@@ -337,7 +338,7 @@ public:
         return std::move(_base_msg.payload);
     }
 
-    // Whether this object can be destructed at this point in time
+    // Whether this object can be destructed at this point in time 
     // without waiting for another thread.
     bool isDestructible() const {
         if (_future_aggregate.valid() && _aggregating) return false;

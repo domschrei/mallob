@@ -125,6 +125,7 @@ void Client::readIncomingJobs() {
             }
 
             // Job can be read: Enqueue reader task into thread pool
+            LOGGER(log, V4_VVER, "ENQUEUE #%i\n", data.description->getId());
             unreadyJobs.erase(std::pair<int, int>(data.description->getId(), data.description->getRevision()));
             if (_params.monoFilename.isSet() && _mono_job_id < 0) _mono_job_id = data.description->getId();
 
@@ -473,7 +474,7 @@ int Client::getMaxNumParallelJobs() {
 
 void Client::introduceNextJob() {
 
-    if (Terminator::isTerminating(/*fromMainThread=*/true))
+    if (Terminator::isTerminating(/*fromMainThread=*/true)) 
         return;
 
     // Are there any non-introduced jobs left?

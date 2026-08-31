@@ -1,0 +1,37 @@
+#!/bin/bash
+
+echo ""
+echo ""
+echo "BUILDING MALLOB via $0"
+echo ""
+echo ""
+#get the latest swissat source & binary
+# ./sweep/fetch-local-sweep-kissat.sh
+
+# ./sweep/show-kissat-build.sh
+
+mkdir -p build
+#remove old binaries and linkers to make sure they are updated
+rm build/*mallob*
+
+# BUILD_TYPE="RELEASE"
+# BUILD_TYPE="DEBUG"
+
+cd build
+CC=$(which mpicc) CXX=$(which mpicxx) cmake -DCMAKE_BUILD_TYPE=RELEASE \
+  -DMALLOB_APP_SAT=1 \
+  -DMALLOB_APP_SATWITHPRE=1 \
+  -DMALLOB_APP_SWEEP=1 \
+  -DMALLOB_APP_SMT=0 \
+  -DMALLOB_APP_PALRUPCHECK=0 \
+  -DMALLOB_LOG_VERBOSITY=4 \
+  -DMALLOB_USE_JEMALLOC=1 \
+  -DMALLOB_ASSERT=1 \
+  -DMALLOB_ASSERT_HEAVY=0 \
+  -DMALLOB_USE_ASAN=0 \
+  -DMALLOB_SUBPROC_DISPATCH_PATH=\"build/\" ..
+
+# make clean
+make -j 12; cd ..
+
+

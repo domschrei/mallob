@@ -135,7 +135,7 @@ struct SendHandle {
         memcpy(tempStorage.data()+(end-begin)+sizeof(int), &sentBatches, sizeof(int));
         memcpy(tempStorage.data()+(end-begin)+2*sizeof(int), &totalNumBatches, sizeof(int));
 
-        MPI_Isend(tempStorage.data(), msglen, MPI_BYTE, dest,
+        MPI_Isend(tempStorage.data(), msglen, MPI_BYTE, dest, 
                 tag+MSG_OFFSET_BATCHED, MPI_COMM_WORLD, &request);
 
         sentBatches++;

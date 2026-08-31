@@ -58,7 +58,7 @@ private:
             {"application", "SAT"}
         };
         // if (_params.crossJobCommunication()) json["group-id"] = "1";
-        // We should probably provide the actual groupID instead of hardcoding the id "1" ?
+        // We should probably (?) provide the actual groupID instead of hardcoded "1" 
         if (_params.crossJobCommunication()) json["group-id"] = std::to_string(_desc.getGroupId());
         LOG(V0_CRIT, "MallobSat GroupId %i \n", _desc.getGroupId());
 

@@ -163,7 +163,7 @@ public:
     bool hasInactiveJobsWaitingForReactivation() const {
         if (!_params.reactivationScheduling()) return false;
         for (auto& [_, job] : _jobs) {
-            if (job->getState() == SUSPENDED && job->getJobTree().isWaitingForReactivation())
+            if (job->getState() == SUSPENDED && job->getJobTree().isWaitingForReactivation()) 
                 return true;
         }
         return false;

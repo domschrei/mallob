@@ -24,7 +24,6 @@ private:
     bool _received_response_right {false};
     bool _result_extracted {false};
 
-    //The default callback, to be set when Object is initialized
     std::function<void()> _cb;
 
 public:
@@ -36,7 +35,6 @@ public:
         _job_id(jobId), _tree(tree), _internal_msg_tag(internalMsgTag),
         _sub_broadcast(MSG_JOB_TREE_MODULAR_BROADCAST, [&](MessageHandle& h) {return receiveMessage(h);}) {
         _cb = callback;
-        //for example, when coming from collectives_example_job.hpp, the callback is 'digestBroadcast()'
     }
 
     void broadcast(JobMessage&& msg, bool rootOfBcast = true) {
@@ -64,7 +62,7 @@ public:
 
             _tree.sendToParent(_msg, MSG_JOB_TREE_MODULAR_BROADCAST);
         }
-        // execute the provided callback. When used in SweepJob, it's SweepJob::cbContributeToAllReduce()
+        // When used in SweepJob, the callback is SweepJob::cbContributeToAllReduce()
         if (hasResult()) _cb();
     }
 

@@ -5,20 +5,20 @@
 # The configuration used in the paper is instead fmcad26-sweep-exhaustive, where every iteration is fully swept.
 
 echo '-sat-config-dirs=config/sat/base/ -sat-config-files=
-	-mono-app=SWEEP
-	-satsolver=k_
-	-pre-cleanup=1
-	-q=0
+  -mono-app=SWEEP
+  -satsolver=k_
+  -pre-cleanup=1
+  -q=0
   -os=1
   -cm=0
   -rspaa=1
-	-rpa=1
+  -rpa=1
   -mlpt=50000000
-	-seed=1
-	-jcup=0.05
+  -seed=1
+  -jcup=0.05
   -sleep=100
   -v=2
-	-preprocess-sweepnsat=1
+  -preprocess-sweepnsat=1
   -preprocess-sweep-priority=1.0
   -sweep-solver-verbosity=0
   -cjc=0

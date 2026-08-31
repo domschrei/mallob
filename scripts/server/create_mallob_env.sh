@@ -57,6 +57,6 @@ echo ""
 
 # prevent linking error that -lz can't be found
 export LIBRARY_PATH=$(spack location -i zlib-ng)/lib:$LIBRARY_PATH
-export LD_LIBRARY_PATH=$(spack location -i zlib-ng)/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$(spack location -i zlib-ng)/lib:$LD_LIBRARY_PATH 
 
 spack env activate mallob_env

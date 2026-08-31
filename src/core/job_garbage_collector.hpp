@@ -82,10 +82,13 @@ private:
             std::list<Job*> copy;
             {
                 // Try to fetch the current jobs to free
+                _watchdog.setActive(false);
                 auto lock = _mtx.getLock();
                 _cond_var.waitWithLockedMutex(lock, [&]() {
                     return !_worker.continueRunning() || !_jobs_to_free.empty();
                 });
+                _watchdog.reset();
+                _watchdog.setActive(true);
                 if (!_worker.continueRunning() && _jobs_to_free.empty() && _num_stored_jobs == 0)
                     break;
                 
@@ -99,6 +102,7 @@ private:
             // Free each job
             for (Job* job : copy) {
                 int id = job->getId();
+                LOGGER(lg, V5_DEBG, "DELETE #%i\n", id);
                 delete job;
                 LOGGER(lg, V4_VVER, "DELETED #%i\n", id);
                 Logger::getMainInstance().mergeJobLogs(id);
