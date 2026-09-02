@@ -22,6 +22,7 @@ extern "C" {
 #include "kissat/src/kissat.h"
 }
 
+
 #define DOUBLELOG(LOGGERINST, VERB, ...) \
     do { \
         LOGGER(LOGGERINST, VERB, __VA_ARGS__); \
@@ -292,7 +293,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 }
 
 
-std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
+std::shared_ptr<KissatSweep> SweepJob::createNewSweeper(int localId) {
 	const JobDescription& desc = getDescription();
 	SolverSetup setup;
 	setup.logger = &Logger::getMainInstance();
@@ -314,7 +315,7 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 		_numVars = setup.numVars;
 
 	float t0 = Timer::elapsedSeconds();
-	auto sweeper = std::make_shared<Kissat>(setup);
+	auto sweeper = std::make_shared<KissatSweep>(setup);
 	float t1 = Timer::elapsedSeconds();
 	float init_dur =  (t1 - t0);
 	//Usual kissat initializations take 0.2ms in the Sat Solver Subprocess
@@ -330,7 +331,7 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 	//Connecting kissat to Kissat
 	sweeper->sweepSetExportCallbacks();
 
-	//Connecting the .c kissat solver directly to SweepJob, skipping the intermediate Mallob::Kissat interface
+	//Connecting the kissat solver directly to SweepJob, skipping the intermediate Mallob::Kissat interface
     shweep_set_search_work_callback(sweeper->solver, this, cb_search_work_in_tree);
 	shweep_set_SweepJob_eq_import_callback(sweeper->solver, this, cb_import_eq);
 	shweep_set_SweepJob_unit_import_callback(sweeper->solver, this, cb_import_unit);
@@ -340,7 +341,7 @@ std::shared_ptr<Kissat> SweepJob::createNewSweeper(int localId) {
 		//solver nr. 0 at the root node
 		//it is also used to report some statistics after each iteration (number of active variables and clauses, etc.)
 		if (localId==_representative_localId) {
-			sweeper->sweepSetFormulaReportCallback();
+			sweeper->setPreprocessingReportCallback();
 			shweep_set_report_finished_iteration_callback(sweeper->solver, this, cb_report_iteration);
 		}
 		//tell all solvers which one is the representative one

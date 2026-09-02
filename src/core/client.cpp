@@ -74,7 +74,7 @@ void Client::readIncomingJobs() {
         // Find a single job eligible for parsing
         bool foundAJob = false;
         for (auto& data : _incoming_job_queue) {
-
+            
             // Jobs are sorted by arrival:
             // If this job has not arrived yet, then none have arrived yet
             if (time < data.description->getArrival()) {
@@ -324,6 +324,7 @@ std::string Client::getSocketPath() {
 } 
 
 void Client::advance() {
+    
     auto time = Timer::elapsedSecondsCached();
 
     // Send notification messages for recently done jobs
@@ -797,6 +798,7 @@ void Client::handleAbort(MessageHandle& handle) {
 }
 
 void Client::finishJob(int jobId, bool hasIncrementalSuccessors) {
+
     if (!_active_jobs.count(jobId)) {
         // try to fetch client-side job
         for (auto it = _done_client_side_jobs.begin(); it != _done_client_side_jobs.end(); ++it) {
@@ -821,6 +823,7 @@ void Client::finishJob(int jobId, bool hasIncrementalSuccessors) {
         auto lock = _done_job_lock.getLock();
         _done_jobs[jobId] = DoneInfo{_active_jobs[jobId]->getRevision(), _active_jobs[jobId]->getChecksum()};
     }
+
     // Clean up job, remember as done
     if (!hasIncrementalSuccessors) {
         _root_nodes.erase(jobId);

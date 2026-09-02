@@ -170,6 +170,7 @@ public:
         if (msg.returnedToSender) return false;
 
         if (msg.tag == MSG_AGGREGATE_RANKLIST) {
+
             {
                 AddressList ranklist;
                 ranklist.deserializeFromJobMsg(msg.payload);
@@ -207,7 +208,6 @@ public:
             } else {
                 // Forward to parent
                 //log(LOG_ADD_DESTRANK | V3_VERB, "send Ranklist size %i", getJobTree().getParentNodeRank(), msg.payload.size());
-                // LOG(V4_VVER, "RANKLIST [%i] send nextlist size %i to parent [%i](%i) \n", _job_tree.getRank(), _next_address_list.list.size(), _job_tree.getParentNodeRank(), _job_tree.getParentIndex());
                 _job_tree.sendToParent(msg);
             }
 

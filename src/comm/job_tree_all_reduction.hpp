@@ -161,7 +161,8 @@ private:
                     && msg.tag == _base_msg.tag;
         if (!accept) return false;
 
-        if (msg.returnedToSender) {
+        if (msg.returnedToSender && tag == MSG_JOB_TREE_MODULAR_REDUCE) {
+            //A race-condition occured, the reduction element we sent upwards to our parent bounced back 
             _returnToSender_counter++;
             LOG(V1_WARN, "WARN: AllReduce got %i. returnedToSender msg (source %i, tag %i, msg.tag %i, msg.size %i)\n", _returnToSender_counter, source, tag, msg.tag, msg.payload.size());
             _returnToSender_payload = std::move(msg.payload);
@@ -180,7 +181,7 @@ private:
             bool fromRightChild = !_received_child_elems.second && source == _expected_child_ranks.second;
             accept &= fromLeftChild || fromRightChild;
             if (!accept) return false;
-
+            
             // message accepted: store and check off
             _child_elems.insert({source, std::move(msg.payload)});
             if (fromLeftChild) _received_child_elems.first = true;
@@ -256,10 +257,8 @@ public:
             return *this;
         }
 
-        //at child_elems == expected_elems we briefly add our own element to the children,
-        //so then we have one more child element than expected,
-        //but thats no longer an issue to the propagate the combined aggregated element
         if (_child_elems.size() == _num_expected_child_elems && _local_elem.has_value()) {
+             
             _child_elems.insert({-1, std::move(_local_elem.value())});
             _local_elem.reset();
 
@@ -279,13 +278,13 @@ public:
 
             _future_aggregate.get();
             _reduction_locally_done = true;
-
+            
             if (_is_root) {
                 // Transform reduced element at root
                 if (_has_transformation_at_root) {
                     _aggregated_elem.emplace(_transformation_at_root(_aggregated_elem.value()));
                 }
-                //A non-const transformation to avoid copying of the whole vector, when possible
+                //A non-const transformation is used to avoid copying the whole vector, when possible
                 if (_has_inplace_transformation_at_root) {
                    _inplace_transformation_at_root(_aggregated_elem.value());
                 }

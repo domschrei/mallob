@@ -11,6 +11,8 @@
 #include "comm/job_tree_all_reduction.hpp"
 #include "comm/job_tree_broadcast.hpp"
 
+#include "app/sweep/kissat_sweep_extras.hpp"
+
 
 class SweepJob : public BaseSatJob {
 private:
@@ -41,7 +43,7 @@ private:
 
 	//Local Solvers
 	int _nThreads{0};
-	typedef std::shared_ptr<Kissat> KissatPtr;
+	typedef std::shared_ptr<KissatSweep> KissatPtr;
 	std::vector<KissatPtr> _sweepers;
 	std::vector<std::unique_ptr<BackgroundWorker>> _bg_workers;
     std::atomic_int _started_sweepers_count {0};

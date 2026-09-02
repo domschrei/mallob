@@ -35,15 +35,6 @@ void consume_clause(void* state, int** clause, int* size, int* glue, unsigned lo
     ((Kissat*) state)->consumeClause(clause, size, glue, id, sig);
 }
 
-void sweep_export_eq(void *state) {
-    ((Kissat*) state)->sweepExportEq();
-}
-
-void sweep_export_unit(void *state, int unit) {
-    ((Kissat*) state)->sweepExportUnit(unit);
-}
-
-
 int terminate_callback(void* state) {
     return ((Kissat*) state)->shouldTerminate() ? 1 : 0;
 }
@@ -74,9 +65,7 @@ void on_drup_deletion(void* state, const int* lits, int nbLits) {
 
 Kissat::Kissat(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup), solver(kissat_init()),
-        learntClauseBuffer(_setup.strictMaxLitsPerClause+ClauseMetadata::numInts()),
-        eq_up_buffer(2)  //buffer pass an equality as two literals
-{
+        learntClauseBuffer(_setup.strictMaxLitsPerClause+ClauseMetadata::numInts()) {
 
     kissat_set_terminate(solver, this, &terminate_callback);
     glueLimit = _setup.strictLbdLimit;
@@ -98,28 +87,14 @@ Kissat::Kissat(const SolverSetup& setup)
     }
 }
 
+void Kissat::setPreprocessingReportCallback() {
+    kissat_set_preprocessing_report_callback(solver, this, begin_formula_report, report_preprocessed_lit);
+}
+
 void Kissat::addLiteral(int lit) {
 	kissat_add(solver, lit);
     numVars = std::max(numVars, std::abs(lit));
 }
-
-//Tighter handling on option setting, triggers an assertion if an option can't be applied
-bool Kissat::set_option(const std::string &option_name, int value) {
-    int prev_value = kissat_get_option(solver, option_name.c_str());
-    kissat_set_option(solver, option_name.c_str(), value);
-    int set_value = kissat_get_option(solver, option_name.c_str());
-
-    if (set_value != value) {
-        LOGGER(_logger, V0_CRIT, "ERROR Setting Kissat Option %s: %i --> %i failed, remained at %i (or option not found)\n", option_name.c_str(), prev_value, value, prev_value);
-        assert(false);
-        return false;
-    }
-    // LOGGER(_logger, V3_VERB, "Kissat Set Option: %i --> %i (%s)\n", prev_value, value, option_name.c_str());
-    return true;
-}
-
-
-
 
 void Kissat::diversify(int seed) {
 
@@ -209,10 +184,6 @@ void Kissat::setSolverInterrupt() {
     if (interruptionInitialized) kissat_terminate (solver);
 }
 
-void Kissat::triggerSweepTerminate() {
-    shweep_set_end_job_signal(solver);
-}
-
 void Kissat::unsetSolverInterrupt() {
 	interrupted = false;
 }
@@ -273,12 +244,6 @@ void Kissat::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
     kissat_set_clause_import_callback(solver, this, &consume_clause);
 }
 
-
-void Kissat::sweepSetExportCallbacks() {
-    shweep_set_equivalence_export_callback(solver, this, eq_up_buffer.data(), &sweep_export_eq);
-    shweep_set_unit_export_callback(solver, this, &sweep_export_unit);
-}
-
 void Kissat::produceClause(int size, int lbd) {
     interruptionInitialized = true;
     if (size > _setup.strictMaxLitsPerClause) return;
@@ -314,34 +279,6 @@ void Kissat::consumeClause(int** clause, int* size, int* lbd, unsigned long* id,
     }
 }
 
-
-void Kissat::sweepExportEq() {
-    {
-        std::lock_guard<std::mutex> lock(sweep_export_mutex); //dont push something when the aggregation thread is just touching the eqs_to_share vector
-        const int elit1 = eq_up_buffer[0];
-        const int elit2 = eq_up_buffer[1];
-        eqs_to_share.push_back(elit1);
-        eqs_to_share.push_back(elit2);
-        assert((elit1 !=0 &&  elit2!=0) || log_return_false("SWEEP ERROR: in exportEq: elit is zero. elit1=%i, elit2=%i. (buffersize: %i)\n", elit1, elit2, eq_up_buffer.size()));
-        assert(std::abs(elit1) < std::abs(elit2) || log_return_false("SWEEP ERROR: in exportEq: abs(elit1) is larger than abs(elit2), but it should be smaller. elit1=%i, elit2=%i. (buffersize: %i)\n", elit1, elit2, eq_up_buffer.size()));
-        // LOG(V1_WARN, "(%i) exported e[%i,%i]\n", getLocalId(), elit1, elit2);
-    }
-}
-
-void Kissat::sweepExportUnit(int eunit) {
-    {
-        std::lock_guard<std::mutex> lock(sweep_export_mutex);
-        assert(eunit!=0 || log_return_false("SWEEP ERROR: in exportUnit: eunit is zero.\n"));
-        units_to_share.push_back(eunit);
-    }
-}
-
-
-void Kissat::sweepSetFormulaReportCallback() {
-    kissat_set_preprocessing_report_callback(solver, this, begin_formula_report, report_preprocessed_lit);
-}
-
-
 void Kissat::processProofLine(LratOp&& op) {
     _lrat->push(std::move(op));
 }
@@ -369,23 +306,18 @@ void Kissat::writeStatistics(SolverStatistics& stats) {
 }
 
 
-shweep_statistics Kissat::fetchSweepStats() {
-    sweep_stats = shweep_get_statistics(solver);
-    return sweep_stats;
+void Kissat::setToSweeper() {
+    isSweeper = true;
 }
 
 bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
     bool accept = nbVars != _setup.numVars || nbClauses != _setup.numOriginalClauses;
-    if (is_sweeper) {
+    if (isSweeper) {
         //Only the representative solver at the root node should have received this callback
-        assert(getLocalId() == representative_localId);
+        // assert(getLocalId() == representative_localId);
         LOG(V2_INFO, "SWEEP [root](%i) first to report dimacs result\n", getLocalId());
-        if (accept) {
-            LOG(V2_INFO, "SWEEP dimacs formula is acceptable bc. different from original\n");
-        }
-        else {
-            LOG(V2_INFO, "SWEEP dimacs formula is not acceptable bc. no difference to original\n");
-        }
+        if (accept) { LOG(V2_INFO, "SWEEP dimacs formula is acceptable bc. different from original\n"); }
+        else        { LOG(V2_INFO, "SWEEP dimacs formula is not acceptable bc. no difference to original\n"); }
         LOG(V2_INFO, "SWEEP dimacs simplification: (%i --> %i vars) (%i --> %i clauses) \n", _setup.numVars, nbVars, _setup.numOriginalClauses, nbClauses);
     }
     if (accept) {
@@ -411,15 +343,6 @@ void Kissat::addLiteralFromPreprocessing(int lit) {
         setPreprocessedFormula(std::move(preprocessedFormula));
         setSolverInterrupt();
     }
-}
-
-
-void Kissat::setToSweeper() {
-    is_sweeper = true;
-}
-
-void Kissat::setRepresentativeLocalId(int localId) {
-    representative_localId = localId;
 }
 
 Kissat::~Kissat() {

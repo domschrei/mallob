@@ -48,6 +48,7 @@ void Worker::init() {
 }
 
 void Worker::advance() {
+
     auto time = Timer::elapsedSecondsCached();
 
     // Reset watchdog

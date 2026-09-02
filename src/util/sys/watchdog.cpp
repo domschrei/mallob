@@ -44,7 +44,7 @@ Watchdog::Watchdog(bool enabled, int checkIntervalMillis, bool useThreadPool, st
                     abort();
                 }
                 if (_warning_period_millis > 0 && elapsed > _warning_period_millis) {
-                    LOG(V1_WARN, "[WARN] Watchdog: No reset for %i ms (activity=%i recvtag=%i sendtag=%i)\n",
+                    LOG(V1_WARN, "[WARN] Watchdog: No reset for %i ms (activity=%i recvtag=%i sendtag=%i)\n", 
                         elapsed, _activity, _activity_recv_tag, _activity_send_tag);
                 }
             }

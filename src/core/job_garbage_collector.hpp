@@ -76,7 +76,7 @@ private:
 
         auto lg = Logger::getMainInstance().copy("<Janitor>", ".janitor");
         LOGGER(lg, V3_VERB, "tid=%lu\n", Proc::getTid());
-
+        
         while (_worker.continueRunning() || _num_stored_jobs > 0) {
 
             std::list<Job*> copy;
@@ -98,7 +98,7 @@ private:
             }
 
             LOGGER(lg, V5_DEBG, "Found %i job(s) to delete\n", copy.size());
-
+            
             // Free each job
             for (Job* job : copy) {
                 int id = job->getId();
