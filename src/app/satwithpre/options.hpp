@@ -15,6 +15,8 @@ OPT_FLOAT(preprocessExpansionFactor, "pef", "preprocess-expansion-factor", 1.f, 
 OPT_BOOL(preprocessLingeling, "pl", "preprocess-lingeling", true, "Additionally run Lingeling as a preprocessor")
 OPT_STRING(overrideSatOptions, "oso", "override-sat-options", "",
     "In each distributed SAT sub-task, override the SAT solver process configuration with these Mallob options")
+OPT_STRING(preprocessConfig, "prepro-config", "", "config/satwithpre/actors_default.json",
+    "JSON file to configure the cascading preprocessing actors")
 
 #if MALLOB_USE_SATSUMA
 OPT_BOOL(preprocessSatsuma, "presa", "preprocess-satsuma", false, "Run Satsuma instead of kissat")

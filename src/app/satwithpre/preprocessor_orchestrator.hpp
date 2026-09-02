@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include "app/satwithpre/actor_config_parser.hpp"
 #include "app/satwithpre/ext_satsuma_caller.hpp"
 #include "app/satwithpre/kissat_preprocessor.hpp"
 #include "app/satwithpre/lingeling_preprocessor.hpp"
@@ -20,19 +21,6 @@ private:
     const JobDescription& _desc;
     APIConnector& _api;
 
-    struct ActorContext {
-        enum ActorType {SATSUMA_INT, SATSUMA_EXT, KISSAT, LINGELING, MALLOBSAT} type;
-        ActorContext* prerequisite {nullptr};
-        std::vector<ActorContext*> actorsBeingDisplaced;
-        bool onlyStartIfPrerequisiteSimplified {false};
-
-        std::unique_ptr<SatPreprocessActor> actor;
-        enum ActiveActorState {UNINITIALIZED, RUNNING, FINISHED} state {UNINITIALIZED};
-        SatPreprocessActor::PreprocessActorResult result {SatPreprocessActor::PENDING};
-        std::vector<int> formula;
-        std::vector<int> model;
-        float timeOfSignalledDisplacement {0};
-    };
     std::list<ActorContext> _actors;
     const std::vector<int> _base_cnf;
 
@@ -44,35 +32,13 @@ public:
             _base_cnf(getCnfFromJobDescription()) {
 
         _time_of_start = Timer::elapsedSeconds();
-
-        // Mallob on original instance
-        _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSAT, nullptr});
-        ActorContext* ctxMalOrig = &_actors.back();
-
-        // Lingeling (SAT, UNSAT or nothing)
-        _actors.push_back({PreprocessorOrchestrator::ActorContext::LINGELING, nullptr, {}});
-        ActorContext* ctxLgl = &_actors.back();
-        // Kissat (preprocesses the formula)
-        _actors.push_back({PreprocessorOrchestrator::ActorContext::KISSAT, nullptr, {}});
-        ActorContext* ctxKis = &_actors.back();
-        // Satsuma (preprocesses the formula)
-        _actors.push_back({PreprocessorOrchestrator::ActorContext::SATSUMA_EXT, nullptr, {}});
-        ActorContext* ctxSats = &_actors.back();
-
-        // Kissat on Satsuma-preprocessed formula (preprocesses the formula)
-        _actors.push_back({PreprocessorOrchestrator::ActorContext::KISSAT, ctxSats, {}});
-        ActorContext* ctxKisAfterSats = &_actors.back();
-        ctxKisAfterSats->onlyStartIfPrerequisiteSimplified = true; // do not launch Kissat (again!) if Satsuma didn't simplify anything
-
-        // Mallob on Kissat-preprocessed formula - displaces original Mallob task
-        _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSAT, ctxKis, {ctxMalOrig}});
-        ActorContext* ctxMalPre1 = &_actors.back();
-        ctxMalPre1->onlyStartIfPrerequisiteSimplified = true; // do not launch this MallobSat task if Kissat didn't simplify anything
-
-        // Mallob on Satsuma+Kissat-preprocessed formula - displaces all prior Mallob tasks
-        _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSAT, ctxKisAfterSats, {ctxMalOrig, ctxMalPre1}});
-        ActorContext* ctxMalPreFull = &_actors.back();
-        // (we always spawn this one since Satsuma *did* simplify something if the prerequisite is ready)
+        try {
+            _actors = ActorConfigParser().parseFile(_params.preprocessConfig());
+        } catch (const std::runtime_error& e) {
+            LOG(V0_CRIT, "[ERROR] Parsing error for preprocess actor config file \"%s\": %s\n",
+                _params.preprocessConfig().c_str(), e.what());
+            abort();
+        }
     }
 
     int loop() {
