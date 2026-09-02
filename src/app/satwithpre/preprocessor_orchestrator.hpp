@@ -91,6 +91,7 @@ public:
             actorIdx++;
 
             if (actor.state == ActorContext::UNINITIALIZED) {
+
                 // check prerequisite
                 if (actor.prerequisite && actor.prerequisite->state != ActorContext::FINISHED)
                     continue; // prerequisite not done yet - skip for now

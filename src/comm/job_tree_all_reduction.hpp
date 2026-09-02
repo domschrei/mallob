@@ -100,7 +100,7 @@ public:
         _parent_rank = _tree.parentNodeRank;
         _parent_index = _tree.parentIndex;
         _parent_ctx_id = _tree.parentContextId;
-
+    
         _is_root = _tree.index == 0;
         _base_msg.treeIndexOfSender = _tree.index;
         _base_msg.contextIdOfSender = _tree.contextId;
@@ -284,6 +284,7 @@ public:
                 if (_has_transformation_at_root) {
                     _aggregated_elem.emplace(_transformation_at_root(_aggregated_elem.value()));
                 }
+
                 //A non-const transformation is used to avoid copying the whole vector, when possible
                 if (_has_inplace_transformation_at_root) {
                    _inplace_transformation_at_root(_aggregated_elem.value());
@@ -328,7 +329,7 @@ public:
 
     // Whether the final result to the all-reduction is present.
     bool hasResult() const {return _finished && _valid;}
-
+    
     // Extract the final result to the all-reduction. hasResult() must be true.
     // After this call, hasResult() returns false.
     AllReduceElement extractResult() {

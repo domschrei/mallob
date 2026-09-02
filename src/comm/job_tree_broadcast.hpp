@@ -62,6 +62,7 @@ public:
 
             _tree.sendToParent(_msg, MSG_JOB_TREE_MODULAR_BROADCAST);
         }
+
         if (hasResult()) _cb(); // callback
         // When used in SweepJob, the callback is SweepJob::cbContributeToAllReduce()
     }
