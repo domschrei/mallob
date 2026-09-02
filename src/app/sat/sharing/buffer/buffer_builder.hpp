@@ -8,8 +8,6 @@
 #include "buffer_iterator.hpp"
 #include "../../data/clause.hpp"
 
-#include "util/logger.hpp"
-
 class BufferBuilder {
 
 public:

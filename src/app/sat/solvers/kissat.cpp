@@ -75,12 +75,12 @@ Kissat::Kissat(const SolverSetup& setup)
         assert(_lrat); // needs to be real-time checking setup for Kissat
 
         int solverRank = setup.globalId;
-        int maxNumSolvers = setup.maxNumSolvers;
+		int maxNumSolvers = setup.maxNumSolvers;
 
-        auto descriptor = _lrat ? "on-the-fly checking" : "proof production";
-        LOGGER(_logger, V3_VERB, "Initializing rank=%i size=%i DI=%i #C=%ld IDskips=%i with %s\n",
-            solverRank, maxNumSolvers, getDiversificationIndex(), setup.numOriginalClauses, setup.nbSkippedIdEpochs,
-            descriptor);
+		auto descriptor = _lrat ? "on-the-fly checking" : "proof production";
+		LOGGER(_logger, V3_VERB, "Initializing rank=%i size=%i DI=%i #C=%ld IDskips=%i with %s\n",
+			solverRank, maxNumSolvers, getDiversificationIndex(), setup.numOriginalClauses, setup.nbSkippedIdEpochs,
+			descriptor);
 
         // set Kissat's internal proof tracing mode
         kissat_trace_proof_internally(solver, this, &on_drup_derivation, &on_lrup_import, &on_drup_deletion);

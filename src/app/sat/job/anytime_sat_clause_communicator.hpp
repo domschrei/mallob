@@ -74,7 +74,7 @@ public:
 
     // Need to guard against a mono job with no group (getGroupId() <= 0), where  _cross_job_clause_sharer is initialized to nullptr
     bool hasLocalClausesLeftToShare() const {return _cross_job_clause_sharer && _cross_job_clause_sharer->hasClausesToBroadcastInternally();}
-    //Somehow this needed to be public now, to have access...
+    //Somehow this needed to be public now to have access
     void feedLocalClausesIntoCrossSharing(std::vector<int>& clauses, ClauseSharingSession* session);
 
 private:
