@@ -12,6 +12,7 @@
 #include "interface/api/api_connector.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
+#include <cstdlib>
 #include <list>
 
 class PreprocessorOrchestrator {
@@ -56,8 +57,7 @@ public:
                     continue; // never initialize this actor since its prerequisite didn't lead to a simplification
 
                 // prerequisite done: initialize actor
-                auto formula = (actor.prerequisite && actor.prerequisite->result == SatPreprocessActor::SIMPLIFIED) ?
-                    actor.prerequisite->formula : _base_cnf;
+                auto formula = actor.prerequisite ? actor.prerequisite->formula : _base_cnf;
                 switch (actor.type) {
                 case ActorContext::SATSUMA_INT:
                     actor.actor.reset(new SatsumaPreprocessor(_params, _desc, std::to_string(actorIdx) + ":SatsumaInt", std::move(formula)));
@@ -112,6 +112,7 @@ public:
                 if (res == SatPreprocessActor::SAT) {
                     LOG(V2_INFO, "SATWP %s found SAT\n", actor.actor->getName());
                     _winning_actor = &actor;
+
                     return 10;
                 }
                 if (res == SatPreprocessActor::UNSAT) {
@@ -145,10 +146,15 @@ public:
         auto actor = _winning_actor;
         assert(actor);
         auto model = std::move(actor->model);
+        checkModel(actor->actor->getInputCnf(), model);
+        LOG(V2_INFO, "SATWP Checked model @ %s, size %lu\n", actor->actor->getName(), model.size()-1);
         while (true) {
             actor = actor->prerequisite;
             if (!actor) break;
             actor->actor->reconstructSolution(model);
+            LOG(V2_INFO, "SATWP Reconstructed model @ %s, size %lu\n", actor->actor->getName(), model.size()-1);
+            checkModel(actor->actor->getInputCnf(), model);
+            LOG(V2_INFO, "SATWP Checked model @ %s\n", actor->actor->getName());
         }
         return model;
     }
@@ -175,5 +181,27 @@ private:
         cnf.push_back(nbVars);
         cnf.push_back(nbCls);
         return cnf;
+    }
+
+    void checkModel(const std::vector<int>& formula, const std::vector<int>& model) {
+        bool clauseSatisfied = false;
+        int clauseNo = 1;
+        for (int i = 0; i < formula.size()-2; i++) {
+            int lit = formula[i];
+            if (lit == 0) {
+                if (!clauseSatisfied) {
+                    LOG(V0_CRIT, "[ERROR] Clause # %i at position %i not satisfied by model!\n", clauseNo, i);
+                    abort();
+                }
+                clauseNo++;
+                clauseSatisfied = false;
+                continue;
+            }
+            assert(std::abs(lit) < model.size());
+            int modelLit = model[std::abs(lit)];
+            assert(modelLit == lit || modelLit == -lit);
+            if (modelLit == lit) clauseSatisfied = true;
+        }
+        assert(formula[formula.size()-3] == 0);
     }
 };
