@@ -11,6 +11,8 @@
 #include "app/sat/job/historic_clause_storage.hpp"
 #include "app/sat/job/inplace_sharing_aggregation.hpp"
 #include "app/sat/job/inter_job_clause_sharer.hpp"
+#include "app/sat/sharing/buffer/buffer_builder.hpp"
+#include "app/sat/sharing/buffer/buffer_reducer.hpp"
 #include "comm/job_tree_snapshot.hpp"
 #include "comm/msgtags.h"
 #include "data/app_configuration.hpp"
@@ -41,7 +43,7 @@ void advanceCollective(BaseSatJob* job, JobMessage& msg, int broadcastTag) {
     }
 }
 
-AnytimeSatClauseCommunicator::AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job) : 
+AnytimeSatClauseCommunicator::AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job, bool internalSharing) :
     _params(params), _job(job),
     _cls_history(!params.collectClauseHistory() ? nullptr :
         new HistoricClauseStorage([&]() {
@@ -140,6 +142,19 @@ void AnytimeSatClauseCommunicator::communicate() {
         _cross_job_clause_sharer.reset(new InterJobClauseSharer(_params,
             _job->getDescription().getGroupId(), _job->getContextId(), _job->toStr()));
         initCrossSharer();
+
+        if (_current_session) _current_session->setAdditionalClauseListener(
+            [&, session = _current_session.get()](std::vector<int>& clauses) {
+                if (_params.crossShareAll()) {
+                    feedLocalClausesIntoCrossSharing(clauses, session);
+                } else {
+                    // Forward an empty set of clauses so that XTCS is still performed.
+                    BufferBuilder bb(_cross_job_clause_sharer->getBufferBuilder(-1));
+                    auto cls = bb.extractBuffer();
+                    feedLocalClausesIntoCrossSharing(cls, session);
+                }
+            }
+        );
     }
 
     // root: initiate sharing
@@ -151,7 +166,7 @@ void AnytimeSatClauseCommunicator::communicate() {
     }
 }
 
-void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& msg) {
+bool AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& msg) {
 
     if (msg.returnedToSender) {
         // Message was sent by myself but was then returned.
@@ -164,28 +179,30 @@ void AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
             if (_current_session) {
                 _current_session->pruneChild(source);
             }
+            return true;
         }
         if (msg.tag == MSG_INITIATE_CROSS_JOB_CLAUSE_SHARING) {
             if (_cross_sharing_session) {
                 _cross_sharing_session->pruneChild(source);
             }
+            return true;
         }
 
-        return;
+        return false;
     }
 
-    if (handleClauseHistoryMessage(source, mpiTag, msg)) return;
-    if (handleProofProductionMessage(source, mpiTag, msg)) return;
-    if (handleClauseSharingMessage(source, mpiTag, msg)) return;
+    if (handleClauseHistoryMessage(source, mpiTag, msg)) return true;
+    if (handleProofProductionMessage(source, mpiTag, msg)) return true;
+    if (handleClauseSharingMessage(source, mpiTag, msg)) return true;
 
     if (msg.tag == MSG_BROADCAST_CLAUSES_STATELESS) {
-        if (_job->getState() != ACTIVE) return;
+        if (_job->getState() != ACTIVE) return true;
         _job->getJobTree().sendToAnyChildren(msg);
         _job->digestSharingWithoutFilter(0, std::move(msg.payload), true);
-        return;
+        return true;
     }
 
-    assert(log_return_false("[ERROR] Unexpected job message mpitag=%i inttag=%i <= [%i]\n", mpiTag, msg.tag, source));
+    return false;
 }
 
 bool AnytimeSatClauseCommunicator::handleClauseHistoryMessage(int source, int mpiTag, JobMessage& msg) {
@@ -301,28 +318,39 @@ bool AnytimeSatClauseCommunicator::handleClauseSharingMessage(int source, int mp
 
 void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg, int source, bool fromDeferredQueue) {
 
+    const auto snapshot = _job->getJobTree().getSnapshot();
+
+    // Non-root: reject the clause sharing initiation if you are not active right now
+    // or if the initiation message expects a different tree shape than what you have
+    if (snapshot.index > 0 && (_job->getState() != ACTIVE
+            || snapshot.index != msg.treeIndexOfDestination
+            || snapshot.parentNodeRank != source)) {
+        msg.returnToSender(source, MSG_SEND_APPLICATION_MESSAGE);
+        return;
+    }
+
+    // This pre-check before the next block ensures that a worker never defers a sharing session
+    // where it is already involved with another role (which can happen as a race condition during a re-scheduling).
+    bool waitingForSelf = (_current_session && _current_session->getEpoch() == msg.epoch);
+    if (!waitingForSelf && !fromDeferredQueue && !_deferred_sharing_initiation_msgs.empty())
+        for (auto& def : _deferred_sharing_initiation_msgs)
+            if (def.second.epoch == msg.epoch)
+                waitingForSelf = true;
+    if (snapshot.index > 0 && waitingForSelf) {
+        msg.returnToSender(source, MSG_SEND_APPLICATION_MESSAGE);
+        return;
+    }
+
+    // defer message until all past sessions are done
+    // and all earlier deferred initiation messages have been processed
     if (_current_session || (!fromDeferredQueue && !_deferred_sharing_initiation_msgs.empty())) {
-        // defer message until all past sessions are done
-        // and all earlier deferred initiation messages have been processed
         LOG(V3_VERB, "%s : deferring CS initiation\n", _job->toStr());
         _deferred_sharing_initiation_msgs.push_back({source, std::move(msg)});
         return;
     }
 
-    // reject the clause sharing initiation if you are not active right now
-    if (_job->getState() != ACTIVE && !_job->getJobTree().isRoot()) {
-        msg.returnToSender(source, MSG_SEND_APPLICATION_MESSAGE);
-        return;
-    }
-
     // no current sessions active - can start new session
     _current_epoch = msg.epoch;
-    const auto snapshot = _job->getJobTree().getSnapshot();
-    if (!_job->getJobTree().isRoot() && snapshot.parentNodeRank != source) {
-        // wrong sender from the view of the current snapshot - context changed since this message was sent
-        msg.returnToSender(source, MSG_SEND_APPLICATION_MESSAGE);
-        return;
-    }
     LOG(V4_VVER, "%s : INIT COMM e=%i nc=%i\n", _job->toStr(), _current_epoch, snapshot.nbChildren);
 
     // extract compensation factor for this session from the message
@@ -371,12 +399,14 @@ void AnytimeSatClauseCommunicator::initiateClauseSharing(JobMessage& msg, int so
 }
 
 void AnytimeSatClauseCommunicator::feedLocalClausesIntoCrossSharing(std::vector<int>& clauses, ClauseSharingSession* session) {
-    _cross_job_clause_sharer->updateBestFoundSolutionCost(session->getBestFoundSolutionCost());
+    if (session)
+        _cross_job_clause_sharer->updateBestFoundSolutionCost(session->getBestFoundSolutionCost());
     if (!_params.crossJobCommunication()) return;
     _cross_job_clause_sharer->addInternalSharedClauses(clauses);
     auto& comm = _job->getGroupComm();
     if (comm.getCommSize() > 1 && comm.getMyLocalRank() == 0 && _job->getState() == ACTIVE) {
         // build a cross-job clause sharing initiation message
+        LOG(V4_VVER, "XTCS build cross-job initiation msg\n");
         JobMessage msg;
         msg.tag = MSG_INITIATE_CROSS_JOB_CLAUSE_SHARING;
         auto packedComm = comm.serialize();
@@ -416,8 +446,9 @@ void AnytimeSatClauseCommunicator::initiateCrossSharing(JobMessage& msg, int sou
     _cross_sharing_session.reset(
         new ClauseSharingSession(_params, _cross_job_clause_sharer.get(), snapshot, nullptr, 0, 1)
     );
-    if (snapshot.index == 0) {
+    if (snapshot.index == 0 && _params.crossJobToClientParent()) {
         // root of XTCS: export cross-shared clauses to client parent
+        LOG(V4_VVER, "XTCS export to client parent [%i]\n", _job->getJobTree().getParentNodeRank());
         _cross_sharing_session->setAdditionalClauseListener([&](std::vector<int>& clauses) {
             JobMessage resultMsg(_job->getId(), _job->getId(), _job->getRevision(), _xtcs_epoch++, MSG_SEND_APP_DATA_TO_CLIENT_JOB);
             resultMsg.treeIndexOfDestination = 0;
@@ -463,6 +494,7 @@ bool AnytimeSatClauseCommunicator::tryInitiateSharing() {
 
     if (_job->getState() != ACTIVE) return false;
     if (_proof_producer || !_sent_cert_unsat_ready_msg) return false;
+    if (!_internal_sharing) return false;
 
     auto time = Timer::elapsedSecondsCached();
     bool nextEpochDue = _params.appCommPeriod() > 0 &&

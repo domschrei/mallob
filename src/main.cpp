@@ -356,6 +356,7 @@ int main(int argc, char *argv[]) {
     if (clientComm != MPI_COMM_NULL) MPI_Comm_free(&clientComm);
     if (workerComm != MPI_COMM_NULL) MPI_Comm_free(&workerComm);
     MPI_Finalize();
+    APIRegistry::close();
     TmpDir::wipe(false);
     Process::removeDelayedExitWatchers();
     LOG(V2_INFO, "Exiting happily\n");

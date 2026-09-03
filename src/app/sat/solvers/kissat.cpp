@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <random>
+#include <utility>
 
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
@@ -82,6 +84,10 @@ Kissat::Kissat(const SolverSetup& setup)
         // set Kissat's internal proof tracing mode
         kissat_trace_proof_internally(solver, this, &on_drup_derivation, &on_lrup_import, &on_drup_deletion);
     }
+}
+
+void Kissat::setPreprocessingReportCallback() {
+    kissat_set_preprocessing_report_callback(solver, this, begin_formula_report, report_preprocessed_lit);
 }
 
 void Kissat::addLiteral(int lit) {
@@ -191,7 +197,7 @@ void Kissat::cleanUp() {
             + "." + std::to_string(_setup.globalId);
 		LOGGER(_logger, V4_VVER, "Writing profile ...\n");
 		kissat_write_profile(solver, profileFileString.c_str());
-		LOGGER(_logger, V4_VVER, "Profile written\n");
+		LOGGER(_logger, V4_VVER, "Kissat %s : Profile written\n", profileFileString.c_str());
 	}
 }
 
@@ -210,13 +216,19 @@ std::vector<int> Kissat::getSolution() {
 }
 
 void Kissat::reconstructSolutionFromPreprocessing(std::vector<int>& model) {
+    // LOGGER(_logger, V3_VERB, "Latest Model contains variables up to var %i \n", model.size()-1);
+    //first entry is dummy zero, to match index [1] to variable 1
     kissat_import_model(solver, model.data(), model.size());
     model.resize(_setup.numVars+1);
-    for (int v = 1; v <= _setup.numVars; v++) {
-        int val = kissat_value(solver, v);
-        if (std::abs(val) == v) model[v] = val;
-        assert(model[v] != 0);
-        //assert(std::abs(model[v]) == v || LOG_RETURN_FALSE("[ERROR] value of variable %i returned %i\n", v, model[v]));
+    LOGGER(_logger, V3_VERB, "Original formula contained variables up to var %i \n", _setup.numVars);
+    for (int idx = 1; idx <= _setup.numVars; idx++) {
+        int val = kissat_value(solver, idx);
+        if (std::abs(val) == idx) model[idx] = val;
+        if (model[idx] == 0) {
+            LOGGER(_logger, V1_WARN, "WARN: Reconstructing var %i to (arbitrary) default negative value %i \n", idx, -idx); //because an earlier processing step completely eliminated it, and didnt even bother setting any value of it
+            model[idx] = -idx;
+        }
+        assert(model[idx] != 0 || log_return_false("ERROR: Model reconstruction failed at var %i, has undecided val %i \n", idx, val));
     }
 }
 
@@ -292,11 +304,28 @@ void Kissat::writeStatistics(SolverStatistics& stats) {
         kstats.r_ee, kstats.r_ed, kstats.r_pb, kstats.r_ss, kstats.r_sw, kstats.r_tr, kstats.r_fx, kstats.r_ia, kstats.r_tl);
 }
 
+
+void Kissat::setToSweeper() {
+    isSweeper = true;
+}
+
 bool Kissat::isPreprocessingAcceptable(int nbVars, int nbClauses) {
     bool accept = nbVars != _setup.numVars || nbClauses != _setup.numOriginalClauses;
+    if (isSweeper) {
+        //Only the representative solver at the root node should have received this callback
+        // assert(getLocalId() == representative_localId);
+        LOG(V2_INFO, "SWEEP [root](%i) first to report dimacs result\n", getLocalId());
+        if (accept) { LOG(V2_INFO, "SWEEP dimacs formula is acceptable bc. different from original\n"); }
+        else        { LOG(V2_INFO, "SWEEP dimacs formula is not acceptable bc. no difference to original\n"); }
+        LOG(V2_INFO, "SWEEP dimacs simplification: (%i --> %i vars) (%i --> %i clauses) \n", _setup.numVars, nbVars, _setup.numOriginalClauses, nbClauses);
+    }
     if (accept) {
         nbPreprocessedVariables = nbVars;
         nbPreprocessedClausesAdvertised = nbClauses;
+        //Attention: The number of Vars & Clauses we write here can differ from the original file, due to
+        //variables having been eliminated or never occurred in the formula in the first place (holes).
+        //If we wish a full reconstruction later, we are reliant on the previous job knowing the original variable count.
+        //In the old preprocessing logic this was how it was done, sequential prepro Kissat knew these original values.
     } else setSolverInterrupt();
     return accept;
 }
