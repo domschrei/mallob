@@ -16,7 +16,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-class MallobSatPreprocessActor : public SatPreprocessActor {
+class MallobSweepPreprocessActor : public SatPreprocessActor {
 
 private:
     const JobDescription& _desc; // contains our instance to solve and all metadata
@@ -27,7 +27,7 @@ private:
     nlohmann::json _base_json;
 
 public:
-    MallobSatPreprocessActor(const Parameters& params, const JobDescription& desc, const std::string& name,
+    MallobSweepPreprocessActor(const Parameters& params, const JobDescription& desc, const std::string& name,
             APIConnector& api, std::vector<int>&& formula, float timeOfActivation) :
         SatPreprocessActor(params, name, std::move(formula)), _desc(desc), _api(api),
             _job_id(desc.getId()), _time_of_activation(timeOfActivation) {
@@ -36,7 +36,7 @@ public:
 
         _jobstr = "#" + std::to_string(_job_id) + ":mal:" + std::to_string(_actor_counter++);
     }
-    ~MallobSatPreprocessActor() {}
+    ~MallobSweepPreprocessActor() {}
 
     void preprocessAsync() override {
         submitJob();
@@ -50,18 +50,21 @@ public:
 
 private:
     void submitJob() {
+        // Prepare job submission data
         auto& json = _base_json;
         json = {
-            {"user", "sat-" + std::string(toStr())},
-            {"name", std::string(toStr())+":job"},
-            {"priority", 1.000},
-            {"application", "SAT"}
+            {"user", "sweep-" + std::string(toStr())},
+            {"name", std::string(toStr())+":SWEEP:job"},
+            {"priority", _params.preprocessSweepPriority()},
+            {"application", "SWEEP"},
         };
+        // if (_params.crossJobCommunication()) json["group-id"] = "1";
         if (_params.crossJobCommunication()) json["group-id"] = std::to_string(_desc.getGroupId());
+        LOG(V0_CRIT, "MallobSweep GroupId %i \n", _desc.getGroupId());
+
 
         auto f = std::vector<int>(_input_cnf.begin(), _input_cnf.end() - 2);
         StaticStore<std::vector<int>>::insert(json["name"].get<std::string>(), std::move(f));
-
         json["internalliterals"] = json["name"].get<std::string>();
         json["configuration"]["__NV"] = std::to_string(nbInputVars());
         json["configuration"]["__NC"] = std::to_string(nbInputClauses());
@@ -71,8 +74,7 @@ private:
         if (_desc.getCpuLimit() > 0)
             json["cpu-limit"] = std::to_string(
             std::max(0.001f, _desc.getCpuLimit() - getAgeSinceActivation())) + "s";
-        if (_params.overrideSatOptions.isSet())
-            json["configuration"]["options"] = _params.overrideSatOptions();
+
         applySuccessiveGrowth(json);
 
         auto copiedJson = json;
@@ -81,6 +83,7 @@ private:
             auto res = jsonToJobResult(response);
             if (res.result == RESULT_SAT) _result = SAT;
             else if (res.result == RESULT_UNSAT) _result = UNSAT;
+            else if (res.result == RESULT_SIMPLIFIED) _result = SIMPLIFIED;
             else _result = NONE;
         });
         if (result != JsonInterface::Result::ACCEPT) {
@@ -147,6 +150,9 @@ private:
         if (res.result == RESULT_SAT) {
             assert(solution.size() >= 1 && solution[0] == 0);
             _model = std::move(solution);
+        } else if (res.result == RESULT_SIMPLIFIED) {
+            _output_cnf = std::move(solution);
+            //already contains metadata #vals and #clauses in the last two entries
         }
         res.setSolution(std::move(solution));
         LOG(V3_VERB, "SATWP %s extracted\n", json["name"].get<std::string>().c_str());

@@ -191,12 +191,13 @@ private:
     }
 
     static ActorContext::ActorType parseType(const std::string& s) {
-        static const std::unordered_map<std::string, ActorContext::ActorType> map = {
+        static const tsl::robin_map<std::string, ActorContext::ActorType> map = {
             {"SATSUMA_INT", ActorContext::SATSUMA_INT},
             {"SATSUMA_EXT", ActorContext::SATSUMA_EXT},
             {"KISSAT", ActorContext::KISSAT},
             {"LINGELING", ActorContext::LINGELING},
             {"MALLOBSAT", ActorContext::MALLOBSAT},
+            {"MALLOBSWEEP", ActorContext::MALLOBSWEEP},
         };
         auto it = map.find(s);
         if (it == map.end()) {
@@ -212,6 +213,7 @@ private:
             case ActorContext::KISSAT: return "KISSAT";
             case ActorContext::LINGELING: return "LINGELING";
             case ActorContext::MALLOBSAT: return "MALLOBSAT";
+            case ActorContext::MALLOBSWEEP: return "MALLOBSWEEP";
         }
         throw ParseError("ActorConfigParser: unhandled ActorType in typeToString");
     }

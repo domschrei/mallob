@@ -7,6 +7,7 @@
 #include "app/satwithpre/kissat_preprocessor.hpp"
 #include "app/satwithpre/lingeling_preprocessor.hpp"
 #include "app/satwithpre/mallobsat_preprocess_actor.hpp"
+#include "app/satwithpre/mallobsweep_preprocess_actor.hpp"
 #include "app/satwithpre/sat_preprocess_actor.hpp"
 #include "app/satwithpre/satsuma_preprocessor.hpp"
 #include "data/job_description.hpp"
@@ -90,6 +91,9 @@ public:
                 case ActorContext::MALLOBSAT:
                     name += "MallobSat";
                     actor.actor.reset(new MallobSatPreprocessActor(_params, _desc, name, _api, std::move(formula), _time_of_start));
+                    break;
+                case ActorContext::MALLOBSWEEP:
+                    actor.actor.reset(new MallobSweepPreprocessActor(_params, _desc, std::to_string(actorIdx) + ":MallobSweep", _api, std::move(formula), _time_of_start));
                     break;
                 }
                 actor.id += ":" + name;

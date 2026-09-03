@@ -7,7 +7,7 @@
 
 struct ActorContext {
     std::string id;
-    enum ActorType {SATSUMA_INT, SATSUMA_EXT, KISSAT, LINGELING, MALLOBSAT} type;
+    enum ActorType {SATSUMA_INT, SATSUMA_EXT, KISSAT, LINGELING, MALLOBSAT, MALLOBSWEEP} type;
     ActorContext* prerequisite {nullptr};
     std::vector<ActorContext*> actorsBeingDisplaced;
     bool onlyStartIfPrerequisiteSimplified {false};
