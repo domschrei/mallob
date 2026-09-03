@@ -27,7 +27,7 @@
       "settings": [ {"type": "set", "key": "probe", "value": 0} ] },
     { "backend": "Kissat",
       "selector": { "type": "and", "selectors": [{"type":"flavour","value":"default"},{"type":"scatter","start":8,"step":11}] },
-      "settings": [ {"type": "set", "key": "minimizedepth", "value": 1e4} ] },
+      "settings": [ {"type": "set", "key": "minimizedepth", "value": 10000} ] },
     { "backend": "Kissat",
       "selector": { "type": "and", "selectors": [{"type":"flavour","value":"default"},{"type":"scatter","start":9,"step":11}] },
       "settings": [ {"type": "set", "key": "reducefraction", "value": 90} ] },
