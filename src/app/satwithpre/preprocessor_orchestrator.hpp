@@ -13,6 +13,7 @@
 #include "interface/api/api_connector.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
+#include "util/sys/fileutils.hpp"
 #include <cstdlib>
 #include <list>
 
@@ -29,6 +30,8 @@ private:
     float _time_of_start;
     ActorContext* _winning_actor {nullptr};
 
+    std::string _preprocess_log_dir;
+
 public:
     PreprocessorOrchestrator(const Parameters& params, const JobDescription& desc, APIConnector& api) : _params(params), _desc(desc), _api(api),
             _base_cnf(getCnfFromJobDescription()) {
@@ -40,6 +43,11 @@ public:
             LOG(V0_CRIT, "[ERROR] Parsing error for preprocess actor config file \"%s\": %s\n",
                 _params.preprocessConfig().c_str(), e.what());
             abort();
+        }
+
+        if (_params.preprocessLogDir.isSet()) {
+            _preprocess_log_dir = _params.preprocessLogDir() + "/#" + std::to_string(_desc.getId());
+            FileUtils::mkdir(_preprocess_log_dir);
         }
     }
 
@@ -85,6 +93,8 @@ public:
                     break;
                 }
                 actor.id += ":" + name;
+                if (!_preprocess_log_dir.empty())
+                    writeFormula(actor.actor->getInputCnf(), _preprocess_log_dir + "/in." + actor.getId() + ".cnf");
                 LOG(V2_INFO, "SATWP launch %s\n", actor.getId());
                 actor.actor->preprocessAsync();
                 actor.state = ActorContext::RUNNING;
@@ -119,10 +129,15 @@ public:
                 assert(actor.formula[actor.formula.size() - 1] >= 0); // # clauses
                 actor.result = res;
                 actor.state = ActorContext::FINISHED;
+                if (!_preprocess_log_dir.empty()) {
+                    if (res == SatPreprocessActor::SIMPLIFIED)
+                        writeFormula(actor.formula, _preprocess_log_dir + "/out." + actor.getId() + ".cnf");
+                    if (res == SatPreprocessActor::SAT)
+                        writeModel(actor.model, _preprocess_log_dir + "/model." + actor.getId() + ".txt");
+                }
                 if (res == SatPreprocessActor::SAT) {
                     LOG(V2_INFO, "SATWP %s found SAT\n", actor.getId());
                     _winning_actor = &actor;
-
                     return 10;
                 }
                 if (res == SatPreprocessActor::UNSAT) {
@@ -163,6 +178,8 @@ public:
             if (!actor) break;
             actor->actor->reconstructSolution(model);
             LOG(V2_INFO, "SATWP Reconstructed model @ %s, size %lu\n", actor->getId(), model.size()-1);
+            if (!_preprocess_log_dir.empty())
+                writeModel(model, _preprocess_log_dir + "/recmodel." + actor->getId() + ".txt");
             checkModel(actor->actor->getInputCnf(), model);
             LOG(V2_INFO, "SATWP Checked model @ %s\n", actor->getId());
         }
@@ -213,5 +230,20 @@ private:
             if (modelLit == lit) clauseSatisfied = true;
         }
         assert(formula[formula.size()-3] == 0);
+    }
+
+    void writeFormula(const std::vector<int>& formula, const std::string& path) {
+        std::ofstream ofsF(path);
+        ofsF << "p cnf " << formula[formula.size() - 2] << " "
+            << formula[formula.size() - 1] << "\n";
+        for (int i = 0; i < formula.size()-2; i++) {
+            ofsF << formula[i] << (formula[i] == 0 ? "\n" : " ");
+        }
+    }
+    void writeModel(const std::vector<int>& model, const std::string& path) {
+        std::ofstream ofsM(path);
+        ofsM << "v";
+        for (int i = 1; i < model.size(); i++) ofsM << " " << model[i];
+        ofsM << " 0\n";
     }
 };
