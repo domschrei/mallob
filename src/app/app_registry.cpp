@@ -98,7 +98,7 @@ namespace app_registry {
     }
 
     void checkAndOverrideProgramOptions(Parameters& params, const JobDescription& desc,
-            const std::string& optOverrides = "") {
+            std::string optOverrides) {
 
         int appId = desc.getApplicationId();
         OptionChecker chk = getOptionChecker(appId);

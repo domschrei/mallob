@@ -85,5 +85,5 @@ namespace app_registry {
     std::string getCombinedCopyrightInformation();
 
     void checkAndOverrideProgramOptions(Parameters& params, const JobDescription& desc,
-        const std::string& optionOverrides);
+        std::string optionOverrides = "");
 }

@@ -66,7 +66,7 @@ private:
             {"priority", _params.preprocessSweepPriority()},
             {"application", _type == SWEEPER ? "SWEEP" : "SAT"},
             {"group-id", _group_id},
-            {"configuration", {"options", _option_overrides}}
+            {"configuration", {{"options", _option_overrides}}}
         };
 
         auto f = std::vector<int>(_input_cnf.begin(), _input_cnf.end() - 2);
@@ -81,7 +81,8 @@ private:
             json["cpu-limit"] = std::to_string(
             std::max(0.001f, _desc.getCpuLimit() - getAgeSinceActivation())) + "s";
         if (_type == SATSOLVER && _params.overrideSatOptions.isSet())
-            json["configuration"]["options"] += (json["configuration"]["options"].empty() ? "" : " ") + _params.overrideSatOptions();
+            json["configuration"]["options"] = json["configuration"]["options"].get<std::string>()
+                + (json["configuration"]["options"].empty() ? "" : " ") + _params.overrideSatOptions();
         applySuccessiveGrowth(json);
 
         auto copiedJson = json;

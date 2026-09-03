@@ -7,8 +7,7 @@
 #include "app/satwithpre/ext_satsuma_caller.hpp"
 #include "app/satwithpre/kissat_preprocessor.hpp"
 #include "app/satwithpre/lingeling_preprocessor.hpp"
-#include "app/satwithpre/mallobsat_preprocess_actor.hpp"
-#include "app/satwithpre/mallobsweep_preprocess_actor.hpp"
+#include "app/satwithpre/mallob_preprocess_actor.hpp"
 #include "app/satwithpre/sat_preprocess_actor.hpp"
 #include "app/satwithpre/satsuma_preprocessor.hpp"
 #include "data/job_description.hpp"
@@ -72,6 +71,7 @@ public:
                 // prerequisite done: initialize actor
                 auto formula = actor.prerequisite ? actor.prerequisite->formula : _base_cnf;
                 auto name = std::to_string(actorIdx) + ":";
+                if (!actor.groupId.empty()) actor.groupId = "#" + std::to_string(_desc.getId()) + ":" + actor.groupId;
                 Parameters params(_params);
                 app_registry::checkAndOverrideProgramOptions(params, _desc, actor.options);
                 switch (actor.type) {

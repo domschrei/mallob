@@ -4,13 +4,15 @@
         "type": "MALLOBSAT",
         "prerequisite": null,
         "actorsBeingDisplaced": [],
-        "onlyStartIfPrerequisiteSimplified": false
+        "onlyStartIfPrerequisiteSimplified": false,
+        "group-id": "1"
     },
     {
         "id": "sweep",
         "type": "MALLOBSWEEP",
         "prerequisite": null,
         "actorsBeingDisplaced": [],
-        "onlyStartIfPrerequisiteSimplified": false
+        "onlyStartIfPrerequisiteSimplified": false,
+        "group-id": "1"
     }
 ]
