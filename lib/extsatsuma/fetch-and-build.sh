@@ -3,7 +3,7 @@
 source ../base-build-functions.sh
 dirname="satsuma"
 
-branchorcommit="9f8032a792149978b1b9868cb4b7baba551adf55"
+branchorcommit="4e2a70714b8ab53557dafe7aa367fc7dc2fe8ee2"
 fetch_and_extract $dirname CMakeLists.txt https://github.com/domschrei/satsuma-with-cliquer/archive/${branchorcommit}.zip
 
 echo "[$dirname] Building ..."
