@@ -84,5 +84,6 @@ namespace app_registry {
     std::vector<ResourceCleaner> getCleaners();
     std::string getCombinedCopyrightInformation();
 
-    void checkAndOverrideProgramOptions(Parameters& params, JobDescription& desc);
+    void checkAndOverrideProgramOptions(Parameters& params, const JobDescription& desc,
+        const std::string& optionOverrides);
 }

@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include "app/app_registry.hpp"
 #include "app/satwithpre/actor_config_parser.hpp"
 #include "app/satwithpre/actor_context.hpp"
 #include "app/satwithpre/ext_satsuma_caller.hpp"
@@ -71,29 +72,36 @@ public:
                 // prerequisite done: initialize actor
                 auto formula = actor.prerequisite ? actor.prerequisite->formula : _base_cnf;
                 auto name = std::to_string(actorIdx) + ":";
+                Parameters params(_params);
+                app_registry::checkAndOverrideProgramOptions(params, _desc, actor.options);
                 switch (actor.type) {
                 case ActorContext::SATSUMA_INT:
                     name += "SatsumaInt";
-                    actor.actor.reset(new SatsumaPreprocessor(_params, _desc, name, std::move(formula)));
+                    actor.actor.reset(new SatsumaPreprocessor(params, _desc, name, std::move(formula)));
                     break;
                 case ActorContext::SATSUMA_EXT:
                     name += "SatsumaExt";
-                    actor.actor.reset(new ExtSatsumaCaller(_params, _desc, name, std::move(formula)));
+                    actor.actor.reset(new ExtSatsumaCaller(params, _desc, name, std::move(formula)));
                     break;
                 case ActorContext::KISSAT:
                     name += "Kissat";
-                    actor.actor.reset(new KissatPreprocessor(_params, _desc, name, std::move(formula)));
+                    actor.actor.reset(new KissatPreprocessor(params, _desc, name, std::move(formula)));
                     break;
                 case ActorContext::LINGELING:
                     name += "Lingeling";
-                    actor.actor.reset(new LingelingPreprocessor(_params, _desc, name, std::move(formula)));
+                    actor.actor.reset(new LingelingPreprocessor(params, _desc, name, std::move(formula)));
                     break;
                 case ActorContext::MALLOBSAT:
                     name += "MallobSat";
-                    actor.actor.reset(new MallobSatPreprocessActor(_params, _desc, name, _api, std::move(formula), _time_of_start));
+                    actor.actor.reset(new MallobPreprocessActor(params, _desc, name, _api, std::move(formula),
+                        _time_of_start, MallobPreprocessActor::SATSOLVER,
+                        actor.groupId, actor.options));
                     break;
                 case ActorContext::MALLOBSWEEP:
-                    actor.actor.reset(new MallobSweepPreprocessActor(_params, _desc, std::to_string(actorIdx) + ":MallobSweep", _api, std::move(formula), _time_of_start));
+                    name += "MallobSweep";
+                    actor.actor.reset(new MallobPreprocessActor(params, _desc, name, _api, std::move(formula),
+                        _time_of_start, MallobPreprocessActor::SWEEPER,
+                        actor.groupId, actor.options));
                     break;
                 }
                 actor.id += ":" + name;

@@ -16,27 +16,35 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-class MallobSatPreprocessActor : public SatPreprocessActor {
+class MallobPreprocessActor : public SatPreprocessActor {
+
+public:
+    enum MallobJobType {SATSOLVER, SWEEPER};
 
 private:
     const JobDescription& _desc; // contains our instance to solve and all metadata
     APIConnector& _api; // for submitting jobs to Mallob
     const int _job_id;
     const float _time_of_activation;
+    const std::string _group_id;
+    const std::string _option_overrides;
+    const MallobJobType _type;
 
     nlohmann::json _base_json;
 
 public:
-    MallobSatPreprocessActor(const Parameters& params, const JobDescription& desc, const std::string& name,
-            APIConnector& api, std::vector<int>&& formula, float timeOfActivation) :
+    MallobPreprocessActor(const Parameters& params, const JobDescription& desc, const std::string& name,
+            APIConnector& api, std::vector<int>&& formula, float timeOfActivation,
+            MallobJobType type, const std::string& groupId, const std::string& optionOverrides) :
         SatPreprocessActor(params, name, std::move(formula)), _desc(desc), _api(api),
-            _job_id(desc.getId()), _time_of_activation(timeOfActivation) {
+            _job_id(desc.getId()), _time_of_activation(timeOfActivation),
+            _group_id(groupId), _option_overrides(optionOverrides), _type(type) {
 
         static int _actor_counter = 1;
 
         _jobstr = "#" + std::to_string(_job_id) + ":mal:" + std::to_string(_actor_counter++);
     }
-    ~MallobSatPreprocessActor() {}
+    ~MallobPreprocessActor() {}
 
     void preprocessAsync() override {
         submitJob();
@@ -50,18 +58,19 @@ public:
 
 private:
     void submitJob() {
+        // Prepare job submission data
         auto& json = _base_json;
         json = {
-            {"user", "sat-" + std::string(toStr())},
-            {"name", std::string(toStr())+":job"},
-            {"priority", 1.000},
-            {"application", "SAT"}
+            {"user", std::string(toStr())},
+            {"name", std::string(toStr())+":" + (_type == SWEEPER ? "SWEEP" : "SAT") + ":job"},
+            {"priority", _params.preprocessSweepPriority()},
+            {"application", _type == SWEEPER ? "SWEEP" : "SAT"},
+            {"group-id", _group_id},
+            {"configuration", {"options", _option_overrides}}
         };
-        if (_params.crossJobCommunication()) json["group-id"] = std::to_string(_desc.getGroupId());
 
         auto f = std::vector<int>(_input_cnf.begin(), _input_cnf.end() - 2);
         StaticStore<std::vector<int>>::insert(json["name"].get<std::string>(), std::move(f));
-
         json["internalliterals"] = json["name"].get<std::string>();
         json["configuration"]["__NV"] = std::to_string(nbInputVars());
         json["configuration"]["__NC"] = std::to_string(nbInputClauses());
@@ -71,8 +80,8 @@ private:
         if (_desc.getCpuLimit() > 0)
             json["cpu-limit"] = std::to_string(
             std::max(0.001f, _desc.getCpuLimit() - getAgeSinceActivation())) + "s";
-        if (_params.overrideSatOptions.isSet())
-            json["configuration"]["options"] = _params.overrideSatOptions();
+        if (_type == SATSOLVER && _params.overrideSatOptions.isSet())
+            json["configuration"]["options"] += (json["configuration"]["options"].empty() ? "" : " ") + _params.overrideSatOptions();
         applySuccessiveGrowth(json);
 
         auto copiedJson = json;
@@ -81,6 +90,7 @@ private:
             auto res = jsonToJobResult(response);
             if (res.result == RESULT_SAT) _result = SAT;
             else if (res.result == RESULT_UNSAT) _result = UNSAT;
+            else if (res.result == RESULT_SIMPLIFIED) _result = SIMPLIFIED;
             else _result = NONE;
         });
         if (result != JsonInterface::Result::ACCEPT) {
@@ -147,6 +157,9 @@ private:
         if (res.result == RESULT_SAT) {
             assert(solution.size() >= 1 && solution[0] == 0);
             _model = std::move(solution);
+        } else if (res.result == RESULT_SIMPLIFIED) {
+            _output_cnf = std::move(solution);
+            //already contains metadata #vals and #clauses in the last two entries
         }
         res.setSolution(std::move(solution));
         LOG(V3_VERB, "SATWP %s extracted\n", json["name"].get<std::string>().c_str());

@@ -93,6 +93,8 @@ public:
             ctx.type = parseType(entry.at("type").get<std::string>());
             ctx.onlyStartIfPrerequisiteSimplified =
                 entry.value("onlyStartIfPrerequisiteSimplified", false);
+            ctx.options = entry.count("options") ? entry.at("options").get<std::string>() : "";
+            ctx.groupId = entry.count("group-id") ? entry.at("group-id").get<std::string>() : "";
 
             actors.push_back(std::move(ctx));
             byId[id] = &actors.back();

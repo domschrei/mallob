@@ -6,6 +6,7 @@
 #include <memory>
 #include <utility>
 
+#include "data/app_configuration.hpp"
 #include "robin_hash.h"
 #include "robin_map.h"
 #include "util/logger.hpp"
@@ -96,7 +97,8 @@ namespace app_registry {
         return out;
     }
 
-    void checkAndOverrideProgramOptions(Parameters& params, JobDescription& desc) {
+    void checkAndOverrideProgramOptions(Parameters& params, const JobDescription& desc,
+            const std::string& optOverrides = "") {
 
         int appId = desc.getApplicationId();
         OptionChecker chk = getOptionChecker(appId);
@@ -114,9 +116,15 @@ namespace app_registry {
         }
 
         const auto appConf = desc.getAppConfiguration();
-        if (!appConf.map.count("options")) return;
+        if (appConf.map.count("options")) {
+            std::string overrides = appConf.map.at("options");
+            std::replace(overrides.begin(), overrides.end(), '&', ' ');
+            std::istringstream buffer(overrides);
+            std::vector<std::string> args {std::istream_iterator<std::string>(buffer),
+                                    std::istream_iterator<std::string>()};
+            params.init(args); // override
+        }
 
-        std::string optOverrides = appConf.map.at("options");
         std::replace(optOverrides.begin(), optOverrides.end(), '&', ' ');
         std::istringstream buffer(optOverrides);
         std::vector<std::string> args {std::istream_iterator<std::string>(buffer),

@@ -12,6 +12,9 @@ struct ActorContext {
     std::vector<ActorContext*> actorsBeingDisplaced;
     bool onlyStartIfPrerequisiteSimplified {false};
 
+    std::string options;
+    std::string groupId;
+
     std::unique_ptr<SatPreprocessActor> actor;
     enum ActiveActorState {UNINITIALIZED, RUNNING, FINISHED} state {UNINITIALIZED};
     SatPreprocessActor::PreprocessActorResult result {SatPreprocessActor::PENDING};
