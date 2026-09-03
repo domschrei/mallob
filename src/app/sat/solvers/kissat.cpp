@@ -23,7 +23,6 @@ extern "C" {
 }
 #include "kissat.hpp"
 
-#include "app/sweep/sweep_job.hpp"
 
 
 
