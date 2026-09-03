@@ -18,4 +18,8 @@ struct ActorContext {
     std::vector<int> formula;
     std::vector<int> model;
     float timeOfSignalledDisplacement {0};
+
+    const char* getId() const {
+        return id.c_str();
+    }
 };

@@ -61,24 +61,31 @@ public:
 
                 // prerequisite done: initialize actor
                 auto formula = actor.prerequisite ? actor.prerequisite->formula : _base_cnf;
+                auto name = std::to_string(actorIdx) + ":";
                 switch (actor.type) {
                 case ActorContext::SATSUMA_INT:
-                    actor.actor.reset(new SatsumaPreprocessor(_params, _desc, std::to_string(actorIdx) + ":SatsumaInt", std::move(formula)));
+                    name += "SatsumaInt";
+                    actor.actor.reset(new SatsumaPreprocessor(_params, _desc, name, std::move(formula)));
                     break;
                 case ActorContext::SATSUMA_EXT:
-                    actor.actor.reset(new ExtSatsumaCaller(_params, _desc, std::to_string(actorIdx) + ":SatsumaExt", std::move(formula)));
+                    name += "SatsumaExt";
+                    actor.actor.reset(new ExtSatsumaCaller(_params, _desc, name, std::move(formula)));
                     break;
                 case ActorContext::KISSAT:
-                    actor.actor.reset(new KissatPreprocessor(_params, _desc, std::to_string(actorIdx) + ":Kissat", std::move(formula)));
+                    name += "Kissat";
+                    actor.actor.reset(new KissatPreprocessor(_params, _desc, name, std::move(formula)));
                     break;
                 case ActorContext::LINGELING:
-                    actor.actor.reset(new LingelingPreprocessor(_params, _desc, std::to_string(actorIdx) + ":Lingeling", std::move(formula)));
+                    name += "Lingeling";
+                    actor.actor.reset(new LingelingPreprocessor(_params, _desc, name, std::move(formula)));
                     break;
                 case ActorContext::MALLOBSAT:
-                    actor.actor.reset(new MallobSatPreprocessActor(_params, _desc, std::to_string(actorIdx) + ":MallobSat", _api, std::move(formula), _time_of_start));
+                    name += "MallobSat";
+                    actor.actor.reset(new MallobSatPreprocessActor(_params, _desc, name, _api, std::move(formula), _time_of_start));
                     break;
                 }
-                LOG(V2_INFO, "SATWP launch %s\n", actor.actor->getName());
+                actor.id += ":" + name;
+                LOG(V2_INFO, "SATWP launch %s\n", actor.getId());
                 actor.actor->preprocessAsync();
                 actor.state = ActorContext::RUNNING;
 
@@ -86,9 +93,9 @@ public:
                 for (auto& other : actor.actorsBeingDisplaced) {
                     if (other->timeOfSignalledDisplacement <= 0) {
                         if (other->actor)
-                            LOG(V2_INFO, "SATWP %s --displace--> %s\n", actor.actor->getName(), other->actor->getName());
+                            LOG(V2_INFO, "SATWP %s --displace--> %s\n", actor.getId(), other->getId());
                         else
-                            LOG(V2_INFO, "SATWP %s --displace--\n", actor.actor->getName());
+                            LOG(V2_INFO, "SATWP %s --displace--\n", actor.getId());
                         other->timeOfSignalledDisplacement = Timer::elapsedSeconds();
                     }
                 }
@@ -97,7 +104,7 @@ public:
             if (actor.state == ActorContext::RUNNING && actor.actor->isDonePreprocessing()) {
                 // this actor is done
                 auto res = actor.actor->getPreprocessingResult();
-                LOG(V2_INFO, "SATWP %s done, result %s\n", actor.actor->getName(),
+                LOG(V2_INFO, "SATWP %s done, result %s\n", actor.getId(),
                     actor.actor->getPreprocessingResultAsString().c_str());
                 if (res == SatPreprocessActor::SAT) {
                     actor.model = std::move(actor.actor->getModel());
@@ -113,13 +120,13 @@ public:
                 actor.result = res;
                 actor.state = ActorContext::FINISHED;
                 if (res == SatPreprocessActor::SAT) {
-                    LOG(V2_INFO, "SATWP %s found SAT\n", actor.actor->getName());
+                    LOG(V2_INFO, "SATWP %s found SAT\n", actor.getId());
                     _winning_actor = &actor;
 
                     return 10;
                 }
                 if (res == SatPreprocessActor::UNSAT) {
-                    LOG(V2_INFO, "SATWP %s found UNSAT\n", actor.actor->getName());
+                    LOG(V2_INFO, "SATWP %s found UNSAT\n", actor.getId());
                     _winning_actor = &actor;
                     return 20;
                 }
@@ -129,13 +136,13 @@ public:
             if (actor.state == ActorContext::RUNNING && actor.timeOfSignalledDisplacement > 0) {
                 // this actor is being displaced (after some time)
                 if (_params.preprocessBalancing() == 0) {
-                    LOG(V2_INFO, "SATWP %s interrupt\n", actor.actor->getName());
+                    LOG(V2_INFO, "SATWP %s interrupt\n", actor.getId());
                     actor.actor->interrupt();
                     actor.timeOfSignalledDisplacement = 0;
                 }
                 if (_params.preprocessBalancing() == 1 && Timer::elapsedSeconds() - _time_of_start >=
                     _params.preprocessExpansionFactor() * (actor.timeOfSignalledDisplacement - _time_of_start)) {
-                    LOG(V2_INFO, "SATWP %s interrupt\n", actor.actor->getName());
+                    LOG(V2_INFO, "SATWP %s interrupt\n", actor.getId());
                     actor.actor->interrupt();
                     actor.timeOfSignalledDisplacement = 0;
                 }
@@ -150,21 +157,21 @@ public:
         assert(actor);
         auto model = std::move(actor->model);
         checkModel(actor->actor->getInputCnf(), model);
-        LOG(V2_INFO, "SATWP Checked model @ %s, size %lu\n", actor->actor->getName(), model.size()-1);
+        LOG(V2_INFO, "SATWP Checked model @ %s, size %lu\n", actor->getId(), model.size()-1);
         while (true) {
             actor = actor->prerequisite;
             if (!actor) break;
             actor->actor->reconstructSolution(model);
-            LOG(V2_INFO, "SATWP Reconstructed model @ %s, size %lu\n", actor->actor->getName(), model.size()-1);
+            LOG(V2_INFO, "SATWP Reconstructed model @ %s, size %lu\n", actor->getId(), model.size()-1);
             checkModel(actor->actor->getInputCnf(), model);
-            LOG(V2_INFO, "SATWP Checked model @ %s\n", actor->actor->getName());
+            LOG(V2_INFO, "SATWP Checked model @ %s\n", actor->getId());
         }
         return model;
     }
 
     void stopAll() {
         for (auto& actor : _actors) if (actor.state == ActorContext::RUNNING) {
-            LOG(V2_INFO, "SATWP %s interrupt\n", actor.actor->getName());
+            LOG(V2_INFO, "SATWP %s interrupt\n", actor.getId());
             actor.actor->interrupt();
         }
     }
