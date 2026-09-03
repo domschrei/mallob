@@ -40,6 +40,8 @@ private:
     volatile bool _received_empty_clause {false};
     volatile bool _simplification_achieved {false};
 
+    std::ofstream _ofs_in;
+
 public:
     ExtSatsumaCaller(const Parameters& params, const JobDescription& desc, const std::string& name, std::vector<int>&& formula) :
         SatPreprocessActor(params, name, std::move(formula)) {
@@ -139,20 +141,19 @@ private:
 
         assert(nbInputVars() > 0 && nbInputVars() < 1'000'000'000);
 
-        std::ofstream ofs(_in_path.c_str());
+        _ofs_in = std::ofstream(_in_path.c_str());
 
         _orig_nb_vars = nbInputVars();
         _orig_nb_cls = nbInputClauses();
         LOG(V4_VVER, "%s Writing p cnf %i %i\n", getName(), _orig_nb_vars, _orig_nb_cls);
 
-        ofs << "p cnf " << _orig_nb_vars << " " << _orig_nb_cls << "\n";
+        _ofs_in << "p cnf " << _orig_nb_vars << " " << _orig_nb_cls << "\n";
         for (int i = 0; i+2 < _input_cnf.size(); i++) {
             int lit = _input_cnf[i];
-            ofs << lit << (lit==0 ? "\n" : " ");
+            _ofs_in << lit << (lit==0 ? "\n" : " ");
         }
-        ofs << "X";
-        ofs.flush();
-        ofs.close();
+        _ofs_in << "X";
+        _ofs_in.flush();
 
         LOG(V4_VVER, "%s Forwarded %lu lits to Satsuma\n", getName(), _input_cnf.size()-2);
     }
