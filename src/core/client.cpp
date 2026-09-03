@@ -216,6 +216,10 @@ void Client::readIncomingJobs() {
     log.flush();
 }
 
+ /*
+  * Client::init() passes this function to the JsonInterface where it is stored as _job_callback
+  * When _job_callback(...) is called, we land here
+  */
 void Client::handleNewJob(JobMetadata&& data) {
 
     if (data.done) {
@@ -672,6 +676,7 @@ void Client::handleSendJobResultInternal(JobResult&& jobResult) {
     if (resultCode == RESULT_SAT) resultCodeString = "SATISFIABLE";
     if (resultCode == RESULT_UNSAT) resultCodeString = "UNSATISFIABLE";
     if (resultCode == RESULT_OPTIMUM_FOUND) resultCodeString = "OPTIMUM FOUND";
+    if (resultCode == RESULT_SIMPLIFIED) resultCodeString = "SIMPLIFIED";
 
     // Output response time and solution header
     LOG(V2_INFO, "RESPONSE_TIME #%i %.6f rev. %i\n", jobId, desc.getStatistics().totalResponseTime, revision);

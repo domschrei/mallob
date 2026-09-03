@@ -41,7 +41,7 @@ private:
     int _comm_size;
     int _comm_rank;
 
-    std::unique_ptr<GenericClauseStore> _clause_store;
+    std::unique_ptr<StaticClauseStore<false>> _clause_store;
     std::unique_ptr<GenericClauseFilter> _clause_filter;
     std::unique_ptr<GenericExportManager> _export_manager;
 
@@ -141,6 +141,9 @@ public:
         else
             LOG(V4_VVER, "XTCS added %lu/%lu ITCS clauses\n", nbAdded, nbAdded+nbBlocked);
     }
+    bool hasClausesToExport() const {
+        return _clause_store->getTotalSizeAfterLastScan() > 0;
+    }
 
     void updateBestFoundSolutionCost(long long cost) override {
         _best_found_solution_cost = std::min(_best_found_solution_cost, cost);
@@ -158,8 +161,12 @@ public:
         return _has_clauses_to_broadcast_internally;
     }
     std::vector<int>&& getClausesToBroadcastInternally() {
+        //Nicco: Added this flag switch to false. Otherwise, this flag was always (?) 
+        //stuck at true when using Cross-Job Sharing (at least in Sweep'n'Sat) and was never sent back to false.
+        _has_clauses_to_broadcast_internally = false;
         return std::move(_clauses_to_broadcast_internally);
     }
+    auto getBufferBuilder(int limit) {return _clause_store->getBufferBuilder(limit);}
 
     virtual int getActorJobId() const override {
         return _group_id;

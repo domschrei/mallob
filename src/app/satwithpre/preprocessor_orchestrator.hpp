@@ -5,6 +5,7 @@
 #include "app/satwithpre/kissat_preprocessor.hpp"
 #include "app/satwithpre/lingeling_preprocessor.hpp"
 #include "app/satwithpre/mallobsat_preprocess_actor.hpp"
+#include "app/satwithpre/mallobsweep_preprocess_actor.hpp"
 #include "app/satwithpre/sat_preprocess_actor.hpp"
 #include "app/satwithpre/satsuma_preprocessor.hpp"
 #include "data/job_description.hpp"
@@ -21,7 +22,7 @@ private:
     APIConnector& _api;
 
     struct ActorContext {
-        enum ActorType {SATSUMA_INT, SATSUMA_EXT, KISSAT, LINGELING, MALLOBSAT} type;
+        enum ActorType {SATSUMA_INT, SATSUMA_EXT, KISSAT, LINGELING, MALLOBSAT, MALLOBSWEEP} type;
         ActorContext* prerequisite {nullptr};
         std::vector<ActorContext*> actorsBeingDisplaced;
         bool onlyStartIfPrerequisiteSimplified {false};
@@ -44,6 +45,14 @@ public:
             _base_cnf(getCnfFromJobDescription()) {
 
         _time_of_start = Timer::elapsedSeconds();
+
+        LOG(V2_INFO, "SATWP start orchestrator\n");
+
+        if (_params.preprocessSweepnSat()) {
+            //start Sweep'n'Sat (and nothing else)
+            startSweepNSat();
+            return;
+        }
 
         // Mallob on original instance
         _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSAT, nullptr});
@@ -107,6 +116,9 @@ public:
                     break;
                 case ActorContext::MALLOBSAT:
                     actor.actor.reset(new MallobSatPreprocessActor(_params, _desc, std::to_string(actorIdx) + ":MallobSat", _api, std::move(formula), _time_of_start));
+                    break;
+                case ActorContext::MALLOBSWEEP:
+                    actor.actor.reset(new MallobSweepPreprocessActor(_params, _desc, std::to_string(actorIdx) + ":MallobSweep", _api, std::move(formula), _time_of_start));
                     break;
                 }
                 LOG(V2_INFO, "SATWP launch %s\n", actor.actor->getName());
@@ -209,5 +221,11 @@ private:
         cnf.push_back(nbVars);
         cnf.push_back(nbCls);
         return cnf;
+    }
+
+    void startSweepNSat() {
+        //Two apps (SWEEP and SAT) run concurrently. from the FMCAD'26 paper
+        _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSAT, nullptr});
+        _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSWEEP, nullptr, {}});
     }
 };

@@ -56,20 +56,26 @@ private:
 
     int _last_skipped_epochs_warning {0};
 
+    bool _internal_sharing = true;
     MessageSubscription _sub_incoming_crossshared_clauses;
     std::list<std::vector<int>> _incoming_crossshared_clauses;
 
 public:
-    AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job);
+    AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job, bool internalSharing = true);
     void initCrossSharer();
 
     void communicate();
-    void handle(int source, int mpiTag, JobMessage& msg);
+    bool handle(int source, int mpiTag, JobMessage& msg);
 
     bool isDestructible();
     int getCurrentEpoch() const {return _current_epoch;}
 
     bool isDoneAssemblingProof() const {return _proof_producer && _proof_producer->isDoneAssemblingProof();}
+
+    // Need to guard against a mono job with no group (getGroupId() <= 0), where  _cross_job_clause_sharer is initialized to nullptr
+    bool hasLocalClausesLeftToShare() const {return _cross_job_clause_sharer && _cross_job_clause_sharer->hasClausesToBroadcastInternally();}
+    //Somehow this needed to be public now to have access
+    void feedLocalClausesIntoCrossSharing(std::vector<int>& clauses, ClauseSharingSession* session);
 
 private:
     bool handleClauseHistoryMessage(int source, int mpiTag, JobMessage& msg);
@@ -80,7 +86,6 @@ private:
 
     void initiateClauseSharing(JobMessage& msg, int source, bool fromDeferredQueue);
     void initiateCrossSharing(JobMessage& msg, int source, bool fromDeferredQueue);
-    void feedLocalClausesIntoCrossSharing(std::vector<int>& clauses, ClauseSharingSession* session);
     void tryActivateDeferredSharingInitiation();
     
     void checkCertifiedUnsatReadyMsg();
