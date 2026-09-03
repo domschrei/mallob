@@ -40,7 +40,11 @@ public:
                 res.result = RESULT_SAT;
             }
             else if (code == 20) res.result = RESULT_UNSAT;
-            else usleep(1000); // 1ms
+            else if (code == -1) {
+                LOG(V2_INFO, "SATWP terminate: no actors left\n");
+                break;
+            }
+            usleep(1000); // no result yet, sleep for 1ms
         }
         _po.stopAll();
 

@@ -2,6 +2,7 @@
 #pragma once
 
 #include "app/satwithpre/actor_config_parser.hpp"
+#include "app/satwithpre/actor_context.hpp"
 #include "app/satwithpre/ext_satsuma_caller.hpp"
 #include "app/satwithpre/kissat_preprocessor.hpp"
 #include "app/satwithpre/lingeling_preprocessor.hpp"
@@ -45,8 +46,10 @@ public:
     int loop() {
 
         int actorIdx = -1;
+        int nbRemainingActors = 0;
         for (auto& actor : _actors) {
             actorIdx++;
+            nbRemainingActors += (actor.state != ActorContext::FINISHED);
 
             if (actor.state == ActorContext::UNINITIALIZED) {
 
@@ -139,7 +142,7 @@ public:
             }
         }
 
-        return 0;
+        return nbRemainingActors == 0 ? -1 : 0;
     }
 
     std::vector<int> getModel() {
