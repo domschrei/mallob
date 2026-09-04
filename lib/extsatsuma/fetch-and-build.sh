@@ -17,6 +17,6 @@ echo "[$dirname] Build complete"
 if ! [ -z "$1" ]; then
     echo "[$dirname] cp build/satsuma $1/"
     cp build/satsuma "$1/"
-    echo "[$dirname] cp build/run-satsuma.sh $1/"
-    cp build/run-satsuma.sh "$1/"
+    echo "[$dirname] cp run-satsuma.sh $1/"
+    cp run-satsuma.sh "$1/"
 fi

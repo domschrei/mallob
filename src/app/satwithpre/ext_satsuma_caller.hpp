@@ -45,7 +45,7 @@ public:
     ExtSatsumaCaller(const Parameters& params, const JobDescription& desc, const std::string& name, std::vector<int>&& formula) :
         SatPreprocessActor(params, name, std::move(formula)) {
 
-        std::string basePath = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallobtermrelev."
+        std::string basePath = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob."
             + std::to_string(Proc::getPid()) + "."
             + std::to_string(desc.getId()) + "." + name + ".";
         std::ostringstream oss;
@@ -83,7 +83,7 @@ public:
 
         LOG(V4_VVER, "%s Calling Satsuma: %s\n", getName(), cmd.c_str());
         _pid = subSatsuma.start();
-        LOG(V4_VVER, "%s started\n", getName());
+        LOG(V4_VVER, "%s started, pid %i\n", getName(), _pid);
 
         _fut_prepro = ProcessWideThreadPool::get().addTask([&]() {
             _fut_in.get();
@@ -111,8 +111,9 @@ public:
     void interrupt() override {
         if (!_fut_prepro.valid() || _result != PENDING) return;
         if (_pid > 0) {
-            LOG(V4_VVER, "%s TERMINATE\n", getName());
-            Process::sendSignal(_pid, SIGTERM);
+            LOG(V4_VVER, "%s TERMINATE pid=%i\n", getName(), _pid);
+            Process::terminate(_pid);
+            Process::resume(_pid);
             return;
         }
     }
@@ -143,9 +144,8 @@ private:
 
     void readPreprocessedFormula() {
 
-        LOG(V4_VVER, "%s opening ifs ...\n", getName());
+        LOG(V4_VVER, "%s opening results pipe\n", getName());
         std::ifstream ifs(_out_path);
-        LOG(V4_VVER, "%s ifs open\n", getName());
         
         std::string line;
         bool lastLitZero = true;
