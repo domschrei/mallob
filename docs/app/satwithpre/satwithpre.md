@@ -3,7 +3,7 @@
 
 In the context of our [SAT'25 publication](https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.SAT.2025.27) and subsequent [SAT Competition '26 submission](https://satres.kikit.kit.edu/papers/2026-mallob-cascading.pdf), we developed an alternative setup for distributed SAT solving where a number of (pre-)processing actors can interact in a DAG-like pipeline. In this _Cascading Preprocessing_, preprocessors can be chained together - both sequential ones (like Satsuma or Kissat) and parallel ones (like MallobSweep) - and their results can be fed into parallel solvers, running in parallel or displacing each another.
 
-Compile Mallob with `-DMALLOB_APP_SATWITHPRE=1` and then set `-mono-app=SATWITHPRE` to use this setup, which will (by default) also override the SAT solver configuration accordingly.
+Compile Mallob with `-DMALLOB_APP_SATWITHPRE=1` and then set `-mono-app=SATWITHPRE` to use this setup. Readily configured presets are available via `config/presets/satcomp26-quick*`.
 
 ## Configuration
 
@@ -23,4 +23,3 @@ Use the option `-preprocess-config=path/to/config.json`, where the supplied JSON
 * "group-id": Group ID for cross-task clause sharing; two processors with the same group ID are allowed to exchange clauses with each another (see `-cjc` option).
 * "options": A string of whitespace-separated Mallob program options, overriding the global options for this particular actor.
 
-Readily configured presets are available via `config/presets/satcomp26-quick*`. 
