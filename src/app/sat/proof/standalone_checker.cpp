@@ -27,6 +27,23 @@ void exitUnverified() {
     exit(1);
 }
 
+void printAllClauses(const int *data, size_t size) {
+    LOG(V1_WARN, "Printing original clauses \n");
+    u64 id = 1;
+    std::stringstream out;
+    out << id << ": ";
+    for (size_t i = 0; i < size; i++) {
+        int lit = data[i];
+        out << lit << " ";
+        if (lit == 0) {
+            LOG(V1_WARN, "%s \n", out.str().c_str());
+            out.str(""); 
+            id++;
+            out << id << ": ";
+        }
+    }
+}
+
 int main(int argc, char** argv) {
     prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY, 0, 0, 0);
 
@@ -89,6 +106,8 @@ int main(int argc, char** argv) {
     }
     time = Timer::elapsedSeconds() - time;
     LOG(V2_INFO, "Loaded CNF to LRAT checker; time %.3f\n", time);
+    
+    printAllClauses(desc->getFormulaPayload(0), desc->getFormulaPayloadSize(0));
 
     // Delete formula to make space
     time = Timer::elapsedSeconds();
@@ -137,6 +156,7 @@ int main(int argc, char** argv) {
                 exitUnverified();
             }
         } else {
+            LOG(V1_WARN, "(ncco) %lu: %s", nbLines, line.toStr().c_str());
             if (!compactifier.handleClauseAddition(line)) {
                 duplicates++;
                 continue;

@@ -80,6 +80,9 @@ private:
     unsigned long _total_partial_proof_bytes = 0;
     unsigned long _total_partial_proof_clauses = 0;
     unsigned long _total_combined_proof_clauses = 0;
+    
+    std::vector<bool> isOrigClauseNecessary{};
+    
 
 public:
     DistributedProofMerger(const Parameters& params, MPI_Comm comm, int branchingFactor, 
@@ -322,6 +325,10 @@ private:
         SerializedLratLine bufferLine;
         float inactiveTimeStart = 0;
         LratClauseId lastId = std::numeric_limits<LratClauseId>::max();
+        
+        if (_is_root) {
+           isOrigClauseNecessary = std::vector<bool>(_num_original_clauses+1, 0);
+        }
 
         while (!Terminator::isTerminating()) {
             
@@ -395,6 +402,7 @@ private:
                     }
                 }
                 // Write into final file
+                markNeccessaryOrigClauses(chosenLine);
                 _proof_writer->pushAdditionBlocking(chosenLine);
                 chosenLine.clear();
             } else {
@@ -406,11 +414,44 @@ private:
             }
             numOutputLines++;
         }
+        
+        if (_is_root) {
+            printNeccesaryOrigClauses();
+        }
 
+        
         if (inactiveTimeStart > 0) {
             _time_inactive += Timer::elapsedSeconds() - inactiveTimeStart;
             inactiveTimeStart = 0;
         }
+    }
+    
+    void markNeccessaryOrigClauses(const SerializedLratLine &line) {
+        // LOG(V1_WARN, "merg %s", line.toStr().c_str());
+        auto [ptr, numHints] = line.getHints();
+        for (size_t i = 0; i < numHints; i++) {
+            auto hint = ptr[i];
+            if (hint <= _num_original_clauses && !isOrigClauseNecessary[hint]) {
+                // LOG(V1_WARN, "new orighint %lu \n", hint);
+                isOrigClauseNecessary[hint] = true;
+            }
+        }
+    }
+    
+    void printNeccesaryOrigClauses() {
+        int count = 0;
+        if (!_is_root) return;
+        std::ofstream unsatcore;
+        unsatcore.open("unsatcoreIDs.txt");
+        for (int id=1; id <= _num_original_clauses; id++) {
+           if (isOrigClauseNecessary[id]) {
+               // LOG(V1_WARN, "necc %lu \n", id);
+               unsatcore << id << std::endl;       
+               count++;
+           }
+        }
+        unsatcore.close();
+        LOG(V1_WARN, "Necessary %lu / %lu \n", count, _num_original_clauses);
     }
 
     void concludeMerging() {
@@ -461,6 +502,7 @@ private:
                         lrat_utils::writeDeletionLine(out, 1, hints, nbHints, lrat_utils::NORMAL);
                     } else {
                         // addition
+                        // LOG(V1_WARN, "inv %s", line.toStr().c_str());
                         if (!compactifier.handleClauseAddition(line))
                             continue;
                         lrat_utils::writeLine(out, line, lrat_utils::NORMAL);

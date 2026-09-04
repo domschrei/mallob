@@ -4,6 +4,9 @@
 #include "siphash/siphash.hpp"
 #include "trusted_utils.hpp"
 #include "robin_map.h"
+#include "util/logger.hpp"
+
+#include <sstream>
 
 class LratChecker {
 
