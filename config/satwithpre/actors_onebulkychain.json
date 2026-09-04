@@ -1,0 +1,32 @@
+[
+    {
+        "id": "sats",
+        "type": "SATSUMA_EXT",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "kis",
+        "type": "KISSAT",
+        "prerequisite": "sats",
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "sweep",
+        "type": "MALLOBSWEEP",
+        "prerequisite": "kis",
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false,
+        "group-id": "1"
+    },
+    {
+        "id": "mal",
+        "type": "MALLOBSAT",
+        "prerequisite": "sweep",
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false,
+        "group-id": "2"
+    }
+]
