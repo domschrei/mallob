@@ -23,3 +23,4 @@ Use the option `-preprocess-config=path/to/config.json`, where the supplied JSON
 * "group-id": Group ID for cross-task clause sharing; two processors with the same group ID are allowed to exchange clauses with each another (see `-cjc` option).
 * "options": A string of whitespace-separated Mallob program options, overriding the global options for this particular actor.
 
+Reconstruction of a found satisfying variable assignment works by tracing the "winning chain" back to its first actor and successively converting the model back as needed. Compositional proof production for a selected subset of actors is being worked on but not yet merged.
