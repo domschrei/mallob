@@ -23,4 +23,66 @@ Use the option `-preprocess-config=path/to/config.json`, where the supplied JSON
 * "group-id": Group ID for cross-task clause sharing; two processors with the same group ID are allowed to exchange clauses with each another (see `-cjc` option).
 * "options": A string of whitespace-separated Mallob program options, overriding the global options for this particular actor.
 
-Reconstruction of a found satisfying variable assignment works by tracing the "winning chain" back to its first actor and successively converting the model back as needed. Compositional proof production for a selected subset of actors is being worked on but not yet merged.
+### Example
+
+This example, from `config/satwithpre/actors_default.json`, configures actors as in our SAT'26 `quick` submission. Note that the "group-id" and "options" fields are optional and not used here.
+
+```json
+[
+    {
+        "id": "mal_orig",
+        "type": "MALLOBSAT",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "lgl",
+        "type": "LINGELING",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "kis",
+        "type": "KISSAT",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "sats",
+        "type": "SATSUMA_EXT",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "kis_after_sats",
+        "type": "KISSAT",
+        "prerequisite": "sats",
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": true
+    },
+    {
+        "id": "mal_pre1",
+        "type": "MALLOBSAT",
+        "prerequisite": "kis",
+        "actorsBeingDisplaced": ["mal_orig"],
+        "onlyStartIfPrerequisiteSimplified": true
+    },
+    {
+        "id": "mal_pre_full",
+        "type": "MALLOBSAT",
+        "prerequisite": "kis_after_sats",
+        "actorsBeingDisplaced": ["mal_orig", "mal_pre1"],
+        "onlyStartIfPrerequisiteSimplified": false
+    }
+]
+```
+
+## Other Notes
+
+Reconstruction of a found satisfying variable assignment works by tracing the "winning chain" back to its first actor and successively converting the model back as needed.
+
+Compositional proof production for a selected subset of actors is being worked on but not yet merged.

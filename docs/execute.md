@@ -84,7 +84,7 @@ Afterwards, we explain Mallob's other modes of operation (solving multiple insta
 
 ## SAT Solving
 
-See the documentation on the [SAT engine (MallobSat)](app/sat/sat.md) and [SATWITHPRE engine (MallobSat + Cascading Preprocessing)](app/satwithpre/satwithpre.md).
+For using and configuring Mallob's SAT solving, see the documentation on the [SAT engine (MallobSat)](app/sat/README.md) and [SATWITHPRE engine (MallobSat + Cascading Preprocessing)](app/satwithpre/README.md).
 
 ## MaxSAT Solving
 
