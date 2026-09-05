@@ -21,7 +21,7 @@ MallobSat offers a range of options for logging and/or checking proofs of unsati
 
 ### Monolithic Proofs of Unsatisfiability
 
-> [!NOTE]  
+> [!TIP]
 > **Preset:** `scripts/run/mallob_local.sh $(config/presets/monolithic-proof) -mono=path/to/f.cnf`  
 > ~ writes inverted LRUP proof to `proof.lrat`  
 > ~ check with (e.g.): `build/standalone_lrat_checker path/to/f.cnf proof.lrat`  
@@ -42,7 +42,7 @@ You can use the [`drat-trim`](https://github.com/marijnheule/drat-trim) tool sui
 
 ### Real-time Proof Checking
 
-> [!NOTE]  
+> [!TIP]
 > **Preset:** `scripts/run/mallob_local.sh $(config/presets/satcomp26-safe) -mono=path/to/f.cnf`
 
 Proof production can be costly and bottlenecked by the I/O bandwidth of the single process which needs to write the entire proof. A more scalable approach is to check all proof information on-the-fly, without writing it to disk, and to transfer clause soundness guarantees across machines via hash-based fingerprints. This is explained in detail in our [2024 SAT publication](https://dominikschreiber.de/papers/2024-sat-trusted-pre.pdf) and our [2026 TACAS publication](https://satres.kikit.kit.edu/papers/2026-tacas-distrincproof.pdf), where we extend the framework to incremental SAT solving.
@@ -70,7 +70,7 @@ build/iimpcheck_confirm -key-seed=13805254743912277295 -formula=instances/r3unsa
 
 ### PalRUP: Distributed Proofs of Unsatisfiability
 
-> [!NOTE]  
+> [!TIP]
 > **Presets:**  
 > ~ `scripts/run/mallob_local.sh $(config/presets/palrup-solve) -mono=path/to/f.cnf` - solve, write proof to `./proofs/`  
 > ~ `scripts/run/mallob_local.sh $(config/presets/palrup-check) -mono=path/to/f.cnf -proof-dir=path/to/proof/` - check produced proof  
