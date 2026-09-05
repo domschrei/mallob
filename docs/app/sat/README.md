@@ -5,6 +5,8 @@ This page describes general usage of MallobSat, Mallob's integrated distributed 
 
 For quickstarting, there are several MallobSat presets available in `config/presets/`, such as `satcomp26-safe` (with real-time proof checking), `sat-incremental` (for incremental SAT solving), and `palrup-*` (for scalable production and checking of parallel UNSAT proofs).
 
+See also the [SATWITHPRE engine](../satwithpre/README.md), which combines the MallobSat engine with a number of preprocessing actors and, as such, hosts some of the currently best performing SAT solving methods in Mallob(Sat).
+
 
 ## Input Formats
 
@@ -18,6 +20,12 @@ For binary files, Mallob reads clauses as integer sequences with separation zero
 MallobSat offers a range of options for logging and/or checking proofs of unsatisfiability for highest confidence in obtained results and the option to analyze UNSAT results.
 
 ### Monolithic Proofs of Unsatisfiability
+
+> [!NOTE]  
+> **Preset:** `scripts/run/mallob_local.sh $(config/presets/monolithic-proof) -mono=path/to/f.cnf`  
+> ~ writes inverted LRUP proof to `proof.lrat`  
+> ~ check with (e.g.): `build/standalone_lrat_checker path/to/f.cnf proof.lrat`  
+> ~ performance tweak: add Mallob option `-uninvert-proof=0` and checker option `--reversed`
 
 We call a proof _monolithic_ if it mimics the proof emitted by a sequential SAT solver, i.e., it is comprised of one single, linear file that combines the reasoning of all involved solver threads (as far as needed).
 
@@ -33,6 +41,9 @@ Further synergies are possible; you can set `-uninvert=0` for Mallob and `--reve
 You can use the [`drat-trim`](https://github.com/marijnheule/drat-trim) tool suite to decompress a proof; note that you need to `#define MODE 2` (1=DRAT, 2=LRAT) in `decompress.c` before building.
 
 ### Real-time Proof Checking
+
+> [!NOTE]  
+> **Preset:** `scripts/run/mallob_local.sh $(config/presets/satcomp26-safe) -mono=path/to/f.cnf`
 
 Proof production can be costly and bottlenecked by the I/O bandwidth of the single process which needs to write the entire proof. A more scalable approach is to check all proof information on-the-fly, without writing it to disk, and to transfer clause soundness guarantees across machines via hash-based fingerprints. This is explained in detail in our [2024 SAT publication](https://dominikschreiber.de/papers/2024-sat-trusted-pre.pdf) and our [2026 TACAS publication](https://satres.kikit.kit.edu/papers/2026-tacas-distrincproof.pdf), where we extend the framework to incremental SAT solving.
 
@@ -58,6 +69,12 @@ build/iimpcheck_confirm -key-seed=13805254743912277295 -formula=instances/r3unsa
 **Note:** On-the-fly checking can also be used in Mallob's scheduled mode of operation. Globally unique clause IDs are ensured by adding a large offset times $x$ to a new solver thread's clause ID counter if the job has already experienced $x$ _balancing epochs_, i.e., received $x$ volume updates, since its initialization. The offset is chosen in such a way that 10,000 solvers each producing 10,000 clauses per second can run for 10,000 seconds before they may begin overlapping with clause IDs from the next balancing epoch. `ImpCheck` notices and reports any errors that would result from such a corner case.
 
 ### PalRUP: Distributed Proofs of Unsatisfiability
+
+> [!NOTE]  
+> **Presets:**  
+> ~ `scripts/run/mallob_local.sh $(config/presets/palrup-solve) -mono=path/to/f.cnf` - solve, write proof to `./proofs/`  
+> ~ `scripts/run/mallob_local.sh $(config/presets/palrup-check) -mono=path/to/f.cnf -proof-dir=path/to/proof/` - check produced proof  
+> ~ `scripts/run/mallob_local.sh $(config/presets/palrup-solve-check) -mono=path/to/f.cnf` - solve, produce & immediately check proof
 
 To enable _natively parallel_ proof production in the PalRUP framework, run Mallob with options `-palrup=1 -proof-dir=path/to/palrup/proof`. The given path can be on local disks, if Mallob is run on a distributed system. To output the proof in a readable text format (instead of variable byte length coded binary format) set the option `-palrup-binary=0`.
 
