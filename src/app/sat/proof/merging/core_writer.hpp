@@ -19,11 +19,12 @@ public:
     void pushAddition(const SerializedLratLine& line) {
         auto [data, nbHints] = line.getHints();
         for (int i = 0; i < nbHints; i++) {
-            uint64_t hint = data[i];
+            const uint64_t hint = data[i];
             assert(hint > 0);
-            if (hint < _ordered_clauses.size()) {
+            const int clauseIdx = (int) (hint-1);
+            if (clauseIdx < _ordered_clauses.size()) {
                 // original clause being referenced
-                _core_clause_indices.insert((int) hint);
+                _core_clause_indices.insert(clauseIdx);
             }
         }
     }
