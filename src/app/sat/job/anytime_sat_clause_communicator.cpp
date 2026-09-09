@@ -618,5 +618,5 @@ void AnytimeSatClauseCommunicator::setupProofProducer(JobMessage& msg) {
         }
     }
 
-    _proof_producer.reset(new ProofProducer(_params, setup, _job->getJobTree()));
+    _proof_producer.reset(new ProofProducer(_params, _job->getDescription(), setup, _job->getJobTree()));
 }

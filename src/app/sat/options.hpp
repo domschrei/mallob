@@ -93,7 +93,7 @@ OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversificati
 
 OPTION_GROUP(grpAppSatProof, "app/sat/proof", "Production of UNSAT proofs")
  OPT_STRING(proofDirectory,               "proof-dir", "",                             "",                      "Directory to write partial proofs into (default: -log option")
- OPT_STRING(proofOutputFile,              "proof", "",                                 "",                      "Enable UNSAT proof production, writing final LRAT proof to specified destination (output by rank zero)")
+ OPT_STRING(proofOutputFile,              "proof", "",                                 "",                      "Enable UNSAT proof production, writing final LRAT proof to specified destination (output by rank zero; can be /dev/null)")
  OPT_BOOL(onTheFlyChecking,               "otfc", "on-the-fly-checking",               false,                   "Enable on-the-fly checking of local derivations; generate and validate signatures for shared clauses")
  OPT_BOOL(onTheFlyCheckModel,             "otfcm", "on-the-fly-check-model",           true,                    "Also check satisfiable assignment in on-the-fly checking (prevents deletion of orig. clauses in one checker per process)")
  OPT_BOOL(onTheFlyCheckIncremental,       "otfci", "on-the-fly-check-incremental",     false,                   "Enable on-the-fly checking for incremental SAT solving - true(false) expects the (non)incremental ImpCheck programs")
@@ -113,3 +113,4 @@ OPTION_GROUP(grpAppSatProof, "app/sat/proof", "Production of UNSAT proofs")
  OPT_FLOAT(clauseErrorChancePerMille,     "cecpm", "clause-error-chance-per-mille",    0,    0, 1000,  "Chance per mille for tampering with some literal in a shared clause")
  OPT_FLOAT(derivationErrorChancePerMille, "decpm", "deriv-error-chance-per-mille",     0,    0, 1000,  "Chance per mille for tampering with some on-the-fly checking clause derivation")
  OPT_STRING(injectProofData, "ipd", "inject-proof-data", "", "Specify directory with clauseepochs.X and proof.X.lrat files to use for immediate proof assembly")
+ OPT_STRING(coreOutputFile, "core", "", "", "[Only with -proof=...] Output an UNSAT core to the specified path")

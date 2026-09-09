@@ -5,9 +5,12 @@
 #include <string>
 #include <fstream>
 
+#include "app/sat/parse/cnf_util.hpp"
 #include "app/sat/proof/merging/clause_id_filter.hpp"
+#include "app/sat/proof/merging/core_writer.hpp"
 #include "app/sat/proof/merging/lrat_compactifier.hpp"
 #include "comm/mympi.hpp"
+#include "data/job_description.hpp"
 #include "data/serializable.hpp"
 #include "util/params.hpp"
 #include "util/sys/fileutils.hpp"
@@ -35,6 +38,7 @@ private:
     const static int FULL_CHUNK_SIZE_BYTES = 900'000;
 
     const Parameters& _params;
+    const JobDescription& _desc;
     MPI_Comm _comm;
     int _branching_factor;
     MergeSourceInterface<SerializedLratLine>* _local_source;
@@ -62,6 +66,7 @@ private:
     std::string _output_filename;
     std::unique_ptr<ProofWriter> _proof_writer;
     std::unique_ptr<ClauseIdFilter> _output_id_filter;
+    std::unique_ptr<CoreWriter> _core_writer;
     std::future<void> _fut_root_prepare;
     bool _root_prepared = false;
 
@@ -72,7 +77,7 @@ private:
     std::future<void> _fut_merging;
     bool _began_merging = false;
     bool _began_final_barrier = false;
-    bool _reversed_file = false;
+    bool _finalized_file = false;
 
     float _timepoint_merge_begin {0};
     float _time_inactive {0};
@@ -82,10 +87,10 @@ private:
     unsigned long _total_combined_proof_clauses = 0;
 
 public:
-    DistributedProofMerger(const Parameters& params, MPI_Comm comm, int branchingFactor, 
+    DistributedProofMerger(const Parameters& params, const JobDescription& desc, MPI_Comm comm, int branchingFactor,
         MergeSourceInterface<SerializedLratLine>* localSource, const std::string& outputFileAtZero) : 
             _log(Logger::getMainInstance().copy("DFM", ".proofmerge")), _params(params),
-            _comm(comm), _branching_factor(branchingFactor), _local_source(localSource) {
+            _desc(desc), _comm(comm), _branching_factor(branchingFactor), _local_source(localSource) {
 
         int myRank = MyMpi::rank(comm);
         _is_root = myRank == 0;
@@ -97,8 +102,14 @@ public:
                 // Create final output file
                 _output_filename = outputFileAtZero;
                 std::string reverseFilename = _output_filename + ".inv";
-                LOGGER(_log, V3_VERB, "Opening output file \"%s\"\n", reverseFilename.c_str());
-                _proof_writer.reset(new ProofWriter(reverseFilename, _binary_output));
+                if (_params.coreOutputFile.isSet()) {
+                    LOGGER(_log, V3_VERB, "Opening core output file \"%s\"\n", _params.coreOutputFile().c_str());
+                    _core_writer.reset(new CoreWriter(CnfUtil::getClausesFromJobDescription(_desc), _params.coreOutputFile()));
+                }
+                if (_output_filename != "/dev/null") {
+                    LOGGER(_log, V3_VERB, "Opening output file \"%s\"\n", reverseFilename.c_str());
+                    _proof_writer.reset(new ProofWriter(reverseFilename, _binary_output));
+                }
                 if (_params.addClauseDeletionStatements() > 0) {
                     _output_id_filter.reset(new ClauseIdFilter(
                         _params.addClauseDeletionStatements() == 1 ?
@@ -238,7 +249,7 @@ public:
 
     bool finished() const {
         if (!isFullyExhausted()) return false;
-        if (_is_root) return _reversed_file;
+        if (_is_root) return _finalized_file;
         return true;
     }
 
@@ -390,12 +401,13 @@ private:
                         }
                     }
                     if (!hintsToDelete.empty()) {
-                        _proof_writer->pushDeletionBlocking(chosenId, hintsToDelete);
+                        if (_proof_writer) _proof_writer->pushDeletionBlocking(chosenId, hintsToDelete);
                         hintsToDelete.clear();
                     }
                 }
                 // Write into final file
-                _proof_writer->pushAdditionBlocking(chosenLine);
+                if (_core_writer) _core_writer->pushAddition(chosenLine);
+                if (_proof_writer) _proof_writer->pushAdditionBlocking(chosenLine);
                 chosenLine.clear();
             } else {
                 // Write into output buffer
@@ -414,7 +426,7 @@ private:
     }
 
     void concludeMerging() {
-        if (_is_root) {
+        if (_proof_writer) {
             _proof_writer->markExhausted();
             while (!_proof_writer->isDone()) usleep(1000*10);
             _proof_writer.reset(); // internally waits for writer to finish
@@ -422,7 +434,11 @@ private:
     }
 
     void reverseFile() {
-        if (!_is_root) return;
+        if (!_is_root || _output_filename == "/dev/null") {
+            _core_writer.reset(); // outputs core file if writer is present
+            _finalized_file = true;
+            return;
+        }
 
         LOG(V2_INFO, "PROOFSTATS partialproofbytes=%lu partialprooflines=%lu combinedprooflines=%lu\n",
                     _total_partial_proof_bytes, _total_partial_proof_clauses, _total_combined_proof_clauses);
@@ -435,7 +451,7 @@ private:
             }
             int res = ::rename(inputFilename.c_str(), _output_filename.c_str());
             assert(res == 0);
-            _reversed_file = true;
+            _finalized_file = true;
             return;
         }
 
@@ -486,7 +502,7 @@ private:
         int result = FileUtils::rm(inputFilename);
         assert(result == 0);
 
-        _reversed_file = true;
+        _finalized_file = true;
     }
 
     bool isFullyExhausted() const {

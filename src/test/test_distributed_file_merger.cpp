@@ -4,6 +4,7 @@
 #include <functional>
 
 #include "comm/msg_queue/message_queue.hpp"
+#include "data/job_description.hpp"
 #include "util/random.hpp"
 #include "util/logger.hpp"
 #include "util/sys/timer.hpp"
@@ -41,7 +42,8 @@ void testMerge(int myRank) {
     int maxLineCounter = 10000;
 
     Parameters params;
-    auto merger = DistributedProofMerger(params, MPI_COMM_WORLD, 5, new LambdaMergeSource<SerializedLratLine>(
+    JobDescription desc;
+    auto merger = DistributedProofMerger(params, desc, MPI_COMM_WORLD, 5, new LambdaMergeSource<SerializedLratLine>(
         [&](SerializedLratLine& out) {
             if (lineCounter == maxLineCounter) {
                 return false;

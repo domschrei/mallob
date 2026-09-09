@@ -2,6 +2,7 @@
 #pragma once
 
 #include "app/app_registry.hpp"
+#include "app/sat/parse/cnf_util.hpp"
 #include "app/satwithpre/actor_config_parser.hpp"
 #include "app/satwithpre/actor_context.hpp"
 #include "app/satwithpre/ext_satsuma_caller.hpp"
@@ -35,7 +36,7 @@ private:
 
 public:
     PreprocessorOrchestrator(const Parameters& params, const JobDescription& desc, APIConnector& api) : _params(params), _desc(desc), _api(api),
-            _base_cnf(getCnfFromJobDescription()) {
+            _base_cnf(CnfUtil::getCnfFromJobDescription(desc)) {
 
         _time_of_start = Timer::elapsedSeconds();
         try {
@@ -106,7 +107,7 @@ public:
                 }
                 actor.id += ":" + name;
                 if (!_preprocess_log_dir.empty())
-                    writeFormula(actor.actor->getInputCnf(), _preprocess_log_dir + "/in." + actor.getId() + ".cnf");
+                    CnfUtil::writeFormula(actor.actor->getInputCnf(), _preprocess_log_dir + "/in." + actor.getId() + ".cnf");
                 LOG(V2_INFO, "SATWP launch %s\n", actor.getId());
                 actor.actor->preprocessAsync();
                 actor.state = ActorContext::RUNNING;
@@ -143,9 +144,9 @@ public:
                 actor.state = ActorContext::FINISHED;
                 if (!_preprocess_log_dir.empty()) {
                     if (res == SatPreprocessActor::SIMPLIFIED)
-                        writeFormula(actor.formula, _preprocess_log_dir + "/out." + actor.getId() + ".cnf");
+                        CnfUtil::writeFormula(actor.formula, _preprocess_log_dir + "/out." + actor.getId() + ".cnf");
                     if (res == SatPreprocessActor::SAT)
-                        writeModel(actor.model, _preprocess_log_dir + "/model." + actor.getId() + ".txt");
+                        CnfUtil::writeModel(actor.model, _preprocess_log_dir + "/model." + actor.getId() + ".txt");
                 }
                 if (res == SatPreprocessActor::SAT) {
                     LOG(V2_INFO, "SATWP %s found SAT\n", actor.getId());
@@ -183,7 +184,7 @@ public:
         auto actor = _winning_actor;
         assert(actor);
         auto model = std::move(actor->model);
-        checkModel(actor->actor->getInputCnf(), model);
+        CnfUtil::checkModel(actor->actor->getInputCnf(), model);
         LOG(V2_INFO, "SATWP Checked model @ %s, size %lu\n", actor->getId(), model.size()-1);
         while (true) {
             actor = actor->prerequisite;
@@ -191,8 +192,8 @@ public:
             actor->actor->reconstructSolution(model);
             LOG(V2_INFO, "SATWP Reconstructed model @ %s, size %lu\n", actor->getId(), model.size()-1);
             if (!_preprocess_log_dir.empty())
-                writeModel(model, _preprocess_log_dir + "/recmodel." + actor->getId() + ".txt");
-            checkModel(actor->actor->getInputCnf(), model);
+                CnfUtil::writeModel(model, _preprocess_log_dir + "/recmodel." + actor->getId() + ".txt");
+            CnfUtil::checkModel(actor->actor->getInputCnf(), model);
             LOG(V2_INFO, "SATWP Checked model @ %s\n", actor->getId());
         }
         return model;
@@ -203,59 +204,5 @@ public:
             LOG(V2_INFO, "SATWP %s interrupt\n", actor.getId());
             actor.actor->interrupt();
         }
-    }
-
-private:
-    std::vector<int> getCnfFromJobDescription() {
-
-        SerializedFormulaParser parser(Logger::getMainInstance(), _desc.getFormulaPayload(0),
-            _desc.getFormulaPayloadSize(0));
-        if (_params.compressFormula()) parser.setCompressed();
-        int nbVars = _desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
-        int nbCls = _desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
-
-        std::vector<int> cnf;
-        int lit;
-        while (parser.getNextLiteral(lit)) cnf.push_back(lit);
-        cnf.push_back(nbVars);
-        cnf.push_back(nbCls);
-        return cnf;
-    }
-
-    void checkModel(const std::vector<int>& formula, const std::vector<int>& model) {
-        bool clauseSatisfied = false;
-        int clauseNo = 1;
-        for (int i = 0; i < formula.size()-2; i++) {
-            int lit = formula[i];
-            if (lit == 0) {
-                if (!clauseSatisfied) {
-                    LOG(V0_CRIT, "[ERROR] Clause # %i at position %i not satisfied by model!\n", clauseNo, i);
-                    abort();
-                }
-                clauseNo++;
-                clauseSatisfied = false;
-                continue;
-            }
-            assert(std::abs(lit) < model.size());
-            int modelLit = model[std::abs(lit)];
-            assert(modelLit == lit || modelLit == -lit);
-            if (modelLit == lit) clauseSatisfied = true;
-        }
-        assert(formula[formula.size()-3] == 0);
-    }
-
-    void writeFormula(const std::vector<int>& formula, const std::string& path) {
-        std::ofstream ofsF(path);
-        ofsF << "p cnf " << formula[formula.size() - 2] << " "
-            << formula[formula.size() - 1] << "\n";
-        for (int i = 0; i < formula.size()-2; i++) {
-            ofsF << formula[i] << (formula[i] == 0 ? "\n" : " ");
-        }
-    }
-    void writeModel(const std::vector<int>& model, const std::string& path) {
-        std::ofstream ofsM(path);
-        ofsM << "v";
-        for (int i = 1; i < model.size(); i++) ofsM << " " << model[i];
-        ofsM << " 0\n";
     }
 };
