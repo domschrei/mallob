@@ -230,8 +230,8 @@ public:
         }
 
         auto nameOfCall = copy["name"].get<std::string>();
-        StaticStore<std::vector<int>>::insert(nameOfCall, std::move(newLiterals));
-        copy["internalliterals"] = nameOfCall;
+        StaticStore<std::vector<int>>::insert(_username + "::" + nameOfCall, std::move(newLiterals));
+        copy["internalliterals"] = _username + "::" + nameOfCall;
         if (!descriptionLabel.empty()) {
             copy["description-id"] = descriptionLabel;
         }
@@ -367,6 +367,10 @@ public:
     }
     int getMallobRootRank() const {
         return _mallob_root_rank.load(std::memory_order_relaxed);
+    }
+
+    bool usesIncrementalSatSolving() const {
+        return _incremental;
     }
 
 private:

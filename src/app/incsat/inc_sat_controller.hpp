@@ -166,19 +166,21 @@ public:
         assert(_stream);
         return _stream->stream;
     }
-    MallobSatJobStreamProcessor* getMallobProcessor() {
+    std::list<MallobSatJobStreamProcessor*> getMallobProcessors() {
         assert(_stream);
-        return _stream->mallobProcessor;
+        return _stream->mallobProcessors;
     }
 
 private:
     void initStream(bool createProblemFileAsPipe) {
         _start_time = Timer::elapsedSeconds();
         _stream.reset(new WrappedSatJobStream(_name));
-        _stream->mallobProcessor = new MallobSatJobStreamProcessor(_params, _api, _desc,
+
+        auto mallobProcessor = new MallobSatJobStreamProcessor(_params, _api, _desc,
             _name, _stream_id, _use_incremental_sat, _stream->stream.getSynchronizer());
-        _stream->mallobProcessor->setDTaskTracker(_dtask_tracker);
-        _stream->stream.addProcessor(_stream->mallobProcessor);
+        mallobProcessor->setDTaskTracker(_dtask_tracker);
+        _stream->stream.addProcessor(mallobProcessor);
+        _stream->mallobProcessors.push_back(mallobProcessor);
 
         if (_params.internalStreamProcessor()) {
             SolverSetup setup;

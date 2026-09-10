@@ -219,7 +219,9 @@ private:
         std::unique_ptr<IncSatController> incsat(new IncSatController(_params, APIRegistry::get(), _desc, _dtask_tracker,
             _params.incrementalSatTasks()));
         incsat->initInteractiveSolving();
-        incsat->getMallobProcessor()->setGroupId("cnc-" + std::to_string(_desc.getId()));
+        for (auto mallobProc : incsat->getMallobProcessors())
+            if (mallobProc->usesIncrementalSatSolving())
+                mallobProc->setGroupId("cnc-" + std::to_string(_desc.getId()));
         return incsat;
     }
 

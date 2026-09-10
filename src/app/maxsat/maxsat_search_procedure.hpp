@@ -144,7 +144,8 @@ public:
             TheorySpecification spec({std::move(rule)});
             std::string specStr = spec.toStr();
             specStr.erase(std::remove_if(specStr.begin(), specStr.end(), ::isspace), specStr.end());
-            _stream_wrapper->getMallobProcessor()->setInnerObjective(specStr);
+            for (auto mallobProc : _stream_wrapper->getMallobProcessors())
+                mallobProc->setInnerObjective(specStr);
         }
     }
 
@@ -221,9 +222,10 @@ public:
         }
 
         if (!_initialized && _stream_wrapper->hasStream()) {
-            _stream_wrapper->getMallobProcessor()->setInitialSize(
-                _instance.nbVars,
-                _desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
+            for (auto mallobProc : _stream_wrapper->getMallobProcessors())
+                mallobProc->setInitialSize(
+                    _instance.nbVars,
+                    _desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
             _initialized = true;
         }
 
@@ -385,7 +387,9 @@ public:
 
     void setGroupId(const std::string& groupId, int minVar = -1, int maxVar = -1) {
         _stream_wrapper->initInteractiveSolving();
-        _stream_wrapper->getMallobProcessor()->setGroupId(groupId, minVar, maxVar);
+        for (auto mallobProc : _stream_wrapper->getMallobProcessors())
+            if (mallobProc->usesIncrementalSatSolving())
+                mallobProc->setGroupId(groupId, minVar, maxVar);
         _group_id = _api.getJsonInterface().getJobDescriptionIdAllocator().getId(groupId);
     }
 
