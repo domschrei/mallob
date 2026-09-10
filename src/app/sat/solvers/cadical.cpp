@@ -187,16 +187,26 @@ void Cadical::setDefaultPhase(const bool phase) {
 
 // Solve the formula with a given set of assumptions
 // return 10 for SAT, 20 for UNSAT, 0 for UNKNOWN
-SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
+SatResult Cadical::solve(size_t numAssumptions, const int* asmpt) {
 
-	// set the assumptions
-	this->assumptions.clear();
-	//clearConditionalLits();
-	for (size_t i = 0; i < numAssumptions; i++) {
-		int lit = assumptions[i];
-		solver->assume(lit);
-		this->assumptions.push_back(lit);
-		//addConditionalLit(-lit);
+	// set/update the assumptions
+	assumptions.clear();
+	if (_setup.doIncrementalSolving) {
+		// actual assumptions
+		//clearConditionalLits();
+		for (size_t i = 0; i < numAssumptions; i++) {
+			int lit = asmpt[i];
+			solver->assume(lit);
+			assumptions.push_back(lit);
+			//addConditionalLit(-lit);
+		}
+	} else {
+		// non-incremental mode: add assumptions as unit clauses
+		LOGGER(_logger, V2_INFO, "add %i assumptions as units\n", numAssumptions);
+		for (int i = 0; i < numAssumptions; i++) {
+			addLiteral(asmpt[i]);
+			addLiteral(0);
+		}
 	}
 	unsatConclusionId = 0;
 
@@ -242,8 +252,10 @@ std::vector<int> Cadical::getSolution() {
 
 std::set<int> Cadical::getFailedAssumptions() {
 	std::set<int> result;
+	// In non-incremental solving, we need to output the full set of assumptions
+	// as the trivial core, since no further information is available.
 	for (auto assumption : assumptions)
-		if (solver->failed(assumption))
+		if (!_setup.doIncrementalSolving || solver->failed(assumption))
 			result.insert(assumption);
 
 	return result;

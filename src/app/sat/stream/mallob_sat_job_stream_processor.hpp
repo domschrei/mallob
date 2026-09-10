@@ -290,6 +290,10 @@ public:
         LOG(V5_DEBG, "MSJS %s call ended\n", _name.c_str());
 
         _backlog_task = SatTask{_backlog_task.type};
+        if (!_incremental) {
+            // non-incremental MallobSat task: immediately revert to undeployed state
+            yield();
+        }
     }
 
     void yield() {
@@ -301,16 +305,16 @@ public:
 
         if (_dtask) _dtask->evicted = true; // mark as evicted yourself
         while (_task_pending) usleep(1000);
-        if (!_incremental) return;
-        if (!_json_base.contains("name")) return;
-        _json_base["precursor"] = _username + std::string(".") + _json_base["name"].get<std::string>();
-        _json_base["name"] = _base_job_name + std::to_string(_subjob_counter++);
-        nlohmann::json copy(_json_base);
-        copy["done"] = true;
-        // The callback is never called.
-        LOG(V4_VVER, "%s closing API\n", _name.c_str());
-        _api.submit(copy, [&](nlohmann::json& result) {assert(false);});
-        LOG(V4_VVER, "%s closed API\n", _name.c_str());
+        if (_incremental && _json_base.contains("name")) {
+            _json_base["precursor"] = _username + std::string(".") + _json_base["name"].get<std::string>();
+            _json_base["name"] = _base_job_name + std::to_string(_subjob_counter++);
+            nlohmann::json copy(_json_base);
+            copy["done"] = true;
+            // The callback is never called.
+            LOG(V4_VVER, "%s closing API\n", _name.c_str());
+            _api.submit(copy, [&](nlohmann::json& result) {assert(false);});
+            LOG(V4_VVER, "%s closed API\n", _name.c_str());
+        }
 
         _mallob_job_id = -1;
         _mallob_root_rank.store(-1, std::memory_order_relaxed);

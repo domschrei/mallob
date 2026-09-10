@@ -159,8 +159,13 @@ void Kissat::setPhase(const int var, const bool phase) {
 // return 10 for SAT, 20 for UNSAT, 0 for UNKNOWN
 SatResult Kissat::solve(size_t numAssumptions, const int* assumptions) {
 
-	// TODO handle assumptions?
-    assert(numAssumptions == 0);
+	// Add assumptions as unit clauses
+    currentAssumptions.clear();
+    for (int i = 0; i < numAssumptions; i++) {
+        addLiteral(assumptions[i]);
+        addLiteral(0);
+        currentAssumptions.push_back(assumptions[i]);
+    }
 
     // Push the initial variable phases to kissat
     initialVariablePhasesLocked = true;
@@ -233,8 +238,9 @@ void Kissat::reconstructSolutionFromPreprocessing(std::vector<int>& model) {
 }
 
 std::set<int> Kissat::getFailedAssumptions() {
-	// TODO ?
-    return std::set<int>();
+    // In this non-incremental setting, we need to output the full set of assumptions
+	// as the trivial core, since no further information is available.
+    return std::set<int>(currentAssumptions.begin(), currentAssumptions.end());
 }
 
 void Kissat::setLearnedClauseCallback(const LearnedClauseCallback& callback) {
