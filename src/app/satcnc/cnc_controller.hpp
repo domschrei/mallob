@@ -216,7 +216,8 @@ private:
     std::unique_ptr<IncSatController> addJobStream() {
 
         // Create wrapper object for SAT job stream
-        std::unique_ptr<IncSatController> incsat(new IncSatController(_params, APIRegistry::get(), _desc, _dtask_tracker));
+        std::unique_ptr<IncSatController> incsat(new IncSatController(_params, APIRegistry::get(), _desc, _dtask_tracker,
+            _params.incrementalSatTasks()));
         incsat->initInteractiveSolving();
         incsat->getMallobProcessor()->setGroupId("cnc-" + std::to_string(_desc.getId()));
         return incsat;

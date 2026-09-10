@@ -51,7 +51,7 @@ private:
 
 public:
     IncSatController(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& dTaskTracker,
-                bool useIncrementalSatSolving = true) :
+                bool useIncrementalSatSolving) :
             _params(params), _api(api), _desc(desc), _use_incremental_sat(useIncrementalSatSolving), _stream_id(getNextStreamId()),
             _name("#" + std::to_string(desc.getId()) + "(ISAT):" + std::to_string(_stream_id)),
             _dtask_tracker(dTaskTracker) {

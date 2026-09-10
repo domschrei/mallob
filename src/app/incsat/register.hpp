@@ -13,7 +13,9 @@ struct ClientSideIncSatProgram : public app_registry::ClientSideProgram {
     DTaskTracker dTaskTracker;
     std::unique_ptr<IncSatController> solver;
     ClientSideIncSatProgram(const Parameters& params, APIConnector& api, JobDescription& desc, const std::string& problemFile) :
-        app_registry::ClientSideProgram(), dTaskTracker(params), solver(new IncSatController(params, api, desc, dTaskTracker)) {
+        app_registry::ClientSideProgram(), dTaskTracker(params), solver(
+            new IncSatController(params, api, desc, dTaskTracker, params.incrementalSatTasks())
+        ) {
         function = [s=&solver, problemFile]() {return s->get()->solveFromIncrementalFile(problemFile);};
     }
     virtual ~ClientSideIncSatProgram() {}

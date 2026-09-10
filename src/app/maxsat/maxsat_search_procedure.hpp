@@ -111,7 +111,8 @@ public:
         _lits_to_add(_instance.formulaData, _instance.formulaData+_instance.formulaSize),
         _current_bound(ULONG_MAX), _encoding_strat(encStrat), _search_strat(searchStrat), _label(label) {
 
-        _stream_wrapper.reset(new IncSatController(_params, _api, _desc, tracker));
+        _stream_wrapper.reset(new IncSatController(_params, _api, _desc, tracker,
+            _params.incrementalSatTasks()));
 
         _nb_orig_vars = _instance.nbVars; // before cardinality constraint encodings!
 
