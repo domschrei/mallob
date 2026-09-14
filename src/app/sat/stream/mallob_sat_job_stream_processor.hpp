@@ -87,7 +87,7 @@ public:
         _json_base["user"] = _username;
         _json_base["incremental"] = _incremental;
         _json_base["priority"] = 1;
-        _json_base["application"] = "SAT";
+        _json_base["application"] = _incremental ? "SAT" : _params.nonincrementalSatApp();
         _json_base["files"] = std::vector<std::string>();
         if (!_json_base["configuration"].count("__XL"))
             _json_base["configuration"]["__XL"] = "-1";
@@ -108,6 +108,10 @@ public:
     }
     void setDTaskTracker(DTaskTracker& tracker) {
         _dtask_tracker = &tracker;
+    }
+    void overrideSolvingDelays(long delay) {
+        _nontrivial_wait_millis_initial = delay;
+        _nontrivial_wait_millis_subsequent = delay;
     }
 
     virtual void loop() override {

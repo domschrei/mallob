@@ -18,7 +18,7 @@ LOG="$4"
 pid_satsuma=0
 
 cat "$INPUT" | \
- "$MALLOB_SUBPROC_DISPATCH_PATH/satsuma" fix --add-reduced-as-unit --out-file "$OUTPUT" \
+ "$MALLOB_SUBPROC_DISPATCH_PATH/satsuma" fix --add-reduced-as-unit --no-limits --out-file "$OUTPUT" \
  > "$LOG" 2>&1 &
 
 pid_satsuma=$!

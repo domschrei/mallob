@@ -29,7 +29,7 @@ void register_mallob_app_satwithpre() {
     entry.copyrightInformation = "\nc Featuring Satsuma by Markus Anders, with interface code by Anna Görth\n";
 
     entry.reader = [](const Parameters& params, const std::vector<std::string>& files, JobDescription& desc) {
-        return SatReader(params, files.front()).read(desc);
+        return SatReader(params, files).read(desc);
     };
 
     entry.clientSideProgramCreator = [](const Parameters& params, APIConnector& api, JobDescription& desc) {

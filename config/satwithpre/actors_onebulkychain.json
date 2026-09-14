@@ -19,7 +19,8 @@
         "prerequisite": "kis",
         "actorsBeingDisplaced": [],
         "onlyStartIfPrerequisiteSimplified": false,
-        "group-id": "1"
+        "group-id": "1",
+        "options": "-fcll=2"
     },
     {
         "id": "mal",
@@ -27,6 +28,7 @@
         "prerequisite": "sweep",
         "actorsBeingDisplaced": [],
         "onlyStartIfPrerequisiteSimplified": false,
-        "group-id": "2"
+        "group-id": "2",
+        "options": "-satsolver=k"
     }
 ]

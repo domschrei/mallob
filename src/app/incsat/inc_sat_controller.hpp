@@ -182,6 +182,15 @@ private:
         _stream->stream.addProcessor(mallobProcessor);
         _stream->mallobProcessors.push_back(mallobProcessor);
 
+        if (_params.nonincrementalSolvingDelay() > 0) {
+            auto mallobProcessor = new MallobSatJobStreamProcessor(_params, _api, _desc,
+            _name + ":ni", _stream_id, false, _stream->stream.getSynchronizer());
+            mallobProcessor->setDTaskTracker(_dtask_tracker);
+            mallobProcessor->overrideSolvingDelays(_params.nonincrementalSolvingDelay());
+            _stream->stream.addProcessor(mallobProcessor);
+            _stream->mallobProcessors.push_back(mallobProcessor);
+        }
+
         if (_params.internalStreamProcessor()) {
             SolverSetup setup;
             setup.baseSeed = _params.seed();
