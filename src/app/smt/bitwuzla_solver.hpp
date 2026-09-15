@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include "app/app_terminate_checker.hpp"
 #include "app/smt/bitwuzllob_sat_solver_factory.hpp"
 #include "core/dtask_tracker.hpp"
 #include "data/job_description.hpp"
@@ -23,6 +24,8 @@ private:
     const Parameters _params;
     APIConnector& _api;
     JobDescription _desc;
+    AppTerminateChecker _term;
+
     std::string _problem_file;
     float _start_time = (float) INT32_MAX;
 
@@ -41,17 +44,17 @@ private:
             updateStartTime(startTime);
         }
         void updateStartTime(float startTime) {
-            endTime = std::min(endTime, getEndTime(&params, &desc, startTime));
+            endTime = std::min(endTime, inst.getAppTerminateChecker().getEndTime());
         }
         inline bool terminate() {
-            return inst.isTimeoutHit(&params, &desc, endTime);
+            return inst.getAppTerminateChecker().isTimeoutHit(endTime);
         }
     } _terminator;
 
 public:
     BitwuzlaSolver(const Parameters& params, APIConnector& api, JobDescription& desc, const std::string& problemFile) :
-            _params(params), _api(api), _desc(desc.getBasicCopy()), _problem_file(problemFile),
-            _name("#" + std::to_string(desc.getId()) + "(SMT)"),
+            _params(params), _api(api), _desc(desc.getBasicCopy()), _term(_params, _desc),
+            _problem_file(problemFile), _name("#" + std::to_string(desc.getId()) + "(SMT)"),
             _terminator(*this, _params, _desc, _start_time) {
 
         LOG(V2_INFO,"SMT Bitwuzla+Mallob %s\n", _name.c_str());
@@ -64,7 +67,6 @@ public:
     JobResult solve() {
         _start_time = Timer::elapsedSeconds();
         _terminator.updateStartTime(_start_time);
-        float endTime = getEndTime(&_params, &_desc, _start_time);
         _result.result = -1;
 
         // We execute Bitwuzllob concurrently in another thread. If it gets stuck somewhere,
@@ -75,7 +77,7 @@ public:
         });
 
         float sleepMicros = 1;
-        while (_result.result == -1 && !isTimeoutHit(&_params, &_desc, endTime)) {
+        while (_result.result == -1 && !_term.isTimeoutHit()) {
             // To allow for relatively small latencies for trivial problems:
             // initially just sleep for 1us, then increase it exponentially up to 25ms
             usleep((unsigned long) sleepMicros);
@@ -84,7 +86,7 @@ public:
 
         _result.id = _desc.getId();
         _result.revision = 0;
-        if (_result.result <= 0 || isTimeoutHit(&_params, &_desc, endTime)) {
+        if (_result.result <= 0 || _term.isTimeoutHit()) {
             LOG(V2_INFO, "%s SMT TASK INTERRUPTED time=%.3fs\n", _name.c_str(),
                 Timer::elapsedSeconds()-_start_time);
             JobResult res = _result;
@@ -101,22 +103,8 @@ public:
         return params.smtOutputFile() + (params.monoFilename.isSet() ? "" : "." + std::to_string(jobId));
     }
 
-    static inline bool isTimeoutHit(const Parameters* params, JobDescription* desc, float endTime) {
-        if (Terminator::isTerminating()) {
-            return true;
-        }
-        if (Timer::elapsedSeconds() > endTime) {
-            return true;
-        }
-        return false;
-    }
-    static float getEndTime(const Parameters* params, JobDescription* desc, float startTime) {
-        float endTime = INT32_MAX;
-        if (params->timeLimit() > 0)
-            endTime = std::min(endTime, startTime + params->timeLimit());
-        if (desc->getWallclockLimit() > 0)
-            endTime = std::min(endTime, startTime + desc->getWallclockLimit());
-        return endTime;
+    const AppTerminateChecker& getAppTerminateChecker() const {
+        return _term;
     }
 
 private:
@@ -197,7 +185,7 @@ private:
             else opts.push_back(arg);
         }
         options.set(opts);
-        float endTime = getEndTime(&_params, &_desc, _start_time);
+        float endTime = _term.getEndTime();
         if (endTime < INT32_MAX) {
             options.set(bitwuzla::Option::TIME_LIMIT_PER, 1000.f * (endTime - Timer::elapsedSeconds()));
         }

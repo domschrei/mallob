@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include "app/app_terminate_checker.hpp"
 #include "app/maxsat/maxsat_instance.hpp"
 #include "app/maxsat/maxsat_search_procedure.hpp"
 #include "app/maxsat/parse/maxsat_reader.hpp"
@@ -41,6 +42,7 @@ private:
     const Parameters _params; // configuration, cmd line arguments
     APIConnector& _api; // for submitting jobs to Mallob
     JobDescription& _desc; // contains our instance to solve and all metadata
+    AppTerminateChecker _term;
 
     std::unique_ptr<MaxSatInstance> _instance; // the problem instance we're solving
 
@@ -87,7 +89,7 @@ private:
 public:
     // Initializes the solver instance and parses the description's formula.
     MaxSatSolver(const Parameters& params, APIConnector& api, JobDescription& desc) :
-        _params(params), _api(api), _desc(desc), _dtask_tracker(_params),
+        _params(params), _api(api), _desc(desc), _term(_params, _desc), _dtask_tracker(_params),
         _sub_xtcs_incoming_clauses(MSG_SEND_APP_DATA_TO_CLIENT_JOB, [&](MessageHandle& h) {
             auto lock = _mtx_incoming_messages.getLock();
             _incoming_messages.push_back(h);
@@ -235,7 +237,7 @@ public:
         std::list<std::unique_ptr<MaxSatSearchProcedure>> searchesToFinalize;
         bool changeSinceLastFocus = true;
         float timeOfLastChange = Timer::elapsedSeconds();
-        while (!isTimeoutHit() && _instance->lowerBound < _instance->bestCost && !searches.empty()) {
+        while (!_term.isTimeoutHit() && _instance->lowerBound < _instance->bestCost && !searches.empty()) {
             // Loop over all search strategies
             bool change = false;
             bool stagnation = false;
@@ -355,7 +357,7 @@ public:
                     // cleanup (has to happen before update)
                     LOG(V2_INFO, "MAXSAT improvement found by MaxPRE: restart searches\n");
                     tryStopAllSearches(searches);
-                    if (!isTimeoutHit()) {
+                    if (!_term.isTimeoutHit()) {
                         for (auto& search : searches) searchesToFinalize.push_back(std::move(search));
                         searches.clear();
                         while (!searchesToFinalize.empty()) tryDeleteOldSearches(searchesToFinalize);
@@ -389,7 +391,7 @@ public:
             if (_instance->bestCost == _instance->upperBound) {
                 // -- yes
                 r.result = RESULT_OPTIMUM_FOUND;
-            } else if (!isTimeoutHit()) {
+            } else if (!_term.isTimeoutHit()) {
                 // -- no: tight bounds are known, but we do not have a corresponding solution yet.
                 // Make one more SAT call to find such a solution.
                 LOG(V2_INFO, "MAXSAT final SAT call to find solution of optimal cost %lu ...\n", _instance->upperBound);
@@ -646,16 +648,6 @@ private:
         for (auto& searcher : searches) {
             searcher->addCrossSharedClauses(msg);
         }
-    }
-
-    bool isTimeoutHit() const {
-        if (_params.timeLimit() > 0 && Timer::elapsedSeconds() >= _params.timeLimit())
-            return true;
-        if (_desc.getWallclockLimit() > 0 && (Timer::elapsedSeconds() - _start_time) >= _desc.getWallclockLimit())
-            return true;
-        if (Terminator::isTerminating())
-            return true;
-        return false;
     }
 
     void tryStopAllSearches(std::list<std::unique_ptr<MaxSatSearchProcedure>>& searches) {
