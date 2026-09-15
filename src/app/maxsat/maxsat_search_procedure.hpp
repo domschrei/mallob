@@ -409,6 +409,7 @@ public:
     ~MaxSatSearchProcedure() {
         while (!canBeFinalized()) {usleep(1000);}
         finalize();
+        _stream_wrapper.reset();
     }
 
 private:

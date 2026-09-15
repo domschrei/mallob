@@ -171,14 +171,14 @@ public:
             LOG(V4_VVER, "%s sleep initially\n", _name.c_str());
             time = Timer::elapsedSeconds() - time;
             // X ms minus the time taken to copy the literals
-            usleep(1'000'000 * std::max(0.0, 0.001 * _nontrivial_wait_millis_initial - time));
+            waitUntil(Timer::elapsedSeconds() + 0.001 * _nontrivial_wait_millis_initial - time, t.rev);
             if (_terminator(t.rev)) return; // Task has become obsolete in the meantime, so skip solving
 
         } else if (_last_won_rev < t.rev-1 && _nontrivial_wait_millis_subsequent > 0) {
             LOG(V4_VVER, "%s sleep (last won: %i, now: %i)\n", _name.c_str(), _last_won_rev, t.rev);
             time = Timer::elapsedSeconds() - time;
             // X ms minus the time taken to copy the literals
-            usleep(1'000'000 * std::max(0.0, 0.001 * _nontrivial_wait_millis_subsequent - time));
+            waitUntil(Timer::elapsedSeconds() + 0.001 * _nontrivial_wait_millis_subsequent - time, t.rev);
             if (_terminator(t.rev)) return; // Task has become obsolete in the meantime, so skip solving
         }
 
@@ -378,6 +378,15 @@ public:
     }
 
 private:
+    void waitUntil(float targetTime, int rev) {
+        while (Timer::elapsedSeconds() < targetTime && !_terminator(rev)) {
+            // sleep for up to 100ms but only as long as we still have to wait
+            unsigned long timeInterval = std::min(1000UL * 100,
+                (unsigned long) (1000 * 1000 * (targetTime - Timer::elapsedSeconds())));
+            if (timeInterval > 0) usleep(timeInterval);
+        }
+    }
+
     bool continueWaitingForTask(int rev) {
         if (!_task_pending) return false;
         if (_pending_task_interrupted) return false; // do NOT wait for interrupted call to return

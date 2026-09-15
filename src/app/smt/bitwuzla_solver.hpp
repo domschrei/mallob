@@ -22,7 +22,7 @@ class BitwuzlaSolver {
 private:
     const Parameters _params;
     APIConnector& _api;
-    JobDescription& _desc;
+    JobDescription _desc;
     std::string _problem_file;
     float _start_time = (float) INT32_MAX;
 
@@ -50,7 +50,7 @@ private:
 
 public:
     BitwuzlaSolver(const Parameters& params, APIConnector& api, JobDescription& desc, const std::string& problemFile) :
-            _params(params), _api(api), _desc(desc), _problem_file(problemFile),
+            _params(params), _api(api), _desc(desc.getBasicCopy()), _problem_file(problemFile),
             _name("#" + std::to_string(desc.getId()) + "(SMT)"),
             _terminator(*this, _params, _desc, _start_time) {
 

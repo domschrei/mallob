@@ -22,8 +22,8 @@
 class PreprocessorOrchestrator {
 
 private:
-    const Parameters& _params;
-    const JobDescription& _desc;
+    const Parameters _params;
+    const JobDescription _desc;
     APIConnector& _api;
 
     std::list<ActorContext> _actors;
@@ -35,8 +35,9 @@ private:
     std::string _preprocess_log_dir;
 
 public:
-    PreprocessorOrchestrator(const Parameters& params, const JobDescription& desc, APIConnector& api) : _params(params), _desc(desc), _api(api),
-            _base_cnf(CnfUtil::getCnfFromJobDescription(desc)) {
+    PreprocessorOrchestrator(const Parameters& params, const JobDescription& desc, APIConnector& api) :
+            _params(params), _desc(desc.getBasicCopy()), _api(api),
+            _base_cnf(CnfUtil::getCnfFromJobDescription(desc, true)) {
 
         _time_of_start = Timer::elapsedSeconds();
         try {

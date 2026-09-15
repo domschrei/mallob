@@ -7,27 +7,37 @@
 class CnfUtil {
 
 public:
-    static std::vector<int> getCnfFromJobDescription(const JobDescription& _desc) {
+    static std::vector<int> getCnfFromJobDescription(const JobDescription& _desc, bool addAssumptionUnits) {
 
         SerializedFormulaParser parser(Logger::getMainInstance(), _desc.getFormulaPayload(0),
             _desc.getFormulaPayloadSize(0));
         int nbVars = _desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
-        int nbCls = _desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
+        int nbCls = 0;
 
         std::vector<int> cnf;
         int lit;
-        while (parser.getNextLiteral(lit)) cnf.push_back(lit);
+        while (parser.getNextLiteral(lit)) {
+            cnf.push_back(lit);
+            nbVars = std::max(nbVars, std::abs(lit));
+            nbCls += (lit == 0);
+        }
+        if (addAssumptionUnits) {
+            while (parser.getNextAssumption(lit)) {
+                cnf.push_back(lit);
+                cnf.push_back(0);
+                nbVars = std::max(nbVars, std::abs(lit));
+                nbCls++;
+            }
+        }
         cnf.push_back(nbVars);
         cnf.push_back(nbCls);
         return cnf;
     }
 
-    static std::vector<std::vector<int>> getClausesFromJobDescription(const JobDescription& _desc) {
+    static std::vector<std::vector<int>> getClausesFromJobDescription(const JobDescription& _desc, bool addAssumptionUnits) {
 
         SerializedFormulaParser parser(Logger::getMainInstance(), _desc.getFormulaPayload(0),
             _desc.getFormulaPayloadSize(0));
-        int nbVars = _desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
-        int nbCls = _desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
 
         std::vector<std::vector<int>> clauses;
         int lit;
@@ -36,6 +46,9 @@ public:
             if (lit == 0) clauses.push_back(std::move(clause));
             else clause.push_back(lit);
         }
+        if (addAssumptionUnits)
+            while (parser.getNextAssumption(lit))
+                clauses.push_back({lit, 0});
         return clauses;
     }
 

@@ -121,7 +121,7 @@ public:
 private:
     void loadFormulaToPipe() {
 
-        LOG(V4_VVER, "%s Loading formula to Satsuma pipe ...\n", getName());
+        LOG(V4_VVER, "%s Loading formula (%i,%i) to Satsuma pipe ...\n", getName(), nbInputVars(), nbInputClauses());
 
         assert(nbInputVars() > 0 && nbInputVars() < 1'000'000'000);
 

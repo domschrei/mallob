@@ -104,7 +104,7 @@ public:
                 std::string reverseFilename = _output_filename + ".inv";
                 if (_params.coreOutputFile.isSet()) {
                     LOGGER(_log, V3_VERB, "Opening core output file \"%s\"\n", _params.coreOutputFile().c_str());
-                    _core_writer.reset(new CoreWriter(CnfUtil::getClausesFromJobDescription(_desc), _params.coreOutputFile()));
+                    _core_writer.reset(new CoreWriter(CnfUtil::getClausesFromJobDescription(_desc, true), _params.coreOutputFile()));
                 }
                 if (_output_filename != "/dev/null") {
                     LOGGER(_log, V3_VERB, "Opening output file \"%s\"\n", reverseFilename.c_str());

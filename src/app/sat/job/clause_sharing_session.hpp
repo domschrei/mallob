@@ -49,6 +49,7 @@ private:
     bool _has_clause_listener {false};
     std::function<void(std::vector<int>&)> _clause_listener;
 
+    std::unique_ptr<Parameters> _merge_store_params;
     std::unique_ptr<StaticClauseStore<false>> _merge_store;
     bool _priority_based_buffer_merging = false;
 
@@ -342,8 +343,8 @@ private:
 
     void initMergeClauseStore() {
         if (_merge_store) return;
-        auto params = _job->getClauseStoreParams();
-        _merge_store.reset(new StaticClauseStore<false>(params, false, 256, true, INT32_MAX));
-        _priority_based_buffer_merging = params.priorityBasedBufferMerging();
+        _merge_store_params.reset(new Parameters(_job->getClauseStoreParams()));
+        _merge_store.reset(new StaticClauseStore<false>(*_merge_store_params, false, 256, true, INT32_MAX));
+        _priority_based_buffer_merging = _merge_store_params->priorityBasedBufferMerging();
     }
 };
