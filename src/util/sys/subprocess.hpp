@@ -3,6 +3,7 @@
 
 #include "util/logger.hpp"
 #include "util/params.hpp"
+#include "util/sys/proc.hpp"
 #include "util/sys/process.hpp"
 #include "util/assert.hpp"
 #include "util/sys/tmpdir.hpp"
@@ -50,6 +51,10 @@ public:
         if (res == 0) {
             // [child process]
             // Danger zone: Do not touch any memory.
+
+            // Prevents subtle pipe bugs (hangs) due to off-by-one in file descriptor refcount
+            Proc::closeAllFileDescriptors();
+
             execle(MALLOB_SUBPROC_DISPATCH_PATH"mallob_process_dispatcher",
                 MALLOB_SUBPROC_DISPATCH_PATH"mallob_process_dispatcher", 
                 (char*) 0, environ);
