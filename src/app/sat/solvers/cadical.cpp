@@ -110,7 +110,7 @@ Cadical::Cadical(const SolverSetup& setup)
 				okay = solver->set("binary", _setup.outputBinaryPalRup ? 1 : 0); assert(okay); // set proof logging mode to binary format
 				okay = solver->set("lratdeletelines", 1); assert(okay); // do enable printing deletion lines
 				int sqrt = std::ceil(std::sqrt((double) maxNumSolvers));
-				proofFileString = _setup.proofDir + "/" + std::to_string((int)(solverRank / sqrt)) + "/" + std::to_string(_setup.globalId) + "/out.palrup~";
+				proofFileString = _setup.proofDir + "/" + std::to_string((int)(solverRank / sqrt)) + "/" + std::to_string(_setup.globalId) + "/out.palrup";
 			} else {
 				// Monolithic proof production: LRAT tracer that outputs to a file.
 				// Clause export for sharing is separate, set up in setLearnedClauseCallback.
@@ -120,10 +120,11 @@ Cadical::Cadical(const SolverSetup& setup)
 			}
 			if (_setup.compressProofMode == SolverSetup::NONE) {
 				// No proof compression.
-				okay = solver->trace_proof(proofFileString.c_str()); assert(okay);
+				okay = solver->trace_proof((proofFileString + "~").c_str()); assert(okay);
 			} else {
 				// Proof compression.
 				// - Create pipe from solver to compressor
+				proofFileString += (_setup.compressProofMode == SolverSetup::XZ ? ".xz" : ".vg");
 				std::string pipePath = proofFileString + ".compress";
 				int res;
 				res = mkfifo(pipePath.c_str(), 0666);
@@ -132,7 +133,7 @@ Cadical::Cadical(const SolverSetup& setup)
 				Parameters params;
 				Subprocess subprocCompress(params, "compress-proof.sh "
 					+ std::string(_setup.compressProofMode == SolverSetup::XZ ? "XZ" : "VASKIN_GOETZ")
-					+ " " + pipePath + " " + proofFileString, false);
+					+ " " + pipePath + " " + proofFileString + "~", false);
 				compressorPid = subprocCompress.start();
 				// - Tell solver to output its proof information to the pipe
 				okay = solver->trace_proof(pipePath.c_str()); assert(okay);
@@ -339,10 +340,8 @@ void Cadical::cleanUp() {
 		}
 		if (_setup.usePalRupFormat) {
 			// Finalize the proof fragment by moving temporary to final file
-			int sqrt = std::ceil(std::sqrt((double) _setup.maxNumSolvers));
-			std::string proofFileStringOld = _setup.proofDir + "/" + std::to_string((int)(_setup.globalId / sqrt)) + "/" + std::to_string(_setup.globalId) + "/out.palrup~";
-			std::string proofFileStringNew = _setup.proofDir + "/" + std::to_string((int)(_setup.globalId / sqrt)) + "/" + std::to_string(_setup.globalId) + "/out.palrup";
-			::rename(proofFileStringOld.c_str(), proofFileStringNew.c_str());
+			std::string proofFileStringOld = proofFileString + "~";
+			::rename(proofFileStringOld.c_str(), proofFileString.c_str());
 		}
 	}
 	if (_setup.profilingLevel > 0) {

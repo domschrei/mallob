@@ -722,6 +722,8 @@ void SatEngine::cleanUp(bool hardTermination) {
 			for (int localId = 0; localId < _params.numThreadsPerProcess(); localId++) {
 				int globalId = _config.apprank * _params.numThreadsPerProcess() + localId;
 				auto dir = setup.proofDir + "/" + std::to_string((int)(globalId / sqrt)) + "/" + std::to_string(globalId);
+				if (FileUtils::exists(dir + "/out.palrup.xz") || FileUtils::exists(dir + "/out.palrup.vg"))
+					continue;
 				FileUtils::create(dir + "/out.palrup");
 			}
 		}
