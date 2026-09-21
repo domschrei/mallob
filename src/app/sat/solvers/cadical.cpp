@@ -164,7 +164,6 @@ void Cadical::diversify(int seed) {
 
 	seedSet = true;
 	setClauseSharing(getNumOriginalDiversifications());
-	applySolverConfiguration(_setup.baseSeed);
 }
 
 void Cadical::addConfigurationSetting(Setting setting) {

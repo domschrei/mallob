@@ -85,9 +85,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	}
 	std::string proofDirectory;
 
-	SolverPortfolioConfig soc;
-	soc.parseFromDirsAndFiles(params.satConfigDirs(), params.satConfigFiles());
-	LOG(V3_VERB, "Parsed %i solver configuration rules\n", soc.ruleCount());
+	_spc.parseFromDirsAndFiles(params.satConfigDirs(), params.satConfigFiles());
+	LOG(V3_VERB, "Parsed %i solver configuration rules\n", _spc.ruleCount());
 
 	// Launched in some certified UNSAT mode?
     if (_params.proofOutputFile.isSet() || _params.onTheFlyChecking() || _params.palRup()) {
@@ -302,7 +301,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		setup.modelCheckingLratConnector = modelCheckingLratConnector;
 		setup.avoidUnsatParticipation = (params.proofOutputFile.isSet() || params.onTheFlyChecking() || _params.palRup()) && !item.outputProof;
 		setup.exportClauses = !setup.avoidUnsatParticipation;
-		setup.solverConfig = soc;
+		setup.solverConfig = &_spc;
 
 		_solver_interfaces.push_back(createSolver(setup));
 		cyclePos = (cyclePos+1) % portfolio.cycle.size();

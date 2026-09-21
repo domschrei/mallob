@@ -41,7 +41,7 @@ struct SolverSetup {
 	bool doIncrementalSolving {false};
 	int diversificationIndex {0};
 	PortfolioSequence::Flavour flavour {PortfolioSequence::DEFAULT};
-	SolverPortfolioConfig solverConfig;
+	SolverPortfolioConfig* solverConfig {nullptr};
 
 	SolvingReplay::Mode replayMode {SolvingReplay::NONE};
 

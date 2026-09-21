@@ -3,6 +3,7 @@
 
 #include "app/app_registry.hpp"
 #include "app/sat/parse/cnf_util.hpp"
+#include "app/sat/solvers/solver_portfolio_config.hpp"
 #include "app/satwithpre/actor_config_parser.hpp"
 #include "app/satwithpre/actor_context.hpp"
 #include "app/satwithpre/ext_satsuma_caller.hpp"
@@ -34,6 +35,8 @@ private:
 
     std::string _preprocess_log_dir;
 
+    SolverPortfolioConfig _spc;
+
 public:
     PreprocessorOrchestrator(const Parameters& params, const JobDescription& desc, APIConnector& api) :
             _params(params), _desc(desc.getBasicCopy()), _api(api),
@@ -52,6 +55,9 @@ public:
             _preprocess_log_dir = _params.preprocessLogDir() + "/#" + std::to_string(_desc.getId());
             FileUtils::mkdir(_preprocess_log_dir);
         }
+
+        _spc.parseFromDirsAndFiles(params.satConfigDirs(), params.satConfigFiles());
+        LOG(V3_VERB, "Parsed %i solver configuration rules\n", _spc.ruleCount());
     }
 
     int loop() {
@@ -87,11 +93,11 @@ public:
                     break;
                 case ActorContext::KISSAT:
                     name += "Kissat";
-                    actor.actor.reset(new KissatPreprocessor(params, _desc, name, std::move(formula)));
+                    actor.actor.reset(new KissatPreprocessor(params, _desc, name, _spc, std::move(formula)));
                     break;
                 case ActorContext::LINGELING:
                     name += "Lingeling";
-                    actor.actor.reset(new LingelingPreprocessor(params, _desc, name, std::move(formula)));
+                    actor.actor.reset(new LingelingPreprocessor(params, _desc, name, _spc, std::move(formula)));
                     break;
                 case ActorContext::MALLOBSAT:
                     name += "MallobSat";
