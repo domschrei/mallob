@@ -1,6 +1,7 @@
 #!/bin/bash
 
-source scripts/slurm/account.sh # $projectname , $username
+# source scripts/slurm/account.sh # $projectname , $username
+source $ACCOUNTINFO
 
 set -e
 

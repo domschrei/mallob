@@ -1,6 +1,7 @@
 #!/bin/bash
 
-source scripts/slurm/account.sh # $projectname , $username
+# source scripts/slurm/account.sh # $projectname , $username
+source $ACCOUNTINFO
 
 jobname="$1"
 sbatch_base="$2"

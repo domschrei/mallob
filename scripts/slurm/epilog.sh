@@ -17,11 +17,15 @@ dest="$outputlogdir/$(basename $globallogdir)"
 if [ -f "$dest/.alldone" ]; then exit ; fi
 
 >&2 echo "$(date) EPILOG $(hostname): $build $globallogdir $outputlogdir"
+>&2 echo "$(date) EPILOG $(hostname): DEST: $dest"
 
 # move global log dir to output log dir
 prevdir=$(pwd)
 cd "$globallogdir"
 for x in * ; do
+	echo "IN: $globallogdir"
+	echo "MOVING: $x"
+	echo "FULLPATH: $(realpath $x)"
     if [ -d $x ]; then mv $x/* "$dest/$x/" & : ; fi
     if [ -f $x ]; then mv $x "$dest/" & : ; fi
 done
