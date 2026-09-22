@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <cmath>
 #include <vector>
 
 #include "app/sat/data/model_string_compressor.hpp"
@@ -31,6 +32,7 @@ private:
     const MallobJobType _type;
 
     nlohmann::json _base_json;
+    int _sub_job_id {-1};
 
 public:
     MallobPreprocessActor(const Parameters& params, const JobDescription& desc, const std::string& name,
@@ -69,6 +71,7 @@ public:
             if (!pending) break;
             usleep(1000 * 100); // 100ms
         }
+        createMissingDirectoriesAndFiles(src + "/proof#" + std::to_string(_sub_job_id));
         return SatPreprocessActor::rename_proof(i);
     }
 
@@ -116,7 +119,7 @@ private:
             else if (res.result == RESULT_UNSAT) _result = UNSAT;
             else if (res.result == RESULT_SIMPLIFIED) _result = SIMPLIFIED;
             else _result = NONE;
-        });
+        }, &_sub_job_id);
         if (result != JsonInterface::Result::ACCEPT) {
             LOG(V0_CRIT, "[ERROR] Cannot introduce mono job!\n");
             abort();
@@ -197,5 +200,18 @@ private:
     const char* toStr() const {
         return _jobstr.c_str();
     }
-};
 
+    void createMissingDirectoriesAndFiles(const std::string& src) {
+        double maxNumSolvers = MyMpi::size(MPI_COMM_WORLD) * _params.numThreadsPerProcess();
+        int lastCreatedHierarchy = -1;
+        for (int i = 0; i < maxNumSolvers; i++) {
+            int hierarchy = (int) (i / std::ceil(std::sqrt(maxNumSolvers)));
+            if (hierarchy > lastCreatedHierarchy) {
+                FileUtils::mkdir(src + "/" + std::to_string(hierarchy));
+                lastCreatedHierarchy = hierarchy;
+            }
+            FileUtils::mkdir(src + "/" + std::to_string(hierarchy) + "/" + std::to_string(i));
+            FileUtils::create(src + "/" + std::to_string(hierarchy) + "/" + std::to_string(i) + "/out.palrup");
+        }
+    }
+};
