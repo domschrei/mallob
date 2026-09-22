@@ -26,7 +26,16 @@ void register_mallob_app_satwithpre() {
     entry.key = "SATWITHPRE";
     entry.type = app_registry::AppEntry::CLIENT_SIDE;
 
-    entry.copyrightInformation = "\nc Featuring Satsuma by Markus Anders, with interface code by Anna Görth\n";
+    entry.copyrightInformation = "\nc Featuring Satsuma by Markus Anders\nc Featuring interface and proof production code by Anna Görth\n";
+
+    entry.optionChecker = [](const Parameters& params, auto& vec) {
+        if (params.savePreprocessingProofs() && !params.proofDirectory.isSet()) {
+            vec.push_back({&params.savePreprocessingProofs,
+                "Preprocessing proof saving (-prepro-proofs) requires a proof directory (-proof-dir)."
+            });
+        }
+        return vec.empty();
+    };
 
     entry.reader = [](const Parameters& params, const std::vector<std::string>& files, JobDescription& desc) {
         return SatReader(params, files).read(desc);

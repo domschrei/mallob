@@ -11,6 +11,7 @@
 
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
+#include "app/sat/solvers/preprocess_proof_tracker.hpp"
 #include "util/logger.hpp"
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "app/sat/data/solver_statistics.hpp"
@@ -46,6 +47,9 @@ void report_preprocessed_lit(void* state, int lit) {
     ((Kissat*) state)->addLiteralFromPreprocessing(lit);
 }
 
+void on_prepro_drup_derivation(void* state, const int* lits, int nbLits, int glue) {
+    ((Kissat*) state)->getPreprocessProofTracker()->appendDerivation(lits, nbLits);
+}
 void on_drup_derivation(void* state, const int* lits, int nbLits, int glue) {
     //((Kissat*) state)->processProofLine(LratOp(lits, nbLits, glue));
 }
@@ -54,6 +58,9 @@ void on_lrup_import(void* state, unsigned long id, const int* lits, int nbLits, 
     //((Kissat*) state)->processProofLine(LratOp(id, lits, nbLits, sigData));
 }
 
+void on_prepro_drup_deletion(void* state, const int* lits, int nbLits) {
+    ((Kissat*) state)->getPreprocessProofTracker()->appendDeletion(lits, nbLits);
+}
 void on_drup_deletion(void* state, const int* lits, int nbLits) {
     //((Kissat*) state)->processProofLine(LratOp(lits, nbLits));
 }
@@ -71,18 +78,32 @@ Kissat::Kissat(const SolverSetup& setup)
     numVars = setup.numVars;
 
     if (setup.certifiedUnsat) {
-        assert(_lrat); // needs to be real-time checking setup for Kissat
+        if (setup.flavour == PortfolioSequence::PREPROCESS) {
 
-        int solverRank = setup.globalId;
-		int maxNumSolvers = setup.maxNumSolvers;
+            _prepro_proof_tracker.reset(new PreprocessProofTracker(numVars,
+                "", //setup.proofDir + "/formula.cnf",
+                setup.proofDir + "/proof.drat"));
 
-		auto descriptor = _lrat ? "on-the-fly checking" : "proof production";
-		LOGGER(_logger, V3_VERB, "Initializing rank=%i size=%i DI=%i #C=%ld IDskips=%i with %s\n",
-			solverRank, maxNumSolvers, getDiversificationIndex(), setup.numOriginalClauses, setup.nbSkippedIdEpochs,
-			descriptor);
+            // set Kissat's internal proof tracing mode
+            kissat_trace_proof_internally(solver, this,
+                &on_prepro_drup_derivation,
+                &on_lrup_import,
+                &on_prepro_drup_deletion);
 
-        // set Kissat's internal proof tracing mode
-        kissat_trace_proof_internally(solver, this, &on_drup_derivation, &on_lrup_import, &on_drup_deletion);
+        } else {
+            assert(_lrat); // needs to be real-time checking setup for Kissat
+
+            int solverRank = setup.globalId;
+            int maxNumSolvers = setup.maxNumSolvers;
+
+            auto descriptor = _lrat ? "on-the-fly checking" : "proof production";
+            LOGGER(_logger, V3_VERB, "Initializing rank=%i size=%i DI=%i #C=%ld IDskips=%i with %s\n",
+                solverRank, maxNumSolvers, getDiversificationIndex(), setup.numOriginalClauses, setup.nbSkippedIdEpochs,
+                descriptor);
+
+            // set Kissat's internal proof tracing mode
+            kissat_trace_proof_internally(solver, this, &on_drup_derivation, &on_lrup_import, &on_drup_deletion);
+        }
     }
 }
 
@@ -91,7 +112,7 @@ void Kissat::setPreprocessingReportCallback() {
 }
 
 void Kissat::addLiteral(int lit) {
-	kissat_add(solver, lit);
+    kissat_add(solver, lit);
     numVars = std::max(numVars, std::abs(lit));
 }
 
@@ -197,6 +218,10 @@ bool Kissat::shouldTerminate() {
 }
 
 void Kissat::cleanUp() {
+    if (getPreprocessProofTracker()) {
+        getPreprocessProofTracker()->finalizeOutput();
+    }
+
     if (_setup.profilingLevel > 0) {
         auto profileFileString = _setup.profilingBaseDir + "/profile." + _setup.jobname
             + "." + std::to_string(_setup.globalId);

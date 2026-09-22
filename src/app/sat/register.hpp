@@ -90,7 +90,7 @@ void register_mallob_app_sat() {
             if (!IncrementalTrustedParserStore::map.count(desc.getId()))
                 IncrementalTrustedParserStore::map[desc.getId()] = reader.getTrustedParser();
         }
-        if (params.palRup())
+        if (params.palRup() && !files.empty()) // could be empty if started from preprocessing actor
             StaticStore<std::string>::insert("cnf-#" + std::to_string(desc.getId()), files[0]);
         return res;
     };

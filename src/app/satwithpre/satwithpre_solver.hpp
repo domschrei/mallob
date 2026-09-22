@@ -46,6 +46,7 @@ public:
             usleep(1000); // no result yet, sleep for 1ms
         }
         _po->stopAll();
+        _po->finalizeProofs();
 
         LOG(V2_INFO, "SATWP RES ~%i~\n", res.result);
         return res;

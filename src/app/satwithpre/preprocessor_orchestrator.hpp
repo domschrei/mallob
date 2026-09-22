@@ -42,6 +42,16 @@ public:
             _params(params), _desc(desc.getBasicCopy()), _api(api),
             _base_cnf(CnfUtil::getCnfFromJobDescription(desc, true)) {
 
+        if (_params.savePreprocessingProofs()) {
+            auto existing = FileUtils::glob(_params.proofDirectory() + "/*");
+            if (!existing.empty()) {
+                LOG(V0_CRIT, "[ERROR] Proof directory \"%s\" is not empty - please clear it before running with -prepro-proofs=1\n",
+                    _params.proofDirectory().c_str());
+                abort();
+            }
+            FileUtils::mkdir(_params.proofDirectory() + "/tmp");
+        }
+
         _time_of_start = Timer::elapsedSeconds();
         try {
             _actors = ActorConfigParser().parseFile(_params.preprocessConfig());
@@ -141,6 +151,8 @@ public:
                 }
                 if (res == SatPreprocessActor::SIMPLIFIED) {
                     actor.formula = std::move(actor.actor->getPreprocessedFormula());
+                    if (_params.savePreprocessingProofs())
+                        actor.actor->writeCnf(actor.formula);
                 } else {
                     actor.formula = std::move(actor.actor->getInputCnf());
                 }
@@ -211,5 +223,26 @@ public:
             LOG(V2_INFO, "SATWP %s interrupt\n", actor.getId());
             actor.actor->interrupt();
         }
+    }
+
+    void finalizeProofs() {
+        if (!_params.savePreprocessingProofs()) return;
+        ActorContext* last = _winning_actor;
+        if (!last || last->result != SatPreprocessActor::UNSAT) return;
+        std::vector<ActorContext*> line;
+        // only include actors that acually simplify the formula
+
+        bool isWinner = true;
+        while (last) {
+            if (isWinner || last->result == SatPreprocessActor::SIMPLIFIED) line.push_back(last);
+            isWinner = false;
+            last = last->prerequisite;
+        }
+        int total = line.size();
+        for (int i = 1; i <= total; i++){
+            ActorContext* step = line[total - i];
+            step->actor->rename_proof(i);
+        }
+        FileUtils::rmrf(_params.proofDirectory() + "/tmp");
     }
 };

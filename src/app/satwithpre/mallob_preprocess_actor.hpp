@@ -43,6 +43,7 @@ public:
         static int _actor_counter = 1;
 
         _jobstr = "#" + std::to_string(_job_id) + ":mal:" + std::to_string(_actor_counter++);
+        _proof_format = _type == SATSOLVER ? "palrup" : "";
     }
     ~MallobPreprocessActor() {}
 
@@ -54,6 +55,21 @@ public:
 
     void interrupt() override {
         interrupt(_base_json);
+    }
+
+    // some processes may still be writing, so we need to wait until moving is possible
+    bool rename_proof(int i, std::string cnfSrc = "", std::string proofSrc = "") override {
+        std::string src = _params.proofDirectory() + "/tmp/" + _name + "." + _proof_format;
+        for (int attempt = 0; attempt < 100 && std::filesystem::exists(src); attempt++) {
+            bool pending = false;
+            for (const auto& entry : std::filesystem::recursive_directory_iterator(src)) {
+                std::string filename = entry.path().filename().string();
+                if (!filename.empty() && filename.back() == '~') { pending = true; break; }
+            }
+            if (!pending) break;
+            usleep(1000 * 100); // 100ms
+        }
+        return SatPreprocessActor::rename_proof(i);
     }
 
 private:
@@ -80,9 +96,16 @@ private:
         if (_desc.getCpuLimit() > 0)
             json["cpu-limit"] = std::to_string(
             std::max(0.001f, _desc.getCpuLimit() - getAgeSinceActivation())) + "s";
+
+        std::string opts;
+        if (json["configuration"].count("options"))
+            opts = json["configuration"]["options"].get<std::string>();
         if (_type == SATSOLVER && _params.overrideSatOptions.isSet())
-            json["configuration"]["options"] = json["configuration"]["options"].get<std::string>()
-                + (json["configuration"]["options"].empty() ? "" : " ") + _params.overrideSatOptions();
+            opts += " " + _params.overrideSatOptions();
+        if (_params.savePreprocessingProofs())
+            opts += " -palrup=1 -proof-dir=" + _params.proofDirectory() + "/tmp/" + _name + "." + _proof_format
+                 + " -satsolver=c!";
+        if (!opts.empty()) json["configuration"]["options"] = opts;
         applySuccessiveGrowth(json);
 
         auto copiedJson = json;

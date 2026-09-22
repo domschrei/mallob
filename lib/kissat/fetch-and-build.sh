@@ -10,6 +10,6 @@ fetch_and_extract $dirname configure https://github.com/domschrei/kissat/archive
 # fetch_and_extract $dirname configure https://github.com/nrilu/kissat/archive/${branchorcommit}.zip
 
 echo "[kissat] Building ..."
-./configure -O3 --no-proofs
+./configure -O3
 make -j
 echo "[kissat] Build complete"
