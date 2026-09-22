@@ -106,8 +106,7 @@ private:
         if (_type == SATSOLVER && _params.overrideSatOptions.isSet())
             opts += " " + _params.overrideSatOptions();
         if (_params.savePreprocessingProofs())
-            opts += " -palrup=1 -proof-dir=" + _params.proofDirectory() + "/tmp/" + _name + "." + _proof_format
-                 + " -satsolver=c!";
+            opts += " -palrup=1 -proof-dir=" + _params.proofDirectory() + "/tmp/" + _name + "." + _proof_format;
         if (!opts.empty()) json["configuration"]["options"] = opts;
         applySuccessiveGrowth(json);
 

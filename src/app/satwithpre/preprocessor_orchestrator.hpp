@@ -244,5 +244,13 @@ public:
             step->actor->rename_proof(i);
         }
         FileUtils::rmrf(_params.proofDirectory() + "/tmp");
+
+#if MALLOB_BUILD_CHAINCHECK
+        LOG(V2_INFO, "SATWP Check the chained proof via: build/chaincheck <input-CNF> %s\n",
+            _params.proofDirectory().c_str());
+#else
+        LOG(V2_INFO, "SATWP Check the chained proof via chaincheck on the input CNF and proof dir %s\n",
+            _params.proofDirectory().c_str());
+#endif
     }
 };
