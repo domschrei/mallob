@@ -162,8 +162,9 @@ public:
     // or the aggregation function finished. No-op if getResult() was already called.
     JobTreeBasicAllReduction& advance() {
 
-        LOG(V3_VERB, "CSC advance() _child_elems.size()==%i, _num_expected_child_elems==%i, _local_elem.has_value()==%i. aggregating %i, _future_aggregate.valid()==%i\n", 
-            _child_elems.size(), _num_expected_child_elems, _local_elem.has_value(), _aggregating, _future_aggregate.valid());
+        // LOG(V3_VERB, "CSC advance() _child_elems.size()==%i, _num_expected_child_elems==%i, _local_elem.has_value()==%i. aggregating %i, _future_aggregate.valid()==%i\n", 
+            // _child_elems.size(), _num_expected_child_elems, _local_elem.has_value(), _aggregating, _future_aggregate.valid());
+        
         if (_finished) return *this;
 
         if (_child_elems.size() == _num_expected_child_elems && _local_elem.has_value()) {
