@@ -100,7 +100,11 @@ public:
 
     void advanceSharing() {
 
+        LOG(V3_VERB, "CSC advanceSharing\n");
+        
         if (_stage == PRODUCING_CLAUSES && _job->hasPreparedSharing()) {
+            
+            LOG(V3_VERB, "CSC PRODUCING_CLAUSES \n");
 
             // Produce contribution to all-reduction of clauses
             _allreduce_clauses.produce([&]() {
@@ -119,6 +123,7 @@ public:
         }
 
         if (_stage == AGGREGATING_CLAUSES && _allreduce_clauses.advance().hasResult()) {
+            LOG(V3_VERB, "CSC AGGREGATING_CLAUSES \n");
 
             // Some clauses may have been left behind during merge
             if (_excess_clauses_from_merge.size() > 4) {
@@ -171,6 +176,7 @@ public:
 
         if (_stage == PRODUCING_FILTER && _job->hasFilteredSharing(_epoch)) {
 
+            LOG(V3_VERB, "CSC PRODUCING_FILTER \n");
             _allreduce_filter->produce([&]() {
                 auto f = _job->getLocalFilter(_epoch);
                 LOG(V5_DEBG, "%s CS produced filter, size %i\n", _job->getLabel(), f.size());
@@ -181,6 +187,7 @@ public:
 
         if (_stage == AGGREGATING_FILTER && _allreduce_filter->advance().hasResult()) {
 
+            LOG(V3_VERB, "CSC AGGREGATING_FILTER \n");
 
             // Extract and digest result
             auto filter = _allreduce_filter->extractResult();
