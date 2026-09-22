@@ -238,7 +238,7 @@ private:
 	std::unique_ptr<AnytimeSatClauseCommunicator> _clause_comm;
 	std::vector<int>  _crossjob_root_received_units{};
 	std::mutex _crossjob_import_mutex;
-	bool _crossjob_has_prepared_sharing{false};
+	// bool _crossjob_has_prepared_sharing{false};
 
 	//[seconds] End sweeping 5 seconds earlier than the wallclock time, to allow for substitute to finish,
 	//to get a proper final clause database state before reporting
@@ -427,7 +427,7 @@ private:
 				_clause_comm->handle(
 					deferredMsg.source, deferredMsg.mpiTag, deferredMsg.msg);
 			}
-			_crossjob_has_prepared_sharing = true;
+			// _crossjob_has_prepared_sharing = true;
 		}
 
 		//Within SweepJob, pass down the units received via Cross-Job-Communication to all sweepers.
@@ -565,9 +565,10 @@ private:
 
 	bool hasPreparedSharing() override {
 
-	bool answer = _crossjob_has_prepared_sharing;
-	LOGGER(_sweeplogger,V4_VVER, "[SweepJob] Called stub: hasPreparedSharing. return %i  (root)\n",  answer);
-	return answer;
+		return true;
+	// bool answer = _crossjob_has_prepared_sharing;
+	// LOGGER(_sweeplogger,V4_VVER, "[SweepJob] Called stub: hasPreparedSharing. return %i  (root)\n",  answer);
+	// return answer;
 	}
 
 
@@ -575,7 +576,7 @@ private:
 		successfulSolverId = -1;
 		numLits = 0;
 		LOGGER(_sweeplogger,V4_VVER, "[SweepJob] Called stub: getPreparedClauses. return succSolver -1 , numLits 0, vector {}\n");
-		_crossjob_has_prepared_sharing = false; //mirroring the behaviour in inter_job_clause_sharer.hpp
+		// _crossjob_has_prepared_sharing = false; //mirroring the behaviour in inter_job_clause_sharer.hpp
 		return {};
 	}
 
