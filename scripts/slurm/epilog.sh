@@ -19,6 +19,10 @@ if [ -f "$dest/.alldone" ]; then exit ; fi
 >&2 echo "$(date) EPILOG $(hostname): $build $globallogdir $outputlogdir"
 
 # move global log dir to output log dir
+# Only one process is allowed to move from $globallogdir,
+# because it now resides on $SCRATCH instead of /tmp,
+# to which all nodes have full access too
+if mkdir "$dest/.movelock" 2>/dev/null ; then
 prevdir=$(pwd)
 cd "$globallogdir"
 for x in * ; do
@@ -27,6 +31,7 @@ for x in * ; do
 done
 wait
 cd $prevdir
+fi
 
 # Barrier across hosts (note that we clean up the lock directory afterwards)
 touch "$dest/.done.$(hostname)"
@@ -35,6 +40,6 @@ touch "$dest/.alldone"
 
 # Clean up orphaned processes and tmp directory
 killall -9 $build/mallob $build/mallob_sat_process $build/mallob_process_dispatcher 2>/dev/null || :
-rm -rf ${localtmpdir} /dev/shm/edu.kit.iti.mallob.* /tmp/.epilog.lock 2>/dev/null || :
+rm -rf ${localtmpdir} /dev/shm/edu.kit.iti.mallob.* /tmp/.epilog.lock $dest/.movelock 2>/dev/null || :
 
 >&2 echo "$(date) END EPILOG $(hostname)"
