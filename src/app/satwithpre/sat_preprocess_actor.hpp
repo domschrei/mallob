@@ -1,9 +1,9 @@
 
 #pragma once
 
-#include "app/sat/parse/serialized_formula_parser.hpp"
-#include "data/job_description.hpp"
+#include "util/assert.hpp"
 #include "util/params.hpp"
+#include <future>
 #include <vector>
 
 class SatPreprocessActor {
@@ -51,7 +51,7 @@ public:
     const char* getName() const {return _name.c_str();}
 
 protected:
-    const Parameters& _params;
+    const Parameters _params;
     std::string _name;
     const std::vector<int> _input_cnf;
     std::vector<int> _output_cnf;

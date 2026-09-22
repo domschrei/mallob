@@ -185,6 +185,27 @@ bool Process::didChildExit(pid_t childpid, int* exitStatusOut) {
     return false;
 }
 
+void Process::waitForChildToExit(pid_t childpid, int* exitStatusOut) {
+
+    {
+        auto lock = _children_mutex.getLock();
+        if (!_children.count(childpid)) {
+            if (exitStatusOut != nullptr)
+                *exitStatusOut = 0;
+            return;
+        }
+    }
+
+    int status;
+    pid_t result = waitpid(childpid, &status, 0);
+
+    if (result != 0) {
+        auto lock = _children_mutex.getLock();
+        _children.erase(childpid);
+        if (exitStatusOut != nullptr) *exitStatusOut = status;
+    }
+}
+
 std::optional<Process::SignalInfo> Process::getCaughtSignal() {
     std::optional<SignalInfo> opt;
     if (_exit_signal_caught) {

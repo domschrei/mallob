@@ -127,6 +127,37 @@ public:
     JobDescription(const JobDescription& other) = delete;
     JobDescription& operator=(const JobDescription& other) = delete;
 
+    // Instead, a copy operation must be called very deliberately.
+    // It copies all job description payload instead of referencing it.
+    JobDescription getBasicCopy() const {
+        JobDescription copy;
+        copy._id = _id;
+        copy._root_rank = _root_rank;
+        copy._priority = _priority;
+        copy._revision = _revision;
+        copy._client_rank = _client_rank;
+        copy._wallclock_limit = _wallclock_limit;
+        copy._cpu_limit = _cpu_limit;
+        copy._max_demand = _max_demand;
+        copy._application_id = _application_id;
+        copy._incremental = _incremental;
+        copy._group_id = _group_id;
+        copy._description_id = _description_id;
+        copy._first_balancing_epoch = _first_balancing_epoch;
+        copy._checksum = _checksum;
+        copy._arrival = _arrival;
+        copy._app_config = _app_config;
+        copy._num_vars = _num_vars;
+        copy._f_size = _f_size;
+        copy._preloaded_literals = _preloaded_literals;
+        for (auto& data : _data_per_revision) {
+            std::shared_ptr<std::vector<uint8_t>> vec(new std::vector<uint8_t>(
+            data->begin(), data->end()));
+            copy._data_per_revision.push_back(vec);
+        }
+        return copy;
+    }
+
 
     // Parse (initial) job description into this object
 

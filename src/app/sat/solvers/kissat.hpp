@@ -33,6 +33,8 @@ private:
 	Mallob::Clause learntClause;
     std::vector<int> producedClause;
 
+	std::vector<int> currentAssumptions;
+
     bool interrupted = false;
     unsigned int glueLimit;
 

@@ -32,6 +32,9 @@
 #include "app/sat/solvers/cadical_clause_import.hpp"
 #include "app/sat/solvers/cadical_terminator.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
+#include "util/params.hpp"
+#include "util/sys/fileutils.hpp"
+#include "util/sys/subprocess.hpp"
 
 Cadical::Cadical(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup),
@@ -99,23 +102,42 @@ Cadical::Cadical(const SolverSetup& setup)
 					LOGGER(_logger, V2_INFO, "CONCLUSION ID %lu\n", unsatConclusionId);
 				}
 			);
-		} else if (_setup.usePalRupFormat) {
-			// Production of parallel (PalRUP) files: Initialize tracer that outputs to a file.
-			// Clause export for sharing is separate, set up in setLearnedClauseCallback.
-			okay = solver->set("lratpalrup", 1); // enable PalRUP proof output
-			okay = solver->set("binary", _setup.outputBinaryPalRup ? 1 : 0); assert(okay); // set proof logging mode to binary format
-			okay = solver->set("lratdeletelines", 1); assert(okay); // do enable printing deletion lines
-			int sqrt = std::ceil(std::sqrt((double) maxNumSolvers));
-			proofFileString = _setup.proofDir + "/" + std::to_string((int)(solverRank / sqrt)) + "/" + std::to_string(_setup.globalId) + "/out.palrup~";
-			LOG(V5_DEBG, "CADICAL PROOF DIR %s\n", proofFileString.c_str());
-			okay = solver->trace_proof(proofFileString.c_str()); assert(okay);
 		} else {
-			// Monolithic proof production: LRAT tracer that outputs to a file.
-			// Clause export for sharing is separate, set up in setLearnedClauseCallback.
-			okay = solver->set("binary", 1); assert(okay); // set proof logging mode to binary format
-			okay = solver->set("lratdeletelines", 0); assert(okay); // disable printing deletion lines
-			proofFileString = _setup.proofDir + "/proof." + std::to_string(_setup.globalId) + ".lrat";
-			okay = solver->trace_proof(proofFileString.c_str()); assert(okay);
+			if (_setup.usePalRupFormat) {
+				// Production of parallel (PalRUP) files: Initialize tracer that outputs to a file.
+				// Clause export for sharing is separate, set up in setLearnedClauseCallback.
+				okay = solver->set("lratpalrup", 1); // enable PalRUP proof output
+				okay = solver->set("binary", _setup.outputBinaryPalRup ? 1 : 0); assert(okay); // set proof logging mode to binary format
+				okay = solver->set("lratdeletelines", 1); assert(okay); // do enable printing deletion lines
+				int sqrt = std::ceil(std::sqrt((double) maxNumSolvers));
+				proofFileString = _setup.proofDir + "/" + std::to_string((int)(solverRank / sqrt)) + "/" + std::to_string(_setup.globalId) + "/out.palrup";
+			} else {
+				// Monolithic proof production: LRAT tracer that outputs to a file.
+				// Clause export for sharing is separate, set up in setLearnedClauseCallback.
+				okay = solver->set("binary", 1); assert(okay); // set proof logging mode to binary format
+				okay = solver->set("lratdeletelines", 0); assert(okay); // disable printing deletion lines
+				proofFileString = _setup.proofDir + "/proof." + std::to_string(_setup.globalId) + ".lrat";
+			}
+			if (_setup.compressProofMode == SolverSetup::NONE) {
+				// No proof compression.
+				okay = solver->trace_proof((proofFileString + "~").c_str()); assert(okay);
+			} else {
+				// Proof compression.
+				// - Create pipe from solver to compressor
+				proofFileString += (_setup.compressProofMode == SolverSetup::XZ ? ".xz" : ".vg");
+				std::string pipePath = proofFileString + ".compress";
+				int res;
+				res = mkfifo(pipePath.c_str(), 0666);
+				if (res == -1) abort();
+				// - Launch compression sub-process
+				Parameters params;
+				Subprocess subprocCompress(params, "compress-proof.sh "
+					+ std::string(_setup.compressProofMode == SolverSetup::XZ ? "XZ" : "VASKIN_GOETZ")
+					+ " " + pipePath + " " + proofFileString + "~", false);
+				compressorPid = subprocCompress.start();
+				// - Tell solver to output its proof information to the pipe
+				okay = solver->trace_proof(pipePath.c_str()); assert(okay);
+			}
 		}
 	}
 
@@ -142,7 +164,6 @@ void Cadical::diversify(int seed) {
 
 	seedSet = true;
 	setClauseSharing(getNumOriginalDiversifications());
-	applySolverConfiguration(_setup.baseSeed);
 }
 
 void Cadical::addConfigurationSetting(Setting setting) {
@@ -187,16 +208,26 @@ void Cadical::setDefaultPhase(const bool phase) {
 
 // Solve the formula with a given set of assumptions
 // return 10 for SAT, 20 for UNSAT, 0 for UNKNOWN
-SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
+SatResult Cadical::solve(size_t numAssumptions, const int* asmpt) {
 
-	// set the assumptions
-	this->assumptions.clear();
-	//clearConditionalLits();
-	for (size_t i = 0; i < numAssumptions; i++) {
-		int lit = assumptions[i];
-		solver->assume(lit);
-		this->assumptions.push_back(lit);
-		//addConditionalLit(-lit);
+	// set/update the assumptions
+	assumptions.clear();
+	if (_setup.doIncrementalSolving) {
+		// actual assumptions
+		//clearConditionalLits();
+		for (size_t i = 0; i < numAssumptions; i++) {
+			int lit = asmpt[i];
+			solver->assume(lit);
+			assumptions.push_back(lit);
+			//addConditionalLit(-lit);
+		}
+	} else {
+		// non-incremental mode: add assumptions as unit clauses
+		LOGGER(_logger, V4_VVER, "add %i assumptions as units\n", numAssumptions);
+		for (int i = 0; i < numAssumptions; i++) {
+			addLiteral(asmpt[i]);
+			addLiteral(0);
+		}
 	}
 	unsatConclusionId = 0;
 
@@ -242,8 +273,10 @@ std::vector<int> Cadical::getSolution() {
 
 std::set<int> Cadical::getFailedAssumptions() {
 	std::set<int> result;
+	// In non-incremental solving, we need to output the full set of assumptions
+	// as the trivial core, since no further information is available.
 	for (auto assumption : assumptions)
-		if (solver->failed(assumption))
+		if (!_setup.doIncrementalSolving || solver->failed(assumption))
 			result.insert(assumption);
 
 	return result;
@@ -298,12 +331,16 @@ void Cadical::cleanUp() {
 	if (_setup.certifiedUnsat) {
 		LOGGER(_logger, V4_VVER, "Closing proof output asynchronously\n");
 		solver->close_proof_asynchronously ();
+		if (compressorPid > 0) Process::waitForChildToExit(compressorPid);
+		if (_setup.compressProofMode != SolverSetup::NONE) {
+			LOGGER(_logger, V5_DEBG, "Compressor PID %i finished\n", compressorPid);
+			// remove pipe file
+			FileUtils::rm(proofFileString + ".compress");
+		}
 		if (_setup.usePalRupFormat) {
 			// Finalize the proof fragment by moving temporary to final file
-			int sqrt = std::ceil(std::sqrt((double) _setup.maxNumSolvers));
-			std::string proofFileStringOld = _setup.proofDir + "/" + std::to_string((int)(_setup.globalId / sqrt)) + "/" + std::to_string(_setup.globalId) + "/out.palrup~";
-			std::string proofFileStringNew = _setup.proofDir + "/" + std::to_string((int)(_setup.globalId / sqrt)) + "/" + std::to_string(_setup.globalId) + "/out.palrup";
-			::rename(proofFileStringOld.c_str(), proofFileStringNew.c_str());
+			std::string proofFileStringOld = proofFileString + "~";
+			::rename(proofFileStringOld.c_str(), proofFileString.c_str());
 		}
 	}
 	if (_setup.profilingLevel > 0) {

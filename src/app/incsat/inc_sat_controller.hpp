@@ -27,6 +27,7 @@ private:
     APIConnector& _api;
     JobDescription& _desc;
     std::string _problem_file;
+    const bool _use_incremental_sat;
 
     int _rev {-1};
     std::unique_ptr<TrustedIncParserProcessAdapter> _tppa;
@@ -49,8 +50,9 @@ private:
     volatile bool _terminators_invalidated {false};
 
 public:
-    IncSatController(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& dTaskTracker) :
-            _params(params), _api(api), _desc(desc), _stream_id(getNextStreamId()),
+    IncSatController(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& dTaskTracker,
+                bool useIncrementalSatSolving) :
+            _params(params), _api(api), _desc(desc), _use_incremental_sat(useIncrementalSatSolving), _stream_id(getNextStreamId()),
             _name("#" + std::to_string(desc.getId()) + "(ISAT):" + std::to_string(_stream_id)),
             _dtask_tracker(dTaskTracker) {
 
@@ -164,26 +166,37 @@ public:
         assert(_stream);
         return _stream->stream;
     }
-    MallobSatJobStreamProcessor* getMallobProcessor() {
+    std::list<MallobSatJobStreamProcessor*> getMallobProcessors() {
         assert(_stream);
-        return _stream->mallobProcessor;
+        return _stream->mallobProcessors;
     }
 
 private:
     void initStream(bool createProblemFileAsPipe) {
         _start_time = Timer::elapsedSeconds();
         _stream.reset(new WrappedSatJobStream(_name));
-        _stream->mallobProcessor = new MallobSatJobStreamProcessor(_params, _api, _desc,
-            _name, _stream_id, true, _stream->stream.getSynchronizer());
-        _stream->mallobProcessor->setDTaskTracker(_dtask_tracker);
-        _stream->stream.addProcessor(_stream->mallobProcessor);
+
+        auto mallobProcessor = new MallobSatJobStreamProcessor(_params, _api, _desc,
+            _name, _stream_id, _use_incremental_sat, _stream->stream.getSynchronizer());
+        mallobProcessor->setDTaskTracker(_dtask_tracker);
+        _stream->stream.addProcessor(mallobProcessor);
+        _stream->mallobProcessors.push_back(mallobProcessor);
+
+        if (_params.nonincrementalSolvingDelay() > 0) {
+            auto mallobProcessor = new MallobSatJobStreamProcessor(_params, _api, _desc,
+            _name + ":ni", _stream_id, false, _stream->stream.getSynchronizer());
+            mallobProcessor->setDTaskTracker(_dtask_tracker);
+            mallobProcessor->overrideSolvingDelays(_params.nonincrementalSolvingDelay());
+            _stream->stream.addProcessor(mallobProcessor);
+            _stream->mallobProcessors.push_back(mallobProcessor);
+        }
 
         if (_params.internalStreamProcessor()) {
             SolverSetup setup;
             setup.baseSeed = _params.seed();
             setup.jobId = _desc.getId();
             setup.jobname = _name + ".int";
-            setup.isJobIncremental = true;
+            setup.isJobIncremental = true; // always use incremental SAT here (smallest overhead)
             setup.onTheFlyChecking = _params.onTheFlyChecking();
             setup.onTheFlyCheckModel = _params.onTheFlyChecking() && _params.onTheFlyCheckModel();
             setup.incrementalImpCheck = _params.onTheFlyCheckIncremental();

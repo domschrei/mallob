@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include "data/job_description.hpp"
 #include "proof_assembler.hpp"
 #include "merging/distributed_proof_merger.hpp"
 #include "merging/proof_merge_connector.hpp"
@@ -28,6 +29,7 @@ public:
 
 private:
     const Parameters& _params;
+    const JobDescription& _desc;
     ProofSetup _setup;
     JobTree& _job_tree;
 
@@ -46,8 +48,8 @@ private:
     std::optional<MessageSubscription> _subscription_merge;
 
 public:
-    ProofProducer(const Parameters& params, const ProofSetup& setup, JobTree& jobTree) : 
-        _params(params), _setup(setup), _job_tree(jobTree),
+    ProofProducer(const Parameters& params, const JobDescription& desc, const ProofSetup& setup, JobTree& jobTree) : 
+        _params(params), _desc(desc), _setup(setup), _job_tree(jobTree),
         _proof_assembler(new ProofAssembler(_params, setup.jobId, setup.numWorkers, setup.threadsPerWorker, setup.thisWorkerIndex, 
                 setup.finalEpoch, setup.winningInstance, setup.globalStartOfSuccessEpoch)) {
         
@@ -162,7 +164,7 @@ private:
         _local_merger.reset(new SmallMerger<SerializedLratLine>(ptrs));
 
         // Set up distributed merge procedure
-        _file_merger.reset(new DistributedProofMerger(_params, MPI_COMM_WORLD, /*branchingFactor=*/6, 
+        _file_merger.reset(new DistributedProofMerger(_params, _desc, MPI_COMM_WORLD, /*branchingFactor=*/6, 
             _local_merger.get(), _params.proofOutputFile()));
 
         // Register callback for processing merge messages
