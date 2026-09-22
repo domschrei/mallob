@@ -101,6 +101,9 @@ public:
     void advanceSharing() {
 
         LOG(V3_VERB, "CSC advanceSharing, stage %i \n", _stage);
+        if (_stage== PRODUCING_CLAUSES) {
+            LOG(V3_VERB, "CSC advanceSharing, stage %i, _job->hasPreparedSharing==%i \n", _stage, _job->hasPreparedSharing());
+        }
         
         if (_stage == PRODUCING_CLAUSES && _job->hasPreparedSharing()) {
             

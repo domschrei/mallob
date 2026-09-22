@@ -82,10 +82,15 @@ public:
         _is_root = _tree.index == 0;
         _base_msg.treeIndexOfSender = _tree.index;
         _base_msg.contextIdOfSender = _tree.contextId;
+        
+        LOG(V3_VERB, "CSC init expected_child_elems %i\n",_num_expected_child_elems);
+        LOG(V3_VERB, "CSC init left child [%i](%i)\n", leftRank, _expected_child_indices.first);
+        LOG(V3_VERB, "CSC init right child [%i](%i)\n", rightRank, _expected_child_indices.second);
     }
 
     void pruneChild(int rank) {
         assert(rank >= 0);
+        LOG(V3_VERB, "CSC pruning child [%i] \n", rank);
         bool left = rank == _expected_child_ranks.first;
         bool right = rank == _expected_child_ranks.second;
         if (left && !_received_child_elems.first) {
