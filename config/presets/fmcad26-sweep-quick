@@ -6,7 +6,7 @@
 
 echo '-sat-config-dirs=config/sat/base/ -sat-config-files=
   -mono-app=SWEEP
-  -satsolver=k_
+  -satsolver=k
   -pre-cleanup=1
   -q=0
   -os=1
