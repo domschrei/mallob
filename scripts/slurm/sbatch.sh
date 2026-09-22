@@ -116,18 +116,24 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     echo "instance: $f"
     echo " "
 
-    # TODO Configure Mallob
     timeout=$DS_SECONDSPERJOB
     cmd="$build/mallob \
 	-mono-app=$DS_APP \
     -satsolver=k \
+    -sat-config-dirs=config/sat/base/ -sat-config-files= \
+  	-preprocess-config=config/satwithpre/actors_sweepnsat.json \
 	-pb=1 -pjp=999999 -pef=1 -mono=$f -jwl=$timeout -T=$(($timeout+30)) -wam=60``000 -pre-cleanup=1 \
     -q=1 -log=$globallogdir -tmp=$localtmpdir -comment-outputlogdir=$outputlogdir -sro=${globallogdir}/processed-jobs.out \
-	-trace-dir=${globallogdir}/ -os=1 -iff=0 -s2f=${globallogdir}/model -cm=0 \
+	-trace-dir=${globallogdir}/ -s2f=${globallogdir}/model \
+	-os=1 \
+	-iff=0 \
+	-cm=0 \
+	-rspaa=1 \
     -rpa=1 -pph=${SLURM_NTASKS_PER_NODE} -mlpt=50``000``000 -t=$((${SLURM_CPUS_PER_TASK} / 2)) \
     -scll=60 -slbdl=60 -qcll=60 -qlbdl=60 -csm=3 -cfm=3 -cfci=30 -mscf=5 -bem=1 -aim=1 \
     -seed=0 \
   -jcup=0.05 \
+  -spd=${globallogdir}/ -spl=-1 \
   -sleep=100 \
   -v=3 \
   -preprocess-sweepnsat=1  \
@@ -136,11 +142,12 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
   -cjc=1 \
   -cjtcp=0 \
   -fcll=2 \
-  -sweep-skip-ratio=0.000 \
   -sweep-max-kitten-prop=1000000 \
-  -sweep-signal-kitten=1 \
+  -sweep-max-payload=50000000 \
   -sweep-sharing-period=0.050 \
-    -spd=${globallogdir}/ -spl=-1"
+  -sweep-skip-ratio=0.001 \
+  -sweep-skip-window=2.0 \
+  -sweep-max-bad-iters=3"
 
     # Pre-create network-disk output directories to avoid many concurrent filesystem manips
     mkdir -p $(for rank in $(seq 0 $(($SLURM_NTASKS-1))); do echo $outputlogdir/$i/$rank; done)
