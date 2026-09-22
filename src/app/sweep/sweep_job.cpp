@@ -555,6 +555,7 @@ bool SweepJob::appl_isDestructible() {
 	if (_clause_comm && !_clause_comm->isDestructible()) {
 		for (int i = 0; i < 10; i++) _clause_comm->communicate(); // may advance destructibility
 		LOGGER(_sweeplogger,V3_VERB, "SWEEP TERM #%i ctx %i [%i] isDestructible? no. _clause_comm not destructible yet\n",  getId(),_my_ctx_id,  _my_rank);
+		LOG(V2_INFO, "SWEEP TERMINATION #%i ctx %i [%i] isDestructible==false, _clause_comm not destructible yet\n",  getId(),_my_ctx_id,  _my_rank);
 		return false;
 	}
 	int _running_sweepers = _started_sweepers_count - _finished_sweepers_count;
