@@ -34,3 +34,4 @@ cmake-build-debug/
 scripts/sweeping
 scripts/slurm/sbatch-sweep.sh
 tmp/
+slurm*.out

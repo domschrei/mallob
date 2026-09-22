@@ -145,7 +145,7 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
   -sweep-max-kitten-prop=1000000 \
   -sweep-max-payload=50000000 \
   -sweep-sharing-period=0.050 \
-  -sweep-skip-ratio=0.001 \
+  -sweep-skip-ratio=0.000 \
   -sweep-skip-window=2.0 \
   -sweep-max-bad-iters=3"
 
