@@ -87,7 +87,7 @@ public:
         _json_base["user"] = _username;
         _json_base["incremental"] = _incremental;
         _json_base["priority"] = 1;
-        _json_base["application"] = "SAT";
+        _json_base["application"] = _incremental ? "SAT" : _params.nonincrementalSatApp();
         _json_base["files"] = std::vector<std::string>();
         if (!_json_base["configuration"].count("__XL"))
             _json_base["configuration"]["__XL"] = "-1";
@@ -108,6 +108,10 @@ public:
     }
     void setDTaskTracker(DTaskTracker& tracker) {
         _dtask_tracker = &tracker;
+    }
+    void overrideSolvingDelays(long delay) {
+        _nontrivial_wait_millis_initial = delay;
+        _nontrivial_wait_millis_subsequent = delay;
     }
 
     virtual void loop() override {
@@ -167,14 +171,14 @@ public:
             LOG(V4_VVER, "%s sleep initially\n", _name.c_str());
             time = Timer::elapsedSeconds() - time;
             // X ms minus the time taken to copy the literals
-            usleep(1'000'000 * std::max(0.0, 0.001 * _nontrivial_wait_millis_initial - time));
+            waitUntil(Timer::elapsedSeconds() + 0.001 * _nontrivial_wait_millis_initial - time, t.rev);
             if (_terminator(t.rev)) return; // Task has become obsolete in the meantime, so skip solving
 
         } else if (_last_won_rev < t.rev-1 && _nontrivial_wait_millis_subsequent > 0) {
             LOG(V4_VVER, "%s sleep (last won: %i, now: %i)\n", _name.c_str(), _last_won_rev, t.rev);
             time = Timer::elapsedSeconds() - time;
             // X ms minus the time taken to copy the literals
-            usleep(1'000'000 * std::max(0.0, 0.001 * _nontrivial_wait_millis_subsequent - time));
+            waitUntil(Timer::elapsedSeconds() + 0.001 * _nontrivial_wait_millis_subsequent - time, t.rev);
             if (_terminator(t.rev)) return; // Task has become obsolete in the meantime, so skip solving
         }
 
@@ -230,8 +234,8 @@ public:
         }
 
         auto nameOfCall = copy["name"].get<std::string>();
-        StaticStore<std::vector<int>>::insert(nameOfCall, std::move(newLiterals));
-        copy["internalliterals"] = nameOfCall;
+        StaticStore<std::vector<int>>::insert(_username + "::" + nameOfCall, std::move(newLiterals));
+        copy["internalliterals"] = _username + "::" + nameOfCall;
         if (!descriptionLabel.empty()) {
             copy["description-id"] = descriptionLabel;
         }
@@ -290,6 +294,10 @@ public:
         LOG(V5_DEBG, "MSJS %s call ended\n", _name.c_str());
 
         _backlog_task = SatTask{_backlog_task.type};
+        if (!_incremental) {
+            // non-incremental MallobSat task: immediately revert to undeployed state
+            yield();
+        }
     }
 
     void yield() {
@@ -301,16 +309,16 @@ public:
 
         if (_dtask) _dtask->evicted = true; // mark as evicted yourself
         while (_task_pending) usleep(1000);
-        if (!_incremental) return;
-        if (!_json_base.contains("name")) return;
-        _json_base["precursor"] = _username + std::string(".") + _json_base["name"].get<std::string>();
-        _json_base["name"] = _base_job_name + std::to_string(_subjob_counter++);
-        nlohmann::json copy(_json_base);
-        copy["done"] = true;
-        // The callback is never called.
-        LOG(V4_VVER, "%s closing API\n", _name.c_str());
-        _api.submit(copy, [&](nlohmann::json& result) {assert(false);});
-        LOG(V4_VVER, "%s closed API\n", _name.c_str());
+        if (_incremental && _json_base.contains("name")) {
+            _json_base["precursor"] = _username + std::string(".") + _json_base["name"].get<std::string>();
+            _json_base["name"] = _base_job_name + std::to_string(_subjob_counter++);
+            nlohmann::json copy(_json_base);
+            copy["done"] = true;
+            // The callback is never called.
+            LOG(V4_VVER, "%s closing API\n", _name.c_str());
+            _api.submit(copy, [&](nlohmann::json& result) {assert(false);});
+            LOG(V4_VVER, "%s closed API\n", _name.c_str());
+        }
 
         _mallob_job_id = -1;
         _mallob_root_rank.store(-1, std::memory_order_relaxed);
@@ -365,7 +373,20 @@ public:
         return _mallob_root_rank.load(std::memory_order_relaxed);
     }
 
+    bool usesIncrementalSatSolving() const {
+        return _incremental;
+    }
+
 private:
+    void waitUntil(float targetTime, int rev) {
+        while (Timer::elapsedSeconds() < targetTime && !_terminator(rev)) {
+            // sleep for up to 100ms but only as long as we still have to wait
+            unsigned long timeInterval = std::min(1000UL * 100,
+                (unsigned long) (1000 * 1000 * (targetTime - Timer::elapsedSeconds())));
+            if (timeInterval > 0) usleep(timeInterval);
+        }
+    }
+
     bool continueWaitingForTask(int rev) {
         if (!_task_pending) return false;
         if (_pending_task_interrupted) return false; // do NOT wait for interrupted call to return

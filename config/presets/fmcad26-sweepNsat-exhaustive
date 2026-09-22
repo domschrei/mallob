@@ -7,8 +7,8 @@
 
 echo '-minprocs 2
   -sat-config-dirs=config/sat/base/ -sat-config-files=
-  -mono-app=SATWITHPRE
-  -satsolver=k_
+  -mono-app=SATWITHPRE -preprocess-config=config/satwithpre/actors_sweepnsat.json
+  -satsolver=k
   -pre-cleanup=1
   -q=0
   -os=1

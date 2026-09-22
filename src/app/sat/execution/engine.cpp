@@ -85,9 +85,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	}
 	std::string proofDirectory;
 
-	SolverPortfolioConfig soc;
-	soc.parseFromDirsAndFiles(params.satConfigDirs(), params.satConfigFiles());
-	LOG(V3_VERB, "Parsed %i solver configuration rules\n", soc.ruleCount());
+	_spc.parseFromDirsAndFiles(params.satConfigDirs(), params.satConfigFiles());
+	LOG(V3_VERB, "Parsed %i solver configuration rules\n", _spc.ruleCount());
 
 	// Launched in some certified UNSAT mode?
     if (_params.proofOutputFile.isSet() || _params.onTheFlyChecking() || _params.palRup()) {
@@ -238,6 +237,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.numOriginalClauses = numClauses;
 	int sqrt = std::ceil(std::sqrt((double) setup.maxNumSolvers));
 	setup.proofDir = proofDirectory;
+	if (_params.proofCompressionMode() == 1) setup.compressProofMode = SolverSetup::XZ;
+	if (_params.proofCompressionMode() == 2) setup.compressProofMode = SolverSetup::VASKIN_GOETZ;
 
 	LratConnector* modelCheckingLratConnector {nullptr};
 	setup.nbSkippedIdEpochs = std::max(0, epochOffset + epochModulus * config.nbPreviousBalancingEpochs);
@@ -300,7 +301,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		setup.modelCheckingLratConnector = modelCheckingLratConnector;
 		setup.avoidUnsatParticipation = (params.proofOutputFile.isSet() || params.onTheFlyChecking() || _params.palRup()) && !item.outputProof;
 		setup.exportClauses = !setup.avoidUnsatParticipation;
-		setup.solverConfig = soc;
+		setup.solverConfig = &_spc;
 
 		_solver_interfaces.push_back(createSolver(setup));
 		cyclePos = (cyclePos+1) % portfolio.cycle.size();
@@ -720,6 +721,8 @@ void SatEngine::cleanUp(bool hardTermination) {
 			for (int localId = 0; localId < _params.numThreadsPerProcess(); localId++) {
 				int globalId = _config.apprank * _params.numThreadsPerProcess() + localId;
 				auto dir = setup.proofDir + "/" + std::to_string((int)(globalId / sqrt)) + "/" + std::to_string(globalId);
+				if (FileUtils::exists(dir + "/out.palrup.xz") || FileUtils::exists(dir + "/out.palrup.vg"))
+					continue;
 				FileUtils::create(dir + "/out.palrup");
 			}
 		}

@@ -41,6 +41,7 @@ private:
 
 	std::string proofFileString;
 	std::string profileFileString;
+	pid_t compressorPid {-1};
 
 	std::unique_ptr<OptimizingPropagator> optimizer;
 

@@ -6,6 +6,7 @@
 #include "app/sat/execution/solver_setup.hpp"
 #include "app/sat/solvers/kissat.hpp"
 #include "app/sat/solvers/lingeling.hpp"
+#include "app/sat/solvers/solver_portfolio_config.hpp"
 #include "app/satwithpre/sat_preprocess_actor.hpp"
 #include "data/job_description.hpp"
 #include "scheduling/core_allocator.hpp"
@@ -20,10 +21,12 @@ class KissatPreprocessor : public SatPreprocessActor {
 
 private:
     std::unique_ptr<Kissat> _kissat;
+    SolverPortfolioConfig& _spc;
 
 public:
-    KissatPreprocessor(const Parameters& params, const JobDescription& desc, const std::string& name, std::vector<int>&& formula) :
-        SatPreprocessActor(params, name, std::move(formula)) {}
+    KissatPreprocessor(const Parameters& params, const JobDescription& desc, const std::string& name,
+            SolverPortfolioConfig& spc, std::vector<int>&& formula) :
+        SatPreprocessActor(params, name, std::move(formula)), _spc(spc) {}
     ~KissatPreprocessor() {}
 
     void preprocessAsync() override {
@@ -34,14 +37,16 @@ public:
             setup.logger = &Logger::getMainInstance();
             setup.numVars = nbInputVars();
             setup.numOriginalClauses = nbInputClauses();
-            setup.solverType = 'p';
+            setup.solverType = 'k';
             setup.flavour = PortfolioSequence::PREPROCESS;
+            setup.solverConfig = &_spc;
             _kissat.reset(new Kissat(setup));
 
             for (int i = 0; i+2 < _input_cnf.size(); i++) {
                 _kissat->addLiteral(_input_cnf[i]);
             }
             _kissat->diversify(0);
+            _kissat->applySolverConfiguration(0);
 
             LOG(V2_INFO, "PREPRO running Kissat\n");
             int res = _kissat->solve(0, nullptr);

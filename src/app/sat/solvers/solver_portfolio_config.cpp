@@ -6,6 +6,7 @@
 #include "solver_portfolio_config.hpp"
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "util/distribution.hpp"
+#include "util/logger.hpp"
 #include "util/random.hpp"
 #include "util/sys/fileutils.hpp"
 
@@ -346,7 +347,8 @@ SettingsList SolverPortfolioConfig::getConfigurationSettings(SolverBackendType b
     SettingsList result;
     for (const auto& rule : _rules) {
         if (rule.backend != backend) continue;
-        if (!rule.selector->matches(index, flavour, index + randomSeed)) continue;
+        if (!rule.selector->matches(index, flavour, index + randomSeed))
+            continue;
         for (auto setting : rule.settings) {
             // sample from random distribution where necessary
             if (setting.val.index() == 0) { // string

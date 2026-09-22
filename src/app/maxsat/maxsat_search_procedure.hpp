@@ -111,7 +111,8 @@ public:
         _lits_to_add(_instance.formulaData, _instance.formulaData+_instance.formulaSize),
         _current_bound(ULONG_MAX), _encoding_strat(encStrat), _search_strat(searchStrat), _label(label) {
 
-        _stream_wrapper.reset(new IncSatController(_params, _api, _desc, tracker));
+        _stream_wrapper.reset(new IncSatController(_params, _api, _desc, tracker,
+            _params.incrementalSatTasks()));
 
         _nb_orig_vars = _instance.nbVars; // before cardinality constraint encodings!
 
@@ -143,7 +144,8 @@ public:
             TheorySpecification spec({std::move(rule)});
             std::string specStr = spec.toStr();
             specStr.erase(std::remove_if(specStr.begin(), specStr.end(), ::isspace), specStr.end());
-            _stream_wrapper->getMallobProcessor()->setInnerObjective(specStr);
+            for (auto mallobProc : _stream_wrapper->getMallobProcessors())
+                mallobProc->setInnerObjective(specStr);
         }
     }
 
@@ -220,9 +222,10 @@ public:
         }
 
         if (!_initialized && _stream_wrapper->hasStream()) {
-            _stream_wrapper->getMallobProcessor()->setInitialSize(
-                _instance.nbVars,
-                _desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
+            for (auto mallobProc : _stream_wrapper->getMallobProcessors())
+                mallobProc->setInitialSize(
+                    _instance.nbVars,
+                    _desc.getAppConfiguration().fixedSizeEntryToInt("__NC"));
             _initialized = true;
         }
 
@@ -384,7 +387,9 @@ public:
 
     void setGroupId(const std::string& groupId, int minVar = -1, int maxVar = -1) {
         _stream_wrapper->initInteractiveSolving();
-        _stream_wrapper->getMallobProcessor()->setGroupId(groupId, minVar, maxVar);
+        for (auto mallobProc : _stream_wrapper->getMallobProcessors())
+            if (mallobProc->usesIncrementalSatSolving())
+                mallobProc->setGroupId(groupId, minVar, maxVar);
         _group_id = _api.getJsonInterface().getJobDescriptionIdAllocator().getId(groupId);
     }
 
@@ -404,6 +409,7 @@ public:
     ~MaxSatSearchProcedure() {
         while (!canBeFinalized()) {usleep(1000);}
         finalize();
+        _stream_wrapper.reset();
     }
 
 private:

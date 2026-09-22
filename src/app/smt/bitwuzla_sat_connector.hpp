@@ -62,7 +62,8 @@ public:
         bitwuzla::SatSolver(), _params(params), _desc(desc),
         _name(name) {
 
-        _incsat.reset(new IncSatController(_params, api, _desc, tracker));
+        _incsat.reset(new IncSatController(_params, api, _desc,
+            tracker, _params.incrementalSatTasks()));
         _incsat->setInnerTerminator([&]() {
             if (_bzla_term && _bzla_term->terminate()) return true;
             if (_ext_term && _ext_term->terminate()) return true;

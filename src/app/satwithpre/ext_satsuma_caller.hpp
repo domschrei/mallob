@@ -17,6 +17,7 @@
 #include "scheduling/core_allocator.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
+#include "util/sys/subprocess.hpp"
 #include "util/sys/thread_pool.hpp"
 #include <fstream>
 #include <future>
@@ -30,7 +31,7 @@ private:
     std::string _in_path;
     std::string _out_path;
 
-    std::string _pid_path;
+    pid_t _pid {0};
 
     std::future<void> _fut_in;
     std::future<void> _fut_out;
@@ -44,7 +45,7 @@ public:
     ExtSatsumaCaller(const Parameters& params, const JobDescription& desc, const std::string& name, std::vector<int>&& formula) :
         SatPreprocessActor(params, name, std::move(formula)) {
 
-        std::string basePath = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallobtermrelev."
+        std::string basePath = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob."
             + std::to_string(Proc::getPid()) + "."
             + std::to_string(desc.getId()) + "." + name + ".";
         std::ostringstream oss;
@@ -53,7 +54,6 @@ public:
 
         _in_path = basePath + "in.pipe.cnf";
         _out_path = basePath + "out.pipe.cnf";
-        _pid_path = basePath + "pid";
 
         int res;
         res = mkfifo(_in_path.c_str(), 0666);
@@ -75,22 +75,20 @@ public:
             readPreprocessedFormula();
         });
 
-        _fut_prepro = ProcessWideThreadPool::get().addTask([&]() {
-            CoreAllocator::Allocation ca(1);
-            std::string cmd = //"cat " + _in_path + " | " + 
-                std::string(MALLOB_SUBPROC_DISPATCH_PATH"/satsuma")
-                + " fix --add-reduced-as-unit --file " + _in_path
-                + " --out-file " + _out_path
-                + " > " + (_params.logDirectory.isSet() ? (_params.logDirectory() + "/satsuma.txt") : "/dev/null")
-                + " 2>&1 & echo \"$! x\" > " + _pid_path;
+        CoreAllocator::Allocation ca(1);
+        std::string cmd = std::string("run-satsuma.sh ")
+            + MALLOB_SUBPROC_DISPATCH_PATH + " " + _in_path + " " + _out_path + " "
+            + (_params.logDirectory.isSet() ? (_params.logDirectory() + "/satsuma.txt") : "/dev/null");
+        Subprocess subSatsuma(_params, cmd, false);
 
-            LOG(V4_VVER, "%s Calling Satsuma: %s\n", getName(), cmd.c_str());
-            const int retval = system(cmd.c_str());
-            LOG(V4_VVER, "%s returned, retval %i\n", getName(), retval);
+        LOG(V4_VVER, "%s Calling Satsuma: %s\n", getName(), cmd.c_str());
+        _pid = subSatsuma.start();
+        LOG(V4_VVER, "%s started, pid %i\n", getName(), _pid);
+
+        _fut_prepro = ProcessWideThreadPool::get().addTask([&]() {
             _fut_in.get();
             _fut_out.get();
-
-            if (retval != 0) _result = ERROR;
+            if (_pid < 0) _result = ERROR;
             else if (_received_empty_clause) _result = UNSAT;
             else if (_simplification_achieved) _result = SIMPLIFIED;
             else _result = NONE;
@@ -112,30 +110,18 @@ public:
 
     void interrupt() override {
         if (!_fut_prepro.valid() || _result != PENDING) return;
-
-        LOG(V4_VVER, "%s INTERRUPT\n", getName());
-
-        for (int i = 0; i < 10; i++) {
-            pid_t pid;
-            {
-                LOG(V4_VVER, "%s try to read pid from %s\n", getName(), _pid_path.c_str());
-                std::ifstream ifs(_pid_path);
-                std::string x;
-                ifs >> pid >> x;
-                if (ifs.fail() || x != "x") pid = -1;
-            }
-            if (pid > 0) {
-                LOG(V4_VVER, "%s TERMINATE\n", getName());
-                Process::sendSignal(pid, SIGTERM);
-                return;
-            } else usleep(1000 * 30); // 30ms
+        if (_pid > 0) {
+            LOG(V4_VVER, "%s TERMINATE pid=%i\n", getName(), _pid);
+            Process::terminate(_pid);
+            Process::resume(_pid);
+            return;
         }
     }
 
 private:
     void loadFormulaToPipe() {
 
-        LOG(V4_VVER, "%s Loading formula to Satsuma pipe ...\n", getName());
+        LOG(V4_VVER, "%s Loading formula (%i,%i) to Satsuma pipe ...\n", getName(), nbInputVars(), nbInputClauses());
 
         assert(nbInputVars() > 0 && nbInputVars() < 1'000'000'000);
 
@@ -150,18 +136,16 @@ private:
             int lit = _input_cnf[i];
             ofs << lit << (lit==0 ? "\n" : " ");
         }
-        ofs << "X";
+        // ofs << "X";
         ofs.flush();
-        ofs.close();
 
         LOG(V4_VVER, "%s Forwarded %lu lits to Satsuma\n", getName(), _input_cnf.size()-2);
     }
 
     void readPreprocessedFormula() {
 
-        LOG(V4_VVER, "%s opening ifs ...\n", getName());
+        LOG(V4_VVER, "%s opening results pipe\n", getName());
         std::ifstream ifs(_out_path);
-        LOG(V4_VVER, "%s ifs open\n", getName());
         
         std::string line;
         bool lastLitZero = true;

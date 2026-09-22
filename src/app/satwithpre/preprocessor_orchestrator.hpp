@@ -1,94 +1,72 @@
 
 #pragma once
 
+#include "app/app_registry.hpp"
+#include "app/sat/parse/cnf_util.hpp"
+#include "app/sat/solvers/solver_portfolio_config.hpp"
+#include "app/satwithpre/actor_config_parser.hpp"
+#include "app/satwithpre/actor_context.hpp"
 #include "app/satwithpre/ext_satsuma_caller.hpp"
 #include "app/satwithpre/kissat_preprocessor.hpp"
 #include "app/satwithpre/lingeling_preprocessor.hpp"
-#include "app/satwithpre/mallobsat_preprocess_actor.hpp"
-#include "app/satwithpre/mallobsweep_preprocess_actor.hpp"
+#include "app/satwithpre/mallob_preprocess_actor.hpp"
 #include "app/satwithpre/sat_preprocess_actor.hpp"
 #include "app/satwithpre/satsuma_preprocessor.hpp"
 #include "data/job_description.hpp"
 #include "interface/api/api_connector.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
+#include "util/sys/fileutils.hpp"
+#include <cstdlib>
 #include <list>
 
 class PreprocessorOrchestrator {
 
 private:
-    const Parameters& _params;
-    const JobDescription& _desc;
+    const Parameters _params;
+    const JobDescription _desc;
     APIConnector& _api;
 
-    struct ActorContext {
-        enum ActorType {SATSUMA_INT, SATSUMA_EXT, KISSAT, LINGELING, MALLOBSAT, MALLOBSWEEP} type;
-        ActorContext* prerequisite {nullptr};
-        std::vector<ActorContext*> actorsBeingDisplaced;
-        bool onlyStartIfPrerequisiteSimplified {false};
-
-        std::unique_ptr<SatPreprocessActor> actor;
-        enum ActiveActorState {UNINITIALIZED, RUNNING, FINISHED} state {UNINITIALIZED};
-        SatPreprocessActor::PreprocessActorResult result {SatPreprocessActor::PENDING};
-        std::vector<int> formula;
-        std::vector<int> model;
-        float timeOfSignalledDisplacement {0};
-    };
     std::list<ActorContext> _actors;
     const std::vector<int> _base_cnf;
 
     float _time_of_start;
     ActorContext* _winning_actor {nullptr};
 
+    std::string _preprocess_log_dir;
+
+    SolverPortfolioConfig _spc;
+
 public:
-    PreprocessorOrchestrator(const Parameters& params, const JobDescription& desc, APIConnector& api) : _params(params), _desc(desc), _api(api),
-            _base_cnf(getCnfFromJobDescription()) {
+    PreprocessorOrchestrator(const Parameters& params, const JobDescription& desc, APIConnector& api) :
+            _params(params), _desc(desc.getBasicCopy()), _api(api),
+            _base_cnf(CnfUtil::getCnfFromJobDescription(desc, true)) {
 
         _time_of_start = Timer::elapsedSeconds();
-
-        LOG(V2_INFO, "SATWP start orchestrator\n");
-
-        if (_params.preprocessSweepnSat()) {
-            //start Sweep'n'Sat (and nothing else)
-            startSweepNSat();
-            return;
+        try {
+            _actors = ActorConfigParser().parseFile(_params.preprocessConfig());
+        } catch (const std::runtime_error& e) {
+            LOG(V0_CRIT, "[ERROR] Parsing error for preprocess actor config file \"%s\": %s\n",
+                _params.preprocessConfig().c_str(), e.what());
+            abort();
         }
 
-        // Mallob on original instance
-        _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSAT, nullptr});
-        ActorContext* ctxMalOrig = &_actors.back();
+        if (_params.preprocessLogDir.isSet()) {
+            _preprocess_log_dir = _params.preprocessLogDir() + "/#" + std::to_string(_desc.getId());
+            FileUtils::mkdir(_preprocess_log_dir);
+        }
 
-        // Lingeling (SAT, UNSAT or nothing)
-        _actors.push_back({PreprocessorOrchestrator::ActorContext::LINGELING, nullptr, {}});
-        ActorContext* ctxLgl = &_actors.back();
-        // Kissat (preprocesses the formula)
-        _actors.push_back({PreprocessorOrchestrator::ActorContext::KISSAT, nullptr, {}});
-        ActorContext* ctxKis = &_actors.back();
-        // Satsuma (preprocesses the formula)
-        _actors.push_back({PreprocessorOrchestrator::ActorContext::SATSUMA_EXT, nullptr, {}});
-        ActorContext* ctxSats = &_actors.back();
-
-        // Kissat on Satsuma-preprocessed formula (preprocesses the formula)
-        _actors.push_back({PreprocessorOrchestrator::ActorContext::KISSAT, ctxSats, {}});
-        ActorContext* ctxKisAfterSats = &_actors.back();
-        ctxKisAfterSats->onlyStartIfPrerequisiteSimplified = true; // do not launch Kissat (again!) if Satsuma didn't simplify anything
-
-        // Mallob on Kissat-preprocessed formula - displaces original Mallob task
-        _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSAT, ctxKis, {ctxMalOrig}});
-        ActorContext* ctxMalPre1 = &_actors.back();
-        ctxMalPre1->onlyStartIfPrerequisiteSimplified = true; // do not launch this MallobSat task if Kissat didn't simplify anything
-
-        // Mallob on Satsuma+Kissat-preprocessed formula - displaces all prior Mallob tasks
-        _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSAT, ctxKisAfterSats, {ctxMalOrig, ctxMalPre1}});
-        ActorContext* ctxMalPreFull = &_actors.back();
-        // (we always spawn this one since Satsuma *did* simplify something if the prerequisite is ready)
+        _spc.parseFromDirsAndFiles(params.satConfigDirs(), params.satConfigFiles());
+        LOG(V3_VERB, "Parsed %i solver configuration rules\n", _spc.ruleCount());
     }
 
     int loop() {
 
         int actorIdx = -1;
+        int nbRemainingActors = 0;
         for (auto& actor : _actors) {
             actorIdx++;
+            nbRemainingActors += (actor.state != ActorContext::FINISHED);
 
             if (actor.state == ActorContext::UNINITIALIZED) {
 
@@ -99,29 +77,45 @@ public:
                     continue; // never initialize this actor since its prerequisite didn't lead to a simplification
 
                 // prerequisite done: initialize actor
-                auto formula = (actor.prerequisite && actor.prerequisite->result == SatPreprocessActor::SIMPLIFIED) ?
-                    actor.prerequisite->formula : _base_cnf;
+                auto formula = actor.prerequisite ? actor.prerequisite->formula : _base_cnf;
+                auto name = std::to_string(actorIdx) + ":";
+                if (!actor.groupId.empty()) actor.groupId = "#" + std::to_string(_desc.getId()) + ":" + actor.groupId;
+                Parameters params(_params);
+                app_registry::checkAndOverrideProgramOptions(params, _desc, actor.options);
                 switch (actor.type) {
                 case ActorContext::SATSUMA_INT:
-                    actor.actor.reset(new SatsumaPreprocessor(_params, _desc, std::to_string(actorIdx) + ":SatsumaInt", std::move(formula)));
+                    name += "SatsumaInt";
+                    actor.actor.reset(new SatsumaPreprocessor(params, _desc, name, std::move(formula)));
                     break;
                 case ActorContext::SATSUMA_EXT:
-                    actor.actor.reset(new ExtSatsumaCaller(_params, _desc, std::to_string(actorIdx) + ":SatsumaExt", std::move(formula)));
+                    name += "SatsumaExt";
+                    actor.actor.reset(new ExtSatsumaCaller(params, _desc, name, std::move(formula)));
                     break;
                 case ActorContext::KISSAT:
-                    actor.actor.reset(new KissatPreprocessor(_params, _desc, std::to_string(actorIdx) + ":Kissat", std::move(formula)));
+                    name += "Kissat";
+                    actor.actor.reset(new KissatPreprocessor(params, _desc, name, _spc, std::move(formula)));
                     break;
                 case ActorContext::LINGELING:
-                    actor.actor.reset(new LingelingPreprocessor(_params, _desc, std::to_string(actorIdx) + ":Lingeling", std::move(formula)));
+                    name += "Lingeling";
+                    actor.actor.reset(new LingelingPreprocessor(params, _desc, name, _spc, std::move(formula)));
                     break;
                 case ActorContext::MALLOBSAT:
-                    actor.actor.reset(new MallobSatPreprocessActor(_params, _desc, std::to_string(actorIdx) + ":MallobSat", _api, std::move(formula), _time_of_start));
+                    name += "MallobSat";
+                    actor.actor.reset(new MallobPreprocessActor(params, _desc, name, _api, std::move(formula),
+                        _time_of_start, MallobPreprocessActor::SATSOLVER,
+                        actor.groupId, actor.options));
                     break;
                 case ActorContext::MALLOBSWEEP:
-                    actor.actor.reset(new MallobSweepPreprocessActor(_params, _desc, std::to_string(actorIdx) + ":MallobSweep", _api, std::move(formula), _time_of_start));
+                    name += "MallobSweep";
+                    actor.actor.reset(new MallobPreprocessActor(params, _desc, name, _api, std::move(formula),
+                        _time_of_start, MallobPreprocessActor::SWEEPER,
+                        actor.groupId, actor.options));
                     break;
                 }
-                LOG(V2_INFO, "SATWP launch %s\n", actor.actor->getName());
+                actor.id += ":" + name;
+                if (!_preprocess_log_dir.empty())
+                    CnfUtil::writeFormula(actor.actor->getInputCnf(), _preprocess_log_dir + "/in." + actor.getId() + ".cnf");
+                LOG(V2_INFO, "SATWP launch %s\n", actor.getId());
                 actor.actor->preprocessAsync();
                 actor.state = ActorContext::RUNNING;
 
@@ -129,9 +123,9 @@ public:
                 for (auto& other : actor.actorsBeingDisplaced) {
                     if (other->timeOfSignalledDisplacement <= 0) {
                         if (other->actor)
-                            LOG(V2_INFO, "SATWP %s --displace--> %s\n", actor.actor->getName(), other->actor->getName());
+                            LOG(V2_INFO, "SATWP %s --displace--> %s\n", actor.getId(), other->getId());
                         else
-                            LOG(V2_INFO, "SATWP %s --displace--\n", actor.actor->getName());
+                            LOG(V2_INFO, "SATWP %s --displace--\n", actor.getId());
                         other->timeOfSignalledDisplacement = Timer::elapsedSeconds();
                     }
                 }
@@ -140,7 +134,7 @@ public:
             if (actor.state == ActorContext::RUNNING && actor.actor->isDonePreprocessing()) {
                 // this actor is done
                 auto res = actor.actor->getPreprocessingResult();
-                LOG(V2_INFO, "SATWP %s done, result %s\n", actor.actor->getName(),
+                LOG(V2_INFO, "SATWP %s done, result %s\n", actor.getId(),
                     actor.actor->getPreprocessingResultAsString().c_str());
                 if (res == SatPreprocessActor::SAT) {
                     actor.model = std::move(actor.actor->getModel());
@@ -155,13 +149,19 @@ public:
                 assert(actor.formula[actor.formula.size() - 1] >= 0); // # clauses
                 actor.result = res;
                 actor.state = ActorContext::FINISHED;
+                if (!_preprocess_log_dir.empty()) {
+                    if (res == SatPreprocessActor::SIMPLIFIED)
+                        CnfUtil::writeFormula(actor.formula, _preprocess_log_dir + "/out." + actor.getId() + ".cnf");
+                    if (res == SatPreprocessActor::SAT)
+                        CnfUtil::writeModel(actor.model, _preprocess_log_dir + "/model." + actor.getId() + ".txt");
+                }
                 if (res == SatPreprocessActor::SAT) {
-                    LOG(V2_INFO, "SATWP %s found SAT\n", actor.actor->getName());
+                    LOG(V2_INFO, "SATWP %s found SAT\n", actor.getId());
                     _winning_actor = &actor;
                     return 10;
                 }
                 if (res == SatPreprocessActor::UNSAT) {
-                    LOG(V2_INFO, "SATWP %s found UNSAT\n", actor.actor->getName());
+                    LOG(V2_INFO, "SATWP %s found UNSAT\n", actor.getId());
                     _winning_actor = &actor;
                     return 20;
                 }
@@ -171,61 +171,45 @@ public:
             if (actor.state == ActorContext::RUNNING && actor.timeOfSignalledDisplacement > 0) {
                 // this actor is being displaced (after some time)
                 if (_params.preprocessBalancing() == 0) {
-                    LOG(V2_INFO, "SATWP %s interrupt\n", actor.actor->getName());
+                    LOG(V2_INFO, "SATWP %s interrupt\n", actor.getId());
                     actor.actor->interrupt();
                     actor.timeOfSignalledDisplacement = 0;
                 }
                 if (_params.preprocessBalancing() == 1 && Timer::elapsedSeconds() - _time_of_start >=
                     _params.preprocessExpansionFactor() * (actor.timeOfSignalledDisplacement - _time_of_start)) {
-                    LOG(V2_INFO, "SATWP %s interrupt\n", actor.actor->getName());
+                    LOG(V2_INFO, "SATWP %s interrupt\n", actor.getId());
                     actor.actor->interrupt();
                     actor.timeOfSignalledDisplacement = 0;
                 }
             }
         }
 
-        return 0;
+        return nbRemainingActors == 0 ? -1 : 0;
     }
 
     std::vector<int> getModel() {
         auto actor = _winning_actor;
         assert(actor);
         auto model = std::move(actor->model);
+        CnfUtil::checkModel(actor->actor->getInputCnf(), model);
+        LOG(V2_INFO, "SATWP Checked model @ %s, size %lu\n", actor->getId(), model.size()-1);
         while (true) {
             actor = actor->prerequisite;
             if (!actor) break;
             actor->actor->reconstructSolution(model);
+            LOG(V2_INFO, "SATWP Reconstructed model @ %s, size %lu\n", actor->getId(), model.size()-1);
+            if (!_preprocess_log_dir.empty())
+                CnfUtil::writeModel(model, _preprocess_log_dir + "/recmodel." + actor->getId() + ".txt");
+            CnfUtil::checkModel(actor->actor->getInputCnf(), model);
+            LOG(V2_INFO, "SATWP Checked model @ %s\n", actor->getId());
         }
         return model;
     }
 
     void stopAll() {
         for (auto& actor : _actors) if (actor.state == ActorContext::RUNNING) {
-            LOG(V2_INFO, "SATWP %s interrupt\n", actor.actor->getName());
+            LOG(V2_INFO, "SATWP %s interrupt\n", actor.getId());
             actor.actor->interrupt();
         }
-    }
-
-private:
-    std::vector<int> getCnfFromJobDescription() {
-
-        SerializedFormulaParser parser(Logger::getMainInstance(), _desc.getFormulaPayload(0),
-            _desc.getFormulaPayloadSize(0));
-        if (_params.compressFormula()) parser.setCompressed();
-        int nbVars = _desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
-        int nbCls = _desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
-
-        std::vector<int> cnf;
-        int lit;
-        while (parser.getNextLiteral(lit)) cnf.push_back(lit);
-        cnf.push_back(nbVars);
-        cnf.push_back(nbCls);
-        return cnf;
-    }
-
-    void startSweepNSat() {
-        //Two apps (SWEEP and SAT) run concurrently. from the FMCAD'26 paper
-        _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSAT, nullptr});
-        _actors.push_back({PreprocessorOrchestrator::ActorContext::MALLOBSWEEP, nullptr, {}});
     }
 };

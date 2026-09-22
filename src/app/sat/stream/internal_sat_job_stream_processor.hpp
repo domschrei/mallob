@@ -46,6 +46,7 @@ public:
         setup.maxNumSolvers = 64; // just for proper diversification
         setup.solverType = 'C';
         setup.exportClauses = false;
+        setup.doIncrementalSolving = true;
 #if MALLOB_USE_MINISAT
         if (_solvertype == MINISAT) {
             auto minisat = new MiniSat(setup);

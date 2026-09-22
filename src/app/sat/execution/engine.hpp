@@ -12,6 +12,7 @@
 #include "app/sat/data/revision_data.hpp"
 #include "app/sat/data/theories/integer_rule.hpp"
 #include "app/sat/sharing/filter/clause_prefilter.hpp"
+#include "app/sat/solvers/solver_portfolio_config.hpp"
 #include "util/sys/threading.hpp"
 #include "util/logger.hpp"
 #include "../sharing/sharing_manager.hpp"
@@ -36,6 +37,7 @@ private:
 	Logger& _logger;
 	int _job_id;
 
+	SolverPortfolioConfig _spc;
 	SolverSetup _base_solver_setup;	
 	size_t _num_solvers;
 	size_t _num_active_solvers;

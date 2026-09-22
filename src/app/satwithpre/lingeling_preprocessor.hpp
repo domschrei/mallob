@@ -5,6 +5,7 @@
 
 #include "app/sat/execution/solver_setup.hpp"
 #include "app/sat/solvers/lingeling.hpp"
+#include "app/sat/solvers/solver_portfolio_config.hpp"
 #include "app/satwithpre/sat_preprocess_actor.hpp"
 #include "data/job_description.hpp"
 #include "scheduling/core_allocator.hpp"
@@ -17,9 +18,13 @@
 
 class LingelingPreprocessor : public SatPreprocessActor {
 
+private:
+    SolverPortfolioConfig& _spc;
+
 public:
-    LingelingPreprocessor(const Parameters& params, const JobDescription& desc, const std::string& name, std::vector<int>&& formula) :
-        SatPreprocessActor(params, name, std::move(formula)) {}
+    LingelingPreprocessor(const Parameters& params, const JobDescription& desc, const std::string& name,
+        SolverPortfolioConfig& spc, std::vector<int>&& formula) :
+        SatPreprocessActor(params, name, std::move(formula)), _spc(spc) {}
     ~LingelingPreprocessor() {}
 
     void preprocessAsync() override {
@@ -32,12 +37,14 @@ public:
             setup.numOriginalClauses = nbInputClauses();
             setup.solverType = 'l';
             setup.flavour = PortfolioSequence::PREPROCESS;
+            setup.solverConfig = &_spc;
             std::unique_ptr<Lingeling> _lingeling(new Lingeling(setup));
 
             for (int i = 0; i+2 < _input_cnf.size(); i++) {
                 _lingeling->addLiteral(_input_cnf[i]);
             }
             _lingeling->diversify(0);
+            _lingeling->applySolverConfiguration(0);
 
             LOG(V2_INFO, "PREPRO running Lingeling\n");
             int res = _lingeling->solve(0, nullptr);

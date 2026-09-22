@@ -148,7 +148,8 @@ public:
 
 	void applySolverConfiguration(int seed) {
 		int nbApplied = 0;
-		for (auto& setting : _setup.solverConfig.getConfigurationSettings(
+		if (!_setup.solverConfig) return;
+		for (auto& setting : _setup.solverConfig->getConfigurationSettings(
 				PortfolioSequence::BaseSolver(_setup.solverType), _setup.flavour,
 				_setup.diversificationIndex, seed)) {
 			addConfigurationSetting(setting);
