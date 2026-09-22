@@ -140,7 +140,7 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
   -sweep-max-kitten-prop=1000000 \
   -sweep-signal-kitten=1 \
   -sweep-sharing-period=0.050 \
-    -spd=${globallogdir}/ -spl=3"
+    -spd=${globallogdir}/ -spl=-1"
 
     # Pre-create network-disk output directories to avoid many concurrent filesystem manips
     mkdir -p $(for rank in $(seq 0 $(($SLURM_NTASKS-1))); do echo $outputlogdir/$i/$rank; done)
