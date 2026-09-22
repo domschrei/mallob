@@ -544,25 +544,25 @@ bool AnytimeSatClauseCommunicator::tryInitiateSharing() {
 
 bool AnytimeSatClauseCommunicator::isDestructible() {
     if (_current_session) {
-        LOG(V3_VERB, "ccomm nondestructible: _current_session \n", _job->toStr());
+        // LOG(V3_VERB, "ccomm nondestructible: _current_session \n", _job->toStr());
         return false;
     }
     if (_cross_sharing_session) {
-        LOG(V3_VERB, "ccomm nondestructible: _cross_sharing_session \n", _job->toStr());
+        // LOG(V3_VERB, "ccomm nondestructible: _cross_sharing_session \n", _job->toStr());
         return false;
     }
     for (auto& session : _cancelled_sessions) {
         if (!session->isDestructible()) {
-            LOG(V3_VERB, "ccomm nondestructible: _cancelled_sessions \n", _job->toStr());
+            // LOG(V3_VERB, "ccomm nondestructible: _cancelled_sessions \n", _job->toStr());
             return false;
         }
     };
     if (!_deferred_sharing_initiation_msgs.empty()) {
-        LOG(V3_VERB, "ccomm nondestructible: _deferred_sharing_initiation_msgs \n", _job->toStr());
+        // LOG(V3_VERB, "ccomm nondestructible: _deferred_sharing_initiation_msgs \n", _job->toStr());
         return false;
     }
     if (!_deferred_cross_sharing_initiation_msgs.empty()) {
-        LOG(V3_VERB, "ccomm nondestructible: _deferred_cross_sharing_initiation_msgs \n", _job->toStr());
+        // LOG(V3_VERB, "ccomm nondestructible: _deferred_cross_sharing_initiation_msgs \n", _job->toStr());
         return false;
     }
     return true;
