@@ -1,0 +1,16 @@
+[
+    {
+        "id": "sats",
+        "type": "SATSUMA_EXT",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "mal",
+        "type": "MALLOBSAT",
+        "prerequisite": "sats",
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    }
+]

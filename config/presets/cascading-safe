@@ -1,0 +1,12 @@
+#!/bin/bash
+
+sab_ratio=16
+
+echo '-minprocs 2 -max-lits-per-thread=35000000 -pre-cleanup=1
+ -seed=110519 -zero-only-logging=1
+ -v=2 -s2f=solution.txt -terminate-abruptly=1
+ -mono-app=SATWITHPRE -sat-config-dirs=config/sat/base/
+ -sat-config-files=config/sat/noise.json,config/sat/reduce.json
+ -satsolver=c_c_k+[c_]{'$(($sab_ratio-3))'}c_c_l+[c_]{'$(($sab_ratio-3))'} -jc=2
+ -preprocess-config=config/satwithpre/actors_satsumakissatsat.json
+ -prepro-proofs=1 -proof-dir=proof/'$$-$(date +%s)
