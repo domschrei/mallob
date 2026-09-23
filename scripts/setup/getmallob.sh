@@ -25,7 +25,7 @@ if [ ! -d automallob-$suffix ]; then
     git clone git@github.com:domschrei/mallob.git automallob-$suffix
 fi
 cd automallob-$suffix
-git checkout chaincheck
+#git checkout master
 
 # Build Mallob
 if [ "x$suffix" == "xmini" ]; then

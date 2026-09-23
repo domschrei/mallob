@@ -50,12 +50,16 @@ public:
             }
             _kissat.reset(new Kissat(setup));
 
-            auto proofTracker = _kissat->getPreprocessProofTracker();
-            for (int i = 0; i+2 < _input_cnf.size(); i++) {
+            if (_params.savePreprocessingProofs()) {
+                auto proofTracker = _kissat->getPreprocessProofTracker();
                 // Important: proof tracker import *before* Kissat import
                 // (Otherwise Kissat may emit a proof line on a clause
                 // the proof tracker doesn't know yet)
-                proofTracker->appendOriginalLiteral(_input_cnf[i]);
+                if (proofTracker->tracksCnf()) for (int i = 0; i+2 < _input_cnf.size(); i++) {
+                    proofTracker->appendOriginalLiteral(_input_cnf[i]);
+                }
+            }
+            for (int i = 0; i+2 < _input_cnf.size(); i++) {
                 _kissat->addLiteral(_input_cnf[i]);
             }
             _kissat->diversify(0);

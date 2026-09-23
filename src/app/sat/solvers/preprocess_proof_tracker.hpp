@@ -13,7 +13,7 @@ private:
     int _nb_vars;
     const std::string _cnf_output_path;
     const std::string _proof_output_path;
-    bool _do_output_cnf;
+    bool _tracks_cnf;
 
     int _nb_clauses {0};
     struct ClauseHasher {
@@ -32,13 +32,13 @@ private:
 public:
     PreprocessProofTracker(int nbVars, const std::string& cnfOutputPath, const std::string& proofOutputPath)
         : _nb_vars(nbVars), _cnf_output_path(cnfOutputPath), _proof_output_path(proofOutputPath),
-        _do_output_cnf(!_cnf_output_path.empty()) {
+        _tracks_cnf(!_cnf_output_path.empty()) {
 
         _ofs_proof = std::ofstream(_proof_output_path, std::ios::binary);
     }
 
     void appendOriginalLiteral(int lit) {
-        if (!_do_output_cnf) return;
+        if (!_tracks_cnf) return;
         if (lit == 0) {
             //logProofOrigClause(_orig_cls.data(), _orig_cls.size());
             addClause(_orig_cls.data(), _orig_cls.size());
@@ -60,7 +60,7 @@ public:
 
     void finalizeOutput() {
         _ofs_proof.close();
-        if (!_do_output_cnf) return;
+        if (!_tracks_cnf) return;
         std::ofstream ofs(_cnf_output_path);
         ofs << "p cnf " << _nb_vars << " " << _nb_clauses << std::endl;
         for (auto& [cls, occ] : _clause_map) {
@@ -69,16 +69,20 @@ public:
         }
     }
 
+    bool tracksCnf() const {
+        return _tracks_cnf;
+    }
+
 private:
 
     void addClause(const int* lits, int nbLits) {
-        if (!_do_output_cnf) return;
+        if (!_tracks_cnf) return;
         auto vec = litsToVec(lits, nbLits);
         _clause_map[vec]++;
         _nb_clauses++;
     }
     void deleteClause(const int* lits, int nbLits) {
-        if (!_do_output_cnf) return;
+        if (!_tracks_cnf) return;
         auto vec = litsToVec(lits, nbLits);
         auto& item = _clause_map[vec];
         if (item == 0) {
