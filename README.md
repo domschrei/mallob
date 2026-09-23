@@ -39,6 +39,9 @@ We also provide a setup based on Docker containerization. Please consult the (fo
 
 ## Usage
 
+> [!IMPORTANT]  
+> **Always make sure to execute Mallob and its wrapper run scripts from Mallob's home directory**, otherwise Mallob will not find critical executables in `build/` and **will not work correctly**.
+
 **Quick Start:**
 
 If you just want to use Mallob on a single, parallel machine, then the script `scripts/run/mallob_local.sh` automatically retrieves a suitable process+thread configuration of Mallob for your hardware that makes use of the entire machine. Useful presets can be applied by calling the scripts at `config/presets/`. Examples:
@@ -55,8 +58,6 @@ scripts/run/mallob_local.sh $(config/presets/smtcomp26) -mono=path/to/problem.sm
 # MaxSAT solving
 scripts/run/mallob_local.sh -mono=path/to/problem.wcnf -mono-app=MAXSAT
 ```
-
-**Always make sure to execute Mallob and its wrapper run scripts from Mallob's home directory**, otherwise Mallob will not find critical executables in `build/` and **will not work correctly**.
 
 **More general settings:**
 
