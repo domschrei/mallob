@@ -52,8 +52,13 @@ public:
     void preprocessAsync() override {
         submitJob();
     }
-    // Nothing to do
-    void reconstructSolution(std::vector<int>& sol) override {}
+    
+    void reconstructSolution(std::vector<int>& model) override {
+        if (_type == SWEEPER) {
+            LOG(V0_CRIT, "Sweeper wants to reconstruct solution with given model size %i\n", model.size());
+        }
+        //Nothing to do with type SATSOLVER
+    }
 
     void interrupt() override {
         interrupt(_base_json);

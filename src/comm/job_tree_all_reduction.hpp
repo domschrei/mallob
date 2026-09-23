@@ -171,7 +171,7 @@ private:
         }
 
         if (tag == MSG_JOB_TREE_MODULAR_REDUCE) {
-            LOG(V2_INFO, "REDUCE\n");
+            // LOG(V2_INFO, "REDUCE\n");
 
             if (_aggregating || _future_aggregate.valid() || _reduction_locally_done) 
                 return false; // already internally aggregating elements (or already done)!
@@ -190,7 +190,7 @@ private:
             advance();
         }
         if (tag == MSG_JOB_TREE_MODULAR_BROADCAST && _broadcast_enabled) {
-            LOG(V2_INFO, "BROADCAST\n");
+            // LOG(V2_INFO, "BROADCAST\n");
             receiveAndForwardFinalElem(std::move(msg.payload));
         }
         return true;
