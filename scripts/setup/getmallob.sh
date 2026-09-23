@@ -30,11 +30,11 @@ git checkout chaincheck
 # Build Mallob
 if [ "x$suffix" == "xmini" ]; then
     MALLOB_MINIMAL=1 scripts/setup/cmake-make.sh build || \
-        die "Build error. Please consult: https://github.com/domschrei/mallob/blob/master/docs/"
+        die "Build error. Please consult https://github.com/domschrei/mallob/blob/master/docs/ or (locally) ./docs/"
 else
     check_deps meson ninja pkgconf cargo
     scripts/setup/cmake-make.sh build || \
-        die "Build error. Please consult: https://github.com/domschrei/mallob/blob/master/docs/"
+        die "Build error. Please consult https://github.com/domschrei/mallob/blob/master/docs/ or (locally) ./docs/"
 fi
 
 echo ""

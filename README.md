@@ -21,9 +21,14 @@ Building upon Mallob's job scheduling and SAT solving capabilities, Mallob also 
 
 ## Setup
 
+> [!NOTE]  
+> **Quick Start** without manually pulling the repository (latest @ master branch):  
+> `curl -sSL https://satres.eu/getmallobmini.sh | bash` for a minimal build,  
+> `curl -sSL https://satres.eu/getmallobfull.sh | bash` for a full featured build.
+
 Mallob uses MPI (Message Passing Interface) and is built using CMake.
 
-For a default, full featured build, execute [`bash scripts/setup/cmake-make.sh build`](scripts/setup/build.sh).
+For a default, full featured build, execute [`bash scripts/setup/cmake-make.sh build`](scripts/setup/build.sh) in this (Mallob base) directory. For a minimal build, prepend `MALLOB_MINIMAL=1`.
 
 [**Find detailed instructions at docs/setup.md.**](docs/setup.md)
 
