@@ -172,6 +172,8 @@ private:
     float _time_of_increment_activation = 0;
     float _time_of_first_volume_update = -1;
     float _time_of_abort = 0;
+    float _time_of_shrink_start {-1};
+    float _time_of_shrink_end {-1};
     
     float _time_of_last_comm = 0;
     float _time_of_last_limit_check = 0;
@@ -369,6 +371,11 @@ public:
         
         // Update volume
         _volume = newVolume;
+    }
+
+    void applyShrinkDirective(float timeSpan) {
+        _time_of_shrink_start = Timer::elapsedSecondsCached();
+        _time_of_shrink_end = _time_of_shrink_start + timeSpan;
     }
 
     // Updates the job's resource usage and then checks whether the job reached

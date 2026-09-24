@@ -20,7 +20,9 @@ struct ActorContext {
     SatPreprocessActor::PreprocessActorResult result {SatPreprocessActor::PENDING};
     std::vector<int> formula;
     std::vector<int> model;
+    float timeOfStart {0};
     float timeOfSignalledDisplacement {0};
+    bool shrinking {false};
 
     const char* getId() const {
         return id.c_str();

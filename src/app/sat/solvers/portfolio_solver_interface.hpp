@@ -210,6 +210,7 @@ public:
 	}
 	bool hasPreprocessedFormula() const {return _has_preprocessed_formula;}
 	std::vector<int>&& extractPreprocessedFormula() {
+		assert(hasPreprocessedFormula());
 		_has_preprocessed_formula = false;
 		return std::move(_preprocessed_formula);
 	}

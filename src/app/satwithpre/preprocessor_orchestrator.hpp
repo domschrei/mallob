@@ -80,11 +80,21 @@ public:
 
             if (actor.state == ActorContext::UNINITIALIZED) {
 
-                // check prerequisite
+                // check prerequisites
                 if (actor.prerequisite && actor.prerequisite->state != ActorContext::FINISHED)
                     continue; // prerequisite not done yet - skip for now
-                if (actor.prerequisite && actor.onlyStartIfPrerequisiteSimplified && actor.prerequisite->result != SatPreprocessActor::SIMPLIFIED)
-                    continue; // never initialize this actor since its prerequisite didn't lead to a simplification
+                // never initialize an actor whose prerequisite didn't lead to a required simplification
+                if (actor.prerequisite && actor.onlyStartIfPrerequisiteSimplified && actor.prerequisite->result != SatPreprocessActor::SIMPLIFIED) {
+                    actor.state = ActorContext::FINISHED;
+                    actor.result = SatPreprocessActor::NONE;
+                    continue;
+                }
+                // was the actor displaced before we even started it? -> mark as done immediately
+                if (actor.timeOfSignalledDisplacement > 0) {
+                    actor.state = ActorContext::FINISHED;
+                    actor.result = SatPreprocessActor::NONE;
+                    continue;
+                }
 
                 // prerequisite done: initialize actor
                 auto formula = actor.prerequisite ? actor.prerequisite->formula : _base_cnf;
@@ -126,16 +136,14 @@ public:
                 if (!_preprocess_log_dir.empty())
                     CnfUtil::writeFormula(actor.actor->getInputCnf(), _preprocess_log_dir + "/in." + actor.getId() + ".cnf");
                 LOG(V2_INFO, "SATWP launch %s\n", actor.getId());
+                actor.timeOfStart = Timer::elapsedSeconds();
                 actor.actor->preprocessAsync();
                 actor.state = ActorContext::RUNNING;
 
                 // signal displacement to actors being displaced
                 for (auto& other : actor.actorsBeingDisplaced) {
                     if (other->timeOfSignalledDisplacement <= 0) {
-                        if (other->actor)
-                            LOG(V2_INFO, "SATWP %s --displace--> %s\n", actor.getId(), other->getId());
-                        else
-                            LOG(V2_INFO, "SATWP %s --displace--\n", actor.getId());
+                        LOG(V2_INFO, "SATWP %s --displace--> %s\n", actor.getId(), other->getId());
                         other->timeOfSignalledDisplacement = Timer::elapsedSeconds();
                     }
                 }
@@ -183,15 +191,23 @@ public:
             if (actor.state == ActorContext::RUNNING && actor.timeOfSignalledDisplacement > 0) {
                 // this actor is being displaced (after some time)
                 if (_params.preprocessBalancing() == 0) {
+                    // immediate displacement
                     LOG(V2_INFO, "SATWP %s interrupt\n", actor.getId());
                     actor.actor->interrupt();
                     actor.timeOfSignalledDisplacement = 0;
                 }
-                if (_params.preprocessBalancing() == 1 && Timer::elapsedSeconds() - _time_of_start >=
-                    _params.preprocessExpansionFactor() * (actor.timeOfSignalledDisplacement - _time_of_start)) {
-                    LOG(V2_INFO, "SATWP %s interrupt\n", actor.getId());
-                    actor.actor->interrupt();
-                    actor.timeOfSignalledDisplacement = 0;
+                if (_params.preprocessBalancing() == 1) {
+                    float timeSpan = _params.preprocessExpansionFactor() * (actor.timeOfSignalledDisplacement - actor.timeOfStart);
+                    if (Timer::elapsedSeconds() >= actor.timeOfSignalledDisplacement + timeSpan) {
+                        LOG(V2_INFO, "SATWP %s interrupt (time >= %.3f + %.3f)\n", actor.getId(),
+                            actor.timeOfSignalledDisplacement, timeSpan);
+                        actor.actor->interrupt();
+                        actor.timeOfSignalledDisplacement = 0;
+                    } else if (!actor.shrinking) {
+                        LOG(V2_INFO, "SATWP %s shrink %.3f\n", actor.getId(), timeSpan);
+                        actor.actor->shrink(timeSpan);
+                        actor.shrinking = true;
+                    }
                 }
             }
         }
