@@ -3,6 +3,7 @@
 #include <memory>
 #include <algorithm>
 #include <sys/wait.h>
+#include <sstream>
 
 #include "app/job.hpp"
 #include "app/job_tree.hpp"
@@ -67,6 +68,8 @@ void SweepJob::appl_start() {
 	//set some general metadata information
 	_internal_result.id = getId();
 	_internal_result.revision = getRevision();
+	
+
 
 	// _started_appl_start = true;
 	_my_rank = getJobTree().getRank();
@@ -147,6 +150,15 @@ void SweepJob::appl_start() {
 	if (_params.crossJobCommunication()) {
         _clause_comm = std::make_unique<AnytimeSatClauseCommunicator>(_params, this, false);
 	}
+	
+	
+	reconstructionDir =  TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob."
+			+ std::to_string(Proc::getPid()) + "."
+			+ std::to_string(desc.getId()) + "." + "sweep" + ".";
+	std::ostringstream ostream;
+	ostream << static_cast<const void*>(this);
+	reconstructionDir += ostream.str() + ".";
+	LOG(V2_INFO, "SWEEP reconstructionDir: %s\n", reconstructionDir.c_str());
 
 	LOGGER(_sweeplogger, V3_VERB, "SWEEP appl_start() FINISHED\n");
 }
@@ -185,7 +197,7 @@ void SweepJob::appl_communicate() {
 	checkIdleWorkStatus();
 	checkForUnsatResults();
 
-	clearImportedRound();
+	// clearImportedRound();
 	checkCrossCommNeedsAdvancing("appl_communicate");
 	tryReportToMallob();
 
@@ -258,7 +270,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		} else if (res==UNKNOWN && _is_root && sweeper->getLocalId()==_representative_localId) {
 			//Found either IMPROVED or UNKNOWN
 			auto stats = sweeper->fetchSweepStats();
-			if (stats.clauses < stats.start_clauses) {
+			if (sweeper->hasPreprocessedFormula()) {
 				//Found some improvements
 				rootReportSolverResult(SIMPLIFIED, sweeper->extractPreprocessedFormula());
 			} else {
@@ -609,13 +621,17 @@ void SweepJob::rootReportSolverResult(int res, const std::vector<int> &formula =
 		return;
 	}
 
+	printFirstClauses(formula, 100);
+	SweepResult resultObj = combineFormulaWithUnitsEqs(formula);
+	std::vector<int> resultVec = serializeSweepResult(resultObj);
+	
 	LOGGER(_sweeplogger,V3_VERB, "SWEEP JOB [%i] stages sweep result %i to Mallob\n", _my_rank, res);
 	assert(_staged_solved_status == -1 || log_return_false("SWEEP ERROR: duplicate attempt to report result to mallob, was already reported as %i \n", _internal_result.result));
 	if (res==UNSAT) {
 		LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB [%i]: Solution UNSAT\n", _my_rank);
 	}
 	else if (res==SIMPLIFIED){
-		LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB [%i]: Solution SIMPLIFIED, payload size %zu\n", _my_rank, formula.size());
+		LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB [%i]: Solution SIMPLIFIED, formula size %zu, payload size %zu\n", _my_rank, formula.size(), resultVec.size());
 	} else if (res==UNKNOWN) {
 		// No progress has been made.
 		// Design choice: we don't send any formula back, since there would be no new information in it
@@ -626,10 +642,83 @@ void SweepJob::rootReportSolverResult(int res, const std::vector<int> &formula =
 	DOUBLELOG(_sweeplogger,V2_INFO, "SWEEP_RESULT_CODE %i == %s \n", res, res==40 ? "SIMPLIFIED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
 	//Serialization required!
 	//Even an empty solution needs to be serialized, otherwise the format is wrong at deserialization
-	_internal_result.setSolutionToSerialize(formula.data(), formula.size());
+	// _internal_result.setSolutionToSerialize(formula.data(), formula.size());
+	//The new result vector also contains all found units and equivalences explicitly (in addition to the simplified formula)
+	_internal_result.setSolutionToSerialize(resultVec.data(), resultVec.size());
 	_staged_solved_status = res;
 }
 
+//Collect all units and equivalences found during sweeping and bundle them with the simplified formula
+SweepJob::SweepResult SweepJob::combineFormulaWithUnitsEqs(const std::vector<int>& formula) {
+	assert(_is_root || log_return_false("[Error]: Called  addUnitsEqsToFormula in SweepApp from non-root process\n"));
+	SweepResult res;	
+	for (int round=0; round < _root_sharing_round + 2; round++) {
+		auto data = _imported_data[round];
+		res.units.insert(res.units.end(), data.units.begin(), data.units.end());
+		res.eqs.insert(res.eqs.end(), data.eqs.begin(), data.eqs.end());
+		if (!data.units.empty() || !data.eqs.empty()) {
+			LOGGER(_sweeplogger,V3_VERB, "adding (units,eqs) from sweep result round %i: %i %i\n", round, data.units.size(), data.eqs.size() );
+		}
+	}
+	res.formula = formula;
+	return res;
+}
+
+
+
+SweepJob::SweepResult SweepJob::deserializeSweepResult(const std::vector<int>& resVec) {
+	// Layout: [units..., eqs..., formula..., units_size, eqs_size, formula_size]
+	if (resVec.size() < 3) {
+		throw std::runtime_error("deserializeSweepResult: buffer too small");
+	}
+
+	const int unitsSize   = resVec[resVec.size() - 3];
+	const int eqsSize     = resVec[resVec.size() - 2];
+	const int formulaSize = resVec[resVec.size() - 1];
+
+	if (unitsSize < 0 || eqsSize < 0 || formulaSize < 0) {
+		throw std::runtime_error("deserializeSweepResult: negative size");
+	}
+
+	const size_t payload = resVec.size() - 3;
+	if (static_cast<size_t>(unitsSize) + eqsSize + formulaSize != payload) {
+		throw std::runtime_error("deserializeSweepResult: sizes do not match buffer length");
+	}
+
+	SweepJob::SweepResult resObj;
+	auto it = resVec.begin();
+	resObj.units.assign(  it, it + unitsSize);       it += unitsSize;
+	resObj.eqs.assign(    it, it + eqsSize);         it += eqsSize;
+	resObj.formula.assign(it, it + formulaSize);
+	return resObj;
+}
+	
+std::vector<int> SweepJob::serializeSweepResult(const SweepJob::SweepResult &res) {
+	// Layout: [units..., eqs..., formula..., units_size, eqs_size, formula_size]
+	std::vector<int> resVec{};
+	resVec.insert(resVec.end(), res.units.begin(), res.units.end());
+	resVec.insert(resVec.end(), res.eqs.begin(), res.eqs.end());
+	resVec.insert(resVec.end(), res.formula.begin(), res.formula.end());
+	resVec.push_back(res.units.size());
+	resVec.push_back(res.eqs.size());
+	resVec.push_back(res.formula.size());
+	return resVec;
+}
+
+void SweepJob::printFirstClauses(const std::vector<int> &formula, int nbClauses) {
+	int clauseNo = 1;	
+	std::ostringstream oss;
+	for (int i=0; i < formula.size()-2 && clauseNo < nbClauses; i++) {
+		int lit = formula[i];
+		if (lit==0) {
+			LOG(V3_VERB, "cl#%i: %s  (gi %i)\n", clauseNo, oss.str().c_str(), i);
+			oss.str("");
+			clauseNo++;
+		} else {
+			oss << lit << " ";
+		}
+	}
+}
 
 void SweepJob::cbReportIteration(int localId) {
 	assert(_is_root || log_return_false("SWEEP ERROR : iteration report in a non-root rank. Technically possible, but currently not allowed \n"));

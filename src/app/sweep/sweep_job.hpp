@@ -244,6 +244,12 @@ private:
 	//to get a proper final clause database state before reporting
 	const double TIMEBUFFER_FOR_FINAL_SUBSTITUTE = 5;
 
+	std::string reconstructionDir;
+	
+	
+	
+	
+	
 	//The root node (and only the root node) tracks global sweeping progress
 	//It decides whether a given sharing iteration should continue or end
 	//It broadcasts this decision to all other ranks, along with general information about the current sweeping state
@@ -500,7 +506,16 @@ public:
 	friend void cb_import_unit(void *SweepJobState, int *elit, int localId);
 	friend int  cb_custom_query(void *SweeJobState, int localId, int query);
 	friend void cb_report_iteration(void *SweepJobState, int localId);
+	
+	struct SweepResult {
+		std::vector<int> units{};
+		std::vector<int> eqs{}; 
+		std::vector<int> formula{};
+	};
 
+	SweepResult combineFormulaWithUnitsEqs(const std::vector<int>& formula);
+	static SweepResult deserializeSweepResult(const std::vector<int> &resVec);
+	static std::vector<int> serializeSweepResult(const SweepJob::SweepResult &resObj);	
 
 private:
 	KissatPtr createNewSweeper(int localId);
@@ -538,6 +553,7 @@ private:
 
 	std::vector<int> getRandomIdPermutation();
 	void printActiveMPIRequestsCount();
+	static void printFirstClauses(const std::vector<int> &formula, int nbClauses);
 
 	bool canSolverExitStealing(KissatPtr sweeper);
 	bool tryProvideInitialWork(KissatPtr sweeper);

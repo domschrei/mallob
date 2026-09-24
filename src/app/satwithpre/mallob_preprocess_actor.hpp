@@ -14,6 +14,7 @@
 #include "util/params.hpp"
 #include "util/static_store.hpp"
 #include "util/sys/timer.hpp"
+#include "app/sweep/sweep_job.hpp"
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -33,6 +34,10 @@ private:
 
     nlohmann::json _base_json;
     int _sub_job_id {-1};
+    
+    //intermediate data from Sweeping used for model reconstruction
+    std::vector<int> _sweep_units{};
+    std::vector<int> _sweep_eqs{};
 
 public:
     MallobPreprocessActor(const Parameters& params, const JobDescription& desc, const std::string& name,
@@ -53,9 +58,148 @@ public:
         submitJob();
     }
     
+    // void getRepr(int var, std::vector<int> &repr) {
+       // while (repr[var]!=var) {
+           
+       // }
+    // }
+    
+    // static unsigned VAR_TO_LIT(const int var) {
+        // unsigned lit = ((unsigned)std::abs(var)) << 1;
+        // if (var < 0) {
+            // lit++;
+        // }
+        // return lit;
+    // }
+    
+    // static unsigned NOT_LIT(const unsigned lit) {
+        // return lit ^ 1u;
+    // }
+    
+    // static unsigned getRepr(unsigned lit, std::vector<unsigned> &repr) {
+        // unsigned res = repr[lit];
+        // while (res != lit) {
+            // lit = res;
+            // res = repr[lit];
+        // }
+        // return res;
+    // }
+    
+    static int getReprVar(int var, std::vector<int> &repr) {
+        if (repr[var]==0) {
+            return 0;
+        }
+        int sign = 1; 
+        int res = repr[var];
+        while (res != var) {
+            LOG(V1_WARN, "SATWP %i --> %i \n", var, res);
+            if (res < 0) {
+                sign = -sign;
+                res = -res;
+            }
+            var = res;
+            res = repr[var];
+        }
+        return res * sign;
+    }
+    
+    static int signof(int var) {
+        if (var==0) return 0;
+        if (var<0) return -1;
+        return 1;
+    }
+    
+    // static int LIT_TO_VAR(const unsigned lit) {
+        // int var = lit >> 1;
+        // if (lit & 1u) {
+           // var = -var; 
+        // }
+        // return var;
+    // }
+    
     void reconstructSolution(std::vector<int>& model) override {
         if (_type == SWEEPER) {
-            LOG(V0_CRIT, "Sweeper wants to reconstruct solution with given model size %i\n", model.size());
+            LOG(V0_CRIT, "SATWP Sweeper wants to reconstruct solution with given model size %i\n", model.size()-1);
+            
+            //Make all sweep units accessible by index
+            std::vector<int> sweepunits(nbInputVars()+1, 0);
+            std::sort(_sweep_units.begin(), _sweep_units.end());
+            for (int unit : _sweep_units) {
+                sweepunits[std::abs(unit)] = unit;
+                LOG(V3_VERB, "SATWP Sweeper unit %i\n", unit);
+            }
+            
+            //Make all sweep equivalences accessible by index
+            //Use unsigned format, it makes signed-ness much easier to handle
+            // std::vector<unsigned> representatives(nbInputVars()+1, 0);
+            std::vector<int> representatives(nbInputVars()+1);
+            for (int i=0; i<representatives.size(); i++) {
+                representatives[i]=i;
+            }
+            for (int i=0; i<_sweep_eqs.size(); i+=2) {
+                int v1 = _sweep_eqs[i];
+                int v2 = _sweep_eqs[i+1];
+                LOG(V3_VERB, "SATWP Sweeper eq %i %i\n", _sweep_eqs[i], _sweep_eqs[i+1]);
+                assert(std::abs(v1)<std::abs(v2));
+                // unsigned lit1 = VAR_TO_LIT(v1);
+                // unsigned lit2 = VAR_TO_LIT(v2);
+                // unsigned notlit1 = NOT_LIT(lit1);
+                // unsigned notlit2 = NOT_LIT(lit2);
+                // representatives[lit2]=lit1;
+                // representatives[notlit2]=notlit1;
+                if (v2 < 0) {
+                    v2 = -v2;
+                    v1 = -v1;
+                }
+                representatives[v2]=v1;
+            }
+            
+            model.resize(nbInputVars()+1);
+            //Order of resolving the polarity of each variable:
+            //  1. Sweep unit
+            //  2. Sweep representative into Sweep unit
+            //  3. Sweep representative into model lit
+            //  4. model lit (unchanged)
+            for (int var = 1; var <= nbInputVars() ; var++) {
+                if (const int sweepLit = sweepunits[var]; sweepLit != 0) {
+                    //Case 1: Sweep knows the unit value
+                    if (model[var] != sweepLit) {
+                        LOG(V1_WARN, "SATWP [WARN] var %i : Sweep lit (%i) != model lit (%i) \n", var, sweepLit, model[var]);
+                    }
+                    LOG(V1_WARN, "SATWP sweepLit %i \n", sweepLit);
+                    model[var] = sweepLit;
+                } else if (int reprVar = getReprVar(var, representatives); reprVar != var) {
+                    const int signToRep = signof(reprVar);
+                    reprVar = std::abs(reprVar);
+                    const int sweepReprLit = sweepunits[reprVar] * signToRep;
+                    const int sweepReprSign = signof(sweepReprLit);
+                    if (sweepReprSign!= 0) {
+                        //Case 2: Sweep knows a representative, and it knows its value
+                        if (sweepReprLit != model[reprVar]) {
+                            LOG(V1_WARN, "SATWP [WARN] var %i : Sweep repr lit (%i) != model repr lit (%i) \n", var, sweepReprLit, model[reprVar]);
+                        }
+                        const int deducedLit = var * signToRep * sweepReprSign;
+                        if (deducedLit != model[var]) {
+                            LOG(V1_WARN, "SATWP [WARN] var %i : Sweep deduced lit (%i) != model lit (%i) \n", var, deducedLit, model[var]);
+                        }
+                        LOG(V1_WARN, "SATWP deducedSweepLit %i \n", deducedLit);
+                        model[var] = deducedLit;
+                    } else {
+                        //Case 3: Sweep knows a representative, but not its value
+                        const int modelReprLit = model[reprVar];
+                        const int modelReprSign = signof(modelReprLit);
+                        const int deducedLit = var * signToRep * modelReprSign;
+                        if (deducedLit != model[var]) {
+                            LOG(V1_WARN, "SATWP [WARN] var %i : Sweep model deduced lit (%i) != model lit (%i) \n", var, deducedLit, model[var]);
+                        }
+                        LOG(V1_WARN, "SATWP deducedModelLit %i \n", deducedLit);
+                        model[var] = deducedLit;
+                    }
+                } else {
+                    LOG(V1_WARN, "SATWP model %i \n", model[var]);
+                }
+                // LOG(V3_VERB, "SATWP Sweeper sees var %i == %i (%i)\n", var, model[var], stored_unit);
+            }
         }
         //Nothing to do with type SATSOLVER
     }
@@ -189,9 +333,22 @@ private:
             assert(solution.size() >= 1 && solution[0] == 0);
             _model = std::move(solution);
         } else if (res.result == RESULT_SIMPLIFIED) {
+            if (_type == SWEEPER) {
+                //Sweep returns three arrays in its result vector, [units, equivalences, formula], 
+                //we store units and equivalences for model reconstruction, and pass on the formula
+                SweepJob::SweepResult sweepRes = SweepJob::deserializeSweepResult(solution);
+                _sweep_units = std::move(sweepRes.units);
+                _sweep_eqs   = std::move(sweepRes.eqs);
+                LOG(V3_VERB, "SATWP %s : Sweepunits %i\n", toStr(), _sweep_units.size());
+                LOG(V3_VERB, "SATWP %s : Sweepeqs   %i\n", toStr(), _sweep_eqs.size());
+                //Trim the solution-vector to just the formula, to make the sweep splicing transparent to following code
+                solution = std::move(sweepRes.formula);
+            }
             _output_cnf = std::move(solution);
             //already contains metadata #vals and #clauses in the last two entries
         }
+        //TODO: Is there even anything left in solution at this point, since we already moved it to _output_cnf?
+        //      and, does it even matter? because nothing is done with this set solution...
         res.setSolution(std::move(solution));
         LOG(V3_VERB, "SATWP %s extracted\n", json["name"].get<std::string>().c_str());
         return res;
