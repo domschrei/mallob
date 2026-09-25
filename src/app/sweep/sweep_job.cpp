@@ -363,7 +363,9 @@ std::shared_ptr<KissatSweep> SweepJob::createNewSweeper(int localId) {
     //Basic configuration
     sweeper->set_option("quiet", _params.sweepSolverQuiet());  //suppress any standard kissat messages
     sweeper->set_option("verbose", 0);//the native kissat verbosity
-    sweeper->set_option("log", 0);    //potentially extensive logging
+	if (_is_root && localId==_representative_localId) {
+		sweeper->set_option("log", 1);    //extensive logging (needs to be configured+compiled with -l)
+	}
     sweeper->set_option("check", 0);  //do not check model or derived clauses, because we anyways dont have proof tracking
     sweeper->set_option("statistics", 1);  //print full statistics
     sweeper->set_option("profile", max(_params.satProfilingLevel.val, 0)); //detailed profiling. kissat allows down to 0, mallob down to -1
@@ -621,7 +623,7 @@ void SweepJob::rootReportSolverResult(int res, const std::vector<int> &formula =
 		return;
 	}
 
-	printFirstClauses(formula, 100);
+	printFirstClauses(formula, 2000);
 	SweepResult resultObj = combineFormulaWithUnitsEqs(formula);
 	std::vector<int> resultVec = serializeSweepResult(resultObj);
 	
@@ -711,7 +713,7 @@ void SweepJob::printFirstClauses(const std::vector<int> &formula, int nbClauses)
 	for (int i=0; i < formula.size()-2 && clauseNo < nbClauses; i++) {
 		int lit = formula[i];
 		if (lit==0) {
-			LOG(V3_VERB, "cl#%i: %s  (gi %i)\n", clauseNo, oss.str().c_str(), i);
+			LOG(V3_VERB, "cl#%i: %s\n", clauseNo, oss.str().c_str());
 			oss.str("");
 			clauseNo++;
 		} else {

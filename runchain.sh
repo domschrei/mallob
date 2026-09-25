@@ -1,12 +1,17 @@
 #!/bin/bash
 
+
+OUT_DIR=$HOME/PhD/logsntraces/
+
 FLAGS=(
- -minprocs 2
+ -minprocs 1
  -max-lits-per-thread=35000000 
  -pre-cleanup=1
  -seed=110519 
- -s2f=solution.txt 
- -terminate-abruptly=1
+ -trace-dir=$OUT_DIR/traces
+ -log=$OUT_DIR/logs/
+ -spd=$OUT_DIR/logs/
+ -terminate-abruptly=0
  -v=3
  -mono-app=SATWITHPRE 
  -sat-config-dirs=config/sat/base/
@@ -16,9 +21,14 @@ FLAGS=(
  -jcup=0.05
  -sweep-max-iterations=2
  -jc=2
+ -sweep-solver-verbosity=4
 )
 
 echo "${FLAGS[@]}"
+
+#clean old logs and traces
+rm -rf $HOME/PhD/logsntraces/logs/*
+rm -rf $HOME/PhD/logsntraces/traces/*
 
 
 INST="$HOME/PhD/instances/sat-and-minisat1m/0225fa9581c622e5abbc8497a97edf4e-fla-qhid-360-4.cnf.xz"
@@ -36,6 +46,8 @@ INST="$HOME/PhD/instances/sat-and-minisat1m/00be590675417eba2bb2585790ac392d-iso
 # INST="$HOME/PhD/instances/sat-and-minisat1m/003de2086be59a5fb7a7aaad0992cf47-x9-07025.sat.sanitized.cnf.xz" #nothign to find, but exits
 # INST="$HOME/PhD/instances/sat-and-minisat1m/02ee4550987a8545d00d0ad14d4b215c-manthey_DimacsSorter_28_0.cnf.xz"
 
+# INST="$HOME/PhD/instances/tmp2024/05c8e94aaee86390eaf6e68dd3ec3570-noL-11-2.sanitized.cnf"
+#
 
-./scripts/run/mallob_local.sh "${FLAGS[@]}" -mono="$INST"
+./scripts/run/mallob_local.sh "${FLAGS[@]}" -mono="$INST" -t=1
 
