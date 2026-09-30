@@ -261,12 +261,13 @@ public:
         }
         FileUtils::rmrf(_params.proofDirectory() + "/tmp");
 
+        std::string problemFile = StaticStore<std::string>::extract("satwp-jobdesc-#" + std::to_string(_desc.getId()));
 #if MALLOB_BUILD_CHAINCHECK
-        LOG(V2_INFO, "SATWP Check the chained proof via: build/chaincheck <input-CNF> %s\n",
-            _params.proofDirectory().c_str());
+        std::string chaincheck = "build/chaincheck";
 #else
-        LOG(V2_INFO, "SATWP Check the chained proof via chaincheck on the input CNF and proof dir %s\n",
-            _params.proofDirectory().c_str());
+        std::string chaincheck = "chaincheck";
 #endif
+        LOG(V2_INFO, "SATWP Check produced proof via: %s %s %s\n",
+            chaincheck.c_str(), problemFile.c_str(), _params.proofDirectory().c_str());
     }
 };

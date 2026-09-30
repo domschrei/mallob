@@ -10,6 +10,7 @@
 #include "data/job_processing_statistics.hpp"
 #include "interface/api/api_connector.hpp"
 #include "app/sat/parse/sat_reader.hpp"
+#include "util/static_store.hpp"
 
 struct ClientSideSatProgram : public app_registry::ClientSideProgram {
     std::unique_ptr<SatWithPreSolver> solver;
@@ -38,6 +39,9 @@ void register_mallob_app_satwithpre() {
     };
 
     entry.reader = [](const Parameters& params, const std::vector<std::string>& files, JobDescription& desc) {
+        if (params.savePreprocessingProofs()) {
+            StaticStore<std::string>::insert("satwp-jobdesc-#" + std::to_string(desc.getId()), files[0]);
+        }
         return SatReader(params, files).read(desc);
     };
 
