@@ -3,7 +3,7 @@
 source ../base-build-functions.sh
 dirname="chaincheck"
 
-branchorcommit="e740c5180781364afef3048f27ffe4fea15d01ac" # updated 2026-01-29
+branchorcommit="e740c5180781364afef3048f27ffe4fea15d01ac" # updated 2026-09-30
 fetch_and_extract $dirname CMakeLists.txt https://github.com/domschrei/chaincheck/archive/${branchorcommit}.zip
 
 echo "[$dirname] Building ..."
