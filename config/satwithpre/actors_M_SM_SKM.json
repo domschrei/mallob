@@ -1,0 +1,40 @@
+[
+    {
+        "id": "mallobsat-plain",
+        "type": "MALLOBSAT",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false,
+        "options": "-satsolver=k_c_k+[k_]{29}k_c_l+[k_]{29}"
+    },
+    {
+        "id": "satsuma",
+        "type": "SATSUMA_EXT",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "mallobsat-on-satsuma",
+        "type": "MALLOBSAT",
+        "prerequisite": "satsuma",
+        "actorsBeingDisplaced": ["mallobsat-plain"],
+        "onlyStartIfPrerequisiteSimplified": true,
+        "options": "-satsolver=k_c_k+[k_]{29}k_c_l+[k_]{29}"
+    },
+    {
+        "id": "kissat-on-satsuma",
+        "type": "KISSAT",
+        "prerequisite": "satsuma",
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "mallobsat-on-satsuma-kissat",
+        "type": "MALLOBSAT",
+        "prerequisite": "kissat-on-satsuma",
+        "actorsBeingDisplaced": ["mallobsat-plain", "mallobsat-on-satsuma"],
+        "onlyStartIfPrerequisiteSimplified": true,
+        "options": "-satsolver=k_c_k+[k_]{29}k_c_l+[k_]{29}"
+    }
+]

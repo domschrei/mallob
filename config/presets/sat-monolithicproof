@@ -1,0 +1,6 @@
+#!/bin/bash
+
+echo '-max-lits-per-thread=35000000 -pre-cleanup=1 -seed=110519 -zero-only-logging=1
+ -v=2 -s2f=solution.txt -terminate-abruptly=1 
+ -mono-app=SAT -satsolver=c!k+(c!){29}(c!l+(c!){29}){7}
+ -rspaa=0 -proof-dir=proofs/ -proof=proof.lrat -uninvert-proof=1'
