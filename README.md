@@ -18,6 +18,8 @@ Mallob's flexible and decentralized approach to job scheduling allows to concurr
 
 Building upon Mallob's job scheduling and SAT solving capabilities, Mallob also features engines for state-of-the-art distributed **MaxSAT solving** (_MallobMax_) and bit-precise **SMT solving** (_Bitwuzllob_ - parallelizing [Bitwuzla](https://github.com/bitwuzla/bitwuzla)).
 
+This README provides some basic information and quick instructions for popular use cases of Mallob. **Please also consult Mallob's full documentation, with [docs/README.md](docs/README.md) as an entry point.**
+
 
 ## Setup
 
