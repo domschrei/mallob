@@ -35,9 +35,9 @@ private:
     nlohmann::json _base_json;
     int _sub_job_id {-1};
     
-    //intermediate data from Sweeping used for model reconstruction
-    std::vector<int> _sweep_units{};
-    std::vector<int> _sweep_eqs{};
+    //SweepJob returns additional data (via the file system) which we need for model reconstruction
+    std::string  _sweepresults_dir;
+    SweepJob::SweepResult _sweepRes{};
 
 public:
     MallobPreprocessActor(const Parameters& params, const JobDescription& desc, const std::string& name,
@@ -51,39 +51,17 @@ public:
 
         _jobstr = "#" + std::to_string(_job_id) + ":mal:" + std::to_string(_actor_counter++);
         _proof_format = _type == SATSOLVER ? "palrup" : "";
+        if (_type == SWEEPER) {
+            assert(!_params.tmpDirectory().empty() 
+                || log_return_false("[ERROR] SATWP Sweep needs a shared-filesystem tmp-directory, provide it via -tmp= \n"));
+            _sweepresults_dir = _params.tmpDirectory() + "/sweepresults-" + std::to_string(Timer::getStartTime().tv_sec);
+        }
     }
     ~MallobPreprocessActor() {}
 
     void preprocessAsync() override {
         submitJob();
     }
-    
-    // void getRepr(int var, std::vector<int> &repr) {
-       // while (repr[var]!=var) {
-           
-       // }
-    // }
-    
-    // static unsigned VAR_TO_LIT(const int var) {
-        // unsigned lit = ((unsigned)std::abs(var)) << 1;
-        // if (var < 0) {
-            // lit++;
-        // }
-        // return lit;
-    // }
-    
-    // static unsigned NOT_LIT(const unsigned lit) {
-        // return lit ^ 1u;
-    // }
-    
-    // static unsigned getRepr(unsigned lit, std::vector<unsigned> &repr) {
-        // unsigned res = repr[lit];
-        // while (res != lit) {
-            // lit = res;
-            // res = repr[lit];
-        // }
-        // return res;
-    // }
     
     static int getReprVar(int var, std::vector<int> &repr) {
         if (repr[var]==0) {
@@ -109,14 +87,25 @@ public:
         return 1;
     }
     
-    // static int LIT_TO_VAR(const unsigned lit) {
-        // int var = lit >> 1;
-        // if (lit & 1u) {
-           // var = -var; 
-        // }
-        // return var;
-    // }
+    void reconstructSolution(std::vector<int>& model) override {
+        if (_type != SWEEPER) return; //nothing to do when coming from SAT job
+        assert(!_sweepRes.reconstruction.empty() || log_return_false("[ERROR] SweepResult reconstruction data is missing, can't reconstruct solution"));
+        SolverSetup setup;
+        setup.logger = &Logger::getMainInstance();
+        // setup.jobname = "sweep-"+to_string(_my_index);
+        // setup.numVars = desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
+        // setup.numOriginalClauses = desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
+        // setup.localId = localId;
+        // setup.globalId = _my_rank * _nThreads + localId;
+        LOG(V1_WARN, "MallobPreprocessActor : making kissat object\n");
+        auto kissat = Kissat(setup);
+        LOG(V1_WARN, "MallobPreprocessActor : made kissat object\n");
+        kissat.importReconstructionArrays(_sweepRes.reconstruction);
+        LOG(V1_WARN, "MallobPreprocessActor : imported arrays\n");
+        kissat.reconstructSolutionFromPreprocessing(model);
+    }
     
+    /**
     void reconstructSolution(std::vector<int>& model) override {
         if (_type == SWEEPER) {
             LOG(V0_CRIT, "SATWP Sweeper wants to reconstruct solution with given model size %i\n", model.size()-1);
@@ -203,6 +192,8 @@ public:
         }
         //Nothing to do with type SATSOLVER
     }
+    **/
+
 
     void interrupt() override {
         interrupt(_base_json);
@@ -259,6 +250,11 @@ private:
         if (!opts.empty()) json["configuration"]["options"] = opts;
         applySuccessiveGrowth(json);
 
+        if (_type == SWEEPER) {
+            LOG(V2_INFO, "SATWP Sweep setting json['%s']=%s\n", SweepJob::SWEEPRESULT_DIR_KEY.c_str(), _sweepresults_dir.c_str());
+            json["configuration"][SweepJob::SWEEPRESULT_DIR_KEY] = _sweepresults_dir;
+        }
+        
         auto copiedJson = json;
         auto result = _api.submit(copiedJson, [&](nlohmann::json& response) {
             // Job done
@@ -334,15 +330,10 @@ private:
             _model = std::move(solution);
         } else if (res.result == RESULT_SIMPLIFIED) {
             if (_type == SWEEPER) {
-                //Sweep returns three arrays in its result vector, [units, equivalences, formula], 
-                //we store units and equivalences for model reconstruction, and pass on the formula
-                SweepJob::SweepResult sweepRes = SweepJob::deserializeSweepResult(solution);
-                _sweep_units = std::move(sweepRes.units);
-                _sweep_eqs   = std::move(sweepRes.eqs);
-                LOG(V3_VERB, "SATWP %s : Sweepunits %i\n", toStr(), _sweep_units.size());
-                LOG(V3_VERB, "SATWP %s : Sweepeqs   %i\n", toStr(), _sweep_eqs.size());
-                //Trim the solution-vector to just the formula, to make the sweep splicing transparent to following code
-                solution = std::move(sweepRes.formula);
+                //SweepJob wrote result files which we need for model reconstruction
+                _sweepRes = SweepJob::readSweepResultsFromDir(_sweepresults_dir);
+                // LOG(V3_VERB, "SATWP Extracted sweepresults from filesystem:\n", json["name"].get<std::string>().c_str());
+                SweepJob::printSweepResult(_sweepRes);
             }
             _output_cnf = std::move(solution);
             //already contains metadata #vals and #clauses in the last two entries

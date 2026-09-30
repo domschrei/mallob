@@ -208,8 +208,9 @@ public:
         while (true) {
             actor = actor->prerequisite;
             if (!actor) break;
+            LOG(V2_INFO, "SATWP Reconstructing model @ %s, size %lu\n", actor->getId(), model.size()-1);
             actor->actor->reconstructSolution(model);
-            LOG(V2_INFO, "SATWP Reconstructed model @ %s, size %lu\n", actor->getId(), model.size()-1);
+            LOG(V2_INFO, "SATWP Reconstructed  model @ %s, size %lu\n", actor->getId(), model.size()-1);
             if (!_preprocess_log_dir.empty())
                 CnfUtil::writeModel(model, _preprocess_log_dir + "/recmodel." + actor->getId() + ".txt");
             CnfUtil::checkModel(actor->actor->getInputCnf(), model);

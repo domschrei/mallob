@@ -155,6 +155,8 @@ private:
 	static_assert(sizeof(Metadata) % sizeof(int) == 0,
 		"Metadata must be a packed run of ints for tail-of-vector memcpy");
 	static constexpr int NUM_METADATA_FIELDS = sizeof(Metadata) / sizeof(int);
+	
+	static constexpr int SWEEPRESULT_METADATA_FIELDS = 2;
 
 	//Buffer received Eq+Units from sharing rounds, for Sweepers to soon import them
 	//To allow easier concurrent accessed, we choose a large preallocated vector
@@ -244,11 +246,6 @@ private:
 	//to get a proper final clause database state before reporting
 	const double TIMEBUFFER_FOR_FINAL_SUBSTITUTE = 5;
 
-	std::string reconstructionDir;
-	
-	
-	
-	
 	
 	//The root node (and only the root node) tracks global sweeping progress
 	//It decides whether a given sharing iteration should continue or end
@@ -510,22 +507,38 @@ public:
 	struct SweepResult {
 		std::vector<int> units{};
 		std::vector<int> eqs{}; 
-		std::vector<int> formula{};
+		std::vector<Kissat::namedSolverArray> reconstruction;
 	};
 
-	SweepResult combineFormulaWithUnitsEqs(const std::vector<int>& formula);
-	static SweepResult deserializeSweepResult(const std::vector<int> &resVec);
-	static std::vector<int> serializeSweepResult(const SweepJob::SweepResult &resObj);	
+	static inline const std::string SWEEPRESULT_DIR_KEY = "sweepresult-dir";
+	//(De)serialization  SweepResult <---> int-vector
+	
+	// static std::vector<int> serializeSweepResult(const SweepResult &resObj);	
+	// static SweepResult deserializeSweepResult(const std::vector<int> &resVec);
+	
+	//Conversion jsonstring  <---> Extra data in SweepResult
+	// static std::string getSweepResultFromJson(const SweepResult &res);
+	// static void addJsonToSweepResult(SweepResult &res, const std::string &jsonstring);
+	
+	static SweepResult readSweepResultsFromDir(const std::string &dir);
+	static void printSweepResult(const SweepResult &res);
 
 private:
 	KissatPtr createNewSweeper(int localId);
 
 	void createAndStartNewSweeper(int localId);
     void loadFormula(KissatPtr sweeper);
+	
+	SweepResult collectSweepResult(std::vector<Kissat::namedSolverArray> &reconstruction);
+	std::string writeSweepResultsToDir(const SweepResult &res);
+	
+	
+	
+	static size_t bytesToInts(size_t bytes);
 
 	void checkSharingDelay();
 	void checkForUnsatResults();
-	void rootReportSolverResult(int res, const std::vector<int> &formula);
+	void rootReportSolverResult(int res, const KissatPtr &sweeper);
 	void reportEndStats(KissatPtr sweeper);
 	void tryReportToMallob();
 	bool checkCrossCommNeedsAdvancing(const std::string &from);
@@ -553,7 +566,7 @@ private:
 
 	std::vector<int> getRandomIdPermutation();
 	void printActiveMPIRequestsCount();
-	static void printFirstClauses(const std::vector<int> &formula, int nbClauses);
+	void printFirstClauses(const std::vector<int> &formula, int nbClauses);
 
 	bool canSolverExitStealing(KissatPtr sweeper);
 	bool tryProvideInitialWork(KissatPtr sweeper);

@@ -11,8 +11,9 @@ FLAGS=(
  -trace-dir=$OUT_DIR/traces
  -log=$OUT_DIR/logs/
  -spd=$OUT_DIR/logs/
+ -tmp=$OUT_DIR/tmp/
  -terminate-abruptly=0
- -v=3
+ -v=2
  -mono-app=SATWITHPRE 
  -sat-config-dirs=config/sat/base/
  -preprocess-config=config/satwithpre/actors_sweepfirst.json
@@ -21,7 +22,7 @@ FLAGS=(
  -jcup=0.05
  -sweep-max-iterations=2
  -jc=2
- -sweep-solver-verbosity=4
+ -sweep-solver-verbosity=0
 )
 
 echo "${FLAGS[@]}"
@@ -30,6 +31,7 @@ echo "${FLAGS[@]}"
 rm -rf $HOME/PhD/logsntraces/logs/*
 rm -rf $HOME/PhD/logsntraces/traces/*
 
+grep "CC=" ./lib/kissat/build/makefile
 
 INST="$HOME/PhD/instances/sat-and-minisat1m/0225fa9581c622e5abbc8497a97edf4e-fla-qhid-360-4.cnf.xz"
 INST="$HOME/PhD/instances/sat-and-minisat1m/01d037bf22a943430790eedd667f415e-60-128351.cnf.xz"
