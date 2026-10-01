@@ -118,6 +118,7 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     timeout=$DS_SECONDSPERJOB
     cmd="$build/mallob \
 	-mono-app=$DS_APP \
+    -preprocess-config=config/satwithpre/actors_sweepfirst.json
 	-satsolver=k \
 	-mono=$f -jwl=$timeout -T=$(($timeout+30)) -wam=60``000 -pre-cleanup=1 \
     -log=$globallogdir -tmp=$localtmpdir -comment-outputlogdir=$outputlogdir -sro=${globallogdir}/processed-jobs.out -trace-dir=${globallogdir}/ -os=1 -v=4 -iff=0 -s2f=${globallogdir}/model -cm=0 \
