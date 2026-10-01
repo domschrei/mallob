@@ -25,7 +25,7 @@ public:
 		std::string name;
 		std::vector<std::byte> array{};
 	};
-	static inline const std::vector<std::string> _reconstruction_names = {"extend", "import", "values"};
+	static inline const std::vector<std::string> _reconstruction_names = {"extend", "import", "eliminated", "values"};
 	
 protected:
 	//Accessible for KissatSweep 

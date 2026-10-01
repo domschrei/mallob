@@ -92,108 +92,16 @@ public:
         assert(!_sweepRes.reconstruction.empty() || log_return_false("[ERROR] SweepResult reconstruction data is missing, can't reconstruct solution"));
         SolverSetup setup;
         setup.logger = &Logger::getMainInstance();
-        // setup.jobname = "sweep-"+to_string(_my_index);
-        // setup.numVars = desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
-        // setup.numOriginalClauses = desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
-        // setup.localId = localId;
-        // setup.globalId = _my_rank * _nThreads + localId;
-        LOG(V1_WARN, "MallobPreprocessActor : making kissat object\n");
-        auto kissat = Kissat(setup);
-        LOG(V1_WARN, "MallobPreprocessActor : made kissat object\n");
-        kissat.importReconstructionArrays(_sweepRes.reconstruction);
-        LOG(V1_WARN, "MallobPreprocessActor : imported arrays\n");
-        kissat.reconstructSolutionFromPreprocessing(model);
+        setup.numVars = nbInputVars();
+        setup.numOriginalClauses = nbInputClauses();
+        //We piggyback on kissats existing model reconstruction code instead of writing our own.
+        //To make this work we need to supply a "skeleton" kissat solver with the necessary reconstruction datastructures, 
+        //which we accordingly extracted earlier from the representative solver at the end of the SweepJob App, byte-for-byte.
+        auto skeleton_kissat = Kissat(setup);
+        skeleton_kissat.importReconstructionArrays(_sweepRes.reconstruction);
+        skeleton_kissat.reconstructSolutionFromPreprocessing(model);
     }
     
-    /**
-    void reconstructSolution(std::vector<int>& model) override {
-        if (_type == SWEEPER) {
-            LOG(V0_CRIT, "SATWP Sweeper wants to reconstruct solution with given model size %i\n", model.size()-1);
-            
-            //Make all sweep units accessible by index
-            std::vector<int> sweepunits(nbInputVars()+1, 0);
-            std::sort(_sweep_units.begin(), _sweep_units.end());
-            for (int unit : _sweep_units) {
-                sweepunits[std::abs(unit)] = unit;
-                LOG(V3_VERB, "SATWP Sweeper unit %i\n", unit);
-            }
-            
-            //Make all sweep equivalences accessible by index
-            //Use unsigned format, it makes signed-ness much easier to handle
-            // std::vector<unsigned> representatives(nbInputVars()+1, 0);
-            std::vector<int> representatives(nbInputVars()+1);
-            for (int i=0; i<representatives.size(); i++) {
-                representatives[i]=i;
-            }
-            for (int i=0; i<_sweep_eqs.size(); i+=2) {
-                int v1 = _sweep_eqs[i];
-                int v2 = _sweep_eqs[i+1];
-                LOG(V3_VERB, "SATWP Sweeper eq %i %i\n", _sweep_eqs[i], _sweep_eqs[i+1]);
-                assert(std::abs(v1)<std::abs(v2));
-                // unsigned lit1 = VAR_TO_LIT(v1);
-                // unsigned lit2 = VAR_TO_LIT(v2);
-                // unsigned notlit1 = NOT_LIT(lit1);
-                // unsigned notlit2 = NOT_LIT(lit2);
-                // representatives[lit2]=lit1;
-                // representatives[notlit2]=notlit1;
-                if (v2 < 0) {
-                    v2 = -v2;
-                    v1 = -v1;
-                }
-                representatives[v2]=v1;
-            }
-            
-            model.resize(nbInputVars()+1);
-            //Order of resolving the polarity of each variable:
-            //  1. Sweep unit
-            //  2. Sweep representative into Sweep unit
-            //  3. Sweep representative into model lit
-            //  4. model lit (unchanged)
-            for (int var = 1; var <= nbInputVars() ; var++) {
-                if (const int sweepLit = sweepunits[var]; sweepLit != 0) {
-                    //Case 1: Sweep knows the unit value
-                    if (model[var] != sweepLit) {
-                        LOG(V1_WARN, "SATWP [WARN] var %i : Sweep lit (%i) != model lit (%i) \n", var, sweepLit, model[var]);
-                    }
-                    LOG(V1_WARN, "SATWP sweepLit %i \n", sweepLit);
-                    model[var] = sweepLit;
-                } else if (int reprVar = getReprVar(var, representatives); reprVar != var) {
-                    const int signToRep = signof(reprVar);
-                    reprVar = std::abs(reprVar);
-                    const int sweepReprLit = sweepunits[reprVar] * signToRep;
-                    const int sweepReprSign = signof(sweepReprLit);
-                    if (sweepReprSign!= 0) {
-                        //Case 2: Sweep knows a representative, and it knows its value
-                        if (sweepReprLit != model[reprVar]) {
-                            LOG(V1_WARN, "SATWP [WARN] var %i : Sweep repr lit (%i) != model repr lit (%i) \n", var, sweepReprLit, model[reprVar]);
-                        }
-                        const int deducedLit = var * signToRep * sweepReprSign;
-                        if (deducedLit != model[var]) {
-                            LOG(V1_WARN, "SATWP [WARN] var %i : Sweep deduced lit (%i) != model lit (%i) \n", var, deducedLit, model[var]);
-                        }
-                        LOG(V1_WARN, "SATWP deducedSweepLit %i \n", deducedLit);
-                        model[var] = deducedLit;
-                    } else {
-                        //Case 3: Sweep knows a representative, but not its value
-                        const int modelReprLit = model[reprVar];
-                        const int modelReprSign = signof(modelReprLit);
-                        const int deducedLit = var * signToRep * modelReprSign;
-                        if (deducedLit != model[var]) {
-                            LOG(V1_WARN, "SATWP [WARN] var %i : Sweep model deduced lit (%i) != model lit (%i) \n", var, deducedLit, model[var]);
-                        }
-                        LOG(V1_WARN, "SATWP deducedModelLit %i \n", deducedLit);
-                        model[var] = deducedLit;
-                    }
-                } else {
-                    LOG(V1_WARN, "SATWP model %i \n", model[var]);
-                }
-                // LOG(V3_VERB, "SATWP Sweeper sees var %i == %i (%i)\n", var, model[var], stored_unit);
-            }
-        }
-        //Nothing to do with type SATSOLVER
-    }
-    **/
-
 
     void interrupt() override {
         interrupt(_base_json);

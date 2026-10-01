@@ -13,6 +13,7 @@ FLAGS=(
  -spd=$OUT_DIR/logs/
  -tmp=$OUT_DIR/tmp/
  -terminate-abruptly=0
+ -os=1
  -v=2
  -mono-app=SATWITHPRE 
  -sat-config-dirs=config/sat/base/
