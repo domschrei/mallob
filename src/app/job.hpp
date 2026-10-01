@@ -3,6 +3,8 @@
 #define DOMPASCH_BALANCER_JOB_BASE_H
 
 #include <assert.h>
+#include <cstdint>
+#include <limits>
 #include <stddef.h>
 #include <stdint.h>
 #include <string>
@@ -11,7 +13,6 @@
 #include <algorithm>
 #include <functional>
 #include <optional>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -172,6 +173,8 @@ private:
     float _time_of_increment_activation = 0;
     float _time_of_first_volume_update = -1;
     float _time_of_abort = 0;
+    float _time_of_shrink_start {-1};
+    float _time_of_shrink_end {std::numeric_limits<float>::max()};
     
     float _time_of_last_comm = 0;
     float _time_of_last_limit_check = 0;
@@ -369,6 +372,12 @@ public:
         
         // Update volume
         _volume = newVolume;
+    }
+
+    void applyShrinkDirective(float timeSpan) {
+        // apply in addition to any previous shrink directives
+        if (_time_of_shrink_start < 0) _time_of_shrink_start = Timer::elapsedSecondsCached();
+        _time_of_shrink_end = std::min(_time_of_shrink_end, Timer::elapsedSecondsCached() + timeSpan);
     }
 
     // Updates the job's resource usage and then checks whether the job reached

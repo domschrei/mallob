@@ -1,0 +1,10 @@
+#!/bin/bash
+
+sab_ratio=20
+
+echo '-minprocs 2 -max-lits-per-thread=35000000 -pre-cleanup=1
+ -seed=110519 -zero-only-logging=1
+ -v=2 -s2f=solution.txt -terminate-abruptly=1
+ -mono-app=SATWITHPRE -sat-config-dirs=config/sat/base/
+ -sat-config-files=config/sat/noise.json,config/sat/reduce.json -jc=2
+ -preprocess-config=config/satwithpre/actors_M_SM_SKM.json -pb=0'

@@ -46,6 +46,8 @@ public:
 
     const std::string& getProofFormat() const {return _proof_format;}
 
+    virtual void shrink(float timeSpan) {}
+
     int nbInputVars() const {
         assert(_input_cnf.size() >= 2);
         return _input_cnf[_input_cnf.size() - 2];

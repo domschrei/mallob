@@ -2,11 +2,13 @@
 #pragma once
 
 #include <cmath>
+#include <atomic>
 #include <vector>
 
 #include "app/sat/data/model_string_compressor.hpp"
 #include "app/sat/job/sat_constants.h"
 #include "app/satwithpre/sat_preprocess_actor.hpp"
+#include "core/client_directive.hpp"
 #include "data/job_description.hpp"
 #include "interface/api/api_connector.hpp"
 #include "util/json.hpp"
@@ -34,6 +36,7 @@ private:
 
     nlohmann::json _base_json;
     int _sub_job_id {-1};
+    std::atomic_int _child_job_root_rank {-1};
     
     //SweepJob returns additional data which we need for model reconstruction
     std::string  _sweepresults_dir;
@@ -101,6 +104,16 @@ public:
         return SatPreprocessActor::rename_proof(i);
     }
 
+    void shrink(float timeSpan) override {
+        if (_sub_job_id == -1 || _child_job_root_rank == -1) return;
+        ClientDirective dir;
+        dir.jobId = _sub_job_id;
+        dir.type = ClientDirective::SHRINK;
+        dir.setData(timeSpan);
+        MyMpi::isend(_child_job_root_rank.load(std::memory_order_relaxed),
+            MSG_SEND_CLIENT_DIRECTIVE_TO_JOB_TREE_ROOT, std::move(dir), false);
+    }
+
 private:
     void submitJob() {
         // Prepare job submission data
@@ -111,7 +124,8 @@ private:
             {"priority", _params.preprocessSweepPriority()},
             {"application", _type == SWEEPER ? "SWEEP" : "SAT"},
             {"group-id", _group_id},
-            {"configuration", {{"options", _option_overrides}}}
+            {"configuration", {{"options", _option_overrides}}},
+            {"incremental", false}
         };
 
         auto f = std::vector<int>(_input_cnf.begin(), _input_cnf.end() - 2);
@@ -134,7 +148,6 @@ private:
         if (_params.savePreprocessingProofs())
             opts += " -palrup=1 -proof-dir=" + _params.proofDirectory() + "/tmp/" + _name + "." + _proof_format;
         if (!opts.empty()) json["configuration"]["options"] = opts;
-        applySuccessiveGrowth(json);
 
         if (_type == SWEEPER) {
             LOG(V2_INFO, "SATWP Sweep setting json['%s']=%s\n", SweepJob::SWEEPRESULT_DIR_KEY.c_str(), _sweepresults_dir.c_str());
@@ -149,7 +162,7 @@ private:
             else if (res.result == RESULT_UNSAT) _result = UNSAT;
             else if (res.result == RESULT_SIMPLIFIED) _result = SIMPLIFIED;
             else _result = NONE;
-        }, &_sub_job_id);
+        }, &_sub_job_id, [&](int rootRank) {_child_job_root_rank = rootRank;});
         if (result != JsonInterface::Result::ACCEPT) {
             LOG(V0_CRIT, "[ERROR] Cannot introduce mono job!\n");
             abort();
@@ -223,7 +236,7 @@ private:
             _output_cnf = std::move(solution); 
             //already contains metadata #vals and #clauses in the last two entries
         }
-        //TODO: We are passing an empty solution vector here, since it got already std::move'd ? 
+        //TODO: We are apparently passing an empty solution vector? since it got already std::move'd ? 
         res.setSolution(std::move(solution));
         LOG(V3_VERB, "SATWP %s extracted\n", json["name"].get<std::string>().c_str());
         return res;
