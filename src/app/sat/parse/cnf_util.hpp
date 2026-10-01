@@ -65,7 +65,7 @@ public:
                 clauseNo++;
                 clauseSatisfied = false;
                 continue;
-            } 
+            }
             assert(std::abs(lit) < model.size());
             int modelLit = model[std::abs(lit)];
             assert(modelLit == lit || modelLit == -lit);

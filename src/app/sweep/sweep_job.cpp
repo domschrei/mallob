@@ -41,7 +41,6 @@ SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTa
 	assert(_params.crossJobToClientParent()==false || log_return_false("[ERROR] For this application to work,"
 		    " you must explicitly disable cross-job sharing to the client parent, i.e. -cjtcp=0"));
 	DOUBLELOG(_sweeplogger, V2_INFO, "New SweepJob MPI Process on rank [%i] with planned %i threads, ctx %i \n", getJobTree().getRank(), params.numThreadsPerProcess.val, getJobTree().getContextId());
-	
 }
 
 
@@ -84,9 +83,8 @@ void SweepJob::appl_start() {
 	_timestamp_start_sweepapp = Timer::elapsedSeconds();
 	_worksteal_requests.resize(_nThreads);
 
-	
-	// const auto& conf = getDescription().getAppConfiguration().map;
-	assert(desc.getAppConfiguration().map.count(SWEEPRESULT_DIR_KEY) || log_return_false("[ERROR] SweepJob json['%s'] is empty, need a shared directory to write Sweep results (units, eqs, reconstruction data) \n", SWEEPRESULT_DIR_KEY.c_str()));
+	assert(desc.getAppConfiguration().map.count(SWEEPRESULT_DIR_KEY) 
+		|| log_return_false("[ERROR] SweepJob json['%s'] is empty, need a shared directory to write Sweep results (units, eqs, reconstruction data) \n", SWEEPRESULT_DIR_KEY.c_str()));
 	
 	//Moved all logging down here to keep it separate from the actual logic
 	DOUBLELOG(_sweeplogger,V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d, NumVars %i, NumClauses %i\n",
@@ -192,7 +190,7 @@ void SweepJob::appl_communicate() {
 	checkIdleWorkStatus();
 	checkForUnsatResults();
 
-	// clearImportedRound();
+	// clearImportedRound(); //we no longer clear this while solving, because we export all its units and eqs at the end
 	checkCrossCommNeedsAdvancing("appl_communicate");
 	tryReportToMallob();
 
@@ -359,9 +357,7 @@ std::shared_ptr<KissatSweep> SweepJob::createNewSweeper(int localId) {
     //Basic configuration
     sweeper->set_option("quiet", _params.sweepSolverQuiet());  //suppress any standard kissat messages
     sweeper->set_option("verbose", 0);//the native kissat verbosity
-	// if (_is_root && localId==_representative_localId) {
-		// sweeper->set_option("log", 1);    //extensive logging (needs to be configured+compiled with -l)
-	// }
+    sweeper->set_option("log", 0);    //extensive logging (needs to be configured+compiled with -l)
     sweeper->set_option("check", 0);  //do not check model or derived clauses, because we anyways dont have proof tracking
     sweeper->set_option("statistics", 1);  //print full statistics
     sweeper->set_option("profile", max(_params.satProfilingLevel.val, 0)); //detailed profiling. kissat allows down to 0, mallob down to -1
@@ -654,15 +650,14 @@ void SweepJob::rootReportSolverResult(int res, const KissatPtr &sweeper) {
 SweepJob::SweepResult SweepJob::collectSweepResult(std::vector<Kissat::namedSolverArray> &reconstruction) {
 	assert(_is_root || log_return_false("[Error]: Called  addUnitsEqsToFormula in SweepApp from non-root process\n"));
 	SweepResult res;	
-	// res.formula = std::move(formula);
 	res.reconstruction = std::move(reconstruction);
-	//Full history of all units and equivalences is stored here at the root node
+	//Full history of all units and equivalences is stored here 
 	for (int round=0; round < _root_sharing_round + 2; round++) {
 		auto data = _imported_data[round];
 		res.units.insert(res.units.end(), data.units.begin(), data.units.end());
 		res.eqs.insert(  res.eqs.end(),   data.eqs.begin(),   data.eqs.end());
 		if (!data.units.empty() || !data.eqs.empty()) {
-			LOGGER(_sweeplogger,V3_VERB, "adding (units,eqs) from sweep result round %i: %i %i\n", round, data.units.size(), data.eqs.size() );
+			LOGGER(_sweeplogger,V3_VERB, "SweepResult add (units,eqs) from round %i: %i %i\n", round, data.units.size(), data.eqs.size() );
 		}
 	}
 	return res;
@@ -1895,8 +1890,6 @@ std::vector<int> SweepJob::getRandomIdPermutation() {
 	std::shuffle(permutation.begin(), permutation.end(), rng);
 	return permutation;
 }
-
-
 
 void SweepJob::crossjob_rootReceiveClauses(std::vector<int>  &&clauses) {
 	if (!_params.sweepXTCSrecv()) {
