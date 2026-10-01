@@ -687,11 +687,8 @@ SweepJob::SweepResult SweepJob::readSweepResultsFromDir(const std::string &dir) 
 	LOG(V2_INFO, "Reading sweepresults from %s\n", dir.c_str());
 	res.units = FileUtils::readFileToVector<int>(dir + "/units.int");
 	res.eqs   = FileUtils::readFileToVector<int>(dir + "/eqs.int");
-	// LOG(V2_INFO, "Read from Sweep units %zu \n", res.units.size());
-	// LOG(V2_INFO, "Read from Sweep eqs   %zu \n", res.eqs.size()/2); //two ints per equivalence
 	for (const auto &name : Kissat::_reconstruction_names) {
 		res.reconstruction.push_back({name, FileUtils::readFileToVector<std::byte>(dir + "/" + name + ".byte" )});
-		// LOG(V2_INFO, "Read from Sweep reconstruction '%s': %zu bytes\n", name.c_str(), res.reconstruction.back().array.size()); 
 	}
 	return res;
 }

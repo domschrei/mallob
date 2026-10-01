@@ -56,8 +56,8 @@ public:
         _proof_format = _type == SATSOLVER ? "palrup" : "";
         if (_type == SWEEPER) {
             assert(!_params.tmpDirectory().empty() 
-                || log_return_false("[ERROR] SATWP Sweep needs a shared-filesystem tmp-directory, provide it via -tmp= \n"));
-            _sweepresults_dir = _params.tmpDirectory() + "/sweepresults-" + std::to_string(Timer::getStartTime().tv_sec);
+                || log_return_false("[ERROR] SATWP Sweep needs a shared-filesystem tmp-directory. Provide it via -tmp= \n"));
+            _sweepresults_dir = _params.tmpDirectory() + "/sweepresults-" + std::to_string(Timer::getStartTime().tv_nsec);
         }
     }
     ~MallobPreprocessActor() {}
@@ -232,6 +232,11 @@ private:
                 //SweepJob wrote files into the shared filesystem, we need them later for model reconstruction
                 _sweepRes = SweepJob::readSweepResultsFromDir(_sweepresults_dir);
                 SweepJob::printSweepResult(_sweepRes);
+                if (FileUtils::rmrf(_sweepresults_dir)) {
+                    LOG(V2_INFO, "SATWP cleaned up (deleted) temporary Sweep directory %s\n", _sweepresults_dir.c_str());
+                } else {
+                    LOG(V1_WARN, "[WARN] SATWP couldn't properly clean up (delete) temporary Sweep directory %s\n", _sweepresults_dir.c_str());
+                }
             }
             _output_cnf = std::move(solution); 
             //already contains metadata #vals and #clauses in the last two entries
