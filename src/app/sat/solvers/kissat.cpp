@@ -383,8 +383,8 @@ void Kissat::addLiteralFromPreprocessing(int lit) {
 
 void Kissat::exportReconstruction() {
     for (const auto &name : _reconstruction_names) {
-        _reconstruction.push_back(getNamedArray(solver, name));
-        LOG(V2_INFO, "Kissat exported reconstruction array '%s' %zu bytes\n", name.c_str(), _reconstruction.back().array.size());
+        _reconstruction.push_back(exportNamedArray(solver, name));
+        LOG(V3_VERB, "Kissat exported reconstruction array '%s' %zu bytes\n", name.c_str(), _reconstruction.back().array.size());
     }
     _has_reconstruction = true;
 }
@@ -398,7 +398,7 @@ std::vector<Kissat::namedSolverArray>&& Kissat::extractReconstruction() {
     return std::move(_reconstruction);
 }
 
-Kissat::namedSolverArray Kissat::getNamedArray(kissat *solver, const std::string &name) {
+Kissat::namedSolverArray Kissat::exportNamedArray(kissat *solver, const std::string &name) {
     size_t received_bytes; 
     auto data = static_cast<const std::byte *> (kissat_export_array (solver, name.c_str(), &received_bytes));
     return {name, std::vector<std::byte> (data, data + received_bytes) };
@@ -406,7 +406,7 @@ Kissat::namedSolverArray Kissat::getNamedArray(kissat *solver, const std::string
 
 void Kissat::importReconstructionArrays(std::vector<namedSolverArray> &reconstruction) {
    for (const auto &arr : reconstruction) {
-       LOG(V2_INFO, "importing model reconstruction array '%s' %zu bytes \n", arr.name.c_str(), arr.array.size());
+       LOG(V3_VERB, "importing model reconstruction array '%s' %zu bytes \n", arr.name.c_str(), arr.array.size());
        kissat_import_array(solver, arr.name.c_str(), arr.array.data(), arr.array.size());
    } 
 }

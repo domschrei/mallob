@@ -4,7 +4,7 @@
 OUT_DIR=$HOME/PhD/logsntraces/
 
 FLAGS=(
- -minprocs 1
+ -minprocs 2
  -max-lits-per-thread=35000000 
  -pre-cleanup=1
  -seed=110519 
@@ -14,23 +14,23 @@ FLAGS=(
  -tmp=$OUT_DIR/tmp/
  -terminate-abruptly=0
  -os=1
- -v=2
- -mono-app=SATWITHPRE 
+ -spl=-1
+ -jcup=0.05
  -sat-config-dirs=config/sat/base/
  -preprocess-config=config/satwithpre/actors_sweepfirst.json
+ -mono-app=SATWITHPRE 
+ -v=2
  -satsolver=k 
- -cjtcp=0
- -jcup=0.05
- -sweep-max-iterations=2
- -jc=2
  -sweep-solver-verbosity=0
+ -sweep-max-iterations=2
+ -cjtcp=0
+ -jc=2
 )
 
 echo "${FLAGS[@]}"
 
 #clean old logs and traces
-rm -rf $HOME/PhD/logsntraces/logs/*
-rm -rf $HOME/PhD/logsntraces/traces/*
+$HOME/PhD/logsntraces/clean.sh
 
 grep "CC=" ./lib/kissat/build/makefile
 
@@ -42,15 +42,15 @@ INST="$HOME/PhD/instances/sat-and-minisat1m/006be0fb3ae0a75aac0e386c2e6c4669-ben
 
 # INST="$HOME/PhD/instances/sat-and-minisat1m/00be590675417eba2bb2585790ac392d-iso-brn008.shuffled-as.sat05-2933.cnf.xz" #good quick mix
 # INST="$HOME/PhD/instances/sat-and-minisat1m/02da8e9305ee7b4ad33c348f46afebea-x9-03055.sat.sanitized.cnf.xz" #too easy
-INST="$HOME/PhD/instances/sat-and-minisat1m/01653db16d6cedc27f5314d680efc055-fla-komb-220-5.cnf.xz" #destructible problems!
+# INST="$HOME/PhD/instances/sat-and-minisat1m/01653db16d6cedc27f5314d680efc055-fla-komb-220-5.cnf.xz" #destructible problems!
 # INST="$HOME/PhD/instances/sat-and-minisat1m/00bbdbb1bc700e4c4ceb0d6e86e33c23-glassybp-v300-s1496080651.cnf.xz"
 # INST="$HOME/PhD/instances/sat-and-minisat1m/02b69d0e5c2b68d5c3d650164b6c277d-Q3inK08.cnf.xz" #destructible problems
-# INST="$HOME/PhD/instances/sat-and-minisat1m/0320af21bba8b8cd940a95277377803d-okgen-c1200-v300-s509783707-509783707.cnf.xz" #destructible rpoblems!
+INST="$HOME/PhD/instances/sat-and-minisat1m/0320af21bba8b8cd940a95277377803d-okgen-c1200-v300-s509783707-509783707.cnf.xz" #destructible rpoblems!
 # INST="$HOME/PhD/instances/sat-and-minisat1m/003de2086be59a5fb7a7aaad0992cf47-x9-07025.sat.sanitized.cnf.xz" #nothign to find, but exits
 # INST="$HOME/PhD/instances/sat-and-minisat1m/02ee4550987a8545d00d0ad14d4b215c-manthey_DimacsSorter_28_0.cnf.xz"
 
 # INST="$HOME/PhD/instances/tmp2024/05c8e94aaee86390eaf6e68dd3ec3570-noL-11-2.sanitized.cnf"
 #
 
-./scripts/run/mallob_local.sh "${FLAGS[@]}" -mono="$INST" -t=1
+./scripts/run/mallob_local.sh "${FLAGS[@]}" -mono="$INST" -t=3
 

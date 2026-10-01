@@ -132,7 +132,7 @@ void SweepJob::appl_start() {
 	if (_exited_immediately) {
 		if (_is_root) {
 			LOGGER(_sweeplogger,V2_INFO,"Report UNKOWN to Mallob immediately\n");
-			rootReportSolverResult(UNKNOWN, {});
+			rootReportSolverResult(UNKNOWN, nullptr);
 		}
 		return;
 	}
@@ -256,7 +256,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			LOGGER(_sweeplogger,V4_VVER, "SWEEP [%i](%i) found UNSAT! \n", _my_rank, localId);
 			if (_is_root) {
 				//for consistency, only the root node is allowed to report to Mallob
-				rootReportSolverResult(UNSAT, {});
+				rootReportSolverResult(UNSAT, nullptr);
 			} else {
 				//if we are not on root, this flag lets the main Process soon send an MPI message to root, indicating UNSAT
 				_do_report_UNSAT_to_root = true;
@@ -270,7 +270,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 				rootReportSolverResult(SIMPLIFIED, sweeper);
 			} else {
 				//the whole sweeping didn't yield any improvements at all
-				rootReportSolverResult(UNKNOWN, {});
+				rootReportSolverResult(UNKNOWN, nullptr);
 			}
 		}
 
@@ -538,7 +538,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 	else if (msg.tag == TAG_FOUND_UNSAT) {
 		LOGGER(_sweeplogger,V2_INFO, "SWEEP MSG [%i] <~~~ Found UNSAT! [%i]\n", _my_rank, sourceRank );
 		assert(_is_root);
-		rootReportSolverResult(UNSAT, {});
+		rootReportSolverResult(UNSAT, nullptr);
 	}
 	else if (mpiTag == MSG_NOTIFY_JOB_ABORTING)    {LOGGER(_sweeplogger,V1_WARN, "SWEEP MSG WARN [%i]: received NOTIFY_JOB_ABORTING \n", _my_rank);}
 	else if (mpiTag == MSG_NOTIFY_JOB_TERMINATING) {LOGGER(_sweeplogger,V1_WARN, "SWEEP MSG WARN [%i]: received NOTIFY_JOB_TERMINATING \n", _my_rank);}
@@ -620,7 +620,6 @@ void SweepJob::rootReportSolverResult(int res, const KissatPtr &sweeper) {
 	}
 
 	std::vector<int> formula{};
-	std::vector<Kissat::namedSolverArray> reconstruction{};
 	
 	LOGGER(_sweeplogger,V3_VERB, "SWEEP JOB [%i] stages sweep result %i to Mallob\n", _my_rank, res);
 	assert(_staged_solved_status == -1 || log_return_false("SWEEP ERROR: duplicate attempt to report result to mallob, was already reported as %i \n", _internal_result.result));
@@ -632,7 +631,11 @@ void SweepJob::rootReportSolverResult(int res, const KissatPtr &sweeper) {
 		assert(sweeper->hasPreprocessedFormula());
 		assert(sweeper->hasReconstruction());
 		formula = sweeper->extractPreprocessedFormula(); //already contains numVars and numClauses in the last two slots
-		reconstruction = sweeper->extractReconstruction();
+		auto reconstruction = sweeper->extractReconstruction();
+		SweepResult sweepRes = collectSweepResult(reconstruction);
+		printSweepResult(sweepRes);
+		writeSweepResultsToDir(sweepRes);
+		printFirstClauses(formula, 10);
 	} else if (res==UNKNOWN) {
 		// No progress has been made.
 		// Design choice: we don't send any formula back, since there would be no new information in it
@@ -642,15 +645,7 @@ void SweepJob::rootReportSolverResult(int res, const KissatPtr &sweeper) {
 	}
 	DOUBLELOG(_sweeplogger,V2_INFO, "SWEEP_RESULT_CODE %i == %s \n", res, res==40 ? "SIMPLIFIED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
 	
-	SweepResult sweepRes = collectSweepResult(reconstruction);
-	printSweepResult(sweepRes);
-	writeSweepResultsToDir(sweepRes);
-	
-	printFirstClauses(formula, 10);
-	// std::vector<int> resVec = serializeSweepResult(resObj);
-	
-	//Mallob-side serialization required!
-	//Even an empty solution needs to be serialized, otherwise the format is wrong during Mallobs deserialization
+	//Mallob requires and provides its own serialization on top
 	_internal_result.setSolutionToSerialize(formula.data(), formula.size());
 	_staged_solved_status = res;
 }
@@ -675,8 +670,6 @@ SweepJob::SweepResult SweepJob::collectSweepResult(std::vector<Kissat::namedSolv
 
 std::string SweepJob::writeSweepResultsToDir(const SweepResult &res) {
 	const auto& conf = getDescription().getAppConfiguration().map;
-	// const std::string dir = conf.at("result-dir") + "/mallob-sweep-"
-		// + std::to_string(getId()) + "-" + std::to_string(getRevision());
 	const std::string dir = conf.at(SWEEPRESULT_DIR_KEY);
 	if (FileUtils::mkdir(dir) != 0) {
 		LOG(V1_WARN, "SWEEP [%i]: could not create result dir %s\n", _my_rank, dir.c_str());

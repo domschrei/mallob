@@ -132,7 +132,7 @@ private:
     bool isPreprocessingAcceptable(int vars, int cls);
     void addLiteralFromPreprocessing(int lit);
 	void exportReconstruction();
-	static namedSolverArray getNamedArray(kissat *solver, const std::string &name);
+	static namedSolverArray exportNamedArray(kissat *solver, const std::string &name);
 
     bool shouldTerminate();
 

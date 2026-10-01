@@ -358,7 +358,7 @@ private:
 		if (decide_end_iteration) {
 			if (_root_had_success_this_iteration == false) {
 				_root_weak_iterations++;
-				LOGGER(_sweeplogger,V2_INFO, "Iteration %i weak . Now WEAK_ITERATIONS %i \n", _root_iteration, _root_weak_iterations);
+				LOGGER(_sweeplogger,V3_VERB, "Iteration %i weak . Now WEAK_ITERATIONS %i \n", _root_iteration, _root_weak_iterations);
 			}
 		}
 		//Terminate the whole SweepJob if enough failed iterations happened

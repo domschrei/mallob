@@ -35,7 +35,7 @@ private:
     nlohmann::json _base_json;
     int _sub_job_id {-1};
     
-    //SweepJob returns additional data (via the file system) which we need for model reconstruction
+    //SweepJob returns additional data which we need for model reconstruction
     std::string  _sweepresults_dir;
     SweepJob::SweepResult _sweepRes{};
 
@@ -63,43 +63,21 @@ public:
         submitJob();
     }
     
-    static int getReprVar(int var, std::vector<int> &repr) {
-        if (repr[var]==0) {
-            return 0;
-        }
-        int sign = 1; 
-        int res = repr[var];
-        while (res != var) {
-            LOG(V1_WARN, "SATWP %i --> %i \n", var, res);
-            if (res < 0) {
-                sign = -sign;
-                res = -res;
-            }
-            var = res;
-            res = repr[var];
-        }
-        return res * sign;
-    }
-    
-    static int signof(int var) {
-        if (var==0) return 0;
-        if (var<0) return -1;
-        return 1;
-    }
-    
     void reconstructSolution(std::vector<int>& model) override {
-        if (_type != SWEEPER) return; //nothing to do when coming from SAT job
-        assert(!_sweepRes.reconstruction.empty() || log_return_false("[ERROR] SweepResult reconstruction data is missing, can't reconstruct solution"));
-        SolverSetup setup;
-        setup.logger = &Logger::getMainInstance();
-        setup.numVars = nbInputVars();
-        setup.numOriginalClauses = nbInputClauses();
-        //We piggyback on kissats existing model reconstruction code instead of writing our own.
-        //To make this work we need to supply a "skeleton" kissat solver with the necessary reconstruction datastructures, 
-        //which we accordingly extracted earlier from the representative solver at the end of the SweepJob App, byte-for-byte.
-        auto skeleton_kissat = Kissat(setup);
-        skeleton_kissat.importReconstructionArrays(_sweepRes.reconstruction);
-        skeleton_kissat.reconstructSolutionFromPreprocessing(model);
+        if (_type == SWEEPER && _result == SIMPLIFIED) {
+            assert(!_sweepRes.reconstruction.empty() || log_return_false("[ERROR] SweepResult reconstruction data is missing, can't reconstruct solution"));
+            SolverSetup setup;
+            setup.logger = &Logger::getMainInstance();
+            setup.numVars = nbInputVars();
+            setup.numOriginalClauses = nbInputClauses();
+            //We piggyback on kissats existing model reconstruction code instead of writing our own.
+            //To make this work we need to supply a "skeleton" kissat solver with the necessary reconstruction datastructures, 
+            //which we accordingly extracted earlier from the representative solver at the end of the SweepJob App, byte-for-byte.
+            auto skeleton_kissat = Kissat(setup);
+            skeleton_kissat.importReconstructionArrays(_sweepRes.reconstruction);
+            skeleton_kissat.reconstructSolutionFromPreprocessing(model);
+        }
+        //Nothing to do for a SAT job or when Sweeping couldn't simplify the formula at all
     }
     
 
@@ -238,16 +216,14 @@ private:
             _model = std::move(solution);
         } else if (res.result == RESULT_SIMPLIFIED) {
             if (_type == SWEEPER) {
-                //SweepJob wrote result files which we need for model reconstruction
+                //SweepJob wrote files into the shared filesystem, we need them later for model reconstruction
                 _sweepRes = SweepJob::readSweepResultsFromDir(_sweepresults_dir);
-                // LOG(V3_VERB, "SATWP Extracted sweepresults from filesystem:\n", json["name"].get<std::string>().c_str());
                 SweepJob::printSweepResult(_sweepRes);
             }
-            _output_cnf = std::move(solution);
+            _output_cnf = std::move(solution); 
             //already contains metadata #vals and #clauses in the last two entries
         }
-        //TODO: Is there even anything left in solution at this point, since we already moved it to _output_cnf?
-        //      and, does it even matter? because nothing is done with this set solution...
+        //TODO: We are passing an empty solution vector here, since it got already std::move'd ? 
         res.setSolution(std::move(solution));
         LOG(V3_VERB, "SATWP %s extracted\n", json["name"].get<std::string>().c_str());
         return res;

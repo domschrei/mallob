@@ -55,12 +55,9 @@ public:
     static void checkModel(const std::vector<int>& formula, const std::vector<int>& model) {
         bool clauseSatisfied = false;
         int clauseNo = 1;
-	    std::ostringstream oss;
         for (int i = 0; i < formula.size()-2; i++) {
             int lit = formula[i];
             if (lit == 0) {
-                // LOG(V3_VERB, "cl.%i: %s\n", clauseNo, oss.str().c_str());
-                oss.str("");
                 if (!clauseSatisfied) {
                     LOG(V0_CRIT, "[ERROR] Clause # %i at position %i not satisfied by model!\n", clauseNo, i);
                     abort();
@@ -69,7 +66,6 @@ public:
                 clauseSatisfied = false;
                 continue;
             } 
-            oss << lit << " ";
             assert(std::abs(lit) < model.size());
             int modelLit = model[std::abs(lit)];
             assert(modelLit == lit || modelLit == -lit);
