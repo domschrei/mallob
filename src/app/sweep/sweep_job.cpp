@@ -933,7 +933,7 @@ void SweepJob::checkIdleWorkStatus() {
 		//no touching them anymore
 	}
 
-	const float CHECK_PERIOD = 2 * _params.sweepSharingPeriod(); // Defines the long-term-idle threshhold
+	const float CHECK_PERIOD = 5 * _params.sweepSharingPeriod(); // Defines the long-term-idle threshhold
 	if (Timer::elapsedSeconds() - _timestamp_log_last_idleinfo < CHECK_PERIOD) {
 		return;
 	}
@@ -2022,15 +2022,15 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 			_root_had_success_this_iteration = true;
 		}
 	}
-	//Skip the iteration because too many solvers are lagging (stuck in the same sweep call for a whole skip-window duration)
+	//Skip the iteration because too many solvers are longterm idle (stuck in the same sweep call for X sharing rounds)
 	int nSolvers = md.active_count + md.idle_count;
-	if (shared.size()>=_skip_window_rounds && md.lagging > 0.33 * nSolvers) {
+	if (shared.size()>=_skip_window_rounds && md.longtermidle_count > 0.25 * nSolvers) {
 		decide_end_iteration = true;
 		//We declare this iteration failed, otherwise it can happen that hundreds of iterations
 		//occur, each skipped after 3-4 seconds due to lagging, but each being juuust long enough to count as successfull
 		_root_had_success_this_iteration = false;
-		LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](root-trf) LAGGING_SKIP iteration %i (rnd %i) , bc. more than a third of solvers are lagging ( %i / %i ) in window %.3f sec , %i rounds \n",
-			_my_rank, _root_iteration, _root_sharing_round, md.lagging, nSolvers, _params.sweepSkipWindowSecs(), _skip_window_rounds);
+		LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](root-trf) LAGGING_SKIP iteration %i (rnd %i) , bc. more than a third of solvers are longtermidle ( %i / %i ) in window %.3f sec , %i rounds \n",
+			_my_rank, _root_iteration, _root_sharing_round, md.longtermidle_count , nSolvers, _params.sweepSkipWindowSecs(), _skip_window_rounds);
 	}
 
 	//If all work has been done, the iteration ends naturally
