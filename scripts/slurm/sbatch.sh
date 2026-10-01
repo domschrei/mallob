@@ -117,25 +117,26 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     # TODO Configure Mallob
     timeout=$DS_SECONDSPERJOB
     cmd="$build/mallob \
-	-mono-app=$DS_APP \
-    -preprocess-config=config/satwithpre/actors_sweepfirst.json
-	-satsolver=k \
-	-mono=$f -jwl=$timeout -T=$(($timeout+30)) -wam=60``000 -pre-cleanup=1 \
-    -log=$globallogdir -tmp=$localtmpdir -comment-outputlogdir=$outputlogdir -sro=${globallogdir}/processed-jobs.out -trace-dir=${globallogdir}/ -os=1 -v=4 -iff=0 -s2f=${globallogdir}/model -cm=0 \
-    -rpa=1 -pph=${SLURM_NTASKS_PER_NODE} -mlpt=50``000``000 -t=$((${SLURM_CPUS_PER_TASK} / 2)) \
+    -mono-app=$DS_APP \
+    -preprocess-config=config/satwithpre/actors_sweepfirst.json \
+    -satsolver=k \
+    -mono=$f -jwl=$timeout -T=$(($timeout+30)) -wam=60000 -pre-cleanup=1 \
+    -log=$globallogdir -tmp=$localtmpdir -comment-outputlogdir=$outputlogdir -sro=${globallogdir}/processed-jobs.out \
+    -trace-dir=${globallogdir}/ \
+    -rpa=1 -pph=${SLURM_NTASKS_PER_NODE} -mlpt=50000000 -t=$((${SLURM_CPUS_PER_TASK} / 2)) \
     -isp=0 -cfci=30  -rlbd=0 -ilbd=1 \
     -q=0 \
     -os=1 \
     -cm=0 \
     -rspaa=1 \
-  	-jcup=0.1 \
-  	-v=2 \
-  	-sweep-solver-verbosity=0 \
-  	-cjc=1 \
-  	-cjtcp=0 \
-  	-fcll=2 \
+    -jcup=0.1 \
+    -v=2 \
+    -sweep-solver-verbosity=0 \
+    -cjc=1 \
+    -cjtcp=0 \
+    -fcll=2 \
     -seed=0 \
-	-sweep-skip-ratio=0.001 \
+    -sweep-skip-ratio=0.001 \
     -sweep-skip-window=2.0 \
     -sweep-max-bad-iters=3 \
     -spd=${globallogdir}/ -spl=-1"
