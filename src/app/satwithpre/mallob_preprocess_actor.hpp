@@ -232,11 +232,8 @@ private:
                 //SweepJob wrote files into the shared filesystem, we need them later for model reconstruction
                 _sweepRes = SweepJob::readSweepResultsFromDir(_sweepresults_dir);
                 SweepJob::printSweepResult(_sweepRes);
-                if (FileUtils::rmrf(_sweepresults_dir)) {
-                    LOG(V1_WARN, "[WARN] SATWP couldn't properly clean up (delete) temporary Sweep directory %s\n", _sweepresults_dir.c_str());
-                } else {
-                    LOG(V2_INFO, "SATWP cleaned up temporary Sweep directory %s\n", _sweepresults_dir.c_str());
-                }
+                LOG(V2_INFO, "SATWP cleaning up temporary Sweep directory %s\n", _sweepresults_dir.c_str());
+                FileUtils::rmrf(_sweepresults_dir);
             }
             _output_cnf = std::move(solution); 
             //already contains metadata #vals and #clauses in the last two entries
