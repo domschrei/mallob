@@ -631,7 +631,7 @@ void SweepJob::rootReportSolverResult(int res, const KissatPtr &sweeper) {
 		LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB [%i]: Solution SIMPLIFIED\n", _my_rank);
 		assert(sweeper->hasPreprocessedFormula());
 		assert(sweeper->hasReconstruction());
-		formula = sweeper->extractPreprocessedFormula();
+		formula = sweeper->extractPreprocessedFormula(); //already contains numVars and numClauses in the last two slots
 		reconstruction = sweeper->extractReconstruction();
 	} else if (res==UNKNOWN) {
 		// No progress has been made.
@@ -798,6 +798,10 @@ void SweepJob::printSweepResult(const SweepResult &res) {
 
 void SweepJob::printFirstClauses(const std::vector<int> &formula, int nbClauses) {
 	int clauseNo = 1;	
+	if (formula.empty()) {
+		return;
+	}
+	assert(formula.size() >= 2); //must have numVars and numClauses at the end
 	std::ostringstream oss;
 	LOGGER(_sweeplogger, V3_VERB, "First %i clauses (total formula size %i\n", nbClauses, formula.size());
 	for (int i=0; i < formula.size()-2 && clauseNo < nbClauses; i++) {
