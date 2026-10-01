@@ -17,6 +17,8 @@
 
 module load slurm_setup; module unload devEnv/Intel/2019 intel-mpi; module load gcc/11 intel-mpi/2019-gcc cmake/3.14.5 gdb
 
+source load_standard_modules.sh
+
 username="$DS_USERNAME"
 projname="$DS_PROJECTNAME"
 starttime=$(date +%s)
@@ -26,6 +28,7 @@ hostname
 module list
 which mpirun
 echo "#ranks: $SLURM_NTASKS"
+echo "$(date)"
 
 build="build" # TODO your build directory for Mallob
 
@@ -46,7 +49,8 @@ localtmpdir_base=${SCRATCH}/tmp/$DS_JOBNAME-$SLURM_JOB_ID # fast (?) disk
 mkdir -p $localtmpdir_base $globallogdir_base
 
 # Benchmark instances, one per line
-benchmarkfile="/hppfs/work/$projname/$username/instances/2023+2024-unique.txt" # TODO benchmark file
+# benchmarkfile="/hppfs/work/$projname/$username/instances/2023+2024-unique.txt" # TODO benchmark file
+benchmarkfile="$DS_BENCHMARKFILE"
 if [ ! -f $benchmarkfile ]; then
     echo "Benchmark file not found!"
     exit 1
@@ -98,16 +102,42 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     outputlogdir="${globallogdir_base}"
 
     echo "logdir: $globallogdir , localtmp: $localtmpdir , output: $outputlogdir"
+	  echo " "
+    echo " "
+    echo "$(date)"
+    echo "jobname:  $DS_JOBNAME"
+    echo "index:    $i"
+    echo "logdir:   $globallogdir"
+    echo "localtmp: $localtmpdir"
+    echo "output:   $outputlogdir"
+    echo "instance: $f"
+    echo " "
+
 
     # TODO Configure Mallob
     timeout=$DS_SECONDSPERJOB
-    cmd="$build/mallob -mono-app=SATWITHPRE -pb=1 -pjp=999999 -pef=1 -mono=$f -jwl=$timeout -T=$(($timeout+30)) -wam=60``000 -pre-cleanup=1 \
-    -q=1 -log=$globallogdir -tmp=$localtmpdir -comment-outputlogdir=$outputlogdir -sro=${globallogdir}/processed-jobs.out -trace-dir=${globallogdir}/ -os=1 -v=4 -iff=0 -s2f=${globallogdir}/model -cm=0 \
+    cmd="$build/mallob \
+	-mono-app=$DS_APP \
+	-satsolver=k \
+	-mono=$f -jwl=$timeout -T=$(($timeout+30)) -wam=60``000 -pre-cleanup=1 \
+    -log=$globallogdir -tmp=$localtmpdir -comment-outputlogdir=$outputlogdir -sro=${globallogdir}/processed-jobs.out -trace-dir=${globallogdir}/ -os=1 -v=4 -iff=0 -s2f=${globallogdir}/model -cm=0 \
     -rpa=1 -pph=${SLURM_NTASKS_PER_NODE} -mlpt=50``000``000 -t=$((${SLURM_CPUS_PER_TASK} / 2)) \
-    -satsolver=[k_]w -isp=0 -div-phases=1 -div-noise=0 -div-seeds=1 -div-elim=0 -div-native=0 -scsd=0 \
-    -scll=60 -slbdl=60 -qcll=60 -qlbdl=60 -csm=3 -cfm=3 -cfci=30 -mscf=5 -bem=1 -aim=1 -rlbd=0 -ilbd=1 -randlbd=0 -scramble-lbds=0 \
+    -isp=0 -cfci=30  -rlbd=0 -ilbd=1 \
+    -q=0 \
+    -os=1 \
+    -cm=0 \
+    -rspaa=1 \
+  	-jcup=0.1 \
+  	-v=2 \
+  	-sweep-solver-verbosity=0 \
+  	-cjc=1 \
+  	-cjtcp=0 \
+  	-fcll=2 \
     -seed=0 \
-    -spd=${globallogdir}/ -spl=3"
+	-sweep-skip-ratio=0.001 \
+    -sweep-skip-window=2.0 \
+    -sweep-max-bad-iters=3 \
+    -spd=${globallogdir}/ -spl=-1"
 
     # Pre-create network-disk output directories to avoid many concurrent filesystem manips
     mkdir -p $(for rank in $(seq 0 $(($SLURM_NTASKS-1))); do echo $outputlogdir/$i/$rank; done)
@@ -131,7 +161,7 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     $mpicall bash -c "scripts/slurm/prolog.sh ; $cmd"
 
     sleep 3 # avoid "nodes are still busy" issue?
-    $mpicall scripts/slurm/epilog.sh
+    $mpicall scripts/slurm/epilogNew.sh
 
     echo "$(date) JOB $i FINISHED"
 
