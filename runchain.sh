@@ -19,10 +19,10 @@ FLAGS=(
  -sat-config-dirs=config/sat/base/
  -preprocess-config=config/satwithpre/actors_sweepfirst.json
  -mono-app=SATWITHPRE 
- -v=2
+ -v=3
  -satsolver=k 
  -sweep-solver-verbosity=0
- -sweep-max-iterations=2
+ -sweep-max-iterations=999
  -cjtcp=0
  -jc=2
 )
@@ -41,6 +41,8 @@ INST="$HOME/PhD/instances/sat-and-minisat1m/00847fca81490df01b9e239fd6027378-ben
 INST="$HOME/PhD/instances/sat-and-minisat1m/006be0fb3ae0a75aac0e386c2e6c4669-bench_501.smt2.cnf.xz"
 
 INST="$HOME/PhD/instances/sat-and-minisat1m/00be590675417eba2bb2585790ac392d-iso-brn008.shuffled-as.sat05-2933.cnf.xz" #good quick mix
+INST="$HOME/PhD/instances/sat-and-minisat1m/0151782431fa0ec1f855523721c52682-58-122783.cnf.xz" #lot of lagging
+
 # INST="$HOME/PhD/instances/sat-and-minisat1m/02da8e9305ee7b4ad33c348f46afebea-x9-03055.sat.sanitized.cnf.xz" #too easy
 # INST="$HOME/PhD/instances/sat-and-minisat1m/01653db16d6cedc27f5314d680efc055-fla-komb-220-5.cnf.xz" #destructible problems!
 # INST="$HOME/PhD/instances/sat-and-minisat1m/00bbdbb1bc700e4c4ceb0d6e86e33c23-glassybp-v300-s1496080651.cnf.xz"

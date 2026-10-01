@@ -154,7 +154,7 @@ private:
 
         assert(tag == MSG_JOB_TREE_MODULAR_REDUCE || tag == MSG_JOB_TREE_MODULAR_BROADCAST || log_return_false("[WARN] Unexpected tag %i (msg.tag %i) in JobTreeAllReduction receive(...) from source %i\n", tag, msg.tag, source));
 
-        LOG(V3_VERB, "TRY REDUCE %i %i %i %i %i\n", tag, msg.epoch, _base_msg.epoch, msg.tag, _base_msg.tag);
+        // LOG(V3_VERB, "TRY REDUCE %i %i %i %i %i\n", tag, msg.epoch, _base_msg.epoch, msg.tag, _base_msg.tag);
 
         bool accept = msg.epoch == _base_msg.epoch 
                     //&& msg.revision == _base_msg.revision 
@@ -171,7 +171,7 @@ private:
         }
 
         if (tag == MSG_JOB_TREE_MODULAR_REDUCE) {
-            LOG(V3_VERB, "REDUCE\n");
+            // LOG(V3_VERB, "REDUCE\n");
 
             if (_aggregating || _future_aggregate.valid() || _reduction_locally_done) 
                 return false; // already internally aggregating elements (or already done)!
@@ -190,7 +190,7 @@ private:
             advance();
         }
         if (tag == MSG_JOB_TREE_MODULAR_BROADCAST && _broadcast_enabled) {
-            LOG(V3_VERB, "BROADCAST\n");
+            // LOG(V3_VERB, "BROADCAST\n");
             receiveAndForwardFinalElem(std::move(msg.payload));
         }
         return true;
