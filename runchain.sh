@@ -52,5 +52,5 @@ INST="$HOME/PhD/instances/sat-and-minisat1m/00be590675417eba2bb2585790ac392d-iso
 # INST="$HOME/PhD/instances/tmp2024/05c8e94aaee86390eaf6e68dd3ec3570-noL-11-2.sanitized.cnf"
 #
 
-./scripts/run/mallob_local.sh "${FLAGS[@]}" -mono="$INST" -t=3
+./scripts/run/mallob_local.sh "${FLAGS[@]}" -mono="$INST" -t=5
 

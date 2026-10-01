@@ -302,7 +302,7 @@ std::shared_ptr<KissatSweep> SweepJob::createNewSweeper(int localId) {
 	const JobDescription& desc = getDescription();
 	SolverSetup setup;
 	setup.logger = &Logger::getMainInstance();
-	setup.jobname = "sweep-"+to_string(_my_index);
+	setup.jobname = "#" + std::to_string(getId());
 	setup.numVars = desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
 	setup.numOriginalClauses = desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
 	setup.localId = localId;
