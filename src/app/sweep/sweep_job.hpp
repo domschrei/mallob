@@ -241,11 +241,9 @@ private:
 	std::vector<int>  _crossjob_root_received_units{};
 	std::mutex _crossjob_import_mutex;
 
-	//[seconds] End sweeping 5 seconds earlier than the wallclock time, to allow for substitute to finish,
+	//[seconds] End sweeping earlier than the wallclock time, to allow for substitute to finish,
 	//to get a proper final clause database state before reporting
-	const double TIMEBUFFER_FOR_FINAL_SUBSTITUTE = 5;
-
-	
+	const double TIMEBUFFER_FOR_FINAL_SUBSTITUTE = 1;
 
 	enum CustomQuery {
 		QUERY_SWEEP_ITERATION = 1

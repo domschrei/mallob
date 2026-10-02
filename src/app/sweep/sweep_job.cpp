@@ -1926,7 +1926,7 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 	const int payload_size = getDescription().getFormulaPayloadSize(0);
 	constexpr int BITS_PER_MB = 8000000;
 	float formula_in_MB = ((float)payload_size*32)/BITS_PER_MB;
-	LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](%i) loading formula (%.3f MB) \n", _my_rank, sweeper->getLocalId(), formula_in_MB);
+	LOGGER(_sweeplogger,V4_VVER, "SWEEP [%i](%i) loading formula (%.3f MB) \n", _my_rank, sweeper->getLocalId(), formula_in_MB);
 	float t0 = Timer::elapsedSeconds();
 	constexpr int CHECK_INTERVAL = 50000;
 	int counter = CHECK_INTERVAL;
@@ -2195,7 +2195,8 @@ SweepJob::~SweepJob() {
 		LOGGER(_sweeplogger,V1_WARN, "SWEEP [%i] WARN : rank was terminated while synchronizing \n", _my_rank);
 	}
 	if (!_flag_terminated_while_synchronizing && (_lastClearedRound + 2 < _lastImportedRound)) {
-		LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i] WARN : didn't clear all imported rounds. lastCleared %i, lastImported %i \n", _my_rank, _lastClearedRound, _lastImportedRound.load());
+		// Warning no longer relevant, since we keep all units & eqs till the end, to export them separately
+		// LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i] WARN : didn't clear all imported rounds. lastCleared %i, lastImported %i \n", _my_rank, _lastClearedRound, _lastImportedRound.load());
 	}
 	if (_lastImportedRound==0) {
 		LOGGER(_sweeplogger,V1_WARN, "SWEEP [%i] WARN : rank didn't receive a single sharing round! (irrelevant if only 1 sweep rank was used) \n", _my_rank);
