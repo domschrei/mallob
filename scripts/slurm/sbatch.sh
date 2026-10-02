@@ -124,7 +124,7 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     -mono=$f -jwl=$timeout -T=$(($timeout+30)) -wam=60000 -pre-cleanup=1 \
     -log=$globallogdir -tmp=$localtmpdir -comment-outputlogdir=$outputlogdir -sro=${globallogdir}/processed-jobs.out \
     -trace-dir=${globallogdir}/ \
-    -rpa=1 -pph=${SLURM_NTASKS_PER_NODE} -mlpt=50000000 -t=$((${SLURM_CPUS_PER_TASK} / 2)) \
+    -rpa=1 -pph=${SLURM_NTASKS_PER_NODE} -mlpt=30000000 -t=$((${SLURM_CPUS_PER_TASK} / 2)) \
     -isp=0 -cfci=30  -rlbd=0 -ilbd=1 \
     -q=0 \
     -os=1 \
