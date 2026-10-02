@@ -7,8 +7,10 @@ dirname="kissat"
 # fetch_and_extract $dirname configure https://github.com/domschrei/kissat/archive/${branchorcommit}.zip
 # Niccos Sweep Kissat
 # branchorcommit="d4e76a387c93b28bbe84a2db043008e5bc70b185" #FMCAD26 Artifact Commit
-branchorcommit="86fb21cb2777dccb0b1e2bb3ee86af0eb92a382d" #with Sweep Model-Reconstruction (2026-10-01)
-fetch_and_extract $dirname configure https://github.com/nrilu/kissat/archive/${branchorcommit}.zip
+# branchorcommit="86fb21cb2777dccb0b1e2bb3ee86af0eb92a382d" #with Sweep Model-Reconstruction (2026-10-01)
+# fetch_and_extract $dirname configure https://github.com/nrilu/kissat/archive/${branchorcommit}.zip
+branch="update24"   # latest Nicco branch for sweeping
+curl -L -o kissat.zip "https://github.com/nrilu/kissat/archive/refs/heads/${branch}.zip"
 
 echo "[kissat] Building ..."
 ./configure -O3
