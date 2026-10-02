@@ -13,13 +13,6 @@ if [ -z "$localtmpdir" ]; then exit; fi
 if ! mkdir /tmp/.epilog.lock 2>/dev/null ; then exit ; fi
 trap 'rmdir /tmp/.epilog.lock 2>/dev/null' EXIT
 
-echo "EPILOG echos"
-echo $build
-echo $globallogdir
-echo $localtmpdir
-echo $outputlogdir
-echo $numnodes
-
 dest="$outputlogdir/$(basename "$globallogdir")"
 
 mkdir -p "$dest"
@@ -27,7 +20,6 @@ if [ -f "$dest/.alldone" ]; then exit ; fi
 
 >&2 echo "$(date) EPILOG $(hostname): $build $globallogdir $outputlogdir"
 >&2 echo "$(date) EPILOG $(hostname): DEST: $dest"
-
 
 # Cross-node lock on the SHARED filesystem: exactly one node does the move
 if mkdir "$dest/.movelock" 2>/dev/null ; then
