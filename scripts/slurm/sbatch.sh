@@ -115,16 +115,18 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     echo " "
 
 
+    # -preprocess-config=config/satwithpre/actors_sweepfirst.json \
     # TODO Configure Mallob
     timeout=$DS_SECONDSPERJOB
     cmd="$build/mallob \
     -mono-app=$DS_APP \
-    -preprocess-config=config/satwithpre/actors_sweepfirst.json \
+    -sat-config-files=config/sat/preprokissat-congruence.json \
+    -preprocess-config=config/satwithpre/actors_KEM.json \
     -satsolver=k \
     -mono=$f -jwl=$timeout -T=$(($timeout+30)) -wam=60000 -pre-cleanup=1 \
     -log=$globallogdir -tmp=$localtmpdir -comment-outputlogdir=$outputlogdir -sro=${globallogdir}/processed-jobs.out \
     -trace-dir=${globallogdir}/ \
-    -rpa=1 -pph=${SLURM_NTASKS_PER_NODE} -mlpt=50000000 -t=$((${SLURM_CPUS_PER_TASK} / 2)) \
+    -rpa=1 -pph=${SLURM_NTASKS_PER_NODE} -mlpt=30000000 -t=$((${SLURM_CPUS_PER_TASK} / 2)) \
     -isp=0 -cfci=30  -rlbd=0 -ilbd=1 \
     -q=0 \
     -os=1 \
@@ -137,7 +139,7 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     -cjtcp=0 \
     -fcll=2 \
     -seed=0 \
-    -sweep-initial-congruence=1 \
+    -sweep-initial-congruence=0 \
     -sweep-skip-ratio=0.01 \
     -sweep-skip-window=0.5 \
     -sweep-max-weak-iters=4 \
