@@ -8,23 +8,28 @@ FLAGS=(
  -max-lits-per-thread=35000000 
  -pre-cleanup=1
  -seed=110519 
+ -os=1
+ -spl=-1
+ -jcup=0.05
+ -terminate-abruptly=0
  -trace-dir=$OUT_DIR/traces
  -log=$OUT_DIR/logs/
  -spd=$OUT_DIR/logs/
  -tmp=$OUT_DIR/tmp/
- -terminate-abruptly=0
- -os=1
- -spl=-1
- -jcup=0.05
- -sat-config-dirs=config/sat/base/
- -preprocess-config=config/satwithpre/actors_sweepfirst.json
  -mono-app=SATWITHPRE 
- -v=3
  -satsolver=k 
- -sweep-solver-verbosity=0
- -sweep-max-iterations=999
+ -sat-config-dirs=config/sat/base/
+ -sat-config-files=config/sat/preprokissat-congruence.json
+ -preprocess-config=config/satwithpre/actors_KEM.json
+ -v=3
  -cjtcp=0
  -jc=2
+ -sweep-solver-verbosity=0
+ -sweep-max-iterations=999
+ -sweep-initial-congruence=0
+ -sweep-skip-ratio=0.01
+ -sweep-skip-window=0.5
+ -sweep-max-weak-iters=4
 )
 
 echo "${FLAGS[@]}"
@@ -41,7 +46,8 @@ INST="$HOME/PhD/instances/sat-and-minisat1m/00847fca81490df01b9e239fd6027378-ben
 INST="$HOME/PhD/instances/sat-and-minisat1m/006be0fb3ae0a75aac0e386c2e6c4669-bench_501.smt2.cnf.xz"
 
 INST="$HOME/PhD/instances/sat-and-minisat1m/00be590675417eba2bb2585790ac392d-iso-brn008.shuffled-as.sat05-2933.cnf.xz" #good quick mix
-INST="$HOME/PhD/instances/sat-and-minisat1m/0151782431fa0ec1f855523721c52682-58-122783.cnf.xz" #lot of lagging
+INST="$HOME/PhD/instances/sat23/28e45a3e488ddac73b6116cc6f3e67e0-g2-T99.2.0.cnf"
+# INST="$HOME/PhD/instances/sat-and-minisat1m/0151782431fa0ec1f855523721c52682-58-122783.cnf.xz" #lot of lagging
 
 # INST="$HOME/PhD/instances/sat-and-minisat1m/02da8e9305ee7b4ad33c348f46afebea-x9-03055.sat.sanitized.cnf.xz" #too easy
 # INST="$HOME/PhD/instances/sat-and-minisat1m/01653db16d6cedc27f5314d680efc055-fla-komb-220-5.cnf.xz" #destructible problems!
@@ -54,5 +60,5 @@ INST="$HOME/PhD/instances/sat-and-minisat1m/0151782431fa0ec1f855523721c52682-58-
 # INST="$HOME/PhD/instances/tmp2024/05c8e94aaee86390eaf6e68dd3ec3570-noL-11-2.sanitized.cnf"
 #
 
-./scripts/run/mallob_local.sh "${FLAGS[@]}" -mono="$INST" -t=5
+./scripts/run/mallob_local.sh "${FLAGS[@]}" -mono="$INST" -t=2
 
