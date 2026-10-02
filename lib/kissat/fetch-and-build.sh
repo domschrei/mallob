@@ -10,7 +10,7 @@ dirname="kissat"
 # branchorcommit="86fb21cb2777dccb0b1e2bb3ee86af0eb92a382d" #with Sweep Model-Reconstruction (2026-10-01)
 # fetch_and_extract $dirname configure https://github.com/nrilu/kissat/archive/${branchorcommit}.zip
 branch="update24"   # latest Nicco branch for sweeping
-curl -L -o kissat.zip "https://github.com/nrilu/kissat/archive/refs/heads/${branch}.zip"
+fetch_and_extract $dirname configure https://github.com/nrilu/kissat/archive/refs/heads/${branch}.zip
 
 echo "[kissat] Building ..."
 ./configure -O3
