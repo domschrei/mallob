@@ -2026,14 +2026,14 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 	int nSolvers = md.active_count + md.idle_count;
 	double LAGGING_TRESHHOLD_FRACTION = 0.05; //if more than this fraction of solvers is lagging, end this iteration
 	//explicitly calculate threshhold count, such that it is at least 1 for edgecases with very few solvers
-	int lagging_thresh_count = std::min(1, (int) (LAGGING_TRESHHOLD_FRACTION * nSolvers)); 
+	int lagging_thresh_count = std::max(1, (int) (LAGGING_TRESHHOLD_FRACTION * nSolvers)); 
 	if (shared.size()>=_skip_window_rounds && md.lagging >= lagging_thresh_count ) {
 		decide_end_iteration = true;
 		//We declare this iteration failed, otherwise it can happen that hundreds of iterations
 		//occur, each skipped after 3-4 seconds due to lagging, but each being juuust long enough to count as successfull
 		_root_had_success_this_iteration = false;
-		LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](root-trf) LAGGING_SKIP iteration %i (rnd %i) , bc. fraction beyond threshhold %f of solvers are lagging ( %i / %i ) in window %.3f sec =^= %i rounds \n",
-			_my_rank, _root_iteration, _root_sharing_round, LAGGING_TRESHHOLD_FRACTION, md.longtermidle_count , nSolvers, _params.sweepSkipWindowSecs(), _skip_window_rounds);
+		LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](root-trf) LAGGING_SKIP iteration %i (rnd %i) , bc. fraction beyond threshhold %f of solvers are lagging ( %i / %i ) in window %.3f sec == %i rounds \n",
+			_my_rank, _root_iteration, _root_sharing_round, LAGGING_TRESHHOLD_FRACTION, md.lagging, nSolvers, _params.sweepSkipWindowSecs(), _skip_window_rounds);
 	}
 
 	//If all work has been done, the iteration ends naturally
