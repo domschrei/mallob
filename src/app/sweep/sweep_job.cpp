@@ -2013,7 +2013,7 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 		if (success_in_window < _params.sweepSkipRatio()) {
 			decide_end_iteration = true;
 			_root_skipped_iterations++;
-			LOGGER(_sweeplogger,V3_VERB, "[%i](root-trf) SUCCESS_SKIP iteration %i (rnd %i) , bc. success %f (%i / %i) < %.3f thresh, in rounds [%i, %i]. Skipped-Count %i  Failed-Count %i (this: +%i)\n",
+			LOGGER(_sweeplogger,V3_VERB, "[%i](root-trf) NONSUCCESS_SKIP iteration %i (rnd %i) , bc. success %f (%i / %i) < %.3f thresh, in rounds [%i, %i]. Skipped-Count %i  Weak-Count %i (this: +%i)\n",
 				_my_rank, _root_iteration, _root_sharing_round,  success_in_window, shared_in_window, swept_in_window,
 				_params.sweepSkipRatio(), _root_sharing_round - window, _root_sharing_round,
 				_root_skipped_iterations, _root_weak_iterations, !_root_had_success_this_iteration);
