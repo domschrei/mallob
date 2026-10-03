@@ -4,7 +4,7 @@
 OUT_DIR=$HOME/PhD/logsntraces/
 
 FLAGS=(
- -minprocs 2
+ -minprocs 3
  -max-lits-per-thread=35000000 
  -pre-cleanup=1
  -seed=110519 
@@ -24,7 +24,7 @@ FLAGS=(
  -v=3
  -cjtcp=0
  -jc=2
- -sweep-solver-verbosity=0
+ -sweep-solver-verbosity=2
  -sweep-max-iterations=999
  -sweep-initial-congruence=0
  -sweep-skip-ratio=0.01
@@ -48,7 +48,8 @@ INST="$HOME/PhD/instances/sat-and-minisat1m/006be0fb3ae0a75aac0e386c2e6c4669-ben
 INST="$HOME/PhD/instances/sat-and-minisat1m/00be590675417eba2bb2585790ac392d-iso-brn008.shuffled-as.sat05-2933.cnf.xz" #good quick mix
 INST="$HOME/PhD/instances/sat23/28e45a3e488ddac73b6116cc6f3e67e0-g2-T99.2.0.cnf" #big CCC
 INST="$HOME/PhD/instances/sat23/65b1e2253626af4a72b954f8186a5880-hash_table_find_safety_size_10.cnf" #big CCC
-INST="$HOME/PhD/instances/sat23/911cbc796d15eb316d36c82c90fd7d11-c499_gr_2pin_w6.shuffled.cnf" #endless 300s sweep? 
+INST="$HOME/PhD/instances/sat23/911cbc796d15eb316d36c82c90fd7d11-c499_gr_2pin_w6.shuffled.cnf" #>100 rounds endless 
+INST="$HOME/PhD/instances/sat23/0982db5b0b15642e79e8242881529b39-REGRandom-K4-L3-Seed15.cnf.xz" #isDestructible problem
 
 # INST="$HOME/PhD/instances/sat-and-minisat1m/0151782431fa0ec1f855523721c52682-58-122783.cnf.xz" #lot of lagging
 
@@ -63,5 +64,5 @@ INST="$HOME/PhD/instances/sat23/911cbc796d15eb316d36c82c90fd7d11-c499_gr_2pin_w6
 # INST="$HOME/PhD/instances/tmp2024/05c8e94aaee86390eaf6e68dd3ec3570-noL-11-2.sanitized.cnf"
 #
 
-./scripts/run/mallob_local.sh "${FLAGS[@]}" -mono="$INST" -t=2
+./scripts/run/mallob_local.sh "${FLAGS[@]}" -mono="$INST" -t=3
 

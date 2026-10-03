@@ -240,6 +240,7 @@ private:
 	std::unique_ptr<AnytimeSatClauseCommunicator> _clause_comm;
 	std::vector<int>  _crossjob_root_received_units{};
 	std::mutex _crossjob_import_mutex;
+	int _clausecomm_isDestructible_counter=0;
 
 	//[seconds] End sweeping earlier than the wallclock time, to allow for substitute to finish,
 	//to get a proper final clause database state before reporting

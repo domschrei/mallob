@@ -560,7 +560,9 @@ void SweepJob::appl_memoryPanic() {
 bool SweepJob::appl_isDestructible() {
 	if (_clause_comm && !_clause_comm->isDestructible()) {
 		for (int i = 0; i < 10; i++) _clause_comm->communicate(); // may advance destructibility
-		LOGGER(_sweeplogger,V3_VERB, "SWEEP TERM #%i ctx %i [%i] isDestructible? no. _clause_comm not destructible yet\n",  getId(),_my_ctx_id,  _my_rank);
+		if (_clausecomm_isDestructible_counter % 100 == 0) //avoid too much spam
+			LOGGER(_sweeplogger,V3_VERB, "SWEEP TERM #%i ctx %i [%i] isDestructible? no. _clause_comm not destructible yet\n",  getId(),_my_ctx_id,  _my_rank);
+		_clausecomm_isDestructible_counter++;
 		return false;
 	}
 	int _running_sweepers = _started_sweepers_count - _finished_sweepers_count;
