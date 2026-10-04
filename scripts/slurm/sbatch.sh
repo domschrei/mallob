@@ -134,12 +134,10 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     -rspaa=1 \
     -jcup=0.1 \
     -v=3 \
-    -sweep-solver-verbosity=0 \
-    -cjc=1 \
+    -cjc=0 \
     -cjtcp=0 \
     -fcll=2 \
     -seed=0 \
-    -sweep-initial-congruence=0 \
     -sweep-skip-ratio=0.01 \
     -sweep-skip-window=0.5 \
     -sweep-max-weak-iters=4 \
