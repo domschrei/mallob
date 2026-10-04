@@ -4,17 +4,14 @@
       "backend": "Kissat",
       "selector": { "type": "flavour", "value": "sweeper" },
       "settings": [
-        {"type": "set", "key": "mallob_sweeping", "value": 1},
-
-        {"type": "set", "key": "mallob_custom_sweep_verbosity", "value": 3},
-        {"type": "set", "key": "quiet", "value": 0},
-        {"type": "set", "key": "verbose", "value": 3},
+        {"type": "set", "key": "mallob_custom_sweep_verbosity", "value": 0},
+        {"type": "set", "key": "quiet", "value": 1},
+        {"type": "set", "key": "verbose", "value": 0},
         {"type": "set", "key": "log", "value": 0},
         {"type": "set", "key": "check", "value": 0},
         {"type": "set", "key": "statistics", "value": 1},
         {"type": "set", "key": "seed", "value": 0},
         {"type": "set", "key": "mallob_staggered_logs", "value": 1},
-
 
         {"type": "set", "key": "mallob_resweep_chance", "value": 0},
         {"type": "set", "key": "mallob_initial_congruence", "value": 0},
