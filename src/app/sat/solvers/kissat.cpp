@@ -166,7 +166,7 @@ void Kissat::addConfigurationSetting(Setting setting) {
         value += std::get<1>(setting.val);
         value = std::min(value, setting.max);
         value = std::max(value, setting.min);
-        LOGGER(_logger, V2_INFO, "Kissat opt override \"%s=%lld\"\n", setting.key.c_str(), value);
+        // LOGGER(_logger, V2_INFO, "Kissat opt override \"%s=%lld\"\n", setting.key.c_str(), value);
         LOGGER(_logger, V5_DEBG, "opt override \"%s=%lld\"\n", setting.key.c_str(), value);
         kissat_set_option(solver, setting.key.c_str(), value);
     }

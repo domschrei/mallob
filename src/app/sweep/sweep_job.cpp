@@ -41,6 +41,8 @@ SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTa
 	assert(_params.crossJobToClientParent()==false || log_return_false("[ERROR] For this application to work,"
 		    " you must explicitly disable cross-job sharing to the client parent, i.e. -cjtcp=0"));
 	DOUBLELOG(_sweeplogger, V2_INFO, "New SweepJob MPI Process on rank [%i] with planned %i threads, ctx %i \n", getJobTree().getRank(), params.numThreadsPerProcess.val, getJobTree().getContextId());
+	_solverConfig.parseFromDirsAndFiles(_params.satConfigDirs(), _params.satConfigFiles());
+	DOUBLELOG(_sweeplogger, V2_INFO, "SWEEP parsed %i solver configuration rules\n", _solverConfig.ruleCount());
 }
 
 
@@ -307,6 +309,9 @@ std::shared_ptr<KissatSweep> SweepJob::createNewSweeper(int localId) {
 	setup.numOriginalClauses = desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
 	setup.localId = localId;
 	setup.globalId = _my_rank * _nThreads + localId;
+	setup.flavour = PortfolioSequence::SWEEPER;
+	setup.solverType = 'k';
+	setup.solverConfig = &_solverConfig;
 
 	if (_params.satProfilingLevel() >= 0) {
 		setup.profilingBaseDir = _params.satProfilingDir();
@@ -355,46 +360,49 @@ std::shared_ptr<KissatSweep> SweepJob::createNewSweeper(int localId) {
 	}
 
     //Basic configuration
-    sweeper->set_option("quiet", _params.sweepSolverQuiet());  //suppress any standard kissat messages
-    sweeper->set_option("verbose", 0);//the native kissat verbosity
-    sweeper->set_option("log", 0);    //extensive logging (needs to be configured+compiled with -l)
-    sweeper->set_option("check", 0);  //do not check model or derived clauses, because we anyways dont have proof tracking
-    sweeper->set_option("statistics", 1);  //print full statistics
+    // sweeper->set_option("quiet", _params.sweepSolverQuiet());  //suppress any standard kissat messages
+    // sweeper->set_option("verbose", 3);//the native kissat verbosity
+    // sweeper->set_option("log", 0);    //extensive logging (needs to be configured+compiled with -l)
+    // sweeper->set_option("check", 0);  //do not check model or derived clauses, because we anyways dont have proof tracking
+    // sweeper->set_option("statistics", 1);  //print full statistics
     sweeper->set_option("profile", max(_params.satProfilingLevel.val, 0)); //detailed profiling. kissat allows down to 0, mallob down to -1
-	sweeper->set_option("seed", 0);   //Sweeping should not contain any own RNG part
+	// sweeper->set_option("seed", 0);   //Sweeping should not contain any own RNG part
 
 	//Specific due to Mallob
-	sweeper->set_option("mallob_sweeping", 1); //Bypass all other Kissat-stuff and go directly to MallobSweep Logic
-	sweeper->set_option("mallob_custom_sweep_verbosity", _params.sweepSolverVerbosity.val); //0..4, get info from the solvers themselves
+	// sweeper->set_option("mallob_sweeping", 1); //Bypass all other Kissat-stuff and go directly to MallobSweep Logic
+	// sweeper->set_option("mallob_custom_sweep_verbosity", _params.sweepSolverVerbosity.val); //0..4, get info from the solvers themselves
 	sweeper->set_option("mallob_local_id", localId);
 	sweeper->set_option("mallob_rank", _my_rank);
 	sweeper->set_option("mallob_is_root", _is_root);
-	sweeper->set_option("mallob_resweep_chance", _params.sweepResweepChance.val);
-	sweeper->set_option("mallob_staggered_logs", 1); //have indents in log lines, useful to distinguish (a few) different solvers
-	sweeper->set_option("mallob_initial_congruence", _params.sweepInitialCongruence.val);
-	sweeper->set_option("mallob_signal_kitten", _params.sweepSignalKitten());
+	// sweeper->set_option("mallob_resweep_chance", _params.sweepResweepChance.val);
+	// sweeper->set_option("mallob_staggered_logs", 1); //have indents in log lines, useful to distinguish (a few) different solvers
+	// sweeper->set_option("mallob_initial_congruence", _params.sweepInitialCongruence.val);
+	// sweeper->set_option("mallob_signal_kitten", _params.sweepSignalKitten());
 
 	//Own options of Kissat
-	sweeper->set_option("sweepcomplete", 1); //deactivates checking for time limits during sweeping, so we dont get kicked out due to some limits
+	// sweeper->set_option("sweepcomplete", 1); //deactivates checking for time limits during sweeping, so we dont get kicked out due to some limits
 	//We start already with depth 3, because depth 2 is so quickly done, and less powerfull
 	//accordingly, start with doubled sweepvars and clauses than the default (depth 2)
-  	sweeper->set_option("sweepdepth", 3);				//, 2,    0, INT_MAX,	"environment depth")
-  	sweeper->set_option("sweepvars", 256*2);			//  256,  0, INT_MAX,	"environment variables")
-  	sweeper->set_option("sweepclauses", 1024*2);		//	1024, 0, INT_MAX,	"environment clauses")
-  	sweeper->set_option("sweepmaxdepth", _params.sweepMaxDepth.val); //	//	3,    1, INT_MAX,	"maximum environment depth")
+  	// sweeper->set_option("sweepdepth", 3);				//, 2,    0, INT_MAX,	"environment depth")
+  	// sweeper->set_option("weepvars", 256*2);			//  256,  0, INT_MAX,	"environment variables")
+  	// sweeper->set_option("sweepclauses", 1024*2);		//	1024, 0, INT_MAX,	"environment clauses")
+  	// sweeper->set_option("sweepmaxdepth", _params.sweepMaxDepth.val); //	//	3,    1, INT_MAX,	"maximum environment depth")
 	//Allow a lot more vars and clauses per environment (compared to sequential sweeping)
-  	sweeper->set_option("sweepmaxvars", 64 * 8192);		//	8192, 2, INT_MAX,	"maximum environment variables")
-  	sweeper->set_option("sweepmaxclauses", 64 * 32768);	//	32768,2, INT_MAX,	"maximum environment clauses")
-  	sweeper->set_option("sweepfliprounds", 1);		//	1,    0, INT_MAX,	"flipping rounds")
-  	sweeper->set_option("sweeprand", 0);			//  0,    0,    1,		"randomize sweeping environment")
-  	sweeper->set_option("puresweep_maxKittenProp", _params.sweepMaxKittenProp()); //limit Kitten SAT calls
+  	// sweeper->set_option("sweepmaxvars", 64 * 8192);		//	8192, 2, INT_MAX,	"maximum environment variables")
+  	// sweeper->set_option("sweepmaxclauses", 64 * 32768);	//	32768,2, INT_MAX,	"maximum environment clauses")
+  	// sweeper->set_option("sweepfliprounds", 1);		//	1,    0, INT_MAX,	"flipping rounds")
+  	// sweeper->set_option("sweeprand", 0);			//  0,    0,    1,		"randomize sweeping environment")
+  	// sweeper->set_option("puresweep_maxKittenProp", _params.sweepMaxKittenProp()); //limit Kitten SAT calls
 
-	sweeper->set_option("substitute", 1);	   //apply equivalence substitutions after sweeping, keep here explicitly to remember it
-	sweeper->set_option("substituterounds", 2);//there does not seem to be any need to go higher, almost always all equivalences are already found in the very first round
+	// sweeper->set_option("substitute", 1);	   //apply equivalence substitutions after sweeping, keep here explicitly to remember it
+	// sweeper->set_option("substituterounds", 2);//there does not seem to be any need to go higher, almost always all equivalences are already found in the very first round
 
-	sweeper->set_option("preprocess", 0); //skip this part in search.c, go directly to sweeping
-	sweeper->set_option("luckyearly", 0); // dito
-	sweeper->set_option("luckylate", 0);  // dito
+	// sweeper->set_option("preprocess", 0); //skip this part in search.c, go directly to sweeping
+	// sweeper->set_option("luckyearly", 0); // dito
+	// sweeper->set_option("luckylate", 0);  // dito
+
+	//All static options are now set via the "sweeper" flavour JSON rules (config/sat/base/sweeper.json)
+	sweeper->applySolverConfiguration(0);
 	sweeper->interruptionInitialized = true;
 	return sweeper;
 }
@@ -1990,6 +1998,7 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 
 	bool decide_end_iteration = false;
 	bool decide_terminate_job = false;
+	
 
 	//There exist three ways in which an iteration can end.
 	// 1. Naturally, because all work has been done (notice through either all idle, or work estimate is zero)
@@ -2169,6 +2178,9 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 		done_scheduled_prcnt , 100*(md.work_sweeps + md.unsched_resweeps)/(double)_numVars, success_in_window, _root_shared_eqs_this_iteration, _root_shared_units_this_iteration
 	);
 	LOGGER(_sweeplogger, V3_VERB, "%s", logmsg);
+	for (int i=0; i < md.eq_size; i+=2) {
+		LOGGER(_sweeplogger, V3_VERB, "EQ(%i) = %i %i\n", i/2, payload[i], payload[i+1]);
+	}
 	//no return statement, because the payload was just transformed in-place
 };
 

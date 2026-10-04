@@ -10,6 +10,7 @@
 #include "app/sat/job/anytime_sat_clause_communicator.hpp"
 #include "comm/job_tree_all_reduction.hpp"
 #include "comm/job_tree_broadcast.hpp"
+#include "app/sat/solvers/solver_portfolio_config.hpp"
 
 #include "app/sweep/kissat_sweep_extras.hpp"
 
@@ -211,6 +212,8 @@ private:
 
 	Logger _sweeplogger;
 
+	//Solver configuration is done via a JSON file, here the 'sweeper' flavour applies
+	SolverPortfolioConfig _solverConfig;
 
 
 	//when we exporting Eqs+Units from a solver thread to Mallob, use mutex to prevent
