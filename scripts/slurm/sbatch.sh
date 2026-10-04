@@ -114,6 +114,10 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     echo "instance: $f"
     echo " "
 
+    # Need cjc=0 when using MallobSweep and MallobSAT as sequential actors,
+    # otherwise there were some crashes because the _clause_comm couldnt properly finish,
+    # which maybe was due to weird overlap between the finishing MallobSweep and starting MallobSAT,
+    # where temporarliy the _clause_comm was subscribed to 2 jobs, but one of them then immediately left...?
 
     # -preprocess-config=config/satwithpre/actors_sweepfirst.json \
     # TODO Configure Mallob
