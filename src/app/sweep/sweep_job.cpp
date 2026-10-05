@@ -2164,7 +2164,7 @@ void SweepJob::triggerTerminations() {
 }
 
 SweepJob::~SweepJob() {
-	DOUBLELOG(_sweeplogger,V3_VERB, "SWEEP JOB DESTRUCTOR ENTERED (ctx %i) \n", _my_ctx_id);
+	LOGGER(_sweeplogger,V3_VERB, "SWEEP JOB DESTRUCTOR ENTERED (ctx %i) \n", _my_ctx_id);
 	for (int i=0; i<5; i++) {
 		clearImportedRound();
 	}
@@ -2179,5 +2179,5 @@ SweepJob::~SweepJob() {
 		LOGGER(_sweeplogger,V1_WARN, "SWEEP [%i] WARN : rank didn't receive a single sharing round! (irrelevant if only 1 sweep rank was used) \n", _my_rank);
 	}
 	// triggerTerminations();
-	DOUBLELOG(_sweeplogger,V2_INFO, "SWEEP JOB DESTRUCTOR DONE ctx %i\n", _my_ctx_id);
+	LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB DESTRUCTOR DONE ctx %i\n", _my_ctx_id);
 }
