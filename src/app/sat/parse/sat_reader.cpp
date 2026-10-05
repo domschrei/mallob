@@ -253,6 +253,7 @@ bool SatReader::parseInternally(JobDescription& desc) {
 }
 
 bool SatReader::read(JobDescription& desc) {
+	LOG(V2_INFO, "READER START (size %zu) \n", desc.getFormulaPayloadSize(0));
 
 	std::optional<std::future<void>> optFuture;
 	std::vector<int> litsToParse;
@@ -330,6 +331,8 @@ bool SatReader::read(JobDescription& desc) {
 	}
 
 	desc.endInitialization();
+
+	LOG(V2_INFO, "READER DONE (size %zu) \n", desc.getFormulaPayloadSize(0));
 
 	if (_pipe != nullptr) pclose(_pipe);
 	if (_namedpipe != -1) close(_namedpipe);
