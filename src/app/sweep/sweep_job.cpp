@@ -236,7 +236,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			return;
 		}
 
-		LOGGER(_sweeplogger,V3_VERB, "SWEEP JOB [%i](%i) solve() START \n", _my_rank, localId);
+		// LOGGER(_sweeplogger,V3_VERB, "SWEEP JOB [%i](%i) solve() START \n", _my_rank, localId);
 
 		//only now expose the solver to the rest of the system, now that solving starts
 		_sweepers[localId] = sweeper;
@@ -244,9 +244,9 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		_timestamp_started_synchronized_solving = Timer::elapsedSeconds();
 		shweep_set_wallclock_offset(sweeper->solver, -1.0 * Timer::elapsedSeconds());
 
-		LOGGER(_sweeplogger, V3_VERB, "SWEEP [%i](%i) START solve() \n", _my_rank, localId);
+		LOGGER(_sweeplogger, V4_VVER, "SWEEP [%i](%i) START solve() \n", _my_rank, localId);
 		int res = sweeper->solve(0, nullptr);
-		LOGGER(_sweeplogger, V3_VERB, "SWEEP [%i](%i) FINISH solve(). Result %i \n", _my_rank, localId, res);
+		LOGGER(_sweeplogger, V4_VVER, "SWEEP [%i](%i) FINISH solve(). Result %i \n", _my_rank, localId, res);
 
 
 		if (res==UNSAT) {
