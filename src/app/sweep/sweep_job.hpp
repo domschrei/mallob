@@ -35,7 +35,8 @@ private:
 	int _my_ctx_id{0};
     bool _is_root{false};
     uint8_t* _metadata; //serialized description
-	int _numVars{0};
+	int _numOrigVars{0};
+	// int _numOrigClauses{0};
 
 	const int INVALID_ELIT = __INT32_MAX__;
 

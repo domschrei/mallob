@@ -207,7 +207,7 @@ void SweepJob::appl_communicate() {
 void SweepJob::createAndStartNewSweeper(int localId) {
 	LOGGER(_sweeplogger,V4_VVER, "SWEEP JOB [%i](%i) queuing background worker thread\n", _my_rank, localId);
 	_bg_workers[localId]->run([this, localId]() {
-		LOGGER(_sweeplogger,V3_VERB, "SWEEP JOB [%i](%i) WORKER START \n", _my_rank, localId);
+		LOGGER(_sweeplogger,V4_VVER, "SWEEP JOB [%i](%i) WORKER START \n", _my_rank, localId);
 
 		auto sweeper = createNewSweeper(localId);
 
@@ -320,9 +320,9 @@ std::shared_ptr<KissatSweep> SweepJob::createNewSweeper(int localId) {
 		setup.profilingLevel = _params.satProfilingLevel();
 	}
 
-	if (_numVars==0)
-		_numVars = setup.numVars;
-
+	if (_numOrigVars==0)
+		_numOrigVars = setup.numVars;
+		
 	float t0 = Timer::elapsedSeconds();
 	auto sweeper = std::make_shared<KissatSweep>(setup);
 	float t1 = Timer::elapsedSeconds();
@@ -1393,9 +1393,9 @@ void SweepJob::rootStartNewSharingRound() {
 		if (t > _timestamp_log_delayedround + LOG_PERIOD) {
 			_timestamp_log_delayedround = t;
 			if (_root_iteration==0) {
-				LOGGER(_sweeplogger,V3_VERB, "root: Delay first sharing round, CCC still running\n");
+				LOGGER(_sweeplogger,V4_VVER, "root: Delay first sharing round, CCC still running\n");
 			} else {
-				LOGGER(_sweeplogger,V3_VERB, "root: Delay next sharing round, haven't started to provide initial work\n");
+				LOGGER(_sweeplogger,V4_VVER, "root: Delay next sharing round, haven't started to provide initial work\n");
 			}
 		}
 		return;
@@ -1824,7 +1824,7 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	if (max_steal_amount < MIN_STEAL_AMOUNT)
 		return {};
 	assert(max_steal_amount > 0			 || log_return_false("SWEEP STEAL ERROR [%i](%i): negative max steal amount %i, maybe segfault into non-initialized kissat solver \n", _my_rank, localId, max_steal_amount));
-	assert(max_steal_amount < 2*_numVars || log_return_false("SWEEP STEAL ERROR [%i](%i): too large max steal amount %i >= 2*NUM_VARS, maybe segfault into non-initialized kissat solver \n", _my_rank, localId, max_steal_amount));
+	assert(max_steal_amount < 2*_numOrigVars || log_return_false("SWEEP STEAL ERROR [%i](%i): too large max steal amount %i >= 2*NUM_VARS, maybe segfault into non-initialized kissat solver \n", _my_rank, localId, max_steal_amount));
 	//There is something to steal.
 	//Use mutex to prevent multiple solvers from stealing concurrently from the same solver.
 	//While this is a sane choice in general, it also seemed that 23 threads stealing at the same time from one solver
@@ -1853,7 +1853,7 @@ void SweepJob::printActiveMPIRequestsCount() {
 	for (auto &request : _worksteal_requests) {
 		active+=request.is_active;
 	}
-	LOGGER(_sweeplogger,V3_VERB, "still active MPI requests: %i\n",active);
+	LOGGER(_sweeplogger,V4_VVER, "still active MPI requests: %i\n",active);
 }
 
 std::vector<int> SweepJob::getRandomIdPermutation() {
@@ -1952,7 +1952,7 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 	//Track metadata of this round
 	bool all_idle = (md.active_count == 0);
 	bool all_work_done = _root_had_work_this_iteration && (md.remaining_work_estimate==0);
-	double done_scheduled_prcnt = 100*(md.work_sweeps + md.work_stepovers)/(double)_numVars;
+	double done_scheduled_prcnt = 100*(md.work_sweeps + md.work_stepovers)/(double)_numOrigVars;
 	_root_shared_units_this_iteration += md.unit_size;
 	_root_shared_eqs_this_iteration   += n_eqs;
 	_root_total_shared_units += md.unit_size;
@@ -2023,25 +2023,22 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 		_root_atp_round = _root_sharing_round;
 		LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](root-trf): All-time-peak EU %i round %i  \n", _my_rank, _root_atp_EU, _root_sharing_round);
 	}
+	
 	//End this iteration if we hadn't had a new EU peak in a while, and any new EU values are significantly below the last peak
 	if (EU_this_round <= 0.3 * _root_atp_EU && _root_sharing_round - _root_atp_round > _skip_window_rounds) {
 		decide_end_iteration = true;	
 		LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](root-trf): End Iteration <%i,%i> bc. for %i rounds below all time peak EU %i (from round %i) \n", _my_rank, _root_iteration, _root_sharing_round, _skip_window_rounds, _root_atp_EU, _root_atp_round);
-		if (md.lagging == 0 && _shared_EU_this_iteration_cumul.back() > 0) {
-			_root_had_success_this_iteration = true;
-		}
 	}
 		
 #endif
 	
-
 	//If all work has been done, the iteration ends naturally
 	if (all_idle || all_work_done) {
+		decide_end_iteration = true;
 		if (all_idle)
 			LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](root-trf): All idle      - ending this iteration %i \n", _my_rank, _root_iteration);
 		else if (all_work_done)
 			LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](root-trf): All work done - ending this iteration %i \n", _my_rank, _root_iteration);
-		decide_end_iteration = true;
 		//Usually we wait for sufficiently many rounds until we determine whether this iteration had success.
 		//But if we reach the end of an iteration earlier through all_idle, before the first such check,
 		//we do the next best thing, which is we evaluate the success of all the (few) rounds of this iteration.
@@ -2056,9 +2053,20 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 	//On iteration end, note whether we ever had success in this iteration, because we only allow a fixed
 	//number of unsuccessfull (failed) iterations
 	if (decide_end_iteration) {
+		assert(_numOrigVars>0);
+		const double simplification_ratio = _shared_EU_this_iteration_cumul.back() / (double)_numOrigVars;
+		if (simplification_ratio > _params.sweepSkipRatio()) {
+			_root_had_success_this_iteration = true;
+		}
+		if (md.lagging > 0) {
+			_root_had_success_this_iteration = false;
+		}
+		
 		if (_root_had_success_this_iteration == false) {
 			_root_weak_iterations++;
 			LOGGER(_sweeplogger,V3_VERB, "Iteration %i weak . Now WEAK_ITERATIONS %i \n", _root_iteration, _root_weak_iterations);
+		} else {
+			LOGGER(_sweeplogger,V3_VERB, "Iteration %i strong, simplified by ratio EU/vars = %f \n", _root_iteration, simplification_ratio);
 		}
 	}
 	//Terminate the whole SweepJob if enough failed iterations happened
@@ -2165,7 +2173,7 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 		_my_rank, md.active_count, md.idle_count, md.longtermidle_count, md.sweeper_objs, md.lagging, md.maxxed_kittens,  _root_iteration, _root_sharing_round,
 		all_idle,  decide_end_iteration, decide_terminate_job, n_eqs, n_sweep_units, crossjob_units_received,
 		md.work_sweeps, md.work_stepovers, md.remaining_work_estimate,
-		done_scheduled_prcnt , 100*(md.work_sweeps + md.unsched_resweeps)/(double)_numVars, success_in_window, _root_shared_eqs_this_iteration, _root_shared_units_this_iteration
+		done_scheduled_prcnt , 100*(md.work_sweeps + md.unsched_resweeps)/(double)_numOrigVars, success_in_window, _root_shared_eqs_this_iteration, _root_shared_units_this_iteration
 	);
 	LOGGER(_sweeplogger, V3_VERB, "%s", logmsg);
 	// for (int i=0; i < md.eq_size; i+=2) {
