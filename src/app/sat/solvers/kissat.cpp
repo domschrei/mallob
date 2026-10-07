@@ -72,7 +72,7 @@ void on_drup_deletion(void* state, const int* lits, int nbLits) {
 Kissat::Kissat(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup), solver(kissat_init()),
         learntClauseBuffer(_setup.strictMaxLitsPerClause+ClauseMetadata::numInts()) {
-
+    
     kissat_set_terminate(solver, this, &terminate_callback);
     glueLimit = _setup.strictLbdLimit;
     numVars = setup.numVars;
@@ -229,6 +229,20 @@ void Kissat::cleanUp() {
 		kissat_write_profile(solver, profileFileString.c_str());
 		LOGGER(_logger, V4_VVER, "Kissat %s : Profile written\n", profileFileString.c_str());
 	}
+    
+    if (_setup.exportmoreStatistics) {
+        auto stats = kissat_get_exportmore_statistics(solver);
+        LOGGER(_logger, V2_INFO, "EXPORTMORE unit_sweep        %lu\n", stats.unit_sweep);
+        LOGGER(_logger, V2_INFO, "EXPORTMORE unit_inlineassign %lu\n", stats.unit_inlineassign);
+        LOGGER(_logger, V2_INFO, "EXPORTMORE bin_sweep         %lu\n", stats.bin_sweep);
+        LOGGER(_logger, V2_INFO, "EXPORTMORE bin_strengthen    %lu\n", stats.bin_strengthen);
+        LOGGER(_logger, V2_INFO, "EXPORTMORE bin_forwardsub    %lu\n", stats.bin_forwardsub);
+        LOGGER(_logger, V2_INFO, "EXPORTMORE bin_congruence    %lu\n", stats.bin_congruence);
+        LOGGER(_logger, V2_INFO, "EXPORTMORE bin_vivify        %lu\n", stats.bin_vivify);
+        LOGGER(_logger, V2_INFO, "EXPORTMORE cls_strengthen    %lu\n", stats.cls_strengthen);
+        LOGGER(_logger, V2_INFO, "EXPORTMORE cls_forwardsub    %lu\n", stats.cls_forwardsub);
+        LOGGER(_logger, V2_INFO, "EXPORTMORE cls_vivify        %lu\n", stats.cls_vivify);
+    }
 }
 
 std::vector<int> Kissat::getSolution() {
