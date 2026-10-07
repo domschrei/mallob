@@ -135,6 +135,7 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     -os=1 \
     -cm=0 \
     -v=2 \
+	-exportmore-statistics=1 \
     -spd=${globallogdir}/ -spl=-1"
 
     # Pre-create network-disk output directories to avoid many concurrent filesystem manips
