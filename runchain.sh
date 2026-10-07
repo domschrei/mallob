@@ -4,7 +4,7 @@
 OUT_DIR=$HOME/PhD/logsntraces/
 
 FLAGS=(
- -minprocs 1
+ -minprocs 2
  -max-lits-per-thread=35000000 
  -pre-cleanup=1
  -seed=110519 
@@ -25,13 +25,9 @@ FLAGS=(
  -cjc=0
  -cjtcp=0
  -jc=2
- -sweep-solver-quiet=0
- -sweep-solver-verbosity=3
- -sweep-max-iterations=999
- -sweep-initial-congruence=0
  -sweep-skip-ratio=0.01
- -sweep-skip-window=0.5
- -sweep-max-weak-iters=4
+ -sweep-skip-window=1
+ -sweep-max-weak-iters=1
 )
 
 echo "${FLAGS[@]}"
@@ -48,6 +44,8 @@ INST="$HOME/PhD/instances/sat-and-minisat1m/00847fca81490df01b9e239fd6027378-ben
 INST="$HOME/PhD/instances/sat-and-minisat1m/006be0fb3ae0a75aac0e386c2e6c4669-bench_501.smt2.cnf.xz"
 
 INST="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s127.cnf.xz" #trickle
+
+INST="$HOME/PhD/instances/sat25/d88c6afc13cdad0e2c8371a879692b39-battleship-13-13-unsat.cnf.xz"
 
 # INST="$HOME/PhD/instances/sat-and-minisat1m/00be590675417eba2bb2585790ac392d-iso-brn008.shuffled-as.sat05-2933.cnf.xz" #good quick mix
 # INST="$HOME/PhD/instances/sat23/28e45a3e488ddac73b6116cc6f3e67e0-g2-T99.2.0.cnf" #big CCC

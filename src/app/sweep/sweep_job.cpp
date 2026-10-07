@@ -2016,13 +2016,15 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 	
 #else
 	
+	//Check whether we have a new all-time peak
 	int EU_this_round = md.unit_size + n_eqs;
 	if (EU_this_round > _root_atp_EU) {
 		_root_atp_EU = EU_this_round;
 		_root_atp_round = _root_sharing_round;
 		LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](root-trf): All-time-peak EU %i round %i  \n", _my_rank, _root_atp_EU, _root_sharing_round);
 	}
-	if (EU_this_round < 0.3 * _root_atp_EU && _root_sharing_round - _root_atp_round > _skip_window_rounds) {
+	//End this iteration if we hadn't had a new EU peak in a while, and any new EU values are significantly below the last peak
+	if (EU_this_round <= 0.3 * _root_atp_EU && _root_sharing_round - _root_atp_round > _skip_window_rounds) {
 		decide_end_iteration = true;	
 		LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](root-trf): End iteration %i (round %i) because too long below all time peak (peak EU %i , round %i) \n", _my_rank, _root_iteration, _root_atp_EU, _root_atp_round);
 		if (md.lagging == 0 && _shared_EU_this_iteration_cumul.back() > 0) {
