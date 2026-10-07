@@ -61,6 +61,7 @@ struct SolverSetup {
 	unsigned int freeMaxLitsPerClause {255};
 	size_t clauseBaseBufferSize {1000};
 
+	bool exportmoreStatistics{false};
 
 	// Clause import
 
