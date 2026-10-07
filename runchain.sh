@@ -45,7 +45,9 @@ INST="$HOME/PhD/instances/sat-and-minisat1m/006be0fb3ae0a75aac0e386c2e6c4669-ben
 
 INST="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s127.cnf.xz" #trickle
 
-INST="$HOME/PhD/instances/sat25/d88c6afc13cdad0e2c8371a879692b39-battleship-13-13-unsat.cnf.xz"
+INST="$HOME/PhD/instances/sat25/d88c6afc13cdad0e2c8371a879692b39-battleship-13-13-unsat.cnf.xz" #suddenly endless
+INST="$HOME/PhD/instances/sat25/0a8a4c28d27228e954354ea0a6e7f16c-sum_of_three_cubes_42_known_representation.cnf.xz"
+
 
 # INST="$HOME/PhD/instances/sat-and-minisat1m/00be590675417eba2bb2585790ac392d-iso-brn008.shuffled-as.sat05-2933.cnf.xz" #good quick mix
 # INST="$HOME/PhD/instances/sat23/28e45a3e488ddac73b6116cc6f3e67e0-g2-T99.2.0.cnf" #big CCC
