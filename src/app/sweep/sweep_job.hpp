@@ -230,6 +230,9 @@ private:
 	int _root_shared_eqs_this_iteration = 0;
 	int _root_total_shared_eqs = 0;
 	int _root_total_shared_units = 0;
+	
+	int _root_atp_EU = 0; //all time peak Eq+Units in one sharing round (carries over to next iterations)
+	int _root_atp_round = 0; //round of that atp value (reset to 0 at new iteration)
 
 	//This next value starts with true to immediately start into iteration nr. 1
 	bool _root_did_just_finish_iteration = true;

@@ -1917,6 +1917,7 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 	LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](%i) loaded formula (%.3f MB) in %.6f sec \n", _my_rank, sweeper->getLocalId(), formula_in_MB , (t1-t0));
 }
 
+#define OLD_EXIT_LOGIC 0
 
 //The root node (and only the root node) tracks global sweeping progress
 //It decides whether a given sharing iteration should continue or end
@@ -1938,6 +1939,7 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 		_root_rounds_this_iteration=0;
 		_root_had_success_this_iteration = false;
 		_root_had_work_this_iteration = false;
+		_root_atp_round = _root_sharing_round; //make the all time peak which is carried over into this new iteration effectively "happe" at the start of the iteration
 		LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) ITERATION %i/%i STARTED \n", _my_rank, _root_iteration, _params.sweepMaxIterations());
 	}
 
@@ -1982,6 +1984,7 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 	//and potentially terminating Sweeping because single calls take too long,
 	//even when there have been ongoing new Eqs+Units found within these (very few) same ongoing sweep() calls
 
+#if OLD_EXIT_LOGIC
 	//Skip this iteration if there has not been enough success in the considered window
 	if (shared.size()>=_skip_window_rounds) {
 		if (success_in_window < _params.sweepSkipRatio()) {
@@ -1996,19 +1999,39 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 			_root_had_success_this_iteration = true;
 		}
 	}
+	
 	//Skip the iteration because too many solvers are too stuck
-	int nSolvers = md.active_count + md.idle_count;
-	double LAGGING_TRESHHOLD_FRACTION = 0.05; //if more than this fraction of solvers is lagging, end this iteration
+	const int nSolvers = md.active_count + md.idle_count;
+	const double LAGGING_TRESHHOLD_FRACTION = 0.05; //if more than this fraction of solvers is lagging, end this iteration
 	//explicitly calculate threshhold count, such that it is at least 1 for edgecases with very few solvers
-	int lagging_thresh_count = std::max(1, (int) (LAGGING_TRESHHOLD_FRACTION * nSolvers)); 
+	const int lagging_thresh_count = std::max(1, (int) (LAGGING_TRESHHOLD_FRACTION * nSolvers)); 
 	if (shared.size()>=_skip_window_rounds && md.lagging >= lagging_thresh_count ) {
 		decide_end_iteration = true;
 		//We declare this iteration failed, otherwise it can happen that hundreds of iterations
-		//occur, each skipped after 3-4 seconds due to lagging, but each being juuust long enough to count as successfull
+		//occur, each skipped quickly due to lagging, but each being juuust long enough to count as successful
 		_root_had_success_this_iteration = false;
 		LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](root-trf) LAGGING_SKIP iteration %i (rnd %i) , bc. fraction beyond threshhold %f of solvers are lagging ( %i / %i ) in window %.3f sec == %i rounds \n",
 			_my_rank, _root_iteration, _root_sharing_round, LAGGING_TRESHHOLD_FRACTION, md.lagging, nSolvers, _params.sweepSkipWindowSecs(), _skip_window_rounds);
 	}
+	
+#else
+	
+	int EU_this_round = md.unit_size + n_eqs;
+	if (EU_this_round > _root_atp_EU) {
+		_root_atp_EU = EU_this_round;
+		_root_atp_round = _root_sharing_round;
+		LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](root-trf): All-time-peak EU %i round %i  \n", _my_rank, _root_atp_EU, _root_sharing_round);
+	}
+	if (EU_this_round < 0.3 * _root_atp_EU && _root_sharing_round - _root_atp_round > _skip_window_rounds) {
+		decide_end_iteration = true;	
+		LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](root-trf): End iteration %i (round %i) because too long below all time peak (peak EU %i , round %i) \n", _my_rank, _root_iteration, _root_atp_EU, _root_atp_round);
+		if (md.lagging == 0 && _shared_EU_this_iteration_cumul.back() > 0) {
+			_root_had_success_this_iteration = true;
+		}
+	}
+		
+#endif
+	
 
 	//If all work has been done, the iteration ends naturally
 	if (all_idle || all_work_done) {
@@ -2020,10 +2043,12 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 		//Usually we wait for sufficiently many rounds until we determine whether this iteration had success.
 		//But if we reach the end of an iteration earlier through all_idle, before the first such check,
 		//we do the next best thing, which is we evaluate the success of all the (few) rounds of this iteration.
+		#if OLD_EXIT_LOGIC
 		if (shared.size() < _skip_window_rounds && success_in_window >= _params.sweepSkipRatio()) {
 			_root_had_success_this_iteration = true;
 			LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf): SHORT_SUCCESSFULL_ITERATION  \n", _my_rank, _root_iteration);
 		}
+		#endif
 	}
 
 	//On iteration end, note whether we ever had success in this iteration, because we only allow a fixed
@@ -2035,7 +2060,7 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 		}
 	}
 	//Terminate the whole SweepJob if enough failed iterations happened
-	if (_root_weak_iterations > _params.sweepMaxWeakIterations()) {
+	if (_root_weak_iterations >= _params.sweepMaxWeakIterations()) {
 		decide_terminate_job = true;
 		LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) TERMINATE (due to TOO_MANY_WEAK_ITERATIONS) due to %i th weak iteration (limit: %i) \n", _my_rank, _root_weak_iterations, _params.sweepMaxWeakIterations());
 	}
