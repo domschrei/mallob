@@ -1,0 +1,12 @@
+{
+    "rules": [
+      {
+        "backend": "Kissat",
+        "selector": { "type": "flavour", "value": "default" },
+        "settings": [
+          {"type": "set", "key": "exportmore", "value": 1}
+        ]
+      }
+    ]
+  }
+  
