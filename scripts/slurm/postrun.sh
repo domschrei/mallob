@@ -3,7 +3,7 @@
 source scripts/slurm/account.sh # $projectname , $username
 source $ACCOUNTINFO
 
-set -e
+# set -e
 
 jobname="$1"
 outdir="/hppfs/work/$projectname/$username/logs/${jobname}"
@@ -21,6 +21,7 @@ for f in /hppfs/work/$projectname/$username/logs/${jobname}-*/*/.alldone ; do
     mv $(dirname $f) "$outdir/"
 done
 mv sbatch/generated/${jobname}/sbatch.sh "$outdir/"
+mv sbatch/generated/${jobname}/config/ "$outdir/"
 echo /hppfs/work/$projectname/$username/logs/${jobname}-*/ | grep -oE "\-[0-9]{7}/" | grep -oE "[0-9]{7}" | while read slurmid; do
     if ! [ -f slurm-${slurmid}.out ]; then
        echo "WARN: Slurm file slurm-${slurmid}.out not present"
