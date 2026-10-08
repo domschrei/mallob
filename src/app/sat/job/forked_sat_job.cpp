@@ -333,7 +333,7 @@ void ForkedSatJob::appl_memoryPanic() {
     int nbThreads = (int)getNumThreads() - (int)std::max(1UL, (size_t)std::round(0.1*getNumThreads()));
 
     // Gently ask the solver process to reduce its number of solvers
-    LOG(V1_WARN, "[WARN] %s : memory panic triggered - reducing thread count\n", toStr());
+    LOG(V1_WARN, "[WARN] %s : memory panic triggered - reducing thread count to %i\n", toStr(), nbThreads);
     setNumThreads(nbThreads);
 
     // Straight up crash the solver process, restart with reduced # solvers
