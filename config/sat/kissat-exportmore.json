@@ -4,7 +4,8 @@
         "backend": "Kissat",
         "selector": { "type": "flavour", "value": "default" },
         "settings": [
-          {"type": "set", "key": "exportmore", "value": 1}
+          {"type": "set", "key": "exportmore", "value": 1}, 
+          {"type": "set", "key": "exportmore_bincongr", "value": 0}
         ]
       }
     ]
