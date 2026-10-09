@@ -4,7 +4,7 @@
 OUT_DIR=$HOME/PhD/logsntraces/
 
 FLAGS=(
- -minprocs 2
+ -minprocs 3
  -max-lits-per-thread=35000000 
  -pre-cleanup=1
  -seed=110519 
@@ -20,8 +20,8 @@ FLAGS=(
  -satsolver=k 
  -sat-config-dirs=config/sat/base/
  -sat-config-files=config/sat/preprokissat-congruence.json
- -preprocess-config=config/satwithpre/actors_KEM.json
- -v=3
+ -preprocess-config=config/satwithpre/actors_M_SM_SKM.json
+ -v=2
  -cjc=0
  -cjtcp=0
  -jc=2
@@ -41,12 +41,14 @@ INST="$HOME/PhD/instances/sat-and-minisat1m/0225fa9581c622e5abbc8497a97edf4e-fla
 INST="$HOME/PhD/instances/sat-and-minisat1m/01d037bf22a943430790eedd667f415e-60-128351.cnf.xz"
 INST="$HOME/PhD/instances/sat-and-minisat1m/000a41cdca43be89ed62ea3abf2d0b64-snw_13_9_pre.cnf.xz"
 INST="$HOME/PhD/instances/sat-and-minisat1m/00847fca81490df01b9e239fd6027378-bench_1614.smt2.cnf.xz" #28sec
-INST="$HOME/PhD/instances/sat-and-minisat1m/006be0fb3ae0a75aac0e386c2e6c4669-bench_501.smt2.cnf.xz"
+# INST="$HOME/PhD/instances/tmp2024/12b4a08e412a3bffb513ca65639c7c69-Folkman-175-7416734.sanitized.cnf"
 
-INST="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s127.cnf.xz" #trickle
+# INST="$HOME/PhD/instances/sat-and-minisat1m/006be0fb3ae0a75aac0e386c2e6c4669-bench_501.smt2.cnf.xz"
 
-INST="$HOME/PhD/instances/sat25/d88c6afc13cdad0e2c8371a879692b39-battleship-13-13-unsat.cnf.xz" #suddenly endless
-INST="$HOME/PhD/instances/sat25/0a8a4c28d27228e954354ea0a6e7f16c-sum_of_three_cubes_42_known_representation.cnf.xz"
+# INST="$HOME/PhD/instances/miters/hwmcc12miters/cnf/xits/opt/6s127.cnf.xz" #trickle
+
+# INST="$HOME/PhD/instances/sat25/d88c6afc13cdad0e2c8371a879692b39-battleship-13-13-unsat.cnf.xz" #suddenly endless
+# INST="$HOME/PhD/instances/sat25/0a8a4c28d27228e954354ea0a6e7f16c-sum_of_three_cubes_42_known_representation.cnf.xz"
 
 
 # INST="$HOME/PhD/instances/sat-and-minisat1m/00be590675417eba2bb2585790ac392d-iso-brn008.shuffled-as.sat05-2933.cnf.xz" #good quick mix
@@ -68,5 +70,5 @@ INST="$HOME/PhD/instances/sat25/0a8a4c28d27228e954354ea0a6e7f16c-sum_of_three_cu
 # INST="$HOME/PhD/instances/tmp2024/05c8e94aaee86390eaf6e68dd3ec3570-noL-11-2.sanitized.cnf"
 #
 
-./scripts/run/mallob_local.sh "${FLAGS[@]}" -mono="$INST" -t=2
+./scripts/run/mallob_local.sh "${FLAGS[@]}" -mono="$INST" -t=3
 
