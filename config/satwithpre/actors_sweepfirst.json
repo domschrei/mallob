@@ -1,0 +1,20 @@
+[
+    {
+        "id": "sweep",
+        "type": "MALLOBSWEEP",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false,
+        "group-id": "1",
+        "options": "-fcll=2"
+    },
+    {
+        "id": "mal",
+        "type": "MALLOBSAT",
+        "prerequisite": "sweep",
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false,
+        "group-id": "2",
+        "options": "-satsolver=k"
+    }
+]
