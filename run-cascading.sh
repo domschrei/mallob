@@ -34,6 +34,7 @@ echo "${FLAGS[@]}"
 
 #clean old logs and traces
 $HOME/PhD/logsntraces/clean.sh
+cp -r config/ "$OUT_DIR"
 
 grep "CC=" ./lib/kissat/build/makefile
 
