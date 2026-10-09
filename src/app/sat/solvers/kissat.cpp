@@ -207,7 +207,7 @@ SatResult Kissat::solve(size_t numAssumptions, const int* assumptions) {
 void Kissat::setSolverInterrupt() {
 	interrupted = true;
     if (interruptionInitialized) {
-        LOGGER(_logger, V4_VVER, "Interrupting Kissat in phase %s \n", kissat_get_current_profilename(solver));
+        LOGGER(_logger, V4_VVER, "Interrupting Kissat in phase '%s' \n", kissat_get_current_profilename(solver));
         kissat_terminate (solver);
     }
 }
