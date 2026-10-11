@@ -3,7 +3,7 @@
 source scripts/slurm/account.sh # $projectname , $username
 source $ACCOUNTINFO
 
-set -e
+# set -e
 
 jobname="$1"
 outdir="/hppfs/work/$projectname/$username/logs/${jobname}"
