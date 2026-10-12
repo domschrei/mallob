@@ -138,13 +138,8 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     -rspaa=1 \
     -jcup=0.1 \
     -v=3 \
-    -cjc=0 \
-    -cjtcp=0 \
-    -fcll=2 \
     -seed=0 \
-    -sweep-skip-ratio=0.01 \
-    -sweep-skip-window=1 \
-    -sweep-max-weak-iters=1 \
+    -ems=1 \
     -spd=${globallogdir}/ -spl=-1"
 
     # Pre-create network-disk output directories to avoid many concurrent filesystem manips
