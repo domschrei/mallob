@@ -464,7 +464,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		//in case we don't have full tree information about the origin of the message we can still send it back,
 		//because we can use metadata in the message itself as a backup
 		if (msg.contextIdOfDestination != 0) {
-			assert(msg.contextIdOfDestination == sourceContextId || log_return_false("[ERROR] In sweeping: source rank [%i]->jobcommIdx(%i)->ctx<%i> msg selfinfo (%i)<%i> (me [%i](%i), msg.sender (%i)<%i>)\n", sourceRank, sourceIndex, msg.contextIdOfDestination, msg.contextIdOfDestination, sourceTreeIndex, sourceContextId, _my_rank, _my_index, msg.treeIndexOfSender, msg.contextIdOfSender));
+			assert(msg.contextIdOfDestination == sourceContextId || log_return_false("[ERROR] In sweeping: source rank [%i]->jobcommIdx(%i)->ctx<%i> msg selfinfo (%i)<%i> (me [%i](%i), msg.sender (%i)<%i>)\n", sourceRank, sourceIndex, msg.contextIdOfDestination, sourceTreeIndex, sourceContextId, _my_rank, _my_index, msg.treeIndexOfSender, msg.contextIdOfSender));
 		} else {
 			msg.contextIdOfDestination = sourceContextId;
 			LOGGER(_sweeplogger,V1_WARN,"WARN SWEEP: SEARCHING_WORK receiver [%i] does not know contextIdOfDestination of sender [%i], now using ContextId %i provided by incoming msg itself\n", _my_rank, sourceRank, sourceContextId);
