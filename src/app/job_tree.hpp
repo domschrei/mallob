@@ -268,6 +268,7 @@ public:
         assert(_root_ctx_id != 0);
         _parent_ctx_id = parentContextId;
         assert(index == 0 || _parent_ctx_id != 0);
+        LOG(V3_VERB, "JOBTREE UPDATE index %i rootRank %i rootCtxId %i parentRank %i parentCtxId %i\n", index, rootRank, rootContextId, parentRank, parentContextId);
     }
     void updateJobNode(int index, int newRank) {
         _job_node_ranks.adjust(index, newRank);
