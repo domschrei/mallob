@@ -443,50 +443,56 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 	}
 	else if (msg.tag == TAG_SEARCHING_WORK) {
 		assert(msg.payload.size() == NUM_SEARCHING_WORK_FIELDS);
-		int sourceLocalId = msg.payload[0];
-		int sourceContextId = msg.payload[1];
-		int sourceTreeIndex = msg.payload[2];
+		int manualSenderLocalId = msg.payload[0];
+		int manualSenderContextId = msg.payload[1];
+		int manualSenderTreeIndex = msg.payload[2];
 		msg.payload.clear();
-		LOGGER(_sweeplogger,V4_VVER, "SWEEP MSG [%i] <---?---- [%i](%i) \n", _my_rank, sourceRank, sourceLocalId);
+		LOGGER(_sweeplogger,V4_VVER, "SWEEP MSG [%i] <---?---- [%i](%i) \n", _my_rank, sourceRank, manualSenderLocalId);
 		if (_terminate_all.load(std::memory_order_relaxed)) {
-			LOGGER(_sweeplogger,V4_VVER, "SWEEP Not answering to post-termination MPI steal request from [%i](%i) \n", sourceRank, sourceLocalId);
+			LOGGER(_sweeplogger,V4_VVER, "SWEEP Not answering to post-termination MPI steal request from [%i](%i) \n", sourceRank, manualSenderLocalId);
 			return;
 		}
-		auto locally_stolen_work = stealWorkFromAnyLocalSolver(sourceRank, sourceLocalId);
+		auto locally_stolen_work = stealWorkFromAnyLocalSolver(sourceRank, manualSenderLocalId);
 		int stolen_count = locally_stolen_work.size();
 		msg.payload = std::move(locally_stolen_work);
-		msg.payload.push_back(sourceLocalId);
+		msg.payload.push_back(manualSenderLocalId);
 		//send back to source
 		msg.tag = TAG_RETURNING_STEAL_REQUEST;
-		int sourceIndex = getJobComm().getInternalRankOrMinusOne(sourceRank);
-		msg.treeIndexOfDestination = sourceIndex;
-		msg.contextIdOfDestination = getJobComm().getContextIdOrZero(sourceIndex);
+		int jobCommSenderIndex = getJobComm().getInternalRankOrMinusOne(sourceRank);
+		// msg.treeIndexOfDestination = sourceIndex;
+		// msg.contextIdOfDestination = getJobComm().getContextIdOrZero(sourceIndex);
+		msg.treeIndexOfDestination = msg.treeIndexOfSender;
+		msg.contextIdOfDestination = msg.contextIdOfSender;
 		//in case we don't have full tree information about the origin of the message we can still send it back,
 		//because we can use metadata in the message itself as a backup
-		if (msg.contextIdOfDestination != 0) {
-			assert(msg.contextIdOfDestination == sourceContextId || log_return_false("[ERROR] In sweeping: source rank [%i]->jobcommIdx(%i)->ctx<%i> msg selfinfo (%i)<%i> (me [%i](%i), msg.sender (%i)<%i>)\n", sourceRank, sourceIndex, msg.contextIdOfDestination, sourceTreeIndex, sourceContextId, _my_rank, _my_index, msg.treeIndexOfSender, msg.contextIdOfSender));
-		} else {
-			msg.contextIdOfDestination = sourceContextId;
-			LOGGER(_sweeplogger,V1_WARN,"WARN SWEEP: SEARCHING_WORK receiver [%i] does not know contextIdOfDestination of sender [%i], now using ContextId %i provided by incoming msg itself\n", _my_rank, sourceRank, sourceContextId);
+		if (msg.contextIdOfDestination != manualSenderContextId) {
+			LOG(V1_WARN, "[WARN] In sweeping: sender source rank [%i]->jobcommIdx(%i)->ctx<%i> msg selfinfo (%i)<%i> (me [%i](%i), msg.sender (%i)<%i>)\n", sourceRank, jobCommSenderIndex, msg.contextIdOfDestination, manualSenderTreeIndex, manualSenderContextId, _my_rank, _my_index, msg.treeIndexOfSender, msg.contextIdOfSender);
 		}
-		if (msg.treeIndexOfDestination != -1) {
-			assert(msg.treeIndexOfDestination == sourceTreeIndex|| log_return_false("[ERROR] In sweeping: msg.treeIndexOfDestination == %i != %i == sourceTreeIndex \n", msg.treeIndexOfDestination, sourceTreeIndex));
-		} else {
-			msg.treeIndexOfDestination = sourceTreeIndex;
-			LOGGER(_sweeplogger,V1_WARN,"WARN SWEEP: SEARCHING_WORK receiver [%i] does not know treeIndexOfDestination of sender [%i], now using treeIndex %i provided by incoming msg itself\n", _my_rank, sourceRank, sourceTreeIndex);
-		}
+		// if (msg.contextIdOfDestination != 0) {
+			// assert(msg.contextIdOfDestination == manualSenderContextId || log_return_false("[ERROR] In sweeping: source rank [%i]->jobcommIdx(%i)->ctx<%i> msg selfinfo (%i)<%i> (me [%i](%i), msg.sender (%i)<%i>)\n",
+				// sourceRank, jobCommSenderIndex, msg.contextIdOfDestination, manualSenderTreeIndex, manualSenderContextId, _my_rank, _my_index, msg.treeIndexOfSender, msg.contextIdOfSender));
+		// } else {
+			// msg.contextIdOfDestination = manualSenderContextId;
+			// LOGGER(_sweeplogger,V1_WARN,"WARN SWEEP: SEARCHING_WORK receiver [%i] does not know contextIdOfDestination of sender [%i], now using ContextId %i provided by incoming msg itself\n", _my_rank, sourceRank, manualSenderContextId);
+		// }
+		// if (msg.treeIndexOfDestination != -1) {
+			// assert(msg.treeIndexOfDestination == manualSenderTreeIndex|| log_return_false("[ERROR] In sweeping: msg.treeIndexOfDestination == %i != %i == sourceTreeIndex \n", msg.treeIndexOfDestination, manualSenderTreeIndex));
+		// } else {
+			// msg.treeIndexOfDestination = manualSenderTreeIndex;
+			// LOGGER(_sweeplogger,V1_WARN,"WARN SWEEP: SEARCHING_WORK receiver [%i] does not know treeIndexOfDestination of sender [%i], now using treeIndex %i provided by incoming msg itself\n", _my_rank, sourceRank, manualSenderTreeIndex);
+		// }
 		//probably happens when sweep message slips right into the ongoing ranklist update
 		//that is periodically started as aggregating, in job.cpp 233
 		assert(msg.contextIdOfDestination != 0 ||
 			log_return_false("SWEEP STEAL ERROR: invalid contextIdOfDestination==0. In TAG_RETURNING_STEAL_REQUEST, wanted to return an message"
-					"With sourceRank=%i, sourceIndex=%i, payload.size()=%zu \n", sourceRank, sourceIndex, msg.payload.size()));
+					"With sourceRank=%i, sourceIndex=%i, payload.size()=%zu \n", sourceRank, jobCommSenderIndex, msg.payload.size()));
 
 		assert(msg.treeIndexOfDestination >= 0 ||
 			log_return_false("SWEEP STEAL ERROR: treeIndexOfDestination < 0 . In TAG_RETURNING_STEAL_REQUEST, wanted to return an message"
-					"With sourceRank=%i, sourceIndex=%i, contextIdOfDestination=%i, payload.size()=%zu \n", sourceRank, sourceIndex, msg.contextIdOfDestination, msg.payload.size()));
+					"With sourceRank=%i, sourceIndex=%i, contextIdOfDestination=%i, payload.size()=%zu \n", sourceRank, jobCommSenderIndex, msg.contextIdOfDestination, msg.payload.size()));
 
 		if (stolen_count>0) {
-			LOGGER(_sweeplogger,V4_VVER, "SWEEP snd [%i] >>>>%i>>>> [%i](%i) \n", _my_rank, stolen_count, sourceRank, sourceLocalId);
+			LOGGER(_sweeplogger,V4_VVER, "SWEEP snd [%i] >>>>%i>>>> [%i](%i) \n", _my_rank, stolen_count, sourceRank, manualSenderLocalId);
 		}
 		getJobTree().send(sourceRank, MSG_SEND_APPLICATION_MESSAGE, msg);
 	}
