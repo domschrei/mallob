@@ -124,7 +124,7 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     timeout=$DS_SECONDSPERJOB
     cmd="$build/mallob \
     -mono-app=$DS_APP \
-    -sat-config-files=config/sat/preprokissat-congruence.json \
+    -sat-config-files=config/sat/preprokissat-congruence.json,kissat-exportmore.json \
     -preprocess-config=config/satwithpre/actors_M_SM_SKM.json \
     -satsolver=k \
     -mono=$f -jwl=$timeout -T=$(($timeout+30)) -wam=60000 -pre-cleanup=1 \
