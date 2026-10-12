@@ -35,8 +35,8 @@
         "prerequisite": "SK",
         "actorsBeingDisplaced": ["M", "SM"],
         "onlyStartIfPrerequisiteSimplified": false,
-        "options": "-fcll=2"
-    },
+		"options": "-fcll=2 -rspaa=1 -jcup=0.1 -cjc=0 -cjtcp=0 -sweep-skip-ratio=0.01 -sweep-skip-window=1 -sweep-max-weak-iters=1"
+	},
     {
         "id": "SKEM",
         "type": "MALLOBSAT",
