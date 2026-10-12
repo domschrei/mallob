@@ -1,0 +1,24 @@
+[
+    {
+        "id": "S",
+        "type": "SATSUMA_EXT",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "SK",
+        "type": "KISSAT",
+        "prerequisite": "S",
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "SKM",
+        "type": "MALLOBSAT",
+        "prerequisite": "SK",
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false,
+        "options": "-satsolver=k_c_k+[k_]{29}k_c_l+[k_]{29}"
+    }
+]
