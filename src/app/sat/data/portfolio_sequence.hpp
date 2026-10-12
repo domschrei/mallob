@@ -17,7 +17,7 @@ struct PortfolioSequence {
         PREPROCESSOR = 'p',
     };
     enum Flavour {
-        DEFAULT, SAT, UNSAT, PLAIN, PREPROCESS, SWEEPER, PLAINWITHSWEEP
+        DEFAULT, SAT, UNSAT, PLAIN, PREPROCESS, SWEEPER, CHEAP
     };
     struct Item {
         BaseSolver baseSolver;
@@ -153,8 +153,8 @@ private:
                 next.flavour = PLAIN;
                 break;
             case '~':
-                //"Plain" flavour, but allowing sweep & congruence closure
-                next.flavour = PLAINWITHSWEEP;
+                //Limit inprocessing to the cheaper techniques
+                next.flavour = CHEAP;
                 break;
             case '0':
                 // "Preprocess" flavour

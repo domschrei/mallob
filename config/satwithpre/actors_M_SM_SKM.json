@@ -35,6 +35,6 @@
         "prerequisite": "kissat-on-satsuma",
         "actorsBeingDisplaced": ["mallobsat-plain", "mallobsat-on-satsuma"],
         "onlyStartIfPrerequisiteSimplified": true,
-        "options": "-satsolver=k_c_k+[k_]{29}k_c_l+[k_]{29}"
+        "options": "-satsolver=k_c_k+[k_]{29}k_c_l+[k_]{29} -ems=1 -spl=4"
     }
 ]

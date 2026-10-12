@@ -2,19 +2,19 @@
     "rules": [
       {
         "backend": "Kissat",
-        "selector": { "type": "flavour", "value": "default" },
+        "selector": {"type": "true"},
         "settings": [
-          {"type": "set", "key": "exportmore_unit_sweep", 	"value": 1},
-          {"type": "set", "key": "exportmore_unit_inlineassign","value": 1},
-          {"type": "set", "key": "exportmore_bin_sweep", 	"value": 1},
-          {"type": "set", "key": "exportmore_bin_strengthen", 	"value": 1},
-          {"type": "set", "key": "exportmore_bin_forwardsub", 	"value": 1},
-          {"type": "set", "key": "exportmore_bin_congruence", 	"value": 0},
-          {"type": "set", "key": "exportmore_bin_vivify", 	"value": 1},
-          {"type": "set", "key": "exportmore_cls_strengthen", 	"value": 1},
-          {"type": "set", "key": "exportmore_cls_forwardsub", 	"value": 1},
-          {"type": "set", "key": "exportmore_cls_vivify", 	"value": 1},
-          {"type": "set", "key": "exportmore_maxsize",  "value": 5}
+          {"type": "set", "key": "exportmore_unit_sweep",       "value": 1},
+          {"type": "set", "key": "exportmore_unit_inlineassign","value": 0},
+          {"type": "set", "key": "exportmore_bin_sweep",        "value": 1},
+          {"type": "set", "key": "exportmore_bin_strengthen",   "value": 1},
+          {"type": "set", "key": "exportmore_bin_forwardsub",   "value": 1},
+          {"type": "set", "key": "exportmore_bin_congruence",   "value": 0},
+          {"type": "set", "key": "exportmore_bin_vivify",       "value": 1},
+          {"type": "set", "key": "exportmore_cls_strengthen",   "value": 1},
+          {"type": "set", "key": "exportmore_cls_forwardsub",   "value": 1},
+          {"type": "set", "key": "exportmore_cls_vivify",       "value": 1},
+          {"type": "set", "key": "exportmore_maxsize",  "value": 6}
         ]
       }
     ]
