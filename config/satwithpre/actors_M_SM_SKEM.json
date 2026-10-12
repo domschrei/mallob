@@ -1,0 +1,48 @@
+[
+    {
+        "id": "M",
+        "type": "MALLOBSAT",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false,
+        "options": "-satsolver=k_c_k+[k_]{29}k_c_l+[k_]{29}"
+    },
+    {
+        "id": "S",
+        "type": "SATSUMA_EXT",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "SM",
+        "type": "MALLOBSAT",
+        "prerequisite": "S",
+        "actorsBeingDisplaced": ["M"],
+        "onlyStartIfPrerequisiteSimplified": true,
+        "options": "-satsolver=k_c_k+[k_]{29}k_c_l+[k_]{29}"
+    },
+    {
+        "id": "SK",
+        "type": "KISSAT",
+        "prerequisite": "S",
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "SKE",
+        "type": "MALLOBSWEEP",
+        "prerequisite": "SK",
+        "actorsBeingDisplaced": ["M", "SM"],
+        "onlyStartIfPrerequisiteSimplified": false,
+        "options": "-fcll=2"
+    },
+    {
+        "id": "SKEM",
+        "type": "MALLOBSAT",
+        "prerequisite": "SKE",
+        "actorsBeingDisplaced": ["M", "SM"],
+        "onlyStartIfPrerequisiteSimplified": true,
+        "options": "-satsolver=k_c_k+[k_]{29}k_c_l+[k_]{29}"
+    }
+]
