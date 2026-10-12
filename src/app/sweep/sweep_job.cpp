@@ -293,7 +293,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		_sweepers[localId].reset();
 		_running_sweepers_count--;
 		_finished_sweepers_count++;
-		LOGGER(_sweeplogger,	V3_VERB, "SWEEP [%i](%i) WORKER EXITED. still running: %i\n", _my_rank, localId, _running_sweepers_count.load());
+		LOGGER(_sweeplogger,V4_VVER, "SWEEP [%i](%i) WORKER EXITED. still running: %i\n", _my_rank, localId, _running_sweepers_count.load());
 		printActiveMPIRequestsCount();
 	});
 }
@@ -464,13 +464,12 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		//in case we don't have full tree information about the origin of the message we can still send it back,
 		//because we can use metadata in the message itself as a backup
 		if (msg.contextIdOfDestination != 0) {
-			assert(msg.contextIdOfDestination == sourceContextId || log_return_false("[ERROR] In sweeping: msg.contextIdOfDestination == %i != %i == sourceContextId\n", msg.contextIdOfDestination, sourceContextId));
+			assert(msg.contextIdOfDestination == sourceContextId || log_return_false("[ERROR] In sweeping: (jobComm->rank->index-ctx) msg.contextIdOfDestination == %i != %i == sourceContextId (payload own data) (myrank %i, source rank %i, source index %i)\n", msg.contextIdOfDestination, sourceContextId, _my_rank, sourceRank, sourceIndex));
 		} else {
 			msg.contextIdOfDestination = sourceContextId;
 			LOGGER(_sweeplogger,V1_WARN,"WARN SWEEP: SEARCHING_WORK receiver [%i] does not know contextIdOfDestination of sender [%i], now using ContextId %i provided by incoming msg itself\n", _my_rank, sourceRank, sourceContextId);
 		}
 		if (msg.treeIndexOfDestination != -1) {
-			assert(msg.treeIndexOfDestination == sourceTreeIndex);
 			assert(msg.treeIndexOfDestination == sourceTreeIndex|| log_return_false("[ERROR] In sweeping: msg.treeIndexOfDestination == %i != %i == sourceTreeIndex \n", msg.treeIndexOfDestination, sourceTreeIndex));
 		} else {
 			msg.treeIndexOfDestination = sourceTreeIndex;
@@ -2191,9 +2190,9 @@ void SweepJob::triggerTerminations() {
 	for (auto &sweeper : _sweepers) {
 		if (sweeper) {
 			sweeper->triggerSweepTerminate();
-			LOGGER(_sweeplogger,                V3_VERB, "SWEEP TERM #%i [%i] trigger termination of solver (%i) \n", getId(), _my_rank, i);
+			LOGGER(_sweeplogger, V3_VERB, "SWEEP TERM #%i [%i] trigger termination of solver (%i) \n", getId(), _my_rank, i);
 		} else {
-			LOGGER(_sweeplogger,				V3_VERB, "SWEEP TERM #%i [%i] skip    termination of solver (%i), already null \n", getId(), _my_rank, i);
+			LOGGER(_sweeplogger, V3_VERB, "SWEEP TERM #%i [%i] skip    termination of solver (%i), already null \n", getId(), _my_rank, i);
 		}
 		i++;
 	}
