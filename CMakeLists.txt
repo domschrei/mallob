@@ -194,6 +194,9 @@ endif()
 if(NOT MALLOB_APP_SWEEP EQUAL 0) # included by default
 register_mallob_app("sweep")
 endif()
+if(NOT MALLOB_APP_MUS EQUAL 0) # included by default
+register_mallob_app("mus")
+endif()
 if(MALLOB_APP_SATCNC EQUAL 1)
 register_mallob_app("satcnc")
 endif()
