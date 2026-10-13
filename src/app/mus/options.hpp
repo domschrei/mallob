@@ -8,5 +8,5 @@
 
 OPTION_GROUP(grpAppMus, "app/mus", "MUS solving options")
 
-OPT_INT(musOption, "musOption", "", 1, 0, 1, "test opeion")
+OPT_INT(musOption, "musOption", "", 1, 0, 1, "test mus option")
 

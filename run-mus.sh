@@ -4,9 +4,9 @@
 OUT_DIR=$HOME/PhD/logsntraces/
 
 INST="$HOME/PhD/instances/sat-and-minisat1m/0225fa9581c622e5abbc8497a97edf4e-fla-qhid-360-4.cnf.xz"
-INST="$HOME/PhD/instances/sat-and-minisat1m/01d037bf22a943430790eedd667f415e-60-128351.cnf.xz"
-INST="$HOME/PhD/instances/sat-and-minisat1m/000a41cdca43be89ed62ea3abf2d0b64-snw_13_9_pre.cnf.xz"
-INST="$HOME/PhD/instances/sat-and-minisat1m/00847fca81490df01b9e239fd6027378-bench_1614.smt2.cnf.xz" #28sec SAT
+# INST="$HOME/PhD/instances/sat-and-minisat1m/01d037bf22a943430790eedd667f415e-60-128351.cnf.xz"
+# INST="$HOME/PhD/instances/sat-and-minisat1m/000a41cdca43be89ed62ea3abf2d0b64-snw_13_9_pre.cnf.xz"
+# INST="$HOME/PhD/instances/sat-and-minisat1m/00847fca81490df01b9e239fd6027378-bench_1614.smt2.cnf.xz" #28sec SAT
 
 # INST="$HOME/PhD/instances/tmp2024/12b4a08e412a3bffb513ca65639c7c69-Folkman-175-7416734.sanitized.cnf"
 # INST="$HOME/PhD/instances/sat-and-minisat1m/006be0fb3ae0a75aac0e386c2e6c4669-bench_501.smt2.cnf.xz"
@@ -23,28 +23,16 @@ INST="$HOME/PhD/instances/sat-and-minisat1m/00847fca81490df01b9e239fd6027378-ben
 # INST="$HOME/PhD/instances/sat23/0982db5b0b15642e79e8242881529b39-REGRandom-K4-L3-Seed15.cnf.xz" #isDestructible problem
 # INST="$HOME/PhD/instances/sat-and-minisat1m/0151782431fa0ec1f855523721c52682-58-122783.cnf.xz" #lot of lagging
 
-
 FLAGS=(
  -minprocs 2
  -max-lits-per-thread=35000000 
- -pre-cleanup=1
- -seed=110519 
  -os=1
- -jc=2
- -jcup=0.05
- -terminate-abruptly=0
  -trace-dir=$OUT_DIR/traces
  -log=$OUT_DIR/logs/
  -spd=$OUT_DIR/logs/
  -tmp=$OUT_DIR/tmp/
- -mono-app=SATWITHPRE 
- -satsolver=k 
- -preprocess-config=config/satwithpre/actors_M_SM_SKM.json
- -sat-config-dirs=config/sat/base/
- -sat-config-files=config/sat/preprokissat-congruence.json,config/sat/kissat-exportmore.json,config/sat/kissat-plaincheap.json
+ -mono-app=MUS
  -v=3
- -spl=4
- -ems=1
 )
 
 echo "${FLAGS[@]}"
@@ -55,5 +43,5 @@ cp -r config/ "$OUT_DIR"
 
 grep "CC=" ./lib/kissat/build/makefile
 
-./scripts/run/mallob_local.sh "${FLAGS[@]}" -mono="$INST" -t=5
+./scripts/run/mallob_local.sh "${FLAGS[@]}" -mono="$INST" -t=2
 
