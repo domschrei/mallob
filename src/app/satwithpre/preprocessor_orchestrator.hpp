@@ -27,8 +27,9 @@ private:
     const JobDescription _desc;
     APIConnector& _api;
 
+    std::vector<int> _base_cnf;
+    std::list<std::vector<int>> _modified_cnfs;
     std::list<ActorContext> _actors;
-    const std::vector<int> _base_cnf;
 
     float _time_of_start;
     ActorContext* _winning_actor {nullptr};
@@ -39,7 +40,7 @@ private:
 
 public:
     PreprocessorOrchestrator(const Parameters& params, const JobDescription& desc, APIConnector& api) :
-            _params(params), _desc(desc.getBasicCopy()), _api(api),
+            _params(params), _desc(desc.getBasicCopy(false)), _api(api),
             _base_cnf(CnfUtil::getCnfFromJobDescription(desc, true)) {
 
         if (_params.savePreprocessingProofs()) {
@@ -97,7 +98,7 @@ public:
                 }
 
                 // prerequisite done: initialize actor
-                auto formula = actor.prerequisite ? actor.prerequisite->formula : _base_cnf;
+                auto formula = actor.prerequisite ? actor.prerequisite->formula : &_base_cnf;
                 auto name = std::to_string(actorIdx) + ":";
                 if (!actor.groupId.empty()) actor.groupId = "#" + std::to_string(_desc.getId()) + ":" + actor.groupId;
                 Parameters params(_params);
@@ -158,20 +159,23 @@ public:
                     actor.model = std::move(actor.actor->getModel());
                 }
                 if (res == SatPreprocessActor::SIMPLIFIED) {
-                    actor.formula = std::move(actor.actor->getPreprocessedFormula());
+                    // extract the preprocessed formula and append it to a list with stable pointers
+                    // so that later actors can reference it in a safe manner
+                    _modified_cnfs.push_back(std::move(actor.actor->getPreprocessedFormula()));
+                    actor.formula = &_modified_cnfs.back();
                     if (_params.savePreprocessingProofs())
-                        actor.actor->writeCnf(actor.formula);
+                        actor.actor->writeCnf(_modified_cnfs.back());
                 } else {
-                    actor.formula = std::move(actor.actor->getInputCnf());
+                    actor.formula = &actor.actor->getInputCnf();
                 }
-                assert(actor.formula.size() > 2);
-                assert(actor.formula[actor.formula.size() - 2] >= 0); // # vars
-                assert(actor.formula[actor.formula.size() - 1] >= 0); // # clauses
+                assert(actor.formula->size() > 2);
+                assert(actor.formula->at(actor.formula->size() - 2) >= 0); // # vars
+                assert(actor.formula->at(actor.formula->size() - 1) >= 0); // # clauses
                 actor.result = res;
                 actor.state = ActorContext::FINISHED;
                 if (!_preprocess_log_dir.empty()) {
                     if (res == SatPreprocessActor::SIMPLIFIED)
-                        CnfUtil::writeFormula(actor.formula, _preprocess_log_dir + "/out." + actor.getId() + ".cnf");
+                        CnfUtil::writeFormula(*actor.formula, _preprocess_log_dir + "/out." + actor.getId() + ".cnf");
                     if (res == SatPreprocessActor::SAT)
                         CnfUtil::writeModel(actor.model, _preprocess_log_dir + "/model." + actor.getId() + ".txt");
                 }
@@ -185,7 +189,7 @@ public:
                     _winning_actor = &actor;
                     return 20;
                 }
-                assert(actor.formula[0] != 0); // no empty clause without reporting UNSAT!
+                assert(actor.formula->at(0) != 0); // no empty clause without reporting UNSAT!
             }
 
             if (actor.state == ActorContext::RUNNING && actor.timeOfSignalledDisplacement > 0) {

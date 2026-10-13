@@ -19,8 +19,8 @@
 class SatsumaPreprocessor : public SatPreprocessActor {
 
 public:
-    SatsumaPreprocessor(const Parameters& params, const JobDescription& desc, const std::string& name, std::vector<int>&& formula) :
-        SatPreprocessActor(params, name, std::move(formula)) {}
+    SatsumaPreprocessor(const Parameters& params, const JobDescription& desc, const std::string& name, const std::vector<int>* formula) :
+        SatPreprocessActor(params, name, formula) {}
     ~SatsumaPreprocessor() {}
 
     void preprocessAsync() override {
@@ -52,8 +52,8 @@ private:
     void loadFormulaToCnf2wl(satsuma::ICnf2wl& result) {
         result.reserve(nbInputVars(), nbInputClauses());
 		std::vector<int> construct_clause;
-        for (int i = 0; i+2 < _input_cnf.size(); i++) {
-            int lit = _input_cnf[i];
+        for (int i = 0; i+2 < _input_cnf->size(); i++) {
+            int lit = _input_cnf->at(i);
 			if (lit != 0) {
 				construct_clause.push_back(lit);
 			} else {

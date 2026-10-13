@@ -53,7 +53,7 @@ private:
 
 public:
     BitwuzlaSolver(const Parameters& params, APIConnector& api, JobDescription& desc, const std::string& problemFile) :
-            _params(params), _api(api), _desc(desc.getBasicCopy()), _term(_params, _desc),
+            _params(params), _api(api), _desc(desc.getBasicCopy(false)), _term(_params, _desc),
             _problem_file(problemFile), _name("#" + std::to_string(desc.getId()) + "(SMT)"),
             _terminator(*this, _params, _desc, _start_time) {
 

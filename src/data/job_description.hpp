@@ -129,7 +129,7 @@ public:
 
     // Instead, a copy operation must be called very deliberately.
     // It copies all job description payload instead of referencing it.
-    JobDescription getBasicCopy() const {
+    JobDescription getBasicCopy(bool copyPayloads) const {
         JobDescription copy;
         copy._id = _id;
         copy._root_rank = _root_rank;
@@ -149,8 +149,8 @@ public:
         copy._app_config = _app_config;
         copy._num_vars = _num_vars;
         copy._f_size = _f_size;
-        copy._preloaded_literals = _preloaded_literals;
-        for (auto& data : _data_per_revision) {
+        if (copyPayloads) copy._preloaded_literals = _preloaded_literals;
+        if (copyPayloads) for (auto& data : _data_per_revision) {
             std::shared_ptr<std::vector<uint8_t>> vec(new std::vector<uint8_t>(
             data->begin(), data->end()));
             copy._data_per_revision.push_back(vec);

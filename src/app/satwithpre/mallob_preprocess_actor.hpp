@@ -39,9 +39,9 @@ private:
 
 public:
     MallobPreprocessActor(const Parameters& params, const JobDescription& desc, const std::string& name,
-            APIConnector& api, std::vector<int>&& formula, float timeOfActivation,
+            APIConnector& api, const std::vector<int>* formula, float timeOfActivation,
             MallobJobType type, const std::string& groupId, const std::string& optionOverrides) :
-        SatPreprocessActor(params, name, std::move(formula)), _desc(desc), _api(api),
+        SatPreprocessActor(params, name, formula), _desc(desc), _api(api),
             _job_id(desc.getId()), _time_of_activation(timeOfActivation),
             _group_id(groupId), _option_overrides(optionOverrides), _type(type) {
 
@@ -102,7 +102,7 @@ private:
             {"incremental", false}
         };
 
-        auto f = std::vector<int>(_input_cnf.begin(), _input_cnf.end() - 2);
+        auto f = std::vector<int>(_input_cnf->begin(), _input_cnf->end() - 2);
         StaticStore<std::vector<int>>::insert(json["name"].get<std::string>(), std::move(f));
         json["internalliterals"] = json["name"].get<std::string>();
         json["configuration"]["__NV"] = std::to_string(nbInputVars());
