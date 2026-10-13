@@ -337,7 +337,7 @@ void Cadical::cleanUp() {
 			// remove pipe file
 			FileUtils::rm(proofFileString + ".compress");
 		}
-		if (_setup.usePalRupFormat) {
+		if (!_lrat) {
 			// Finalize the proof fragment by moving temporary to final file
 			std::string proofFileStringOld = proofFileString + "~";
 			::rename(proofFileStringOld.c_str(), proofFileString.c_str());

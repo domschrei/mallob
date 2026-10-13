@@ -1,11 +1,14 @@
 
 #pragma once
 
+#include <cmath>
+#include <atomic>
 #include <vector>
 
 #include "app/sat/data/model_string_compressor.hpp"
 #include "app/sat/job/sat_constants.h"
 #include "app/satwithpre/sat_preprocess_actor.hpp"
+#include "core/client_directive.hpp"
 #include "data/job_description.hpp"
 #include "interface/api/api_connector.hpp"
 #include "util/json.hpp"
@@ -31,6 +34,8 @@ private:
     const MallobJobType _type;
 
     nlohmann::json _base_json;
+    int _sub_job_id {-1};
+    std::atomic_int _child_job_root_rank {-1};
 
 public:
     MallobPreprocessActor(const Parameters& params, const JobDescription& desc, const std::string& name,
@@ -43,6 +48,7 @@ public:
         static int _actor_counter = 1;
 
         _jobstr = "#" + std::to_string(_job_id) + ":mal:" + std::to_string(_actor_counter++);
+        _proof_format = _type == SATSOLVER ? "palrup" : "";
     }
     ~MallobPreprocessActor() {}
 
@@ -56,6 +62,32 @@ public:
         interrupt(_base_json);
     }
 
+    // some processes may still be writing, so we need to wait until moving is possible
+    bool rename_proof(int i, std::string cnfSrc = "", std::string proofSrc = "") override {
+        std::string src = _params.proofDirectory() + "/tmp/" + _name + "." + _proof_format;
+        for (int attempt = 0; attempt < 100 && std::filesystem::exists(src); attempt++) {
+            bool pending = false;
+            for (const auto& entry : std::filesystem::recursive_directory_iterator(src)) {
+                std::string filename = entry.path().filename().string();
+                if (!filename.empty() && filename.back() == '~') { pending = true; break; }
+            }
+            if (!pending) break;
+            usleep(1000 * 100); // 100ms
+        }
+        createMissingDirectoriesAndFiles(src + "/proof#" + std::to_string(_sub_job_id));
+        return SatPreprocessActor::rename_proof(i);
+    }
+
+    void shrink(float timeSpan) override {
+        if (_sub_job_id == -1 || _child_job_root_rank == -1) return;
+        ClientDirective dir;
+        dir.jobId = _sub_job_id;
+        dir.type = ClientDirective::SHRINK;
+        dir.setData(timeSpan);
+        MyMpi::isend(_child_job_root_rank.load(std::memory_order_relaxed),
+            MSG_SEND_CLIENT_DIRECTIVE_TO_JOB_TREE_ROOT, std::move(dir), false);
+    }
+
 private:
     void submitJob() {
         // Prepare job submission data
@@ -66,7 +98,8 @@ private:
             {"priority", _params.preprocessSweepPriority()},
             {"application", _type == SWEEPER ? "SWEEP" : "SAT"},
             {"group-id", _group_id},
-            {"configuration", {{"options", _option_overrides}}}
+            {"configuration", {{"options", _option_overrides}}},
+            {"incremental", false}
         };
 
         auto f = std::vector<int>(_input_cnf.begin(), _input_cnf.end() - 2);
@@ -80,10 +113,15 @@ private:
         if (_desc.getCpuLimit() > 0)
             json["cpu-limit"] = std::to_string(
             std::max(0.001f, _desc.getCpuLimit() - getAgeSinceActivation())) + "s";
+
+        std::string opts;
+        if (json["configuration"].count("options"))
+            opts = json["configuration"]["options"].get<std::string>();
         if (_type == SATSOLVER && _params.overrideSatOptions.isSet())
-            json["configuration"]["options"] = json["configuration"]["options"].get<std::string>()
-                + (json["configuration"]["options"].empty() ? "" : " ") + _params.overrideSatOptions();
-        applySuccessiveGrowth(json);
+            opts += " " + _params.overrideSatOptions();
+        if (_params.savePreprocessingProofs())
+            opts += " -palrup=1 -proof-dir=" + _params.proofDirectory() + "/tmp/" + _name + "." + _proof_format;
+        if (!opts.empty()) json["configuration"]["options"] = opts;
 
         auto copiedJson = json;
         auto result = _api.submit(copiedJson, [&](nlohmann::json& response) {
@@ -93,7 +131,7 @@ private:
             else if (res.result == RESULT_UNSAT) _result = UNSAT;
             else if (res.result == RESULT_SIMPLIFIED) _result = SIMPLIFIED;
             else _result = NONE;
-        });
+        }, &_sub_job_id, [&](int rootRank) {_child_job_root_rank = rootRank;});
         if (result != JsonInterface::Result::ACCEPT) {
             LOG(V0_CRIT, "[ERROR] Cannot introduce mono job!\n");
             abort();
@@ -174,5 +212,18 @@ private:
     const char* toStr() const {
         return _jobstr.c_str();
     }
-};
 
+    void createMissingDirectoriesAndFiles(const std::string& src) {
+        double maxNumSolvers = MyMpi::size(MPI_COMM_WORLD) * _params.numThreadsPerProcess();
+        int lastCreatedHierarchy = -1;
+        for (int i = 0; i < maxNumSolvers; i++) {
+            int hierarchy = (int) (i / std::ceil(std::sqrt(maxNumSolvers)));
+            if (hierarchy > lastCreatedHierarchy) {
+                FileUtils::mkdir(src + "/" + std::to_string(hierarchy));
+                lastCreatedHierarchy = hierarchy;
+            }
+            FileUtils::mkdir(src + "/" + std::to_string(hierarchy) + "/" + std::to_string(i));
+            FileUtils::create(src + "/" + std::to_string(hierarchy) + "/" + std::to_string(i) + "/out.palrup");
+        }
+    }
+};

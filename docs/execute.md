@@ -17,12 +17,14 @@ If you just want to use Mallob on a single, parallel machine, then the script `s
 ```bash
 # SAT solving (default, simple setup)
 scripts/run/mallob_local.sh -mono=instances/r3unsat_300.cnf
-# SAT solving (SAT Competition 2026 winning configuration, with Satsuma)
-scripts/run/mallob_local.sh $(config/presets/satcomp2026-quick) -mono=instances/r3unsat_300.cnf
-# SAT solving (with real-time proof checking and assignment checking)
-scripts/run/mallob_local.sh $(config/presets/satcomp2026-safe) -mono=instances/r3unsat_300.cnf
+# SAT solving (similar to SAT Competition 2026 winning configuration, with Satsuma)
+scripts/run/mallob_local.sh $(config/presets/sat-cascading-quick) -mono=instances/r3unsat_300.cnf
+# SAT solving (with Satsuma and compositional proof production)
+scripts/run/mallob_local.sh $(config/presets/sat-cascading-safe) -mono=instances/r3unsat_300.cnf
+# SAT solving (with real-time proof/model checking)
+scripts/run/mallob_local.sh $(config/presets/sat-realtimecheck) -mono=instances/r3unsat_300.cnf
 # SMT solving
-scripts/run/mallob_local.sh -mono=path/to/problem.smt2 -mono-app=SMT
+scripts/run/mallob_local.sh $(config/presets/smtcomp26) -mono=path/to/problem.smt2
 # MaxSAT solving
 scripts/run/mallob_local.sh -mono=path/to/problem.wcnf -mono-app=MAXSAT
 ```

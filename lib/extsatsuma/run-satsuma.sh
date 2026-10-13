@@ -15,11 +15,18 @@ MALLOB_SUBPROC_DISPATCH_PATH="$1"
 INPUT="$2"
 OUTPUT="$3"
 LOG="$4"
+PROOF="$5"
+
+proofcmd=""
+if ! [ -z "$PROOF" ]; then
+    proofcmd="--sr --proof-file"
+fi
+
 pid_satsuma=0
 
-cat "$INPUT" | \
- "$MALLOB_SUBPROC_DISPATCH_PATH/satsuma" fix --add-reduced-as-unit --no-limits --out-file "$OUTPUT" \
- > "$LOG" 2>&1 &
+cmd="$MALLOB_SUBPROC_DISPATCH_PATH/satsuma fix --add-reduced-as-unit --no-limits --out-file $OUTPUT $proofcmd $PROOF"
+echo "Now calling: \"cat $INPUT | $cmd\"" > "$LOG"
+cat $INPUT | $cmd >> "$LOG" 2>&1 &
 
 pid_satsuma=$!
 while ps -p $pid_satsuma > /dev/null; do

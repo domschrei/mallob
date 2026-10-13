@@ -352,11 +352,11 @@ int main(int argc, char *argv[]) {
     MyMpi::getMessageQueue().close();
     distTerm.reset();
     MPI_Barrier(MPI_COMM_WORLD);
+    APIRegistry::close();
     delete &MyMpi::getMessageQueue();
     if (clientComm != MPI_COMM_NULL) MPI_Comm_free(&clientComm);
     if (workerComm != MPI_COMM_NULL) MPI_Comm_free(&workerComm);
     MPI_Finalize();
-    APIRegistry::close();
     TmpDir::wipe(false);
     Process::removeDelayedExitWatchers();
     LOG(V2_INFO, "Exiting happily\n");

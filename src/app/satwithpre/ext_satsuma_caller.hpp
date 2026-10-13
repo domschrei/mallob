@@ -17,6 +17,7 @@
 #include "scheduling/core_allocator.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
+#include "util/string_utils.hpp"
 #include "util/sys/subprocess.hpp"
 #include "util/sys/thread_pool.hpp"
 #include <fstream>
@@ -44,6 +45,8 @@ private:
 public:
     ExtSatsumaCaller(const Parameters& params, const JobDescription& desc, const std::string& name, std::vector<int>&& formula) :
         SatPreprocessActor(params, name, std::move(formula)) {
+
+        _proof_format = "sr";
 
         std::string basePath = TmpDir::getMachineLocalTmpDir() + "/edu.kit.iti.mallob."
             + std::to_string(Proc::getPid()) + "."
@@ -78,7 +81,8 @@ public:
         CoreAllocator::Allocation ca(1);
         std::string cmd = std::string("run-satsuma.sh ")
             + MALLOB_SUBPROC_DISPATCH_PATH + " " + _in_path + " " + _out_path + " "
-            + (_params.logDirectory.isSet() ? (_params.logDirectory() + "/satsuma.txt") : "/dev/null");
+            + (_params.logDirectory.isSet() ? (_params.logDirectory() + "/satsuma.txt") : "/dev/null")
+            + (_params.savePreprocessingProofs() ? " " + _params.proofDirectory() + "/tmp/" + _name + ".sr" : "");
         Subprocess subSatsuma(_params, cmd, false);
 
         LOG(V4_VVER, "%s Calling Satsuma: %s\n", getName(), cmd.c_str());

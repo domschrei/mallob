@@ -10,7 +10,7 @@
 
 **Mallob** (**Mal**leable **Lo**ad **B**alancer, or **Ma**ssively P**a**ra**ll**el **Lo**gic **B**ackend) is a distributed platform for automated reasoning in modern large-scale HPC and cloud environments.
 
-Mallob primarily solves instances of _propositional satisfiability_ (SAT) – an essential building block at the core of Symbolic AI. Mallob with its SAT solving engine **MallobSat** is leading the respective (massively) parallel tracks of the International SAT Competition since 2020. 
+Mallob primarily solves instances of _propositional satisfiability_ (SAT) – an essential building block at the core of Symbolic AI. Mallob with its SAT solving engine **MallobSat** is leading the respective (massively) parallel tracks of the [International SAT Competition](https://satcompetition.github.io/) since 2020.
 
 Each SAT solving task in Mallob can be _incremental_ (allowing for efficient interactive solving procedures over evolving formulas) and can produce and/or check _proof information_ (offering full confidence in each obtained result).
 
@@ -18,14 +18,21 @@ Mallob's flexible and decentralized approach to job scheduling allows to concurr
 
 Building upon Mallob's job scheduling and SAT solving capabilities, Mallob also features engines for state-of-the-art distributed **MaxSAT solving** (_MallobMax_) and bit-precise **SMT solving** (_Bitwuzllob_ - parallelizing [Bitwuzla](https://github.com/bitwuzla/bitwuzla)).
 
+This README provides some basic information and quick instructions for popular use cases of Mallob. **Please also consult Mallob's full documentation, with [docs/README.md](docs/README.md) as an entry point.**
+
 
 ## Setup
 
+> [!NOTE]  
+> **Quick Start** without manually pulling the repository (latest @ master branch):  
+> `curl -sSL https://satres.eu/getmallobmini.sh | bash` for a minimal build,  
+> `curl -sSL https://satres.eu/getmallobfull.sh | bash` for a full featured build.
+
 Mallob uses MPI (Message Passing Interface) and is built using CMake.
 
-For a default, full featured build, execute [`bash scripts/setup/cmake-make.sh build`](scripts/setup/build.sh).
+For a default, full featured build, execute [`bash scripts/setup/cmake-make.sh build`](scripts/setup/build.sh) in this (Mallob base) directory. For a minimal build, prepend `MALLOB_MINIMAL=1` (and then append optional additions to the build as desired).
 
-[**Find detailed instructions at docs/setup.md.**](docs/setup.md)
+[**Find detailed instructions, including dependencies, at docs/setup.md.**](docs/setup.md)
 
 ### Docker
 
@@ -34,6 +41,9 @@ We also provide a setup based on Docker containerization. Please consult the (fo
 
 ## Usage
 
+> [!IMPORTANT]  
+> **Always make sure to execute Mallob and its wrapper run scripts from Mallob's home directory**, otherwise Mallob will not find critical executables in `build/` and **will not work correctly**.
+
 **Quick Start:**
 
 If you just want to use Mallob on a single, parallel machine, then the script `scripts/run/mallob_local.sh` automatically retrieves a suitable process+thread configuration of Mallob for your hardware that makes use of the entire machine. Useful presets can be applied by calling the scripts at `config/presets/`. Examples:
@@ -41,17 +51,17 @@ If you just want to use Mallob on a single, parallel machine, then the script `s
 ```bash
 # SAT solving (default, simple setup)
 scripts/run/mallob_local.sh -mono=instances/r3unsat_300.cnf
-# SAT solving (SAT Competition 2026 winning configuration, with Satsuma)
-scripts/run/mallob_local.sh $(config/presets/satcomp26-quick) -mono=instances/r3unsat_300.cnf
-# SAT solving (with real-time proof checking and assignment checking)
-scripts/run/mallob_local.sh $(config/presets/satcomp26-safe) -mono=instances/r3unsat_300.cnf
+# SAT solving (similar to SAT Competition 2026 winning configuration, with Satsuma)
+scripts/run/mallob_local.sh $(config/presets/sat-cascading-quick) -mono=instances/r3unsat_300.cnf
+# SAT solving (with Satsuma and compositional proof production)
+scripts/run/mallob_local.sh $(config/presets/sat-cascading-safe) -mono=instances/r3unsat_300.cnf
+# SAT solving (with real-time proof/model checking)
+scripts/run/mallob_local.sh $(config/presets/sat-realtimecheck) -mono=instances/r3unsat_300.cnf
 # SMT solving
 scripts/run/mallob_local.sh $(config/presets/smtcomp26) -mono=path/to/problem.smt2
 # MaxSAT solving
 scripts/run/mallob_local.sh -mono=path/to/problem.wcnf -mono-app=MAXSAT
 ```
-
-**Always make sure to execute Mallob and its wrapper run scripts from Mallob's home directory**, otherwise Mallob will not find critical executables in `build/` and **will not work correctly**.
 
 **More general settings:**
 

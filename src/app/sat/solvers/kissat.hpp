@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "app/sat/proof/lrat_op.hpp"
+#include "app/sat/solvers/preprocess_proof_tracker.hpp"
 #include "portfolio_solver_interface.hpp"
 #include "app/sat/data/clause.hpp"
 #include "app/sat/data/definitions.hpp"
@@ -47,6 +48,8 @@ private:
 	int nbPreprocessedClausesAdvertised {0};
 	
 	bool isSweeper = false; 
+
+	std::unique_ptr<PreprocessProofTracker> _prepro_proof_tracker;
 
 public:
 	Kissat(const SolverSetup& setup);
@@ -95,12 +98,13 @@ public:
     friend void on_lrup_import(void* state, unsigned long id, const int* lits, int nbLits, const uint8_t* sigData);
     friend void on_drup_deletion(void* state, const int* lits, int nbLits);
 	
-	
     void setToSweeper();
     void setPreprocessingReportCallback();
     friend bool begin_formula_report(void* state, int vars, int cls);
     friend void report_preprocessed_lit(void* state, int lit);
     friend int terminate_callback(void* state);
+
+	PreprocessProofTracker* getPreprocessProofTracker() {return _prepro_proof_tracker.get();}
 
 private:
     void produceClause(int size, int lbd);

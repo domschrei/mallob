@@ -58,6 +58,21 @@ else()
     set(MALLOB_CORE_DEPS ${MALLOB_CORE_DEPS} dep_extsatsuma CACHE INTERNAL "")
 endif()
 
+if(NOT MALLOB_BUILD_CHAINCHECK EQUAL 0)
+    # chaincheck (a.k.a. Anna Görth's proof checker for preprocessing chains)
+    add_definitions(-DMALLOB_BUILD_CHAINCHECK=1)
+    message("* Registering dependency chaincheck")
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/chaincheck
+        COMMAND bash fetch-and-build.sh ${CMAKE_CURRENT_BINARY_DIR}
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/lib/chaincheck/
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib/chaincheck/
+        COMMENT "Building dependency chaincheck"
+    )
+    add_custom_target(dep_chaincheck DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/chaincheck)
+    set(MALLOB_CORE_DEPS ${MALLOB_CORE_DEPS} dep_chaincheck CACHE INTERNAL "")
+endif()
+
 # Add unit tests: for each $arg there must be a standalone cpp file under "test/test_${arg}.cpp".
 # ...
 

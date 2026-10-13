@@ -4,6 +4,18 @@
 #include "optionslist.hpp"
 #include "util/option.hpp"
 
+#if MALLOB_USE_CADICAL
+#define MALLOB_DEFAULT_PORTFOLIO "C"
+#elif MALLOB_USE_KISSAT
+#define MALLOB_DEFAULT_PORTFOLIO "k"
+#elif MALLOB_USE_LINGELING
+#define MALLOB_DEFAULT_PORTFOLIO "L"
+#else
+#define MALLOB_DEFAULT_PORTFOLIO ""
+static_assert(false, "No viable solver backend is included in the build."
+   " Add at least one of: -DMALLOB_USE_{KISSAT,CADICAL,LINGELING}=1");
+#endif
+
 // Application-specific program options for SAT solving.
 // memberName                               short option name, long option name          default   min  max
 
@@ -86,14 +98,15 @@ OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversificati
  OPT_BOOL(diversifySeeds,                   "div-seeds", "",                             true,              "Diversify solvers with different random seeds")
  OPT_BOOL(diversifyPhases,                  "div-phases", "",                            true,
     "Diversify solvers based on random sparse variable phases in addition to native diversification")
- OPT_STRING(satSolverSequence,              "satsolver",  "",                            "C",
- "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")
+ OPT_STRING(satSolverSequence,              "satsolver",  "",                            MALLOB_DEFAULT_PORTFOLIO,
+    "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")
  OPT_STRING(satConfigDirs, "sat-config-dirs", "", "config/sat/base", "Directory path, or comma-separated list of directory paths, to JSON solver configuration files")
  OPT_STRING(satConfigFiles, "sat-config-files", "", "", "File path, or comma-separated list of file paths, to JSON solver configuration rules")
 
 OPTION_GROUP(grpAppSatProof, "app/sat/proof", "Production of UNSAT proofs")
  OPT_STRING(proofDirectory,               "proof-dir", "",                             "",                      "Directory to write partial proofs into (default: -log option")
  OPT_STRING(proofOutputFile,              "proof", "",                                 "",                      "Enable UNSAT proof production, writing final LRAT proof to specified destination (output by rank zero; can be /dev/null)")
+ OPT_BOOL(savePreprocessingProofs,        "prepro-proofs", "",                         false,                   "Save proofs for each preprocessing step (requires -proof-dir to be set)")
  OPT_BOOL(onTheFlyChecking,               "otfc", "on-the-fly-checking",               false,                   "Enable on-the-fly checking of local derivations; generate and validate signatures for shared clauses")
  OPT_BOOL(onTheFlyCheckModel,             "otfcm", "on-the-fly-check-model",           true,                    "Also check satisfiable assignment in on-the-fly checking (prevents deletion of orig. clauses in one checker per process)")
  OPT_BOOL(onTheFlyCheckIncremental,       "otfci", "on-the-fly-check-incremental",     false,                   "Enable on-the-fly checking for incremental SAT solving - true(false) expects the (non)incremental ImpCheck programs")

@@ -52,12 +52,15 @@ void Client::readIncomingJobs() {
 
     while (true) {
         // Wait for a nonempty incoming job queue
+        LOGGER(log, V4_VVER, "waiting inc=%i loaded=%i\n", _num_incoming_jobs.load(), _num_loaded_jobs.load());
         _incoming_job_cond_var.wait(_incoming_job_lock, [&]() {
+            LOGGER(log, V4_VVER, "  -- inc=%i loaded=%i\n", _num_incoming_jobs.load(), _num_loaded_jobs.load());
             return !_instance_reader.continueRunning() 
                 || (_num_incoming_jobs > 0 && _num_loaded_jobs < _params.loadedJobsPerClient());
         });
         if (!_instance_reader.continueRunning()) break;
         if (_num_loaded_jobs >= _params.loadedJobsPerClient()) continue;
+        LOGGER(log, V4_VVER, "done waiting inc=%i loaded=%i\n", _num_incoming_jobs.load(), _num_loaded_jobs.load());
 
         // Obtain lock, measure time
         auto lock = _incoming_job_lock.getLock();
@@ -74,6 +77,7 @@ void Client::readIncomingJobs() {
         // Find a single job eligible for parsing
         bool foundAJob = false;
         for (auto& data : _incoming_job_queue) {
+            LOGGER(log, V4_VVER, "trying job #%i %s\n", data.description->getId(), data.jobName.c_str());
             
             // Jobs are sorted by arrival:
             // If this job has not arrived yet, then none have arrived yet
@@ -354,6 +358,12 @@ void Client::advance() {
             _done_client_side_jobs.push_back(std::move(job));
             it = _client_side_jobs.erase(it);
             --it;
+            // waiting instance reader might be able to continue now
+            {
+                auto lock = _incoming_job_lock.getLock();
+                atomics::decrementRelaxed(_num_loaded_jobs);
+            }
+            _incoming_job_cond_var.notify();
         }
         _client_side_jobs_mutex.unlock();
     }

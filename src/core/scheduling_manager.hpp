@@ -95,6 +95,7 @@ private:
     void handleObsoleteJobResult(MessageHandle& handle);
     void handleJobResultFound(MessageHandle& handle);
     void handleJobReleasedFromWaitingForReactivation(MessageHandle& handle);
+    void handleClientDirectiveForJobTreeRoot(MessageHandle& h);
 
     void handleJobAfterArrivedJobDescription(int jobId, int source);
     void leaveJobTree(Job& job, bool notifyParent);

@@ -114,7 +114,11 @@ By default, the value of `-sat-config-dirs` enables a range of configuration fil
 
 #### Structure of JSON Files
 
-Each JSON file contains a list of "rules". Each rule says: for solver threads of a given BACKEND which matches a given SELECTOR, apply a given list of SETTINGS. Here is an example for such a JSON:
+Each JSON file contains a list of "rules". Each rule says: for solver threads of a given BACKEND which matches a given SELECTOR, apply a given list of SETTINGS.
+
+**Valuable examples** are located at `config/sat/base/native.json` (for cycling over a sequence of configuration options for each solver backend) and `config/sat/reduce.json` (for adding random diversification to some specific numeric options).
+
+Here is the **general structure** of such a JSON:
 
 ```json
 {
