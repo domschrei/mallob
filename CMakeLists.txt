@@ -130,6 +130,9 @@ set(MALLOB_COREPLUSCOMM_SOURCES ${MALLOB_CORE_SOURCES}
 
 # Function to add a unit test
 function(new_test testname includes linklibs)
+    if(MALLOB_UNIT_TESTS EQUAL 0)
+        return()
+    endif ()
     message("* Adding test: ${testname}")
     add_executable(test_${testname} src/test/test_${testname}.cpp)
     target_include_directories(test_${testname} PRIVATE ${includes})
@@ -251,7 +254,6 @@ SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MY_DEBUG_OPTIONS}")
 
 
 # Tests
-
 new_test(permutation "${BASE_INCLUDES}" mallob_core)
 new_test(message_queue "${BASE_INCLUDES}" mallob_corepluscomm)
 new_test(volume_calculator "${BASE_INCLUDES}" mallob_core)

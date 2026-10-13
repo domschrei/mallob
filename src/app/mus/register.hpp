@@ -25,7 +25,7 @@ void register_mallob_app_mus() {
     app_registry::AppEntry entry;
     entry.key = "MUS";
     entry.type = app_registry::AppEntry::CLIENT_SIDE;
-    entry.copyrightInformation = "by Niccolò Rigi-Luperti and Dominik Schreiber\n";
+    entry.copyrightInformation = "by Niccolò Rigi-Luperti and Dominik Schreiber";
 
     entry.reader = [](const Parameters& params, const std::vector<std::string>& files, JobDescription& desc) {
         auto reader = SatReader(params, files);
