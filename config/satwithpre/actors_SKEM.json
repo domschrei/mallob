@@ -27,6 +27,6 @@
         "prerequisite": "SKE",
         "actorsBeingDisplaced": [],
         "onlyStartIfPrerequisiteSimplified": false,
-        "options": "-satsolver=k_c_k+[k_]{29}k_c_l+[k_]{29} -ems=1"
+        "options": "-satsolver=k_c_l+[k_]{29} -ems=1"
     }
 ]
