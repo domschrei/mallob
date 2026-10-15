@@ -26,6 +26,15 @@ public:
     static std::string getDirectory(const std::string& filePath);
 
     static std::vector<std::string> glob(const std::string& pattern);
+    
+    static bool writeRawToFile(const std::string &path, const void *data, size_t numBytes);
+    static bool writeIntsToFile(const std::string &path, const std::vector<int> &data);
+    static bool writeBytesToFile(const std::string &path, const std::vector<std::byte> &data);
+    
+    template <typename Elem>
+    static std::vector<Elem> readFileToVector(const std::string& path);
+    
+
 };
 
 #endif

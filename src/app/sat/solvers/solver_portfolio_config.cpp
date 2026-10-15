@@ -154,6 +154,8 @@ std::unique_ptr<Selector> parseSelector(const json& j) {
             return std::make_unique<FlavourSelector>(PortfolioSequence::Flavour::PLAIN);
         else if (j.at("value") == "preprocess")
             return std::make_unique<FlavourSelector>(PortfolioSequence::Flavour::PREPROCESS);
+        else if (j.at("value") == "sweeper")
+            return std::make_unique<FlavourSelector>(PortfolioSequence::Flavour::SWEEPER);
         else
             throw std::runtime_error("Flavour selector has invalid 'value' field "
                 + j.at("value").get<std::string>());

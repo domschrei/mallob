@@ -3,6 +3,7 @@
 #include <memory>
 #include <algorithm>
 #include <sys/wait.h>
+#include <sstream>
 
 #include "app/job.hpp"
 #include "app/job_tree.hpp"
@@ -16,6 +17,7 @@
 #include "util/ctre.hpp"
 #include "util/logger.hpp"
 #include "util/sys/tmpdir.hpp"
+#include "util/sys/fileutils.hpp"
 
 
 extern "C" {
@@ -39,6 +41,7 @@ SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTa
 	assert(_params.crossJobToClientParent()==false || log_return_false("[ERROR] For this application to work,"
 		    " you must explicitly disable cross-job sharing to the client parent, i.e. -cjtcp=0"));
 	DOUBLELOG(_sweeplogger, V2_INFO, "New SweepJob MPI Process on rank [%i] with planned %i threads, ctx %i \n", getJobTree().getRank(), params.numThreadsPerProcess.val, getJobTree().getContextId());
+	_solverConfig.parseFromDirsAndFiles(_params.satConfigDirs(), _params.satConfigFiles());
 }
 
 
@@ -64,16 +67,16 @@ void cb_report_iteration(void *SweepJobState, int localId) {
 }
 
 void SweepJob::appl_start() {
-	//set some general metadata information
+	//set some general metadata information upfront
 	_internal_result.id = getId();
 	_internal_result.revision = getRevision();
-
-	// _started_appl_start = true;
+	
 	_my_rank = getJobTree().getRank();
 	_my_index = getJobTree().getIndex();
 	_my_ctx_id = getJobTree().getContextId();
 	_is_root = getJobTree().isRoot();
-	_nThreads = min( getNumThreads(), _params.numThreadsPerProcess.val); //done in constructor
+	_nThreads = min( getNumThreads(), _params.numThreadsPerProcess.val); 
+	
 	const JobDescription& desc = getDescription();
 	int numVars = desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
 	int numClauses = desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
@@ -81,6 +84,9 @@ void SweepJob::appl_start() {
 	_timestamp_start_sweepapp = Timer::elapsedSeconds();
 	_worksteal_requests.resize(_nThreads);
 
+	assert(desc.getAppConfiguration().map.count(SWEEPRESULT_DIR_KEY) 
+		|| log_return_false("[ERROR] SweepJob json['%s'] is empty, need a shared directory to write Sweep results (units, eqs, reconstruction data) \n", SWEEPRESULT_DIR_KEY.c_str()));
+	
 	//Moved all logging down here to keep it separate from the actual logic
 	DOUBLELOG(_sweeplogger,V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d, NumVars %i, NumClauses %i\n",
 		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _nThreads, numVars, numClauses);
@@ -125,7 +131,7 @@ void SweepJob::appl_start() {
 	if (_exited_immediately) {
 		if (_is_root) {
 			LOGGER(_sweeplogger,V2_INFO,"Report UNKOWN to Mallob immediately\n");
-			rootReportSolverResult(UNKNOWN, {});
+			rootReportSolverResult(UNKNOWN, nullptr);
 		}
 		return;
 	}
@@ -185,7 +191,7 @@ void SweepJob::appl_communicate() {
 	checkIdleWorkStatus();
 	checkForUnsatResults();
 
-	clearImportedRound();
+	// clearImportedRound(); //we no longer clear this while solving, because we export all its units and eqs at the end
 	checkCrossCommNeedsAdvancing("appl_communicate");
 	tryReportToMallob();
 
@@ -201,7 +207,7 @@ void SweepJob::appl_communicate() {
 void SweepJob::createAndStartNewSweeper(int localId) {
 	LOGGER(_sweeplogger,V4_VVER, "SWEEP JOB [%i](%i) queuing background worker thread\n", _my_rank, localId);
 	_bg_workers[localId]->run([this, localId]() {
-		LOGGER(_sweeplogger,V3_VERB, "SWEEP JOB [%i](%i) WORKER START \n", _my_rank, localId);
+		LOGGER(_sweeplogger,V4_VVER, "SWEEP JOB [%i](%i) WORKER START \n", _my_rank, localId);
 
 		auto sweeper = createNewSweeper(localId);
 
@@ -230,7 +236,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			return;
 		}
 
-		LOGGER(_sweeplogger,V3_VERB, "SWEEP JOB [%i](%i) solve() START \n", _my_rank, localId);
+		// LOGGER(_sweeplogger,V3_VERB, "SWEEP JOB [%i](%i) solve() START \n", _my_rank, localId);
 
 		//only now expose the solver to the rest of the system, now that solving starts
 		_sweepers[localId] = sweeper;
@@ -238,9 +244,9 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		_timestamp_started_synchronized_solving = Timer::elapsedSeconds();
 		shweep_set_wallclock_offset(sweeper->solver, -1.0 * Timer::elapsedSeconds());
 
-		LOGGER(_sweeplogger, V3_VERB, "SWEEP [%i](%i) START solve() \n", _my_rank, localId);
+		LOGGER(_sweeplogger, V4_VVER, "SWEEP [%i](%i) START solve() \n", _my_rank, localId);
 		int res = sweeper->solve(0, nullptr);
-		LOGGER(_sweeplogger, V3_VERB, "SWEEP [%i](%i) FINISH solve(). Result %i \n", _my_rank, localId, res);
+		LOGGER(_sweeplogger, V4_VVER, "SWEEP [%i](%i) FINISH solve(). Result %i \n", _my_rank, localId, res);
 
 
 		if (res==UNSAT) {
@@ -249,7 +255,7 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 			LOGGER(_sweeplogger,V4_VVER, "SWEEP [%i](%i) found UNSAT! \n", _my_rank, localId);
 			if (_is_root) {
 				//for consistency, only the root node is allowed to report to Mallob
-				rootReportSolverResult(UNSAT, {});
+				rootReportSolverResult(UNSAT, nullptr);
 			} else {
 				//if we are not on root, this flag lets the main Process soon send an MPI message to root, indicating UNSAT
 				_do_report_UNSAT_to_root = true;
@@ -258,12 +264,12 @@ void SweepJob::createAndStartNewSweeper(int localId) {
 		} else if (res==UNKNOWN && _is_root && sweeper->getLocalId()==_representative_localId) {
 			//Found either IMPROVED or UNKNOWN
 			auto stats = sweeper->fetchSweepStats();
-			if (stats.clauses < stats.start_clauses) {
+			if (sweeper->hasPreprocessedFormula()) {
 				//Found some improvements
-				rootReportSolverResult(SIMPLIFIED, sweeper->extractPreprocessedFormula());
+				rootReportSolverResult(SIMPLIFIED, sweeper);
 			} else {
 				//the whole sweeping didn't yield any improvements at all
-				rootReportSolverResult(UNKNOWN, {});
+				rootReportSolverResult(UNKNOWN, nullptr);
 			}
 		}
 
@@ -297,11 +303,14 @@ std::shared_ptr<KissatSweep> SweepJob::createNewSweeper(int localId) {
 	const JobDescription& desc = getDescription();
 	SolverSetup setup;
 	setup.logger = &Logger::getMainInstance();
-	setup.jobname = "sweep-"+to_string(_my_index);
+	setup.jobname = "#" + std::to_string(getId());
 	setup.numVars = desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
 	setup.numOriginalClauses = desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
 	setup.localId = localId;
 	setup.globalId = _my_rank * _nThreads + localId;
+	setup.flavour = PortfolioSequence::SWEEPER;
+	setup.solverType = 'k';
+	setup.solverConfig = &_solverConfig;
 
 	if (_params.satProfilingLevel() >= 0) {
 		setup.profilingBaseDir = _params.satProfilingDir();
@@ -311,9 +320,9 @@ std::shared_ptr<KissatSweep> SweepJob::createNewSweeper(int localId) {
 		setup.profilingLevel = _params.satProfilingLevel();
 	}
 
-	if (_numVars==0)
-		_numVars = setup.numVars;
-
+	if (_numOrigVars==0)
+		_numOrigVars = setup.numVars;
+		
 	float t0 = Timer::elapsedSeconds();
 	auto sweeper = std::make_shared<KissatSweep>(setup);
 	float t1 = Timer::elapsedSeconds();
@@ -343,52 +352,21 @@ std::shared_ptr<KissatSweep> SweepJob::createNewSweeper(int localId) {
 		if (localId==_representative_localId) {
 			sweeper->setPreprocessingReportCallback();
 			shweep_set_report_finished_iteration_callback(sweeper->solver, this, cb_report_iteration);
+			sweeper->setReconstructionExportCallback();
 		}
 		//tell all solvers which one is the representative one
 		sweeper->setRepresentativeLocalId(_representative_localId);
 	}
 
     //Basic configuration
-    sweeper->set_option("quiet", _params.sweepSolverQuiet());  //suppress any standard kissat messages
-    sweeper->set_option("verbose", 0);//the native kissat verbosity
-    sweeper->set_option("log", 0);    //potentially extensive logging
-    sweeper->set_option("check", 0);  //do not check model or derived clauses, because we anyways dont have proof tracking
-    sweeper->set_option("statistics", 1);  //print full statistics
     sweeper->set_option("profile", max(_params.satProfilingLevel.val, 0)); //detailed profiling. kissat allows down to 0, mallob down to -1
-	sweeper->set_option("seed", 0);   //Sweeping should not contain any own RNG part
-
 	//Specific due to Mallob
 	sweeper->set_option("mallob_sweeping", 1); //Bypass all other Kissat-stuff and go directly to MallobSweep Logic
-	sweeper->set_option("mallob_custom_sweep_verbosity", _params.sweepSolverVerbosity.val); //0..4, get info from the solvers themselves
 	sweeper->set_option("mallob_local_id", localId);
 	sweeper->set_option("mallob_rank", _my_rank);
 	sweeper->set_option("mallob_is_root", _is_root);
-	sweeper->set_option("mallob_resweep_chance", _params.sweepResweepChance.val);
-	sweeper->set_option("mallob_staggered_logs", 1); //have indents in log lines, useful to distinguish (a few) different solvers
-	sweeper->set_option("mallob_initial_congruence", _params.sweepInitialCongruence.val);
-	sweeper->set_option("mallob_signal_kitten", _params.sweepSignalKitten());
-
-	//Own options of Kissat
-	sweeper->set_option("sweepcomplete", 1); //deactivates checking for time limits during sweeping, so we dont get kicked out due to some limits
-	//We start already with depth 3, because depth 2 is so quickly done, and less powerfull
-	//accordingly, start with doubled sweepvars and clauses than the default (depth 2)
-  	sweeper->set_option("sweepdepth", 3);				//, 2,    0, INT_MAX,	"environment depth")
-  	sweeper->set_option("sweepvars", 256*2);			//  256,  0, INT_MAX,	"environment variables")
-  	sweeper->set_option("sweepclauses", 1024*2);		//	1024, 0, INT_MAX,	"environment clauses")
-  	sweeper->set_option("sweepmaxdepth", _params.sweepMaxDepth.val); //	//	3,    1, INT_MAX,	"maximum environment depth")
-	//Allow a lot more vars and clauses per environment (compared to sequential sweeping)
-  	sweeper->set_option("sweepmaxvars", 64 * 8192);		//	8192, 2, INT_MAX,	"maximum environment variables")
-  	sweeper->set_option("sweepmaxclauses", 64 * 32768);	//	32768,2, INT_MAX,	"maximum environment clauses")
-  	sweeper->set_option("sweepfliprounds", 1);		//	1,    0, INT_MAX,	"flipping rounds")
-  	sweeper->set_option("sweeprand", 0);			//  0,    0,    1,		"randomize sweeping environment")
-  	sweeper->set_option("puresweep_maxKittenProp", _params.sweepMaxKittenProp()); //limit Kitten SAT calls
-
-	sweeper->set_option("substitute", 1);	   //apply equivalence substitutions after sweeping, keep here explicitly to remember it
-	sweeper->set_option("substituterounds", 2);//there does not seem to be any need to go higher, almost always all equivalences are already found in the very first round
-
-	sweeper->set_option("preprocess", 0); //skip this part in search.c, go directly to sweeping
-	sweeper->set_option("luckyearly", 0); // dito
-	sweeper->set_option("luckylate", 0);  // dito
+	//solver options are now set via a JSON file, for the "sweeper" flavour (config/sat/base/sweeper.json)
+	sweeper->applySolverConfiguration(0);
 	sweeper->interruptionInitialized = true;
 	return sweeper;
 }
@@ -528,7 +506,7 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 	else if (msg.tag == TAG_FOUND_UNSAT) {
 		LOGGER(_sweeplogger,V2_INFO, "SWEEP MSG [%i] <~~~ Found UNSAT! [%i]\n", _my_rank, sourceRank );
 		assert(_is_root);
-		rootReportSolverResult(UNSAT, {});
+		rootReportSolverResult(UNSAT, nullptr);
 	}
 	else if (mpiTag == MSG_NOTIFY_JOB_ABORTING)    {LOGGER(_sweeplogger,V1_WARN, "SWEEP MSG WARN [%i]: received NOTIFY_JOB_ABORTING \n", _my_rank);}
 	else if (mpiTag == MSG_NOTIFY_JOB_TERMINATING) {LOGGER(_sweeplogger,V1_WARN, "SWEEP MSG WARN [%i]: received NOTIFY_JOB_TERMINATING \n", _my_rank);}
@@ -554,7 +532,9 @@ void SweepJob::appl_memoryPanic() {
 bool SweepJob::appl_isDestructible() {
 	if (_clause_comm && !_clause_comm->isDestructible()) {
 		for (int i = 0; i < 10; i++) _clause_comm->communicate(); // may advance destructibility
-		LOGGER(_sweeplogger,V3_VERB, "SWEEP TERM #%i ctx %i [%i] isDestructible? no. _clause_comm not destructible yet\n",  getId(),_my_ctx_id,  _my_rank);
+		if (_clausecomm_isDestructible_counter % 100 == 0) //avoid too much spam
+			LOGGER(_sweeplogger,V3_VERB, "SWEEP TERM #%i ctx %i [%i] isDestructible? no. _clause_comm not destructible yet\n",  getId(),_my_ctx_id,  _my_rank);
+		_clausecomm_isDestructible_counter++;
 		return false;
 	}
 	int _running_sweepers = _started_sweepers_count - _finished_sweepers_count;
@@ -594,7 +574,7 @@ void SweepJob::checkForUnsatResults() {
 }
 
 
-void SweepJob::rootReportSolverResult(int res, const std::vector<int> &formula = {}) {
+void SweepJob::rootReportSolverResult(int res, const KissatPtr &sweeper) {
 	if (!_is_root) {
 		LOGGER(_sweeplogger,V3_VERB, "Non-root rank tried to report result %i , not let through \n");
 		return;
@@ -609,13 +589,23 @@ void SweepJob::rootReportSolverResult(int res, const std::vector<int> &formula =
 		return;
 	}
 
+	std::vector<int> formula{};
+	
 	LOGGER(_sweeplogger,V3_VERB, "SWEEP JOB [%i] stages sweep result %i to Mallob\n", _my_rank, res);
 	assert(_staged_solved_status == -1 || log_return_false("SWEEP ERROR: duplicate attempt to report result to mallob, was already reported as %i \n", _internal_result.result));
 	if (res==UNSAT) {
 		LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB [%i]: Solution UNSAT\n", _my_rank);
 	}
 	else if (res==SIMPLIFIED){
-		LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB [%i]: Solution SIMPLIFIED, payload size %zu\n", _my_rank, formula.size());
+		LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB [%i]: Solution SIMPLIFIED\n", _my_rank);
+		assert(sweeper->hasPreprocessedFormula());
+		assert(sweeper->hasReconstruction());
+		formula = sweeper->extractPreprocessedFormula(); //already contains numVars and numClauses in the last two slots
+		auto reconstruction = sweeper->extractReconstruction();
+		SweepResult sweepRes = collectSweepResult(reconstruction);
+		printSweepResult(sweepRes);
+		writeSweepResultsToDir(sweepRes);
+		printFirstClauses(formula, 10);
 	} else if (res==UNKNOWN) {
 		// No progress has been made.
 		// Design choice: we don't send any formula back, since there would be no new information in it
@@ -624,12 +614,166 @@ void SweepJob::rootReportSolverResult(int res, const std::vector<int> &formula =
 		LOGGER(_sweeplogger,V1_WARN, "WARN SWEEP [%i]: unexpected result code %i when reporting to mallob \n", _my_rank, res);
 	}
 	DOUBLELOG(_sweeplogger,V2_INFO, "SWEEP_RESULT_CODE %i == %s \n", res, res==40 ? "SIMPLIFIED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
-	//Serialization required!
-	//Even an empty solution needs to be serialized, otherwise the format is wrong at deserialization
+	
+	//Mallob requires and provides its own serialization on top
 	_internal_result.setSolutionToSerialize(formula.data(), formula.size());
 	_staged_solved_status = res;
 }
 
+//SweepJob returns more information than just the formula, assemble all of that extra information here
+SweepJob::SweepResult SweepJob::collectSweepResult(std::vector<Kissat::namedSolverArray> &reconstruction) {
+	assert(_is_root || log_return_false("[Error]: Called  addUnitsEqsToFormula in SweepApp from non-root process\n"));
+	SweepResult res;	
+	res.reconstruction = std::move(reconstruction);
+	//Full history of all units and equivalences is stored here 
+	for (int round=0; round < _root_sharing_round + 2; round++) {
+		auto data = _imported_data[round];
+		res.units.insert(res.units.end(), data.units.begin(), data.units.end());
+		res.eqs.insert(  res.eqs.end(),   data.eqs.begin(),   data.eqs.end());
+		if (!data.units.empty() || !data.eqs.empty()) {
+			LOGGER(_sweeplogger,V4_VVER, "E U round %i: %i %i\n", round, data.eqs.size(), data.units.size() );
+		}
+	}
+	return res;
+}
+
+std::string SweepJob::writeSweepResultsToDir(const SweepResult &res) {
+	const auto& conf = getDescription().getAppConfiguration().map;
+	const std::string dir = conf.at(SWEEPRESULT_DIR_KEY);
+	if (FileUtils::mkdir(dir) != 0) {
+		LOG(V1_WARN, "SWEEP [%i]: could not create result dir %s\n", _my_rank, dir.c_str());
+		return "";
+	}
+	bool ok = true;
+	ok &= FileUtils::writeIntsToFile(dir + "/units.int", res.units);
+	ok &= FileUtils::writeIntsToFile(dir + "/eqs.int",   res.eqs);
+	for (const auto& named_array : res.reconstruction)
+		ok &= FileUtils::writeBytesToFile(dir + "/" + named_array.name + ".byte", named_array.array);
+	if (!ok) {
+		LOG(V1_WARN, "SWEEP [%i] failed at writing into sweepresult dir %s\n", _my_rank, dir.c_str());
+	}
+	return dir;
+}
+
+SweepJob::SweepResult SweepJob::readSweepResultsFromDir(const std::string &dir) {
+	assert(FileUtils::exists(dir) || log_return_false("[ERROR] Couldn't find SweepJob results in directory '%s' - needs to be a shared folder to which all processes have access to\n", dir.c_str()));
+	SweepResult res;
+	LOG(V2_INFO, "Reading sweepresults from %s\n", dir.c_str());
+	res.units = FileUtils::readFileToVector<int>(dir + "/units.int");
+	res.eqs   = FileUtils::readFileToVector<int>(dir + "/eqs.int");
+	for (const auto &name : Kissat::_reconstruction_names) {
+		res.reconstruction.push_back({name, FileUtils::readFileToVector<std::byte>(dir + "/" + name + ".byte" )});
+	}
+	return res;
+}
+
+void SweepJob::printSweepResult(const SweepResult &res) {
+	LOG(V2_INFO, "SWEEP_RESULT_UNITS   %zu \n", res.units.size());
+	LOG(V2_INFO, "SWEEP_RESULT_EQS     %zu \n", res.eqs.size()/2);
+	for (const auto &array : res.reconstruction) {
+		LOG(V2_INFO, "SWEEP_RESULT_ARRAY '%s' %zu bytes \n", array.name.c_str(), array.array.size());
+	}
+}
+
+// std::string SweepJob::getSweepResultFromJson(const SweepJob::SweepResult &res) {
+	// nlohmann::json json; 
+	// json["units"] = res.units;
+	// json["eqs"]	= res.eqs;
+	// nlohmann::json recon = nlohmann::json::array();	
+	// for (const auto &array : res.reconstruction) {
+		// nlohmann::json entry;
+		// entry["name"] = array.name;
+		// entry["data"] = nlohmann::json::array();
+		// for (auto byte : array.array) {
+			// entry["data"].push_back(std::to_integer<int>(byte));
+		// }
+		// recon.push_back(std::move(entry));
+	// }
+	// json["reconstruction"] = std::move(recon);
+	// return json.dump();
+// }
+
+// void SweepJob::addJsonToSweepResult(SweepResult &res, const std::string &jsonstring) {
+	// Read exactly the specific bytes, since original data was also in bytes
+	// nlohmann::json json = nlohmann::json::parse(jsonstring);
+	// res.units = json["units"].get<std::vector<int>>();
+	// res.eqs   = json["eqs"].get<std::vector<int>>();
+	// for (const auto &entry : json["reconstruction"]) {
+		// Kissat::namedArray array;
+		// array.name = entry["name"].get<std::string>();
+		// const auto &data = entry["data"];
+		// array.array.resize(data.size());
+		// for (size_t i=0; i<data.size(); i++) {
+			// array.array[i] = static_cast<std::byte>(data[i].get<int>());
+		// }
+		// res.reconstruction.push_back(std::move(array));	
+	// }
+// }
+
+// std::vector<int> SweepJob::serializeSweepResult(const SweepJob::SweepResult &res) {
+	// Layout: [formula..., json.dump... , formula_int_size, json_byte_size]
+	// std::vector<int> resVec{};
+	// resVec.insert(resVec.end(), res.formula.begin(), res.formula.end());
+	// std::string extraJson = getSweepResultFromJson(res);
+	// size_t json_bytes = extraJson.size();
+	// size_t json_ints = bytesToInts(json_bytes);
+	// resVec.insert(resVec.end(), json_ints, 0);
+	// if (json_bytes > 0) {
+		// memcpy(resVec.data() + resVec.size() - json_ints, extraJson.data(), json_bytes);
+	// }
+	// to do: formula size can be larger than 32 bit ?!
+	// int n = 0;
+	// resVec.push_back(res.formula.size()); n++;
+	// resVec.push_back((int)json_bytes); n++;
+	// assert(n == SWEEPRESULT_METADATA_FIELDS);
+	// return resVec;
+// }
+
+// size_t SweepJob::bytesToInts(size_t bytes) {
+	// return (bytes + 3 ) / 4;
+// }
+
+// SweepJob::SweepResult SweepJob::deserializeSweepResult(const std::vector<int>& resVec) {
+	// Layout: [units..., eqs..., formula..., units_size, eqs_size, formula_size]
+	// if (resVec.size() < SWEEPRESULT_METADATA_FIELDS) {
+		// throw std::runtime_error("deserializeSweepResult: buffer too small");
+	// }
+
+	// const unsigned formulaSize = resVec[resVec.size() - 2];
+	// const unsigned jsonBytes   = resVec[resVec.size() - 1];
+	// const unsigned jsonInts = bytesToInts(jsonBytes);
+
+	// const size_t payload = resVec.size() - SWEEPRESULT_METADATA_FIELDS;
+	// assert( (formulaSize + jsonInts == payload) || log_return_false("deserializeSweepResult: sizes do not match buffer length"));
+
+	// SweepResult res;
+	// res.formula.assign(resVec.begin(), resVec.begin() + formulaSize);     
+	// if (jsonBytes > 0) {
+		// std::string stringjson = 
+	// }
+	// return res;
+// }
+	
+
+void SweepJob::printFirstClauses(const std::vector<int> &formula, int nbClauses) {
+	int clauseNo = 1;	
+	if (formula.empty()) {
+		return;
+	}
+	assert(formula.size() >= 2); //must have numVars and numClauses at the end
+	std::ostringstream oss;
+	LOGGER(_sweeplogger, V3_VERB, "First %i clauses (total formula size %i\n", nbClauses, formula.size());
+	for (int i=0; i < formula.size()-2 && clauseNo < nbClauses; i++) {
+		int lit = formula[i];
+		if (lit==0) {
+			LOGGER(_sweeplogger, V3_VERB, "cl#%i: %s\n", clauseNo, oss.str().c_str());
+			oss.str("");
+			clauseNo++;
+		} else {
+			oss << lit << " ";
+		}
+	}
+}
 
 void SweepJob::cbReportIteration(int localId) {
 	assert(_is_root || log_return_false("SWEEP ERROR : iteration report in a non-root rank. Technically possible, but currently not allowed \n"));
@@ -749,10 +893,9 @@ void SweepJob::reportEndStats(KissatPtr sweeper) {
 			}
 		}
 	}
-	// float max_appl_comm_duration = *std::max_element(_duration_appl_communicate.begin(), _duration_appl_communicate.end());
 	LOGGER(_sweeplogger,V3_VERB, "SWEEP_APPL_COMMUNICATE_MAX   %.6f s \n", _max_appl_comm_duration);
 	for (int i=0; i<15 && i<_internal_result.getSolutionSize(); i++) {
-		LOGGER(_sweeplogger,V3_VERB, "RESULT Sweep Formula[%i] = %i \n", i, _internal_result.getSolution(i));
+		LOGGER(_sweeplogger,V4_VVER, "RESULT Sweep Formula[%i] = %i \n", i, _internal_result.getSolution(i));
 	}
 }
 
@@ -763,7 +906,7 @@ void SweepJob::checkIdleWorkStatus() {
 		//no touching them anymore
 	}
 
-	const float CHECK_PERIOD = 2 * _params.sweepSharingPeriod(); // Defines the long-term-idle threshhold
+	const float CHECK_PERIOD = 5 * _params.sweepSharingPeriod(); // Defines the long-term-idle threshhold
 	if (Timer::elapsedSeconds() - _timestamp_log_last_idleinfo < CHECK_PERIOD) {
 		return;
 	}
@@ -1062,7 +1205,7 @@ bool SweepJob::tryProvideInitialWork(KissatPtr sweeper) {
 			static thread_local std::mt19937 rng19937(std::random_device{}());
 			std::shuffle(sweeper->work_received_from_steal.begin(), sweeper->work_received_from_steal.end(), rng19937);
 			for (int i=0; i <8 && i<sweeper->work_received_from_steal.size(); i++) {
-				LOGGER(_sweeplogger,V3_VERB, "SWEEP WORK Shuffle view: %i\n", sweeper->work_received_from_steal[i]);
+				LOGGER(_sweeplogger,V4_VVER, "SWEEP WORK Shuffle view: %i\n", sweeper->work_received_from_steal[i]);
 			}
 		}
 		LOGGER(_sweeplogger,V3_VERB, "SWEEP WORK PROVIDED  -------------%u----------------> to sweeper [%i](%i)\n", VARS, _my_rank, sweeper->getLocalId());
@@ -1250,9 +1393,9 @@ void SweepJob::rootStartNewSharingRound() {
 		if (t > _timestamp_log_delayedround + LOG_PERIOD) {
 			_timestamp_log_delayedround = t;
 			if (_root_iteration==0) {
-				LOGGER(_sweeplogger,V3_VERB, "root: Delay first sharing round, CCC still running\n");
+				LOGGER(_sweeplogger,V4_VVER, "root: Delay first sharing round, CCC still running\n");
 			} else {
-				LOGGER(_sweeplogger,V3_VERB, "root: Delay next sharing round, haven't started to provide initial work\n");
+				LOGGER(_sweeplogger,V4_VVER, "root: Delay next sharing round, haven't started to provide initial work\n");
 			}
 		}
 		return;
@@ -1329,7 +1472,10 @@ void SweepJob::cbContributeToAllReduce() {
 	LOGGER(_sweeplogger,V5_DEBG, "SWEEP [%i] RED SHARE RESET\n", _my_rank);
 	_red.reset(new JobTreeAllReduction(snapshot, baseMsg, std::vector<int>(), aggregateEqUnitContributions));
 	if (_is_root)
-		_red->setInplaceTransformationOfElementAtRoot(_inplace_rootTransform);
+		_red->setInplaceTransformationOfElementAtRoot(
+			[this](JobTreeAllReduction::AllReduceElement& payload) {
+				_inplace_rootTransform(payload);
+			});
 	//Bring individual data per thread in the sharing element format
 	std::list<std::vector<int>> contribs;
 	int id=-1; //for debugging
@@ -1678,7 +1824,7 @@ std::vector<int> SweepJob::stealWorkFromSpecificLocalSolver(int localId) {
 	if (max_steal_amount < MIN_STEAL_AMOUNT)
 		return {};
 	assert(max_steal_amount > 0			 || log_return_false("SWEEP STEAL ERROR [%i](%i): negative max steal amount %i, maybe segfault into non-initialized kissat solver \n", _my_rank, localId, max_steal_amount));
-	assert(max_steal_amount < 2*_numVars || log_return_false("SWEEP STEAL ERROR [%i](%i): too large max steal amount %i >= 2*NUM_VARS, maybe segfault into non-initialized kissat solver \n", _my_rank, localId, max_steal_amount));
+	assert(max_steal_amount < 2*_numOrigVars || log_return_false("SWEEP STEAL ERROR [%i](%i): too large max steal amount %i >= 2*NUM_VARS, maybe segfault into non-initialized kissat solver \n", _my_rank, localId, max_steal_amount));
 	//There is something to steal.
 	//Use mutex to prevent multiple solvers from stealing concurrently from the same solver.
 	//While this is a sane choice in general, it also seemed that 23 threads stealing at the same time from one solver
@@ -1707,7 +1853,7 @@ void SweepJob::printActiveMPIRequestsCount() {
 	for (auto &request : _worksteal_requests) {
 		active+=request.is_active;
 	}
-	LOGGER(_sweeplogger,V3_VERB, "still active MPI requests: %i\n",active);
+	LOGGER(_sweeplogger,V4_VVER, "still active MPI requests: %i\n",active);
 }
 
 std::vector<int> SweepJob::getRandomIdPermutation() {
@@ -1753,7 +1899,7 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 	const int payload_size = getDescription().getFormulaPayloadSize(0);
 	constexpr int BITS_PER_MB = 8000000;
 	float formula_in_MB = ((float)payload_size*32)/BITS_PER_MB;
-	LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](%i) loading formula (%.3f MB) \n", _my_rank, sweeper->getLocalId(), formula_in_MB);
+	LOGGER(_sweeplogger,V4_VVER, "SWEEP [%i](%i) loading formula (%.3f MB) \n", _my_rank, sweeper->getLocalId(), formula_in_MB);
 	float t0 = Timer::elapsedSeconds();
 	constexpr int CHECK_INTERVAL = 50000;
 	int counter = CHECK_INTERVAL;
@@ -1770,6 +1916,228 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 	float t1 = Timer::elapsedSeconds();
 	LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](%i) loaded formula (%.3f MB) in %.6f sec \n", _my_rank, sweeper->getLocalId(), formula_in_MB , (t1-t0));
 }
+
+#define OLD_EXIT_LOGIC 0
+
+//The root node (and only the root node) tracks global sweeping progress
+//It decides whether a given sharing iteration should continue or end
+//It broadcasts this decision to all other ranks, along with general information about the current sweeping state
+//On a technical level, this information is injected here via an inplace root transform at
+//the end of the sharing aggregation, before broadcasting it
+void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
+	assert(_is_root);
+	_root_sharing_round++;
+	//Remember from last sharing round whether a new iteration starts now
+	if (_root_did_just_finish_iteration) {
+		_root_iteration++;
+		_root_did_just_finish_iteration = false;
+		//Resets
+		_shared_EU_this_iteration_cumul = {0};
+		_swept_this_iteration_cumul = {0};
+		_root_shared_units_this_iteration = 0;
+		_root_shared_eqs_this_iteration = 0;
+		_root_rounds_this_iteration=0;
+		_root_had_success_this_iteration = false;
+		_root_had_work_this_iteration = false;
+		_root_atp_round = _root_sharing_round; //make the all time peak which is carried over into this new iteration effectively "happe" at the start of the iteration
+		LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) ITERATION %i/%i STARTED \n", _my_rank, _root_iteration, _params.sweepMaxIterations());
+	}
+
+	Metadata md = readMetadataFromReductionElement(payload);
+	const int n_eqs = md.eq_size / 2;  //each equivalence takes up two integers
+
+	if (md.remaining_work_estimate>0) {
+		_root_had_work_this_iteration = true;
+	}
+	//Track metadata of this round
+	bool all_idle = (md.active_count == 0);
+	bool all_work_done = _root_had_work_this_iteration && (md.remaining_work_estimate==0);
+	double done_scheduled_prcnt = 100*(md.work_sweeps + md.work_stepovers)/(double)_numOrigVars;
+	_root_shared_units_this_iteration += md.unit_size;
+	_root_shared_eqs_this_iteration   += n_eqs;
+	_root_total_shared_units += md.unit_size;
+	_root_total_shared_eqs   += n_eqs;
+	_root_rounds_this_iteration++;
+	_shared_EU_this_iteration_cumul.push_back(_root_shared_units_this_iteration + _root_shared_eqs_this_iteration);
+	_swept_this_iteration_cumul.push_back(md.work_sweeps + md.unsched_resweeps);
+
+	bool decide_end_iteration = false;
+	bool decide_terminate_job = false;
+	
+
+	//There exist three ways in which an iteration can end.
+	// 1. Naturally, because all work has been done (notice through either all idle, or work estimate is zero)
+	// 2. Early, because there has not been enough success in recent rounds (found Eqs+Units)
+	// 3. Early, because there have been too many lagging solvers in recent rounds (solvers stuck in long sweep calls)
+
+	//Calculate the success within the last rounds window (Number of equivalences + units versus the number of swept variables)
+	auto &shared = _shared_EU_this_iteration_cumul;
+	auto &swept = _swept_this_iteration_cumul;
+	int window = _skip_window_rounds;
+	if (window > shared.size()) {
+		window = shared.size();
+	}
+	int shared_in_window = shared.back() - shared[shared.size()-window];
+	int swept_in_window  = swept.back()  - swept[swept.size()-window];
+	double success_in_window = swept_in_window==0 ? 0: shared_in_window / (double) swept_in_window;
+	//This has the side effect of assigning success==0 also in case not a single new sweep() call has been started,
+	//and potentially terminating Sweeping because single calls take too long,
+	//even when there have been ongoing new Eqs+Units found within these (very few) same ongoing sweep() calls
+
+	//Check whether we have a new all-time peak
+	int EU_this_round = md.unit_size + n_eqs;
+	if (EU_this_round > _root_atp_EU) {
+		_root_atp_EU = EU_this_round;
+		_root_atp_round = _root_sharing_round;
+		LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](root-trf): All-time-peak EU %i round %i  \n", _my_rank, _root_atp_EU, _root_sharing_round);
+	}
+	
+	//End this iteration if we hadn't had a new EU peak in a while, and any new EU values are significantly below the last peak
+	if (EU_this_round <= 0.3 * _root_atp_EU && _root_sharing_round - _root_atp_round > _skip_window_rounds) {
+		decide_end_iteration = true;	
+		LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](root-trf): End Iteration <%i,%i> bc. for %i rounds below all time peak EU %i (from round %i) \n", _my_rank, _root_iteration, _root_sharing_round, _skip_window_rounds, _root_atp_EU, _root_atp_round);
+	}
+
+	//If all work has been done, the iteration ends naturally
+	if (all_idle || all_work_done) {
+		decide_end_iteration = true;
+		if (all_idle)
+			LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](root-trf): All idle      - ending this iteration %i \n", _my_rank, _root_iteration);
+		else if (all_work_done)
+			LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](root-trf): All work done - ending this iteration %i \n", _my_rank, _root_iteration);
+	}
+
+	//On iteration end, note whether we ever had success in this iteration, because we only allow a fixed
+	//number of unsuccessfull (failed) iterations
+	if (decide_end_iteration) {
+		assert(_numOrigVars>0);
+		const double simplification_ratio = _shared_EU_this_iteration_cumul.back() / (double)_numOrigVars;
+		if (simplification_ratio > _params.sweepSkipRatio()) {
+			_root_had_success_this_iteration = true;
+		}
+		if (md.lagging > 0) {
+			_root_had_success_this_iteration = false;
+		}
+		
+		if (_root_had_success_this_iteration == false) {
+			_root_weak_iterations++;
+			LOGGER(_sweeplogger,V3_VERB, "Iteration %i weak . Now WEAK_ITERATIONS %i \n", _root_iteration, _root_weak_iterations);
+		} else {
+			LOGGER(_sweeplogger,V3_VERB, "Iteration %i strong, simplified by ratio EU/vars = %f \n", _root_iteration, simplification_ratio);
+		}
+	}
+	//Terminate the whole SweepJob if enough failed iterations happened
+	if (_root_weak_iterations >= _params.sweepMaxWeakIterations()) {
+		decide_terminate_job = true;
+		LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) TERMINATE (due to TOO_MANY_WEAK_ITERATIONS) due to %i th weak iteration (limit: %i) \n", _my_rank, _root_weak_iterations, _params.sweepMaxWeakIterations());
+	}
+	if (_params.jobWallclockLimit()>0 && Timer::elapsedSeconds() > _params.jobWallclockLimit() - TIMEBUFFER_FOR_FINAL_SUBSTITUTE) {
+		decide_terminate_job=true;
+		LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) TERMINATE (due to SWEEP_JOB_TIMEOUT %.3f), with buffer time %f for final substitute \n", _my_rank, _params.jobWallclockLimit(), TIMEBUFFER_FOR_FINAL_SUBSTITUTE);
+	}
+	//A round is finished if all sweepers are idle or if we didnt have enough progress
+	if (decide_end_iteration || decide_terminate_job) {
+		LOGGER(_sweeplogger,V3_VERB, "[%i](root-trf) (%i)all_idle  (%i)end_iteration (%i)foundUn-sat (%i)terminate_job \n", _my_rank, all_idle, decide_end_iteration, md.foundUnsat, decide_terminate_job);
+		LOGGER(_sweeplogger,V3_VERB, "[%i](root-trf) ITERATION %i/%i FINISHED in sharing round %i \n", _my_rank, _root_iteration, _params.sweepMaxIterations(), _root_sharing_round);
+		LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf) ITERATION %i/%i shared: %i EQS, %i UNITS  \n", _my_rank, _root_iteration, _params.sweepMaxIterations(), _root_shared_eqs_this_iteration, _root_shared_units_this_iteration);
+		if (_root_iteration == _params.sweepMaxIterations()) {
+			LOGGER(_sweeplogger,V2_INFO, "[%i](root-trf): Job finished! All iterations done (%i/%i). Broadcasting termination signal with sharing data.\n", _my_rank, _root_iteration, _params.sweepMaxIterations());
+			decide_terminate_job = true;
+		}
+		else {
+			_root_did_just_finish_iteration = true; //remember for the next round
+			_root_initwork_startedproviding = false; //providing work to the solvers can take some time, track that progress
+			_root_initwork_provided		= false;
+			LOGGER(_sweeplogger,V3_VERB, "[%i](root-trf) Preparing for new iteration \n", _my_rank);
+		}
+	}
+	//The root node (and only the root node) tracks the number of completed sweep rounds,
+	//and broadcasts this information. This way, also nodes that join later know which round we are in.
+	md.sweep_iteration = _root_iteration;
+	md.sharing_round = _root_sharing_round;
+	md.end_iteration = decide_end_iteration;
+	md.terminate = decide_terminate_job;
+
+	//Send my units and equivalences via cross-job communication to the SAT job
+	const int n_sweep_units = md.unit_size;
+	const int eq_size = md.eq_size;
+	if (!md.foundUnsat && _clause_comm && _params.crossJobCommunication()) {
+		assert(_clause_comm || log_return_false("Sweep ERROR: _clause_comm object missing\n"));
+		BufferBuilder bb(-1, 10, false);
+		if (_params.sweepXTCSsend()) {
+			//Payload Format: [eqs, units, metadata]
+			//Read units, which are stored directly after the equivalences
+			for (int i=eq_size; i<eq_size+n_sweep_units; i++) {
+				int unit = payload[i];
+				bb.append({&unit, 1, 1});
+			}
+			//Read equivalences (need to append to the buffer after units, because they have a larger clause length)
+			for (int i=0; i < eq_size; i+=2) {
+				int elit1 = payload[i];
+				int elit2 = payload[i+1];
+				//Represent the equality elit1==elit2 in CNF format via two binary clauses
+				int cnfA[2] = {-elit1, elit2};
+				int cnfB[2] = {-elit2, elit1};
+				bb.append({&cnfA[0],2,2});
+				bb.append({&cnfB[0],2,2});
+			}
+		}
+		auto buffer = bb.extractBuffer();
+		if (_params.sweepXTCSsend()) {
+			LOGGER(_sweeplogger,V4_VVER, "SWEEPsns to XTCS: s %i cl %i \n", buffer.size(), n_eqs*2 + n_sweep_units);
+		}
+		_clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
+		_clause_comm->communicate();
+		while (hasDeferredMessage()) {
+			auto deferredMsg = getDeferredMessage();
+			_clause_comm->handle(
+				deferredMsg.source, deferredMsg.mpiTag, deferredMsg.msg);
+		}
+	}
+
+	//Within SweepJob, pass down the units received via Cross-Job-Communication to all sweepers.
+	//(we use SweepJobs own broadcasting, instead of relying on the CJC broadcasting)
+	int crossjob_units_received = 0;
+	if (_params.crossJobCommunication() && _params.sweepXTCSrecv()) {
+		std::lock_guard<std::mutex> lock(_crossjob_import_mutex);
+		if (!_crossjob_root_received_units.empty()) {
+			const int insert_pos = eq_size + n_sweep_units;
+			// Splice the cross-job units into the existing vector,
+			// appending them after the sweep units, but before before the metadata
+			payload.insert(
+				payload.begin() + insert_pos,
+				_crossjob_root_received_units.begin(),
+				_crossjob_root_received_units.end()
+			);
+			crossjob_units_received = static_cast<int>(_crossjob_root_received_units.size());
+			assert(payload.size() == eq_size + n_sweep_units + crossjob_units_received + NUM_METADATA_FIELDS);
+
+			//updated stored unit count to reflect the additions.
+			//Otherwise, the sweepers would not know that we added new units
+			md.unit_size = n_sweep_units + crossjob_units_received;
+
+			//discard the temporary buffer, to not import the same units a second time
+			_crossjob_root_received_units.clear();
+		}
+	}
+
+	//Persist the (possibly mutated) metadata back into the tail of the payload
+	writeMetadataToReductionElement(payload, md);
+
+	char logmsg[512];
+	snprintf(logmsg, sizeof(logmsg),
+		"[%i](root-trf) send: act,idl,lti %i,%i,%i  swp %i lag %i mxkit %i  iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i  SW %i  ST %i  RmW %i  Sched, Swept  %.2f , %.2f °/.  wsucc  %.6f  ETI %i  UTI %i\n",
+		_my_rank, md.active_count, md.idle_count, md.longtermidle_count, md.sweeper_objs, md.lagging, md.maxxed_kittens,  _root_iteration, _root_sharing_round,
+		all_idle,  decide_end_iteration, decide_terminate_job, n_eqs, n_sweep_units, crossjob_units_received,
+		md.work_sweeps, md.work_stepovers, md.remaining_work_estimate,
+		done_scheduled_prcnt , 100*(md.work_sweeps + md.unsched_resweeps)/(double)_numOrigVars, success_in_window, _root_shared_eqs_this_iteration, _root_shared_units_this_iteration
+	);
+	LOGGER(_sweeplogger, V3_VERB, "%s", logmsg);
+	// for (int i=0; i < md.eq_size; i+=2) {
+		// LOGGER(_sweeplogger, V3_VERB, "EQ(%i) = %i %i\n", i/2, payload[i], payload[i+1]);
+	// }
+	//no return statement, because the payload was just transformed in-place
+};
 
 void SweepJob::triggerTerminations() {
 	LOGGER(_sweeplogger,  V3_VERB, "SWEEP TERM #%i [%i] trigger solver terminations (ctx %i). Of: Running %i, Finished %i \n", getId(), _my_rank, _my_ctx_id, _running_sweepers_count.load(), _finished_sweepers_count.load());
@@ -1788,7 +2156,7 @@ void SweepJob::triggerTerminations() {
 }
 
 SweepJob::~SweepJob() {
-	DOUBLELOG(_sweeplogger,V3_VERB, "SWEEP JOB DESTRUCTOR ENTERED (ctx %i) \n", _my_ctx_id);
+	LOGGER(_sweeplogger,V3_VERB, "SWEEP JOB DESTRUCTOR ENTERED (ctx %i) \n", _my_ctx_id);
 	for (int i=0; i<5; i++) {
 		clearImportedRound();
 	}
@@ -1796,11 +2164,12 @@ SweepJob::~SweepJob() {
 		LOGGER(_sweeplogger,V1_WARN, "SWEEP [%i] WARN : rank was terminated while synchronizing \n", _my_rank);
 	}
 	if (!_flag_terminated_while_synchronizing && (_lastClearedRound + 2 < _lastImportedRound)) {
-		LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i] WARN : didn't clear all imported rounds. lastCleared %i, lastImported %i \n", _my_rank, _lastClearedRound, _lastImportedRound.load());
+		// Warning no longer relevant, since we keep all units & eqs till the end, to export them separately
+		// LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i] WARN : didn't clear all imported rounds. lastCleared %i, lastImported %i \n", _my_rank, _lastClearedRound, _lastImportedRound.load());
 	}
 	if (_lastImportedRound==0) {
 		LOGGER(_sweeplogger,V1_WARN, "SWEEP [%i] WARN : rank didn't receive a single sharing round! (irrelevant if only 1 sweep rank was used) \n", _my_rank);
 	}
 	// triggerTerminations();
-	DOUBLELOG(_sweeplogger,V2_INFO, "SWEEP JOB DESTRUCTOR DONE ctx %i\n", _my_ctx_id);
+	LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB DESTRUCTOR DONE ctx %i\n", _my_ctx_id);
 }
