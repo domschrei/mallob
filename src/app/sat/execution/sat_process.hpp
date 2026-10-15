@@ -179,7 +179,7 @@ private:
                         
                         success = Proc::getThreadCpuRatio(threadTids[i], cpuShare, sysShare);
                         if (success) {
-                            LOGGER(_log, V3_VERB, "td.%ld cpuratio=%.3f sys=%.3f\n", threadTids[i], cpuShare, sysShare);
+                            LOGGER(_log, V4_VVER, "td.%ld cpuratio=%.3f sys=%.3f\n", threadTids[i], cpuShare, sysShare);
                         }
                     }
 
