@@ -1,0 +1,12 @@
+{
+    "rules": [
+      {
+        "backend": "Kissat",
+        "selector": {"type": "true"},
+        "settings": [
+          {"type": "set", "key": "walkeffort", "value": 0}
+        ]
+      }
+    ]
+  }
+  
