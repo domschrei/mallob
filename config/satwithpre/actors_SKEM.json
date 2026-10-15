@@ -19,7 +19,7 @@
         "prerequisite": "SK",
         "actorsBeingDisplaced": [],
         "onlyStartIfPrerequisiteSimplified": false,
-		"options": "-ems=0 -fcll=2 -rspaa=1 -jcup=0.1 -cjc=0 -cjtcp=0 -sweep-skip-ratio=0.01 -sweep-skip-window=1 -sweep-max-weak-iters=1"
+		"options": "-ems=0 -fcll=2 -rspaa=1 -jcup=0.1 -cjc=0 -cjtcp=0 -sweep-skip-ratio=0.015 -sweep-skip-window=1 -sweep-max-weak-iters=1 -sweep-peak-fall-ratio=0.1"
     },
     {
         "id": "SKEM",

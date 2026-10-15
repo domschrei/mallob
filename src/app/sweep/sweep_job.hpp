@@ -201,7 +201,7 @@ private:
 	//that happen within that time window
 	//since this naturally ignores time spent inbetween iterations (where sequential bookkeping is done)
 	//and where skipping would not defined or wanted
-	int _skip_window_rounds = _params.sweepSkipWindowSecs() / (double) _params.sweepSharingPeriod();
+	int _skip_window_rounds;
 
 	//See how much each rank contributed in postprocessing
 	//Main use is to detect whether some ranks didn't contribute at all, which would hint at a bug

@@ -72,6 +72,7 @@ void* SolverThread::run() {
 
     diversifyInitially();        
 
+    //looping over potentially many revisions
     while (!_terminated) {
 
         // Sleep and wait if the solver should not do solving right now

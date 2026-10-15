@@ -1,3 +1,6 @@
+#ifndef DOMPASCH_MALLOB_SWEEP_JOB_CPP
+#define DOMPASCH_MALLOB_SWEEP_JOB_CPP
+
 #include "sweep_job.hpp"
 
 #include <memory>
@@ -83,6 +86,8 @@ void SweepJob::appl_start() {
     _metadata = getSerializedDescription(0)->data();
 	_timestamp_start_sweepapp = Timer::elapsedSeconds();
 	_worksteal_requests.resize(_nThreads);
+
+	_skip_window_rounds = _params.sweepSkipWindowSecs() / (double) _params.sweepSharingPeriod();
 
 	assert(desc.getAppConfiguration().map.count(SWEEPRESULT_DIR_KEY) 
 		|| log_return_false("[ERROR] SweepJob json['%s'] is empty, need a shared directory to write Sweep results (units, eqs, reconstruction data) \n", SWEEPRESULT_DIR_KEY.c_str()));
@@ -1923,8 +1928,6 @@ void SweepJob::loadFormula(KissatPtr sweeper) {
 	LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](%i) loaded formula (%.3f MB) in %.6f sec \n", _my_rank, sweeper->getLocalId(), formula_in_MB , (t1-t0));
 }
 
-#define OLD_EXIT_LOGIC 0
-
 //The root node (and only the root node) tracks global sweeping progress
 //It decides whether a given sharing iteration should continue or end
 //It broadcasts this decision to all other ranks, along with general information about the current sweeping state
@@ -1990,38 +1993,6 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 	//and potentially terminating Sweeping because single calls take too long,
 	//even when there have been ongoing new Eqs+Units found within these (very few) same ongoing sweep() calls
 
-#if OLD_EXIT_LOGIC
-	//Skip this iteration if there has not been enough success in the considered window
-	if (shared.size()>=_skip_window_rounds) {
-		if (success_in_window < _params.sweepSkipRatio()) {
-			decide_end_iteration = true;
-			_root_skipped_iterations++;
-			LOGGER(_sweeplogger,V3_VERB, "[%i](root-trf) NONSUCCESS_SKIP iteration %i (rnd %i) , bc. success %f (%i / %i) < %.3f thresh, in rounds [%i, %i]. Skipped-Count %i  Weak-Count %i (this: +%i)\n",
-				_my_rank, _root_iteration, _root_sharing_round,  success_in_window, shared_in_window, swept_in_window,
-				_params.sweepSkipRatio(), _root_sharing_round - window, _root_sharing_round,
-				_root_skipped_iterations, _root_weak_iterations, !_root_had_success_this_iteration);
-		} else {
-			//Had some success in this iteration, average over a sufficiently large window
-			_root_had_success_this_iteration = true;
-		}
-	}
-	
-	//Skip the iteration because too many solvers are too stuck
-	const int nSolvers = md.active_count + md.idle_count;
-	const double LAGGING_TRESHHOLD_FRACTION = 0.05; //if more than this fraction of solvers is lagging, end this iteration
-	//explicitly calculate threshhold count, such that it is at least 1 for edgecases with very few solvers
-	const int lagging_thresh_count = std::max(1, (int) (LAGGING_TRESHHOLD_FRACTION * nSolvers)); 
-	if (shared.size()>=_skip_window_rounds && md.lagging >= lagging_thresh_count ) {
-		decide_end_iteration = true;
-		//We declare this iteration failed, otherwise it can happen that hundreds of iterations
-		//occur, each skipped quickly due to lagging, but each being juuust long enough to count as successful
-		_root_had_success_this_iteration = false;
-		LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](root-trf) LAGGING_SKIP iteration %i (rnd %i) , bc. fraction beyond threshhold %f of solvers are lagging ( %i / %i ) in window %.3f sec == %i rounds \n",
-			_my_rank, _root_iteration, _root_sharing_round, LAGGING_TRESHHOLD_FRACTION, md.lagging, nSolvers, _params.sweepSkipWindowSecs(), _skip_window_rounds);
-	}
-	
-#else
-	
 	//Check whether we have a new all-time peak
 	int EU_this_round = md.unit_size + n_eqs;
 	if (EU_this_round > _root_atp_EU) {
@@ -2031,13 +2002,11 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 	}
 	
 	//End this iteration if we hadn't had a new EU peak in a while, and any new EU values are significantly below the last peak
-	if (EU_this_round <= 0.3 * _root_atp_EU && _root_sharing_round - _root_atp_round > _skip_window_rounds) {
+	if (EU_this_round <= _params.sweepPeakFallRatio() * _root_atp_EU && _root_sharing_round - _root_atp_round > _skip_window_rounds) {
 		decide_end_iteration = true;	
 		LOGGER(_sweeplogger,V3_VERB, "SWEEP [%i](root-trf): End Iteration <%i,%i> bc. for %i rounds below all time peak EU %i (from round %i) \n", _my_rank, _root_iteration, _root_sharing_round, _skip_window_rounds, _root_atp_EU, _root_atp_round);
 	}
-		
-#endif
-	
+
 	//If all work has been done, the iteration ends naturally
 	if (all_idle || all_work_done) {
 		decide_end_iteration = true;
@@ -2048,12 +2017,6 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 		//Usually we wait for sufficiently many rounds until we determine whether this iteration had success.
 		//But if we reach the end of an iteration earlier through all_idle, before the first such check,
 		//we do the next best thing, which is we evaluate the success of all the (few) rounds of this iteration.
-		#if OLD_EXIT_LOGIC
-		if (shared.size() < _skip_window_rounds && success_in_window >= _params.sweepSkipRatio()) {
-			_root_had_success_this_iteration = true;
-			LOGGER(_sweeplogger,V2_INFO, "SWEEP [%i](root-trf): SHORT_SUCCESSFULL_ITERATION  \n", _my_rank, _root_iteration);
-		}
-		#endif
 	}
 
 	//On iteration end, note whether we ever had success in this iteration, because we only allow a fixed
@@ -2067,12 +2030,12 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 		if (md.lagging > 0) {
 			_root_had_success_this_iteration = false;
 		}
-		
+
 		if (_root_had_success_this_iteration == false) {
 			_root_weak_iterations++;
-			LOGGER(_sweeplogger,V3_VERB, "Iteration %i weak . Now WEAK_ITERATIONS %i \n", _root_iteration, _root_weak_iterations);
+			LOGGER(_sweeplogger,V3_VERB, "Iteration %i weak,   simplified ratio EU/vars = %.f\n", _root_iteration, simplification_ratio);
 		} else {
-			LOGGER(_sweeplogger,V3_VERB, "Iteration %i strong, simplified by ratio EU/vars = %f \n", _root_iteration, simplification_ratio);
+			LOGGER(_sweeplogger,V3_VERB, "Iteration %i strong, simplified ratio EU/vars = %f \n", _root_iteration, simplification_ratio);
 		}
 	}
 	//Terminate the whole SweepJob if enough failed iterations happened
@@ -2222,3 +2185,5 @@ SweepJob::~SweepJob() {
 	// triggerTerminations();
 	LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB DESTRUCTOR DONE ctx %i\n", _my_ctx_id);
 }
+
+#endif
