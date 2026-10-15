@@ -12,7 +12,7 @@
           {"type": "set", "key": "factor",      "value": 0},
           {"type": "set", "key": "simplify","value": 1},
           {"type": "set", "key": "probe",   "value": 1},
-          {"type": "set", "key": "substitute",  "value": 1},
+          {"type": "set", "key": "substitute",  "value": 0},
           {"type": "set", "key": "backbone",    "value": 1},
           {"type": "set", "key": "transitive",  "value": 1},
           {"type": "set", "key": "eliminate",   "value": 1},

@@ -122,6 +122,7 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     # -preprocess-config=config/satwithpre/actors_sweepfirst.json \
     # TODO Configure Mallob
 
+    # -preprocess-config=config/satwithpre/actors_M_SM_SKM.json \
     # -sat-config-files=config/sat/base/preprocesskissat-nosweep.json,config/sat/kissat-plaincheap.json,config/sat/kissat-exportmore.json \
     # -sat-config-files=config/sat/base/preprocesskissat-nosweep.json,config/sat/kissat-plaincheap.json \
     # -sat-config-files=config/sat/base/preprocesskissat-nosweep.json \
@@ -129,7 +130,7 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     cmd="$build/mallob \
     -mono-app=$DS_APP \
     -preprocess-config=config/satwithpre/actors_M_SM_SKM.json \
-    -sat-config-files=config/sat/base/preprocesskissat-nosweep.json \
+    -sat-config-files=config/sat/kissat-plaincheap.json,config/sat/kissat-exportmore.json \
     -satsolver=k \
     -mono=$f -jwl=$timeout -T=$(($timeout+30)) -wam=60000 -pre-cleanup=1 \
     -log=$globallogdir -tmp=$localtmpdir -comment-outputlogdir=$outputlogdir -sro=${globallogdir}/processed-jobs.out \
