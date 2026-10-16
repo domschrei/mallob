@@ -130,6 +130,9 @@ set(MALLOB_COREPLUSCOMM_SOURCES ${MALLOB_CORE_SOURCES}
 
 # Function to add a unit test
 function(new_test testname includes linklibs)
+    if(DEFINED MALLOB_UNIT_TEST AND MALLOB_UNIT_TEST EQUAL 0)
+        return()
+    endif()
     message("* Adding test: ${testname}")
     add_executable(test_${testname} src/test/test_${testname}.cpp)
     target_include_directories(test_${testname} PRIVATE ${includes})
