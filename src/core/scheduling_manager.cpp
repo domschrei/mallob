@@ -692,7 +692,7 @@ void SchedulingManager::handleJobInterruption(MessageHandle& handle) {
             jobId, rev, job.getRevision());
         return;
     }
-    LOG(V3_VERB, "Acknowledge #%i interrupt\n", jobId);
+    LOG(V4_VVER, "Acknowledge #%i interrupt\n", jobId);
     // Information should be sent to the client only if this process is the job's root
     // and if it's either a one-shot job or the interruption has been an explicit event
     // (i.e., due to a hit limit or a user interruption and not due to normal termination).
