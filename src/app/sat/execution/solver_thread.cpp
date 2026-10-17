@@ -224,6 +224,7 @@ void SolverThread::diversifyAfterReading() {
     if (!_params.diversifyPhases()) return;
     if (_solver.getGlobalId() < _solver.getNumOriginalDiversifications()) return;
 
+    //Attention: In MUS extraction, we dont't want to mess with phases inbetween incremental calls!
     int solversCount = _local_solvers_count;
     int totalSolvers = solversCount * _portfolio_size;
     int vars = _solver.getVariablesCount();
