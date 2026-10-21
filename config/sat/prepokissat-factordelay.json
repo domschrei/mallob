@@ -1,0 +1,12 @@
+{
+    "rules": [
+      {
+        "backend": "Kissat",
+        "selector": { "type": "flavour", "value": "preprocess" },
+        "settings": [
+          {"type": "set", "key": "factordelay", "value": 6}
+        ]
+      }
+    ]
+  }
+  
