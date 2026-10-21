@@ -1,0 +1,17 @@
+{
+    "rules": [
+      {
+        "backend": "Kissat",
+        "selector": { "type": "flavour", "value": "preprocess" },
+        "settings": [
+          {"type": "set", "key": "fastelim", "value": 16},
+          {"type": "set", "key": "fasteloccs", "value": 200},
+          {"type": "set", "key": "fastelrounds", "value": 8},
+          {"type": "set", "key": "fastelclslim", "value": 200},
+          {"type": "set", "key": "factoriniticks", "value": 1400},
+          {"type": "set", "key": "factorsize", "value": 7}
+        ]
+      }
+    ]
+  }
+  
