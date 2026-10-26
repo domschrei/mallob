@@ -2033,7 +2033,7 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 
 		if (_root_had_success_this_iteration == false) {
 			_root_weak_iterations++;
-			LOGGER(_sweeplogger,V3_VERB, "Iteration %i weak,   simplified ratio EU/vars = %.f\n", _root_iteration, simplification_ratio);
+			LOGGER(_sweeplogger,V3_VERB, "Iteration %i weak,   simplified ratio EU/vars = %f\n", _root_iteration, simplification_ratio);
 		} else {
 			LOGGER(_sweeplogger,V3_VERB, "Iteration %i strong, simplified ratio EU/vars = %f \n", _root_iteration, simplification_ratio);
 		}

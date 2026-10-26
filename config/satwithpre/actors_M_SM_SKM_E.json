@@ -1,0 +1,58 @@
+[
+    {
+        "id": "M",
+        "type": "MALLOBSAT",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false,
+        "options": "-satsolver=k_c_l+[k_]{29}"
+    },
+    {
+        "id": "S",
+        "type": "SATSUMA_EXT",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "SM",
+        "type": "MALLOBSAT",
+        "prerequisite": "S",
+        "actorsBeingDisplaced": ["M"],
+        "onlyStartIfPrerequisiteSimplified": true,
+        "options": "-satsolver=k_c_l+[k_]{29}"
+    },
+    {
+        "id": "SK",
+        "type": "KISSAT",
+        "prerequisite": "S",
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "SKM",
+        "type": "MALLOBSAT",
+        "prerequisite": "SK",
+        "actorsBeingDisplaced": ["M", "SM"],
+        "onlyStartIfPrerequisiteSimplified": true,
+        "options": "-satsolver=k_c_l+[k_]{29}"
+    },
+    {
+        "id": "SKE",
+        "type": "MALLOBSWEEP",
+        "prerequisite": "SK",
+        "group-id": "1",
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": true,
+		"options": "-fcll=2 -rspaa=1 -jcup=0.1 -cjc=1 -cjtcp=0 -sweep-skip-ratio=0.015 -sweep-skip-window=1 -sweep-max-weak-iters=3 -sweep-peak-fall-ratio=0.1"
+	},
+    {
+        "id": "SKEM",
+        "type": "MALLOBSAT",
+        "prerequisite": "SK",
+        "group-id": "1",
+        "actorsBeingDisplaced": ["M", "SM", "SKM"],
+        "onlyStartIfPrerequisiteSimplified": true,
+        "options": "-satsolver=k_c_l+[k_]{29}"
+    }
+]
