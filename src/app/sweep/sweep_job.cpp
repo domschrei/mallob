@@ -1900,7 +1900,7 @@ void SweepJob::crossjob_rootReceiveClauses(std::vector<int>  &&clauses) {
 			clause = reader.getNextIncomingClause();
 		}
 		int after = _crossjob_root_received_units.size();
-		LOGGER(_sweeplogger,V4_VVER, "SWEEP stored %i received XTCS units \n", after -before);
+		LOGGER(_sweeplogger,V3_VERB, "SWEEP stored received XTCS units %i\n", after - before);
 	}
 }
 
@@ -2096,7 +2096,7 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 		}
 		auto buffer = bb.extractBuffer();
 		if (_params.sweepXTCSsend()) {
-			LOGGER(_sweeplogger,V4_VVER, "SWEEPsns to XTCS: s %i cl %i \n", buffer.size(), n_eqs*2 + n_sweep_units);
+			LOGGER(_sweeplogger,V3_VERB, "SWEEP to XTCS: s %i cl %i \n", buffer.size(), n_eqs*2 + n_sweep_units);
 		}
 		_clause_comm->feedLocalClausesIntoCrossSharing(buffer, nullptr);
 		_clause_comm->communicate();
