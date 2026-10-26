@@ -8,7 +8,7 @@
           {"type": "set", "key": "preprocess",  "value": 0},
 
           {"type": "set", "key": "probecheap",  "value": 1},
-          {"type": "set", "key": "substitute",  "value": 1},
+          {"type": "set", "key": "substitute",  "value": 0},
           {"type": "set", "key": "backbone",    "value": 1},
           {"type": "set", "key": "transitive",  "value": 1},
 
