@@ -52,9 +52,9 @@ void Client::readIncomingJobs() {
 
     while (true) {
         // Wait for a nonempty incoming job queue
-        LOGGER(log, V4_VVER, "waiting inc=%i loaded=%i\n", _num_incoming_jobs.load(), _num_loaded_jobs.load());
+        LOGGER(log, V6_DEBGV, "waiting inc=%i loaded=%i\n", _num_incoming_jobs.load(), _num_loaded_jobs.load());
         _incoming_job_cond_var.wait(_incoming_job_lock, [&]() {
-            LOGGER(log, V4_VVER, "  -- inc=%i loaded=%i\n", _num_incoming_jobs.load(), _num_loaded_jobs.load());
+            LOGGER(log, V6_DEBGV, "  -- inc=%i loaded=%i\n", _num_incoming_jobs.load(), _num_loaded_jobs.load());
             return !_instance_reader.continueRunning() 
                 || (_num_incoming_jobs > 0 && _num_loaded_jobs < _params.loadedJobsPerClient());
         });
@@ -77,7 +77,7 @@ void Client::readIncomingJobs() {
         // Find a single job eligible for parsing
         bool foundAJob = false;
         for (auto& data : _incoming_job_queue) {
-            LOGGER(log, V4_VVER, "trying job #%i %s\n", data.description->getId(), data.jobName.c_str());
+            LOGGER(log, V5_DEBG, "trying job #%i %s\n", data.description->getId(), data.jobName.c_str());
             
             // Jobs are sorted by arrival:
             // If this job has not arrived yet, then none have arrived yet
@@ -722,8 +722,11 @@ void Client::handleSendJobResultInternal(JobResult&& jobResult) {
             if (resultCode == RESULT_SAT && params.compressModels()) {
                 auto vec = ModelStringCompressor::decompress(json.get<std::string>());
                 std::string modelStr = "v ";
-                for (int l : vec) if (l!=0) modelStr += std::to_string(l) + " ";
-                modelStr += "0\n";
+                modelStr.reserve(vec.size() * 8 + 4); // rough estimate, avoids most reallocations
+                for (int l : vec) if (l != 0) {
+                    modelStr += std::to_string(l);
+                    modelStr += ' ';
+                }
                 modelStrings.push_back(std::move(modelStr));
             } else {
                 modelStrings.push_back(json.get<std::string>());

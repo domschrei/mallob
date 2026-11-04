@@ -26,8 +26,8 @@ private:
 
 public:
     KissatPreprocessor(const Parameters& params, const JobDescription& desc, const std::string& name,
-            SolverPortfolioConfig& spc, std::vector<int>&& formula) :
-        SatPreprocessActor(params, name, std::move(formula)), _spc(spc) {
+            SolverPortfolioConfig& spc, const std::vector<int>* formula) :
+        SatPreprocessActor(params, name, formula), _spc(spc) {
 
         _proof_format = "drat";
     }
@@ -55,12 +55,12 @@ public:
                 // Important: proof tracker import *before* Kissat import
                 // (Otherwise Kissat may emit a proof line on a clause
                 // the proof tracker doesn't know yet)
-                if (proofTracker->tracksCnf()) for (int i = 0; i+2 < _input_cnf.size(); i++) {
-                    proofTracker->appendOriginalLiteral(_input_cnf[i]);
+                if (proofTracker->tracksCnf()) for (int i = 0; i+2 < _input_cnf->size(); i++) {
+                    proofTracker->appendOriginalLiteral(_input_cnf->at(i));
                 }
             }
-            for (int i = 0; i+2 < _input_cnf.size(); i++) {
-                _kissat->addLiteral(_input_cnf[i]);
+            for (int i = 0; i+2 < _input_cnf->size(); i++) {
+                _kissat->addLiteral(_input_cnf->at(i));
             }
             _kissat->diversify(0);
             _kissat->applySolverConfiguration(0);

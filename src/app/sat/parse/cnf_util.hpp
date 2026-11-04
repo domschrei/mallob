@@ -3,11 +3,14 @@
 
 #include "app/sat/parse/serialized_formula_parser.hpp"
 #include "data/job_description.hpp"
+#include "util/logger.hpp"
 
 class CnfUtil {
 
 public:
     static std::vector<int> getCnfFromJobDescription(const JobDescription& _desc, bool addAssumptionUnits) {
+
+        float time = Timer::elapsedSeconds();
 
         SerializedFormulaParser parser(Logger::getMainInstance(), _desc.getFormulaPayload(0),
             _desc.getFormulaPayloadSize(0));
@@ -31,6 +34,8 @@ public:
         }
         cnf.push_back(nbVars);
         cnf.push_back(nbCls);
+
+        LOG(V4_VVER, "desc2cnf took %.4fs\n", Timer::elapsedSeconds() - time);
         return cnf;
     }
 

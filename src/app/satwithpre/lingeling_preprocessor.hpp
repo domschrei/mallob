@@ -23,8 +23,8 @@ private:
 
 public:
     LingelingPreprocessor(const Parameters& params, const JobDescription& desc, const std::string& name,
-        SolverPortfolioConfig& spc, std::vector<int>&& formula) :
-        SatPreprocessActor(params, name, std::move(formula)), _spc(spc) {}
+        SolverPortfolioConfig& spc, const std::vector<int>* formula) :
+        SatPreprocessActor(params, name, formula), _spc(spc) {}
     ~LingelingPreprocessor() {}
 
     void preprocessAsync() override {
@@ -40,8 +40,8 @@ public:
             setup.solverConfig = &_spc;
             std::unique_ptr<Lingeling> _lingeling(new Lingeling(setup));
 
-            for (int i = 0; i+2 < _input_cnf.size(); i++) {
-                _lingeling->addLiteral(_input_cnf[i]);
+            for (int i = 0; i+2 < _input_cnf->size(); i++) {
+                _lingeling->addLiteral(_input_cnf->at(i));
             }
             _lingeling->diversify(0);
             _lingeling->applySolverConfiguration(0);

@@ -18,7 +18,7 @@ struct ActorContext {
     std::unique_ptr<SatPreprocessActor> actor;
     enum ActiveActorState {UNINITIALIZED, RUNNING, FINISHED} state {UNINITIALIZED};
     SatPreprocessActor::PreprocessActorResult result {SatPreprocessActor::PENDING};
-    std::vector<int> formula;
+    const std::vector<int>* formula {nullptr};
     std::vector<int> model;
     float timeOfStart {0};
     float timeOfSignalledDisplacement {0};

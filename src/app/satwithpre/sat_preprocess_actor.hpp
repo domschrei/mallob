@@ -12,8 +12,8 @@
 class SatPreprocessActor {
 
 public:
-    SatPreprocessActor(const Parameters& params, const std::string& name, std::vector<int>&& inputCnf) :
-        _params(params), _name(name), _input_cnf(std::move(inputCnf)) {}
+    SatPreprocessActor(const Parameters& params, const std::string& name, const std::vector<int>* inputCnf) :
+        _params(params), _name(name), _input_cnf(inputCnf) {}
 
     virtual void preprocessAsync() = 0;
     enum PreprocessActorResult {PENDING, SAT, UNSAT, SIMPLIFIED, ERROR, NONE};
@@ -49,15 +49,15 @@ public:
     virtual void shrink(float timeSpan) {}
 
     int nbInputVars() const {
-        assert(_input_cnf.size() >= 2);
-        return _input_cnf[_input_cnf.size() - 2];
+        assert(_input_cnf->size() >= 2);
+        return _input_cnf->at(_input_cnf->size() - 2);
     }
     int nbInputClauses() const {
-        assert(_input_cnf.size() >= 2);
-        return _input_cnf[_input_cnf.size() - 1];
+        assert(_input_cnf->size() >= 2);
+        return _input_cnf->at(_input_cnf->size() - 1);
     }
     const std::vector<int>& getInputCnf() const {
-        return _input_cnf;
+        return *_input_cnf;
     }
     const char* getName() const {return _name.c_str();}
 
@@ -101,7 +101,7 @@ protected:
     const Parameters _params;
     std::string _name;
     std::string _proof_format;
-    const std::vector<int> _input_cnf;
+    const std::vector<int>* _input_cnf;
     std::vector<int> _output_cnf;
     std::vector<int> _model;
     volatile PreprocessActorResult _result {PENDING};

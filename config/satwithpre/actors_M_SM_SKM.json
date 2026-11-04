@@ -5,7 +5,7 @@
         "prerequisite": null,
         "actorsBeingDisplaced": [],
         "onlyStartIfPrerequisiteSimplified": false,
-        "options": "-satsolver=k_c_k+[k_]{29}k_c_l+[k_]{29}"
+        "options": "-satsolver=k_c_l+[k_]{29}"
     },
     {
         "id": "satsuma",
@@ -20,7 +20,7 @@
         "prerequisite": "satsuma",
         "actorsBeingDisplaced": ["mallobsat-plain"],
         "onlyStartIfPrerequisiteSimplified": true,
-        "options": "-satsolver=k_c_k+[k_]{29}k_c_l+[k_]{29}"
+        "options": "-satsolver=k_c_l+[k_]{29}"
     },
     {
         "id": "kissat-on-satsuma",
@@ -35,6 +35,6 @@
         "prerequisite": "kissat-on-satsuma",
         "actorsBeingDisplaced": ["mallobsat-plain", "mallobsat-on-satsuma"],
         "onlyStartIfPrerequisiteSimplified": true,
-        "options": "-satsolver=k_c_k+[k_]{29}k_c_l+[k_]{29}"
+        "options": "-satsolver=k_c_l+[k_]{29}"
     }
 ]
