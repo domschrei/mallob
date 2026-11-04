@@ -99,6 +99,7 @@ protected:
 	bool _sharing_op_ongoing {false};
 
 	std::unique_ptr<ClauseLogger> _clause_logger;
+	std::unique_ptr<ClauseLogger> _unit_clause_logger;
 
 	std::vector<int> _groundtruth_model;
 
@@ -144,6 +145,8 @@ public:
 	bool isSharingOperationOngoing() const {
 		return _sharing_op_ongoing;
 	}
+
+	void finalize();
 
 private:
 

@@ -30,6 +30,7 @@
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
 #include "util/logger.hpp"
 #include "util/string_utils.hpp"
+#include "util/sys/fileutils.hpp"
 #include "util/sys/timer.hpp"
 #include "util/random.hpp"
 #include "filter/in_place_clause_filtering.hpp"
@@ -137,6 +138,10 @@ SharingManager::SharingManager(
 
 	if (_job_index == 0 && _params.clauseLog.isSet()) {
 		_clause_logger.reset(new ClauseLogger(_params.clauseLog()
+			+ ".#" + std::to_string(_solvers[0]->getSolverSetup().jobId)));
+	}
+	if (_job_index == 0 && _params.unitClauseLog.isSet()) {
+		_unit_clause_logger.reset(new ClauseLogger(_params.unitClauseLog()
 			+ ".#" + std::to_string(_solvers[0]->getSolverSetup().jobId)));
 	}
 
@@ -440,6 +445,8 @@ void SharingManager::digestSharingWithFilter(std::vector<int>& clauseBuf, std::v
 		}
 
 		if (_clause_logger) _clause_logger->append(clause);
+		if (_unit_clause_logger && clause.size == ClauseMetadata::numInts()+1)
+			_unit_clause_logger->append(clause);
 
 		if (filterSizeBeingLocked != clause.size) {
 			if (filterSizeBeingLocked != -1) _clause_filter->releaseLock(filterSizeBeingLocked);
@@ -490,6 +497,7 @@ void SharingManager::digestSharingWithFilter(std::vector<int>& clauseBuf, std::v
 	_gc_pending = true;
 	_sharing_op_ongoing = false;
 	if (_clause_logger) _clause_logger->publish();
+	if (_unit_clause_logger) _unit_clause_logger->publish();
 }
 
 void SharingManager::applyFilterToBuffer(std::vector<int>& clauseBuf, std::vector<int>* filter) {
@@ -576,6 +584,53 @@ void SharingManager::continueClauseImport(int solverId) {
 	_solvers[solverId]->setCallbackResultFound([&](int localId) {
 		if (_det_sync) _det_sync->notifySolverDone(localId);
 	});
+}
+
+void SharingManager::finalize() {
+	if (_solvers.empty()) return;
+
+	if (_unit_clause_logger) {
+		LOG(V2_INFO, "stopping unit clause logger\n");
+		_unit_clause_logger.reset(); // stops background thread
+		int jobId = _solvers.front()->getSolverSetup().jobId;
+		std::string file = _params.unitClauseLog() + ".#" + std::to_string(jobId);
+		if (FileUtils::exists(file)) {
+			std::ifstream in(file);
+			if (!in) throw std::runtime_error("Cannot open file: " + file);
+
+			std::set<int> uniqueUnits;
+			std::string line;
+			while (std::getline(in, line)) {
+				// Strip trailing whitespace (including '\r' from Windows line endings)
+				while (!line.empty() && std::isspace(static_cast<unsigned char>(line.back())))
+					line.pop_back();
+				if (line.empty()) continue;
+
+				// Find the start of the last whitespace-separated token
+				std::size_t pos = line.find_last_of(" \t");
+				std::string token = (pos == std::string::npos) ? line : line.substr(pos + 1);
+				try {
+					std::size_t used = 0;
+					int value = std::stoi(token, &used);
+					if (used == token.size())
+						uniqueUnits.insert(value);
+				} catch (const std::exception&) {
+					// Not an integer (e.g. header row); skip
+				}
+			}
+			in.close();
+
+			if (!uniqueUnits.empty()) {
+				// Output units in logging and file
+				std::string unitStr = "u ";
+				for (int unit : uniqueUnits) unitStr += std::to_string(unit) + " ";
+				LOG(V4_VVER, "#%i %s\n", jobId, unitStr.c_str());
+				std::ofstream ofs(file);
+				ofs << unitStr << std::endl;
+				LOG(V2_INFO, "#%i wrote %lu units to %s\n", jobId, uniqueUnits.size(), file.c_str());
+			}
+		}            
+	}
 }
 
 SharingManager::~SharingManager() {}

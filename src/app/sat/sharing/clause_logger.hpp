@@ -11,11 +11,11 @@
 class ClauseLogger {
 
 private:
-    BackgroundWorker _bg_worker;
     std::ofstream _ofs;
     Mutex _mtx_parcelled_clauses;
     ConditionVariable _cond_var;
     std::vector<std::vector<int>> _parcelled_clauses;
+    BackgroundWorker _bg_worker;
 
 public:
     ClauseLogger(const std::string& outputPath) : _ofs(outputPath) {
@@ -51,6 +51,7 @@ public:
                 if (!_bg_worker.continueRunning()) break;
                 outClauses = std::move(_parcelled_clauses);
             }
+            bool publishedSomething = false;
             for (auto& vec : outClauses) if (!vec.empty()) {
                 _ofs << vec[0];
                 if (ClauseMetadata::enabled()) {
@@ -60,11 +61,18 @@ public:
                 for (size_t i = 1+ClauseMetadata::numInts(); i < vec.size(); i++)
                     _ofs << " " << vec[i];
                 _ofs << std::endl;
+                publishedSomething = true;
             }
             outClauses.clear();
-            _ofs << std::endl;
-            _ofs.flush();
+            if (publishedSomething) {
+                _ofs << std::endl;
+                _ofs.flush();
+            }
         }
         _ofs.close();
+    }
+
+    ~ClauseLogger() {
+        publish();
     }
 };

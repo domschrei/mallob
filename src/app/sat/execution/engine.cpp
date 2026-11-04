@@ -710,6 +710,8 @@ void SatEngine::cleanUp(bool hardTermination) {
 
 	LOGGER(_logger, V4_VVER, "[engine-cleanup] enter\n");
 
+	_sharing_manager->finalize();
+
 	// Terminate any remaining running threads
 	auto& setup = _base_solver_setup;
 	terminateSolvers(hardTermination);
