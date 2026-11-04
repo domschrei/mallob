@@ -67,6 +67,7 @@ private:
     std::atomic_bool _initialized = false;
     std::atomic_bool _terminated = false;
     bool _in_solve_call = false;
+    std::atomic_bool _is_claimed_for_scatterjob = false;
 
     int _found_result_rev = -1;
     JobResult _result;
@@ -122,6 +123,16 @@ public:
     }
 
     int getActiveRevision() const {return _active_revision;}
+
+    SolverBackendType getSolvertype() const {return SolverBackendType(_solver.getType());}
+
+    int getLocalId() const {return _solver.getLocalId();}
+
+    bool isClaimedForScatterJob() {return _is_claimed_for_scatterjob;}
+
+    bool claimForScatterjob() {return !_is_claimed_for_scatterjob.exchange(true);}
+
+    void releaseScatterjobClaim() {_is_claimed_for_scatterjob.store(false);}
 
 private:
     void init();

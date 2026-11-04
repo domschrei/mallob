@@ -123,6 +123,8 @@ public:
 	 * The solver's local ID on this node and job. 
 	 */
 	int getLocalId() {return _local_id;}
+
+	char getType() {return _setup.solverType;}
 	/**
 	 * This number n denotes that this solver is the n-th solver of this type
 	 * being employed to compute on this job.
