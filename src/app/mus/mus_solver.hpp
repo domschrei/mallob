@@ -85,7 +85,7 @@ private:
         auto& json = _base_json;
         json = {
             {"user", std::string(toStr())},
-            {"name", std::string(toStr())+":" + "SATbyMUS" + ":job"},
+            {"name", std::string(toStr())+":" + "MUSbySAT" + ":job"},
             {"priority", "1"},
             {"application", "SAT"},
             {"group-id", "1"},
@@ -101,7 +101,7 @@ private:
             json["wallclock-limit"] = std::to_string(std::max(0.001f, _desc.getWallclockLimit())) + "s";
         if (_desc.getCpuLimit() > 0)
             json["cpu-limit"] = std::to_string(std::max(0.001f, _desc.getCpuLimit())) + "s";
-        json["configuration"]["scatter"] = "true";
+        json["configuration"]["scatter"] = "mus";
         // std::string opts;
         // if (json["configuration"].count("options"))
             // opts = json["configuration"]["options"].get<std::string>();

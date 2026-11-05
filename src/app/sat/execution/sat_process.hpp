@@ -62,7 +62,8 @@ public:
     }
 
     void run() {
-        SatEngine engine(_params, _config, _log);
+        SatEngine engine(_params, _config, _log); //or MusEngine
+        engine.init();
         try {
             mainProgram(engine); // does not return
         } catch (const std::exception& ex) {

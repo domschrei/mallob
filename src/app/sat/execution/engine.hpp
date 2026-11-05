@@ -30,12 +30,13 @@ struct SolverSetup;
 
 class SatEngine {
 
-private:
+protected:
 
 	Parameters _params;
 	SatProcessConfig _config;
 	Logger& _logger;
 	int _job_id;
+	bool _is_scatterengine{false};
 
 	SolverPortfolioConfig _spc;
 	SolverSetup _base_solver_setup;	
@@ -68,7 +69,12 @@ private:
 public:
 
     SatEngine(const Parameters& params, const SatProcessConfig& config, Logger& loggingInterface);
-	~SatEngine();
+	virtual ~SatEngine();
+	virtual void init();
+
+	//default behavior of SatEngine, to be overwritten by e.g. MusEngine
+	virtual int getNumSolvers(int numThreads) {return numThreads;}
+	virtual std::string getSolverChoicesStr() {return _params.satSolverSequence();}
 
 	void solve();
 	void setClauseBufferRevision(int revision);

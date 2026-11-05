@@ -7,26 +7,26 @@
 #include <queue>
 #include <unordered_map>
 
+#include "app/sat/execution/engine.hpp"
 #include "app/sat/solvers/solver_portfolio_config.hpp"
 #include "app/sat/execution/solver_thread.hpp"
 
 typedef std::shared_ptr<SolverThread> solverptr;
 
-class ScatterEngine {
+class ScatterEngine : public SatEngine {
 public:
-	//Defining the jobtype as a class allows the custom scatter engines to define their own enums
-	//while we can still write generic code about them without knowing the custom enums
+	//class integer enums to allow the children (MusEngine, ...) to define their own enums
+	//while we can still write generic code about them here on the ScatterEngine level
 	enum class Jobtype : int {};
 
 	struct Scatterjob {
 		size_t nr{0};
 		Jobtype jobtype;
-		int preferred_id{0};
 		int revision{-1};
+		int preferred_id{0};
+		int running_id{-1};
 		std::vector<int> definition{};
 		std::vector<int> payload{};
-		int running_id{-1};
-		bool has_claimed_solver{false};
 	};
 
 	struct JobToSolverMapping {
@@ -34,42 +34,37 @@ public:
 		SolverBackendType solvertype;
 	};
 
-
 private:
-	Parameters _params;
-	bool _initialized{false};
+	std::atomic_size_t _num_scattersolvers_currently_running{0};
 
-	std::vector<solverptr> &_solver_threads; //not owned, just reference
+	//one jobqueue per jobtype
+	std::unordered_map<Jobtype, std::queue<Scatterjob>> _scatterjob_queues{};
+	Mutex _mutex_scatterjob_queues;
 
-	std::unordered_map<Jobtype, std::queue<Scatterjob>> _scatterjob_queues{}; //one queue per jobtype
-	std::mutex _scatterjob_queues_mutex;
+	//the jobs currently running, indexed via their running solvers id
+	std::vector<Scatterjob> _scatterjobs_stored_running{};
+	Mutex _mutex_scatterjobs_running;
 
-	std::vector<Scatterjob> _scatterjobs_running{}; //at most one running job per solver id
-	// std::vector<JobToSolverMapping> _allowed_mappings{}; //allowed matches from jobtype to solvertype
-	std::unordered_map<SolverBackendType, std::vector<Jobtype>> _mapped_jobtypes_to_solvertype{};
+	//specifies which jobtypes are to be run on which solvertypes
+	std::unordered_map<SolverBackendType, std::vector<Jobtype>> _mapped_jobtypes_per_solvertype{};
+
 
 public:
-	ScatterEngine(std::vector<solverptr> &solver_threads, Parameters &params);
+	ScatterEngine(const Parameters& params, const SatProcessConfig& config, Logger& loggingInterface);
 	virtual ~ScatterEngine() = default;
+	void init() override;
 
-private:
-	//these methods are already implemented by ScatterEngine itself
-	void init();
+protected:
 	bool doesJobMapToSolver(Jobtype jobtype, SolverBackendType solvertype) const;
-	// SolverBackendType getType(SolverThread &solverthread) const;
-	int loop();
-	Scatterjob getJobForSolver(solverptr solver);
-	bool tryDeployJob(Scatterjob job);
-	void deployNewJobForSolverOrRelease(solverptr solver);
+	void startJobsLoop();
+	Scatterjob getJob(int preferred_id, SolverBackendType solvertype);
+	int tryToRunJob(Scatterjob &&job);
 	solverptr claimFreeSolverOrNull(int preferred_id, Jobtype jobtype);
 	void storeJobAsRunning(Scatterjob &&job);
-	ScatterEngine::Scatterjob &&extractStoredRunningJob(int reporting_id);
-	void requeueJob(Scatterjob &job);
+	ScatterEngine::Scatterjob &&extractStoredFinishedJob(int reporting_id);
+	void requeueJob(Scatterjob &&job);
 	void cbScatterjobResult(int reporting_id, Jobtype jobtype);
-	bool tryChainNextJob(int reporting_id, Jobtype jobtype, JobResult &&result);
-	bool isJobObsolete(Scatterjob &job);
-
-
+	bool isEmpty(Scatterjob &job);
 
 
 	/*
@@ -77,29 +72,30 @@ private:
 	 */
 	//Provide a list which specifies for every custom jobtype the solvertype on which this jobtype must run
 	//Each jobtype must map to exactly one solvertype, but each solvertype can be mapped to by multiple jobtypes
-	virtual std::vector<JobToSolverMapping> getMappingDefinitions() const = 0;
+	virtual std::vector<JobToSolverMapping> getJobToSolverMappingDefinitions() const = 0;
 
-	//Provide the desired solver combinations, using the -satsolver= logic
+	//Provide the desired solver combinations using the logic of the -satsolver=... flag
+	//e.g. "kcl" for kissat cadical lingeling repeating
 	virtual std::string_view getSolverChoicesStr() const = 0;
 
-	//Provide the number of created solver. This can also be more than the number of cores,
-	//since its the responsibility of the custom engine to decide when to run which specific solver
-	virtual int getNumSolversForCores(int numCores) const = 0;
+	//Provide the number of solvers that should be created. This can also be more than the number of cores,
+	//since not all solvers will run all of the time, it is the responsibility of the custom engine to handle this
+	virtual int getNumSolvers(int numCores) const = 0;
 
 	//Provide a new default job if nothing else is known or given
 	//Can return obsolete jobs for some solvertypes as long as it returns a proper job for at least one solvertype
-	virtual Scatterjob createNewDefaultJob(solverptr solver) const = 0;
+	virtual Scatterjob createNewDefaultJob(int preferred_id, SolverBackendType solvertype) const = 0;
 
 	//Turn the definition of a job into actual payload, potentially using the fact that now we know
 	//the exact solver this job will run on (via job.running_id)
 	//Must also provide a correct job.revision number for that given solver
-	virtual void instantiateJobForSpecificSolver(Scatterjob &job) const = 0;
+	virtual void instantiateJob(Scatterjob &job) const = 0;
 
 	//Do something with the obtained result
 	virtual void readScatterjobResult(int reporting_id, Jobtype jobtype, JobResult &result) const = 0;
 
 	//Given a result, a special next job can be returned that builds directly on top of the result
-	virtual Scatterjob getSpecialChainedJobOrDummy(int reporting_id, Jobtype jobtype, JobResult &&result) const = 0;
+	virtual Scatterjob getNewJobBasedOnResult(int reporting_id, Jobtype jobtype, JobResult &&result) const = 0;
 
 };
 

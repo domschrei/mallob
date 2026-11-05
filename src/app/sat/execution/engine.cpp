@@ -61,22 +61,32 @@ class LratConnector;
 using namespace SolvingStates;
 
 SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, Logger& loggingInterface) : 
-			_params(params), _config(config), _logger(loggingInterface), _prefilter(params), _state(INITIALIZING) {
+			_params(params), _config(config), _logger(loggingInterface), _prefilter(params), _state(INITIALIZING) {}
 
-    int appRank = config.apprank;
 
-	LOGGER(_logger, V4_VVER, "SAT engine for %s\n", config.getJobStr().c_str());
+
+//This Initialisation must be called right after the constructor.
+//It got factored out from the constructor to allow subclass overrides
+//(e.g. by ScatterEngine and MusEngine) which would not be possible within the SatEngine constructor
+void SatEngine::init() {
+    int appRank = _config.apprank;
+	//Local convenience aliases to avoid diffing every existing line to "_params" and "_config"
+	Parameters &params = _params;
+	SatProcessConfig &config = _config;
+
+	LOGGER(_logger, V4_VVER, "SAT engine for %s\n", _config.getJobStr().c_str());
+
 	//params.printParams();
-	_num_solvers = config.threads;
+	_num_solvers = getNumSolvers(config.threads); //virtual
 	_num_active_solvers = _num_solvers;
-	int numOrigSolvers = params.numThreadsPerProcess();
+	int numOrigSolvers = getNumSolvers(params.numThreadsPerProcess()); //virtual
 	_job_id = config.jobid;
 	
 	_block_result = _params.deterministicSolving();
 
 	// Retrieve the string defining the cycle of solver choices, one character per solver
 	// e.g. "llgc" => lingeling lingeling glucose cadical lingeling lingeling glucose ...
-	std::string solverChoicesStr = params.satSolverSequence();
+	std::string solverChoicesStr = getSolverChoicesStr(); //virtual
 	PortfolioSequence portfolio;
 	bool ok = portfolio.parse(solverChoicesStr);
 	if (!ok) {
@@ -133,7 +143,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	}
 
 	// Read options from app config
-	AppConfiguration appConfig; appConfig.deserialize(params.applicationConfiguration());
+	AppConfiguration appConfig; appConfig.deserialize(_params.applicationConfiguration());
 	const std::string keyPrefix = "div-offset-prefix";
 	const std::string keyCycle = "div-offset-cycle";
 	const int divOffsetPrefix = appConfig.map.count(keyPrefix) ? atoi(appConfig.map[keyPrefix].c_str()) : 0;
