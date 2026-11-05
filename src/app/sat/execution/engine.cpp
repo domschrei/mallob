@@ -3,9 +3,11 @@
 
 #include "../sharing/sharing_manager.hpp"
 #include "app/sat/data/clause_metadata.hpp"
+#include "app/sat/data/model_string_compressor.hpp"
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "app/sat/data/revision_data.hpp"
 #include "app/sat/data/theories/theory_specification.hpp"
+#include "app/sat/sharing/clause_logger.hpp"
 #include "app/sat/solvers/solver_portfolio_config.hpp"
 #include "app/sat/solvers/solving_replay.hpp"
 #include "util/logger.hpp"
@@ -290,7 +292,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		}
 		setup.solverType = item.baseSolver;
 		setup.flavour = item.flavour;
-		setup.doIncrementalSolving = setup.isJobIncremental && item.incremental;
+		setup.doIncrementalSolving = (setup.isJobIncremental || params.enumerateModels()) && item.incremental;
 		setup.certifiedUnsat = item.outputProof && (params.proofOutputFile.isSet() || params.onTheFlyChecking() || _params.palRup());
 		setup.onTheFlyChecking = setup.certifiedUnsat && params.onTheFlyChecking();
 		setup.onTheFlyCheckModel = params.onTheFlyChecking() && params.onTheFlyCheckModel();
@@ -301,6 +303,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		setup.modelCheckingLratConnector = modelCheckingLratConnector;
 		setup.avoidUnsatParticipation = (params.proofOutputFile.isSet() || params.onTheFlyChecking() || _params.palRup()) && !item.outputProof;
 		setup.exportClauses = !setup.avoidUnsatParticipation;
+		setup.enumerateModels = params.enumerateModels();
 		setup.solverConfig = &_spc;
 
 		_solver_interfaces.push_back(createSolver(setup));
@@ -388,7 +391,10 @@ void SatEngine::appendRevision(int revision, RevisionData data, bool lastRevisio
 	_revision_data.push_back(data);
 	_sharing_manager->setImportedRevision(revision);
 	_prefilter.notifyFormula(data.fLits->data(), data.fLits->size());
-	
+
+	// since we enter a new revision, output the solutions enumerated in the last one
+	writeEnumeratedSolutions();
+
 	for (size_t i = 0; i < _num_active_solvers; i++) {
 		if (revision == 0) {
 			// Initialize solver thread
@@ -416,27 +422,20 @@ void SatEngine::appendRevision(int revision, RevisionData data, bool lastRevisio
 				}
 				// Pseudo-incremental SAT solving: 
 				// Phase out old solver thread
-				_sharing_manager->stopClauseImport(i);
-				_solver_threads[i]->setTerminate();
-				_obsolete_solver_threads.push_back(std::move(_solver_threads[i]));
-				// Setup new solver and new solver thread
-				SolverSetup s = _solver_interfaces[i]->getSolverSetup();
-				s.solverRevision++;
-				_solver_interfaces[i] = createSolver(s);
-				_solver_threads[i] = std::shared_ptr<SolverThread>(new SolverThread(
-					_params, _config, _solver_interfaces[i], _revision_data[0], i
-				));
+				resetSolver(i);
 				// Load entire formula 
-				for (int importedRevision = 1; importedRevision <= revision; importedRevision++) {
+				for (int importedRevision = 0; importedRevision <= revision; importedRevision++) {
 					auto data = _revision_data[importedRevision];
 					_solver_threads[i]->appendRevision(importedRevision, data);
 				}
 				_sharing_manager->continueClauseImport(i);
 				if (_solvers_started) _solver_threads[i]->start();
+				_num_active_solvers++; // decremented in resetSolver(i)
 			}
 		}
 	}
-	_revision_data.back().fLits.reset(); // formula increment no longer needed here
+	if (!_params.enumerateModels())
+		_revision_data.back().fLits.reset(); // formula increment no longer needed here
 	_revision = revision;
 }
 
@@ -484,10 +483,23 @@ int SatEngine::solveLoop() {
 	// perform GC in export filter whenever necessary
 	if (_sharing_manager) _sharing_manager->collectGarbageInFilter();
 
-    // Solving done?
 	bool done = false;
 	bool preprocessingResult = false;
-	for (size_t i = 0; i < std::min(_num_active_solvers, _solver_threads.size()); i++) {
+
+	// Termination condition for model enumeration when sufficiently many models have been found
+	if (!_enumerated_solutions.empty() && _nb_globally_found_models >= _params.enumerationLimit()) {
+		assert(_result.result == SAT);
+		done = true;
+	}
+	// Termination condition for model enumeration when the time limit has elapsed
+	if (!_enumerated_solutions.empty() && _time_of_first_model >= 0 &&
+		Timer::elapsedSeconds() - _time_of_first_model >= _params.enumerationTimeLimit()) {
+		assert(_result.result == SAT);
+		done = true;
+	}
+
+	// Solving done?
+	if (!done) for (size_t i = 0; i < std::min(_num_active_solvers, _solver_threads.size()); i++) {
 		if (_params.injectProofData.isSet()) {
 			// Inject solver result from the specified proof meta data
 			if (_solver_interfaces[i]->getGlobalId() == _result.winningInstanceId) {
@@ -503,11 +515,95 @@ int SatEngine::solveLoop() {
 
 			auto& result = _solver_threads[i]->getSatResult();
 			if (result.result > 0 && result.revision == _revision) {
-				done = true;
-				_result = std::move(result);
+
+				// only override previous result if the new one isn't an UNSAT result from an enumerating thread
+				if (result.result == SAT || !_solver_interfaces[i]->getSolverSetup().currentlyEnumerating)
+					_result = std::move(result);
 				_result.winningInstanceId = _solver_interfaces[i]->getGlobalId();
 				_result.globalStartOfSuccessEpoch = _sharing_manager->getGlobalStartOfSuccessEpoch();
+
+				if (result.result == SAT && _params.enumerateModels()) {
+					// model enumeration: try next model
+					// Reset solver thread
+					if (_solver_interfaces[i]->getSolverSetup().doIncrementalSolving) {
+						// incremental solver is *done* enumerating (since it internally loops exhaustively)
+						// Note: we don't need to lock the enumerated solutions since the solver already returned
+						auto solutions = std::move(_solver_threads[i]->extractEnumeratedSolutions());
+						size_t size = _enumerated_solutions.size();
+						_enumerated_solutions.insert(solutions.begin(), solutions.end());
+						if (_enumerated_solutions.size() > size) {
+							LOGGER(_logger, V3_VERB, "S%i found %lu new solutions (process-locally now %lu)\n",
+								i, _enumerated_solutions.size()-size, _enumerated_solutions.size());
+						}
+						done = true; // actually report a solution
+					} else {
+						// compress model and try to insert it into unique set of models
+						auto sol = _result.copySolution();
+						auto [it, success] = _enumerated_solutions.insert(ModelStringCompressor::compress(sol));
+						if (success) {
+							// found model is new
+							LOGGER(_logger, V4_VVER, "S%i found new solution (process-locally no. %lu)\n", i, _enumerated_solutions.size());
+							// add its blocking clause
+							for (int pos = 1; pos < sol.size(); pos++) {
+								_enumeration_blocking_clauses.push_back(-sol[pos]);
+							}
+							_enumeration_blocking_clauses.push_back(0);
+						}
+						// add unit clauses found thus far to clause set (temporarily)
+						int sizeBefore = _enumeration_blocking_clauses.size();
+						if (_params.enumerationFeedUnits() && _sharing_manager->getUnitClauseLogger()) {
+							const auto& units = _sharing_manager->getUnitClauseLogger()->beginAccessingPublishedClauses();
+							for (auto& cls : units) {
+								_enumeration_blocking_clauses.push_back(cls.back());
+								_enumeration_blocking_clauses.push_back(0);
+							}
+							LOG(V4_VVER, "S%i feeding %i units\n", i, units.size());
+						}
+						// reset non-incremental solver with added blocking clauses (plus units)
+						resetSolver(i, &_enumeration_blocking_clauses);
+						// re-remove units, return access to published units
+						_enumeration_blocking_clauses.resize(sizeBefore);
+						if (_sharing_manager->getUnitClauseLogger())
+							_sharing_manager->getUnitClauseLogger()->endAccessingPublishedClauses();
+						// append formula revisions to solver
+						for (int importedRevision = 0; importedRevision <= _revision; importedRevision++) {
+							auto data = _revision_data[importedRevision];
+							_solver_threads[i]->appendRevision(importedRevision, data);
+						}
+						// start solver again
+						_sharing_manager->continueClauseImport(i);
+						_solver_threads[i]->start();
+						_num_active_solvers++; // decremented in resetSolver(i)
+					}
+
+				} else {
+					done = true;
+				}
 				break;
+			}
+
+		} else if (_params.enumerateModels() && _solver_interfaces[i]->getSolverSetup().doIncrementalSolving
+				&& _solver_threads[i]->getActiveRevision() == _revision) {
+			// An incremental solver thread's enumeration is still ongoing, but we want to report
+			// the models found thus far directly (also to watch limits etc.) without concluding the revision.
+
+			_solver_threads[i]->lockEnumeratedSolutions();
+			auto solutions = std::move(_solver_threads[i]->extractEnumeratedSolutions());
+			_solver_threads[i]->unlockEnumeratedSolutions();
+			size_t size = _enumerated_solutions.size();
+			_enumerated_solutions.insert(solutions.begin(), solutions.end());
+			if (_enumerated_solutions.size() > size) {
+				LOGGER(_logger, V3_VERB, "S%i found %lu new solutions (process-locally now %lu)\n",
+					i, _enumerated_solutions.size()-size, _enumerated_solutions.size());
+				if (_result.result != SAT) {
+					// prematurely create a suitable SatResult object
+					_result.revision = _revision;
+					_result.result = SAT;
+					_result.winningInstanceId = _solver_interfaces[i]->getGlobalId();
+					_result.globalStartOfSuccessEpoch = _sharing_manager->getGlobalStartOfSuccessEpoch();
+					auto primarySol = ModelStringCompressor::decompress(*_enumerated_solutions.begin());
+					_result.setSolutionToSerialize(primarySol.data(), primarySol.size());
+				}
 			}
 		}
 		if (!preprocessingResult && _solver_threads[i]->hasPreprocessedFormula()) {
@@ -599,25 +695,31 @@ void SatEngine::setActiveThreadCount(int nbThreads) {
 	if (nbThreadsToTerminate <= 0) return;
 	for (int termIdx = 0; termIdx < nbThreadsToTerminate; termIdx++) {
 		size_t i = _num_active_solvers-1;
-		LOGGER(_logger, V3_VERB, "Terminating %lu-th solver to reduce thread count\n", i);
-		_sharing_manager->stopClauseImport(i);
-		SolverSetup s = _solver_interfaces[i]->getSolverSetup();
-		s.solverRevision++;
-		_solver_threads[i]->setTerminate(false);
-		auto movedSolver = std::move(_solver_interfaces[i]);
-		_solver_interfaces[i] = createSolver(s);
-		auto movedThread = std::move(_solver_threads[i]);
-		_solver_threads[i] = std::shared_ptr<SolverThread>(new SolverThread(
-			_params, _config, _solver_interfaces[i], {}, i
-		));
-		_num_active_solvers--;
-		_solver_thread_cleanups.push_back(ProcessWideThreadPool::get().addTask([thread = std::move(movedThread), solver = std::move(movedSolver)]() mutable {
-			thread->cleanUpAsynchronously();
-			thread->tryJoin();
-			thread.reset();
-			solver.reset();
-		}));
+		resetSolver(i);
 	}
+}
+
+void SatEngine::resetSolver(int i, const std::vector<int>* addedLits) {
+	LOGGER(_logger, V3_VERB, "Terminating local solver %lu\n", i);
+	assert(i >= 0 && i < _solver_interfaces.size());
+	_sharing_manager->stopClauseImport(i);
+	SolverSetup s = _solver_interfaces[i]->getSolverSetup();
+	s.solverRevision++;
+	if (addedLits) s.inlineLiterals = *addedLits;
+	_solver_threads[i]->setTerminate(false);
+	auto movedSolver = std::move(_solver_interfaces[i]);
+	_solver_interfaces[i] = createSolver(s);
+	auto movedThread = std::move(_solver_threads[i]);
+	_solver_threads[i] = std::shared_ptr<SolverThread>(new SolverThread(
+		_params, _config, _solver_interfaces[i], {}, i
+	));
+	_num_active_solvers--;
+	_solver_thread_cleanups.push_back(ProcessWideThreadPool::get().addTask([thread = std::move(movedThread), solver = std::move(movedSolver)]() mutable {
+		thread->cleanUpAsynchronously();
+		thread->tryJoin();
+		thread.reset();
+		solver.reset();
+	}));
 }
 
 void SatEngine::dumpStats(bool final) {
@@ -697,6 +799,23 @@ long long SatEngine::getBestFoundObjectiveCost() const {
 	return best;
 }
 
+int SatEngine::getNbLocallyFoundModels() const {
+	return _enumerated_solutions.size();
+}
+void SatEngine::updateNbGloballyFoundModels(int rev, int nbFound) {
+	if (_revision != rev) return;
+	if (nbFound > _nb_globally_found_models) {
+		// log progress
+		if (_config.apprank == 0)
+			LOG(V5_DEBG, "nb found solutions: %i\n", nbFound);
+		else
+			LOG(V3_VERB, "nb found solutions: %i\n", nbFound);
+	}
+	_nb_globally_found_models = nbFound;
+	if (_nb_globally_found_models > 0 && _time_of_first_model < 0)
+		_time_of_first_model = Timer::elapsedSeconds();
+}
+
 void SatEngine::writeClauseEpochs() {
 	if (_params.injectProofData.isSet()) return;
 	std::string filename = _params.proofDirectory() + "/proof"
@@ -705,12 +824,29 @@ void SatEngine::writeClauseEpochs() {
 		_solver_interfaces[0]->getGlobalId(), */filename);
 }
 
+void SatEngine::writeEnumeratedSolutions() {
+	if (_enumerated_solutions.empty() || !_params.solutionToFile.isSet()) return;
+
+	std::ofstream ofs(_params.solutionToFile() + ".#"
+		+ std::to_string(_config.jobid) + ".enum."
+		+ (_revision > 0 ? "rev" + std::to_string(_revision) + "." : "")
+		+ std::to_string(_config.apprank));
+	for (auto& sol : _enumerated_solutions)
+		ofs << sol << std::endl;
+
+	_enumerated_solutions.clear();
+	_enumeration_blocking_clauses.clear();
+	_nb_globally_found_models = 0;
+	_time_of_first_model = -1;
+}
+
 void SatEngine::cleanUp(bool hardTermination) {
 	double time = Timer::elapsedSeconds();
 
 	LOGGER(_logger, V4_VVER, "[engine-cleanup] enter\n");
 
 	_sharing_manager->finalize();
+	writeEnumeratedSolutions();
 
 	// Terminate any remaining running threads
 	auto& setup = _base_solver_setup;

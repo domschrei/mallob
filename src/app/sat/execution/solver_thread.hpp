@@ -70,6 +70,8 @@ private:
 
     int _found_result_rev = -1;
     JobResult _result;
+    Mutex _mtx_enumerated_solutions;
+    std::vector<std::string> _enumerated_solutions;
 
 public:
     SolverThread(const Parameters& params, const SatProcessConfig& config, std::shared_ptr<PortfolioSolverInterface> solver, 
@@ -121,6 +123,16 @@ public:
         return std::move(_solver.extractPreprocessedFormula());
     }
 
+    void lockEnumeratedSolutions() {
+        _mtx_enumerated_solutions.lock();
+    }
+    std::vector<std::string>&& extractEnumeratedSolutions() {
+        return std::move(_enumerated_solutions);
+    }
+    void unlockEnumeratedSolutions() {
+        _mtx_enumerated_solutions.unlock();
+    }
+
     int getActiveRevision() const {return _active_revision;}
 
 private:
@@ -138,7 +150,7 @@ private:
     void waitWhileSolved();
     void waitUntil(std::function<bool()> predicate);
     
-    void reportResult(int res, int revision);
+    void reportResult(int res, int revision, std::vector<int> solution = {});
 
     const char* toStr();
 

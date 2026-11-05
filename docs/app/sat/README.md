@@ -168,3 +168,55 @@ A `<selector>` is one of:
 ```
 The integers in the "range" and "scatter" selectors reference the solver's global ID within its backend, e.g., 7 if it is the seventh instantiated solver thread of its backend type (e.g., "Kissat") in its distributed job.
 A setting value is either a string or a number (integer or floating point).
+
+
+## Extras
+
+### UNSAT Core Extraction
+
+In **monolithic proof production mode**, it is possible to produce an UNSAT core, i.e., a subset of the formula's clauses that is UNSAT.
+
+Use the option `-core=path/to/out.cnf`.
+
+This procedure can be iterated to successively refine the UNSAT core. **Example:**
+
+```bash
+touch out.cnf ; f=instances/r3unsat_300.cnf ; cp $f in.cnf
+for i in {1..10}; do  # do 10 times
+  rm out.cnf
+  echo -ne $(head -1 in.cnf) "=> ... "
+  scripts/run/mallob_local.sh $(config/presets/monolithic-proof) -mono=in.cnf -proof=/dev/null -core=out.cnf -q > /dev/null
+  echo "=>" $(head -1 out.cnf)
+  cp out.cnf in.cnf
+done
+```
+
+### Model Enumeration
+
+Mallob supports a limited kind of model enumeration that may prove useful and sufficient in certain use cases where not one but several models are desired.
+
+Use `-enum=1` and, optionally, `-enum-timelimit=<limit-secs> -enum-limit=<limit-models>` to limit the enumeration procedure after an initial model was found.
+
+**Examples:**
+```bash
+# Enumerate solutions indefinitely.
+# Use incremental CaDiCaLs, each of which tightly loops to find different models, with thread-local blocking clauses only.
+scripts/run/mallob_local.sh -mono=instances/r3sat_300.cnf -enum=1 -satsolver=C -s2f=$solpath
+# Enumerate solutions for up to 10s (and stopping after 100 have been found).
+# Use non-incremental Kissats, restarting them as needed with all process-local blocking clauses thus far
+# and also with all unit clauses shared thus far (disable with -enum-feed-units=0).
+scripts/run/mallob_local.sh -mono=instances/r3sat_300.cnf -enum=1 -satsolver=k -s2f=$solpath -enum-timelim=10 -enum-limit=100
+```
+
+In the above examples, solutions are written to `${solpath}.#<jobid>.enum.*`, where `<jobid>` is a number that increases with each run of Mallob.
+The models are written in a compressed string representation (one hexadecimal digit for each block of four variables).
+To decompress and de-duplicate them into a single sequence of unique textual models (`v 1 -2 3 4 -5 ... 0`), use the script `scripts/run/decompress_models.sh`. You can apply it to all solution files of the most recent run simultaneously like this:
+
+```bash
+scripts/run/decompress_models.sh $solpath.$(ls -t $solpath.#*|grep -oE "#[0-9]+"|head -1).enum.*
+```
+
+**Caveats:**
+* The number of distinct solutions found is **over-approximated** by Mallob: Duplicate solutions are only accounted for at a process-local level but not at the distributed level. As such, you may obtain fewer distinct models than expected when running several processes.
+* The procedure is not designed to perform exhaustive model enumeration. Since each solver unit (thread or process) only accumulates models at a local level, a single solver unit has to find all of the formula's models (and then prove UNSAT) for the procedure to terminate. Moreover, the worst-case number of clauses (each of size `|V|`) that need to be added is exponential.
+* At a programmatic level, only a single model is reported by the distributed SAT task even if many models are enumerated. That said, all of the globally found models are written to files (see above).

@@ -223,7 +223,7 @@ SatResult Cadical::solve(size_t numAssumptions, const int* asmpt) {
 		}
 	} else {
 		// non-incremental mode: add assumptions as unit clauses
-		LOGGER(_logger, V4_VVER, "add %i assumptions as units\n", numAssumptions);
+		if (numAssumptions > 0) LOGGER(_logger, V4_VVER, "add %i assumptions as units\n", numAssumptions);
 		for (int i = 0; i < numAssumptions; i++) {
 			addLiteral(asmpt[i]);
 			addLiteral(0);

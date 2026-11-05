@@ -17,9 +17,17 @@ private:
     std::vector<std::vector<int>> _parcelled_clauses;
     BackgroundWorker _bg_worker;
 
+    bool _keep_all_in_mem {false};
+    std::vector<std::vector<int>> _published_parcelled_clauses;
+    Mutex _mtx_published_clauses;
+
 public:
-    ClauseLogger(const std::string& outputPath) : _ofs(outputPath) {
+    ClauseLogger(const std::string& outputPath, bool keepAllInMem) : _ofs(outputPath), _keep_all_in_mem(keepAllInMem) {
         _bg_worker.run([&]() {run();});
+    }
+
+    void disableFileOutput() {
+        _ofs.close();
     }
 
     void append(const Mallob::Clause& clause) {
@@ -40,6 +48,14 @@ public:
         _cond_var.notify();
     }
 
+    const std::vector<std::vector<int>>& beginAccessingPublishedClauses() {
+        _mtx_published_clauses.lock();
+        return _published_parcelled_clauses;
+    }
+    void endAccessingPublishedClauses() {
+        _mtx_published_clauses.unlock();
+    }
+
     void run() {
         std::vector<std::vector<int>> outClauses;
         while (true) {
@@ -52,7 +68,7 @@ public:
                 outClauses = std::move(_parcelled_clauses);
             }
             bool publishedSomething = false;
-            for (auto& vec : outClauses) if (!vec.empty()) {
+            if (_ofs.is_open()) for (auto& vec : outClauses) if (!vec.empty()) {
                 _ofs << vec[0];
                 if (ClauseMetadata::enabled()) {
                     uint64_t id = ClauseMetadata::readUnsignedLong(vec.data()+1);
@@ -63,13 +79,19 @@ public:
                 _ofs << std::endl;
                 publishedSomething = true;
             }
+            if (_keep_all_in_mem) {
+                auto lock = _mtx_published_clauses.getLock();
+                for (auto& cls : outClauses) if (!cls.empty()) {
+                    _published_parcelled_clauses.push_back(std::move(cls));
+                }
+            }
             outClauses.clear();
             if (publishedSomething) {
                 _ofs << std::endl;
                 _ofs.flush();
             }
         }
-        _ofs.close();
+        if (_ofs.is_open()) _ofs.close();
     }
 
     ~ClauseLogger() {

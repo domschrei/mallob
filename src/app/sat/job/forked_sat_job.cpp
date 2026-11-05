@@ -386,10 +386,11 @@ bool ForkedSatJob::hasPreparedSharing() {
     if (!hasCollected) prepareSharing();
     return hasCollected;
 }
-std::vector<int> ForkedSatJob::getPreparedClauses(Checksum& checksum, int& successfulSolverId, int& numLits) {
+std::vector<int> ForkedSatJob::getPreparedClauses(Checksum& checksum, int& successfulSolverId, int& numLits, int& nbFoundModels) {
     successfulSolverId = -1;
     numLits = 0;
-    return _solver->getCollectedClauses(successfulSolverId, numLits);
+    nbFoundModels = 0;
+    return _solver->getCollectedClauses(successfulSolverId, numLits, nbFoundModels);
 }
 int ForkedSatJob::getLastAdmittedNumLits() {
     if (!_initialized) return 0;

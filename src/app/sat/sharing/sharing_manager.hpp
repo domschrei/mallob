@@ -125,6 +125,7 @@ public:
 	bool syncDeterministicSolvingAndCheckForWinningSolver();
 
 	SharingStatistics getStatistics();
+	std::unique_ptr<ClauseLogger>& getUnitClauseLogger() {return _unit_clause_logger;}
 
 	void setImportedRevision(int revision) {_imported_revision = std::max(_imported_revision, revision);}
 	void stopClauseImport(int solverId);

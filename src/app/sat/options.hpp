@@ -39,6 +39,15 @@ OPTION_GROUP(grpAppSat, "app/sat", "SAT solving options")
  OPT_INT(replay, "replay", "", 0, 0, 2, "0: nothing, 1: record solver threads' behavior, 2: replay solving")
  OPT_INT(jobSlots, "js", "", 0, 0, LARGE_INT, "Max. concurrent SAT job streams per client process (0: use # MPI processes)")
 
+OPTION_GROUP(grpAppSatEnum, "app/sat/enum", "Model enumeration")
+ OPT_BOOL(enumerateModels, "enum", "enumerate-models", false, "Keep enumerating models after finding an initial model")
+ OPT_INT(enumerationLimit, "enum-limit", "", MAX_INT, 2, MAX_INT, "Stop after enumerating this many models "
+   "(only checks for duplicates locally!)")
+ OPT_FLOAT(enumerationTimeLimit, "enum-timelim", "enum-time-limit", LARGE_INT, 0, LARGE_INT, "Perform model enumeration "
+   "for this many seconds (+ 1x clause sharing period) after an initial model has been found")
+ OPT_BOOL(enumerationFeedUnits, "enum-feed-units", "", true, "[requires -unit-clause-log=...] Whether restarted non-incremental solvers "
+   "should be fed the unit clauses found thus far")
+
 OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration")
  OPT_INT(bufferedImportedClsGenerations,    "bicg", "buffered-imported-cls-generations", 4,        1,   LARGE_INT, 
     "Number of subsequent full clause sharings to fit in each solver's import buffer")

@@ -1,5 +1,17 @@
 #!/bin/bash
 
+# remove any STOP files from prior executions
+if [ -f .MALLOB_STOP ]; then rm .MALLOB_STOP ; fi
+
+# Some MPI installations / setups may not forward SIGINT but rather terminate the program directly.
+# This indirect mechanism makes sure that Mallob is being requested to exit gracefully.
+on_sigint() {
+    echo "Caught SIGINT - signalling termination to Mallob via signal file $(pwd)/.MALLOB_STOP" >&2
+    touch .MALLOB_STOP
+    trap - INT  # reset handler for subsequent signals
+}
+trap on_sigint INT
+
 # How many sockets, how many physical cores per socket?
 nb_sockets=$(lscpu | grep -E "^Socket" | awk '{print $NF}')
 nb_pcores_per_socket=$(lscpu | grep -E "^Core.*per socket" | awk '{print $NF}')

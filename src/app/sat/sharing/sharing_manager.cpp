@@ -138,11 +138,12 @@ SharingManager::SharingManager(
 
 	if (_job_index == 0 && _params.clauseLog.isSet()) {
 		_clause_logger.reset(new ClauseLogger(_params.clauseLog()
-			+ ".#" + std::to_string(_solvers[0]->getSolverSetup().jobId)));
+			+ ".#" + std::to_string(_solvers[0]->getSolverSetup().jobId), false));
 	}
-	if (_job_index == 0 && _params.unitClauseLog.isSet()) {
+	if ((_job_index == 0 && _params.unitClauseLog.isSet()) || (_params.enumerateModels() && _params.enumerationFeedUnits())) {
 		_unit_clause_logger.reset(new ClauseLogger(_params.unitClauseLog()
-			+ ".#" + std::to_string(_solvers[0]->getSolverSetup().jobId)));
+			+ ".#" + std::to_string(_solvers[0]->getSolverSetup().jobId), true));
+		if (!_params.unitClauseLog.isSet() || _job_index > 0) _unit_clause_logger->disableFileOutput();
 	}
 
 	if (_params.groundTruthModel.isSet()) {
@@ -445,8 +446,9 @@ void SharingManager::digestSharingWithFilter(std::vector<int>& clauseBuf, std::v
 		}
 
 		if (_clause_logger) _clause_logger->append(clause);
-		if (_unit_clause_logger && clause.size == ClauseMetadata::numInts()+1)
+		if (_unit_clause_logger && clause.size == ClauseMetadata::numInts()+1) {
 			_unit_clause_logger->append(clause);
+		}
 
 		if (filterSizeBeingLocked != clause.size) {
 			if (filterSizeBeingLocked != -1) _clause_filter->releaseLock(filterSizeBeingLocked);
@@ -580,6 +582,9 @@ void SharingManager::continueClauseImport(int solverId) {
 	assert(solverId >= 0 && solverId < _solvers.size());
 	_solver_revisions[solverId] = _solvers[solverId]->getSolverSetup().solverRevision;
 	_solvers[solverId]->setExtLearnedClauseCallback(getCallback());
+	_solvers[solverId]->setExtProbingLearnedClauseCallback([&](int effectiveClauseLength) {
+		return effectiveClauseLength <= _clause_store->getMaxAdmissibleEffectiveClauseLength();
+	});
 	_solver_stats[solverId] = &_solvers[solverId]->getSolverStatsRef();
 	_solvers[solverId]->setCallbackResultFound([&](int localId) {
 		if (_det_sync) _det_sync->notifySolverDone(localId);

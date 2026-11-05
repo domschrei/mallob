@@ -218,11 +218,12 @@ void SatProcessAdapter::collectClauses(int maxSize) {
 bool SatProcessAdapter::hasCollectedClauses() {
     return !_initialized || _state != SolvingStates::ACTIVE || _clause_collecting_stage == RETURNED;
 }
-std::vector<int> SatProcessAdapter::getCollectedClauses(int& successfulSolverId, int& numLits) {
+std::vector<int> SatProcessAdapter::getCollectedClauses(int& successfulSolverId, int& numLits, int& nbFoundModels) {
     if (_clause_collecting_stage != RETURNED) return std::vector<int>();
     _clause_collecting_stage = NONE;
     successfulSolverId = _successful_solver_id;
     numLits = _nb_incoming_lits;
+    nbFoundModels = _nb_found_models;
     return std::move(_collected_clauses);
 }
 int SatProcessAdapter::getLastAdmittedNumLits() {
@@ -342,6 +343,7 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
         if (c == CLAUSE_PIPE_PREPARE_CLAUSES) {
             _collected_clauses = pipe.get()->readData(c);
 
+            _nb_found_models = _collected_clauses.back(); _collected_clauses.pop_back();
             _successful_solver_id = _collected_clauses.back(); _collected_clauses.pop_back();
             _nb_incoming_lits = _collected_clauses.back(); _collected_clauses.pop_back();
 
