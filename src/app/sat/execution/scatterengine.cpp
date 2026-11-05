@@ -14,14 +14,14 @@ ScatterEngine::ScatterEngine(const Parameters& params, const SatProcessConfig& c
 void ScatterEngine::init() {
 	//create the solvers etc.
 	SatEngine::init();
-	//pre-compute the mappings (by e.g MusEngine) to iterate over them a bit more elegantly during solving
+	//pre-compute the mappings (by e.g MusEngine) to iterate more elegantly over them during solving
 	for (auto &map : getJobToSolverMappingDefinitions()) {
 		_mapped_jobtypes_per_solvertype.at(map.solvertype).push_back(map.jobtype);
 	}
 	_scatterjobs_stored_running.resize(_num_solvers);
 }
 
-void ScatterEngine::startJobsLoop() {
+void ScatterEngine::loop() {
 	//if terminated: do we need to retun early, to avoid touching terminating solvers?
 	if (_num_scattersolvers_currently_running >= _config.threads)
 		return;
@@ -32,7 +32,6 @@ void ScatterEngine::startJobsLoop() {
 			tryToRunJob(std::move(job));
 		}
 	}
-	return;
 }
 
 ScatterEngine::Scatterjob ScatterEngine::getJob(int preferred_id, SolverBackendType solvertype) {
@@ -77,7 +76,7 @@ int ScatterEngine::tryToRunJob(Scatterjob &&job) {
 }
 
 solverptr ScatterEngine::claimFreeSolverOrNull(int preferred_id, Jobtype jobtype) {
-	if (_num_scattersolvers_currently_running >= _num_allocated_threads)
+	if (_num_scattersolvers_currently_running >= _config.threads)
 		return nullptr;
 	const size_t n = _solver_threads.size();
 	if (n == 0) return nullptr;

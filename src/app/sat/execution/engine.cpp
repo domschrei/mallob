@@ -191,6 +191,7 @@ void SatEngine::init() {
 	int numMini = 0;
 	int numKis = 0;
 	int numPre = 0;
+	int numRot = 0;
 
 	// Add solvers from full cycles on previous ranks
 	// and from the begun cycle on the previous rank
@@ -209,6 +210,7 @@ void SatEngine::init() {
 		case PortfolioSequence::MINISAT: solverToAdd = &numMini; break;
 		case PortfolioSequence::KISSAT: solverToAdd = &numKis; break;
 		case PortfolioSequence::PREPROCESSOR: solverToAdd = &numPre; break;
+		case PortfolioSequence::ROTATOR: solverToAdd = &numRot; break;
 		}
 		*solverToAdd += numFullCycles + (i < begunCyclePos);
 	}
@@ -295,6 +297,7 @@ void SatEngine::init() {
 			case PortfolioSequence::GLUCOSE: setup.diversificationIndex = numGlu++; break;
 			case PortfolioSequence::KISSAT: setup.diversificationIndex = numKis++; break;
 			case PortfolioSequence::PREPROCESSOR: setup.diversificationIndex = numPre++; break;
+			case PortfolioSequence::ROTATOR: setup.diversificationIndex = numRot++; break;
 			}
 			setup.diversificationIndex += divOffsetCycle;
 		}

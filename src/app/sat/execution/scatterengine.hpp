@@ -15,8 +15,8 @@ typedef std::shared_ptr<SolverThread> solverptr;
 
 class ScatterEngine : public SatEngine {
 public:
-	//class integer enums to allow the children (MusEngine, ...) to define their own enums
-	//while we can still write generic code about them here on the ScatterEngine level
+	//class integer enums allow the children (MusEngine, ...) to define their own enums
+	//while we can still write generic code about them here
 	enum class Jobtype : int {};
 
 	struct Scatterjob {
@@ -52,16 +52,19 @@ private:
 public:
 	ScatterEngine(const Parameters& params, const SatProcessConfig& config, Logger& loggingInterface);
 	virtual ~ScatterEngine() = default;
-	void init() override;
+	virtual void init() override;
+
+	//todo: more overrrides of standard SatEngine methods
+	//	or at least modifications to them
 
 protected:
 	bool doesJobMapToSolver(Jobtype jobtype, SolverBackendType solvertype) const;
-	void startJobsLoop();
+	void loop();
 	Scatterjob getJob(int preferred_id, SolverBackendType solvertype);
 	int tryToRunJob(Scatterjob &&job);
 	solverptr claimFreeSolverOrNull(int preferred_id, Jobtype jobtype);
 	void storeJobAsRunning(Scatterjob &&job);
-	ScatterEngine::Scatterjob &&extractStoredFinishedJob(int reporting_id);
+	Scatterjob &&extractStoredFinishedJob(int reporting_id);
 	void requeueJob(Scatterjob &&job);
 	void cbScatterjobResult(int reporting_id, Jobtype jobtype);
 	bool isEmpty(Scatterjob &job);
@@ -73,14 +76,6 @@ protected:
 	//Provide a list which specifies for every custom jobtype the solvertype on which this jobtype must run
 	//Each jobtype must map to exactly one solvertype, but each solvertype can be mapped to by multiple jobtypes
 	virtual std::vector<JobToSolverMapping> getJobToSolverMappingDefinitions() const = 0;
-
-	//Provide the desired solver combinations using the logic of the -satsolver=... flag
-	//e.g. "kcl" for kissat cadical lingeling repeating
-	virtual std::string_view getSolverChoicesStr() const = 0;
-
-	//Provide the number of solvers that should be created. This can also be more than the number of cores,
-	//since not all solvers will run all of the time, it is the responsibility of the custom engine to handle this
-	virtual int getNumSolvers(int numCores) const = 0;
 
 	//Provide a new default job if nothing else is known or given
 	//Can return obsolete jobs for some solvertypes as long as it returns a proper job for at least one solvertype
@@ -96,6 +91,15 @@ protected:
 
 	//Given a result, a special next job can be returned that builds directly on top of the result
 	virtual Scatterjob getNewJobBasedOnResult(int reporting_id, Jobtype jobtype, JobResult &&result) const = 0;
+
+public:
+	//Provide the desired solver combinations using the logic of the -satsolver=... flag
+	//e.g. "kcl" for kissat cadical lingeling repeating
+	virtual std::string getSolverChoicesStr() override = 0;
+
+	//Provide the number of solvers that should be created. This can also be more than the number of cores,
+	//since not all solvers will run all of the time, the ScatterEngine tries to handle this
+	virtual int getNumSolvers(int numCores) override = 0;
 
 };
 

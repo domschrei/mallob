@@ -15,6 +15,7 @@ struct PortfolioSequence {
         MERGESAT = 'm',
         MINISAT = 'n',
         PREPROCESSOR = 'p',
+        ROTATOR = 'r'
     };
     enum Flavour {
         DEFAULT, SAT, UNSAT, PLAIN, PREPROCESS, PLAINWITHSWEEP
@@ -97,6 +98,9 @@ private:
                 break;
             case 'p':
                 next.baseSolver = PREPROCESSOR;
+                break;
+            case 'r':
+                next.baseSolver = ROTATOR;
                 break;
             case '(': case '[': {
                 if (begun) {
