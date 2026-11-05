@@ -195,9 +195,9 @@ done
 
 Mallob supports a limited kind of model enumeration that may prove useful and sufficient in certain use cases where not one but several models are desired.
 
-Use `-enum=1` and, optionally, `-enum-time-limit=<limit-secs> -enum-limit=<limit-models>` to limit the enumeration procedure after an initial model was found.
+Use `-enum=1` to enable enumeration and, optionally, `-enum-time-limit=<limit-secs> -enum-limit=<limit-models>` to limit the enumeration procedure after an initial model was found.
 
-**Examples:**
+**Examples:** (set `$solpath` to a suitable path + file name)
 ```bash
 # Enumerate solutions indefinitely.
 # Use incremental CaDiCaLs, each of which tightly loops to find different models, with thread-local blocking clauses only.
