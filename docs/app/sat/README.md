@@ -212,9 +212,7 @@ In the above examples, solutions are written to `${solpath}.#<jobid>.enum.*`, wh
 The models are written in a compressed string representation (one hexadecimal digit for each block of four variables).
 To decompress and de-duplicate them into a single sequence of unique textual models (`v 1 -2 3 4 -5 ... 0`), use the script `scripts/run/decompress_models.sh`. You can apply it to all solution files of the most recent run simultaneously like this:
 
-```bash
-scripts/run/decompress_models.sh $solpath.$(ls -t $solpath.#*|grep -oE "#[0-9]+"|head -1).enum.*
-```
+`scripts/run/decompress_models.sh $solpath.$(ls -t $solpath.#*|grep -oE "#[0-9]+"|head -1).enum.*`
 
 **Caveats:**
 * The number of distinct solutions found is **over-approximated** by Mallob: Duplicate solutions are only accounted for at a process-local level but not at the distributed level. As such, you may obtain fewer distinct models than expected when running several processes.
