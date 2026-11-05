@@ -220,3 +220,9 @@ scripts/run/decompress_models.sh $solpath.$(ls -t $solpath.#*|grep -oE "#[0-9]+"
 * The number of distinct solutions found is **over-approximated** by Mallob: Duplicate solutions are only accounted for at a process-local level but not at the distributed level. As such, you may obtain fewer distinct models than expected when running several processes.
 * The procedure is not designed to perform exhaustive model enumeration. Since each solver unit (thread or process) only accumulates models at a local level, a single solver unit has to find all of the formula's models (and then prove UNSAT) for the procedure to terminate. Moreover, the worst-case number of clauses (each of size `|V|`) that need to be added is exponential.
 * At a programmatic level, only a single model is reported by the distributed SAT task even if many models are enumerated. That said, all of the globally found models are written to files (see above).
+
+### Clause Logging
+
+Use `-clause-log=path/to/log.txt` to write all *successfully shared* clauses to a text file.
+Specifically for unit clauses, `-unit-clause-log=path/to/units.txt` writes a log of all successfully shared units.
+Use `-vcl=1` to log additional information (LBD, IDs as applicable) with each clause.

@@ -31,6 +31,7 @@ OPTION_GROUP(grpAppSat, "app/sat", "SAT solving options")
     "Log successfully shared clauses to the provided path")
  OPT_STRING(unitClauseLog,                  "unit-clause-log", "",                            "",
     "Log successfully shared unit clauses to the provided path")
+ OPT_BOOL(verboseClauseLogs,            "vcl", "", false, "Log metadata for each logged clause (-clause-log, -unit-clause-log)")
  OPT_STRING(satProfilingDir,            "spd", "sat-profiling-dir", "", "Directory to write SAT thread profiling reports to")
  OPT_INT(satProfilingLevel,             "spl", "sat-profiling-level", -1, -1, 4, "Profiling level for SAT solvers (-1=none ... 4=all)")
  OPT_BOOL(compressFormula,                  "cf", "compress-formula", false, "Compress formula serialization (reorders clauses and literals in clauses)")

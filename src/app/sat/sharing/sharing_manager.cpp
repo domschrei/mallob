@@ -138,11 +138,13 @@ SharingManager::SharingManager(
 
 	if (_job_index == 0 && _params.clauseLog.isSet()) {
 		_clause_logger.reset(new ClauseLogger(_params.clauseLog()
-			+ ".#" + std::to_string(_solvers[0]->getSolverSetup().jobId), false));
+			+ ".#" + std::to_string(_solvers[0]->getSolverSetup().jobId),
+			false, !_params.verboseClauseLogs()));
 	}
 	if ((_job_index == 0 && _params.unitClauseLog.isSet()) || (_params.enumerateModels() && _params.enumerationFeedUnits())) {
 		_unit_clause_logger.reset(new ClauseLogger(_params.unitClauseLog()
-			+ ".#" + std::to_string(_solvers[0]->getSolverSetup().jobId), true));
+			+ ".#" + std::to_string(_solvers[0]->getSolverSetup().jobId),
+			true, !_params.verboseClauseLogs()));
 		if (!_params.unitClauseLog.isSet() || _job_index > 0) _unit_clause_logger->disableFileOutput();
 	}
 
