@@ -201,6 +201,15 @@ void SolverThread::appendRevision(int revision, RevisionData data) {
     _state_cond.notify();
 }
 
+void SolverThread::interruptRevision(int revision) {
+    auto lock = _state_mutex.getLock();
+    if (revision > _interrupted_revision)
+        _interrupted_revision = revision;
+    if (_in_solve_call && _active_revision == revision) {
+       _solver.interrupt();
+    }
+}
+
 void SolverThread::diversifyInitially() {
 
     // Random seed
@@ -252,7 +261,7 @@ void SolverThread::runOnce() {
         aSize = _pending_assumptions.size();
         _in_solve_call = true;
         _solver.uninterrupt(); // make sure solver isn't in an interrupted state
-        performSolving = revision == _latest_revision; // obsolete revision? just "pretend" to solve ...
+        performSolving = (revision == _latest_revision) && (revision > _interrupted_revision); // obsolete revision? just "pretend" to solve ...
     }
 
     // append assumption literals to formula hash
@@ -325,7 +334,7 @@ void SolverThread::waitUntil(std::function<bool()> predicate) {
 void SolverThread::reportResult(int res, int revision) {
     if (_found_result_rev >= revision) return;
 
-    const char* resultString = res==SAT?"SAT":"UNSAT";
+    const char* resultString = res==SAT?"SAT": res==UNSAT?"UNSAT" : "UNKNOWN";
 
     {
         auto lock = _state_mutex.getLock();

@@ -34,7 +34,9 @@ public:
 		SolverBackendType solvertype;
 	};
 
-private:
+protected:
+
+	int _numThreads{-1};
 	std::atomic_size_t _num_scattersolvers_currently_running{0};
 
 	//one jobqueue per jobtype
@@ -48,6 +50,12 @@ private:
 	//specifies which jobtypes are to be run on which solvertypes
 	std::unordered_map<SolverBackendType, std::vector<Jobtype>> _mapped_jobtypes_per_solvertype{};
 
+	//the scatter engine automatically increments revision counts, if not overwritten by the custom engine
+	std::vector<int> _revision_counts;
+
+	//Decide whether the job payload should be std::move'd into the revision (faster, but no longer accessible later)
+	//or whether it should only be copied (slower, but still accessible later when reading results)
+	bool _should_job_payload_be_moved_out_of_job = true;
 
 public:
 	ScatterEngine(const Parameters& params, const SatProcessConfig& config, Logger& loggingInterface);
@@ -61,13 +69,15 @@ protected:
 	bool doesJobMapToSolver(Jobtype jobtype, SolverBackendType solvertype) const;
 	void loop();
 	Scatterjob getJob(int preferred_id, SolverBackendType solvertype);
-	int tryToRunJob(Scatterjob &&job);
+	void tryToRunJob(Scatterjob &&job);
 	solverptr claimFreeSolverOrNull(int preferred_id, Jobtype jobtype);
 	void storeJobAsRunning(Scatterjob &&job);
-	Scatterjob &&extractStoredFinishedJob(int reporting_id);
+	Scatterjob extractStoredFinishedJob(int reporting_id);
 	void requeueJob(Scatterjob &&job);
 	void cbScatterjobResult(int reporting_id, Jobtype jobtype);
 	bool isEmpty(Scatterjob &job);
+	int incrementRevisionFallback(Scatterjob &job);
+	// bool isRunning(Scatterjob &job);
 
 
 	/*
@@ -81,16 +91,20 @@ protected:
 	//Can return obsolete jobs for some solvertypes as long as it returns a proper job for at least one solvertype
 	virtual Scatterjob createNewDefaultJob(int preferred_id, SolverBackendType solvertype) const = 0;
 
-	//Turn the definition of a job into actual payload, potentially using the fact that now we know
-	//the exact solver this job will run on (via job.running_id)
-	//Must also provide a correct job.revision number for that given solver
+	//Turn the definition of a job into actual payload
+	//This is done on purpose later than the job definition, because here at instantiation
+	//we now know the exact solver id this job will run on, which can be necessary information to make the payload.
+	//This method must also provide a valid job.revision number for that given running solver
 	virtual void instantiateJob(Scatterjob &job) const = 0;
 
-	//Do something with the obtained result
-	virtual void readScatterjobResult(int reporting_id, Jobtype jobtype, JobResult &result) const = 0;
+	//Do something with the obtained result. Can also be Unknown, if solver got e.g. interrupted.
+	virtual void readScatterjobResult(int reporting_id, Jobtype jobtype, const JobResult &result, const Scatterjob &job) const = 0;
 
 	//Given a result, a special next job can be returned that builds directly on top of the result
-	virtual Scatterjob getNewJobBasedOnResult(int reporting_id, Jobtype jobtype, JobResult &&result) const = 0;
+	virtual Scatterjob createNewJobFromResult(int reporting_id, Jobtype jobtype, JobResult &&old_result, const Scatterjob &old_job) {
+		//default: no-op, returns an empty job
+		return Scatterjob();
+	}
 
 public:
 	//Provide the desired solver combinations using the logic of the -satsolver=... flag

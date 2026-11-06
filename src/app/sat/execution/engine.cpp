@@ -60,9 +60,11 @@ class LratConnector;
 
 using namespace SolvingStates;
 
-SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, Logger& loggingInterface) : 
-			_params(params), _config(config), _logger(loggingInterface), _prefilter(params), _state(INITIALIZING) {}
-
+SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, Logger& loggingInterface)
+	: _params(params), _config(config), _logger(loggingInterface), _prefilter(params), _state(INITIALIZING)
+{
+	//Moved the initialisation from this constructor body to its own function ::init(), to allow subclass polymorphism
+}
 
 
 //This Initialisation must be called right after the constructor.

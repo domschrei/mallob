@@ -56,6 +56,7 @@ private:
     ConditionVariable _state_cond;
 
     std::atomic_int _latest_revision = 0;
+    int _interrupted_revision = -1; //guarded by _state_mutex
     Checksum _latest_checksum;
     std::atomic_int _active_revision = 0;
     unsigned long _imported_lits_curr_revision = 0;
@@ -129,10 +130,10 @@ public:
     int getLocalId() const {return _solver.getLocalId();}
 
     bool isClaimedForScatterJob() {return _is_claimed_for_scatterjob;}
-
     bool claimForScatterjob() {return !_is_claimed_for_scatterjob.exchange(true);}
-
     void releaseScatterjobClaim() {_is_claimed_for_scatterjob.store(false);}
+
+    void interruptRevision(int revision);
 
 private:
     void init();

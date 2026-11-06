@@ -4,6 +4,7 @@
 
 #include <functional>
 #include <mutex>
+#include <shared_mutex>
 #include <condition_variable>
 #include <future>
 #include <optional>
@@ -82,5 +83,21 @@ public:
 		return !isValidAndReady(fut);
 	}
 };
+
+
+class SharedMutex {
+private:
+	 std::shared_mutex mtx;
+
+public:
+	// Exclusive (read-write) access
+	std::unique_lock<std::shared_mutex> getUniqueLock() {return std::unique_lock(mtx);}
+	// std::unique_lock<std::shared_mutex> getTryLock() {return std::unique_lock(mtx, std::try_to_lock);}
+
+	// Shared (read-only) access: any number of holders, excludes exclusive holders
+	std::shared_lock<std::shared_mutex> getSharedLock() { return std::shared_lock(mtx);}
+	// std::shared_lock<std::shared_mutex> getTrySharedLock() {return std::shared_lock(mtx, std::try_to_lock);}
+};
+
 
 #endif 
