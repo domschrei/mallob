@@ -11,6 +11,7 @@
 #include "app/sat/data/clause.hpp"
 #include "app/sat/data/definitions.hpp"
 
+
 extern "C" {
 #include "kissat/src/kissat.h"
 }
@@ -19,14 +20,20 @@ struct kissat;
 struct SolverSetup;
 struct SolverStatistics;
 
-class Kissat : public PortfolioSolverInterface {
+class KissatReconstruction : public Serializable {
 public:
+	static inline const std::vector<std::string> expectedReconstrNames = {"values", "import", "eliminated", "extend"};
 	struct namedSolverArray {
 		std::string name;
 		std::vector<std::byte> array{};
 	};
-	static inline const std::vector<std::string> _reconstruction_names = {"values", "import", "eliminated", "extend"};
-	
+	std::vector<namedSolverArray> reconstrArrays;
+	std::vector<uint8_t> serialize() const override;
+	KissatReconstruction &deserialize(const std::vector<uint8_t>& packed) override;
+};
+
+
+class Kissat : public PortfolioSolverInterface {
 protected:
 	//Accessible for KissatSweep 
 	kissat* solver;
@@ -58,8 +65,7 @@ private:
 
 	std::unique_ptr<PreprocessProofTracker> _prepro_proof_tracker;
 	
-	
-	std::vector<namedSolverArray> _reconstruction{};
+	KissatReconstruction _reconstruction;
 	bool _has_reconstruction = false;
 
 public:
@@ -102,7 +108,7 @@ public:
 	void cleanUp() override;
 
 	void reconstructSolutionFromPreprocessing(std::vector<int>& model);
-	void importReconstructionArrays(std::vector<namedSolverArray> &reconstruction);
+	void importReconstruction(KissatReconstruction &reconstruction);
 
     friend void produce_clause(void* state, int size, int glue);
     friend void consume_clause(void* state, int** clause, int* size, int* lbd, unsigned long* id, unsigned char* sig);
@@ -122,7 +128,7 @@ public:
 	
 	
 	bool hasReconstruction() const;
-	std::vector<Kissat::namedSolverArray>&& extractReconstruction();
+	KissatReconstruction&& extractReconstruction();
 
 private:
     void produceClause(int size, int lbd);
@@ -132,9 +138,10 @@ private:
     bool isPreprocessingAcceptable(int vars, int cls);
     void addLiteralFromPreprocessing(int lit);
 	void exportReconstruction();
-	static namedSolverArray exportNamedArray(kissat *solver, const std::string &name);
+	static KissatReconstruction::namedSolverArray exportNamedArray(kissat *solver, const std::string &name);
 
     bool shouldTerminate();
 
 
 };
+

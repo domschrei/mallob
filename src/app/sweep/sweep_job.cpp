@@ -89,9 +89,6 @@ void SweepJob::appl_start() {
 
 	_skip_window_rounds = _params.sweepSkipWindowSecs() / (double) _params.sweepSharingPeriod();
 
-	assert(desc.getAppConfiguration().map.count(SWEEPRESULT_DIR_KEY) 
-		|| log_return_false("[ERROR] SweepJob json['%s'] is empty, need a shared directory to write Sweep results (units, eqs, reconstruction data) \n", SWEEPRESULT_DIR_KEY.c_str()));
-	
 	//Moved all logging down here to keep it separate from the actual logic
 	DOUBLELOG(_sweeplogger,V2_INFO,"SWEEP JOB SweepJob appl_start() STARTED: Rank %i, Index %i, ContextId %i, is root? %i, Parent-Rank %i, Parent-Index %i, threads=%d, NumVars %i, NumClauses %i\n",
 		_my_rank, _my_index, getJobTree().getContextId(), _is_root, getJobTree().getParentNodeRank(), getJobTree().getParentIndex(), _nThreads, numVars, numClauses);
@@ -600,7 +597,7 @@ void SweepJob::rootReportSolverResult(int res, const KissatPtr &sweeper) {
 		return;
 	}
 
-	std::vector<int> formula{};
+	SweepResult sweepresult;
 	
 	LOGGER(_sweeplogger,V3_VERB, "SWEEP JOB [%i] stages sweep result %i to Mallob\n", _my_rank, res);
 	assert(_staged_solved_status == -1 || log_return_false("SWEEP ERROR: duplicate attempt to report result to mallob, was already reported as %i \n", _internal_result.result));
@@ -609,14 +606,9 @@ void SweepJob::rootReportSolverResult(int res, const KissatPtr &sweeper) {
 	}
 	else if (res==SIMPLIFIED){
 		LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB [%i]: Solution SIMPLIFIED\n", _my_rank);
-		assert(sweeper->hasPreprocessedFormula());
-		assert(sweeper->hasReconstruction());
-		formula = sweeper->extractPreprocessedFormula(); //already contains numVars and numClauses in the last two slots
-		auto reconstruction = sweeper->extractReconstruction();
-		SweepResult sweepRes = collectSweepResult(reconstruction);
-		printSweepResult(sweepRes);
-		writeSweepResultsToDir(sweepRes);
-		printFirstClauses(formula, 10);
+		sweepresult = getSweepResult(sweeper);
+		printSweepResult(sweepresult);
+		printFirstClauses(sweepresult.formula, 10);
 	} else if (res==UNKNOWN) {
 		// No progress has been made.
 		// Design choice: we don't send any formula back, since there would be no new information in it
@@ -625,18 +617,25 @@ void SweepJob::rootReportSolverResult(int res, const KissatPtr &sweeper) {
 		LOGGER(_sweeplogger,V1_WARN, "WARN SWEEP [%i]: unexpected result code %i when reporting to mallob \n", _my_rank, res);
 	}
 	DOUBLELOG(_sweeplogger,V2_INFO, "SWEEP_RESULT_CODE %i == %s \n", res, res==40 ? "SIMPLIFIED" : res==20 ? "UNSATISFIABLE" : "UNKNOWN");
-	
-	//Mallob requires and provides its own serialization on top
-	_internal_result.setSolutionToSerialize(formula.data(), formula.size());
+
+	//The SweepResult serialization is byte-precise, but we need to pad it up to be an int-vector
+	//because that is the format Mallobs solution serialization pipeline wants
+	auto serialized_32bit = Serializable::bytesToInts(sweepresult.serialize());
+
+	//This serialization is provided by Mallob, we don't need to touch it
+	_internal_result.setSolutionToSerialize(serialized_32bit.data(), serialized_32bit.size());
 	_staged_solved_status = res;
 }
 
 //SweepJob returns more information than just the formula, assemble all of that extra information here
-SweepJob::SweepResult SweepJob::collectSweepResult(std::vector<Kissat::namedSolverArray> &reconstruction) {
+SweepResult SweepJob::getSweepResult(KissatPtr sweeper) {
 	assert(_is_root || log_return_false("[Error]: Called  addUnitsEqsToFormula in SweepApp from non-root process\n"));
-	SweepResult res;	
-	res.reconstruction = std::move(reconstruction);
-	//Full history of all units and equivalences is stored here 
+	assert(sweeper);
+	assert(sweeper->hasPreprocessedFormula());
+	assert(sweeper->hasReconstruction());
+	SweepResult res;
+	res.formula = sweeper->extractPreprocessedFormula(); //already contains numVars and numClauses in the last two slots
+	//Full history of all units and equivalences is stored here
 	for (int round=0; round < _root_sharing_round + 2; round++) {
 		auto data = _imported_data[round];
 		res.units.insert(res.units.end(), data.units.begin(), data.units.end());
@@ -645,126 +644,19 @@ SweepJob::SweepResult SweepJob::collectSweepResult(std::vector<Kissat::namedSolv
 			LOGGER(_sweeplogger,V4_VVER, "E U round %i: %i %i\n", round, data.eqs.size(), data.units.size() );
 		}
 	}
-	return res;
-}
-
-std::string SweepJob::writeSweepResultsToDir(const SweepResult &res) {
-	const auto& conf = getDescription().getAppConfiguration().map;
-	const std::string dir = conf.at(SWEEPRESULT_DIR_KEY);
-	if (FileUtils::mkdir(dir) != 0) {
-		LOG(V1_WARN, "SWEEP [%i]: could not create result dir %s\n", _my_rank, dir.c_str());
-		return "";
-	}
-	bool ok = true;
-	ok &= FileUtils::writeIntsToFile(dir + "/units.int", res.units);
-	ok &= FileUtils::writeIntsToFile(dir + "/eqs.int",   res.eqs);
-	for (const auto& named_array : res.reconstruction)
-		ok &= FileUtils::writeBytesToFile(dir + "/" + named_array.name + ".byte", named_array.array);
-	if (!ok) {
-		LOG(V1_WARN, "SWEEP [%i] failed at writing into sweepresult dir %s\n", _my_rank, dir.c_str());
-	}
-	return dir;
-}
-
-SweepJob::SweepResult SweepJob::readSweepResultsFromDir(const std::string &dir) {
-	assert(FileUtils::exists(dir) || log_return_false("[ERROR] Couldn't find SweepJob results in directory '%s' - needs to be a shared folder to which all processes have access to\n", dir.c_str()));
-	SweepResult res;
-	LOG(V2_INFO, "Reading sweepresults from %s\n", dir.c_str());
-	res.units = FileUtils::readFileToVector<int>(dir + "/units.int");
-	res.eqs   = FileUtils::readFileToVector<int>(dir + "/eqs.int");
-	for (const auto &name : Kissat::_reconstruction_names) {
-		res.reconstruction.push_back({name, FileUtils::readFileToVector<std::byte>(dir + "/" + name + ".byte" )});
-	}
+	res.reconstruction = sweeper->extractReconstruction();
 	return res;
 }
 
 void SweepJob::printSweepResult(const SweepResult &res) {
+	LOG(V2_INFO, "SWEEP_RESULT_FORMULA_PAYLOAD_SIZE   %zu \n", res.formula.size());
 	LOG(V2_INFO, "SWEEP_RESULT_UNITS   %zu \n", res.units.size());
 	LOG(V2_INFO, "SWEEP_RESULT_EQS     %zu \n", res.eqs.size()/2);
-	for (const auto &array : res.reconstruction) {
+	for (const auto &array : res.reconstruction.reconstrArrays) {
 		LOG(V2_INFO, "SWEEP_RESULT_ARRAY '%s' %zu bytes \n", array.name.c_str(), array.array.size());
 	}
 }
 
-// std::string SweepJob::getSweepResultFromJson(const SweepJob::SweepResult &res) {
-	// nlohmann::json json; 
-	// json["units"] = res.units;
-	// json["eqs"]	= res.eqs;
-	// nlohmann::json recon = nlohmann::json::array();	
-	// for (const auto &array : res.reconstruction) {
-		// nlohmann::json entry;
-		// entry["name"] = array.name;
-		// entry["data"] = nlohmann::json::array();
-		// for (auto byte : array.array) {
-			// entry["data"].push_back(std::to_integer<int>(byte));
-		// }
-		// recon.push_back(std::move(entry));
-	// }
-	// json["reconstruction"] = std::move(recon);
-	// return json.dump();
-// }
-
-// void SweepJob::addJsonToSweepResult(SweepResult &res, const std::string &jsonstring) {
-	// Read exactly the specific bytes, since original data was also in bytes
-	// nlohmann::json json = nlohmann::json::parse(jsonstring);
-	// res.units = json["units"].get<std::vector<int>>();
-	// res.eqs   = json["eqs"].get<std::vector<int>>();
-	// for (const auto &entry : json["reconstruction"]) {
-		// Kissat::namedArray array;
-		// array.name = entry["name"].get<std::string>();
-		// const auto &data = entry["data"];
-		// array.array.resize(data.size());
-		// for (size_t i=0; i<data.size(); i++) {
-			// array.array[i] = static_cast<std::byte>(data[i].get<int>());
-		// }
-		// res.reconstruction.push_back(std::move(array));	
-	// }
-// }
-
-// std::vector<int> SweepJob::serializeSweepResult(const SweepJob::SweepResult &res) {
-	// Layout: [formula..., json.dump... , formula_int_size, json_byte_size]
-	// std::vector<int> resVec{};
-	// resVec.insert(resVec.end(), res.formula.begin(), res.formula.end());
-	// std::string extraJson = getSweepResultFromJson(res);
-	// size_t json_bytes = extraJson.size();
-	// size_t json_ints = bytesToInts(json_bytes);
-	// resVec.insert(resVec.end(), json_ints, 0);
-	// if (json_bytes > 0) {
-		// memcpy(resVec.data() + resVec.size() - json_ints, extraJson.data(), json_bytes);
-	// }
-	// to do: formula size can be larger than 32 bit ?!
-	// int n = 0;
-	// resVec.push_back(res.formula.size()); n++;
-	// resVec.push_back((int)json_bytes); n++;
-	// assert(n == SWEEPRESULT_METADATA_FIELDS);
-	// return resVec;
-// }
-
-// size_t SweepJob::bytesToInts(size_t bytes) {
-	// return (bytes + 3 ) / 4;
-// }
-
-// SweepJob::SweepResult SweepJob::deserializeSweepResult(const std::vector<int>& resVec) {
-	// Layout: [units..., eqs..., formula..., units_size, eqs_size, formula_size]
-	// if (resVec.size() < SWEEPRESULT_METADATA_FIELDS) {
-		// throw std::runtime_error("deserializeSweepResult: buffer too small");
-	// }
-
-	// const unsigned formulaSize = resVec[resVec.size() - 2];
-	// const unsigned jsonBytes   = resVec[resVec.size() - 1];
-	// const unsigned jsonInts = bytesToInts(jsonBytes);
-
-	// const size_t payload = resVec.size() - SWEEPRESULT_METADATA_FIELDS;
-	// assert( (formulaSize + jsonInts == payload) || log_return_false("deserializeSweepResult: sizes do not match buffer length"));
-
-	// SweepResult res;
-	// res.formula.assign(resVec.begin(), resVec.begin() + formulaSize);     
-	// if (jsonBytes > 0) {
-		// std::string stringjson = 
-	// }
-	// return res;
-// }
-	
 
 void SweepJob::printFirstClauses(const std::vector<int> &formula, int nbClauses) {
 	int clauseNo = 1;	
@@ -2184,6 +2076,28 @@ SweepJob::~SweepJob() {
 	}
 	// triggerTerminations();
 	LOGGER(_sweeplogger,V2_INFO, "SWEEP JOB DESTRUCTOR DONE ctx %i\n", _my_ctx_id);
+}
+
+std::vector<uint8_t> SweepResult::serialize() const {
+	std::vector<uint8_t> packed{};
+	appendVec(packed, formula);
+	appendVec(packed, units);
+	appendVec(packed, eqs);
+	appendVec(packed, reconstruction.serialize());
+	return packed;
+}
+
+SweepResult &SweepResult::deserialize(const std::vector<uint8_t>& packed) {
+	size_t offset = 0;
+	//mirrors the order of serialization
+	formula = readVec<int>(packed, offset);
+	units = readVec<int>(packed, offset);
+	eqs = readVec<int>(packed, offset);
+	auto serializedReconstruction = readVec<uint8_t>(packed, offset);
+	reconstruction.deserialize(serializedReconstruction);
+	// reconstruction.deserialize(readVec<uint8_t>(packed, offset));
+	assert(offset == packed.size());
+	return *this;
 }
 
 #endif

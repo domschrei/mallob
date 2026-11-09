@@ -279,7 +279,8 @@ void Kissat::reconstructSolutionFromPreprocessing(std::vector<int>& model) {
         int val = kissat_value(solver, idx);
         if (std::abs(val) == idx) model[idx] = val;
         if (model[idx] == 0) {
-            LOGGER(_logger, V1_WARN, "WARN: Reconstructing var %i to (arbitrary) default negative value %i \n", idx, -idx); //because an earlier processing step completely eliminated it, and didnt even bother setting any value of it
+            LOGGER(_logger, V1_WARN, "WARN: Reconstructing var %i to (arbitrary) default negative value %i \n", idx, -idx);
+            //because an earlier processing step completely eliminated it, and didnt even bother setting any value for it
             model[idx] = -idx;
         }
         assert(model[idx] != 0 || log_return_false("ERROR: Model reconstruction failed at var %i, has undecided val %i \n", idx, val));
@@ -400,9 +401,9 @@ void Kissat::addLiteralFromPreprocessing(int lit) {
 }
 
 void Kissat::exportReconstruction() {
-    for (const auto &name : _reconstruction_names) {
-        _reconstruction.push_back(exportNamedArray(solver, name));
-        LOG(V3_VERB, "Kissat exported reconstruction array '%s' %zu bytes\n", name.c_str(), _reconstruction.back().array.size());
+    for (const auto &name : KissatReconstruction::expectedReconstrNames) {
+        _reconstruction.reconstrArrays.push_back(exportNamedArray(solver, name));
+        LOG(V3_VERB, "Kissat exported reconstruction array '%s' %zu bytes\n", name.c_str(), _reconstruction.reconstrArrays.back().array.size());
     }
     _has_reconstruction = true;
 }
@@ -411,20 +412,20 @@ bool Kissat::hasReconstruction() const {
     return _has_reconstruction;
 }
 
-std::vector<Kissat::namedSolverArray>&& Kissat::extractReconstruction() {
+KissatReconstruction&& Kissat::extractReconstruction() {
     _has_reconstruction = false; 
     return std::move(_reconstruction);
 }
 
-Kissat::namedSolverArray Kissat::exportNamedArray(kissat *solver, const std::string &name) {
+KissatReconstruction::namedSolverArray Kissat::exportNamedArray(kissat *solver, const std::string &name) {
     size_t received_bytes; 
     auto data = static_cast<const std::byte *> (kissat_export_array (solver, name.c_str(), &received_bytes));
     return {name, std::vector<std::byte> (data, data + received_bytes) };
 }
 
-void Kissat::importReconstructionArrays(std::vector<namedSolverArray> &reconstruction) {
-   for (const auto &arr : reconstruction) {
-       LOG(V3_VERB, "importing model reconstruction array '%s' %zu bytes \n", arr.name.c_str(), arr.array.size());
+void Kissat::importReconstruction(KissatReconstruction &reconstruction) {
+   for (const auto &arr : reconstruction.reconstrArrays) {
+       LOG(V3_VERB, "kissat imports model reconstruction array '%s' %zu bytes \n", arr.name.c_str(), arr.array.size());
        kissat_import_array(solver, arr.name.c_str(), arr.array.data(), arr.array.size());
    } 
 }
@@ -437,3 +438,27 @@ Kissat::~Kissat() {
         solver = nullptr;
     }
 }
+
+std::vector<uint8_t>  KissatReconstruction::serialize() const {
+    std::vector<uint8_t> packed{};
+    assert(reconstrArrays.size() == expectedReconstrNames.size());
+    for (int i=0; i < expectedReconstrNames.size(); ++i) {
+        //make sure that the arrays are presented in the expected (named) order
+        assert(reconstrArrays[i].name == expectedReconstrNames[i]);
+        appendVec(packed, reconstrArrays[i].array);
+    }
+    return packed;
+}
+
+KissatReconstruction& KissatReconstruction::deserialize(const std::vector<uint8_t>& packed) {
+    reconstrArrays.clear();
+    size_t offset = 0;
+    for (const auto &name : expectedReconstrNames) {
+        //we expect the same (asserted) named order as in serialization
+        reconstrArrays.push_back({name, readVec<std::byte>(packed, offset)}) ;
+    }
+    assert(offset == packed.size());
+    return *this;
+}
+
+

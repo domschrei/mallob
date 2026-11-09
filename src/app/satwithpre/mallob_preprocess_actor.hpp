@@ -38,9 +38,8 @@ private:
     int _sub_job_id {-1};
     std::atomic_int _child_job_root_rank {-1};
     
-    //SweepJob returns additional data which we need for model reconstruction
-    std::string  _sweepresults_dir;
-    SweepJob::SweepResult _sweepRes{};
+    //Additional Data received from a SweepJob, which we need for model reconstruction
+    SweepResult _sweepRes{};
 
 public:
     MallobPreprocessActor(const Parameters& params, const JobDescription& desc, const std::string& name,
@@ -54,11 +53,6 @@ public:
 
         _jobstr = "#" + std::to_string(_job_id) + ":mal:" + std::to_string(_actor_counter++);
         _proof_format = _type == SATSOLVER ? "palrup" : "";
-        if (_type == SWEEPER) {
-            assert(!_params.tmpDirectory().empty() 
-                || log_return_false("[ERROR] SATWP Sweep needs a shared-filesystem tmp-directory. Provide it via -tmp= \n"));
-            _sweepresults_dir = _params.tmpDirectory() + "/sweepresults-" + std::to_string(Timer::getStartTime().tv_nsec);
-        }
     }
     ~MallobPreprocessActor() {}
 
@@ -68,7 +62,7 @@ public:
     
     void reconstructSolution(std::vector<int>& model) override {
         if (_type == SWEEPER && _result == SIMPLIFIED) {
-            assert(!_sweepRes.reconstruction.empty() || log_return_false("[ERROR] SweepResult reconstruction data is missing, can't reconstruct solution"));
+            assert(!_sweepRes.reconstruction.reconstrArrays.empty() || log_return_false("[ERROR] SweepResult reconstruction data is missing, can't reconstruct solution"));
             SolverSetup setup;
             setup.logger = &Logger::getMainInstance();
             setup.numVars = nbInputVars();
@@ -77,10 +71,10 @@ public:
             //To make this work we need to supply a "skeleton" kissat solver with the necessary reconstruction datastructures, 
             //which we accordingly extracted earlier from the representative solver at the end of the SweepJob App, byte-for-byte.
             auto skeleton_kissat = Kissat(setup);
-            skeleton_kissat.importReconstructionArrays(_sweepRes.reconstruction);
+            skeleton_kissat.importReconstruction(_sweepRes.reconstruction);
             skeleton_kissat.reconstructSolutionFromPreprocessing(model);
         }
-        //Nothing to do for a SAT job or when Sweeping couldn't simplify the formula at all
+        //Nothing to reconstruct for a regular (non-sweep) SAT job, or when Sweeping couldn't simplify the formula
     }
     
 
@@ -149,11 +143,6 @@ private:
             opts += " -palrup=1 -proof-dir=" + _params.proofDirectory() + "/tmp/" + _name + "." + _proof_format;
         if (!opts.empty()) json["configuration"]["options"] = opts;
 
-        if (_type == SWEEPER) {
-            LOG(V2_INFO, "SATWP Sweep setting json['%s']=%s\n", SweepJob::SWEEPRESULT_DIR_KEY.c_str(), _sweepresults_dir.c_str());
-            json["configuration"][SweepJob::SWEEPRESULT_DIR_KEY] = _sweepresults_dir;
-        }
-        
         auto copiedJson = json;
         auto result = _api.submit(copiedJson, [&](nlohmann::json& response) {
             // Job done
@@ -229,11 +218,12 @@ private:
             _model = std::move(solution);
         } else if (res.result == RESULT_SIMPLIFIED) {
             if (_type == SWEEPER) {
-                //SweepJob wrote files into the shared filesystem, we need them later for model reconstruction
-                _sweepRes = SweepJob::readSweepResultsFromDir(_sweepresults_dir);
+                // Read simplified formula, found units and equivalences, as well as the reconstruction data
+                _sweepRes.deserialize(Serializable::intsToBytes(solution));
+                LOG(V3_VERB, "SATWP %s extracted MPI-sent SweepResult arrays:\n", json["name"].get<std::string>().c_str());
                 SweepJob::printSweepResult(_sweepRes);
-                LOG(V2_INFO, "SATWP cleaning up temporary Sweep directory %s\n", _sweepresults_dir.c_str());
-                FileUtils::rmrf(_sweepresults_dir);
+                // Outer code expects the solution vector to contain just the formula, which we spliced from the rest
+                solution = std::move(_sweepRes.formula);
             }
             _output_cnf = std::move(solution); 
             //already contains metadata #vals and #clauses in the last two entries

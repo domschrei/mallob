@@ -20,9 +20,10 @@ INST="$HOME/PhD/instances/sat-and-minisat1m/00847fca81490df01b9e239fd6027378-ben
 # INST="$HOME/PhD/instances/sat-and-minisat1m/00be590675417eba2bb2585790ac392d-iso-brn008.shuffled-as.sat05-2933.cnf.xz" #good quick mix
 # INST="$HOME/PhD/instances/sat23/28e45a3e488ddac73b6116cc6f3e67e0-g2-T99.2.0.cnf" #big CCC
 # INST="$HOME/PhD/instances/sat23/65b1e2253626af4a72b954f8186a5880-hash_table_find_safety_size_10.cnf" #big CCC
-# INST="$HOME/PhD/instances/sat23/0982db5b0b15642e79e8242881529b39-REGRandom-K4-L3-Seed15.cnf.xz" #isDestructible problem
+INST="$HOME/PhD/instances/sat23/0982db5b0b15642e79e8242881529b39-REGRandom-K4-L3-Seed15.cnf.xz" #isDestructible problem
 # INST="$HOME/PhD/instances/sat-and-minisat1m/0151782431fa0ec1f855523721c52682-58-122783.cnf.xz" #lot of lagging
 
+ # -preprocess-config=config/satwithpre/actors_M_SM_SKM.json
 
 FLAGS=(
  -minprocs 2
@@ -39,12 +40,12 @@ FLAGS=(
  -tmp=$OUT_DIR/tmp/
  -mono-app=SATWITHPRE 
  -satsolver=k 
- -preprocess-config=config/satwithpre/actors_M_SM_SKM.json
+ -preprocess-config=config/satwithpre/actors_SKEM.json
  -sat-config-dirs=config/sat/base/
- -sat-config-files=config/sat/preprokissat-congruence.json,config/sat/kissat-exportmore.json,config/sat/kissat-plaincheap.json
+ -sat-config-files=
  -v=3
  -spl=4
- -ems=1
+ -ems=0
 )
 
 echo "${FLAGS[@]}"

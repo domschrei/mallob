@@ -15,6 +15,17 @@
 #include "app/sweep/kissat_sweep_extras.hpp"
 
 
+class SweepResult : public Serializable {
+public:
+	std::vector<int> formula{};
+	std::vector<int> units{};
+	std::vector<int> eqs{};
+	KissatReconstruction reconstruction;
+
+	std::vector<uint8_t> serialize() const override;
+	SweepResult &deserialize(const std::vector<uint8_t>& packed) override;
+};
+
 class SweepJob : public BaseSatJob {
 private:
 
@@ -282,14 +293,9 @@ public:
 	friend void cb_import_unit(void *SweepJobState, int *elit, int localId);
 	friend int  cb_custom_query(void *SweeJobState, int localId, int query);
 	friend void cb_report_iteration(void *SweepJobState, int localId);
-	
-	struct SweepResult {
-		std::vector<int> units{};
-		std::vector<int> eqs{}; 
-		std::vector<Kissat::namedSolverArray> reconstruction;
-	};
 
-	static inline const std::string SWEEPRESULT_DIR_KEY = "sweepresult-dir";
+
+	// static inline const std::string SWEEPRESULT_DIR_KEY = "sweepresult-dir";
 	//(De)serialization  SweepResult <---> int-vector
 	
 	// static std::vector<int> serializeSweepResult(const SweepResult &resObj);	
@@ -299,7 +305,7 @@ public:
 	// static std::string getSweepResultFromJson(const SweepResult &res);
 	// static void addJsonToSweepResult(SweepResult &res, const std::string &jsonstring);
 	
-	static SweepResult readSweepResultsFromDir(const std::string &dir);
+	// static SweepResult readSweepResultsFromDir(const std::string &dir);
 	static void printSweepResult(const SweepResult &res);
 
 private:
@@ -308,8 +314,8 @@ private:
 	void createAndStartNewSweeper(int localId);
     void loadFormula(KissatPtr sweeper);
 	
-	SweepResult collectSweepResult(std::vector<Kissat::namedSolverArray> &reconstruction);
-	std::string writeSweepResultsToDir(const SweepResult &res);
+	SweepResult getSweepResult(KissatPtr sweeper);
+	// std::string writeSweepResultsToDir(const SweepResult &res);
 	
 	void _inplace_rootTransform(std::vector<int>& payload);
 	
