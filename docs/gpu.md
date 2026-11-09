@@ -106,6 +106,6 @@ This is not to be confused with `Device` memory types. Device memory types are u
 
 ### Architecture
 
-![ArchMGI](pictures/MGI.png)
+![ArchMGI](pictures/mgi.png)
 
 TODO -> From Notes
