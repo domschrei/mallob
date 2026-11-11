@@ -620,7 +620,8 @@ void SweepJob::rootReportSolverResult(int res, const KissatPtr &sweeper) {
 
 	//The SweepResult serialization is byte-precise, but we need to pad it up to be an int-vector
 	//because that is the format Mallobs solution serialization pipeline wants
-	auto serialized_32bit = Serializable::bytesToInts(sweepresult.serialize());
+	auto serialized_8bit  = sweepresult.serialize();
+	auto serialized_32bit = Serializable::bytesToInts(serialized_8bit);
 
 	//This serialization is provided by Mallob, we don't need to touch it
 	_internal_result.setSolutionToSerialize(serialized_32bit.data(), serialized_32bit.size());

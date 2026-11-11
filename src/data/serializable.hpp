@@ -66,7 +66,7 @@ public:
     }
 
     // Bytes -> int32s, zero-padding the tail up to the next 4-byte boundary.
-    static std::vector<std::int32_t> bytesToInts(const std::vector<std::uint8_t>& bytes) {
+    static std::vector<std::int32_t> bytesToInts(const std::vector<std::uint8_t> &bytes) {
         std::vector<std::int32_t> ints((bytes.size() + sizeof(std::int32_t) - 1) / sizeof(std::int32_t), 0);
         if (!bytes.empty())
             std::memcpy(ints.data(), bytes.data(), bytes.size());
@@ -74,7 +74,7 @@ public:
     }
 
     // int32s -> bytes, in principle just a redefinition, but for code simplicity we use a copy
-    static std::vector<std::uint8_t> intsToBytes(const std::vector<std::int32_t>& ints) {
+    static std::vector<std::uint8_t> intsToBytes(const std::vector<std::int32_t> &ints) {
         std::vector<std::uint8_t> bytes(ints.size() * sizeof(std::int32_t));
         if (!ints.empty())
             std::memcpy(bytes.data(), ints.data(), bytes.size());
