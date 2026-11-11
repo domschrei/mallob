@@ -441,7 +441,7 @@ Kissat::~Kissat() {
 
 std::vector<uint8_t>  KissatReconstruction::serialize() const {
     std::vector<uint8_t> packed{};
-    assert(reconstrArrays.size() == expectedReconstrNames.size());
+    assert(reconstrArrays.size() == expectedReconstrNames.size() || log_return_false("[ERROR] reconstrArrays.size() %i != %i expectedSize \n", reconstrArrays.size(), expectedReconstrNames.size()));
     for (int i=0; i < expectedReconstrNames.size(); ++i) {
         //make sure that the arrays are presented in the expected (named) order
         assert(reconstrArrays[i].name == expectedReconstrNames[i]);
