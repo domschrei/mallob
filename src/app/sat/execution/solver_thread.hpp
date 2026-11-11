@@ -59,6 +59,7 @@ private:
     Checksum _latest_checksum;
     std::atomic_int _active_revision = 0;
     unsigned long _imported_lits_curr_revision = 0;
+    int _nb_diversified_vars = 0;
     bool _last_read_lit_zero = true;
     int _max_var = 0;
     Checksum _running_chksum;

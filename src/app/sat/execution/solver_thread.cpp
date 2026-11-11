@@ -228,10 +228,11 @@ void SolverThread::diversifyAfterReading() {
     int totalSolvers = solversCount * _portfolio_size;
     int vars = _solver.getVariablesCount();
 
-    for (int var = 1; var <= vars; var++) {
+    while (_nb_diversified_vars < vars) {
+        _nb_diversified_vars++;
         float numSolversRand = _rng.randomInRange(0, totalSolvers);
         if (numSolversRand < 1) {
-            _solver.setPhase(var, numSolversRand < 0.5);
+            _solver.setPhase(_nb_diversified_vars, numSolversRand < 0.5);
         }
     }
 }

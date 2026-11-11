@@ -58,6 +58,10 @@ Cadical::Cadical(const SolverSetup& setup)
 
 	bool okay = solver->set("quiet", 1); assert(okay); // no messy logging output
 
+	if (setup.doIncrementalSolving && setup.isJobIncremental) {
+		solver->set("lucky", 0); // disable lucky phase checking because it's done for every increment
+	}
+
 	// In certified UNSAT mode?
 	if (setup.certifiedUnsat) {
 
