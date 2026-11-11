@@ -2091,10 +2091,14 @@ SweepResult &SweepResult::deserialize(const std::vector<uint8_t>& packed) {
 	size_t offset = 0;
 	//mirrors the order of serialization
 	formula = readVec<int>(packed, offset);
+	LOG(V2_INFO, "1.OFFSET,PACKEDSIZE %i %i", offset, packed.size());
 	units = readVec<int>(packed, offset);
+	LOG(V2_INFO, "2.OFFSET,PACKEDSIZE %i %i", offset, packed.size());
 	eqs = readVec<int>(packed, offset);
+	LOG(V2_INFO, "3.OFFSET,PACKEDSIZE %i %i", offset, packed.size());
 	auto serializedReconstruction = readVec<uint8_t>(packed, offset);
 	reconstruction.deserialize(serializedReconstruction);
+	LOG(V2_INFO, "4.OFFSET,PACKEDSIZE %i %i", offset, packed.size());
 	// reconstruction.deserialize(readVec<uint8_t>(packed, offset));
 	assert(offset == packed.size());
 	return *this;
