@@ -39,3 +39,10 @@
 
 #define CLAUSE_PIPE_SOLUTION 'S'
 
+// -> request
+// <- data to export
+#define SCATTER_PIPE_EXPORT 'E'
+
+// -> data to import
+// <- feedback
+#define SCATTER_PIPE_IMPORT 'I'

@@ -8,12 +8,14 @@
 MusEngine::MusEngine(const Parameters& params, const SatProcessConfig& config, Logger& loggingInterface)
 	: ScatterEngine(params, config, loggingInterface)
 {
-	ScatterEngine::init();
-	_numThreads = config.threads; // allocated "physical" threads
-	_solverdata.resize(_num_solvers); // allocated solvers (of which not all run at the same time)
 	// numClauses, firstAssumpVar, ...
 }
 
+void MusEngine::init() {
+	ScatterEngine::init();
+	// allocate some bookkeeping for each individual solver
+	_solverdata.resize(_num_solvers);
+}
 
 std::string MusEngine::getSolverChoicesStr() {
 	// The MUS engine uses incremental Cadical and Rotator solvers, allocated in a 1:1 ratio.
@@ -70,17 +72,19 @@ MusEngine::Scatterjob MusEngine::createNewDefaultJob(int preferred_id, SolverBac
 	int a_cand = getNextCandidateVar();
 	if (!a_cand) {
 		// nothing to kick anymore, return empty
+		assert(isEmpty(job));
 		return job;
 	}
 	// a proper job
 	setCandidateAssumpVar(job, a_cand);
+	assert(!isEmpty(job));
 	return job;
 }
 
 void MusEngine::instantiateJob(Scatterjob &job) {
-	assert(job.running_id!=-1);
-	assert(!job.definition.empty());
-	assert(job.payload.empty());
+	assert(job.running_id!=-1); //We know the running id
+	assert(!job.definition.empty()); //The job needs to be defined
+	assert(job.payload.empty()); //It should not yet be instantiated
 	if (job.jobtype == KICK_CANDIDATE_CLAUSE) {
 		// Collect all newly imported fixed units from the engine, which the solver doesn't know yet.
 		std::vector<int> Afixed_new{};
@@ -89,37 +93,38 @@ void MusEngine::instantiateJob(Scatterjob &job) {
 		const int a_cand = getCandidateAssumpVar(job);
 		{
 			auto lock  = _Mutex_status_fixed.getSharedLock();
-			const int first_unread_pos = solverdata.Afixed_first_unread_pos;
-			for (int pos = first_unread_pos ; pos < _Afixed.size() ; pos++ ) {
-				const int a_fixed = _Afixed[pos];
-				if (std::abs(a_fixed) == a_cand) {
-					// edgecase: job has already been solved by somebody else in the meantime
-					// don't write anything into this solver (since we don't commit to the job),
-					// only mark the job empty and exit.
-					job.definition.clear();
-					return;
-				}
-				Afixed_new.push_back(a_fixed);
+			if (_Astatus[varToPos(a_cand)]!=0) {
+				// edgecase, this candidate variable has already been fixed in the meantime
+				// so this job became obsolete
+				job.definition.clear();
+				assert(isEmpty(job));
+				return;
 			}
-			//we commit to this job, so now we can progress the solver data accordingly
-			solverdata.Afixed_first_unread_pos = _Afixed.size();
+			// Candidate is still open, so now we committed to this job
+			// Update the solver about the latest fixes that it doesn't know about yet
+			// and update its own counter then
+			assert(_Astatus[varToPos(a_cand)]==0);
+			if (solverdata.Afixed_first_unread_pos < (int)_Afixed.size()) {
+				Afixed_new.insert(Afixed_new.end(), _Afixed.begin() + solverdata.Afixed_first_unread_pos, _Afixed.end());
+				solverdata.Afixed_first_unread_pos = _Afixed.size();
+			}
 		}
-		// Store a copy of those fixed units for this solver,
-		// to later know the exact initial conditions of this solving call.
+		// Store a copy of the fixes for this solver in particular,
+		// necessary such that later we can know the exact initial starting state of this solving call
 		for (int a_fixed : Afixed_new) {
 			const int pos = varToPos(a_fixed);
 			assert(solverdata.Astatus[pos]==0);
 			solverdata.Astatus[pos] = sign(a_fixed);
 		}
-		// Pass all new fixed assumptions to the solver by encoding them in this revision as unit clauses
+		// Pass all new fixed assumptions to the solver by encoding them as unit clauses
 		for (int a_fixed : Afixed_new) {
 			job.payload.push_back(a_fixed);
 			job.payload.push_back(0);
 		}
-		// Mark separator between clauses and assumptions
+		// separator between clauses and assumptions
 		job.payload.push_back(INT32_MAX);
-		// Deactivate the specific candidate clause by satisfying its guarding literal (-a).
-		// reduce all other clauses to their original form by unsatisfiying their guarding literal.
+		// Deactivate the specific candidate clause by satisfying its guarding literal -a.
+		// Reduce all other clauses to their original form by unsatisfying their guard literal.
 		for (int pos = 0; pos < _numAssumptions; pos++) {
 			if (solverdata.Astatus[pos]==0) {
 				const int a = posToVar(pos);
@@ -129,9 +134,8 @@ void MusEngine::instantiateJob(Scatterjob &job) {
 					job.payload.push_back(a); // reduce to original
 			}
 		}
-		// Mark end of assumptions
+		// separator for end of assumptions
 		job.payload.push_back(INT32_MIN);
-		// job is now fully instantiated
 	}
 	if (job.jobtype == ROTATE_MODEL_AROUND_CLAUSE) {
 		// todo...
@@ -171,29 +175,36 @@ char MusEngine::sign(int a) {
 }
 
 void MusEngine::newCoreFoundLocally(std::vector<int> &&core) {
-	int new_size = getCoreSize(core);
+	//Need exclusive access here to make sure that each new core is handled cleanly on its own
 	bool commitToNewCore = false;
 	{
-		//TODO: reject a core if it contains a variable that in the meantime has already been deactivated globally
-		//TODO: make core handling more robust against interweaving threads
-		auto lock = _Mutex_found_locally.getUniqueLock();
-		int old_size = getCoreSize(_Acore_found_locally);
-		// possible optimization: keep live track of the stored core size instead of recomputing it here each time...
-		if (new_size < old_size) {
-			LOG(V2_INFO, "Commited new core size %i / %i", new_size, core.size());
+		auto lock1 = _Mutex_status_fixed.getUniqueLock();
+		auto lock2 = _Mutex_found_locally.getUniqueLock();
+		int size_new = getCoreUndecidedSizeLocked(core);
+		int size_old = getCoreUndecidedSizeLocked(_Acore_found_locally);
+		if (size_new == INT32_MAX && size_old == INT32_MAX) {
+			//Weird edgecase that both cores are invalid. Can this ever happen?
+			LOG(V1_WARN, "BOTH_CORES_INVALID!\n");
+			return;
+		}
+		if (size_new < size_old) {
+			LOG(V2_INFO, "Commited to new core of effective size %i / %i", size_new, core.size());
 			_Acore_found_locally = std::move(core);
-			commitToNewCore = true;
+			// commitToNewCore = true;
 		}
 	}
-	if (commitToNewCore && _params.musNonsharingEngine()) {
-		//claims its own mutexes
-		fixVariablesOutsideCore_MOVE_TO_CLIENT_LATER();
-	}
+
+	// if (commitToNewCore && _params.musNonsharingEngine()) {
+		// claims its own mutexes
+		// fixVariablesOutsideCore_MOVE_TO_CLIENT_LATER();
+	// }
 }
 
-// all variables outside the core which are still undecided can be fixed (to the state unnecessary)
 void MusEngine::fixVariablesOutsideCore_MOVE_TO_CLIENT_LATER() {
-	// its easier to find the variables NOT in the core by blasting it into a bool array
+	// all variables outside the core which are still undecided can be fixed to be unnecessary
+
+	// To find those variables, we blast the core into a flat boolean array
+	// and then walk through it and note every slot that is NOT filled.
 	std::vector<bool> isInCore = std::vector<bool>(_numAssumptions, false);
 	{
 		auto lock = _Mutex_found_locally.getSharedLock();
@@ -201,18 +212,21 @@ void MusEngine::fixVariablesOutsideCore_MOVE_TO_CLIENT_LATER() {
 			isInCore[varToPos(a)]=true;
 		}
 	}
-	std::vector<int> Afixed{};
+
+	std::vector<int> AoutsideCore{};
 	{
 		auto lock = _Mutex_status_fixed.getSharedLock();
 		for (int pos = 0; pos < _numAssumptions; pos++) {
 			// can be deactivated if not in the core and still undecided
 			if (!isInCore[pos] && _Astatus[pos]==0) {
-				int a_fixed = - posToVar(pos); // MINUS !! the variable is unnecessary
-				Afixed.push_back(a_fixed);
+				// MINUS !! marks the variable as unnecessary
+				int a_fixed_unness = - posToVar(pos);
+				assert(a_fixed_unness < 0);
+				AoutsideCore.push_back(a_fixed_unness);
 			}
 		}
 	}
-	newGloballyFixedAssumptions(std::move(Afixed));
+	newGloballyFixedAssumptions(std::move(AoutsideCore));
 }
 
 void MusEngine::newNessAssumpFoundLocally(int a) {
@@ -266,14 +280,25 @@ void MusEngine::interruptOutdatedJobs(std::vector<int> &&Afixed) {
 }
 
 
-int MusEngine::getCoreSize(const std::vector<int> &core) {
-	if (core.size()==0)  // doesnt exist yet, so we want to replace it
+//Get the number of still undecided variables within this UNSAT core
+int MusEngine::getCoreUndecidedSizeLocked(const std::vector<int> &core) {
+	//_Astatus mutex needs to be locked!
+	if (core.size()==0) {
+		// only the initial empty core can trigger this, so we give a large fake number to make sure
+		// it is replaced by the other compared core
 		return INT32_MAX;
-	int size = 0;
-	auto lock = _Mutex_status_fixed.getSharedLock();
-	for (int a : core) {
-		size += _Astatus[varToPos(a)]==0;
 	}
+	int size = 0;
+	for (int a : core) {
+		const int status = _Astatus[varToPos(a)];
+		size += status==0;
+		if (a > 0 && status < 0) {
+			// Edgecase: The core became invalid. Invalidate it against its comparison by giving it a huge size.
+			LOG(V1_WARN, "WARN Core contained positive assumption that in the meantime has been marked useless!\n");
+			return INT32_MAX;
+		}
+	}
+
 	return size;
 }
 
@@ -359,3 +384,15 @@ void MusEngine::rebalanceWork() {
 	auto lock = _Mutex_pos.getUniqueLock();
 	_Astatus_next_candidate_pos = myPosToStart;
 }
+
+
+/* export data */ std::vector<int> MusEngine::scattershareExport(std::vector<int> &&request_for_export) {
+	//read and send our Aness and Core back
+	return {};
+}
+
+/* feedback on import */ std::vector<int> MusEngine::scattershareImport(std::vector<int> &&data_to_import) {
+	//import and maybe send some feedback
+	return {};
+}
+

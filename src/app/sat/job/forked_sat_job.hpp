@@ -102,6 +102,9 @@ public:
 
     virtual bool canHandleIncompleteRevision(int rev) override;
 
+    // Methods for
+    // void prepareScatterCollect() override
+
 private:
     void doStartSolver();
     void handleSolverCrash();

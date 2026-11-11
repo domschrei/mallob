@@ -2,18 +2,16 @@
 //
 
 #include "scatterengine.hpp"
-
 #include "engine.hpp"
 
 ScatterEngine::ScatterEngine(const Parameters& params, const SatProcessConfig& config, Logger& loggingInterface)
 	: SatEngine(params, config, loggingInterface)
 {
-	//empty
+	//empty constructor. Everything relevant is in ::init() to allow polymorphism
 }
 
 void ScatterEngine::init() {
-	//create the solvers etc.
-	SatEngine::init();
+	SatEngine::init(); //careful not do call init twice?
 	//pre-compute the job-to-solver mappings for more ergonomic iteration during solving
 	for (auto &map : getJobToSolverMappingDefinitions()) {
 		_mapped_jobtypes_per_solvertype[map.solvertype].push_back(map.jobtype);
@@ -23,14 +21,17 @@ void ScatterEngine::init() {
 	_scatterjobs_stored_running.resize(_num_solvers);
 	_revision_counts.resize(_num_solvers);
 
-	//Remember the actual number of threads (or physical cores) that are available
+	//Remember the number of actual threads (often corresponding to physical cores) that we got allocated
 	_numThreads = _config.threads;
 }
 
 void ScatterEngine::loop() {
-	//if terminated: do we need to retun early, to avoid touching terminating solvers?
-	if (_num_scattersolvers_currently_running >= _numThreads)
+	// if terminated: do we need to retun early to avoid touching terminating solvers?
+
+	// we don't want to start more jobs than we have physical cores (or allocated threads)
+	if (_num_scattersolvers_currently_running >= _numThreads) {
 		return;
+	}
 	for (auto &solver : _solver_threads) {
 		if (!solver) continue;
 		if (!solver->isClaimedForScatterJob()) {
@@ -70,35 +71,36 @@ void ScatterEngine::tryToRunJob(Scatterjob &&job) {
 	job.running_id = solver->getLocalId();
 	instantiateJob(job);
 	if (isEmpty(job)) {
-		//we noticed after instantiation that *now* the job is no longer relevant
+		//we now noticed that the job is no longer relevant
+		_num_scattersolvers_currently_running--; //undo the fetch_add during claiming
 		solver->releaseScatterjobClaim();
 		return;
 	}
-	//Need the revision here because we move the job out
-	int revision = incrementRevisionFallback(job);
+	//Need to copy the revision value because we std::move the job
+	int revision = incrementRevisionIfNegative(job);
 	RevisionData revisionData = _should_job_payload_be_moved_out_of_job
 			? RevisionData{std::make_shared<std::vector<int>>(std::move(job.payload)), {}}
 			: RevisionData{std::make_shared<std::vector<int>>(job.payload), {}};
-	//Need to store before solver starts solving
+	//Need to store the job before the solver starts solving
 	storeJobAsRunning(std::move(job));
 	solver->appendRevision(revision, revisionData);
-	return;
 }
 
-int ScatterEngine::incrementRevisionFallback(Scatterjob &job) {
+int ScatterEngine::incrementRevisionIfNegative(Scatterjob &job) {
 	if (job.revision < 0) {
-		//in case that the user didn't bother setting a revision
-		//pre-increment, because revision 0 is already taken when setting up the solver
+		//fallback in case that the user didn't bother setting a revision
+		//it pre-increments, because revision 0 is already taken when the solver is set up
 		job.revision = ++_revision_counts[job.running_id];
 	}
 	return job.revision;
 }
 
 solverptr ScatterEngine::claimFreeSolverOrNull(int preferred_id, Jobtype jobtype) {
-	if (_num_scattersolvers_currently_running >= _numThreads)
+	if (_num_scattersolvers_currently_running.fetch_add(1) >= _numThreads) {
+		_num_scattersolvers_currently_running--;  //undo the fetch_add
 		return nullptr;
+	}
 	const size_t n = _solver_threads.size();
-	if (n == 0) return nullptr;
 	//loop over all IDs, starting with the preferred one
 	for (size_t j = 0; j < n; j++) {
 		const size_t id = (preferred_id + j) % n;
@@ -107,6 +109,7 @@ solverptr ScatterEngine::claimFreeSolverOrNull(int preferred_id, Jobtype jobtype
 			return solver;
 		}
 	}
+	_num_scattersolvers_currently_running--;  //undo the fetch_add
 	return nullptr;
 }
 
@@ -135,7 +138,6 @@ void ScatterEngine::storeJobAsRunning(Scatterjob &&job) {
 	assert(isEmpty(_scatterjobs_stored_running[job.running_id]));
 	//Store
 	_scatterjobs_stored_running[job.running_id] = std::move(job);
-	_num_scattersolvers_currently_running++;
 }
 
 ScatterEngine::Scatterjob ScatterEngine::extractStoredFinishedJob(int reporting_id) {
@@ -187,3 +189,14 @@ void ScatterEngine::cbScatterjobResult(int reporting_id, Jobtype jobtype) {
 	}
 }
 
+// bool ScatterEngine::handleCustomPipeTag(char tag, BiDirectionalAnytimePipeShmem &pipe) {
+	// if (tag == SCATTER_PIPE_GATHER) {
+		// read and write the pipe
+		// return true; //confirm to SatEngine that we handled the pipe
+	// }
+	// if (tag == SCATTER_PIPE_DIGEST) {
+		// read and write the pipe
+		// return true;
+	// }
+	// return false; //not a scatter tag
+// }

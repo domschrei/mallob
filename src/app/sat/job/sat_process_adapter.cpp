@@ -225,6 +225,24 @@ std::vector<int> SatProcessAdapter::getCollectedClauses(int& successfulSolverId,
     numLits = _nb_incoming_lits;
     return std::move(_collected_clauses);
 }
+
+void SatProcessAdapter::collectScatterdata() {
+    if (!_initialized || _state != SolvingStates::ACTIVE || _scatterdata_collecting_stage != NONE)
+        return;
+    _guard_pipe.lock().get()->writeData({}, SCATTER_PIPE_EXPORT);
+    _scatterdata_collecting_stage = QUERIED;
+    if (_hsm->isInitialized) Process::wakeUp(_child_pid); // guess I should copy that too
+}
+bool SatProcessAdapter::hasScatterdata() {
+    return !_initialized || _state != SolvingStates::ACTIVE || _scatterdata_collecting_stage == RETURNED;
+}
+std::vector<int> SatProcessAdapter::getScatterdata() {
+    if (_scatterdata_collecting_stage != RETURNED) return {};
+    _scatterdata_collecting_stage = NONE;
+    return std::move(_collected_scatterdata);
+}
+
+
 int SatProcessAdapter::getLastAdmittedNumLits() {
     return _last_admitted_nb_lits;
 }
@@ -383,6 +401,12 @@ SatProcessAdapter::SubprocessStatus SatProcessAdapter::check() {
         } else if (c == CLAUSE_PIPE_SUBMIT_PREPROCESSED_FORMULA) {
             _preprocessed_formula = pipe.get()->readData(c);
             return FOUND_PREPROCESSED_FORMULA;
+        } else if (c == SCATTER_PIPE_EXPORT) {
+            _collected_scatterdata = pipe.get()->readData(c);
+            _scatterdata_collecting_stage = RETURNED;
+        } else if (c == SCATTER_PIPE_IMPORT) {
+            auto feedback = pipe.get()->readData(c);
+            // not yet doing something with the feedback ...
         }
         if (_thread_count_update && pipe.get()->hasSpaceForWriting()) {
             pipe.get()->writeData({_nb_threads}, CLAUSE_PIPE_SET_THREAD_COUNT);

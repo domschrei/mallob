@@ -29,8 +29,8 @@ private:
     std::vector<int> _cnf_w_assumptions;
     nlohmann::json _base_json;
 
-    std::vector<char> _assumptions_status;
-    int _first_assumption_idx{0};
+    std::vector<char> _Astatus;
+    int _firstAssumpVar{0};
 
     int _sub_job_id {-1};
     std::atomic_int _child_job_root_rank {-1};
@@ -63,14 +63,16 @@ public:
         _result.result = RESULT_UNKNOWN;
         LOG(V2_INFO, "MUS solve()\n");
         LOG(V2_INFO, "Input %i vars %i clauses\n", nbInputVars(), nbInputClauses());
-        _assumptions_status.resize(nbInputClauses(),0);
-        _first_assumption_idx = nbInputVars() + 1;
+        _Astatus.resize(nbInputClauses(),0);
+        _firstAssumpVar = nbInputVars() + 1;
         _cnf_w_assumptions.clear();
-        int new_asm_var = _first_assumption_idx;
+        int a = _firstAssumpVar;
         for (int lit : _input_cnf) {
             if (lit == 0) {
-                _cnf_w_assumptions.push_back(-new_asm_var);
-                new_asm_var++;
+                // our convention: negative guard variables
+                // this way: a>0: clause is active. a<0: clause is deactivated.
+                _cnf_w_assumptions.push_back(-a);
+                a++;
             }
            _cnf_w_assumptions.push_back(lit);
         }
@@ -92,6 +94,8 @@ private:
             {"incremental", false}
         };
 
+        json["configuration"]["scatter"] = "mus";
+
         auto f = _cnf_w_assumptions;
         StaticStore<std::vector<int>>::insert(json["name"].get<std::string>(), std::move(f));
         json["internalliterals"] = json["name"].get<std::string>();
@@ -101,7 +105,6 @@ private:
             json["wallclock-limit"] = std::to_string(std::max(0.001f, _desc.getWallclockLimit())) + "s";
         if (_desc.getCpuLimit() > 0)
             json["cpu-limit"] = std::to_string(std::max(0.001f, _desc.getCpuLimit())) + "s";
-        json["configuration"]["scatter"] = "mus";
         // std::string opts;
         // if (json["configuration"].count("options"))
             // opts = json["configuration"]["options"].get<std::string>();

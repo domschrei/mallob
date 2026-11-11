@@ -22,6 +22,7 @@
 #include "data/checksum.hpp"
 #include "data/job_result.hpp"
 #include "../job/sat_process_config.hpp"
+#include "util/sys/bidirectional_anytime_pipe_shmem.hpp"
 
 class Logger;
 class PortfolioSolverInterface;
@@ -72,7 +73,7 @@ public:
 	virtual ~SatEngine();
 	virtual void init();
 
-	//default behavior of SatEngine, to be overwritten by e.g. MusEngine
+	// implemented behaviour of the SatEngine which can be overwritten by e.g. a MusEngine
 	virtual int getNumSolvers(int numThreads) {return numThreads;}
 	virtual std::string getSolverChoicesStr() {return _params.satSolverSequence();}
 
@@ -93,6 +94,7 @@ public:
 	void digestSharingWithoutFilter(std::vector<int>& clauseBuf, bool stateless);
 	void returnClauses(std::vector<int>& clauseBuf);
 	void digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>& clauseBuf);
+
 
 	struct LastAdmittedStats {
 		int nbAdmittedCls;
@@ -122,6 +124,21 @@ public:
 				tids.push_back(_solver_threads[i]->getTid());
 		}
 		return tids;
+	}
+
+	// Virtuals that need to be overwritten in case we are in a ScatterEngine child (i.e. MusEngine),
+	// otherwise can be left untouched and are never called
+	virtual std::vector<int> scattershareExport(std::vector<int> &&request_for_export) {
+		// -> request for data
+		// <- our data to export (clauses, ...)
+		LOGGER(_logger, V0_CRIT, "[ERROR] SCATTER_PIPE_GATHER sent to a non-scatter engine or method not overridden yet\n");
+		abort();
+	}
+	virtual std::vector<int> scattershareImport(std::vector<int> &&data_to_import) {
+		// -> data to import (clauses, ...)
+		// <- our feedback
+		LOGGER(_logger, V0_CRIT, "[ERROR] SCATTER_PIPE_DIGEST sent to a non-scatter engine or method not overridden yet\n");
+		abort();
 	}
 
 	void cleanUp(bool hardTermination = false);

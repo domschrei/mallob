@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <variant>
 #include "app/sat/data/clause_metadata.hpp"
 #include "app/sat/job/inplace_sharing_aggregation.hpp"
 #include "util/assert.hpp"
@@ -28,8 +29,11 @@
 #include "engine.hpp"
 #include "../job/sat_shared_memory.hpp"
 #include "util/sys/watchdog.hpp"
+#include "app/mus/musEngine.hpp"
+#include "data/app_configuration.hpp"
 
 class SatProcess {
+    using EngineSlot = std::variant<std::monostate, SatEngine, MusEngine>;
 
 private:
     const Parameters& _params;
@@ -62,7 +66,10 @@ public:
     }
 
     void run() {
-        SatEngine engine(_params, _config, _log); //or MusEngine
+        // workaround to keep the engine on the stack, i.e. all the references to it untouched,
+        // but still allow to choose between SatEngine and MusEngine subclass
+        EngineSlot slot;
+        SatEngine &engine = createEngine(slot);
         engine.init();
         try {
             mainProgram(engine); // does not return
@@ -76,6 +83,21 @@ public:
     }
 
 private:
+    SatEngine& createEngine(EngineSlot &engineSlot) {
+        AppConfiguration appConfig;
+        appConfig.deserialize(_params.applicationConfiguration());
+        auto it = appConfig.map.find("scatter");
+        if (it != appConfig.map.end() && it->second == "mus")
+            return engineSlot.emplace<MusEngine>(_params, _config, _log);
+        if (it != appConfig.map.end()) {
+            LOGGER(_log, V0_CRIT, "[ERROR] Unknown scatter engine %s", it->second.c_str());
+            abort();
+        }
+        //default
+        return engineSlot.emplace<SatEngine>(_params, _config, _log);
+    }
+
+
     void doImportClauses(SatEngine& engine, std::vector<int>& incomingClauses, std::vector<int>* filterOrNull, int revision, int epoch, bool stateless = false) {
         LOGGER(_log, V5_DEBG, "DO import clauses rev=%i\n", revision);
         // Write imported clauses from shared memory into vector
@@ -266,6 +288,16 @@ private:
                     auto data = pipe.readData(c);
                     long long bestCost = * (long long*) data.data();
                     engine.updateBestFoundObjectiveCost(bestCost);
+
+                } else if (c == SCATTER_PIPE_EXPORT) {
+                    auto request = pipe.readData(c);
+                    auto dataToExport = engine.scattershareExport(std::move(request));
+                    pipe.writeData(std::move(dataToExport), {}, SCATTER_PIPE_EXPORT);
+
+                } else if (c == SCATTER_PIPE_IMPORT) {
+                    auto dataToImport = pipe.readData(c);
+                    auto feedback = engine.scattershareImport(std::move(dataToImport));
+                    pipe.writeData(std::move(feedback), {}, SCATTER_PIPE_IMPORT);
 
                 } else {
                     LOGGER(_log, V0_CRIT, "[ERROR] Unknown pipe directive \"%c\"!\n", c);

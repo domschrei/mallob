@@ -42,19 +42,26 @@ public:
 	~MusEngine() {
 		if (!isCleanedUp()) cleanUp();
 	}
+	virtual void init() override;
 
 	// public virtual overrides
     int getNumSolvers(int numThreads) override;
 	std::string getSolverChoicesStr() override;
 
-private:
-	// private virtual overrrides
+	/* our data to export */		 std::vector<int> scattershareExport(std::vector<int> &&request_for_export) override;
+	/* our feedback to the import */ std::vector<int> scattershareImport(std::vector<int> &&data_to_import) override;
+
+protected:
+	// private virtual overrides
 	std::vector<JobToSolverMapping> getJobToSolverMappingDefinitions() override;
 	Scatterjob createNewDefaultJob(int preferred_id, SolverBackendType solvertype) override;
 	void readScatterjobResult(int reporting_id, Jobtype jobtype, const JobResult &result, const Scatterjob &job) override;
 	void instantiateJob(Scatterjob &job) override;
 	Scatterjob createNewJobFromResult(int reporting_id, Jobtype old_jobtype, JobResult &&old_result, const Scatterjob &old_job) override;
+	std::vector<int> gatherScattersharing() override;
+	void digestScattersharing(std::vector<int> &&model) override;
 
+private:
 	//Own MUS methods
 	int getNextCandidateVar();
 	int posToVar(int pos);
@@ -66,7 +73,7 @@ private:
 	bool hasCandidateAssumpVar(const Scatterjob &job);
 	void setCandidateAssumpVar(Scatterjob &job, int a);
 	int getCandidateAssumpVar(const Scatterjob &job);
-	int getCoreSize(const std::vector<int> &core);
+	int getCoreUndecidedSizeLocked(const std::vector<int> &core);
 	void newCoreFoundLocally(std::vector<int> &&core);
 	Scatterjob createNewRotationJob(int a_ness, std::vector<int> &&model);
 	void fixVariablesOutsideCore_MOVE_TO_CLIENT_LATER();

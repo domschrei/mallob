@@ -98,6 +98,9 @@ private:
     int _epoch_of_export_buffer {-1};
     long long _best_found_objective_cost {LLONG_MAX};
 
+    std::vector<int> _collected_scatterdata{};
+    ClauseCollectingStage _scatterdata_collecting_stage{NONE};
+
     pid_t _child_pid = -1;
     SolvingStates::SolvingState _state = SolvingStates::INITIALIZING;
 
@@ -155,6 +158,12 @@ public:
 
     void returnClauses(std::vector<int>&& clauses);
     void digestHistoricClauses(int epochBegin, int epochEnd, std::vector<int>&& clauses);
+
+    void collectScatterdata(); // request via pipe
+    bool hasScatterdata();
+    std::vector<int> getScatterdata(); //forward to ForkedSatJob
+    void importScatterdata(); // send via pipe
+
 
     void dumpStats();
     
