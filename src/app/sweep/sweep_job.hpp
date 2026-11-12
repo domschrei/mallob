@@ -257,6 +257,7 @@ private:
 	//Cross-Job-sharing
 	std::unique_ptr<AnytimeSatClauseCommunicator> _clause_comm;
 	std::vector<int>  _crossjob_root_received_units{};
+	std::vector<int>  _crossjob_root_received_equivalences{};
 	std::mutex _crossjob_import_mutex;
 	int _clausecomm_isDestructible_counter=0;
 
@@ -340,6 +341,8 @@ private:
 
     void rootStartNewSharingRound();
     void cbContributeToAllReduce();
+	static uint64_t get64bitELitPairKey(int elit1, int elit2, bool normalize = false);
+	static std::pair<int,int> extract2x32bitELits(uint64_t litpair);
     static std::vector<int> aggregateEqUnitContributions(std::list<std::vector<int>> &contribs);
 	static void appendMetadataToReductionElement(std::vector<int> &contrib, const Metadata &md);
 	static Metadata readMetadataFromReductionElement(const std::vector<int> &contrib);

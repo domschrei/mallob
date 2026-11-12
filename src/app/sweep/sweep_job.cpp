@@ -1582,6 +1582,25 @@ int SweepJob::countLaggingSolvers() {
 
 }
 
+uint64_t SweepJob::get64bitELitPairKey(int elit1, int elit2, bool normalize) {
+	// Combining two 32-bit lits into one 64-bit key.
+	// The uint32_t cast is critically necessary to truncate to 32 bits first,
+	// killing the sign extension. Only this way we can pack it without mangling the values
+	if (normalize) {
+		// Convention: Put smaller variable first
+		if (abs(elit1) > abs(elit2))
+			std::swap(elit1, elit2);
+	}
+	return (((uint64_t)(uint32_t)elit1) << 32) |  ((uint64_t)(uint32_t)elit2);
+}
+
+std::pair<int,int> SweepJob::extract2x32bitELits(uint64_t litpair) {
+	//Extraction: explicit narrowing cast to recover sign
+	int elit1 = (int32_t)(litpair >> 32);
+	int elit2 = (int32_t)(litpair & 0xffffffff);
+	return {elit1, elit2};
+}
+
 std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<int>> &contribs) {
 	//sanity check whether each contribution contains coherent size information about itself
 	for (const auto& contrib : contribs) {
@@ -1610,7 +1629,7 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 			assert(std::abs(elit1) < std::abs(elit2) || log_return_false("SWEEP ERROR: in aggregate: abs(elit1) is larger than abs(elit2), but it should be smaller. elit1=%i, elit2=%i, at index j=%i\n", elit1, elit2, j));
 			// The uint32_t cast is critically necessary to truncate to 32 bits first,
 			// killing the sign extension. Only this way we can pack it without mangling the values
-			uint64_t litpair = (((uint64_t)(uint32_t)elit1) << 32) |  ((uint64_t)(uint32_t)elit2);
+			uint64_t litpair = get64bitELitPairKey(elit1, elit2);
 			set_of_eqs.insert(litpair);
 		}
 		//Deduplicate Units
@@ -1633,8 +1652,9 @@ std::vector<int> SweepJob::aggregateEqUnitContributions(std::list<std::vector<in
 	int j=0;
 	for (uint64_t litpair : set_of_eqs) {
 		//Extraction: explicit narrowing cast to recover sign
-		int elit1 = (int32_t)(litpair >> 32);
-		int elit2 = (int32_t)(litpair & 0xffffffff);
+		auto pair = extract2x32bitELits(litpair);
+		int elit1 = pair.first;
+		int elit2 = pair.second;
 		assert(std::abs(elit1) < std::abs(elit2) || log_return_false("SWEEP ERROR: in extraction on aggregate: abs(elit1) is larger than abs(elit2), but it should be smaller. elit1=%i, elit2=%i, at index j=%i\n", elit1, elit2, j));
 		aggregated[j++] = elit1;
 		aggregated[j++] = elit2;
@@ -1775,25 +1795,46 @@ void SweepJob::crossjob_rootReceiveClauses(std::vector<int>  &&clauses) {
 	LOGGER(_sweeplogger,V4_VVER, "SWEEP storing part of received XTCS size %i\n",clauses.size());
 	auto reader = BufferReader(clauses.data(), clauses.size(), 10, false);
 	auto clause = reader.getNextIncomingClause();
+	robin_hood::unordered_flat_set<uint64_t> set_of_binaries;
 	{
-		int before = _crossjob_root_received_units.size();
 		std::lock_guard<std::mutex> lock(_crossjob_import_mutex);
+		int units_before = _crossjob_root_received_units.size();
+		int eqs_before = _crossjob_root_received_equivalences.size();
 		while (clause.begin != nullptr) {
 			if (ClauseMetadata::enabled()) {
 				assert(clause.size >= ClauseMetadata::numInts()+1 || log_return_false("[ERROR] Clause of invalid size %i!\n", clause.size));
 				uint64_t id;
 				memcpy(&id, clause.begin, sizeof(uint64_t));
 			}
-			if (clause.size==1) {
-				assert(clause.begin[0]!=0 || log_return_false("SWEEPsns ERROR : got crossjob unit literal 0\n"));
+			if (clause.size == 1) {
+				assert(clause.begin[0]!=0 || log_return_false("SWEEP ERROR : got crossjob unit literal 0\n"));
 				_crossjob_root_received_units.push_back(clause.begin[0]);
 			}
-			//Technically we could also scan for equivalences (in linear time),
-			//but for now I have not added this extraction algorithm
+			if (clause.size == 2) {
+				//Try to also detect equivalences by finding matching binaries
+				int elit1 = clause.begin[0];
+				int elit2 = clause.begin[1];
+				if (std::abs(elit1) != std::abs(elit2)) {
+					uint64_t litpair = get64bitELitPairKey(elit1, elit2, true);
+					set_of_binaries.insert(litpair);
+				}
+			}
 			clause = reader.getNextIncomingClause();
 		}
-		int after = _crossjob_root_received_units.size();
-		LOGGER(_sweeplogger,V3_VERB, "SWEEP stored received XTCS units %i\n", after - before);
+		// See if there are matching binaries
+		for (auto litpair : set_of_binaries) {
+			auto [elit1, elit2] = extract2x32bitELits(litpair);
+			if (elit1 < 0) continue; //if there exists an equivalence, we only need to visit one of its two clauses
+			uint64_t theoretical_matching_pair = get64bitELitPairKey(-elit1, -elit2, true);
+			if (set_of_binaries.contains(theoretical_matching_pair)) {
+				_crossjob_root_received_equivalences.push_back(elit1);
+				_crossjob_root_received_equivalences.push_back(-elit2); //minus!
+				// if we find clauses (1 OR 2) AND (-1 OR -2), then on the variable level the equivalence is 1 == -2 !
+			}
+		}
+		int units_after = _crossjob_root_received_units.size();
+		int eqs_after = _crossjob_root_received_equivalences.size();
+		LOGGER(_sweeplogger,V3_VERB, "SWEEP stored received XTCS units & eqs: %i %i\n", units_after - units_before, eqs_after - eqs_before);
 	}
 }
 
@@ -1847,6 +1888,7 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 
 	Metadata md = readMetadataFromReductionElement(payload);
 	const int n_eqs = md.eq_size / 2;  //each equivalence takes up two integers
+	const int n_sweep_units = md.unit_size;
 
 	if (md.remaining_work_estimate>0) {
 		_root_had_work_this_iteration = true;
@@ -1964,25 +2006,23 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 	md.terminate = decide_terminate_job;
 
 	//Send my units and equivalences via cross-job communication to the SAT job
-	const int n_sweep_units = md.unit_size;
-	const int eq_size = md.eq_size;
 	if (!md.foundUnsat && _clause_comm && _params.crossJobCommunication()) {
 		assert(_clause_comm || log_return_false("Sweep ERROR: _clause_comm object missing\n"));
 		BufferBuilder bb(-1, 10, false);
 		if (_params.sweepXTCSsend()) {
 			//Payload Format: [eqs, units, metadata]
 			//Read units, which are stored directly after the equivalences
-			for (int i=eq_size; i<eq_size+n_sweep_units; i++) {
+			for (int i=md.eq_size; i<md.eq_size+md.unit_size; i++) {
 				int unit = payload[i];
 				bb.append({&unit, 1, 1});
 			}
 			//Read equivalences (need to append to the buffer after units, because they have a larger clause length)
-			for (int i=0; i < eq_size; i+=2) {
+			for (int i=0; i < md.eq_size; i+=2) {
 				int elit1 = payload[i];
 				int elit2 = payload[i+1];
 				//Represent the equality elit1==elit2 in CNF format via two binary clauses
 				int cnfA[2] = {-elit1, elit2};
-				int cnfB[2] = {-elit2, elit1};
+				int cnfB[2] = {elit1, -elit2};
 				bb.append({&cnfA[0],2,2});
 				bb.append({&cnfB[0],2,2});
 			}
@@ -2002,28 +2042,39 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 
 	//Within SweepJob, pass down the units received via Cross-Job-Communication to all sweepers.
 	//(we use SweepJobs own broadcasting, instead of relying on the CJC broadcasting)
-	int crossjob_units_received = 0;
+	int cj_received_units_size = 0;
+	int cj_received_eqs_size = 0;
+
 	if (_params.crossJobCommunication() && _params.sweepXTCSrecv()) {
 		std::lock_guard<std::mutex> lock(_crossjob_import_mutex);
-		if (!_crossjob_root_received_units.empty()) {
-			const int insert_pos = eq_size + n_sweep_units;
-			// Splice the cross-job units into the existing vector,
-			// appending them after the sweep units, but before before the metadata
-			payload.insert(
-				payload.begin() + insert_pos,
-				_crossjob_root_received_units.begin(),
-				_crossjob_root_received_units.end()
+
+		cj_received_units_size =  _crossjob_root_received_units.size();
+		cj_received_eqs_size = _crossjob_root_received_equivalences.size();
+
+		// Splice the new cross-job equivalences into the payload,
+		// after the existing equivalences but before the existing units
+		payload.insert(
+			payload.begin() + md.eq_size,
+			_crossjob_root_received_equivalences.begin(),
+			_crossjob_root_received_equivalences.end()
 			);
-			crossjob_units_received = static_cast<int>(_crossjob_root_received_units.size());
-			assert(payload.size() == eq_size + n_sweep_units + crossjob_units_received + NUM_METADATA_FIELDS);
+		// Update ! We just increased the equivalence vector part
+		md.eq_size += cj_received_eqs_size;
 
-			//updated stored unit count to reflect the additions.
-			//Otherwise, the sweepers would not know that we added new units
-			md.unit_size = n_sweep_units + crossjob_units_received;
+		// Splice the cross-job units into the existing vector,
+		// appending them after after the (now larger) equivalence section, but before before the existing units
+		payload.insert(
+			payload.begin() + md.eq_size,
+			_crossjob_root_received_units.begin(),
+			_crossjob_root_received_units.end()
+		);
+		// Update ! We just increased the units vector part
+		md.unit_size += cj_received_units_size;
 
-			//discard the temporary buffer, to not import the same units a second time
-			_crossjob_root_received_units.clear();
-		}
+		//discard the temporary buffers to not import the same units/eqs a second time
+		_crossjob_root_received_units.clear();
+		_crossjob_root_received_equivalences.clear();
+		// }
 	}
 
 	//Persist the (possibly mutated) metadata back into the tail of the payload
@@ -2031,16 +2082,13 @@ void SweepJob::_inplace_rootTransform(std::vector<int>& payload) {
 
 	char logmsg[512];
 	snprintf(logmsg, sizeof(logmsg),
-		"[%i](root-trf) send: act,idl,lti %i,%i,%i  swp %i lag %i mxkit %i  iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i  SW %i  ST %i  RmW %i  Sched, Swept  %.2f , %.2f °/.  wsucc  %.6f  ETI %i  UTI %i\n",
+		"[%i](root-trf) send: act,idl,lti %i,%i,%i  swp %i lag %i mxkit %i  iter %i rnd %i :  %i ai  %i endi %i trm  E %i  U %i  XJU %i XJE %i  SW %i  ST %i  RmW %i  Sched, Swept  %.2f , %.2f °/.  wsucc  %.6f  ETI %i  UTI %i\n",
 		_my_rank, md.active_count, md.idle_count, md.longtermidle_count, md.sweeper_objs, md.lagging, md.maxxed_kittens,  _root_iteration, _root_sharing_round,
-		all_idle,  decide_end_iteration, decide_terminate_job, n_eqs, n_sweep_units, crossjob_units_received,
+		all_idle,  decide_end_iteration, decide_terminate_job, n_eqs, n_sweep_units, cj_received_units_size, cj_received_eqs_size/2,
 		md.work_sweeps, md.work_stepovers, md.remaining_work_estimate,
 		done_scheduled_prcnt , 100*(md.work_sweeps + md.unsched_resweeps)/(double)_numOrigVars, success_in_window, _root_shared_eqs_this_iteration, _root_shared_units_this_iteration
 	);
 	LOGGER(_sweeplogger, V3_VERB, "%s", logmsg);
-	// for (int i=0; i < md.eq_size; i+=2) {
-		// LOGGER(_sweeplogger, V3_VERB, "EQ(%i) = %i %i\n", i/2, payload[i], payload[i+1]);
-	// }
 	//no return statement, because the payload was just transformed in-place
 };
 

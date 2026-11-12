@@ -6,10 +6,11 @@ OUT_DIR=$HOME/PhD/logsntraces/
 INST="$HOME/PhD/instances/sat-and-minisat1m/0225fa9581c622e5abbc8497a97edf4e-fla-qhid-360-4.cnf.xz"
 INST="$HOME/PhD/instances/sat-and-minisat1m/01d037bf22a943430790eedd667f415e-60-128351.cnf.xz"
 INST="$HOME/PhD/instances/sat-and-minisat1m/000a41cdca43be89ed62ea3abf2d0b64-snw_13_9_pre.cnf.xz"
-INST="$HOME/PhD/instances/sat-and-minisat1m/00847fca81490df01b9e239fd6027378-bench_1614.smt2.cnf.xz" #28sec SAT
+# INST="$HOME/PhD/instances/sat-and-minisat1m/00847fca81490df01b9e239fd6027378-bench_1614.smt2.cnf.xz" #28sec SAT
 
 #SweepResult assertions
-INST="$HOME/PhD/instances/sat26/9fbe200523c648000d71b2c739093aa2-adv_gc_n100_k13_UNSAT_s42.sanitized.cnf.xz"
+# INST="$HOME/PhD/instances/sat26/9fbe200523c648000d71b2c739093aa2-adv_gc_n100_k13_UNSAT_s42.sanitized.cnf.xz"
+INST="$HOME/PhD/instances/sat26/9ef9243ff051b32795890fccd6c3f6b2-sum_of_3_cubes_50_bits_91.cnf.xz"
 
 
 # INST="$HOME/PhD/instances/tmp2024/12b4a08e412a3bffb513ca65639c7c69-Folkman-175-7416734.sanitized.cnf"
@@ -44,10 +45,11 @@ FLAGS=(
  -tmp=$OUT_DIR/tmp/
  -mono-app=SATWITHPRE 
  -satsolver=k 
- -preprocess-config=config/satwithpre/actors_SKEM.json
+ -preprocess-config=config/satwithpre/actors_M_SM_SKM_E.json
  -sat-config-dirs=config/sat/base/
  -sat-config-files=
- -v=3
+ -v=4
+ -cjc=1
  -spl=4
  -ems=0
 )

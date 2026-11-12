@@ -33,18 +33,18 @@
         "id": "SKM",
         "type": "MALLOBSAT",
         "prerequisite": "SK",
-        "group-id": "1",
         "actorsBeingDisplaced": ["M", "SM"],
         "onlyStartIfPrerequisiteSimplified": true,
-        "options": "-satsolver=k_c_l+[k_]{29} -cjc=1"
+        "options": "-satsolver=k_c_l+[k_]{29} -cjc=1",
+        "group-id": "1"
     },
     {
         "id": "SKE",
         "type": "MALLOBSWEEP",
         "prerequisite": "SK",
-        "group-id": "1",
         "actorsBeingDisplaced": [],
         "onlyStartIfPrerequisiteSimplified": true,
-		"options": "-fcll=2 -rspaa=1 -jcup=0.1 -cjc=1 -cjtcp=0 -sweep-skip-ratio=0.015 -sweep-skip-window=1 -sweep-max-weak-iters=3 -sweep-peak-fall-ratio=0.1"
+		"options": "-fcll=2 -rspaa=1 -jcup=0.1 -cjc=1 -cjtcp=0 -sweep-skip-ratio=0.015 -sweep-skip-window=1 -sweep-max-weak-iters=2 -sweep-peak-fall-ratio=0.1",
+        "group-id": "1"
 	}
 ]
