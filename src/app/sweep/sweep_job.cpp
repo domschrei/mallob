@@ -41,9 +41,6 @@ SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTa
 {
 	assert(_params.jobCommUpdatePeriod() > 0 || log_return_false("[ERROR] For this application to work,"
             " you must explicitly enable job communicators with the -jcup option, e.g., -jcup=0.1\n"));
-	assert(_params.crossJobCommToClient()==false || log_return_false("[ERROR] For this application to work,"
-		    " you must explicitly disable cross-job sharing to the client parent, i.e. -cjcc=0"));
-	DOUBLELOG(_sweeplogger, V2_INFO, "New SweepJob MPI Process on rank [%i] with planned %i threads, ctx %i \n", getJobTree().getRank(), params.numThreadsPerProcess.val, getJobTree().getContextId());
 	_solverConfig.parseFromDirsAndFiles(_params.satConfigDirs(), _params.satConfigFiles());
 }
 
@@ -73,7 +70,13 @@ void SweepJob::appl_start() {
 	//set some general metadata information upfront
 	_internal_result.id = getId();
 	_internal_result.revision = getRevision();
-	
+
+	// assert those params here and not already in the constructor, because only now we have those
+	// specifically overwritten for this SweepJob
+	assert(_params.crossJobCommToClient()==false || log_return_false("[ERROR] For this application to work,"
+		    " you must explicitly disable cross-job sharing to the client parent, i.e. -cjcc=0"));
+	DOUBLELOG(_sweeplogger, V2_INFO, "New SweepJob MPI Process on rank [%i] with planned %i threads, ctx %i \n", getJobTree().getRank(), _params.numThreadsPerProcess(), getJobTree().getContextId());
+
 	_my_rank = getJobTree().getRank();
 	_my_index = getJobTree().getIndex();
 	_my_ctx_id = getJobTree().getContextId();

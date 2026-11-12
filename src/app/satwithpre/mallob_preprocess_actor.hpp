@@ -117,10 +117,12 @@ private:
             {"name", std::string(toStr())+":" + (_type == SWEEPER ? "SWEEP" : "SAT") + ":job"},
             {"priority", _params.preprocessSweepPriority()},
             {"application", _type == SWEEPER ? "SWEEP" : "SAT"},
-            {"group-id", _group_id},
             {"configuration", {{"options", _option_overrides}}},
             {"incremental", false}
         };
+
+        // only pass a group-id when the user explicitly entered it in the json
+        if (!_group_id.empty()) json["group-id"] =  _group_id;
 
         auto f = std::vector<int>(_input_cnf->begin(), _input_cnf->end() - 2);
         StaticStore<std::vector<int>>::insert(json["name"].get<std::string>(), std::move(f));
@@ -141,8 +143,16 @@ private:
             opts += " " + _params.overrideSatOptions();
         if (_params.savePreprocessingProofs())
             opts += " -palrup=1 -proof-dir=" + _params.proofDirectory() + "/tmp/" + _name + "." + _proof_format;
-        if (_type == SWEEPER)
-            opts += " -cjcc=0"; //SweepJob shall not send cross-job clauses back to the CascadingOrchestrator, would crash the run
+        // Sweep and SAT Jobs are not allowed to send cross-job clauses back to the CascadingOrchestrator, as it would crash it
+        // because the orchestrator doesn't subscribe to that handle
+        opts += " -cjcc=0";
+        // If SOME actors should share clauses cross-job, then the overarching Orchestrator job needs the -cjc=1 flag.
+        // However, this then also automatically activated cross-job sharing for EVERY actor, even those where
+        // the user didn't want or expect it. Thus we deactivate any possibility for cross-job sharing for any job
+        // where the user didn't explictly provide a group-id. Otherwise we could also get very wrong results,
+        // i.e. when actor M and SM share clauses with each other.
+        if (_group_id.empty())
+            opts += " -cjc=0";
         if (!opts.empty()) json["configuration"]["options"] = opts;
 
         auto copiedJson = json;
