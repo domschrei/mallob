@@ -385,9 +385,10 @@ private:
 	}
 
 
-	std::vector<int> getPreparedClauses(Checksum& checksum, int& successfulSolverId, int& numLits) override {
+	std::vector<int> getPreparedClauses(Checksum& checksum, int& successfulSolverId, int& numLits, int& nbFoundModels) override {
 		successfulSolverId = -1;
 		numLits = 0;
+		nbFoundModels = 0;
 		LOGGER(_sweeplogger,V4_VVER, "[SweepJob] Called stub: getPreparedClauses. return succSolver -1 , numLits 0, vector {}\n");
 		return {};
 	}

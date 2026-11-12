@@ -196,6 +196,7 @@ private:
                     InplaceClauseAggregation agg(incomingClauses);
                     int winningSolverId = agg.successfulSolver();
                     int bufferRevision = agg.maxRevision();
+                    int nbFoundModels = agg.nbFoundModels();
                     agg.stripToRawBuffer();
                     LOGGER(_log, V5_DEBG, "DO filter clauses\n");
                     engine.setClauseBufferRevision(bufferRevision);
@@ -206,6 +207,7 @@ private:
                         LOGGER(_log, V4_VVER, "winning solver ID: %i\n", winningSolverId);
                         engine.setWinningSolverId(winningSolverId);
                     }
+                    engine.updateNbGloballyFoundModels(bufferRevision, nbFoundModels);
 
                 } else if (c == CLAUSE_PIPE_DIGEST_IMPORT) {
                     auto filter = pipe.readData(c);
@@ -295,6 +297,7 @@ private:
                 int numCollectedLits;
                 auto clauses = engine.prepareSharing(exportLiteralLimit, successfulSolverId, numCollectedLits);
                 if (!clauses.empty()) {
+                    int nbFoundModels = engine.getNbLocallyFoundModels();
                     long long bestFoundObjectiveCost = engine.getBestFoundObjectiveCost();
                     int costAsInts[sizeof(long long)/sizeof(int)];
                     memcpy(costAsInts, &bestFoundObjectiveCost, sizeof(long long));
@@ -303,6 +306,7 @@ private:
                         metadata.push_back(costAsInts[i]);
                     metadata.push_back(numCollectedLits);
                     metadata.push_back(successfulSolverId);
+                    metadata.push_back(nbFoundModels);
                     pipe.writeData(std::move(clauses), metadata, CLAUSE_PIPE_PREPARE_CLAUSES);
                 }
                 collectClauses = false;

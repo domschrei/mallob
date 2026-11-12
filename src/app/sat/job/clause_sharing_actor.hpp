@@ -40,7 +40,7 @@ public:
 
     virtual void prepareSharing() = 0;
     virtual bool hasPreparedSharing() = 0;
-    virtual std::vector<int> getPreparedClauses(Checksum& checksum, int& successfulSolverId, int& numLits) = 0;
+    virtual std::vector<int> getPreparedClauses(Checksum& checksum, int& successfulSolverId, int& numLits, int& nbFoundModels) = 0;
     virtual void filterSharing(int epoch, std::vector<int>&& clauses) = 0;
     virtual bool hasFilteredSharing(int epoch) = 0;
     virtual std::vector<int> getLocalFilter(int epoch) = 0;

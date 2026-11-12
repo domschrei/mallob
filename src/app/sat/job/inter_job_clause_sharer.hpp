@@ -150,7 +150,7 @@ public:
     }
 
     void broadcastCrossSharedClauses(std::vector<int>& clauses, int nbLits) {
-        InplaceClauseAggregation::prepareRawBuffer(clauses,
+        InplaceClauseAggregation::prepareRawBuffer(clauses, 0,
             getClausesRevision(), nbLits, 1, -1,
             _best_found_solution_cost);
         _clauses_to_broadcast_internally = std::move(clauses);
@@ -212,8 +212,9 @@ public:
         _clause_filter->updateEpoch(_epoch);
     }
     virtual bool hasPreparedSharing() override {return _has_prepared_internal_shared_clauses;}
-    virtual std::vector<int> getPreparedClauses(Checksum& checksum, int& successfulSolverId, int& numLits) override {
+    virtual std::vector<int> getPreparedClauses(Checksum& checksum, int& successfulSolverId, int& numLits, int& nbFoundModels) override {
         successfulSolverId = -1;
+        nbFoundModels = 0;
         numLits = _nb_internal_shared_lits;
         _has_prepared_internal_shared_clauses = false;
         LOG(V4_VVER, "%s XTCS contrib size %i\n", _label.c_str(), _internal_shared_clauses.size());

@@ -11,21 +11,31 @@
 class ClauseLogger {
 
 private:
-    BackgroundWorker _bg_worker;
     std::ofstream _ofs;
     Mutex _mtx_parcelled_clauses;
     ConditionVariable _cond_var;
     std::vector<std::vector<int>> _parcelled_clauses;
+    BackgroundWorker _bg_worker;
+
+    bool _allow_retrieval {false};
+    bool _raw_output {false};
+    std::vector<std::vector<int>> _published_parcelled_clauses;
+    Mutex _mtx_published_clauses;
 
 public:
-    ClauseLogger(const std::string& outputPath) : _ofs(outputPath) {
+    ClauseLogger(const std::string& outputPath, bool allowRetrieval, bool rawOutput) :
+            _ofs(outputPath), _allow_retrieval(allowRetrieval), _raw_output(rawOutput) {
         _bg_worker.run([&]() {run();});
     }
 
+    void disableFileOutput() {
+        _ofs.close();
+    }
+
     void append(const Mallob::Clause& clause) {
-        std::vector<int> vec(clause.size+1);
-        vec[0] = clause.lbd;
-        for (size_t i = 0; i < clause.size; i++) vec[i+1] = clause.begin[i];
+        std::vector<int> vec(clause.size + !_raw_output);
+        if (!_raw_output) vec[0] = clause.lbd;
+        for (size_t i = 0; i < clause.size; i++) vec[i+!_raw_output] = clause.begin[i];
         {
             auto lock = _mtx_parcelled_clauses.getLock();
             _parcelled_clauses.push_back(std::move(vec));
@@ -40,6 +50,14 @@ public:
         _cond_var.notify();
     }
 
+    const std::vector<std::vector<int>>& beginAccessingPublishedClauses() {
+        _mtx_published_clauses.lock();
+        return _published_parcelled_clauses;
+    }
+    void endAccessingPublishedClauses() {
+        _mtx_published_clauses.unlock();
+    }
+
     void run() {
         std::vector<std::vector<int>> outClauses;
         while (true) {
@@ -51,20 +69,33 @@ public:
                 if (!_bg_worker.continueRunning()) break;
                 outClauses = std::move(_parcelled_clauses);
             }
-            for (auto& vec : outClauses) if (!vec.empty()) {
-                _ofs << vec[0];
-                if (ClauseMetadata::enabled()) {
-                    uint64_t id = ClauseMetadata::readUnsignedLong(vec.data()+1);
-                    _ofs << " [id=" << id << "]";
+            bool publishedSomething = false;
+            if (_ofs.is_open()) for (auto& vec : outClauses) if (!vec.empty()) {
+                if (!_raw_output) {
+                    _ofs << vec[0] << " ";
+                    if (ClauseMetadata::enabled()) {
+                        uint64_t id = ClauseMetadata::readUnsignedLong(vec.data()+1);
+                        _ofs << " [id=" << id << "] ";
+                    }
                 }
-                for (size_t i = 1+ClauseMetadata::numInts(); i < vec.size(); i++)
-                    _ofs << " " << vec[i];
-                _ofs << std::endl;
+                for (size_t i = !_raw_output+ClauseMetadata::numInts(); i < vec.size(); i++)
+                    _ofs << vec[i] << " ";
+                _ofs << "0" << std::endl;
+                publishedSomething = true;
+            }
+            if (_allow_retrieval) {
+                auto lock = _mtx_published_clauses.getLock();
+                for (auto& cls : outClauses) if (!cls.empty()) {
+                    _published_parcelled_clauses.push_back(std::move(cls));
+                }
             }
             outClauses.clear();
-            _ofs << std::endl;
-            _ofs.flush();
+            if (publishedSomething) _ofs.flush();
         }
-        _ofs.close();
+        if (_ofs.is_open()) _ofs.close();
+    }
+
+    ~ClauseLogger() {
+        publish();
     }
 };

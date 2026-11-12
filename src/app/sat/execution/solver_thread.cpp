@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <set>
 
+#include "app/sat/data/model_string_compressor.hpp"
 #include "app/sat/data/revision_data.hpp"
 #include "app/sat/job/sat_constants.h"
 #include "solver_thread.hpp"
@@ -229,10 +230,11 @@ void SolverThread::diversifyAfterReading() {
     int totalSolvers = solversCount * _portfolio_size;
     int vars = _solver.getVariablesCount();
 
-    for (int var = 1; var <= vars; var++) {
+    while (_nb_diversified_vars < vars) {
+        _nb_diversified_vars++;
         float numSolversRand = _rng.randomInRange(0, totalSolvers);
         if (numSolversRand < 1) {
-            _solver.setPhase(var, numSolversRand < 0.5);
+            _solver.setPhase(_nb_diversified_vars, numSolversRand < 0.5);
         }
     }
 }
@@ -274,15 +276,48 @@ void SolverThread::runOnce() {
     //std::ofstream ofs("DBG_" + std::to_string(_solver.getGlobalId()) + "_" + std::to_string(_active_revision));
     //ofs << _dbg_lits << "\n";
     //ofs.close();
-    SatResult res;
-    if (_solver.supportsIncrementalSat()) {
-        res = performSolving ? _solver.solve(aSize, aLits) : UNKNOWN;
+    SatResult res = UNKNOWN;
+    if (_solver.getSolverSetup().enumerateModels) {
+        auto lock = _mtx_enumerated_solutions.getLock();
+        _enumerated_solutions.clear();
+    }
+
+    if (_solver.getSolverSetup().doIncrementalSolving) {
+        while (performSolving) {
+            assert(_solver.getSolverSetup().inlineLiterals.empty());
+            auto newRes = _solver.solve(aSize, aLits);
+            if (newRes != SAT && res == SAT) {
+                // solver didn't find another model, but if found some previously:
+                // make sure to report as "SAT"
+                break;
+            }
+            res = newRes;
+            if (res != SAT || !_solver.getSolverSetup().enumerateModels) {
+                // we're not enumerating solutions: stop directly
+                break;
+            }
+
+            // SAT result found, but we want to enumerate more:
+            // fetch solution, add according blocking clause
+            auto solution = _solver.getOptimizer() ?
+                _solver.getOptimizer()->get_solution() : _solver.getSolution();
+            for (int i = 1; i < solution.size(); i++) {
+                _solver.addLiteral(-solution[i]);
+            }
+            _solver.addLiteral(0);
+
+            // store new enumerated solution
+            auto lock = _mtx_enumerated_solutions.getLock();
+            _enumerated_solutions.push_back(ModelStringCompressor::compress(solution));
+        }
     } else {
         // Add assumptions as permanent unit clauses
         for (const int* aLit = aLits; aLit != aLits+aSize; aLit++) {
             _solver.addLiteral(*aLit);
             _solver.addLiteral(0);
         }
+        // Add inline literals
+        for (int lit : _solver.getSolverSetup().inlineLiterals) _solver.addLiteral(lit);
         res = performSolving ? _solver.solve(0, nullptr) : UNKNOWN;
     }
 
@@ -312,7 +347,14 @@ void SolverThread::runOnce() {
             res = SAT;
         }
     }
-    reportResult(res, revision);
+
+    if (_solver.getSolverSetup().enumerateModels) {
+        auto lock = _mtx_enumerated_solutions.getLock();
+        reportResult(res, revision, _enumerated_solutions.empty() ? std::vector<int>() :
+            ModelStringCompressor::decompress(_enumerated_solutions.front()));
+    } else {
+        reportResult(res, revision, std::vector<int>());
+    }
 }
 
 void SolverThread::waitWhileSolved() {
@@ -324,7 +366,7 @@ void SolverThread::waitUntil(std::function<bool()> predicate) {
     _state_cond.wait(_state_mutex, predicate);
 }
 
-void SolverThread::reportResult(int res, int revision) {
+void SolverThread::reportResult(int res, int revision, std::vector<int> solution) {
     if (_found_result_rev >= revision) return;
 
     const char* resultString = res==SAT?"SAT":"UNSAT";
@@ -348,8 +390,9 @@ void SolverThread::reportResult(int res, int revision) {
     }
 
     if (res == SAT) {
-        auto solution = _solver.getOptimizer() ?
-            _solver.getOptimizer()->get_solution() : _solver.getSolution();
+        if (solution.empty())
+            solution = _solver.getOptimizer() ?
+                _solver.getOptimizer()->get_solution() : _solver.getSolution();
         auto lrat = _solver.getSolverSetup().modelCheckingLratConnector;
         if (lrat) {
             LOGGER(_logger, V3_VERB, "Validating SAT (rev. %i) ...\n", revision);

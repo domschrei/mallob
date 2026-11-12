@@ -58,6 +58,11 @@ private:
 	JobResult _result;
 	std::atomic_bool _cleaned_up = false;
 
+	tsl::robin_set<std::string> _enumerated_solutions;
+	std::vector<int> _enumeration_blocking_clauses;
+	int _nb_globally_found_models {0};
+	float _time_of_first_model {-1};
+
 	bool _block_result {false};
 	int _winning_solver_id {-1};
 
@@ -96,12 +101,15 @@ public:
 	LastAdmittedStats getLastAdmittedClauseShare();
 	long long getBestFoundObjectiveCost() const;
 	void updateBestFoundObjectiveCost(long long bestFoundObjectiveCost);
+	int getNbLocallyFoundModels() const;
+	void updateNbGloballyFoundModels(int rev, int nbFound);
 
 	void setWinningSolverId(int globalId);
 	void syncDeterministicSolvingAndCheckForLocalWinner();
 
 	void reduceActiveThreadCount();
 	void setActiveThreadCount(int nbThreads);
+	void resetSolver(int i, const std::vector<int>* addedLits = nullptr);
 
     void setPaused();
     void unsetPaused();
@@ -124,5 +132,6 @@ public:
 private:
 
 	void writeClauseEpochs();
+	void writeEnumeratedSolutions();
 	std::shared_ptr<PortfolioSolverInterface> createSolver(const SolverSetup& setup);
 };

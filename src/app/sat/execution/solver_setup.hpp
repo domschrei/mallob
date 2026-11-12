@@ -33,6 +33,7 @@ struct SolverSetup {
 	bool isJobIncremental {false};
 	bool hasPseudoincrementalSolvers {false};
 	int solverRevision {0};
+	std::vector<int> inlineLiterals;
 
 
 	// Solver configuration and diversification
@@ -44,6 +45,9 @@ struct SolverSetup {
 	SolverPortfolioConfig* solverConfig {nullptr};
 
 	SolvingReplay::Mode replayMode {SolvingReplay::NONE};
+
+	bool enumerateModels = false;
+	bool currentlyEnumerating = false;
 
 
 	// Clause export

@@ -107,9 +107,11 @@ public:
                 Checksum checksum;
                 int successfulSolverId;
                 int numLits;
-                auto clauses = _job->getPreparedClauses(checksum, successfulSolverId, numLits);
-                LOG(V4_VVER, "%s CS produced cls size=%lu lits=%i/%i\n", _job->getLabel(), clauses.size(), numLits, _local_export_limit);
-                auto agg = InplaceClauseAggregation::prepareRawBuffer(clauses,
+                int nbFoundModels;
+                auto clauses = _job->getPreparedClauses(checksum, successfulSolverId, numLits, nbFoundModels);
+                LOG(V4_VVER, "%s CS produced cls size=%lu lits=%i/%i sols=%i\n",
+                    _job->getLabel(), clauses.size(), numLits, _local_export_limit, nbFoundModels);
+                auto agg = InplaceClauseAggregation::prepareRawBuffer(clauses, nbFoundModels,
                     _job->getClausesRevision(), numLits, 1, successfulSolverId,
                     _job->getBestFoundObjectiveCost());
                 return clauses;
@@ -265,6 +267,7 @@ private:
         int numInputLits = 0;
         int successfulSolverId = -1;
         long long bestFoundSolutionCost = LLONG_MAX;
+        int nbFoundModels = 0;
         for (auto& elem : elems) {
             assert(elem.size() >= InplaceClauseAggregation::numMetadataInts()
                 || log_return_false("[ERROR] Clause buffer has size %ld!\n", elem.size()));
@@ -276,6 +279,7 @@ private:
             numInputLits += agg.numInputLiterals();
             maxRevision = std::max(maxRevision, agg.maxRevision());
             bestFoundSolutionCost = std::min(bestFoundSolutionCost, agg.bestFoundSolutionCost());
+            nbFoundModels += agg.nbFoundModels();
             agg.stripToRawBuffer();
         }
         int buflim = _job->getBufferLimit(numAggregated, false);
@@ -304,7 +308,7 @@ private:
     
         LOG(V4_VVER, "%s : merged %i contribs rev=%i (inp=%i, t=%.4fs) ~> len=%i\n",
             _job->getLabel(), numAggregated, maxRevision, numInputLits, time, merged.size());
-        InplaceClauseAggregation::prepareRawBuffer(merged,
+        InplaceClauseAggregation::prepareRawBuffer(merged, nbFoundModels,
             maxRevision, numInputLits, numAggregated, successfulSolverId,
             bestFoundSolutionCost);
         return merged;

@@ -92,6 +92,7 @@ private:
     int _last_admitted_nb_lits {0};
     int _successful_solver_id {-1};
     int _nb_incoming_lits {0};
+    int _nb_found_models {0};
     enum ClauseCollectingStage {NONE, QUERIED, RETURNED} _clause_collecting_stage {NONE};
     std::vector<int> _collected_clauses;
     tsl::robin_map<int, std::vector<int>> _filters_by_epoch;
@@ -143,7 +144,7 @@ public:
 
     void collectClauses(int maxSize);
     bool hasCollectedClauses();
-    std::vector<int> getCollectedClauses(int& successfulSolverId, int& numLits);
+    std::vector<int> getCollectedClauses(int& successfulSolverId, int& numLits, int& nbFoundModels);
     int getLastAdmittedNumLits();
     long long getBestFoundObjectiveCost() const;
 
