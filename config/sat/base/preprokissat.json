@@ -5,7 +5,8 @@
         "selector": { "type": "flavour", "value": "preprocess" },
         "settings": [
           {"type": "set", "key": "sweep", "value": 0},
-          {"type": "set", "key": "fastel", "value": 1}
+          {"type": "set", "key": "fastel", "value": 1},
+          {"type": "set", "key": "fastelfix", "value": 1}
         ]
       }
     ]
