@@ -486,12 +486,16 @@ namespace mgi
         const auto physicalDevices = setup.instance.enumeratePhysicalDevices();
 
         vk::DeviceQueueCreateInfo queueCreateInfo({}, 0, info.queuePriorities);
-        static vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features, vk::PhysicalDeviceVulkan13Features> features;
+        static vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceVulkan12Features> features;
         auto &vulkan11FeaturesSet = features.get<vk::PhysicalDeviceVulkan11Features>();
         vulkan11FeaturesSet.variablePointersStorageBuffer = true;
         vulkan11FeaturesSet.variablePointers = true;
         auto &vulkan13FeaturesSet = features.get<vk::PhysicalDeviceVulkan13Features>();
         vulkan13FeaturesSet.synchronization2 = true;
+        auto &vulkan12FeaturesSet = features.get<vk::PhysicalDeviceVulkan12Features>();
+        vulkan12FeaturesSet.bufferDeviceAddress = true;
+        vulkan12FeaturesSet.storageBuffer8BitAccess = true;
+        vulkan12FeaturesSet.shaderInt8 = true;
         auto &physicalDeviceFeaturesSet = features.get<vk::PhysicalDeviceFeatures2>();
         physicalDeviceFeaturesSet.features.shaderInt64 = true;
         vk::DeviceCreateInfo deviceCreateInfo({}, queueCreateInfo, {}, deviceExtensions);
@@ -513,7 +517,7 @@ namespace mgi
                 LOG(V1_WARN, "Vulkan device %s does not support Vulkan 1.3, skipping!\n", deviceProperties.deviceName.data());
                 continue;
             }
-            vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features, vk::PhysicalDeviceVulkan13Features> featurePresent;
+            vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceVulkan12Features> featurePresent;
             phyDevice.getFeatures2(&featurePresent.get<vk::PhysicalDeviceFeatures2>());
             const auto &vulkan11Features = featurePresent.get<vk::PhysicalDeviceVulkan11Features>();
             if (!vulkan11Features.variablePointersStorageBuffer || !vulkan11Features.variablePointers)
@@ -531,6 +535,12 @@ namespace mgi
             if (!vulkan13Features.synchronization2)
             {
                 LOG(V1_WARN, "Vulkan device %s does not support synchronization2, skipping!\n", deviceProperties.deviceName.data());
+                continue;
+            }
+            const auto &vulkan12Features = featurePresent.get<vk::PhysicalDeviceVulkan12Features>();
+            if (!vulkan12Features.bufferDeviceAddress)
+            {
+                LOG(V1_WARN, "Vulkan device %s does not support bufferDeviceAddress, skipping!\n", deviceProperties.deviceName.data());
                 continue;
             }
             LOG(V2_INFO, "Found Vulkan device: %s\n", deviceProperties.deviceName.data());
