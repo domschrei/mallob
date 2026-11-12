@@ -28,10 +28,10 @@
 #define MGI_KERNEL(name) void name
 
 #ifndef MGI_GLOBAL
-    #define MGI_GLOBAL 
-    #define MGI_SHARED 
-    #define MGI_CONST const
-    #define MGI_LOCAL 
+    #define MGI_GLOBAL global 
+    #define MGI_SHARED local 
+    #define MGI_CONST const constant
+    #define MGI_LOCAL private 
 #endif
 #define MGI_GID_X gl_GlobalInvocationID[0]
 #define MGI_GID MGI_GID_X

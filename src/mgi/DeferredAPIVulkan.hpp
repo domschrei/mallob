@@ -332,7 +332,7 @@ namespace mgi
 
                 cmd.bindPipeline(vk::PipelineBindPoint::eCompute, pipeInfo.pipeline);
                 if(!pipeInfo.pushConstants.empty()) {
-                    uint32_t sizes[3] = {(uint32_t)task.range[0], (uint32_t)task.range[1], (uint32_t)task.range[2]};
+                    uint32_t sizes[3] = {0, 0, 0}; // Todo recheck offsetting
                     cmd.pushConstants(pipeInfo.pipeLayout, vk::ShaderStageFlagBits::eCompute, 0, sizeof(sizes), &sizes);
                 }
                 cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, pipeInfo.pipeLayout, 0, descriptorSet, {});
@@ -354,13 +354,11 @@ namespace mgi
             const auto deviceID = selectDevice();
             const auto device = setup.devices[deviceID];
 
-            auto cmd = beginAndGet(device, setup.commandPools[deviceID]);
-            vk::MemoryBarrier2 barrier(vk::PipelineStageFlagBits2::eComputeShader, vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eShaderRead, 
-                vk::PipelineStageFlagBits2::eComputeShader, vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderRead);
-            std::vector<vk::MemoryBarrier2> barriers(tasks.size(), barrier);
-            vk::DependencyInfo depInfo({}, barriers);
-            cmd.waitEvents2(tasks.size(), (vk::Event*)tasks.data(), &depInfo);
-            endSubmitAndWait(device, setup.commandPools[deviceID], cmd);
+            for(const auto event : mgi::span((vk::Event*)tasks.data(), tasks.size())) {
+                while(device.getEventStatus(event) != vk::Result::eEventSet) {
+                    std::this_thread::yield();
+                }
+            }
         }
 
         std::vector<TaskStatus> queueWaitTasks(span<const TaskInfo> taskInfos, const TaskStrategy &strategy = {})
@@ -438,10 +436,12 @@ namespace mgi
         const auto physicalDevices = setup.instance.enumeratePhysicalDevices();
 
         vk::DeviceQueueCreateInfo queueCreateInfo({}, 0, info.queuePriorities);
-        static vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features> features;
+        static vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features, vk::PhysicalDeviceVulkan13Features> features;
         auto &vulkan11FeaturesSet = features.get<vk::PhysicalDeviceVulkan11Features>();
         vulkan11FeaturesSet.variablePointersStorageBuffer = true;
         vulkan11FeaturesSet.variablePointers = true;
+        auto &vulkan13FeaturesSet = features.get<vk::PhysicalDeviceVulkan13Features>();
+        vulkan13FeaturesSet.synchronization2 = true;
         auto &physicalDeviceFeaturesSet = features.get<vk::PhysicalDeviceFeatures2>();
         physicalDeviceFeaturesSet.features.shaderInt64 = true;
         vk::DeviceCreateInfo deviceCreateInfo({}, queueCreateInfo, {}, deviceExtensions);
@@ -463,7 +463,7 @@ namespace mgi
                 LOG(V1_WARN, "Vulkan device %s does not support Vulkan 1.3, skipping!\n", deviceProperties.deviceName.data());
                 continue;
             }
-            vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features> featurePresent;
+            vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features, vk::PhysicalDeviceVulkan13Features> featurePresent;
             phyDevice.getFeatures2(&featurePresent.get<vk::PhysicalDeviceFeatures2>());
             const auto &vulkan11Features = featurePresent.get<vk::PhysicalDeviceVulkan11Features>();
             if (!vulkan11Features.variablePointersStorageBuffer || !vulkan11Features.variablePointers)
@@ -475,6 +475,12 @@ namespace mgi
             if (!physicalDeviceFeatures.features.shaderInt64)
             {
                 LOG(V1_WARN, "Vulkan device %s does not support shaderInt64, skipping!\n", deviceProperties.deviceName.data());
+                continue;
+            }
+            const auto &vulkan13Features = featurePresent.get<vk::PhysicalDeviceVulkan13Features>();
+            if (!vulkan13Features.synchronization2)
+            {
+                LOG(V1_WARN, "Vulkan device %s does not support synchronization2, skipping!\n", deviceProperties.deviceName.data());
                 continue;
             }
             LOG(V2_INFO, "Found Vulkan device: %s\n", deviceProperties.deviceName.data());
