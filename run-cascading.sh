@@ -6,11 +6,14 @@ OUT_DIR=$HOME/PhD/logsntraces/
 INST="$HOME/PhD/instances/sat-and-minisat1m/0225fa9581c622e5abbc8497a97edf4e-fla-qhid-360-4.cnf.xz"
 INST="$HOME/PhD/instances/sat-and-minisat1m/01d037bf22a943430790eedd667f415e-60-128351.cnf.xz"
 INST="$HOME/PhD/instances/sat-and-minisat1m/000a41cdca43be89ed62ea3abf2d0b64-snw_13_9_pre.cnf.xz"
-# INST="$HOME/PhD/instances/sat-and-minisat1m/00847fca81490df01b9e239fd6027378-bench_1614.smt2.cnf.xz" #28sec SAT
+INST="$HOME/PhD/instances/sat-and-minisat1m/00847fca81490df01b9e239fd6027378-bench_1614.smt2.cnf.xz" #28sec SAT
 
 #SweepResult assertions
 # INST="$HOME/PhD/instances/sat26/9fbe200523c648000d71b2c739093aa2-adv_gc_n100_k13_UNSAT_s42.sanitized.cnf.xz"
-INST="$HOME/PhD/instances/sat26/9ef9243ff051b32795890fccd6c3f6b2-sum_of_3_cubes_50_bits_91.cnf.xz"
+# INST="$HOME/PhD/instances/sat26/9ef9243ff051b32795890fccd6c3f6b2-sum_of_3_cubes_50_bits_91.cnf.xz" # quick sat
+# INST="$HOME/PhD/instances/sat26/8d0d8518a438d93428257d9a38863c3c-as-p31-l12-o9-56.sanitized.cnf.xz" #quick sat
+# INST="$HOME/PhD/instances/sat26/1f81f7e009f501014cb23a8c2d41836f-ACG-20-10p1.cnf.xz" #long >90sec
+# INST="$HOME/PhD/instances/sat26/30e8b47741a4104c01eeea1d00bbce9e-aes_equiv_encry_3_rounds.debugged.cnf.xz" #>90sec
 
 
 # INST="$HOME/PhD/instances/tmp2024/12b4a08e412a3bffb513ca65639c7c69-Folkman-175-7416734.sanitized.cnf"
@@ -48,7 +51,7 @@ FLAGS=(
  -preprocess-config=config/satwithpre/actors_M_SM_SKM_E.json
  -sat-config-dirs=config/sat/base/
  -sat-config-files=
- -v=4
+ -v=3
  -cjc=1
  -spl=4
  -ems=0
