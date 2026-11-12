@@ -141,6 +141,8 @@ private:
             opts += " " + _params.overrideSatOptions();
         if (_params.savePreprocessingProofs())
             opts += " -palrup=1 -proof-dir=" + _params.proofDirectory() + "/tmp/" + _name + "." + _proof_format;
+        if (_type == SWEEPER)
+            opts += " -cjcc=0"; //SweepJob shall not send cross-job clauses back to the CascadingOrchestrator, would crash the run
         if (!opts.empty()) json["configuration"]["options"] = opts;
 
         auto copiedJson = json;

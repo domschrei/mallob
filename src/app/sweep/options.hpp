@@ -12,10 +12,10 @@ OPT_BOOL(sweepXTCSsend,			"swxs", 	"sweep-xj-send",			true, "send units and equi
 OPT_BOOL(sweepXTCSrecv,			"swxr", 	"sweep-xj-recv",			true, "receive units via cross-job-communication -cjc")
 OPT_FLOAT(sweepSharingPeriod,	"swsp", 	"sweep-sharing-period", 	0.050, 0.001, LARGE_INT, "The sharing period (of equivalences and units), in seconds")
 OPT_FLOAT(sweepPeakFallRatio,	"swpfr",	"sweep-peak-fall-ratio",	0.1, 0, 1, "ratio by how much the number of found Eqs+Units is allowed to drop (versus the all-time peak) before the iteration is ended")
-OPT_FLOAT(sweepSkipRatio,		"swskr",    "sweep-skip-ratio",			0.01, 0, 1, "minimum ratio of found Eqs+Units versus number of swept variables to not skip an iteration")
+OPT_FLOAT(sweepSkipRatio,		"swskr",    "sweep-skip-ratio",			0.015, 0, 1, "minimum ratio of found Eqs+Units (versus number of swept variables, within the last time window) to not skip an iteration")
 OPT_FLOAT(sweepSkipWindowSecs,	"swskw",	"sweep-skip-window",		1.0, 0, LARGE_INT, "size of moving window for which the skip-ratio is checked (in seconds)")
-OPT_INT(sweepMaxWeakIterations,	"swmwi",	"sweep-max-weak-iters",		3, 0, LARGE_INT, "max number of iterations that are allowed to end without being successful before the Job is terminated")
+OPT_INT(sweepMaxWeakIterations,	"swmwi",	"sweep-max-weak-iters",		2, 0, LARGE_INT, "max number of iterations that are allowed to end without being successful before the Job is terminated")
 OPT_BOOL(sweepShowLagWarn,		"swslw", 	"sweep-show-lag-warn",		false, "show 'lagging' solvers that are in the same sweep(...) call since a long time")
-OPT_INT(sweepMaxPayload,		"swmpay",	"sweep-max-payload",		100'000'000, 0, 2'000'000'000, "max payload for which the SweepApp starts, otherwise it directly exits")
+OPT_INT(sweepMaxPayload,		"swmpay",	"sweep-max-payload",		100'000'000, 0, 2'000'000'000, "max payload for which the SweepApp starts, otherwise it exits directly")
 OPT_BOOL(sweepTrackWorksteals,	"swtws", 	"sweep-track-worksteals",	false, "track information about individual worksteal events in the Sweep App, and show them at the end")
 
