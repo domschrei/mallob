@@ -287,8 +287,49 @@ namespace mgi
 
         inline void writeMemory(Memory memory, span<const BufferUpdateInfo> updates)
         {
-            if (updates.empty())
+            if (updates.empty() || !memory) {
+                LOG(V1_WARN, "writeMemory called with empty updates or invalid memory!\n");
                 return;
+            }
+            std::vector<PackedBuffer> packedBuffer;
+            const auto deviceID = selectDevice();
+            const auto device = setup.devices[deviceID];
+            const auto cmdPool = setup.commandPools[deviceID];
+            const auto &memTypeIndices = setup.memoryTypeIndices[deviceID];
+
+            const auto infoMem = bufferToMemLookup[memory.internal];
+            const auto mem = infoMem.memory;
+            const auto LG = memoryMutex[memory.internal];
+            std::lock_guard lock(*LG);
+
+            const auto memType = memoryType[memory.internal];
+            const auto cmd = beginAndGet(device, cmdPool);
+            // TODO: Seperate loops!
+            for (size_t i = 0; i < updates.size(); i++)
+            {
+                const auto &region = updates[i];
+                if (region.size != 0)
+                {
+                    if (isHostAccessable(memType))
+                    {
+                        upload<uint8_t>(device, mem, mgi::span<uint8_t>{(uint8_t*)region.data, region.size}, 
+                            region.destinationOffset + infoMem.offset);
+                    }
+                    else
+                    {
+                        const vk::Buffer buffer = *((VkBuffer *)&memory.internal);
+                        const auto packBuffer = allocatePackedBuffer(region.size, device,
+                                                                     memTypeIndices[(uint32_t)MemoryType::Global], vk::BufferUsageFlagBits::eTransferSrc);
+                        upload<uint8_t>(device, packBuffer.memory, span<uint8_t>{(uint8_t *)region.data, region.size});
+                        packedBuffer.push_back(packBuffer);
+                        vk::BufferCopy copy(0, region.destinationOffset, region.size);
+                        cmd.copyBuffer(packBuffer.buffer, buffer, copy);
+                    }
+                }
+            }
+            endSubmitAndWait(device, cmdPool, cmd);
+            for (auto &b : packedBuffer)
+                b.destroy(device);
         }
 
         inline std::array<uint32_t, 3> getWorkgroupAmount(const TaskInfo& info, Kernel kernel)
@@ -369,7 +410,16 @@ namespace mgi
 
         std::vector<TaskStatus> getStatus(span<const Task> tasks)
         {
-            return {};
+            std::vector<TaskStatus> statuses;
+            statuses.reserve(tasks.size());
+
+            const auto deviceID = selectDevice();
+            const auto device = setup.devices[deviceID];
+            for(const auto event : mgi::span((vk::Event*)tasks.data(), tasks.size())) {
+                const auto status = device.getEventStatus(event) != vk::Result::eEventSet ? TaskStatus::Running : TaskStatus::Complete;
+                statuses.push_back(status);
+            }
+            return statuses;
         }
 
         Task copyMemory(Memory source, Memory destination, span<const MemoryCopyInfo> copyInfos)
