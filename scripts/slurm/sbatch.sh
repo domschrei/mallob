@@ -142,6 +142,7 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     -cm=0 \
     -rspaa=1 \
     -jcup=0.1 \
+    -cjc=1 \
     -v=3 \
     -seed=0 \
     -ems=0 \
