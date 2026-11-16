@@ -20,6 +20,13 @@ struct SolverSetup;
 struct SolverStatistics;
 
 class Kissat : public PortfolioSolverInterface {
+public:
+	struct namedSolverArray {
+		std::string name;
+		std::vector<std::byte> array{};
+	};
+	static inline const std::vector<std::string> _reconstruction_names = {"values", "import", "eliminated", "extend"};
+	
 protected:
 	//Accessible for KissatSweep 
 	kissat* solver;
@@ -50,6 +57,10 @@ private:
 	bool isSweeper = false; 
 
 	std::unique_ptr<PreprocessProofTracker> _prepro_proof_tracker;
+	
+	
+	std::vector<namedSolverArray> _reconstruction{};
+	bool _has_reconstruction = false;
 
 public:
 	Kissat(const SolverSetup& setup);
@@ -91,6 +102,7 @@ public:
 	void cleanUp() override;
 
 	void reconstructSolutionFromPreprocessing(std::vector<int>& model);
+	void importReconstructionArrays(std::vector<namedSolverArray> &reconstruction);
 
     friend void produce_clause(void* state, int size, int glue);
     friend void consume_clause(void* state, int** clause, int* size, int* lbd, unsigned long* id, unsigned char* sig);
@@ -100,11 +112,17 @@ public:
 	
     void setToSweeper();
     void setPreprocessingReportCallback();
+	void setReconstructionExportCallback();
     friend bool begin_formula_report(void* state, int vars, int cls);
     friend void report_preprocessed_lit(void* state, int lit);
     friend int terminate_callback(void* state);
+	friend void reconstruction_export_callback(void *KissatState);
 
 	PreprocessProofTracker* getPreprocessProofTracker() {return _prepro_proof_tracker.get();}
+	
+	
+	bool hasReconstruction() const;
+	std::vector<Kissat::namedSolverArray>&& extractReconstruction();
 
 private:
     void produceClause(int size, int lbd);
@@ -113,6 +131,8 @@ private:
 
     bool isPreprocessingAcceptable(int vars, int cls);
     void addLiteralFromPreprocessing(int lit);
+	void exportReconstruction();
+	static namedSolverArray exportNamedArray(kissat *solver, const std::string &name);
 
     bool shouldTerminate();
 

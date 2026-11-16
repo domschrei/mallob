@@ -253,7 +253,6 @@ bool SatReader::parseInternally(JobDescription& desc) {
 }
 
 bool SatReader::read(JobDescription& desc) {
-
 	std::optional<std::future<void>> optFuture;
 	std::vector<int> litsToParse;
 	if (_files.empty()) {

@@ -65,7 +65,9 @@ void on_drup_deletion(void* state, const int* lits, int nbLits) {
     //((Kissat*) state)->processProofLine(LratOp(lits, nbLits));
 }
 
-
+void reconstruction_export_callback(void *KissatState) {
+    return ((Kissat*) KissatState)->exportReconstruction();
+}
 
 
 
@@ -109,6 +111,10 @@ Kissat::Kissat(const SolverSetup& setup)
 
 void Kissat::setPreprocessingReportCallback() {
     kissat_set_preprocessing_report_callback(solver, this, begin_formula_report, report_preprocessed_lit);
+}
+
+void Kissat::setReconstructionExportCallback() {
+    kissat_set_reconstructionexport_callback(solver, this, reconstruction_export_callback);
 }
 
 void Kissat::addLiteral(int lit) {
@@ -374,6 +380,37 @@ void Kissat::addLiteralFromPreprocessing(int lit) {
         setSolverInterrupt();
     }
 }
+
+void Kissat::exportReconstruction() {
+    for (const auto &name : _reconstruction_names) {
+        _reconstruction.push_back(exportNamedArray(solver, name));
+        LOG(V3_VERB, "Kissat exported reconstruction array '%s' %zu bytes\n", name.c_str(), _reconstruction.back().array.size());
+    }
+    _has_reconstruction = true;
+}
+
+bool Kissat::hasReconstruction() const {
+    return _has_reconstruction;
+}
+
+std::vector<Kissat::namedSolverArray>&& Kissat::extractReconstruction() {
+    _has_reconstruction = false; 
+    return std::move(_reconstruction);
+}
+
+Kissat::namedSolverArray Kissat::exportNamedArray(kissat *solver, const std::string &name) {
+    size_t received_bytes; 
+    auto data = static_cast<const std::byte *> (kissat_export_array (solver, name.c_str(), &received_bytes));
+    return {name, std::vector<std::byte> (data, data + received_bytes) };
+}
+
+void Kissat::importReconstructionArrays(std::vector<namedSolverArray> &reconstruction) {
+   for (const auto &arr : reconstruction) {
+       LOG(V3_VERB, "importing model reconstruction array '%s' %zu bytes \n", arr.name.c_str(), arr.array.size());
+       kissat_import_array(solver, arr.name.c_str(), arr.array.data(), arr.array.size());
+   } 
+}
+
 
 Kissat::~Kissat() {
     if (solver) {

@@ -171,7 +171,7 @@ bool AnytimeSatClauseCommunicator::handle(int source, int mpiTag, JobMessage& ms
     if (msg.returnedToSender) {
         // Message was sent by myself but was then returned.
         // Handle individual cases.
-        LOG(V1_WARN, "%s : msg returned to sender\n", _job->toStr());
+        LOG(V1_WARN, "[WARN] %s : msg returned to sender (source %i, mpiTag %i, msg.tag %i)\n", _job->toStr(), source, mpiTag, msg.tag);
 
         if (msg.tag == MSG_INITIATE_CLAUSE_SHARING) {
             // Initiation of clause sharing was rejected:

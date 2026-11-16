@@ -154,3 +154,45 @@ std::vector<std::string> FileUtils::glob(const std::string& pattern) {
     globfree(&result);
     return files;
 }
+
+// Raw binary write. Creates the file even for zero bytes (truncating any
+// previous content), so the reading side can always derive the element
+// count from the file size alone.
+bool FileUtils::writeRawToFile(const std::string &path, const void *data, size_t numBytes) {
+    std::ofstream file(path, std::ios::binary | std::ios::trunc);
+    if (!file.is_open()) return false;
+    if (numBytes > 0) {
+        file.write(reinterpret_cast<const char*>(data), static_cast<std::streamsize>(numBytes));
+    }
+    file.close();
+    return file.good();   // close() reports flush/failure in the stream state
+}
+
+bool FileUtils::writeIntsToFile(const std::string &path, const std::vector<int> &data) {
+    return writeRawToFile(path, data.data(), data.size() * sizeof(int));
+}
+
+bool FileUtils::writeBytesToFile(const std::string &path, const std::vector<std::byte> &data) {
+    return writeRawToFile(path, data.data(), data.size());
+}
+
+template <typename T>
+std::vector<T> FileUtils::readFileToVector(const std::string& path) {
+    static_assert(std::is_trivially_copyable_v<T>, "element type must be trivially copyable");
+
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (!file.is_open()) return {};
+
+    const std::streamsize size = file.tellg();
+    if (size <= 0) return {};
+    file.seekg(0);
+
+    const std::size_t count = static_cast<std::size_t>(size) / sizeof(T);
+    std::vector<T> data(count);
+    const auto bytesToRead = static_cast<std::streamsize>(count * sizeof(T));
+    if (!file.read(reinterpret_cast<char*>(data.data()), bytesToRead)) return {};
+    return data;
+}
+
+template std::vector<int> FileUtils::readFileToVector(const std::string&);
+template std::vector<std::byte> FileUtils::readFileToVector(const std::string&);
