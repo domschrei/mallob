@@ -11,7 +11,6 @@
 #include "app/sat/data/clause.hpp"
 #include "app/sat/data/definitions.hpp"
 
-
 extern "C" {
 #include "kissat/src/kissat.h"
 }
@@ -31,7 +30,6 @@ public:
 	std::vector<uint8_t> serialize() const override;
 	KissatReconstruction &deserialize(const std::vector<uint8_t>& packed) override;
 };
-
 
 class Kissat : public PortfolioSolverInterface {
 protected:
@@ -126,7 +124,6 @@ public:
 
 	PreprocessProofTracker* getPreprocessProofTracker() {return _prepro_proof_tracker.get();}
 	
-	
 	bool hasReconstruction() const;
 	KissatReconstruction&& extractReconstruction();
 
@@ -144,4 +141,3 @@ private:
 
 
 };
-

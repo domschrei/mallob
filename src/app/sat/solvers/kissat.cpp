@@ -65,6 +65,7 @@ void on_drup_deletion(void* state, const int* lits, int nbLits) {
     //((Kissat*) state)->processProofLine(LratOp(lits, nbLits));
 }
 
+
 void reconstruction_export_callback(void *KissatState) {
     return ((Kissat*) KissatState)->exportReconstruction();
 }
@@ -74,7 +75,7 @@ void reconstruction_export_callback(void *KissatState) {
 Kissat::Kissat(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup), solver(kissat_init()),
         learntClauseBuffer(_setup.strictMaxLitsPerClause+ClauseMetadata::numInts()) {
-    
+
     kissat_set_terminate(solver, this, &terminate_callback);
     glueLimit = _setup.strictLbdLimit;
     numVars = setup.numVars;
@@ -166,7 +167,6 @@ void Kissat::addConfigurationSetting(Setting setting) {
         value += std::get<1>(setting.val);
         value = std::min(value, setting.max);
         value = std::max(value, setting.min);
-        // LOGGER(_logger, V2_INFO, "Kissat opt override \"%s=%lld\"\n", setting.key.c_str(), value);
         LOGGER(_logger, V5_DEBG, "opt override \"%s=%lld\"\n", setting.key.c_str(), value);
         kissat_set_option(solver, setting.key.c_str(), value);
     }
@@ -430,7 +430,6 @@ void Kissat::importReconstruction(KissatReconstruction &reconstruction) {
    } 
 }
 
-
 Kissat::~Kissat() {
     if (solver) {
         setSolverInterrupt();
@@ -444,7 +443,7 @@ std::vector<uint8_t>  KissatReconstruction::serialize() const {
     // Either there exists no reconstruction at all, or it contains all expected arrays
     assert(reconstrArrays.empty() || reconstrArrays.size() == expectedReconstrNames.size());
     for (int i=0; i < reconstrArrays.size(); ++i) {
-        //make sure that existing reconstrucion arrays are also given in the correct order
+        // assert that provided reconstruction arrays are also given in the correct expected order
         assert(reconstrArrays[i].name == expectedReconstrNames[i]);
         appendVec(packed, reconstrArrays[i].array);
     }
@@ -461,5 +460,3 @@ KissatReconstruction& KissatReconstruction::deserialize(const std::vector<uint8_
     assert(offset == packed.size());
     return *this;
 }
-
-

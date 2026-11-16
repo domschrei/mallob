@@ -71,8 +71,8 @@ void SweepJob::appl_start() {
 	_internal_result.id = getId();
 	_internal_result.revision = getRevision();
 
-	// assert those params here and not already in the constructor, because only now we have those
-	// specifically overwritten for this SweepJob
+	// We only assert the parameter now (and not already in the constructor)
+	// because only now we have the polymorphic SweepJob-specific overwritten values
 	assert(_params.crossJobCommToClient()==false || log_return_false("[ERROR] For this application to work,"
 		    " you must explicitly disable cross-job sharing to the client parent, i.e. -cjcc=0"));
 	DOUBLELOG(_sweeplogger, V2_INFO, "New SweepJob MPI Process on rank [%i] with planned %i threads, ctx %i \n", getJobTree().getRank(), _params.numThreadsPerProcess(), getJobTree().getContextId());
@@ -308,6 +308,7 @@ std::shared_ptr<KissatSweep> SweepJob::createNewSweeper(int localId) {
 	const JobDescription& desc = getDescription();
 	SolverSetup setup;
 	setup.logger = &Logger::getMainInstance();
+	// Use the standard jobname convention such that the cleanup script can merge all solver logfiles into one
 	setup.jobname = "#" + std::to_string(getId());
 	setup.numVars = desc.getAppConfiguration().fixedSizeEntryToInt("__NV");
 	setup.numOriginalClauses = desc.getAppConfiguration().fixedSizeEntryToInt("__NC");
@@ -370,7 +371,7 @@ std::shared_ptr<KissatSweep> SweepJob::createNewSweeper(int localId) {
 	sweeper->set_option("mallob_local_id", localId);
 	sweeper->set_option("mallob_rank", _my_rank);
 	sweeper->set_option("mallob_is_root", _is_root);
-	//solver options are now set via a JSON file, for the "sweeper" flavour (config/sat/base/sweeper.json)
+	// solver options are now primarily set via a JSON file specifying the "sweeper" flavour (config/sat/base/sweeper.json)
 	sweeper->applySolverConfiguration(0);
 	sweeper->interruptionInitialized = true;
 	return sweeper;
@@ -473,19 +474,6 @@ void SweepJob::appl_communicate(int sourceRank, int mpiTag, JobMessage& msg) {
 		if (msg.contextIdOfDestination != manualSenderContextId) {
 			LOG(V1_WARN, "[WARN] In sweeping: sender source rank [%i]->jobcommIdx(%i)->ctx<%i> msg selfinfo (%i)<%i> (me [%i](%i), msg.sender (%i)<%i>)\n", sourceRank, jobCommSenderIndex, msg.contextIdOfDestination, manualSenderTreeIndex, manualSenderContextId, _my_rank, _my_index, msg.treeIndexOfSender, msg.contextIdOfSender);
 		}
-		// if (msg.contextIdOfDestination != 0) {
-			// assert(msg.contextIdOfDestination == manualSenderContextId || log_return_false("[ERROR] In sweeping: source rank [%i]->jobcommIdx(%i)->ctx<%i> msg selfinfo (%i)<%i> (me [%i](%i), msg.sender (%i)<%i>)\n",
-				// sourceRank, jobCommSenderIndex, msg.contextIdOfDestination, manualSenderTreeIndex, manualSenderContextId, _my_rank, _my_index, msg.treeIndexOfSender, msg.contextIdOfSender));
-		// } else {
-			// msg.contextIdOfDestination = manualSenderContextId;
-			// LOGGER(_sweeplogger,V1_WARN,"WARN SWEEP: SEARCHING_WORK receiver [%i] does not know contextIdOfDestination of sender [%i], now using ContextId %i provided by incoming msg itself\n", _my_rank, sourceRank, manualSenderContextId);
-		// }
-		// if (msg.treeIndexOfDestination != -1) {
-			// assert(msg.treeIndexOfDestination == manualSenderTreeIndex|| log_return_false("[ERROR] In sweeping: msg.treeIndexOfDestination == %i != %i == sourceTreeIndex \n", msg.treeIndexOfDestination, manualSenderTreeIndex));
-		// } else {
-			// msg.treeIndexOfDestination = manualSenderTreeIndex;
-			// LOGGER(_sweeplogger,V1_WARN,"WARN SWEEP: SEARCHING_WORK receiver [%i] does not know treeIndexOfDestination of sender [%i], now using treeIndex %i provided by incoming msg itself\n", _my_rank, sourceRank, manualSenderTreeIndex);
-		// }
 		//probably happens when sweep message slips right into the ongoing ranklist update
 		//that is periodically started as aggregating, in job.cpp 233
 		assert(msg.contextIdOfDestination != 0 ||

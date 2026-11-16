@@ -48,6 +48,7 @@ public:
         _po->stopAll();
         _po->finalizeProofs();
 
+        // Print time to be extra robust against mangled log lines
         LOG(V2_INFO, "SATWP RES ~%i~ at %.3f\n", res.result, Timer::elapsedSeconds());
         return res;
     }

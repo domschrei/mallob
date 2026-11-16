@@ -47,7 +47,6 @@ private:
     bool _is_root{false};
     uint8_t* _metadata; //serialized description
 	int _numOrigVars{0};
-	// int _numOrigClauses{0};
 
 	const int INVALID_ELIT = __INT32_MAX__;
 
@@ -207,11 +206,10 @@ private:
 	std::vector<int> _swept_this_iteration_cumul{};
 
 
-	//The user defines the skip window in terms of seconds
-	//For us internally, it is however more elegant to express it in the corresponding number of sharing rounds
-	//that happen within that time window
-	//since this naturally ignores time spent inbetween iterations (where sequential bookkeping is done)
-	//and where skipping would not defined or wanted
+	// The user defines the skip window in terms of seconds, but for us its interally
+	// more elegant to express it in the corresponding number of sharing rounds, because then it naturally
+	// ignores time spent inbetween iterations, where the solver do e.g. equivalence substitution.
+	// Also, we don't set the value here yet, because it needs the parameter inputs from runtime
 	int _skip_window_rounds;
 
 	//See how much each rank contributed in postprocessing

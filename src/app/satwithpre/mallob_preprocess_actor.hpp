@@ -38,7 +38,7 @@ private:
     int _sub_job_id {-1};
     std::atomic_int _child_job_root_rank {-1};
     
-    //Additional Data received from a SweepJob, which we need for model reconstruction
+    // A MallobSweep job sends back additional data which we will need for model reconstruction
     SweepResult _sweepRes{};
 
 public:
@@ -67,9 +67,9 @@ public:
             setup.logger = &Logger::getMainInstance();
             setup.numVars = nbInputVars();
             setup.numOriginalClauses = nbInputClauses();
-            //We piggyback on kissats existing model reconstruction code instead of writing our own.
-            //To make this work we need to supply a "skeleton" kissat solver with the necessary reconstruction datastructures, 
-            //which we accordingly extracted earlier from the representative solver at the end of the SweepJob App, byte-for-byte.
+            // We piggyback on kissats existing model reconstruction code instead of writing our own.
+            // by creating a "skeleton" kissat solver and supplying it with the necessary reconstruction datastructures,
+            // which we extracted earlier from a representative solver at the end of the SweepJob, byte-for-byte.
             auto skeleton_kissat = Kissat(setup);
             skeleton_kissat.importReconstruction(_sweepRes.reconstruction);
             skeleton_kissat.reconstructSolutionFromPreprocessing(model);
@@ -121,7 +121,12 @@ private:
             {"incremental", false}
         };
 
-        // only pass a group-id when the user explicitly entered it in the json
+        // If we want SOME actors to do cross-job clause-sharing but OTHERS not,
+        // then we need the flag -cjc=1 in the top-level orchestrator.
+        // However, this then also automatically activates cross-job sharing for EVERY actor, even those where
+        // the user didn't want it or expect it. Thus we need to make sure this doesnt happen where the user
+        // didn't explicitly provide a group-id.
+        // So we only pass a group-id when the user explicitly entered it in the json
         if (!_group_id.empty()) json["group-id"] =  _group_id;
 
         auto f = std::vector<int>(_input_cnf->begin(), _input_cnf->end() - 2);
@@ -143,14 +148,11 @@ private:
             opts += " " + _params.overrideSatOptions();
         if (_params.savePreprocessingProofs())
             opts += " -palrup=1 -proof-dir=" + _params.proofDirectory() + "/tmp/" + _name + "." + _proof_format;
-        // Sweep and SAT Jobs are not allowed to send cross-job clauses back to the CascadingOrchestrator, as it would crash it
-        // because the orchestrator doesn't subscribe to that handle
+        // Sweep and SAT Jobs are not allowed to send cross-job clauses back to the CascadingOrchestrator,
+        // this would crash the orchestrator because it doesn't subscribe to that handle
         opts += " -cjcc=0";
-        // If SOME actors should share clauses cross-job, then the overarching Orchestrator job needs the -cjc=1 flag.
-        // However, this then also automatically activated cross-job sharing for EVERY actor, even those where
-        // the user didn't want or expect it. Thus we deactivate any possibility for cross-job sharing for any job
-        // where the user didn't explictly provide a group-id. Otherwise we could also get very wrong results,
-        // i.e. when actor M and SM share clauses with each other.
+        // And just to be sure, if the user didn't declare a group, he/she most likely
+        // absolutely doesn't want cross-job-sharing to happen
         if (_group_id.empty())
             opts += " -cjc=0";
         if (!opts.empty()) json["configuration"]["options"] = opts;
@@ -230,11 +232,12 @@ private:
             _model = std::move(solution);
         } else if (res.result == RESULT_SIMPLIFIED) {
             if (_type == SWEEPER) {
-                // Read simplified formula, found units and equivalences, as well as the reconstruction data
+                // SweepJob not only returns a formula but much more, and in particular model reconstruction data
                 _sweepRes.deserialize(Serializable::intsToBytes(solution));
                 LOG(V3_VERB, "SATWP %s extracted MPI-sent SweepResult arrays:\n", json["name"].get<std::string>().c_str());
                 SweepJob::printSweepResult(_sweepRes);
                 // Outer code expects the solution vector to contain just the formula, which we spliced from the rest
+                // and can now pass back in
                 solution = std::move(_sweepRes.formula);
             }
             _output_cnf = std::move(solution); 
