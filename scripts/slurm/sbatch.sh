@@ -115,6 +115,8 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     echo "localtmp: $localtmpdir"
     echo "output:   $outputlogdir"
     echo "instance: $f"
+    echo "SLURM_NTASKS_PER_NODE" $SLURM_NTASKS_PER_NODE
+    echo "SLURM_CPUS_PER_TASK: " $SLURM_CPUS_PER_TASK
     echo " "
 
     # Need cjc=0 when using MallobSweep and MallobSAT as sequential actors,
@@ -152,8 +154,8 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
 
     # Assemble MPI command options
     mpicall="mpiexec -n $SLURM_NTASKS --bind-to core --map-by numa -genvall"
-    mpicleanup="mpiexec -n $((SLURM_NTASKS*SLURM_CPUS_PER_TASK)) drm --traceless --lite --aggressive"
-    mpicopy="mpiexec -n $((SLURM_NTASKS*SLURM_CPUS_PER_TASK)) dcp"
+    mpicleanup="mpiexec -n $((SLURM_NTASKS)) drm --traceless --lite --aggressive"
+    mpicopy="mpiexec -n $((SLURM_NTASKS)) dcp"
 
     # Drop hint which file we're solving
     echo "$f -> $globallogdir"
