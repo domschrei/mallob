@@ -149,6 +149,8 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
 
     # Assemble MPI command options
     mpicall="mpiexec -n $SLURM_NTASKS --bind-to core --map-by numa -genvall"
+    mpicleanup="mpiexec -n $((SLURM_NTASKS*SLURM_CPUS_PER_TASK)) drm --traceless --lite --aggressive"
+    mpicopy="mpiexec -n $((SLURM_NTASKS*SLURM_CPUS_PER_TASK)) dcp"
 
     # Drop hint which file we're solving
     echo "$f -> $globallogdir"
@@ -160,7 +162,14 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     $mpicall bash -c "scripts/slurm/prolog.sh ; $cmd"
 
     sleep 3 # avoid "nodes are still busy" issue?
-    $mpicall scripts/slurm/epilogNew.sh
+    echo "EPILOG"
+    echo "$mpicopy $globallogdir $outputlogdir"
+    $mpicopy $globallogdir $outputlogdir
+    mkdir "$outputlogdir/$i/.alldone"
+    echo "$mpicleanup $globallogdir"
+    $mpicleanup $globallogdir
+
+    # $mpicall scripts/slurm/epilogNew.sh
 
     echo "$(date) JOB $i FINISHED"
 
@@ -173,3 +182,6 @@ if ! $change; then exit; fi
 
 # Submit next instance, to begin after this job is done (do nothing if it fails)
 sbatch --begin=now`#+$(($DS_RUNTIME+30))` sbatch/generated/$DS_JOBNAME/sbatch.sh
+
+# clean up lod dir skeletons
+$mpicleanup $globallogdir
