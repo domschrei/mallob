@@ -4,24 +4,23 @@
 # (original in the SAT Comp: 16)
 n_threads_per_process=24
 
-echo '
- -mono-app=SATWITHPRE 
+echo '-wam=60000
+ -mono-app=SATWITHPRE
  -v=2
- -pb=0 
- -q=1 
- -jc=2 
+ -pb=0
+ -q=1
+ -jc=2
  -os=1
  -cm=0
- -rpa=1 
+ -rpa=1
  -seed=89081
- -wam=60000 
- -mlpt=50000000 
+ -mlpt=50000000
  -pre-cleanup=1
- -max-lits-per-thread=60000000 
+ -max-lits-per-thread=60000000
  -zero-only-logging=1
  -terminate-abruptly=1
- -sat-config-dirs=config/sat/base/ 
+ -sat-config-dirs=config/sat/base/
  -sat-config-files=
  -preprocess-config=config/satwithpre/actors_all.json
- -satsolver=l+[k_]{'$(($n_threads_per_process-1))'} 
+ -satsolver=l+[k_]{'$(($n_threads_per_process-1))'}
 '
