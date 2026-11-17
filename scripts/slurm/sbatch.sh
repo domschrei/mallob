@@ -131,7 +131,7 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     cmd="$build/mallob $preset \
     -mono=$f -jwl=$timeout -T=$(($timeout+30)) \
     -pph=${SLURM_NTASKS_PER_NODE} -t=$((${SLURM_CPUS_PER_TASK} / 2)) \
-    -log=$globallogdir \ -tmp=$localtmpdir -comment-outputlogdir=$outputlogdir \
+    -log=$globallogdir -tmp=$localtmpdir -comment-outputlogdir=$outputlogdir \
     -sro=${globallogdir}/processed-jobs.out \
     -trace-dir=${globallogdir}/ \
     -preprocess-config=config/satwithpre/$DS_ACTORFILE \
