@@ -31,6 +31,9 @@ echo /hppfs/work/$projectname/$username/logs/${jobname}-*/ | grep -oE "\-[0-9]{7
 done
 
 for globallogdir in $outdir/*/ ; do
+    if [ $(basename $globallogdir) = "config" ]; then
+            continue
+    fi
     grep -m 1 "Program options" "$globallogdir/0/log.0" | grep -oP "mono=.*? " | sed 's/mono=//g' | awk '{print $1}' > "$globallogdir/instance.txt"
 done
 
