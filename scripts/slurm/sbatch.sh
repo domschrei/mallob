@@ -43,7 +43,21 @@ export MALLOC_CONF="thp:always"
 # HOME
 globallogdir_base=logs/$DS_JOBNAME-$SLURM_JOB_ID
 # WORK
-if [ -d "$WORK_$DS_PROJECTNAME" ]; then globallogdir_base="$WORK_$DS_PROJECTNAME/$globallogdir_base"; fi
+# if [ -d "$WORK_$DS_PROJECTNAME" ]; then globallogdir_base="$WORK_$DS_PROJECTNAME/$globallogdir_base"; fi
+if [[ $PROJECT == *toolbox* ]]; then
+    # HoreKa
+    if [[ -z $HOREKAWORK ]]; then
+        echo "Error: \$HOREKAWORK is not set" >&2
+        exit 1
+    fi
+    globallogdir_base="$HOREKAWORK/$globallogdir_base"
+else
+    # SuperMUC Work
+    if [ -d "$WORK_$DS_PROJECTNAME" ]; then 
+      globallogdir_base="$WORK_$DS_PROJECTNAME/$globallogdir_base"; 
+    fi
+fi
+
 # SCRATCH
 #if [ -d "$SCRATCH" ]; then globallogdir_base="$SCRATCH/$globallogdir_base"; fi
 
