@@ -168,4 +168,75 @@ Kernel loadKernel(const std::string &file, const KernelCache &cache = {})
 
 ### Kernel Example
 
-TODO -> From Notes
+
+```c
+MGI_KERNEL(clauseOuts)(MGI_GLOBAL MGIInfo *info, MGI_IN MGIReservoir *resolve, MGI_GLOBAL m_uint *clauseOuts)
+{
+    const m_uint current = MGI_GID_X + 2;
+    const MGIResolveInfo localResolve = resolve[MGI_GID_X].resolve;
+    clauseOuts[1] = 0; // First element is zero [1 based index]
+    // Initalize with the current size
+    clauseOuts[current] = localResolve.literal != 0 ? 
+        localResolve.resolvedSize : 0;
+    // Lockstep!
+    MGI_BARRIER(MGI_MEM_GLOBAL);
+    // Log2(n) steps needed to complete the sum
+    m_uint maxSteps = ceil(log2((float)MGI_GSIZE_X));
+    for (size_t i = 0; i < maxSteps; i++)
+    {
+        const m_uint otherIndex = current + (1 << i);
+        // Out of bounds guard
+        if (otherIndex < MGI_GSIZE_X)
+        {   
+            clauseOuts[otherIndex] += clauseOuts[current];
+        }
+        // Lockstep!
+        MGI_BARRIER(MGI_MEM_GLOBAL);
+    }
+}
+```
+
+#### Available Macros
+
+The macrotization of the kernel code allowes us to share statements between host and device code. It also enables testing on the cpu of some limited gpu code. Therefore the following definitions exist:
+
+From [`MGIKernelDefs.hpp`](../src/mgi_kernel/MGIKernelDefs.hpp), this is only used on the host for testing. You should include this into your kernel.
+```c
+// Device memory type decleration
+#define MGI_GLOBAL  
+#define MGI_LOCAL  
+#define MGI_CONST 
+#define MGI_PRIVATE  
+
+// Define an entry point
+#define MGI_KERNEL(name)
+
+// Get global launch ID
+#define MGI_GID_X
+#define MGI_GID_Y
+#define MGI_GID
+#define MGI_GID_Z
+#define MGI_GID_ND(x)
+
+// Query launch sizes
+#define MGI_GSIZE_X
+#define MGI_GSIZE_Y
+#define MGI_GSIZE
+#define MGI_GSIZE_Z
+#define MGI_GSIZE_ND(x)
+```
+
+From [`MGIShared.hpp`](../src/mgi_kernel/MGIShared.hpp), this header is shared between Host and Kernel code. You can add your own.
+```c
+    // Struct definition helper 
+    #define MGI_STRUCT(name) struct __##name; typedef struct __##name name; typedef name* name##_p; struct __##name
+    
+    // Unroll hint for the compiler
+    #define MGI_UNROLL_HINT(hint)
+
+    // Barrier
+    #define MGI_BARRIER(flags)
+    #define MGI_MEM_GLOBAL 1
+    #define MGI_MEM_LOCAL 2
+    #define MGI_MEM_IMAGE 4
+```
