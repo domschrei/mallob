@@ -14,7 +14,7 @@ if [[ $PROJECT == *toolbox* ]]; then
         exit 1
     fi
     outdir="$HOREKAWORK/logs/${jobname}"
-else
+fi
 
 openids=$(cat sbatch/generated/${jobname}/.remaining_ids)
 if ! [ -z "$openids" ]; then

@@ -39,8 +39,6 @@ SweepJob::SweepJob(const Parameters& params, const JobSetup& setup, AppMessageTa
     : BaseSatJob(params, setup, table),
 	_sweeplogger(Logger::getMainInstance().copy("<SWEEP>", ".sweep"))
 {
-	assert(_params.jobCommUpdatePeriod() > 0 || log_return_false("[ERROR] For this application to work,"
-            " you must explicitly enable job communicators with the -jcup option, e.g., -jcup=0.1\n"));
 	_solverConfig.parseFromDirsAndFiles(_params.satConfigDirs(), _params.satConfigFiles());
 }
 
