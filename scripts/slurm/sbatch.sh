@@ -169,12 +169,15 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     echo "$(date) JOB $i FINISHED"
     sleep 3 # avoid "nodes are still busy" issue?
     echo "$(date) EPILOG"
-    echo "$mpicopy $globallogdir $outputlogdir"
-    $mpicopy $globallogdir $outputlogdir
-    mkdir "$outputlogdir/$i/.alldone"
-    echo "$mpicleanup $globallogdir"
-    $mpicleanup $globallogdir
-
+    if [[ $PROJECT == *toolbox* ]]; then
+      $mpicall scripts/slurm/epilogNew.sh
+    else
+      echo "$mpicopy $globallogdir $outputlogdir"
+      $mpicopy $globallogdir $outputlogdir
+      mkdir "$outputlogdir/$i/.alldone"
+      echo "$mpicleanup $globallogdir"
+      $mpicleanup $globallogdir
+    fi
     # $mpicall scripts/slurm/epilogNew.sh
 
     echo "$(date) JOB $i FINISHED"
@@ -190,4 +193,6 @@ if ! $change; then exit; fi
 sbatch --begin=now`#+$(($DS_RUNTIME+30))` sbatch/generated/$DS_JOBNAME/sbatch.sh
 
 # clean up lod dir skeletons
-$mpicleanup $globallogdir
+if [[ $PROJECT != *toolbox* ]]; then
+  $mpicleanup $globallogdir
+fi
