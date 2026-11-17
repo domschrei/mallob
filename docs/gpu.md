@@ -112,54 +112,58 @@ This is not to be confused with `Device` memory types. Device memory types are u
 
 - `allocate` reservers new device memory. The new buffers might or might not be allocated in the same memory region depending on the `strategy`
 ```cpp
-std::vector<Memory> allocate(span<const AllocationInfo> infos, const AllocationStrategy &strategy = {})
+std::vector<Memory> allocate(span<const AllocationInfo> infos, const AllocationStrategy &strategy = {});
 ```
 
 - `readMemory` makes device memory available to the host. Depending on the memory type this requires copying the requested sections. It returns a lock which synchronizes host access to the memory. It does **NOT** synchronize the device. Synchronizing device memory access is up to the user.
 ```cpp
-ReadLock readMemory(Memory memory, span<const ReadInfo> reads)
+ReadLock readMemory(Memory memory, span<const ReadInfo> reads);
 ```
 
 - `writeMemory` writes the given memory to the device. Depending on the memory type this might require an additional copying of the requested sections. The memory is protected for host writes. It does **NOT** synchronize the device. Synchronizing device memory access is up to the user.
 ```cpp
-void writeMemory(Memory memory, span<const BufferUpdateInfo> updates)
+void writeMemory(Memory memory, span<const BufferUpdateInfo> updates);
 ```
 
 - `copyMemory` copies memory from one device memory to an other. This operation is a **deferred** operation. If you want the operation to finish after the call has completed us the `*Wait` version.
 For more information on the deffered operation see [Task Managment](#tasks)
 ```cpp
-Task copyMemory(Memory source, Memory destination, span<const MemoryCopyInfo> copyInfos)
+Task copyMemory(Memory source, Memory destination, span<const MemoryCopyInfo> copyInfos);
 
-void copyMemoryWait(Memory source, Memory destination, span<const MemoryCopyInfo> copyInfos)
+void copyMemoryWait(Memory source, Memory destination, span<const MemoryCopyInfo> copyInfos);
 ```
 
 - `freeObj` frees the memory object.
 ```cpp
-void freeObj(Memory memory)
+void freeObj(Memory memory);
 ```
 
 #### Task Managment {#tasks}
 
 - `queueTasks` launches an operation on the device. This operation is a **deferred** operation. The call returns before the operations are completed. The call is thread safe on the host. To wait for the tasks use the `waitTasks` call or none deferred variant.
 ```cpp
-std::vector<Task> queueTasks(span<const TaskInfo> tasks, const TaskStrategy &strategy = {})
+std::vector<Task> queueTasks(span<const TaskInfo> tasks, const TaskStrategy &strategy = {});
 
-std::vector<TaskStatus> queueWaitTasks(span<const TaskInfo> taskInfos, const TaskStrategy &strategy = {})
+std::vector<TaskStatus> queueWaitTasks(span<const TaskInfo> taskInfos, const TaskStrategy &strategy = {});
 
-void waitTasks(span<const Task> tasks)
+void waitTasks(span<const Task> tasks);
 ```
 
 - `getStatus` returns the current status of the operation. What this can return is dependent on the backend used.
 ```cpp
-std::vector<TaskStatus> getStatus(span<const Task> tasks)
-void freeObj(Task task)
+std::vector<TaskStatus> getStatus(span<const Task> tasks);
+```
+
+- `freeObj` frees the task object.
+```cpp
+void freeObj(Task task);
 ```
 
 #### Kernel
 
-- `loadKernel` loads a kernel file and compiles it on the host. This operation is not synchronized (This might change). Kernels are loaded from the 
+- `loadKernel` loads a kernel file and compiles it on the host. This operation is not synchronized (This might change). Kernels are loaded from the [`mgi_kernel`](../src/mgi_kernel)
 ```cpp
-Kernel loadKernel(const std::string &file, const KernelCache &cache = {})
+Kernel loadKernel(const std::string &file, const KernelCache &cache = {});
 ```
 
 #### Integration
