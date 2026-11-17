@@ -127,26 +127,16 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     # -sat-config-files=config/sat/kissat-plaincheap.json \
     # -sat-config-files=config/sat/kissat-nowalk.json \
     timeout=$DS_SECONDSPERJOB
-    cmd="$build/mallob \
-    -mono-app=$DS_APP \
-    -preprocess-config=config/satwithpre/actors_M_SM_SKM_E.json \
-    -sat-config-files= \
-    -satsolver=k \
-    -mono=$f -jwl=$timeout -T=$(($timeout+30)) -wam=60000 -pre-cleanup=1 \
-    -log=$globallogdir -tmp=$localtmpdir -comment-outputlogdir=$outputlogdir -sro=${globallogdir}/processed-jobs.out \
+    preset="$(config/presets/supermuc/satwithpre | tr '\n' ' ')"
+    cmd="$build/mallob $preset \
+    -mono=$f -jwl=$timeout -T=$(($timeout+30)) \
+    -pph=${SLURM_NTASKS_PER_NODE} -t=$((${SLURM_CPUS_PER_TASK} / 2)) \
+    -log=$globallogdir \ -tmp=$localtmpdir -comment-outputlogdir=$outputlogdir \
+    -sro=${globallogdir}/processed-jobs.out \
     -trace-dir=${globallogdir}/ \
-    -rpa=1 -pph=${SLURM_NTASKS_PER_NODE} -mlpt=30000000 -t=$((${SLURM_CPUS_PER_TASK} / 2)) \
-    -isp=0 -cfci=30  -rlbd=0 -ilbd=1 \
-    -q=0 \
-    -os=1 \
-    -cm=0 \
-    -rspaa=1 \
-    -jcup=0.1 \
-    -cjc=1 \
-    -v=3 \
-    -seed=0 \
-    -ems=0 \
-    -spd=${globallogdir}/ -spl=-1"
+    -preprocess-config=config/satwithpre/actors_M_SM_SKM_E.json \
+    -sat-config-files=
+    "
 
     # Pre-create network-disk output directories to avoid many concurrent filesystem manips
     mkdir -p $(for rank in $(seq 0 $(($SLURM_NTASKS-1))); do echo $outputlogdir/$i/$rank; done)
