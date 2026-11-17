@@ -15,6 +15,9 @@
 # SuperMUC has TWO processors with 24 physical cores each, totalling 48 physical cores (96 hwthreads)
 # See: https://doku.lrz.de/download/attachments/43321076/SuperMUC-NG_computenode.png
 
+
+date
+
 module load slurm_setup;
 # module unload devEnv/Intel/2019 intel-mpi; module load gcc/11 intel-mpi/2019-gcc cmake/3.14.5 gdb
 
@@ -29,7 +32,7 @@ hostname
 module list
 which mpirun
 echo "#ranks: $SLURM_NTASKS"
-echo "$(date)"
+date
 
 build="build" # TODO your build directory for Mallob
 
@@ -158,10 +161,12 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     # Launch
     echo "$(date) JOB $i LAUNCHING"
 
+    date
     echo $mpicall $cmd
     $mpicall bash -c "scripts/slurm/prolog.sh ; $cmd"
 
     sleep 3 # avoid "nodes are still busy" issue?
+    date
     echo "EPILOG"
     echo "$mpicopy $globallogdir $outputlogdir"
     $mpicopy $globallogdir $outputlogdir
