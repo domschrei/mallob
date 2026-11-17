@@ -134,7 +134,7 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     -log=$globallogdir \ -tmp=$localtmpdir -comment-outputlogdir=$outputlogdir \
     -sro=${globallogdir}/processed-jobs.out \
     -trace-dir=${globallogdir}/ \
-    -preprocess-config=$DS_ACTORFILE \
+    -preprocess-config=config/satwithpre/$DS_ACTORFILE \
     -sat-config-files=
     "
 
