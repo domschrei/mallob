@@ -159,13 +159,13 @@ void freeObj(Task task)
 
 #### Kernel
 
-- `loadKernel` loads a kernel file and compiles it on the host. This operation is not synchronized. (This might change)
+- `loadKernel` loads a kernel file and compiles it on the host. This operation is not synchronized (This might change). Kernels are loaded from the 
 ```cpp
 Kernel loadKernel(const std::string &file, const KernelCache &cache = {})
 ```
 
 #### Intigration
 
-
+### Kernel Example
 
 TODO -> From Notes
