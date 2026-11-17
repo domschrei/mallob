@@ -110,8 +110,6 @@ This is not to be confused with `Device` memory types. Device memory types are u
 
 #### Memory Managment
 
-
-
 - `allocate` reservers new device memory. The new buffers might or might not be allocated in the same memory region depending on the `strategy`
 ```cpp
 std::vector<Memory> allocate(span<const AllocationInfo> infos, const AllocationStrategy &strategy = {})
@@ -164,10 +162,15 @@ void freeObj(Task task)
 Kernel loadKernel(const std::string &file, const KernelCache &cache = {})
 ```
 
-#### Intigration
+#### Integration
+
+
+![Integration into mallob](pictures/integration.png)
 
 ### Kernel Example
 
+The following kernel code uses OpenCL C and computes a prefix sum.
+It uses macros to make this code also compileable on the cpu. Which you can read more about in the following section. The structs are shared between the host and the device through a combined header. See the [`resolution_kernel.cpp`](../src/mgi_kernel/resolution_kernel.cpp) and the following section for implementation details.
 
 ```c
 MGI_KERNEL(clauseOuts)(MGI_GLOBAL MGIInfo *info, MGI_IN MGIReservoir *resolve, MGI_GLOBAL m_uint *clauseOuts)
