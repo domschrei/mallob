@@ -1,0 +1,9 @@
+[
+    {
+        "id": "lgl",
+        "type": "LINGELING",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    }
+]

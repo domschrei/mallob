@@ -1,0 +1,9 @@
+[
+    {
+        "id": "E",
+        "type": "MALLOBSWEEP",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    }
+]

@@ -1,0 +1,10 @@
+[
+    {
+        "id": "Mk",
+        "type": "MALLOBSAT",
+        "options": "-satsolver=l+[k]{23}",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    }
+]

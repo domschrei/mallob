@@ -1,0 +1,9 @@
+[
+    {
+        "id": "K",
+        "type": "KISSAT",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    }
+]

@@ -23,5 +23,5 @@ echo '
  -sat-config-dirs=config/sat/base/ 
  -sat-config-files=
  -preprocess-config=config/satwithpre/actors_all.json
- -satsolver=k_k_l+[k_]{'$(($n_threads_per_process-3))'} 
+ -satsolver=l+[k_]{'$(($n_threads_per_process-1))'} 
 '
