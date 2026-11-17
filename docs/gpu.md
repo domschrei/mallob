@@ -164,6 +164,7 @@ Kernel loadKernel(const std::string &file, const KernelCache &cache = {})
 
 #### Integration
 
+If GPU support is enabled a `mgi::DeferredAPI` instance is automatically created (for SAT-Jobs only) from the selected API type. It is automatically stored in [`ForkedSatJob`](../src/app/sat/job/forked_sat_job.hpp). For other use cases create your own instance once for each MPI process. The API is desgined to be thread safe and can therfore be used between multiple threads. Integration examples can be seen in the following diagram.
 
 ![Integration into mallob](pictures/integration.png)
 
