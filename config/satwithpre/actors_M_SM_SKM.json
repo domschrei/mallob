@@ -4,8 +4,7 @@
         "type": "MALLOBSAT",
         "prerequisite": null,
         "actorsBeingDisplaced": [],
-        "onlyStartIfPrerequisiteSimplified": false,
-        "options": "-satsolver=k_c_l+[k_]{29}"
+        "onlyStartIfPrerequisiteSimplified": false
     },
     {
         "id": "satsuma",
@@ -19,8 +18,7 @@
         "type": "MALLOBSAT",
         "prerequisite": "satsuma",
         "actorsBeingDisplaced": ["mallobsat-plain"],
-        "onlyStartIfPrerequisiteSimplified": true,
-        "options": "-satsolver=k_c_l+[k_]{29}"
+        "onlyStartIfPrerequisiteSimplified": true
     },
     {
         "id": "kissat-on-satsuma",
@@ -34,7 +32,6 @@
         "type": "MALLOBSAT",
         "prerequisite": "kissat-on-satsuma",
         "actorsBeingDisplaced": ["mallobsat-plain", "mallobsat-on-satsuma"],
-        "onlyStartIfPrerequisiteSimplified": true,
-        "options": "-satsolver=k_c_l+[k_]{29} -ems=1 -spl=4"
+        "onlyStartIfPrerequisiteSimplified": true
     }
 ]

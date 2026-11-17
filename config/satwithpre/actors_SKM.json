@@ -18,7 +18,6 @@
         "type": "MALLOBSAT",
         "prerequisite": "SK",
         "actorsBeingDisplaced": [],
-        "onlyStartIfPrerequisiteSimplified": false,
-        "options": "-satsolver=k_c_l+[k_]{29} -ems=1"
+        "onlyStartIfPrerequisiteSimplified": false
     }
 ]

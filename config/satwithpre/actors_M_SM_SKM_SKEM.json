@@ -4,8 +4,7 @@
         "type": "MALLOBSAT",
         "prerequisite": null,
         "actorsBeingDisplaced": [],
-        "onlyStartIfPrerequisiteSimplified": false,
-        "options": "-satsolver=k_c_l+[k_]{29}"
+        "onlyStartIfPrerequisiteSimplified": false
     },
     {
         "id": "S",
@@ -19,8 +18,7 @@
         "type": "MALLOBSAT",
         "prerequisite": "S",
         "actorsBeingDisplaced": ["M"],
-        "onlyStartIfPrerequisiteSimplified": true,
-        "options": "-satsolver=k_c_l+[k_]{29}"
+        "onlyStartIfPrerequisiteSimplified": true
     },
     {
         "id": "SK",
@@ -34,23 +32,20 @@
         "type": "MALLOBSAT",
         "prerequisite": "SK",
         "actorsBeingDisplaced": ["M", "SM"],
-        "onlyStartIfPrerequisiteSimplified": true,
-        "options": "-satsolver=k_c_l+[k_]{29}"
+        "onlyStartIfPrerequisiteSimplified": true
     },
     {
         "id": "SKE",
         "type": "MALLOBSWEEP",
         "prerequisite": "SK",
         "actorsBeingDisplaced": [],
-        "onlyStartIfPrerequisiteSimplified": false,
-		"options": "-fcll=2 -rspaa=1 -jcup=0.1"
+        "onlyStartIfPrerequisiteSimplified": false
 	},
     {
         "id": "SKEM",
         "type": "MALLOBSAT",
         "prerequisite": "SKE",
         "actorsBeingDisplaced": ["M", "SM", "SKM"],
-        "onlyStartIfPrerequisiteSimplified": true,
-        "options": "-satsolver=k_c_l+[k_]{29}"
+        "onlyStartIfPrerequisiteSimplified": true
     }
 ]
