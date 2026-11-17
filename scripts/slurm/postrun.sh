@@ -7,6 +7,14 @@ source $ACCOUNTINFO
 
 jobname="$1"
 outdir="/hppfs/work/$projectname/$username/logs/${jobname}"
+if [[ $PROJECT == *toolbox* ]]; then
+    # HoreKa
+    if [[ -z $HOREKAWORK ]]; then
+        echo "Error: \$HOREKAWORK is not set" >&2
+        exit 1
+    fi
+    outdir="$HOREKAWORK/logs/${jobname}"
+else
 
 openids=$(cat sbatch/generated/${jobname}/.remaining_ids)
 if ! [ -z "$openids" ]; then
@@ -16,13 +24,13 @@ if ! [ -z "$openids" ]; then
 fi
 
 mkdir -p "$outdir/"
-for f in /hppfs/work/$projectname/$username/logs/${jobname}-*/*/.alldone ; do
+for f in $outdir-*/*/.alldone ; do
     if [ -d "$outdir/$(basename $(dirname $f))" ]; then continue; fi
     mv $(dirname $f) "$outdir/"
 done
 mv sbatch/generated/${jobname}/sbatch.sh "$outdir/"
 mv sbatch/generated/${jobname}/config/ "$outdir/"
-echo /hppfs/work/$projectname/$username/logs/${jobname}-*/ | grep -oE "\-[0-9]{7}/" | grep -oE "[0-9]{7}" | while read slurmid; do
+echo $outdir-*/ | grep -oE "\-[0-9]{7}/" | grep -oE "[0-9]{7}" | while read slurmid; do
     if ! [ -f slurm-${slurmid}.out ]; then
        echo "WARN: Slurm file slurm-${slurmid}.out not present"
        continue
@@ -46,4 +54,4 @@ rmdir sbatch/generated/${jobname}
 
 echo ""
 echo "If all went well, you can now delete the old log directories by executing:"
-echo "    rm -rf /hppfs/work/$projectname/$username/logs/${jobname}-*"
+echo "    rm -rf $outdir-*"
