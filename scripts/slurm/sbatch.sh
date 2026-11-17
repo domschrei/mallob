@@ -163,13 +163,13 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     # Launch
     echo "$(date) JOB $i LAUNCHING"
 
-    date
     echo $mpicall $cmd
     $mpicall bash -c "scripts/slurm/prolog.sh ; $cmd"
 
+
+    echo "$(date) JOB $i FINISHED"
     sleep 3 # avoid "nodes are still busy" issue?
-    date
-    echo "EPILOG"
+    echo "$(date) EPILOG"
     echo "$mpicopy $globallogdir $outputlogdir"
     $mpicopy $globallogdir $outputlogdir
     mkdir "$outputlogdir/$i/.alldone"
