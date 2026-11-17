@@ -18,7 +18,6 @@
 
 date
 
-module load slurm_setup;
 # module unload devEnv/Intel/2019 intel-mpi; module load gcc/11 intel-mpi/2019-gcc cmake/3.14.5 gdb
 
 source load_standard_modules.sh
