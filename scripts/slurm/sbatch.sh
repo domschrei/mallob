@@ -181,8 +181,8 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
 
     # Assemble MPI command options
     mpicall="mpiexec -n $SLURM_NTASKS --bind-to core --map-by numa -genvall"
-    mpicleanup="mpiexec -n $((SLURM_NTASKS)) drm --traceless --lite --aggressive"
-    mpicopy="mpiexec -n $((SLURM_NTASKS)) dcp"
+    mpicleanup="mpiexec -n $((SLURM_NTASKS)) drm -q --traceless --lite --aggressive"
+    mpicopy="mpiexec -n $((SLURM_NTASKS)) dcp -q"
 
     # Drop hint which file we're solving
     echo "$f -> $globallogdir"
