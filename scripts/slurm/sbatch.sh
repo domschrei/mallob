@@ -142,11 +142,10 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
 
     if [[ -n "$DS_COPYTOTMP" ]]; then
       echo "COPYTOTMP_START $(date +"%T.%3N")"
-      super_local_dir=/tmp/mallob/
-      mkdir -p $super_local_dir
-      cp "$f" $super_local_dir
-      justInstName=$(basename "$f")
-      f=$super_local_dir/$justInstName
+      buffered_dir=$SCRATCH/buffercopy/
+      mkdir -p $buffered_dir
+      cp "$f" $buffered_dir
+      f=$buffered_dir/$f
       echo "COPYTOTMP_END $(date +"%T.%3N")"
       echo "NEW INSTANCE PATH $f"
     fi
