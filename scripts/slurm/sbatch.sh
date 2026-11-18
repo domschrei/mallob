@@ -146,7 +146,7 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
       mkdir -p $buffered_dir
       cp "$f" $buffered_dir
       f=$buffered_dir/$f
-      echo "COPYTOTMP_END $(date +"%T.%3N")"
+      echo "COPYTOTMP_END   $(date +"%T.%3N")"
       echo "NEW INSTANCE PATH $f"
     fi
     
