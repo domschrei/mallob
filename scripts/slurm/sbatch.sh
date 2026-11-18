@@ -143,14 +143,15 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     if [[ -n "$DS_COPYTOTMP" ]]; then
       t_start=$(date +%s.%N)
       echo "COPYTOTMP_START $(date +"%T.%3N")"
-      buffered_dir=$SCRATCH/buffercopy/
-      mkdir -p $buffered_dir
-      cp "$f" $buffered_dir
-      f=$buffered_dir/$f
+      buffered_dir="$SCRATCH/buffercopy/$SLURM_JOB_ID/$i"   # unique per job and instance, to avoid clashes 
+      mkdir -p "$buffered_dir"
+      cp --parents "$f" "$buffered_dir"  # we want to remember the full original source path, to have faithful logs
+      f="${buffered_dir%/}/${f#/}"       # remove double slashes
       t_end=$(date +%s.%N)
       echo "COPYTOTMP_END   $(date +"%T.%3N")"
       awk -v s="$t_start" -v e="$t_end" 'BEGIN { printf "COPYTOTMP_DURATION %.3f s\n", e - s }'
       echo "NEW INSTANCE PATH $f"
+      [[ -s "$f" ]] || echo "ERROR: buffered instance missing or empty: $f"
     fi
     
     # -preprocess-config=config/satwithpre/actors_M_SM_SKM.json \
