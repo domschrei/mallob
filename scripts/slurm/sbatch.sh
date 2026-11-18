@@ -141,12 +141,15 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     # TODO Configure Mallob
 
     if [[ -n "$DS_COPYTOTMP" ]]; then
+      t_start=$(date +%s.%N)
       echo "COPYTOTMP_START $(date +"%T.%3N")"
       buffered_dir=$SCRATCH/buffercopy/
       mkdir -p $buffered_dir
       cp "$f" $buffered_dir
       f=$buffered_dir/$f
+      t_end=$(date +%s.%N)
       echo "COPYTOTMP_END   $(date +"%T.%3N")"
+      awk -v s="$t_start" -v e="$t_end" 'BEGIN { printf "COPYTOTMP_DURATION %.3f s\n", e - s }'
       echo "NEW INSTANCE PATH $f"
     fi
     
