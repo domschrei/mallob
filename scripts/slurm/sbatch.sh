@@ -65,6 +65,9 @@ fi
 localtmpdir_base=${SCRATCH}/tmp/$DS_JOBNAME-$SLURM_JOB_ID # fast (?) disk
 mkdir -p $localtmpdir_base $globallogdir_base
 
+echo "SCRATCH is: $SCRATCH"
+echo "TMPDIR is:  $TMPDIR"
+
 # Benchmark instances, one per line
 # benchmarkfile="/hppfs/work/$projname/$username/instances/2023+2024-unique.txt" # TODO benchmark file
 benchmarkfile="$DS_BENCHMARKFILE"
