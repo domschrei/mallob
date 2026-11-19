@@ -10,10 +10,14 @@
 #SBATCH --ear=off # Needed for profiling / benchmarking
 #SBATCH --switches=1 # Force a single island
 
+
 # SBATCH --ear-mpi-dist=openmpi # For OpenMPI
+
+# For Horeka2 we overwrite/add/remove some of these SBATCH values! 
 
 # SuperMUC has TWO processors with 24 physical cores each, totalling 48 physical cores (96 hwthreads)
 # See: https://doku.lrz.de/download/attachments/43321076/SuperMUC-NG_computenode.png
+
 
 
 date
@@ -67,6 +71,9 @@ mkdir -p $localtmpdir_base $globallogdir_base
 
 echo "SCRATCH is: $SCRATCH"
 echo "TMPDIR is:  $TMPDIR"
+echo "$(hostname) rank ${OMPI_COMM_WORLD_RANK:-$PMI_RANK}: $(grep Cpus_allowed_list /proc/self/status)"
+echo "numactl -H"
+numactl -H
 
 # Benchmark instances, one per line
 # benchmarkfile="/hppfs/work/$projname/$username/instances/2023+2024-unique.txt" # TODO benchmark file
@@ -173,6 +180,8 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     -sat-config-files=
     "
 
+    # DIVISION BY 2 on the solvercount -t=... because the slurm variable counts hwthreads (since we activated hyperthreading), but we want to spawn a SAT-Solver only for every physical core, which is half as many hwthreads that each process receives
+
     # Pre-create network-disk output directories to avoid many concurrent filesystem manips
     mkdir -p $(for rank in $(seq 0 $(($SLURM_NTASKS-1))); do echo $outputlogdir/$i/$rank; done)
 
@@ -183,9 +192,15 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     export MALLOB_NUMNODES=$DS_NODES
 
     # Assemble MPI command options
-    mpicall="mpiexec -n $SLURM_NTASKS --bind-to core --map-by numa -genvall"
-    mpicleanup="mpiexec -n $((SLURM_NTASKS)) drm -q --traceless --lite --aggressive"
-    mpicopy="mpiexec -n $((SLURM_NTASKS)) dcp -q"
+    if [[ $PROJECT == *toolbox* ]]; then
+      # HoreKa: Open MPI; PE counts physical cores
+      mpicall="mpirun -n $SLURM_NTASKS --bind-to core --map-by numa:PE=$((SLURM_CPUS_PER_TASK / 2)) --report-bindings \
+        -x PATH -x RDMAV_FORK_SAFE -x MALLOC_CONF -x MALLOB_GLOBALLOGDIR -x MALLOB_LOCALTMPDIR \
+        -x MALLOB_OUTPUTLOGDIR -x MALLOB_BUILDDIR -x MALLOB_NUMNODES"
+    else
+      # SuperMUC: Intel MPI
+      mpicall="mpiexec -n $SLURM_NTASKS --bind-to core --map-by numa -genvall"
+    fi
 
     # Drop hint which file we're solving
     echo "$f -> $globallogdir"
@@ -196,13 +211,14 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     echo $mpicall $cmd
     $mpicall bash -c "scripts/slurm/prolog.sh ; $cmd"
 
-
     echo "$(date) JOB $i FINISHED"
     sleep 3 # avoid "nodes are still busy" issue?
     echo "$(date) EPILOG"
     if [[ $PROJECT == *toolbox* ]]; then
       $mpicall scripts/slurm/epilogNew.sh
     else
+      mpicleanup="mpiexec -n $((SLURM_NTASKS)) drm -q --traceless --lite --aggressive"
+      mpicopy="mpiexec -n $((SLURM_NTASKS)) dcp -q"
       echo "$mpicopy $globallogdir $outputlogdir"
       $mpicopy $globallogdir $outputlogdir
       mkdir "$outputlogdir/$i/.alldone"
