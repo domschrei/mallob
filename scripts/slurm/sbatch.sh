@@ -191,15 +191,22 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     export MALLOB_BUILDDIR=$build
     export MALLOB_NUMNODES=$DS_NODES
 
+    # For SuperMuc, Intel MPI bindings need to be provided via these exports.
+    # Pinning each rank to one socket, 24 cores + their 24 hyperthreads (48 logical CPUs)
+    # compact for a nice order
+    export I_MPI_PIN=1
+    export I_MPI_PIN_DOMAIN=socket
+    export I_MPI_PIN_ORDER=compact
+
     # Assemble MPI command options
     if [[ $PROJECT == *toolbox* ]]; then
-      # HoreKa: Open MPI; PE counts physical cores
+      # HoreKa: Open MPI; PE for each process counts physical cores
       mpicall="mpirun -n $SLURM_NTASKS --bind-to core --map-by numa:PE=$((SLURM_CPUS_PER_TASK / 2)) --report-bindings \
         -x PATH -x RDMAV_FORK_SAFE -x MALLOC_CONF -x MALLOB_GLOBALLOGDIR -x MALLOB_LOCALTMPDIR \
         -x MALLOB_OUTPUTLOGDIR -x MALLOB_BUILDDIR -x MALLOB_NUMNODES"
     else
-      # SuperMUC: Intel MPI
-      mpicall="mpiexec -n $SLURM_NTASKS --bind-to core --map-by numa -genvall"
+      # SuperMUC: Intel MPI. Factored out the pinning into I_MPI_* variables above
+      mpicall="mpiexec -n $SLURM_NTASKS -genvall"
     fi
 
     # Drop hint which file we're solving
