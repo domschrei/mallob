@@ -211,8 +211,7 @@ while is_enough_time_remaining; do
     -log=$globallogdir -tmp=$localtmpdir -comment-outputlogdir=$outputlogdir \
     -sro=${globallogdir}/processed-jobs.out \
     -trace-dir=${globallogdir}/ \
-    -preprocess-config=config/satwithpre/$DS_ACTORFILE \
-    -sat-config-files=
+    -preprocess-config=config/satwithpre/$DS_ACTORFILE
     "
 
     # DIVISION BY 2 in the solvercount flag -t=... because the slurm variable counts hwthreads since we activated hyperthreading, 
