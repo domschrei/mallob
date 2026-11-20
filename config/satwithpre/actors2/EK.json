@@ -1,0 +1,16 @@
+[
+    {
+        "id": "E",
+        "type": "MALLOBSWEEP",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "EK",
+        "type": "KISSAT",
+        "prerequisite": "E",
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    }
+]

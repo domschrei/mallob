@@ -1,0 +1,16 @@
+[
+    {
+        "id": "E",
+        "type": "MALLOBSWEEP",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "ES",
+        "type": "SATSUMA_EXT",
+        "prerequisite": "E",
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    }
+]

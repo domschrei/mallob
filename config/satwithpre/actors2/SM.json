@@ -1,0 +1,16 @@
+[
+    {
+        "id": "S",
+        "type": "SATSUMA_EXT",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "SM",
+        "type": "MALLOBSAT",
+        "prerequisite": "S",
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    }
+]
