@@ -155,15 +155,15 @@ while is_enough_time_remaining; do
     # We can be unlucky with the filesystem even a simple single file read can take more than a minute to complete.
     # To buffer such latencies such that Mallob doesn't see them (and they don't count towards Mallobs time),
     # copy the "cold" instance such that the fresh temporary copy is "warm" for Mallob to read
-    if [[ -n "$DS_COPYTOTMP" ]]; then
+    if [[ -n "$DS_BUFFERCOPY" ]]; then
       buffered_dir="$SCRATCH/buffercopy/$SLURM_JOB_ID/$i"   # unique per job and instance to avoid clashes 
       t_start=$(date +%s.%N)
-      echo "COPYTOTMP_START $(date +"%T.%3N")"
+      echo "BUFFERCOPY_START $(date +"%T.%3N")"
       mkdir -p "$buffered_dir"
       cp --parents "$f" "$buffered_dir"  # we want to remember the full original source path 
-      echo "COPYTOTMP_END   $(date +"%T.%3N")"
+      echo "BUFFERCOPY_END   $(date +"%T.%3N")"
       t_end=$(date +%s.%N)
-      awk -v s="$t_start" -v e="$t_end" 'BEGIN { printf "COPYTOTMP_DURATION %.3f s\n", e - s }'
+      awk -v s="$t_start" -v e="$t_end" 'BEGIN { printf "BUFFERCOPY_DUR %.3f s\n", e - s }'
       f="${buffered_dir%/}/${f#/}"       # remove double slashes
       echo "NEW INSTANCE PATH $f"
       [[ -s "$f" ]] || echo "ERROR: buffered instance missing or empty: $f"
@@ -172,7 +172,7 @@ while is_enough_time_remaining; do
     # If we actually encounter a large filesystem latency, after copying the instance we might no longer have enough time for solving
     if ! is_enough_time_remaining; then
         echo "$(date) JOB $i SKIPPED after copy: only $(slurm_time_left) s left -> returning ID to queue"
-        [[ -n "$DS_COPYTOTMP" ]] && rm -rf "$buffered_dir"
+        [[ -n "$DS_BUFFERCOPY" ]] && rm -rf "$buffered_dir"
         while ! mkdir $lockfile 2>/dev/null; do 
           sleep 0.1; 
         done
@@ -269,7 +269,7 @@ while is_enough_time_remaining; do
     fi
 
     # Clean up the buffered instance
-    [[ -n "$DS_COPYTOTMP" ]] && [[ -n "$buffered_dir" ]] && rm -rf "$buffered_dir"
+    [[ -n "$DS_BUFFERCOPY" ]] && [[ -n "$buffered_dir" ]] && rm -rf "$buffered_dir"
 
 
     echo "$(date) JOB $i FINISHED"
