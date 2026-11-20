@@ -147,7 +147,8 @@ while is_enough_time_remaining; do
 
     echo ""
     echo ""
-    echo "index:    $i"
+    echo ""
+    echo "try index:    $i"
 
     # Benchmark file
     f=$(cat $benchmarkfile|sed $i'q;d')
@@ -199,7 +200,6 @@ while is_enough_time_remaining; do
     echo "instance: $f"
     echo "SLURM_NTASKS_PER_NODE" $SLURM_NTASKS_PER_NODE
     echo "SLURM_CPUS_PER_TASK: " $SLURM_CPUS_PER_TASK
-    echo " "
 
     # TODO Configure Mallob
     #
