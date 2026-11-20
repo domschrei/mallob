@@ -29,12 +29,15 @@ echo "SLURM  end:   $(date -d @${SLURM_JOB_END_TIME:-0})"
 echo "SCRIPT start: $(date -d @$script_start)"
 echo "SLURM-TO-SCRIPT delay: $(( script_start - ${SLURM_JOB_START_TIME:-$script_start} )) s"
 
-
 source load_standard_modules.sh
 
 username="$DS_USERNAME"
 projname="$DS_PROJECTNAME"
 starttime=$(date +%s)
+
+onHoreka() {
+  [[ $PROJECT == *toolbox* ]]
+}
 
 # For debugging
 hostname
@@ -54,8 +57,7 @@ export MALLOC_CONF="thp:always"
 globallogdir_base=logs/$DS_JOBNAME-$SLURM_JOB_ID
 # WORK
 # if [ -d "$WORK_$DS_PROJECTNAME" ]; then globallogdir_base="$WORK_$DS_PROJECTNAME/$globallogdir_base"; fi
-if [[ $PROJECT == *toolbox* ]]; then
-    # HoreKa
+if onHoreka ; then
     if [[ -z $HOREKAWORK ]]; then
         echo "Error: \$HOREKAWORK is not set" >&2
         exit 1
@@ -76,9 +78,12 @@ echo "TMPDIR is:  $TMPDIR"
 echo "$(hostname) rank ${OMPI_COMM_WORLD_RANK:-$PMI_RANK}: $(grep Cpus_allowed_list /proc/self/status)"
 
 # Directories for writing and for storing logs
-# On Horeka its technically advised to use $TMPDIR instead of $SCRATCH, but according to the logs above 
-# both lead to the same /scratch anyways
 localtmpdir_base=${SCRATCH}/tmp/$DS_JOBNAME-$SLURM_JOB_ID # fast (?) disk
+if onHoreka ; then
+  # they advise to use $TMPDIR, though according to my logs above it also points to /scratch anyways...
+  localtmpdir_base=${TMPDIR}/tmp/$DS_JOBNAME-$SLURM_JOB_ID #  
+fi
+
 mkdir -p $localtmpdir_base $globallogdir_base
 
 # echo "numactl -H"
@@ -115,28 +120,17 @@ is_enough_time_remaining() {
 while is_enough_time_remaining; do
 
     # obtain lock
-    # while ! mkdir $lockfile 2> /dev/null ; do
-        # if ! is_enough_time_remaining; then
-            # break # timeout
-        # fi
-        # sleep 0.1
-    # done
-    # lock held
-
-    # obtain lock
     got_lock=false
     while is_enough_time_remaining; do
         if mkdir $lockfile 2>/dev/null; then got_lock=true; break; fi
         sleep 0.1
     done
-    if ! $got_lock; then break; fi   # lock is not ours -> do NOT rmdir it
+    if ! $got_lock; then 
+      # lock is not ours -> NOT removing it
+      # and we also ran out of time, so breaking out of the overall loop
+      break; 
+    fi   
     # lock held
-
-    # exit if you may be unable to finish another job in time
-    # if ! is_enough_time_remaining; then
-        # rmdir $lockfile # release lock
-        # break
-    # fi
 
     # extract next job from file of remaining instance IDs (should be constant-time)
     i=$(tail -n 1 $idfile)
@@ -162,15 +156,15 @@ while is_enough_time_remaining; do
     # To buffer such latencies such that Mallob doesn't see them (and they don't count towards Mallobs time),
     # copy the "cold" instance such that the fresh temporary copy is "warm" for Mallob to read
     if [[ -n "$DS_COPYTOTMP" ]]; then
+      buffered_dir="$SCRATCH/buffercopy/$SLURM_JOB_ID/$i"   # unique per job and instance to avoid clashes 
       t_start=$(date +%s.%N)
       echo "COPYTOTMP_START $(date +"%T.%3N")"
-      buffered_dir="$SCRATCH/buffercopy/$SLURM_JOB_ID/$i"   # unique per job and instance to avoid clashes 
       mkdir -p "$buffered_dir"
       cp --parents "$f" "$buffered_dir"  # we want to remember the full original source path 
-      f="${buffered_dir%/}/${f#/}"       # remove double slashes
-      t_end=$(date +%s.%N)
       echo "COPYTOTMP_END   $(date +"%T.%3N")"
+      t_end=$(date +%s.%N)
       awk -v s="$t_start" -v e="$t_end" 'BEGIN { printf "COPYTOTMP_DURATION %.3f s\n", e - s }'
+      f="${buffered_dir%/}/${f#/}"       # remove double slashes
       echo "NEW INSTANCE PATH $f"
       [[ -s "$f" ]] || echo "ERROR: buffered instance missing or empty: $f"
     fi
@@ -179,14 +173,15 @@ while is_enough_time_remaining; do
     if ! is_enough_time_remaining; then
         echo "$(date) JOB $i SKIPPED after copy: only $(slurm_time_left) s left -> returning ID to queue"
         [[ -n "$DS_COPYTOTMP" ]] && rm -rf "$buffered_dir"
-        while ! mkdir $lockfile 2>/dev/null; do sleep 0.1; done
+        while ! mkdir $lockfile 2>/dev/null; do 
+          sleep 0.1; 
+        done
         echo "$i" >> $idfile
         rmdir $lockfile
         break
     fi
 
-    # Only NOW we comitted to this istance
-
+    # Only now we comitted to this instance
 
     echo "logdir: $globallogdir , localtmp: $localtmpdir , output: $outputlogdir"
 	  echo " "
@@ -202,7 +197,6 @@ while is_enough_time_remaining; do
     echo "SLURM_CPUS_PER_TASK: " $SLURM_CPUS_PER_TASK
     echo " "
 
-    
     # TODO Configure Mallob
     #
     timeout=$DS_SECONDSPERJOB
@@ -217,7 +211,8 @@ while is_enough_time_remaining; do
     -sat-config-files=
     "
 
-    # DIVISION BY 2 on the solvercount -t=... because the slurm variable counts hwthreads (since we activated hyperthreading), but we want to spawn a SAT-Solver only for every physical core, which is half as many hwthreads that each process receives
+    # DIVISION BY 2 in the solvercount flag -t=... because the slurm variable counts hwthreads since we activated hyperthreading, 
+    # but we want to spawn only spawn a SAT-Solver for every physical core, which is half of the number of hwthreads that each process receives
 
     # Pre-create network-disk output directories to avoid many concurrent filesystem manips
     mkdir -p $(for rank in $(seq 0 $(($SLURM_NTASKS-1))); do echo $outputlogdir/$i/$rank; done)
@@ -236,7 +231,7 @@ while is_enough_time_remaining; do
     export I_MPI_PIN_ORDER=compact
 
     # Assemble MPI command options
-    if [[ $PROJECT == *toolbox* ]]; then
+    if onHoreka ; then
       # HoreKa: Open MPI; PE for each process counts physical cores
       mpicall="mpirun -n $SLURM_NTASKS --bind-to core --map-by numa:PE=$((SLURM_CPUS_PER_TASK / 2)) --report-bindings \
         -x PATH -x RDMAV_FORK_SAFE -x MALLOC_CONF -x MALLOB_GLOBALLOGDIR -x MALLOB_LOCALTMPDIR \
@@ -258,7 +253,8 @@ while is_enough_time_remaining; do
     echo "$(date) JOB $i FINISHED"
     sleep 3 # avoid "nodes are still busy" issue?
     echo "$(date) EPILOG"
-    if [[ $PROJECT == *toolbox* ]]; then
+    if onHoreka ; then
+      # Horeka doesnt support mpifileutils 
       $mpicall scripts/slurm/epilogNew.sh
     else
       mpicleanup="mpiexec -n $((SLURM_NTASKS)) drm -q --traceless --lite --aggressive"
@@ -268,7 +264,6 @@ while is_enough_time_remaining; do
       echo "$mpicleanup $globallogdir"
       $mpicleanup $globallogdir
     fi
-    # $mpicall scripts/slurm/epilogNew.sh
 
     echo "$(date) JOB $i FINISHED"
 
@@ -282,7 +277,3 @@ if ! $change; then exit; fi
 # Submit next instance, to begin after this job is done (do nothing if it fails)
 sbatch --begin=now`#+$(($DS_RUNTIME+$SLURM_OVERHEAD_BUFFER))` sbatch/generated/$DS_JOBNAME/sbatch.sh
 
-# clean up lod dir skeletons
-# if [[ $PROJECT != *toolbox* ]]; then
-  # $mpicleanup $globallogdir
-# fi
