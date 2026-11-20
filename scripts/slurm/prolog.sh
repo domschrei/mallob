@@ -7,4 +7,4 @@ localtmpdir=$MALLOB_LOCALTMPDIR
 
 mkdir -p "$localtmpdir" "$globallogdir"
 
-echo "PROLOG END $(date)"
+echo "$(date) PROLOG END"

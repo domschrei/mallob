@@ -27,7 +27,7 @@ script_start=$(date +%s)
 echo "SLURM  start: $(date -d @${SLURM_JOB_START_TIME:-0})" # converts an integer into the date string
 echo "SLURM  end:   $(date -d @${SLURM_JOB_END_TIME:-0})"
 echo "SCRIPT start: $(date -d @$script_start)"
-echo "SLURM-TO-SCRIPT delay: $(( script_start - ${SLURM_JOB_START_TIME:-$script_start} )) s"
+echo "SLURM_TO_SCRIPT_DELAY $(( script_start - ${SLURM_JOB_START_TIME:-$script_start} )) s"
 
 source load_standard_modules.sh
 
