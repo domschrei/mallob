@@ -145,6 +145,10 @@ while is_enough_time_remaining; do
 
     change=true
 
+    echo ""
+    echo ""
+    echo "index:    $i"
+
     # Benchmark file
     f=$(cat $benchmarkfile|sed $i'q;d')
 
@@ -186,11 +190,7 @@ while is_enough_time_remaining; do
     fi
 
     # Only now we comitted to this instance
-
     echo "logdir: $globallogdir , localtmp: $localtmpdir , output: $outputlogdir"
-	  echo " "
-    echo " "
-    echo "$(date)"
     echo "jobname:  $DS_JOBNAME"
     echo "index:    $i"
     echo "logdir:   $globallogdir"
@@ -276,7 +276,7 @@ while is_enough_time_remaining; do
     [[ -z "$DS_NOBUFFERCOPY" ]] && [[ -n "$buffered_dir" ]] && rm -rf "$buffered_dir"
 
 
-    echo "$(date) JOB $i FINISHED"
+    echo "$(date) EPILOG END"
 
     sleep 3 # maybe a means to avoid "nodes are still busy" srun error?
 
