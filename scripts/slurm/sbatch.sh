@@ -19,10 +19,14 @@
 # See: https://doku.lrz.de/download/attachments/43321076/SuperMUC-NG_computenode.png
 
 
-
-date
-
 # module unload devEnv/Intel/2019 intel-mpi; module load gcc/11 intel-mpi/2019-gcc cmake/3.14.5 gdb
+
+# There can be a delay between the slurm job formally starting and the node actually begin working
+script_start=$(date +%s)
+echo "SLURM  start: $(date -d @${SLURM_JOB_START_TIME:-0})"
+echo "SLURM  end:   $(date -d @${SLURM_JOB_END_TIME:-0})"
+echo "SCRIPT start: $(date -d @$script_start)"
+echo "SLURM-TO-SCRIPT delay: $(( script_start - ${SLURM_JOB_START_TIME:-$script_start} )) s"
 
 source load_standard_modules.sh
 
@@ -227,8 +231,7 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
       mpicleanup="mpiexec -n $((SLURM_NTASKS)) drm -q --traceless --lite --aggressive"
       mpicopy="mpiexec -n $((SLURM_NTASKS)) dcp -q"
       echo "$mpicopy $globallogdir $outputlogdir"
-      $mpicopy $globallogdir $outputlogdir
-      mkdir "$outputlogdir/$i/.alldone"
+      $mpicopy $globallogdir $outputlogdir   &&   mkdir "$outputlogdir/$i/.alldone"  #only mark alldone when copying succeeds
       echo "$mpicleanup $globallogdir"
       $mpicleanup $globallogdir
     fi
