@@ -163,14 +163,14 @@ while is_enough_time_remaining; do
       mkdir -p "$buffered_dir"
       # we want to remember the full original source path, so we copy the whole path
       if cp --parents "$f" "$buffered_dir" && [[ -s "${buffered_dir%/}/${f#/}" ]]; then
-          f="${buffered_dir%/}/${f#/}" # remove double slashes
-          echo "BUFFERED_INSTANCE_PATH $f"
+          f="${buffered_dir%/}/${f#/}" # set to new buffer path and remove double slashes
         else
           echo "ERROR: buffer copy failed, using original path $f" >&2
         fi
       echo "BUFFERCOPY_END   $(date +"%T.%3N")"
       t_end=$(date +%s.%N)
-      awk -v s="$t_start" -v e="$t_end" 'BEGIN { printf "BUFFERCOPY_DUR %.3f s\n", e - s }'
+      awk -v s="$t_start" -v e="$t_end" 'BEGIN { printf "BUFFERCOPY_DUR   %.3f s\n", e - s }'
+      echo "BUFFERED_INSTANCE_PATH $f"
     fi
 
     # If we actually encounter a large filesystem latency, after copying the instance we might no longer have enough time for solving
