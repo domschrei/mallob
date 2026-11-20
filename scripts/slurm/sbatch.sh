@@ -76,8 +76,8 @@ mkdir -p $localtmpdir_base $globallogdir_base
 echo "SCRATCH is: $SCRATCH"
 echo "TMPDIR is:  $TMPDIR"
 echo "$(hostname) rank ${OMPI_COMM_WORLD_RANK:-$PMI_RANK}: $(grep Cpus_allowed_list /proc/self/status)"
-echo "numactl -H"
-numactl -H
+# echo "numactl -H"
+# numactl -H
 
 # Benchmark instances, one per line
 # benchmarkfile="/hppfs/work/$projname/$username/instances/2023+2024-unique.txt" # TODO benchmark file
