@@ -254,16 +254,23 @@ while is_enough_time_remaining; do
     sleep 3 # avoid "nodes are still busy" issue?
     echo "$(date) EPILOG"
     if onHoreka ; then
-      # Horeka doesnt support mpifileutils 
+      # Horeka doesnt support mpifileutils, so fallback to our manual method
       $mpicall scripts/slurm/epilogNew.sh
     else
-      mpicleanup="mpiexec -n $((SLURM_NTASKS)) drm -q --traceless --lite --aggressive"
       mpicopy="mpiexec -n $((SLURM_NTASKS)) dcp -q"
-      echo "$mpicopy $globallogdir $outputlogdir"
-      $mpicopy $globallogdir $outputlogdir   &&   mkdir "$outputlogdir/$i/.alldone"  #only mark alldone when copying succeeds
-      echo "$mpicleanup $globallogdir"
-      $mpicleanup $globallogdir
+      mpicleanup="mpiexec -n $((SLURM_NTASKS)) drm -q --traceless --lite --aggressive"
+      if $mpicopy $globallogdir $outputlogdir; then
+        mkdir "$outputlogdir/$i/.alldone"
+        echo "$mpicleanup $globallogdir"
+        $mpicleanup $globallogdir
+      else
+        echo "$(date) WARNING: copy of $globallogdir failed, keeping it on scratch" >&2
+      fi
     fi
+
+    # Clean up the buffered instance
+    [[ -n "$DS_COPYTOTMP" ]] && [[ -n "$buffered_dir" ]] && rm -rf "$buffered_dir"
+
 
     echo "$(date) JOB $i FINISHED"
 
