@@ -110,8 +110,8 @@ slurm_job_end=${SLURM_JOB_END_TIME:-$(( starttime + $DS_RUNTIME ))}
 slurm_time_left() { echo $(( slurm_job_end - $(date +%s) )); }
 
 # Buffer times for within Mallob (startup, teardown, ...) and for operations within this sbatch (prolog, epilog, ...)
-MALLOB_OVERHEAD_BUFFER=20
 SLURM_OVERHEAD_BUFFER=40
+MALLOB_OVERHEAD_BUFFER=20
 
 is_enough_time_remaining() { 
   (( $(slurm_time_left) >  $DS_SECONDSPERJOB + SLURM_OVERHEAD_BUFFER))
@@ -155,7 +155,8 @@ while is_enough_time_remaining; do
     # We can be unlucky with the filesystem even a simple single file read can take more than a minute to complete.
     # To buffer such latencies such that Mallob doesn't see them (and they don't count towards Mallobs time),
     # copy the "cold" instance such that the fresh temporary copy is "warm" for Mallob to read
-    if [[ -n "$DS_BUFFERCOPY" ]]; then
+    if [[ -z "$DS_NOBUFFERCOPY" ]]; then
+      # default path, as usually DS_NOBUFFERCOPY is not set
       buffered_dir="$SCRATCH/buffercopy/$SLURM_JOB_ID/$i"   # unique per job and instance to avoid clashes 
       t_start=$(date +%s.%N)
       echo "BUFFERCOPY_START $(date +"%T.%3N")"
@@ -172,7 +173,7 @@ while is_enough_time_remaining; do
     # If we actually encounter a large filesystem latency, after copying the instance we might no longer have enough time for solving
     if ! is_enough_time_remaining; then
         echo "$(date) JOB $i SKIPPED after copy: only $(slurm_time_left) s left -> returning ID to queue"
-        [[ -n "$DS_BUFFERCOPY" ]] && rm -rf "$buffered_dir"
+        [[ -z "$DS_NOBUFFERCOPY" ]] && rm -rf "$buffered_dir"
         while ! mkdir $lockfile 2>/dev/null; do 
           sleep 0.1; 
         done
@@ -269,7 +270,7 @@ while is_enough_time_remaining; do
     fi
 
     # Clean up the buffered instance
-    [[ -n "$DS_BUFFERCOPY" ]] && [[ -n "$buffered_dir" ]] && rm -rf "$buffered_dir"
+    [[ -z "$DS_NOBUFFERCOPY" ]] && [[ -n "$buffered_dir" ]] && rm -rf "$buffered_dir"
 
 
     echo "$(date) JOB $i FINISHED"
