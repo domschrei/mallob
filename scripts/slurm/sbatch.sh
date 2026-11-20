@@ -161,13 +161,16 @@ while is_enough_time_remaining; do
       t_start=$(date +%s.%N)
       echo "BUFFERCOPY_START $(date +"%T.%3N")"
       mkdir -p "$buffered_dir"
-      cp --parents "$f" "$buffered_dir"  # we want to remember the full original source path 
+      # we want to remember the full original source path, so we copy the whole path
+      if cp --parents "$f" "$buffered_dir" && [[ -s "${buffered_dir%/}/${f#/}" ]]; then
+          f="${buffered_dir%/}/${f#/}" # remove double slashes
+          echo "BUFFERED_INSTANCE_PATH $f"
+        else
+          echo "ERROR: buffer copy failed, using original path $f" >&2
+        fi
       echo "BUFFERCOPY_END   $(date +"%T.%3N")"
       t_end=$(date +%s.%N)
       awk -v s="$t_start" -v e="$t_end" 'BEGIN { printf "BUFFERCOPY_DUR %.3f s\n", e - s }'
-      f="${buffered_dir%/}/${f#/}"       # remove double slashes
-      echo "NEW INSTANCE PATH $f"
-      [[ -s "$f" ]] || echo "ERROR: buffered instance missing or empty: $f"
     fi
 
     # If we actually encounter a large filesystem latency, after copying the instance we might no longer have enough time for solving
