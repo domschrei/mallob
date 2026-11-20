@@ -263,6 +263,7 @@ while is_enough_time_remaining; do
     else
       mpicopy="mpiexec -n $((SLURM_NTASKS)) dcp -q"
       mpicleanup="mpiexec -n $((SLURM_NTASKS)) drm -q --traceless --lite --aggressive"
+      echo "$mpicopy $globallogdir $outputlogdir"
       if $mpicopy $globallogdir $outputlogdir; then
         mkdir "$outputlogdir/$i/.alldone"
         echo "$mpicleanup $globallogdir"
