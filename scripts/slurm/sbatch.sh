@@ -21,12 +21,14 @@
 
 # module unload devEnv/Intel/2019 intel-mpi; module load gcc/11 intel-mpi/2019-gcc cmake/3.14.5 gdb
 
-# There can be a delay between the slurm job formally starting and the node actually begin working
+# Slurm can "count" a job as started earlier than the actual node executing this script here,
+# measure that delay to understand how severe this delay can be
 script_start=$(date +%s)
-echo "SLURM  start: $(date -d @${SLURM_JOB_START_TIME:-0})"
+echo "SLURM  start: $(date -d @${SLURM_JOB_START_TIME:-0})" # converts an integer into the date string
 echo "SLURM  end:   $(date -d @${SLURM_JOB_END_TIME:-0})"
 echo "SCRIPT start: $(date -d @$script_start)"
 echo "SLURM-TO-SCRIPT delay: $(( script_start - ${SLURM_JOB_START_TIME:-$script_start} )) s"
+
 
 source load_standard_modules.sh
 
@@ -69,13 +71,16 @@ fi
 # SCRATCH
 #if [ -d "$SCRATCH" ]; then globallogdir_base="$SCRATCH/$globallogdir_base"; fi
 
-# Directories for writing and for storing logs
-localtmpdir_base=${SCRATCH}/tmp/$DS_JOBNAME-$SLURM_JOB_ID # fast (?) disk
-mkdir -p $localtmpdir_base $globallogdir_base
-
 echo "SCRATCH is: $SCRATCH"
 echo "TMPDIR is:  $TMPDIR"
 echo "$(hostname) rank ${OMPI_COMM_WORLD_RANK:-$PMI_RANK}: $(grep Cpus_allowed_list /proc/self/status)"
+
+# Directories for writing and for storing logs
+# On Horeka its technically advised to use $TMPDIR instead of $SCRATCH, but according to the logs above 
+# both lead to the same /scratch anyways
+localtmpdir_base=${SCRATCH}/tmp/$DS_JOBNAME-$SLURM_JOB_ID # fast (?) disk
+mkdir -p $localtmpdir_base $globallogdir_base
+
 # echo "numactl -H"
 # numactl -H
 
@@ -95,22 +100,43 @@ change=false # track if this task makes any progress and should hence start anot
 lockfile=sbatch/generated/$DS_JOBNAME/.lock
 idfile=sbatch/generated/$DS_JOBNAME/.remaining_ids
 
-while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME ]; do
+# Slurms own variable is more accurate than our manual calculation, which is only used as a fallback
+slurm_job_end=${SLURM_JOB_END_TIME:-$(( starttime + $DS_RUNTIME ))}
+slurm_time_left() { echo $(( slurm_job_end - $(date +%s) )); }
+
+# Buffer times for within Mallob (startup, teardown, ...) and for operations within this sbatch (prolog, epilog, ...)
+MALLOB_OVERHEAD_BUFFER=20
+SLURM_OVERHEAD_BUFFER=40
+
+is_enough_time_remaining() { 
+  (( $(slurm_time_left) >  $DS_SECONDSPERJOB + SLURM_OVERHEAD_BUFFER))
+}
+
+while is_enough_time_remaining; do
 
     # obtain lock
-    while ! mkdir $lockfile 2> /dev/null ; do
-        if [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -gt $DS_RUNTIME ]; then
-            break # timeout
-        fi
+    # while ! mkdir $lockfile 2> /dev/null ; do
+        # if ! is_enough_time_remaining; then
+            # break # timeout
+        # fi
+        # sleep 0.1
+    # done
+    # lock held
+
+    # obtain lock
+    got_lock=false
+    while is_enough_time_remaining; do
+        if mkdir $lockfile 2>/dev/null; then got_lock=true; break; fi
         sleep 0.1
     done
+    if ! $got_lock; then break; fi   # lock is not ours -> do NOT rmdir it
     # lock held
 
     # exit if you may be unable to finish another job in time
-    if [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -gt $DS_RUNTIME ]; then
-        rmdir $lockfile # release lock
-        break
-    fi
+    # if ! is_enough_time_remaining; then
+        # rmdir $lockfile # release lock
+        # break
+    # fi
 
     # extract next job from file of remaining instance IDs (should be constant-time)
     i=$(tail -n 1 $idfile)
@@ -132,6 +158,36 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     globallogdir="${localtmpdir_base}/$i"
     outputlogdir="${globallogdir_base}"
 
+    # We can be unlucky with the filesystem even a simple single file read can take more than a minute to complete.
+    # To buffer such latencies such that Mallob doesn't see them (and they don't count towards Mallobs time),
+    # copy the "cold" instance such that the fresh temporary copy is "warm" for Mallob to read
+    if [[ -n "$DS_COPYTOTMP" ]]; then
+      t_start=$(date +%s.%N)
+      echo "COPYTOTMP_START $(date +"%T.%3N")"
+      buffered_dir="$SCRATCH/buffercopy/$SLURM_JOB_ID/$i"   # unique per job and instance to avoid clashes 
+      mkdir -p "$buffered_dir"
+      cp --parents "$f" "$buffered_dir"  # we want to remember the full original source path 
+      f="${buffered_dir%/}/${f#/}"       # remove double slashes
+      t_end=$(date +%s.%N)
+      echo "COPYTOTMP_END   $(date +"%T.%3N")"
+      awk -v s="$t_start" -v e="$t_end" 'BEGIN { printf "COPYTOTMP_DURATION %.3f s\n", e - s }'
+      echo "NEW INSTANCE PATH $f"
+      [[ -s "$f" ]] || echo "ERROR: buffered instance missing or empty: $f"
+    fi
+
+    # If we actually encounter a large filesystem latency, after copying the instance we might no longer have enough time for solving
+    if ! is_enough_time_remaining; then
+        echo "$(date) JOB $i SKIPPED after copy: only $(slurm_time_left) s left -> returning ID to queue"
+        [[ -n "$DS_COPYTOTMP" ]] && rm -rf "$buffered_dir"
+        while ! mkdir $lockfile 2>/dev/null; do sleep 0.1; done
+        echo "$i" >> $idfile
+        rmdir $lockfile
+        break
+    fi
+
+    # Only NOW we comitted to this istance
+
+
     echo "logdir: $globallogdir , localtmp: $localtmpdir , output: $outputlogdir"
 	  echo " "
     echo " "
@@ -146,36 +202,13 @@ while [ $(( $(date +%s) - $starttime + $DS_SECONDSPERJOB + 30 )) -lt $DS_RUNTIME
     echo "SLURM_CPUS_PER_TASK: " $SLURM_CPUS_PER_TASK
     echo " "
 
-    # Need cjc=0 when using MallobSweep and MallobSAT as sequential actors,
-    # otherwise there were some crashes because the _clause_comm couldnt properly finish,
-    # which maybe was due to weird overlap between the finishing MallobSweep and starting MallobSAT,
-    # where temporarliy the _clause_comm was subscribed to 2 jobs, but one of them then immediately left...?
-
-    # -preprocess-config=config/satwithpre/actors_sweepfirst.json \
-    # TODO Configure Mallob
-
-    if [[ -n "$DS_COPYTOTMP" ]]; then
-      t_start=$(date +%s.%N)
-      echo "COPYTOTMP_START $(date +"%T.%3N")"
-      buffered_dir="$SCRATCH/buffercopy/$SLURM_JOB_ID/$i"   # unique per job and instance, to avoid clashes 
-      mkdir -p "$buffered_dir"
-      cp --parents "$f" "$buffered_dir"  # we want to remember the full original source path, to have faithful logs
-      f="${buffered_dir%/}/${f#/}"       # remove double slashes
-      t_end=$(date +%s.%N)
-      echo "COPYTOTMP_END   $(date +"%T.%3N")"
-      awk -v s="$t_start" -v e="$t_end" 'BEGIN { printf "COPYTOTMP_DURATION %.3f s\n", e - s }'
-      echo "NEW INSTANCE PATH $f"
-      [[ -s "$f" ]] || echo "ERROR: buffered instance missing or empty: $f"
-    fi
     
-    # -preprocess-config=config/satwithpre/actors_M_SM_SKM.json \
-    # -sat-config-files=config/sat/kissat-plaincheap.json,config/sat/kissat-exportmore.json \
-    # -sat-config-files=config/sat/kissat-plaincheap.json \
-    # -sat-config-files=config/sat/kissat-nowalk.json \
+    # TODO Configure Mallob
+    #
     timeout=$DS_SECONDSPERJOB
     preset="$(config/presets/supermuc/satwithpre | tr '\n' ' ')"
     cmd="$build/mallob $preset \
-    -mono=$f -jwl=$timeout -T=$(($timeout+30)) \
+    -mono=$f -jwl=$timeout -T=$(($timeout+$MALLOB_OVERHEAD_BUFFER)) \
     -pph=${SLURM_NTASKS_PER_NODE} -t=$((${SLURM_CPUS_PER_TASK} / 2)) \
     -log=$globallogdir -tmp=$localtmpdir -comment-outputlogdir=$outputlogdir \
     -sro=${globallogdir}/processed-jobs.out \
@@ -247,9 +280,9 @@ done # END OF MAIN LOOP
 if ! $change; then exit; fi
 
 # Submit next instance, to begin after this job is done (do nothing if it fails)
-sbatch --begin=now`#+$(($DS_RUNTIME+30))` sbatch/generated/$DS_JOBNAME/sbatch.sh
+sbatch --begin=now`#+$(($DS_RUNTIME+$SLURM_OVERHEAD_BUFFER))` sbatch/generated/$DS_JOBNAME/sbatch.sh
 
 # clean up lod dir skeletons
-if [[ $PROJECT != *toolbox* ]]; then
-  $mpicleanup $globallogdir
-fi
+# if [[ $PROJECT != *toolbox* ]]; then
+  # $mpicleanup $globallogdir
+# fi
