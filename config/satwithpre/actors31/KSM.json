@@ -1,0 +1,23 @@
+[
+    {
+        "id": "K",
+        "type": "KISSAT",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "KS",
+        "type": "SATSUMA_EXT",
+        "prerequisite": "K",
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "KSM",
+        "type": "MALLOBSAT",
+        "prerequisite": "KS",
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    }
+]

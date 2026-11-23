@@ -1,0 +1,16 @@
+[
+    {
+        "id": "S",
+        "type": "SATSUMA_EXT",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "K",
+        "type": "KISSAT",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    }
+]

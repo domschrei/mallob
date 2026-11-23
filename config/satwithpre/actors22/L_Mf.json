@@ -1,0 +1,17 @@
+[
+    {
+        "id": "L",
+        "type": "LINGELING",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "Mf",
+        "type": "MALLOBSAT",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false,
+        "options": "-satsolver=k"
+    }
+]
