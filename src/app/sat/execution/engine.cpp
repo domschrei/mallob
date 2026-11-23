@@ -327,7 +327,7 @@ std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSe
 	case 'l':
 	case 'L':
 		// Lingeling
-		LOGGER(_logger, V4_VVER, "S%i : Lingeling-%i\n", setup.globalId, setup.diversificationIndex);
+		LOGGER(_logger, V2_INFO, "S%i : Lingeling-flv(%s)-%i\n", setup.globalId, (char) setup.flavour, setup.diversificationIndex);
 		solver.reset(new Lingeling(setup));
 		break;
 #endif
@@ -335,7 +335,7 @@ std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSe
 	case 'c':
 	case 'C':
 		// Cadical
-		LOGGER(_logger, V4_VVER, "S%i : Cadical-%i\n", setup.globalId, setup.diversificationIndex);
+		LOGGER(_logger, V2_INFO, "S%i : Cadical-%i\n", setup.globalId, setup.diversificationIndex);
 		solver.reset(new Cadical(setup));
 		break;
 #endif
@@ -344,9 +344,10 @@ std::shared_ptr<PortfolioSolverInterface> SatEngine::createSolver(const SolverSe
 	case 'v': // variable addition via Kissat
 	case 'p': // preprocessing via Kissat
 		// Kissat
-		LOGGER(_logger, V4_VVER, "S%i : Kissat%s%s-%i\n", setup.globalId,
+		LOGGER(_logger, V2_INFO, "S%i : Kissat%s%s-flv(%s)-%i\n", setup.globalId,
 			setup.solverType == 'v' ? "-BVA": "",
 			setup.solverType == 'p' ? "-pre": "",
+			(char) setup.flavour,
 			setup.diversificationIndex);
 		solver.reset(new Kissat(setup));
 		break;

@@ -17,7 +17,13 @@ struct PortfolioSequence {
         PREPROCESSOR = 'p',
     };
     enum Flavour {
-        DEFAULT, SAT, UNSAT, PLAIN, PREPROCESS, SWEEPER, CHEAP
+        DEFAULT = 'd',
+        SAT = 's',
+        UNSAT = 'u',
+        PLAIN = '_',
+        PREPROCESS = 'p',
+        SWEEPER = 'e',
+        CHEAP = 'c'
     };
     struct Item {
         BaseSolver baseSolver;
