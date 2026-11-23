@@ -1,8 +1,8 @@
 [
     {
-        "id": "Mk",
+        "id": "Mp",
         "type": "MALLOBSAT",
-        "options": "-satsolver=l+[k]{23}",
+        "options": "-satsolver=k_",
         "prerequisite": null,
         "actorsBeingDisplaced": [],
         "onlyStartIfPrerequisiteSimplified": false
