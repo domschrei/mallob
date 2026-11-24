@@ -46,19 +46,27 @@ public:
         setup.maxNumSolvers = 64; // just for proper diversification
         setup.solverType = 'C';
         setup.exportClauses = false;
-        setup.diversifyNative = true;
-        if (setup.onTheFlyChecking) setup.certifiedUnsat = true;
+        setup.doIncrementalSolving = true;
 #if MALLOB_USE_MINISAT
         if (_solvertype == MINISAT) {
-            _solver.reset(new MiniSat(setup));
+            auto minisat = new MiniSat(setup);
+            minisat->setExternalTerminator([&]() {
+                return _terminator(_current_rev);
+            });
+            _solver.reset(minisat);
         }
 #endif
 #if MALLOB_USE_CADICAL
         if (_solvertype == CADICAL) {
+            if (setup.onTheFlyChecking) setup.certifiedUnsat = true;
+            // disable pre-/inprocessing
+            // setup.flavour = PortfolioSequence::PLAIN;
             auto cadical = new Cadical(setup);
             cadical->getTerminator().setExternalTerminator([&]() {
                 return _terminator(_current_rev);
             });
+            // phase=0 happens to improve performance
+            cadical->setDefaultPhase(false);
             _solver.reset(cadical);
             _lrat = setup.onTheFlyChecking ? _solver->getLratConnector() : nullptr;
         }
@@ -85,7 +93,7 @@ public:
         _current_rev = task.rev;
         _internal_rev++;
         _pending = true;
-        LOG(V2_INFO, "%s rev. %i process payload of size %lu, %lu assumptions\n", _name.c_str(), task.rev, task.lits.size(), task.assumptions.size());
+        LOG(V3_VERB, "%s rev. %i process payload of size %lu, %lu assumptions\n", _name.c_str(), task.rev, task.lits.size(), task.assumptions.size());
         if (task.type == SatJobStreamProcessor::SatTask::RAW) {
             SerializedFormulaParser parser(Logger::getMainInstance(), task.lits.data(), task.lits.size(), true);
             assert(task.assumptions.empty());
@@ -125,8 +133,13 @@ public:
             solution = std::move(failedVec);
         }
         bool winner = concludeRevision(task.rev, res, std::move(solution));
-        if (winner) LOG(V2_INFO, "%s rev. %i won with res=%i\n", _name.c_str(), task.rev, res);
+        if (winner) LOG(V3_VERB, "%s rev. %i won with res=%i\n", _name.c_str(), task.rev, res);
         _pending = false;
+    }
+
+    void forwardAsyncRedundantClauses(std::vector<int>& clauseBuf) override {
+        BufferReader reader(clauseBuf.data(), clauseBuf.size(), 255, false);
+        _solver->addLearnedClauses(reader, 0);
     }
 
     virtual void finalize() override {

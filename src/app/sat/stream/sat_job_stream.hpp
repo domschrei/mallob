@@ -45,7 +45,7 @@ public:
     // Transfers ownership of the pointer.
     void addProcessor(SatJobStreamProcessor* processor) {
         processor->setName(_name);
-        processor->setRetrieveFullTaskCallback([this]() -> const SatJobStreamProcessor::SatTask& {
+        processor->setRetrieveFullTaskCallback([this]() -> SatJobStreamProcessor::SatTask {
             assert(_initialized_complete_task);
             auto lock = _mtx_complete_task.getLock();
             return _complete_task;
@@ -65,6 +65,7 @@ public:
 
                 if (!taskInitialized) {
                     accumulatedTask.type = task.type;
+                    accumulatedTask.nbVars = accumulatedTask.nbClauses = 0;
                     taskInitialized = true;
                 }
                 accumulatedTask.integrate(std::move(task));
@@ -75,6 +76,7 @@ public:
                 processor->process(accumulatedTask); // blocking
 
                 accumulatedTask = SatJobStreamProcessor::SatTask{accumulatedTask.type};
+                accumulatedTask.nbVars = accumulatedTask.nbClauses = 0;
             }
             LOG(V4_VVER, "Processor %s stopping\n", processor->getName().c_str());
             processor->finalize();
@@ -90,6 +92,7 @@ public:
     void solveNonblocking(SatJobStreamProcessor::SatTask&& task) {
 
         assert(task.lits.empty() || task.lits.front() != 0);
+        assert(task.lits.empty() || task.lits.back() == 0);
 
         _active_rev++;
         assert(_sync.resultQueue.empty());
@@ -122,6 +125,12 @@ public:
         return {result.resultCode, std::move(result.solution)};
     }
     int getRevision() const {return _active_rev;}
+
+    void forwardAsyncRedundantClauses(std::vector<int>& clauseBuf) {
+        for (auto& [proc, worker] : _processors) {
+            proc->forwardAsyncRedundantClauses(clauseBuf);
+        }
+    }
 
     void setTerminator(const std::function<bool()>& terminator) {
         for (auto& [proc, worker] : _processors)

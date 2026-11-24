@@ -3,9 +3,12 @@
 
 #include "../sharing/sharing_manager.hpp"
 #include "app/sat/data/clause_metadata.hpp"
+#include "app/sat/data/model_string_compressor.hpp"
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "app/sat/data/revision_data.hpp"
 #include "app/sat/data/theories/theory_specification.hpp"
+#include "app/sat/sharing/clause_logger.hpp"
+#include "app/sat/solvers/solver_portfolio_config.hpp"
 #include "app/sat/solvers/solving_replay.hpp"
 #include "util/logger.hpp"
 #include "util/sys/fileutils.hpp"
@@ -84,6 +87,9 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	}
 	std::string proofDirectory;
 
+	_spc.parseFromDirsAndFiles(params.satConfigDirs(), params.satConfigFiles());
+	LOG(V3_VERB, "Parsed %i solver configuration rules\n", _spc.ruleCount());
+
 	// Launched in some certified UNSAT mode?
     if (_params.proofOutputFile.isSet() || _params.onTheFlyChecking() || _params.palRup()) {
 
@@ -115,6 +121,8 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 					"Irredundant clause IDs in the produced proof will be ordered differently (by clause length). "
 					"Running a vanilla LRUP checker on the input CNF and the produced proof will fail!\n");
 			}
+			if (_params.palRup())
+				LOG(V2_INFO, "Writing PalRUP proof to %s\n", proofDirectory.c_str());
 		}
     }
 
@@ -174,7 +182,6 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	int numMrg = 0;
 	int numMini = 0;
 	int numKis = 0;
-	int numBVA = 0;
 	int numPre = 0;
 
 	// Add solvers from full cycles on previous ranks
@@ -193,7 +200,6 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		case PortfolioSequence::MERGESAT: solverToAdd = &numMrg; break;
 		case PortfolioSequence::MINISAT: solverToAdd = &numMini; break;
 		case PortfolioSequence::KISSAT: solverToAdd = &numKis; break;
-		case PortfolioSequence::VARIABLE_ADDITION: solverToAdd = &numBVA; break;
 		case PortfolioSequence::PREPROCESSOR: solverToAdd = &numPre; break;
 		}
 		*solverToAdd += numFullCycles + (i < begunCyclePos);
@@ -227,45 +233,14 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 	setup.minImportChunksPerSolver = params.minNumChunksForImportPerSolver();
 	setup.numBufferedClsGenerations = params.bufferedImportedClsGenerations();
 	setup.skipClauseSharingDiagonally = params.skipClauseSharingDiagonally();
-	setup.diversifyNoise = params.diversifyNoise();
-
-	setup.decayDistribution = params.decayDistribution();
-	setup.decayMean = params.decayMean();
-	setup.decayStddev = params.decayStddev();
-	setup.decayMin = params.decayMin();
-	setup.decayMax = params.decayMax();
-
-	setup.diversifyReduce = params.diversifyReduce();
-	setup.reduceMin = params.reduceMin();
-	setup.reduceMax = params.reduceMax();
-	setup.reduceMean = params.reduceMean();
-	setup.reduceStddev = params.reduceStddev();
-	setup.reduceDelta = params.reduceDelta();
-
-	setup.plainAddSpecific = params.plainAddSpecific();
-	setup.diversifyNative = params.diversifyNative();
-	setup.diversifyFanOut = params.diversifyFanOut();
-	setup.diversifyInitShuffle = params.diversifyInitShuffle();
-	switch (_params.diversifyElimination()) {
-	case 0:
-		setup.eliminationSetting = SolverSetup::ALLOW_ALL;
-		break;
-	case 1:
-		setup.eliminationSetting = SolverSetup::DISABLE_SOME;
-		break;
-	case 2:
-		setup.eliminationSetting = SolverSetup::DISABLE_MOST;
-		break;
-	case 3:
-		setup.eliminationSetting = SolverSetup::DISABLE_ALL;
-		break;
-	}
 	setup.adaptiveImportManager = params.adaptiveImportManager();
 	setup.maxNumSolvers = config.mpisize * params.numThreadsPerProcess();
 	setup.numVars = numVars;
 	setup.numOriginalClauses = numClauses;
 	int sqrt = std::ceil(std::sqrt((double) setup.maxNumSolvers));
 	setup.proofDir = proofDirectory;
+	if (_params.proofCompressionMode() == 1) setup.compressProofMode = SolverSetup::XZ;
+	if (_params.proofCompressionMode() == 2) setup.compressProofMode = SolverSetup::VASKIN_GOETZ;
 
 	LratConnector* modelCheckingLratConnector {nullptr};
 	setup.nbSkippedIdEpochs = std::max(0, epochOffset + epochModulus * config.nbPreviousBalancingEpochs);
@@ -284,7 +259,7 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		setup.globalId = appRank * numOrigSolvers + setup.localId;
 		int sqrt = std::ceil(std::sqrt((double) setup.maxNumSolvers));
 		auto dir = proofDirectory + "/" + std::to_string((int)(setup.globalId / sqrt)) + "/" + std::to_string(setup.globalId);
-		LOG(V2_INFO, "MKDIR %s\n", dir.c_str());
+		LOG(V4_VVER, "MKDIR %s\n", dir.c_str());
 		FileUtils::mkdir(dir);
 	}
 
@@ -311,14 +286,13 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 			case PortfolioSequence::MINISAT: setup.diversificationIndex = numMini++; break;
 			case PortfolioSequence::GLUCOSE: setup.diversificationIndex = numGlu++; break;
 			case PortfolioSequence::KISSAT: setup.diversificationIndex = numKis++; break;
-			case PortfolioSequence::VARIABLE_ADDITION: setup.diversificationIndex = numBVA++; break;
 			case PortfolioSequence::PREPROCESSOR: setup.diversificationIndex = numPre++; break;
 			}
 			setup.diversificationIndex += divOffsetCycle;
 		}
 		setup.solverType = item.baseSolver;
 		setup.flavour = item.flavour;
-		setup.doIncrementalSolving = setup.isJobIncremental && item.incremental;
+		setup.doIncrementalSolving = (setup.isJobIncremental || params.enumerateModels()) && item.incremental;
 		setup.certifiedUnsat = item.outputProof && (params.proofOutputFile.isSet() || params.onTheFlyChecking() || _params.palRup());
 		setup.onTheFlyChecking = setup.certifiedUnsat && params.onTheFlyChecking();
 		setup.onTheFlyCheckModel = params.onTheFlyChecking() && params.onTheFlyCheckModel();
@@ -329,12 +303,15 @@ SatEngine::SatEngine(const Parameters& params, const SatProcessConfig& config, L
 		setup.modelCheckingLratConnector = modelCheckingLratConnector;
 		setup.avoidUnsatParticipation = (params.proofOutputFile.isSet() || params.onTheFlyChecking() || _params.palRup()) && !item.outputProof;
 		setup.exportClauses = !setup.avoidUnsatParticipation;
+		setup.enumerateModels = params.enumerateModels();
+		setup.solverConfig = &_spc;
 
 		_solver_interfaces.push_back(createSolver(setup));
 		cyclePos = (cyclePos+1) % portfolio.cycle.size();
 		auto mclc = _solver_interfaces.back()->getSolverSetup().modelCheckingLratConnector;
 		if (mclc) modelCheckingLratConnector = mclc;
 	}
+	_base_solver_setup = setup;
 
 	_sharing_manager.reset(new SharingManager(_solver_interfaces, _params, _logger, 
 		/*max. deferred literals per solver=*/5*config.maxBroadcastedLitsPerCycle, config.apprank));
@@ -414,7 +391,10 @@ void SatEngine::appendRevision(int revision, RevisionData data, bool lastRevisio
 	_revision_data.push_back(data);
 	_sharing_manager->setImportedRevision(revision);
 	_prefilter.notifyFormula(data.fLits->data(), data.fLits->size());
-	
+
+	// since we enter a new revision, output the solutions enumerated in the last one
+	writeEnumeratedSolutions();
+
 	for (size_t i = 0; i < _num_active_solvers; i++) {
 		if (revision == 0) {
 			// Initialize solver thread
@@ -442,27 +422,20 @@ void SatEngine::appendRevision(int revision, RevisionData data, bool lastRevisio
 				}
 				// Pseudo-incremental SAT solving: 
 				// Phase out old solver thread
-				_sharing_manager->stopClauseImport(i);
-				_solver_threads[i]->setTerminate();
-				_obsolete_solver_threads.push_back(std::move(_solver_threads[i]));
-				// Setup new solver and new solver thread
-				SolverSetup s = _solver_interfaces[i]->getSolverSetup();
-				s.solverRevision++;
-				_solver_interfaces[i] = createSolver(s);
-				_solver_threads[i] = std::shared_ptr<SolverThread>(new SolverThread(
-					_params, _config, _solver_interfaces[i], _revision_data[0], i
-				));
+				resetSolver(i);
 				// Load entire formula 
-				for (int importedRevision = 1; importedRevision <= revision; importedRevision++) {
+				for (int importedRevision = 0; importedRevision <= revision; importedRevision++) {
 					auto data = _revision_data[importedRevision];
 					_solver_threads[i]->appendRevision(importedRevision, data);
 				}
 				_sharing_manager->continueClauseImport(i);
 				if (_solvers_started) _solver_threads[i]->start();
+				_num_active_solvers++; // decremented in resetSolver(i)
 			}
 		}
 	}
-	_revision_data.back().fLits.reset(); // formula increment no longer needed here
+	if (!_params.enumerateModels())
+		_revision_data.back().fLits.reset(); // formula increment no longer needed here
 	_revision = revision;
 }
 
@@ -510,10 +483,23 @@ int SatEngine::solveLoop() {
 	// perform GC in export filter whenever necessary
 	if (_sharing_manager) _sharing_manager->collectGarbageInFilter();
 
-    // Solving done?
 	bool done = false;
 	bool preprocessingResult = false;
-	for (size_t i = 0; i < std::min(_num_active_solvers, _solver_threads.size()); i++) {
+
+	// Termination condition for model enumeration when sufficiently many models have been found
+	if (!_enumerated_solutions.empty() && _nb_globally_found_models >= _params.enumerationLimit()) {
+		assert(_result.result == SAT);
+		done = true;
+	}
+	// Termination condition for model enumeration when the time limit has elapsed
+	if (!_enumerated_solutions.empty() && _time_of_first_model >= 0 &&
+		Timer::elapsedSeconds() - _time_of_first_model >= _params.enumerationTimeLimit()) {
+		assert(_result.result == SAT);
+		done = true;
+	}
+
+	// Solving done?
+	if (!done) for (size_t i = 0; i < std::min(_num_active_solvers, _solver_threads.size()); i++) {
 		if (_params.injectProofData.isSet()) {
 			// Inject solver result from the specified proof meta data
 			if (_solver_interfaces[i]->getGlobalId() == _result.winningInstanceId) {
@@ -529,11 +515,95 @@ int SatEngine::solveLoop() {
 
 			auto& result = _solver_threads[i]->getSatResult();
 			if (result.result > 0 && result.revision == _revision) {
-				done = true;
-				_result = std::move(result);
+
+				// only override previous result if the new one isn't an UNSAT result from an enumerating thread
+				if (result.result == SAT || !_solver_interfaces[i]->getSolverSetup().currentlyEnumerating)
+					_result = std::move(result);
 				_result.winningInstanceId = _solver_interfaces[i]->getGlobalId();
 				_result.globalStartOfSuccessEpoch = _sharing_manager->getGlobalStartOfSuccessEpoch();
+
+				if (result.result == SAT && _params.enumerateModels()) {
+					// model enumeration: try next model
+					// Reset solver thread
+					if (_solver_interfaces[i]->getSolverSetup().doIncrementalSolving) {
+						// incremental solver is *done* enumerating (since it internally loops exhaustively)
+						// Note: we don't need to lock the enumerated solutions since the solver already returned
+						auto solutions = std::move(_solver_threads[i]->extractEnumeratedSolutions());
+						size_t size = _enumerated_solutions.size();
+						_enumerated_solutions.insert(solutions.begin(), solutions.end());
+						if (_enumerated_solutions.size() > size) {
+							LOGGER(_logger, V3_VERB, "S%i found %lu new solutions (process-locally now %lu)\n",
+								i, _enumerated_solutions.size()-size, _enumerated_solutions.size());
+						}
+						done = true; // actually report a solution
+					} else {
+						// compress model and try to insert it into unique set of models
+						auto sol = _result.copySolution();
+						auto [it, success] = _enumerated_solutions.insert(ModelStringCompressor::compress(sol));
+						if (success) {
+							// found model is new
+							LOGGER(_logger, V4_VVER, "S%i found new solution (process-locally no. %lu)\n", i, _enumerated_solutions.size());
+							// add its blocking clause
+							for (int pos = 1; pos < sol.size(); pos++) {
+								_enumeration_blocking_clauses.push_back(-sol[pos]);
+							}
+							_enumeration_blocking_clauses.push_back(0);
+						}
+						// add unit clauses found thus far to clause set (temporarily)
+						int sizeBefore = _enumeration_blocking_clauses.size();
+						if (_params.enumerationFeedUnits() && _sharing_manager->getUnitClauseLogger()) {
+							const auto& units = _sharing_manager->getUnitClauseLogger()->beginAccessingPublishedClauses();
+							for (auto& cls : units) {
+								_enumeration_blocking_clauses.push_back(cls.back());
+								_enumeration_blocking_clauses.push_back(0);
+							}
+							LOG(V4_VVER, "S%i feeding %i units\n", i, units.size());
+						}
+						// reset non-incremental solver with added blocking clauses (plus units)
+						resetSolver(i, &_enumeration_blocking_clauses);
+						// re-remove units, return access to published units
+						_enumeration_blocking_clauses.resize(sizeBefore);
+						if (_sharing_manager->getUnitClauseLogger())
+							_sharing_manager->getUnitClauseLogger()->endAccessingPublishedClauses();
+						// append formula revisions to solver
+						for (int importedRevision = 0; importedRevision <= _revision; importedRevision++) {
+							auto data = _revision_data[importedRevision];
+							_solver_threads[i]->appendRevision(importedRevision, data);
+						}
+						// start solver again
+						_sharing_manager->continueClauseImport(i);
+						_solver_threads[i]->start();
+						_num_active_solvers++; // decremented in resetSolver(i)
+					}
+
+				} else {
+					done = true;
+				}
 				break;
+			}
+
+		} else if (_params.enumerateModels() && _solver_interfaces[i]->getSolverSetup().doIncrementalSolving
+				&& _solver_threads[i]->getActiveRevision() == _revision) {
+			// An incremental solver thread's enumeration is still ongoing, but we want to report
+			// the models found thus far directly (also to watch limits etc.) without concluding the revision.
+
+			_solver_threads[i]->lockEnumeratedSolutions();
+			auto solutions = std::move(_solver_threads[i]->extractEnumeratedSolutions());
+			_solver_threads[i]->unlockEnumeratedSolutions();
+			size_t size = _enumerated_solutions.size();
+			_enumerated_solutions.insert(solutions.begin(), solutions.end());
+			if (_enumerated_solutions.size() > size) {
+				LOGGER(_logger, V3_VERB, "S%i found %lu new solutions (process-locally now %lu)\n",
+					i, _enumerated_solutions.size()-size, _enumerated_solutions.size());
+				if (_result.result != SAT) {
+					// prematurely create a suitable SatResult object
+					_result.revision = _revision;
+					_result.result = SAT;
+					_result.winningInstanceId = _solver_interfaces[i]->getGlobalId();
+					_result.globalStartOfSuccessEpoch = _sharing_manager->getGlobalStartOfSuccessEpoch();
+					auto primarySol = ModelStringCompressor::decompress(*_enumerated_solutions.begin());
+					_result.setSolutionToSerialize(primarySol.data(), primarySol.size());
+				}
 			}
 		}
 		if (!preprocessingResult && _solver_threads[i]->hasPreprocessedFormula()) {
@@ -625,25 +695,31 @@ void SatEngine::setActiveThreadCount(int nbThreads) {
 	if (nbThreadsToTerminate <= 0) return;
 	for (int termIdx = 0; termIdx < nbThreadsToTerminate; termIdx++) {
 		size_t i = _num_active_solvers-1;
-		LOGGER(_logger, V3_VERB, "Terminating %lu-th solver to reduce thread count\n", i);
-		_sharing_manager->stopClauseImport(i);
-		SolverSetup s = _solver_interfaces[i]->getSolverSetup();
-		s.solverRevision++;
-		_solver_threads[i]->setTerminate(false);
-		auto movedSolver = std::move(_solver_interfaces[i]);
-		_solver_interfaces[i] = createSolver(s);
-		auto movedThread = std::move(_solver_threads[i]);
-		_solver_threads[i] = std::shared_ptr<SolverThread>(new SolverThread(
-			_params, _config, _solver_interfaces[i], {}, i
-		));
-		_num_active_solvers--;
-		_solver_thread_cleanups.push_back(ProcessWideThreadPool::get().addTask([thread = std::move(movedThread), solver = std::move(movedSolver)]() mutable {
-			thread->cleanUpAsynchronously();
-			thread->tryJoin();
-			thread.reset();
-			solver.reset();
-		}));
+		resetSolver(i);
 	}
+}
+
+void SatEngine::resetSolver(int i, const std::vector<int>* addedLits) {
+	LOGGER(_logger, V3_VERB, "Terminating local solver %lu\n", i);
+	assert(i >= 0 && i < _solver_interfaces.size());
+	_sharing_manager->stopClauseImport(i);
+	SolverSetup s = _solver_interfaces[i]->getSolverSetup();
+	s.solverRevision++;
+	if (addedLits) s.inlineLiterals = *addedLits;
+	_solver_threads[i]->setTerminate(false);
+	auto movedSolver = std::move(_solver_interfaces[i]);
+	_solver_interfaces[i] = createSolver(s);
+	auto movedThread = std::move(_solver_threads[i]);
+	_solver_threads[i] = std::shared_ptr<SolverThread>(new SolverThread(
+		_params, _config, _solver_interfaces[i], {}, i
+	));
+	_num_active_solvers--;
+	_solver_thread_cleanups.push_back(ProcessWideThreadPool::get().addTask([thread = std::move(movedThread), solver = std::move(movedSolver)]() mutable {
+		thread->cleanUpAsynchronously();
+		thread->tryJoin();
+		thread.reset();
+		solver.reset();
+	}));
 }
 
 void SatEngine::dumpStats(bool final) {
@@ -656,11 +732,12 @@ void SatEngine::dumpStats(bool final) {
 	for (size_t i = 0; i < _num_solvers; i++) {
 		SolverStatistics st = _solver_interfaces[i]->getSolverStats();
 		int globalId = _solver_interfaces[i]->getGlobalId();
-		_logger.log(verb, "%sS%d %s\n",
+		int sVerb = final ? V3_VERB : verb;
+		_logger.log(sVerb, "%sS%d %s\n",
 				final ? "END " : "", globalId, st.getReport().c_str());
-		_logger.log(verb, "%sS%d clenhist prod %s\n",
+		_logger.log(sVerb, "%sS%d clenhist prod %s\n",
 				final ? "END " : "", globalId, st.histProduced->getReport().c_str());
-		_logger.log(verb, "%sS%d clenhist digd %s\n",
+		_logger.log(sVerb, "%sS%d clenhist digd %s\n",
 				final ? "END " : "", globalId, st.histDigested->getReport().c_str());
 		solveStats.aggregate(st);
 	}
@@ -669,16 +746,24 @@ void SatEngine::dumpStats(bool final) {
 	// Sharing statistics
 	SharingStatistics shareStats;
 	if (_sharing_manager != NULL) shareStats = _sharing_manager->getStatistics();
-	_logger.log(verb, "%s%s\n", final ? "END " : "", shareStats.getReport().c_str());
+	_logger.log(shareStats.empty() ? V4_VVER : verb, "%s%s\n",
+		final ? "END " : "", shareStats.getReport().c_str());
 
 	if (final) {
+		std::initializer_list<std::pair<std::string, ClauseHistogram*>> histList = {
+			{"prod", shareStats.histProduced},
+			{"flfl", shareStats.histFailedFilter},
+			{"admt", shareStats.histAdmittedToDb},
+			{"drpd", shareStats.histDroppedBeforeDb},
+			{"dltd", shareStats.histDeletedInSlots},
+			{"retd", shareStats.histReturnedToDb}
+		};
 		// Histogram over clause lengths (do not print trailing zeroes)
-		_logger.log(verb, "clenhist prod %s\n", shareStats.histProduced->getReport().c_str());
-		_logger.log(verb, "clenhist flfl %s\n", shareStats.histFailedFilter->getReport().c_str());
-		_logger.log(verb, "clenhist admt %s\n", shareStats.histAdmittedToDb->getReport().c_str());
-		_logger.log(verb, "clenhist drpd %s\n", shareStats.histDroppedBeforeDb->getReport().c_str());
-		_logger.log(verb, "clenhist dltd %s\n", shareStats.histDeletedInSlots->getReport().c_str());
-		_logger.log(verb, "clenhist retd %s\n", shareStats.histReturnedToDb->getReport().c_str());
+		for (auto& [name, hist] : histList) {
+			// Increased verbosity for empty histograms
+			_logger.log(hist->getTotal()==0 ? V4_VVER : verb,
+				"clenhist %s %s\n", name.c_str(), hist->getReport().c_str());
+		}
 
 		// Flush logs
 		for (auto& solver : _solver_interfaces) solver->getLogger().flush();
@@ -714,6 +799,23 @@ long long SatEngine::getBestFoundObjectiveCost() const {
 	return best;
 }
 
+int SatEngine::getNbLocallyFoundModels() const {
+	return _enumerated_solutions.size();
+}
+void SatEngine::updateNbGloballyFoundModels(int rev, int nbFound) {
+	if (_revision != rev) return;
+	if (nbFound > _nb_globally_found_models) {
+		// log progress
+		if (_config.apprank == 0)
+			LOG(V5_DEBG, "nb found solutions: %i\n", nbFound);
+		else
+			LOG(V3_VERB, "nb found solutions: %i\n", nbFound);
+	}
+	_nb_globally_found_models = nbFound;
+	if (_nb_globally_found_models > 0 && _time_of_first_model < 0)
+		_time_of_first_model = Timer::elapsedSeconds();
+}
+
 void SatEngine::writeClauseEpochs() {
 	if (_params.injectProofData.isSet()) return;
 	std::string filename = _params.proofDirectory() + "/proof"
@@ -722,13 +824,32 @@ void SatEngine::writeClauseEpochs() {
 		_solver_interfaces[0]->getGlobalId(), */filename);
 }
 
+void SatEngine::writeEnumeratedSolutions() {
+	if (_enumerated_solutions.empty() || !_params.solutionToFile.isSet()) return;
+
+	std::ofstream ofs(_params.solutionToFile() + ".#"
+		+ std::to_string(_config.jobid) + ".enum."
+		+ (_revision > 0 ? "rev" + std::to_string(_revision) + "." : "")
+		+ std::to_string(_config.apprank));
+	for (auto& sol : _enumerated_solutions)
+		ofs << sol << std::endl;
+
+	_enumerated_solutions.clear();
+	_enumeration_blocking_clauses.clear();
+	_nb_globally_found_models = 0;
+	_time_of_first_model = -1;
+}
+
 void SatEngine::cleanUp(bool hardTermination) {
 	double time = Timer::elapsedSeconds();
 
 	LOGGER(_logger, V4_VVER, "[engine-cleanup] enter\n");
 
+	_sharing_manager->finalize();
+	writeEnumeratedSolutions();
+
 	// Terminate any remaining running threads
-	auto setup = _solver_interfaces.front()->getSolverSetup();
+	auto& setup = _base_solver_setup;
 	terminateSolvers(hardTermination);
 	if (hardTermination) {
 		if (_params.proofOutputFile.isSet()) writeClauseEpochs();
@@ -738,6 +859,8 @@ void SatEngine::cleanUp(bool hardTermination) {
 			for (int localId = 0; localId < _params.numThreadsPerProcess(); localId++) {
 				int globalId = _config.apprank * _params.numThreadsPerProcess() + localId;
 				auto dir = setup.proofDir + "/" + std::to_string((int)(globalId / sqrt)) + "/" + std::to_string(globalId);
+				if (FileUtils::exists(dir + "/out.palrup.xz") || FileUtils::exists(dir + "/out.palrup.vg"))
+					continue;
 				FileUtils::create(dir + "/out.palrup");
 			}
 		}

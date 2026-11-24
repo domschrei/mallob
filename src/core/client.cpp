@@ -52,12 +52,15 @@ void Client::readIncomingJobs() {
 
     while (true) {
         // Wait for a nonempty incoming job queue
+        LOGGER(log, V6_DEBGV, "waiting inc=%i loaded=%i\n", _num_incoming_jobs.load(), _num_loaded_jobs.load());
         _incoming_job_cond_var.wait(_incoming_job_lock, [&]() {
+            LOGGER(log, V6_DEBGV, "  -- inc=%i loaded=%i\n", _num_incoming_jobs.load(), _num_loaded_jobs.load());
             return !_instance_reader.continueRunning() 
                 || (_num_incoming_jobs > 0 && _num_loaded_jobs < _params.loadedJobsPerClient());
         });
         if (!_instance_reader.continueRunning()) break;
         if (_num_loaded_jobs >= _params.loadedJobsPerClient()) continue;
+        LOGGER(log, V4_VVER, "done waiting inc=%i loaded=%i\n", _num_incoming_jobs.load(), _num_loaded_jobs.load());
 
         // Obtain lock, measure time
         auto lock = _incoming_job_lock.getLock();
@@ -74,6 +77,7 @@ void Client::readIncomingJobs() {
         // Find a single job eligible for parsing
         bool foundAJob = false;
         for (auto& data : _incoming_job_queue) {
+            LOGGER(log, V5_DEBG, "trying job #%i %s\n", data.description->getId(), data.jobName.c_str());
             
             // Jobs are sorted by arrival:
             // If this job has not arrived yet, then none have arrived yet
@@ -182,7 +186,13 @@ void Client::readIncomingJobs() {
                             *res = prog->function();
                             *done = true;
                         });
+                        // Notify root rank of this job to user
+                        if (foundJob.cbRootRank) foundJob.cbRootRank(_world_rank);
                     } else {
+                        if (foundJob.cbRootRank) {
+                            auto lock = _root_rank_callbacks_mutex.getLock();
+                            _root_rank_callbacks[id] = std::move(foundJob.cbRootRank);
+                        }
                         // Enqueue in ready jobs to be scheduled properly
                         auto lock = _ready_job_lock.getLock();
                         _ready_job_queue.push_back(std::move(foundJob.description));
@@ -210,6 +220,10 @@ void Client::readIncomingJobs() {
     log.flush();
 }
 
+ /*
+  * Client::init() passes this function to the JsonInterface where it is stored as _job_callback
+  * When _job_callback(...) is called, we land here
+  */
 void Client::handleNewJob(JobMetadata&& data) {
 
     if (data.done) {
@@ -327,7 +341,7 @@ void Client::advance() {
         }
         for (int jobId : doneJobs) {
             LOG_ADD_DEST(V3_VERB, "Notify #%i:0 that job is done", _root_nodes[jobId], jobId);
-            IntVec payload({jobId});
+            IntVec payload({jobId, -1});
             MyMpi::isend(_root_nodes[jobId], MSG_INCREMENTAL_JOB_FINISHED, payload);
             finishJob(jobId, /*hasIncrementalSuccessors=*/false);
         }
@@ -344,6 +358,12 @@ void Client::advance() {
             _done_client_side_jobs.push_back(std::move(job));
             it = _client_side_jobs.erase(it);
             --it;
+            // waiting instance reader might be able to continue now
+            {
+                auto lock = _incoming_job_lock.getLock();
+                atomics::decrementRelaxed(_num_loaded_jobs);
+            }
+            _incoming_job_cond_var.notify();
         }
         _client_side_jobs_mutex.unlock();
     }
@@ -574,6 +594,18 @@ void Client::sendJobDescription(JobRequest& req, int destRank) {
     // Remember transaction
     _root_nodes[req.jobId] = destRank;
 
+    // Notify root rank of this job to the user
+    std::function<void(int)> rootRankCb;
+    {
+        auto lock = _root_rank_callbacks_mutex.getLock();
+        auto it = _root_rank_callbacks.find(req.jobId);
+        if (it != _root_rank_callbacks.end()) {
+            rootRankCb = it->second;
+            _root_rank_callbacks.erase(it);
+        }
+    }
+    if (rootRankCb) rootRankCb(destRank);
+
     // waiting instance reader might be able to continue now
     {
         auto lock = _incoming_job_lock.getLock();
@@ -654,6 +686,7 @@ void Client::handleSendJobResultInternal(JobResult&& jobResult) {
     if (resultCode == RESULT_SAT) resultCodeString = "SATISFIABLE";
     if (resultCode == RESULT_UNSAT) resultCodeString = "UNSATISFIABLE";
     if (resultCode == RESULT_OPTIMUM_FOUND) resultCodeString = "OPTIMUM FOUND";
+    if (resultCode == RESULT_SIMPLIFIED) resultCodeString = "SIMPLIFIED";
 
     // Output response time and solution header
     LOG(V2_INFO, "RESPONSE_TIME #%i %.6f rev. %i\n", jobId, desc.getStatistics().totalResponseTime, revision);
@@ -689,8 +722,11 @@ void Client::handleSendJobResultInternal(JobResult&& jobResult) {
             if (resultCode == RESULT_SAT && params.compressModels()) {
                 auto vec = ModelStringCompressor::decompress(json.get<std::string>());
                 std::string modelStr = "v ";
-                for (int l : vec) if (l!=0) modelStr += std::to_string(l) + " ";
-                modelStr += "0\n";
+                modelStr.reserve(vec.size() * 8 + 4); // rough estimate, avoids most reallocations
+                for (int l : vec) if (l != 0) {
+                    modelStr += std::to_string(l);
+                    modelStr += ' ';
+                }
                 modelStrings.push_back(std::move(modelStr));
             } else {
                 modelStrings.push_back(json.get<std::string>());
@@ -837,6 +873,10 @@ Client::~Client() {
     _client_side_jobs.clear();
     _done_client_side_jobs.clear();
 
-    APIRegistry::close();
     LOG(V4_VVER, "Leaving client destructor\n");
+}
+
+// RAII to ensure that the API closes only after everything else is cleaned up.
+Client::APIConnectorHandle::~APIConnectorHandle() {
+    APIRegistry::close();
 }

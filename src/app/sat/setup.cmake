@@ -6,7 +6,7 @@ set(SAT_SUBPROC_SOURCES src/app/sat/execution/engine.cpp src/app/sat/execution/s
     src/app/sat/execution/solving_state.cpp src/app/sat/sharing/buffer/buffer_merger.cpp 
     src/app/sat/sharing/buffer/buffer_reader.cpp src/app/sat/sharing/filter/clause_buffer_lbd_scrambler.cpp 
     src/app/sat/sharing/sharing_manager.cpp src/app/sat/solvers/portfolio_solver_interface.cpp 
-    src/app/sat/data/clause_metadata.cpp src/app/sat/proof/lrat_utils.cpp CACHE INTERNAL "")
+    src/app/sat/data/clause_metadata.cpp src/app/sat/proof/lrat_utils.cpp src/app/sat/solvers/solver_portfolio_config.cpp CACHE INTERNAL "")
 
 # Add SAT-specific sources to main Mallob executable
 set(SAT_MALLOB_SOURCES src/app/sat/proof/incremental_trusted_parser_store.cpp src/app/sat/data/formula_compressor.cpp
@@ -15,7 +15,7 @@ set(SAT_MALLOB_SOURCES src/app/sat/proof/incremental_trusted_parser_store.cpp sr
     src/app/sat/job/sat_process_adapter.cpp src/app/sat/job/historic_clause_storage.cpp
     src/app/sat/sharing/buffer/buffer_merger.cpp src/app/sat/sharing/buffer/buffer_reader.cpp
     src/app/sat/sharing/filter/clause_buffer_lbd_scrambler.cpp src/app/sat/data/clause_metadata.cpp
-    src/app/sat/proof/lrat_utils.cpp)
+    src/app/sat/proof/lrat_utils.cpp src/app/sat/solvers/solver_portfolio_config.cpp)
 set(MALLOB_COREPLUSCOMM_SOURCES ${MALLOB_COREPLUSCOMM_SOURCES} ${SAT_MALLOB_SOURCES} CACHE INTERNAL "")
 
 #message("commons+SAT sources: ${BASE_SOURCES}") # Use to debug
@@ -39,7 +39,7 @@ endif()
 
 
 # ImpCheck binaries for real-time proof checking.
-if(MALLOB_BUILD_IMPCHECK EQUAL 1)
+if(NOT MALLOB_BUILD_IMPCHECK EQUAL 0)
     add_definitions(-DMALLOB_USE_IMPCHECK=1)
 
     # Incremental ImpCheck (IImpCheck)
@@ -109,3 +109,4 @@ new_test(sat_reader "${BASE_INCLUDES}" mallob_corepluscomm)
 new_test(job_description "${BASE_INCLUDES}" mallob_corepluscomm)
 new_test(distributed_file_merger "${BASE_INCLUDES}" mallob_corepluscomm)
 new_test(formula_compressor "${BASE_INCLUDES}" mallob_corepluscomm)
+new_test(solver_portfolio_config "${BASE_INCLUDES}" mallob_sat_subproc)

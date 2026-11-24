@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.11.4)
 project (mallob)
 
+set(CMAKE_FIND_LIBRARY_SUFFIXES ".a" ".lib" ".so" ".dylib")
+
 find_package(MPI REQUIRED)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
@@ -180,16 +182,20 @@ if(NOT MALLOB_APP_SATWITHPRE EQUAL 0) # included by default
 register_mallob_app("satwithpre")
 endif()
 if(NOT MALLOB_APP_PALRUPCHECK EQUAL 0) # included by default
+add_compile_definitions(MALLOB_APP_PALRUPCHECK)
 register_mallob_app("palrupcheck")
+endif()
+if(NOT MALLOB_APP_MAXSAT EQUAL 0) # included by default
+register_mallob_app("maxsat")
+endif()
+if(NOT MALLOB_APP_SMT EQUAL 0) # included by default
+register_mallob_app("smt")
+endif()
+if(NOT MALLOB_APP_SWEEP EQUAL 0) # included by default
+register_mallob_app("sweep")
 endif()
 if(MALLOB_APP_SATCNC EQUAL 1)
 register_mallob_app("satcnc")
-endif()
-if(MALLOB_APP_MAXSAT EQUAL 1)
-register_mallob_app("maxsat")
-endif()
-if(MALLOB_APP_SMT EQUAL 1)
-register_mallob_app("smt")
 endif()
 if(MALLOB_APP_KMEANS EQUAL 1)
     register_mallob_app("kmeans")
@@ -351,7 +357,7 @@ target_include_directories(mallob_core PRIVATE ${BASE_INCLUDES})
 target_compile_options(mallob_core PRIVATE ${BASE_COMPILEFLAGS})
 target_link_libraries(mallob_core ${BASE_LIBS})
 target_link_directories(mallob_core PUBLIC ${BASE_LINK_DIRS})
-if (DEFINED MALLOB_CORE_DEPS)
+if (DEFINED MALLOB_CORE_DEPS AND NOT MALLOB_CORE_DEPS STREQUAL "")
     add_dependencies(mallob_core ${MALLOB_CORE_DEPS})
 endif()
 

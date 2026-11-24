@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# just an assumption - the command will also work with deviating scales
+# (original in the SAT Comp: 11 - probably resulted in very weak clause sharing)
+n_threads_per_process=32
+
+echo '-max-lits-per-thread=35000000 -pre-cleanup=1 -seed=110519 -zero-only-logging=1
+ -v=2 -s2f=solution.txt -terminate-abruptly=1
+ -sat-config-dirs=config/sat/base/ -sat-config-files=config/sat/incremental.json
+ -satsolver=CL(C){'$(($n_threads_per_process-2))'}'

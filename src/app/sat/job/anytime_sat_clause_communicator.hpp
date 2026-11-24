@@ -9,7 +9,11 @@
 
 #include "app/sat/data/clause.hpp"
 #include "app/sat/job/inter_job_clause_sharer.hpp"
+<<<<<<< HEAD
 #include "gpu_clause_interface.hpp"
+=======
+#include "comm/msg_queue/message_subscription.hpp"
+>>>>>>> master
 #include "util/params.hpp"
 #include "util/hashing.hpp"
 #include "data/job_transfer.hpp"
@@ -40,6 +44,7 @@ private:
     int _current_epoch = 0;
     float _time_of_last_epoch_initiation = 0;
     float _time_of_last_epoch_conclusion = 0;
+    int _xtcs_epoch = 0;
 
     float _solving_time = 0;
 
@@ -58,21 +63,29 @@ private:
     // If non null, this is a non owned reference that always survives
     // this object's life scope. 
     GpuClauseInterface* _gpu_clauses {nullptr};
+    bool _internal_sharing = true;
+    MessageSubscription _sub_incoming_crossshared_clauses;
+    std::list<std::vector<int>> _incoming_crossshared_clauses;
 
 public:
-    AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job);
+    AnytimeSatClauseCommunicator(const Parameters& params, BaseSatJob* job, bool internalSharing = true);
     void initCrossSharer();
     void setGpuClauseInterface(GpuClauseInterface* gpuClauses) {
         _gpu_clauses = gpuClauses;
     }
 
     void communicate();
-    void handle(int source, int mpiTag, JobMessage& msg);
+    bool handle(int source, int mpiTag, JobMessage& msg);
 
     bool isDestructible();
     int getCurrentEpoch() const {return _current_epoch;}
 
     bool isDoneAssemblingProof() const {return _proof_producer && _proof_producer->isDoneAssemblingProof();}
+
+    // Need to guard against a mono job with no group (getGroupId() <= 0), where  _cross_job_clause_sharer is initialized to nullptr
+    bool hasLocalClausesLeftToShare() const {return _cross_job_clause_sharer && _cross_job_clause_sharer->hasClausesToBroadcastInternally();}
+    //Somehow this needed to be public now to have access
+    void feedLocalClausesIntoCrossSharing(std::vector<int>& clauses, ClauseSharingSession* session);
 
 private:
     bool handleClauseHistoryMessage(int source, int mpiTag, JobMessage& msg);
@@ -83,7 +96,6 @@ private:
 
     void initiateClauseSharing(JobMessage& msg, int source, bool fromDeferredQueue);
     void initiateCrossSharing(JobMessage& msg, int source, bool fromDeferredQueue);
-    void feedLocalClausesIntoCrossSharing(std::vector<int>& clauses, ClauseSharingSession* session);
     void tryActivateDeferredSharingInitiation();
     
     void checkCertifiedUnsatReadyMsg();

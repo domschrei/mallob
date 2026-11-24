@@ -10,6 +10,7 @@
 
 #include "app/sat/proof/trusted/trusted_utils.hpp"
 #include "data/checksum.hpp"
+#include "util/logger.hpp"
 #include "util/spsc_blocking_ringbuffer.hpp"
 #include "util/string_utils.hpp"
 
@@ -20,6 +21,8 @@ public:
         enum Type {RAW, SPLIT} type {SPLIT};
         std::vector<int> lits;
         std::vector<int> assumptions;
+        int nbVars {-1};
+        int nbClauses {-1};
         std::string descLabel;
         float priority;
         Checksum chksum;
@@ -30,6 +33,8 @@ public:
         void integrate(SatTask&& other) {
             assert(other.rev != rev);
             assert(type == other.type);
+            nbVars = std::max(nbVars, other.nbVars);
+            nbClauses = std::min(nbClauses, other.nbClauses) >= 0 ? nbClauses + other.nbClauses : -1;
             if (other.rev > rev) {
                 rev = other.rev;
                 descLabel = std::move(other.descLabel);
@@ -51,8 +56,9 @@ public:
                     //for (int l : lits) assert(l != INT32_MAX && l != INT32_MIN);
                 }
                 // Append new clauses, fingerprint, and assumptions
-                for (int lit : other.lits) lits.push_back(lit);
+                lits.insert(lits.end(), other.lits.begin(), other.lits.end());
             }
+            other = SatTask {type};
         }
     };
     struct SatTaskResult {
@@ -76,7 +82,7 @@ public:
 protected:
     std::string _name;
     std::function<bool(int)> _terminator;
-    std::function<const SatTask&()> _cb_retrieve_full_task;
+    std::function<SatTask()> _cb_retrieve_full_task;
 
 private:
     Synchronizer& _sync;
@@ -89,7 +95,7 @@ public:
     virtual void setName(const std::string& baseName) {
         _name = baseName + ":base";
     }
-    virtual void setRetrieveFullTaskCallback(std::function<const SatTask&()> cb) {
+    virtual void setRetrieveFullTaskCallback(std::function<SatTask()> cb) {
         _cb_retrieve_full_task = cb;
     }
     virtual void setTerminator(const std::function<bool(int)>& terminator) {
@@ -102,9 +108,10 @@ public:
 
     virtual void loop() {}
     virtual void process(SatTask& task) = 0;
+    virtual void forwardAsyncRedundantClauses(std::vector<int>& clauseBuf) = 0;
 
     virtual void finalize() {
-        LOG(V2_INFO, "%s finalize\n", _name.c_str());
+        LOG(V4_VVER, "%s finalize\n", _name.c_str());
         _queue.markExhausted();
         _queue.markTerminated();
     }

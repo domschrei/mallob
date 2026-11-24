@@ -1,0 +1,24 @@
+[
+    {
+        "id": "sats",
+        "type": "SATSUMA_EXT",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "kis",
+        "type": "KISSAT",
+        "prerequisite": "sats",
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "mal",
+        "type": "MALLOBSAT",
+        "prerequisite": "kis",
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false,
+        "options": "-satsolver=k"
+    }
+]

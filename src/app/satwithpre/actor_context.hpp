@@ -1,0 +1,30 @@
+
+#pragma once
+
+#include "app/satwithpre/sat_preprocess_actor.hpp"
+#include <memory>
+#include <vector>
+
+struct ActorContext {
+    std::string id;
+    enum ActorType {SATSUMA_INT, SATSUMA_EXT, KISSAT, LINGELING, MALLOBSAT, MALLOBSWEEP} type;
+    ActorContext* prerequisite {nullptr};
+    std::vector<ActorContext*> actorsBeingDisplaced;
+    bool onlyStartIfPrerequisiteSimplified {false};
+
+    std::string options;
+    std::string groupId;
+
+    std::unique_ptr<SatPreprocessActor> actor;
+    enum ActiveActorState {UNINITIALIZED, RUNNING, FINISHED} state {UNINITIALIZED};
+    SatPreprocessActor::PreprocessActorResult result {SatPreprocessActor::PENDING};
+    const std::vector<int>* formula {nullptr};
+    std::vector<int> model;
+    float timeOfStart {0};
+    float timeOfSignalledDisplacement {0};
+    bool shrinking {false};
+
+    const char* getId() const {
+        return id.c_str();
+    }
+};

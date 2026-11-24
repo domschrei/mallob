@@ -7,9 +7,11 @@
 #include "app/sat/stream/mallob_sat_job_stream_processor.hpp"
 #include "app/sat/stream/sat_job_stream_processor.hpp"
 #include "app/sat/stream/wrapped_sat_job_stream.hpp"
+#include "comm/msgtags.h"
 #include "core/dtask_tracker.hpp"
 #include "data/job_description.hpp"
 #include "data/job_result.hpp"
+#include "data/job_transfer.hpp"
 #include "interface/api/api_connector.hpp"
 #include "util/logger.hpp"
 #include "util/params.hpp"
@@ -21,10 +23,11 @@
 class IncSatController {
 
 private:
-    const Parameters _params;
+    const Parameters& _params;
     APIConnector& _api;
     JobDescription& _desc;
     std::string _problem_file;
+    const bool _use_incremental_sat;
 
     int _rev {-1};
     std::unique_ptr<TrustedIncParserProcessAdapter> _tppa;
@@ -43,16 +46,20 @@ private:
     std::function<bool()> _cb_terminate;
     bool _replace_default_terminator {false};
 
+    Mutex _mtx_terminate;
+    volatile bool _terminators_invalidated {false};
+
 public:
-    IncSatController(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& dTaskTracker) :
-            _params(params), _api(api), _desc(desc), _stream_id(getNextStreamId()),
+    IncSatController(const Parameters& params, APIConnector& api, JobDescription& desc, DTaskTracker& dTaskTracker,
+                bool useIncrementalSatSolving) :
+            _params(params), _api(api), _desc(desc), _use_incremental_sat(useIncrementalSatSolving), _stream_id(getNextStreamId()),
             _name("#" + std::to_string(desc.getId()) + "(ISAT):" + std::to_string(_stream_id)),
             _dtask_tracker(dTaskTracker) {
 
-        LOG(V3_VERB, "+IncSat %s\n", _name.c_str());
+        LOG(V4_VVER, "+IncSat %s\n", _name.c_str());
     }
     ~IncSatController() {
-        LOG(V3_VERB, "-IncSat %s\n", _name.c_str());
+        LOG(V4_VVER, "-IncSat %s\n", _name.c_str());
         finalize();
     }
 
@@ -90,12 +97,13 @@ public:
         initStream(true);
     }
 
-    bool solveNextRevisionNonblocking(std::vector<int>&& clauses, std::vector<int>&& assumptions, const std::string& descLabel = "") {
+    bool solveNextRevisionNonblocking(std::vector<int>&& clauses, std::vector<int>&& assumptions, const std::string& descLabel = "",
+            int nbVars = -1, int nbClauses = -1) {
         initInteractiveSolving();
 
         if (!_params.onTheFlyChecking()) {
             _stream->stream.solveNonblocking({SatJobStreamProcessor::SatTask::Type::SPLIT,
-                std::move(clauses), std::move(assumptions)});
+                std::move(clauses), std::move(assumptions), nbVars, nbClauses});
             return true;
         }
         auto futWrite = ProcessWideThreadPool::get().addTask([&]() {
@@ -119,19 +127,30 @@ public:
         }
         std::vector<int> payload(_desc.getFormulaPayload(_rev),
             _desc.getFormulaPayload(_rev)+_desc.getFormulaPayloadSize(_rev));
-        _stream->stream.solveNonblocking({SatJobStreamProcessor::SatTask::Type::RAW, std::move(payload)});
+        _stream->stream.solveNonblocking({SatJobStreamProcessor::SatTask::Type::RAW, std::move(payload),
+            {}, nbVars, nbClauses});
         return true;
     }
 
-    std::pair<int, std::vector<int>> solveNextRevision(std::vector<int>&& clauses, std::vector<int>&& assumptions) {
-        bool ok = solveNextRevisionNonblocking(std::move(clauses), std::move(assumptions));
+    std::pair<int, std::vector<int>> solveNextRevision(std::vector<int>&& clauses, std::vector<int>&& assumptions,
+            int nbVars = -1, int nbClauses = -1) {
+        bool ok = solveNextRevisionNonblocking(std::move(clauses), std::move(assumptions),
+            "", nbVars, nbClauses);
         assert(ok);
         return _stream->stream.getNonblockingSolveResult();
     }
 
+    void forwardAsyncRedundantClauses(std::vector<int>& clauseBuf) {
+        _stream->stream.forwardAsyncRedundantClauses(clauseBuf);
+    } 
+
     void setInnerTerminator(std::function<bool()> cb, bool replaceDefaultTerminator) {
         _cb_terminate = cb;
         _replace_default_terminator = replaceDefaultTerminator;
+    }
+    void invalidateTerminators() {
+        auto lock = _mtx_terminate.getLock();
+        _terminators_invalidated = true;
     }
 
     void finalize() {
@@ -147,26 +166,37 @@ public:
         assert(_stream);
         return _stream->stream;
     }
-    MallobSatJobStreamProcessor* getMallobProcessor() {
+    std::list<MallobSatJobStreamProcessor*> getMallobProcessors() {
         assert(_stream);
-        return _stream->mallobProcessor;
+        return _stream->mallobProcessors;
     }
 
 private:
     void initStream(bool createProblemFileAsPipe) {
         _start_time = Timer::elapsedSeconds();
         _stream.reset(new WrappedSatJobStream(_name));
-        _stream->mallobProcessor = new MallobSatJobStreamProcessor(_params, _api, _desc,
-            _name, _stream_id, true, _stream->stream.getSynchronizer());
-        _stream->mallobProcessor->setDTaskSlot(_dtask_tracker.createDTask());
-        _stream->stream.addProcessor(_stream->mallobProcessor);
+
+        auto mallobProcessor = new MallobSatJobStreamProcessor(_params, _api, _desc,
+            _name, _stream_id, _use_incremental_sat, _stream->stream.getSynchronizer());
+        mallobProcessor->setDTaskTracker(_dtask_tracker);
+        _stream->stream.addProcessor(mallobProcessor);
+        _stream->mallobProcessors.push_back(mallobProcessor);
+
+        if (_params.nonincrementalSolvingDelay() > 0) {
+            auto mallobProcessor = new MallobSatJobStreamProcessor(_params, _api, _desc,
+            _name + ":ni", _stream_id, false, _stream->stream.getSynchronizer());
+            mallobProcessor->setDTaskTracker(_dtask_tracker);
+            mallobProcessor->overrideSolvingDelays(_params.nonincrementalSolvingDelay());
+            _stream->stream.addProcessor(mallobProcessor);
+            _stream->mallobProcessors.push_back(mallobProcessor);
+        }
 
         if (_params.internalStreamProcessor()) {
             SolverSetup setup;
             setup.baseSeed = _params.seed();
             setup.jobId = _desc.getId();
             setup.jobname = _name + ".int";
-            setup.isJobIncremental = true;
+            setup.isJobIncremental = true; // always use incremental SAT here (smallest overhead)
             setup.onTheFlyChecking = _params.onTheFlyChecking();
             setup.onTheFlyCheckModel = _params.onTheFlyChecking() && _params.onTheFlyCheckModel();
             setup.incrementalImpCheck = _params.onTheFlyCheckIncremental();
@@ -177,10 +207,23 @@ private:
         }
 
         _stream->stream.setTerminator([&, str=&_stream->stream, params=&_params, desc=&_desc, startTime=_start_time]() {
-            if (str->finalizing()) return true;
-            if (_cb_terminate && _cb_terminate()) return true;
+            if (str->finalizing()) {
+                return true;
+            }
+            {
+                auto lock = _mtx_terminate.getLock();
+                if (_terminators_invalidated) {
+                    return true;
+                }
+                if (_cb_terminate && _cb_terminate()) {
+                    return true;
+                }
+            }
             if (_replace_default_terminator) return false; // skip default terminator
-            return isTimeoutHit(params, desc, startTime);
+            if (isTimeoutHit(params, desc, startTime)) {
+                return true;
+            }
+            return false;
         });
 
         if (!_problem_file.empty()) {

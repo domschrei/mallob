@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include "app/app_terminate_checker.hpp"
 #include "app/incsat/inc_sat_controller.hpp"
 #include "app/sat/data/definitions.hpp"
 #include "app/sat/solvers/cadical.hpp"
@@ -12,7 +13,6 @@
 #include "util/logger.hpp"
 #include "util/params.hpp"
 #include "util/random.hpp"
-#include "util/sys/terminator.hpp"
 #include <algorithm>
 #include <bitset>
 #include <cmath>
@@ -25,6 +25,7 @@ private:
     const Parameters _params;
     JobDescription& _desc;
     std::vector<int> _base_formula;
+    AppTerminateChecker _term;
 
     float _start_time;
     int _status {0};
@@ -34,7 +35,8 @@ private:
     DTaskTracker _dtask_tracker;
 
 public:
-    CncController(const Parameters& params, JobDescription& desc) : _params(params), _desc(desc), _dtask_tracker(_params) {
+    CncController(const Parameters& params, JobDescription& desc) : _params(params), _desc(desc),
+            _term(_params, _desc), _dtask_tracker(_params) {
         // Extract the base formula to solve.
         _base_formula.insert(_base_formula.end(),
             _desc.getFormulaPayload(0),
@@ -77,7 +79,7 @@ public:
         // Repeatedly loop over all your streams, submitting cubes and fetching results,
         // until a stopping criterion is reached.
         bool stop = false;
-        while (!stop && !isTimeoutHit()) {
+        while (!stop && !_term.isTimeoutHit()) {
             if (nbUnsatCubes == nbGeneratedCubes) {
                 // All cubes found UNSAT. We are done!
                 LOG(V2_INFO, "CNC CONCLUDE UNSAT\n");
@@ -216,9 +218,12 @@ private:
     std::unique_ptr<IncSatController> addJobStream() {
 
         // Create wrapper object for SAT job stream
-        std::unique_ptr<IncSatController> incsat(new IncSatController(_params, APIRegistry::get(), _desc, _dtask_tracker));
+        std::unique_ptr<IncSatController> incsat(new IncSatController(_params, APIRegistry::get(), _desc, _dtask_tracker,
+            _params.incrementalSatTasks()));
         incsat->initInteractiveSolving();
-        incsat->getMallobProcessor()->setGroupId("cnc-" + std::to_string(_desc.getId()));
+        for (auto mallobProc : incsat->getMallobProcessors())
+            if (mallobProc->usesIncrementalSatSolving())
+                mallobProc->setGroupId("cnc-" + std::to_string(_desc.getId()));
         return incsat;
     }
 
@@ -227,16 +232,5 @@ private:
         std::vector<int> formula;
         if (incsat.getStream().getRevision() == -1) formula = _base_formula;
         incsat.solveNextRevisionNonblocking(std::move(formula), std::vector<int>(cube));
-    }
-
-    // Check whether this job should terminate right now.
-    bool isTimeoutHit() const {
-        if (Terminator::isTerminating())
-            return true;
-        if (_params.timeLimit() > 0 && Timer::elapsedSeconds() >= _params.timeLimit())
-            return true;
-        if (_desc.getWallclockLimit() > 0 && (Timer::elapsedSeconds() - _start_time) >= _desc.getWallclockLimit())
-            return true;
-        return false;
     }
 };

@@ -90,7 +90,7 @@ void register_mallob_app_sat() {
             if (!IncrementalTrustedParserStore::map.count(desc.getId()))
                 IncrementalTrustedParserStore::map[desc.getId()] = reader.getTrustedParser();
         }
-        if (params.palRup())
+        if (params.palRup() && !files.empty()) // could be empty if started from preprocessing actor
             StaticStore<std::string>::insert("cnf-#" + std::to_string(desc.getId()), files[0]);
         return res;
     };
@@ -117,7 +117,7 @@ void register_mallob_app_sat() {
     };
 
     entry.cleaner = [](const Parameters& params) {
-        if (!params.proofDirectory().empty() && !params.injectProofData.isSet()) {
+        if (params.proofDirectory.isSet() && params.proofOutputFile.isSet() && !params.injectProofData.isSet()) {
             for (auto file : FileUtils::glob(params.proofDirectory() + "/proof#*/")) {
                 FileUtils::rmrf(file);
             }
@@ -151,8 +151,10 @@ void register_mallob_app_sat() {
         auto sol = res.copySolution();
         Witness w = Witness::extractWitnessFromSolutionVector(sol);
         res.setSolutionToSerialize(sol.data(), sol.size());
-        if (w.valid() && params.logDirectory.isSet()) {
-            std::ofstream ofs(params.logDirectory() + "/witness.#" + std::to_string(res.id), ios_base::app);
+        if (w.valid() && (params.solutionToFile.isSet() || params.logDirectory.isSet())) {
+            auto dir = params.solutionToFile.isSet() ? FileUtils::getDirectory(params.solutionToFile())
+                : params.logDirectory();
+            std::ofstream ofs(dir + "/witness.#" + std::to_string(res.id), ios_base::app);
             ofs << w.cidx << " " << w.result << " "
                 << Logger::dataToHexStr((const u8*) w.data, SIG_SIZE_BYTES);
             if (!w.asmpt.empty()) {

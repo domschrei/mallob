@@ -19,6 +19,7 @@ std::promise<nlohmann::json> APIConnector::processAsync(nlohmann::json& input) {
     return promise;
 }
 
-JsonInterface::Result APIConnector::submit(nlohmann::json& data, std::function<void(nlohmann::json&)> callback) {
-    return _interface.handle(data, callback);
+JsonInterface::Result APIConnector::submit(nlohmann::json& data, std::function<void(nlohmann::json&)> callback,
+        int* outId, std::function<void(int)> callbackRootRank) {
+    return _interface.handle(data, callback, outId, callbackRootRank);
 }

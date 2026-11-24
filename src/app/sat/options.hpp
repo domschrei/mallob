@@ -4,6 +4,18 @@
 #include "optionslist.hpp"
 #include "util/option.hpp"
 
+#if MALLOB_USE_CADICAL
+#define MALLOB_DEFAULT_PORTFOLIO "C"
+#elif MALLOB_USE_KISSAT
+#define MALLOB_DEFAULT_PORTFOLIO "k"
+#elif MALLOB_USE_LINGELING
+#define MALLOB_DEFAULT_PORTFOLIO "L"
+#else
+#define MALLOB_DEFAULT_PORTFOLIO ""
+static_assert(false, "No viable solver backend is included in the build."
+   " Add at least one of: -DMALLOB_USE_{KISSAT,CADICAL,LINGELING}=1");
+#endif
+
 // Application-specific program options for SAT solving.
 // memberName                               short option name, long option name          default   min  max
 
@@ -17,14 +29,25 @@ OPTION_GROUP(grpAppSat, "app/sat", "SAT solving options")
     "Copy each formula + assumptions from shared memory to local memory before launching solvers")
  OPT_STRING(clauseLog,                      "clause-log", "",                            "",
     "Log successfully shared clauses to the provided path")
+ OPT_STRING(unitClauseLog,                  "unit-clause-log", "",                            "",
+    "Log successfully shared unit clauses to the provided path")
+ OPT_BOOL(verboseClauseLogs,            "vcl", "", false, "Log metadata for each logged clause (-clause-log, -unit-clause-log)")
  OPT_STRING(satProfilingDir,            "spd", "sat-profiling-dir", "", "Directory to write SAT thread profiling reports to")
  OPT_INT(satProfilingLevel,             "spl", "sat-profiling-level", -1, -1, 4, "Profiling level for SAT solvers (-1=none ... 4=all)")
  OPT_BOOL(compressFormula,                  "cf", "compress-formula", false, "Compress formula serialization (reorders clauses and literals in clauses)")
  OPT_BOOL(compressModels,                   "cm", "compress-models", true, "Compress found models into hexadecimal vector in output")
  OPT_STRING(groundTruthModel,               "gtm", "", "", "Ground truth model to test learned clauses against")
  OPT_INT(replay, "replay", "", 0, 0, 2, "0: nothing, 1: record solver threads' behavior, 2: replay solving")
- OPT_BOOL(internalStreamProcessor, "isp", "", true, "For incremental SAT job streams, run a local single-threaded SAT solver for latency hiding")
  OPT_INT(jobSlots, "js", "", 0, 0, LARGE_INT, "Max. concurrent SAT job streams per client process (0: use # MPI processes)")
+
+OPTION_GROUP(grpAppSatEnum, "app/sat/enum", "Model enumeration")
+ OPT_BOOL(enumerateModels, "enum", "enumerate-models", false, "Keep enumerating models after finding an initial model")
+ OPT_INT(enumerationLimit, "enum-limit", "", MAX_INT, 2, MAX_INT, "Stop after enumerating this many models "
+   "(only checks for duplicates locally!)")
+ OPT_FLOAT(enumerationTimeLimit, "enum-timelim", "enum-time-limit", LARGE_INT, 0, LARGE_INT, "Perform model enumeration "
+   "for this many seconds (+ 1x clause sharing period) after an initial model has been found")
+ OPT_BOOL(enumerationFeedUnits, "enum-feed-units", "", true, "[requires -unit-clause-log=...] Whether restarted non-incremental solvers "
+   "should be fed the unit clauses found thus far")
 
 OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration")
  OPT_INT(bufferedImportedClsGenerations,    "bicg", "buffered-imported-cls-generations", 4,        1,   LARGE_INT, 
@@ -81,37 +104,21 @@ OPTION_GROUP(grpAppSatSharing, "app/sat/sharing", "Clause sharing configuration"
  OPT_INT(incrementalVariableDomainHeuristic, "ivdh", "incremental-variable-domain-heuristic", 0, 0, 2,
    ">=1: Replace LBD values with a rating based on how many clause literals are in the original (0th increment) variable range; 1=for cross-sharing only, 2=always. "
    ">=1 also overrides -lbdpi=1 -lbdpo=1 -pbbm=1 for cross-sharing ONLY.")
+ OPT_BOOL(crossShareAll, "csa", "cross-share-all", true, "Cross-share (-cjc=1) clauses from intra-job sharing automatically")
 
 OPTION_GROUP(grpAppSatDiversification, "app/sat/diversification", "Diversification options")
- OPT_INT(diversifyElimination,              "div-elim", "",                              0,        0,   3,
-    "0=normal diversification, 1/2/3=disable some/most/all variable elimination")
- OPT_BOOL(diversifyFanOut,                  "div-fanout", "",                            false,
-    "Diversify some solvers based on making X random variable decisions every Y conflicts")
- OPT_BOOL(diversifyInitShuffle,             "div-init-shuffle", "",                      false, "Shuffle order in which variables are activated (->scored) initially")
+ OPT_BOOL(diversifySeeds,                   "div-seeds", "",                             true,              "Diversify solvers with different random seeds")
  OPT_BOOL(diversifyPhases,                  "div-phases", "",                            true,
     "Diversify solvers based on random sparse variable phases in addition to native diversification")
- OPT_BOOL(diversifyNative,                 "div-native",  "",                            true,
-    "Diversify solvers by cycling through sequence of solver-specific configurations")
- OPT_INT(plainAddSpecific,                 "plain-add-specific", "",                       0,     0,      1,    "Add specific single options to plain. 0=Nothing. 1=Sweep")
- OPT_BOOL(diversifyNoise,                  "div-noise",  "",                            false,                  "Diversify solvers by adding Gaussian noise on top of numeric parameters")
- OPT_INT(decayDistribution,                "decay-distr",  "",                             1,     1,      2,    "The type of the decay sampling distribution. 1=Gaussian, 2=Uniform     (used for div-noise=1)")
- OPT_INT(decayMean,                        "decay-mean",  "",                             50,     1,    200,    "The mean for sampling the decay value                (used for div-noise=1)")
- OPT_INT(decayStddev,                      "decay-stddev",  "",                           3,      0,   1000,    "The standard deviation for sampling the decay value  (used for div-noise=1)")
- OPT_INT(decayMin,                         "decay-min",  "",                              1,      1,    200,    "The minimum cutoff for sampling a decay value        (used for div-noise=1)")
- OPT_INT(decayMax,                         "decay-max",  "",                              200,    1,    200,    "The maximum cutoff for sampling a decay value        (used for div-noise=1)")
- OPT_INT(diversifyReduce,                  "div-reduce",  "",                             0,      0,      3,    "Toggle to diversify the reduce parameters. 0=Dont, 1=Uniform(with delta optional), 2=Extremes, 3=Gaussian")
- OPT_INT(reduceMin,                        "reduce-min",  "",                             300,    0,    1000,    "The minimium reduce value, in per mille")
- OPT_INT(reduceMax,                        "reduce-max",  "",                             980,    0,    1000,    "The maximum reduce value, in per mille")
- OPT_INT(reduceDelta,                      "reduce-delta", "",                            100,    0,    1000,    "For div-reduce=1: Samples a center reduce value r and give Kissat reducelow=r-delta and reducehigh=r+delta")
- OPT_INT(reduceMean,                       "reduce-mean", "",                             700,    0,    1000,    "For div-reduce=3: The mean reduce value")
- OPT_INT(reduceStddev,                     "reduce-stddev", "",                           150,    0,    1000,    "For div-reduce=3: The stddev of the Gaussian sampled reduce value")
- OPT_BOOL(diversifySeeds,                   "div-seeds", "",                             true,              "Diversify solvers with different random seeds")
- OPT_STRING(satSolverSequence,              "satsolver",  "",                            "C",
- "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")
+ OPT_STRING(satSolverSequence,              "satsolver",  "",                            MALLOB_DEFAULT_PORTFOLIO,
+    "Sequence of SAT solvers to cycle through (capital letter for true incremental solver, lowercase for pseudo-incremental solving): L|l:Lingeling C|c:CaDiCaL G|g:Glucose k:Kissat m:MergeSAT")
+ OPT_STRING(satConfigDirs, "sat-config-dirs", "", "config/sat/base", "Directory path, or comma-separated list of directory paths, to JSON solver configuration files")
+ OPT_STRING(satConfigFiles, "sat-config-files", "", "", "File path, or comma-separated list of file paths, to JSON solver configuration rules")
 
 OPTION_GROUP(grpAppSatProof, "app/sat/proof", "Production of UNSAT proofs")
  OPT_STRING(proofDirectory,               "proof-dir", "",                             "",                      "Directory to write partial proofs into (default: -log option")
- OPT_STRING(proofOutputFile,              "proof", "",                                 "",                      "Enable UNSAT proof production, writing final LRAT proof to specified destination (output by rank zero)")
+ OPT_STRING(proofOutputFile,              "proof", "",                                 "",                      "Enable UNSAT proof production, writing final LRAT proof to specified destination (output by rank zero; can be /dev/null)")
+ OPT_BOOL(savePreprocessingProofs,        "prepro-proofs", "",                         false,                   "Save proofs for each preprocessing step (requires -proof-dir to be set)")
  OPT_BOOL(onTheFlyChecking,               "otfc", "on-the-fly-checking",               false,                   "Enable on-the-fly checking of local derivations; generate and validate signatures for shared clauses")
  OPT_BOOL(onTheFlyCheckModel,             "otfcm", "on-the-fly-check-model",           true,                    "Also check satisfiable assignment in on-the-fly checking (prevents deletion of orig. clauses in one checker per process)")
  OPT_BOOL(onTheFlyCheckIncremental,       "otfci", "on-the-fly-check-incremental",     false,                   "Enable on-the-fly checking for incremental SAT solving - true(false) expects the (non)incremental ImpCheck programs")
@@ -132,3 +139,5 @@ OPTION_GROUP(grpAppSatProof, "app/sat/proof", "Production of UNSAT proofs")
  OPT_FLOAT(derivationErrorChancePerMille, "decpm", "deriv-error-chance-per-mille",     0,    0, 1000,  "Chance per mille for tampering with some on-the-fly checking clause derivation")
  OPT_STRING(injectProofData, "ipd", "inject-proof-data", "", "Specify directory with clauseepochs.X and proof.X.lrat files to use for immediate proof assembly")
  OPT_BOOL(verifyGPUResolvents, "verify-gpu-resolvents", "", false, "Verify that the resolvents produced by the GPU are correct")
+ OPT_STRING(coreOutputFile, "core", "", "", "[Only with -proof=...] Output an UNSAT core to the specified path")
+ OPT_INT(proofCompressionMode, "pcm", "proof-compression-mode", 0, 0, 2, "0: No compression; 1: xz compression; 2: Vaskin-Goetz compression")

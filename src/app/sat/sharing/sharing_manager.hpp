@@ -99,6 +99,7 @@ protected:
 	bool _sharing_op_ongoing {false};
 
 	std::unique_ptr<ClauseLogger> _clause_logger;
+	std::unique_ptr<ClauseLogger> _unit_clause_logger;
 
 	std::vector<int> _groundtruth_model;
 
@@ -124,6 +125,7 @@ public:
 	bool syncDeterministicSolvingAndCheckForWinningSolver();
 
 	SharingStatistics getStatistics();
+	std::unique_ptr<ClauseLogger>& getUnitClauseLogger() {return _unit_clause_logger;}
 
 	void setImportedRevision(int revision) {_imported_revision = std::max(_imported_revision, revision);}
 	void stopClauseImport(int solverId);
@@ -144,6 +146,8 @@ public:
 	bool isSharingOperationOngoing() const {
 		return _sharing_op_ongoing;
 	}
+
+	void finalize();
 
 private:
 

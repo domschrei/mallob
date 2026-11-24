@@ -68,7 +68,7 @@ void Process::reportTerminationSignal(const SignalInfo& info) {
         LOG(V0_CRIT, "[ERROR] pid=%ld tid=%ld signal=%d\n", 
                 Proc::getPid(), info.tid, info.signum);
     } else {
-        LOG(V3_VERB, "pid=%ld tid=%ld signal=%d\n",
+        LOG(V2_INFO, "pid=%ld tid=%ld signal=%d\n",
                 Proc::getPid(), info.tid, info.signum);
     }
     Logger::getMainInstance().flush();
@@ -183,6 +183,27 @@ bool Process::didChildExit(pid_t childpid, int* exitStatusOut) {
         return true;
     }
     return false;
+}
+
+void Process::waitForChildToExit(pid_t childpid, int* exitStatusOut) {
+
+    {
+        auto lock = _children_mutex.getLock();
+        if (!_children.count(childpid)) {
+            if (exitStatusOut != nullptr)
+                *exitStatusOut = 0;
+            return;
+        }
+    }
+
+    int status;
+    pid_t result = waitpid(childpid, &status, 0);
+
+    if (result != 0) {
+        auto lock = _children_mutex.getLock();
+        _children.erase(childpid);
+        if (exitStatusOut != nullptr) *exitStatusOut = status;
+    }
 }
 
 std::optional<Process::SignalInfo> Process::getCaughtSignal() {

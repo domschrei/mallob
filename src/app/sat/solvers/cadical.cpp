@@ -8,20 +8,20 @@
 #include <assert.h>
 #include <cstdint>
 #include <cstdio>
+#include <memory>
 #include <stdint.h>
 #include <functional>
 #include <algorithm>
 #include <cmath>
-#include <random>
 
 #include "app/sat/data/definitions.hpp"
 #include "app/sat/proof/lrat_connector.hpp"
 #include "cadical.hpp"
 #include "app/sat/proof/trusted/trusted_utils.hpp"
 #include "app/sat/solvers/solving_replay.hpp"
+#include "cadical/src/cadical.hpp"
 #include "cadical/src/onthefly_checking.hpp"
 #include "util/logger.hpp"
-#include "util/distribution.hpp"
 #include "app/sat/data/clause.hpp"
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "app/sat/data/solver_statistics.hpp"
@@ -32,7 +32,9 @@
 #include "app/sat/solvers/cadical_clause_import.hpp"
 #include "app/sat/solvers/cadical_terminator.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
+#include "util/params.hpp"
 #include "util/sys/fileutils.hpp"
+#include "util/sys/subprocess.hpp"
 
 Cadical::Cadical(const SolverSetup& setup)
 	: PortfolioSolverInterface(setup),
@@ -55,6 +57,10 @@ Cadical::Cadical(const SolverSetup& setup)
 	}
 
 	bool okay = solver->set("quiet", 1); assert(okay); // no messy logging output
+
+	if (setup.doIncrementalSolving && setup.isJobIncremental) {
+		solver->set("lucky", 0); // disable lucky phase checking because it's done for every increment
+	}
 
 	// In certified UNSAT mode?
 	if (setup.certifiedUnsat) {
@@ -100,31 +106,52 @@ Cadical::Cadical(const SolverSetup& setup)
 					LOGGER(_logger, V2_INFO, "CONCLUSION ID %lu\n", unsatConclusionId);
 				}
 			);
-		} else if (_setup.usePalRupFormat) {
-			// Production of parallel (PalRUP) files: Initialize tracer that outputs to a file.
-			// Clause export for sharing is separate, set up in setLearnedClauseCallback.
-			okay = solver->set("lratpalrup", 1); // enable PalRUP proof output
-			okay = solver->set("binary", _setup.outputBinaryPalRup ? 1 : 0); assert(okay); // set proof logging mode to binary format
-			okay = solver->set("lratdeletelines", 1); assert(okay); // do enable printing deletion lines
-			int sqrt = std::ceil(std::sqrt((double) maxNumSolvers));
-			proofFileString = _setup.proofDir + "/" + std::to_string((int)(solverRank / sqrt)) + "/" + std::to_string(_setup.globalId) + "/out.palrup~";
-			LOG(V2_INFO, "CADICAL PROOF DIR %s\n", proofFileString.c_str());
-			okay = solver->trace_proof(proofFileString.c_str()); assert(okay);
 		} else {
-			// Monolithic proof production: LRAT tracer that outputs to a file.
-			// Clause export for sharing is separate, set up in setLearnedClauseCallback.
-			okay = solver->set("binary", 1); assert(okay); // set proof logging mode to binary format
-			okay = solver->set("lratdeletelines", 0); assert(okay); // disable printing deletion lines
-			proofFileString = _setup.proofDir + "/proof." + std::to_string(_setup.globalId) + ".lrat";
-			okay = solver->trace_proof(proofFileString.c_str()); assert(okay);
+			if (_setup.usePalRupFormat) {
+				// Production of parallel (PalRUP) files: Initialize tracer that outputs to a file.
+				// Clause export for sharing is separate, set up in setLearnedClauseCallback.
+				okay = solver->set("lratpalrup", 1); // enable PalRUP proof output
+				okay = solver->set("binary", _setup.outputBinaryPalRup ? 1 : 0); assert(okay); // set proof logging mode to binary format
+				okay = solver->set("lratdeletelines", 1); assert(okay); // do enable printing deletion lines
+				int sqrt = std::ceil(std::sqrt((double) maxNumSolvers));
+				proofFileString = _setup.proofDir + "/" + std::to_string((int)(solverRank / sqrt)) + "/" + std::to_string(_setup.globalId) + "/out.palrup";
+			} else {
+				// Monolithic proof production: LRAT tracer that outputs to a file.
+				// Clause export for sharing is separate, set up in setLearnedClauseCallback.
+				okay = solver->set("binary", 1); assert(okay); // set proof logging mode to binary format
+				okay = solver->set("lratdeletelines", 0); assert(okay); // disable printing deletion lines
+				proofFileString = _setup.proofDir + "/proof." + std::to_string(_setup.globalId) + ".lrat";
+			}
+			if (_setup.compressProofMode == SolverSetup::NONE) {
+				// No proof compression.
+				okay = solver->trace_proof((proofFileString + "~").c_str()); assert(okay);
+			} else {
+				// Proof compression.
+				// - Create pipe from solver to compressor
+				proofFileString += (_setup.compressProofMode == SolverSetup::XZ ? ".xz" : ".vg");
+				std::string pipePath = proofFileString + ".compress";
+				int res;
+				res = mkfifo(pipePath.c_str(), 0666);
+				if (res == -1) abort();
+				// - Launch compression sub-process
+				Parameters params;
+				Subprocess subprocCompress(params, "compress-proof.sh "
+					+ std::string(_setup.compressProofMode == SolverSetup::XZ ? "XZ" : "VASKIN_GOETZ")
+					+ " " + pipePath + " " + proofFileString + "~", false);
+				compressorPid = subprocCompress.start();
+				// - Tell solver to output its proof information to the pipe
+				okay = solver->trace_proof(pipePath.c_str()); assert(okay);
+			}
 		}
 	}
 
+#if MALLOB_USE_CADICAL // explicit compile-time check to suppress missing polymorphy warning
 	if (_optimizer) {
 		solver->connect_external_propagator(_optimizer.get());
 		for (auto [weight, lit] : _setup.objectiveFunction)
 			solver->add_observed_var(std::abs(lit));
 	}
+#endif
 }
 
 void Cadical::addLiteral(int lit) {
@@ -134,81 +161,42 @@ void Cadical::addLiteral(int lit) {
 void Cadical::diversify(int seed) {
 
 	if (seedSet) return;
-
 	LOGGER(_logger, V3_VERB, "Diversifying %i seed=%i\n", getDiversificationIndex(), seed);
+
 	bool okay = solver->set("seed", seed);
 	assert(okay);
 
 	seedSet = true;
 	setClauseSharing(getNumOriginalDiversifications());
+}
 
-	// Randomize ("jitter") certain options around their default value
-    if (getDiversificationIndex() >= getNumOriginalDiversifications() && _setup.diversifyNoise) {
-        std::mt19937 rng(seed);
-        Distribution distribution(rng);
-
-        // Randomize restart frequency
-        double meanRestarts = solver->get("restartint");
-        double maxRestarts = std::min(2e9, 20*meanRestarts);
-        distribution.configure(Distribution::NORMAL, std::vector<double>{
-            /*mean=*/meanRestarts, /*stddev=*/10, /*min=*/1, /*max=*/maxRestarts
-        });
-        int restartFrequency = (int) std::round(distribution.sample());
-        okay = solver->set("restartint", restartFrequency); assert(okay);
-
-        // Randomize score decay
-        double meanDecay = solver->get("scorefactor");
-        distribution.configure(Distribution::NORMAL, std::vector<double>{
-            /*mean=*/meanDecay, /*stddev=*/3, /*min=*/500, /*max=*/1000
-        });
-        int decay = (int) std::round(distribution.sample());
-        okay = solver->set("scorefactor", decay); assert(okay);
-        
-        LOGGER(_logger, V3_VERB, "Sampled restartint=%i decay=%i\n", restartFrequency, decay);
-    }
-
-	if (getDiversificationIndex() >= getNumOriginalDiversifications() && _setup.diversifyFanOut) {
-		okay = solver->set("fanout", 1); assert(okay);
-	}
-
-	if (_setup.flavour == PortfolioSequence::SAT) {
-		switch (getDiversificationIndex() % 3) {
-		case 0: okay = solver->configure("sat"); break;
-		case 1: /*default configuration*/ break;
-		case 2: okay = solver->set("inprocessing", 0); break;
+void Cadical::addConfigurationSetting(Setting setting) {
+	bool ok = true;
+	if (setting.type == Setting::CONFIGURE) {
+		const char* conf = std::get<0>(setting.val).c_str();
+		if (!solver->is_valid_configuration(conf)) {
+			LOGGER(_logger, V0_CRIT, "[ERROR] CaDiCaL does not have configuration %s\n", conf);
+			abort();
 		}
-	} else if (_setup.flavour == PortfolioSequence::PLAIN) {
-		LOGGER(_logger, V4_VVER, "plain\n");
-		okay = solver->configure("plain");
+		LOGGER(_logger, V5_DEBG, "conf override \"%s\"\n", conf);
+		ok = solver->configure(conf);
 	} else {
-		if (_setup.flavour != PortfolioSequence::DEFAULT) {
-			LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");
-			_setup.flavour = PortfolioSequence::DEFAULT;
+		const char* opt = setting.key.c_str();
+		if (!solver->is_valid_option(opt)) {
+			LOGGER(_logger, V0_CRIT, "[ERROR] CaDiCaL does not have option %s\n", opt);
+			abort();
 		}
-		if (_setup.diversifyNative) {
-			switch (getDiversificationIndex() % getNumOriginalDiversifications()) {
-			// Greedy 10-portfolio according to tests on SAT2020 instances
-			case 0: okay = solver->set("phase", 0); break;
-			case 1: okay = solver->configure("sat"); break;
-			case 2: okay = solver->set("elim", 0); break;
-			case 3: okay = solver->configure("unsat"); break;
-			case 4: okay = solver->set("condition", 1); break;
-			case 5: okay = solver->set("walk", 0); break;
-			case 6: okay = solver->set("restartint", 100); break;
-			case 7: okay = solver->set("cover", 1); break;
-			case 8: okay = solver->set("shuffle", 1) && solver->set("shufflerandom", 1); break;
-			case 9: okay = solver->set("inprocessing", 0); break;
-			}
-		}
+		long long value = setting.type == Setting::ADD ? solver->get(setting.key.c_str()) : 0;
+		value += std::get<1>(setting.val);
+		value = std::min(value, setting.max);
+		value = std::max(value, setting.min);
+		LOGGER(_logger, V5_DEBG, "opt override \"%s=%lld\"\n", setting.key.c_str(), value);
+		ok = solver->set(opt, value);
 	}
-
-	// Disable clause import for the 0th solver thread in incremental solving
-	// for the lowest possible best-case response latencies.
-	//if (_setup.isJobIncremental && _setup.doIncrementalSolving && _setup.globalId == 0
-	//	&& _setup.maxNumSolvers >= 8)
-	//	_clause_import_enabled = false;
-
-	assert(okay);
+	if (!ok) {
+		LOGGER(_logger, V0_CRIT, "[ERROR] CaDiCaL override for key \"%s\" failed!\n", setting.key.c_str());
+		abort();
+	}
 }
 
 int Cadical::getNumOriginalDiversifications() {
@@ -218,19 +206,32 @@ int Cadical::getNumOriginalDiversifications() {
 void Cadical::setPhase(const int var, const bool phase) {
 	solver->phase(phase ? var : -var);
 }
+void Cadical::setDefaultPhase(const bool phase) {
+	solver->set("phase", phase);
+}
 
 // Solve the formula with a given set of assumptions
 // return 10 for SAT, 20 for UNSAT, 0 for UNKNOWN
-SatResult Cadical::solve(size_t numAssumptions, const int* assumptions) {
+SatResult Cadical::solve(size_t numAssumptions, const int* asmpt) {
 
-	// set the assumptions
-	this->assumptions.clear();
-	//clearConditionalLits();
-	for (size_t i = 0; i < numAssumptions; i++) {
-		int lit = assumptions[i];
-		solver->assume(lit);
-		this->assumptions.push_back(lit);
-		//addConditionalLit(-lit);
+	// set/update the assumptions
+	assumptions.clear();
+	if (_setup.doIncrementalSolving) {
+		// actual assumptions
+		//clearConditionalLits();
+		for (size_t i = 0; i < numAssumptions; i++) {
+			int lit = asmpt[i];
+			solver->assume(lit);
+			assumptions.push_back(lit);
+			//addConditionalLit(-lit);
+		}
+	} else {
+		// non-incremental mode: add assumptions as unit clauses
+		if (numAssumptions > 0) LOGGER(_logger, V4_VVER, "add %i assumptions as units\n", numAssumptions);
+		for (int i = 0; i < numAssumptions; i++) {
+			addLiteral(asmpt[i]);
+			addLiteral(0);
+		}
 	}
 	unsatConclusionId = 0;
 
@@ -276,8 +277,10 @@ std::vector<int> Cadical::getSolution() {
 
 std::set<int> Cadical::getFailedAssumptions() {
 	std::set<int> result;
+	// In non-incremental solving, we need to output the full set of assumptions
+	// as the trivial core, since no further information is available.
 	for (auto assumption : assumptions)
-		if (solver->failed(assumption))
+		if (!_setup.doIncrementalSolving || solver->failed(assumption))
 			result.insert(assumption);
 
 	return result;
@@ -332,12 +335,16 @@ void Cadical::cleanUp() {
 	if (_setup.certifiedUnsat) {
 		LOGGER(_logger, V4_VVER, "Closing proof output asynchronously\n");
 		solver->close_proof_asynchronously ();
-		if (_setup.usePalRupFormat) {
+		if (compressorPid > 0) Process::waitForChildToExit(compressorPid);
+		if (_setup.compressProofMode != SolverSetup::NONE) {
+			LOGGER(_logger, V5_DEBG, "Compressor PID %i finished\n", compressorPid);
+			// remove pipe file
+			FileUtils::rm(proofFileString + ".compress");
+		}
+		if (!_lrat) {
 			// Finalize the proof fragment by moving temporary to final file
-			int sqrt = std::ceil(std::sqrt((double) _setup.maxNumSolvers));
-			std::string proofFileStringOld = _setup.proofDir + "/" + std::to_string((int)(_setup.globalId / sqrt)) + "/" + std::to_string(_setup.globalId) + "/out.palrup~";
-			std::string proofFileStringNew = _setup.proofDir + "/" + std::to_string((int)(_setup.globalId / sqrt)) + "/" + std::to_string(_setup.globalId) + "/out.palrup";
-			::rename(proofFileStringOld.c_str(), proofFileStringNew.c_str());
+			std::string proofFileStringOld = proofFileString + "~";
+			::rename(proofFileStringOld.c_str(), proofFileString.c_str());
 		}
 	}
 	if (_setup.profilingLevel > 0) {

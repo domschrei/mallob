@@ -12,12 +12,10 @@
 #include <cmath>
 #include <algorithm>
 #include <functional>
-#include <random>
 
 #include "app/sat/data/clause_metadata.hpp"
 #include "lingeling.hpp"
 #include "util/sys/timer.hpp"
-#include "util/distribution.hpp"
 #include "app/sat/data/portfolio_sequence.hpp"
 #include "app/sat/data/solver_statistics.hpp"
 #include "app/sat/execution/solver_setup.hpp"
@@ -90,7 +88,7 @@ Lingeling::Lingeling(const SolverSetup& setup)
 	sizeLimit = _setup.strictMaxLitsPerClause;
 	glueLimit = _setup.strictLbdLimit;
 
-    maxvar = setup.numVars;
+    updateMaxVar(setup.numVars);
 
 	numDiversifications = 11;
 }
@@ -114,79 +112,31 @@ void Lingeling::updateMaxVar(int lit) {
 }
 
 void Lingeling::diversify(int seed) {
-	
-	lglsetopt(solver, "seed", seed);
-	int rank = getDiversificationIndex();
 
-	// This portfolio is based on Plingeling (mix of ayv and bcj)
+	LOGGER(_logger, V3_VERB, "Diversifying %i seed=%i\n", getDiversificationIndex(), seed);
+
+	lglsetopt(solver, "seed", seed);
 	lglsetopt(solver, "classify", 0);
-	if (_setup.flavour == PortfolioSequence::SAT) {
-		// sat preset: just run YalSAT
-		lglsetopt (solver, "plain", true);
-		lglsetopt (solver, "locs", -1);
-		lglsetopt (solver, "locsrtc", 1);
-		lglsetopt (solver, "locswait", 0);
-		lglsetopt (solver, "locsclim", (1<<24));
-	} else if (_setup.flavour == PortfolioSequence::PLAIN) {
-		LOGGER(_logger, V4_VVER, "plain\n");
-		lglsetopt (solver, "plain", 1);
-	} else if (_setup.flavour == PortfolioSequence::PREPROCESS) {
+
+	setClauseSharing(getNumOriginalDiversifications());
+
+	if (_setup.flavour == PortfolioSequence::PREPROCESS) {
 		LOGGER(_logger, V4_VVER, "preprocess\n");
 		lglsetopt (solver, "dlim", 0);
 		lglsetopt (solver, "clim", 0);
 		lglsetopt (solver, "sweep", 0);
 		lglsetopt (solver, "gausswait", 0);
-	} else {
-		if (_setup.flavour != PortfolioSequence::DEFAULT) {
-			LOGGER(_logger, V1_WARN, "[WARN] Unsupported flavor - overriding with default\n");
-			_setup.flavour = PortfolioSequence::DEFAULT;
-		}
-		if (_setup.diversifyNative) {
-			switch (rank % numDiversifications) {
-			case 0: lglsetopt (solver, "gluescale", 5); break; // from 3 (value "ld" moved)
-			case 1: 
-				lglsetopt (solver, "plain", 1);
-				lglsetopt (solver, "decompose", 1);
-				break;
-			case 2:
-				lglsetopt (solver, "plain", rank % (2*numDiversifications) < numDiversifications);
-				lglsetopt (solver, "locs", -1);
-				lglsetopt (solver, "locsrtc", 1);
-				lglsetopt (solver, "locswait", 0);
-				lglsetopt (solver, "locsclim", (1<<24));
-				break;
-			case 3: lglsetopt (solver, "restartint", 100); break;
-			case 4: lglsetopt (solver, "sweeprtc", 1); break;
-			case 5: lglsetopt (solver, "restartint", 1000); break;
-			case 6: lglsetopt (solver, "scincinc", 50); break;
-			case 7: lglsetopt (solver, "restartint", 4); break;
-			case 8: lglsetopt (solver, "phase", 1); break;
-			case 9: lglsetopt (solver, "phase", -1); break;
-			case 10: 
-				lglsetopt (solver, "block", 0); 
-				lglsetopt (solver, "cce", 0); 
-				break;
-			}
-		}
 	}
+}
 
-	if (rank >= getNumOriginalDiversifications() && _setup.diversifyNoise) {
-		std::mt19937 rng(seed);
-        Distribution distribution(rng);
-
-        // Randomize restart frequency
-        double meanRestarts = lglgetopt(solver, "restartint");
-        double maxRestarts = std::min(10e4, 20*meanRestarts);
-        distribution.configure(Distribution::NORMAL, std::vector<double>{
-            /*mean=*/meanRestarts, /*stddev=*/10, /*min=*/1, /*max=*/maxRestarts
-        });
-        int restartFrequency = (int) std::round(distribution.sample());
-        lglsetopt(solver, "restartint", restartFrequency);
-
-		LOGGER(_logger, V3_VERB, "Sampled restartint=%i\n", restartFrequency);
-	}
-
-	setClauseSharing(getNumOriginalDiversifications());
+void Lingeling::addConfigurationSetting(Setting setting) {
+	const char* opt = setting.key.c_str();
+	long long value = setting.type == Setting::ADD ? lglgetopt(solver, setting.key.c_str()) : 0;
+	value += std::get<1>(setting.val);
+	value = std::min(value, setting.max);
+	value = std::max(value, setting.min);
+	LOGGER(_logger, V5_DEBG, "opt override \"%s=%lld\"\n", setting.key.c_str(), value);
+	lglsetopt(solver, opt, value);
 }
 
 // Set initial phase for a given variable

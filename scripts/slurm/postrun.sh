@@ -7,6 +7,13 @@ set -e
 jobname="$1"
 outdir="/hppfs/work/$projectname/$username/logs/${jobname}"
 
+openids=$(cat sbatch/generated/${jobname}/.remaining_ids)
+if ! [ -z "$openids" ]; then
+    echo "ERROR: Remaining open job IDs: $openids"
+    echo "If you are fine with this, execute \"> sbatch/generated/${jobname}/.remaining_ids\" and retry."
+    exit 1
+fi
+
 mkdir -p "$outdir/"
 for f in /hppfs/work/$projectname/$username/logs/${jobname}-*/*/.alldone ; do
     if [ -d "$outdir/$(basename $(dirname $f))" ]; then continue; fi
@@ -14,6 +21,10 @@ for f in /hppfs/work/$projectname/$username/logs/${jobname}-*/*/.alldone ; do
 done
 mv sbatch/generated/${jobname}/sbatch.sh "$outdir/"
 echo /hppfs/work/$projectname/$username/logs/${jobname}-*/ | grep -oE "\-[0-9]{7}/" | grep -oE "[0-9]{7}" | while read slurmid; do
+    if ! [ -f slurm-${slurmid}.out ]; then
+       echo "WARN: Slurm file slurm-${slurmid}.out not present"
+       continue
+    fi
     mv slurm-${slurmid}.out "$outdir/"
 done
 
@@ -24,8 +35,8 @@ done
 echo "All logs and sbatch / SLURM files moved to: $outdir"
 echo ""
 
-rmdir sbatch/generated/${jobname}/.{done,reserved}* # locks for starting jobs
 rm sbatch/generated/${jobname}/.ticks # tick list for job counting failsafe
+rm sbatch/generated/${jobname}/.remaining_ids
 rmdir sbatch/generated/${jobname}
 
 echo ""

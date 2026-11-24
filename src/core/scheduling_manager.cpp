@@ -12,6 +12,7 @@
 
 #include "comm/msg_queue/message_handle.hpp"
 #include "comm/msgtags.h"
+#include "core/client_directive.hpp"
 #include "data/job_interrupt_reason.hpp"
 #include "data/job_state.h"
 #include "data/job_transfer.hpp"
@@ -49,6 +50,13 @@ SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm,
         _reactivation_scheduler(_params, _job_registry,
             // Callback for emitting a job request
             [&](JobRequest& req, int tag, bool left, int dest) {
+                if (!has(req.jobId)) {
+                    LOG(V1_WARN, "[WARN] Tasked to emit req. with unknown ID #%i\n", req.jobId);
+                    return;
+                }
+                auto& job = get(req.jobId);
+                req.revision = std::max(req.revision, job.getDesiredRevision());
+                req.requestingNodeContextId = job.getContextId();
                 _req_mgr.emitJobRequest(get(req.jobId), req, tag, left, dest);
             }
         ) {
@@ -85,7 +93,8 @@ SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm,
         [&](auto& h) {handleJobInterruption(h);});
     _subscriptions.emplace_back(MSG_NOTIFY_JOB_TERMINATING, 
         [&](auto& h) {
-            interruptJob(Serializable::get<int>(h.getRecvData()), /*terminate=*/true, /*reckless=*/false);
+            IntPair idRev = Serializable::get<IntPair>(h.getRecvData());
+            interruptJob(idRev.first, idRev.second, /*terminate=*/true, /*reckless=*/false);
         }
     );
     _subscriptions.emplace_back(MSG_NOTIFY_RESULT_FOUND, 
@@ -94,7 +103,8 @@ SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm,
         [&](auto& h) {handleIncrementalJobFinished(h);});
     _subscriptions.emplace_back(MSG_INTERRUPT,
         [&](auto& h) {
-            interruptJob(Serializable::get<int>(h.getRecvData()), /*terminate=*/false, /*reckless=*/false);
+            IntPair idRev = Serializable::get<IntPair>(h.getRecvData());
+            interruptJob(idRev.first, idRev.second, /*terminate=*/false, /*reckless=*/false);
         });
     _subscriptions.emplace_back(MSG_NOTIFY_NODE_LEAVING_JOB, 
         [&](auto& h) {handleLeavingChild(h);});
@@ -130,7 +140,9 @@ SchedulingManager::SchedulingManager(Parameters& params, MPI_Comm& comm,
         [&](auto& h) {_req_matcher->handle(h);});
     _subscriptions.emplace_back(MSG_SCHED_RELEASE_FROM_WAITING, 
         [&](auto& h) {handleJobReleasedFromWaitingForReactivation(h);});
-    
+    _subscriptions.emplace_back(MSG_SEND_CLIENT_DIRECTIVE_TO_JOB_TREE_ROOT,
+        [&](auto& h) {handleClientDirectiveForJobTreeRoot(h);});
+
     // Local scheduler message handling
     auto localSchedulerCb = [&](MessageHandle& handle) {
         _reactivation_scheduler.handle(handle);
@@ -663,14 +675,17 @@ void SchedulingManager::handleJobInterruption(MessageHandle& handle) {
     int rev = vec[1];
     JobInterruptReason reason = static_cast<JobInterruptReason>(vec[2]);
 
-    if (!has(jobId) || get(jobId).getState() != ACTIVE || get(jobId).getRevision() < rev) {
-        // defer message until the job is ACTIVE in revision "rev"
+    // if we are dealing with an interruption of some revision of a (possibly) incremental job ...
+    if (handle.tag == MSG_INTERRUPT && (!has(jobId) || get(jobId).isIncremental()) &&
+            (!has(jobId) || get(jobId).getState() != ACTIVE || get(jobId).getRevision() < rev)) {
+        // ... defer the interruption message until the job is present and ACTIVE in that revision.
         _job_execution_hooks[jobId].push_back([&, h = std::move(handle)]() mutable {
             LOG(V4_VVER, "#%i post-exec hook : interrupt\n", Serializable::get<IntVec>(h.getRecvData())[0]);
             handleJobInterruption(h);
         });
         return;
     }
+    if (!has(jobId)) return;
     auto& job = get(jobId);
     if (rev >= 0 && job.getRevision() > rev) {
         LOG(V3_VERB, "#%i interrupt concerns old revision %i (rev. %i now)\n",
@@ -690,9 +705,9 @@ void SchedulingManager::handleJobInterruption(MessageHandle& handle) {
     }
 
     if (job.isIncremental()) {
-        interruptJob(jobId, /*terminate=*/false, /*reckless=*/false);
+        interruptJob(jobId, rev, /*terminate=*/false, /*reckless=*/false);
     } else {
-        interruptJob(jobId, /*terminate=*/true, /*reckless=*/true);
+        interruptJob(jobId, rev, /*terminate=*/true, /*reckless=*/true);
     }
 }
 
@@ -710,7 +725,8 @@ void SchedulingManager::handleIncrementalJobFinished(MessageHandle& handle) {
 
     if (has(jobId)) {
         LOG(V3_VERB, "Incremental job %s done\n", get(jobId).toStr());
-        interruptJob(Serializable::get<int>(handle.getRecvData()), /*terminate=*/true, /*reckless=*/false);
+        IntPair idRev = Serializable::get<IntPair>(handle.getRecvData());
+        interruptJob(idRev.first, idRev.second, /*terminate=*/true, /*reckless=*/false);
     }
 }
 
@@ -769,9 +785,11 @@ void SchedulingManager::handleJobResultFound(MessageHandle& handle) {
         std::vector<uint8_t> data(3*sizeof(int));
         memcpy(data.data(), dataInts.data(), 3*sizeof(int));
         handle.setReceive(std::move(data));
+        handle.tag = MSG_INTERRUPT;
         handleJobInterruption(handle);
     } else {
-        interruptJob(Serializable::get<int>(handle.getRecvData()), /*terminate=*/true, /*reckless=*/false);
+        IntPair idRev = Serializable::get<IntPair>(handle.getRecvData());
+        interruptJob(idRev.first, idRev.second, /*terminate=*/true, /*reckless=*/false);
     }
 }
 
@@ -808,6 +826,22 @@ void SchedulingManager::handleJobReleasedFromWaitingForReactivation(MessageHandl
         // Job not present any more: Let sender know
         MyMpi::isend(handle.source, MSG_SCHED_NODE_FREED, 
             IntVec({jobId, MyMpi::rank(MPI_COMM_WORLD), index, epoch}));
+    }
+}
+
+void SchedulingManager::handleClientDirectiveForJobTreeRoot(MessageHandle& handle) {
+    ClientDirective dir = Serializable::get<ClientDirective>(handle.getRecvData());
+    if (dir.type == ClientDirective::NONE || !has(dir.jobId)) return;
+
+    Job& job = get(dir.jobId);
+    if (!job.getJobTree().isRoot()) {
+        LOG(V1_WARN, "[WARN] Non-root worker %s received client directive\n", job.toStr());
+        return;
+    }
+
+    if (dir.type == ClientDirective::SHRINK) {
+        job.applyShrinkDirective(dir.getDataAsFloat());
+        LOG(V4_VVER, "%s received shrink directive (time span %.3f)\n", job.toStr(), dir.getDataAsFloat());
     }
 }
 
@@ -1229,19 +1263,20 @@ void SchedulingManager::terminate(Job& job) {
     eraseJobAndQueueForDeletion(job);
 }
 
-void SchedulingManager::interruptJob(int jobId, bool doTerminate, bool reckless) {
+void SchedulingManager::interruptJob(int jobId, int revision, bool doTerminate, bool reckless) {
 
     int msgTag;
     if (doTerminate && reckless) msgTag = MSG_NOTIFY_JOB_ABORTING;
     else if (doTerminate) msgTag = MSG_NOTIFY_JOB_TERMINATING;
     else msgTag = MSG_INTERRUPT;
+    LOG(V4_VVER, "Interrupt msg for #%i - term=%i reckl=%i\n", jobId, doTerminate?1:0, reckless?1:0);
 
     if (doTerminate && _orphaned_child_nodes.count(jobId)) {
         // We are terminating a job for which we know some orphaned child nodes:
         // Forward the termination message to them
         for (int rank : _orphaned_child_nodes.at(jobId)) {
             if (rank == MyMpi::rank(MPI_COMM_WORLD) || rank < 0) continue;
-            MyMpi::isend(rank, msgTag, IntVec({jobId, -1, JobInterruptReason::DONE}));
+            MyMpi::isend(rank, msgTag, IntVec({jobId, revision, JobInterruptReason::DONE}));
             LOG_ADD_DEST(V4_VVER, "Propagate termination of #%i ...", rank, jobId);
         }
         _orphaned_child_nodes.erase(jobId);
@@ -1255,6 +1290,12 @@ void SchedulingManager::interruptJob(int jobId, bool doTerminate, bool reckless)
     if (!has(jobId)) return;
     Job& job = get(jobId);
 
+    // Avoid ping-pong of an old interruption signal back to the root for the next revision
+    if (!doTerminate && revision >= 0 && revision < job.getRevision()) {
+        LOG(V4_VVER, "Interruption of %s : old revision %i (now %i)\n", job.toStr(), revision, job.getRevision());
+        return;
+    }
+
     // Ignore if this job node is already in the goal state
     // (also implying that it already forwarded such a request downwards if necessary)
     if (!doTerminate && !job.hasCommitment() && (job.getState() == SUSPENDED || job.getState() == INACTIVE)) 
@@ -1266,7 +1307,7 @@ void SchedulingManager::interruptJob(int jobId, bool doTerminate, bool reckless)
     if (job.getJobTree().hasRightChild()) destinations.insert(job.getJobTree().getRightChildNodeRank());
     for (auto childRank : destinations) {
         if (childRank < 0) continue;
-        MyMpi::isend(childRank, msgTag, IntVec({jobId, job.getRevision(), JobInterruptReason::DONE}));
+        MyMpi::isend(childRank, msgTag, IntVec({jobId, revision, JobInterruptReason::DONE}));
         LOG_ADD_DEST(V4_VVER, "Propagate interruption of %s ...", childRank, job.toStr());
     }
     if (doTerminate) job.getJobTree().getPastChildren().clear();
@@ -1343,6 +1384,10 @@ SchedulingManager::~SchedulingManager() {
         eraseJobAndQueueForDeletion(get(jobId));
         watchdog.reset();
     }
+    // For the corner case where a new job gets created during the below loop,
+    // we allow the job registry to clean it up immediately regardless of the
+    // job cache size and the job's age.
+    _job_registry.setTerminating();
 
     // Empty destruct queue into garbage for janitor to clean up.
     // We also need to make sure that any remaining open sends

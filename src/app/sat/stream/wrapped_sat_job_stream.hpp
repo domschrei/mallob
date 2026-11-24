@@ -6,7 +6,7 @@
 
 struct WrappedSatJobStream {
     SatJobStream stream;
-    MallobSatJobStreamProcessor* mallobProcessor {nullptr};
+    std::list<MallobSatJobStreamProcessor*> mallobProcessors;
     std::atomic<void*> innerTerminator {nullptr};
     WrappedSatJobStream(const std::string& name) : stream(name) {}
 };

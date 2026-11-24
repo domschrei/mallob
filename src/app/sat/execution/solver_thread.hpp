@@ -59,6 +59,7 @@ private:
     Checksum _latest_checksum;
     std::atomic_int _active_revision = 0;
     unsigned long _imported_lits_curr_revision = 0;
+    int _nb_diversified_vars = 0;
     bool _last_read_lit_zero = true;
     int _max_var = 0;
     Checksum _running_chksum;
@@ -70,6 +71,8 @@ private:
 
     int _found_result_rev = -1;
     JobResult _result;
+    Mutex _mtx_enumerated_solutions;
+    std::vector<std::string> _enumerated_solutions;
 
 public:
     SolverThread(const Parameters& params, const SatProcessConfig& config, std::shared_ptr<PortfolioSolverInterface> solver, 
@@ -121,6 +124,16 @@ public:
         return std::move(_solver.extractPreprocessedFormula());
     }
 
+    void lockEnumeratedSolutions() {
+        _mtx_enumerated_solutions.lock();
+    }
+    std::vector<std::string>&& extractEnumeratedSolutions() {
+        return std::move(_enumerated_solutions);
+    }
+    void unlockEnumeratedSolutions() {
+        _mtx_enumerated_solutions.unlock();
+    }
+
     int getActiveRevision() const {return _active_revision;}
 
 private:
@@ -138,7 +151,7 @@ private:
     void waitWhileSolved();
     void waitUntil(std::function<bool()> predicate);
     
-    void reportResult(int res, int revision);
+    void reportResult(int res, int revision, std::vector<int> solution = {});
 
     const char* toStr();
 

@@ -125,9 +125,13 @@ std::vector<uint8_t> JobMessage::serialize() const {
     std::vector<uint8_t> packed(size);
 
     assert(treeIndexOfSender >= 0);
-    assert(treeIndexOfDestination >= 0);
+    assert(treeIndexOfDestination >= 0 ||
+        log_return_false("ERROR treeIndexOfDestination<0! From: treeIndexOfDestination=%i, jobId=%i, tag=%i, payload_size=%i, epoch=%i, treeIdxOfSender=%i, treeIndexOfDest=%i \n",
+            treeIndexOfDestination, jobId, tag, payload.size(), epoch, treeIndexOfSender, treeIndexOfDestination));
     assert(contextIdOfSender != 0);
-    assert(contextIdOfDestination != 0);
+    assert(contextIdOfDestination != 0 ||
+        log_return_false("ERROR contextIdOfDestination==0! From: ContextIdOfSender=%i, jobId=%i, tag=%i, payload_size=%i, epoch=%i, treeIdxOfSender=%i, treeIndexOfDest=%i \n",
+            contextIdOfSender, jobId, tag, payload.size(), epoch, treeIndexOfSender, treeIndexOfDestination));
 
     int i = 0, n;
     n = sizeof(int); memcpy(packed.data()+i, &jobId, n); i += n;
@@ -170,6 +174,10 @@ void JobMessage::returnToSender(int senderRank, int mpiTag) {
     if (returnedToSender) return;
     returnedToSender = true;
     // Do not swap the metadata, since an internal redirection of messages doesn't either
+    LOG(V1_WARN, "[WARN] JobMessage::return to sender. senderRank %i, mpiTag %i, jobId %i, "
+                 "idxsender %i, idxdest %i, ctxsender %i, ctxdest %i, tag %i \n", senderRank, mpiTag, jobId,
+                 treeIndexOfSender, treeIndexOfDestination, contextIdOfSender, contextIdOfDestination);
+
     MyMpi::isend(senderRank, mpiTag, *this);
 }
 

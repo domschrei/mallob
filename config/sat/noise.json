@@ -1,0 +1,58 @@
+{
+  "rules": [
+    {
+      "backend": "Kissat",
+      "selector": { "type": "scatter", "start": 1, "step": 1 },
+      "settings": [
+        {"type": "add", "key": "restartint", "value": "sample Norm-0-10-m100k-100k", "min": 1, "max": 100000}
+      ]
+    },
+    {
+      "backend": "Kissat",
+      "selector": { "type": "scatter", "start": 1, "step": 1 },
+      "settings": [
+        {"type": "set", "key": "decay", "value": "sample Norm-50-3-1-300"}
+      ]
+    },
+
+    {
+      "backend": "CaDiCaL",
+      "selector": { "type": "scatter", "start": 1, "step": 1 },
+      "settings": [
+        {"type": "add", "key": "restartint", "value": "sample Norm-0-10-m100k-100k", "min": 1, "max": 100000}
+      ]
+    },
+    {
+      "backend": "CaDiCaL",
+      "selector": { "type": "scatter", "start": 1, "step": 1 },
+      "settings": [
+        {"type": "set", "key": "scorefactor", "value": "sample Norm-50-3-1-300"}
+      ]
+    },
+
+    {
+      "backend": "Lingeling",
+      "selector": { "type": "scatter", "start": 1, "step": 1 },
+      "settings": [
+        {"type": "add", "key": "restartint", "value": "sample Norm-0-10-m100k-100k", "min": 1, "max": 100000}
+      ]
+    }
+  ],
+
+  "samplers": [
+    {
+      "name": "Norm-0-10-m100k-100k",
+      "distribution": {
+        "type": "normal",
+        "params": [0, 10, -100000, 100000]
+      }
+    },
+    {
+      "name": "Norm-50-3-1-300",
+      "distribution": {
+        "type": "normal",
+        "params": [50, 3, 1, 300]
+      }
+    }
+  ]
+}

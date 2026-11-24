@@ -4,9 +4,9 @@
 #include <string>
 
 #include "app/sat/data/portfolio_sequence.hpp"
+#include "app/sat/solvers/solver_portfolio_config.hpp"
 #include "app/sat/solvers/solving_replay.hpp"
 #include "util/logger.hpp"
-#include "util/random.hpp"
 
 class LratConnector; // fwd
 
@@ -33,6 +33,7 @@ struct SolverSetup {
 	bool isJobIncremental {false};
 	bool hasPseudoincrementalSolvers {false};
 	int solverRevision {0};
+	std::vector<int> inlineLiterals;
 
 
 	// Solver configuration and diversification
@@ -40,31 +41,14 @@ struct SolverSetup {
 	char solverType;
 	bool doIncrementalSolving {false};
 	int diversificationIndex {0};
+	PortfolioSequence::Flavour flavour {PortfolioSequence::DEFAULT};
+	SolverPortfolioConfig* solverConfig {nullptr};
 
 	SolvingReplay::Mode replayMode {SolvingReplay::NONE};
 
-	bool diversifyNoise {false};
-	int decayDistribution {0};
-	int decayMean {50};
-	int decayStddev {3};
-	int decayMin {1};
-	int decayMax {200};
+	bool enumerateModels = false;
+	bool currentlyEnumerating = false;
 
-	int diversifyReduce {0};
-	int reduceMin {300};
-	int reduceMax {980};
-	int reduceDelta {100};
-	int reduceMean {700};
-	int reduceStddev {150};
-
-	int plainAddSpecific{0};
-	bool diversifyNative {false};
-	bool diversifyFanOut {false};
-	bool diversifyInitShuffle {false};
-	enum EliminationSetting {
-		ALLOW_ALL, DISABLE_SOME, DISABLE_MOST, DISABLE_ALL
-	} eliminationSetting {ALLOW_ALL};
-	PortfolioSequence::Flavour flavour {PortfolioSequence::DEFAULT};
 
 	// Clause export
 
@@ -102,6 +86,7 @@ struct SolverSetup {
 	// PalRUP proof output.
 	bool usePalRupFormat {false};
 	bool outputBinaryPalRup {true};
+	enum CompressProofMode {NONE, XZ, VASKIN_GOETZ} compressProofMode {NONE};
 	// If on-the-fly checking is enabled: this solver also seeks to have a found satisfying assignment checked.
 	bool onTheFlyCheckModel {false};
 	bool incrementalImpCheck {false};

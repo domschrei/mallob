@@ -108,7 +108,7 @@ public:
     }
 
     enum TreeRelative {LEFT_CHILD, RIGHT_CHILD, NONE};
-    JobRequest getJobRequestFor(int jobId, TreeRelative rel, int balancingEpoch, int appId, bool incremental) {
+    JobRequest getJobRequestFor(int jobId, TreeRelative rel, int balancingEpoch, int appId, bool incremental) const {
         JobRequest req(jobId, appId, getRootNodeRank(), _rank, 
                 rel == LEFT_CHILD ? getLeftChildIndex() : getRightChildIndex(), 
                 Timer::elapsedSeconds(), balancingEpoch, 0, incremental);

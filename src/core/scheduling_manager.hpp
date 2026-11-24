@@ -95,6 +95,7 @@ private:
     void handleObsoleteJobResult(MessageHandle& handle);
     void handleJobResultFound(MessageHandle& handle);
     void handleJobReleasedFromWaitingForReactivation(MessageHandle& handle);
+    void handleClientDirectiveForJobTreeRoot(MessageHandle& h);
 
     void handleJobAfterArrivedJobDescription(int jobId, int source);
     void leaveJobTree(Job& job, bool notifyParent);
@@ -118,7 +119,7 @@ private:
     void setLoad(int load, int jobId);
         
     void handleDemandUpdate(Job& job, int demand);
-    void interruptJob(int jobId, bool terminate, bool reckless);
+    void interruptJob(int jobId, int revision, bool terminate, bool reckless);
 
     bool isRequestObsolete(const JobRequest& req);
     enum AdoptionResult {ADOPT, REJECT, DEFER, DISCARD};

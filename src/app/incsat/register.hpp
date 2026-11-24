@@ -13,7 +13,9 @@ struct ClientSideIncSatProgram : public app_registry::ClientSideProgram {
     DTaskTracker dTaskTracker;
     std::unique_ptr<IncSatController> solver;
     ClientSideIncSatProgram(const Parameters& params, APIConnector& api, JobDescription& desc, const std::string& problemFile) :
-        app_registry::ClientSideProgram(), dTaskTracker(params), solver(new IncSatController(params, api, desc, dTaskTracker)) {
+        app_registry::ClientSideProgram(), dTaskTracker(params), solver(
+            new IncSatController(params, api, desc, dTaskTracker, params.incrementalSatTasks())
+        ) {
         function = [s=&solver, problemFile]() {return s->get()->solveFromIncrementalFile(problemFile);};
     }
     virtual ~ClientSideIncSatProgram() {}
@@ -24,6 +26,15 @@ void register_mallob_app_incsat() {
     app_registry::AppEntry entry;
     entry.key = "INCSAT";
     entry.type = app_registry::AppEntry::CLIENT_SIDE;
+
+    entry.optionChecker = [&](const Parameters& params, auto& vec) {
+        if (params.nonincrementalSatApp() != "SAT" && params.nonincrementalSatApp() != "SATWITHPRE") {
+            vec.push_back({&params.nonincrementalSatApp,
+                "Non-incremental SAT app must be SAT or SATWITHPRE."
+            });
+        }
+        return vec.empty(); // all good?
+    };
 
     entry.reader = [](const Parameters& params, const std::vector<std::string>& files, JobDescription& desc) {
         const std::string NC_DEFAULT_VAL = "BMMMKKK111";

@@ -1,0 +1,277 @@
+
+#pragma once
+
+#include "app/app_registry.hpp"
+#include "app/sat/parse/cnf_util.hpp"
+#include "app/sat/solvers/solver_portfolio_config.hpp"
+#include "app/satwithpre/actor_config_parser.hpp"
+#include "app/satwithpre/actor_context.hpp"
+#include "app/satwithpre/ext_satsuma_caller.hpp"
+#include "app/satwithpre/kissat_preprocessor.hpp"
+#include "app/satwithpre/lingeling_preprocessor.hpp"
+#include "app/satwithpre/mallob_preprocess_actor.hpp"
+#include "app/satwithpre/sat_preprocess_actor.hpp"
+#include "app/satwithpre/satsuma_preprocessor.hpp"
+#include "data/job_description.hpp"
+#include "interface/api/api_connector.hpp"
+#include "util/logger.hpp"
+#include "util/params.hpp"
+#include "util/sys/fileutils.hpp"
+#include <cstdlib>
+#include <list>
+
+class PreprocessorOrchestrator {
+
+private:
+    const Parameters _params;
+    const JobDescription _desc;
+    APIConnector& _api;
+
+    std::vector<int> _base_cnf;
+    std::list<std::vector<int>> _modified_cnfs;
+    std::list<ActorContext> _actors;
+
+    float _time_of_start;
+    ActorContext* _winning_actor {nullptr};
+
+    std::string _preprocess_log_dir;
+
+    SolverPortfolioConfig _spc;
+
+public:
+    PreprocessorOrchestrator(const Parameters& params, const JobDescription& desc, APIConnector& api) :
+            _params(params), _desc(desc.getBasicCopy(false)), _api(api),
+            _base_cnf(CnfUtil::getCnfFromJobDescription(desc, true)) {
+
+        if (_params.savePreprocessingProofs()) {
+            auto existing = FileUtils::glob(_params.proofDirectory() + "/*");
+            if (!existing.empty()) {
+                LOG(V0_CRIT, "[ERROR] Proof directory \"%s\" is not empty - please clear it before running with -prepro-proofs=1\n",
+                    _params.proofDirectory().c_str());
+                abort();
+            }
+            FileUtils::mkdir(_params.proofDirectory() + "/tmp");
+        }
+
+        _time_of_start = Timer::elapsedSeconds();
+        try {
+            _actors = ActorConfigParser().parseFile(_params.preprocessConfig());
+        } catch (const std::runtime_error& e) {
+            LOG(V0_CRIT, "[ERROR] Parsing error for preprocess actor config file \"%s\": %s\n",
+                _params.preprocessConfig().c_str(), e.what());
+            abort();
+        }
+
+        if (_params.preprocessLogDir.isSet()) {
+            _preprocess_log_dir = _params.preprocessLogDir() + "/#" + std::to_string(_desc.getId());
+            FileUtils::mkdir(_preprocess_log_dir);
+        }
+
+        _spc.parseFromDirsAndFiles(params.satConfigDirs(), params.satConfigFiles());
+        LOG(V3_VERB, "Parsed %i solver configuration rules\n", _spc.ruleCount());
+    }
+
+    int loop() {
+
+        int actorIdx = -1;
+        int nbRemainingActors = 0;
+        for (auto& actor : _actors) {
+            actorIdx++;
+            nbRemainingActors += (actor.state != ActorContext::FINISHED);
+
+            if (actor.state == ActorContext::UNINITIALIZED) {
+
+                // check prerequisites
+                if (actor.prerequisite && actor.prerequisite->state != ActorContext::FINISHED)
+                    continue; // prerequisite not done yet - skip for now
+                // never initialize an actor whose prerequisite didn't lead to a required simplification
+                if (actor.prerequisite && actor.onlyStartIfPrerequisiteSimplified && actor.prerequisite->result != SatPreprocessActor::SIMPLIFIED) {
+                    actor.state = ActorContext::FINISHED;
+                    actor.result = SatPreprocessActor::NONE;
+                    continue;
+                }
+                // was the actor displaced before we even started it? -> mark as done immediately
+                if (actor.timeOfSignalledDisplacement > 0) {
+                    actor.state = ActorContext::FINISHED;
+                    actor.result = SatPreprocessActor::NONE;
+                    continue;
+                }
+
+                // prerequisite done: initialize actor
+                auto formula = actor.prerequisite ? actor.prerequisite->formula : &_base_cnf;
+                auto name = std::to_string(actorIdx) + ":";
+                if (!actor.groupId.empty()) actor.groupId = "#" + std::to_string(_desc.getId()) + ":" + actor.groupId;
+                Parameters params(_params);
+                app_registry::checkAndOverrideProgramOptions(params, _desc, actor.options);
+                switch (actor.type) {
+                case ActorContext::SATSUMA_INT:
+                    name += "SatsumaInt";
+                    actor.actor.reset(new SatsumaPreprocessor(params, _desc, name, std::move(formula)));
+                    break;
+                case ActorContext::SATSUMA_EXT:
+                    name += "SatsumaExt";
+                    actor.actor.reset(new ExtSatsumaCaller(params, _desc, name, std::move(formula)));
+                    break;
+                case ActorContext::KISSAT:
+                    name += "Kissat";
+                    actor.actor.reset(new KissatPreprocessor(params, _desc, name, _spc, std::move(formula)));
+                    break;
+                case ActorContext::LINGELING:
+                    name += "Lingeling";
+                    actor.actor.reset(new LingelingPreprocessor(params, _desc, name, _spc, std::move(formula)));
+                    break;
+                case ActorContext::MALLOBSAT:
+                    name += "MallobSat";
+                    actor.actor.reset(new MallobPreprocessActor(params, _desc, name, _api, std::move(formula),
+                        _time_of_start, MallobPreprocessActor::SATSOLVER,
+                        actor.groupId, actor.options));
+                    break;
+                case ActorContext::MALLOBSWEEP:
+                    name += "MallobSweep";
+                    actor.actor.reset(new MallobPreprocessActor(params, _desc, name, _api, std::move(formula),
+                        _time_of_start, MallobPreprocessActor::SWEEPER,
+                        actor.groupId, actor.options));
+                    break;
+                }
+                actor.id += ":" + name;
+                if (!_preprocess_log_dir.empty())
+                    CnfUtil::writeFormula(actor.actor->getInputCnf(), _preprocess_log_dir + "/in." + actor.getId() + ".cnf");
+                LOG(V2_INFO, "SATWP launch %s\n", actor.getId());
+                actor.timeOfStart = Timer::elapsedSeconds();
+                actor.actor->preprocessAsync();
+                actor.state = ActorContext::RUNNING;
+
+                // signal displacement to actors being displaced
+                for (auto& other : actor.actorsBeingDisplaced) {
+                    if (other->timeOfSignalledDisplacement <= 0) {
+                        LOG(V2_INFO, "SATWP %s --displace--> %s\n", actor.getId(), other->getId());
+                        other->timeOfSignalledDisplacement = Timer::elapsedSeconds();
+                    }
+                }
+            }
+
+            if (actor.state == ActorContext::RUNNING && actor.actor->isDonePreprocessing()) {
+                // this actor is done
+                auto res = actor.actor->getPreprocessingResult();
+                LOG(V2_INFO, "SATWP %s done, result %s\n", actor.getId(),
+                    actor.actor->getPreprocessingResultAsString().c_str());
+                if (res == SatPreprocessActor::SAT) {
+                    actor.model = std::move(actor.actor->getModel());
+                }
+                if (res == SatPreprocessActor::SIMPLIFIED) {
+                    // extract the preprocessed formula and append it to a list with stable pointers
+                    // so that later actors can reference it in a safe manner
+                    _modified_cnfs.push_back(std::move(actor.actor->getPreprocessedFormula()));
+                    actor.formula = &_modified_cnfs.back();
+                    if (_params.savePreprocessingProofs())
+                        actor.actor->writeCnf(_modified_cnfs.back());
+                } else {
+                    actor.formula = &actor.actor->getInputCnf();
+                }
+                assert(actor.formula->size() > 2);
+                assert(actor.formula->at(actor.formula->size() - 2) >= 0); // # vars
+                assert(actor.formula->at(actor.formula->size() - 1) >= 0); // # clauses
+                actor.result = res;
+                actor.state = ActorContext::FINISHED;
+                if (!_preprocess_log_dir.empty()) {
+                    if (res == SatPreprocessActor::SIMPLIFIED)
+                        CnfUtil::writeFormula(*actor.formula, _preprocess_log_dir + "/out." + actor.getId() + ".cnf");
+                    if (res == SatPreprocessActor::SAT)
+                        CnfUtil::writeModel(actor.model, _preprocess_log_dir + "/model." + actor.getId() + ".txt");
+                }
+                if (res == SatPreprocessActor::SAT) {
+                    LOG(V2_INFO, "SATWP %s found SAT\n", actor.getId());
+                    _winning_actor = &actor;
+                    return 10;
+                }
+                if (res == SatPreprocessActor::UNSAT) {
+                    LOG(V2_INFO, "SATWP %s found UNSAT\n", actor.getId());
+                    _winning_actor = &actor;
+                    return 20;
+                }
+                assert(actor.formula->at(0) != 0); // no empty clause without reporting UNSAT!
+            }
+
+            if (actor.state == ActorContext::RUNNING && actor.timeOfSignalledDisplacement > 0) {
+                // this actor is being displaced (after some time)
+                if (_params.preprocessBalancing() == 0) {
+                    // immediate displacement
+                    LOG(V2_INFO, "SATWP %s interrupt\n", actor.getId());
+                    actor.actor->interrupt();
+                    actor.timeOfSignalledDisplacement = 0;
+                }
+                if (_params.preprocessBalancing() == 1) {
+                    float timeSpan = _params.preprocessExpansionFactor() * (actor.timeOfSignalledDisplacement - actor.timeOfStart);
+                    if (Timer::elapsedSeconds() >= actor.timeOfSignalledDisplacement + timeSpan) {
+                        LOG(V2_INFO, "SATWP %s interrupt (time >= %.3f + %.3f)\n", actor.getId(),
+                            actor.timeOfSignalledDisplacement, timeSpan);
+                        actor.actor->interrupt();
+                        actor.timeOfSignalledDisplacement = 0;
+                    } else if (!actor.shrinking) {
+                        LOG(V2_INFO, "SATWP %s shrink %.3f\n", actor.getId(), timeSpan);
+                        actor.actor->shrink(timeSpan);
+                        actor.shrinking = true;
+                    }
+                }
+            }
+        }
+
+        return nbRemainingActors == 0 ? -1 : 0;
+    }
+
+    std::vector<int> getModel() {
+        auto actor = _winning_actor;
+        assert(actor);
+        auto model = std::move(actor->model);
+        CnfUtil::checkModel(actor->actor->getInputCnf(), model);
+        LOG(V2_INFO, "SATWP Checked model @ %s, size %lu\n", actor->getId(), model.size()-1);
+        while (true) {
+            actor = actor->prerequisite;
+            if (!actor) break;
+            actor->actor->reconstructSolution(model);
+            LOG(V2_INFO, "SATWP Reconstructed model @ %s, size %lu\n", actor->getId(), model.size()-1);
+            if (!_preprocess_log_dir.empty())
+                CnfUtil::writeModel(model, _preprocess_log_dir + "/recmodel." + actor->getId() + ".txt");
+            CnfUtil::checkModel(actor->actor->getInputCnf(), model);
+            LOG(V2_INFO, "SATWP Checked model @ %s\n", actor->getId());
+        }
+        return model;
+    }
+
+    void stopAll() {
+        for (auto& actor : _actors) if (actor.state == ActorContext::RUNNING) {
+            LOG(V2_INFO, "SATWP %s interrupt\n", actor.getId());
+            actor.actor->interrupt();
+        }
+    }
+
+    void finalizeProofs() {
+        if (!_params.savePreprocessingProofs()) return;
+        ActorContext* last = _winning_actor;
+        if (!last || last->result != SatPreprocessActor::UNSAT) return;
+        std::vector<ActorContext*> line;
+        // only include actors that acually simplify the formula
+
+        bool isWinner = true;
+        while (last) {
+            if (isWinner || last->result == SatPreprocessActor::SIMPLIFIED) line.push_back(last);
+            isWinner = false;
+            last = last->prerequisite;
+        }
+        int total = line.size();
+        for (int i = 1; i <= total; i++){
+            ActorContext* step = line[total - i];
+            step->actor->rename_proof(i);
+        }
+        FileUtils::rmrf(_params.proofDirectory() + "/tmp");
+
+        std::string problemFile = StaticStore<std::string>::extract("satwp-jobdesc-#" + std::to_string(_desc.getId()));
+#if MALLOB_BUILD_CHAINCHECK
+        std::string chaincheck = "build/chaincheck";
+#else
+        std::string chaincheck = "chaincheck";
+#endif
+        LOG(V2_INFO, "SATWP Check produced proof via: %s %s %s\n",
+            chaincheck.c_str(), problemFile.c_str(), _params.proofDirectory().c_str());
+    }
+};

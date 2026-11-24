@@ -1,0 +1,9 @@
+#!/bin/bash
+
+proof_dir="proofs"
+proof_working="proofs_working"
+proof_logs="proofs_logs"
+
+echo "-mono-app=PALRUPCHECK -pre-cleanup=1 -v=2 \
+ -log=$proof_logs -palrup-binary=1 -palrup-clean=1\
+ -palrup-check=1 -palrup-check-dir=$proof_working"

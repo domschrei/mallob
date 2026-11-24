@@ -7,6 +7,8 @@
 #include <optional>
 
 #include "util/logger.hpp"
+#include "util/periodic_event.hpp"
+#include "util/sys/fileutils.hpp"
 #include "util/sys/process.hpp"
 #include "util/sys/proc.hpp"
 
@@ -15,6 +17,7 @@ class Terminator {
 private:
     static std::atomic_bool _exit;
     static bool _forward_terminate_to_children;
+    static PeriodicEvent<100> _check_terminate_file;
 
 public:
     static void setForwardTerminateToChildren(bool forward) {_forward_terminate_to_children = forward;}
@@ -37,6 +40,12 @@ public:
                 setTerminating();
                 return true;
             }
+        }
+
+        if (!_exit && _check_terminate_file.ready() && FileUtils::exists(".MALLOB_STOP")) {
+            FileUtils::rm(".MALLOB_STOP");
+            setTerminating();
+            return true;
         }
 
         return _exit.load(std::memory_order_relaxed);

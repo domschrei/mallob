@@ -123,6 +123,10 @@ std::string FileUtils::getAbsoluteFilePath(const std::string& path) {
     return getWorkingDirectory() + "/" + path;
 }
 
+std::string FileUtils::getDirectory(const std::string& filePath) {
+    size_t pos = filePath.find_last_of("/\\");
+    return (pos == std::string::npos) ? "." : filePath.substr(0, pos);
+}
 
 std::vector<std::string> FileUtils::glob(const std::string& pattern) {
     std::vector<std::string> files;

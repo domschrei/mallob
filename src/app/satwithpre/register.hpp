@@ -5,16 +5,17 @@
 #include "app/app_registry.hpp"
 #include "app/sat/data/model_string_compressor.hpp"
 #include "app/sat/job/sat_constants.h"
-#include "app/satwithpre/sat_preprocess_solver.hpp"
+#include "app/satwithpre/satwithpre_solver.hpp"
 #include "data/job_description.hpp"
 #include "data/job_processing_statistics.hpp"
 #include "interface/api/api_connector.hpp"
 #include "app/sat/parse/sat_reader.hpp"
+#include "util/static_store.hpp"
 
 struct ClientSideSatProgram : public app_registry::ClientSideProgram {
-    std::unique_ptr<SatPreprocessSolver> solver;
+    std::unique_ptr<SatWithPreSolver> solver;
     ClientSideSatProgram(const Parameters& params, APIConnector& api, JobDescription& desc) :
-        app_registry::ClientSideProgram(), solver(new SatPreprocessSolver(params, api, desc)) {
+        app_registry::ClientSideProgram(), solver(new SatWithPreSolver(params, api, desc)) {
         function = [&]() {return solver->solve();};
     }
     virtual ~ClientSideSatProgram() {}
@@ -26,8 +27,22 @@ void register_mallob_app_satwithpre() {
     entry.key = "SATWITHPRE";
     entry.type = app_registry::AppEntry::CLIENT_SIDE;
 
+    entry.copyrightInformation = "\nc Featuring Satsuma by Markus Anders\nc Featuring interface and proof production code by Anna Görth\n";
+
+    entry.optionChecker = [](const Parameters& params, auto& vec) {
+        if (params.savePreprocessingProofs() && !params.proofDirectory.isSet()) {
+            vec.push_back({&params.savePreprocessingProofs,
+                "Preprocessing proof saving (-prepro-proofs) requires a proof directory (-proof-dir)."
+            });
+        }
+        return vec.empty();
+    };
+
     entry.reader = [](const Parameters& params, const std::vector<std::string>& files, JobDescription& desc) {
-        return SatReader(params, files.front()).read(desc);
+        if (params.savePreprocessingProofs()) {
+            StaticStore<std::string>::insert("satwp-jobdesc-#" + std::to_string(desc.getId()), files[0]);
+        }
+        return SatReader(params, files).read(desc);
     };
 
     entry.clientSideProgramCreator = [](const Parameters& params, APIConnector& api, JobDescription& desc) {

@@ -15,6 +15,7 @@
 #include "app/sat/sharing/generic_import_manager.hpp"
 #include "app/sat/sharing/store/generic_clause_store.hpp"
 #include "app/sat/solvers/optimizing_propagator.hpp"
+#include "app/sat/solvers/solver_portfolio_config.hpp"
 #include "app/sat/solvers/solving_replay.hpp"
 #include "util/random.hpp"
 #include "util/logger.hpp"
@@ -89,6 +90,8 @@ public:
 	// and the individual diversification index given by getDiversificationIndex().
 	virtual void diversify(int seed) = 0;
 
+	virtual void addConfigurationSetting(Setting setting) = 0;
+
 	// How many "true" different diversifications do you have?
 	// May be used to decide when to apply additional diversifications.
 	virtual int getNumOriginalDiversifications() = 0;
@@ -143,6 +146,18 @@ public:
 		return _clause_import_enabled;
 	}
 
+	void applySolverConfiguration(int seed) {
+		int nbApplied = 0;
+		if (!_setup.solverConfig) return;
+		for (auto& setting : _setup.solverConfig->getConfigurationSettings(
+				PortfolioSequence::BaseSolver(_setup.solverType), _setup.flavour,
+				_setup.diversificationIndex, seed)) {
+			addConfigurationSetting(setting);
+			nbApplied++;
+		}
+		LOGGER(_logger, V4_VVER, "applied %i settings\n", nbApplied);
+	}
+
 	void addConditionalLit(int condLit) {assert(condLit != 0); _conditional_lits.push_back(condLit);}
 	void clearConditionalLits() {_conditional_lits.clear();}
 	void setExtLearnedClauseCallback(const ExtLearnedClauseCallback& callback);
@@ -195,6 +210,7 @@ public:
 	}
 	bool hasPreprocessedFormula() const {return _has_preprocessed_formula;}
 	std::vector<int>&& extractPreprocessedFormula() {
+		assert(hasPreprocessedFormula());
 		_has_preprocessed_formula = false;
 		return std::move(_preprocessed_formula);
 	}

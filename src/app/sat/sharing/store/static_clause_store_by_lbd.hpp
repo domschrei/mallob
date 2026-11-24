@@ -162,6 +162,10 @@ public:
         return BufferReader(data, buflen, _max_eff_clause_length, false, useChecksums);
     }
 
+    BufferBuilder getBufferBuilder(int limit) const override {
+        return BufferBuilder(limit, _max_eff_clause_length, false);
+    }
+
     ~StaticClauseStoreByLbd() {
         for (unsigned int i = 0; i < buckets.size(); i++) {
             delete buckets[i];

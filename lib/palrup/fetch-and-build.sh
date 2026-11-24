@@ -3,7 +3,7 @@
 source ../base-build-functions.sh
 dirname="PalRUP-Check"
 
-branchorcommit="31f52fd70d39c1a6f7eeb3ce1bb7d97dbee6142d" # updated 2026-01-29
+branchorcommit="d089fd6dd4425f56fb8c62ea96cf2be495b41051" # updated 2026-01-29
 fetch_and_extract $dirname CMakeLists.txt https://github.com/rubenGoetz/PalRUP-Check/archive/${branchorcommit}.zip
 
 sed -i 's/-Werror/-Wno-strict-prototypes/g' CMakeLists.txt
@@ -15,3 +15,8 @@ cmake ..
 make
 cd ..
 echo "[$dirname] Build complete"
+
+if ! [ -z "$1" ]; then
+    echo "[$dirname] cp compress-proof.sh $1/"
+    cp compress-proof.sh "$1/"
+fi

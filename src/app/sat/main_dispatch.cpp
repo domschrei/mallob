@@ -1,4 +1,5 @@
 
+#include "util/sys/proc.hpp"
 #include "util/sys/process.hpp"
 #include "util/sys/process_dispatcher.hpp"
 

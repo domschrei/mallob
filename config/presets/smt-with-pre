@@ -1,0 +1,3 @@
+#!/bin/bash
+
+echo '-minprocs 4 -max-lits-per-thread=35000000 -pre-cleanup=1 -seed=110519 -zero-only-logging=1 -v=2 -s2f=solution.txt -smt-out-file=out.smt2 -terminate-abruptly=1 -mono-app=SMT -js=2 -jc=2 -satsolver=CCL[C]{17} -isp=1 -nsdi=3 -nsds=0 -nisd=5000 -nisa=SATWITHPRE -preprocess-config=config/satwithpre/actors_M_SM_SKM.json -pb=0'

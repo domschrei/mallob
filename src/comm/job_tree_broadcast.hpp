@@ -8,6 +8,8 @@
 #include "comm/msgtags.h"
 #include "data/job_transfer.hpp"
 
+#define VERB_BCAST V5_DEBG
+
 class JobTreeBroadcast {
 
 private:
@@ -43,7 +45,7 @@ public:
         assert(_internal_msg_tag == -1 || _msg.tag == _internal_msg_tag);
         _internal_msg_tag = _msg.tag;
 
-        LOG(V2_INFO, "received broadcast\n");
+        LOG(V3_VERB, "received broadcast\n");
         _received_broadcast = true;
 
         assert(!_msg.returnedToSender);
@@ -62,6 +64,7 @@ public:
         }
 
         if (hasResult()) _cb(); // callback
+        // When used in SweepJob, the callback is SweepJob::cbContributeToAllReduce()
     }
 
     void updateJobTree(const JobTree& tree) {
@@ -85,10 +88,15 @@ public:
         return _internal_msg_tag;
     }
 
+    bool hasReceivedBroadcast() {
+        return _received_broadcast;
+    }
+
 private:
     bool receiveMessage(MessageHandle& h) {
         JobMessage msg = Serializable::get<JobMessage>(h.getRecvData());
 
+        LOG(VERB_BCAST, "BCAST [%i] <-- [%i] rcvd \n", _tree.nodeRank, h.source);
         // Right recipient?
         if (msg.jobId != _job_id) return false;
         if (_internal_msg_tag >= 0 && msg.tag != _internal_msg_tag) return false;
@@ -97,17 +105,25 @@ private:
         if (msg.returnedToSender) {
             // prune child
             if (h.source == _tree.leftChildNodeRank) {
+                assert(_tree.nbChildren>0 || log_return_false("ERROR JobTreeBroadcast: Left child [%i] should be pruned, but _tree.nbChildren already %i", _tree.leftChildNodeRank, _tree.nbChildren));
                 _tree.leftChildNodeRank = -1;
+                _tree.nbChildren--;
                 _received_response_left = true;
             }
             if (h.source == _tree.rightChildNodeRank) {
+                assert(_tree.nbChildren>0 || log_return_false("ERROR JobTreeBroadcast: Right child [%i] should be pruned, but _tree.nbChildren already %i", _tree.leftChildNodeRank, _tree.nbChildren));
                 _tree.rightChildNodeRank = -1;
+                _tree.nbChildren--;
                 _received_response_right = true;
             }
             if (hasResult()) _cb(); // callback
             return true;
         }
 
+        if (_received_broadcast) {
+            LOG(VERB_BCAST, "BCAST [%i] <-- [%i] child response (either [%i],[%i])\n",
+                _tree.nodeRank, h.source, _tree.leftChildNodeRank, _tree.rightChildNodeRank);
+        }
         // Response from child?
         if (_received_broadcast && h.source == _tree.leftChildNodeRank) {
             _received_response_left = true;

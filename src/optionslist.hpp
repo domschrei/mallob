@@ -3,6 +3,7 @@
 #define DOMPASCH_MALLOB_OPTIONS_LIST_HPP
 
 #include "util/option.hpp"
+#include "util/logger_defs.h"
 
 #ifndef MALLOB_MAX_N_APPTHREADS_PER_PROCESS
 #define MALLOB_MAX_N_APPTHREADS_PER_PROCESS 32
@@ -39,6 +40,7 @@ OPTION_GROUP(grpGeneral, "general", "General")
  OPT_BOOL(preCleanup,                     "pre-cleanup", "",                           false,                   "Clean up shmem/proof/trace/extmem files before starting off")
  OPT_STRING(clientApplication,            "client-app", "",                            "", "Have clients run specified external program path + \".\" + i for increasing i (or, if nonexistent, just the path as is)")
  OPT_INT(clientAppThreads,                "client-app-threads", "",                    1,    1, LARGE_INT,      "Max. number of applications to run per client")
+ OPT_BOOL(terminateAbruptly,              "terminate-abruptly", "",                    false, "Upon termination, avoid waiting for sub-processors to finish")
 
 ///////////////////////////////////////////////////////////////////////
 
@@ -67,7 +69,7 @@ OPTION_GROUP(grpOutput, "output", "Output")
  OPT_INT(pipeSolutions,                   "ps", "pipe-solutions",                      MALLOB_PIPE_SOLUTIONS_NONE, MALLOB_PIPE_SOLUTIONS_NONE, MALLOB_PIPE_SOLUTIONS_ALL,                   "Provide [0=no,1=large,2=all] solutions over a named pipe instead of directly writing them into the response JSON")
  OPT_BOOL(quiet,                          "q", "quiet",                                false,                   "Do not log to stdout besides critical information")
  OPT_STRING(solutionToFile,               "s2f", "solution-to-file",                   "",                      "Write solutions to file with provided base name + job ID")
- OPT_INT(verbosity,                       "v", "verbosity",                            2,    0, 6,              "Logging verbosity: 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB 5=DEBG")
+ OPT_INT(verbosity,                       "v", "verbosity",                            2, 0, LOGGER_STATIC_VERBOSITY, "Logging verbosity: 0=CRIT 1=WARN 2=INFO 3=VERB 4=VVERB 5=DEBG")
  OPT_BOOL(zeroOnlyLogging,                "0o", "zero-only-logging",                   false,                   "Only PE of rank zero does logging")
  OPT_STRING(tmpDirectory,                 "tmp", "tmp-directory",                      "/tmp",                  "General temporary directory to write working files into")
 
@@ -105,6 +107,7 @@ OPTION_GROUP(grpJob, "job", "Global configuration of jobs")
     "Number of application worker threads per MPI process; maximum value configurable at compile time via -DMALLOB_MAX_N_APPTHREADS_PER_PROCESS")
  OPT_BOOL(aggressiveDescriptionCaching, "adc", "aggressive-desc-caching", false, "Try to reuse cached job descriptions by only transferring them when not repairable without them")
  OPT_BOOL(crossJobCommunication, "cjc", "cross-job-communication", false, "Enable communication across jobs, such as cross-problem clause sharing, within user-specified job groups")
+ OPT_BOOL(crossJobToClientParent, "cjtcp", "cross-job-to-client-parent", false, "Allow distributed jobs to send cross-job shared information to their client parent")
 
 ///////////////////////////////////////////////////////////////////////
 

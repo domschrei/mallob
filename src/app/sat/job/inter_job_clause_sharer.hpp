@@ -41,7 +41,7 @@ private:
     int _comm_size;
     int _comm_rank;
 
-    std::unique_ptr<GenericClauseStore> _clause_store;
+    std::unique_ptr<StaticClauseStore<false>> _clause_store;
     std::unique_ptr<GenericClauseFilter> _clause_filter;
     std::unique_ptr<GenericExportManager> _export_manager;
 
@@ -141,13 +141,16 @@ public:
         else
             LOG(V4_VVER, "XTCS added %lu/%lu ITCS clauses\n", nbAdded, nbAdded+nbBlocked);
     }
+    bool hasClausesToExport() const {
+        return _clause_store->getTotalSizeAfterLastScan() > 0;
+    }
 
     void updateBestFoundSolutionCost(long long cost) override {
         _best_found_solution_cost = std::min(_best_found_solution_cost, cost);
     }
 
     void broadcastCrossSharedClauses(std::vector<int>& clauses, int nbLits) {
-        InplaceClauseAggregation::prepareRawBuffer(clauses,
+        InplaceClauseAggregation::prepareRawBuffer(clauses, 0,
             getClausesRevision(), nbLits, 1, -1,
             _best_found_solution_cost);
         _clauses_to_broadcast_internally = std::move(clauses);
@@ -158,8 +161,12 @@ public:
         return _has_clauses_to_broadcast_internally;
     }
     std::vector<int>&& getClausesToBroadcastInternally() {
+        //Nicco: Added this flag switch to false. Otherwise, this flag was always (?) 
+        //stuck at true when using Cross-Job Sharing (at least in Sweep'n'Sat) and was never sent back to false.
+        _has_clauses_to_broadcast_internally = false;
         return std::move(_clauses_to_broadcast_internally);
     }
+    auto getBufferBuilder(int limit) {return _clause_store->getBufferBuilder(limit);}
 
     virtual int getActorJobId() const override {
         return _group_id;
@@ -179,6 +186,8 @@ public:
     virtual int getExportVolumeMultiplier() const override {
         return _cs_params.numThreadsPerProcess();
     }
+
+    int getLocalRank() const {return _comm_rank;}
 
     virtual Parameters getClauseStoreParams() const override {
         Parameters params = _cs_params;
@@ -203,8 +212,9 @@ public:
         _clause_filter->updateEpoch(_epoch);
     }
     virtual bool hasPreparedSharing() override {return _has_prepared_internal_shared_clauses;}
-    virtual std::vector<int> getPreparedClauses(Checksum& checksum, int& successfulSolverId, int& numLits) override {
+    virtual std::vector<int> getPreparedClauses(Checksum& checksum, int& successfulSolverId, int& numLits, int& nbFoundModels) override {
         successfulSolverId = -1;
+        nbFoundModels = 0;
         numLits = _nb_internal_shared_lits;
         _has_prepared_internal_shared_clauses = false;
         LOG(V4_VVER, "%s XTCS contrib size %i\n", _label.c_str(), _internal_shared_clauses.size());

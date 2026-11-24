@@ -30,6 +30,7 @@
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
 #include "util/logger.hpp"
 #include "util/string_utils.hpp"
+#include "util/sys/fileutils.hpp"
 #include "util/sys/timer.hpp"
 #include "util/random.hpp"
 #include "filter/in_place_clause_filtering.hpp"
@@ -136,7 +137,15 @@ SharingManager::SharingManager(
 	}
 
 	if (_job_index == 0 && _params.clauseLog.isSet()) {
-		_clause_logger.reset(new ClauseLogger(_params.clauseLog()));
+		_clause_logger.reset(new ClauseLogger(_params.clauseLog()
+			+ ".#" + std::to_string(_solvers[0]->getSolverSetup().jobId),
+			false, !_params.verboseClauseLogs()));
+	}
+	if ((_job_index == 0 && _params.unitClauseLog.isSet()) || (_params.enumerateModels() && _params.enumerationFeedUnits())) {
+		_unit_clause_logger.reset(new ClauseLogger(_params.unitClauseLog()
+			+ ".#" + std::to_string(_solvers[0]->getSolverSetup().jobId),
+			true, !_params.verboseClauseLogs()));
+		if (!_params.unitClauseLog.isSet() || _job_index > 0) _unit_clause_logger->disableFileOutput();
 	}
 
 	if (_params.groundTruthModel.isSet()) {
@@ -174,9 +183,9 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 	// Add the supplied conditional variable in negated form to the clause.
 	// This effectively renders the found conflict relative to the assumptions
 	// which were added not as assumptions but as permanent unit clauses.
-	std::vector<int>* tldClauseVec = nullptr;
+	std::unique_ptr<std::vector<int>> tldClauseVec;
 	if (!condLits.empty()) {
-		tldClauseVec = new std::vector<int>(clause.size+condLits.size());
+		tldClauseVec.reset(new std::vector<int>(clause.size+condLits.size()));
 		for (int i = 0; i < clause.size; i++) tldClauseVec->at(i) = clause.begin[i];
 		for (int i = clause.size; i < tldClauseVec->size(); i++)
 			tldClauseVec->at(i) = condLits[i - clause.size];
@@ -206,10 +215,7 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 	const int effectiveClauseLength = clauseSize - ClauseMetadata::numInts();
 
     // Check maximum size of clause
-    if (effectiveClauseLength > _params.strictClauseLengthLimit()) {
-        if (tldClauseVec) delete tldClauseVec;
-        return;
-    }
+    if (effectiveClauseLength > _params.strictClauseLengthLimit()) return;
 
 	if (effectiveClauseLength == 1 && clause.lbd != 1) {
 		_logger.log(V1_WARN, "Observed unit LBD of %i\n", clause.lbd);
@@ -248,10 +254,8 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 	}
 
 	Mallob::Clause c {clauseBegin, clauseSize, clauseLbd};
-	if (_prefilter && !_prefilter->prefilterClause(c)) {
-		if (tldClauseVec) delete tldClauseVec;
-        return;
-	}
+	if (_prefilter && !_prefilter->prefilterClause(c)) return;
+
 	assert(effectiveClauseLength == 1 || (clauseLbd >= 2 && clauseLbd <= effectiveClauseLength));
 	clauseLbd = c.lbd; // update LBD from pre-filter
 
@@ -283,8 +287,6 @@ void SharingManager::onProduceClause(int solverId, int solverRevision, const Cla
 
 	_export_buffer->produce(clauseBegin, clauseSize, clauseLbd, solverId, _internal_epoch);
 	//log(V6_DEBGV, "%i : PRODUCED %s\n", solverId, tldClause.toStr().c_str());
-
-	if (tldClauseVec) delete tldClauseVec;
 }
 
 std::vector<int> SharingManager::prepareSharing(int totalLiteralLimit, int& outSuccessfulSolverId, int& outNbLits) {
@@ -446,6 +448,9 @@ void SharingManager::digestSharingWithFilter(std::vector<int>& clauseBuf, std::v
 		}
 
 		if (_clause_logger) _clause_logger->append(clause);
+		if (_unit_clause_logger && clause.size == ClauseMetadata::numInts()+1) {
+			_unit_clause_logger->append(clause);
+		}
 
 		if (filterSizeBeingLocked != clause.size) {
 			if (filterSizeBeingLocked != -1) _clause_filter->releaseLock(filterSizeBeingLocked);
@@ -496,6 +501,7 @@ void SharingManager::digestSharingWithFilter(std::vector<int>& clauseBuf, std::v
 	_gc_pending = true;
 	_sharing_op_ongoing = false;
 	if (_clause_logger) _clause_logger->publish();
+	if (_unit_clause_logger) _unit_clause_logger->publish();
 }
 
 void SharingManager::applyFilterToBuffer(std::vector<int>& clauseBuf, std::vector<int>* filter) {
@@ -578,10 +584,60 @@ void SharingManager::continueClauseImport(int solverId) {
 	assert(solverId >= 0 && solverId < _solvers.size());
 	_solver_revisions[solverId] = _solvers[solverId]->getSolverSetup().solverRevision;
 	_solvers[solverId]->setExtLearnedClauseCallback(getCallback());
+	_solvers[solverId]->setExtProbingLearnedClauseCallback([&](int effectiveClauseLength) {
+		return effectiveClauseLength <= _clause_store->getMaxAdmissibleEffectiveClauseLength();
+	});
 	_solver_stats[solverId] = &_solvers[solverId]->getSolverStatsRef();
 	_solvers[solverId]->setCallbackResultFound([&](int localId) {
 		if (_det_sync) _det_sync->notifySolverDone(localId);
 	});
+}
+
+void SharingManager::finalize() {
+	if (_solvers.empty()) return;
+
+	if (_unit_clause_logger) {
+		LOG(V2_INFO, "stopping unit clause logger\n");
+		_unit_clause_logger.reset(); // stops background thread
+		int jobId = _solvers.front()->getSolverSetup().jobId;
+		std::string file = _params.unitClauseLog() + ".#" + std::to_string(jobId);
+		if (FileUtils::exists(file)) {
+			std::ifstream in(file);
+			if (!in) throw std::runtime_error("Cannot open file: " + file);
+
+			std::set<int> uniqueUnits;
+			std::string line;
+			while (std::getline(in, line)) {
+				// Strip trailing whitespace (including '\r' from Windows line endings)
+				while (!line.empty() && std::isspace(static_cast<unsigned char>(line.back())))
+					line.pop_back();
+				if (line.empty()) continue;
+
+				// Find the start of the last whitespace-separated token
+				std::size_t pos = line.find_last_of(" \t");
+				std::string token = (pos == std::string::npos) ? line : line.substr(pos + 1);
+				try {
+					std::size_t used = 0;
+					int value = std::stoi(token, &used);
+					if (used == token.size())
+						uniqueUnits.insert(value);
+				} catch (const std::exception&) {
+					// Not an integer (e.g. header row); skip
+				}
+			}
+			in.close();
+
+			if (!uniqueUnits.empty()) {
+				// Output units in logging and file
+				std::string unitStr = "u ";
+				for (int unit : uniqueUnits) unitStr += std::to_string(unit) + " ";
+				LOG(V4_VVER, "#%i %s\n", jobId, unitStr.c_str());
+				std::ofstream ofs(file);
+				ofs << unitStr << std::endl;
+				LOG(V2_INFO, "#%i wrote %lu units to %s\n", jobId, uniqueUnits.size(), file.c_str());
+			}
+		}            
+	}
 }
 
 SharingManager::~SharingManager() {}

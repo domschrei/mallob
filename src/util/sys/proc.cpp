@@ -1,5 +1,6 @@
 
 
+#include <dirent.h>
 #include <sched.h>
 #include <pthread.h>
 #include <assert.h>
@@ -279,4 +280,16 @@ long Proc::getRecursiveProportionalSetSizeKbs(pid_t pid) {
     for (pid_t child : childPids) memory += getRecursiveProportionalSetSizeKbs(child);
 
     return memory;
+}
+
+void Proc::closeAllFileDescriptors() {
+    DIR *dir = opendir("/proc/self/fd");
+    struct dirent *entry;
+    int dirfd = ::dirfd(dir);
+    while ((entry = readdir(dir)) != NULL) {
+        int fd = atoi(entry->d_name);
+        if (fd > STDERR_FILENO && fd != dirfd)
+            close(fd);
+    }
+    closedir(dir);
 }

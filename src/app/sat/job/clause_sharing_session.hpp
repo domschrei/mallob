@@ -53,6 +53,7 @@ private:
     bool _has_gpu_source {false};
     GpuClauseInterface* _gpu_clause_source;
 
+    std::unique_ptr<Parameters> _merge_store_params;
     std::unique_ptr<StaticClauseStore<false>> _merge_store;
     bool _priority_based_buffer_merging = false;
 
@@ -114,9 +115,11 @@ public:
                 Checksum checksum;
                 int successfulSolverId;
                 int numLits;
-                auto clauses = _job->getPreparedClauses(checksum, successfulSolverId, numLits);
-                LOG(V4_VVER, "%s CS produced cls size=%lu lits=%i/%i\n", _job->getLabel(), clauses.size(), numLits, _local_export_limit);
-                auto agg = InplaceClauseAggregation::prepareRawBuffer(clauses,
+                int nbFoundModels;
+                auto clauses = _job->getPreparedClauses(checksum, successfulSolverId, numLits, nbFoundModels);
+                LOG(V4_VVER, "%s CS produced cls size=%lu lits=%i/%i sols=%i\n",
+                    _job->getLabel(), clauses.size(), numLits, _local_export_limit, nbFoundModels);
+                auto agg = InplaceClauseAggregation::prepareRawBuffer(clauses, nbFoundModels,
                     _job->getClausesRevision(), numLits, 1, successfulSolverId,
                     _job->getBestFoundObjectiveCost());
                 return clauses;
@@ -245,6 +248,10 @@ public:
         return _merge_store->getBufferReader(data, buflen);
     }
 
+    int getEpoch() const {
+        return _epoch;
+    }
+
     ~ClauseSharingSession() {
         LOG(V5_DEBG, "%s CS CLOSE e=%i\n", _job->getLabel(), _epoch);
         // If not done producing, will send empty clause buffer upwards
@@ -272,6 +279,7 @@ private:
         int numInputLits = 0;
         int successfulSolverId = -1;
         long long bestFoundSolutionCost = LLONG_MAX;
+        int nbFoundModels = 0;
         for (auto& elem : elems) {
             assert(elem.size() >= InplaceClauseAggregation::numMetadataInts()
                 || log_return_false("[ERROR] Clause buffer has size %ld!\n", elem.size()));
@@ -283,6 +291,7 @@ private:
             numInputLits += agg.numInputLiterals();
             maxRevision = std::max(maxRevision, agg.maxRevision());
             bestFoundSolutionCost = std::min(bestFoundSolutionCost, agg.bestFoundSolutionCost());
+            nbFoundModels += agg.nbFoundModels();
             agg.stripToRawBuffer();
         }
         int buflim = _job->getBufferLimit(numAggregated, false);
@@ -319,7 +328,7 @@ private:
     
         LOG(V4_VVER, "%s : merged %i contribs rev=%i (inp=%i, t=%.4fs) ~> len=%i\n",
             _job->getLabel(), numAggregated, maxRevision, numInputLits, time, merged.size());
-        InplaceClauseAggregation::prepareRawBuffer(merged,
+        InplaceClauseAggregation::prepareRawBuffer(merged, nbFoundModels,
             maxRevision, numInputLits, numAggregated, successfulSolverId,
             bestFoundSolutionCost);
         return merged;
@@ -358,8 +367,8 @@ private:
 
     void initMergeClauseStore() {
         if (_merge_store) return;
-        auto params = _job->getClauseStoreParams();
-        _merge_store.reset(new StaticClauseStore<false>(params, false, 256, true, INT32_MAX));
-        _priority_based_buffer_merging = params.priorityBasedBufferMerging();
+        _merge_store_params.reset(new Parameters(_job->getClauseStoreParams()));
+        _merge_store.reset(new StaticClauseStore<false>(*_merge_store_params, false, 256, true, INT32_MAX));
+        _priority_based_buffer_merging = _merge_store_params->priorityBasedBufferMerging();
     }
 };

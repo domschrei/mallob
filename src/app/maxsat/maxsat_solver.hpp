@@ -1,16 +1,20 @@
 
 #pragma once
 
+#include "app/app_terminate_checker.hpp"
 #include "app/maxsat/maxsat_instance.hpp"
 #include "app/maxsat/maxsat_search_procedure.hpp"
 #include "app/maxsat/parse/maxsat_reader.hpp"
 #include "app/maxsat/solution_writer.hpp"
 #include "app/sat/data/definitions.hpp"
 #include "app/sat/job/sat_constants.h"
+#include "comm/msg_queue/message_subscription.hpp"
+#include "comm/msgtags.h"
 #include "comm/mympi.hpp"
 #include "core/dtask_tracker.hpp"
 #include "data/job_description.hpp"
 #include "data/job_result.hpp"
+#include "data/job_transfer.hpp"
 #include "interface/api/api_connector.hpp"
 #include <algorithm>
 #include <climits>
@@ -38,6 +42,7 @@ private:
     const Parameters _params; // configuration, cmd line arguments
     APIConnector& _api; // for submitting jobs to Mallob
     JobDescription& _desc; // contains our instance to solve and all metadata
+    AppTerminateChecker _term;
 
     std::unique_ptr<MaxSatInstance> _instance; // the problem instance we're solving
 
@@ -75,10 +80,20 @@ private:
 
     DTaskTracker _dtask_tracker;
 
+    std::list<std::unique_ptr<MaxSatSearchProcedure>> searches;
+
+    MessageSubscription _sub_xtcs_incoming_clauses;
+    Mutex _mtx_incoming_messages;
+    std::list<MessageHandle> _incoming_messages;
+
 public:
     // Initializes the solver instance and parses the description's formula.
     MaxSatSolver(const Parameters& params, APIConnector& api, JobDescription& desc) :
-        _params(params), _api(api), _desc(desc), _dtask_tracker(_params) {
+        _params(params), _api(api), _desc(desc), _term(_params, _desc), _dtask_tracker(_params),
+        _sub_xtcs_incoming_clauses(MSG_SEND_APP_DATA_TO_CLIENT_JOB, [&](MessageHandle& h) {
+            auto lock = _mtx_incoming_messages.getLock();
+            _incoming_messages.push_back(h);
+        }) {
 
         LOG(V2_INFO, "Mallob client-side MaxSAT solver, by Jeremias Berg & Dominik Schreiber\n");
 
@@ -108,7 +123,6 @@ public:
     JobResult solve(int updateLayer = 0) {
 
         // holds all active streams of Mallob jobs and allows interacting with them
-        std::list<std::unique_ptr<MaxSatSearchProcedure>> searches;
         std::shared_ptr<SolutionWriter> writer;
         if (_params.maxSatSolutionFile.isSet())
             writer.reset(new SolutionWriter(_instance->nbVars, _params.maxSatSolutionFile(), _params.compressModels()));
@@ -223,7 +237,7 @@ public:
         std::list<std::unique_ptr<MaxSatSearchProcedure>> searchesToFinalize;
         bool changeSinceLastFocus = true;
         float timeOfLastChange = Timer::elapsedSeconds();
-        while (!isTimeoutHit() && _instance->lowerBound < _instance->bestCost && !searches.empty()) {
+        while (!_term.isTimeoutHit() && _instance->lowerBound < _instance->bestCost && !searches.empty()) {
             // Loop over all search strategies
             bool change = false;
             bool stagnation = false;
@@ -272,6 +286,16 @@ public:
             }
             if (stagnation || _instance->lowerBound >= _instance->bestCost)
                 break;
+
+            {
+                auto lock = _mtx_incoming_messages.getLock();
+                while (!_incoming_messages.empty()) {
+                    MessageHandle h = std::move(_incoming_messages.back());
+                    _incoming_messages.pop_back();
+                    JobMessage msg = Serializable::get<JobMessage>(h.getRecvData());
+                    handleIncomingSharedClauses(msg, h.source);
+                }
+            }
 
             // Wait a bit if nothing changed
             if (change) {
@@ -333,7 +357,7 @@ public:
                     // cleanup (has to happen before update)
                     LOG(V2_INFO, "MAXSAT improvement found by MaxPRE: restart searches\n");
                     tryStopAllSearches(searches);
-                    if (!isTimeoutHit()) {
+                    if (!_term.isTimeoutHit()) {
                         for (auto& search : searches) searchesToFinalize.push_back(std::move(search));
                         searches.clear();
                         while (!searchesToFinalize.empty()) tryDeleteOldSearches(searchesToFinalize);
@@ -367,7 +391,7 @@ public:
             if (_instance->bestCost == _instance->upperBound) {
                 // -- yes
                 r.result = RESULT_OPTIMUM_FOUND;
-            } else if (!isTimeoutHit()) {
+            } else if (!_term.isTimeoutHit()) {
                 // -- no: tight bounds are known, but we do not have a corresponding solution yet.
                 // Make one more SAT call to find such a solution.
                 LOG(V2_INFO, "MAXSAT final SAT call to find solution of optimal cost %lu ...\n", _instance->upperBound);
@@ -399,6 +423,7 @@ public:
 
         // Now all searches can be cleaned up by leaving this method
         LOG(V2_INFO, "MAXSAT exiting\n");
+        searches.clear();
         return r;
     }
 
@@ -594,10 +619,6 @@ private:
         MaxSatSearchProcedure::SearchStrategy searchStrat;
         std::string label = std::to_string(index) + ":";
         switch (c) {
-        case 'd':
-            searchStrat = MaxSatSearchProcedure::DECREASING;
-            label += "DEC";
-            break;
         case 'i':
             searchStrat = MaxSatSearchProcedure::INCREASING;
             label += "INC";
@@ -610,6 +631,11 @@ private:
             searchStrat = MaxSatSearchProcedure::NAIVE_REFINEMENT;
             label += "NRE";
             break;
+        case 'd':
+        default:
+            searchStrat = MaxSatSearchProcedure::DECREASING;
+            label += "DEC";
+            break;
         }
         // Initialize search procedure
         auto p = new MaxSatSearchProcedure(_params, _api, _desc, _dtask_tracker,
@@ -617,14 +643,11 @@ private:
         return p;
     }
 
-    bool isTimeoutHit() const {
-        if (_params.timeLimit() > 0 && Timer::elapsedSeconds() >= _params.timeLimit())
-            return true;
-        if (_desc.getWallclockLimit() > 0 && (Timer::elapsedSeconds() - _start_time) >= _desc.getWallclockLimit())
-            return true;
-        if (Terminator::isTerminating())
-            return true;
-        return false;
+    void handleIncomingSharedClauses(JobMessage& msg, int srcRank) {
+        LOG_ADD_SRC(V2_INFO, "MAXSAT XXS client received clauses", srcRank);
+        for (auto& searcher : searches) {
+            searcher->addCrossSharedClauses(msg);
+        }
     }
 
     void tryStopAllSearches(std::list<std::unique_ptr<MaxSatSearchProcedure>>& searches) {

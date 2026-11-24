@@ -7,15 +7,21 @@
 #include "interface/api/api_connector.hpp"
 
 #include "app/smt/bitwuzla_solver.hpp"
+#include "util/params.hpp"
 #include "util/static_store.hpp"
 
 struct ClientSideSMTProgram : public app_registry::ClientSideProgram {
-    std::unique_ptr<BitwuzlaSolver> solver;
+    const bool _terminate_abruptly;
+    BitwuzlaSolver* _solver;
     ClientSideSMTProgram(const Parameters& params, APIConnector& api, JobDescription& desc, const std::string& problemFile) :
-        app_registry::ClientSideProgram(), solver(new BitwuzlaSolver(params, api, desc, problemFile)) {
-        function = [&]() {return solver->solve();};
+        app_registry::ClientSideProgram(), _terminate_abruptly(params.terminateAbruptly()),
+        _solver(new BitwuzlaSolver(params, api, desc, problemFile)) {
+
+        function = [&]() {return _solver->solve();};
     }
-    virtual ~ClientSideSMTProgram() {}
+    virtual ~ClientSideSMTProgram() {
+        if (!_terminate_abruptly) delete _solver;
+    }
 };
 
 void register_mallob_app_smt() {

@@ -16,7 +16,7 @@ public:
     BaseSatJob(const Parameters& params, const JobSetup& setup, AppMessageTable& appMsgTable) : 
         Job(params, setup, appMsgTable), ClauseSharingActor(getParams()) {}
     virtual ~BaseSatJob() {
-        if (_estimate_shared_lits != -1.f) {
+        if (_estimate_shared_lits >= 0 && _total_shared > 0) {
             LOG(V3_VERB, "%s CS total expected=%lu exchanged=%lu ratio=%.3f\n", toStr(), 
                 _total_desired, _total_shared, _total_desired/(float)_total_shared);
         }

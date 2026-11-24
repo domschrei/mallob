@@ -97,11 +97,11 @@ std::vector<int> BufferMerger::mergePriorityBased(const Parameters& params, std:
 
 std::vector<int> BufferMerger::merge(std::vector<int>* excessClauses, SplitMix64Rng* rng) {
     
-    AbstractClauseThreewayComparator* threewayCompare = _slots_for_sum_of_length_and_lbd ?
+    std::unique_ptr<AbstractClauseThreewayComparator> threewayCompare {_slots_for_sum_of_length_and_lbd ?
         (AbstractClauseThreewayComparator*) new LengthLbdSumClauseThreewayComparator(_max_eff_clause_length+2) :
-        (AbstractClauseThreewayComparator*) new LexicographicClauseThreewayComparator();
-    ClauseComparator compare(threewayCompare);
-    InputClauseComparator inputCompare(threewayCompare);
+        (AbstractClauseThreewayComparator*) new LexicographicClauseThreewayComparator()};
+    ClauseComparator compare(threewayCompare.get());
+    InputClauseComparator inputCompare(threewayCompare.get());
 
     // Setup readers
     for (size_t i = 0; i < _readers.size(); i++) {
@@ -128,9 +128,9 @@ std::vector<int> BufferMerger::merge(std::vector<int>* excessClauses, SplitMix64
     // Setup builders for main buffer and excess clauses buffer
     BufferBuilder mainBuilder(_size_limit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
     mainBuilder.setFreeClauseLengthLimit(_max_free_eff_clause_length - ClauseMetadata::numInts());
-    BufferBuilder* excessBuilder {nullptr};
-    if (excessClauses != nullptr) {
-        excessBuilder = new BufferBuilder(_size_limit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
+    std::unique_ptr<BufferBuilder> excessBuilder;
+    if (excessClauses) {
+        excessBuilder.reset(new BufferBuilder(INT32_MAX, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd));
     }
     BufferBuilder* currentBuilder = &mainBuilder;
     int excessFirstCounterPosition = -1;
@@ -165,7 +165,7 @@ std::vector<int> BufferMerger::merge(std::vector<int>* excessClauses, SplitMix64
             if (!success && currentBuilder == &mainBuilder) {
                 // Switch from normal output to excess clauses output
                 assert(excessBuilder);
-                currentBuilder = excessBuilder;
+                currentBuilder = excessBuilder.get();
                 success = currentBuilder->append(lastSeenClause);
                 if (success) excessFirstCounterPosition = currentBuilder->getCurrentCounterPosition();
             }
@@ -209,11 +209,8 @@ std::vector<int> BufferMerger::merge(std::vector<int>* excessClauses, SplitMix64
                     *rng, failedInfo, excessFirstCounterPosition);
             } // else: insertion failed on a bucket border: no tie breaking needed
         }
-
-        delete excessBuilder;
     }
 
-    delete threewayCompare;
     return resultClauses;
 }
 

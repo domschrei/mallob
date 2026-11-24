@@ -247,6 +247,9 @@ public:
     BufferBuilder getBufferBuilder(std::vector<int>* out, int totalLiteralLimit = -1) const {
         return BufferBuilder(totalLiteralLimit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd, out);
     }
+    BufferBuilder getBufferBuilder(int totalLiteralLimit) const override {
+        return BufferBuilder(totalLiteralLimit, _max_eff_clause_length, _slots_for_sum_of_length_and_lbd);
+    }
 
     int getCurrentlyUsedLiterals() const override {
         return getCurrentlyUsedNonunitLiterals() + getCurrentlyUsedUnitLiterals();

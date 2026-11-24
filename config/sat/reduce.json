@@ -1,0 +1,72 @@
+{
+  "rules": [
+    {
+      "backend": "Kissat",
+      "selector": { "type": "scatter", "start": 1, "step": 1 },
+      "settings": [
+        {"type": "set", "key": "tier1", "value": 1},
+        {"type": "set", "key": "tier2", "value": 2},
+        {"type": "add", "key": "reducelow", "value": "sample Norm-0-5-m50-50", "min": 1, "max": 999},
+        {"type": "add", "key": "reducehigh", "value": "sample Norm-0-5-m50-50", "min": 1, "max": 999}
+      ]
+    },
+    {
+      "backend": "CaDiCaL",
+      "selector": { "type": "scatter", "start": 1, "step": 1 },
+      "settings": [
+        {"type": "set", "key": "reducetier1glue", "value": 1},
+        {"type": "set", "key": "reducetier2glue", "value": 2},
+        {"type": "add", "key": "reducetarget", "value": "sample Norm-0-5-m50-50", "min": 1, "max": 999}
+      ]
+    },
+    {
+      "backend": "Lingeling",
+      "selector": { "type": "scatter", "start": 1, "step": 1 },
+      "settings": [
+        {"type": "set", "key": "gluekeep", "value": 1},
+        {"type": "set", "key": "promotegluelim", "value": 2}
+      ]
+    },
+
+    {
+      "backend": "Kissat",
+      "selector": {
+        "type": "and",
+        "selectors": [ 
+          { "type": "scatter", "start": 10, "step": 1 },
+          { "type": "random", "chance": 0.1 },
+          { "type": "scatter", "start": 0, "step": 2 }
+        ]
+      },
+      "settings": [
+        {"type": "set", "key": "reducelow", "value": 50},
+        {"type": "set", "key": "reducehigh", "value": 50}
+      ]
+    },
+    {
+      "backend": "Kissat",
+      "selector": {
+        "type": "and",
+        "selectors": [ 
+          { "type": "scatter", "start": 10, "step": 1 },
+          { "type": "random", "chance": 0.1 },
+          { "type": "scatter", "start": 1, "step": 2 }
+        ]
+      },
+      "settings": [
+        {"type": "set", "key": "reducelow", "value": 950},
+        {"type": "set", "key": "reducehigh", "value": 950}
+      ]
+    }
+  ],
+
+  "samplers": [
+    {
+      "name": "Norm-0-5-m50-50",
+      "distribution": {
+        "type": "normal",
+        "params": [0, 5, -50, 50]
+      }
+    }
+  ]
+}

@@ -6,20 +6,26 @@
 #include <vector>
 
 #include "app/sat/proof/lrat_op.hpp"
+#include "app/sat/solvers/preprocess_proof_tracker.hpp"
 #include "portfolio_solver_interface.hpp"
 #include "app/sat/data/clause.hpp"
 #include "app/sat/data/definitions.hpp"
+
+extern "C" {
 #include "kissat/src/kissat.h"
-#include "util/sys/threading.hpp"
+}
 
 struct kissat;
 struct SolverSetup;
 struct SolverStatistics;
 
 class Kissat : public PortfolioSolverInterface {
+protected:
+	//Accessible for KissatSweep 
+	kissat* solver;
+	bool interruptionInitialized = false;
 
 private:
-	kissat* solver;
 	bool seedSet = false;
     int numVars = 0;
 
@@ -28,7 +34,8 @@ private:
 	Mallob::Clause learntClause;
     std::vector<int> producedClause;
 
-	bool interruptionInitialized = false;
+	std::vector<int> currentAssumptions;
+
     bool interrupted = false;
     unsigned int glueLimit;
 
@@ -39,6 +46,10 @@ private:
 	int nbPreprocessedVariables {0};
 	int nbPreprocessedClausesReceived {0};
 	int nbPreprocessedClausesAdvertised {0};
+	
+	bool isSweeper = false; 
+
+	std::unique_ptr<PreprocessProofTracker> _prepro_proof_tracker;
 
 public:
 	Kissat(const SolverSetup& setup);
@@ -48,12 +59,11 @@ public:
 	void addLiteral(int lit) override;
 
 	void diversify(int seed) override;
+	void addConfigurationSetting(Setting setting) override;
 	void setPhase(const int var, const bool phase) override;
 
 	// Solve the formula with a given set of assumptions
 	SatResult solve(size_t numAssumptions, const int* assumptions) override;
-
-	void configureBoundedVariableAddition();
 
 	void setSolverInterrupt() override;
 	void unsetSolverInterrupt() override;
@@ -87,9 +97,14 @@ public:
 	friend void on_drup_derivation(void* state, const int* lits, int nbLits, int glue);
     friend void on_lrup_import(void* state, unsigned long id, const int* lits, int nbLits, const uint8_t* sigData);
     friend void on_drup_deletion(void* state, const int* lits, int nbLits);
+	
+    void setToSweeper();
+    void setPreprocessingReportCallback();
     friend bool begin_formula_report(void* state, int vars, int cls);
     friend void report_preprocessed_lit(void* state, int lit);
     friend int terminate_callback(void* state);
+
+	PreprocessProofTracker* getPreprocessProofTracker() {return _prepro_proof_tracker.get();}
 
 private:
     void produceClause(int size, int lbd);
@@ -100,5 +115,6 @@ private:
     void addLiteralFromPreprocessing(int lit);
 
     bool shouldTerminate();
+
 
 };

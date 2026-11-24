@@ -1,0 +1,229 @@
+
+#pragma once
+
+#include <cmath>
+#include <atomic>
+#include <vector>
+
+#include "app/sat/data/model_string_compressor.hpp"
+#include "app/sat/job/sat_constants.h"
+#include "app/satwithpre/sat_preprocess_actor.hpp"
+#include "core/client_directive.hpp"
+#include "data/job_description.hpp"
+#include "interface/api/api_connector.hpp"
+#include "util/json.hpp"
+#include "util/logger.hpp"
+#include "util/params.hpp"
+#include "util/static_store.hpp"
+#include "util/sys/timer.hpp"
+#include <sys/stat.h>
+#include <unistd.h>
+
+class MallobPreprocessActor : public SatPreprocessActor {
+
+public:
+    enum MallobJobType {SATSOLVER, SWEEPER};
+
+private:
+    const JobDescription& _desc; // contains our instance to solve and all metadata
+    APIConnector& _api; // for submitting jobs to Mallob
+    const int _job_id;
+    const float _time_of_activation;
+    const std::string _group_id;
+    const std::string _option_overrides;
+    const MallobJobType _type;
+
+    nlohmann::json _base_json;
+    int _sub_job_id {-1};
+    std::atomic_int _child_job_root_rank {-1};
+
+public:
+    MallobPreprocessActor(const Parameters& params, const JobDescription& desc, const std::string& name,
+            APIConnector& api, const std::vector<int>* formula, float timeOfActivation,
+            MallobJobType type, const std::string& groupId, const std::string& optionOverrides) :
+        SatPreprocessActor(params, name, formula), _desc(desc), _api(api),
+            _job_id(desc.getId()), _time_of_activation(timeOfActivation),
+            _group_id(groupId), _option_overrides(optionOverrides), _type(type) {
+
+        static int _actor_counter = 1;
+
+        _jobstr = "#" + std::to_string(_job_id) + ":mal:" + std::to_string(_actor_counter++);
+        _proof_format = _type == SATSOLVER ? "palrup" : "";
+    }
+    ~MallobPreprocessActor() {}
+
+    void preprocessAsync() override {
+        submitJob();
+    }
+    // Nothing to do
+    void reconstructSolution(std::vector<int>& sol) override {}
+
+    void interrupt() override {
+        interrupt(_base_json);
+    }
+
+    // some processes may still be writing, so we need to wait until moving is possible
+    bool rename_proof(int i, std::string cnfSrc = "", std::string proofSrc = "") override {
+        std::string src = _params.proofDirectory() + "/tmp/" + _name + "." + _proof_format;
+        for (int attempt = 0; attempt < 100 && std::filesystem::exists(src); attempt++) {
+            bool pending = false;
+            for (const auto& entry : std::filesystem::recursive_directory_iterator(src)) {
+                std::string filename = entry.path().filename().string();
+                if (!filename.empty() && filename.back() == '~') { pending = true; break; }
+            }
+            if (!pending) break;
+            usleep(1000 * 100); // 100ms
+        }
+        createMissingDirectoriesAndFiles(src + "/proof#" + std::to_string(_sub_job_id));
+        return SatPreprocessActor::rename_proof(i);
+    }
+
+    void shrink(float timeSpan) override {
+        if (_sub_job_id == -1 || _child_job_root_rank == -1) return;
+        ClientDirective dir;
+        dir.jobId = _sub_job_id;
+        dir.type = ClientDirective::SHRINK;
+        dir.setData(timeSpan);
+        MyMpi::isend(_child_job_root_rank.load(std::memory_order_relaxed),
+            MSG_SEND_CLIENT_DIRECTIVE_TO_JOB_TREE_ROOT, std::move(dir), false);
+    }
+
+private:
+    void submitJob() {
+        // Prepare job submission data
+        auto& json = _base_json;
+        json = {
+            {"user", std::string(toStr())},
+            {"name", std::string(toStr())+":" + (_type == SWEEPER ? "SWEEP" : "SAT") + ":job"},
+            {"priority", _params.preprocessSweepPriority()},
+            {"application", _type == SWEEPER ? "SWEEP" : "SAT"},
+            {"group-id", _group_id},
+            {"configuration", {{"options", _option_overrides}}},
+            {"incremental", false}
+        };
+
+        auto f = std::vector<int>(_input_cnf->begin(), _input_cnf->end() - 2);
+        StaticStore<std::vector<int>>::insert(json["name"].get<std::string>(), std::move(f));
+        json["internalliterals"] = json["name"].get<std::string>();
+        json["configuration"]["__NV"] = std::to_string(nbInputVars());
+        json["configuration"]["__NC"] = std::to_string(nbInputClauses());
+        if (_desc.getWallclockLimit() > 0)
+            json["wallclock-limit"] = std::to_string(
+                std::max(0.001f, _desc.getWallclockLimit() - getAgeSinceActivation())) + "s";
+        if (_desc.getCpuLimit() > 0)
+            json["cpu-limit"] = std::to_string(
+            std::max(0.001f, _desc.getCpuLimit() - getAgeSinceActivation())) + "s";
+
+        std::string opts;
+        if (json["configuration"].count("options"))
+            opts = json["configuration"]["options"].get<std::string>();
+        if (_type == SATSOLVER && _params.overrideSatOptions.isSet())
+            opts += " " + _params.overrideSatOptions();
+        if (_params.savePreprocessingProofs())
+            opts += " -palrup=1 -proof-dir=" + _params.proofDirectory() + "/tmp/" + _name + "." + _proof_format;
+        if (!opts.empty()) json["configuration"]["options"] = opts;
+
+        auto copiedJson = json;
+        auto result = _api.submit(copiedJson, [&](nlohmann::json& response) {
+            // Job done
+            auto res = jsonToJobResult(response);
+            if (res.result == RESULT_SAT) _result = SAT;
+            else if (res.result == RESULT_UNSAT) _result = UNSAT;
+            else if (res.result == RESULT_SIMPLIFIED) _result = SIMPLIFIED;
+            else _result = NONE;
+        }, &_sub_job_id, [&](int rootRank) {_child_job_root_rank = rootRank;});
+        if (result != JsonInterface::Result::ACCEPT) {
+            LOG(V0_CRIT, "[ERROR] Cannot introduce mono job!\n");
+            abort();
+        }
+    }
+
+    void applySuccessiveGrowth(nlohmann::json& json) {
+        // begin successively retracting this job
+        float _time_of_retraction_start = Timer::elapsedSeconds();
+        // We want the job to retract over sqrt(p) rounds
+        // with a total duration of the job's wallclock time so far.
+        float totalRetractionDuration;
+        if (_params.preprocessBalancing() == 0 || MyMpi::size(MPI_COMM_WORLD) == 1) {
+            // drop original immediately
+            totalRetractionDuration = 0.001;
+        } else {
+            // replace original gradually, scaled by task age so far and expansion factor
+            totalRetractionDuration = std::max(0.001f, getAgeSinceActivation() * _params.preprocessExpansionFactor());
+        }
+        // If this preprocessing result could be critical in terms of RAM usage,
+        // perform the retraction essentially immediately.
+        size_t currentSize = _desc.getFormulaPayloadSize(0);
+        if (currentSize > 100'000'000 /*&& preprocessedSize/(double)currentSize < 0.75*/)
+            totalRetractionDuration = 0.001;
+        double _retraction_round_duration = totalRetractionDuration / std::sqrt(MyMpi::size(MPI_COMM_WORLD));
+        if (_params.preprocessBalancing() == 1 && MyMpi::size(MPI_COMM_WORLD) > 1) {
+            LOG(V3_VERB, "SATWP %s : Retracting base job over ~%.3fs\n", toStr(), totalRetractionDuration);
+        }
+        if (_params.preprocessBalancing() == 1 && MyMpi::size(MPI_COMM_WORLD) > 1)
+            json["configuration"]["__growprd"] = std::to_string(_retraction_round_duration);
+    }
+
+    void interrupt(nlohmann::json& json/*, volatile bool& doneFlag*/) {
+        if (!json.count("name")) return;
+        LOG(V3_VERB, "SATWP Interrupt %s\n", json["name"].get<std::string>().c_str());
+        nlohmann::json jsonInterrupt {
+            {"name", json["name"]},
+            {"user", json["user"]},
+            {"application", json["application"]},
+            {"incremental", false},
+            {"interrupt", true}
+        };
+        // In this particular case, the callback is never called.
+        // Instead, the callback of the job's original submission is called.
+        auto result = _api.submit(jsonInterrupt, [&](nlohmann::json& result) {assert(false);});
+        //if (result == JsonInterface::Result::DISCARD) doneFlag = true;
+    }
+
+    JobResult jsonToJobResult(nlohmann::json& json) {
+        LOG(V3_VERB, "SATWP Extract result of %s\n", json["name"].get<std::string>().c_str());
+        JobResult res;
+        res.id = _job_id;
+        res.revision = 0;
+        res.result = json["result"]["resultcode"];
+        if (res.result == RESULT_UNKNOWN) return res;
+        std::vector<int> solution;
+        if (_params.compressModels() && res.result == RESULT_SAT) {
+            solution = ModelStringCompressor::decompress(json["result"]["solution"].get<std::string>());
+        } else {
+            solution = json["result"]["solution"].get<std::vector<int>>();
+        }
+        if (res.result == RESULT_SAT) {
+            assert(solution.size() >= 1 && solution[0] == 0);
+            _model = std::move(solution);
+        } else if (res.result == RESULT_SIMPLIFIED) {
+            _output_cnf = std::move(solution);
+            //already contains metadata #vals and #clauses in the last two entries
+        }
+        res.setSolution(std::move(solution));
+        LOG(V3_VERB, "SATWP %s extracted\n", json["name"].get<std::string>().c_str());
+        return res;
+    }
+
+    float getAgeSinceActivation() const {
+        return Timer::elapsedSeconds() - _time_of_activation;
+    }
+    std::string _jobstr;
+    const char* toStr() const {
+        return _jobstr.c_str();
+    }
+
+    void createMissingDirectoriesAndFiles(const std::string& src) {
+        double maxNumSolvers = MyMpi::size(MPI_COMM_WORLD) * _params.numThreadsPerProcess();
+        int lastCreatedHierarchy = -1;
+        for (int i = 0; i < maxNumSolvers; i++) {
+            int hierarchy = (int) (i / std::ceil(std::sqrt(maxNumSolvers)));
+            if (hierarchy > lastCreatedHierarchy) {
+                FileUtils::mkdir(src + "/" + std::to_string(hierarchy));
+                lastCreatedHierarchy = hierarchy;
+            }
+            FileUtils::mkdir(src + "/" + std::to_string(hierarchy) + "/" + std::to_string(i));
+            FileUtils::create(src + "/" + std::to_string(hierarchy) + "/" + std::to_string(i) + "/out.palrup");
+        }
+    }
+};

@@ -36,9 +36,9 @@ public:
     }
     // Wipe both the general tmp directory and the machine-local tmp directory.
     // Use with caution and only before or after the actual Mallob run.
-    static void wipe() {
+    static void wipe(bool deleteTerminationRelevantFiles = false) {
         for (std::string base : {getGeneralTmpDir(), getMachineLocalTmpDir()}) {
-            for (std::string file : FileUtils::glob(base + "/edu.kit.iti.mallob.*")) {
+            for (std::string file : FileUtils::glob(base + "/edu.kit.iti.mallob" + (deleteTerminationRelevantFiles ? "" : ".") + "*")) {
                 FileUtils::rm(file);
             }
         }

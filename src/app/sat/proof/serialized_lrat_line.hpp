@@ -185,7 +185,7 @@ public:
             + sizeof(int)
             + sizeof(LratClauseId)*numHints;
     }
-    static int getDataPosOfNumLits() {
+    static constexpr int getDataPosOfNumLits() {
         return sizeof(LratClauseId);
     }
     static int getDataPosOfNumHints(int numLits) {

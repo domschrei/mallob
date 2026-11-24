@@ -15,10 +15,9 @@ struct PortfolioSequence {
         MERGESAT = 'm',
         MINISAT = 'n',
         PREPROCESSOR = 'p',
-        VARIABLE_ADDITION = 'v'
     };
     enum Flavour {
-        DEFAULT, SAT, UNSAT, PLAIN, PREPROCESS
+        DEFAULT, SAT, UNSAT, PLAIN, PREPROCESS, PLAINWITHSWEEP
     };
     struct Item {
         BaseSolver baseSolver;
@@ -96,9 +95,6 @@ private:
             case 'n':
                 next.baseSolver = MINISAT;
                 break;
-            case 'v':
-                next.baseSolver = VARIABLE_ADDITION;
-                break;
             case 'p':
                 next.baseSolver = PREPROCESSOR;
                 break;
@@ -155,6 +151,10 @@ private:
             case '_':
                 // "Plain" flavour
                 next.flavour = PLAIN;
+                break;
+            case '~':
+                //"Plain" flavour, but allowing sweep & congruence closure
+                next.flavour = PLAINWITHSWEEP;
                 break;
             case '0':
                 // "Preprocess" flavour

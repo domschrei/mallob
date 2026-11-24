@@ -51,6 +51,7 @@ private:
     std::vector<int> _bucket_idx_to_priority_idx;
     std::vector<int> _priority_idx_to_bucket_idx;
 
+    size_t _total_size_after_last_scan = 0;
 
 public:
     enum BucketPriorityMode {
@@ -338,6 +339,8 @@ public:
                 bufferIdxToStr(maxNonemptyBufferIdx).c_str());
         }
 
+        _total_size_after_last_scan = totalSizeAfter;
+
         if (Concurrent) addClauseLock.unlock();
         nbExportedClauses = builder.getNumAddedClauses();
         return builder.extractBuffer();
@@ -397,7 +400,7 @@ public:
         return BufferReader(data, buflen, _max_eff_clause_length, false, useChecksums);
     }
 
-    BufferBuilder getBufferBuilder(int limit) const {
+    BufferBuilder getBufferBuilder(int limit) const override {
         BufferBuilder builder(limit, _max_eff_clause_length, false);
         builder.setFreeClauseLengthLimit(_max_nb_free_lits);
         return builder;
@@ -408,6 +411,7 @@ public:
         if (_max_admissible_bucket_idx == INT32_MAX) return _max_eff_clause_length;
         return _current_max_eff_clause_length.load(std::memory_order_relaxed);
     }
+    size_t getTotalSizeAfterLastScan() const {return _total_size_after_last_scan;}
 
     ~StaticClauseStore() {
         for (unsigned int i = 0; i < buckets.size(); i++) {

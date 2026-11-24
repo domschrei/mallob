@@ -1,0 +1,51 @@
+[
+    {
+        "id": "mal_orig",
+        "type": "MALLOBSAT",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "lgl",
+        "type": "LINGELING",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "kis",
+        "type": "KISSAT",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "sats",
+        "type": "SATSUMA_EXT",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "kis_after_sats",
+        "type": "KISSAT",
+        "prerequisite": "sats",
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": true
+    },
+    {
+        "id": "mal_pre1",
+        "type": "MALLOBSAT",
+        "prerequisite": "kis",
+        "actorsBeingDisplaced": ["mal_orig"],
+        "onlyStartIfPrerequisiteSimplified": true
+    },
+    {
+        "id": "mal_pre_full",
+        "type": "MALLOBSAT",
+        "prerequisite": "kis_after_sats",
+        "actorsBeingDisplaced": ["mal_orig", "mal_pre1"],
+        "onlyStartIfPrerequisiteSimplified": false
+    }
+]

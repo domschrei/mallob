@@ -29,4 +29,9 @@ struct SharingStatistics {
 			+ " pflt:" + std::to_string(clausesProcessFilteredAtExport)
 			+ " sflt:" + std::to_string(clausesSolverFilteredAtExport);
 	}
+
+	bool empty() const {
+		return exportedClauses == 0 && clausesDroppedAtExport == 0
+			&& clausesProcessFilteredAtExport == 0 && clausesSolverFilteredAtExport == 0;
+	}
 };

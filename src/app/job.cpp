@@ -166,9 +166,10 @@ int Job::getDemand() const {
     if (_state != ACTIVE) {
         return _commitment.has_value() ? 1 : 0;
     } 
-    
+
+    // Compute the job's intrinsic demand, going by its age and growth period
     int commSize = _job_tree.getCommSize();
-    int demand; 
+    int demand;
     if (_growth_period <= 0) {
         // Immediate growth
         demand = commSize;
@@ -200,6 +201,16 @@ int Job::getDemand() const {
     if (_max_demand > 0) {
         demand = std::min(demand, _max_demand);
     }
+
+    // Apply shrinkage if present
+    if (_time_of_shrink_start > 0) {
+        float fullTimeRange = std::max(0.f, _time_of_shrink_end - _time_of_shrink_start);
+        float remaining = std::max(0.f, _time_of_shrink_end - Timer::elapsedSecondsCached());
+        if (fullTimeRange <= 0 || remaining <= 0) demand = 1;
+        else
+            demand = std::max(1, (int) std::round(demand * std::min(1.f, remaining/fullTimeRange)));
+    }
+
     return demand;
 }
 

@@ -4,6 +4,8 @@
 #include "app/sat/execution/solver_setup.hpp"
 #include "app/sat/solvers/portfolio_solver_interface.hpp"
 
+#include <functional>
+
 class IPAsirMiniSAT;
 
 class MiniSat : public PortfolioSolverInterface {
@@ -39,12 +41,15 @@ public:
 	// Diversify your parameters (seeds, heuristics, etc.) according to the seed
 	// and the individual diversification index given by getDiversificationIndex().
 	virtual void diversify(int seed) override;
+	virtual void addConfigurationSetting(Setting setting) override {}
 	// How many "true" different diversifications do you have?
 	// May be used to decide when to apply additional diversifications.
 	virtual int getNumOriginalDiversifications() override;
 	virtual bool supportsIncrementalSat() override;
 	virtual bool exportsConditionalClauses() override;
 	virtual void cleanUp() override;
+
+	void setExternalTerminator(std::function<bool()> extTerminator) {_ext_terminator = extTerminator;}
 
 protected:
 	// Interrupt the SAT solving, solving cannot continue until interrupt is unset.
@@ -55,7 +60,8 @@ protected:
 private:
 	std::vector<int> _assumptions;
 	IPAsirMiniSAT* _solver {0};
-	volatile bool interrupt {false};
 
+	volatile bool interrupt {false};
 	friend int cbTerminate(void * state);
+	std::function<bool()> _ext_terminator;
 };
