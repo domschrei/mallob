@@ -214,9 +214,11 @@ To decompress and de-duplicate them into a single sequence of unique textual mod
 
 `scripts/run/decompress_models.sh $solpath.$(ls -t $solpath.#*|grep -oE "#[0-9]+"|head -1).enum.*`
 
+If you only want to know the precise number of models found, you can do `sort -u $solpath.$(ls -t $solpath.#*|grep -oE "#[0-9]+"|head -1).enum.* | wc -l`.
+
 **Caveats:**
-* The number of distinct solutions found is **over-approximated** by Mallob: Duplicate solutions are only accounted for at a process-local level but not at the distributed level. As such, you may obtain fewer distinct models than expected when running several processes.
-* The procedure is not designed to perform exhaustive model enumeration. Since each solver unit (thread or process) only accumulates models at a local level, a single solver unit has to find all of the formula's models (and then prove UNSAT) for the procedure to terminate. Moreover, the worst-case number of clauses (each of size `|V|`) that need to be added is exponential.
+* The number of distinct solutions found is **over-approximated** by Mallob: Duplicate solutions are only accounted for at a process-local level but not at the distributed level. As such, the procedure may produce fewer distinct models than desired when running several processes.
+* Since each solver unit (thread or process) only accumulates and blocks found models at a local level, information on blocked models is only transmitted rather indirectly via shared clauses learned from blocked models. As such, while exhaustion of all models *can* in principle be concluded cooperatively via "UNSAT", expect such a proof search to be inefficient to infeasible.
 * At a programmatic level, only a single model is reported by the distributed SAT task even if many models are enumerated. That said, all of the globally found models are written to files (see above).
 
 ### Clause Logging

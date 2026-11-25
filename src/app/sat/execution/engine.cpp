@@ -532,7 +532,7 @@ int SatEngine::solveLoop() {
 						size_t size = _enumerated_solutions.size();
 						_enumerated_solutions.insert(solutions.begin(), solutions.end());
 						if (_enumerated_solutions.size() > size) {
-							LOGGER(_logger, V3_VERB, "S%i found %lu new solutions (process-locally now %lu)\n",
+							LOGGER(_logger, V5_DEBG, "S%i found %lu new solutions (process-locally now %lu)\n",
 								i, _enumerated_solutions.size()-size, _enumerated_solutions.size());
 						}
 						done = true; // actually report a solution
@@ -542,7 +542,7 @@ int SatEngine::solveLoop() {
 						auto [it, success] = _enumerated_solutions.insert(ModelStringCompressor::compress(sol));
 						if (success) {
 							// found model is new
-							LOGGER(_logger, V4_VVER, "S%i found new solution (process-locally no. %lu)\n", i, _enumerated_solutions.size());
+							LOGGER(_logger, V5_DEBG, "S%i found new solution (process-locally no. %lu)\n", i, _enumerated_solutions.size());
 							// add its blocking clause
 							for (int pos = 1; pos < sol.size(); pos++) {
 								_enumeration_blocking_clauses.push_back(-sol[pos]);
@@ -557,7 +557,7 @@ int SatEngine::solveLoop() {
 								_enumeration_blocking_clauses.push_back(cls.back());
 								_enumeration_blocking_clauses.push_back(0);
 							}
-							LOG(V4_VVER, "S%i feeding %i units\n", i, units.size());
+							LOG(V5_DEBG, "S%i feeding %i units\n", i, units.size());
 						}
 						// reset non-incremental solver with added blocking clauses (plus units)
 						resetSolver(i, &_enumeration_blocking_clauses);
@@ -593,7 +593,7 @@ int SatEngine::solveLoop() {
 			size_t size = _enumerated_solutions.size();
 			_enumerated_solutions.insert(solutions.begin(), solutions.end());
 			if (_enumerated_solutions.size() > size) {
-				LOGGER(_logger, V3_VERB, "S%i found %lu new solutions (process-locally now %lu)\n",
+				LOGGER(_logger, V5_DEBG, "S%i found %lu new solutions (process-locally now %lu)\n",
 					i, _enumerated_solutions.size()-size, _enumerated_solutions.size());
 				if (_result.result != SAT) {
 					// prematurely create a suitable SatResult object
@@ -825,6 +825,7 @@ void SatEngine::writeClauseEpochs() {
 }
 
 void SatEngine::writeEnumeratedSolutions() {
+	LOGGER(_logger, V4_VVER, "writing %i enumerated solutions\n", _enumerated_solutions.size());
 	if (_enumerated_solutions.empty() || !_params.solutionToFile.isSet()) return;
 
 	std::ofstream ofs(_params.solutionToFile() + ".#"
@@ -845,8 +846,8 @@ void SatEngine::cleanUp(bool hardTermination) {
 
 	LOGGER(_logger, V4_VVER, "[engine-cleanup] enter\n");
 
-	_sharing_manager->finalize();
 	writeEnumeratedSolutions();
+	_sharing_manager->finalize();
 
 	// Terminate any remaining running threads
 	auto& setup = _base_solver_setup;
