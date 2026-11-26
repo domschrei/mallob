@@ -279,6 +279,8 @@ void SolverThread::runOnce() {
         auto lock = _mtx_enumerated_solutions.getLock();
         _enumerated_solutions.clear();
     }
+    std::optional<std::vector<int>> optModel;
+    bool enumerate = _solver.getSolverSetup().enumerateModels;
 
     if (_solver.getSolverSetup().doIncrementalSolving) {
         while (performSolving) {
@@ -290,7 +292,7 @@ void SolverThread::runOnce() {
                 break;
             }
             res = newRes;
-            if (res != SAT || !_solver.getSolverSetup().enumerateModels) {
+            if (res != SAT || !enumerate) {
                 // we're not enumerating solutions: stop directly
                 break;
             }
@@ -299,6 +301,7 @@ void SolverThread::runOnce() {
             // fetch solution, add according blocking clause
             auto solution = _solver.getOptimizer() ?
                 _solver.getOptimizer()->get_solution() : _solver.getSolution();
+            if (enumerate && !optModel) optModel = solution;
             for (int i = 1; i < solution.size(); i++) {
                 _solver.addLiteral(-solution[i]);
             }
@@ -346,10 +349,9 @@ void SolverThread::runOnce() {
         }
     }
 
-    if (_solver.getSolverSetup().enumerateModels) {
+    if (enumerate) {
         auto lock = _mtx_enumerated_solutions.getLock();
-        reportResult(res, revision, _enumerated_solutions.empty() ? std::vector<int>() :
-            ModelStringCompressor::decompress(_enumerated_solutions.front()));
+        reportResult(res, revision, optModel.value_or(std::vector<int>()));
     } else {
         reportResult(res, revision, std::vector<int>());
     }
