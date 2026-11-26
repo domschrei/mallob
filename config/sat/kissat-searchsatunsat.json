@@ -1,0 +1,10 @@
+{
+   "rules": [
+     { "backend": "Kissat",
+       "selector": { "type": "and", "selectors": [{"type":"flavour","value":"plain"},{"type":"scatter","start":1,"step":3}] },
+       "settings": [ {"type": "configure", "key": "configure", "value": "sat"} ] },
+     { "backend": "Kissat",
+       "selector": { "type": "and", "selectors": [{"type":"flavour","value":"plain"},{"type":"scatter","start":2,"step":3}] },
+       "settings": [ {"type": "configure", "key": "configure", "value": "unsat"} ] }
+   ]
+}
