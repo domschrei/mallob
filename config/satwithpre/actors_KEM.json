@@ -1,0 +1,27 @@
+[
+    {
+        "id": "K",
+        "type": "KISSAT",
+        "prerequisite": null,
+        "actorsBeingDisplaced": [],
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "KEsns",
+        "type": "MALLOBSWEEP",
+        "prerequisite": "K",
+        "actorsBeingDisplaced": [],
+        "group-id": "1",
+        "options": "-fcll=2 -jcup=0.1 -cjc=1 -zero-only-logging=0",
+        "onlyStartIfPrerequisiteSimplified": false
+    },
+    {
+        "id": "KMsns",
+        "type": "MALLOBSAT",
+        "prerequisite": "K",
+        "actorsBeingDisplaced": [],
+        "group-id": "1",
+        "options": "-fcll=2 -jcup=0.1 -cjc=1",
+        "onlyStartIfPrerequisiteSimplified": false
+    }
+]
